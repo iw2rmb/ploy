@@ -5,6 +5,7 @@
 ### Added
 - Analysis: Added engine and HTTP handler unit tests covering analyzer registration, cache reuse, fallback execution, configuration validation, and API failure modes to increase confidence in the static-analysis pipeline.
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
+- Mods API: Added handler coverage for status enrichment, cancellation guards, event ingestion, artifact streaming/SBOM pointers, log SSE, and debug Nomad endpoints using in-memory KV and storage doubles; lifted `api/mods` coverage to ~61%.
 - CLI: Added high-coverage unit tests for `ploy recipe` help, validation, and confirmation flows.
 - Lanes: E2E scaffolding added for A–G
   - tests/lanes/README.md with comprehensive plan and envs

@@ -157,10 +157,11 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 	// Targeted memory bump per language (defaults 512MB)
 	memMB := utils.Getenv("PLOY_KANIKO_MEMORY_MB", "512")
 	ll := strings.ToLower(strings.TrimSpace(language))
-	if ll == ".net" || ll == "dotnet" || ll == "csharp" || ll == "c#" {
+	switch ll {
+	case ".net", "dotnet", "csharp", "c#":
 		// .NET builds often need more memory
 		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_DOTNET_MB", "2048")
-	} else if ll == "java" || ll == "scala" || ll == "kotlin" || ll == "jvm" {
+	case "java", "scala", "kotlin", "jvm":
 		// JVM builds (Gradle/Maven) typically need more than default
 		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_JAVA_MB", "1024")
 	}

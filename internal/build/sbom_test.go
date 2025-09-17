@@ -21,7 +21,13 @@ func TestSBOMFeatureEnabled_QueryOverride(t *testing.T) {
 		return nil
 	})
 	req := httptest.NewRequest("GET", "/?sbom=false", nil)
-	_, _ = app.Test(req)
+	resp1, err := app.Test(req)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp1 != nil && resp1.Body != nil {
+			_ = resp1.Body.Close()
+		}
+	})
 	require.False(t, got)
 }
 
@@ -36,12 +42,24 @@ func TestSBOMFeatureEnabled_EnvToggle(t *testing.T) {
 		return nil
 	})
 	req := httptest.NewRequest("GET", "/", nil)
-	_, _ = app.Test(req)
+	resp2, err := app.Test(req)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp2 != nil && resp2.Body != nil {
+			_ = resp2.Body.Close()
+		}
+	})
 	require.True(t, got, "default should be enabled when env not set")
 
 	t.Setenv("PLOY_SBOM_ENABLED", "off")
 	req = httptest.NewRequest("GET", "/", nil)
-	_, _ = app.Test(req)
+	resp3, err := app.Test(req)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp3 != nil && resp3.Body != nil {
+			_ = resp3.Body.Close()
+		}
+	})
 	require.False(t, got)
 }
 

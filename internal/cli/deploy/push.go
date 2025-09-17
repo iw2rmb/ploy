@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"path/filepath"
@@ -92,7 +93,7 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool, controllerO
 	}
 
 	// Prefer async mode to avoid long-lived client connections through ingress, unless disabled via env
-	if v := os.Getenv("PLOY_ASYNC"); !(v == "0" || v == "false" || v == "off" || v == "FALSE") {
+	if v := strings.ToLower(os.Getenv("PLOY_ASYNC")); v != "0" && v != "false" && v != "off" {
 		url += "&async=true"
 	}
 	// Propagate autogen flag to server so the async inner call can honor it

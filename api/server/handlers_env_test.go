@@ -28,30 +28,62 @@ func TestEnvHandlers_CRUD(t *testing.T) {
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/v1/apps/myapp/env", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
-	resp := mustResponse(t)(app.Test(req))
-	if resp.StatusCode != 200 {
-		t.Fatalf("set env vars expected 200, got %d", resp.StatusCode)
+	resp1, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp1 != nil && resp1.Body != nil {
+			_ = resp1.Body.Close()
+		}
+	})
+	if resp1.StatusCode != 200 {
+		t.Fatalf("set env vars expected 200, got %d", resp1.StatusCode)
 	}
 
 	// GET
-	resp = mustResponse(t)(app.Test(httptest.NewRequest("GET", "/v1/apps/myapp/env", nil)))
-	if resp.StatusCode != 200 {
-		t.Fatalf("get env vars expected 200, got %d", resp.StatusCode)
+	resp2, err := app.Test(httptest.NewRequest("GET", "/v1/apps/myapp/env", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp2 != nil && resp2.Body != nil {
+			_ = resp2.Body.Close()
+		}
+	})
+	if resp2.StatusCode != 200 {
+		t.Fatalf("get env vars expected 200, got %d", resp2.StatusCode)
 	}
 
 	// PUT single
 	pb := []byte(`{"value":"3"}`)
 	req = httptest.NewRequest("PUT", "/v1/apps/myapp/env/A", bytes.NewReader(pb))
 	req.Header.Set("Content-Type", "application/json")
-	resp = mustResponse(t)(app.Test(req))
-	if resp.StatusCode != 200 {
-		t.Fatalf("put env var expected 200, got %d", resp.StatusCode)
+	resp3, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp3 != nil && resp3.Body != nil {
+			_ = resp3.Body.Close()
+		}
+	})
+	if resp3.StatusCode != 200 {
+		t.Fatalf("put env var expected 200, got %d", resp3.StatusCode)
 	}
 
 	// DELETE
-	resp = mustResponse(t)(app.Test(httptest.NewRequest("DELETE", "/v1/apps/myapp/env/B", nil)))
-	if resp.StatusCode != 200 {
-		t.Fatalf("delete env var expected 200, got %d", resp.StatusCode)
+	resp4, err := app.Test(httptest.NewRequest("DELETE", "/v1/apps/myapp/env/B", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp4 != nil && resp4.Body != nil {
+			_ = resp4.Body.Close()
+		}
+	})
+	if resp4.StatusCode != 200 {
+		t.Fatalf("delete env var expected 200, got %d", resp4.StatusCode)
 	}
 
 	// Verify underlying file exists

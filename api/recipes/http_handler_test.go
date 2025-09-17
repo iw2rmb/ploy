@@ -17,25 +17,6 @@ import (
 
 type testSeaweed struct{ data map[string][]byte }
 
-func mustResponse(t *testing.T) func(*http.Response, error) *http.Response {
-	t.Helper()
-	return func(resp *http.Response, err error) *http.Response {
-		t.Helper()
-		if err != nil {
-			t.Fatalf("request failed: %v", err)
-		}
-		respCopy := resp
-		t.Cleanup(func() {
-			if respCopy != nil && respCopy.Body != nil {
-				if cerr := respCopy.Body.Close(); cerr != nil {
-					t.Errorf("close body: %v", cerr)
-				}
-			}
-		})
-		return resp
-	}
-}
-
 func newTestSeaweed() *testSeaweed { return &testSeaweed{data: map[string][]byte{}} }
 
 func (m *testSeaweed) PutObject(_ string, key string, body io.ReadSeeker, _ string) (*storage.PutObjectResult, error) {
@@ -107,7 +88,15 @@ func TestHTTPHandlerListRecipes(t *testing.T) {
 	handler.RegisterRoutes(app)
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/recipes", nil)
-	resp := mustResponse(t)(app.Test(req))
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", resp.StatusCode)
@@ -138,7 +127,15 @@ func TestHTTPHandlerCreateRecipe(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/recipes", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp := mustResponse(t)(app.Test(req))
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", resp.StatusCode)

@@ -111,8 +111,9 @@ func (s *Server) handleAppStatusWatch(c *fiber.Ctx) error {
 			Status      string         `json:"status"`
 			JobName     string         `json:"job_name"`
 			Lane        string         `json:"lane"`
+			WaitIndex   uint64         `json:"wait_index"`
 			Allocations []allocSummary `json:"allocations"`
-		}{Status: "running", JobName: jobName, Lane: "unknown"}
+		}{Status: "running", JobName: jobName, Lane: "unknown", WaitIndex: waitIdx}
 		// Convert allocs
 		for _, a := range allocs {
 			s := allocSummary{ID: a.ID, ClientStatus: a.ClientStatus, DesiredStatus: a.DesiredStatus}

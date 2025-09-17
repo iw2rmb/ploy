@@ -18,7 +18,15 @@ func TestErrorHandler_TypedErrorJSON(t *testing.T) {
 		return apperr.NotFound("recipe not found", nil)
 	})
 	req := httptest.NewRequest("GET", "/boom", nil)
-	resp := mustResponse(t)(app.Test(req))
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	if resp.StatusCode != 404 {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
@@ -31,7 +39,15 @@ func TestErrorHandler_WrapUnknownAsInternal(t *testing.T) {
 	}})
 	app.Get("/boom", func(c *fiber.Ctx) error { return errors.New("x") })
 	req := httptest.NewRequest("GET", "/boom", nil)
-	resp := mustResponse(t)(app.Test(req))
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	if resp.StatusCode != 500 {
 		t.Fatalf("expected 500, got %d", resp.StatusCode)
 	}

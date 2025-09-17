@@ -22,20 +22,44 @@ func TestServerRoutes_V1HealthAndMetrics(t *testing.T) {
 	s.setupRoutes()
 
 	// /v1/health may be 200 or 503
-	resp := mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/v1/health", nil)))
-	if resp.StatusCode != 200 && resp.StatusCode != 503 {
-		t.Fatalf("unexpected /v1/health status: %d", resp.StatusCode)
+	resp1, err := s.app.Test(httptest.NewRequest("GET", "/v1/health", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp1 != nil && resp1.Body != nil {
+			_ = resp1.Body.Close()
+		}
+	})
+	if resp1.StatusCode != 200 && resp1.StatusCode != 503 {
+		t.Fatalf("unexpected /v1/health status: %d", resp1.StatusCode)
 	}
 
 	// Root /health/metrics
-	resp = mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/health/metrics", nil)))
-	if resp.StatusCode != 200 {
-		t.Fatalf("unexpected /health/metrics status: %d", resp.StatusCode)
+	resp2, err := s.app.Test(httptest.NewRequest("GET", "/health/metrics", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp2 != nil && resp2.Body != nil {
+			_ = resp2.Body.Close()
+		}
+	})
+	if resp2.StatusCode != 200 {
+		t.Fatalf("unexpected /health/metrics status: %d", resp2.StatusCode)
 	}
 
 	// Versioned /v1/health/metrics
-	resp = mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/v1/health/metrics", nil)))
-	if resp.StatusCode != 200 {
-		t.Fatalf("unexpected /v1/health/metrics status: %d", resp.StatusCode)
+	resp3, err := s.app.Test(httptest.NewRequest("GET", "/v1/health/metrics", nil))
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp3 != nil && resp3.Body != nil {
+			_ = resp3.Body.Close()
+		}
+	})
+	if resp3.StatusCode != 200 {
+		t.Fatalf("unexpected /v1/health/metrics status: %d", resp3.StatusCode)
 	}
 }

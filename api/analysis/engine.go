@@ -129,6 +129,14 @@ func (e *Engine) GetAnalyzer(language string) (LanguageAnalyzer, error) {
 	return analyzer, nil
 }
 
+// getFallbackAnalyzer retrieves a fallback analyzer if registered
+func (e *Engine) getFallbackAnalyzer(language string) LanguageAnalyzer {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	return e.fallbackAnalyzers[strings.ToLower(language)]
+}
+
 // GetSupportedLanguages returns all supported languages
 func (e *Engine) GetSupportedLanguages() []string {
 	e.mu.RLock()
@@ -263,12 +271,7 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 			// Handle analysis errors
 			if analysisErr != nil {
 				e.logger.WithError(analysisErr).WithField("language", language).Error("Analysis failed")
-				langResult = &LanguageAnalysisResult{
-					Language: language,
-					Analyzer: analyzer.GetAnalyzerInfo().Name,
-					Success:  false,
-					Error:    analysisErr.Error(),
-				}
+				langResult = e.handleAnalyzerFailure(analyzerCtx, codebase, language, analyzer, analysisErr)
 			}
 
 			// Store result
@@ -479,4 +482,55 @@ func (e *Engine) sortIssues(issues []Issue) {
 		// Then by line
 		return issues[i].Line < issues[j].Line
 	})
+}
+
+// handleAnalyzerFailure attempts to recover from analyzer failures using a fallback analyzer when available
+func (e *Engine) handleAnalyzerFailure(ctx context.Context, codebase Codebase, language string, analyzer LanguageAnalyzer, primaryErr error) *LanguageAnalysisResult {
+	fallback := e.getFallbackAnalyzer(language)
+	if fallback == nil {
+		return &LanguageAnalysisResult{
+			Language: language,
+			Analyzer: analyzer.GetAnalyzerInfo().Name,
+			Success:  false,
+			Error:    primaryErr.Error(),
+		}
+	}
+
+	fallbackInfo := fallback.GetAnalyzerInfo()
+	e.logger.WithError(primaryErr).
+		WithField("language", language).
+		WithField("fallback", fallbackInfo.Name).
+		Warn("Primary analyzer failed, attempting fallback")
+
+	fallbackResult, fallbackErr := fallback.Analyze(ctx, codebase)
+	if fallbackErr != nil {
+		e.logger.WithError(fallbackErr).
+			WithField("language", language).
+			WithField("fallback", fallbackInfo.Name).
+			Error("Fallback analysis failed")
+		return &LanguageAnalysisResult{
+			Language: language,
+			Analyzer: fallbackInfo.Name,
+			Success:  false,
+			Error:    fmt.Sprintf("fallback analyzer failed: %v (primary: %v)", fallbackErr, primaryErr),
+		}
+	}
+
+	if fallbackResult == nil {
+		fallbackResult = &LanguageAnalysisResult{
+			Language: language,
+			Analyzer: fallbackInfo.Name,
+			Success:  true,
+		}
+	} else {
+		if fallbackResult.Analyzer == "" {
+			fallbackResult.Analyzer = fallbackInfo.Name
+		}
+		if fallbackResult.Language == "" {
+			fallbackResult.Language = language
+		}
+		fallbackResult.Success = true
+	}
+
+	return fallbackResult
 }

@@ -35,6 +35,11 @@ func TestBuildLaneG_UploadsWasm(t *testing.T) {
 	req := httptest.NewRequest("POST", "/g", nil)
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	require.Equal(t, 200, resp.StatusCode)
 	mockStorage.AssertExpectations(t)
 }

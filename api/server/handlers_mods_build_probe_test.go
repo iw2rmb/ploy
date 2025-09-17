@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,41 +27,6 @@ func (fakeGitProvider) CreateOrUpdateMR(ctx context.Context, config provider.MRC
 }
 
 func (fakeGitProvider) ValidateConfiguration() error { return nil }
-
-// noopStorage implements storage.Storage with no-ops for handler wiring tests.
-type noopStorage struct{}
-
-func (noopStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	return io.NopCloser(strings.NewReader("")), nil
-}
-
-func (noopStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
-	return nil
-}
-
-func (noopStorage) Delete(ctx context.Context, key string) error { return nil }
-
-func (noopStorage) Exists(ctx context.Context, key string) (bool, error) { return false, nil }
-
-func (noopStorage) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
-	return nil, nil
-}
-
-func (noopStorage) DeleteBatch(ctx context.Context, keys []string) error { return nil }
-
-func (noopStorage) Head(ctx context.Context, key string) (*storage.Object, error) { return nil, nil }
-
-func (noopStorage) UpdateMetadata(ctx context.Context, key string, metadata map[string]string) error {
-	return nil
-}
-
-func (noopStorage) Copy(ctx context.Context, src, dst string) error { return nil }
-
-func (noopStorage) Move(ctx context.Context, src, dst string) error { return nil }
-
-func (noopStorage) Health(ctx context.Context) error { return nil }
-
-func (noopStorage) Metrics() *storage.StorageMetrics { return &storage.StorageMetrics{} }
 
 // inMemoryKV is a lightweight orchestration.KV implementation for tests.
 type inMemoryKV struct{ data map[string][]byte }
@@ -101,7 +65,7 @@ func (kv *inMemoryKV) Delete(key string) error {
 
 func TestSetupRoutes_RegistersModsEndpoints(t *testing.T) {
 	s := createMockServer()
-	s.dependencies.ModsHandler = modsapi.NewHandler(fakeGitProvider{}, noopStorage{}, newInMemoryKV())
+	s.dependencies.ModsHandler = modsapi.NewHandler(fakeGitProvider{}, newTestStorage(), newInMemoryKV())
 
 	s.setupRoutes()
 
@@ -154,7 +118,7 @@ func TestHandleTriggerAppBuild_StorageResolutionFailure(t *testing.T) {
 func TestHandleTriggerAppBuild_InvalidAppName(t *testing.T) {
 	original := resolveStorageFromConfigService
 	resolveStorageFromConfigService = func(_ *cfgsvc.Service) (storage.Storage, error) {
-		return noopStorage{}, nil
+		return newTestStorage(), nil
 	}
 	t.Cleanup(func() { resolveStorageFromConfigService = original })
 
