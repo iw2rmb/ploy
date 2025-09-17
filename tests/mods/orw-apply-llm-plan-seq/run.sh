@@ -45,7 +45,8 @@ HTTP_CODE=$(echo "$RESP" | awk -FHTTP_CODE: 'END{print $2}')
 JSON=$(echo "$RESP" | sed '/HTTP_CODE:/d')
 if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
   echo "Run submission failed: HTTP $HTTP_CODE" >&2
-  echo "$JSON" | jq . >&2 || echo "$JSON" >&2
+  # Pretty-print JSON if possible; otherwise show raw body without jq noise
+  if echo "$JSON" | jq . 1>&2 2>/dev/null; then :; else echo "$JSON" >&2; fi
   exit 1
 fi
 
