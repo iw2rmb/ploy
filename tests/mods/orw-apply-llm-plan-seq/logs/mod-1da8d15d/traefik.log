@@ -1,8 +1,0 @@
-[2025-09-15 21:32:12] Getting stdout logs for allocation: 4b93912a-0985-74dc-5257-eb47332514fb (task: traefik, lines: 800, follow: false)
-[2025-09-15 21:32:12] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/4b93912a-0985-74dc-5257-eb47332514fb?type=stdout&plain=true&task=traefik&offset=-800
-[2025-09-15 21:32:12] Response code: 200
-.75.241:30232" 2ms
-45.12.75.241 - - [15/Sep/2025:21:32:11 +0000] "POST /v2/ploy-lane-e-python-3-12/blobs/uploads/ HTTP/2.0" 202 0 "-" "-" 4544 "websecure-docker-registry@consulcatalog" "http://45.12.75.241:30232" 5ms
-185.200.106.98 - - [15/Sep/2025:21:32:11 +0000] "GET /v1/mods/mod-1da8d15d/logs?follow=1 HTTP/2.0" 200 10656 "-" "-" 4545 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:31229" 3ms
-185.200.106.98 - - [15/Sep/2025:21:32:11 +0000] "GET /v2/ploy-lane-e-python-3-12/manifests/05fe0f5772e4 HTTP/2.0" 404 102 "-" "-" 4546 "websecure-docker-registry@consulcatalog" "http://45.12.75.241:30232" 3ms
-185.200.106.98 - - [15/Sep/2025:21:32:11 +0000] "GET /v1/platform/api/logs?lines=800 HTTP/2.0" 200 1144 "-" "-" 4547 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:20746" 47ms
