@@ -93,6 +93,16 @@ job "ploy-api" {
         NOMAD_SUBMIT_MAX_CONCURRENCY = "{{ ploy.nomad_submit_max_concurrency | default('4') }}"
         NOMAD_BLOCKING_WAIT = "{{ ploy.nomad_blocking_wait | default('30s') }}"
 
+        # Force SDK mode for Nomad submissions (disable wrapper inside API process)
+        USE_NOMAD_JOB_MANAGER = 0
+
+        # Lane E/G knobs (builder/runtime)
+        # JVM builds often need more memory for Kaniko
+        PLOY_KANIKO_MEMORY_JAVA_MB = "{{ ploy.kaniko_memory_java_mb | default('3072') }}"
+        # WASM runner selection (Lane G distroless)
+        PLOY_WASM_DISTROLESS = 1
+        PLOY_WASM_ENGINE = wazero
+
         # SeaweedFS configuration (master via localhost, filer via consul DNS)
         SEAWEEDFS_MASTER = "http://localhost:9333"
         SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:8888"
