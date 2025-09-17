@@ -96,6 +96,19 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
        - Or pre-set `START_TS` manually and optionally combine with `FILTER_MARKERS` to narrow to key markers (e.g., `[Lane E]`, `[Orch]`).
 - This keeps log slices small and focused per run without bouncing the API allocations.
 
+- Mods scenario SINCE_FMT (practical): For `tests/mods/orw-apply-llm-plan-seq`, derive a VPS-friendly timestamp from SSE and pass it to the Nomad log wrapper when fetching allocation logs.
+  - `SINCE_RAW=$(grep -hEo '"time":"[^"]+"' tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/events*.sse | head -n1 | sed -E 's/.*"time":"([^\"]+)".*/\1/')`
+  - `SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"`
+  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since \"$SINCE_FMT\"'" > tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/last_job.logs`
+  - Or set `START_TS_SOURCE=vps` (requires `TARGET_HOST`) to auto-resolve the timestamp in helpers like `tests/e2e/deploy/fetch-logs.sh`.
+  - If SeaweedFS isn’t reachable from the workstation, fetch artifacts via SSH on the VPS: `curl -fsS 'http://seaweedfs-filer.service.consul:8888/artifacts/<KEY>'`.
+
+### Build-Gate Drill‑down
+
+- Build-gate errors may include `(deployment_id=…)` in events and an `X-Deployment-ID` header in API responses. Use it to fetch detailed logs:
+  - `curl -sS "$PLOY_CONTROLLER/apps/<app>/builds/<deployment_id>/logs?lines=1200"`
+  - Attach relevant excerpts to scenario summaries and use time slicing for focused inspection.
+
 ## Commands
 
 **LOCAL**: 
@@ -114,6 +127,20 @@ Notes:
 - Container images (platform services and job runners) must be pushed to the VPS Docker Registry (Docker Registry v2). Do not rely on public registries in VPS workflows.
   - Examples: `openrewrite-jvm`, `langgraph-runner`, lane-specific images.
   - Configure image refs in environment (e.g., `MODS_ORW_APPLY_IMAGE`, `MODS_PLANNER_IMAGE`, `MODS_REDUCER_IMAGE`, `MODS_LLM_EXEC_IMAGE`) to point at the internal registry.
+
+### API Deployment (Correct Procedure)
+
+- Preferred (workstation):
+  - Ensure clean tree and passing hooks: `pre-commit run --all-files`.
+  - Commit and push: `git add -A && git commit -m "<message>" && git push`.
+  - Export `PLOY_CONTROLLER` (e.g., `https://api.dev.ployman.app/v1`).
+  - Deploy: `./bin/ployman api deploy --monitor`.
+  - Verify: `curl -sS "$PLOY_CONTROLLER/health"` and `curl -sS "$PLOY_CONTROLLER/ready"`.
+
+- Bootstrap/admin (Ansible, when explicitly needed):
+  - Env: `TARGET_HOST`, `PLOY_PLATFORM_DOMAIN` (e.g., `dev.ployman.app`), `GITHUB_PLOY_DEV_USERNAME`, `GITHUB_PLOY_DEV_PAT`.
+  - Run: `ansible-playbook -i iac/dev/inventory/hosts.yml iac/dev/playbooks/api.yml -e target_host=$TARGET_HOST -e PLOY_PLATFORM_DOMAIN=dev.ployman.app`.
+  - The playbook deploys the API via the Nomad job manager wrapper and waits for readiness.
 
 **VPS**:
 - You may SSH to the VPS to fetch logs and perform required diagnostics/operations (e.g., `ssh root@$TARGET_HOST`, then `su - ploy`).
