@@ -51,24 +51,30 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 	tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 
-	// Ensure Dockerfile exists or optionally autogenerate a minimal one
-	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
-	if _, statErr := os.Stat(dockerfilePath); statErr != nil {
-		autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
-		if autogen == "true" || autogen == "1" || autogen == "on" {
-			fmt.Printf("[Lane E] No Dockerfile; attempting autogen for app=%s lang=%s tool=%s\n", appName, facts.Language, facts.BuildTool)
-			if err := dockerfileGenerator(srcDir, facts); err != nil {
-				return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
-					"error":   "no Dockerfile and failed to autogenerate",
-					"details": err.Error(),
-				})
-			}
-			fmt.Printf("[Lane E] Autogen Dockerfile created for %s\n", appName)
-		} else {
-			return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
-				"error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
-			})
-		}
+    // Ensure Dockerfile exists or optionally autogenerate a minimal one
+    dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+    if _, statErr := os.Stat(dockerfilePath); statErr != nil {
+        autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
+        if autogen == "true" || autogen == "1" || autogen == "on" {
+            // Best-effort fill facts if missing
+            if facts.Language == "" && facts.BuildTool == "" {
+                facts = project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
+            }
+            fmt.Printf("[Lane E] No Dockerfile; attempting autogen for app=%s lang=%s tool=%s\n", appName, facts.Language, facts.BuildTool)
+            if aerr := dockerfileGenerator(srcDir, facts); aerr != nil {
+                // Log autogen failure explicitly and surface details to async status
+                fmt.Printf("[Lane E][ERROR] stage=autogen app=%s sha=%s lang=%s tool=%s err=%v\n", appName, sha, facts.Language, facts.BuildTool, aerr)
+                return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
+                    "error":   "no Dockerfile and failed to autogenerate",
+                    "details": aerr.Error(),
+                })
+            }
+            fmt.Printf("[Lane E] Autogen Dockerfile created for %s (lang=%s tool=%s)\n", appName, facts.Language, facts.BuildTool)
+        } else {
+            return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
+                "error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
+            })
+        }
 	}
 
 	// Create a tar context from srcDir
