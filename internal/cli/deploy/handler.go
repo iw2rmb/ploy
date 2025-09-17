@@ -29,7 +29,7 @@ func PushCmd(args []string, controllerURL string) {
 	fmt.Printf("🚀 Deploying %s to %s.ployd.app...\n", *app, *app)
 
 	// Use app-specific deployment (no platform logic, simplified)
-	result, err := DeployApp(*app, *lane, *main, *sha, false)
+	result, err := DeployApp(*app, *lane, *main, *sha, false, controllerURL)
 	if err != nil {
 		fmt.Printf("❌ Deployment failed: %v\n", err)
 		return

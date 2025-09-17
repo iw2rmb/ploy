@@ -27,10 +27,10 @@ func TestRecipeCatalogSearch_Query_OK(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	// wire search under /v1/arf/recipes/search for test
-	srv.app.Get("/v1/recipes/search", srv.handleRecipeCatalogSearch)
+	// wire search under test-specific path to avoid clashes with production routes
+	srv.app.Get("/_test/recipes/search", srv.handleRecipeCatalogSearch)
 
-	req := httptest.NewRequest("GET", "/v1/recipes/search?q=Format", nil)
+	req := httptest.NewRequest("GET", "/_test/recipes/search?q=Format", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

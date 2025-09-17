@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -105,17 +106,22 @@ func initializeAnalysisHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service
 	logger.SetLevel(logrus.InfoLevel)
 
 	// Check analysis mode from environment (nomad, legacy, or disabled)
-	analysisMode := utils.Getenv("PLOY_ANALYSIS_MODE", "nomad")
+	analysisModeRaw := utils.Getenv("PLOY_ANALYSIS_MODE", "nomad")
+	analysisMode := strings.ToLower(strings.TrimSpace(analysisModeRaw))
+	if analysisMode != "nomad" && analysisMode != "legacy" && analysisMode != "disabled" {
+		log.Printf("Invalid analysis mode %q, defaulting to legacy", analysisModeRaw)
+		analysisMode = "legacy"
+	}
 	log.Printf("Static analysis mode: %s", analysisMode)
 
 	var engine *analysis.Engine
 
-	if analysisMode == "nomad" {
+	switch analysisMode {
+	case "nomad":
 		if cfgService == nil {
 			log.Printf("Analysis nomad mode requested but config service unavailable; falling back to legacy mode")
 			analysisMode = "legacy"
 		} else {
-			// Create Nomad‑based dispatcher using unified storage from config service
 			st, err := cfgService.Get().CreateStorageClient()
 			if err != nil {
 				return nil, fmt.Errorf("failed to create storage for analysis: %w", err)
@@ -127,7 +133,11 @@ func initializeAnalysisHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service
 			engine = analysis.NewEngineWithDispatcher(logger, dispatcher)
 			log.Printf("Initialized Nomad-based analysis engine with unified storage")
 		}
+	case "disabled":
+		engine = analysis.NewEngine(logger)
+		log.Printf("Analysis engine disabled - no analyzers registered")
 	}
+
 	if analysisMode == "legacy" || engine == nil {
 		// Create legacy engine with local analyzers
 		engine = analysis.NewEngine(logger)
@@ -145,13 +155,6 @@ func initializeAnalysisHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service
 		}
 		log.Printf("Registered legacy local analyzers")
 
-	} else if analysisMode == "disabled" {
-		// Create minimal engine with no analyzers
-		engine = analysis.NewEngine(logger)
-		log.Printf("Analysis engine disabled - no analyzers registered")
-
-	} else {
-		return nil, fmt.Errorf("invalid analysis mode: %s (must be 'nomad', 'legacy', or 'disabled')", analysisMode)
 	}
 
 	// TODO: Register additional language analyzers as they are implemented

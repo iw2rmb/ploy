@@ -18,8 +18,8 @@ func TestRecipeCatalogPing_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer error: %v", err)
 	}
-	srv.app.Get("/v1/recipes/ping", srv.handleRecipeCatalogPing)
-	req := httptest.NewRequest("GET", "/v1/recipes/ping", nil)
+	srv.app.Get("/_test/recipes/ping", srv.handleRecipeCatalogPing)
+	req := httptest.NewRequest("GET", "/_test/recipes/ping", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -35,8 +35,8 @@ func TestRecipeCatalogList_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer error: %v", err)
 	}
-	srv.app.Get("/v1/recipes", srv.handleRecipeCatalogList)
-	req := httptest.NewRequest("GET", "/v1/recipes?language=java&tag=cleanup", nil)
+	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
+	req := httptest.NewRequest("GET", "/_test/recipes?language=java&tag=cleanup", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -62,8 +62,8 @@ func TestRecipeCatalogList_StorageBacked_OK(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	srv.app.Get("/v1/recipes", srv.handleRecipeCatalogList)
-	req := httptest.NewRequest("GET", "/v1/recipes?tag=cleanup", nil)
+	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
+	req := httptest.NewRequest("GET", "/_test/recipes?tag=cleanup", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -89,8 +89,8 @@ func TestRecipeCatalogList_StorageBacked_LanguageFilter(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	srv.app.Get("/v1/recipes", srv.handleRecipeCatalogList)
-	req := httptest.NewRequest("GET", "/v1/recipes?language=java", nil)
+	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
+	req := httptest.NewRequest("GET", "/_test/recipes?language=java", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -124,9 +124,9 @@ func TestRecipeCatalogGet_StorageBacked_OK(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	srv.app.Get("/v1/recipes/_test/:id", srv.handleRecipeCatalogGet)
+	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
 
-	req := httptest.NewRequest("GET", "/v1/recipes/_test/org.openrewrite.java.cleanup.Cleanup", nil)
+	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -151,8 +151,8 @@ func TestRecipeCatalogList_StorageBacked_PayloadFields(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	srv.app.Get("/v1/recipes", srv.handleRecipeCatalogList)
-	req := httptest.NewRequest("GET", "/v1/recipes", nil)
+	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
+	req := httptest.NewRequest("GET", "/_test/recipes", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -177,9 +177,9 @@ func TestRecipeCatalogGet_StorageBacked_PayloadFields(t *testing.T) {
 	}
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	srv.app.Get("/v1/recipes/_test/:id", srv.handleRecipeCatalogGet)
+	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
 
-	req := httptest.NewRequest("GET", "/v1/recipes/_test/org.openrewrite.java.format.AutoFormat", nil)
+	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.format.AutoFormat", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
