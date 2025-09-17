@@ -79,18 +79,20 @@ type AllocationStatusLite struct {
 
 // Submit HCL using the job manager wrapper
 func submitWithJobManager(hclPath string) (string, error) {
-	name, err := extractJobName(hclPath)
-	if err != nil {
-		return "", err
-	}
-	cmd := exec.Command(jobManagerPath(), "run", "--job", name, "--file", hclPath)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("nomad-job-manager run failed: %v: %s", err, out.String())
-	}
-	return name, nil
+    name, err := extractJobName(hclPath)
+    if err != nil {
+        return "", err
+    }
+    fmt.Printf("[Orch] Wrapper submit: job=%s file=%s\n", name, hclPath)
+    cmd := exec.Command(jobManagerPath(), "run", "--job", name, "--file", hclPath)
+    var out bytes.Buffer
+    cmd.Stdout = &out
+    cmd.Stderr = &out
+    if err := cmd.Run(); err != nil {
+        return "", fmt.Errorf("nomad-job-manager run failed: %v: %s", err, out.String())
+    }
+    fmt.Printf("[Orch] Wrapper submit OK: job=%s\n", name)
+    return name, nil
 }
 
 // Wait for terminal state using job manager outputs
@@ -174,70 +176,74 @@ func waitTerminalWithJobManager(jobName string, timeout time.Duration) error {
 
 // Submit reads an HCL job file, parses and registers it via Nomad API.
 func Submit(jobPath string) error {
-	if useJobManager() {
-		_, err := submitWithJobManager(jobPath)
-		return err
-	}
-	acquireSubmit()
-	defer releaseSubmit()
-	hcl, err := os.ReadFile(jobPath)
-	if err != nil {
-		return fmt.Errorf("read job file: %w", err)
-	}
-	client, err := newNomadClient()
-	if err != nil {
-		return err
-	}
-	jobs := client.Jobs()
-	job, err := jobs.ParseHCL(string(hcl), true)
-	if err != nil {
-		return fmt.Errorf("parse HCL: %w", err)
-	}
-	_, _, err = jobs.Register(job, nil)
-	if err != nil {
-		return fmt.Errorf("register job: %w", err)
-	}
-	return nil
+    if useJobManager() {
+        _, err := submitWithJobManager(jobPath)
+        return err
+    }
+    acquireSubmit()
+    defer releaseSubmit()
+    hcl, err := os.ReadFile(jobPath)
+    if err != nil {
+        return fmt.Errorf("read job file: %w", err)
+    }
+    client, err := newNomadClient()
+    if err != nil {
+        return err
+    }
+    jobs := client.Jobs()
+    job, err := jobs.ParseHCL(string(hcl), true)
+    if err != nil {
+        return fmt.Errorf("parse HCL: %w", err)
+    }
+    name := ""
+    if job != nil && job.Name != nil { name = *job.Name }
+    fmt.Printf("[Orch] SDK register: job=%s file=%s\n", name, jobPath)
+    _, _, err = jobs.Register(job, nil)
+    if err != nil {
+        return fmt.Errorf("register job: %w", err)
+    }
+    fmt.Printf("[Orch] SDK register OK: job=%s\n", name)
+    return nil
 }
 
 // SubmitAndWaitHealthy parses, registers the job, and waits for min healthy allocations.
 func SubmitAndWaitHealthy(jobPath string, expectedCount int, timeout time.Duration) error {
-	if useJobManager() {
-		name, err := submitWithJobManager(jobPath)
-		if err != nil {
-			return err
-		}
-		// Healthy == at least one running alloc within timeout
-		monitor := NewHealthMonitor()
-		return monitor.WaitForHealthyAllocations(name, expectedCount, timeout)
-	}
-	acquireSubmit()
-	defer releaseSubmit()
-	hcl, err := os.ReadFile(jobPath)
-	if err != nil {
-		return fmt.Errorf("read job file: %w", err)
-	}
-	client, err := newNomadClient()
-	if err != nil {
-		return err
-	}
-	jobs := client.Jobs()
-	job, err := jobs.ParseHCL(string(hcl), true)
-	if err != nil {
-		return fmt.Errorf("parse HCL: %w", err)
-	}
-	if _, _, err := jobs.Register(job, nil); err != nil {
-		return fmt.Errorf("register job: %w", err)
-	}
-	name := ""
-	if job != nil && job.Name != nil {
-		name = *job.Name
-	}
-	if name == "" {
-		return nil
-	}
-	monitor := NewHealthMonitor()
-	return monitor.WaitForHealthyAllocations(name, expectedCount, timeout)
+    if useJobManager() {
+        name, err := submitWithJobManager(jobPath)
+        if err != nil {
+            return err
+        }
+        // Healthy == at least one running alloc within timeout
+        monitor := NewHealthMonitor()
+        return monitor.WaitForHealthyAllocations(name, expectedCount, timeout)
+    }
+    acquireSubmit()
+    defer releaseSubmit()
+    hcl, err := os.ReadFile(jobPath)
+    if err != nil {
+        return fmt.Errorf("read job file: %w", err)
+    }
+    client, err := newNomadClient()
+    if err != nil {
+        return err
+    }
+    jobs := client.Jobs()
+    job, err := jobs.ParseHCL(string(hcl), true)
+    if err != nil {
+        return fmt.Errorf("parse HCL: %w", err)
+    }
+    name := ""
+    if job != nil && job.Name != nil { name = *job.Name }
+    fmt.Printf("[Orch] SDK register (healthy wait): job=%s file=%s\n", name, jobPath)
+    if _, _, err := jobs.Register(job, nil); err != nil {
+        return fmt.Errorf("register job: %w", err)
+    }
+    if name == "" {
+        return nil
+    }
+    fmt.Printf("[Orch] SDK waiting healthy: job=%s expected=%d timeout=%s\n", name, expectedCount, timeout)
+    monitor := NewHealthMonitor()
+    return monitor.WaitForHealthyAllocations(name, expectedCount, timeout)
 }
 
 // ValidateJob parses HCL to validate syntax; returns error if invalid.
@@ -296,23 +302,23 @@ func SubmitAndWaitTerminal(jobPath string, timeout time.Duration) error {
 func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.Duration) error {
 	start := time.Now()
 	allocAppearGuard := envDur("NOMAD_ALLOC_APPEARANCE_TIMEOUT", 90*time.Second)
-	if useJobManager() {
-		name, err := submitWithJobManager(jobPath)
-		if err != nil {
-			return err
-		}
-		// Wait with guard and cancellation support
-		done := make(chan error, 1)
-		go func() { done <- waitTerminalWithJobManager(name, timeout) }()
-		select {
-		case err := <-done:
-			return err
-		case <-ctx.Done():
-			// Best-effort stop via wrapper
-			_ = stopWithJobManager(name)
-			return ctx.Err()
-		}
-	}
+    if useJobManager() {
+        name, err := submitWithJobManager(jobPath)
+        if err != nil {
+            return err
+        }
+        // Wait with guard and cancellation support
+        done := make(chan error, 1)
+        go func() { done <- waitTerminalWithJobManager(name, timeout) }()
+        select {
+        case err := <-done:
+            return err
+        case <-ctx.Done():
+            // Best-effort stop via wrapper
+            _ = stopWithJobManager(name)
+            return ctx.Err()
+        }
+    }
 	acquireSubmit()
 	defer releaseSubmit()
 	hcl, err := os.ReadFile(jobPath)
@@ -328,16 +334,16 @@ func SubmitAndWaitTerminalCtx(ctx context.Context, jobPath string, timeout time.
 	if err != nil {
 		return fmt.Errorf("parse HCL: %w", err)
 	}
-	if _, _, err := jobs.Register(job, nil); err != nil {
-		return fmt.Errorf("register job: %w", err)
-	}
-	name := ""
-	if job != nil && job.Name != nil {
-		name = *job.Name
-	}
-	if name == "" {
-		return fmt.Errorf("job name not resolved")
-	}
+    name := ""
+    if job != nil && job.Name != nil { name = *job.Name }
+    fmt.Printf("[Orch] SDK register (terminal wait): job=%s file=%s\n", name, jobPath)
+    if _, _, err := jobs.Register(job, nil); err != nil {
+        return fmt.Errorf("register job: %w", err)
+    }
+    if name == "" {
+        return fmt.Errorf("job name not resolved")
+    }
+    fmt.Printf("[Orch] SDK waiting terminal: job=%s timeout=%s\n", name, timeout)
 
 	deadline := time.Now().Add(timeout)
 	var lastIndex uint64
