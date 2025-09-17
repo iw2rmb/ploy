@@ -309,6 +309,8 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
       fi
       if [ -z "$TARGET_FILE" ]; then
         post_event "warn" "llm-exec" "llm-exec" "could not resolve offending file from inputs.json"
+      else
+        post_event "info" "llm-exec" "llm-exec" "resolved target file: $TARGET_REL line: ${TARGET_LINE:-<unset>}"
       fi
       if [ -n "$LINE" ]; then
         TARGET_LINE="$LINE"
@@ -358,6 +360,7 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
       post_event "info" "llm-exec" "llm-exec" "generated minimal edit patch (comment offending lines)"
     else
       log "No actionable inputs; writing minimal placeholder patch"
+      post_event "warn" "llm-exec" "llm-exec" "no actionable inputs; writing placeholder diff (.llm-healing)"
       cat >"$OUT_DIR/diff.patch" <<'EOF'
 diff --git a/.llm-healing b/.llm-healing
 new file mode 100644
