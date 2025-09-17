@@ -56,7 +56,7 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 	if err := orchestration.SubmitAndWaitTerminal(jobFile, 10*time.Minute); err != nil {
 		jobName := fmt.Sprintf("%s-c-build-%s", appName, sha)
 		// Fetch broader logs tail for diagnostics and upload full log to storage when possible
-		fullLogs := fetchJobLogsFull(jobName, 2000)
+		fullLogs := fetchJobLogsFullFn(jobName, 2000)
 		snippet := fullLogs
 		if len(snippet) > 8000 {
 			snippet = snippet[len(snippet)-8000:]

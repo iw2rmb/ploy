@@ -237,7 +237,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
 	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
 		// Fetch and upload builder logs for diagnostics
-		fullLogs := fetchJobLogsFull(builderJobName, 2000)
+		fullLogs := fetchJobLogsFullFn(builderJobName, 2000)
 		snippet := fullLogs
 		if len(snippet) > 8000 {
 			snippet = snippet[len(snippet)-8000:]

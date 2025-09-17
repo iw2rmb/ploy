@@ -102,7 +102,7 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 	}
 	builderJobName := fmt.Sprintf("%s-g-build-%s", appName, versionWithNonce)
 	if err := orchestration.SubmitAndWaitTerminal(wasmBuilderHCL, 10*time.Minute); err != nil {
-		fullLogs := fetchJobLogsFull(builderJobName, 2000)
+		fullLogs := fetchJobLogsFullFn(builderJobName, 2000)
 		snippet := fullLogs
 		if len(snippet) > 8000 {
 			snippet = snippet[len(snippet)-8000:]

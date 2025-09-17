@@ -37,8 +37,12 @@ job "seaweedfs-filer" {
       driver = "raw_exec"
 
       # Download SeaweedFS binary
+      # Download SeaweedFS binary (version defaults to 3.96 if not provided)
+      # NOTE: This file is a Jinja template and must be rendered by Ansible.
+      #       Do not submit this raw template directly to Nomad, or variables
+      #       like {{ seaweedfs.version }} will not be resolved.
       artifact {
-        source = "https://github.com/seaweedfs/seaweedfs/releases/download/{{ seaweedfs.version }}/linux_amd64.tar.gz"
+        source = "https://github.com/seaweedfs/seaweedfs/releases/download/{{ seaweedfs.version | default('3.96') }}/linux_amd64.tar.gz"
         destination = "local/"
         mode = "any"
       }
