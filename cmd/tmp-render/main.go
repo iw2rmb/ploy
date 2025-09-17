@@ -19,7 +19,6 @@ func main() {
 		JvmMemory:           512,
 		MainClass:           "com.example.Main",
 		DomainSuffix:        "ployd.app",
-		VaultEnabled:        false,
 		ConnectEnabled:      false,
 		ConsulConfigEnabled: false,
 		Language:            "java",

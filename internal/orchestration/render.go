@@ -30,7 +30,6 @@ type RenderData struct {
 	DiskSize      int
 
 	// Feature flags
-	VaultEnabled        bool
 	ConsulConfigEnabled bool
 	ConnectEnabled      bool
 	VolumeEnabled       bool
@@ -321,14 +320,11 @@ func loadTemplateContent(templatePath string) ([]byte, error) {
 func applyTemplateSubstitutions(template string, data RenderData) string {
 	s := template
 	s = processConditionalBlocks(s, data)
-	// Safety: strip mesh/secrets blocks if disabled and conditionals didn't remove them
+	// Safety: strip mesh blocks if disabled and conditionals didn't remove them
 	if !data.ConnectEnabled {
 		s = strings.ReplaceAll(s, "connect { sidecar_service {} }", "")
 		// Best-effort removal of standalone connect service blocks
 		s = regexp.MustCompile(`(?s)service\s*\{\s*name\s*=\s*\".*-connect\".*?\}`).ReplaceAllString(s, "")
-	}
-	if !data.VaultEnabled {
-		s = regexp.MustCompile(`(?s)vault\s*\{.*?\}`).ReplaceAllString(s, "")
 	}
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
@@ -522,8 +518,7 @@ func (r *RenderData) SetDefaults() {
 	r.ConsulConfigEnabled = isPlat
 	// Volumes default off for regular apps; may be enabled for platform services
 	r.VolumeEnabled = isPlat
-	// Vault and Connect default off unless explicitly enabled by caller
-	// r.VaultEnabled and r.ConnectEnabled remain false unless set by caller
+	// Connect defaults off unless an orchestrated lane specifically enables it
 	r.DebugEnabled = false
 }
 
@@ -562,8 +557,6 @@ func processConditionalBlocks(template string, data RenderData) string {
 
 func evaluateCondition(condition string, data RenderData) bool {
 	switch condition {
-	case "VAULT_ENABLED":
-		return data.VaultEnabled
 	case "CONSUL_CONFIG_ENABLED":
 		return data.ConsulConfigEnabled
 	case "CONNECT_ENABLED":
@@ -587,7 +580,7 @@ func isPlatformService(data RenderData) bool {
 	}
 	platform := []string{"api", "controller", "openrewrite", "openrewrite-service",
 		"metrics", "monitoring", "logging", "traefik",
-		"nomad", "consul", "vault", "seaweedfs"}
+		"nomad", "consul", "seaweedfs"}
 	for _, s := range platform {
 		if data.App == s || strings.HasPrefix(data.App, s+"-") {
 			return true
