@@ -4,10 +4,8 @@ import (
     "bytes"
     "context"
     "fmt"
-    "math/rand"
     "os"
     "path/filepath"
-    "sync"
     "time"
 
     "github.com/iw2rmb/ploy/internal/storage"
@@ -16,23 +14,6 @@ import (
 // Retry settings for uploads; overridden in tests for speed.
 var retryMaxAttempts = 5
 var retryBaseDelay = 500 * time.Millisecond
-
-var (
-	uploadSlots chan struct{}
-	onceInit    sync.Once
-)
-
-func initUploadLimiter() {
-    onceInit.Do(func() {
-        // Fixed concurrency cap for uploads
-        max := 2
-        uploadSlots = make(chan struct{}, max)
-        rand.Seed(time.Now().UnixNano())
-    })
-}
-
-func acquireUpload() { initUploadLimiter(); uploadSlots <- struct{}{} }
-func releaseUpload() { <-uploadSlots }
 
 func backoffDelay(attempt int) time.Duration {
 	if attempt < 1 {
@@ -50,8 +31,6 @@ func backoffDelay(attempt int) time.Duration {
 
 // uploadFileWithRetryAndVerification uploads a file with enhanced retry logic and integrity verification
 func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, filePath, storageKey, contentType string) error {
-    acquireUpload()
-    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
     for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -130,8 +109,6 @@ func uploadArtifactBundleWithUnifiedStorage(ctx context.Context, storageInterfac
 
 // uploadFileWithUnifiedStorage uploads a file using unified storage interface with retry logic
 func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, filePath, storageKey, contentType string) error {
-    acquireUpload()
-    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
     for attempt := 1; attempt <= maxRetries; attempt++ {
@@ -180,8 +157,6 @@ func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.
 
 // uploadBytesWithUnifiedStorage uploads byte data using unified storage interface with retry logic
 func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, data []byte, storageKey, contentType string) error {
-    acquireUpload()
-    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
     for attempt := 1; attempt <= maxRetries; attempt++ {
