@@ -31,6 +31,10 @@ func (f *flakyStorage) Put(ctx context.Context, key string, reader io.Reader, op
 }
 
 func TestUploadFileWithUnifiedStorage_RetryThenSuccess(t *testing.T) {
+    // speed up retries for unit test
+    oldDelay := retryBaseDelay
+    retryBaseDelay = 5 * time.Millisecond
+    t.Cleanup(func(){ retryBaseDelay = oldDelay })
     base := mem.NewMemoryStorage(0)
     flaky := &flakyStorage{Storage: base, failCount: 1}
     ctx := context.Background()
@@ -50,6 +54,9 @@ func TestUploadFileWithUnifiedStorage_RetryThenSuccess(t *testing.T) {
 }
 
 func TestUploadBytesWithUnifiedStorage_AllFail(t *testing.T) {
+    oldDelay := retryBaseDelay
+    retryBaseDelay = 5 * time.Millisecond
+    t.Cleanup(func(){ retryBaseDelay = oldDelay })
     base := mem.NewMemoryStorage(0)
     flaky := &flakyStorage{Storage: base, failCount: 3}
     ctx := context.Background()
@@ -58,4 +65,3 @@ func TestUploadBytesWithUnifiedStorage_AllFail(t *testing.T) {
     err := uploadBytesWithUnifiedStorage(ctx, flaky, data, "k2", "application/octet-stream")
     require.Error(t, err)
 }
-

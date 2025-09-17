@@ -261,6 +261,7 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
     TARGET_REL=""
     TARGET_LINE=""
     if [ -s "$CTX_DIR/inputs.json" ]; then
+      CAND_REL=""
       # Prefer explicit top-level hints if present
       CAND=$(sed -n 's/.*"first_error_file"[[:space:]]*:[[:space:]]*"\([^\"]*\)".*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
       LINE=$(sed -n 's/.*"first_error_line"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$CTX_DIR/inputs.json" | head -n1)
@@ -299,7 +300,7 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
           esac
         fi
         # If a source snapshot was provided, prefer it to ensure exact diff
-        if [ -f "$CTX_DIR/sources/$CAND_REL" ]; then
+        if [ -f "$CTX_DIR/sources/${CAND_REL:-}" ]; then
           TARGET_FILE="$CTX_DIR/sources/$CAND_REL"
           TARGET_REL="$CAND_REL"
         elif [ -f "$CTX_DIR/sources/$CAND" ]; then

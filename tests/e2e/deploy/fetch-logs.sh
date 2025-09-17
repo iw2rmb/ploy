@@ -13,23 +13,14 @@ SHA=${SHA:-}
 LINES=${LINES:-200}
 FILTER_MARKERS=${FILTER_MARKERS:-}
 START_TS=${START_TS:-}
+START_TS_SOURCE=${START_TS_SOURCE:-} # vps|platform|local (default local)
 FOLLOW=${FOLLOW:-false}
 OUT_DIR=${OUT_DIR:-}
-SHRINK_PLATFORM_LOGS=${SHRINK_PLATFORM_LOGS:-}
 BUILD_ID=${BUILD_ID:-}
 
 if [[ -z "$APP_NAME" ]]; then echo "APP_NAME required" >&2; exit 2; fi
 
 PC=${PLOY_CONTROLLER%/}
-
-# Optional: shrink platform logs by restarting ploy-api alloc (requires TARGET_HOST)
-if [[ "${SHRINK_PLATFORM_LOGS}" =~ ^(1|true|TRUE|on|ON)$ && -n "${TARGET_HOST:-}" ]]; then
-  echo "== Shrinking platform logs by bouncing ploy-api (TARGET_HOST=$TARGET_HOST)" >&2
-  ssh -o ConnectTimeout=10 "root@$TARGET_HOST" \
-    "/opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api || true; \
-     /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api --file /opt/hashicorp/nomad/jobs/ploy-api.hcl; \
-     /opt/hashicorp/bin/nomad-job-manager.sh wait --job ploy-api --timeout 300" || true
-fi
 
 # Prepare OUT_DIR if provided
 if [[ -n "$OUT_DIR" ]]; then
@@ -37,6 +28,26 @@ if [[ -n "$OUT_DIR" ]]; then
 fi
 
 if [[ -n "${PC:-}" ]]; then
+  # Optionally resolve START_TS from VPS or platform logs to avoid timezone skew
+  if [[ -z "$START_TS" && -n "$START_TS_SOURCE" ]]; then
+    case "$START_TS_SOURCE" in
+      vps)
+        if [[ -n "${TARGET_HOST:-}" ]]; then
+          START_TS=$(ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "date '+%Y-%m-%d %H:%M:%S'" 2>/dev/null || true)
+        fi
+        ;;
+      platform)
+        # Pull a tiny snapshot and use the last bracketed timestamp as START_TS
+        SNAP=$(curl -sf "$PC/platform/api/logs?lines=20" 2>/dev/null || true)
+        if [[ -n "$SNAP" ]]; then
+          TS=$(printf '%s\n' "$SNAP" | awk 'match($0,/^\[([0-9-]{10} [0-9:]{8})\]/,m){ts=m[1]} END{print ts}')
+          if [[ -n "$TS" ]]; then START_TS="$TS"; fi
+        fi
+        ;;
+    esac
+    if [[ -n "$START_TS" ]]; then echo "== START_TS resolved: $START_TS (source: $START_TS_SOURCE)" >&2; fi
+  fi
+
   echo "== App status" >&2
   if [[ -n "$OUT_DIR" ]]; then
     curl -sf "$PC/apps/$APP_NAME/status" | tee "$OUT_DIR/app.status.json" || true; echo
@@ -56,11 +67,15 @@ if [[ -n "${PC:-}" ]]; then
     if [[ -n "$START_TS" ]]; then
       echo "== Platform API logs (sliced since $START_TS)" >&2
       awk -v start="$START_TS" '
+        BEGIN { printed=0 }
         {
           ts="";
-          if (match($0,/^\[([0-9-]{10} [0-9:]{8})\]/, m)) ts=m[1];
+          if ($0 ~ /^\[/) {
+            # Timestamp formatted as [YYYY-MM-DD HH:MM:SS]
+            ts=substr($0, 2, 19);
+          }
           if (ts=="" && printed==1) { print; next }
-          if (ts!="" && ts >= start) { printed=1; print }
+          if (ts!="" && ts >= start) { printed=1; print; next }
         }' "$OUT_DIR/platform_api.log" | tee "$OUT_DIR/platform_api.sliced.log" >/dev/null || true; echo
     fi
     if [[ -n "$FILTER_MARKERS" ]]; then

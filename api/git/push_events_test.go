@@ -33,6 +33,8 @@ func joinArgs(args []string) string {
 }
 
 func TestPushBranchPublishesEventsOnSuccess(t *testing.T) {
+    // Ensure token injection does not alter the expected remote URL in this test
+    _ = os.Unsetenv("GITLAB_TOKEN")
 	runner := &fakeRunner{}
 	svc := NewService(ServiceConfig{Runner: runner})
 
@@ -77,6 +79,7 @@ func TestPushBranchPublishesEventsOnSuccess(t *testing.T) {
 }
 
 func TestPushBranchPublishesFailureEvent(t *testing.T) {
+    _ = os.Unsetenv("GITLAB_TOKEN")
 	runner := &fakeRunner{failAt: 3}
 	svc := NewService(ServiceConfig{Runner: runner})
 
