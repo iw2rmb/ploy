@@ -1,97 +1,112 @@
-<!-- moved from CLAUDE.md: Mods CLI documentation -->
-# Mods CLI Module
+# Mods Subsystem
 
-## Purpose
-Production-ready CLI integration for orchestrating multi-step code transformation workflows with comprehensive self-healing capabilities using three distinct branch types (human-step, llm-exec, orw-gen), production Nomad job orchestration, GitLab merge request integration, and active Knowledge Base learning from healing attempts. MVP COMPLETE: All components now operational in production environment.
+The Mods subsystem orchestrates end-to-end code transformation and self-healing workflows. It runs planner → reducer → branch steps (human-step, llm-exec, orw-gen), applies diffs safely, validates builds, opens/updates merge requests, and learns from outcomes via a Knowledge Base.
 
-## Narrative Summary
-The Mods module provides end-to-end implementation of `ploy mod run` command supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge request(s), and includes sophisticated self-healing workflows with three distinct healing branch types executed via production Nomad job orchestration.
+## Features
 
-Core workflow: clone repository → create branch → apply transformations → commit changes → validate build → create/update merge request → on build failures, triggers self-healing via parallel fanout orchestration with first-success-wins semantics. The healing system supports human-step (MR-based manual intervention), llm-exec (LLM-powered code fixes), and orw-gen (OpenRewrite recipe generation) branches. Production orchestration uses SubmitAndWaitTerminal for real Nomad job submission with HCL template rendering and artifact processing.
+- Workflow engine: planner → reducer → branches (human-step, llm-exec, orw-gen)
+- Fanout healing: parallel branches with first-success-wins, bounded concurrency, timeouts
+- Production job submission: HCL render/validate/submit via orchestration submitter; SeaweedFS artifact fetch
+- Merge Requests: auth, templating, reporter; Git operations (clone/branch/commit/push)
+- Diff apply + build gate: unified diff validation, path allowlist, staged commits, build check
+- Gates: SBOM hooks and optional vulnerability gate; configurable timeouts and limits
+- Knowledge Base: signatures, normalization, deduplication, compaction, locks, metrics, maintenance, summary
+- Events: controller reporter, MR events, structured event emission, log sanitization
+- Defaults: image/model defaults, LLM tools/limits; MCP integration and env var generation
+- Templates: planner/reducer/llm-exec/orw-apply HCL with variable substitution
 
-NEW: Model Context Protocol (MCP) Integration - Extends LLM-exec healing branches with Model Context Protocol tool support, enabling enhanced context gathering during code transformation workflows. The system supports file system tools (mcp://fs), search tools (mcp://rg), and HTTP/HTTPS URL context sources. MCP configuration is declaratively specified in Mods YAML files and automatically converted to environment variables for containerized job execution. Context prefetching system pre-loads file patterns and web resources to improve LLM context quality during healing operations.
+## Files
 
-✅ ACTIVE: KB Learning Pipeline - Production-ready Knowledge Base learning system now actively integrated in the main Mods workflow via KB integration. Every healing attempt (success or failure) is automatically recorded, analyzed, and added to the KB for future recommendations. The system provides intelligent fix suggestions based on historical success patterns, fuzzy error signature matching, and confidence scoring. Features comprehensive deduplication with Hamming distance similarity, multi-factor patch similarity detection, automated storage compaction, and distributed coordination via Consul locking. VPS VALIDATED: System operational in production environment with real-world validation.
+- allocs_utils.go — Resolve first Nomad allocation ID via job-manager wrapper
+- apply_and_build_adapter.go — Apply diff safely, commit, and run the build gate
+- apply_build.go — Adapter to apply a diff then trigger build validation
+- assets_llm_exec.go — Render llm-exec HCL template into workspace
+- assets_orw_apply.go — Render ORW apply HCL template into workspace
+- assets_planner.go — Write planner inputs.json and HCL template
+- assets_reducer.go — Render reducer HCL template into workspace
+- branch_chain.go — Branch chain model and execution helpers
+- branch_chain_meta.go — Branch chain metadata helpers
+- branch_chain_replayer.go — Replay just the HEAD step from a branch chain
+- branch_step.go — Branch step struct and helpers
+- build_gate.go — Build gate runner and response helpers
+- build_guard.go — Guardrails around build submission and status
+- cleanup.go — Cleanup helpers for temporary files/workspaces
+- commit_push.go — Commit and push logic for repository changes
+- config.go — YAML config (mods.yaml) types, loading, defaults, validation
+- debug.go — Debug helpers and verbose logging toggles
+- defaults.go — System defaults (timeouts, allowlists, plans)
+- diff.go — Unified diff validation and application helpers
+- enhanced_signatures.go — Enhanced KB signature extraction and comparisons
+- events_emit.go — Event emission to controller and local sinks
+- events_mr.go — Emit MR-related events and formatting
+- events_util.go — Event reporting utilities (e.g., job submitted, alloc discovery)
+- execution.go — Orchestration entrypoints for executing steps
+- fanout_human_step.go — Human-step branch execution
+- fanout_llm_exec.go — LLM-exec branch submission and result handling
+- fanout_llm_helpers.go — Helpers for LLM-exec branch jobs
+- fanout_orchestrator_core.go — Fanout engine core (parallel branches, first-success-wins)
+- fanout_orw_apply.go — ORW generate/apply branch execution
+- hcl_submitter.go — Interface/seam for HCL render/validate/submit
+- healing_debug.go — Debug helpers for healing workflows
+- healing_orchestration_adapter.go — Adapter wiring to orchestration submitter
+- healing_orchestrator.go — Healing orchestrator composition
+- human_step_helpers.go — Utilities for human-step branch (MR hints, notes)
+- images.go — Image resolver for runner jobs (planner/reducer/LLM/ORW)
+- infra.go — Infra resolver (controller URL, SeaweedFS URL, datacenter, registry)
+- integrations.go — Production vs. test integrations factory wiring
+- job_io.go — Read/write job artifacts (plan.json, next.json, diff.patch)
+- job_mcp_env.go — Build MCP env vars and context for LLM-exec
+- job_status_wait.go — Wait helpers for submitted jobs
+- job_submit_planner.go — Submit planner job and fetch plan.json
+- job_submit_reducer.go — Submit reducer job and fetch next.json
+- job_submitter_types.go — Job submission type definitions and helpers
+- job_template_subst.go — HCL template substitution for job env vars
+- kb_compaction.go — KB storage compaction and maintenance
+- kb_integration.go — KB recording and suggestion integration
+- kb_locks.go — KB distributed locking (Consul KV)
+- kb_maintenance.go — KB maintenance job triggers and utilities
+- kb_metrics.go — KB metrics and counters
+- kb_performance_analysis.go — KB performance/analysis helpers
+- kb_signatures.go — Error signature extraction and canonicalization
+- kb_storage.go — KB storage I/O (SeaweedFS paths and helpers)
+- kb_summary.go — Produce KB summary/recommendations
+- llm_defaults.go — LLM default model, tools, and limits
+- llm_exec_helpers.go — LLM-exec helpers (paths, branch ID, outputs)
+- log_sanitizer.go — Normalize and sanitize logs for KB and events
+- mcp_integration.go — MCP config parsing, budget coercion, and context prefetch
+- mocks.go — Test doubles for integrations (used in unit tests)
+- modules.go — Small modular adapters (repo manager, build gate, MR manager)
+- mr.go — Merge request operations (create/update) workflow
+- mr_auth.go — MR auth helpers (token/env resolution)
+- mr_template.go — MR title/body templating helpers
+- orw_gen_helpers.go — Helpers for ORW generation branch
+- orw_helpers.go — ORW execution helpers (paths, names)
+- orw_prehcl.go — ORW HCL pre-processing helpers
+- orw_submit.go — Submit ORW job and fetch diff.patch
+- output.go — Output formatting helpers for CLI/API
+- patch_normalization.go — Patch normalization and cleanup rules
+- planner.go — CLI planner mode: render/submit planner and validate outputs
+- push_events.go — Push event normalization and integration
+- recipe_coords.go — Recipe coordinates (group/artifact/version) helpers
+- recipe_subst.go — Recipe template substitution logic
+- reducer.go — Reducer step orchestration
+- remote.go — Remote repository URL handling and normalization
+- repo_ops.go — Repository operations (clone/branch/commit/push)
+- repo_ops_adapter.go — Adapter to Git provider/ops interfaces
+- reporter.go — Controller/MR reporter abstraction
+- run.go — Command entrypoints and runner setup
+- runid.go — Stable run and branch identifiers
+- runner.go — Main runner: orchestrates mods flow and healing
+- runner_di.go — Runner dependency injection seams
+- runner_helpers.go — Small helpers extracted from runner
+- runner_results.go — Result aggregation helpers (winner, losers)
+- schema.go — JSON/YAML schema shims and helpers
+- self_healing.go — Healing entrypoints and decision logic
+- signatures.go — Minimal signature helpers used outside KB
+- step_types.go — Canonical step types and normalization
+- steps_orw_apply.go — ORW-apply step execution helpers
+- test_services.go — Integration helpers (test-only utilities used by tests)
+- types.go — Job/plan/branch types and interfaces
+- utilities.go — Generic utility helpers (paths, files, HTTP)
+- vuln_gate.go — Vulnerability gate based on SBOM/NVD
 
-✅ E2E Test Framework - Complete end-to-end validation framework providing comprehensive testing of entire Mods workflows from CLI invocation through GitLab MR creation. Framework validates Java migration workflows, self-healing capabilities, KB learning integration, and production Nomad job orchestration. VPS PRODUCTION VALIDATED: Supports VPS production environment testing with real GitLab integration at https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git, enabling full workflow validation including repository cloning, code transformation, build validation, healing branch execution, and merge request operations.
-
-## Key Files
-- `run.go` - CLI command entry point and flag parsing
-- `runner.go` - Complete orchestration logic with healing integration and ProductionBranchRunner interface implementation
-- `config.go` - Configuration loading, validation, and timeout parsing with MCP integration
-- `integrations.go` - Factory pattern for production vs test implementations with KB integration
-- `types.go` - Job submission type system with interface definitions
-- `fanout_orchestrator.go` - ProductionBranchRunner interface for asset rendering and dependency access with GetTargetRepo() method
-- `job_submission.go` - Production JobSubmissionHelper with HCL rendering and artifact parsing
-- `mcp_integration.go` - MCP configuration parsing, context prefetching, and env generation
-
-## Key Patterns
-- Complete dependency injection with interface-based design
-- Factory pattern for production vs test implementations
-- Test mode infrastructure with comprehensive mocking
-- Production job submission with HCL template rendering and environment substitution
-- MCP-enhanced template substitution with context prefetching
-- Real artifact processing with JSON parsing for job outputs
-- Type-safe job submission interfaces supporting planner/reducer/branch workflows
-- Production fanout orchestration with first-success-wins semantics and real Nomad jobs
-- Branch type support for llm-exec, orw-gen, and human-step healing strategies
-- MCP configuration parsing and validation with comprehensive error handling
-- Context prefetching system supporting file patterns and HTTP/HTTPS URLs
-- Environment variable generation from structured MCP configuration
-- MCP tool endpoint validation with protocol support (mcp://, http://, https://)
-- Default MCP configuration with file-system and search tools
-- Context manifest creation for containerized job execution
-- URL content fetching with timeout and error handling
-- File pattern processing with manifest generation
-- Graceful error handling with optional MR creation
-- Comprehensive test coverage with mock implementations supporting all interface methods and error scenarios
-- Self-healing workflow with production LangGraph integration and complete parallel branch execution via first-success-wins fanout orchestration
-- Configuration validation with timeout parsing and comprehensive error reporting
-- ✅ Production KB learning integration via KBModRunner with automatic healing case recording - MVP complete and VPS validated
-- KB persistence with content-addressed storage and distributed locking
-- Production KB integration with SeaweedFS and Consul backends
-- Advanced deduplication with fuzzy matching algorithms and Hamming distance similarity
-- Multi-factor patch similarity detection using lexical, structural, and semantic analysis
-- Automated storage compaction with intelligent case merging and retention policies
-- Maintenance job orchestration with Nomad-based scheduling and resource management
-- Performance monitoring with real-time deduplication metrics and query optimization tracking
-- Backward compatibility preservation with comprehensive performance validation
-- Weighted scoring system for fix promotion with recency/frequency/success factors
-- Backward compatibility maintained for non-MCP workflows with optional MCP fields in YAML configuration
-
-## Production Status
-
-✅ MVP COMPLETE - All Components Operational:
-- Self-Healing System: All three branch types (human-step, llm-exec, orw-gen) operational with production Nomad orchestration
-- KB Learning Integration: Active learning from every healing attempt via KBModRunner integration
-- VPS Production Validation: Complete workflows tested and validated in production environment
-- E2E Testing Framework: Full workflow validation from CLI through GitLab MR creation
-- Performance Benchmarking: Acceptance testing completed with production-grade performance
-- GitLab Integration: Production merge request operations with real repository validation
-- Storage Backends: SeaweedFS + Consul operational for KB persistence and distributed coordination
-- Job Orchestration: Nomad-based healing workflows with HCL template rendering and artifact processing
-
-## References
-- `../../../platform/nomad/mods/` - HCL templates for planner, reducer, and healing branch jobs
-- `../../../platform/nomad/mods/llm_exec.hcl` - MCP-enhanced HCL template with environment variables for LLM-exec jobs
-- `../../../platform/nomad/mods/MCP_INTEGRATION.md` - MCP integration documentation and usage examples
-- `../git/provider/README.md` - GitLab provider implementation
-- `../../orchestration` - Production job submission and monitoring infrastructure
-## CLI Usage
-
-Mods offers explicit subcommands for common workflows:
-
-- `ploy mod run -f mods.yaml [--watch] [--output json|text]`
-  - Remote execution via controller. Prints execution ID and optionally attaches a watch.
-- `ploy mod watch -id <mod_id>`
-  - Attaches to a running run and streams status/events.
-- `ploy mod render -f mods.yaml [--work-dir DIR] [--preserve-workspace] [-v]`
-  - Renders planner inputs and HCL locally (no submission).
-- `ploy mod plan -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]`
-  - Renders planner and optionally submits when `--submit` is set.
-- `ploy mod reduce -f mods.yaml [--submit] [--work-dir DIR] [--preserve-workspace] [-v]`
-  - Renders reducer and optionally submits when `--submit` is set.
-- `ploy mod apply -f mods.yaml (--diff-path FILE | --diff-url URL) [--work-dir DIR] [--preserve-workspace]`
-  - Applies a unified diff locally, commits, and runs the build gate.
-
-Use `ploy mod` with no arguments or an unknown subcommand to print help.
