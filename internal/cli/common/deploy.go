@@ -1,15 +1,15 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
-	"time"
-
-	"bytes"
-	"log"
 	"path/filepath"
+	"strings"
+	"time"
 
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
@@ -103,20 +103,26 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	// Parse response
+	var respBody []byte
 	if resp.StatusCode != http.StatusOK {
 		// Read and log response body for diagnostics, then restore body for downstream readers
 		if b, rerr := io.ReadAll(resp.Body); rerr == nil {
 			log.Printf("[SharedPush] Non-200 response status=%d body=%s", resp.StatusCode, string(b))
+			respBody = b
 			resp.Body = io.NopCloser(bytes.NewReader(b))
 		}
 	}
-	result, err := parseDeployResponse(resp, config)
+	result, err := parseDeployResponse(resp, respBody, config)
 	if err != nil {
 		return nil, err
 	}
 
 	// Output to console
-	_, _ = io.Copy(os.Stdout, resp.Body)
+	if len(respBody) > 0 {
+		_, _ = os.Stdout.Write(respBody)
+	} else {
+		_, _ = io.Copy(os.Stdout, resp.Body)
+	}
 
 	return result, nil
 }
@@ -166,7 +172,7 @@ func buildDeployURL(config DeployConfig) string {
 }
 
 // parseDeployResponse parses the HTTP response into a DeployResult
-func parseDeployResponse(resp *http.Response, config DeployConfig) (*DeployResult, error) {
+func parseDeployResponse(resp *http.Response, rawBody []byte, config DeployConfig) (*DeployResult, error) {
 	// Get the target domain
 	domain := getTargetDomain(config)
 
@@ -181,7 +187,16 @@ func parseDeployResponse(resp *http.Response, config DeployConfig) (*DeployResul
 
 	// Add error message if not successful
 	if !result.Success {
-		result.Message = fmt.Sprintf("Deployment failed with status %d", resp.StatusCode)
+		if len(rawBody) > 0 {
+			trimmed := strings.TrimSpace(string(rawBody))
+			if trimmed != "" {
+				result.Message = trimmed
+			} else {
+				result.Message = fmt.Sprintf("Deployment failed with status %d", resp.StatusCode)
+			}
+		} else {
+			result.Message = fmt.Sprintf("Deployment failed with status %d", resp.StatusCode)
+		}
 	}
 
 	return result, nil
