@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/storage"
@@ -38,8 +39,12 @@ func (p *Provider) Put(ctx context.Context, key string, reader io.Reader, opts .
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
-	// Construct URL and ensure forward-slash normalization
-	url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, path.Clean("/"+key))
+	// Construct URL and ensure no accidental double-leading slashes which some proxies mishandle
+	cleanedKey := path.Clean(key)
+	if strings.HasPrefix(cleanedKey, "/") {
+		cleanedKey = strings.TrimLeft(cleanedKey, "/")
+	}
+	url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, cleanedKey)
 	req, err := http.NewRequestWithContext(ctx, "PUT", url, reader)
 	if err != nil {
 		return err
@@ -53,9 +58,9 @@ func (p *Provider) Put(ctx context.Context, key string, reader io.Reader, opts .
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
 		if len(body) > 0 {
-			return fmt.Errorf("put failed: %s: %s", resp.Status, string(body))
+			return fmt.Errorf("put failed: %s url=%s: %s", resp.Status, url, string(body))
 		}
-		return fmt.Errorf("put failed: %s", resp.Status)
+		return fmt.Errorf("put failed: %s url=%s", resp.Status, url)
 	}
 	return nil
 }
