@@ -56,10 +56,16 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 	if err := orchestration.SubmitAndWaitTerminal(jobFile, 10*time.Minute); err != nil {
 		jobName := fmt.Sprintf("%s-c-build-%s", appName, sha)
 		snippet := getJobLogsSnippet(jobName, 80)
-		// keep error context for caller
+		be := &BuildError{
+			Type:    "lane_c_build",
+			Message: fmt.Sprintf("OSv builder failed for job %s", jobName),
+			Details: err.Error(),
+			Stdout:  snippet,
+		}
+		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", jobName)
 		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":   fmt.Sprintf("OSv builder failed: %v", err),
+			"error":   formatted,
 			"builder": fiber.Map{"job": jobName, "logs": snippet},
 		})
 	}

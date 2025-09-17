@@ -103,7 +103,19 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 	builderJobName := fmt.Sprintf("%s-g-build-%s", appName, versionWithNonce)
 	if err := orchestration.SubmitAndWaitTerminal(wasmBuilderHCL, 10*time.Minute); err != nil {
 		snippet := getJobLogsSnippet(builderJobName, 80)
-		return "", c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("wasm builder failed for job %s", builderJobName), "stage": "wasm_submit", "details": err.Error(), "builder": fiber.Map{"job": builderJobName, "logs": snippet}})
+		be := &BuildError{
+			Type:    "lane_g_build",
+			Message: fmt.Sprintf("wasm builder failed for job %s", builderJobName),
+			Details: err.Error(),
+			Stdout:  snippet,
+		}
+		formatted := FormatBuildError(be, true, 4000)
+		c.Set("X-Deployment-ID", builderJobName)
+		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+			"error":   formatted,
+			"stage":   "wasm_submit",
+			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+		})
 	}
 	return "", nil
 }
