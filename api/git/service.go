@@ -89,8 +89,8 @@ func NewGitOperations(workDir string) *Service {
 }
 
 // SetEventSink updates the sink used for emitting events; primarily for wiring observers post-construction.
-func (s *Service) SetEventSink(sink EventSink) {
-	s.sink = sink
+func (g *Service) SetEventSink(sink EventSink) {
+	g.sink = sink
 }
 
 // Operation represents a long-running git action with observable events.
@@ -140,17 +140,17 @@ func (o *Operation) finalize(event Event) {
 	})
 }
 
-func (s *Service) emit(op *Operation, event Event) {
+func (g *Service) emit(op *Operation, event Event) {
 	op.emit(event)
-	if s.sink != nil {
-		s.sink.Publish(event)
+	if g.sink != nil {
+		g.sink.Publish(event)
 	}
 }
 
-func (s *Service) finalize(op *Operation, event Event) {
+func (g *Service) finalize(op *Operation, event Event) {
 	op.finalize(event)
-	if s.sink != nil {
-		s.sink.Publish(event)
+	if g.sink != nil {
+		g.sink.Publish(event)
 	}
 }
 
@@ -190,20 +190,20 @@ func (g *Service) CreateBranchAndCheckout(ctx context.Context, repoPath, branchN
 }
 
 // PushBranchAsync executes a git push asynchronously and emits lifecycle events.
-func (s *Service) PushBranchAsync(ctx context.Context, req PushRequest) *Operation {
+func (g *Service) PushBranchAsync(ctx context.Context, req PushRequest) *Operation {
 	op := newOperation("push")
 	go func() {
-		s.emit(op, Event{
+		g.emit(op, Event{
 			Type:      EventStarted,
 			Operation: op.name,
 			Message:   fmt.Sprintf("pushing %s to %s", req.Branch, req.RemoteURL),
 		})
 
-		remoteURL := s.authenticatedRemoteURL(req.RemoteURL)
-		_ = s.runner.Run(ctx, req.RepoPath, "git", "remote", "remove", "origin")
-		if err := s.runner.Run(ctx, req.RepoPath, "git", "remote", "add", "origin", remoteURL); err != nil {
+		remoteURL := g.authenticatedRemoteURL(req.RemoteURL)
+		_ = g.runner.Run(ctx, req.RepoPath, "git", "remote", "remove", "origin")
+		if err := g.runner.Run(ctx, req.RepoPath, "git", "remote", "add", "origin", remoteURL); err != nil {
 			wrapped := fmt.Errorf("failed to set remote origin: %w", err)
-			s.finalize(op, Event{
+			g.finalize(op, Event{
 				Type:      EventFailed,
 				Operation: op.name,
 				Message:   wrapped.Error(),
@@ -212,15 +212,15 @@ func (s *Service) PushBranchAsync(ctx context.Context, req PushRequest) *Operati
 			return
 		}
 
-		s.emit(op, Event{
+		g.emit(op, Event{
 			Type:      EventProgress,
 			Operation: op.name,
 			Message:   "remote origin configured",
 		})
 
-		if err := s.runner.Run(ctx, req.RepoPath, "git", "push", "-u", "origin", req.Branch); err != nil {
+		if err := g.runner.Run(ctx, req.RepoPath, "git", "push", "-u", "origin", req.Branch); err != nil {
 			wrapped := fmt.Errorf("git push failed: %w", err)
-			s.finalize(op, Event{
+			g.finalize(op, Event{
 				Type:      EventFailed,
 				Operation: op.name,
 				Message:   wrapped.Error(),
@@ -229,7 +229,7 @@ func (s *Service) PushBranchAsync(ctx context.Context, req PushRequest) *Operati
 			return
 		}
 
-		s.finalize(op, Event{
+		g.finalize(op, Event{
 			Type:      EventCompleted,
 			Operation: op.name,
 			Message:   "branch pushed",
@@ -239,8 +239,8 @@ func (s *Service) PushBranchAsync(ctx context.Context, req PushRequest) *Operati
 }
 
 // PushBranch is the synchronous wrapper maintained for compatibility with existing call sites.
-func (s *Service) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
-	op := s.PushBranchAsync(ctx, PushRequest{RepoPath: repoPath, RemoteURL: remoteURL, Branch: branchName})
+func (g *Service) PushBranch(ctx context.Context, repoPath, remoteURL, branchName string) error {
+	op := g.PushBranchAsync(ctx, PushRequest{RepoPath: repoPath, RemoteURL: remoteURL, Branch: branchName})
 	return op.Wait()
 }
 
