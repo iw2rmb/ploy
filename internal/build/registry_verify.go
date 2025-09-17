@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+var registryHTTPClient = &http.Client{Timeout: 10 * time.Second}
+
 // verifyResult represents the outcome of an OCI manifest existence check
 type verifyResult struct {
 	OK      bool
@@ -43,7 +45,10 @@ func verifyOCIPush(tag string) verifyResult {
 		"application/vnd.oci.image.manifest.v1+json",
 		"application/vnd.docker.distribution.manifest.v2+json",
 	}, ", "))
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := registryHTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return verifyResult{OK: false, Status: 0, Message: "registry check failed: " + err.Error()}

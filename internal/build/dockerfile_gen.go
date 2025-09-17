@@ -23,7 +23,8 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			v = v[:i]
 		}
 		var dockerfile string
-		if facts.BuildTool == "gradle" {
+		switch facts.BuildTool {
+		case "gradle":
 			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
 			if facts.MainClass != "" {
 				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
@@ -41,7 +42,7 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-		} else if facts.BuildTool == "maven" {
+		case "maven":
 			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
 			if facts.MainClass != "" {
 				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
@@ -59,7 +60,7 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-		} else {
+		default:
 			return fmt.Errorf("no supported Java build tool detected for Dockerfile autogen")
 		}
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
