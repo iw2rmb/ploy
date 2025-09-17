@@ -24,14 +24,17 @@ type DeployResult struct {
 }
 
 // DeployApp handles deployment for regular applications (ploy)
-func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployResult, error) {
+func DeployApp(appName, lane, mainClass, sha string, blueGreen bool, controllerOverride string) (*DeployResult, error) {
 	// Validate inputs
 	if appName == "" {
 		return nil, fmt.Errorf("app name is required")
 	}
 
-	// Get controller URL (regular apps always use ployd.app domain)
-	controllerURL := os.Getenv("PLOY_CONTROLLER")
+	// Get controller URL (allow override for tests and CLI)
+	controllerURL := controllerOverride
+	if controllerURL == "" {
+		controllerURL = os.Getenv("PLOY_CONTROLLER")
+	}
 	if controllerURL == "" {
 		controllerURL = "http://localhost:8081/v1"
 	}
@@ -107,8 +110,8 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool) (*DeployRes
 		pr, pw := io.Pipe()
 		mw := multipart.NewWriter(pw)
 		go func() {
-			defer pw.Close()
-			defer mw.Close()
+			defer func() { _ = pw.Close() }()
+			defer func() { _ = mw.Close() }()
 			part, err := mw.CreateFormFile("file", "src.tar")
 			if err != nil {
 				_ = pw.CloseWithError(err)

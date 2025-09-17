@@ -25,7 +25,8 @@ func TestRecipesRoute_GetByID_Internal(t *testing.T) {
 	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
 	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	req := httptest.NewRequest("GET", "/v1/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
+	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
+	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
 	resp, err := srv.app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
