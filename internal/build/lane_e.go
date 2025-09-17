@@ -69,7 +69,17 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
                     "details": aerr.Error(),
                 })
             }
-            fmt.Printf("[Lane E] Autogen Dockerfile created for %s (lang=%s tool=%s)\n", appName, facts.Language, facts.BuildTool)
+            // Stat and log head of generated Dockerfile for diagnostics
+            if fi, serr := os.Stat(dockerfilePath); serr == nil {
+                fmt.Printf("[Lane E] Autogen Dockerfile created for %s (lang=%s tool=%s) size=%d bytes\n", appName, facts.Language, facts.BuildTool, fi.Size())
+            } else {
+                fmt.Printf("[Lane E] Autogen Dockerfile stat error for %s: %v\n", appName, serr)
+            }
+            if b, rerr := os.ReadFile(dockerfilePath); rerr == nil {
+                max := 600
+                if len(b) > max { b = b[:max] }
+                fmt.Printf("[Lane E] Autogen Dockerfile head (first %d bytes):\n%s\n", len(b), string(b))
+            }
         } else {
             return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
                 "error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
