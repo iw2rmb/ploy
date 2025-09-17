@@ -12,8 +12,18 @@ import (
 // generateDockerfileWithFacts writes a simple Dockerfile into srcDir based on detected project markers.
 // Supports Go, Node.js, Python, .NET, and JVM via Gradle/Maven. For other stacks, returns an error.
 func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error {
-	// Java/Scala (JVM) via Gradle/Maven multi-stage, selecting eclipse-temurin:<ver>-jre
-	if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
+    // Ensure we infer JVM build tool even if facts weren't populated upstream
+    if facts.BuildTool == "" && facts.Language == "" {
+        if fileExists(filepath.Join(srcDir, "build.gradle.kts")) || fileExists(filepath.Join(srcDir, "build.gradle")) {
+            facts.Language = "java"
+            facts.BuildTool = "gradle"
+        } else if fileExists(filepath.Join(srcDir, "pom.xml")) {
+            facts.Language = "java"
+            facts.BuildTool = "maven"
+        }
+    }
+    // Java/Scala (JVM) via Gradle/Maven multi-stage, selecting eclipse-temurin:<ver>-jre
+    if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
 		v := facts.Versions.Java
 		if v == "" {
 			v = "17"
