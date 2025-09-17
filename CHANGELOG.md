@@ -24,6 +24,7 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 - API Recipes: Added handler regression tests covering invalid payloads, storage failures, and missing registry wiring, plus adapter latest-version coverage to lift recipe catalog confidence.
 - Build: Added unit tests for `internal/build` covering error formatting/parsing, log retrieval handler, request body ingestion, unified storage artifact uploads, WASM artifact discovery, and orchestration helpers. Improves `internal/build` unit coverage and ensures the package is exercised in local test runs.
+- Nomad wrapper: Added `purge` command to `/opt/hashicorp/bin/nomad-job-manager.sh` supporting `--job` and `--prefix` modes with `--dry-run`, `--limit`, and `--yes` safety guard. Enables single-command cleanup of completed batch jobs (e.g., `orw-apply-*`, `mods-llm-exec-*`).
 
 ### Changed
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.

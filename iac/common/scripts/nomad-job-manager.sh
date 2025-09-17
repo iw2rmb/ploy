@@ -1,7 +1,7 @@
 #!/bin/bash
 # Nomad Job Manager - HTTP API wrapper to prevent 429 rate limiting
 # Usage: nomad-job-manager.sh <command> --param value
-# Commands: stop, run, status, wait, allocs, alloc-status, running-alloc, logs, cleanup, validate
+# Commands: stop, run, status, wait, allocs, alloc-status, running-alloc, logs, cleanup, validate, purge
 
 set -e
 
@@ -22,6 +22,10 @@ parse_params() {
         case $1 in
             --job)
                 JOB_NAME="$2"
+                shift 2
+                ;;
+            --prefix)
+                PREFIX_FILTER="$2"
                 shift 2
                 ;;
             --file)
@@ -64,6 +68,22 @@ parse_params() {
                 SINCE_TS="$2"
                 shift 2
                 ;;
+            --dry-run)
+                DRY_RUN="true"
+                shift
+                ;;
+            --include-running)
+                INCLUDE_RUNNING="true"
+                shift
+                ;;
+            --limit)
+                PURGE_LIMIT="$2"
+                shift 2
+                ;;
+            --yes|--confirm)
+                CONFIRM="true"
+                shift
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -99,6 +119,12 @@ Commands:
       --since "YYYY-MM-DD HH:MM:SS"        Only lines at or after this timestamp (format must match log prefix)
   cleanup --job <name>                      Clean up stale service registrations
   validate --file <file>                   Validate a Nomad job file (HCL or JSON)
+  purge [--job <name> | --prefix <prefix>] Purge job(s) from Nomad history
+    Options:
+      --dry-run                            Preview matching jobs, no changes
+      --include-running                    Include non-dead jobs (off by default)
+      --limit <N>                          Max jobs to purge when using --prefix (default: 100)
+      --yes                                Required to purge multiple jobs matched by --prefix
 
 Examples:
   $0 stop --job ploy-api
@@ -108,6 +134,9 @@ Examples:
   $0 logs --alloc-id abc123 --both --follow
   $0 allocs --job ploy-api --format json
   $0 validate --file job.hcl
+  $0 purge --job old-batch-job
+  $0 purge --prefix orw-apply- --dry-run
+  $0 purge --prefix mods-llm-exec- --yes --limit 50
 EOF
 }
 
@@ -522,6 +551,83 @@ validate_job() {
     return 0
 }
 
+purge_jobs() {
+    local limit=${PURGE_LIMIT:-100}
+    # Single job purge
+    if [ -n "${JOB_NAME:-}" ]; then
+        log "Purging job: $JOB_NAME"
+        if [ "${DRY_RUN:-}" = "true" ]; then
+            echo "DRY-RUN would purge $JOB_NAME"
+            return 0
+        fi
+        if http_request "DELETE" "$NOMAD_ADDR/v1/job/$JOB_NAME?purge=true" "" "200 404" >/dev/null; then
+            log "Purged $JOB_NAME"
+            return 0
+        else
+            log "Failed to purge $JOB_NAME"
+            return 1
+        fi
+    fi
+
+    # Prefix-based purge
+    if [ -z "${PREFIX_FILTER:-}" ]; then
+        echo "Error: purge requires --job <name> or --prefix <prefix>" >&2
+        show_help
+        exit 1
+    fi
+
+    log "Listing jobs for purge with prefix: $PREFIX_FILTER (dead-only: ${INCLUDE_RUNNING:+false}${INCLUDE_RUNNING:-true}, limit: $limit)"
+    local jobs_json
+    if ! jobs_json=$(http_request "GET" "$NOMAD_ADDR/v1/jobs" "" "200"); then
+        log "Failed to list jobs"
+        return 1
+    fi
+
+    local jq_expr
+    if [ "${INCLUDE_RUNNING:-}" = "true" ]; then
+        jq_expr='.[] | select(.ID | startswith($p)) | .ID'
+    else
+        jq_expr='.[] | select(.Status=="dead" and (.ID | startswith($p))) | .ID'
+    fi
+
+    # Build list, enforce limit
+    mapfile -t ids < <(printf '%s' "$jobs_json" | jq -r --arg p "$PREFIX_FILTER" "$jq_expr" | head -n "$limit")
+
+    if [ ${#ids[@]} -eq 0 ]; then
+        echo "No matching jobs to purge"
+        return 0
+    fi
+
+    echo "Matches (up to $limit):"
+    for id in "${ids[@]}"; do
+        echo "  $id"
+    done
+
+    if [ "${DRY_RUN:-}" = "true" ]; then
+        echo "DRY-RUN only; no jobs purged"
+        return 0
+    fi
+
+    # Safety guard for bulk purge
+    if [ ${#ids[@]} -gt 1 ] && [ "${CONFIRM:-}" != "true" ]; then
+        echo "Refusing to purge ${#ids[@]} jobs without --yes. Re-run with --dry-run to preview."
+        return 2
+    fi
+
+    local purged=0 failed=0
+    for id in "${ids[@]}"; do
+        if http_request "DELETE" "$NOMAD_ADDR/v1/job/$id?purge=true" "" "200 404" >/dev/null; then
+            echo "purged $id"
+            purged=$((purged+1))
+        else
+            echo "failed  $id"
+            failed=$((failed+1))
+        fi
+        sleep 0.2
+    done
+    echo "SUMMARY purged=$purged failed=$failed"
+}
+
 # Main command routing
 COMMAND=$1
 shift
@@ -568,6 +674,10 @@ case "$COMMAND" in
     
     "validate")
         validate_job
+        ;;
+    
+    "purge")
+        purge_jobs
         ;;
     
     "help"|"--help"|"-h"|"")
