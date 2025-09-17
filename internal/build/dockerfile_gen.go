@@ -102,10 +102,18 @@ ENTRYPOINT ["/app"]
 `
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
 	}
-	// Node
-	pkgJSON := filepath.Join(srcDir, "package.json")
-	if _, err := os.Stat(pkgJSON); err == nil {
-		content := `FROM node:20-alpine
+    // Node via template (npm)
+    pkgJSON := filepath.Join(srcDir, "package.json")
+    if _, err := os.Stat(pkgJSON); err == nil {
+        v := facts.Versions.Node
+        if v == "" { v = "20" }
+        type data struct { NodeVersion string }
+        d := data{NodeVersion: v}
+        if rendered, err := templates.Render("dockerfiles/node/npm.Dockerfile.tmpl", d); err == nil {
+            return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+        }
+        // Fallback inline
+        content := fmt.Sprintf(`FROM node:%s-alpine
 WORKDIR /app
 COPY package.json .
 RUN npm install --omit=dev || true
@@ -113,32 +121,28 @@ COPY . .
 ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "index.js"]
-`
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-	}
-	// Python
-	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
-	// Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
-	if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
-		v := facts.Versions.Python
-		if v == "" {
-			v = "3.12"
-		}
-		// Normalize to major.minor
-		if parts := strings.Split(v, "."); len(parts) >= 2 {
-			v = parts[0] + "." + parts[1]
-		}
-		base := fmt.Sprintf("python:%s-slim", v)
-		// Detect app servers
-		hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
-		hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
-		cmd := `CMD ["python", "app.py"]`
-		if hasGunicorn {
-			cmd = `CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]`
-		} else if hasUvicorn {
-			cmd = `CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]`
-		}
-		content := fmt.Sprintf(`FROM %s
+`, v)
+        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+    }
+    // Python via template
+    // Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
+    // Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
+    if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
+        v := facts.Versions.Python
+        if v == "" { v = "3.12" }
+        if parts := strings.Split(v, "."); len(parts) >= 2 { v = parts[0] + "." + parts[1] }
+        hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
+        hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
+        type data struct { PythonVersion string; UseGunicorn bool; UseUvicorn bool }
+        d := data{PythonVersion: v, UseGunicorn: hasGunicorn, UseUvicorn: hasUvicorn}
+        if rendered, err := templates.Render("dockerfiles/python/default.Dockerfile.tmpl", d); err == nil {
+            return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+        }
+        // Fallback inline
+        base := fmt.Sprintf("python:%s-slim", v)
+        cmd := `CMD ["python", "app.py"]`
+        if hasGunicorn { cmd = `CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]` } else if hasUvicorn { cmd = `CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]` }
+        content := fmt.Sprintf(`FROM %s
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -149,8 +153,8 @@ RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no
 EXPOSE 8080
 %s
 `, base, cmd)
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-	}
+        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+    }
 	// .NET
 	// Detect .NET projects by presence of *.csproj
 	if csproj := findFirstCsproj(srcDir); csproj != "" {
