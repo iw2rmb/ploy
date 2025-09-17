@@ -31,12 +31,12 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 	if wasmPath != "" {
 		if deps.Storage != nil {
 			ctxUp := context.Context(c.Context())
-			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, key, "application/wasm"); err != nil {
+			if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, key, "application/wasm"); err != nil {
 				return "", utils.ErrJSON(c, 500, fmt.Errorf("upload wasm failed: %w", err))
 			}
 			// If distroless runner is enabled, also publish a stable artifact path
 			if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
-				if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, "artifacts/module.wasm", "application/wasm"); err != nil {
+				if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, "artifacts/module.wasm", "application/wasm"); err != nil {
 					return "", utils.ErrJSON(c, 500, fmt.Errorf("upload wasm (artifacts) failed: %w", err))
 				}
 			}
@@ -64,7 +64,7 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 	var contextURL string
 	if deps.Storage != nil {
 		ctxUp := context.Context(c.Context())
-		if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, ctxKey, "application/x-tar"); err != nil {
+		if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, ctxKey, "application/x-tar"); err != nil {
 			return "", utils.ErrJSON(c, 500, fmt.Errorf("failed to upload build context: %w", err))
 		}
 		base := os.Getenv("PLOY_SEAWEEDFS_URL")
