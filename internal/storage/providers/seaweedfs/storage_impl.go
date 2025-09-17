@@ -1,36 +1,68 @@
 package seaweedfs
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"io"
-	"net/http"
-	"time"
+    "bytes"
+    "context"
+    "fmt"
+    "io"
+    "net/http"
+    "path"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/storage"
+    "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // Storage interface implementation
 
 func (p *Provider) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	return p.GetObject(p.collection, key)
+    url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, key)
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+    if err != nil {
+        return nil, err
+    }
+    resp, err := p.httpClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    if resp.StatusCode != http.StatusOK {
+        _ = resp.Body.Close()
+        return nil, fmt.Errorf("get object failed: %s", resp.Status)
+    }
+    return resp.Body, nil
 }
 
 func (p *Provider) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
-	contentType := "application/octet-stream"
-	var readSeeker io.ReadSeeker
-	if rs, ok := reader.(io.ReadSeeker); ok {
-		readSeeker = rs
-	} else {
-		data, err := io.ReadAll(reader)
-		if err != nil {
-			return fmt.Errorf("failed to read data: %w", err)
-		}
-		readSeeker = bytes.NewReader(data)
-	}
-	_, err := p.PutObject(p.collection, key, readSeeker, contentType)
-	return err
+    // Apply options
+    contentType := "application/octet-stream"
+    po := &storage.putOptions{}
+    for _, fn := range opts {
+        if fn != nil {
+            fn(po)
+        }
+    }
+    if po.ContentType != "" {
+        contentType = po.ContentType
+    }
+    // Construct URL and ensure forward-slash normalization
+    url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, path.Clean("/"+key))
+    req, err := http.NewRequestWithContext(ctx, "PUT", url, reader)
+    if err != nil {
+        return err
+    }
+    req.Header.Set("Content-Type", contentType)
+    resp, err := p.httpClient.Do(req)
+    if err != nil {
+        return err
+    }
+    defer func() { _ = resp.Body.Close() }()
+    if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+        body, _ := io.ReadAll(resp.Body)
+        if len(body) > 0 {
+            return fmt.Errorf("put failed: %s: %s", resp.Status, string(body))
+        }
+        return fmt.Errorf("put failed: %s", resp.Status)
+    }
+    return nil
 }
 
 func (p *Provider) Delete(ctx context.Context, key string) error {
@@ -58,21 +90,47 @@ func (p *Provider) Exists(ctx context.Context, key string) (bool, error) {
 }
 
 func (p *Provider) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
-	infos, err := p.ListObjects(p.collection, opts.Prefix)
-	if err != nil {
-		return nil, err
-	}
-	objects := make([]storage.Object, len(infos))
-	for i, info := range infos {
-		var lastModified time.Time
-		if info.LastModified != "" {
-			if parsed, err := time.Parse(time.RFC3339, info.LastModified); err == nil {
-				lastModified = parsed
-			}
-		}
-		objects[i] = storage.Object{Key: info.Key, Size: info.Size, ContentType: info.ContentType, ETag: info.ETag, LastModified: lastModified, Metadata: make(map[string]string)}
-	}
-	return objects, nil
+    // Fetch JSON listing from filer
+    url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, opts.Prefix)
+    req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+    if err != nil {
+        return nil, err
+    }
+    req.Header.Set("Accept", "application/json")
+    resp, err := p.httpClient.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer func() { _ = resp.Body.Close() }()
+    if resp.StatusCode == http.StatusNotFound {
+        return []storage.Object{}, nil
+    }
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("failed to list objects: %s", resp.Status)
+    }
+    var result struct {
+        Entries []struct {
+            FullPath string `json:"FullPath"`
+            FileSize int64  `json:"FileSize"`
+            Mode     int64  `json:"Mode"`
+            Mtime    string `json:"Mtime"`
+        } `json:"Entries"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, fmt.Errorf("failed to decode response: %w", err)
+    }
+    var objects []storage.Object
+    for _, entry := range result.Entries {
+        name := path.Base(entry.FullPath)
+        var lastModified time.Time
+        if entry.Mtime != "" {
+            if parsed, err := time.Parse(time.RFC3339, entry.Mtime); err == nil {
+                lastModified = parsed
+            }
+        }
+        objects = append(objects, storage.Object{Key: name, Size: entry.FileSize, LastModified: lastModified, ContentType: "application/octet-stream", Metadata: make(map[string]string)})
+    }
+    return objects, nil
 }
 
 func (p *Provider) DeleteBatch(ctx context.Context, keys []string) error {
