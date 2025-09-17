@@ -20,6 +20,7 @@
 - Developer workflow: added `.pre-commit-config.yaml` to run `make fmt` and `golangci-lint run` on commit; documented in AGENTS.md and docs/TESTING.md.
  - CI: added GitHub Actions job to execute pre-commit hooks across all files.
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
+- API Recipes: Added handler regression tests covering invalid payloads, storage failures, and missing registry wiring, plus adapter latest-version coverage to lift recipe catalog confidence.
 
 ### Changed
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.
@@ -28,6 +29,7 @@
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - API: Fixed SeaweedFS health readiness regression by creating storage clients from the centralized config service without requiring a metrics shim, preventing Nomad canaries from failing `/v1/health` with nil-pointer panics.
+- API Recipes: Registry storage adapter now semver-sorts recipe versions so latest-version lookups favor the highest semantic release.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
 - internal/mods: Extracted DI/accessors and tiny helpers from `runner.go` into `runner_di.go` and `runner_helpers.go` to reduce LOC and improve maintainability. No behavior changes.
  - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.

@@ -17,6 +17,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
 - **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
+- **Recipe Catalog Coverage** (Sep 2025): REST handlers assert invalid payload, storage failure, and missing registry behaviors; registry adapter tests verify semantic version ordering for latest lookups.
 - **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply) to improve lane readiness.
 - **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides, lane G distroless runner selection, and Nomad monitor timeout behaviour.
 - **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.

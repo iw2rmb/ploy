@@ -3,8 +3,11 @@ package recipes
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/iw2rmb/ploy/api/recipes/models"
+	"golang.org/x/mod/semver"
 )
 
 // RegistryStorageAdapter adapts RecipeRegistry to the RecipeStorage interface
@@ -88,6 +91,9 @@ func (a *RegistryStorageAdapter) GetRecipeVersions(ctx context.Context, name str
 			out = append(out, r)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool {
+		return compareRecipeVersions(out[i].Metadata.Version, out[j].Metadata.Version) > 0
+	})
 	return out, nil
 }
 
@@ -100,6 +106,35 @@ func (a *RegistryStorageAdapter) GetLatestRecipe(ctx context.Context, name strin
 		return nil, fmt.Errorf("no versions found for recipe %s", name)
 	}
 	return versions[0], nil
+}
+
+func compareRecipeVersions(v1, v2 string) int {
+	n1, ok1 := normalizeSemver(v1)
+	n2, ok2 := normalizeSemver(v2)
+
+	switch {
+	case ok1 && ok2:
+		return semver.Compare(n1, n2)
+	case ok1:
+		return 1
+	case ok2:
+		return -1
+	default:
+		return strings.Compare(v1, v2)
+	}
+}
+
+func normalizeSemver(version string) (string, bool) {
+	if version == "" {
+		return "", false
+	}
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	if semver.IsValid(version) {
+		return version, true
+	}
+	return "", false
 }
 
 // Bulk
