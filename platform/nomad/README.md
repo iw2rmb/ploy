@@ -51,7 +51,7 @@ DEBUG_PORT = "5005"
 ```hcl
 # ❌ Nested conditionals
 {{#if CONNECT_ENABLED}}
-  {{#if VAULT_ENABLED}}
+  {{#if DEBUG_ENABLED}}
     # This causes parsing errors
   {{/if}}
 {{/if}}
@@ -63,9 +63,8 @@ DEBUG_PORT = "5005"
 
 **Always Enabled**:
 - **Consul Connect**: Service mesh for secure communication
-- **HashiCorp Vault**: Secrets management and PKI
 - **Persistent Volumes**: Data persistence and heap dumps  
-- **Consul KV**: Configuration management
+- **Consul KV**: Configuration management and secrets templating
 
 **Rationale**: Enterprise features provide security, observability, and reliability needed for production workloads.
 
@@ -78,7 +77,7 @@ DEBUG_PORT = "5005"
 platform/nomad/
 ├── base/
 │   ├── common.hcl        # Shared infrastructure blocks
-│   ├── enterprise.hcl    # Vault, Connect, volumes
+│   ├── enterprise.hcl    # Connect, volumes
 │   └── networking.hcl    # Service registration, load balancing
 └── languages/
     ├── java.hcl          # Java-specific overrides
@@ -136,10 +135,10 @@ job "{{APP_NAME}}-lane-{LANE}" {
   # 3. Volume configuration for data persistence
   # 4. Service mesh integration (Consul Connect)
   # 5. Task configuration with runtime-specific settings
-  # 6. Vault integration for secrets
+  # 6. Secrets templating via Consul KV
   # 7. Volume mounts for persistent data  
   # 8. Environment variables (language-specific)
-  # 9. Configuration templates (Consul KV + Vault)
+  # 9. Configuration templates (Consul KV)
   # 10. Service registration with health checks
   # 11. Resource allocation (optimized for language)
   # 12. Lifecycle management (startup/shutdown)
@@ -280,40 +279,6 @@ consul kv put ploy/templates/lane-c-java.hcl @platform/nomad/lane-c-java.hcl
 # Verify update
 consul kv get ploy/templates/lane-c-java.hcl
 ```
-
-## Migration from Conditional Templates
-
-### Legacy Template Issues
-
-**Before** (conditional-heavy):
-```hcl
-{{#if VAULT_ENABLED}}
-vault {
-  policies = ["{{APP_NAME}}-policy"]
-}
-{{/if}}
-```
-- ❌ Nested conditionals caused HCL parsing errors
-- ❌ Complex template processing logic  
-- ❌ Hard to debug and maintain
-
-**After** (language-specific):
-```hcl  
-# Always enabled - no conditionals
-vault {
-  policies = ["{{APP_NAME}}-policy"]  
-}
-```
-- ✅ Simple variable substitution only
-- ✅ Clean, readable templates
-- ✅ No parsing errors
-
-### Migration Benefits
-
-- **Reliability**: No HCL parsing errors from conditional processing
-- **Performance**: Faster template rendering without conditional evaluation  
-- **Maintainability**: Language-specific optimization without conditional complexity
-- **Extensibility**: Easy to add new languages without affecting existing templates
 
 ## Troubleshooting
 

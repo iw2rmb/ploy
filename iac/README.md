@@ -4,7 +4,7 @@ Ansible automation for provisioning and operating the Ploy platform. This README
 
 ## Scope
 
-- Provisions platform services: SeaweedFS, Nomad, Consul, Vault, Traefik, and the Ploy API.
+- Provisions platform services: SeaweedFS, Nomad, Consul, Traefik, and the Ploy API.
 - Supports both development (single‑node) and production (multi‑node) environments.
 - Optional FreeBSD workers for jail/VM lanes.
 - Shared templates under `iac/common/templates/` are the single source of truth.
@@ -40,7 +40,7 @@ Refer to `iac/dev/README.md` and `iac/prod/README.md` for environment‑specific
 - Prod:
   - Inventory with multiple hosts; SSH access established.
   - Production DNS credentials exported; registry creds configured.
-  - Nomad/Consul/Vault persistence and ACLs planned/enabled.
+  - Nomad/Consul persistence and ACLs planned/enabled.
 
 ## Run Commands
 

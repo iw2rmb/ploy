@@ -129,7 +129,7 @@ The deployment will:
 1. ✅ Validate cluster requirements (3+ nodes, FreeBSD node present)
 2. ✅ Install dependencies on all Linux nodes
 3. ✅ Deploy SeaweedFS with production replication (001)
-4. ✅ Setup HashiCorp stack (Nomad/Consul/Vault) in cluster mode
+4. ✅ Setup HashiCorp stack (Nomad/Consul) in cluster mode
 5. ✅ Deploy Ploy controller with high availability
 6. ✅ Configure FreeBSD nodes as workers
 7. ✅ Provision platform wildcard certificates for `*.ployd.app`
@@ -160,7 +160,6 @@ curl -s https://test-prod-app.ployd.app
 ├─────────────────┤  ├─────────────────┤  ├─────────────────┤
 │ • Nomad Server  │  │ • Nomad Server  │  │ • Nomad Client  │
 │ • Consul Server │  │ • Consul Server │  │ • Jail Runtime  │
-│ • Vault Server  │  │ • Vault Server  │  │                 │
 │ • SeaweedFS     │  │ • SeaweedFS     │  │                 │
 │ • Traefik       │  │ • Nomad Client  │  │                 │
 │ • Controller    │  │                 │  │                 │
@@ -177,7 +176,6 @@ curl -s https://test-prod-app.ployd.app
 
 - **3x Nomad servers**: Fault-tolerant job scheduling
 - **3x Consul servers**: Service discovery and configuration
-- **3x Vault servers**: Secret management
 - **SeaweedFS replication**: Data redundancy (001 mode)
 - **Controller replicas**: 3 instances for high availability
 
@@ -248,19 +246,17 @@ ansible-playbook site.yml -i inventory/hosts.yml --tags=update
 - **80/443**: HTTP/HTTPS (Traefik)
 - **4646**: Nomad
 - **8500**: Consul
-- **8200**: Vault
 - **8081**: Controller
 - **9333/8888/8080**: SeaweedFS
 
 ### SSL/TLS
 - **Platform certificates**: Let's Encrypt wildcard for `*.ployd.app`
 - **App domain certificates**: Individual certificates for custom domains
-- **Internal TLS**: Consul/Vault/Nomad inter-service communication
+- **Internal TLS**: Consul/Nomad inter-service communication
 
 ### Access Control
 - **Nomad ACLs**: Enabled in production
 - **Consul ACLs**: Enabled in production  
-- **Vault authentication**: Token-based with policies
 - **Controller API**: JWT-based authentication
 
 ## Troubleshooting

@@ -81,11 +81,6 @@ consul {
   client_auto_join = true
 }
 
-vault {
-  enabled = false
-  address = "http://{{ hostvars[groups['linux_hosts'][0]]['ansible_default_ipv4']['address'] }}:8200"
-}
-
 # FreeBSD jail driver configuration
 plugin "jail" {
   config {

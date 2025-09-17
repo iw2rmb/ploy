@@ -65,7 +65,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 
 ## Architecture
 
-**Stack:** Nomad v1.10.4, Consul v1.21.4, Vault v1.20.2, Traefik v3.5.0, SeaweedFS v3.96, Docker Registry v2, Docker, Go
+**Stack:** Nomad v1.10.4, Consul v1.21.4, Traefik v3.5.0, SeaweedFS v3.96, Docker Registry v2, Docker, Go
 
 **Lanes:** A/B (Unikraft), C (OSv/Hermit), D (FreeBSD jails), E (OCI containers), F (VMs)
 
@@ -76,7 +76,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 | **site.yml** | Complete infrastructure orchestration with service ordering | N/A |
 | **main.yml** | Base VPS setup, Docker, Go, build tools | ✅ Optimized |
 | **seaweedfs.yml** | Distributed storage with collections | ✅ Optimized |
-| **hashicorp.yml** | Nomad, Consul, Vault, Traefik deployment (Nomad system job; node.class=gateway) | ✅ Optimized |
+| **hashicorp.yml** | Nomad, Consul, Traefik deployment (Nomad system job; node.class=gateway) | ✅ Optimized |
 | **docker-registry.yml** | Docker Registry v2 container storage | 🚀 New (Aug 2025) |
 | **api.yml** | Ploy API deployment via Nomad | ✅ Optimized |
 | **testing.yml** | Test environment and Ploy binaries | 🚀 Newly optimized (60-80% faster) |
@@ -84,7 +84,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 
 ## Configuration
 
-**Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Vault 1.20.2, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
+**Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
 
 ### Traefik placement
 
@@ -145,7 +145,6 @@ iac/
 │   ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
 │   ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
 │   ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│   ├── vault.hcl.j2           # Vault configuration
 │   └── *.j2                   # Management scripts and service templates
 ├── dev/playbooks/             # Dev-specific playbooks referencing common templates
 └── prod/playbooks/            # Prod-specific playbooks using same templates
@@ -233,7 +232,7 @@ curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
 
 ## Services After Setup
 
-**Services:** Ploy Controller via Nomad (dynamic port, accessed via https://api.dev.ployman.app), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Vault (8200), Metrics (9100)
+**Services:** Ploy Controller via Nomad (dynamic port, accessed via https://api.dev.ployman.app), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Metrics (9100)
 
 **Container Registry:** Docker Registry v2 at `registry.dev.ployman.app` (lightweight alternative to Harbor)
 - **Storage**: Local filesystem persistence
@@ -294,7 +293,6 @@ ssh freebsd@192.168.100.10
 |----------|----------|
 | **consul-server.hcl.j2** | Consul cluster configuration |
 | **nomad-server.hcl.j2** | Nomad scheduler configuration |
-| **vault.hcl.j2** | Vault secrets management config |
 | **nomad-ploy-api.hcl.j2** | Controller Nomad job with HA deployment |
 | **update-api.sh.j2** | Controller rolling update script |
 | **rollback-api.sh.j2** | Controller rollback script |
@@ -312,12 +310,12 @@ ssh freebsd@192.168.100.10
 
 ```bash
 # Services
-systemctl status {nomad,consul,vault,seaweedfs-*,node-exporter,docker}
+systemctl status {nomad,consul,seaweedfs-*,node-exporter,docker}
 journalctl -u {service-name} -f
 
 # HashiCorp cluster
 nomad {node status,job status traefik}
-consul members && vault status
+consul members
 
 # Docker troubleshooting
 systemctl status docker
@@ -356,7 +354,7 @@ time ansible-playbook playbooks/{testing,freebsd}.yml
 
 ## Security & Performance
 
-**Development Mode:** Vault auto-unseal, Consul no ACLs, Traefik insecure, SeaweedFS no auth
+**Development Mode:** Consul no ACLs, Traefik insecure, SeaweedFS no auth
 **Production:** Enable proper secrets, ACLs, TLS, authentication
 
 **Optimizations:** 60-80% faster redeployments, smart package management, conditional builds, service reuse
@@ -365,7 +363,7 @@ time ansible-playbook playbooks/{testing,freebsd}.yml
 
 ```bash
 # Stop services
-sudo systemctl stop nomad consul vault seaweedfs-* node-exporter docker
+sudo systemctl stop nomad consul seaweedfs-* node-exporter docker
 
 # Clean data
 rm -rf /home/ploy/ploy/build/* /opt/ploy/* /var/lib/seaweedfs/*
