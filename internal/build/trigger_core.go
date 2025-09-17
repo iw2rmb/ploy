@@ -89,6 +89,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
 	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
+	// Precompute and expose a deployment identifier early for error paths (used by clients to fetch logs)
+	// Lane C builder jobs follow the pattern: <app>-c-build-<sha>
+	if strings.ToUpper(lane) == "C" {
+		depID := fmt.Sprintf("%s-c-build-%s", appName, sha)
+		if depID != "" {
+			c.Set("X-Deployment-ID", depID)
+		}
+	}
 	if strings.ToUpper(lane) == "E" {
 		// Early Lane E marker to confirm flow reaches Lane E before builder-specific code
 		fmt.Printf("[Lane E] Begin app=%s sha=%s lang=%s tool=%s hasJib=%t hasDockerfile=%t java=%s autogen_q=%s env_autogen=%s\n",
