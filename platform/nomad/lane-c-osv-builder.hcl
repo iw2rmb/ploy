@@ -24,7 +24,7 @@ job "{{APP_NAME}}-c-build-{{VERSION}}" {
       config {
         image = "maven:3.9.6-eclipse-temurin-17"
         entrypoint = ["/bin/sh", "-lc"]
-        args = ["set -eux; WORKDIR=/workspace/app; mkdir -p $WORKDIR; curl -fsSL \"$CONTEXT_URL\" -o /workspace/src.tar; tar -xf /workspace/src.tar -C $WORKDIR; cd $WORKDIR; mvn -B -q -DskipTests compile; mkdir -p $(dirname \"$OUTPUT_PATH\"); echo 'lane-c artifact placeholder' > \"$OUTPUT_PATH\";"]
+        args = ["set -eux; WORKDIR=/workspace/app; mkdir -p $WORKDIR; curl -fsSL \"$CONTEXT_URL\" -o /workspace/src.tar; tar -xf /workspace/src.tar -C $WORKDIR; cd $WORKDIR; if [ -d src/healing/java ]; then mkdir -p src/main/java && cp -R src/healing/java/. src/main/java/; fi; mvn -B -q -DskipTests compile; mkdir -p $(dirname \"$OUTPUT_PATH\"); echo 'lane-c artifact placeholder' > \"$OUTPUT_PATH\";"]
         volumes = ["/opt/ploy:/host/opt/ploy"]
       }
 
