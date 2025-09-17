@@ -14,10 +14,7 @@ func TestHandleCoordinationHealth_Disabled(t *testing.T) {
 	app.Get("/health/coordination", s.handleCoordinationHealth)
 
 	req := httptest.NewRequest("GET", "/health/coordination", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200 status, got %d", resp.StatusCode)
 	}

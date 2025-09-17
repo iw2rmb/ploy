@@ -48,17 +48,20 @@ func verifyOCIPush(tag string) verifyResult {
 	if err != nil {
 		return verifyResult{OK: false, Status: 0, Message: "registry check failed: " + err.Error()}
 	}
-	defer resp.Body.Close()
 	// Some registries may not support HEAD. Fall back to GET on 405.
 	if resp.StatusCode == http.StatusMethodNotAllowed {
 		req.Method = "GET"
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		resp, err = client.Do(req)
 		if err != nil {
 			return verifyResult{OK: false, Status: 0, Message: "registry GET failed: " + err.Error()}
 		}
-		defer resp.Body.Close()
 	}
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 	vr := verifyResult{Status: resp.StatusCode}
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		vr.OK = true

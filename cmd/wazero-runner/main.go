@@ -32,7 +32,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "download temp create failed: %v\n", err)
 			os.Exit(1)
 		}
-		defer tmp.Close()
+		defer func() { _ = tmp.Close() }()
 		if err := fetchToFile(*moduleURL, tmp); err != nil {
 			fmt.Fprintf(os.Stderr, "download failed: %v\n", err)
 			os.Exit(1)
@@ -78,7 +78,7 @@ func fetchToFile(url string, out *os.File) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("http %d", resp.StatusCode)
 	}
@@ -89,7 +89,7 @@ func fetchToFile(url string, out *os.File) error {
 func runOnce(path string) error {
 	ctx := context.Background()
 	rt := wazero.NewRuntime(ctx)
-	defer rt.Close(ctx)
+	defer func() { _ = rt.Close(ctx) }()
 	if _, err := wasi.Instantiate(ctx, rt); err != nil {
 		return err
 	}

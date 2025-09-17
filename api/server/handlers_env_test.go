@@ -28,13 +28,13 @@ func TestEnvHandlers_CRUD(t *testing.T) {
 	b, _ := json.Marshal(body)
 	req := httptest.NewRequest("POST", "/v1/apps/myapp/env", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ := app.Test(req)
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("set env vars expected 200, got %d", resp.StatusCode)
 	}
 
 	// GET
-	resp, _ = app.Test(httptest.NewRequest("GET", "/v1/apps/myapp/env", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("GET", "/v1/apps/myapp/env", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("get env vars expected 200, got %d", resp.StatusCode)
 	}
@@ -43,13 +43,13 @@ func TestEnvHandlers_CRUD(t *testing.T) {
 	pb := []byte(`{"value":"3"}`)
 	req = httptest.NewRequest("PUT", "/v1/apps/myapp/env/A", bytes.NewReader(pb))
 	req.Header.Set("Content-Type", "application/json")
-	resp, _ = app.Test(req)
+	resp = mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("put env var expected 200, got %d", resp.StatusCode)
 	}
 
 	// DELETE
-	resp, _ = app.Test(httptest.NewRequest("DELETE", "/v1/apps/myapp/env/B", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("DELETE", "/v1/apps/myapp/env/B", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("delete env var expected 200, got %d", resp.StatusCode)
 	}

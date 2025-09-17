@@ -20,10 +20,7 @@ func TestRecipeCatalogPing_OK(t *testing.T) {
 	}
 	srv.app.Get("/_test/recipes/ping", srv.handleRecipeCatalogPing)
 	req := httptest.NewRequest("GET", "/_test/recipes/ping", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -37,10 +34,7 @@ func TestRecipeCatalogList_OK(t *testing.T) {
 	}
 	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
 	req := httptest.NewRequest("GET", "/_test/recipes?language=java&tag=cleanup", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -64,10 +58,7 @@ func TestRecipeCatalogList_StorageBacked_OK(t *testing.T) {
 
 	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
 	req := httptest.NewRequest("GET", "/_test/recipes?tag=cleanup", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -91,10 +82,7 @@ func TestRecipeCatalogList_StorageBacked_LanguageFilter(t *testing.T) {
 
 	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
 	req := httptest.NewRequest("GET", "/_test/recipes?language=java", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -127,10 +115,7 @@ func TestRecipeCatalogGet_StorageBacked_OK(t *testing.T) {
 	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
 
 	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -153,10 +138,7 @@ func TestRecipeCatalogList_StorageBacked_PayloadFields(t *testing.T) {
 
 	srv.app.Get("/_test/recipes", srv.handleRecipeCatalogList)
 	req := httptest.NewRequest("GET", "/_test/recipes", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}
@@ -180,10 +162,7 @@ func TestRecipeCatalogGet_StorageBacked_PayloadFields(t *testing.T) {
 	srv.app.Get("/_test/recipes/:id", srv.handleRecipeCatalogGet)
 
 	req := httptest.NewRequest("GET", "/_test/recipes/org.openrewrite.java.format.AutoFormat", nil)
-	resp, err := srv.app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(srv.app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected status: %d", resp.StatusCode)
 	}

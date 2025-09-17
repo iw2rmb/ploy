@@ -2,6 +2,7 @@ package recipes
 
 import (
 	"fmt"
+	"sort"
 )
 
 // NewHelpSystem creates a new help system with all command documentation
@@ -30,10 +31,11 @@ func (hs *HelpSystem) ShowHelp(command string) error {
 
 // GetAvailableHelp returns list of available help topics
 func (hs *HelpSystem) GetAvailableHelp() []string {
-	var topics []string
+	topics := make([]string, 0, len(hs.commands))
 	for cmd := range hs.commands {
 		topics = append(topics, cmd)
 	}
+	sort.Strings(topics)
 	return topics
 }
 
