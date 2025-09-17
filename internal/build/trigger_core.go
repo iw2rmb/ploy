@@ -395,7 +395,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	response := makeBuildResponse(strings.ToUpper(lane), imagePath, dockerImage, buildCtx.APIContext, buildCtx.AppType, buildStart, sizeInfo, imageSizeMB, builderJobName, appName, sha, registry.Endpoint, registry.GetProject(buildCtx.AppType), scanResult, scanner)
 
 	// In build-only mode, immediately destroy the sandboxed app to avoid leftovers
-	if c.Query("build_only", "false") == "true" {
+	if c.Query("build_only", "false") == "true" && jobName != "" {
 		log.Printf("[Build] build_only=true: tearing down sandboxed app job=%s", jobName)
 		// Best-effort purge of Nomad job to free resources
 		if err := orchestration.DeregisterJob(jobName, true); err != nil {
