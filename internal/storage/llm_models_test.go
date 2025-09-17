@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/internal/llms/models"
 )
 
 // MockLLMStorage is a simple in-memory storage implementation for testing

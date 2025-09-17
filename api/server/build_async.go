@@ -23,15 +23,19 @@ type buildStatus struct {
 	EndedAt   string `json:"ended_at"`
 }
 
+// uploadsBaseDir is the base directory for async build uploads and status files.
+// It is overridden in tests to avoid writing to system paths.
+var uploadsBaseDir = "/opt/ploy/uploads"
+
 func statusPath(id string) string {
-	dir := "/opt/ploy/uploads"
+	dir := uploadsBaseDir
 	_ = os.MkdirAll(dir, 0755)
 	return filepath.Join(dir, id+".json")
 }
 
 // metaPath stores ancillary info about a build (app, sha, lane) for diagnostics/logs.
 func metaPath(id string) string {
-	dir := "/opt/ploy/uploads"
+	dir := uploadsBaseDir
 	_ = os.MkdirAll(dir, 0755)
 	return filepath.Join(dir, id+".meta.json")
 }
@@ -56,7 +60,7 @@ func (s *Server) handleBuildStatus(c *fiber.Ctx) error {
 func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (string, error) {
 	id := fmt.Sprintf("b-%d", time.Now().UnixNano())
 	// Persist body
-	upDir := "/opt/ploy/uploads"
+	upDir := uploadsBaseDir
 	if err := os.MkdirAll(upDir, 0755); err != nil {
 		return "", err
 	}

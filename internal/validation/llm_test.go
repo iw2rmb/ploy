@@ -3,7 +3,7 @@ package validation
 import (
 	"testing"
 
-	"github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/internal/llms/models"
 )
 
 func TestLLMModelValidator_ValidateLLMModel(t *testing.T) {

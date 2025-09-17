@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	models "github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // importRecipes imports recipes from an archive file

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/internal/llms/models"
 )
 
 // LLMModelValidator provides validation for LLM models
@@ -53,8 +53,8 @@ func (v *LLMModelValidator) validateModelID(id string) error {
 		return fmt.Errorf("model ID too short (minimum 3 characters)")
 	}
 
-	if len(id) > 100 {
-		return fmt.Errorf("model ID too long (maximum 100 characters)")
+	if len(id) > 90 {
+		return fmt.Errorf("model ID too long (maximum 90 characters)")
 	}
 
 	// Check for invalid characters
@@ -138,7 +138,7 @@ func (v *LLMModelValidator) validateAnthropicConfig(config map[string]string) er
 func (v *LLMModelValidator) validateAzureConfig(config map[string]string) error {
 	// Azure requires deployment name
 	if _, exists := config["deployment_name"]; !exists {
-		return fmt.Errorf("azure models require 'deployment_name' in config")
+		return fmt.Errorf("Azure models require 'deployment_name'")
 	}
 
 	validKeys := map[string]bool{

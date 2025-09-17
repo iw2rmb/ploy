@@ -19,6 +19,12 @@ func TestHandleTriggerAppBuild_AsyncAccepted(t *testing.T) {
 	resolveStorageFromConfigService = func(_ *cfgsvc.Service) (istorage.Storage, error) { return memory.NewMemoryStorage(0), nil }
 	t.Cleanup(func() { resolveStorageFromConfigService = orig })
 
+	// Redirect uploads path to a temp dir to avoid permission issues and allow 202 path
+	dir := t.TempDir()
+	old := uploadsBaseDir
+	uploadsBaseDir = dir
+	t.Cleanup(func() { uploadsBaseDir = old })
+
 	s := createMockServer()
 	s.app = fiber.New()
 	s.app.Post("/v1/apps/:app/builds", s.handleTriggerAppBuild)
@@ -30,18 +36,16 @@ func TestHandleTriggerAppBuild_AsyncAccepted(t *testing.T) {
 		t.Fatalf("request failed: %v", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-    if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusInternalServerError {
-        t.Fatalf("unexpected status: %d", resp.StatusCode)
-    }
-    if resp.StatusCode == http.StatusAccepted {
-        var body map[string]any
-        if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-            t.Fatalf("decode: %v", err)
-        }
-        if _, ok := body["id"].(string); !ok {
-            t.Fatalf("expected id in response: %#v", body)
-        }
-    }
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", resp.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := body["id"].(string); !ok {
+		t.Fatalf("expected id in response: %#v", body)
+	}
 }
 
 func TestHandleTriggerBuild_InvalidAppName(t *testing.T) {
