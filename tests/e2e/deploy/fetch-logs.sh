@@ -12,13 +12,24 @@ LANE=${LANE:-}
 SHA=${SHA:-}
 LINES=${LINES:-200}
 FILTER_MARKERS=${FILTER_MARKERS:-}
+START_TS=${START_TS:-}
 FOLLOW=${FOLLOW:-false}
 OUT_DIR=${OUT_DIR:-}
+SHRINK_PLATFORM_LOGS=${SHRINK_PLATFORM_LOGS:-}
 BUILD_ID=${BUILD_ID:-}
 
 if [[ -z "$APP_NAME" ]]; then echo "APP_NAME required" >&2; exit 2; fi
 
 PC=${PLOY_CONTROLLER%/}
+
+# Optional: shrink platform logs by restarting ploy-api alloc (requires TARGET_HOST)
+if [[ "${SHRINK_PLATFORM_LOGS}" =~ ^(1|true|TRUE|on|ON)$ && -n "${TARGET_HOST:-}" ]]; then
+  echo "== Shrinking platform logs by bouncing ploy-api (TARGET_HOST=$TARGET_HOST)" >&2
+  ssh -o ConnectTimeout=10 "root@$TARGET_HOST" \
+    "/opt/hashicorp/bin/nomad-job-manager.sh stop --job ploy-api || true; \
+     /opt/hashicorp/bin/nomad-job-manager.sh run --job ploy-api --file /opt/hashicorp/nomad/jobs/ploy-api.hcl; \
+     /opt/hashicorp/bin/nomad-job-manager.sh wait --job ploy-api --timeout 300" || true
+fi
 
 # Prepare OUT_DIR if provided
 if [[ -n "$OUT_DIR" ]]; then
@@ -41,9 +52,22 @@ if [[ -n "${PC:-}" ]]; then
   echo "== Platform API logs ($LINES, follow=$FOLLOW)" >&2
   if [[ -n "$OUT_DIR" ]]; then
     curl -sf "$PC/platform/api/logs?lines=$LINES&follow=$FOLLOW" | tee "$OUT_DIR/platform_api.log" || true; echo
+    # Optional: time-based slicing — keep only lines at or after START_TS if provided
+    if [[ -n "$START_TS" ]]; then
+      echo "== Platform API logs (sliced since $START_TS)" >&2
+      awk -v start="$START_TS" '
+        {
+          ts="";
+          if (match($0,/^\[([0-9-]{10} [0-9:]{8})\]/, m)) ts=m[1];
+          if (ts=="" && printed==1) { print; next }
+          if (ts!="" && ts >= start) { printed=1; print }
+        }' "$OUT_DIR/platform_api.log" | tee "$OUT_DIR/platform_api.sliced.log" >/dev/null || true; echo
+    fi
     if [[ -n "$FILTER_MARKERS" ]]; then
       echo "== Platform API logs (filtered)" >&2
-      rg -n "$FILTER_MARKERS" "$OUT_DIR/platform_api.log" | tee "$OUT_DIR/platform_api.filtered.log" || true; echo
+      SRC_FILE="$OUT_DIR/platform_api.log"
+      if [[ -f "$OUT_DIR/platform_api.sliced.log" ]]; then SRC_FILE="$OUT_DIR/platform_api.sliced.log"; fi
+      rg -n "$FILTER_MARKERS" "$SRC_FILE" | tee "$OUT_DIR/platform_api.filtered.log" || true; echo
     fi
   else
     curl -sf "$PC/platform/api/logs?lines=$LINES&follow=$FOLLOW" || true; echo
