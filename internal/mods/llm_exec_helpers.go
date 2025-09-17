@@ -67,20 +67,24 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 		}
 		var manifest []string
 		for _, cand := range paths {
-			rel := cand
-			if strings.HasPrefix(rel, repoRoot+string(os.PathSeparator)) {
-				rel = strings.TrimPrefix(rel, repoRoot+string(os.PathSeparator))
+			matched := false
+			for _, rel := range candidateRepoRelativePaths(repoRoot, cand) {
+				if copySourceIfExists(ctxDir, repoRoot, rel, seen, &manifest) {
+					matched = true
+					break
+				}
 			}
-			if _, ok := seen[rel]; ok || strings.TrimSpace(rel) == "" {
+			if matched {
 				continue
 			}
-			seen[rel] = struct{}{}
-			srcAbs := filepath.Join(repoRoot, rel)
-			if b, err := os.ReadFile(srcAbs); err == nil {
-				dst := filepath.Join(ctxDir, "sources", rel)
-				_ = os.MkdirAll(filepath.Dir(dst), 0755)
-				_ = os.WriteFile(dst, b, 0644)
-				manifest = append(manifest, rel)
+			base := strings.TrimSuffix(filepath.Base(cand), filepath.Ext(cand))
+			if base == "" {
+				continue
+			}
+			for _, rel := range findJavaFilesByBasename(repoRoot, []string{base}, 3) {
+				if copySourceIfExists(ctxDir, repoRoot, rel, seen, &manifest) {
+					break
+				}
 			}
 		}
 		if len(manifest) > 0 {
@@ -113,6 +117,76 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 	}
 
 	return ctxDir, nil
+}
+
+func candidateRepoRelativePaths(repoRoot, cand string) []string {
+	repoClean := filepath.ToSlash(filepath.Clean(repoRoot))
+	pathClean := filepath.ToSlash(filepath.Clean(cand))
+	var out []string
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		p = strings.TrimPrefix(p, "./")
+		p = strings.TrimPrefix(p, ".\\")
+		p = strings.TrimPrefix(p, "/")
+		p = strings.TrimPrefix(p, "\\")
+		if p == "" {
+			return
+		}
+		p = filepath.ToSlash(p)
+		for _, existing := range out {
+			if existing == p {
+				return
+			}
+		}
+		out = append(out, p)
+	}
+
+	add(pathClean)
+	if strings.HasPrefix(pathClean, repoClean+"/") {
+		add(pathClean[len(repoClean)+1:])
+	}
+	if idx := strings.Index(pathClean, "/repo/"); idx >= 0 {
+		add(pathClean[idx+len("/repo/"):])
+	}
+	if idx := strings.Index(pathClean, "/src/"); idx >= 0 {
+		add(pathClean[idx+1:])
+	}
+	return out
+}
+
+func copySourceIfExists(ctxDir, repoRoot, rel string, seen map[string]struct{}, manifest *[]string) bool {
+	rel = filepath.ToSlash(strings.TrimSpace(rel))
+	if rel == "" {
+		return false
+	}
+	rel = strings.TrimPrefix(rel, "./")
+	rel = strings.TrimPrefix(rel, ".\\")
+	rel = strings.TrimPrefix(rel, "/")
+	rel = strings.TrimPrefix(rel, "\\")
+	if rel == "" {
+		return false
+	}
+	if _, ok := seen[rel]; ok {
+		return false
+	}
+	srcAbs := filepath.Join(repoRoot, filepath.FromSlash(rel))
+	b, err := os.ReadFile(srcAbs)
+	if err != nil {
+		return false
+	}
+	dst := filepath.Join(ctxDir, "sources", filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return false
+	}
+	if err := os.WriteFile(dst, b, 0644); err != nil {
+		return false
+	}
+	*manifest = append(*manifest, rel)
+	seen[rel] = struct{}{}
+	return true
 }
 
 // llmMakeVars builds template variable map for LLM exec.
