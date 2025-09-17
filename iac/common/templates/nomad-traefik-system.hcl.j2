@@ -185,17 +185,17 @@ job "traefik-system" {
         # Consul configuration
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
         # Optional: Consul ACL token for Consul Catalog provider (production)
-        CONSUL_HTTP_TOKEN = "{{ vault_consul_http_token | default(lookup('env', 'CONSUL_HTTP_TOKEN') | default('')) }}"
+        CONSUL_HTTP_TOKEN = "{{ lookup('env', 'CONSUL_HTTP_TOKEN') | default('') }}"
         
         # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default(vault_namecheap_api_user | default('')) }}"
-        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default(vault_namecheap_api_key | default('')) }}"
-        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default(vault_namecheap_sandbox | default('false')) }}"
+        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default(namecheap_api_user_default | default('')) }}"
+        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default(namecheap_api_key_default | default('')) }}"
+        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default(namecheap_sandbox_default | default('false')) }}"
         
         # DNS challenge configuration
         ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(vault_namecheap_client_ip | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
-        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default(vault_namecheap_username | default('')) }}"
+        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(namecheap_client_ip_default | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address'])) }}"
+        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default(namecheap_username_default | default('')) }}"
       }
       
       resources {

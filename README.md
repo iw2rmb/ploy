@@ -97,7 +97,7 @@ Ploy's **api is designed as a horizontally scalable, stateless application** tha
 
 **Zero-SPOF Design:**
 - **Nomad-Managed Deployment** — API runs as Nomad system job across multiple nodes
-- **Stateless Architecture** — All state externalized to Consul KV, SeaweedFS, and Vault
+- **Stateless Architecture** — All state externalized to Consul KV and SeaweedFS
 - **Load Balancing** — Multiple api instances behind Traefik with health checking
 - **Rolling Updates** — Zero-downtime deployments through Nomad's update strategies
 - **Auto-Recovery** — Failed instances automatically restarted by Nomad scheduler
@@ -114,7 +114,7 @@ Ploy's **api is designed as a horizontally scalable, stateless application** tha
 - **Build Metadata** → SeaweedFS JSON artifacts with versioning
 - **Application Configuration** → Consul KV with atomic updates
 - **Routing State** → Consul service registry with health checks
-- **Secrets** → Vault integration with dynamic credential management
+- **Secrets** → Managed via Consul KV or environment variables (legacy secret manager removed)
 
 This architecture makes the api "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
 
@@ -315,7 +315,7 @@ The following app names are **reserved** for platform use:
 - `api`, `admin`, `dashboard`
 - `metrics`, `health`, `console`
 - `www`, `ploy`, `system`
-- `traefik`, `nomad`, `consul`, `vault`
+- `traefik`, `nomad`, `consul`
 
 ### SSL Benefits
 

@@ -85,7 +85,6 @@ job "ploy-api" {
         # HashiCorp service addresses
         CONSUL_ADDR = "http://consul.service.consul:8500"
         NOMAD_ADDR = "http://nomad.service.consul:4646"
-        VAULT_ADDR = "http://vault.service.consul:8200"
         # Nomad SDK resilience (used by API when talking to Nomad directly)
         NOMAD_HTTP_MAX_RETRIES = "{{ ploy.nomad_http_max_retries | default('5') }}"
         NOMAD_HTTP_BASE_DELAY = "{{ ploy.nomad_http_base_delay | default('500ms') }}"
@@ -142,10 +141,10 @@ job "ploy-api" {
         PLOY_ARF_MAVEN_GROUP = "{{ ploy.arf_maven_group | default('org.openrewrite') }}"
         PLOY_ARF_DEFAULT_PACKS = "{{ ploy.arf_default_packs | default('') }}"
 
-        # LLM API Configuration (use Vault secrets in production)
+        # LLM API Configuration (override via environment/secret store)
         LLM_PROVIDER = "{{ llm_provider | default('openai') }}"
         LLM_MODEL = "{{ llm_model | default('gpt-4') }}"
-        LLM_API_KEY = "{{ vault_llm_api_key | default('') }}"
+        LLM_API_KEY = "{{ lookup('env', 'LLM_API_KEY') | default('') }}"
         LLM_MAX_TOKENS = "{{ llm_max_tokens | default('2048') }}"
         LLM_TEMPERATURE = "{{ llm_temperature | default('0.1') }}"
 
@@ -166,12 +165,12 @@ job "ploy-api" {
         PLOY_ENVIRONMENT = "dev"
         {% endif %}
         
-        # DNS provider credentials (from Vault in production)
+        # DNS provider credentials (override via environment or secrets manager)
         {% if ploy.apps_domain_provider == 'namecheap' %}
-        NAMECHEAP_API_USER = "{{ vault_namecheap_api_user | default('') }}"
-        NAMECHEAP_API_KEY = "{{ vault_namecheap_api_key | default('') }}"
+        NAMECHEAP_API_USER = "{{ namecheap_api_user_default | default('') }}"
+        NAMECHEAP_API_KEY = "{{ namecheap_api_key_default | default('') }}"
         {% elif ploy.apps_domain_provider == 'cloudflare' %}
-        CLOUDFLARE_API_TOKEN = "{{ vault_cloudflare_api_token | default('') }}"
+        CLOUDFLARE_API_TOKEN = "{{ lookup('env', 'CLOUDFLARE_API_TOKEN') | default('') }}"
         {% endif %}
         
         # GitHub credentials for repository access

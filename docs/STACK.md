@@ -9,7 +9,7 @@
 ## Orchestration & Service Mesh
 - **HashiCorp Nomad** — Job scheduler and workload orchestrator for all lanes
 - **HashiCorp Consul** — Service discovery, configuration, and connect mesh
-- **HashiCorp Vault** — Secrets management and PKI for secure deployments
+- **Secrets Handling** — Consul KV rendered env templates (legacy secret manager removed)
 
 ## Unikernel & VM Technologies
 - **Unikraft** — Modular unikernel framework for Lanes A/B (ultra-fast boot)

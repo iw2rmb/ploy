@@ -30,7 +30,6 @@
       loop:
         - nomad
         - consul
-        - vault
         - seaweedfs-master
         - seaweedfs-volume
         - seaweedfs-filer
