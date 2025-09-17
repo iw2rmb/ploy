@@ -22,15 +22,15 @@ func runApplyAndBuildWithEvents(
 	r.emit(parent, "apply", "diff-apply-started", "info", "Applying diff to repository")
 	r.emit(parent, "build", "build-gate-start", "info", "Running build gate")
 
-	if err := applyBuild(applyCtx, repoPath, diffPath); err != nil {
-		r.emit(parent, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
-		return StepResult{
-			StepID:   stepID,
-			Success:  false,
-			Message:  fmt.Sprintf("Apply/build failed: %v", err),
-			Duration: time.Since(stepStart),
-		}, nil // continue workflow to allow healing later in build_step
-	}
+    if err := applyBuild(applyCtx, repoPath, diffPath); err != nil {
+        r.emit(parent, "build", "build-gate-failed", "error", fmt.Sprintf("apply/build failed: %v", err))
+        return StepResult{
+            StepID:   stepID,
+            Success:  false,
+            Message:  fmt.Sprintf("Apply/build failed: %v", err),
+            Duration: time.Since(stepStart),
+        }, err
+    }
 
 	r.emit(parent, "apply", "diff-applied", "info", "Diff applied and build gate passed")
 	return StepResult{
