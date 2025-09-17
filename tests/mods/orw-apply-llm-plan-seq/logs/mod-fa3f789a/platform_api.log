@@ -1,0 +1,14 @@
+[2025-09-16 14:17:21] Getting stdout logs for allocation: 01499f7c-f07c-b2e2-e50a-9628e4ea4ee7 (task: api, lines: 800, follow: false)
+[2025-09-16 14:17:21] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/01499f7c-f07c-b2e2-e50a-9628e4ea4ee7?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 14:17:21] Response code: 200
+4662ms
+[14:17:12] 200 - GET /v1/apps/ploy-lane-g-rust-1-79/builds/b-1758032186482948730/status -     261.293µs
+File context.tar uploaded successfully: builds/tfw-java11to17-orw-llm-1758032233/20250916-141713/src.tar
+[14:17:13] 500 - POST /v1/apps/tfw-java11to17-orw-llm-1758032233/builds -   68.315749ms
+[14:17:13] 200 - POST /v1/mods/mod-fa3f789a/events -    4.220842ms
+[14:17:17] 200 - GET /live -     150.482µs
+[14:17:17] 200 - GET /v1/mods/mod-fa3f789a/status -    3.163192ms
+[14:17:18] 200 - GET /v1/mods/mod-fa3f789a/artifacts -    3.842809ms
+[14:17:19] 200 - GET /v1/mods/mod-fa3f789a/artifacts/next_json -    3.554646ms
+[14:17:20] 200 - GET /v1/apps/ploy-lane-g-rust-1-79/builds/b-1758032186482948730/status -     147.471µs
+[14:17:21] 200 - GET /v1/mods/mod-fa3f789a/logs -      128.03µs

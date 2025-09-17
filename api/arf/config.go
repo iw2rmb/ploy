@@ -1,70 +1,21 @@
 package arf
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
-	"github.com/iw2rmb/ploy/api/arf/validation"
 	recipes "github.com/iw2rmb/ploy/api/recipes"
 	internalstorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
-// RecipeValidatorAdapter adapts validation.RecipeValidator to RecipeValidatorInterface
-type RecipeValidatorAdapter struct {
-	validator *validation.RecipeValidator
-}
-
-func (a *RecipeValidatorAdapter) ValidateRecipe(ctx context.Context, recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(ctx, recipe)
-}
-
-func (a *RecipeValidatorAdapter) ValidateStructure(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
-}
-
-func (a *RecipeValidatorAdapter) ValidateTransformations(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
-}
-
-func (a *RecipeValidatorAdapter) ValidateSecurityRules(recipe *models.Recipe) error {
-	return a.validator.ValidateSecurityRules(recipe) // Use proper method
-}
-
-func (a *RecipeValidatorAdapter) ValidateDependencies(recipe *models.Recipe) error {
-	return a.validator.ValidateDependencies(recipe) // Use proper method
-}
-
-func (a *RecipeValidatorAdapter) ValidateAgainstSchema(recipe *models.Recipe, schema interface{}) error {
-	return a.validator.ValidateSchema(recipe)
-}
-
-func (a *RecipeValidatorAdapter) ValidateCompatibility(recipe *models.Recipe, targetVersion string) error {
-	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
-}
-
-func (a *RecipeValidatorAdapter) ValidateSyntax(recipe *models.Recipe) error {
-	return a.validator.ValidateRecipe(context.Background(), recipe) // Use base validation for now
-}
-
-func (a *RecipeValidatorAdapter) ValidateSchema(recipe *models.Recipe) error {
-	return a.validator.ValidateSchema(recipe)
-}
-
-func (a *RecipeValidatorAdapter) GetSchemaVersion() string {
-	return a.validator.GetSchemaVersion()
-}
-
 // Config represents the ARF system configuration
 type Config struct {
-	Storage    StorageConfig    `yaml:"storage" json:"storage"`
-	Index      IndexConfig      `yaml:"index" json:"index"`
-	Validation ValidationConfig `yaml:"validation" json:"validation"`
-	Security   SecurityConfig   `yaml:"security" json:"security"`
-	NVD        NVDConfig        `yaml:"nvd" json:"nvd"`
+	Storage  StorageConfig  `yaml:"storage" json:"storage"`
+	Index    IndexConfig    `yaml:"index" json:"index"`
+	Security SecurityConfig `yaml:"security" json:"security"`
+	NVD      NVDConfig      `yaml:"nvd" json:"nvd"`
 }
 
 // StorageConfig configures recipe storage backend
@@ -91,25 +42,6 @@ type IndexConfig struct {
 	KeyPrefix       string        `yaml:"key_prefix" json:"key_prefix"`
 	BuildOnStartup  bool          `yaml:"build_on_startup" json:"build_on_startup"`
 	RefreshInterval time.Duration `yaml:"refresh_interval" json:"refresh_interval"`
-}
-
-// ValidationConfig configures recipe validation
-type ValidationConfig struct {
-	Enabled       bool                `yaml:"enabled" json:"enabled"`
-	SecurityRules SecurityRulesConfig `yaml:"security_rules" json:"security_rules"`
-	SchemaStrict  bool                `yaml:"schema_strict" json:"schema_strict"`
-}
-
-// SecurityRulesConfig configures security validation rules
-type SecurityRulesConfig struct {
-	AllowedCommands      []string      `yaml:"allowed_commands" json:"allowed_commands"`
-	ForbiddenCommands    []string      `yaml:"forbidden_commands" json:"forbidden_commands"`
-	MaxExecutionTime     time.Duration `yaml:"max_execution_time" json:"max_execution_time"`
-	AllowNetworkAccess   bool          `yaml:"allow_network_access" json:"allow_network_access"`
-	AllowFileSystemWrite bool          `yaml:"allow_file_system_write" json:"allow_file_system_write"`
-	SandboxRequired      bool          `yaml:"sandbox_required" json:"sandbox_required"`
-	MaxMemoryUsageMB     int64         `yaml:"max_memory_usage_mb" json:"max_memory_usage_mb"`
-	MaxCPUUsagePercent   float64       `yaml:"max_cpu_usage_percent" json:"max_cpu_usage_percent"`
 }
 
 // SecurityConfig configures general security settings
@@ -149,28 +81,6 @@ func DefaultConfig() *Config {
 			BuildOnStartup:  true,
 			RefreshInterval: 10 * time.Minute,
 		},
-		Validation: ValidationConfig{
-			Enabled:      true,
-			SchemaStrict: false,
-			SecurityRules: SecurityRulesConfig{
-				AllowedCommands: []string{
-					"java", "javac", "mvn", "gradle",
-					"go", "go build", "go test",
-					"python", "pip",
-					"npm", "yarn", "node",
-				},
-				ForbiddenCommands: []string{
-					"rm -rf", "sudo", "su", "chmod 777",
-					"curl", "wget", "ssh", "scp",
-				},
-				MaxExecutionTime:     15 * time.Minute,
-				AllowNetworkAccess:   false,
-				AllowFileSystemWrite: true,
-				SandboxRequired:      true,
-				MaxMemoryUsageMB:     2048,
-				MaxCPUUsagePercent:   80.0,
-			},
-		},
 		Security: SecurityConfig{
 			EnableEncryption: false,
 			EnableAuditLog:   true,
@@ -192,12 +102,6 @@ func ProductionConfig() *Config {
 	// Use SeaweedFS + Consul in production
 	config.Storage.Backend = "seaweedfs"
 	config.Index.Backend = "consul"
-
-	// Stricter validation in production
-	config.Validation.SchemaStrict = true
-	config.Validation.SecurityRules.AllowNetworkAccess = false
-	config.Validation.SecurityRules.MaxExecutionTime = 10 * time.Minute
-	config.Validation.SecurityRules.MaxMemoryUsageMB = 1024
 
 	// Enable security features
 	config.Security.EnableEncryption = true
@@ -231,19 +135,6 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("consul address is required")
 	}
 
-	// Validate validation config
-	if c.Validation.SecurityRules.MaxExecutionTime <= 0 {
-		return fmt.Errorf("max execution time must be positive")
-	}
-
-	if c.Validation.SecurityRules.MaxMemoryUsageMB <= 0 {
-		return fmt.Errorf("max memory usage must be positive")
-	}
-
-	if c.Validation.SecurityRules.MaxCPUUsagePercent <= 0 || c.Validation.SecurityRules.MaxCPUUsagePercent > 100 {
-		return fmt.Errorf("max CPU usage must be between 0 and 100")
-	}
-
 	return nil
 }
 
@@ -268,7 +159,7 @@ func (c *Config) InitializeStorage() (recipes.RecipeStorage, error) {
 		// Create RecipeRegistry with SeaweedFS storage provider and expose it
 		// via a RecipeStorage-compatible adapter (SeaweedFS only; no memory fallback)
 		registry := recipes.NewRecipeRegistry(client)
-		return NewRegistryStorageAdapter(registry), nil
+		return recipes.NewRegistryStorageAdapter(registry), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported storage backend: %s", c.Storage.Backend)
@@ -290,28 +181,9 @@ func (c *Config) InitializeIndex() (recipes.RecipeIndexStore, error) {
 	}
 }
 
-// InitializeValidator creates and configures the validator from config
+// InitializeValidator exists for compatibility; recipe-level validation is no longer provided here.
 func (c *Config) InitializeValidator() recipes.RecipeValidatorInterface {
-	if !c.Validation.Enabled {
-		return nil
-	}
-
-	securityRules := c.createSecurityRules()
-	return &RecipeValidatorAdapter{validation.NewRecipeValidator(securityRules, c.Validation.SchemaStrict)}
-}
-
-// createSecurityRules converts config to validation.SecurityRuleSet
-func (c *Config) createSecurityRules() *validation.SecurityRuleSet {
-	return &validation.SecurityRuleSet{
-		AllowedCommands:      c.Validation.SecurityRules.AllowedCommands,
-		ForbiddenCommands:    c.Validation.SecurityRules.ForbiddenCommands,
-		MaxExecutionTime:     c.Validation.SecurityRules.MaxExecutionTime,
-		AllowNetworkAccess:   c.Validation.SecurityRules.AllowNetworkAccess,
-		AllowFileSystemWrite: c.Validation.SecurityRules.AllowFileSystemWrite,
-		SandboxRequired:      c.Validation.SecurityRules.SandboxRequired,
-		MaxMemoryUsage:       c.Validation.SecurityRules.MaxMemoryUsageMB * 1024 * 1024, // Convert MB to bytes
-		MaxCPUUsage:          c.Validation.SecurityRules.MaxCPUUsagePercent / 100.0,     // Convert percentage to decimal
-	}
+	return nil
 }
 
 // LoadConfigFromEnv loads ARF configuration from environment variables
@@ -378,14 +250,6 @@ func LoadConfigFromEnv() *Config {
 	}
 	if keyPrefix := os.Getenv("ARF_CONSUL_PREFIX"); keyPrefix != "" {
 		config.Index.KeyPrefix = keyPrefix
-	}
-
-	// Validation configuration
-	if enabled := os.Getenv("ARF_VALIDATION_ENABLED"); enabled != "" {
-		config.Validation.Enabled = enabled == "true"
-	}
-	if strict := os.Getenv("ARF_VALIDATION_STRICT"); strict != "" {
-		config.Validation.SchemaStrict = strict == "true"
 	}
 
 	// Security configuration

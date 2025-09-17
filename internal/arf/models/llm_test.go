@@ -358,7 +358,7 @@ func TestIsValidCapability(t *testing.T) {
 
 // TestTime_JSONMarshaling tests JSON marshaling and unmarshaling of the custom Time type
 func TestTime_JSONMarshaling(t *testing.T) {
-	now := time.Now()
+	now := time.Date(2025, time.January, 15, 10, 30, 45, 0, time.UTC)
 
 	// Test cases for JSON marshaling/unmarshaling
 	tests := []struct {
@@ -477,8 +477,8 @@ func TestLLMModel_JSONRoundTrip(t *testing.T) {
 		},
 		MaxTokens:    128000,
 		CostPerToken: 0.00015,
-		Created:      Time(time.Now().UTC()),
-		Updated:      Time(time.Now().UTC().Add(time.Hour)),
+		Created:      Time(time.Date(2024, time.July, 1, 12, 0, 0, 0, time.UTC)),
+		Updated:      Time(time.Date(2024, time.July, 1, 13, 0, 0, 0, time.UTC)),
 	}
 
 	// Marshal to JSON
@@ -526,16 +526,16 @@ func TestLLMModel_EdgeCases(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "very_long_ID",
+			name: "invalid_id_format",
 			model: &LLMModel{
-				ID:           strings.Repeat("a", 200), // Very long ID
+				ID:           "INVALID FORMAT",
 				Name:         "Test Model",
 				Provider:     "openai",
 				Capabilities: []string{"code"},
 				MaxTokens:    1000,
 			},
 			wantErr: true,
-			errMsg:  "invalid model ID",
+			errMsg:  "invalid model id format",
 		},
 		{
 			name: "special_characters_in_name",

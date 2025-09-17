@@ -6,20 +6,20 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// handleARFRecipesPing is a minimal endpoint to exercise the internal ARF recipes facade.
-func (s *Server) handleARFRecipesPing(c *fiber.Ctx) error {
-	if s.dependencies == nil || s.dependencies.ARFRecipes == nil {
+// handleRecipeCatalogPing exercises the internal recipe catalog facade.
+func (s *Server) handleRecipeCatalogPing(c *fiber.Ctx) error {
+	if s.dependencies == nil || s.dependencies.RecipeCatalog == nil {
 		return c.Status(503).JSON(fiber.Map{"error": "recipes registry unavailable"})
 	}
-	if err := s.dependencies.ARFRecipes.Ping(c.Context()); err != nil {
+	if err := s.dependencies.RecipeCatalog.Ping(c.Context()); err != nil {
 		return c.Status(503).JSON(fiber.Map{"error": "recipes registry unhealthy", "details": err.Error()})
 	}
 	return c.JSON(fiber.Map{"status": "ok"})
 }
 
-// handleARFRecipesList returns a minimal list of recipes via the internal ARF facade.
-func (s *Server) handleARFRecipesList(c *fiber.Ctx) error {
-	if s.dependencies == nil || s.dependencies.ARFRecipes == nil {
+// handleRecipeCatalogList returns a minimal list of recipes via the internal catalog facade.
+func (s *Server) handleRecipeCatalogList(c *fiber.Ctx) error {
+	if s.dependencies == nil || s.dependencies.RecipeCatalog == nil {
 		return c.Status(503).JSON(fiber.Map{"error": "recipes registry unavailable"})
 	}
 	filters := struct {
@@ -29,7 +29,7 @@ func (s *Server) handleARFRecipesList(c *fiber.Ctx) error {
 		Language: c.Query("language"),
 		Tag:      c.Query("tag"),
 	}
-	list, err := s.dependencies.ARFRecipes.List(c.Context(), struct {
+	list, err := s.dependencies.RecipeCatalog.List(c.Context(), struct {
 		Language string
 		Tag      string
 	}(filters))
@@ -39,13 +39,13 @@ func (s *Server) handleARFRecipesList(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"recipes": list})
 }
 
-// handleARFRecipesGet returns a single recipe by ID via the internal ARF facade.
-func (s *Server) handleARFRecipesGet(c *fiber.Ctx) error {
-	if s.dependencies == nil || s.dependencies.ARFRecipes == nil {
+// handleRecipeCatalogGet returns a single recipe by ID via the internal catalog facade.
+func (s *Server) handleRecipeCatalogGet(c *fiber.Ctx) error {
+	if s.dependencies == nil || s.dependencies.RecipeCatalog == nil {
 		return c.Status(503).JSON(fiber.Map{"error": "recipes registry unavailable"})
 	}
 	id := c.Params("id")
-	rec, err := s.dependencies.ARFRecipes.Get(c.Context(), id)
+	rec, err := s.dependencies.RecipeCatalog.Get(c.Context(), id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "get failed", "details": err.Error()})
 	}
@@ -55,9 +55,9 @@ func (s *Server) handleARFRecipesGet(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"recipe": rec})
 }
 
-// handleARFRecipesSearch performs a simple substring search over ID, name, and tags.
-func (s *Server) handleARFRecipesSearch(c *fiber.Ctx) error {
-	if s.dependencies == nil || s.dependencies.ARFRecipes == nil {
+// handleRecipeCatalogSearch performs a simple substring search over ID, name, and tags.
+func (s *Server) handleRecipeCatalogSearch(c *fiber.Ctx) error {
+	if s.dependencies == nil || s.dependencies.RecipeCatalog == nil {
 		return c.Status(503).JSON(fiber.Map{"error": "recipes registry unavailable"})
 	}
 	q := strings.TrimSpace(c.Query("q"))
@@ -65,7 +65,7 @@ func (s *Server) handleARFRecipesSearch(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "query parameter 'q' is required"})
 	}
 	// List all and filter client-side (registry may optimize later)
-	list, err := s.dependencies.ARFRecipes.List(c.Context(), struct {
+	list, err := s.dependencies.RecipeCatalog.List(c.Context(), struct {
 		Language string
 		Tag      string
 	}{})

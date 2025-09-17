@@ -46,6 +46,7 @@ func (s *Server) setupRoutes() {
 	api.Post("/apps/:app/builds/probe", s.handleBuildsProbe)
 	api.Get("/apps", build.ListApps)
 	api.Get("/apps/:app/status", build.Status)
+	api.Get("/apps/:app/status/watch", s.handleAppStatusWatch)
 	api.Get("/apps/:app/logs", build.GetLogs)
 	api.Get("/apps/:app/probe", s.handleAppProbe)
 
@@ -53,6 +54,7 @@ func (s *Server) setupRoutes() {
 	api.Post("/_diag/echo", s.handleDiagEcho)
 	api.Get("/apps/:app/builds/:id/status", s.handleBuildStatus)
 	api.Get("/apps/:app/builds/:id/logs", s.handleBuildLogs)
+	api.Get("/apps/:app/builds/:id/events", s.handleBuildEvents)
 
 	// Platform service endpoints with platform namespace
 	api.Post("/platform/:service/builds", s.handleTriggerPlatformBuild)
@@ -92,12 +94,6 @@ func (s *Server) setupRoutes() {
 	api.Post("/storage/config/reload", s.handleReloadStorageConfig)
 	api.Post("/storage/config/validate", s.handleValidateStorageConfig)
 
-	// ARF recipes minimal facade endpoint (Phase 4 initial slice)
-	api.Get("/arf/recipes/ping", s.handleARFRecipesPing)
-	api.Get("/arf/recipes", s.handleARFRecipesList)
-	api.Get("/arf/recipes/search", s.handleARFRecipesSearch)
-	api.Get("/arf/recipes/:id", s.handleARFRecipesGet)
-
 	// TTL cleanup endpoints with dependency injection
 	if s.dependencies.CleanupHandler != nil {
 		cleanup.SetupRoutes(s.app, s.dependencies.CleanupHandler)
@@ -113,10 +109,15 @@ func (s *Server) setupRoutes() {
 		dns.SetupDNSRoutes(s.app, s.dependencies.DNSHandler)
 	}
 
-	// ARF (Automated Remediation Framework) endpoints
-	if s.dependencies.ARFHandler != nil {
-		s.dependencies.ARFHandler.RegisterRoutes(s.app)
-		log.Printf("ARF routes registered successfully")
+	// Legacy remediation endpoints (Automated Remediation Framework)
+	if s.dependencies.RemediationHandler != nil {
+		s.dependencies.RemediationHandler.RegisterRoutes(s.app)
+		log.Printf("Remediation routes registered successfully")
+	}
+
+	if s.dependencies.RecipesHandler != nil {
+		s.dependencies.RecipesHandler.RegisterRoutes(s.app)
+		log.Printf("Recipe routes registered successfully")
 	}
 
 	// Mods endpoints
@@ -125,7 +126,7 @@ func (s *Server) setupRoutes() {
 		log.Printf("Mods routes registered successfully")
 	}
 
-	// Internal ARF recipes handlers are now the default; legacy overlay removed
+	// Internal recipe catalog handlers are now the default; legacy overlay removed
 
 	// Static Analysis endpoints
 	if s.dependencies.AnalysisHandler != nil {
@@ -225,6 +226,9 @@ func (s *Server) setupPlatformRoutes(api fiber.Router) {
 	platformAPI.Post("/:service/rollback", s.handlePlatformRollback)
 	platformAPI.Delete("/:service", s.handlePlatformRemove)
 	platformAPI.Get("/:service/logs", s.handlePlatformLogs)
+
+	// Nomad allocation events watcher (debug/diagnostics)
+	api.Get("/nomad/allocs/:id/events", s.handleAllocEvents)
 
 	log.Printf("Platform service routes configured at /v1/platform/*")
 }

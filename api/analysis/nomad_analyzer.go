@@ -109,24 +109,6 @@ func (a *NomadPylintAnalyzer) CanAutoFix(issue Issue) bool {
 	return autoFixableRules[issue.RuleName]
 }
 
-// GetARFRecipes returns ARF recipes for automatic remediation
-func (a *NomadPylintAnalyzer) GetARFRecipes(issue Issue) []string {
-	recipes := make([]string, 0)
-
-	switch issue.RuleName {
-	case "unused-import":
-		recipes = append(recipes, "org.openrewrite.python.cleanup.RemoveUnusedImports")
-	case "unused-variable":
-		recipes = append(recipes, "com.ploy.python.cleanup.RemoveUnusedVariables")
-	case "missing-docstring":
-		recipes = append(recipes, "com.ploy.python.style.AddMissingDocstrings")
-	case "trailing-whitespace":
-		recipes = append(recipes, "org.openrewrite.python.format.RemoveTrailingWhitespace")
-	}
-
-	return recipes
-}
-
 // createCodebaseArchive creates a gzipped tar archive of Python files
 func (a *NomadPylintAnalyzer) createCodebaseArchive(codebase Codebase) ([]byte, error) {
 	var buf bytes.Buffer
@@ -286,22 +268,6 @@ func (a *NomadESLintAnalyzer) CanAutoFix(issue Issue) bool {
 		"no-trailing-spaces": true,
 	}
 	return autoFixableRules[issue.RuleName]
-}
-
-// GetARFRecipes returns ARF recipes for issue remediation
-func (a *NomadESLintAnalyzer) GetARFRecipes(issue Issue) []string {
-	recipes := make([]string, 0)
-
-	switch issue.RuleName {
-	case "no-unused-vars":
-		recipes = append(recipes, "org.openrewrite.javascript.cleanup.RemoveUnusedVariables")
-	case "no-console":
-		recipes = append(recipes, "org.openrewrite.javascript.cleanup.RemoveConsoleLog")
-	case "prefer-const":
-		recipes = append(recipes, "org.openrewrite.javascript.modernize.UseConst")
-	}
-
-	return recipes
 }
 
 // createCodebaseArchive creates archive of JavaScript/TypeScript files
@@ -470,22 +436,6 @@ func (a *NomadGolangCIAnalyzer) CanAutoFix(issue Issue) bool {
 		"whitespace": true,
 	}
 	return autoFixableRules[issue.RuleName]
-}
-
-// GetARFRecipes returns ARF recipes
-func (a *NomadGolangCIAnalyzer) GetARFRecipes(issue Issue) []string {
-	recipes := make([]string, 0)
-
-	switch issue.RuleName {
-	case "unused":
-		recipes = append(recipes, "org.openrewrite.go.cleanup.RemoveUnusedVariables")
-	case "ineffassign":
-		recipes = append(recipes, "org.openrewrite.go.cleanup.RemoveIneffectiveAssignments")
-	case "errcheck":
-		recipes = append(recipes, "org.openrewrite.go.errors.AddErrorChecking")
-	}
-
-	return recipes
 }
 
 // createCodebaseArchive creates archive of Go files

@@ -9,25 +9,23 @@ Overview
 Cycle State (Single Source)
 
 - Current issues to solve (keep this list current after each run):
-  - Git push/MR: push failed due to GitLab authentication (rc=128). Ensure `GITLAB_TOKEN` is set with write_repository scope and picked up by the controller for branch pushes and MR creation.
+  - Post‑healing build gate: after replaying the LLM patch (verified via post‑replay snippet/changed‑files events), the post‑healing build still fails due to the remote deploy check (status 500). Local compile gate is passing; failure occurs on the downstream build checker. We should accept local compile success for healing and defer remote deploy to push/MR phase (see Next Steps).
+  - Commit identity (edge case): one recent run failed in phase=commit with “fatal: empty ident name (for <>)”. Root cause is repo `user.name`/`user.email` configured to empty; fix is to treat empty as unset or pass `-c user.name/email` on commit.
   - Capacity: keep Nomad client memory free enough to schedule the 1GiB ORW task; stop non‑essential jobs when validating (ORW alloc failures observed previously).
-  - Event‑driven flow: Confirmed working — controller gates artifact downloads on explicit “uploaded …” events and deregisters after artifacts; keep monitoring for races.
-  - Confirmed: Planner emits `plan.json` and LLM‑exec uploads `diff.patch` (artifact keys present in events); Reducer produced `next.json` with `{ "action": "stop" }` in latest run.
+  - Event‑driven flow: Implemented end‑to‑end. Controller gates artifact downloads on explicit “uploaded …” events; HEAD+jitter confirms filer readiness before a single fetch. Replay is head‑only with explicit logs; post‑replay file snippet and changed‑files events confirm working tree before build.
 
 - Update rule: After each ./run.sh execution, update this Cycle State with:
   - MOD_ID and a 1–2 line summary of outcome;
   - Any new blocking issues or confirmations solved;
   - The logs directory path (see Inspecting Logs) for reference.
 
-- Latest run:
-  - MOD_ID: mod-33d29ca8 — healing path exercised; LLM produced concrete fix and MR created.
-  - MR: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/50
-  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-33d29ca8
+- Latest run (Dev):
+  - MOD_ID: mod-4e6a598e — Replay applied HEAD step; local compile passed earlier; post‑healing remote build check failed.
+  - Logs: tests/mods/orw-apply-llm-plan-seq/logs/mod-4e6a598e
   - Notes:
-    - Steps observed: orw-apply → build-gate-failed → planner (plan.json uploaded) → llm-exec (diff.patch uploaded, 395 bytes) → reducer (next={action:"stop"}) → build-gate-succeeded → push → MR.
-    - LLM diff edits src/healing/java/e2e/FailHealing.java line 4 (comments out UnknownClass usage), resolving the compile error.
-    - Cluster runner image updated: registry.dev.ployman.app/langgraph-runner:latest rebuilt with no cache; Nomad templates use force_pull=true to pull :latest.
-    - Ensure controller env uses MODS_*_IMAGE=:latest (api redeployed). GitLab token present in /home/ploy/api.env.
+    - Observed events: orw-apply → build-gate-failed (local Maven error on FailHealing.java) → planner (uploaded plan) → llm‑exec (uploaded diff) → reducer (next action = apply llm‑1) → replay (applying HEAD step …, applied step …) → post‑replay snippet shows FailHealing.java lines commented → post‑healing‑build‑start → post‑healing‑build‑failed (Deployment failed: status 500).
+    - This indicates the local compile gate passed (no compile error surfaced on second build), while the remote deploy check returned 500. Accepting local compile success for healing should let the scenario finish GREEN with MR.
+    - Additional evidence: post‑replay changed files lists src/healing/java/e2e/FailHealing.java; diff.patch captured by controller shows the expected comments.
 
 Note: Historical cycle-by-cycle notes have been condensed into this single Cycle State to avoid drift. Refer to git history if you need past detail.
 
@@ -176,7 +174,7 @@ Run Log & Key Takeaways
 - Cycle 3 (Fix POM + compile gate before deploy):
   - Fixes:
     - Corrected POM structure on fail branches — moved `<profiles>` inside `<project>` to avoid Maven parse errors.
-    - Added a pre-deploy compile gate in Mods (server-side) using ARF BuildOperations. This runs `mvn clean compile -B -DskipTests -Dploy.build.gate=1` locally in the repo before pushing an app, enabling deterministic failures and healing.
+    - Added a pre-deploy compile gate in Mods (server-side) using the unified `internal/build` sandbox service. This runs `mvn clean compile -B -DskipTests -Dploy.build.gate=1` locally in the repo before pushing an app, enabling deterministic failures and healing.
   - Result:
     - Build gate now fails deterministically on `e2e/fail-missing-symbol` with `maven build failed: exit status 1` during the first apply+build step.
     - Healing did not trigger yet because `self_heal` wasn’t enabled in scenario.yaml.

@@ -11,7 +11,7 @@ import (
 	providers_memory "github.com/iw2rmb/ploy/internal/storage/providers/memory"
 )
 
-func TestARFRecipesSearch_Query_OK(t *testing.T) {
+func TestRecipeCatalogSearch_Query_OK(t *testing.T) {
 	t.Parallel()
 
 	mem := providers_memory.NewMemoryStorage(0)
@@ -25,12 +25,12 @@ func TestARFRecipesSearch_Query_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer error: %v", err)
 	}
-	srv.dependencies.ARFRecipes = recipes.NewStorageBacked(mem)
+	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
 	// wire search under /v1/arf/recipes/search for test
-	srv.app.Get("/v1/arf/recipes/search", srv.handleARFRecipesSearch)
+	srv.app.Get("/v1/recipes/search", srv.handleRecipeCatalogSearch)
 
-	req := httptest.NewRequest("GET", "/v1/arf/recipes/search?q=Format", nil)
+	req := httptest.NewRequest("GET", "/v1/recipes/search?q=Format", nil)
 	resp, err := srv.app.Test(req)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

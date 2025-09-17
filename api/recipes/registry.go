@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"gopkg.in/yaml.v3"
 )

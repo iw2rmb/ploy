@@ -1089,11 +1089,10 @@ Each test should:
 - **Objective**: Verify existing ARF API endpoints function correctly with new DeploymentSandboxManager naming
 - **Prerequisites**: API running with updated ARF deployment integration
 - **Steps**:
-  1. Check ARF health endpoint: `GET /v1/arf/health`
-  2. Test recipe listing: `GET /v1/arf/recipes`
-  3. Test sandbox management: `POST /v1/arf/sandboxes`
-  4. Benchmark endpoints removed from ARF; use Mods status APIs.
-  5. Test transformation endpoints with deployment integration
+  1. Test recipe listing: `GET /v1/arf/recipes`
+  2. Test sandbox management: `POST /v1/arf/sandboxes`
+  3. Benchmark endpoints removed from ARF; use Mods status APIs.
+  4. Test transformation endpoints with deployment integration
 - **Expected Results**: All API endpoints respond correctly with new naming conventions
 
 ### ARF-DI-002: Multi-Stage Benchmark Pipeline Testing

@@ -187,12 +187,12 @@ func TestBuildUnikraftEnvironmentVariables(t *testing.T) {
 		"VAR3": "value3",
 	}
 
-	var capturedEnv []string
+	var capturedCmd *exec.Cmd
 
 	// Mock exec.Command to capture environment
 	mockExecCommand = func(name string, args ...string) *exec.Cmd {
 		cmd := exec.Command("echo", "test.img")
-		capturedEnv = cmd.Env
+		capturedCmd = cmd
 		return cmd
 	}
 
@@ -200,8 +200,9 @@ func TestBuildUnikraftEnvironmentVariables(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify all env vars were added
+	require.NotNil(t, capturedCmd)
 	envMap := make(map[string]string)
-	for _, env := range capturedEnv {
+	for _, env := range capturedCmd.Env {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
 			envMap[parts[0]] = parts[1]
@@ -239,8 +240,15 @@ func BuildUnikraftWithMock(app, lane, srcDir, sha, outDir string, envVars map[st
 	lines := strings.Split(output, "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
-		if line != "" && strings.Contains(line, ".img") && !strings.Contains(line, ":") {
-			return line, nil
+		if line == "" || !strings.Contains(line, ".img") {
+			continue
+		}
+		candidate := line
+		if idx := strings.LastIndex(line, ":"); idx != -1 {
+			candidate = strings.TrimSpace(line[idx+1:])
+		}
+		if candidate != "" {
+			return candidate, nil
 		}
 	}
 

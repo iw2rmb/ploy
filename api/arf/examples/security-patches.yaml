@@ -176,26 +176,3 @@ execution:
   environment:
     SECURITY_SCAN: "true"
     CVE_CHECK_ENABLED: "true"
-
-validation:
-  file_patterns:
-    - "**/*.java"
-    - "**/pom.xml"
-    - "**/build.gradle"
-  min_file_count: 1
-  max_repo_size: 2147483648  # 2GB
-  language_detection:
-    primary: java
-    min_confidence: 0.7
-    required: true
-  custom_rules:
-    - name: Check for web framework
-      description: Determine if this is a web application
-      type: file_exists
-      value: "**/WebSecurityConfig.java"
-      required: false
-    - name: Check for database usage
-      description: Check if application uses database
-      type: file_content
-      value: "javax.sql|java.sql|springframework.jdbc"
-      required: false

@@ -1,9 +1,0 @@
-{
-  "timestamp": "2025-09-04T12:00:00Z",
-  "languages": ["java"],
-  "counts": {
-    "java": { "errors": 12, "cases": 37, "patches": 20 }
-  },
-  "versions": { "embedding_model": "text-embed-3-small@2025-01-01", "index_format": "faiss:v1" }
-}
-

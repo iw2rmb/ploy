@@ -18,7 +18,7 @@ type TransformationStatus struct {
 	SandboxInfo    *TransformationSandboxInfo `json:"sandbox_info,omitempty"`
 	HealingSummary *HealingSummary            `json:"healing_summary,omitempty"`
 
-	// Transformation result fields (previously in TransformationResult)
+	// Transformation summary fields persisted to Consul
 	RecipeID        string   `json:"recipe_id,omitempty"`
 	Diff            string   `json:"diff,omitempty"`
 	FilesModified   []string `json:"files_modified,omitempty"`

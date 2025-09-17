@@ -31,15 +31,3 @@ execution:
   resource_limits:
     cpu: "2"
     memory: "4Gi"
-
-validation:
-  pre_conditions:
-    - type: "language_version"
-      config:
-        language: "java"
-        min_version: "11"
-  post_conditions:
-    - type: "compilation"
-      config:
-        language: "java"
-        must_compile: true

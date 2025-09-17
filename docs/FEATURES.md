@@ -17,6 +17,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
+ - **Codebase Maintainability**: Ongoing large-file decomposition in `internal/mods` (e.g., runner split into DI/helpers/workflow files) to keep modules cohesive without behavior changes.
 
 ✅ **API Error Contract** (Sep 2025):
 - Standardized JSON error envelope via `internal/errors` across API server
@@ -42,6 +43,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ Auto SBOM (Syft) + signatures (Cosign)
 - ✅ Deterministic `<app>-<sha>` naming
 - ✅ Standalone or api invocation
+- ✅ Sandbox Build Service: Unified `internal/build` sandbox runner powers Mods build gate without deployment side effects.
 - ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
   - Automatic Node.js application detection via package.json
   - Enterprise dependency management with npm ci and integrity verification
@@ -495,6 +497,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 ⸻
 
 ## 🔀 Git Integration & Repository Validation
+- ✅ **API Git Module** (Sep 2025): Centralized git operations in `api/git` with event-driven push flow consumed by Mods, replacing ad-hoc helpers and timeout-based push handling.
 - ✅ **Comprehensive Git Repository Analysis** (Aug 2025):
   - **Multi-Source URL Extraction**: Repository URLs from git config, package.json, Cargo.toml, pom.xml, go.mod
   - **URL Normalization**: SSH to HTTPS conversion with .git suffix removal for consistency
@@ -655,6 +658,8 @@ LLM transformations now execute as distributed Nomad batch jobs, providing secur
 
 ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
 
+- ♻️ September 2025: Removed the unused ARF core scaffolding package and server wiring to simplify the remediation surface ahead of future consolidation work.
+
 ### ✅ **Enhanced Transform Command with Self-Healing (August 2025)**
 - ✅ **Unified Transformation Engine**: Single `transform` command replacing sandbox, benchmark, and workflow commands
 - ✅ **Self-Healing Capabilities**: Automatic error recovery with LLM-powered solution planning and parallel attempts
@@ -688,7 +693,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination across multiple repositories
 
 ### ✅ **Implemented Deployment Integration & Application Testing**
-- ✅ **Native Deployment Integration**: Complete integration with core deployment system via DeploymentSandboxManager
+- ✅ **Sandbox Build Service**: Unified build sandbox in `internal/build` powers Mods/analysis without bespoke DeploymentSandboxManager.
 - ✅ **Multi-Stage Testing Pipeline**: transformation → deployment → application testing → error analysis → cleanup
 - ✅ **HTTP Endpoint Validation**: Real application testing via health checks and functionality validation
 - ✅ **Multi-Lane Deployment Support**: Automatic lane detection and deployment for Java, Node.js, Go, Python applications
@@ -744,7 +749,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ⚠️ **Actual Recipe Execution**: Real AST transformations instead of simulated file changes
 
 ### ✅ **Implemented API & CLI Integration**
-- ✅ **Comprehensive REST API**: Complete `/v1/arf/*` endpoint suite for recipes, transformations, sandboxes, monitoring
+- ✅ **Comprehensive REST API**: `/v1/arf/*` endpoints for recipes, transformations, and monitoring (legacy sandboxes removed)
 - ✅ **ARF Phase 3 Endpoints**: 30+ new endpoints for LLM generation, hybrid pipelines, learning system, A/B testing
 - ✅ **ARF Phase 4 Endpoints**: Security scanning, remediation, workflow management, production metrics
 - ✅ **Ploy CLI Integration**: `ploy arf` commands for recipe management, transformation, validation, patterns, testing
@@ -755,16 +760,15 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 Comprehensive transformation of ARF into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
 
 **✅ Phase 5.1: Recipe Data Model & Storage** - ✅ **COMPLETED (2025-08-25)**
-- ✅ **Recipe Data Structures**: Complete models.Recipe with metadata, steps, validation rules, and execution configuration
+- ✅ **Recipe Data Structures**: Complete models.Recipe with metadata, steps, and execution configuration
 - ✅ **SeaweedFS Storage Backend**: Production-ready integration with retry logic, caching, and deletion marker support
 - ✅ **Consul Index Backend**: Enhanced search with relevance scoring and performance optimization
-- ✅ **Security Validation Framework**: Complete recipe validation with security rules, resource limits, and command filtering
 - ✅ **Configuration Management**: Environment-driven backend selection (production: SeaweedFS+Consul, development: memory)
 - ✅ **API Integration**: All handlers updated to use storage backend with graceful fallbacks
 - ✅ **Comprehensive Testing**: Four complete test suites for integration, fallbacks, configuration, and comprehensive validation
 
 **Phase 5.2: CLI Integration & User Interface**
-- Complete `ploy arf recipe` command suite: upload, update, delete, list, search, run, compose
+- Complete `ploy recipe` command suite: upload, update, delete, list, search, run, compose
 - Recipe discovery with intelligent filtering by tags, languages, frameworks, and categories
 - Recipe execution integration with existing benchmark system for seamless testing
 - Import/export functionality enabling recipe sharing and backup capabilities

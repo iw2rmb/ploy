@@ -1,0 +1,14 @@
+[2025-09-16 14:38:45] Getting stdout logs for allocation: abd77f3a-04f0-38e4-9c36-f1413a00f0ae (task: api, lines: 800, follow: false)
+[2025-09-16 14:38:45] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/abd77f3a-04f0-38e4-9c36-f1413a00f0ae?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 14:38:45] Response code: 200
+38:37 leader.go:312: New leader elected: swpjullapd
+[14:38:39] 200 - POST /v1/mods/mod-f9b7c902/events -    7.630662ms
+[coordination] 2025/09/16 14:38:39 leader.go:312: New leader elected: swpjullapd
+[14:38:39] 200 - POST /v1/mods/mod-f9b7c902/events -    3.952174ms
+[coordination] 2025/09/16 14:38:41 leader.go:312: New leader elected: swpjullapd
+[14:38:41] 200 - GET /v1/mods/mod-f9b7c902/status -    2.946473ms
+[14:38:42] 200 - GET /v1/mods/mod-f9b7c902/artifacts/plan_json -    6.551773ms
+[coordination] 2025/09/16 14:38:43 leader.go:312: New leader elected: swpjullapd
+[14:38:43] 200 - GET /v1/mods/mod-f9b7c902/artifacts/diff_patch -    9.312273ms
+[14:38:44] 200 - GET /v1/mods/mod-f9b7c902/logs -     225.912µs
+[coordination] 2025/09/16 14:38:45 leader.go:312: New leader elected: swpjullapd

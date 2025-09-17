@@ -119,23 +119,3 @@ execution:
   environment:
     SHELL: "/bin/bash"
     PATH: "/usr/local/bin:/usr/bin:/bin"
-
-validation:
-  pre_conditions:
-    - type: "command_available"
-      config:
-        commands:
-          - "bash"
-          - "sed"
-          - "find"
-          - "git"
-  
-  post_conditions:
-    - type: "file_exists"
-      config:
-        paths:
-          - "backup/$TRANSFORMATION_DATE"
-    - type: "shell_command"
-      config:
-        command: "test $(find . -name '*.bak' -type f | wc -l) -eq 0"
-        must_succeed: true

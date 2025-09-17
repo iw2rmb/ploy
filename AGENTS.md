@@ -14,40 +14,12 @@
 Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `CHANGELOG.md` for changes.  
 **WASM features**: Reference `docs/WASM.md` for Lane G implementation.
 
-## Go Formatting (MANDATORY)
+## Go Tooling (MANDATORY)
 
-- After editing any Go file, run `goimports` and `gofmt` to automatically fix imports and format code.
-- Before running tests or committing, run `staticcheck` for static analysis to catch bugs and code smells.
-- Recommended commands:
-  - `goimports -w .` (updates imports and writes changes)
-  - `gofmt -s -w .` (simplifies and formats code)
-  - `staticcheck ./...` (runs static analysis across the module)
-
-## Go Analysis Tooling (MANDATORY)
-
-- Source of truth: `.golangci.yml` in repo. Use `make` targets below.
-- Local quick pass (run before PRs):
-  - `make fmt` — `go fmt` + `goimports` organization
-  - `make vet` — `go vet ./...` core analyzers
-  - `make lint` — `golangci-lint run` using `.golangci.yml`
-  - `staticcheck ./...` — supplementary static analysis (config: `staticcheck.conf`)
-- Security and vulnerabilities:
-  - `make sec` — `gosec ./...` security rules
-  - `govulncheck ./...` — known vulnerabilities in code and deps
-- Reliability and tests:
-  - `go test -race ./...` — data race detector
-  - Coverage gate: `make test-coverage-threshold` (60% min; 90% for critical)
-- Modules hygiene:
-  - `go mod tidy -v && go mod verify`
-- Notes:
-  - `golangci-lint` aggregates high-signal linters (errcheck, ineffassign, revive, gocritic, bodyclose, gosec, unparam, cyclo/cognit, etc.). No need to run them individually.
-  - Prefer `gofumpt -l -w .` locally if you want stricter formatting; `gofmt` remains the baseline.
-- Install helpers (developers):
-  - `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest`
-  - `go install golang.org/x/tools/cmd/goimports@latest`
-  - `go install honnef.co/go/tools/cmd/staticcheck@latest`
-  - `go install github.com/securego/gosec/v2/cmd/gosec@latest`
-  - `go install golang.org/x/vuln/cmd/govulncheck@latest`
+- Use the existing make targets for formatting and analysis: `make fmt`, `make vet`, `make lint`, `staticcheck ./...`, and `make test-coverage-threshold`.
+- Follow `.golangci.yml` and `staticcheck.conf` as the sources of truth for enabled checks.
+- Keep modules tidy with `go mod tidy -v && go mod verify` when dependencies change.
+- For security scans, run `make sec` and `govulncheck ./...` as required by the project.
 
 ### Pre-commit Hooks
 

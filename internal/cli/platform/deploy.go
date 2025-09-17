@@ -66,7 +66,8 @@ func DeployPlatformService(serviceName, environment, sha, lane string) (*DeployR
 	req, _ := http.NewRequest("POST", url, pr)
 	req.Header.Set("Content-Type", "application/x-tar")
 	req.Header.Set("X-Platform-Service", "true")
-	req.Header.Set("X-Target-Domain", "ployman.app")
+	targetDomain := platformDomainForEnv(environment)
+	req.Header.Set("X-Target-Domain", targetDomain)
 	req.Header.Set("X-Environment", environment)
 
 	// Execute request
@@ -85,11 +86,7 @@ func DeployPlatformService(serviceName, environment, sha, lane string) (*DeployR
 	}
 
 	// Build URL based on environment
-	if environment == "prod" {
-		result.URL = fmt.Sprintf("https://%s.ployman.app", serviceName)
-	} else {
-		result.URL = fmt.Sprintf("https://%s.%s.ployman.app", serviceName, environment)
-	}
+	result.URL = fmt.Sprintf("https://%s.%s", serviceName, targetDomain)
 
 	// Add error message if not successful
 	if !result.Success {

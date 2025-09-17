@@ -127,23 +127,3 @@ execution:
   environment:
     JAVA_HOME: /usr/lib/jvm/java-17-openjdk
     MAVEN_OPTS: -Xmx1024m -XX:MaxPermSize=256m
-
-# Validation rules
-validation:
-  required_files:
-    - pom.xml
-    - build.gradle
-  file_patterns:
-    - "**/*.java"
-  min_file_count: 1
-  max_repo_size: 1073741824  # 1GB
-  language_detection:
-    primary: java
-    min_confidence: 0.7
-    required: true
-  custom_rules:
-    - name: Check Java Version
-      description: Ensure project is using Java 11 or compatible
-      type: file_content
-      value: "<java.version>11</java.version>"
-      required: false

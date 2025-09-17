@@ -2,7 +2,6 @@ package python
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -407,54 +406,6 @@ func TestPylintAnalyzer_CanAutoFix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			canFix := analyzer.CanAutoFix(tt.issue)
 			assert.Equal(t, tt.expected, canFix)
-		})
-	}
-}
-
-func TestPylintAnalyzer_GetARFRecipes(t *testing.T) {
-	logger := logrus.New()
-	analyzer := NewPylintAnalyzer(logger)
-
-	tests := []struct {
-		name         string
-		issue        analysis.Issue
-		expectRecipe bool
-	}{
-		{
-			name:         "unused import",
-			issue:        analysis.Issue{RuleName: "unused-import"},
-			expectRecipe: true,
-		},
-		{
-			name:         "unused variable",
-			issue:        analysis.Issue{RuleName: "unused-variable"},
-			expectRecipe: true,
-		},
-		{
-			name:         "missing docstring",
-			issue:        analysis.Issue{RuleName: "missing-docstring"},
-			expectRecipe: true,
-		},
-		{
-			name:         "unknown issue",
-			issue:        analysis.Issue{RuleName: "unknown-rule"},
-			expectRecipe: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			recipes := analyzer.GetARFRecipes(tt.issue)
-
-			if tt.expectRecipe {
-				assert.NotEmpty(t, recipes)
-				for _, recipe := range recipes {
-					assert.True(t, strings.HasPrefix(recipe, "org.openrewrite.python.") ||
-						strings.HasPrefix(recipe, "com.ploy.python."))
-				}
-			} else {
-				assert.Empty(t, recipes)
-			}
 		})
 	}
 }
