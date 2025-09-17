@@ -16,8 +16,23 @@ func TestStorageMetrics_RecordAndSuccessRate(t *testing.T) {
 	// Verification success
 	m.RecordVerification(true, "")
 
-	if m.TotalUploads != 1 || m.SuccessfulUploads != 1 || m.TotalDownloads != 1 || m.FailedDownloads != 1 || m.TotalVerifications != 1 || m.SuccessfulVerifications != 1 {
-		t.Fatalf("unexpected counters: %+v", *m)
+	if m.TotalUploads != 1 {
+		t.Fatalf("total uploads = %d, want 1", m.TotalUploads)
+	}
+	if m.SuccessfulUploads != 1 {
+		t.Fatalf("successful uploads = %d, want 1", m.SuccessfulUploads)
+	}
+	if m.TotalDownloads != 1 {
+		t.Fatalf("total downloads = %d, want 1", m.TotalDownloads)
+	}
+	if m.FailedDownloads != 1 {
+		t.Fatalf("failed downloads = %d, want 1", m.FailedDownloads)
+	}
+	if m.TotalVerifications != 1 {
+		t.Fatalf("total verifications = %d, want 1", m.TotalVerifications)
+	}
+	if m.SuccessfulVerifications != 1 {
+		t.Fatalf("successful verifications = %d, want 1", m.SuccessfulVerifications)
 	}
 	// Success rate: (1 upload + 1 verification) / (1+1+1) * 100 = 66.66...
 	sr := m.GetSuccessRate()
@@ -49,7 +64,10 @@ func TestStorageMetrics_RecordAndSuccessRate(t *testing.T) {
 	if err := json.Unmarshal(b, &snap); err != nil {
 		t.Fatalf("unmarshal snapshot: %v", err)
 	}
-	if snap.TotalUploads != 1 || snap.SuccessfulVerifications != 1 {
-		t.Fatalf("unexpected snapshot: %+v", snap)
+	if snap.TotalUploads != 1 {
+		t.Fatalf("snapshot total uploads = %d, want 1", snap.TotalUploads)
+	}
+	if snap.SuccessfulVerifications != 1 {
+		t.Fatalf("snapshot successful verifications = %d, want 1", snap.SuccessfulVerifications)
 	}
 }

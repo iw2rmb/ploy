@@ -14,10 +14,7 @@ func TestHandleBuildsOptions(t *testing.T) {
 	app.Options("/v1/apps/:app/builds", s.handleBuildsOptions)
 
 	req := httptest.NewRequest("OPTIONS", "/v1/apps/foo/builds", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 204 {
 		t.Fatalf("expected 204, got %d", resp.StatusCode)
 	}
@@ -32,10 +29,7 @@ func TestHandleBuildsProbe(t *testing.T) {
 	app.Post("/v1/apps/:app/builds/probe", s.handleBuildsProbe)
 
 	req := httptest.NewRequest("POST", "/v1/apps/myapp/builds/probe", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}

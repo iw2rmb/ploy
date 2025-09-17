@@ -3,6 +3,7 @@
 ## [Unreleased] - Transflow MVP Release
 
 ### Added
+- CLI: Added high-coverage unit tests for `ploy recipe` help, validation, and confirmation flows.
 - Lanes: E2E scaffolding added for A–G
   - tests/lanes/README.md with comprehensive plan and envs
   - tests/e2e/lanes_e2e_test.go (Go E2E; -tags e2e)
@@ -18,6 +19,7 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
 - CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.

@@ -41,7 +41,7 @@ func readRequestBodyToTar(c *fiber.Ctx, dst *os.File) (int64, error) {
 		if err != nil {
 			return 0, err
 		}
-		defer src.Close()
+		defer func() { _ = src.Close() }()
 		n, err := io.Copy(dst, src)
 		if err == nil {
 			log.Printf("[Build] Received multipart tar %q (%d bytes)", fh.Filename, n)

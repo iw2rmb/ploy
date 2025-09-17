@@ -150,8 +150,12 @@ func TestIsPlatformServiceAndDefaults(t *testing.T) {
 	}
 
 	// Domain suffix substitution behavior (platform vs apps)
-	os.Setenv("PLOY_PLATFORM_DOMAIN", "dev.ployman.app")
-	os.Setenv("PLOY_APPS_DOMAIN", "dev.ployd.app")
+	if err := os.Setenv("PLOY_PLATFORM_DOMAIN", "dev.ployman.app"); err != nil {
+		t.Fatalf("set platform domain: %v", err)
+	}
+	if err := os.Setenv("PLOY_APPS_DOMAIN", "dev.ployd.app"); err != nil {
+		t.Fatalf("set apps domain: %v", err)
+	}
 	defer func() { _ = os.Unsetenv("PLOY_PLATFORM_DOMAIN"); _ = os.Unsetenv("PLOY_APPS_DOMAIN") }()
 
 	tpl := "app={{APP_NAME}} domain={{DOMAIN_SUFFIX}}"

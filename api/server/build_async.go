@@ -116,7 +116,7 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Message: err.Error(), EndedAt: time.Now().Format(time.RFC3339)})
 			return
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		req, _ := http.NewRequest("POST", url, f)
 		req.Header.Set("Content-Type", "application/x-tar")
 		st, _ := f.Stat()
@@ -129,8 +129,12 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Message: err.Error(), EndedAt: time.Now().Format(time.RFC3339)})
 			return
 		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
+		defer func() { _ = resp.Body.Close() }()
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Message: readErr.Error(), EndedAt: time.Now().Format(time.RFC3339)})
+			return
+		}
 		if resp.StatusCode == 200 {
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "completed", Code: resp.StatusCode, Message: string(body), EndedAt: time.Now().Format(time.RFC3339)})
 		} else {

@@ -28,7 +28,7 @@ func TestSBOMFeatureEnabled_QueryOverride(t *testing.T) {
 func TestSBOMFeatureEnabled_EnvToggle(t *testing.T) {
 	app := fiber.New()
 	t.Cleanup(func() { _ = app.Shutdown() })
-	os.Unsetenv("PLOY_SBOM_ENABLED")
+	require.NoError(t, os.Unsetenv("PLOY_SBOM_ENABLED"))
 
 	var got bool
 	app.Get("/", func(c *fiber.Ctx) error {
@@ -46,7 +46,7 @@ func TestSBOMFeatureEnabled_EnvToggle(t *testing.T) {
 }
 
 func TestSBOMFailOnError_Toggles(t *testing.T) {
-	os.Unsetenv("PLOY_SBOM_FAIL_ON_ERROR")
+	require.NoError(t, os.Unsetenv("PLOY_SBOM_FAIL_ON_ERROR"))
 	require.False(t, sbomFailOnError())
 	t.Setenv("PLOY_SBOM_FAIL_ON_ERROR", "1")
 	require.True(t, sbomFailOnError())

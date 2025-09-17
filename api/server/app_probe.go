@@ -35,8 +35,11 @@ func (s *Server) handleAppProbe(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(502).JSON(fiber.Map{"endpoint": endpoint, "status": "bad_gateway", "error": err.Error()})
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	defer func() { _ = resp.Body.Close() }()
+	body, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		return c.Status(502).JSON(fiber.Map{"endpoint": endpoint, "status": "read_error", "error": readErr.Error()})
+	}
 	return c.JSON(fiber.Map{
 		"endpoint": endpoint,
 		"code":     resp.StatusCode,

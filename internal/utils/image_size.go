@@ -146,7 +146,11 @@ func getDockerImageSizeFromRegistry(dockerImage string) (*ImageSizeInfo, error) 
 			return nil, err
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("registry responded %d", resp.StatusCode)
 	}

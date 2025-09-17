@@ -16,6 +16,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
   - Improved reliability (Sep 2025): `ployman api deploy` ensures the VPS repo is up to date by cloning if missing (`/home/ploy/ploy`), enforcing the canonical `origin` remote, and using `git fetch --all --prune` before a hard reset to the target branch. Prevents stale code deployments due to missing clones, misconfigured remotes, or non-pruned refs.
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
+- **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
  - **Codebase Maintainability**: Ongoing large-file decomposition in `internal/mods` (e.g., runner split into DI/helpers/workflow files) to keep modules cohesive without behavior changes.
 

@@ -91,7 +91,7 @@ func TestModRunner_Run(t *testing.T) {
 				assert.Contains(t, git.BranchName, "workflow/test-workflow/")
 				// Commit message may be from apply(diff) or later commit step; just ensure a commit was attempted
 				assert.NotEqual(t, "", git.CommitMessage)
-				assert.Contains(t, build.BuildConfig.App, "tfw-test-workflow-")
+				assert.Contains(t, build.BuildConfig.App, "mod-test-workflow-")
 				assert.Equal(t, "https://github.com/org/project", git.PushRemoteURL)
 			},
 		},

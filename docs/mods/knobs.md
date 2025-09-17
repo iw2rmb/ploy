@@ -91,7 +91,7 @@ Per-run MR auth selection (mods.yaml)
 Notes
 
 - PLOY_API_URL vs PLOY_CONTROLLER: PLOY_API_URL is the base (no /v1) used by in-job HTTP calls (e.g., recipe registration); PLOY_CONTROLLER includes /v1 and is used by runner/controller for control-plane events.
-- Cleanup is automatic: the build gate sets build_only so the API deregisters the lane‑c sandbox after the build gate, preventing tfw-…-lane-c leftovers.
+- Cleanup is automatic: the build gate sets build_only so the API deregisters the lane‑c sandbox after the build gate, preventing mod-…-lane-c leftovers.
 - For production/staging, mirror the same knobs but point images to the appropriate registry and increase resources if projects are larger.
 
 Centralized Defaults (helpers)

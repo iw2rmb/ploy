@@ -349,17 +349,17 @@ func TestGenerateAppName(t *testing.T) {
 		{
 			name:     "simple id",
 			id:       "test-workflow",
-			expected: "tfw-test-workflow-",
+			expected: "mod-test-workflow-",
 		},
 		{
 			name:     "id with underscores",
 			id:       "my_complex_workflow",
-			expected: "tfw-my_complex_workflow-",
+			expected: "mod-my_complex_workflow-",
 		},
 		{
 			name:     "short id",
 			id:       "w1",
-			expected: "tfw-w1-",
+			expected: "mod-w1-",
 		},
 	}
 
