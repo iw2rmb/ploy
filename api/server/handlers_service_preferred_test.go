@@ -29,7 +29,15 @@ func TestStorageHealth_UsesConfigServiceWhenProvided(t *testing.T) {
 	server.app.Get("/storage/health", server.handleStorageHealth)
 
 	req := httptest.NewRequest("GET", "/storage/health", nil)
-	resp := mustResponse(t)(server.app.Test(req))
+	resp, err := server.app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 
 	require.Equal(t, 200, resp.StatusCode)
 	var body map[string]interface{}
@@ -55,7 +63,15 @@ func TestStorageMetrics_UsesConfigServiceWhenProvided(t *testing.T) {
 	server.app.Get("/storage/metrics", server.handleStorageMetrics)
 
 	req := httptest.NewRequest("GET", "/storage/metrics", nil)
-	resp := mustResponse(t)(server.app.Test(req))
+	resp, err := server.app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 
 	require.Equal(t, 200, resp.StatusCode)
 	// Metrics JSON structure may evolve; presence check is sufficient here

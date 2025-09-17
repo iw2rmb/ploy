@@ -26,5 +26,10 @@ func TestBuildLaneE_MissingDockerfile_NoAutogen_400(t *testing.T) {
 	req := httptest.NewRequest("POST", "/e?autogen_dockerfile=false", nil)
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	require.Equal(t, 400, resp.StatusCode)
 }

@@ -26,9 +26,9 @@ type buildLogsResponse struct {
 	Message     string `json:"message,omitempty"`
 	Status      string `json:"status,omitempty"`
 	Started     string `json:"started_at,omitempty"`
-    Ended       string `json:"ended_at,omitempty"`
-    DockerImage string `json:"docker_image,omitempty"`
-    PushVerify  any    `json:"push_verify,omitempty"`
+	Ended       string `json:"ended_at,omitempty"`
+	DockerImage string `json:"docker_image,omitempty"`
+	PushVerify  any    `json:"push_verify,omitempty"`
 }
 
 // handleBuildLogs returns recent builder logs for a given async build id.
@@ -48,58 +48,64 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
 	if meta.App == "" {
 		meta.App = app
 	}
-    // Determine builder job name and enrich metadata from message
-    job := deriveBuilderJob(id, st, meta)
+	// Determine builder job name and enrich metadata from message
+	job := deriveBuilderJob(id, st, meta)
 	lines := 200
 	if v := c.Query("lines", ""); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			lines = n
 		}
 	}
-    resp := buildLogsResponse{ID: id, App: app, Job: job, Lines: lines, Status: st.Status, Message: st.Message, Started: st.StartedAt, Ended: st.EndedAt}
-    if st.Message != "" {
-        var m map[string]any
-        if json.Unmarshal([]byte(st.Message), &m) == nil {
-            if di, ok := m["dockerImage"].(string); ok { resp.DockerImage = di }
-            if pv, ok := m["pushVerification"]; ok { resp.PushVerify = pv }
-        }
-    }
+	resp := buildLogsResponse{ID: id, App: app, Job: job, Lines: lines, Status: st.Status, Message: st.Message, Started: st.StartedAt, Ended: st.EndedAt}
+	if st.Message != "" {
+		var m map[string]any
+		if json.Unmarshal([]byte(st.Message), &m) == nil {
+			if di, ok := m["dockerImage"].(string); ok {
+				resp.DockerImage = di
+			}
+			if pv, ok := m["pushVerification"]; ok {
+				resp.PushVerify = pv
+			}
+		}
+	}
 	if job == "" {
 		return c.JSON(resp)
 	}
-    // Resolve running allocation for the builder job via the wrapper
-    alloc := runJobMgr("running-alloc", job)
-    if alloc == "" {
-        if st.Message != "" {
-            if u := extractLastUUID(st.Message); u != "" {
-                alloc = u
-            }
-        }
-        // Try to get the most recent alloc IDs and attempt logs for each
-        if ids := getAllocIDs(job); len(ids) > 0 {
-            for _, cand := range ids {
-                if logs := runJobMgrLogsAny(cand, lines); logs != "" {
-                    alloc = cand
-                    resp.Logs = logs
-                    break
-                }
-            }
-        }
-        if alloc == "" && resp.Logs == "" {
-            // Best-effort: return allocs short list for visibility
-            allocs := runJobMgr("allocs-human", job)
-            resp.Logs = allocs
-            return c.JSON(resp)
-        }
-    }
-    resp.AllocID = alloc
-    if aj := runJobMgr("allocs-json", job); aj != "" {
-        resp.Allocs = aj
-    }
-    if resp.Logs == "" {
-        resp.Logs = runJobMgrLogs(alloc, lines)
-        if resp.Logs == "" { resp.Logs = runJobMgrLogsNoTask(alloc, lines) }
-    }
+	// Resolve running allocation for the builder job via the wrapper
+	alloc := runJobMgr("running-alloc", job)
+	if alloc == "" {
+		if st.Message != "" {
+			if u := extractLastUUID(st.Message); u != "" {
+				alloc = u
+			}
+		}
+		// Try to get the most recent alloc IDs and attempt logs for each
+		if ids := getAllocIDs(job); len(ids) > 0 {
+			for _, cand := range ids {
+				if logs := runJobMgrLogsAny(cand, lines); logs != "" {
+					alloc = cand
+					resp.Logs = logs
+					break
+				}
+			}
+		}
+		if alloc == "" && resp.Logs == "" {
+			// Best-effort: return allocs short list for visibility
+			allocs := runJobMgr("allocs-human", job)
+			resp.Logs = allocs
+			return c.JSON(resp)
+		}
+	}
+	resp.AllocID = alloc
+	if aj := runJobMgr("allocs-json", job); aj != "" {
+		resp.Allocs = aj
+	}
+	if resp.Logs == "" {
+		resp.Logs = runJobMgrLogs(alloc, lines)
+		if resp.Logs == "" {
+			resp.Logs = runJobMgrLogsNoTask(alloc, lines)
+		}
+	}
 	// Include allocation status snapshot for quick diagnosis
 	if st := runJobMgrAllocStatus(alloc); st != "" {
 		// limit size to avoid huge payloads
@@ -211,17 +217,21 @@ func runJobMgrLogs(alloc string, lines int) string {
 }
 
 func runJobMgrLogsNoTask(alloc string, lines int) string {
-    wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
-    c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines))
-    out, _ := runCmdTimeout(c, 8*time.Second)
-    return out
+	wrapper := "/opt/hashicorp/bin/nomad-job-manager.sh"
+	c := exec.Command(wrapper, "logs", "--alloc-id", alloc, "--lines", fmt.Sprintf("%d", lines))
+	out, _ := runCmdTimeout(c, 8*time.Second)
+	return out
 }
 
 // runJobMgrLogsAny tries task-specific logs first, then falls back to no-task logs.
 func runJobMgrLogsAny(alloc string, lines int) string {
-    if alloc == "" { return "" }
-    if out := runJobMgrLogs(alloc, lines); out != "" { return out }
-    return runJobMgrLogsNoTask(alloc, lines)
+	if alloc == "" {
+		return ""
+	}
+	if out := runJobMgrLogs(alloc, lines); out != "" {
+		return out
+	}
+	return runJobMgrLogsNoTask(alloc, lines)
 }
 
 func runJobMgrAllocStatus(alloc string) string {

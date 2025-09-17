@@ -31,7 +31,15 @@ func TestRecipeCatalogSearch_Query_OK(t *testing.T) {
 	srv.app.Get("/_test/recipes/search", srv.handleRecipeCatalogSearch)
 
 	req := httptest.NewRequest("GET", "/_test/recipes/search?q=Format", nil)
-	resp := mustResponse(t)(srv.app.Test(req))
+	resp, err := srv.app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}

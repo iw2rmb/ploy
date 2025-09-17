@@ -174,7 +174,17 @@ func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, 
 			allocs, err = h.GetJobAllocations(jobID)
 		}
 		if err != nil {
-			time.Sleep(2 * time.Second)
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				break
+			}
+			sleep := 2 * time.Second
+			if remaining < sleep {
+				sleep = remaining
+			}
+			if sleep > 0 {
+				time.Sleep(sleep)
+			}
 			continue
 		}
 		healthy := 0

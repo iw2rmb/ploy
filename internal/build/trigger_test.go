@@ -524,6 +524,11 @@ func TestTriggerBuild(t *testing.T) {
 			// Execute request
 			resp, err := app.Test(req, 10000)
 			require.NoError(t, err)
+			t.Cleanup(func() {
+				if resp != nil && resp.Body != nil {
+					_ = resp.Body.Close()
+				}
+			})
 
 			// Verify response
 			assert.Equal(t, tt.expectedStatus, resp.StatusCode)

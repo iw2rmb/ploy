@@ -23,6 +23,11 @@ func TestBuildLaneAB_CreatesImage(t *testing.T) {
 	req := httptest.NewRequest("POST", "/a", nil)
 	resp, err := app.Test(req)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
 	require.Equal(t, 200, resp.StatusCode)
 	// Verify file exists in tmp (final.img)
 	p := filepath.Join(tmp, "final.img")
