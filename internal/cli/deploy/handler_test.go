@@ -1,135 +1,131 @@
 package deploy
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/cli/common"
+	"time"
 )
 
-func TestPushCmd(t *testing.T) {
-	tests := []struct {
-		name          string
-		args          []string
-		wantApp       string
-		wantPlatform  bool
-		wantEnv       string
-		wantLane      string
-		wantBlueGreen bool
-	}{
-		{
-			name:         "default user app",
-			args:         []string{},
-			wantApp:      "ploy", // Will be set from current directory name
-			wantPlatform: false,
-			wantEnv:      "dev",
-		},
-		{
-			name:         "user app with name",
-			args:         []string{"-a", "myapp"},
-			wantApp:      "myapp",
-			wantPlatform: false,
-			wantEnv:      "dev",
-		},
-		{
-			name:         "user app with lane",
-			args:         []string{"-a", "myapp", "-lane", "C"},
-			wantApp:      "myapp",
-			wantPlatform: false,
-			wantEnv:      "dev",
-			wantLane:     "C",
-		},
-		{
-			name:         "user app with environment",
-			args:         []string{"-a", "myapp", "-env", "prod"},
-			wantApp:      "myapp",
-			wantPlatform: false,
-			wantEnv:      "prod",
-		},
-		{
-			name:          "blue-green deployment",
-			args:          []string{"-a", "myapp", "-blue-green"},
-			wantApp:       "myapp",
-			wantPlatform:  false,
-			wantBlueGreen: true,
-		},
+func captureStdout(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+
+	original := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+
+	buf := &bytes.Buffer{}
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(buf, r)
+		_ = r.Close()
+		close(done)
+	}()
+
+	cleanup := func() {
+		os.Stdout = original
+		_ = w.Close()
+		<-done
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test server to capture the request
-			var capturedConfig *common.DeployConfig
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// For blue-green, we won't hit the server
-				if tt.wantBlueGreen {
-					t.Error("Server should not be called for blue-green deployment")
-				}
+	return buf, cleanup
+}
 
-				// Verify headers
-				if r.Header.Get("X-Target-Domain") != "ployd.app" {
-					t.Errorf("Expected X-Target-Domain to be ployd.app, got %s", r.Header.Get("X-Target-Domain"))
-				}
+func moveToTempDir(t *testing.T) func() {
+	t.Helper()
 
-				// Verify URL parameters
-				if !strings.Contains(r.URL.Path, tt.wantApp) {
-					t.Errorf("URL path should contain app name %s", tt.wantApp)
-				}
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
 
-				if tt.wantLane != "" && !strings.Contains(r.URL.Query().Get("lane"), tt.wantLane) {
-					t.Errorf("URL should contain lane=%s", tt.wantLane)
-				}
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
 
-				if tt.wantEnv != "" && !strings.Contains(r.URL.Query().Get("env"), tt.wantEnv) {
-					t.Errorf("URL should contain env=%s", tt.wantEnv)
-				}
+	if err := os.WriteFile("sample.txt", []byte("hello"), 0o644); err != nil {
+		t.Fatalf("write sample: %v", err)
+	}
 
-				w.Header().Set("X-Deployment-ID", "test-deploy-123")
-				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"status": "success"}`))
-			}))
-			defer server.Close()
-
-			// Note: In actual implementation, we'll need to mock or refactor
-			// PushCmd to be testable. For now, this shows the test structure
-			_ = capturedConfig
-		})
+	return func() {
+		_ = os.Chdir(cwd)
 	}
 }
 
-func TestPushCmdValidation(t *testing.T) {
-	tests := []struct {
-		name      string
-		args      []string
-		wantError bool
-	}{
-		{
-			name:      "valid deployment",
-			args:      []string{"-a", "test-app"},
-			wantError: false,
-		},
-		{
-			name:      "reserved app name",
-			args:      []string{"-a", "api"},
-			wantError: true,
-		},
-		{
-			name:      "invalid app name format",
-			args:      []string{"-a", "Test-App"},
-			wantError: true,
-		},
-		{
-			name:      "app name with double hyphen",
-			args:      []string{"-a", "test--app"},
-			wantError: true,
-		},
+func TestPushCmdUsesControllerOverride(t *testing.T) {
+	restoreWD := moveToTempDir(t)
+	defer restoreWD()
+
+	t.Setenv("PLOY_CONTROLLER", "")
+	t.Setenv("PLOY_ASYNC", "0")
+
+	reqCh := make(chan *http.Request, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqCh <- r
+		_, _ = io.Copy(io.Discard, r.Body)
+		if err := r.Body.Close(); err != nil {
+			t.Fatalf("close body: %v", err)
+		}
+		w.Header().Set("X-Deployment-ID", "dep-123")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	outBuf, finish := captureStdout(t)
+
+	PushCmd([]string{"-a", "test-app", "-sha", "abc123"}, server.URL)
+
+	finish()
+
+	select {
+	case req := <-reqCh:
+		if got := req.URL.Path; got != "/apps/test-app/builds" {
+			t.Fatalf("path = %s, want /apps/test-app/builds", got)
+		}
+		if req.URL.Query().Get("sha") != "abc123" {
+			t.Fatalf("sha query missing: %v", req.URL.RawQuery)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected request to controller override")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// This test will validate app names against reserved names
-			// Implementation will be added when refactoring PushCmd
-		})
+	if !strings.Contains(outBuf.String(), "✅ Successfully deployed") {
+		t.Fatalf("output missing success message: %s", outBuf.String())
+	}
+}
+
+func TestPushCmdBlueGreen(t *testing.T) {
+	restoreWD := moveToTempDir(t)
+	defer restoreWD()
+
+	reqCh := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		reqCh <- struct{}{}
+	}))
+	defer server.Close()
+
+	outBuf, finish := captureStdout(t)
+
+	PushCmd([]string{"-a", "test-app", "-blue-green"}, server.URL)
+
+	finish()
+
+	select {
+	case <-reqCh:
+		t.Fatalf("blue-green path should not contact server")
+	default:
+	}
+
+	if !strings.Contains(outBuf.String(), "Blue-green deployments are handled") {
+		t.Fatalf("output missing guidance: %s", outBuf.String())
 	}
 }
