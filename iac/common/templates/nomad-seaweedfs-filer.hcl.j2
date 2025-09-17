@@ -31,13 +31,7 @@ job "seaweedfs-filer" {
       }
     }
 
-    # Restart policy for stability
-    restart {
-      attempts = 5
-      interval = "10m"
-      delay = "30s"
-      mode = "fail"
-    }
+    # Restart policy: use Nomad defaults (delay) to avoid capping attempts
 
     task "filer" {
       driver = "raw_exec"
