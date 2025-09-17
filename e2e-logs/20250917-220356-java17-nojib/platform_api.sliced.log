@@ -1,4 +1,0 @@
-[2025-09-17 19:03:59] Getting stdout logs for allocation: bb746abe-70de-ce34-9371-f5fba92f8f2b (task: api, lines: 2000, follow: false)
-[2025-09-17 19:03:59] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/bb746abe-70de-ce34-9371-f5fba92f8f2b?type=stdout&plain=true&task=api&offset=-2000
-[2025-09-17 19:03:59] Response code: 200
-us/watch -   16.292227ms

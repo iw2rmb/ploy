@@ -1,4 +1,0 @@
-[2025-09-17 19:02:21] Getting stdout logs for allocation: 4b93912a-0985-74dc-5257-eb47332514fb (task: traefik, lines: 200, follow: false)
-[2025-09-17 19:02:21] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/4b93912a-0985-74dc-5257-eb47332514fb?type=stdout&plain=true&task=traefik&offset=-200
-[2025-09-17 19:02:21] Response code: 200
-5.200.106.98 - - [17/Sep/2025:19:01:44 +0000] "GET /v1/platform/api/logs?lines=200&follow=false HTTP/2.0" 500 1353 "-" "-" 37640 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 36191ms
