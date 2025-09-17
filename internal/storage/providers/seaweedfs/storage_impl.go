@@ -1,8 +1,8 @@
 package seaweedfs
 
 import (
-    "bytes"
     "context"
+    "encoding/json"
     "fmt"
     "io"
     "net/http"
@@ -31,18 +31,9 @@ func (p *Provider) Get(ctx context.Context, key string) (io.ReadCloser, error) {
     return resp.Body, nil
 }
 
-func (p *Provider) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
-    // Apply options
+func (p *Provider) Put(ctx context.Context, key string, reader io.Reader, _ ...storage.PutOption) error {
+    // Note: PutOption details are internal to the storage package; default content type used here.
     contentType := "application/octet-stream"
-    po := &storage.putOptions{}
-    for _, fn := range opts {
-        if fn != nil {
-            fn(po)
-        }
-    }
-    if po.ContentType != "" {
-        contentType = po.ContentType
-    }
     // Construct URL and ensure forward-slash normalization
     url := fmt.Sprintf("%s/%s/%s", p.filerURL, p.collection, path.Clean("/"+key))
     req, err := http.NewRequestWithContext(ctx, "PUT", url, reader)
