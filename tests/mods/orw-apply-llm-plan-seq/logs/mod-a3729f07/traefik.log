@@ -1,8 +1,0 @@
-[2025-09-16 04:17:58] Getting stdout logs for allocation: 4b93912a-0985-74dc-5257-eb47332514fb (task: traefik, lines: 800, follow: false)
-[2025-09-16 04:17:58] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/4b93912a-0985-74dc-5257-eb47332514fb?type=stdout&plain=true&task=traefik&offset=-800
-[2025-09-16 04:17:58] Response code: 200
-pi@consulcatalog" "http://45.12.75.241:21891" 7ms
-185.200.106.98 - - [16/Sep/2025:04:17:56 +0000] "GET /v1/mods/mod-a3729f07/artifacts/diff_patch HTTP/2.0" 200 153 "-" "-" 9314 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25992" 7ms
-185.200.106.98 - - [16/Sep/2025:04:17:57 +0000] "GET /v1/mods/mod-a3729f07/status HTTP/2.0" 200 10873 "-" "-" 9315 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:21891" 3ms
-185.200.106.98 - - [16/Sep/2025:04:17:57 +0000] "GET /v1/mods/mod-a3729f07/logs?follow=1 HTTP/2.0" 200 11405 "-" "-" 9316 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25992" 4ms
-185.200.106.98 - - [16/Sep/2025:04:17:58 +0000] "GET /v1/platform/api/logs?lines=800 HTTP/2.0" 200 1144 "-" "-" 9317 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:21891" 66ms

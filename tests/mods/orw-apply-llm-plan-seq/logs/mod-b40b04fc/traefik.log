@@ -1,7 +1,0 @@
-[2025-09-14 16:19:09] Getting stdout logs for allocation: dd436011-0c89-cc3f-30c8-183ed7479bd1 (task: traefik, lines: 800, follow: false)
-[2025-09-14 16:19:09] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/dd436011-0c89-cc3f-30c8-183ed7479bd1?type=stdout&plain=true&task=traefik&offset=-800
-[2025-09-14 16:19:09] Response code: 200
-14T16:15:13Z[0m [31mERR[0m [1mUnable to parse certificate /data/certificates/dev-ployman-app.crt[0m [36merror=[0m[31m[1m"unable to generate TLS certificate: tls: failed to find any PEM data in certificate input"[0m[0m
-[90m2025-09-14T16:15:13Z[0m [31mERR[0m [1mRouter uses a nonexistent certificate resolver[0m [36mcertificateResolver=[0mdev-wildcard [36mrouterName=[0mploy-lane-e-go-local-e@consulcatalog
-[90m2025-09-14T16:15:13Z[0m [31mERR[0m [1mRouter uses a nonexistent certificate resolver[0m [36mcertificateResolver=[0mapps-wildcard [36mrouterName=[0mploy-api-apps@consulcatalog
-[90m2025-09-14T16:15:13Z[0m [31mERR[0m [1mRouter uses a nonexistent certificate resolver[0m [36mcertificateResolver=[0mapps-wildcard [36mrouterName=[0mapps-wildcard-cert@file
