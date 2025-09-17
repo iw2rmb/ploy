@@ -130,10 +130,15 @@ addresses {
 
 # Rate limiting configuration to prevent 429 errors
 limits {
-  https_handshake_timeout = "10s"
-  rpc_handshake_timeout = "10s"
-  rpc_rate = 50000
-  rpc_max_burst = 10000
-  # Increase RPC connection limit per client IP (default: 100)
-  rpc_max_conns_per_client = 1000
+  # HTTP API connection caps (raise to avoid 429 on /v1/* under load)
+  http_max_conns            = 10000
+  http_max_conns_per_client = 512
+
+  # RPC limits (keep generous defaults for single node dev)
+  rpc_max_conns             = 10000
+  rpc_max_conns_per_client  = 512
+
+  # Handshake timeouts
+  https_handshake_timeout   = "10s"
+  rpc_handshake_timeout     = "10s"
 }
