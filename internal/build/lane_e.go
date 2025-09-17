@@ -236,18 +236,14 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	}
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
 	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
-		// Fetch and upload builder logs for diagnostics
-		fullLogs := fetchJobLogsFullFn(builderJobName, 2000)
-		snippet := fullLogs
-		if len(snippet) > 8000 {
-			snippet = snippet[len(snippet)-8000:]
-		}
+		// Fetch and upload builder logs for diagnostics (request a large tail)
+		fullLogs := fetchJobLogsFullFn(builderJobName, 40000)
 		fmt.Printf("[Lane E][ERROR] stage=kaniko_submit app=%s sha=%s job=%s err=%v\n", appName, sha, builderJobName, err)
 		be := &BuildError{
 			Type:    "lane_e_build",
 			Message: fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
 			Details: err.Error(),
-			Stdout:  snippet,
+			Stdout:  fullLogs,
 		}
 		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", builderJobName)
@@ -260,7 +256,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   formatted,
 			"stage":   "kaniko_submit",
-			"builder": fiber.Map{"job": builderJobName, "logs": snippet, "logs_key": logsKey, "logs_url": logsURL},
+			"builder": fiber.Map{"job": builderJobName, "logs": fullLogs, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
 	// Verify image exists in registry before returning and capture digest
