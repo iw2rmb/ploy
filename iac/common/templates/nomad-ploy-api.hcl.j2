@@ -98,7 +98,7 @@ job "ploy-api" {
 
         # Lane E/G knobs (builder/runtime)
         # JVM builds often need more memory for Kaniko
-        PLOY_KANIKO_MEMORY_JAVA_MB = "{{ ploy.kaniko_memory_java_mb | default('3072') }}"
+        PLOY_KANIKO_MEMORY_JAVA_MB = "{{ ploy.kaniko_memory_java_mb | default('4096') }}"
         # WASM runner selection (Lane G distroless)
         PLOY_WASM_DISTROLESS = 1
         PLOY_WASM_ENGINE = wazero
