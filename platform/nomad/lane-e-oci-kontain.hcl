@@ -66,14 +66,6 @@ job "{{APP_NAME}}-lane-e" {
     task "oci-kontain" {
       driver = "docker"
       
-      # Vault integration for secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
-      
       config {
         image = "{{DOCKER_IMAGE}}"
         
@@ -227,43 +219,6 @@ EOF
         env         = true
         change_mode = "restart"
         perms       = "0644"
-      }
-      {{/if}}
-      
-      # Secrets from Vault
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-# Database credentials
-DATABASE_USERNAME={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.username}}{{end}}
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-
-# API keys and secrets
-API_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret_key}}{{end}}
-JWT_SECRET={{with secret "secret/data/{{APP_NAME}}/jwt"}}{{.Data.data.secret}}{{end}}
-ENCRYPTION_KEY={{with secret "secret/data/{{APP_NAME}}/encryption"}}{{.Data.data.key}}{{end}}
-
-# Third-party service credentials
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-AWS_ACCESS_KEY_ID={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.access_key}}{{end}}
-AWS_SECRET_ACCESS_KEY={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-
-# TLS certificates
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-TLS_CERT_PEM={{.Data.certificate}}
-TLS_KEY_PEM={{.Data.private_key}}
-TLS_CA_PEM={{.Data.ca_chain}}
-{{end}}
-
-# OAuth credentials
-OAUTH_CLIENT_ID={{with secret "secret/data/{{APP_NAME}}/oauth"}}{{.Data.data.client_id}}{{end}}
-OAUTH_CLIENT_SECRET={{with secret "secret/data/{{APP_NAME}}/oauth"}}{{.Data.data.client_secret}}{{end}}
-EOF
-        destination = "secrets/app.env"
-        env         = true
-        change_mode = "restart"
-        perms       = "0600"
       }
       {{/if}}
       

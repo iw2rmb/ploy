@@ -70,7 +70,6 @@ run_test "SeaweedFS master" "curl -f -s http://localhost:9333/dir/status"
 run_test "SeaweedFS filer" "curl -f -s http://localhost:8888/dir/status"
 run_test "Consul" "curl -f -s http://localhost:8500/v1/status/leader"
 run_test "Nomad" "curl -f -s http://localhost:4646/v1/status/leader"
-run_test "Vault" "curl -f -s http://localhost:8200/v1/sys/health"
 
 # Test 568: Ansible playbook deploys controller via Nomad job
 echo "🚀 Testing controller deployment..."

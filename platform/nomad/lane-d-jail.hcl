@@ -57,14 +57,6 @@ job "{{APP_NAME}}-lane-d" {
     task "jail" {
       driver = "jail"
       
-      # Vault integration for secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
-      
       config {
         path = "{{IMAGE_PATH}}"
         
@@ -173,51 +165,6 @@ EOF
         change_mode = "restart"
         perms       = "0644"
       }
-      {{/if}}
-      
-      # Vault secrets for jail applications
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-# Database credentials
-DATABASE_USERNAME={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.username}}{{end}}
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-
-# Application secrets
-API_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret_key}}{{end}}
-SESSION_SECRET={{with secret "secret/data/{{APP_NAME}}/session"}}{{.Data.data.secret}}{{end}}
-ENCRYPTION_KEY={{with secret "secret/data/{{APP_NAME}}/encryption"}}{{.Data.data.key}}{{end}}
-
-# External service credentials
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-
-# PKI certificates
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-TLS_CERT_PATH=/app/certs/tls.crt
-TLS_KEY_PATH=/app/certs/tls.key
-{{end}}
-EOF
-        destination = "secrets/jail.env"
-        env         = true
-        change_mode = "restart"
-        perms       = "0600"
-      }
-      
-      # Write TLS certificates to files
-      {{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-      template {
-        data = "{{.Data.certificate}}"
-        destination = "secrets/tls.crt"
-        perms = "0644"
-      }
-      
-      template {
-        data = "{{.Data.private_key}}"
-        destination = "secrets/tls.key"
-        perms = "0600"
-      }
-      {{/with}}
       {{/if}}
       
       service {
