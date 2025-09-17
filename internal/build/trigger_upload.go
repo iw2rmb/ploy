@@ -1,17 +1,16 @@
 package build
 
 import (
-	"bytes"
-	"context"
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"strconv"
-	"sync"
-	"time"
+    "bytes"
+    "context"
+    "fmt"
+    "math/rand"
+    "os"
+    "path/filepath"
+    "sync"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/storage"
+    "github.com/iw2rmb/ploy/internal/storage"
 )
 
 // Retry settings for uploads; overridden in tests for speed.
@@ -24,17 +23,12 @@ var (
 )
 
 func initUploadLimiter() {
-	onceInit.Do(func() {
-		// Default to 2 concurrent uploads; allow override via env PLOY_UPLOAD_MAX_CONCURRENCY
-		max := 2
-		if v := os.Getenv("PLOY_UPLOAD_MAX_CONCURRENCY"); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				max = n
-			}
-		}
-		uploadSlots = make(chan struct{}, max)
-		rand.Seed(time.Now().UnixNano())
-	})
+    onceInit.Do(func() {
+        // Fixed concurrency cap for uploads
+        max := 2
+        uploadSlots = make(chan struct{}, max)
+        rand.Seed(time.Now().UnixNano())
+    })
 }
 
 func acquireUpload() { initUploadLimiter(); uploadSlots <- struct{}{} }
@@ -56,16 +50,17 @@ func backoffDelay(attempt int) time.Duration {
 
 // uploadFileWithRetryAndVerification uploads a file with enhanced retry logic and integrity verification
 func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, filePath, storageKey, contentType string) error {
-	acquireUpload()
-	defer releaseUpload()
+    acquireUpload()
+    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// Open file for this attempt
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %w", filePath, err)
-		}
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        fmt.Printf("[Lane E] Upload attempt start=%d key=%s file=%s\n", attempt, storageKey, filepath.Base(filePath))
+        // Open file for this attempt
+        f, err := os.Open(filePath)
+        if err != nil {
+            return fmt.Errorf("failed to open file %s: %w", filePath, err)
+        }
 
 		// Attempt upload with verification
 		_, uploadErr := storeClient.PutObject(storeClient.GetArtifactsBucket(), storageKey, f, contentType)
@@ -135,16 +130,17 @@ func uploadArtifactBundleWithUnifiedStorage(ctx context.Context, storageInterfac
 
 // uploadFileWithUnifiedStorage uploads a file using unified storage interface with retry logic
 func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, filePath, storageKey, contentType string) error {
-	acquireUpload()
-	defer releaseUpload()
+    acquireUpload()
+    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// Open file for this attempt
-		f, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %w", filePath, err)
-		}
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        fmt.Printf("[Lane E] Upload attempt start=%d key=%s file=%s\n", attempt, storageKey, filepath.Base(filePath))
+        // Open file for this attempt
+        f, err := os.Open(filePath)
+        if err != nil {
+            return fmt.Errorf("failed to open file %s: %w", filePath, err)
+        }
 		// Diagnostics: file size and start time
 		st, _ := f.Stat()
 		started := time.Now()
@@ -184,13 +180,14 @@ func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.
 
 // uploadBytesWithUnifiedStorage uploads byte data using unified storage interface with retry logic
 func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, data []byte, storageKey, contentType string) error {
-	acquireUpload()
-	defer releaseUpload()
+    acquireUpload()
+    defer releaseUpload()
     maxRetries := retryMaxAttempts
 
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		// Create new reader for this attempt
-		reader := bytes.NewReader(data)
+    for attempt := 1; attempt <= maxRetries; attempt++ {
+        fmt.Printf("[Lane E] Upload attempt start=%d key=%s bytes=%d\n", attempt, storageKey, len(data))
+        // Create new reader for this attempt
+        reader := bytes.NewReader(data)
 
 		// Attempt upload with unified storage interface
 		putOpts := []storage.PutOption{
