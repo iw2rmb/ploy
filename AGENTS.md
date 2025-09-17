@@ -25,6 +25,12 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 - Keep modules tidy with `go mod tidy -v && go mod verify` when dependencies change.
 - For security scans, run `make sec` and `govulncheck ./...` as required by the project.
 
+### Test File Naming (MANDATORY)
+
+- Use descriptive, focused test filenames (e.g., `handler_crud_test.go`, `platform_handlers_test.go`).
+- Do not use catch‑all names like `_more_test.go`, `_extra_test.go`, or `_ext_test.go`.
+- Split tests by concern when it improves readability and navigation.
+
 ### Pre-commit Hooks
 
 - Install once: `pipx install pre-commit` or `pip install pre-commit`

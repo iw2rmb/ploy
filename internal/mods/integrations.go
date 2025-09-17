@@ -63,47 +63,47 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	// Use SharedPush to perform the build check
 	// SharedPush already supports build-only mode when used with specific endpoints
 	result, err := common.SharedPush(config)
-    if err != nil {
-        // Emit additional context for debugging 500s
-        if modID := os.Getenv("MOD_ID"); modID != "" {
-            rep := NewControllerEventReporter(b.controllerURL, modID)
-            _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate-error", Level: "error", Message: err.Error()})
-        }
-        return nil, fmt.Errorf("build check failed (controller=%s app=%s lane=%s env=%s): %w", b.controllerURL, config.App, config.Lane, config.Environment, err)
-    }
+	if err != nil {
+		// Emit additional context for debugging 500s
+		if modID := os.Getenv("MOD_ID"); modID != "" {
+			rep := NewControllerEventReporter(b.controllerURL, modID)
+			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate-error", Level: "error", Message: err.Error()})
+		}
+		return nil, fmt.Errorf("build check failed (controller=%s app=%s lane=%s env=%s): %w", b.controllerURL, config.App, config.Lane, config.Environment, err)
+	}
 
-    if result != nil && !result.Success {
-        // Attempt to fetch build logs to enrich error for downstream healing
-        logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
-        if logs != "" {
-            tail := logs
-            if len(tail) > 2000 {
-                tail = tail[len(tail)-2000:]
-            }
-            // Append logs tail to result.Message
-            result.Message = strings.TrimSpace(result.Message + "\n" + tail)
-        }
-        if modID := os.Getenv("MOD_ID"); modID != "" {
-            rep := NewControllerEventReporter(b.controllerURL, modID)
-            // Include deployment id if available
-            dep := result.DeploymentID
-            msg := fmt.Sprintf("unsuccessful: %s", result.Message)
-            if strings.TrimSpace(dep) != "" {
-                msg = fmt.Sprintf("%s (deployment_id=%s)", msg, dep)
-            }
-            _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: msg})
-        }
-        log.Printf("[Mods Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
-        return result, fmt.Errorf("build check unsuccessful (controller=%s app=%s lane=%s env=%s): %s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
-    }
-    if modID := os.Getenv("MOD_ID"); modID != "" {
-        rep := NewControllerEventReporter(b.controllerURL, modID)
-        msg := fmt.Sprintf("succeeded version=%s", result.Version)
-        if strings.TrimSpace(result.DeploymentID) != "" {
-            msg = fmt.Sprintf("%s (deployment_id=%s)", msg, result.DeploymentID)
-        }
-        _ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: msg})
-    }
+	if result != nil && !result.Success {
+		// Attempt to fetch build logs to enrich error for downstream healing
+		logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
+		if logs != "" {
+			tail := logs
+			if len(tail) > 2000 {
+				tail = tail[len(tail)-2000:]
+			}
+			// Append logs tail to result.Message
+			result.Message = strings.TrimSpace(result.Message + "\n" + tail)
+		}
+		if modID := os.Getenv("MOD_ID"); modID != "" {
+			rep := NewControllerEventReporter(b.controllerURL, modID)
+			// Include deployment id if available
+			dep := result.DeploymentID
+			msg := fmt.Sprintf("unsuccessful: %s", result.Message)
+			if strings.TrimSpace(dep) != "" {
+				msg = fmt.Sprintf("%s (deployment_id=%s)", msg, dep)
+			}
+			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "error", Message: msg})
+		}
+		log.Printf("[Mods Build] Unsuccessful build: controller=%s app=%s lane=%s env=%s msg=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+		return result, fmt.Errorf("build check unsuccessful (controller=%s app=%s lane=%s env=%s): %s", b.controllerURL, config.App, config.Lane, config.Environment, result.Message)
+	}
+	if modID := os.Getenv("MOD_ID"); modID != "" {
+		rep := NewControllerEventReporter(b.controllerURL, modID)
+		msg := fmt.Sprintf("succeeded version=%s", result.Version)
+		if strings.TrimSpace(result.DeploymentID) != "" {
+			msg = fmt.Sprintf("%s (deployment_id=%s)", msg, result.DeploymentID)
+		}
+		_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: msg})
+	}
 	log.Printf("[Mods Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
 }

@@ -32,6 +32,7 @@
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - Docs: Updated `internal/README.md` to reflect current internal package structure.
+- Docs: Updated `api/README.md` with accurate API module structure.
 - API: Fixed SeaweedFS health readiness regression by creating storage clients from the centralized config service without requiring a metrics shim, preventing Nomad canaries from failing `/v1/health` with nil-pointer panics.
 - API Recipes: Registry storage adapter now semver-sorts recipe versions so latest-version lookups favor the highest semantic release.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
