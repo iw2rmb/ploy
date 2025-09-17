@@ -57,6 +57,7 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 		jobName := fmt.Sprintf("%s-c-build-%s", appName, sha)
 		snippet := getJobLogsSnippet(jobName, 80)
 		// keep error context for caller
+		c.Set("X-Deployment-ID", jobName)
 		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   fmt.Sprintf("OSv builder failed: %v", err),
 			"builder": fiber.Map{"job": jobName, "logs": snippet},
