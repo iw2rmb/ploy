@@ -1,8 +1,19 @@
 FROM gradle:8-jdk{{ .JavaVersion }} AS build
 WORKDIR /src
 COPY . .
-RUN chmod +x ./gradlew || true \
- && ( ./gradlew -x test clean build || gradle -x test clean build )
+# Patch Kotlin DSL for JavaCompile configuration if present and add toolchain-friendly flags
+RUN set -eux; \
+  if [ -f build.gradle.kts ]; then \
+    grep -q "org.gradle.api.tasks.compile.JavaCompile" build.gradle.kts || sed -i '1s;^;import org.gradle.api.tasks.compile.JavaCompile\n;' build.gradle.kts; \
+    sed -i -E 's/tasks\\.withType\\(JavaCompile\\)\\.configureEach \\{ options\\.release = ([0-9]+) \\}/tasks.withType(org.gradle.api.tasks.compile.JavaCompile::class).configureEach { options.release.set(\\1) }/' build.gradle.kts || true; \
+  fi; \
+  chmod +x ./gradlew || true; \
+  ( ./gradlew -x test clean build \\
+      -Dorg.gradle.java.installations.auto-detect=true \\
+      -Dorg.gradle.java.installations.auto-download=true \
+    || gradle -x test clean build \\
+      -Dorg.gradle.java.installations.auto-detect=true \\
+      -Dorg.gradle.java.installations.auto-download=true )
 
 FROM eclipse-temurin:{{ .JavaVersion }}-jre
 WORKDIR /app
@@ -14,4 +25,3 @@ ENTRYPOINT ["java","-cp","/app/app.jar","{{ .MainClass }}"]
 {{- else }}
 ENTRYPOINT ["java","-jar","/app/app.jar"]
 {{- end }}
-

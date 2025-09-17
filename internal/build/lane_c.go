@@ -61,8 +61,8 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 		if len(snippet) > 8000 {
 			snippet = snippet[len(snippet)-8000:]
 		}
-		// Best-effort upload of full builder logs to artifacts/build-logs/<job>.log
-		logsKey := fmt.Sprintf("artifacts/build-logs/%s.log", jobName)
+		// Best-effort upload of full builder logs to build-logs/<job>.log
+		logsKey := fmt.Sprintf("build-logs/%s.log", jobName)
 		if deps.Storage != nil && fullLogs != "" {
 			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
 		}
@@ -75,13 +75,7 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", jobName)
 		// Compute public URL when SeaweedFS base is known
-		logsURL := ""
-		if base := os.Getenv("PLOY_SEAWEEDFS_URL"); base != "" {
-			if !strings.HasPrefix(base, "http") {
-				base = "http://" + base
-			}
-			logsURL = strings.TrimRight(base, "/") + "/" + logsKey
-		}
+		logsURL := buildLogsURL(logsKey)
 		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   formatted,
 			"builder": fiber.Map{"job": jobName, "logs": snippet, "logs_key": logsKey, "logs_url": logsURL},

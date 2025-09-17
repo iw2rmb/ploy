@@ -62,8 +62,19 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
 WORKDIR /src
 COPY . .
-RUN chmod +x ./gradlew || true \
- && ( ./gradlew -x test clean build || gradle -x test clean build )
+# Patch Kotlin DSL for JavaCompile if present; prefer toolchain-friendly flags
+RUN set -eux; \
+  if [ -f build.gradle.kts ]; then \
+    grep -q "org.gradle.api.tasks.compile.JavaCompile" build.gradle.kts || sed -i '1s;^;import org.gradle.api.tasks.compile.JavaCompile\n;' build.gradle.kts; \
+    sed -i -E 's/tasks\\.withType\\(JavaCompile\\)\\.configureEach \\{ options\\.release = ([0-9]+) \\}/tasks.withType(org.gradle.api.tasks.compile.JavaCompile::class).configureEach { options.release.set(\\1) }/' build.gradle.kts || true; \
+  fi; \
+  chmod +x ./gradlew || true; \
+  ( ./gradlew -x test clean build \\
+      -Dorg.gradle.java.installations.auto-detect=true \\
+      -Dorg.gradle.java.installations.auto-download=true \
+    || gradle -x test clean build \\
+      -Dorg.gradle.java.installations.auto-detect=true \\
+      -Dorg.gradle.java.installations.auto-download=true )
 
 FROM eclipse-temurin:%[1]s-jre
 WORKDIR /app
