@@ -1,10 +1,13 @@
 package mods
 
 import (
+	"encoding/json"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -168,10 +171,10 @@ func parseMCPFromInputs(inputs map[string]interface{}) (*MCPConfig, error) {
 	// Parse budgets
 	if budgetsData, ok := inputs["budgets"]; ok {
 		if budgetsMap, ok := budgetsData.(map[string]interface{}); ok {
-			if maxTokens, ok := budgetsMap["max_tokens"].(int); ok {
+			if maxTokens, ok := coerceInt(budgetsMap["max_tokens"]); ok {
 				config.Budgets.MaxTokens = maxTokens
 			}
-			if maxCost, ok := budgetsMap["max_cost"].(int); ok {
+			if maxCost, ok := coerceInt(budgetsMap["max_cost"]); ok {
 				config.Budgets.MaxCost = maxCost
 			}
 			if timeout, ok := budgetsMap["timeout"].(string); ok {
@@ -181,4 +184,64 @@ func parseMCPFromInputs(inputs map[string]interface{}) (*MCPConfig, error) {
 	}
 
 	return config, nil
+}
+
+func coerceInt(v interface{}) (int, bool) {
+	switch n := v.(type) {
+	case nil:
+		return 0, false
+	case int:
+		return n, true
+	case int8:
+		return int(n), true
+	case int16:
+		return int(n), true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case uint:
+		return int(n), true
+	case uint8:
+		return int(n), true
+	case uint16:
+		return int(n), true
+	case uint32:
+		return int(n), true
+	case uint64:
+		if n > uint64(math.MaxInt) {
+			return 0, false
+		}
+		return int(n), true
+	case float64:
+		if math.IsNaN(n) || math.IsInf(n, 0) {
+			return 0, false
+		}
+		if n < float64(math.MinInt64) || n > float64(math.MaxInt64) {
+			return 0, false
+		}
+		i := int64(n)
+		if float64(i) != n {
+			return 0, false
+		}
+		return int(i), true
+	case float32:
+		return coerceInt(float64(n))
+	case json.Number:
+		if i64, err := n.Int64(); err == nil {
+			return int(i64), true
+		}
+		if f64, err := n.Float64(); err == nil {
+			return coerceInt(f64)
+		}
+	case string:
+		s := strings.TrimSpace(n)
+		if s == "" {
+			return 0, false
+		}
+		if i, err := strconv.Atoi(s); err == nil {
+			return i, true
+		}
+	}
+	return 0, false
 }
