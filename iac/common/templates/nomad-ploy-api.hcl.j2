@@ -173,7 +173,7 @@ job "ploy-api" {
         # GitLab integration (populated from local env via Ansible)
         GITLAB_TOKEN = "{{ lookup('env', 'GITLAB_TOKEN') }}"
         GITLAB_URL   = "{{ lookup('env', 'GITLAB_URL') }}"
-        MODS_SKIP_DEPLOY_LANES = "{{ lookup('env', 'MODS_SKIP_DEPLOY_LANES') | default('C', true) }}"
+        MODS_SKIP_DEPLOY_LANES = "{{ lookup('env', 'MODS_SKIP_DEPLOY_LANES') | default('', true) }}"
       }
 
       # Make binary executable and start

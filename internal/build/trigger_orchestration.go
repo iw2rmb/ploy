@@ -96,6 +96,11 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 
 	jobName := appName + "-lane-" + strings.ToLower(lane)
 	if err := orchestration.WaitHealthy(jobName, 90*time.Second); err != nil {
+		snippet := strings.TrimSpace(getJobLogsSnippet(jobName, 200))
+		if snippet != "" {
+			fmt.Printf("[Build] Lane %s deploy failed. Log tail:\n%s\n", strings.ToUpper(lane), snippet)
+			return "", fiber.NewError(500, fmt.Sprintf("deployment did not become healthy: %v\n%s", err, snippet))
+		}
 		return "", fiber.NewError(500, fmt.Sprintf("deployment did not become healthy: %v", err))
 	}
 	return jobName, nil
