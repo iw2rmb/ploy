@@ -258,6 +258,7 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
   else
     # Attempt to parse build error and derive target file + line
     TARGET_FILE=""
+    TARGET_REL=""
     TARGET_LINE=""
     if [ -s "$CTX_DIR/inputs.json" ]; then
       # Prefer explicit top-level hints if present
@@ -311,6 +312,24 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
       fi
       if [ -n "$LINE" ]; then
         TARGET_LINE="$LINE"
+      fi
+    fi
+    if [ -z "$TARGET_FILE" ] && [ -n "$CAND" ] && [ -d "$CTX_DIR/sources" ]; then
+      BASENAME="$(basename "$CAND")"
+      if [ -n "$BASENAME" ]; then
+        FOUND=$(find "$CTX_DIR/sources" -type f -name "$BASENAME" | head -n1 || true)
+        if [ -n "$FOUND" ] && [ -f "$FOUND" ]; then
+          TARGET_FILE="$FOUND"
+          TARGET_REL="${FOUND#"$CTX_DIR/sources/"}"
+          TARGET_REL="${TARGET_REL#./}"
+        fi
+      fi
+    fi
+    if [ -z "$TARGET_REL" ]; then
+      if [ -n "$CAND_REL" ]; then
+        TARGET_REL="$CAND_REL"
+      elif [ -n "$CAND" ]; then
+        TARGET_REL="$CAND"
       fi
     fi
     if [ -n "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ] && [ -n "$TARGET_LINE" ]; then
