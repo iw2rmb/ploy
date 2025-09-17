@@ -9,8 +9,6 @@ import (
 
 	consul "github.com/hashicorp/consul/api"
 	nomad "github.com/hashicorp/nomad/api"
-	vault "github.com/hashicorp/vault/api"
-
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	orch "github.com/iw2rmb/ploy/internal/orchestration"
@@ -28,7 +26,6 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 		status.Dependencies["storage_config"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["consul"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["nomad"] = DependencyHealth{Status: "healthy"}
-		status.Dependencies["vault"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["seaweedfs"] = DependencyHealth{Status: "healthy"}
 		h.metricsCollector.HealthyResponses++
 		return status
@@ -36,7 +33,6 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
 	status.Dependencies["consul"] = h.checkConsul()
 	status.Dependencies["nomad"] = h.checkNomad()
-	status.Dependencies["vault"] = h.checkVault()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
 	for depName, dep := range status.Dependencies {
 		if dep.Status == "unhealthy" {
@@ -63,7 +59,6 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 		status.Dependencies["storage_config"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["consul"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["nomad"] = DependencyHealth{Status: "healthy"}
-		status.Dependencies["vault"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["seaweedfs"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["env_store"] = DependencyHealth{Status: "healthy"}
 		h.metricsCollector.ReadyResponses++
@@ -72,7 +67,6 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
 	status.Dependencies["consul"] = h.checkConsul()
 	status.Dependencies["nomad"] = h.checkNomad()
-	status.Dependencies["vault"] = h.checkVault()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
 	status.Dependencies["env_store"] = h.checkEnvStore()
 	for depName, dep := range status.Dependencies {
@@ -165,29 +159,6 @@ func (h *HealthChecker) checkNomad() DependencyHealth {
 		dep.Error = fmt.Sprintf("Failed to get Nomad leader: %v", err)
 	} else {
 		dep.Details = map[string]interface{}{"leader": leader, "address": h.nomadAddr}
-	}
-	dep.Latency = time.Since(start)
-	return dep
-}
-
-func (h *HealthChecker) checkVault() DependencyHealth {
-	start := time.Now()
-	dep := DependencyHealth{Status: "healthy", Latency: time.Since(start)}
-	config := vault.DefaultConfig()
-	config.Address = h.vaultAddr
-	client, err := vault.NewClient(config)
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Failed to create Vault client: %v", err)
-		dep.Latency = time.Since(start)
-		return dep
-	}
-	secret, err := client.Sys().Health()
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Vault health check failed: %v", err)
-	} else {
-		dep.Details = map[string]interface{}{"sealed": secret.Sealed, "initialized": secret.Initialized, "cluster": secret.ClusterName}
 	}
 	dep.Latency = time.Since(start)
 	return dep

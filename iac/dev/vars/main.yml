@@ -14,7 +14,7 @@ nodejs_version: "20"  # LTS version for stability
 # Nomad/Consul versions
 nomad_version: "1.10.4"  # Latest stable Nomad available
 consul_version: "1.20.2"  # Compatible Consul version
-vault_version: "1.18.3"  # Compatible Vault version
+# Legacy secrets integration removed; no dedicated binary required
 
 # Traefik version
 traefik_version: "3.5.0"
@@ -32,14 +32,14 @@ traefik_admin_port: 8090
 ploy_platform_cert_email: "{{ lookup('env', 'PLOY_PLATFORM_CERT_EMAIL') | default('admin@ployman.app') }}"
 ploy_apps_cert_email: "{{ lookup('env', 'PLOY_APPS_CERT_EMAIL') | default('admin@ployd.app') }}"
 
-# DNS provider credentials (prefer Vault-injected in production)
+# DNS provider credential defaults (override via env or secrets manager in production)
 # For Namecheap provider used in dev by default; leave blank or populate via env overrides for local testing.
-vault_namecheap_api_user: ""
-vault_namecheap_api_key: ""
-vault_namecheap_username: ""
+namecheap_api_user_default: ""
+namecheap_api_key_default: ""
+namecheap_username_default: ""
 # If your Namecheap account requires API IP whitelist, set to VPS public IP
-vault_namecheap_client_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
-vault_namecheap_sandbox: false
+namecheap_client_ip_default: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+namecheap_sandbox_default: false
 
 # Node Exporter version
 node_exporter_version: "1.7.0"

@@ -49,7 +49,7 @@ Next steps to implement:
 **Phase 6: Platform Enhancement Features**
 1. ✅ **COMPLETED (2025-08-20)** Implement Java version detection for Gradle and Maven projects with fallback to default version.
 2. ✅ **COMPLETED (2025-08-20)** Add TTL cleanup for preview allocations to prevent resource accumulation.
-3. ✅ **COMPLETED (2025-08-20)** Enrich Nomad templates with Vault/Consul/env/volumes and canary rollout.
+3. ✅ **COMPLETED (2025-08-20)** Enrich Nomad templates with Consul/env/volumes and canary rollout (legacy secret manager support later removed).
 
 **Phase Networking: Production Domain Routing**
 1. ✅ **COMPLETED (2025-08-20)** Traefik deployment as system job on all Nomad nodes
@@ -152,7 +152,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 3. ✅ **COMPLETED (2025-08-21)** **Add Health and Readiness Endpoints**:
    - Implement `/health` endpoint for basic service health checking
    - Implement `/ready` endpoint for readiness probes with dependency validation
-   - Add comprehensive health checks for Consul, Nomad, SeaweedFS, and Vault connectivity
+   - Add comprehensive health checks for Consul, Nomad, and SeaweedFS connectivity
    - Implement graceful degradation when non-critical dependencies are unavailable
    - Add health check metrics and logging for operational monitoring
 
@@ -203,7 +203,7 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 2. ✅ **COMPLETED (2025-08-21)** **Ansible Playbook Integration**:
     - Modify Ansible playbooks to deploy controller as Nomad job instead of system service
     - Add controller binary deployment and version management to playbooks
-    - Implement proper ordering: Consul/Vault → Controller → Application jobs
+    - Implement proper ordering: Consul services → Controller → Application jobs
     - Add validation steps for controller deployment success
     - Create migration scripts from current systemd-based deployment
 

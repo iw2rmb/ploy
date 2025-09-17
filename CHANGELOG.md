@@ -83,7 +83,7 @@
 - Traefik: Add private `acme` entrypoint (9443) and bind helper wildcard routers to it with very low priority. This avoids intercepting public traffic while keeping ACME-managed wildcard provisioning available.
 - Dev IaC: Switch Traefik deployment to Nomad-only. Removed systemd-based playbook (`iac/dev/playbooks/traefik.yml`) and its import from `iac/dev/site.yml`. Traefik now deploys exclusively as a Nomad system job via `iac/dev/playbooks/hashicorp.yml` using `/opt/hashicorp/bin/nomad-job-manager.sh`. Placement is restricted to edge/gateway nodes via `node.class = "gateway"`. Consul ACL token is supplied via `CONSUL_HTTP_TOKEN` environment variable, not inline in job args.
  - Traefik DNS env import: `hashicorp.yml` auto-imports legacy Namecheap envs from `/etc/systemd/system/traefik.service` (if present) into Nomad job env, without persisting secrets in the repo. This preserves renewals for existing `*.dev.ployd.app` and `*.dev.ployman.app` certificates after migrating from systemd to Nomad.
-- API Nomad templates: align default feature flags with orchestration. For non‑platform apps, disable Volumes and Consul config by default (Vault/Connect remain off). Fixes Lane E job validation for user apps and prevents invalid volume blocks on dev/test clusters.
+- API Nomad templates: align default feature flags with orchestration. For non‑platform apps, disable Volumes and Consul config by default (Connect remains off). Fixes Lane E job validation for user apps and prevents invalid volume blocks on dev/test clusters.
 - Housekeeping: removed redundant `internal/cli/arf/recipes.go.backup` and the legacy `internal/testutils/` package in favor of `internal/testing/**`.
 - API now embeds platform Nomad HCL templates for lanes and debug/platform jobs and loads them exclusively (no Consul/FS fallback) in `api/nomad` and template management flows.
  - Orchestration: embedded builder templates `lane-e-kaniko-builder.hcl` and `lane-c-osv-builder.hcl` in `internal/orchestration` to remove filesystem dependency during API builds. The blanket Ansible copy of `platform/nomad/*.hcl` is no longer required for API-driven deployments; keep IaC-managed jobs (e.g., Traefik, Docker Registry) in playbooks.
@@ -2760,7 +2760,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 - **Migration Assistance**: Automated migration scripts and validation tools for transitioning from systemd to Nomad deployment
 
 ### Fixed
-- **Service Ordering Dependencies**: Proper dependency validation ensuring all required services (SeaweedFS, Consul, Nomad, Vault) are healthy before controller deployment
+- **Service Ordering Dependencies**: Proper dependency validation ensuring all required services (SeaweedFS, Consul, Nomad) are healthy before controller deployment
 - **Process Conflict Prevention**: Clean migration path preventing conflicts between manual and Nomad-managed controller processes
 - **Health Check Integration**: Enhanced health and readiness checks integrated with Nomad service discovery and load balancing
 
@@ -2803,7 +2803,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
   - Enhanced primary health check with 3 consecutive successes required for update validation
   - Stricter failure tolerance (2 failures) during updates with extended grace periods
   - Rolling update progress monitoring endpoint (/health/update) with canary status tracking
-  - Enhanced readiness check with dependency validation for Consul, Nomad, SeaweedFS, and Vault
+- Enhanced readiness check with dependency validation for Consul, Nomad, and SeaweedFS
 
 - **Automatic Rollback and Monitoring**
   - Auto-rollback configuration on failed updates with health check integration
@@ -2957,7 +2957,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 - Removed unsupported system job features (affinity, spread, reschedule, parameterized)
 - Corrected Nomad job definition validation errors for system job type compatibility
 - Fixed resource allocation and constraint specifications for stable deployment
-- Removed Vault integration temporarily to resolve validation conflicts
+- Removed legacy secrets integration temporarily to resolve validation conflicts
 
 ### Testing
 - Successfully validated both production and testing Nomad job definitions on VPS
@@ -3018,7 +3018,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 - **Dependency Health Checks**
   - Consul connectivity and leader status validation
   - Nomad connectivity and leader status validation
-  - Vault connectivity with initialization and seal status checking
+  - Legacy secrets-service connectivity with initialization and seal status checking (later removed)
   - SeaweedFS connectivity via storage client health status
   - Environment store functionality validation (Consul KV or file-based)
   - Storage configuration validation as critical dependency
@@ -3033,7 +3033,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 
 - **Graceful Degradation**
   - Critical dependencies: storage_config, consul, nomad (for readiness)
-  - Non-critical dependencies: vault, seaweedfs (for basic health)
+  - Non-critical dependencies: seaweedfs (for basic health)
   - Service remains healthy if only non-critical dependencies fail
   - Detailed error reporting for debugging while maintaining availability
 
@@ -3041,7 +3041,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 - **VPS Integration Testing**
   - Verified Consul health checks working correctly (healthy status)
   - Confirmed Nomad health checks detect service state accurately
-  - Validated Vault correctly reports as unhealthy when sealed
+  - Validated legacy secrets-service correctly reported unhealthy states when sealed
   - Tested SeaweedFS connectivity failure handling
   - Verified metrics collection and accumulation
   - Confirmed logging with duration tracking for operational monitoring
@@ -3049,8 +3049,8 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 ## [2025-08-20] - Enhanced Nomad Templates & API Documentation (Phase 6 Step 3)
 
 ### Added
-- **Enhanced Nomad Templates with Vault/Consul Integration**
-  - Comprehensive lane-specific templates with Vault secrets management integration
+- **Enhanced Nomad Templates with Consul Integration**
+  - Comprehensive lane-specific templates with secrets management via Consul
   - Consul KV configuration support for dynamic application configuration
   - Consul Connect service mesh integration with automatic sidecar proxy deployment
   - Canary deployment strategies optimized for each lane type (unikernels, JVM, containers, VMs)
@@ -3081,7 +3081,7 @@ Lane G WebAssembly Runtime Support provides a complete, production-ready platfor
 ### Testing
 - **VPS Integration Testing**
   - Template rendering validation for all lane types with and without advanced features
-  - Conditional processing verification for Vault, Consul, and Connect integrations
+  - Conditional processing verification for Consul and Connect integrations
   - Resource allocation testing ensuring lane-specific configurations are applied correctly
   - API endpoint validation confirming controller can process enhanced template configurations
 

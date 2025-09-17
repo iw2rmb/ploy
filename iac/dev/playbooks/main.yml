@@ -1929,7 +1929,6 @@
         # API port removed - only accessible via domain routing
         - "4646"  # Nomad
         - "8500"  # Consul
-        - "8200"  # Vault
         - "80"    # HTTP (Traefik)
         - "443"   # HTTPS (Traefik)
         - "8080"  # Traefik dashboard

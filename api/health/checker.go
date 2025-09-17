@@ -12,7 +12,6 @@ type HealthChecker struct {
 	storageConfigPath string
 	consulAddr        string
 	nomadAddr         string
-	vaultAddr         string
 	metricsCollector  *HealthMetrics
 	configService     *cfgsvc.Service
 	disableChecks     bool
@@ -23,13 +22,10 @@ func NewHealthChecker(storageConfigPath, consulAddr, nomadAddr string) *HealthCh
 	if nomadAddr == "" {
 		nomadAddr = utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
 	}
-	vaultAddr := utils.Getenv("VAULT_ADDR", "http://127.0.0.1:8200")
-
 	return &HealthChecker{
 		storageConfigPath: storageConfigPath,
 		consulAddr:        consulAddr,
 		nomadAddr:         nomadAddr,
-		vaultAddr:         vaultAddr,
 		metricsCollector: &HealthMetrics{
 			DependencyFailures:  make(map[string]int64),
 			AverageResponseTime: make(map[string]time.Duration),

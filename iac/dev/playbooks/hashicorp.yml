@@ -1,5 +1,5 @@
 ---
-- name: Setup HashiCorp Stack (Nomad, Consul, Vault)
+- name: Setup HashiCorp Stack (Nomad, Consul)
   hosts: linux_hosts
   become: true
   vars_files:
@@ -31,10 +31,8 @@
         - /opt/hashicorp/bin
         - /opt/hashicorp/nomad
         - /opt/hashicorp/consul
-        - /opt/hashicorp/vault
         - /etc/nomad.d
         - /etc/consul.d
-        - /etc/vault.d
 
     - name: Create Mods host volume directories for Nomad
       file:
@@ -129,41 +127,6 @@
             dest: /usr/local/bin/consul
             state: link
 
-    - name: Download and install Vault
-      block:
-        - name: Check if Vault is already installed
-          stat:
-            path: /usr/local/bin/vault
-          register: vault_binary
-
-        - name: Get current Vault version (if installed)
-          command: /usr/local/bin/vault version
-          register: current_vault_version
-          changed_when: false
-          ignore_errors: true
-          when: vault_binary.stat.exists
-
-        - name: Download Vault
-          get_url:
-            url: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_linux_amd64.zip"
-            dest: /tmp/vault.zip
-          when: not vault_binary.stat.exists or vault_version not in (current_vault_version.stdout | default(''))
-
-        - name: Extract Vault
-          unarchive:
-            src: /tmp/vault.zip
-            dest: /opt/hashicorp/bin
-            remote_src: true
-            owner: ploy
-            group: ploy
-          when: not vault_binary.stat.exists or vault_version not in (current_vault_version.stdout | default(''))
-
-        - name: Create Vault symlink
-          file:
-            src: /opt/hashicorp/bin/vault
-            dest: /usr/local/bin/vault
-            state: link
-
     - name: Create Consul configuration
       template:
         src: ../../common/templates/consul-server.hcl.j2
@@ -212,14 +175,6 @@
           }
       register: nomad_meta_config
 
-    - name: Create Vault configuration
-      template:
-        src: ../../common/templates/vault.hcl.j2
-        dest: /etc/vault.d/vault.hcl
-        owner: ploy
-        group: ploy
-        mode: '0644'
-
     - name: Create systemd service files
       template:
         src: "../../common/templates/{{ item }}.service.j2"
@@ -227,7 +182,6 @@
       loop:
         - consul
         - nomad
-        - vault
 
     - name: Restart Nomad service to apply limits
       systemd:
@@ -405,25 +359,6 @@
           {{ go_dns_test.stdout if go_dns_test.rc == 0 else 'FAILED - ' + (go_dns_test.stderr | default('No error output')) }}
           Status: {{ 'SUCCESS' if go_dns_test.rc == 0 else 'FAILED' }}
 
-    - name: Check Vault service status
-      command: systemctl is-active vault
-      register: vault_service_status
-      ignore_errors: true
-      changed_when: false
-
-    - name: Start and enable Vault (if not running)
-      systemd:
-        name: vault
-        state: started
-        enabled: true
-        daemon_reload: true
-      when: vault_service_status.stdout != "active"
-
-    - name: Wait for Vault to be ready
-      wait_for:
-        port: 8200
-        delay: 10
-
     - name: Check Nomad service status
       command: systemctl is-active nomad
       register: nomad_service_status
@@ -545,55 +480,6 @@
         owner: ploy
         group: ploy
         mode: '0755'
-
-    - name: Initialize Vault (if not already initialized)
-      uri:
-        url: "http://localhost:8200/v1/sys/init"
-        method: POST
-        body_format: json
-        body:
-          secret_shares: 1
-          secret_threshold: 1
-        status_code: [200, 400]
-      register: vault_init
-      ignore_errors: true
-
-    - name: Save Vault initialization data
-      copy:
-        content: "{{ vault_init.json | to_nice_json }}"
-        dest: /opt/hashicorp/vault/init.json
-        owner: ploy
-        group: ploy
-        mode: '0600'
-      when: vault_init.status == 200
-
-    - name: Read Vault initialization data (if exists)
-      stat:
-        path: /opt/hashicorp/vault/init.json
-      register: vault_init_file
-
-    - name: Load Vault initialization data
-      slurp:
-        src: /opt/hashicorp/vault/init.json
-      register: vault_init_data
-      when: vault_init_file.stat.exists
-
-    - name: Unseal Vault with initialization key (dev environment)
-      uri:
-        url: "http://localhost:8200/v1/sys/unseal"
-        method: POST
-        body_format: json
-        body:
-          key: "{{ (vault_init_data.content | b64decode | from_json).keys[0] }}"
-        status_code: [200, 400]
-      register: vault_unseal
-      ignore_errors: true
-      when: vault_init_file.stat.exists
-
-    - name: Display Vault unsealing status
-      debug:
-        msg: "Vault unsealing result: {{ vault_unseal.json.sealed | default('Already unsealed or error occurred') }}"
-      when: vault_init_file.stat.exists
 
     - name: Check A-records for root domains (resilient)
       block:

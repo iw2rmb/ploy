@@ -12,7 +12,7 @@
 # SERVICE ORDERING:
 # 1. Cluster validation and basic setup
 # 2. SeaweedFS (distributed storage with replication)
-# 3. HashiCorp Stack (Nomad/Consul/Vault cluster)
+# 3. HashiCorp Stack (Nomad/Consul cluster)
 # 4. Controller (production deployment)
 # 5. FreeBSD nodes (worker configuration)
 
@@ -29,7 +29,6 @@
     # Production cluster configuration
     nomad_cluster_mode: true
     consul_cluster_mode: true
-    vault_cluster_mode: true
     cluster_size: "{{ groups['linux_hosts'] | length }}"
 
 - import_playbook: ../common/playbooks/controller.yml

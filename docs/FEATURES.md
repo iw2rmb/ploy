@@ -185,7 +185,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 
 ## 🚀 Deployment
 - ✅ Nomad templates per lane in `platform/nomad/`
-- ✅ Jobs include health checks, Vault integration, canary rollouts, Consul registration
+- ✅ Jobs include health checks, canary rollouts, Consul registration, and explicit secret templating via Consul KV
 - ✅ API handles rendering, submission, health polling
 - ✅ **Enhanced Health Monitoring** (Aug 2025):
   - **Deployment Progress Tracking**: Real-time monitoring of task group status with healthy/unhealthy allocation counts
@@ -325,7 +325,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 
 - ✅ **Zero-SPOF API Design**
   - **Nomad-Managed Deployment**: API runs as Nomad system job across multiple nodes
-- **Stateless Architecture**: All state externalized to Consul KV, SeaweedFS, and Vault
+- **Stateless Architecture**: All state externalized to Consul KV and SeaweedFS
 - **Layering Guarantees (Sep 2025)**: `internal/*` does not import `api/*`; guardrails in tests prevent regressions
   - **Load Balancing**: Multiple api instances behind Traefik with health checking
   - **Horizontal Scaling**: Scale api instances based on API load and resource requirements
@@ -366,7 +366,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Build Metadata**: SeaweedFS JSON artifacts with versioning
   - **Application Configuration**: Consul KV with atomic updates and validation
   - **Routing State**: Consul service registry with health checks and load balancer integration
-  - **Secrets Management**: Vault integration with dynamic credential management
+  - **Secrets Management**: Consul KV–driven env rendering (legacy secret manager removed)
 
 - ✅ **Production Hardening** (Aug 2025): Complete no-SPOF architecture with operational excellence
   - ✅ **Leader Election System**: Consul-based leader election for coordination-heavy operations with automatic failover
@@ -854,6 +854,6 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - Per-app Unikraft recipes and custom configurations
 - E2E testing suite with full Nomad cluster validation
 - Observability stack integration (Loki/Prometheus/Grafana)
-- Vault secrets management integration
+- Secrets management via Consul KV templates
 - Multi-region deployment support
 - Cost optimization and resource usage analytics

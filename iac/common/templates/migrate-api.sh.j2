@@ -40,7 +40,7 @@ echo "✅ No conflicting controller processes found"
 
 # Check dependencies
 echo "🔍 Checking required services..."
-REQUIRED_SERVICES=("seaweedfs-master:{{ seaweedfs.master_port }}" "consul:8500" "nomad:4646" "vault:8200")
+REQUIRED_SERVICES=("seaweedfs-master:{{ seaweedfs.master_port }}" "consul:8500" "nomad:4646")
 
 for service in "${REQUIRED_SERVICES[@]}"; do
     SERVICE_NAME="${service%:*}"

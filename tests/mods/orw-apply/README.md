@@ -41,7 +41,7 @@ Bottom line: orw-apply reliably produces `diff.patch` to SeaweedFS; runner/build
 
 ## Current Signals / Observations (latest)
 
-- Health endpoint is healthy (Consul/Nomad/SeaweedFS services are expected; Vault unhealthy but unused here).
+- Health endpoint is healthy (Consul/Nomad/SeaweedFS services are expected; legacy secrets service previously unused here).
 - orw-apply generally allocates and produces `/workspace/out/diff.patch` in under a minute (confirmed on VPS via alloc events with exit_code=0).
 - One recent run failed during orw-apply with exit code 6 due to SeaweedFS upload DNS failure (`Could not resolve host: seaweedfs-filer.service.consul`). With `set -e` this aborted the task.
 - Another symptom was the controller waiting at phase=apply because it looked for `diff.patch` in its own temp workspace (bind/mount assumption) instead of pulling from alloc/task-side storage.
@@ -125,7 +125,7 @@ Verify MR & diff (GitLab):
 - Mount strategy: repo as context; container builds `input.tar` internally.
 - Orchestration: job-manager wait uses Terminated `exit_code` for success/fail.
 - Runner: fallback on `diff.patch` after wait timeout; per-phase timeouts + diagnostics.
-- Vault is reported unhealthy; unused for this workflow.
+- Legacy secrets service was reported unhealthy; unused for this workflow.
 - Periodic transient TLS/SSH issues; rerun succeeds after a short interval.
 - SeaweedFS integration: pass `SEAWEEDFS_URL`, `DIFF_KEY`/`OUTPUT_KEY` to tasks; task uploads `diff.patch`/`output.tar` (best‑effort). Controller records artifacts if already present in storage.
 - SSE transparency: added `diff-found`, `diff-apply-started`, `build-gate-start`, `build-gate-failed/succeeded`, and `orw-apply job completed` event.

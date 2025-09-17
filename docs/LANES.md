@@ -148,4 +148,4 @@ If detection fails, the system defaults to Lane E in Dev to maximize success, bu
 
 - API runs as a Nomad job without Docker — container builds use Kaniko.
 - Traefik runs as a Nomad job; logs available via the Dev API.
-- Some advanced lane features (e.g., mesh, Vault) are disabled in Dev templates.
+- Some advanced lane features (e.g., service mesh) are disabled in Dev templates.

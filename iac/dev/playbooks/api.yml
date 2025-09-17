@@ -44,7 +44,6 @@
           loop:
             - "8500"  # Consul
             - "4646"  # Nomad
-            - "8200"  # Vault
 
         - name: Verify Nomad cluster is ready
           uri:
@@ -58,7 +57,7 @@
 
         - name: Display service dependency status
           debug:
-            msg: "All required services (SeaweedFS, Consul, Nomad, Vault) are healthy and ready"
+            msg: "All required services (SeaweedFS, Consul, Nomad) are healthy and ready"
 
     - name: Update code and build binaries
       block:

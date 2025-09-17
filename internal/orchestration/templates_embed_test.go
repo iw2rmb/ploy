@@ -27,7 +27,7 @@ func TestEmbeddedTemplatesHaveNoVaultReferences(t *testing.T) {
 			t.Fatalf("expected embedded template for %s", path)
 		}
 		if strings.Contains(strings.ToLower(string(content)), "vault") {
-			t.Fatalf("vault reference found in embedded template %s", path)
+			t.Fatalf("forbidden secret-manager token found in embedded template %s", path)
 		}
 	}
 }
