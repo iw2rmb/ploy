@@ -55,3 +55,4 @@ test-template/
 
 tests/tmp/
 tests/mods/orw-apply-llm-plan-seq/logs/
+tmp/

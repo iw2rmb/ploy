@@ -20,10 +20,14 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 		domainSuffix = "dev.ployd.app"
 	}
 
-	// Fail fast: Lane E requires a non-empty Docker image reference (preferably tag@digest)
-	if strings.ToUpper(lane) == "E" && strings.TrimSpace(dockerImage) == "" {
-		return "", fmt.Errorf("runtime render prerequisites not met: empty docker image after build (verify/push may have failed)")
-	}
+    // Fail fast: Lane E requires a non-empty Docker image reference (preferably tag@digest)
+    if strings.ToUpper(lane) == "E" && strings.TrimSpace(dockerImage) == "" {
+        return "", fmt.Errorf("runtime render prerequisites not met: empty docker image after build (verify/push may have failed)")
+    }
+    // Log the resolved runtime image for observability
+    if strings.ToUpper(lane) == "E" {
+        fmt.Printf("[Build] Lane E docker image: %s\n", dockerImage)
+    }
 
 	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
 		App:           appName,

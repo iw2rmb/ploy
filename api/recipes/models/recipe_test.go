@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -138,5 +139,32 @@ func TestRecipeCloneProducesDeepCopy(t *testing.T) {
 	}
 	if recipe.Steps[0].Config["recipe"] == "modified" {
 		t.Errorf("original recipe step config mutated after clone")
+	}
+}
+
+func TestRecipeMetadataHelpers(t *testing.T) {
+	meta := RecipeMetadata{
+		Name:        "helper-test",
+		Description: "test helpers",
+		Tags:        []string{"Security", "Performance"},
+		Categories:  []string{"security", "maintenance"},
+		Languages:   []string{"Go", "JAVA"},
+	}
+
+	if !meta.HasTag("security") || !meta.HasTag("PERFORMANCE") {
+		t.Fatalf("HasTag failed for case-insensitive match")
+	}
+	if meta.HasTag("missing") {
+		t.Fatalf("HasTag unexpectedly true for missing tag")
+	}
+	if !meta.HasCategory("Maintenance") {
+		t.Fatalf("HasCategory failed for case-insensitive match")
+	}
+	if !meta.SupportsLanguage("java") {
+		t.Fatalf("SupportsLanguage failed for case-insensitive match")
+	}
+	searchable := meta.GetSearchableText()
+	if !strings.Contains(searchable, "helper-test") || !strings.Contains(searchable, "performance") {
+		t.Fatalf("GetSearchableText missing expected fields: %s", searchable)
 	}
 }
