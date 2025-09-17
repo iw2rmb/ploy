@@ -173,33 +173,6 @@ EOF
         perms       = "0644"
       }
       
-      # Secrets from Vault
-      template {
-        data = <<EOF
-# Database Credentials
-DATABASE_USERNAME={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.username}}{{end}}
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-
-# API Keys and Tokens
-API_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret_key}}{{end}}
-JWT_SECRET={{with secret "secret/data/{{APP_NAME}}/jwt"}}{{.Data.data.secret}}{{end}}
-
-# Third-party integrations
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-
-# TLS Configuration
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-TLS_CERTIFICATE={{.Data.certificate}}
-TLS_PRIVATE_KEY={{.Data.private_key}}
-TLS_CA_CHAIN={{.Data.ca_chain}}
-{{end}}
-EOF
-        destination = "secrets/application-secrets.properties"
-        change_mode = "restart"
-        perms       = "0600"
-      }
-      
       # Enhanced service registration
       service {
         name = "{{APP_NAME}}-lane-c-osv"

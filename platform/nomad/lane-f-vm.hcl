@@ -65,14 +65,6 @@ job "{{APP_NAME}}-lane-f" {
     task "vm" {
       driver = "qemu"
       
-      # Vault integration for VM secrets
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
-      
       config {
         image_path = "{{IMAGE_PATH}}"
         
@@ -195,53 +187,6 @@ EOF
         env         = true
         change_mode = "restart"
         perms       = "0644"
-      }
-      {{/if}}
-      
-      # Comprehensive Vault secrets for VM
-      {{#if VAULT_ENABLED}}
-      template {
-        data = <<EOF
-# Database credentials
-DATABASE_USERNAME={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.username}}{{end}}
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-DB_ROOT_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.root_password}}{{end}}
-
-# Application secrets
-API_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret_key}}{{end}}
-JWT_SECRET={{with secret "secret/data/{{APP_NAME}}/jwt"}}{{.Data.data.secret}}{{end}}
-SESSION_SECRET={{with secret "secret/data/{{APP_NAME}}/session"}}{{.Data.data.secret}}{{end}}
-ENCRYPTION_KEY={{with secret "secret/data/{{APP_NAME}}/encryption"}}{{.Data.data.key}}{{end}}
-
-# External services
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-AWS_ACCESS_KEY_ID={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.access_key}}{{end}}
-AWS_SECRET_ACCESS_KEY={{with secret "aws/creds/{{APP_NAME}}-role"}}{{.Data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-
-# OAuth and third-party integrations
-GOOGLE_CLIENT_ID={{with secret "secret/data/{{APP_NAME}}/google"}}{{.Data.data.client_id}}{{end}}
-GOOGLE_CLIENT_SECRET={{with secret "secret/data/{{APP_NAME}}/google"}}{{.Data.data.client_secret}}{{end}}
-GITHUB_CLIENT_ID={{with secret "secret/data/{{APP_NAME}}/github"}}{{.Data.data.client_id}}{{end}}
-GITHUB_CLIENT_SECRET={{with secret "secret/data/{{APP_NAME}}/github"}}{{.Data.data.client_secret}}{{end}}
-
-# TLS and PKI
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=168h"}}
-TLS_CERTIFICATE={{.Data.certificate}}
-TLS_PRIVATE_KEY={{.Data.private_key}}
-TLS_CA_CHAIN={{.Data.ca_chain}}
-{{end}}
-
-# SSH keys for VM access
-{{with secret "secret/data/{{APP_NAME}}/ssh"}}
-SSH_PRIVATE_KEY={{.Data.data.private_key}}
-SSH_PUBLIC_KEY={{.Data.data.public_key}}
-{{end}}
-EOF
-        destination = "secrets/vm.env"
-        env         = true
-        change_mode = "restart"
-        perms       = "0600"
       }
       {{/if}}
       
