@@ -200,16 +200,13 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 	var err error
 	if h.configService != nil {
 		cfg := h.configService.Get()
-		if cfg != nil {
-			type stIntf interface {
-				CreateStorageClient() (istorage.Storage, error)
-				Metrics() *istorage.StorageMetrics
+		if cfg == nil {
+			err = fmt.Errorf("config service returned nil config")
+		} else {
+			storageClient, err = cfg.CreateStorageClient()
+			if err == nil && storageClient == nil {
+				err = fmt.Errorf("config service returned nil storage client")
 			}
-			var st istorage.Storage
-			if c, ok := any(cfg).(stIntf); ok {
-				st, err = c.CreateStorageClient()
-			}
-			storageClient = st
 		}
 	} else {
 		if h.storageConfigPath != "" {
