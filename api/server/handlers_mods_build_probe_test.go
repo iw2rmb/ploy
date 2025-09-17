@@ -100,7 +100,7 @@ func TestHandleTriggerAppBuild_StorageResolutionFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusServiceUnavailable {
 		t.Fatalf("expected status %d, got %d", fiber.StatusServiceUnavailable, resp.StatusCode)
@@ -134,7 +134,7 @@ func TestHandleTriggerAppBuild_InvalidAppName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusBadRequest {
 		t.Fatalf("expected status %d, got %d", fiber.StatusBadRequest, resp.StatusCode)
@@ -171,7 +171,7 @@ func TestHandleAppProbe_NoEndpointFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusNotFound {
 		t.Fatalf("expected status %d, got %d", fiber.StatusNotFound, resp.StatusCode)
@@ -208,7 +208,7 @@ func TestHandleTriggerPlatformBuild_StorageResolutionFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusServiceUnavailable {
 		t.Fatalf("expected status %d, got %d", fiber.StatusServiceUnavailable, resp.StatusCode)
@@ -224,7 +224,7 @@ func TestHandleBuildsOptionsHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != fiber.StatusNoContent {
 		t.Fatalf("expected status %d, got %d", fiber.StatusNoContent, resp.StatusCode)
