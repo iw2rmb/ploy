@@ -35,16 +35,27 @@ type BuildFacts struct {
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func ComputeFacts(srcDir, language string) BuildFacts {
-	f := BuildFacts{Language: language}
-	// Common flags
-	f.HasDockerfile = exists(filepath.Join(srcDir, "Dockerfile"))
+    f := BuildFacts{Language: language}
+    // Common flags
+    f.HasDockerfile = exists(filepath.Join(srcDir, "Dockerfile"))
 
-	// JVM
-	if language == "java" || language == "scala" || language == "kotlin" {
-		f.Versions.Java = djava.DetectVersion(srcDir)
-		if language == "scala" {
-			f.Versions.Scala = dscala.DetectVersion(srcDir)
-		}
+    // Heuristic: detect JVM build tools even if language was not pre-detected
+    if f.Language == "" {
+        if exists(filepath.Join(srcDir, "build.gradle.kts")) || exists(filepath.Join(srcDir, "build.gradle")) {
+            f.Language = "java"
+            f.BuildTool = "gradle"
+        } else if exists(filepath.Join(srcDir, "pom.xml")) {
+            f.Language = "java"
+            f.BuildTool = "maven"
+        }
+    }
+
+    // JVM
+    if language == "java" || language == "scala" || language == "kotlin" {
+        f.Versions.Java = djava.DetectVersion(srcDir)
+        if language == "scala" {
+            f.Versions.Scala = dscala.DetectVersion(srcDir)
+        }
 		// Build tool
 		if exists(filepath.Join(srcDir, "build.gradle.kts")) || exists(filepath.Join(srcDir, "build.gradle")) {
 			f.BuildTool = "gradle"
@@ -58,11 +69,20 @@ func ComputeFacts(srcDir, language string) BuildFacts {
 		f.MainClass = djava.DetectMainClass(srcDir)
 	}
 
-	// Node
-	if language == "node" || language == "javascript" || language == "typescript" {
-		f.Versions.Node = dnode.DetectVersion(srcDir)
-		f.BuildTool = "npm"
-	}
+    // If JVM heuristics fired (above), still populate versions and main class
+    if f.Language == "java" && f.BuildTool != "" && f.Versions.Java == "" {
+        f.Versions.Java = djava.DetectVersion(srcDir)
+        f.HasJib = djava.DetectJib(srcDir)
+        if f.MainClass == "" {
+            f.MainClass = djava.DetectMainClass(srcDir)
+        }
+    }
+
+    // Node
+    if language == "node" || language == "javascript" || language == "typescript" {
+        f.Versions.Node = dnode.DetectVersion(srcDir)
+        f.BuildTool = "npm"
+    }
 
 	// Python
 	if language == "python" {

@@ -73,7 +73,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 
 	// Create a tar context from srcDir
 	builderTar := filepath.Join(tmpDir, "context.tar")
-	if err := func() error {
+    if err := func() error {
 		f, err := os.Create(builderTar)
 		if err != nil {
 			return err
@@ -81,27 +81,29 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		defer func() { _ = f.Close() }()
 		ign, _ := clutils.ReadGitignore(srcDir)
 		return clutils.TarDir(srcDir, f, ign)
-	}(); err != nil {
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":   "create build context failed",
-			"stage":   "build_context",
-			"details": err.Error(),
-		})
-	}
+    }(); err != nil {
+        fmt.Printf("[Lane E][ERROR] stage=build_context app=%s sha=%s err=%v\n", appName, sha, err)
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":   "create build context failed",
+            "stage":   "build_context",
+            "details": err.Error(),
+        })
+    }
 
 	// Upload context tar to storage for Kaniko to fetch
 	contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
 	var contextURL string
 	if deps.Storage != nil {
 		ctxUp := context.Context(c.Context())
-		if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-			return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-				"error":       "failed to upload build context",
-				"stage":       "upload_context",
-				"context_key": contextKey,
-				"details":     err.Error(),
-			})
-		}
+        if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+            fmt.Printf("[Lane E][ERROR] stage=upload_context app=%s sha=%s key=%s err=%v\n", appName, sha, contextKey, err)
+            return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+                "error":       "failed to upload build context",
+                "stage":       "upload_context",
+                "context_key": contextKey,
+                "details":     err.Error(),
+            })
+        }
 		base := os.Getenv("PLOY_SEAWEEDFS_URL")
 		if base == "" {
 			base = "http://seaweedfs-filer.service.consul:8888"
@@ -143,13 +145,14 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 				time.Sleep(2 * time.Second)
 			}
 		}(contextURL)
-	} else {
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":       "storage not available for build context upload",
-			"stage":       "upload_context",
-			"context_key": contextKey,
-		})
-	}
+    } else {
+        fmt.Printf("[Lane E][ERROR] stage=upload_context app=%s sha=%s err=%s\n", appName, sha, "storage not available")
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":       "storage not available for build context upload",
+            "stage":       "upload_context",
+            "context_key": contextKey,
+        })
+    }
 
 	// Render and execute Kaniko builder job
 	nonce := time.Now().Unix()
@@ -160,50 +163,54 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			langForBuilder = "dotnet"
 		}
 	}
-	builderHCL, err := renderKanikoBuilderFn(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
-	if err != nil {
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":   "render builder failed",
-			"stage":   "render_builder",
-			"details": err.Error(),
-		})
-	}
+    builderHCL, err := renderKanikoBuilderFn(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
+    if err != nil {
+        fmt.Printf("[Lane E][ERROR] stage=render_builder app=%s sha=%s tag=%s err=%v\n", appName, sha, tag, err)
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":   "render builder failed",
+            "stage":   "render_builder",
+            "details": err.Error(),
+        })
+    }
 	// Save a debug copy for inspection
 	func() {
 		_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
 		_ = copyFile(builderHCL, filepath.Join("/opt/ploy/debug/jobs", filepath.Base(builderHCL)))
 	}()
-	if vErr := validateJobFn(builderHCL); vErr != nil {
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":       "builder job validation failed",
-			"stage":       "validate_builder",
-			"builder_hcl": builderHCL,
-			"details":     vErr.Error(),
-		})
-	}
+    if vErr := validateJobFn(builderHCL); vErr != nil {
+        fmt.Printf("[Lane E][ERROR] stage=validate_builder app=%s sha=%s job=%s err=%v\n", appName, sha, filepath.Base(builderHCL), vErr)
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":       "builder job validation failed",
+            "stage":       "validate_builder",
+            "builder_hcl": builderHCL,
+            "details":     vErr.Error(),
+        })
+    }
 	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s)\n", builderJobName, tag)
-	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
-		snippet := getJobLogsSnippet(builderJobName, 80)
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
-			"stage":   "kaniko_submit",
-			"details": err.Error(),
-			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
-		})
-	}
+    if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
+        snippet := getJobLogsSnippet(builderJobName, 80)
+        fmt.Printf("[Lane E][ERROR] stage=kaniko_submit app=%s sha=%s job=%s err=%v\n", appName, sha, builderJobName, err)
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
+            "stage":   "kaniko_submit",
+            "details": err.Error(),
+            "builder": fiber.Map{"job": builderJobName, "logs": snippet},
+        })
+    }
 	// Verify image exists in registry before returning and capture digest
 	vr := verifyOCIPushFn(tag)
 	fmt.Printf("[Lane E] Verify push: tag=%s ok=%t status=%d digest=%s message=%s\n", tag, vr.OK, vr.Status, vr.Digest, vr.Message)
-	if !vr.OK || vr.Digest == "" {
-		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-			"error":   "image push verification failed",
-			"stage":   "verify_push",
-			"image":   tag,
-			"status":  vr.Status,
-			"message": vr.Message,
-		})
-	}
+    if !vr.OK || vr.Digest == "" {
+        fmt.Printf("[Lane E][ERROR] stage=verify_push app=%s sha=%s tag=%s status=%d msg=%s\n", appName, sha, tag, vr.Status, vr.Message)
+        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+            "error":   "image push verification failed",
+            "stage":   "verify_push",
+            "image":   tag,
+            "status":  vr.Status,
+            "message": vr.Message,
+        })
+    }
 	// Prefer digest-based reference to avoid tag drift at runtime
 	digestRef := tag + "@" + vr.Digest
 	fmt.Printf("[Lane E] Using digest ref for runtime: %s\n", digestRef)
