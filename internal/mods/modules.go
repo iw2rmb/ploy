@@ -126,12 +126,12 @@ type MRManagerAdapter struct{ gp provider.GitProvider }
 func NewMRManagerAdapter(gp provider.GitProvider) *MRManagerAdapter { return &MRManagerAdapter{gp: gp} }
 
 func (m *MRManagerAdapter) CreateOrUpdate(ctx context.Context, cfg provider.MRConfig) (string, map[string]any, error) {
-	if m.gp == nil {
-		return "", nil, fmt.Errorf("git provider not configured")
-	}
-	if err := m.gp.ValidateConfiguration(); err != nil {
-		return "", nil, err
-	}
+    if m.gp == nil {
+        return "", nil, fmt.Errorf("git provider not configured")
+    }
+    if err := m.gp.ValidateConfiguration(); err != nil {
+        return "", nil, fmt.Errorf("configuration invalid: %w", err)
+    }
 	res, err := m.gp.CreateOrUpdateMR(ctx, cfg)
 	if err != nil {
 		return "", nil, err
