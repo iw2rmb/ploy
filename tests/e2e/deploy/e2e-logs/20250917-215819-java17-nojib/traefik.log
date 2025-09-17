@@ -1,5 +1,0 @@
-[2025-09-17 19:00:17] Getting stdout logs for allocation: 4b93912a-0985-74dc-5257-eb47332514fb (task: traefik, lines: 200, follow: false)
-[2025-09-17 19:00:17] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/4b93912a-0985-74dc-5257-eb47332514fb?type=stdout&plain=true&task=traefik&offset=-200
-[2025-09-17 19:00:17] Response code: 200
-12.75.241:24894" 6ms
-45.12.75.241 - - [17/Sep/2025:19:00:17 +0000] "POST /v1/mods/mod-631e5bd2/events HTTP/2.0" 200 11 "-" "-" 37353 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 5ms
