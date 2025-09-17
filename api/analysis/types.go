@@ -64,7 +64,6 @@ type FixSuggestion struct {
 	Description string                 `json:"description"`
 	Diff        string                 `json:"diff"`
 	Confidence  float64                `json:"confidence"`
-	ARFRecipe   string                 `json:"arf_recipe,omitempty"`
 	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -82,18 +81,8 @@ type Issue struct {
 	EndColumn      int             `json:"end_column,omitempty"`
 	CodeSnippet    string          `json:"code_snippet,omitempty"`
 	FixSuggestions []FixSuggestion `json:"fix_suggestions,omitempty"`
-	ARFCompatible  bool            `json:"arf_compatible"`
 	Documentation  string          `json:"documentation,omitempty"`
 	Tags           []string        `json:"tags,omitempty"`
-}
-
-// ARFTrigger represents a trigger for ARF remediation
-type ARFTrigger struct {
-	IssueID     string                 `json:"issue_id"`
-	RecipeName  string                 `json:"recipe_name"`
-	Priority    int                    `json:"priority"`
-	AutoApprove bool                   `json:"auto_approve"`
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 }
 
 // AnalysisMetrics contains metrics about the analysis
@@ -130,7 +119,6 @@ type AnalysisResult struct {
 	LanguageResults map[string]*LanguageAnalysisResult `json:"language_results"`
 	Issues          []Issue                            `json:"issues"`
 	Metrics         AnalysisMetrics                    `json:"metrics"`
-	ARFTriggers     []ARFTrigger                       `json:"arf_triggers"`
 	Success         bool                               `json:"success"`
 	Error           string                             `json:"error,omitempty"`
 }
@@ -139,7 +127,6 @@ type AnalysisResult struct {
 type AnalysisConfig struct {
 	Enabled         bool                   `json:"enabled" yaml:"enabled"`
 	FailOnCritical  bool                   `json:"fail_on_critical" yaml:"fail_on_critical"`
-	ARFIntegration  bool                   `json:"arf_integration" yaml:"arf_integration"`
 	MaxIssues       int                    `json:"max_issues" yaml:"max_issues"`
 	Timeout         time.Duration          `json:"timeout" yaml:"timeout"`
 	CacheEnabled    bool                   `json:"cache_enabled" yaml:"cache_enabled"`
@@ -195,9 +182,6 @@ type LanguageAnalyzer interface {
 	// Fix generation
 	GenerateFixSuggestions(issue Issue) ([]FixSuggestion, error)
 	CanAutoFix(issue Issue) bool
-
-	// Integration
-	GetARFRecipes(issue Issue) []string
 }
 
 // CacheManager interface for analysis caching

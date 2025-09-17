@@ -1,0 +1,12 @@
+--- a/src/healing/java/e2e/FailHealing.java
++++ b/src/healing/java/e2e/FailHealing.java
+@@ -1,7 +1,7 @@
+ package e2e;
+ public class FailHealing {
+     public static void main(String[] args) {
+-        UnknownClass obj = new UnknownClass(); // intentional missing symbol
+-        System.out.println(obj);
++//         UnknownClass obj = new UnknownClass(); // intentional missing symbol
++//         System.out.println(obj);
+     }
+ }

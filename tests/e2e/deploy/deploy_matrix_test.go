@@ -3,6 +3,7 @@
 package deploy
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -374,7 +375,51 @@ func fetchUncompressedSizeRemoteDocker(tag string) (bytes int64, mb float64, ok 
 func waitAsync(t *testing.T, controller, app, lane, id string, dur time.Duration) map[string]any {
 	t.Helper()
 	deadline := time.Now().Add(dur)
-	url := fmt.Sprintf("%s/apps/%s/builds/%s/status", strings.TrimRight(controller, "/"), app, id)
+	base := strings.TrimRight(controller, "/")
+	statusURL := fmt.Sprintf("%s/apps/%s/builds/%s/status", base, app, id)
+
+	// Prefer SSE events when available to avoid tick polling
+	if controller != "" {
+		eventsURL := fmt.Sprintf("%s/apps/%s/builds/%s/events", base, app, id)
+		client := &http.Client{Timeout: dur}
+		if req, err := http.NewRequest("GET", eventsURL, nil); err == nil {
+			req.Header.Set("Accept", "text/event-stream")
+			if resp, err := client.Do(req); err == nil && resp.StatusCode == 200 {
+				defer resp.Body.Close()
+				scanner := bufio.NewScanner(resp.Body)
+				// Increase buffer for larger JSON lines
+				buf := make([]byte, 0, 64*1024)
+				scanner.Buffer(buf, 512*1024)
+				for time.Now().Before(deadline) && scanner.Scan() {
+					line := scanner.Text()
+					if !strings.HasPrefix(line, "data:") {
+						continue
+					}
+					payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+					var st map[string]any
+					if err := json.Unmarshal([]byte(payload), &st); err != nil {
+						continue
+					}
+					if s, _ := st["status"].(string); s != "" {
+						if s == "failed" {
+							collectDeployLogs(t, controller, app, lane, "", id)
+							t.Fatalf("async failed: %v", st["message"])
+						}
+						if s == "completed" {
+							if msg, _ := st["message"].(string); msg != "" {
+								var rm map[string]any
+								_ = json.Unmarshal([]byte(msg), &rm)
+								return rm
+							}
+							return nil
+						}
+					}
+				}
+				// If the stream ended without a terminal event, fall back below
+			}
+		}
+	}
+	url := statusURL
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(url)
 		if err == nil && resp.StatusCode == 200 {
@@ -405,38 +450,36 @@ func waitAsync(t *testing.T, controller, app, lane, id string, dur time.Duration
 func waitHealth(controller, app string, dur time.Duration) error {
 	base := fmt.Sprintf("https://%s.dev.ployd.app/healthz", app)
 	deadline := time.Now().Add(dur)
-	statusURL := ""
 	if controller != "" {
-		statusURL = fmt.Sprintf("%s/apps/%s/status", strings.TrimRight(controller, "/"), app)
-	}
-	for time.Now().Before(deadline) {
-		// Prefer event-driven status when available
-		if statusURL != "" {
-			if r, e := http.Get(statusURL); e == nil && r.StatusCode == 200 {
+		watchURL := fmt.Sprintf("%s/apps/%s/status/watch?wait=30s&timeout=30s", strings.TrimRight(controller, "/"), app)
+		// Loop until overall deadline using server long-poll in 30s chunks
+		for time.Now().Before(deadline) {
+			client := &http.Client{Timeout: 35 * time.Second}
+			if r, e := client.Get(watchURL); e == nil {
 				var s map[string]any
 				_ = json.NewDecoder(r.Body).Decode(&s)
 				r.Body.Close()
-				if allocs, ok := s["allocations"].([]any); ok && len(allocs) > 0 {
-					// Look for healthy or failing signals
-					healthy := false
-					failing := false
-					for _, a := range allocs {
-						if m, ok := a.(map[string]any); ok {
-							if cs, _ := m["client_status"].(string); cs == "running" {
-								healthy = true
-							}
-							if tasks, ok := m["tasks"].([]any); ok {
-								for _, t := range tasks {
-									if tm, ok := t.(map[string]any); ok {
-										if fv, _ := tm["failed"].(bool); fv {
-											failing = true
-										}
-										if evs, ok := tm["events"].([]any); ok {
-											for _, ev := range evs {
-												if evm, ok := ev.(map[string]any); ok {
-													// Heuristic: "Alloc Unhealthy", "Killing", "Failed" → failing
-													if typ, _ := evm["type"].(string); typ == "Alloc Unhealthy" || typ == "Killing" || typ == "Failed" {
-														failing = true
+				if r.StatusCode == 200 {
+					if allocs, ok := s["allocations"].([]any); ok && len(allocs) > 0 {
+						healthy := false
+						failing := false
+						for _, a := range allocs {
+							if m, ok := a.(map[string]any); ok {
+								if cs, _ := m["client_status"].(string); cs == "running" {
+									healthy = true
+								}
+								if tasks, ok := m["tasks"].([]any); ok {
+									for _, t := range tasks {
+										if tm, ok := t.(map[string]any); ok {
+											if fv, _ := tm["failed"].(bool); fv {
+												failing = true
+											}
+											if evs, ok := tm["events"].([]any); ok {
+												for _, ev := range evs {
+													if evm, ok := ev.(map[string]any); ok {
+														if typ, _ := evm["type"].(string); typ == "Alloc Unhealthy" || typ == "Killing" || typ == "Failed" {
+															failing = true
+														}
 													}
 												}
 											}
@@ -445,33 +488,36 @@ func waitHealth(controller, app string, dur time.Duration) error {
 								}
 							}
 						}
-					}
-					if failing {
-						return fmt.Errorf("health failed by alloc events")
-					}
-					if healthy {
-						// Optionally confirm via controller-proxied probe once
-						probe := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
-						if pr, pe := http.Get(probe); pe == nil {
-							var pm map[string]any
-							_ = json.NewDecoder(pr.Body).Decode(&pm)
-							pr.Body.Close()
-							if code, ok := pm["code"].(float64); ok && int(code) == 200 {
-								return nil
+						if failing {
+							return fmt.Errorf("health failed by alloc events")
+						}
+						if healthy {
+							// Confirm via controller-proxied probe once
+							probe := fmt.Sprintf("%s/apps/%s/probe", strings.TrimRight(controller, "/"), app)
+							if pr, pe := http.Get(probe); pe == nil {
+								var pm map[string]any
+								_ = json.NewDecoder(pr.Body).Decode(&pm)
+								pr.Body.Close()
+								if code, ok := pm["code"].(float64); ok && int(code) == 200 {
+									return nil
+								}
 							}
 						}
 					}
+					// No allocs or inconclusive; continue long-poll loop
+					continue
 				}
 			}
+			// brief delay on errors before retrying
+			time.Sleep(500 * time.Millisecond)
 		}
-		// External healthz as a fallback
-		if resp, err := http.Get(base); err == nil {
-			resp.Body.Close()
-			if resp.StatusCode == 200 {
-				return nil
-			}
+	}
+	// Fallback: external healthz if controller not available or deadline exceeded
+	if resp, err := http.Get(base); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == 200 {
+			return nil
 		}
-		time.Sleep(1 * time.Second)
 	}
 	return fmt.Errorf("health check failed: %s", base)
 }

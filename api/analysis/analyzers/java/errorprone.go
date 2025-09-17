@@ -215,7 +215,6 @@ func (a *ErrorProneAnalyzer) GenerateFixSuggestions(issue analysis.Issue) ([]ana
 			suggestion := analysis.FixSuggestion{
 				Description: fix,
 				Confidence:  0.8,
-				ARFRecipe:   fmt.Sprintf("org.openrewrite.java.cleanup.%s", pattern),
 			}
 			suggestions = append(suggestions, suggestion)
 			break
@@ -245,45 +244,6 @@ func (a *ErrorProneAnalyzer) CanAutoFix(issue analysis.Issue) bool {
 	}
 
 	return false
-}
-
-// GetARFRecipes returns ARF recipes for an issue
-func (a *ErrorProneAnalyzer) GetARFRecipes(issue analysis.Issue) []string {
-	recipes := []string{}
-
-	// Map Error Prone checks to OpenRewrite recipes
-	recipeMap := map[string][]string{
-		"NullAway": {
-			"org.openrewrite.java.cleanup.ExplicitInitialization",
-			"org.openrewrite.java.cleanup.UseObjectNotifyAll",
-		},
-		"UnusedVariable": {
-			"org.openrewrite.java.cleanup.RemoveUnusedLocalVariables",
-		},
-		"UnusedMethod": {
-			"org.openrewrite.java.cleanup.RemoveUnusedPrivateMethods",
-		},
-		"EqualsIncompatibleType": {
-			"org.openrewrite.java.cleanup.EqualsAvoidsNull",
-		},
-		"MissingOverride": {
-			"org.openrewrite.java.cleanup.MissingOverrideAnnotation",
-		},
-		"DefaultCharset": {
-			"org.openrewrite.java.cleanup.DefaultCharset",
-		},
-		"EmptyBlock": {
-			"org.openrewrite.java.cleanup.EmptyBlock",
-		},
-	}
-
-	for pattern, recipeList := range recipeMap {
-		if strings.Contains(issue.RuleName, pattern) {
-			recipes = append(recipes, recipeList...)
-		}
-	}
-
-	return recipes
 }
 
 // findJavaFiles finds all Java files in the codebase
@@ -423,14 +383,13 @@ func (a *ErrorProneAnalyzer) parseErrorProneOutput(output string) []analysis.Iss
 			message := matches[5]
 
 			issue := analysis.Issue{
-				ID:            fmt.Sprintf("ep-%d", issueID),
-				Severity:      a.mapSeverity(severity),
-				Category:      a.categorizeCheck(checkName),
-				RuleName:      checkName,
-				Message:       message,
-				File:          file,
-				Line:          lineNum,
-				ARFCompatible: a.CanAutoFix(analysis.Issue{RuleName: checkName}),
+				ID:       fmt.Sprintf("ep-%d", issueID),
+				Severity: a.mapSeverity(severity),
+				Category: a.categorizeCheck(checkName),
+				RuleName: checkName,
+				Message:  message,
+				File:     file,
+				Line:     lineNum,
 			}
 
 			issues = append(issues, issue)

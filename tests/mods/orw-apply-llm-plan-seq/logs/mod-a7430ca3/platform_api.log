@@ -1,0 +1,14 @@
+[2025-09-16 13:25:13] Getting stdout logs for allocation: f37a8ad9-81e1-fd74-ac3f-5a0c495a13af (task: api, lines: 800, follow: false)
+[2025-09-16 13:25:13] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/f37a8ad9-81e1-fd74-ac3f-5a0c495a13af?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 13:25:13] Response code: 200
+a7430ca3/events -    8.424276ms
+[13:25:01] 200 - POST /v1/mods/mod-a7430ca3/events -     8.79231ms
+[13:25:01] 200 - GET /v1/mods/mod-a7430ca3/status -    3.070631ms
+[13:25:02] 200 - POST /v1/mods/mod-a7430ca3/events -    6.421254ms
+[13:25:02] 200 - POST /v1/mods/mod-a7430ca3/events -    6.125102ms
+[13:25:05] 200 - POST /v1/mods/mod-a7430ca3/events -    5.282734ms
+{"error":{"code":"internal_error","details":null,"message":"internal error"}}[13:25:05] 200 - POST /v1/mods/mod-a7430ca3/events -     4.98092ms
+[13:25:08] 200 - GET /v1/mods/mod-a7430ca3/status -    3.097812ms
+[13:25:10] 200 - GET /v1/mods/mod-a7430ca3/artifacts/plan_json -    4.775508ms
+[13:25:11] 200 - GET /v1/mods/mod-a7430ca3/artifacts/diff_patch -    9.556469ms
+[13:25:12] 200 - GET /v1/mods/mod-a7430ca3/logs -     141.651µs

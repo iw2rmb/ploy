@@ -1,0 +1,14 @@
+[2025-09-16 14:28:56] Getting stdout logs for allocation: dd78ef6d-fba2-58f5-a381-acf67baf1af8 (task: api, lines: 800, follow: false)
+[2025-09-16 14:28:56] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/dd78ef6d-fba2-58f5-a381-acf67baf1af8?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 14:28:56] Response code: 200
+33ms
+[14:28:45] 200 - POST /v1/mods/mod-26cdcd09/events -     3.69401ms
+[14:28:45] 200 - POST /v1/mods/mod-26cdcd09/events -     6.49124ms
+[14:28:46] 200 - GET /v1/mods/mod-26cdcd09/status -    4.311817ms
+File context.tar uploaded successfully: builds/tfw-java11to17-orw-llm-1758032928/20250916-142848/src.tar
+[14:28:48] 500 - POST /v1/apps/tfw-java11to17-orw-llm-1758032928/builds -   73.365862ms
+{"error":{"code":"internal_error","details":null,"message":"internal error"}}[14:28:48] 200 - POST /v1/mods/mod-26cdcd09/events -    4.342487ms
+[14:28:49] 200 - GET /live -      91.481µs
+[14:28:52] 200 - GET /v1/mods/mod-26cdcd09/artifacts -    2.710499ms
+[14:28:53] 200 - GET /v1/mods/mod-26cdcd09/artifacts/next_json -    3.778961ms
+[14:28:54] 200 - GET /v1/mods/mod-26cdcd09/status -     2.83962ms

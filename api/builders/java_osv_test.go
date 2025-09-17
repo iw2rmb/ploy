@@ -240,11 +240,13 @@ func TestDetectJavaVersion(t *testing.T) {
 				`,
 			},
 			expectedVer: "",
+			expectError: true,
 		},
 		{
 			name:        "No build files",
 			files:       map[string]string{},
 			expectedVer: "",
+			expectError: true,
 		},
 	}
 

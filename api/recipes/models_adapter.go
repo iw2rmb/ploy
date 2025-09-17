@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // Recipe Model Compatibility Methods

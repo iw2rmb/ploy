@@ -61,7 +61,6 @@ func DefaultConfig() AnalysisConfig {
 	return AnalysisConfig{
 		Enabled:        true,
 		FailOnCritical: true,
-		ARFIntegration: true,
 		MaxIssues:      1000,
 		Timeout:        30 * time.Minute,
 		CacheEnabled:   true,
@@ -230,7 +229,6 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 		Timestamp:       time.Now(),
 		LanguageResults: make(map[string]*LanguageAnalysisResult),
 		Issues:          []Issue{},
-		ARFTriggers:     []ARFTrigger{},
 		Success:         true,
 	}
 
@@ -291,11 +289,6 @@ func (e *Engine) AnalyzeCodebase(ctx context.Context, codebase Codebase, config 
 
 	// Calculate overall score
 	result.OverallScore = e.calculateScore(result)
-
-	// Generate ARF triggers if integration is enabled
-	if config.ARFIntegration {
-		result.ARFTriggers = e.generateARFTriggers(result)
-	}
 
 	// Sort issues by severity and file
 	e.sortIssues(result.Issues)
@@ -452,52 +445,6 @@ func (e *Engine) calculateScore(result *AnalysisResult) float64 {
 	}
 
 	return score
-}
-
-// generateARFTriggers generates ARF triggers from issues
-func (e *Engine) generateARFTriggers(result *AnalysisResult) []ARFTrigger {
-	triggers := []ARFTrigger{}
-
-	for _, issue := range result.Issues {
-		if !issue.ARFCompatible {
-			continue
-		}
-
-		// Check if analyzer can provide ARF recipes
-		for lang, langResult := range result.LanguageResults {
-			analyzer, err := e.GetAnalyzer(lang)
-			if err != nil {
-				continue
-			}
-
-			// Check if this issue belongs to this language
-			found := false
-			for _, langIssue := range langResult.Issues {
-				if langIssue.ID == issue.ID {
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				continue
-			}
-
-			// Get ARF recipes for this issue
-			recipes := analyzer.GetARFRecipes(issue)
-			for _, recipe := range recipes {
-				trigger := ARFTrigger{
-					IssueID:     issue.ID,
-					RecipeName:  recipe,
-					Priority:    e.getPriority(issue.Severity),
-					AutoApprove: issue.Severity == SeverityLow || issue.Severity == SeverityInfo,
-				}
-				triggers = append(triggers, trigger)
-			}
-		}
-	}
-
-	return triggers
 }
 
 // getPriority maps severity to priority

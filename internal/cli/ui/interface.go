@@ -47,7 +47,7 @@ Usage:
   ploy bluegreen auto-shift <app>
   ploy bluegreen complete <app>
   ploy bluegreen rollback <app>
-  ploy arf recipe generate --repo <path> --type <type>
+  ploy recipe generate --repo <path> --type <type>
   ploy arf transform <path> --recipe <id>
   ploy arf validate <recipe-file>
   ploy arf patterns list

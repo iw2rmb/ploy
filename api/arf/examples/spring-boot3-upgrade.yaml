@@ -127,32 +127,3 @@ execution:
   environment:
     JAVA_HOME: /usr/lib/jvm/java-17-openjdk
     SPRING_PROFILES_ACTIVE: migration
-
-validation:
-  required_files:
-    - pom.xml
-    - build.gradle
-  file_patterns:
-    - "**/*.java"
-    - "**/*.kt"
-    - "**/application*.properties"
-    - "**/application*.yml"
-  min_file_count: 5
-  max_repo_size: 2147483648  # 2GB
-  language_detection:
-    primary: java
-    secondary:
-      - kotlin
-    min_confidence: 0.8
-    required: true
-  custom_rules:
-    - name: Check Spring Boot Version
-      description: Ensure current version is Spring Boot 2.5+
-      type: file_content
-      value: "<spring-boot.version>2.[5-9]"
-      required: true
-    - name: Check Java Version
-      description: Ensure Java 17 is configured
-      type: file_content
-      value: "<java.version>17</java.version>"
-      required: false

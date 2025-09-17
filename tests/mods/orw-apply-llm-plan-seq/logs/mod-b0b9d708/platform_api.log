@@ -1,0 +1,13 @@
+[2025-09-16 22:03:35] Getting stdout logs for allocation: 53fb17fd-1a8a-f258-2591-78c7c509faed (task: api, lines: 800, follow: false)
+[2025-09-16 22:03:35] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/53fb17fd-1a8a-f258-2591-78c7c509faed?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 22:03:35] Response code: 200
+ts -    5.496066ms
+[22:03:25] 200 - GET /v1/apps/ploy-lane-e-java-17-nojib/builds/b-1758060122001751290/status -      76.331µs
+[22:03:27] 200 - POST /v1/mods/mod-b0b9d708/events -    4.456575ms
+[22:03:27] 200 - POST /v1/mods/mod-b0b9d708/events -     4.93504ms
+[22:03:28] 200 - GET /v1/apps/ploy-lane-e-java-17-nojib/builds/b-1758060122001751290/status -     140.121µs
+[22:03:32] 200 - GET /v1/mods/mod-b0b9d708/status -       2.887ms
+[22:03:32] 200 - GET /v1/apps/ploy-lane-e-java-17-nojib/builds/b-1758060122001751290/status -     101.391µs
+[22:03:33] 200 - GET /v1/mods/mod-b0b9d708/artifacts/next_json -    5.492366ms
+[22:03:34] 200 - GET /v1/mods/mod-b0b9d708/status -    3.307234ms
+[22:03:35] 200 - GET /v1/apps/ploy-lane-e-java-17-nojib/builds/b-1758060122001751290/status -     144.402µs

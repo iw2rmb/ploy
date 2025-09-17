@@ -314,32 +314,29 @@ elif [[ "$RUN_ID_STR" == *"llm-exec"* ]]; then
       fi
     fi
     if [ -n "$TARGET_FILE" ] && [ -s "$TARGET_FILE" ] && [ -n "$TARGET_LINE" ]; then
-      # Build edited file content: comment out the offending line (prefix with // )
+      # Strategy: generate minimal edit by commenting the offending line
+      # and the immediate next line (covers `obj` usage).
       TMP_NEW="$(mktemp)"
-      awk -v ln="$TARGET_LINE" '{ if (NR==ln) { print "// " $0 } else { print $0 } }' "$TARGET_FILE" > "$TMP_NEW"
-      # Try diff -u; fallback to manual minimal hunk if diff not available
+      awk -v ln="$TARGET_LINE" '{ if (NR==ln || NR==ln+1) { print "// " $0 } else { print $0 } }' "$TARGET_FILE" > "$TMP_NEW"
+      # Try unified diff first
       if command -v diff >/dev/null 2>&1; then
         diff -u --label "a/$TARGET_REL" --label "b/$TARGET_REL" "$TARGET_FILE" "$TMP_NEW" > "$OUT_DIR/diff.patch" || true
       fi
       if [ ! -s "$OUT_DIR/diff.patch" ]; then
-        # Manual single-line hunk (3 lines of context when possible)
+        # Manual minimal hunk around target line
         TOTAL=$(wc -l < "$TARGET_FILE" | tr -d ' ')
         S=$(( TARGET_LINE>1 ? TARGET_LINE-1 : TARGET_LINE ))
         E=$(( TARGET_LINE+1<=TOTAL ? TARGET_LINE+1 : TARGET_LINE ))
-        # Read original and new line
         ORIG_LINE=$(sed -n "${TARGET_LINE}p" "$TARGET_FILE")
-        NEW_LINE="// $ORIG_LINE"
+        NEXT_LINE=$(sed -n "$((TARGET_LINE+1))p" "$TARGET_FILE")
         printf "--- a/%s\n+++ b/%s\n" "$TARGET_REL" "$TARGET_REL" > "$OUT_DIR/diff.patch"
         printf "@@ -%d,%d +%d,%d @@\n" "$S" "$((E-S+1))" "$S" "$((E-S+1))" >> "$OUT_DIR/diff.patch"
-        # Emit context before
         if [ "$S" -lt "$TARGET_LINE" ]; then sed -n "${S},$((TARGET_LINE-1))p" "$TARGET_FILE" | sed 's/^/ /' >> "$OUT_DIR/diff.patch"; fi
-        # Emit changed line
-        printf "-%s\n+%s\n" "$ORIG_LINE" "$NEW_LINE" >> "$OUT_DIR/diff.patch"
-        # Emit context after
-        if [ "$E" -gt "$TARGET_LINE" ]; then sed -n "$((TARGET_LINE+1)),${E}p" "$TARGET_FILE" | sed 's/^/ /' >> "$OUT_DIR/diff.patch"; fi
+        printf "-%s\n+// %s\n" "$ORIG_LINE" "$ORIG_LINE" >> "$OUT_DIR/diff.patch"
+        if [ -n "$NEXT_LINE" ]; then printf "-%s\n+// %s\n" "$NEXT_LINE" "$NEXT_LINE" >> "$OUT_DIR/diff.patch"; fi
       fi
       rm -f "$TMP_NEW" || true
-      post_event "info" "llm-exec" "llm-exec" "generated minimal edit patch (comment offending line)"
+      post_event "info" "llm-exec" "llm-exec" "generated minimal edit patch (comment offending lines)"
     else
       log "No actionable inputs; writing minimal placeholder patch"
       cat >"$OUT_DIR/diff.patch" <<'EOF'

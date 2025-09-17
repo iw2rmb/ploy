@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -25,63 +24,53 @@ import (
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
-func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*arf.Handler, error) {
-	log.Printf("Initializing ARF (Automated Remediation Framework)")
+func initializeRemediationHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*arf.Handler, *recipes.HTTPHandler, error) {
+	log.Printf("Initializing automated remediation framework")
 
-	// Load ARF configuration from environment
+	// Load remediation configuration from environment
 	arfConfig := arf.LoadConfigFromEnv()
 
 	// Validate configuration
 	if err := arfConfig.Validate(); err != nil {
-		return nil, fmt.Errorf("ARF configuration validation failed: %w", err)
+		return nil, nil, fmt.Errorf("remediation configuration validation failed: %w", err)
 	}
 
-	log.Printf("ARF configuration loaded: storage=%s, index=%s, validation=%v",
-		arfConfig.Storage.Backend, arfConfig.Index.Backend, arfConfig.Validation.Enabled)
-
-	// Initialize sandbox manager
-	jailBaseDir := utils.Getenv("ARF_JAIL_BASE_DIR", "/jail/arf")
-	jailTemplateDir := utils.Getenv("ARF_JAIL_TEMPLATE_DIR", "/jail/template")
-	jailInterface := utils.Getenv("ARF_JAIL_INTERFACE", "lo0")
-	maxSandboxes := 10
-	defaultTTL := 30 * time.Minute
-
-	sandboxMgr := arf.NewSandboxManagerForOS(jailBaseDir, jailTemplateDir, maxSandboxes, defaultTTL, jailInterface)
+	log.Printf("Remediation configuration loaded: storage=%s, index=%s",
+		arfConfig.Storage.Backend, arfConfig.Index.Backend)
 
 	// Initialize storage backend
 	recipeStorage, err := arfConfig.InitializeStorage()
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize ARF storage backend: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize remediation storage backend: %w", err)
 	}
 
 	// Initialize index backend
 	recipeIndex, err := arfConfig.InitializeIndex()
 	if err != nil {
-		log.Printf("Warning: Failed to initialize ARF index backend: %v", err)
+		log.Printf("Warning: Failed to initialize remediation index backend: %v", err)
 		recipeIndex = nil
 	}
 
-	// Initialize validator
-	recipeValidator := arfConfig.InitializeValidator()
-
-	// Initialize recipe executor (OpenRewrite dispatcher removed; Mods handles ORW)
-	engine := recipes.NewRecipeExecutor(recipeStorage, sandboxMgr)
-
-	// Create ARF handler - RecipeRegistry only (no fallback)
-
-	// Always create handler with RecipeRegistry when storage provider is available
-	// Strictly SeaweedFS-backed RecipeRegistry (no in-memory fallback)
-	handler := arf.NewHandlerWithStorage(
-		engine,
+	// Create remediation handler - RecipeRegistry only (no fallback)
+	remediationHandler := arf.NewHandlerWithStorage(
 		recipeStorage,
 		recipeIndex,
-		recipeValidator,
-		sandboxMgr,
+		nil,
 		nil, // No SeaweedFS provider required; registry optional
 	)
-	log.Printf("ARF handler initialized (no RecipeRegistry storage provider)")
+	log.Printf("Remediation handler initialized (no RecipeRegistry storage provider)")
 
-	// Wire NVD CVE database into ARF security engine (configurable via ARF config)
+	// Build recipes HTTP handler with same components
+	var recipeRegistry *recipes.RecipeRegistry
+	if regProvider, ok := recipeStorage.(interface {
+		Registry() *recipes.RecipeRegistry
+	}); ok {
+		recipeRegistry = regProvider.Registry()
+	}
+	recipesHandler := recipes.NewHTTPHandlerWithStorage(recipeStorage, recipeIndex, nil, nil, recipeRegistry)
+	log.Printf("Recipe HTTP handler initialized")
+
+	// Wire NVD CVE database into remediation security engine (configurable via config)
 	{
 		nvdCfg := arfConfig.NVD
 		if nvdCfg.Enabled {
@@ -95,20 +84,20 @@ func initializeARFHandlerWithService(cfg *ControllerConfig, cfgService *cfgsvc.S
 			if nvdCfg.Timeout > 0 {
 				nvd.SetHTTPTimeout(nvdCfg.Timeout)
 			}
-			handler.SetCVEDatabase(nvd)
-			log.Printf("ARF security engine configured with NVD CVE database (enabled)")
+			remediationHandler.SetCVEDatabase(nvd)
+			log.Printf("Remediation security engine configured with NVD CVE database (enabled)")
 		} else {
-			log.Printf("ARF NVD CVE database disabled by configuration")
+			log.Printf("Remediation NVD CVE database disabled by configuration")
 		}
 	}
 
-	// ARF async transforms and healing were removed; no Consul store is configured here.
+	// Legacy async transforms and healing were removed; no Consul store is configured here.
 
-	log.Printf("ARF handler initialized successfully")
-	return handler, nil
+	log.Printf("Remediation handler initialized successfully")
+	return remediationHandler, recipesHandler, nil
 }
 
-func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, cfgService *cfgsvc.Service) (*analysis.Handler, error) {
+func initializeAnalysisHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*analysis.Handler, error) {
 	log.Printf("Initializing Static Analysis handler")
 
 	// Create a logger for the analysis engine
@@ -169,7 +158,7 @@ func initializeAnalysisHandler(cfg *ControllerConfig, arfHandler *arf.Handler, c
 	// Go, JavaScript, C#, Rust, etc.
 
 	// Create the handler
-	handler := analysis.NewHandler(engine, arfHandler, logger)
+	handler := analysis.NewHandler(engine, logger)
 
 	log.Printf("Static Analysis handler initialized with %d language analyzers (mode: %s)",
 		len(engine.GetSupportedLanguages()), analysisMode)

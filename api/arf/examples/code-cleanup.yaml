@@ -147,13 +147,3 @@ execution:
     max_memory: 1GB
     max_cpu: 2
     isolation_level: low
-
-validation:
-  file_patterns:
-    - "**/*.java"
-  min_file_count: 1
-  max_repo_size: 536870912  # 512MB
-  language_detection:
-    primary: java
-    min_confidence: 0.6
-    required: true

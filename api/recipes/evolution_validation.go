@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // ValidateEvolution validates that an evolved recipe is safe to use

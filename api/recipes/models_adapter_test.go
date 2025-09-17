@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // Use mockStorageProvider from registry_test.go (same package)
