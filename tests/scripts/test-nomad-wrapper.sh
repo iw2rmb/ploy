@@ -59,6 +59,12 @@ else
   warn "allocs failed or job $DEFAULT_JOB not present (acceptable in some environments)"
 fi
 
+info "Purge dry-run smoke (no-op)"
+if "$WRAPPER" purge --prefix nonexist- --dry-run >/dev/null 2>&1; then
+  pass "purge --dry-run works with no matches"
+else
+  warn "purge --dry-run failed (environment may lack Nomad API)"
+fi
+
 info "All wrapper smoke tests completed"
 exit 0
-
