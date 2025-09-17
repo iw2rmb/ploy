@@ -1,56 +1,65 @@
 package build
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
-    "strings"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
-    "github.com/iw2rmb/ploy/internal/build/templates"
-    "github.com/iw2rmb/ploy/internal/detect/project"
+	"github.com/iw2rmb/ploy/internal/build/templates"
+	"github.com/iw2rmb/ploy/internal/detect/project"
 )
 
 // generateDockerfileWithFacts writes a simple Dockerfile into srcDir based on detected project markers.
 // Supports Go, Node.js, Python, .NET, and JVM via Gradle/Maven. For other stacks, returns an error.
 func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error {
-    // Ensure we infer JVM build tool even if facts weren't populated upstream
-    if facts.BuildTool == "" && facts.Language == "" {
-        if fileExists(filepath.Join(srcDir, "build.gradle.kts")) || fileExists(filepath.Join(srcDir, "build.gradle")) {
-            facts.Language = "java"
-            facts.BuildTool = "gradle"
-        } else if fileExists(filepath.Join(srcDir, "pom.xml")) {
-            facts.Language = "java"
-            facts.BuildTool = "maven"
-        }
-    }
-    // Java/Scala (JVM) via Gradle/Maven using embedded templates; fallback to inline if template missing
-    if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
-        v := facts.Versions.Java
-        if v == "" { v = "17" }
-        if i := strings.Index(v, "."); i > 0 { v = v[:i] }
-        type data struct { JavaVersion string; MainClass string }
-        d := data{JavaVersion: v, MainClass: facts.MainClass}
-        var path string
-        switch facts.BuildTool {
-        case "gradle":
-            path = "dockerfiles/java/gradle.Dockerfile.tmpl"
-        case "maven":
-            path = "dockerfiles/java/maven.Dockerfile.tmpl"
-        default:
-            path = "dockerfiles/java/default.Dockerfile.tmpl"
-        }
-        if path != "" {
-            if rendered, err := templates.Render(path, d); err == nil {
-                return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-            }
-        }
-        // Fallback to previous inline generation if template missing
-        var dockerfile string
-        switch facts.BuildTool {
-        case "gradle":
-            entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
-            dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
+	// Ensure we infer JVM build tool even if facts weren't populated upstream
+	if facts.BuildTool == "" && facts.Language == "" {
+		if fileExists(filepath.Join(srcDir, "build.gradle.kts")) || fileExists(filepath.Join(srcDir, "build.gradle")) {
+			facts.Language = "java"
+			facts.BuildTool = "gradle"
+		} else if fileExists(filepath.Join(srcDir, "pom.xml")) {
+			facts.Language = "java"
+			facts.BuildTool = "maven"
+		}
+	}
+	// Java/Scala (JVM) via Gradle/Maven using embedded templates; fallback to inline if template missing
+	if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
+		v := facts.Versions.Java
+		if v == "" {
+			v = "17"
+		}
+		if i := strings.Index(v, "."); i > 0 {
+			v = v[:i]
+		}
+		type data struct {
+			JavaVersion string
+			MainClass   string
+		}
+		d := data{JavaVersion: v, MainClass: facts.MainClass}
+		var path string
+		switch facts.BuildTool {
+		case "gradle":
+			path = "dockerfiles/java/gradle.Dockerfile.tmpl"
+		case "maven":
+			path = "dockerfiles/java/maven.Dockerfile.tmpl"
+		default:
+			path = "dockerfiles/java/default.Dockerfile.tmpl"
+		}
+		if path != "" {
+			if rendered, err := templates.Render(path, d); err == nil {
+				return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+			}
+		}
+		// Fallback to previous inline generation if template missing
+		var dockerfile string
+		switch facts.BuildTool {
+		case "gradle":
+			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+			if facts.MainClass != "" {
+				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
+			}
+			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x ./gradlew || true \
@@ -63,10 +72,12 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-        case "maven":
-            entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
-            dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
+		case "maven":
+			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+			if facts.MainClass != "" {
+				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
+			}
+			dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x ./mvnw || true \
@@ -79,11 +90,13 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-        default:
-            // Fallback default: compile sources with javac into classes and run MainClass
-            entry := "CMD [\\\"sh\\\",\\\"-lc\\\",\\\"echo 'Set MainClass to run application' && sleep 30\\\"]"
-            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
-            dockerfile = fmt.Sprintf(`FROM eclipse-temurin:%[1]s-jdk AS build
+		default:
+			// Fallback default: compile sources with javac into classes and run MainClass
+			entry := "CMD [\\\"sh\\\",\\\"-lc\\\",\\\"echo 'Set MainClass to run application' && sleep 30\\\"]"
+			if facts.MainClass != "" {
+				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
+			}
+			dockerfile = fmt.Sprintf(`FROM eclipse-temurin:%[1]s-jdk AS build
 WORKDIR /src
 COPY . .
 RUN if [ -d src/main/java ]; then find src/main/java -name "*.java" -print0 | xargs -0 javac -d /out; else echo "No src/main/java found"; fi
@@ -95,9 +108,9 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-        }
-        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
-    }
+		}
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
+	}
 
 	// Go
 	goMod := filepath.Join(srcDir, "go.mod")
@@ -118,18 +131,20 @@ ENTRYPOINT ["/app"]
 `
 		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
 	}
-    // Node via template (npm)
-    pkgJSON := filepath.Join(srcDir, "package.json")
-    if _, err := os.Stat(pkgJSON); err == nil {
-        v := facts.Versions.Node
-        if v == "" { v = "20" }
-        type data struct { NodeVersion string }
-        d := data{NodeVersion: v}
-        if rendered, err := templates.Render("dockerfiles/node/npm.Dockerfile.tmpl", d); err == nil {
-            return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-        }
-        // Fallback inline
-        content := fmt.Sprintf(`FROM node:%s-alpine
+	// Node via template (npm)
+	pkgJSON := filepath.Join(srcDir, "package.json")
+	if _, err := os.Stat(pkgJSON); err == nil {
+		v := facts.Versions.Node
+		if v == "" {
+			v = "20"
+		}
+		type data struct{ NodeVersion string }
+		d := data{NodeVersion: v}
+		if rendered, err := templates.Render("dockerfiles/node/npm.Dockerfile.tmpl", d); err == nil {
+			return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+		}
+		// Fallback inline
+		content := fmt.Sprintf(`FROM node:%s-alpine
 WORKDIR /app
 COPY package.json .
 RUN npm install --omit=dev || true
@@ -138,27 +153,39 @@ ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "index.js"]
 `, v)
-        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-    }
-    // Python via template
-    // Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
-    // Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
-    if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
-        v := facts.Versions.Python
-        if v == "" { v = "3.12" }
-        if parts := strings.Split(v, "."); len(parts) >= 2 { v = parts[0] + "." + parts[1] }
-        hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
-        hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
-        type data struct { PythonVersion string; UseGunicorn bool; UseUvicorn bool }
-        d := data{PythonVersion: v, UseGunicorn: hasGunicorn, UseUvicorn: hasUvicorn}
-        if rendered, err := templates.Render("dockerfiles/python/default.Dockerfile.tmpl", d); err == nil {
-            return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-        }
-        // Fallback inline
-        base := fmt.Sprintf("python:%s-slim", v)
-        cmd := `CMD ["python", "app.py"]`
-        if hasGunicorn { cmd = `CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]` } else if hasUvicorn { cmd = `CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]` }
-        content := fmt.Sprintf(`FROM %s
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
+	// Python via template
+	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
+	// Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
+	if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
+		v := facts.Versions.Python
+		if v == "" {
+			v = "3.12"
+		}
+		if parts := strings.Split(v, "."); len(parts) >= 2 {
+			v = parts[0] + "." + parts[1]
+		}
+		hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
+		hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
+		type data struct {
+			PythonVersion string
+			UseGunicorn   bool
+			UseUvicorn    bool
+		}
+		d := data{PythonVersion: v, UseGunicorn: hasGunicorn, UseUvicorn: hasUvicorn}
+		if rendered, err := templates.Render("dockerfiles/python/default.Dockerfile.tmpl", d); err == nil {
+			return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+		}
+		// Fallback inline
+		base := fmt.Sprintf("python:%s-slim", v)
+		cmd := `CMD ["python", "app.py"]`
+		if hasGunicorn {
+			cmd = `CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]`
+		} else if hasUvicorn {
+			cmd = `CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]`
+		}
+		content := fmt.Sprintf(`FROM %s
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -169,8 +196,8 @@ RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no
 EXPOSE 8080
 %s
 `, base, cmd)
-        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
-    }
+		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+	}
 	// .NET
 	// Detect .NET projects by presence of *.csproj
 	if csproj := findFirstCsproj(srcDir); csproj != "" {

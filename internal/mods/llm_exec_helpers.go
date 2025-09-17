@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -24,8 +25,17 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 	_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
 
 	// Inject inputs.json with last_error if provided
-    if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
-        parsed := build.ParseBuildErrors("java", "maven", be)
+	if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
+		parsed := build.ParseBuildErrors("java", "maven", be)
+		// Fallback: also parse compact "(.../File.java:123)" pattern often used in summary messages
+		if len(parsed) == 0 {
+			re := regexp.MustCompile(`([A-Za-z0-9_./\\\-]+\.java):([0-9]+)`) // accept windows and linux seps
+			if m := re.FindStringSubmatch(be); len(m) == 3 {
+				file := strings.ReplaceAll(m[1], "\\", "/")
+				line, _ := strconv.Atoi(m[2])
+				parsed = append(parsed, build.ParsedBuildError{File: file, Line: line, Column: 0, Message: "compile error"})
+			}
+		}
 		var b strings.Builder
 		b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": \"\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": ")
 		b.WriteString(strconv.Quote(be))
@@ -53,15 +63,15 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 		}
 		b.WriteString("]\n}\n")
 		inputsJSON := b.String()
-        _ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
-        if rep != nil {
-            _ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputsJSON)), Time: time.Now()})
-            // Emit a compact summary of first error for downstream visibility
-            if len(parsed) > 0 {
-                sum := parsed[0]
-                _ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("first_error file=%s line=%d", sum.File, sum.Line), Time: time.Now()})
-            }
-        }
+		_ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
+		if rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputsJSON)), Time: time.Now()})
+			// Emit a compact summary of first error for downstream visibility
+			if len(parsed) > 0 {
+				sum := parsed[0]
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("first_error file=%s line=%d", sum.File, sum.Line), Time: time.Now()})
+			}
+		}
 		// Collect a small set of related sources to aid diffing
 		seen := make(map[string]struct{})
 		paths := extractJavaPathsFromError(be, 5)
@@ -92,16 +102,18 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 				}
 			}
 		}
-        if len(manifest) > 0 {
-            _ = os.WriteFile(filepath.Join(ctxDir, "source_manifest.txt"), []byte(strings.Join(manifest, "\n")+"\n"), 0644)
-            if rep != nil {
-                // Emit just the first few entries to avoid noisy payloads
-                show := manifest
-                if len(show) > 3 { show = show[:3] }
-                _ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("collected sources: %s", strings.Join(show, ", ")), Time: time.Now()})
-            }
-        }
-    }
+		if len(manifest) > 0 {
+			_ = os.WriteFile(filepath.Join(ctxDir, "source_manifest.txt"), []byte(strings.Join(manifest, "\n")+"\n"), 0644)
+			if rep != nil {
+				// Emit just the first few entries to avoid noisy payloads
+				show := manifest
+				if len(show) > 3 {
+					show = show[:3]
+				}
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("collected sources: %s", strings.Join(show, ", ")), Time: time.Now()})
+			}
+		}
+	}
 
 	// Optional: precomputed diff and delete paths
 	if v, ok := branch.Inputs["precomputed_diff"].(string); ok && strings.TrimSpace(v) != "" {

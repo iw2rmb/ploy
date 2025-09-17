@@ -53,9 +53,9 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	// Fallback to Kaniko builder
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 	tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-    // Prep diagnostics: tag and autogen flag
-    autoEnv := strings.ToLower(os.Getenv("PLOY_AUTOGEN_DOCKERFILE"))
-    fmt.Printf("[Lane E] Prep app=%s sha=%s tag=%s hasDockerfile=%t autogen_env=%q\n", appName, sha, tag, facts.HasDockerfile, autoEnv)
+	// Prep diagnostics: tag and autogen flag
+	autoEnv := strings.ToLower(os.Getenv("PLOY_AUTOGEN_DOCKERFILE"))
+	fmt.Printf("[Lane E] Prep app=%s sha=%s tag=%s hasDockerfile=%t autogen_env=%q\n", appName, sha, tag, facts.HasDockerfile, autoEnv)
 
 	// Ensure Dockerfile exists or optionally autogenerate a minimal one
 	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
@@ -200,16 +200,18 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			"details": err.Error(),
 		})
 	}
-    // Log builder HCL stats and head for diagnostics
-    if fi, serr := os.Stat(builderHCL); serr == nil {
-        fmt.Printf("[Lane E] Builder HCL rendered app=%s job_file=%s size=%d\n", appName, filepath.Base(builderHCL), fi.Size())
-        if b, rerr := os.ReadFile(builderHCL); rerr == nil {
-            head := b
-            max := 400
-            if len(head) > max { head = head[:max] }
-            fmt.Printf("[Lane E] Builder HCL head (first %d bytes):\n%s\n", len(head), string(head))
-        }
-    }
+	// Log builder HCL stats and head for diagnostics
+	if fi, serr := os.Stat(builderHCL); serr == nil {
+		fmt.Printf("[Lane E] Builder HCL rendered app=%s job_file=%s size=%d\n", appName, filepath.Base(builderHCL), fi.Size())
+		if b, rerr := os.ReadFile(builderHCL); rerr == nil {
+			head := b
+			max := 400
+			if len(head) > max {
+				head = head[:max]
+			}
+			fmt.Printf("[Lane E] Builder HCL head (first %d bytes):\n%s\n", len(head), string(head))
+		}
+	}
 	// Save a debug copy for inspection
 	func() {
 		_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
@@ -225,14 +227,14 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		})
 	}
 	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
-    // Detect wrapper presence for visibility
-    useWrapper := false
-    if v := strings.ToLower(strings.TrimSpace(os.Getenv("USE_NOMAD_JOB_MANAGER"))); v != "" {
-        useWrapper = !(v == "0" || v == "false")
-    } else if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
-        useWrapper = true
-    }
-    fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
+	// Detect wrapper presence for visibility
+	useWrapper := false
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("USE_NOMAD_JOB_MANAGER"))); v != "" {
+		useWrapper = !(v == "0" || v == "false")
+	} else if _, err := os.Stat("/opt/hashicorp/bin/nomad-job-manager.sh"); err == nil {
+		useWrapper = true
+	}
+	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
 	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
 		snippet := getJobLogsSnippet(builderJobName, 80)
 		fmt.Printf("[Lane E][ERROR] stage=kaniko_submit app=%s sha=%s job=%s err=%v\n", appName, sha, builderJobName, err)
