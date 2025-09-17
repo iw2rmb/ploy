@@ -57,10 +57,8 @@ func (m *MemoryStorage) Get(ctx context.Context, key string) (io.ReadCloser, err
 
 // Put stores an object in memory
 func (m *MemoryStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
-	// Apply options
-	options := &putOptions{}
-	// We need to convert storage.PutOption to work with our local putOptions
-	// For now, we'll use default values
+	// Resolve options from the storage package
+	resolved := storage.ResolvePutOptions(opts...)
 
 	// Read all data
 	data, err := io.ReadAll(reader)
@@ -107,9 +105,9 @@ func (m *MemoryStorage) Put(ctx context.Context, key string, reader io.Reader, o
 	m.metadata[key] = &storage.Object{
 		Key:          key,
 		Size:         dataSize,
-		ContentType:  options.ContentType,
+		ContentType:  resolved.ContentType,
 		LastModified: time.Now(),
-		Metadata:     options.Metadata,
+		Metadata:     resolved.Metadata,
 	}
 
 	return nil

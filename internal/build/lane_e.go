@@ -236,7 +236,12 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	}
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
 	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
-		snippet := getJobLogsSnippet(builderJobName, 80)
+		// Fetch and upload builder logs for diagnostics
+		fullLogs := fetchJobLogsFull(builderJobName, 2000)
+		snippet := fullLogs
+		if len(snippet) > 8000 {
+			snippet = snippet[len(snippet)-8000:]
+		}
 		fmt.Printf("[Lane E][ERROR] stage=kaniko_submit app=%s sha=%s job=%s err=%v\n", appName, sha, builderJobName, err)
 		be := &BuildError{
 			Type:    "lane_e_build",
@@ -246,10 +251,22 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		}
 		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", builderJobName)
+		// Upload full logs and include pointer
+		logsKey := fmt.Sprintf("artifacts/build-logs/%s.log", builderJobName)
+		if deps.Storage != nil && fullLogs != "" {
+			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
+		}
+		logsURL := ""
+		if base := os.Getenv("PLOY_SEAWEEDFS_URL"); base != "" {
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
+			logsURL = strings.TrimRight(base, "/") + "/" + logsKey
+		}
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   formatted,
 			"stage":   "kaniko_submit",
-			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+			"builder": fiber.Map{"job": builderJobName, "logs": snippet, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
 	// Verify image exists in registry before returning and capture digest

@@ -58,7 +58,8 @@ func TestUploadBytesWithUnifiedStorage_AllFail(t *testing.T) {
 	retryBaseDelay = 5 * time.Millisecond
 	t.Cleanup(func() { retryBaseDelay = oldDelay })
 	base := mem.NewMemoryStorage(0)
-	flaky := &flakyStorage{Storage: base, failCount: 3}
+	// Fail for all configured attempts to ensure we surface an error
+	flaky := &flakyStorage{Storage: base, failCount: retryMaxAttempts}
 	ctx := context.Background()
 
 	data := []byte("payload")

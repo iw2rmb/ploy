@@ -102,7 +102,11 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 	}
 	builderJobName := fmt.Sprintf("%s-g-build-%s", appName, versionWithNonce)
 	if err := orchestration.SubmitAndWaitTerminal(wasmBuilderHCL, 10*time.Minute); err != nil {
-		snippet := getJobLogsSnippet(builderJobName, 80)
+		fullLogs := fetchJobLogsFull(builderJobName, 2000)
+		snippet := fullLogs
+		if len(snippet) > 8000 {
+			snippet = snippet[len(snippet)-8000:]
+		}
 		be := &BuildError{
 			Type:    "lane_g_build",
 			Message: fmt.Sprintf("wasm builder failed for job %s", builderJobName),
@@ -111,10 +115,21 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 		}
 		formatted := FormatBuildError(be, true, 4000)
 		c.Set("X-Deployment-ID", builderJobName)
+		logsKey := fmt.Sprintf("artifacts/build-logs/%s.log", builderJobName)
+		if deps.Storage != nil && fullLogs != "" {
+			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
+		}
+		logsURL := ""
+		if base := os.Getenv("PLOY_SEAWEEDFS_URL"); base != "" {
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
+			logsURL = strings.TrimRight(base, "/") + "/" + logsKey
+		}
 		return "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   formatted,
 			"stage":   "wasm_submit",
-			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+			"builder": fiber.Map{"job": builderJobName, "logs": snippet, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
 	return "", nil

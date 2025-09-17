@@ -65,8 +65,8 @@ job "seaweedfs-filer" {
 
       # Resource allocation
       resources {
-        cpu = 300    # MHz - lighter than API
-        memory = 256 # MB - filer is lightweight
+        cpu = 800    # MHz - allow more CPU for concurrency
+        memory = 512 # MB - increase memory for higher concurrency
       }
 
       # Create startup script
@@ -106,6 +106,9 @@ exec local/weed filer \
   -dataCenter=dc1 \
   -defaultReplicaPlacement=000 \
   -dirListLimit=1000 \
+  -maxCpu=8 \
+  -maxConnections=0 \
+  -concurrentUploadLimitMB=256 \
   -defaultStoreDir=local/filer-data
 EOF
         destination = "local/start-filer.sh"
