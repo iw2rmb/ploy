@@ -29,6 +29,9 @@ var (
 
 // buildLaneE handles the container workflow (Jib or Kaniko). Returns dockerImage (or empty), imagePath (empty for Kaniko), and builderJobName when Kaniko runs.
 func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha, tmpDir, detectedLanguage string, facts project.BuildFacts, appEnvVars map[string]string) (imagePath, dockerImage, builderJobName string, err error) {
+    // Entry diagnostics for Lane E
+    fmt.Printf("[Lane E] Enter app=%s sha=%s lang=%s tool=%s hasJib=%t hasDockerfile=%t javaVersion=%s\n",
+        appName, sha, facts.Language, facts.BuildTool, facts.HasJib, facts.HasDockerfile, facts.Versions.Java)
 	// Prefer Jib when detected
 	if facts.HasJib {
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
@@ -87,16 +90,16 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
         }
 	}
 
-	// Create a tar context from srcDir
-	builderTar := filepath.Join(tmpDir, "context.tar")
+    // Create a tar context from srcDir
+    builderTar := filepath.Join(tmpDir, "context.tar")
     if err := func() error {
-		f, err := os.Create(builderTar)
-		if err != nil {
-			return err
+        f, err := os.Create(builderTar)
+        if err != nil {
+            return err
 		}
 		defer func() { _ = f.Close() }()
 		ign, _ := clutils.ReadGitignore(srcDir)
-		return clutils.TarDir(srcDir, f, ign)
+        return clutils.TarDir(srcDir, f, ign)
     }(); err != nil {
         fmt.Printf("[Lane E][ERROR] stage=build_context app=%s sha=%s err=%v\n", appName, sha, err)
         return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
@@ -105,12 +108,16 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
             "details": err.Error(),
         })
     }
+    if fi, serr := os.Stat(builderTar); serr == nil {
+        fmt.Printf("[Lane E] Build context tar ready app=%s sha=%s size=%d bytes path=%s\n", appName, sha, fi.Size(), builderTar)
+    }
 
 	// Upload context tar to storage for Kaniko to fetch
 	contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
 	var contextURL string
 	if deps.Storage != nil {
 		ctxUp := context.Context(c.Context())
+        fmt.Printf("[Lane E] Proceeding to context upload app=%s sha=%s key=%s\n", appName, sha, contextKey)
         if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
             fmt.Printf("[Lane E][ERROR] stage=upload_context app=%s sha=%s key=%s err=%v\n", appName, sha, contextKey, err)
             return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
@@ -120,7 +127,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
                 "details":     err.Error(),
             })
         }
-		base := os.Getenv("PLOY_SEAWEEDFS_URL")
+        base := os.Getenv("PLOY_SEAWEEDFS_URL")
 		if base == "" {
 			base = "http://seaweedfs-filer.service.consul:8888"
 		}
