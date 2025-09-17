@@ -36,6 +36,8 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
             path = "dockerfiles/java/gradle.Dockerfile.tmpl"
         case "maven":
             path = "dockerfiles/java/maven.Dockerfile.tmpl"
+        default:
+            path = "dockerfiles/java/default.Dockerfile.tmpl"
         }
         if path != "" {
             if rendered, err := templates.Render(path, d); err == nil {
@@ -78,7 +80,21 @@ EXPOSE 8080
 %s
 `, v, entry)
         default:
-            return fmt.Errorf("no supported Java build tool detected for Dockerfile autogen")
+            // Fallback default: compile sources with javac into classes and run MainClass
+            entry := "CMD [\\\"sh\\\",\\\"-lc\\\",\\\"echo 'Set MainClass to run application' && sleep 30\\\"]"
+            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
+            dockerfile = fmt.Sprintf(`FROM eclipse-temurin:%[1]s-jdk AS build
+WORKDIR /src
+COPY . .
+RUN if [ -d src/main/java ]; then find src/main/java -name "*.java" -print0 | xargs -0 javac -d /out; else echo "No src/main/java found"; fi
+
+FROM eclipse-temurin:%[1]s-jre
+WORKDIR /app
+COPY --from=build /out /app
+ENV PORT=8080
+EXPOSE 8080
+%s
+`, v, entry)
         }
         return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
     }
