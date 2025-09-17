@@ -20,11 +20,26 @@ import (
 // we upload full logs to storage and include logs_key/logs_url in the JSON response.
 func TestLaneE_BuilderFailure_UploadsLogsAndPointer(t *testing.T) {
 	// Save and restore injected functions
+	oldRender := renderKanikoBuilderFn
+	oldValidate := validateJobFn
 	oldSubmit := submitAndWaitFn
 	oldFetch := fetchJobLogsFullFn
+	renderKanikoBuilderFn = func(appName, version, tag, contextURL, dockerfilePath, lang string) (string, error) {
+		path := filepath.Join(t.TempDir(), "builder.hcl")
+		if err := os.WriteFile(path, []byte("job \"test\" {}"), 0644); err != nil {
+			t.Fatalf("write builder hcl: %v", err)
+		}
+		return path, nil
+	}
+	validateJobFn = func(string) error { return nil }
 	submitAndWaitFn = func(hcl string, d time.Duration) error { return assertErr("builder failed") }
 	fetchJobLogsFullFn = func(job string, lines int) string { return "[ERROR] cannot find symbol Foo\nCompilation failure" }
-	defer func() { submitAndWaitFn = oldSubmit; fetchJobLogsFullFn = oldFetch }()
+	defer func() {
+		renderKanikoBuilderFn = oldRender
+		validateJobFn = oldValidate
+		submitAndWaitFn = oldSubmit
+		fetchJobLogsFullFn = oldFetch
+	}()
 
 	// Prepare temp dirs and inputs
 	tmpDir := t.TempDir()
@@ -56,11 +71,14 @@ func TestLaneE_BuilderFailure_UploadsLogsAndPointer(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		return c.SendStatus(200)
+		if c.Response().StatusCode() == 0 {
+			return c.SendStatus(200)
+		}
+		return nil
 	})
 
 	req := httptest.NewRequest("GET", "/test", nil)
-	resp, err := app.Test(req)
+	resp, err := app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
