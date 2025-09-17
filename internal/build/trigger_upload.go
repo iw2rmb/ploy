@@ -59,7 +59,6 @@ func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, file
 	acquireUpload()
 	defer releaseUpload()
     maxRetries := retryMaxAttempts
-	_ = baseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Open file for this attempt
@@ -139,7 +138,6 @@ func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.
 	acquireUpload()
 	defer releaseUpload()
     maxRetries := retryMaxAttempts
-	_ = baseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Open file for this attempt
@@ -189,7 +187,6 @@ func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage
 	acquireUpload()
 	defer releaseUpload()
     maxRetries := retryMaxAttempts
-	_ = baseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Create new reader for this attempt
