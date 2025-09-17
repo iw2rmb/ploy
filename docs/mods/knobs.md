@@ -55,7 +55,7 @@ Where To Set
 
 - Persistent service env (VPS): /home/ploy/api.env
     - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_IMAGEs, MODS_REGISTRY, GIT_AUTHOR/GIT_COMMITTER with sane defaults).
-    - `MODS_SKIP_DEPLOY_LANES` (comma-separated lane codes) skips runtime deployment after local build gates; use `C` for compile-only mods healing validation on lane C.
+    - `MODS_SKIP_DEPLOY_LANES` (comma-separated lane codes) optionally skips runtime deployment for specific lanes (leave unset to exercise full deploy). Override with `C` only when remote lane-C deploy is unavailable and compile-only validation is desired.
 - Job template (orw-apply): platform/nomad/mods/orw_apply.hcl
     - Resources, env block (ORW_IMAGE, PLOY_API_URL, SEAWEEDFS_URL, INPUT_URL, DIFF_KEY, controller/exec IDs).
 - Controller substitution: internal/mods/execution.go
@@ -68,7 +68,7 @@ Recommended Defaults (dev)
 - MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
 - NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
 - PLOY_CONTROLLER: ensure it is set to `https://api.dev.ployman.app/v1` for Dev; `PLOY_API_URL` auto-derived to https://api.dev.ployman.app
-- GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden; set `MODS_SKIP_DEPLOY_LANES=C` to treat lane-C builds as compile-only during healing flows.
+- GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden. Only set `MODS_SKIP_DEPLOY_LANES` when you need to bypass remote deployments (e.g., lane-C compile-only dry runs).
 
 Per-run MR auth selection (mods.yaml)
 
