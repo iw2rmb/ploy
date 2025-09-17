@@ -30,13 +30,23 @@ Quick filters
 - Explicit case (Java 17, no Jib): `go test ./tests/e2e/deploy -tags e2e -v -run TestDeploy_Java17_NoJib -timeout 10m`
 
 After each run: Inspect logs first
-- Preferred: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [BUILD_ID=<id>] [LINES=200] [TARGET_HOST=<ip>] [OUT_DIR=./e2e-logs] ./tests/e2e/deploy/fetch-logs.sh`
+- Preferred: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [BUILD_ID=<id>] [LINES=2000] [FILTER_MARKERS='<rg|pattern>'] [TARGET_HOST=<ip>] [OUT_DIR=./e2e-logs] ./tests/e2e/deploy/fetch-logs.sh`
   - Pulls app status/logs, Platform API and Traefik logs.
+  - If `FILTER_MARKERS` is set (ripgrep syntax), also writes `platform_api.filtered.log` with only matching lines (useful for `[Lane E]` and `[Orch]` markers).
   - If `BUILD_ID` is set (from async response), includes builder logs via API.
   - If `TARGET_HOST` is set, fetches builder logs and app alloc status/logs via Nomad job-manager wrapper.
 - Direct endpoints (fallback):
   - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
   - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
+
+Build error parsing (advanced)
+- Programmatic parsing is provided by the build error parser:
+  - `internal/build/build_errors_parser.go` → `ParseBuildErrors(language, tool, raw string) []ParsedBuildError`.
+  - Paired with `internal/build/build_errors.go` helpers (`RunCmd`, `BuildError`, `FormatBuildError`) for local command execution and formatting.
+- Typical flow:
+  1) Fetch raw builder logs (`builder.logs.json` → `.logs`) or platform logs (`platform_api.log`).
+  2) Parse with `ParseBuildErrors("java", "maven|gradle", raw)` in a small Go snippet to extract `{file,line,column,message}` entries.
+  3) Use `FormatBuildError` when wrapping local command failures to include stdout/stderr snippets alongside messages.
 
 Test matrix (seed)
 | Lane | Stack   | Version | Repo                                         | Image Size (compressed) | Uncompressed Size | Build Time | Builder CPU | Builder Memory | Current State |
