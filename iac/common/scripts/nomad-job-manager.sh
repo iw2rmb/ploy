@@ -60,6 +60,10 @@ parse_params() {
                 OUTPUT_FORMAT="$2"
                 shift 2
                 ;;
+            --since)
+                SINCE_TS="$2"
+                shift 2
+                ;;
             --help|-h)
                 show_help
                 exit 0
@@ -92,6 +96,7 @@ Commands:
       --follow                             Follow log output
       --stderr                             Show stderr instead of stdout
       --both                               Show both stdout and stderr
+      --since "YYYY-MM-DD HH:MM:SS"        Only lines at or after this timestamp (format must match log prefix)
   cleanup --job <name>                      Clean up stale service registrations
   validate --file <file>                   Validate a Nomad job file (HCL or JSON)
 
@@ -464,10 +469,17 @@ get_single_log_stream() {
     
     url="$url?$query_params"
     
-    if ! http_request "GET" "$url" "" "200"; then
-        log "Failed to get $stream_type logs"
-        return 1
+    body=$(http_request "GET" "$url" "" "200")
+    if [ -n "${SINCE_TS:-}" ] && [ -n "$body" ]; then
+        body=$(awk -v start="$SINCE_TS" '
+            {
+              ts="";
+              if (match($0,/^\[([0-9-]{10} [0-9:]{8})\]/, m)) ts=m[1];
+              if (ts=="" && printed==1) { print; next }
+              if (ts!="" && ts >= start) { printed=1; print }
+            }' <<< "$body")
     fi
+    echo "$body"
 }
 
 validate_job() {

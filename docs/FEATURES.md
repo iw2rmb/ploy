@@ -16,6 +16,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
   - Improved reliability (Sep 2025): `ployman api deploy` ensures the VPS repo is up to date by cloning if missing (`/home/ploy/ploy`), enforcing the canonical `origin` remote, and using `git fetch --all --prune` before a hard reset to the target branch. Prevents stale code deployments due to missing clones, misconfigured remotes, or non-pruned refs.
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
+- **Build Module Coverage**: New unit tests exercise `internal/build` (error formatting/parsing, logs endpoint, request body ingestion, storage uploads, WASM artifact discovery, lane helpers) so the package is included and measured in local coverage runs.
 - **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
 - **Recipe Catalog Coverage** (Sep 2025): REST handlers assert invalid payload, storage failure, and missing registry behaviors; registry adapter tests verify semantic version ordering for latest lookups.
 - **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply), MCP budget parsing, and LLM diff-fetch resilience to improve lane readiness.

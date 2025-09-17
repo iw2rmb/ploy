@@ -35,6 +35,8 @@ After each run: Inspect logs first
   - If `FILTER_MARKERS` is set (ripgrep syntax), also writes `platform_api.filtered.log` with only matching lines (useful for `[Lane E]` and `[Orch]` markers).
   - If `BUILD_ID` is set (from async response), includes builder logs via API.
   - If `TARGET_HOST` is set, fetches builder logs and app alloc status/logs via Nomad job-manager wrapper.
+  - To shrink platform logs before the run, set `SHRINK_PLATFORM_LOGS=1` (requires `TARGET_HOST`). This bounces the `ploy-api` job to start a fresh alloc, so platform logs contain only the current run.
+  - Time-based slicing (recommended): set `START_TS="$(date '+%Y-%m-%d %H:%M:%S')"` just before triggering the build. `fetch-logs.sh` will write `platform_api.sliced.log` containing only lines at or after that timestamp, and then apply `FILTER_MARKERS` to that file.
 - Direct endpoints (fallback):
   - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
   - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
