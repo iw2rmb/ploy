@@ -1,12 +1,13 @@
 package build
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
 
-	"github.com/iw2rmb/ploy/internal/detect/project"
+    "github.com/iw2rmb/ploy/internal/build/templates"
+    "github.com/iw2rmb/ploy/internal/detect/project"
 )
 
 // generateDockerfileWithFacts writes a simple Dockerfile into srcDir based on detected project markers.
@@ -22,24 +23,32 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
             facts.BuildTool = "maven"
         }
     }
-    // Java/Scala (JVM) via Gradle/Maven multi-stage, selecting eclipse-temurin:<ver>-jre
+    // Java/Scala (JVM) via Gradle/Maven using embedded templates; fallback to inline if template missing
     if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
-		v := facts.Versions.Java
-		if v == "" {
-			v = "17"
-		}
-		// Normalize: only major
-		if i := strings.Index(v, "."); i > 0 {
-			v = v[:i]
-		}
-		var dockerfile string
-		switch facts.BuildTool {
-		case "gradle":
-			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-			if facts.MainClass != "" {
-				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
-			}
-			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
+        v := facts.Versions.Java
+        if v == "" { v = "17" }
+        if i := strings.Index(v, "."); i > 0 { v = v[:i] }
+        type data struct { JavaVersion string; MainClass string }
+        d := data{JavaVersion: v, MainClass: facts.MainClass}
+        var path string
+        switch facts.BuildTool {
+        case "gradle":
+            path = "dockerfiles/java/gradle.Dockerfile.tmpl"
+        case "maven":
+            path = "dockerfiles/java/maven.Dockerfile.tmpl"
+        }
+        if path != "" {
+            if rendered, err := templates.Render(path, d); err == nil {
+                return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
+            }
+        }
+        // Fallback to previous inline generation if template missing
+        var dockerfile string
+        switch facts.BuildTool {
+        case "gradle":
+            entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
+            dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x ./gradlew || true \
@@ -52,12 +61,10 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-		case "maven":
-			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-			if facts.MainClass != "" {
-				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
-			}
-			dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
+        case "maven":
+            entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
+            if facts.MainClass != "" { entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass) }
+            dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x ./mvnw || true \
@@ -70,11 +77,11 @@ ENV PORT=8080
 EXPOSE 8080
 %s
 `, v, entry)
-		default:
-			return fmt.Errorf("no supported Java build tool detected for Dockerfile autogen")
-		}
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
-	}
+        default:
+            return fmt.Errorf("no supported Java build tool detected for Dockerfile autogen")
+        }
+        return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
+    }
 
 	// Go
 	goMod := filepath.Join(srcDir, "go.mod")
