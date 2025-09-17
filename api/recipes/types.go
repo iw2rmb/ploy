@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // RecipeFilter represents filter criteria for recipe queries

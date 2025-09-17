@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
@@ -25,11 +26,8 @@ func PushCmd(args []string, controllerURL string) {
 	}
 
 	// Display deployment info
-	targetDomain := "ployman.app"
-	if *env != "prod" {
-		targetDomain = fmt.Sprintf("%s.ployman.app", *env)
-	}
-	fmt.Printf("🚀 Deploying platform service %s to %s.%s...\n", *service, *service, targetDomain)
+	baseDomain := platformDomainForEnv(*env)
+	fmt.Printf("🚀 Deploying platform service %s to %s.%s...\n", *service, *service, baseDomain)
 
 	// Use platform-specific deployment
 	result, err := DeployPlatformService(*service, *env, *sha, *lane)
@@ -63,18 +61,26 @@ func OpenCmd(args []string) {
 
 // getPlatformDomain returns the platform domain for a service
 func getPlatformDomain(service string) string {
-	// Check environment for platform domain
-	platformDomain := os.Getenv("PLOY_PLATFORM_DOMAIN")
-	if platformDomain == "" {
-		platformDomain = "ployman.app"
-	}
+	baseDomain := platformDomainForEnv(os.Getenv("PLOY_ENVIRONMENT"))
+	return fmt.Sprintf("%s.%s", service, baseDomain)
+}
 
-	// Check for dev environment
-	environment := os.Getenv("PLOY_ENVIRONMENT")
-	if environment == "dev" {
-		return fmt.Sprintf("%s.dev.%s", service, platformDomain)
+func platformDomainForEnv(env string) string {
+	base := os.Getenv("PLOY_PLATFORM_DOMAIN")
+	if base == "" {
+		base = "dev.ployman.app"
 	}
-
-	// Production domain
-	return fmt.Sprintf("%s.%s", service, platformDomain)
+	env = strings.ToLower(env)
+	if env == "" {
+		env = "dev"
+	}
+	if env == "prod" {
+		trimmed := strings.TrimPrefix(base, "dev.")
+		trimmed = strings.TrimPrefix(trimmed, ".")
+		if trimmed == "" {
+			trimmed = "ployman.app"
+		}
+		return trimmed
+	}
+	return base
 }

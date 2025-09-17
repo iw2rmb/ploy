@@ -2,11 +2,9 @@ package build
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"mime/multipart"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +13,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	"github.com/iw2rmb/ploy/internal/config"
-	"github.com/iw2rmb/ploy/internal/detect/project"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
@@ -72,68 +69,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	tarPath := filepath.Join(tmpDir, "src.tar")
 	f, _ := os.Create(tarPath)
 	defer func() { _ = f.Close() }()
-	ct := strings.ToLower(c.Get("Content-Type"))
-	// Multipart support (field names: file|tar|archive; falls back to first)
-	if strings.HasPrefix(ct, "multipart/form-data") {
-		var fh *multipart.FileHeader
-		for _, key := range []string{"file", "tar", "archive"} {
-			if h, err := c.FormFile(key); err == nil && h != nil {
-				fh = h
-				break
-			}
-		}
-		if fh == nil {
-			if form, err := c.MultipartForm(); err == nil && form != nil {
-				for _, files := range form.File {
-					if len(files) > 0 {
-						fh = files[0]
-						break
-					}
-				}
-			}
-		}
-		if fh == nil {
-			log.Printf("[Build] Multipart request did not include a file part")
-			return c.Status(400).JSON(fiber.Map{"error": "missing file part in multipart"})
-		}
-		src, err := fh.Open()
-		if err != nil {
-			return utils.ErrJSON(c, 400, fmt.Errorf("open multipart: %w", err))
-		}
-		defer src.Close()
-		n, err := io.Copy(f, src)
-		if err != nil {
-			return utils.ErrJSON(c, 400, fmt.Errorf("copy multipart: %w", err))
-		}
-		log.Printf("[Build] Received multipart tar %q (%d bytes)", fh.Filename, n)
+	if n, err := readRequestBodyToTar(c, f); err != nil {
+		log.Printf("[Build] Failed to read request: %v", err)
+		return utils.ErrJSON(c, 400, err)
 	} else {
-		// Log incoming content length (if provided)
-		log.Printf("[Build] Reading request body stream (Content-Length=%d)", int(c.Context().Request.Header.ContentLength()))
-		// Prefer streaming read to avoid buffering limits and reduce proxy timeouts
-		var written int64
-		if reader := c.Context().RequestBodyStream(); reader != nil {
-			n, err := io.Copy(f, reader)
-			written = n
-			if err != nil {
-				log.Printf("[Build] Failed to stream request body: %v", err)
-				return c.Status(400).SendString("Failed to read request body: " + err.Error())
-			}
-		} else {
-			n, err := f.Write(c.Body())
-			written = int64(n)
-			if err != nil {
-				log.Printf("[Build] Failed to write request body: %v", err)
-				return c.Status(400).SendString("Failed to read request body: " + err.Error())
-			}
-		}
-		log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", written, appName, sha, lane)
+		log.Printf("[Build] Received %d bytes for app=%s sha=%s lane=%s", n, appName, sha, lane)
 	}
 
 	srcDir := filepath.Join(tmpDir, "src")
-	if err := os.MkdirAll(srcDir, 0755); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "mkdir src"})
-	}
-	if err := utils.Untar(tarPath, srcDir); err != nil {
+	if err := untarToDir(tarPath, srcDir); err != nil {
 		log.Printf("[Build] Untar failed: %v", err)
 		return utils.ErrJSON(c, 500, fmt.Errorf("untar failed: %w", err))
 	}
@@ -143,37 +87,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
-	detectedLanguage := ""
-	detectedJavaVersion := ""
-	detectedMainClass := ""
-	if lane == "" {
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			lane = res.Lane
-			detectedLanguage = res.Language
-		} else {
-			// Default to container lane for broad compatibility when detection is unavailable
-			lane = "E"
-		}
-	} else {
-		// Attempt language detection even when lane is forced
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			detectedLanguage = res.Language
-		}
-	}
-	// Compute cross-language build facts (versions/main) for consistent behavior
-	facts := project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
-	if facts.Versions.Java != "" {
-		detectedJavaVersion = facts.Versions.Java
-	}
-	if facts.MainClass != "" {
-		detectedMainClass = facts.MainClass
-	}
-	if mainClass == "" && detectedMainClass != "" {
-		mainClass = detectedMainClass
-	}
-	if mainClass == "" {
-		mainClass = "com.ploy.ordersvc.Main"
-	}
+	lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
 	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
 
 	var imagePath, dockerImage string
@@ -218,6 +132,33 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return err
 		}
 		imagePath = img
+
+		// Lane G (WASM): when using the distroless runner, ensure the runtime artifact is visible
+		// at the stable path before submitting the runtime job. This eliminates races between
+		// builder upload and runtime fetch.
+		if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
+			base := os.Getenv("PLOY_SEAWEEDFS_URL")
+			if base == "" {
+				base = "http://seaweedfs-filer.service.consul:8888"
+			}
+			if !strings.HasPrefix(base, "http") {
+				base = "http://" + base
+			}
+			artifactURL := strings.TrimRight(base, "/") + "/artifacts/module.wasm"
+			client := &http.Client{Timeout: 10 * time.Second}
+			req, _ := http.NewRequest("HEAD", artifactURL, nil)
+			resp, err := client.Do(req)
+			if err != nil || (resp != nil && resp.StatusCode >= 400) {
+				code := 0
+				if resp != nil {
+					code = resp.StatusCode
+				}
+				return utils.ErrJSON(c, 500, fmt.Errorf("wasm artifact not ready: %s (status %d): %v", artifactURL, code, err))
+			}
+			if resp != nil {
+				_ = resp.Body.Close()
+			}
+		}
 	default:
 		// Fallback to container lane if unspecified/unsupported
 		lane = "E"
@@ -238,34 +179,11 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	// Copy image to persistent location for Nomad access
 	if imagePath != "" {
-		persistentDir := "/opt/ploy/artifacts"
-		if err := os.MkdirAll(persistentDir, 0755); err != nil {
-			return utils.ErrJSON(c, 500, fmt.Errorf("failed to create persistent artifacts directory: %w", err))
-		}
-
-		persistentImagePath := filepath.Join(persistentDir, filepath.Base(imagePath))
-
-		// Copy the image file
-		if err := copyFile(imagePath, persistentImagePath); err != nil {
+		if p, err := ensurePersistentArtifactCopy(imagePath); err != nil {
 			return utils.ErrJSON(c, 500, fmt.Errorf("failed to copy image to persistent location: %w", err))
+		} else {
+			imagePath = p
 		}
-
-		// Also copy any signature files
-		if utils.FileExists(imagePath + ".sig") {
-			if err := copyFile(imagePath+".sig", persistentImagePath+".sig"); err != nil {
-				fmt.Printf("Warning: Failed to copy signature file: %v\n", err)
-			}
-		}
-
-		// Also copy any SBOM files
-		if utils.FileExists(imagePath + ".sbom.json") {
-			if err := copyFile(imagePath+".sbom.json", persistentImagePath+".sbom.json"); err != nil {
-				fmt.Printf("Warning: Failed to copy SBOM file: %v\n", err)
-			}
-		}
-
-		// Update imagePath to point to the persistent location
-		imagePath = persistentImagePath
 	}
 
 	// Generate comprehensive SBOMs (optional)
@@ -463,261 +381,15 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		return utils.ErrJSON(c, 403, fmt.Errorf("OPA policy enforcement failed: %w", err))
 	}
 
-	// Use enhanced templates with comprehensive configuration
-	// Determine domain suffix by environment
-	envName := c.Query("env", "dev")
-	domainSuffix := "ployd.app"
-	if envName == "dev" {
-		domainSuffix = "dev.ployd.app"
-	}
-
-	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-		App:         appName,
-		ImagePath:   imagePath,
-		DockerImage: dockerImage,
-		EnvVars:     appEnvVars,
-		Version:     sha,
-		Lane:        lane,
-		MainClass:   mainClass,
-		IsDebug:     debug,
-		Language:    detectedLanguage,
-		WasmModuleURL: func() string {
-			if strings.ToUpper(lane) == "G" {
-				base := os.Getenv("PLOY_SEAWEEDFS_URL")
-				if base == "" {
-					base = "http://seaweedfs-filer.service.consul:8888"
-				}
-				if !strings.HasPrefix(base, "http") {
-					base = "http://" + base
-				}
-				return strings.TrimRight(base, "/") + "/" + fmt.Sprintf("builds/%s/%s/module.wasm", appName, sha)
-			}
-			return ""
-		}(),
-
-		WasmRuntimeImage: func() string {
-			if strings.ToUpper(lane) == "G" && os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
-				engine := strings.ToLower(os.Getenv("PLOY_WASM_ENGINE"))
-				switch engine {
-				case "wasmtime":
-					return "registry.dev.ployman.app/wasm/runner:wasmtime-distroless"
-				case "wasmedge":
-					return "registry.dev.ployman.app/wasm/runner:wasmedge-distroless"
-				default:
-					return "registry.dev.ployman.app/wasm/runner:wazero-distroless"
-				}
-			}
-			return ""
-		}(),
-
-		FilerBaseURL: func() string {
-			if strings.ToUpper(lane) == "G" {
-				base := os.Getenv("PLOY_SEAWEEDFS_URL")
-				if base == "" {
-					base = "http://seaweedfs-filer.service.consul:8888"
-				}
-				if !strings.HasPrefix(base, "http") {
-					base = "http://" + base
-				}
-				return strings.TrimRight(base, "/")
-			}
-			return ""
-		}(),
-
-		// Feature flags (dev-friendly defaults)
-		VaultEnabled:        false, // Vault not enabled on dev cluster
-		ConsulConfigEnabled: true,  // Allow Consul KV configuration
-		ConnectEnabled:      false, // Disable Connect to avoid bridge/sidecar requirements
-		VolumeEnabled:       false, // Disable volumes by default (can be enabled per app)
-		DebugEnabled:        debug, // Enable debug features for debug builds
-
-		// Resource allocation based on lane
-		InstanceCount: getInstanceCountForLane(lane),
-		CpuLimit:      getCpuLimitForLane(lane),
-		MemoryLimit:   getMemoryLimitForLane(lane),
-		HttpPort:      8080,
-
-		// JVM-specific configuration for Lane C
-		JvmMemory: getJvmMemoryForLane(lane),
-		JvmCpus:   2,
-		JavaVersion: func() string {
-			if detectedJavaVersion != "" {
-				return detectedJavaVersion
-			}
-			return "17"
-		}(),
-
-		// Domain configuration
-		DomainSuffix: domainSuffix,
-
-		// Build metadata
-		BuildTime: time.Now().Format(time.RFC3339),
-	})
+	// Render, submit and wait for healthy allocation via helper
+	jobName, err := renderAndDeployJob(c, buildCtx, lane, appName, imagePath, dockerImage, sha, mainClass, detectedLanguage, detectedJavaVersion, appEnvVars, debug)
 	if err != nil {
 		return utils.ErrJSON(c, 500, err)
 	}
 
-	// Write debug copy of rendered HCL and validate before submission
-	funcCopy := func(src string) {
-		_ = os.MkdirAll("/opt/ploy/debug/jobs", 0755)
-		base := filepath.Base(src)
-		dst := filepath.Join("/opt/ploy/debug/jobs", base)
-		_ = copyFile(src, dst)
-		fmt.Printf("[Build] Job HCL written to %s\n", dst)
-	}
-	funcCopy(jobFile)
-	// Validate job before submission to return clearer errors from HCL conversion
-	if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
-		return utils.ErrJSON(c, 500, fmt.Errorf("job validation failed: %w", vErr))
-	}
-	if err := orchestration.Submit(jobFile); err != nil {
+	// Upload artifacts and metadata via unified or legacy storage
+	if err := uploadArtifactsAndMetadata(context.Context(c.Context()), deps, srcDir, appName, sha, lane, imagePath, dockerImage, sbom, signed); err != nil {
 		return utils.ErrJSON(c, 500, err)
-	}
-
-	jobName := appName + "-lane-" + strings.ToLower(lane)
-	if err := orchestration.WaitHealthy(jobName, 90*time.Second); err != nil {
-		// Collect allocation summaries to aid diagnostics
-		allocs, _ := orchestration.NewHealthMonitor().GetJobAllocations(jobName)
-		type ev struct{ Type, Message, DisplayMessage string }
-		type ts struct {
-			Name, State string
-			Failed      bool
-			Events      []ev
-		}
-		type sum struct {
-			ID, ClientStatus, DesiredStatus string
-			Tasks                           []ts
-		}
-		var out []sum
-		for _, a := range allocs {
-			s := sum{ID: a.ID, ClientStatus: a.ClientStatus, DesiredStatus: a.DesiredStatus}
-			if len(a.TaskStates) > 0 {
-				for name, st := range a.TaskStates {
-					t := ts{Name: name, State: st.State, Failed: st.Failed}
-					if len(st.Events) > 0 {
-						start := 0
-						if len(st.Events) > 4 {
-							start = len(st.Events) - 4
-						}
-						for _, e := range st.Events[start:] {
-							t.Events = append(t.Events, ev{Type: e.Type, Message: e.Message, DisplayMessage: e.DisplayMessage})
-						}
-					}
-					s.Tasks = append(s.Tasks, t)
-				}
-			}
-			out = append(out, s)
-		}
-		return c.Status(500).JSON(fiber.Map{
-			"error":       "deployment did not become healthy",
-			"job_name":    jobName,
-			"allocations": out,
-			"details":     err.Error(),
-		})
-	}
-
-	// Prefer unified storage interface if available, fallback to legacy StorageClient
-	if deps.Storage != nil {
-		ctx := context.Context(c.Context())
-		keyPrefix := appName + "/" + sha + "/"
-
-		// Upload artifact bundle using unified storage interface
-		if imagePath != "" {
-			if err := uploadArtifactBundleWithUnifiedStorage(ctx, deps.Storage, keyPrefix, imagePath); err != nil {
-				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
-			}
-		}
-
-		// Upload source code SBOM with unified storage interface
-		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
-		if _, err := os.Stat(sourceSBOMPath); err == nil {
-			if err := uploadFileWithUnifiedStorage(ctx, deps.Storage, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
-				fmt.Printf("Warning: Failed to upload source SBOM: %v\n", err)
-			} else {
-				fmt.Printf("Source SBOM uploaded successfully\n")
-			}
-		}
-
-		// Upload container SBOM for Lane E with unified storage interface
-		if dockerImage != "" {
-			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
-			if _, err := os.Stat(containerSBOMPath); err == nil {
-				if err := uploadFileWithUnifiedStorage(ctx, deps.Storage, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
-					fmt.Printf("Warning: Failed to upload container SBOM: %v\n", err)
-				} else {
-					fmt.Printf("Container SBOM uploaded successfully\n")
-				}
-			}
-		}
-
-		// Upload metadata with unified storage interface
-		meta := map[string]string{
-			"lane":        lane,
-			"image":       imagePath,
-			"dockerImage": dockerImage,
-			"timestamp":   time.Now().UTC().Format(time.RFC3339),
-			"sbom":        fmt.Sprintf("%t", sbom),
-			"signed":      fmt.Sprintf("%t", signed),
-		}
-		mb, _ := json.Marshal(meta)
-		if err := uploadBytesWithUnifiedStorage(ctx, deps.Storage, mb, keyPrefix+"meta.json", "application/json"); err != nil {
-			fmt.Printf("Warning: Failed to upload metadata: %v\n", err)
-		} else {
-			fmt.Printf("Metadata uploaded successfully\n")
-		}
-	} else if deps.StorageClient != nil {
-		// Fallback to legacy storage client for backward compatibility
-		keyPrefix := appName + "/" + sha + "/"
-
-		// Upload artifact bundle with comprehensive error handling and verification
-		if imagePath != "" {
-			if result, err := deps.StorageClient.UploadArtifactBundleWithVerification(keyPrefix, imagePath); err != nil {
-				return utils.ErrJSON(c, 500, fmt.Errorf("artifact bundle upload with verification failed: %w", err))
-			} else {
-				fmt.Printf("Artifact bundle integrity verification: %s\n", result.GetVerificationSummary())
-				if !result.Verified {
-					return utils.ErrJSON(c, 500, fmt.Errorf("artifact integrity verification failed: %s", strings.Join(result.Errors, "; ")))
-				}
-			}
-		}
-
-		// Upload source code SBOM with enhanced retry and verification
-		sourceSBOMPath := filepath.Join(srcDir, ".sbom.json")
-		if _, err := os.Stat(sourceSBOMPath); err == nil {
-			if err := uploadFileWithRetryAndVerification(deps.StorageClient, sourceSBOMPath, keyPrefix+"source.sbom.json", "application/json"); err != nil {
-				fmt.Printf("Warning: Failed to upload source SBOM after retries: %v\n", err)
-			} else {
-				fmt.Printf("Source SBOM uploaded and verified successfully\n")
-			}
-		}
-
-		// Upload container SBOM for Lane E with enhanced retry and verification
-		if dockerImage != "" {
-			containerSBOMPath := fmt.Sprintf("/tmp/%s-%s.sbom.json", appName, strings.ReplaceAll(dockerImage, "/", "-"))
-			if _, err := os.Stat(containerSBOMPath); err == nil {
-				if err := uploadFileWithRetryAndVerification(deps.StorageClient, containerSBOMPath, keyPrefix+"container.sbom.json", "application/json"); err != nil {
-					fmt.Printf("Warning: Failed to upload container SBOM after retries: %v\n", err)
-				} else {
-					fmt.Printf("Container SBOM uploaded and verified successfully\n")
-				}
-			}
-		}
-
-		// Upload metadata with enhanced retry and verification
-		meta := map[string]string{
-			"lane":        lane,
-			"image":       imagePath,
-			"dockerImage": dockerImage,
-			"timestamp":   time.Now().UTC().Format(time.RFC3339),
-			"sbom":        fmt.Sprintf("%t", sbom),
-			"signed":      fmt.Sprintf("%t", signed),
-		}
-		mb, _ := json.Marshal(meta)
-		if err := uploadBytesWithRetryAndVerification(deps.StorageClient, mb, keyPrefix+"meta.json", "application/json"); err != nil {
-			fmt.Printf("Warning: Failed to upload metadata after retries: %v\n", err)
-		} else {
-			fmt.Printf("Metadata uploaded and verified successfully\n")
-		}
 	}
 
 	response := makeBuildResponse(strings.ToUpper(lane), imagePath, dockerImage, buildCtx.APIContext, buildCtx.AppType, buildStart, sizeInfo, imageSizeMB, builderJobName, appName, sha, registry.Endpoint, registry.GetProject(buildCtx.AppType), scanResult, scanner)

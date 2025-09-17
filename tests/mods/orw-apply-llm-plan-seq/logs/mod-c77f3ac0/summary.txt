@@ -1,0 +1,11 @@
+MOD_ID: mod-c77f3ac0
+Controller: https://api.dev.ployman.app/v1
+SeaweedFS: <unset>
+
+Status:
+failed, phase=commit
+failed to commit changes: failed to commit changes: exit status 128 - stderr: fatal: empty ident name (for <>) not allowed
+ - stdout: 
+
+Events (errors) → events.filtered.txt
+Platform logs → platform_api.log, traefik.log

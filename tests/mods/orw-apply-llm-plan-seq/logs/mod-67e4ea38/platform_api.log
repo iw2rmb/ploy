@@ -1,0 +1,12 @@
+[2025-09-16 14:31:42] Getting stdout logs for allocation: dd78ef6d-fba2-58f5-a381-acf67baf1af8 (task: api, lines: 800, follow: false)
+[2025-09-16 14:31:42] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/dd78ef6d-fba2-58f5-a381-acf67baf1af8?type=stdout&plain=true&task=api&offset=-800
+[2025-09-16 14:31:42] Response code: 200
+31:30] 200 - POST /v1/mods/mod-67e4ea38/events -    3.388257ms
+[14:31:32] 200 - GET /v1/apps/ploy-lane-g-rust-1-79/builds/b-1758033061441626888/status -     121.103µs
+[14:31:32] 200 - POST /v1/mods/mod-67e4ea38/events -    5.151805ms
+{"error":{"code":"internal_error","details":null,"message":"internal error"}}[14:31:32] 200 - POST /v1/mods/mod-67e4ea38/events -    4.338527ms
+[14:31:34] 200 - GET /v1/apps/ploy-lane-g-rust-1-79/builds/b-1758033061441626888/status -     151.102µs
+[14:31:38] 200 - GET /v1/mods/mod-67e4ea38/status -    4.749841ms
+[14:31:39] 200 - GET /v1/mods/mod-67e4ea38/artifacts/plan_json -    4.238265ms
+[14:31:40] 200 - GET /v1/apps/ploy-lane-g-rust-1-79/builds/b-1758033061441626888/status -      155.55µs
+[14:31:40] 200 - GET /v1/mods/mod-67e4ea38/status -    2.581428ms

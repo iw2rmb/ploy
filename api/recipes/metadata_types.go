@@ -3,7 +3,7 @@ package recipes
 import (
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // RecipeFilters defines search criteria for recipes

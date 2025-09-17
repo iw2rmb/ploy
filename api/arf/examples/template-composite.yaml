@@ -114,32 +114,3 @@ execution:
   sandbox:
     enabled: true
     cleanup_after: true
-
-validation:
-  pre_conditions:
-    - type: "repository_state"
-      config:
-        must_be_clean: true
-        branch_pattern: "^(main|master|develop)$"
-    - type: "language_version"
-      config:
-        language: "java"
-        min_version: "11"
-    - type: "language_version"
-      config:
-        language: "node"
-        min_version: "16"
-  
-  post_conditions:
-    - type: "compilation"
-      config:
-        language: "java"
-        must_compile: true
-    - type: "tests"
-      config:
-        must_pass: true
-        min_coverage: 75
-    - type: "security_scan"
-      config:
-        max_critical: 0
-        max_high: 5

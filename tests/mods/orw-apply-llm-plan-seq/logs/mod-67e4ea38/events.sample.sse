@@ -1,0 +1,306 @@
+event: init
+data: {"id":"mod-67e4ea38","message":"SSE connected"}
+
+event: step
+data: {"step":"clone","phase":"clone","level":"info","message":"Cloning repository: repo=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git ref=e2e/fail-missing-symbol","time":"2025-09-16T14:30:19.254049051Z"}
+
+event: step
+data: {"step":"clone-diagnostics","phase":"clone","level":"info","message":"repo=/tmp/mods-mod-67e4ea38-3350256596/repo entries=.claude,.git,README.md,pom.xml,src","time":"2025-09-16T14:30:20.452172091Z"}
+
+event: step
+data: {"step":"source","phase":"sbom","level":"info","message":"Generated source SBOM","time":"2025-09-16T14:30:20.456807611Z"}
+
+event: step
+data: {"step":"create-branch","phase":"branch","level":"info","message":"Creating workflow branch","time":"2025-09-16T14:30:20.460102647Z"}
+
+event: step
+data: {"step":"guard-build-file","phase":"apply","level":"info","message":"repo=/tmp/mods-mod-67e4ea38-3350256596/repo pom=true gradle=false kts=false","time":"2025-09-16T14:30:20.469415108Z"}
+
+event: step
+data: {"step":"input-preview","phase":"apply","level":"info","message":"input.tar preview:\n./.claude/state/context-warning-75.flag\n./.claude/state/context-warning-90.flag\n./.claude/state/daic-mode.json\n./.git/HEAD\n./.git/ORIG_HEAD\n./.git/config\n./.git/config.worktree\n./.git/description\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/pre-push.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/push-to-checkout.sample","time":"2025-09-16T14:30:20.47702728Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-67e4ea38/java11to17-migration/orw_apply.submitted.hcl","time":"2025-09-16T14:30:20.486754407Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Submitting orw-apply job","time":"2025-09-16T14:30:20.491109334Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T14:30:21.10558313Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T14:31:07.156523405Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"orw-apply job completed","time":"2025-09-16T14:31:07.654225326Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"warn","message":"HEAD.json not found for branch (no steps to replay)","time":"2025-09-16T14:31:07.659927858Z"}
+
+event: step
+data: {"step":"diff-found","phase":"apply","level":"info","message":"diff ready (1106 bytes)","time":"2025-09-16T14:31:07.665872792Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Applying diff and running build gate: repo=/tmp/mods-mod-67e4ea38-3350256596/repo diff=/tmp/mods-mod-67e4ea38-3350256596/orw-apply/java11to17-migration/out/diff.patch","time":"2025-09-16T14:31:07.670100469Z"}
+
+event: step
+data: {"step":"diff-apply-started","phase":"apply","level":"info","message":"Applying diff to repository","time":"2025-09-16T14:31:07.673704337Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Running build gate","time":"2025-09-16T14:31:07.677975035Z"}
+
+event: step
+data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ ploy-orw-java11-maven ---\n[INFO] \n[INFO] --- build-helper-maven-plugin:3.5.0:add-source (add-healing-source) @ ploy-orw-java11-maven ---\n[INFO] Source directory: /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java added.\n[INFO] \n[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ ploy-orw-java11-maven ---\n[INFO] Using 'UTF-8' encoding to copy filtered resources.\n[INFO] skip non existing resourceDirectory /tmp/mods-mod-67e4ea38-3350256596/repo/src/main/resources\n[INFO] \n[INFO] --- maven-compiler-plugin:3.14.0:compile (default-compile) @ ploy-orw-java11-maven ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 2 source files with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[INFO] 2 errors \n[INFO] -------------------------------------------------------------\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  1.365 s\n[INFO] Finished at: 2025-09-16T14:31:10Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.0:compile (default-compile) on project ploy-orw-java11-maven: Compilation failure: Compilation failure: \n[ERROR] /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] -\u003e [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n","time":"2025-09-16T14:31:10.174247764Z"}
+
+event: step
+data: {"step":"build-gate-error","phase":"build","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Buildi…","time":"2025-09-16T14:31:12.678436941Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 1/2","time":"2025-09-16T14:31:12.684295295Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T14:31:12.688866984Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T14:31:12.69487627Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-67e4ea38/planner/planner.submitted.hcl","time":"2025-09-16T14:31:12.704087539Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T14:31:12.70871964Z"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T14:31:13.518848913Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T14:31:13.575908602Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://45.12.75.241:8888","time":"2025-09-16T14:31:13.625030015Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-67e4ea38 RUN_ID=java11to17-orw-llm-planner-1758033072","time":"2025-09-16T14:31:13.680402646Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://45.12.75.241:8888/","time":"2025-09-16T14:31:13.756908326Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-67e4ea38/planner/java11to17-orw-llm-planner-1758033072/plan.json (status 201)","time":"2025-09-16T14:31:13.842730007Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T14:31:13.894852733Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"fanout","level":"info","message":"branch started: llm-1","time":"2025-09-16T14:31:14.028829928Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T14:31:14.03561482Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-67e4ea38/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T14:31:14.046986655Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T14:31:14.762076407Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T14:31:15.077413758Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T14:31:15.092584723Z"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T14:31:16.856328558Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T14:31:16.913177325Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T14:31:16.964172879Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://45.12.75.241:8888","time":"2025-09-16T14:31:17.018272206Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"generated minimal edit patch (comment offending lines)","time":"2025-09-16T14:31:17.095735507Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"uploaded diff to mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033074/diff.patch (status 201)","time":"2025-09-16T14:31:17.174946427Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job completed","time":"2025-09-16T14:31:17.226388445Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download start: key=mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033074/diff.patch start_ts=2025-09-16T14:31:18.392612535Z","time":"2025-09-16T14:31:18.392629255Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download succeeded: key=mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033074/diff.patch bytes=432 start_ts=2025-09-16T14:31:18.392612535Z end_ts=2025-09-16T14:31:18.407317655Z","time":"2025-09-16T14:31:18.407360925Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T14:31:18.506107817Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T14:31:18.554155828Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T14:31:19.206927535Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-67e4ea38/reducer/plan-1758033073-reducer-1758033078/next.json (status 201)","time":"2025-09-16T14:31:19.281299652Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T14:31:19.332246554Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T14:31:19.548919598Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"replay starting: branch_id=llm-1 plan_id=plan-1758033073","time":"2025-09-16T14:31:19.849697162Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"replay branch llm-1: chain length=1","time":"2025-09-16T14:31:19.854765918Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"fetching step llm-exec-llm-1-1758033074 diff from http://45.12.75.241:8888/artifacts/mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033074/diff.patch","time":"2025-09-16T14:31:19.859861373Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"applied step llm-exec-llm-1-1758033074","time":"2025-09-16T14:31:19.871952163Z"}
+
+event: step
+data: {"step":"build-gate","phase":"build","level":"info","message":"start app=tfw-java11to17-orw-llm-1758033082 lane=C env=dev wd=/tmp/mods-mod-67e4ea38-3350256596/repo","time":"2025-09-16T14:31:22.852657794Z"}
+
+event: step
+data: {"step":"build-gate","phase":"build","level":"error","message":"unsuccessful: Deployment failed with status 500","time":"2025-09-16T14:31:22.965530349Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 2/2","time":"2025-09-16T14:31:22.975031941Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-67e4ea38-3350256596/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T14:31:22.982337412Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T14:31:22.988430918Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-67e4ea38/planner/planner.submitted.hcl","time":"2025-09-16T14:31:22.99695211Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T14:31:23.001764412Z"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T14:31:23.756280395Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T14:31:23.839992143Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://45.12.75.241:8888","time":"2025-09-16T14:31:23.910016184Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-67e4ea38 RUN_ID=java11to17-orw-llm-planner-1758033082","time":"2025-09-16T14:31:23.971290788Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://45.12.75.241:8888/","time":"2025-09-16T14:31:24.038793891Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T14:31:24.046472644Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-67e4ea38/planner/java11to17-orw-llm-planner-1758033082/plan.json (status 201)","time":"2025-09-16T14:31:24.128404915Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T14:31:24.18610279Z"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"info","message":"branch started: orw-1","time":"2025-09-16T14:31:24.324284891Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T14:31:24.332861015Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-67e4ea38/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T14:31:24.342907764Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T14:31:24.980530826Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T14:31:25.378914832Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T14:31:25.391123084Z"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T14:31:27.111812308Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T14:31:27.16446882Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T14:31:27.223890554Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://45.12.75.241:8888","time":"2025-09-16T14:31:27.299327464Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"generated minimal edit patch (comment offending lines)","time":"2025-09-16T14:31:27.379924689Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"uploaded diff to mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033084/diff.patch (status 201)","time":"2025-09-16T14:31:27.478135296Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job completed","time":"2025-09-16T14:31:27.535382217Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download start: key=mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033084/diff.patch start_ts=2025-09-16T14:31:28.718060699Z","time":"2025-09-16T14:31:28.718069859Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"download succeeded: key=mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033084/diff.patch bytes=432 start_ts=2025-09-16T14:31:28.718060699Z end_ts=2025-09-16T14:31:28.744319454Z","time":"2025-09-16T14:31:28.744336575Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T14:31:28.843908406Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T14:31:28.897861602Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T14:31:29.513150454Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-67e4ea38/reducer/plan-1758033084-reducer-1758033088/next.json (status 201)","time":"2025-09-16T14:31:29.586091836Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T14:31:29.639457925Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T14:31:29.885102783Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"replay starting: branch_id=llm-1 plan_id=plan-1758033084","time":"2025-09-16T14:31:30.166179425Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"replay branch llm-1: chain length=2","time":"2025-09-16T14:31:30.17117709Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"fetching step llm-exec-llm-1-1758033074 diff from http://45.12.75.241:8888/artifacts/mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033074/diff.patch","time":"2025-09-16T14:31:30.1767336Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"applied step llm-exec-llm-1-1758033074","time":"2025-09-16T14:31:30.188291216Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"info","message":"fetching step llm-exec-llm-1-1758033084 diff from http://45.12.75.241:8888/artifacts/mods/mod-67e4ea38/branches/llm-1/steps/llm-exec-llm-1-1758033084/diff.patch","time":"2025-09-16T14:31:30.193548323Z"}
+
+event: step
+data: {"step":"apply","phase":"healing","level":"warn","message":"diff format invalid for llm-exec-llm-1-1758033084: git apply --check failed: exit status 1: error: patch failed: src/healing/java/e2e/FailHealing.java:1\nerror: src/healing/java/e2e/FailHealing.java: patch does not apply\n","time":"2025-09-16T14:31:30.202407179Z"}
+
+event: step
+data: {"step":"build-gate","phase":"build","level":"info","message":"start app=tfw-java11to17-orw-llm-1758033092 lane=C env=dev wd=/tmp/mods-mod-67e4ea38-3350256596/repo","time":"2025-09-16T14:31:32.748595481Z"}
+
+event: step
+data: {"step":"build-gate","phase":"build","level":"error","message":"unsuccessful: Deployment failed with status 500","time":"2025-09-16T14:31:32.836672526Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"error","message":"healing failed after retries","time":"2025-09-16T14:31:32.844555172Z"}
+
+event: end
+data: {"duration":"","phase":"healing","status":"failed"}
+

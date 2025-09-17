@@ -178,9 +178,9 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
 		})
 	}
-	// Verify image exists in registry before returning
+	// Verify image exists in registry before returning and capture digest
 	vr := verifyOCIPush(tag)
-	if !vr.OK {
+	if !vr.OK || vr.Digest == "" {
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   "image push verification failed",
 			"stage":   "verify_push",
@@ -189,6 +189,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			"message": vr.Message,
 		})
 	}
-	// For Kaniko, we return only dockerImage tag (artifact stored in registry)
-	return "", registry.GetDockerImageTag(appName, sha, buildCtx.AppType), builderJobName, nil
+	// Prefer digest-based reference to avoid tag drift at runtime
+	digestRef := tag + "@" + vr.Digest
+	return "", digestRef, builderJobName, nil
 }

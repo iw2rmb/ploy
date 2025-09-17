@@ -58,10 +58,10 @@ type RenderData struct {
 	// Build metadata
 	BuildTime string
 
-    // WASM-specific options
-    WasmModuleURL   string
-    FilerBaseURL    string
-    WasmRuntimeImage string
+	// WASM-specific options
+	WasmModuleURL    string
+	FilerBaseURL     string
+	WasmRuntimeImage string
 }
 
 // RenderTemplate renders a Nomad job HCL based on lane and data, returning a temp file path
@@ -101,7 +101,7 @@ func RenderTemplate(lane string, data RenderData) (string, error) {
 }
 
 func templateForLane(lane string) string {
-    switch strings.ToUpper(lane) {
+	switch strings.ToUpper(lane) {
 	case "A":
 		return "platform/nomad/lane-a-unikraft.hcl"
 	case "B":
@@ -114,12 +114,12 @@ func templateForLane(lane string) string {
 		return "platform/nomad/lane-e-oci-kontain.hcl"
 	case "F":
 		return "platform/nomad/lane-f-vm.hcl"
-    case "G":
-        // Lane G: allow selecting a distroless runner image
-        if utils.Getenv("PLOY_WASM_DISTROLESS", "") == "1" {
-            return "platform/nomad/lane-g-wasm-runner.hcl"
-        }
-        return "platform/nomad/lane-g-wasm.hcl"
+	case "G":
+		// Lane G: allow selecting a distroless runner image
+		if utils.Getenv("PLOY_WASM_DISTROLESS", "") == "1" {
+			return "platform/nomad/lane-g-wasm-runner.hcl"
+		}
+		return "platform/nomad/lane-g-wasm.hcl"
 	default:
 		return "platform/nomad/lane-c-osv.hcl"
 	}
@@ -154,12 +154,15 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 	}
 	s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
 
-	// Targeted memory bump for .NET builds only
+	// Targeted memory bump per language (defaults 512MB)
 	memMB := utils.Getenv("PLOY_KANIKO_MEMORY_MB", "512")
 	ll := strings.ToLower(strings.TrimSpace(language))
 	if ll == ".net" || ll == "dotnet" || ll == "csharp" || ll == "c#" {
-		// Allow override for .NET-specific memory via env, else default to 2048MB
+		// .NET builds often need more memory
 		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_DOTNET_MB", "2048")
+	} else if ll == "java" || ll == "scala" || ll == "kotlin" || ll == "jvm" {
+		// JVM builds (Gradle/Maven) typically need more than default
+		memMB = utils.Getenv("PLOY_KANIKO_MEMORY_JAVA_MB", "1024")
 	}
 	s = strings.ReplaceAll(s, "{{KANIKO_MEMORY}}", memMB)
 	// Also hard-rewrite any existing static memory assignment to ensure targeted bump applies
@@ -338,12 +341,12 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	if data.WasmModuleURL != "" {
 		s = strings.ReplaceAll(s, "{{WASM_URL}}", data.WasmModuleURL)
 	}
-    if data.FilerBaseURL != "" {
-        s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
-    }
-    if data.WasmRuntimeImage != "" {
-        s = strings.ReplaceAll(s, "{{WASM_RUNTIME_IMAGE}}", data.WasmRuntimeImage)
-    }
+	if data.FilerBaseURL != "" {
+		s = strings.ReplaceAll(s, "{{FILER_URL}}", strings.TrimRight(data.FilerBaseURL, "/"))
+	}
+	if data.WasmRuntimeImage != "" {
+		s = strings.ReplaceAll(s, "{{WASM_RUNTIME_IMAGE}}", data.WasmRuntimeImage)
+	}
 
 	s = strings.ReplaceAll(s, "{{HTTP_PORT}}", fmt.Sprintf("%d", data.HttpPort))
 	if data.GrpcPort > 0 {

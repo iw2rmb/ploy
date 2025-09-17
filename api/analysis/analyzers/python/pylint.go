@@ -244,7 +244,6 @@ func (a *PylintAnalyzer) GenerateFixSuggestions(issue analysis.Issue) ([]analysi
 			suggestion := analysis.FixSuggestion{
 				Description: fix,
 				Confidence:  0.85,
-				ARFRecipe:   fmt.Sprintf("org.openrewrite.python.cleanup.%s", toCamelCase(pattern)),
 			}
 			suggestions = append(suggestions, suggestion)
 			break
@@ -275,45 +274,6 @@ func (a *PylintAnalyzer) CanAutoFix(issue analysis.Issue) bool {
 	}
 
 	return false
-}
-
-// GetARFRecipes returns ARF recipes for an issue
-func (a *PylintAnalyzer) GetARFRecipes(issue analysis.Issue) []string {
-	recipes := []string{}
-
-	// Map Pylint checks to OpenRewrite/custom recipes
-	recipeMap := map[string][]string{
-		"unused-import": {
-			"org.openrewrite.python.cleanup.RemoveUnusedImports",
-			"com.ploy.python.cleanup.OrganizeImports",
-		},
-		"unused-variable": {
-			"org.openrewrite.python.cleanup.RemoveUnusedVariables",
-		},
-		"missing-docstring": {
-			"com.ploy.python.style.AddMissingDocstrings",
-		},
-		"trailing-whitespace": {
-			"org.openrewrite.python.format.RemoveTrailingWhitespace",
-		},
-		"wrong-import-order": {
-			"org.openrewrite.python.cleanup.OrganizeImports",
-		},
-		"line-too-long": {
-			"org.openrewrite.python.format.BreakLongLines",
-		},
-		"duplicate-code": {
-			"com.ploy.python.refactor.ExtractDuplicateCode",
-		},
-	}
-
-	for pattern, recipeList := range recipeMap {
-		if strings.Contains(issue.RuleName, pattern) {
-			recipes = append(recipes, recipeList...)
-		}
-	}
-
-	return recipes
 }
 
 // findPythonFiles finds all Python files in the codebase
@@ -476,15 +436,14 @@ func (a *PylintAnalyzer) parsePylintOutput(output string) []analysis.Issue {
 
 	for i, msg := range messages {
 		issue := analysis.Issue{
-			ID:            fmt.Sprintf("pylint-%d", i),
-			Severity:      a.mapSeverity(msg.Type),
-			Category:      a.categorizeMessage(msg.MessageID),
-			RuleName:      msg.Symbol,
-			Message:       msg.Message,
-			File:          msg.Path,
-			Line:          msg.Line,
-			Column:        msg.Column,
-			ARFCompatible: a.CanAutoFix(analysis.Issue{RuleName: msg.Symbol}),
+			ID:       fmt.Sprintf("pylint-%d", i),
+			Severity: a.mapSeverity(msg.Type),
+			Category: a.categorizeMessage(msg.MessageID),
+			RuleName: msg.Symbol,
+			Message:  msg.Message,
+			File:     msg.Path,
+			Line:     msg.Line,
+			Column:   msg.Column,
 		}
 
 		issues = append(issues, issue)

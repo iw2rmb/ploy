@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/cli/domains"
 	"github.com/iw2rmb/ploy/internal/cli/env"
+	"github.com/iw2rmb/ploy/internal/cli/recipes"
 	"github.com/iw2rmb/ploy/internal/cli/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
@@ -45,7 +46,9 @@ func main() {
 		case "rollback":
 			debug.RollbackCmd(os.Args[2:], controllerURL)
 		case "arf":
-			arf.ARFCmd(os.Args[2:], controllerURL)
+			arf.Run(os.Args[2:], controllerURL)
+		case "recipe", "recipes":
+			recipes.Run(os.Args[2:], controllerURL)
 		case "sbom":
 			sbom.SBOMCmd(os.Args[2:], controllerURL)
 		case "bluegreen":

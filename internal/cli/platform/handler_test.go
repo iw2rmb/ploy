@@ -149,25 +149,24 @@ func TestGetPlatformDomain(t *testing.T) {
 			want:        "ploy-api.ployman.app",
 		},
 		{
-			name:        "staging defaults to prod domain",
+			name:        "staging defaults to dev domain",
 			service:     "metrics",
 			environment: "staging",
-			want:        "metrics.ployman.app",
+			want:        "metrics.dev.ployman.app",
 		},
 		{
-			name:        "no environment defaults to prod",
+			name:        "no environment defaults to dev",
 			service:     "openrewrite",
 			environment: "",
-			want:        "openrewrite.ployman.app",
+			want:        "openrewrite.dev.ployman.app",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment for testing
-			if tt.environment != "" {
-				t.Setenv("PLOY_ENVIRONMENT", tt.environment)
-			}
+			t.Setenv("PLOY_PLATFORM_DOMAIN", "")
+			t.Setenv("PLOY_ENVIRONMENT", tt.environment)
 
 			got := getPlatformDomain(tt.service)
 			if got != tt.want {

@@ -13,7 +13,11 @@ func TestServerRoutes_HealthReadyLive(t *testing.T) {
 	s := &Server{
 		app: fiber.New(),
 		dependencies: &ServiceDependencies{
-			HealthChecker: health.NewHealthChecker("", "127.0.0.1:8500", "http://127.0.0.1:4646"),
+			HealthChecker: func() *health.HealthChecker {
+				hc := health.NewHealthChecker("", "", "")
+				hc.SetDependencyChecksEnabled(false)
+				return hc
+			}(),
 		},
 	}
 	s.setupRoutes()

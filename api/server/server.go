@@ -24,12 +24,12 @@ import (
 	"github.com/iw2rmb/ploy/api/llms"
 	"github.com/iw2rmb/ploy/api/metrics"
 	modsapi "github.com/iw2rmb/ploy/api/mods"
+	recipes "github.com/iw2rmb/ploy/api/recipes"
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/sbom"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 
-	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
 	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
 	"github.com/iw2rmb/ploy/internal/cleanup"
@@ -52,7 +52,8 @@ type ServiceDependencies struct {
 	ACMEHandler             *acme.Handler
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
-	ARFHandler              *arf.Handler
+	RemediationHandler      *arf.Handler
+	RecipesHandler          *recipes.HTTPHandler
 	ModsHandler             *modsapi.Handler
 	AnalysisHandler         *analysis.Handler
 	LLMHandler              *llms.Handler
@@ -62,8 +63,7 @@ type ServiceDependencies struct {
 	Metrics                 *metrics.Metrics
 	StorageConfigPath       string
 	// StorageFactory deprecated: use config service
-	ARFEngine  arfcore.Engine
-	ARFRecipes tarfrecipes.Registry
+	RecipeCatalog tarfrecipes.Registry
 }
 
 // Server represents the stateless controller server
@@ -76,6 +76,74 @@ type Server struct {
 	coordinationCancel context.CancelFunc
 	configService      *cfgsvc.Service
 	indexerStorage     internalStorage.Storage
+}
+
+func (s *Server) runRecipeIndexerIfConfigured() {
+	if s.config == nil {
+		return
+	}
+	packsSpec := strings.TrimSpace(s.config.RemediationDefaultPacks)
+	if packsSpec == "" {
+		return
+	}
+
+	if s.indexerStorage == nil {
+		st, err := s.resolveUnifiedStorage()
+		if err != nil {
+			log.Printf("Warning: unable to resolve storage for recipe indexer: %v", err)
+			return
+		}
+		s.indexerStorage = st
+	}
+
+	var fetcher tarfrecipes.Fetcher
+	switch {
+	case s.config.RemediationFetcher != nil:
+		fetcher = s.config.RemediationFetcher
+	case strings.TrimSpace(s.config.RemediationMavenGroup) != "":
+		base := strings.TrimSpace(s.config.RemediationRegistryURL)
+		if base == "" {
+			base = "https://repo1.maven.org/maven2"
+		}
+		fetcher = tarfrecipes.MavenFetcher{BaseURL: base, GroupID: s.config.RemediationMavenGroup}
+	case strings.TrimSpace(s.config.RemediationRegistryURL) != "":
+		fetcher = tarfrecipes.HTTPFetcher{BaseURL: strings.TrimRight(s.config.RemediationRegistryURL, "/")}
+	default:
+		log.Printf("Skipping recipe catalog indexing: no remediation fetcher or registry configured")
+		return
+	}
+
+	var packs []tarfrecipes.PackSpec
+	for _, part := range strings.Split(packsSpec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		segments := strings.SplitN(part, ":", 2)
+		if len(segments) != 2 {
+			log.Printf("Skipping invalid remediation pack spec: %s", part)
+			continue
+		}
+		pack := strings.TrimSpace(segments[0])
+		ver := strings.TrimSpace(segments[1])
+		if pack == "" || ver == "" {
+			log.Printf("Skipping remediation pack spec with empty fields: %s", part)
+			continue
+		}
+		packs = append(packs, tarfrecipes.PackSpec{Name: pack, Version: ver})
+	}
+	if len(packs) == 0 {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	indexer := tarfrecipes.NewIndexer(fetcher, s.indexerStorage)
+	if _, err := indexer.Refresh(ctx, packs); err != nil {
+		log.Printf("Warning: failed to index remediation packs: %v", err)
+		return
+	}
+	log.Printf("Indexed remediation packs: %s", packsSpec)
 }
 
 // resolveUnifiedStorage prefers the config service if available, otherwise
@@ -186,7 +254,16 @@ func NewServer(config *ControllerConfig) (*Server, error) {
 	// Setup routes
 	server.setupRoutes()
 
-	// Note: ARF recipes indexer initialization would go here if needed
+	if config != nil {
+		if server.indexerStorage == nil {
+			if st, err := server.resolveUnifiedStorage(); err == nil {
+				server.indexerStorage = st
+			} else if err != nil {
+				log.Printf("Warning: unable to prepare storage for recipe catalog indexer: %v", err)
+			}
+		}
+		server.runRecipeIndexerIfConfigured()
+	}
 
 	return server, nil
 }

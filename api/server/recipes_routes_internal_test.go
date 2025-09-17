@@ -10,7 +10,7 @@ import (
 	providers_memory "github.com/iw2rmb/ploy/internal/storage/providers/memory"
 )
 
-// Ensure GET /v1/arf/recipes/:id is wired to internal handler
+// Ensure GET /v1/recipes/:id is wired to internal handler
 func TestRecipesRoute_GetByID_Internal(t *testing.T) {
 	t.Parallel()
 
@@ -23,9 +23,9 @@ func TestRecipesRoute_GetByID_Internal(t *testing.T) {
 	mem := providers_memory.NewMemoryStorage(0)
 	catalog := `[{"id":"org.openrewrite.java.cleanup.Cleanup","display_name":"Java Cleanup","tags":["cleanup"]}]`
 	_ = mem.Put(context.TODO(), "artifacts/openrewrite/catalog.json", strings.NewReader(catalog))
-	srv.dependencies.ARFRecipes = recipes.NewStorageBacked(mem)
+	srv.dependencies.RecipeCatalog = recipes.NewStorageBacked(mem)
 
-	req := httptest.NewRequest("GET", "/v1/arf/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
+	req := httptest.NewRequest("GET", "/v1/recipes/org.openrewrite.java.cleanup.Cleanup", nil)
 	resp, err := srv.app.Test(req, -1)
 	if err != nil {
 		t.Fatalf("request failed: %v", err)

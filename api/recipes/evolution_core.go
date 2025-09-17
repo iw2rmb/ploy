@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // NewRecipeEvolution creates a new recipe evolution system

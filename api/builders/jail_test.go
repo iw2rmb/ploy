@@ -239,12 +239,12 @@ func TestBuildJailEnvironmentPropagation(t *testing.T) {
 		"PATH_VAR":     "/custom/path",
 	}
 
-	var capturedEnv []string
+	var capturedCmd *exec.Cmd
 
 	// Mock exec.Command to capture environment
 	mockCommand := func(name string, args ...string) *exec.Cmd {
 		cmd := exec.Command("echo", "test-output")
-		capturedEnv = cmd.Env
+		capturedCmd = cmd
 		return cmd
 	}
 
@@ -253,8 +253,9 @@ func TestBuildJailEnvironmentPropagation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Convert captured environment to map for easier checking
+	require.NotNil(t, capturedCmd)
 	envMap := make(map[string]string)
-	for _, env := range capturedEnv {
+	for _, env := range capturedCmd.Env {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) == 2 {
 			envMap[parts[0]] = parts[1]

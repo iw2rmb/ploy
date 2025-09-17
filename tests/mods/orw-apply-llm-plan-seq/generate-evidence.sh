@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MOD_DIR="${1:-}"
+
+if [[ -z "$MOD_DIR" ]]; then
+  # Pick most recent mod-*/ by mtime
+  MOD_DIR=$(ls -td "$ROOT_DIR"/logs/mod-* 2>/dev/null | head -n1 || true)
+fi
+
+if [[ -z "$MOD_DIR" || ! -d "$MOD_DIR" ]]; then
+  echo "No logs/mod-*/ directory found. Run ./run.sh first." >&2
+  exit 1
+fi
+
+EVID="$MOD_DIR/evidence.txt"
+EVS="$MOD_DIR/events.sse"
+STAT="$MOD_DIR/status_last.json"
+DIFF="$MOD_DIR/diff.patch"
+
+{
+  echo "Evidence for $(basename "$MOD_DIR")"
+  echo
+  echo "[1] ORW apply → build gate context"
+  rg -n "\\b(orw-apply|diff-found|diff-apply-started|build-gate-start|build-gate-failed|build-gate-succeeded)\\b" "$EVS" -n -S || true
+  echo
+  echo "[2] Planner/LLM inputs prepared (prompt/error context)"
+  rg -n "prepared inputs.json|prompt enriched" "$EVS" -n -S || true
+  echo
+  echo "[3] Build error (from status_last.json)"
+  if [[ -s "$STAT" ]]; then
+    jq -r '.error // empty' "$STAT" | sed -n '1,120p'
+  fi
+  echo
+  echo "[4] LLM diff (first 120 lines if exists)"
+  if [[ -s "$DIFF" ]]; then
+    sed -n '1,120p' "$DIFF"
+  else
+    echo "(no diff.patch captured by controller)"
+  fi
+  echo
+  echo "[5] LLM/Reducer artifact events"
+  rg -n "llm-exec|reducer.*download|uploaded diff|branches/.*/steps/.*/diff.patch|plan.json|next.json|bytes=" "$EVS" -n -S || true
+} > "$EVID"
+
+echo "Wrote $EVID"
+

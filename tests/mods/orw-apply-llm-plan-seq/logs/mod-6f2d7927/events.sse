@@ -1,0 +1,840 @@
+event: init
+data: {"id":"mod-6f2d7927","message":"SSE connected"}
+
+event: step
+data: {"step":"clone","phase":"clone","level":"info","message":"Cloning repository: repo=https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git ref=e2e/fail-missing-symbol","time":"2025-09-16T12:21:13.655939021Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"clone-diagnostics","phase":"clone","level":"info","message":"repo=/tmp/mods-mod-6f2d7927-2768944103/repo entries=.claude,.git,README.md,pom.xml,src","time":"2025-09-16T12:21:14.821158705Z"}
+
+event: step
+data: {"step":"source","phase":"sbom","level":"info","message":"Generated source SBOM","time":"2025-09-16T12:21:14.827857167Z"}
+
+event: step
+data: {"step":"create-branch","phase":"branch","level":"info","message":"Creating workflow branch","time":"2025-09-16T12:21:14.831170192Z"}
+
+event: step
+data: {"step":"guard-build-file","phase":"apply","level":"info","message":"repo=/tmp/mods-mod-6f2d7927-2768944103/repo pom=true gradle=false kts=false","time":"2025-09-16T12:21:14.840085037Z"}
+
+event: step
+data: {"step":"input-preview","phase":"apply","level":"info","message":"input.tar preview:\n./.claude/state/context-warning-75.flag\n./.claude/state/context-warning-90.flag\n./.claude/state/daic-mode.json\n./.git/HEAD\n./.git/ORIG_HEAD\n./.git/config\n./.git/config.worktree\n./.git/description\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/pre-push.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/push-to-checkout.sample","time":"2025-09-16T12:21:14.848998711Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-6f2d7927/java11to17-migration/orw_apply.submitted.hcl","time":"2025-09-16T12:21:14.863341554Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Submitting orw-apply job","time":"2025-09-16T12:21:14.867843932Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T12:21:20.182700163Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Completed orw-apply","time":"2025-09-16T12:22:05.146564241Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"orw-apply job completed","time":"2025-09-16T12:22:06.1559678Z"}
+
+event: step
+data: {"step":"diff-found","phase":"apply","level":"info","message":"diff ready (1106 bytes)","time":"2025-09-16T12:22:06.161232285Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Applying diff and running build gate: repo=/tmp/mods-mod-6f2d7927-2768944103/repo diff=/tmp/mods-mod-6f2d7927-2768944103/orw-apply/java11to17-migration/out/diff.patch","time":"2025-09-16T12:22:06.165135427Z"}
+
+event: step
+data: {"step":"diff-apply-started","phase":"apply","level":"info","message":"Applying diff to repository","time":"2025-09-16T12:22:06.169404482Z"}
+
+event: step
+data: {"step":"build-gate-start","phase":"build","level":"info","message":"Running build gate","time":"2025-09-16T12:22:06.173563206Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"build","status":"running"}
+
+event: step
+data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: build gate failed: compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ ploy-orw-java11-maven ---\n[INFO] \n[INFO] --- build-helper-maven-plugin:3.5.0:add-source (add-healing-source) @ ploy-orw-java11-maven ---\n[INFO] Source directory: /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java added.\n[INFO] \n[INFO] --- maven-resources-plugin:2.6:resources (default-resources) @ ploy-orw-java11-maven ---\n[INFO] Using 'UTF-8' encoding to copy filtered resources.\n[INFO] skip non existing resourceDirectory /tmp/mods-mod-6f2d7927-2768944103/repo/src/main/resources\n[INFO] \n[INFO] --- maven-compiler-plugin:3.14.0:compile (default-compile) @ ploy-orw-java11-maven ---\n[INFO] Recompiling the module because of changed source code.\n[INFO] Compiling 2 source files with javac [debug release 17] to target/classes\n[INFO] -------------------------------------------------------------\n[ERROR] COMPILATION ERROR : \n[INFO] -------------------------------------------------------------\n[ERROR] /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n  symbol:   class UnknownClass\n  location: class e2e.FailHealing\n[INFO] 2 errors \n[INFO] -------------------------------------------------------------\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  1.329 s\n[INFO] Finished at: 2025-09-16T12:22:08Z\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.0:compile (default-compile) on project ploy-orw-java11-maven: Compilation failure: Compilation failure: \n[ERROR] /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:[4,9] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:[4,32] cannot find symbol\n[ERROR]   symbol:   class UnknownClass\n[ERROR]   location: class e2e.FailHealing\n[ERROR] -\u003e [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n","time":"2025-09-16T12:22:08.699225544Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"build-gate-error","phase":"build","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Buildi…","time":"2025-09-16T12:22:11.179295876Z"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 1/2","time":"2025-09-16T12:22:11.184639072Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T12:22:11.188406272Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T12:22:11.193303195Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-6f2d7927/planner/planner.submitted.hcl","time":"2025-09-16T12:22:11.202915457Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T12:22:11.206924489Z"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T12:22:11.936956564Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T12:22:12.004739712Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:22:12.054157227Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-6f2d7927 RUN_ID=java11to17-orw-llm-planner-1758025331","time":"2025-09-16T12:22:12.101025324Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://seaweedfs-filer.service.consul:8888/","time":"2025-09-16T12:22:12.163880129Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-6f2d7927/planner/java11to17-orw-llm-planner-1758025331/plan.json (status 201)","time":"2025-09-16T12:22:12.233990012Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T12:22:12.247805048Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T12:22:12.298604446Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"llm-exec","phase":"fanout","level":"info","message":"branch started: llm-1","time":"2025-09-16T12:23:41.872623013Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T12:23:41.882329736Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-6f2d7927/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T12:23:41.893374292Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T12:23:42.625575628Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T12:23:42.926450743Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T12:23:42.941312539Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:23:44.745759967Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:23:44.808167145Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:23:44.881401898Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:23:44.941241529Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:23:45.01430119Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"error","message":"Failed orw-apply","time":"2025-09-16T12:23:55.221176637Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"fanout","status":"running"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"error","message":"branch orw-1 failed: ORW apply job failed: job orw-apply-orw-1-1758025421 allocation failed (c695413c-07c2-7a47-ebfe-249559996864)","time":"2025-09-16T12:23:56.451297351Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"fanout","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T12:24:00.792695695Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:24:02.456138453Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:24:02.533409508Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:24:02.586575138Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:02.638527886Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:24:02.708728706Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"error","message":"Failed orw-apply","time":"2025-09-16T12:24:13.140833579Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:24:23.549755637Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:24:23.598296118Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:24:23.643976469Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:23.693045456Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:24:23.757380994Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:24:41.660105866Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:24:41.712318986Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:24:41.761710186Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:41.809825053Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:24:41.875230461Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"reducer","status":"running"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"submission failed: job mods-llm-exec-llm-exec-llm-1-1758025421 allocation failed (7bceb550-2ba4-6438-a31b-c75d70fa2259)","time":"2025-09-16T12:24:43.34399275Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T12:24:43.356091358Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T12:24:44.046674786Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-6f2d7927/reducer/plan-1758025332-reducer-1758025483/next.json (status 201)","time":"2025-09-16T12:24:44.13442092Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T12:24:44.18954672Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"reducer","status":"running"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T12:24:44.399022845Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"planner","status":"running"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"info","message":"attempt 2/2","time":"2025-09-16T12:24:47.184378319Z"}
+
+event: step
+data: {"step":"build-error","phase":"healing","level":"info","message":"compilation: Maven compilation failed: 4 errors: /tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:9 - cannot find symbol\n/tmp/mods-mod-6f2d7927-2768944103/repo/src/healing/java/e2e/FailHealing.java:4:32 - cannot find symbol\nstdout:\n[INFO] Scanning for projects...\n[INFO] \n[INFO] ----------------\u003c com.ploy.test:ploy-orw-java11-maven \u003e-----------------\n[INFO] Building Ploy OpenRewrite Java 11 Maven Test 1.0.0-SNAPSHOT\n[INFO] --------------------------------[ jar ]---------------------------------\n[INFO] \n[INFO] --- maven-clean-plugin:2.5:clean (default-clean) @ …","time":"2025-09-16T12:24:47.189768916Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"prepared inputs.json (bytes=4907)","time":"2025-09-16T12:24:47.196272474Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-6f2d7927/planner/planner.submitted.hcl","time":"2025-09-16T12:24:47.207000767Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T12:24:47.215097892Z"}
+
+event: step
+data: {"step":"sbom","phase":"planner","level":"warn","message":"pointer missing storage_key","time":"2025-09-16T12:24:47.958698747Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job started","time":"2025-09-16T12:24:48.006912755Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:48.055394035Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"env MOD_ID=mod-6f2d7927 RUN_ID=java11to17-orw-llm-planner-1758025487","time":"2025-09-16T12:24:48.105074838Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"seaweedfs connectivity (HEAD) status=200 url=http://seaweedfs-filer.service.consul:8888/","time":"2025-09-16T12:24:48.167746767Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"uploaded plan to mods/mod-6f2d7927/planner/java11to17-orw-llm-planner-1758025487/plan.json (status 201)","time":"2025-09-16T12:24:48.242186311Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job submitted","time":"2025-09-16T12:24:48.258872286Z"}
+
+event: step
+data: {"step":"planner","phase":"planner","level":"info","message":"job completed","time":"2025-09-16T12:24:48.315620863Z"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"info","message":"branch started: orw-1","time":"2025-09-16T12:24:48.534566788Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"prepared inputs.json (bytes=4903)","time":"2025-09-16T12:24:48.542473261Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"Saved submitted HCL to /tmp/mods-submitted/mod-6f2d7927/llm-exec/llm-1/llm_exec.submitted.hcl","time":"2025-09-16T12:24:48.551985221Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T12:24:49.151207337Z"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:24:49.479275349Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:24:49.548203514Z"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"job submitted","time":"2025-09-16T12:24:49.58013368Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job submitted","time":"2025-09-16T12:24:49.602319004Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:24:49.627929882Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:49.690549282Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:24:49.756537737Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:24:51.224425162Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:24:51.280785585Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:24:51.330209486Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:24:51.385588828Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:24:51.455114329Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"error","message":"Failed orw-apply","time":"2025-09-16T12:25:01.441192153Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"fanout","status":"running"}
+
+event: step
+data: {"step":"orw-gen","phase":"fanout","level":"error","message":"branch orw-1 failed: ORW apply job failed: job orw-apply-orw-1-1758025488 allocation failed (0c716bd8-445d-1b18-6682-216d22fd8bbb)","time":"2025-09-16T12:25:03.055971497Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"fanout","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"info","message":"Started orw-apply","time":"2025-09-16T12:25:07.007607975Z"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:07.732549879Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:07.805518536Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:07.873760874Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:07.924951312Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:07.995525025Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:12.494619021Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:12.561681886Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:12.616996078Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:12.670202797Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:12.739555076Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: step
+data: {"step":"orw-apply","phase":"apply","level":"error","message":"Failed orw-apply","time":"2025-09-16T12:25:18.962665178Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"apply","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:27.020759627Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:27.070925624Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:27.123074372Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:27.189694872Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:27.25332064Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:33.671989062Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:33.720078715Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:33.76998392Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:33.830522716Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:33.896301947Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:46.64433783Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:46.695113563Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:46.744064627Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:46.793079322Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:46.879493479Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"llm-exec","status":"running"}
+
+event: step
+data: {"step":"sbom","phase":"llm-exec","level":"warn","message":"failed to fetch SBOM pointer","time":"2025-09-16T12:25:51.664968178Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"job started","time":"2025-09-16T12:25:51.717661411Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env CTX_DIR=/local/context OUT_DIR=/local/out","time":"2025-09-16T12:25:51.767412394Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"info","message":"env PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888","time":"2025-09-16T12:25:51.827543615Z"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"job failed","time":"2025-09-16T12:25:51.895800662Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"reducer","status":"running"}
+
+event: step
+data: {"step":"llm-exec","phase":"llm-exec","level":"error","message":"submission failed: job mods-llm-exec-llm-exec-llm-1-1758025488 allocation failed (9eb325cf-3289-0930-303a-262b3396fa42)","time":"2025-09-16T12:25:53.94826851Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T12:25:53.964412949Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"reducer","status":"running"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job started","time":"2025-09-16T12:25:54.644895214Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"uploaded next to mods/mod-6f2d7927/reducer/plan-1758025488-reducer-1758025553/next.json (status 201)","time":"2025-09-16T12:25:54.712678985Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job completed","time":"2025-09-16T12:25:54.782952583Z"}
+
+event: step
+data: {"step":"reducer","phase":"reducer","level":"info","message":"job submitted","time":"2025-09-16T12:25:55.005337778Z"}
+
+event: meta
+data: {"duration":"","overdue":false,"phase":"healing","status":"failed"}
+
+event: step
+data: {"step":"healing","phase":"healing","level":"error","message":"healing failed after retries","time":"2025-09-16T12:25:57.9699138Z"}
+
+event: end
+data: {"duration":"","overdue":false,"phase":"healing","status":"failed"}
+

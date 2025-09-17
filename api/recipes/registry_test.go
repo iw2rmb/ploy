@@ -7,7 +7,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/iw2rmb/ploy/api/arf/models"
+	"github.com/iw2rmb/ploy/api/recipes/models"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

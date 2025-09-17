@@ -7,7 +7,7 @@ import (
 // PatternMatcher identifies patterns in code transformations
 type PatternMatcher interface {
 	MatchPatterns(ctx context.Context, code string) ([]Pattern, error)
-	ExtractPatterns(ctx context.Context, transformations []TransformationResult) ([]Pattern, error)
+	ExtractPatterns(ctx context.Context, transformations []map[string]interface{}) ([]Pattern, error)
 }
 
 // Pattern represents a code pattern
@@ -44,7 +44,7 @@ func (m *DefaultPatternMatcher) MatchPatterns(ctx context.Context, code string) 
 }
 
 // ExtractPatterns extracts patterns from transformation results
-func (m *DefaultPatternMatcher) ExtractPatterns(ctx context.Context, transformations []TransformationResult) ([]Pattern, error) {
+func (m *DefaultPatternMatcher) ExtractPatterns(ctx context.Context, transformations []map[string]interface{}) ([]Pattern, error) {
 	// Placeholder implementation
 	return []Pattern{
 		{

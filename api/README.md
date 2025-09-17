@@ -135,7 +135,6 @@ api/
     ├── pattern_matcher.go    # Code pattern matching engine
     # Note: recipe_* sources (registry, executor, evolution, types) moved to api/recipes
     ├── sandbox.go            # Sandbox management for transformations
-    ├── sandbox_validation.go # Sandbox security validation
     ├── security_engine.go    # Security analysis engine
     ├── storage_service.go    # ARF storage service layer
     ├── unified_service.go    # Unified ARF service interface

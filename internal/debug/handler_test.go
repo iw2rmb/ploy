@@ -47,6 +47,7 @@ func TestDebugApp_UsesPolicyAndBuilder(t *testing.T) {
 	ipolicy.DefaultEnforcer = recEnf
 	recBld := &recordingBuilder{}
 	ibuilders.DefaultDebugBuilder = recBld
+	t.Setenv("PLOY_SKIP_DEPLOY", "true")
 
 	app := fiber.New()
 	app.Post("/debug/:app", func(c *fiber.Ctx) error { return DebugApp(c, fakeEnvStore{}) })

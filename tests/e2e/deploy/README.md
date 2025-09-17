@@ -52,6 +52,7 @@ Test matrix (seed)
 | E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | 4.9MB                    | 8.7MB             | —          | 500         | 512MB          | passed        |
 | E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | 47.3MB                  | 113.7MB           | 22.2s      | 500         | 512MB          | passed        |
 | E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | 97.9MB                   | 207.6MB           | 125.0s     | 500         | 2048MB         | passed        |
+| E    | Java    | 17      | https://github.com/<u>/ploy-lane-e-java-17-nojib | —                   | —                 | —          | 500         | 1536MB         | RED (see notes) |
 | G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —                        | —                 | —          | —           | —              | pending       |
 
 Notes
@@ -68,6 +69,8 @@ Cycle State
 
  - App-name normalization: tests sanitize names to `[a-z0-9-]`, replacing dots in versions (e.g., `1.22` → `1-22`).
  - Lane E status: Node 20, Go 1.22, Python 3.12 pass with event-driven health; .NET 8 fixed by targeted Kaniko memory bump (2048MB). Env override: `PLOY_KANIKO_MEMORY_DOTNET_MB`.
+ - Lane E (Java 17 NoJib): build → deploy path refactored to strict verify + digest-based runtime image. Recent failures are runtime-level due to an empty image in the rendered job (driver error: "image name required"). Controller now guards against empty images and refuses submit; use `PLOY_KANIKO_MEMORY_JAVA_MB` (set to 1536MB on Dev) and confirm `.message.pushVerification.digest` is present and `.message.dockerImage` includes `@sha256`. If these are set and health still fails, inspect runtime logs; the sample app serves `/healthz` on `PORT`.
+ - Health waits are event-driven: tests subscribe to build SSE; health uses controller long-poll at `/v1/apps/:app/status/watch` with sensible timeouts.
  - Lane G status: Builder succeeds using prebuilt `module.wasm`; runtime initially failed due to silent setup errors. Updated runtime to add `-ignore-errors` and verbose logging. Next: confirm `/healthz` and record results.
  - Image size: captured from registry manifest (compressed) and Docker inspect (uncompressed) and recorded in results files.
  - Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs before deeper triage.

@@ -45,23 +45,3 @@ execution:
   environment:
     JAVA_HOME: "/usr/local/openjdk"
     MAVEN_OPTS: "-Xmx2g"
-
-validation:
-  pre_conditions:
-    - type: "language_version"
-      config:
-        language: "java"
-        min_version: "11"
-        max_version: "17"
-    - type: "build_tool"
-      config:
-        tools: ["maven", "gradle"]
-  post_conditions:
-    - type: "compilation"
-      config:
-        language: "java"
-        must_compile: true
-    - type: "tests"
-      config:
-        must_pass: true
-        min_coverage: 80

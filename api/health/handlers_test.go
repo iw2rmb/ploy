@@ -11,6 +11,7 @@ func TestHealthHandlers_Basic(t *testing.T) {
 	t.Setenv("PLOY_USE_CONSUL_ENV", "false") // prefer file envstore path for stable results
 	app := fiber.New()
 	hc := NewHealthChecker("", "127.0.0.1:8500", "http://127.0.0.1:4646")
+	hc.SetDependencyChecksEnabled(false)
 
 	app.Get("/health", hc.HealthHandler)
 	app.Get("/ready", hc.ReadinessHandler)

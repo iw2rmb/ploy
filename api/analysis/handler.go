@@ -8,23 +8,20 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/sirupsen/logrus"
 )
 
 // Handler handles static analysis API requests
 type Handler struct {
-	engine     AnalysisEngine
-	arfHandler *arf.Handler
-	logger     *logrus.Logger
+	engine AnalysisEngine
+	logger *logrus.Logger
 }
 
 // NewHandler creates a new analysis handler
-func NewHandler(engine AnalysisEngine, arfHandler *arf.Handler, logger *logrus.Logger) *Handler {
+func NewHandler(engine AnalysisEngine, logger *logrus.Logger) *Handler {
 	return &Handler{
-		engine:     engine,
-		arfHandler: arfHandler,
-		logger:     logger,
+		engine: engine,
+		logger: logger,
 	}
 }
 
@@ -84,11 +81,6 @@ func (h *Handler) AnalyzeRepository(c *fiber.Ctx) error {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),
 		})
-	}
-
-	// Trigger ARF remediation if requested and integration is enabled
-	if req.FixIssues && req.Config.ARFIntegration && len(result.ARFTriggers) > 0 {
-		go h.triggerARFRemediation(result)
 	}
 
 	return c.JSON(result)
@@ -237,11 +229,11 @@ func (h *Handler) ApplyFix(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Implement fix application through ARF
+	// TODO: Implement fix application through remediation pipeline
 	return c.JSON(fiber.Map{
 		"issue_id": issueID,
 		"status":   "pending",
-		"message":  "Fix application queued for ARF processing",
+		"message":  "Fix application queued for remediation processing",
 	})
 }
 
@@ -283,32 +275,5 @@ func (h *Handler) HealthCheck(c *fiber.Ctx) error {
 		"status":              "healthy",
 		"supported_languages": languages,
 		"analyzers_count":     len(languages),
-		"arf_integration":     h.arfHandler != nil,
 	})
-}
-
-// triggerARFRemediation triggers ARF remediation for analysis results
-func (h *Handler) triggerARFRemediation(result *AnalysisResult) {
-	if h.arfHandler == nil {
-		h.logger.Warn("ARF handler not available for remediation")
-		return
-	}
-
-	h.logger.WithFields(logrus.Fields{
-		"repository": result.Repository.Name,
-		"triggers":   len(result.ARFTriggers),
-	}).Info("Triggering ARF remediation")
-
-	// Log that ARF triggers have been identified
-	for _, trigger := range result.ARFTriggers {
-		h.logger.WithFields(map[string]interface{}{
-			"recipe":       trigger.RecipeName,
-			"issue_id":     trigger.IssueID,
-			"auto_approve": trigger.AutoApprove,
-			"priority":     trigger.Priority,
-		}).Info("ARF remediation trigger identified - would execute recipe")
-
-		// Note: Actual recipe execution would be handled by a separate workflow
-		// This is just logging the triggers for now
-	}
 }

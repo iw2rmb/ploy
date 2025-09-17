@@ -40,7 +40,7 @@ Transformation execution is unified under the Mods API and CLI. See `docs/api/mo
 
 ```bash
 # List recipes
-ploy arf recipes list
+ploy recipes list
 
 # Execute code transformations via Mods
 ploy mod run -f ./mods.yaml

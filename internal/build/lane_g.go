@@ -34,6 +34,12 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 			if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, key, "application/wasm"); err != nil {
 				return "", utils.ErrJSON(c, 500, fmt.Errorf("upload wasm failed: %w", err))
 			}
+			// If distroless runner is enabled, also publish a stable artifact path
+			if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
+				if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, wasmPath, "artifacts/module.wasm", "application/wasm"); err != nil {
+					return "", utils.ErrJSON(c, 500, fmt.Errorf("upload wasm (artifacts) failed: %w", err))
+				}
+			}
 		} else {
 			return "", utils.ErrJSON(c, 500, fmt.Errorf("storage unavailable for wasm upload"))
 		}
@@ -80,6 +86,10 @@ func buildLaneG(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha stri
 		base = "http://" + base
 	}
 	uploadURL := strings.TrimRight(base, "/") + "/" + key
+	if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
+		// For distroless runner, publish at a stable artifact location
+		uploadURL = strings.TrimRight(base, "/") + "/artifacts/module.wasm"
+	}
 
 	nonce := time.Now().Unix()
 	versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)

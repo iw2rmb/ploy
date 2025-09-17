@@ -90,13 +90,10 @@ ploy env delete myapp DEBUG
 
 ### `ploy arf`
 ```
-ploy arf recipes list [--language <java|python|rust>] [--category <cleanup|modernize|security>] [--min-confidence <0.0-1.0>]
-ploy arf recipes get <recipe-id>
-ploy arf recipes search <query>
-ploy arf recipes stats <recipe-id>
-ploy arf health
-ploy arf cache stats
-ploy arf cache clear
+ploy recipe list [--language <java|python|rust>] [--category <cleanup|modernize|security>] [--min-confidence <0.0-1.0>]
+ploy recipe get <recipe-id>
+ploy recipe search <query>
+ploy recipe stats <recipe-id>
 ```
 Automated Remediation Framework (ARF) provides recipe registry/catalog management, model registry, and related utilities. Code transformation workflows are unified under Mods CLI.
 

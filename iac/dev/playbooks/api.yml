@@ -216,12 +216,11 @@
           shell: |
             set -e
             mkdir -p /home/ploy/ploy/build/wasm-runner
-            cat > /home/ploy/ploy/build/wasm-runner/Dockerfile.wazero <<'EOF'
-FROM gcr.io/distroless/base:nonroot
-COPY runner /runner
-USER nonroot
-ENTRYPOINT ["/runner"]
-EOF
+            DOCKERFILE=/home/ploy/ploy/build/wasm-runner/Dockerfile.wazero
+            echo 'FROM gcr.io/distroless/base:nonroot' > "$DOCKERFILE"
+            echo 'COPY runner /runner' >> "$DOCKERFILE"
+            echo 'USER nonroot' >> "$DOCKERFILE"
+            echo 'ENTRYPOINT ["/runner"]' >> "$DOCKERFILE"
             # Copy built runner
             cp /home/ploy/ploy/bin/wazero-runner /home/ploy/ploy/build/wasm-runner/runner
           become_user: ploy
@@ -240,8 +239,14 @@ EOF
             docker push $REG/wasm/runner:wasmtime-distroless || true
             docker push $REG/wasm/runner:wasmedge-distroless || true
           become: yes
-          args:
-            warn: false
+
+        - name: Pre-pull distroless runner images on node (warm cache)
+          shell: |
+            set -e
+            for tag in wazero-distroless wasmtime-distroless wasmedge-distroless; do
+              docker pull registry.dev.ployman.app/wasm/runner:$tag || true
+            done
+          become: yes
 
         - name: Verify binaries were created successfully
           stat:

@@ -14,12 +14,12 @@ This guide covers how to discover, manage, and run OpenRewrite recipes using the
 
 ### List available recipes
 ```bash
-ploy arf recipes list
+ploy recipe list
 ```
 
 ### Search for recipes
 ```bash
-ploy arf recipes search "java migration"
+ploy recipe search "java migration"
 ```
 
 ### Run a transformation
@@ -38,55 +38,55 @@ The Ploy platform provides comprehensive recipe discovery features through both 
 #### List All Recipes
 ```bash
 # List all recipes in table format (default)
-ploy arf recipes list
+ploy recipe list
 
 # List with JSON output
-ploy arf recipes list --output json
+ploy recipe list --output json
 
 # Filter by language
-ploy arf recipes list --language java
+ploy recipe list --language java
 
 # Filter by category
-ploy arf recipes list --category migration
+ploy recipe list --category migration
 
 # Filter by pack
-ploy arf recipes list --pack rewrite-spring
+ploy recipe list --pack rewrite-spring
 
 # Filter by version
-ploy arf recipes list --version 5.0.0
+ploy recipe list --version 5.0.0
 
 # Combine pack and version filters
-ploy arf recipes list --pack rewrite-java --version 8.1.0
+ploy recipe list --pack rewrite-java --version 8.1.0
 
 # Pagination
-ploy arf recipes list --limit 20 --offset 40
+ploy recipe list --limit 20 --offset 40
 ```
 
 #### Search Recipes
 ```bash
 # Search by keyword
-ploy arf recipes search "spring boot"
+ploy recipe search "spring boot"
 
 # Search with limit
-ploy arf recipes search "unused imports" --limit 5
+ploy recipe search "unused imports" --limit 5
 
 # Search with verbose output
-ploy arf recipes search "java 17" --verbose
+ploy recipe search "java 17" --verbose
 ```
 
 #### Show Recipe Details
 ```bash
 # Display recipe details
-ploy arf recipes show org.openrewrite.java.RemoveUnusedImports
+ploy recipe show org.openrewrite.java.RemoveUnusedImports
 
 # Show in YAML format
-ploy arf recipes show org.openrewrite.java.RemoveUnusedImports --output yaml
+ploy recipe show org.openrewrite.java.RemoveUnusedImports --output yaml
 ```
 
 #### Get Recipe Statistics
 ```bash
 # View usage statistics
-ploy arf recipes stats org.openrewrite.java.RemoveUnusedImports
+ploy recipe stats org.openrewrite.java.RemoveUnusedImports
 ```
 
 ### Catalog Mode
@@ -94,7 +94,7 @@ ploy arf recipes stats org.openrewrite.java.RemoveUnusedImports
 Enable lightweight catalog mode for faster searches:
 ```bash
 # Ensure PLOY_RECIPES_CATALOG=true
-ploy arf recipes list
+ploy recipe list
 ```
 
 Server routes can be enabled with:
@@ -157,46 +157,46 @@ The API returns a 400 error with suggestions:
 ### Upload Custom Recipe
 ```bash
 # Upload a new recipe from YAML file
-ploy arf recipes upload my-recipe.yaml
+ploy recipe upload my-recipe.yaml
 
 # Dry run to validate without uploading
-ploy arf recipes upload my-recipe.yaml --dry-run
+ploy recipe upload my-recipe.yaml --dry-run
 
 # Force upload even with warnings
-ploy arf recipes upload my-recipe.yaml --force
+ploy recipe upload my-recipe.yaml --force
 ```
 
 ### Download Recipe
 ```bash
 # Download recipe to file
-ploy arf recipes download org.openrewrite.java.RemoveUnusedImports
+ploy recipe download org.openrewrite.java.RemoveUnusedImports
 
 # Download to specific file
-ploy arf recipes download org.openrewrite.java.RemoveUnusedImports \
+ploy recipe download org.openrewrite.java.RemoveUnusedImports \
   --output custom-name.yaml
 ```
 
 ### Validate Recipe File
 ```bash
 # Basic validation
-ploy arf recipes validate my-recipe.yaml
+ploy recipe validate my-recipe.yaml
 
 # Strict validation
-ploy arf recipes validate my-recipe.yaml --strict
+ploy recipe validate my-recipe.yaml --strict
 ```
 
 ### Update Recipe
 ```bash
-ploy arf recipes update org.custom.MyRecipe updated-recipe.yaml
+ploy recipe update org.custom.MyRecipe updated-recipe.yaml
 ```
 
 ### Delete Recipe
 ```bash
 # Delete with confirmation
-ploy arf recipes delete org.custom.MyRecipe
+ploy recipe delete org.custom.MyRecipe
 
 # Force delete without confirmation
-ploy arf recipes delete org.custom.MyRecipe --force
+ploy recipe delete org.custom.MyRecipe --force
 ```
 
 ## API Reference
@@ -314,7 +314,7 @@ Returns current status, progress, and any healing attempts.
 
 Chain multiple recipes together:
 ```bash
-ploy arf recipes compose \
+ploy recipe compose \
   org.openrewrite.java.RemoveUnusedImports \
   org.openrewrite.java.format.AutoFormat \
   --name "cleanup-and-format" \
@@ -367,7 +367,7 @@ ploy arf transforms status $TRANSFORM_ID --watch
 ### Recipe Not Found
 If a recipe is not found, the system provides suggestions based on fuzzy matching:
 - Check for typos in the recipe ID
-- Use `ploy arf recipes search` to find the correct recipe
+- Use `ploy recipe search` to find the correct recipe
 - Verify the recipe pack is available in your environment
 
 ### Transformation Failures

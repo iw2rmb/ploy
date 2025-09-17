@@ -18,6 +18,9 @@
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
+- Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
+- Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
 - internal/mods: Extracted DI/accessors and tiny helpers from `runner.go` into `runner_di.go` and `runner_helpers.go` to reduce LOC and improve maintainability. No behavior changes.
  - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.
@@ -36,7 +39,15 @@
   No behavior changes; unit tests updated/split accordingly.
 - Mods API: Split `api/mods/handler.go` into logical files (`types.go`, `run.go`, `status.go`, `artifacts.go`, `logs.go`, `debug.go`) to reduce LOC and improve maintainability. No behavior changes.
  - Mods KB: Split `internal/mods/kb_signatures.go` into `signatures.go`, `patch_normalization.go`, `log_sanitizer.go`, and `enhanced_signatures.go`. No behavior changes; fixed minor test expectation by normalizing Hamming comparison length to 16.
- - Mods Integration Tests: Split monolithic `internal/mods/integration_test.go` into focused files: `integration_smoke_test.go`, `integration_seaweedfs_test.go`, `integration_nomad_test.go`, `integration_consul_test.go`, `integration_gitlab_test.go`, `integration_all_services_test.go`, with shared helpers in `test_services.go`.
+- Mods Integration Tests: Split monolithic `internal/mods/integration_test.go` into focused files: `integration_smoke_test.go`, `integration_seaweedfs_test.go`, `integration_nomad_test.go`, `integration_consul_test.go`, `integration_gitlab_test.go`, `integration_all_services_test.go`, with shared helpers in `test_services.go`.
+- Build: Further reduced `internal/build/trigger_core.go` by extracting request parsing/staging (`trigger_request.go`), deployment (`trigger_orchestration.go`), and artifact upload orchestration (`trigger_artifacts_store.go`). No behavior changes; existing build tests pass.
+ - Storage: Split SeaweedFS provider monolith into cohesive files under `internal/storage/providers/seaweedfs/`:
+   - `client_types.go` (Provider type, interface assertions)
+   - `client_factory.go` (constructor and URL normalization)
+   - `storage_impl.go` (unified storage interface methods + health/metrics)
+   - `provider_legacy.go` (legacy StorageProvider methods + verification)
+   - `helpers.go` (request helpers, volume assignment, directory creation)
+   No behavior changes; compile verified. Tests depending on real SeaweedFS remain skipped/failing without services.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
  - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
 - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.
@@ -175,6 +186,10 @@
 - Transflow system integrates seamlessly with existing Ploy infrastructure
 - KB learning is opt-in via configuration (`kb_learning: true`)
 - All existing CLI commands and APIs remain unchanged
+
+### Removed
+- Removed unused ARF core scaffolding package and controller wiring now that remediation relies solely on recipes.
+- Removed legacy ARF `TransformationResult`/`TransformationError` data structures, `TransformRequest`, and their associated tests; controllers now rely exclusively on `TransformationStatus` snapshots.
 
 ## [2025-09-05] - Transflow: Complete Healing Branch Types Implementation
 
@@ -481,7 +496,7 @@
   - Extracts tar to temporary directory for diff generation
   - Generates diff using git diff on extracted files
   - Parses diff to count changed files accurately
-  - Returns diff and file list in TransformationResult
+  - Returns diff and file list alongside persisted transformation status metadata
   - Maintains backward compatibility if download fails
 
 ### Added
@@ -813,7 +828,7 @@
 
 ### Changed
 - **BREAKING: Transform Endpoint**: `/v1/arf/transforms` now returns immediately with status link
-  - Old behavior: Synchronous execution returning complete `TransformationResult` (could timeout)
+  - Old behavior: Synchronous execution returning a full transformation result payload (could timeout)
   - New behavior: Asynchronous execution returning status link within <1 second
   - Response format changed to include `mod_id`, `status`, `status_url`, and `message`
   - Clients must now poll `/v1/arf/transforms/{id}/status` for transformation results
@@ -2209,7 +2224,7 @@
 - **✅ SeaweedFS Storage Client**: Created SeaweedFSStorage for distributed diff file storage
 - **✅ Storage Abstraction Layer**: Built unified JobStorage interface combining Consul and SeaweedFS operations
 - **✅ Composite Storage Adapter**: Implemented CompositeStorage to seamlessly integrate both storage backends
-- **✅ Comprehensive Type System**: Created shared types for JobStatus, RecipeConfig, Job, TransformationResult, and Metrics
+- **✅ Comprehensive Type System**: Created shared types for JobStatus, RecipeConfig, Job, and Metrics (legacy TransformationResult type later retired)
 
 ### Testing
 - **✅ 100% Code Coverage**: Achieved perfect coverage for storage abstraction layer
@@ -2366,14 +2381,14 @@
 ## [2025-08-24] - ARF Deployment Integration & Naming Refinement
 
 ### Added
-- **✅ Complete Deployment Integration**: ARF now fully integrated with core deployment system
-- **✅ DeploymentSandboxManager**: Native deployment system integration replacing separate sandbox management
+- **✅ Complete Deployment Integration**: ARF previously fully integrated with core deployment system (deprecated in favor of shared build sandbox)
+- **🗑️ Removed DeploymentSandboxManager**: deployment-specific sandbox management replaced by shared `internal/build` sandbox service
 - **✅ Multi-Stage Application Testing**: Deployed applications tested via HTTP endpoints with health checks
 - **✅ Error Analysis Pipeline**: Comprehensive deployment log analysis and error categorization for self-healing
 - **✅ Sandbox Lifecycle Management**: Automatic deployment creation and cleanup with TTL management
 
 ### Implementation
-- **✅ DeploymentSandboxManager** (`deployment_sandbox.go`): Native deployment integration using controller APIs
+- **🗑️ Removed DeploymentSandboxManager** (`deployment_sandbox.go`) and related HTTP APIs
 - **✅ Application Testing Pipeline** (`benchmark_suite.go`): Real HTTP testing of deployed transformed applications
 - **✅ Error Detection System**: Deployment logs analysis, build system validation, configuration error detection
 - **✅ Naming Convention Refinement**: Removed redundant "PaaS"/"Ploy" references throughout ARF codebase
@@ -2397,7 +2412,7 @@
 
 ### Implementation
 - **✅ Git Operations** (`git_operations.go`): Clone, diff, commit, and metrics collection
-- **✅ Build Operations** (`build_operations.go`): Build system detection, validation, and test execution
+- **🗑️ Removed legacy BuildOperations/SandboxValidator** in `api/arf` in favor of the shared `internal/build` sandbox service.
 - **✅ Mock OpenRewrite** (`openrewrite_mock.go`): Simulated Java migrations and Spring Boot upgrades
 - **✅ Benchmark Runner** (`benchmark_test_runner.go`): Standalone test runner for local execution
 - **✅ Minimal Test Config**: Quick validation configuration for MVP testing

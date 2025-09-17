@@ -11,7 +11,6 @@ import (
 
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 
-	arfcore "github.com/iw2rmb/ploy/internal/arf/core"
 	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 )
 
@@ -103,24 +102,22 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		}
 	}
 
-	// Initialize ARF Engine (consolidation Phase 4 - initial slice)
-	arfEngine := arfcore.NewEngine(arfcore.EngineConfig{})
 	// Prefer storage-backed recipes registry when storage is resolvable
-	var arfRecipes tarfrecipes.Registry = tarfrecipes.NewInMemory()
+	var recipeCatalog tarfrecipes.Registry = tarfrecipes.NewInMemory()
 	if cfgService != nil {
 		if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
-			arfRecipes = tarfrecipes.NewStorageBacked(st)
+			recipeCatalog = tarfrecipes.NewStorageBacked(st)
 		}
 	}
 
-	// Initialize ARF Handler
-	arfHandler, err := initializeARFHandlerWithService(cfg, cfgService)
+	// Initialize remediation handler (legacy ARF functionality)
+	remediationHandler, recipesHandler, err := initializeRemediationHandlers(cfg, cfgService)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize ARF handler: %v", err)
+		log.Printf("Warning: Failed to initialize remediation handler: %v", err)
 	}
 
 	// Initialize Analysis Handler
-	analysisHandler, err := initializeAnalysisHandler(cfg, arfHandler, cfgService)
+	analysisHandler, err := initializeAnalysisHandler(cfg, cfgService)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize analysis handler: %v", err)
 	}
@@ -168,7 +165,8 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		DNSHandler:              dnsHandler,
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
-		ARFHandler:              arfHandler,
+		RemediationHandler:      remediationHandler,
+		RecipesHandler:          recipesHandler,
 		ModsHandler:             modsHandler,
 		AnalysisHandler:         analysisHandler,
 		LLMHandler:              llmHandler,
@@ -177,8 +175,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		BlueGreenManager:        blueGreenManager,
 		Metrics:                 metricsInstance,
 		StorageConfigPath:       cfg.StorageConfigPath,
-		ARFEngine:               arfEngine,
-		ARFRecipes:              arfRecipes,
+		RecipeCatalog:           recipeCatalog,
 	}
 
 	// Record startup time
