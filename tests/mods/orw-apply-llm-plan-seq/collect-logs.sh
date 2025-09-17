@@ -105,10 +105,33 @@ if [[ -n "${TARGET_HOST:-}" ]]; then
   log "Attempting SSH fetch of last_job allocation logs"
   LAST_ALLOC_ID=$(jq -r 'try .last_job.alloc_id // .last_job.AllocID // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
   LAST_JOB_NAME=$(jq -r 'try .last_job.job_name // .last_job.JobName // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
-  # Derive a --since timestamp from first event time (format to YYYY-MM-DD HH:MM:SS)
-  SINCE_RAW=$(grep -Eo '"time":"[0-9TZ:.-]+' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | sed -E 's/"time":"([0-9T:.\-]+).*/\1/' || true)
-  if [[ -n "$SINCE_RAW" ]]; then
-    SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"
+  # Derive a --since timestamp from first SSE event (ISO8601 -> "YYYY-MM-DD HH:MM:SS"); fallback to VPS/platform clock
+  SINCE_FMT=""
+  if grep -hqo '"time":"' "$OUT_DIR"/events*.sse 2>/dev/null; then
+    SINCE_RAW=$(grep -hEo '"time":"[^"]+"' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | sed -E 's/.*"time":"([^\"]+)".*/\1/' || true)
+    if [[ -n "$SINCE_RAW" ]]; then
+      SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"
+    fi
+  fi
+  if [[ -z "$SINCE_FMT" && -n "${START_TS:-}" ]]; then
+    SINCE_FMT="$START_TS"
+  fi
+  if [[ -z "$SINCE_FMT" && -n "${START_TS_SOURCE:-}" ]]; then
+    case "$START_TS_SOURCE" in
+      vps)
+        VPS_TS=$(ssh -o ConnectTimeout=10 "root@$TARGET_HOST" "date '+%Y-%m-%d %H:%M:%S'" 2>/dev/null || true)
+        if [[ -n "$VPS_TS" ]]; then SINCE_FMT="$VPS_TS"; fi
+        ;;
+      platform)
+        SNAP=$(curl -sf "${PLOY_CONTROLLER%/}/platform/api/logs?lines=20" 2>/dev/null || true)
+        if [[ -n "$SNAP" ]]; then
+          TS=$(printf '%s\n' "$SNAP" | awk 'match($0,/^\[([0-9-]{10} [0-9:]{8})\]/,m){ts=m[1]} END{print ts}')
+          if [[ -n "$TS" ]]; then SINCE_FMT="$TS"; fi
+        fi
+        ;;
+    esac
+  fi
+  if [[ -n "$SINCE_FMT" ]]; then
     log "Using log since timestamp: $SINCE_FMT"
   fi
   if [[ -n "$LAST_ALLOC_ID" ]]; then
@@ -120,6 +143,21 @@ if [[ -n "${TARGET_HOST:-}" ]]; then
   else
     log "No last_job.alloc_id in status; skipping SSH logs"
   fi
+fi
+
+# 5c) SSH fallback to fetch SeaweedFS artifacts when URL not set
+if [[ -z "${PLOY_SEAWEEDFS_URL:-}" && -n "${TARGET_HOST:-}" && -s "$ART_KEYS_FILE" ]]; then
+  log "Downloading artifacts from SeaweedFS via SSH"
+  while IFS= read -r KEY; do
+    DEST="$OUT_DIR/seaweedfs/$KEY"
+    mkdir -p "$(dirname "$DEST")"
+    ssh -o ConnectTimeout=10 "root@$TARGET_HOST" \
+      "curl -fsS 'http://seaweedfs-filer.service.consul:8888/artifacts/${KEY}'" \
+      > "$DEST" 2>/dev/null || {
+        echo "warning: failed to fetch $KEY via SSH" >&2
+        rm -f "$DEST" || true
+      }
+  done < "$ART_KEYS_FILE"
 fi
 
 # 6) Summarize

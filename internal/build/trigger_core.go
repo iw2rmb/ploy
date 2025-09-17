@@ -87,8 +87,14 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
-	lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
-	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
+    lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
+    log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
+    if strings.ToUpper(lane) == "E" {
+        // Early Lane E marker to confirm flow reaches Lane E before builder-specific code
+        log.Printf("[Lane E] Begin app=%s sha=%s lang=%s tool=%s hasJib=%t hasDockerfile=%t java=%s autogen_q=%s env_autogen=%s",
+            appName, sha, facts.Language, facts.BuildTool, facts.HasJib, facts.HasDockerfile, facts.Versions.Java,
+            c.Query("autogen_dockerfile", ""), os.Getenv("PLOY_AUTOGEN_DOCKERFILE"))
+    }
 
 	var imagePath, dockerImage string
 	var builderJobName string
