@@ -181,6 +181,23 @@
         mode: '0644'
       register: nomad_config
 
+    - name: Create Nomad limits configuration (30-limits.hcl)
+      copy:
+        dest: /etc/nomad.d/30-limits.hcl
+        owner: ploy
+        group: ploy
+        mode: '0644'
+        content: |
+          limits {
+            http_max_conns            = 10000
+            http_max_conns_per_client = 1000
+            rpc_max_conns             = 10000
+            rpc_max_conns_per_client  = 1000
+            https_handshake_timeout   = "10s"
+            rpc_handshake_timeout     = "10s"
+          }
+      register: nomad_limits_config
+
     - name: Ensure Nomad client meta for Traefik placement
       copy:
         dest: /etc/nomad.d/20-client-meta.hcl
@@ -211,6 +228,37 @@
         - consul
         - nomad
         - vault
+
+    - name: Validate Nomad configuration
+      command: nomad agent -validate -config=/etc/nomad.d
+      register: nomad_validate
+      changed_when: false
+      failed_when: nomad_validate.rc != 0
+
+    - name: Restart Nomad service to apply limits
+      systemd:
+        name: nomad
+        state: restarted
+        enabled: true
+        daemon_reload: true
+      when: nomad_config.changed or nomad_limits_config.changed or nomad_validate.rc == 0
+
+    - name: Wait for Nomad API after restart
+      wait_for:
+        host: 127.0.0.1
+        port: 4646
+        delay: 2
+        timeout: 60
+
+    - name: Confirm Nomad leader
+      uri:
+        url: http://localhost:4646/v1/status/leader
+        method: GET
+        status_code: 200
+      register: nomad_leader
+      retries: 5
+      delay: 3
+      until: nomad_leader.status == 200
 
     - name: Check Consul service status
       command: systemctl is-active consul
