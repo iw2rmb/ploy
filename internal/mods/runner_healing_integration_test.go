@@ -2,10 +2,16 @@ package mods
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -103,4 +109,354 @@ func TestModRunnerWithHealing(t *testing.T) {
 		assert.True(t, result.HealingSummary.Enabled)
 		assert.Greater(t, result.HealingSummary.AttemptsCount, 0)
 	})
+}
+
+func TestModRunner_HealingMRIncludesORWAndLLMDiffs(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git binary not available")
+	}
+
+	workspace := t.TempDir()
+	origin := filepath.Join(workspace, "origin")
+	bare := filepath.Join(workspace, "bare.git")
+	setupGitRepository(t, origin)
+	runCmd(t, workspace, "git", "clone", "--bare", origin, bare)
+
+	config := &ModConfig{
+		ID:           "healing-mr-diffs",
+		TargetRepo:   bare,
+		TargetBranch: "main",
+		BaseRef:      "main",
+		Lane:         "C",
+		SelfHeal: &SelfHealConfig{
+			Enabled:    true,
+			MaxRetries: 1,
+		},
+		Steps: []ModStep{
+			{
+				Type:               string(StepTypeORWApply),
+				ID:                 "java11to17-migration",
+				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+				RecipeGroup:        "org.openrewrite.recipe",
+				RecipeArtifact:     "rewrite-migrate-java",
+				RecipeVersion:      "3.17.0",
+				MavenPluginVersion: "6.18.0",
+			},
+		},
+		MR: &MRConfigYAML{
+			Labels: []string{"ploy", "tfl", "healing"},
+		},
+	}
+
+	runner, err := NewModRunner(config, workspace)
+	require.NoError(t, err)
+
+	modID := "mod-healing-mr"
+	seaweedBase := "http://seaweed.test"
+	os.Setenv("MOD_ID", modID)
+	os.Setenv("PLOY_SEAWEEDFS_URL", seaweedBase)
+	defer func() {
+		_ = os.Unsetenv("MOD_ID")
+		_ = os.Unsetenv("PLOY_SEAWEEDFS_URL")
+	}()
+
+	orwDiff := `diff --git a/src/main/java/App.java b/src/main/java/App.java
+index 0000000..0000000 100644
+--- a/src/main/java/App.java
++++ b/src/main/java/App.java
+@@ -1 +1,5 @@
+-public class App { public static void main(String[] a){} }
++public class App {
++    public static void main(String[] a) {
++        Helper.greet();
++    }
++}
+`
+	llmDiff := `diff --git a/src/main/java/App.java b/src/main/java/App.java
+index 1f59f67..1d42819 100644
+--- a/src/main/java/App.java
++++ b/src/main/java/App.java
+@@ -2,4 +2,10 @@ public class App {
+     public static void main(String[] a) {
+         Helper.greet();
+     }
++
++    static class Helper {
++        static void greet() {
++            System.out.println("hi from helper");
++        }
++    }
+ }
+`
+
+	store := newSeaweedStub()
+	oldDL := downloadToFileFn
+	oldPutFile := putFileFn
+	oldPutJSON := putJSONFn
+	oldGetJSON := getJSONFn
+	oldHead := headURLFn
+	defer func() {
+		downloadToFileFn = oldDL
+		putFileFn = oldPutFile
+		putJSONFn = oldPutJSON
+		getJSONFn = oldGetJSON
+		headURLFn = oldHead
+	}()
+
+	downloadToFileFn = func(url, dest string) error {
+		key := seaweedKey(seaweedBase, url)
+		if key == "" {
+			return fmt.Errorf("unsupported url: %s", url)
+		}
+		if data, ok := store.getFile(key); ok {
+			if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+				return err
+			}
+			return os.WriteFile(dest, data, 0644)
+		}
+		if strings.Contains(key, "/branches/java11to17-migration/") {
+			store.setFile(key, []byte(orwDiff))
+			if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+				return err
+			}
+			return os.WriteFile(dest, []byte(orwDiff), 0644)
+		}
+		return fmt.Errorf("artifact not found: %s", key)
+	}
+	putFileFn = func(base, key, srcPath, contentType string) error {
+		if base != seaweedBase {
+			return fmt.Errorf("unexpected base: %s", base)
+		}
+		data, err := os.ReadFile(srcPath)
+		if err != nil {
+			return err
+		}
+		store.setFile(key, data)
+		return nil
+	}
+	putJSONFn = func(base, key string, body []byte) error {
+		if base != seaweedBase {
+			return fmt.Errorf("unexpected base: %s", base)
+		}
+		store.setJSON(key, body)
+		return nil
+	}
+	getJSONFn = func(base, key string) ([]byte, int, error) {
+		if base != seaweedBase {
+			return nil, 0, fmt.Errorf("unexpected base: %s", base)
+		}
+		if data, ok := store.getJSON(key); ok {
+			return data, 200, nil
+		}
+		return nil, 404, nil
+	}
+	headURLFn = func(url string) bool {
+		key := seaweedKey(seaweedBase, url)
+		if key == "" {
+			return false
+		}
+		_, ok := store.getFile(key)
+		return ok
+	}
+
+	oldValidate := validateJob
+	oldSubmit := submitAndWaitTerminal
+	validateJob = func(string) error { return nil }
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	defer func() {
+		validateJob = oldValidate
+		submitAndWaitTerminal = oldSubmit
+	}()
+
+	runner.SetGitOperations(NewAPIGitOperations(workspace))
+	runner.SetJobSubmitter(NoopJobSubmitter{})
+	runner.SetHCLSubmitter(okHCLSubmitter{})
+	runner.SetBuildChecker(&stagedBuildChecker{results: []bool{true, false, true}})
+	runner.SetJobHelper(&healingJobHelper{})
+	runner.SetHealingOrchestrator(&healingFanout{
+		modID:      modID,
+		seaweedURL: seaweedBase,
+		diff:       []byte(llmDiff),
+		store:      store,
+	})
+
+	gitProvider := NewMockGitProvider()
+	runner.SetGitProvider(gitProvider)
+
+	repoPath := filepath.Join(workspace, "repo")
+	ctx := context.Background()
+	result, err := runner.Run(ctx)
+	require.NoError(t, err)
+	require.True(t, result.Success, "mods run should succeed")
+	require.NotNil(t, result.HealingSummary)
+	require.True(t, result.HealingSummary.FinalSuccess)
+	require.NotEmpty(t, result.MRURL)
+	require.True(t, gitProvider.MRCalled)
+
+	appBytes, err := os.ReadFile(filepath.Join(repoPath, "src", "main", "java", "App.java"))
+	require.NoError(t, err)
+	appContent := string(appBytes)
+	assert.Contains(t, appContent, "Helper.greet();")
+	javaDirEntries, err := os.ReadDir(filepath.Join(repoPath, "src", "main", "java"))
+	require.NoError(t, err)
+	var names []string
+	for _, entry := range javaDirEntries {
+		names = append(names, entry.Name())
+	}
+	t.Logf("java dir entries: %v", names)
+	patchPath := filepath.Join(workspace, "branch-apply", "out", "chain-s-healing.patch")
+	if patchBytes, err := os.ReadFile(patchPath); err == nil {
+		t.Logf("healing patch contents:\n%s", string(patchBytes))
+	} else {
+		t.Logf("failed to read healing patch at %s: %v", patchPath, err)
+	}
+	assert.Contains(t, appContent, "static class Helper")
+
+	logCmd := exec.Command("git", "log", "--pretty=%s")
+	logCmd.Dir = repoPath
+	logOut, err := logCmd.Output()
+	require.NoError(t, err)
+	logStr := string(logOut)
+	assert.Contains(t, logStr, "apply(diff): mods branch patch", "ORW commit missing")
+	assert.Contains(t, logStr, "apply(healing): reducer patch", "healing commit missing")
+
+	assert.Contains(t, gitProvider.MRConfig.RepoURL, bare)
+	assert.NotEmpty(t, gitProvider.MRConfig.SourceBranch)
+}
+
+type stagedBuildChecker struct {
+	results []bool
+	idx     int
+}
+
+func (s *stagedBuildChecker) CheckBuild(ctx context.Context, cfg common.DeployConfig) (*common.DeployResult, error) {
+	if s.idx >= len(s.results) {
+		return &common.DeployResult{Success: true, Message: "build ok", Version: "v-default"}, nil
+	}
+	success := s.results[s.idx]
+	s.idx++
+	if success {
+		return &common.DeployResult{Success: true, Message: "build ok", Version: fmt.Sprintf("v-%d", s.idx)}, nil
+	}
+	return &common.DeployResult{Success: false, Message: "compilation failed: undefined symbol Helper"}, nil
+}
+
+type healingJobHelper struct{}
+
+func (healingJobHelper) SubmitPlannerJob(ctx context.Context, cfg *ModConfig, buildError string, workspace string) (*PlanResult, error) {
+	return &PlanResult{PlanID: "plan-123", Options: []map[string]interface{}{{"id": "healing-branch", "type": string(StepTypeLLMExec)}}}, nil
+}
+
+func (healingJobHelper) SubmitReducerJob(ctx context.Context, planID string, results []BranchResult, winner *BranchResult, workspace string) (*NextAction, error) {
+	branchID := "healing-branch"
+	if winner != nil && winner.ID != "" {
+		branchID = winner.ID
+	}
+	return &NextAction{Action: "apply", StepID: branchID}, nil
+}
+
+type healingFanout struct {
+	modID      string
+	seaweedURL string
+	diff       []byte
+	store      *seaweedStub
+}
+
+func (f *healingFanout) RunFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error) {
+	if len(branches) == 0 {
+		return BranchResult{}, nil, fmt.Errorf("no branches provided")
+	}
+	branch := branches[0]
+	stepID := "s-healing"
+	key := computeBranchDiffKey(f.modID, branch.ID, stepID)
+	diffBytes := f.diff
+	if len(diffBytes) == 0 || diffBytes[len(diffBytes)-1] != '\n' {
+		diffBytes = append(diffBytes, '\n')
+	}
+	f.store.setFile(key, diffBytes)
+	if err := writeBranchChainStepMeta(f.seaweedURL, f.modID, branch.ID, stepID, key); err != nil {
+		return BranchResult{}, nil, err
+	}
+	now := time.Now()
+	res := BranchResult{ID: branch.ID, Status: "completed", JobID: stepID, StartedAt: now, FinishedAt: now}
+	return res, []BranchResult{res}, nil
+}
+
+type seaweedStub struct {
+	mu    sync.Mutex
+	files map[string][]byte
+	json  map[string][]byte
+}
+
+func newSeaweedStub() *seaweedStub {
+	return &seaweedStub{files: make(map[string][]byte), json: make(map[string][]byte)}
+}
+
+func (s *seaweedStub) setFile(key string, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	copyBuf := append([]byte(nil), data...)
+	s.files[key] = copyBuf
+}
+
+func (s *seaweedStub) getFile(key string) ([]byte, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, ok := s.files[key]
+	if !ok {
+		return nil, false
+	}
+	return append([]byte(nil), data...), true
+}
+
+func (s *seaweedStub) setJSON(key string, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.json[key] = append([]byte(nil), data...)
+}
+
+func (s *seaweedStub) getJSON(key string) ([]byte, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, ok := s.json[key]
+	if !ok {
+		return nil, false
+	}
+	return append([]byte(nil), data...), true
+}
+
+func seaweedKey(base, url string) string {
+	trimmed := strings.TrimRight(base, "/") + "/artifacts/"
+	if !strings.HasPrefix(url, trimmed) {
+		return ""
+	}
+	return strings.TrimPrefix(url, trimmed)
+}
+
+func setupGitRepository(t *testing.T, path string) {
+	t.Helper()
+	runCmd(t, "", "git", "init", "-b", "main", path)
+	runCmd(t, path, "git", "config", "user.email", "test@example.com")
+	runCmd(t, path, "git", "config", "user.name", "Test User")
+	if err := os.MkdirAll(filepath.Join(path, "src", "main", "java"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "src", "main", "java", "App.java"), []byte("public class App { public static void main(String[] a){} }\n"), 0644); err != nil {
+		t.Fatalf("write App.java: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "pom.xml"), []byte("<project></project>\n"), 0644); err != nil {
+		t.Fatalf("write pom.xml: %v", err)
+	}
+	runCmd(t, path, "git", "add", ".")
+	runCmd(t, path, "git", "commit", "-m", "chore: initial")
+}
+
+func runCmd(t *testing.T, dir string, name string, args ...string) {
+	t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s %v failed: %v: %s", name, args, err, string(out))
+	}
 }
