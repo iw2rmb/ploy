@@ -8,10 +8,9 @@ COPY . .
 RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
 EXPOSE 8080
 {{- if .UseGunicorn }}
-CMD ["sh","-lc","exec gunicorn -b 0.0.0.0:$PORT app:app"]
+CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]
 {{- else if .UseUvicorn }}
-CMD ["sh","-lc","exec uvicorn app:app --host 0.0.0.0 --port $PORT"]
+CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]
 {{- else }}
-CMD ["python","app.py"]
+CMD ["python", "app.py"]
 {{- end }}
-
