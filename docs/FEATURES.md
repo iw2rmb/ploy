@@ -16,6 +16,9 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
   - Improved reliability (Sep 2025): `ployman api deploy` ensures the VPS repo is up to date by cloning if missing (`/home/ploy/ploy`), enforcing the canonical `origin` remote, and using `git fetch --all --prune` before a hard reset to the target branch. Prevents stale code deployments due to missing clones, misconfigured remotes, or non-pruned refs.
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
+- **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
+- **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply) to improve lane readiness.
+- **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides, lane G distroless runner selection, and Nomad monitor timeout behaviour.
 - **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
  - **Codebase Maintainability**: Ongoing large-file decomposition in `internal/mods` (e.g., runner split into DI/helpers/workflow files) to keep modules cohesive without behavior changes.
@@ -190,6 +193,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Detailed Error Reporting**: Task event logging with driver failures, exit codes, and actionable debugging information
   - **Concurrent Monitoring**: Background deployment and health check monitoring for faster feedback
   - **Timeout Management**: Prevents indefinite waiting on stuck deployments with configurable deadlines
+  - **Deadline-Aware Error Handling** (Sep 2025): Health monitor stops retrying once the remaining timeout is exhausted even when Nomad allocation queries fail.
   - **Log Streaming**: Real-time allocation log following for debugging failed deployments
   - **Network Resilience**: Graceful handling of transient connectivity issues with retry classification
 
