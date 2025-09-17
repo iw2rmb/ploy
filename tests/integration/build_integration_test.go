@@ -181,6 +181,19 @@ func (suite *BuildIntegrationSuite) TestStorageOperations() {
 		assert.NotEmpty(t, result.ETag, "Should have ETag")
 	})
 
+	suite.T().Run("Controller build context path upload", func(t *testing.T) {
+		controllerKey := "builds/integration-app/test-sha/src.tar"
+		payload := "tar-bytes"
+		_, err := suite.storageClient.PutObject(testBucket, controllerKey, strings.NewReader(payload), "application/x-tar")
+		require.NoError(t, err)
+		rc, err := suite.storageClient.GetObject(testBucket, controllerKey)
+		require.NoError(t, err)
+		defer rc.Close()
+		data, err := io.ReadAll(rc)
+		require.NoError(t, err)
+		assert.Equal(t, payload, string(data))
+	})
+
 	suite.T().Run("Download file from storage", func(t *testing.T) {
 		reader, err := suite.storageClient.GetObject(testBucket, testKey)
 		require.NoError(t, err)

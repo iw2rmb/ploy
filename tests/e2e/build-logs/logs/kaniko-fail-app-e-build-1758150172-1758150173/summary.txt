@@ -1,0 +1,11 @@
+Builder Logs E2E Summary
+APP_NAME: kaniko-fail-app
+BUILD_ID: kaniko-fail-app-e-build-1758150172-1758150173
+logs_url: http://seaweedfs-filer.service.consul:8888/artifacts/build-logs/kaniko-fail-app-e-build-1758150172-1758150173.log
+builder_full_log: builder.full.log bytes=0
+
+API logs tail (first 20 lines of .logs):
+
+
+Full logs tail (last 40 lines):
+<none>
