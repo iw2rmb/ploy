@@ -2,6 +2,7 @@ package mods
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -140,8 +141,19 @@ func fetchBuildLogs(controller, app, id string) string {
 		return ""
 	}
 	b, _ := io.ReadAll(resp.Body)
-	// Cap to a generous tail to keep payloads bounded
+	// Prefer extracting the 'logs' field if JSON; else fall back to raw body
+	type respJSON struct {
+		Logs string `json:"logs"`
+	}
+	var rj respJSON
 	s := string(b)
+	if json.Unmarshal(b, &rj) == nil && rj.Logs != "" {
+		logs := rj.Logs
+		if len(logs) > 12000 { // ~12KB cap for message enrichment
+			logs = logs[len(logs)-12000:]
+		}
+		return logs
+	}
 	if len(s) > 8000 {
 		return s[len(s)-8000:]
 	}

@@ -74,7 +74,8 @@ func orwValidateAndSubmit(ctx context.Context, hcl HCLSubmitter, renderedHCLPath
 	}
 	timeout := ResolveDefaultsFromEnv().ORWApplyTimeout
 	if hcl != nil {
-		if err := hcl.SubmitCtx(ctx, renderedHCLPath, timeout); err != nil {
+		// Use Submit (non-ctx) to enable unit-test stubbing via package-level var
+		if err := hcl.Submit(renderedHCLPath, timeout); err != nil {
 			if allowPartial {
 				diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 				if fi, statErr := os.Stat(diffPath); statErr == nil && fi.Size() > 0 {
