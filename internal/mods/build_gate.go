@@ -3,7 +3,6 @@ package mods
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	build "github.com/iw2rmb/ploy/internal/build"
@@ -28,28 +27,28 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 	cctx, cancel := context.WithTimeout(ctx, compileTimeout)
 	defer cancel()
 	service := build.NewSandboxService()
-	// Emit preflight compile gate details for observability (build system resolved later).
 	r.emit(ctx, "build", "compile-gate-start", "info", fmt.Sprintf("repo=%s sandbox=1", repoPath))
-	res, err := service.Run(cctx, build.SandboxRequest{RepoPath: repoPath, Timeout: compileTimeout})
+	appName := GenerateAppName(r.config.ID)
+	res, err := service.Run(cctx, build.SandboxRequest{
+		RepoPath: repoPath,
+		AppName:  appName,
+		SHA:      r.config.BaseRef,
+		Lane:     r.config.Lane,
+		Timeout:  compileTimeout,
+		EnvVars:  nil,
+		Options:  build.SandboxOptions{},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("sandbox build failed: %w", err)
 	}
 	if res != nil && !res.Success {
-		var details []string
-		for _, e := range res.Errors {
-			details = append(details, fmt.Sprintf("%s:%d:%d %s", e.File, e.Line, e.Column, e.Message))
+		msg := res.Message
+		if len(res.Errors) > 0 {
+			first := res.Errors[0]
+			msg = fmt.Sprintf("%s (%s:%d)", msg, first.File, first.Line)
 		}
-		be := &build.BuildError{
-			Type:    defaultString(res.BuildSystem, "sandbox"),
-			Message: res.Message,
-			Details: strings.Join(details, "\n"),
-			Stdout:  res.Stdout,
-			Stderr:  res.Stderr,
-		}
-		msg := build.FormatBuildError(be, true, 64*1024)
 		return &common.DeployResult{Success: false, Message: msg}, nil
 	}
-	appName := GenerateAppName(r.config.ID)
 	buildCfg := common.DeployConfig{
 		App:         appName,
 		Lane:        r.config.Lane,
@@ -61,11 +60,4 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		return r.buildGate.Check(ctx, buildCfg)
 	}
 	return r.buildChecker.CheckBuild(ctx, buildCfg)
-}
-
-func defaultString(val, fallback string) string {
-	if strings.TrimSpace(val) == "" {
-		return fallback
-	}
-	return val
 }
