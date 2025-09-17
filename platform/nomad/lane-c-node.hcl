@@ -74,10 +74,6 @@ job "{{APP_NAME}}-lane-c" {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            upstreams {
-              destination_name = "vault"
-              local_bind_port  = 8200
-            }
           }
         }
       }
@@ -92,14 +88,6 @@ job "{{APP_NAME}}-lane-c" {
     
     task "osv-node" {
       driver = "qemu"
-      
-      {{#if VAULT_ENABLED}}
-      # Vault integration for Node.js applications
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
       
       config {
         image_path = "{{IMAGE_PATH}}"
@@ -181,33 +169,6 @@ EOF
         destination = "local/application.properties"
         change_mode = "restart"
         perms       = "0644"
-      }
-      
-      # Secrets from Vault
-      template {
-        data = <<EOF
-# Database Credentials
-DATABASE_USERNAME={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.username}}{{end}}
-DATABASE_PASSWORD={{with secret "secret/data/{{APP_NAME}}/db"}}{{.Data.data.password}}{{end}}
-
-# API Keys and Tokens
-API_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/api"}}{{.Data.data.secret_key}}{{end}}
-JWT_SECRET={{with secret "secret/data/{{APP_NAME}}/jwt"}}{{.Data.data.secret}}{{end}}
-
-# Third-party integrations
-STRIPE_SECRET_KEY={{with secret "secret/data/{{APP_NAME}}/stripe"}}{{.Data.data.secret_key}}{{end}}
-SENDGRID_API_KEY={{with secret "secret/data/{{APP_NAME}}/sendgrid"}}{{.Data.data.api_key}}{{end}}
-
-# TLS Configuration
-{{with secret "pki/issue/{{APP_NAME}}" "common_name={{APP_NAME}}.service.consul" "ttl=72h"}}
-TLS_CERTIFICATE={{.Data.certificate}}
-TLS_PRIVATE_KEY={{.Data.private_key}}
-TLS_CA_CHAIN={{.Data.ca_chain}}
-{{end}}
-EOF
-        destination = "secrets/application-secrets.properties"
-        change_mode = "restart"
-        perms       = "0600"
       }
       
       {{#if CONSUL_CONFIG_ENABLED}}

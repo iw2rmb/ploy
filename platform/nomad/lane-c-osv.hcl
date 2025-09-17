@@ -73,10 +73,6 @@ job "{{APP_NAME}}-lane-c" {
               destination_name = "redis"
               local_bind_port  = 6379
             }
-            upstreams {
-              destination_name = "vault"
-              local_bind_port  = 8200
-            }
           }
         }
       }
@@ -91,14 +87,6 @@ job "{{APP_NAME}}-lane-c" {
     
     task "osv-jvm" {
       driver = "qemu"
-      
-      # Vault integration for JVM applications (optional)
-      {{#if VAULT_ENABLED}}
-      vault {
-        policies = ["{{APP_NAME}}-policy"]
-        change_mode = "restart"
-      }
-      {{/if}}
       
       config {
         image_path = "{{IMAGE_PATH}}"
