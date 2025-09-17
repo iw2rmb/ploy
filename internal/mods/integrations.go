@@ -33,6 +33,14 @@ func NewSharedPushBuildChecker(controllerURL string) *SharedPushBuildChecker {
 
 // CheckBuild performs a build check using the existing SharedPush infrastructure
 func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.DeployConfig) (*common.DeployResult, error) {
+	if shouldSkipRemoteBuild(config.Lane) {
+		log.Printf("[Mods Build] Skipping remote build for lane=%s due to MODS_SKIP_DEPLOY_LANES", config.Lane)
+		if modID := os.Getenv("MOD_ID"); modID != "" {
+			rep := NewControllerEventReporter(b.controllerURL, modID)
+			_ = rep.Report(ctx, Event{Phase: "build", Step: "build-gate", Level: "info", Message: fmt.Sprintf("skipped remote build for lane=%s", config.Lane)})
+		}
+		return &common.DeployResult{Success: true, Message: "Remote build skipped"}, nil
+	}
 	// Set the controller URL in the config
 	config.ControllerURL = b.controllerURL
 	config.IsPlatform = false // Mods uses ploy mode, not ployman mode
@@ -84,6 +92,19 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 	log.Printf("[Mods Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
+}
+
+func shouldSkipRemoteBuild(lane string) bool {
+	list := strings.TrimSpace(os.Getenv("MODS_SKIP_DEPLOY_LANES"))
+	if list == "" {
+		return false
+	}
+	for _, part := range strings.Split(list, ",") {
+		if strings.EqualFold(strings.TrimSpace(part), lane) {
+			return true
+		}
+	}
+	return false
 }
 
 // fetchBuildLogs best-effort fetches recent build logs from the controller for a given deployment ID
