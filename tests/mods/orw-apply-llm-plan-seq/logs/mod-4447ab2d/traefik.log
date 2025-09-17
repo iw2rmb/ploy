@@ -1,5 +1,0 @@
-[2025-09-14 14:12:11] Getting stdout logs for allocation: b3190aee-b368-9267-2577-3cd5c3ccb4c8 (task: traefik, lines: 800, follow: false)
-[2025-09-14 14:12:11] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/b3190aee-b368-9267-2577-3cd5c3ccb4c8?type=stdout&plain=true&task=traefik&offset=-800
-[2025-09-14 14:12:11] Response code: 200
-v.`)
-[90m2025-09-14T14:11:07Z[0m [31mERR[0m [1mUnable to obtain ACME certificate for domains[0m [36merror=[0m[31m[1m"unable to generate a certificate for the domains [api.dev]: acme: error: 429 :: POST :: https://acme-v02.api.letsencrypt.org/acme/new-order :: urn:ietf:params:acme:error:rateLimited :: too many failed authorizations (5) for \"api.dev\" in the last 1h0m0s, retry after 2025-09-14 14:18:15 UTC: see https://letsencrypt.org/docs/rate-limits/#authorization-failures-per-hostname-per-account"[0m[0m [36mACME CA=[0mhttps://acme-v02.api.letsencrypt.org/directory [36macmeCA=[0mhttps://acme-v02.api.letsencrypt.org/directory [36mdomains=[0m["api.dev."] [36mproviderName=[0mapps-wildcard.acme [36mrouterName=[0mploy-api-apps@consulcatalog [36mrule=[0mHost(`api.dev.`)

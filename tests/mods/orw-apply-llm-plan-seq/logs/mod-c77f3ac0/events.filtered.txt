@@ -1,6 +1,0 @@
-# Errors
-/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-c77f3ac0/events.sample.sse:data: {"step":"build-gate-failed","phase":"build","level":"error","message":"apply/build failed: commit failed: failed to commit changes: exit status 128 - stderr: fatal: empty ident name (for \u003c\u003e) not allowed\n - stdout: ","time":"2025-09-16T22:24:33.67601284Z"}
-/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-c77f3ac0/events.sample.sse:data: {"step":"commit","phase":"commit","level":"error","message":"Commit failed","time":"2025-09-16T22:24:33.702163509Z"}
-
-# Planner/LLM/Reducer/Apply steps
-/Users/vk/@iw2rmb/ploy/tests/mods/orw-apply-llm-plan-seq/logs/mod-c77f3ac0/events.sample.sse:data: {"step":"apply","phase":"healing","level":"warn","message":"HEAD.json not found for branch (no steps to replay)","time":"2025-09-16T22:24:33.636950073Z"}

@@ -1,6 +1,0 @@
-event: init
-data: {"id":"mod-2e10a769","message":"SSE connected"}
-
-event: end
-data: {"duration":"","phase":"running","status":"failed"}
-
