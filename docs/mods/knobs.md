@@ -45,6 +45,7 @@ Nomad/DC
 -
 Git provider
     - GITLAB_URL, GITLAB_TOKEN (write_repository/api scope). Used for push/MR.
+    - GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME/GIT_COMMITTER_EMAIL (defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` if unset).
 -
 Build gate teardown (ephemeral lane‑c)
     - build_only=true (query param set by the build checker)
@@ -53,7 +54,7 @@ Build gate teardown (ephemeral lane‑c)
 Where To Set
 
 - Persistent service env (VPS): /home/ploy/api.env
-    - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_IMAGEs, MODS_REGISTRY, GIT_AUTHOR).
+    - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_IMAGEs, MODS_REGISTRY, GIT_AUTHOR/GIT_COMMITTER with sane defaults).
 - Job template (orw-apply): platform/nomad/mods/orw_apply.hcl
     - Resources, env block (ORW_IMAGE, PLOY_API_URL, SEAWEEDFS_URL, INPUT_URL, DIFF_KEY, controller/exec IDs).
 - Controller substitution: internal/mods/execution.go
@@ -66,7 +67,7 @@ Recommended Defaults (dev)
 - MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
 - NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
 - PLOY_CONTROLLER: ensure it is set to `https://api.dev.ployman.app/v1` for Dev; `PLOY_API_URL` auto-derived to https://api.dev.ployman.app
-- GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope)
+- GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden.
 
 Per-run MR auth selection (mods.yaml)
 
