@@ -1,181 +1,49 @@
 # Ploy API Server
 
-The Ploy API server provides REST endpoints for application deployment and management. HTTP endpoints are defined in [`server/server.go`](server/server.go) in the `setupRoutes()` function.
+The Ploy API server exposes REST endpoints for deployment, builds, recipes, mods orchestration, and platform management. HTTP routes are wired in `api/server` (see `api/server/server.go` and `api/server/routes.go`).
 
-## API Structure
-
-The API is organized into functional modules:
+## Directory Overview (current)
 
 ```
 api/
-├── main.go                   # API server entry point
-├── server/                   # HTTP server architecture
-│   ├── server.go             # Main server with endpoint definitions (setupRoutes)
-│   ├── routes.go             # Route definitions and setup
-│   ├── handlers.go           # Primary request handlers
-│   ├── handlers_bluegreen.go # Blue-green deployment handlers
-│   ├── handlers_certificate.go # Certificate management handlers
-│   ├── handlers_health.go    # Health check handlers
-│   ├── platform_handlers.go  # Platform service handlers
-│   ├── recipes_handlers.go   # Recipe-specific request handlers
-│   ├── initializers.go       # Server initialization and setup
-│   ├── config.go             # Server configuration management
-│   └── storage_resolver.go   # Storage backend resolution
-├── config/                   # Configuration management
-│   └── config.go             # Configuration loading and validation
-├── health/                   # Health checking infrastructure
-│   └── health.go             # Health, readiness, liveness endpoints
-├── metrics/                  # Metrics collection and monitoring
-│   └── metrics.go            # Prometheus metrics integration
-├── builders/                 # Lane-specific builders (A-G)
-│   ├── debug.go              # Builder debug utilities
-│   ├── jail.go               # Lane D - FreeBSD jails
-│   ├── java_osv.go           # Lane C - OSv/Hermit VMs for JVM
-│   ├── oci.go                # Lane E - OCI containers
-│   ├── unikraft.go           # Lanes A/B - Unikraft unikernels
-│   ├── vm.go                 # Lane F - Full VMs
-│   ├── wasm.go               # Lane G - WebAssembly modules
-│   └── utils.go              # Builder utilities
-├── nomad/                    # HashiCorp Nomad integration
-│   ├── client.go             # Nomad API client
-│   ├── health.go             # Nomad cluster health checks
-│   ├── render.go             # Job template rendering
-│   ├── submit.go             # Job submission to Nomad
-│   └── submit_enhanced.go    # Enhanced job submission
-├── certificates/             # SSL/TLS certificate management
-│   ├── manager.go            # Certificate lifecycle management
-│   └── wildcard.go           # Wildcard certificate handling
-├── dns/                      # DNS provider integration
-│   ├── handler.go            # DNS management endpoints
-│   ├── provider.go           # DNS provider interface
-│   ├── cloudflare.go         # Cloudflare DNS integration
-│   └── namecheap.go          # Namecheap DNS integration
-├── acme/                     # ACME protocol for certificates
-│   ├── client.go             # ACME client implementation
-│   ├── handler.go            # ACME challenge handlers
-│   ├── renewal.go            # Automatic certificate renewal
-│   └── storage.go            # Certificate storage management
-├── domains/                  # Domain management
-│   └── handler.go            # Domain configuration handlers
-├── routing/                  # Traffic routing management
-│   └── traefik.go            # Traefik configuration management
-├── envstore/                 # Environment variable storage
-│   ├── interface.go          # Storage interface definition
-│   ├── store.go              # File-based environment storage
-│   └── store_test.go         # Environment store tests
-├── consul_envstore/          # Consul KV environment storage
-│   └── store.go              # Consul-based environment storage
-├── coordination/             # Distributed coordination
-│   ├── leader.go             # Distributed leader election logic
-│   └── ttl_cleanup.go        # TTL-based resource cleanup
-├── selfupdate/               # Self-updating capability
-│   ├── executor.go           # Update execution logic
-│   ├── handler.go            # Update API endpoints
-│   └── utils.go              # Update utilities
-├── version/                  # Version management
-│   └── handler.go            # Version information endpoints
-├── templates/                # Template management
-│   └── handler.go            # Template processing endpoints
-├── supply/                   # Supply chain security
-│   ├── sbom.go               # SBOM generation
-│   ├── signing.go            # Artifact signing
-│   └── verify.go             # Signature verification
-├── opa/                      # Open Policy Agent security
-│   └── verify.go             # Security policy verification
-├── runtime/                  # Runtime environments
-│   └── wasm.go               # WebAssembly runtime integration
-├── wasm/                     # WebAssembly components
-│   └── components.go         # WASM component management
-├── analysis/                 # Static analysis system
-│   ├── handler.go            # Analysis API endpoints
-│   ├── engine.go             # Analysis engine
-│   ├── cache.go              # Analysis result caching
-│   ├── types.go              # Analysis type definitions
-│   ├── arf_integration.go    # ARF integration
-│   ├── nomad_analyzer.go     # Nomad-based distributed analysis
-│   ├── nomad_dispatcher.go   # Distributed analysis job dispatch
-│   └── analyzers/            # Language-specific analyzers
-│       ├── java/             # Java analysis tools (ErrorProne)
-│       └── python/           # Python analysis tools (Pylint)
-├── platform/                 # Platform service integration
-│   ├── handler.go            # Platform API endpoints
-│   └── handler_test.go       # Platform handler tests
-├── mods/                     # Mods API endpoints (split by concern)
-│   ├── handler.go            # Wiring: Handler struct and RegisterRoutes; events handler
-│   ├── types.go              # Public API types (status, steps, events)
-│   ├── run.go                # RunMod orchestration (async execution)
-│   ├── status.go             # Status, list, cancel, KV helpers
-│   ├── artifacts.go          # Artifact persistence and download helpers
-│   ├── logs.go               # SSE log streaming helpers
-│   └── debug.go              # Debug utilities (Nomad diagnostics)
-├── llms/                     # Large Language Model integration (split by concern)
-│   ├── handler.go            # Wiring: Handler struct and RegisterRoutes
-│   ├── list.go               # ListModels
-│   ├── model_crud.go         # GetModel, CreateModel, UpdateModel, DeleteModel
-│   ├── default.go            # GetDefaultModel, SetDefaultModel
-│   └── stats.go              # GetModelStats
-├── sbom/                     # SBOM API and analyzer
-│   ├── handler.go            # SBOM API endpoints (/v1/sbom/*)
-│   ├── analyzer.go           # Minimal Syft-style analyzer
-│   └── types.go              # SBOM analysis types
-└── arf/                      # Automated Remediation Framework
-    ├── handler.go            # Main ARF endpoint handlers
-    ├── handler_debug.go      # Debug and analysis endpoints
-    ├── handler_recipes.go    # Recipe management endpoints
-    ├── handler_sandbox.go    # Sandbox management endpoints
-    ├── handler_security.go   # Security analysis endpoints
-    ├── handler_transformation_async.go # Async transformation handlers (catalog only)
-    ├── multi_language_core.go # Multi-language transformation core
-    ├── multi_language_java.go # Java-specific transformations
-    ├── multi_language_python.go # Python-specific transformations
-    ├── multi_language_go.go  # Go-specific transformations
-    ├── multi_language_rust.go # Rust-specific transformations
-    # WebAssembly transformations now live under builders/wasm; ARF-specific WASM types removed
-    ├── multi_language_javascript.go # JavaScript transformations
-    ├── pattern_matcher.go    # Code pattern matching engine
-    # Note: recipe_* sources (registry, executor, evolution, types) moved to api/recipes
-    ├── sandbox.go            # Sandbox management for transformations
-    ├── security_engine.go    # Security analysis engine
-    ├── storage_service.go    # ARF storage service layer
-    ├── unified_service.go    # Unified ARF service interface
-    ├── transformation_workflow.go # Transformation orchestration
-    ├──
-    
-    
-    ├── nvd_database.go       # National Vulnerability Database integration
-    ├── deployment_sandbox.go # Deployment environment sandboxing
-    ├── config.go             # ARF configuration management
-    ├── common_types.go       # Shared type definitions
-    ├── shared_types.go       # Additional shared types
-    ├── recipe_types.go       # Recipe-specific type definitions
-    ├── transformation_types.go # Transformation type definitions
-    # LLM integration is handled by Mods and LLMS; ARF LLM types removed
-    ├── debug_types.go        # Debug system types
-    ├── security_engine_types.go # Security engine types
-    ├──
-    ├── registry_storage_adapter.go # Storage adapter for recipe registry
-    ├── db/                   # Database schemas and migrations
-    ├── examples/             # ARF recipe examples
-    ├── models/               # ARF data models and validation
-    └── validation/           # Recipe validation
+├── main.go                # API server entry point
+├── server/                # HTTP server: routes, handlers, initializers, storage resolver
+├── config/                # Configuration loading and validation
+├── health/                # Health/readiness/liveness endpoints and types
+├── metrics/               # Prometheus metrics integration
+├── builders/              # Lane builders (unikraft, oci, vm, wasm, jail, java_osv, jib)
+├── nomad/                 # Nomad client, render, submit (+ enhanced submit)
+├── certificates/          # Certificate lifecycle (manager, wildcard)
+├── dns/                   # DNS providers (Cloudflare, Namecheap) + handler
+├── acme/                  # ACME client, handlers, renewal, storage
+├── domains/               # Domain configuration handlers
+├── routing/               # Traefik config helpers
+├── templates/             # Template endpoints
+├── supply/                # SBOM generation, signing, verification
+├── opa/                   # OPA verification helpers
+├── mods/                  # Mods API (run, status, logs, artifacts, debug)
+├── llms/                  # Model registry CRUD, list, stats
+├── git/                   # Git service and push event handling
+├── analysis/              # Static analysis engine + analyzers (java, python)
+├── sbom/                  # SBOM HTTP endpoints and analyzer helpers
+├── nvd/                   # NVD database/types/lookup/converter
+├── platform/              # Platform handler endpoints
+├── recipes/               # Recipes API, registry adapter, models/
+├── consul_envstore/       # Consul-backed environment store
+├── coordination/          # Leader election and TTL cleanup
+├── selfupdate/            # Self-update executor and endpoints
+├── runtime/               # Runtime integrations (WASM)
+├── wasm/                  # WASM component wiring
+└── version/               # Version endpoint
 ```
-
-## Key Components
-
-- **Server Core**: `server/server.go` contains the main HTTP server setup and all endpoint route definitions
-- **Lane Builders**: `builders/` implements deployment targets for different performance/footprint profiles
-- **Infrastructure**: Integration with Nomad, Consul, Traefik, and SeaweedFS storage
 
 ### Nomad Wrapper Policy (VPS)
 
 On VPS environments, all Nomad interactions are routed through the job manager wrapper at `/opt/hashicorp/bin/nomad-job-manager.sh`.
 
-- Submission and validation in server code prefer the wrapper and fall back to SDK/CLI only when the wrapper is not present (e.g., non-VPS/local).
-- Benefits: unified retries/backoff for 429/5xx, HCL→JSON conversion and validation, consistent logging, and service cleanup before deployments.
-- Do not call the raw `nomad` CLI directly in API code when running on the VPS; use the wrapper or the orchestration facade which auto-detects the wrapper.
-- **Security**: ACME certificates, DNS validation, supply chain security, and OPA policy enforcement
-- **Analysis & Transformation**: Static analysis and automated remediation via ARF system
-- **Management**: Self-update, cleanup, monitoring, and coordination services
+- Submission and validation prefer the wrapper and fall back to SDK/CLI only when absent (non‑VPS/local).
+- Benefits: unified retries/backoff for 429/5xx, HCL→JSON conversion/validation, consistent logging, service cleanup.
+- Do not call the raw `nomad` CLI directly in API code on the VPS; use the wrapper or orchestration facade.
 
 ## SBOM Endpoints
 
@@ -183,11 +51,11 @@ The SBOM module provides endpoints under `/v1/sbom`.
 
 ### POST /v1/sbom/generate
 
-Generate a Software Bill of Materials (SBOM) using Syft for a file artifact or a container image. The API delegates to the Syft-based generator in `api/supply/sbom.go`.
+Generate a Software Bill of Materials (SBOM) using Syft for a file artifact or a container image. The API delegates to the Syft‑based generator in `api/supply/sbom.go`.
 
 - Request (JSON)
   - `artifact` (string, required): Path to a file artifact (e.g., `/path/to/app.bin`) or a container image reference (e.g., `repo/app:1.2.3`).
-  - `format` (string, optional): Output format, defaults to `spdx-json`. Accepts Syft-supported formats.
+  - `format` (string, optional): Output format, defaults to `spdx-json`. Accepts Syft‑supported formats.
   - `lane` (string, optional): Deployment lane identifier for metadata.
   - `app_name` (string, optional): Application name for metadata.
   - `sha` (string, optional): Build SHA for metadata.
@@ -201,7 +69,7 @@ Generate a Software Bill of Materials (SBOM) using Syft for a file artifact or a
 - Behavior
   - If `artifact` contains a colon (`:`), it is treated as a container image reference and the SBOM is written to `/tmp/<sanitized-image>.sbom.json`.
   - Otherwise, the SBOM is generated next to the file with suffix `.sbom.json`.
-  - Backward compatibility: If `artifact` is omitted, the endpoint returns a stubbed successful envelope (legacy tests), but no real generation occurs.
+  - Backward compatibility: If `artifact` is omitted, the endpoint returns a minimal successful envelope for legacy tests, but no real generation occurs.
 
 - Examples
 
@@ -228,3 +96,4 @@ Analyze an existing SBOM and return a basic risk summary. This endpoint currentl
 
 - Response (JSON)
   - Includes `summary`, `vulnerabilities` (mock structure), and `generated_at` used by tests.
+
