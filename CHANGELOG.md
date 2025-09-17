@@ -3,6 +3,8 @@
 ## [Unreleased] - Transflow MVP Release
 
 ### Added
+- Analysis: Added engine and HTTP handler unit tests covering analyzer registration, cache reuse, fallback execution, configuration validation, and API failure modes to increase confidence in the static-analysis pipeline.
+- Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
 - CLI: Added high-coverage unit tests for `ploy recipe` help, validation, and confirmation flows.
 - Lanes: E2E scaffolding added for A–G
   - tests/lanes/README.md with comprehensive plan and envs
@@ -13,12 +15,14 @@
 - Transflow: Canonical StepType constants/enums (`orw-apply`, `llm-exec`, `orw-gen`, `human-step`) with `NormalizeStepType` and `IsValid`. Swept runner/fanout/KB/CLI execution and event emissions to use canonical values; planner alias `human` now normalizes to `human-step`.
 - Transflow: Instance-scoped HCLSubmitter seam for HCL validate/submit. Runner and fanout now use `HCLSubmitter` (default delegates to orchestration). Enables deterministic tests without mutating global state.
 - Transflow tests: Added normalization tests (pre-fanout and event emission) and refactored the healing integration test to inject submitter/helper/healer seams; removed reliance on global function stubs.
+- Orchestration: Added regression tests covering Kaniko builder memory overrides, lane G distroless runner selection, and Nomad monitor timeout handling.
 - New scenario and scripts: `tests/transflow/orw-apply-llm-plan-seq` for an end-to-end flow where orw-apply build gate fails, triggering llm-plan → llm-exec → reducer. Includes run.sh to submit/stream/persist and helpers to fetch artifacts and watch events.
 - Developer workflow: added `.pre-commit-config.yaml` to run `make fmt` and `golangci-lint run` on commit; documented in AGENTS.md and docs/TESTING.md.
  - CI: added GitHub Actions job to execute pre-commit hooks across all files.
  - Branch protection (optional-as-code): added `.github/settings.yml` to require the "CI / Pre-commit Hooks" check on `main` and `develop` when the Settings app is installed.
 
 ### Changed
+- Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.
 - CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
 - CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
