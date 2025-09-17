@@ -13,6 +13,10 @@ import (
 
 // renderAndDeployJob renders the Nomad job, validates, submits and waits for healthy
 func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, imagePath, dockerImage, sha, mainClass, detectedLanguage, detectedJavaVersion string, appEnvVars map[string]string, debug bool) (string, error) {
+	if shouldSkipLaneDeploy(lane) {
+		fmt.Printf("[Build] Lane %s deploy skipped via MODS_SKIP_DEPLOY_LANES\n", strings.ToUpper(lane))
+		return "", nil
+	}
 	// Determine domain suffix by environment
 	envName := c.Query("env", "dev")
 	domainSuffix := "ployd.app"
@@ -95,6 +99,19 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 		return "", fiber.NewError(500, fmt.Sprintf("deployment did not become healthy: %v", err))
 	}
 	return jobName, nil
+}
+
+func shouldSkipLaneDeploy(lane string) bool {
+	list := strings.TrimSpace(os.Getenv("MODS_SKIP_DEPLOY_LANES"))
+	if list == "" {
+		return false
+	}
+	for _, part := range strings.Split(list, ",") {
+		if strings.EqualFold(strings.TrimSpace(part), lane) {
+			return true
+		}
+	}
+	return false
 }
 
 func filerBaseURL(lane string) string {
