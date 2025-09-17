@@ -12,9 +12,9 @@ import (
 func (r *ModRunner) runCommitStep(ctx context.Context, repoPath, initialHead string) (bool, string, error) {
 	// If HEAD already moved, assume apply step committed and skip additional commits
 	headAfter, _ := getHeadHashFn(repoPath)
-    if headAfter != "" && initialHead != "" && headAfter != initialHead {
-        return true, "Changes already committed by apply step", nil
-    }
+	if headAfter != "" && initialHead != "" && headAfter != initialHead {
+		return true, "Changes already committed by apply step", nil
+	}
 	changed, _ := hasRepoChangesFn(repoPath)
 	if !changed {
 		return false, "No changes to commit", fmt.Errorf("no changes produced by transformation")
