@@ -15,10 +15,10 @@ func mrEmitStart(r *ModRunner, ctx context.Context, sourceBranch, targetBranch s
 
 // mrAppendFailure appends a non-fatal MR failure step result to the workflow result.
 func mrAppendFailure(result *ModResult, err error) {
-	if result == nil || err == nil {
-		return
-	}
-	result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: true, Message: fmt.Sprintf("MR creation failed: %v", err)})
+    if result == nil || err == nil {
+        return
+    }
+    result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: false, Message: fmt.Sprintf("MR creation failed: %v", err)})
 }
 
 // mrAppendSuccess appends a success step result and sets the MR URL on the workflow result.
