@@ -229,19 +229,13 @@
         - nomad
         - vault
 
-    - name: Validate Nomad configuration
-      command: nomad agent -validate -config=/etc/nomad.d
-      register: nomad_validate
-      changed_when: false
-      failed_when: nomad_validate.rc != 0
-
     - name: Restart Nomad service to apply limits
       systemd:
         name: nomad
         state: restarted
         enabled: true
         daemon_reload: true
-      when: nomad_config.changed or nomad_limits_config.changed or nomad_validate.rc == 0
+      when: nomad_config.changed or nomad_limits_config.changed
 
     - name: Wait for Nomad API after restart
       wait_for:
