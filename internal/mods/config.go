@@ -207,7 +207,7 @@ func (c *ModConfig) ParseBuildTimeout() (time.Duration, error) {
 
 func GenerateAppName(id string) string {
 	timestamp := time.Now().Unix()
-	return fmt.Sprintf("tfw-%s-%d", id, timestamp)
+	return fmt.Sprintf("mod-%s-%d", id, timestamp)
 }
 
 func GenerateBranchName(id string) string {

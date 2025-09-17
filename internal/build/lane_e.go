@@ -42,24 +42,24 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
 
 	// Ensure Dockerfile exists or optionally autogenerate a minimal one
-    dockerfilePath := filepath.Join(srcDir, "Dockerfile")
-    if _, statErr := os.Stat(dockerfilePath); statErr != nil {
-        autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
-        if autogen == "true" || autogen == "1" || autogen == "on" {
-            fmt.Printf("[Lane E] No Dockerfile; attempting autogen for app=%s lang=%s tool=%s\n", appName, facts.Language, facts.BuildTool)
-            if err := generateDockerfileWithFacts(srcDir, facts); err != nil {
-                return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
-                    "error":   "no Dockerfile and failed to autogenerate",
-                    "details": err.Error(),
-                })
-            }
-            fmt.Printf("[Lane E] Autogen Dockerfile created for %s\n", appName)
-        } else {
-            return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
-                "error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
-            })
-        }
-    }
+	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+	if _, statErr := os.Stat(dockerfilePath); statErr != nil {
+		autogen := strings.ToLower(c.Query("autogen_dockerfile", os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
+		if autogen == "true" || autogen == "1" || autogen == "on" {
+			fmt.Printf("[Lane E] No Dockerfile; attempting autogen for app=%s lang=%s tool=%s\n", appName, facts.Language, facts.BuildTool)
+			if err := generateDockerfileWithFacts(srcDir, facts); err != nil {
+				return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
+					"error":   "no Dockerfile and failed to autogenerate",
+					"details": err.Error(),
+				})
+			}
+			fmt.Printf("[Lane E] Autogen Dockerfile created for %s\n", appName)
+		} else {
+			return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
+				"error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
+			})
+		}
+	}
 
 	// Create a tar context from srcDir
 	builderTar := filepath.Join(tmpDir, "context.tar")
@@ -68,7 +68,7 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		ign, _ := clutils.ReadGitignore(srcDir)
 		return clutils.TarDir(srcDir, f, ign)
 	}(); err != nil {
@@ -82,27 +82,27 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	// Upload context tar to storage for Kaniko to fetch
 	contextKey := fmt.Sprintf("builds/%s/%s/src.tar", appName, sha)
 	var contextURL string
-    if deps.Storage != nil {
-        ctxUp := context.Context(c.Context())
-        if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
-            return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-                "error":       "failed to upload build context",
-                "stage":       "upload_context",
-                "context_key": contextKey,
-                "details":     err.Error(),
-            })
-        }
-        base := os.Getenv("PLOY_SEAWEEDFS_URL")
-        if base == "" {
-            base = "http://seaweedfs-filer.service.consul:8888"
-        }
-        if !strings.HasPrefix(base, "http") {
-            base = "http://" + base
-        }
-        contextURL = strings.TrimRight(base, "/") + "/" + contextKey
-        fmt.Printf("[Lane E] Context uploaded: %s\n", contextURL)
-        // Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
-        func(path string) {
+	if deps.Storage != nil {
+		ctxUp := context.Context(c.Context())
+		if err := uploadFileWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
+			return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+				"error":       "failed to upload build context",
+				"stage":       "upload_context",
+				"context_key": contextKey,
+				"details":     err.Error(),
+			})
+		}
+		base := os.Getenv("PLOY_SEAWEEDFS_URL")
+		if base == "" {
+			base = "http://seaweedfs-filer.service.consul:8888"
+		}
+		if !strings.HasPrefix(base, "http") {
+			base = "http://" + base
+		}
+		contextURL = strings.TrimRight(base, "/") + "/" + contextKey
+		fmt.Printf("[Lane E] Context uploaded: %s\n", contextURL)
+		// Also PUT context directly to Filer HTTP path for Dev fetch compatibility (synchronous to avoid races)
+		func(path string) {
 			fi, err := os.Stat(builderTar)
 			if err != nil {
 				return
@@ -171,31 +171,31 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			"details":     vErr.Error(),
 		})
 	}
-    builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
-    fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s)\n", builderJobName, tag)
-    if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
-        snippet := getJobLogsSnippet(builderJobName, 80)
-        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-            "error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
-            "stage":   "kaniko_submit",
-            "details": err.Error(),
-            "builder": fiber.Map{"job": builderJobName, "logs": snippet},
-        })
-    }
-    // Verify image exists in registry before returning and capture digest
-    vr := verifyOCIPush(tag)
-    fmt.Printf("[Lane E] Verify push: tag=%s ok=%t status=%d digest=%s message=%s\n", tag, vr.OK, vr.Status, vr.Digest, vr.Message)
-    if !vr.OK || vr.Digest == "" {
-        return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
-            "error":   "image push verification failed",
-            "stage":   "verify_push",
-            "image":   tag,
-            "status":  vr.Status,
-            "message": vr.Message,
-        })
-    }
-    // Prefer digest-based reference to avoid tag drift at runtime
-    digestRef := tag + "@" + vr.Digest
-    fmt.Printf("[Lane E] Using digest ref for runtime: %s\n", digestRef)
-    return "", digestRef, builderJobName, nil
+	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
+	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s)\n", builderJobName, tag)
+	if err := orchestration.SubmitAndWaitTerminal(builderHCL, 10*time.Minute); err != nil {
+		snippet := getJobLogsSnippet(builderJobName, 80)
+		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+			"error":   fmt.Sprintf("kaniko builder failed for job %s", builderJobName),
+			"stage":   "kaniko_submit",
+			"details": err.Error(),
+			"builder": fiber.Map{"job": builderJobName, "logs": snippet},
+		})
+	}
+	// Verify image exists in registry before returning and capture digest
+	vr := verifyOCIPush(tag)
+	fmt.Printf("[Lane E] Verify push: tag=%s ok=%t status=%d digest=%s message=%s\n", tag, vr.OK, vr.Status, vr.Digest, vr.Message)
+	if !vr.OK || vr.Digest == "" {
+		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
+			"error":   "image push verification failed",
+			"stage":   "verify_push",
+			"image":   tag,
+			"status":  vr.Status,
+			"message": vr.Message,
+		})
+	}
+	// Prefer digest-based reference to avoid tag drift at runtime
+	digestRef := tag + "@" + vr.Digest
+	fmt.Printf("[Lane E] Using digest ref for runtime: %s\n", digestRef)
+	return "", digestRef, builderJobName, nil
 }

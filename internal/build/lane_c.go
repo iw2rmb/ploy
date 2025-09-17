@@ -21,7 +21,7 @@ func buildLaneC(c *fiber.Ctx, deps *BuildDependencies, appName, srcDir, sha, mai
 		if err != nil {
 			return err
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		ign, _ := clutils.ReadGitignore(srcDir)
 		return clutils.TarDir(srcDir, f, ign)
 	}(); err != nil {

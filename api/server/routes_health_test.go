@@ -23,28 +23,19 @@ func TestServerRoutes_HealthReadyLive(t *testing.T) {
 	s.setupRoutes()
 
 	// /health may be 200 or 503 depending on environment; accept both
-	resp, err := s.app.Test(httptest.NewRequest("GET", "/health", nil))
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/health", nil)))
 	if resp.StatusCode != 200 && resp.StatusCode != 503 {
 		t.Fatalf("unexpected /health status: %d", resp.StatusCode)
 	}
 
 	// /v1/ready
-	resp, err = s.app.Test(httptest.NewRequest("GET", "/v1/ready", nil))
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp = mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/v1/ready", nil)))
 	if resp.StatusCode != 200 && resp.StatusCode != 503 {
 		t.Fatalf("unexpected /v1/ready status: %d", resp.StatusCode)
 	}
 
 	// /v1/live should be 200
-	resp, err = s.app.Test(httptest.NewRequest("GET", "/v1/live", nil))
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp = mustResponse(t)(s.app.Test(httptest.NewRequest("GET", "/v1/live", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("unexpected /v1/live status: %d", resp.StatusCode)
 	}

@@ -59,10 +59,7 @@ func TestHandleStorageHealth_Healthy(t *testing.T) {
 	app := fiber.New()
 	app.Get("/v1/storage/health", s.handleStorageHealth)
 	req := httptest.NewRequest("GET", "/v1/storage/health", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -86,10 +83,7 @@ func TestHandleStorageHealth_Unhealthy(t *testing.T) {
 	app := fiber.New()
 	app.Get("/v1/storage/health", s.handleStorageHealth)
 	req := httptest.NewRequest("GET", "/v1/storage/health", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 503 {
 		t.Fatalf("expected 503, got %d", resp.StatusCode)
 	}
@@ -108,10 +102,7 @@ func TestHandleStorageMetrics(t *testing.T) {
 	app := fiber.New()
 	app.Get("/v1/storage/metrics", s.handleStorageMetrics)
 	req := httptest.NewRequest("GET", "/v1/storage/metrics", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
+	resp := mustResponse(t)(app.Test(req))
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}

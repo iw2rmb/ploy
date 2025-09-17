@@ -28,27 +28,27 @@ func TestStorageHandlersWithConfigService(t *testing.T) {
 	app.Post("/cfg/reload", s.handleReloadStorageConfig)
 	app.Post("/cfg/validate", s.handleValidateStorageConfig)
 
-	resp, _ := app.Test(httptest.NewRequest("GET", "/health", nil))
+	resp := mustResponse(t)(app.Test(httptest.NewRequest("GET", "/health", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("storage health expected 200, got %d", resp.StatusCode)
 	}
 
-	resp, _ = app.Test(httptest.NewRequest("GET", "/metrics", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("GET", "/metrics", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("storage metrics expected 200, got %d", resp.StatusCode)
 	}
 
-	resp, _ = app.Test(httptest.NewRequest("GET", "/cfg", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("GET", "/cfg", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("get storage config expected 200, got %d", resp.StatusCode)
 	}
 
-	resp, _ = app.Test(httptest.NewRequest("POST", "/cfg/reload", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("POST", "/cfg/reload", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("reload storage config expected 200, got %d", resp.StatusCode)
 	}
 
-	resp, _ = app.Test(httptest.NewRequest("POST", "/cfg/validate", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("POST", "/cfg/validate", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("validate storage config expected 200, got %d", resp.StatusCode)
 	}
@@ -60,12 +60,12 @@ func TestHealthSubroutes_NoDeps(t *testing.T) {
 	app.Get("/health/platform-certificates", s.handlePlatformCertificateHealth)
 	app.Get("/health/coordination", s.handleCoordinationHealth)
 
-	resp, _ := app.Test(httptest.NewRequest("GET", "/health/platform-certificates", nil))
+	resp := mustResponse(t)(app.Test(httptest.NewRequest("GET", "/health/platform-certificates", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("platform-certificates expected 200, got %d", resp.StatusCode)
 	}
 
-	resp, _ = app.Test(httptest.NewRequest("GET", "/health/coordination", nil))
+	resp = mustResponse(t)(app.Test(httptest.NewRequest("GET", "/health/coordination", nil)))
 	if resp.StatusCode != 200 {
 		t.Fatalf("coordination health expected 200, got %d", resp.StatusCode)
 	}
