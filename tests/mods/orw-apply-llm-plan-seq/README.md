@@ -9,6 +9,11 @@ Current Cycle Key Takeaways
 - `run.sh` submits `scenario.yaml`, streams `/mods/{id}/logs`, polls status, and fetches artifacts to `logs/<MOD_ID>/`. Expect `plan_json`, `next_json`, and `diff.patch` when healing succeeds.
 - Build failures must be deterministic. Use the prepared `e2e/fail-missing-symbol` branch so orw-apply produces a diff yet Maven still fails, triggering self-heal.
 - Keep enough Nomad capacity free for the OpenRewrite task (about 1 GiB). If the run stalls, grab platform logs through `collect-logs.sh` and confirm the planner/executor received SeaweedFS and MOD_ID env vars.
+- Compile-gate diagnostics: controller may return a generic `internal_error`. Mods now emits build events with `(deployment_id=…)`; fetch Maven logs via `GET /v1/apps/:app/builds/:id/logs?lines=…` to see the real failure (wired for lanes C/E/G).
+- LLM-exec diffs: older runs can upload a sentinel `.llm-healing` patch (rejected by the allowlist). Ensure `langgraph-runner:latest` is deployed; it resolves `first_error_file:line` and emits `resolved target file: …` before generating a minimal edit diff.
+- Artifact access: when `PLOY_SEAWEEDFS_URL` is not resolvable from the workstation, use SSH within `collect-logs.sh` to pull SeaweedFS artifacts (planner plans, LLM diffs) and last_job logs from the VPS.
+- Nomad logs slicing: `collect-logs.sh` now derives a `--since` timestamp from SSE and passes it to the Nomad log wrapper to slice allocation logs by time for faster, targeted inspection.
+- What to watch in SSE: look for `uploaded diff to …/steps/<RUN_ID>/diff.patch`, `download succeeded`, `replay starting: branch_id=llm-1`, and build events including `(deployment_id=…)` for log drill‑downs.
 
 Prepared Repository
 -------------------

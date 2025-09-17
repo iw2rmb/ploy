@@ -90,7 +90,10 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
   1) Record a start timestamp right before triggering a build, e.g. `START_TS=$(date '+%Y-%m-%d %H:%M:%S')`.
   2) After the run, fetch platform logs and filter to lines at or after `START_TS`.
      - The Nomad job manager (`/opt/hashicorp/bin/nomad-job-manager.sh`) supports `--since "YYYY-MM-DD HH:MM:SS"` on `logs` to apply a time-based filter when log lines begin with `[YYYY-MM-DD HH:MM:SS]`.
-     - Alternatively, use `tests/e2e/deploy/fetch-logs.sh` with `FILTER_MARKERS` or pipe through `awk` to slice by timestamp.
+     - Alternatively, use `tests/e2e/deploy/fetch-logs.sh` and set one of:
+       - `START_TS_SOURCE=vps` (requires `TARGET_HOST`) to auto-resolve `START_TS` via `date '+%Y-%m-%d %H:%M:%S'` on the VPS (avoids timezone skew).
+       - `START_TS_SOURCE=platform` to extract the latest bracketed timestamp from a small platform log snapshot.
+       - Or pre-set `START_TS` manually and optionally combine with `FILTER_MARKERS` to narrow to key markers (e.g., `[Lane E]`, `[Orch]`).
 - This keeps log slices small and focused per run without bouncing the API allocations.
 
 ## Commands

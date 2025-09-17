@@ -11,10 +11,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/storage"
 )
 
+// Retry settings for uploads; overridden in tests for speed.
+var retryMaxAttempts = 3
+var retryBaseDelay = time.Second
+
 // uploadFileWithRetryAndVerification uploads a file with enhanced retry logic and integrity verification
 func uploadFileWithRetryAndVerification(storeClient *storage.StorageClient, filePath, storageKey, contentType string) error {
-	const maxRetries = 3
-	const baseDelay = time.Second
+	maxRetries := retryMaxAttempts
+	baseDelay := retryBaseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Open file for this attempt
@@ -91,8 +95,8 @@ func uploadArtifactBundleWithUnifiedStorage(ctx context.Context, storageInterfac
 
 // uploadFileWithUnifiedStorage uploads a file using unified storage interface with retry logic
 func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, filePath, storageKey, contentType string) error {
-	const maxRetries = 3
-	const baseDelay = time.Second
+	maxRetries := retryMaxAttempts
+	baseDelay := retryBaseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Open file for this attempt
@@ -131,8 +135,8 @@ func uploadFileWithUnifiedStorage(ctx context.Context, storageInterface storage.
 
 // uploadBytesWithUnifiedStorage uploads byte data using unified storage interface with retry logic
 func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage.Storage, data []byte, storageKey, contentType string) error {
-	const maxRetries = 3
-	const baseDelay = time.Second
+	maxRetries := retryMaxAttempts
+	baseDelay := retryBaseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Create new reader for this attempt
@@ -167,8 +171,8 @@ func uploadBytesWithUnifiedStorage(ctx context.Context, storageInterface storage
 
 // uploadBytesWithRetryAndVerification uploads byte data with enhanced retry logic and verification
 func uploadBytesWithRetryAndVerification(storeClient *storage.StorageClient, data []byte, storageKey, contentType string) error {
-	const maxRetries = 3
-	const baseDelay = time.Second
+	maxRetries := retryMaxAttempts
+	baseDelay := retryBaseDelay
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Create new reader for this attempt
