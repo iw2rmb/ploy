@@ -35,8 +35,10 @@ After each run: Inspect logs first
   - If `FILTER_MARKERS` is set (ripgrep syntax), also writes `platform_api.filtered.log` with only matching lines (useful for `[Lane E]` and `[Orch]` markers).
   - If `BUILD_ID` is set (from async response), includes builder logs via API.
   - If `TARGET_HOST` is set, fetches builder logs and app alloc status/logs via Nomad job-manager wrapper.
-  - To shrink platform logs before the run, set `SHRINK_PLATFORM_LOGS=1` (requires `TARGET_HOST`). This bounces the `ploy-api` job to start a fresh alloc, so platform logs contain only the current run.
-  - Time-based slicing (recommended): set `START_TS="$(date '+%Y-%m-%d %H:%M:%S')"` just before triggering the build. `fetch-logs.sh` will write `platform_api.sliced.log` containing only lines at or after that timestamp, and then apply `FILTER_MARKERS` to that file.
+  - Time-based slicing (recommended): set `START_TS="$(date '+%Y-%m-%d %H:%M:%S')"` just before triggering the build. `fetch-logs.sh` writes `platform_api.sliced.log` from that point onward, then applies `FILTER_MARKERS`.
+    - To avoid timezone skew (VPS often runs UTC), you can auto-resolve the timestamp origin:
+      - `START_TS_SOURCE=vps` (requires `TARGET_HOST`) — uses `date '+%Y-%m-%d %H:%M:%S'` on VPS.
+      - `START_TS_SOURCE=platform` — extracts the last bracketed timestamp from a small platform log snapshot.
 - Direct endpoints (fallback):
   - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
   - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
@@ -80,12 +82,12 @@ Cycle State
 - Current key takeaways only; update each cycle and keep concise. For historical notes, use CHANGELOG.md.
 
  - App-name normalization: tests sanitize names to `[a-z0-9-]`, replacing dots in versions (e.g., `1.22` → `1-22`).
- - Lane E status: Node 20, Go 1.22, Python 3.12 pass with event-driven health; .NET 8 fixed by targeted Kaniko memory bump (2048MB). Env override: `PLOY_KANIKO_MEMORY_DOTNET_MB`.
- - Lane E (Java 17 NoJib): build → deploy path refactored to strict verify + digest-based runtime image. Recent failures are runtime-level due to an empty image in the rendered job (driver error: "image name required"). Controller now guards against empty images and refuses submit; use `PLOY_KANIKO_MEMORY_JAVA_MB` (set to 1536MB on Dev) and confirm `.message.pushVerification.digest` is present and `.message.dockerImage` includes `@sha256`. If these are set and health still fails, inspect runtime logs; the sample app serves `/healthz` on `PORT`.
- - Health waits are event-driven: tests subscribe to build SSE; health uses controller long-poll at `/v1/apps/:app/status/watch` with sensible timeouts.
- - Lane G status: Builder succeeds using prebuilt `module.wasm`; runtime initially failed due to silent setup errors. Updated runtime to add `-ignore-errors` and verbose logging. Next: confirm `/healthz` and record results.
- - Image size: captured from registry manifest (compressed) and Docker inspect (uncompressed) and recorded in results files.
- - Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs before deeper triage.
+- Lane E status: Node 20, Go 1.22, Python 3.12 pass with event-driven health; .NET 8 fixed by targeted Kaniko memory bump (2048MB). Env override: `PLOY_KANIKO_MEMORY_DOTNET_MB`.
+- Lane E (Java 17 NoJib): introduced embedded, template-driven Dockerfile autogen (Gradle/Maven/default) and strict verify+digest-based runtime images. Controller now guards against empty images and refuses submit. Current Dev state: Kaniko builder job not registering → no digest; guard blocks runtime submit (no app alloc). Added extensive diagnostics (autogen head/size, build-context/pre-upload logs, orchestration markers) and time-based log slicing to isolate runs.
+- Health waits are event-driven: tests subscribe to build SSE; health uses controller long-poll at `/v1/apps/:app/status/watch` with sensible timeouts.
+- Lane G status: Builder succeeds using prebuilt `module.wasm`; runtime initially failed due to silent setup errors. Updated runtime to add `-ignore-errors` and verbose logging. Next: confirm `/healthz` and record results.
+- Image size: captured from registry manifest (compressed) and Docker inspect (uncompressed) and recorded in results files.
+- Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs; set `START_TS` and `FILTER_MARKERS` to time-slice and filter platform logs without restarts.
  - Cleanup: apps are destroyed after each cycle; if automated destroy fails, destroy manually: `ploy apps destroy --name <app> --force`.
 
 Next Steps (Java 17 NoJib)

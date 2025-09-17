@@ -1,0 +1,15 @@
+[2025-09-17 19:03:59] Getting stdout logs for allocation: 4b93912a-0985-74dc-5257-eb47332514fb (task: traefik, lines: 2000, follow: false)
+[2025-09-17 19:03:59] Attempt 1: GET http://nomad.service.consul:4646/v1/client/fs/logs/4b93912a-0985-74dc-5257-eb47332514fb?type=stdout&plain=true&task=traefik&offset=-2000
+[2025-09-17 19:03:59] Response code: 200
+ "-" 37652 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 55ms
+172.17.0.2 - - [17/Sep/2025:19:03:10 +0000] "GET /v2/ HTTP/1.1" 200 2 "-" "-" 37653 "websecure-docker-registry@consulcatalog" "http://45.12.75.241:30232" 3ms
+185.200.106.98 - - [17/Sep/2025:19:03:22 +0000] "GET /v1/apps/ploy-lane-e-java-17-nojib/status HTTP/2.0" 200 192 "-" "-" 37654 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25510" 4ms
+185.200.106.98 - - [17/Sep/2025:19:03:23 +0000] "GET /v1/apps/ploy-lane-e-java-17-nojib/logs?lines=2000 HTTP/2.0" 200 194 "-" "-" 37655 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 3ms
+185.200.106.98 - - [17/Sep/2025:19:03:23 +0000] "GET /v1/platform/api/logs?lines=2000&follow=false HTTP/2.0" 200 2346 "-" "-" 37656 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25510" 53ms
+185.200.106.98 - - [17/Sep/2025:19:03:24 +0000] "GET /v1/platform/traefik/logs?lines=2000&follow=false HTTP/2.0" 200 2354 "-" "-" 37657 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 55ms
+45.12.75.241 - - [17/Sep/2025:19:03:25 +0000] "GET /metrics HTTP/1.1" 404 19 "-" "-" 37658 "-" "-" 0ms
+172.17.0.2 - - [17/Sep/2025:19:03:40 +0000] "GET /v2/ HTTP/1.1" 200 2 "-" "-" 37659 "websecure-docker-registry@consulcatalog" "http://45.12.75.241:30232" 62ms
+45.12.75.241 - - [17/Sep/2025:19:03:55 +0000] "GET /metrics HTTP/1.1" 404 19 "-" "-" 37660 "-" "-" 0ms
+185.200.106.98 - - [17/Sep/2025:19:03:58 +0000] "GET /v1/apps/ploy-lane-e-java-17-nojib/status HTTP/2.0" 200 192 "-" "-" 37661 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25510" 5ms
+185.200.106.98 - - [17/Sep/2025:19:03:58 +0000] "GET /v1/apps/ploy-lane-e-java-17-nojib/logs?lines=2000 HTTP/2.0" 200 194 "-" "-" 37662 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:24894" 4ms
+185.200.106.98 - - [17/Sep/2025:19:03:59 +0000] "GET /v1/platform/api/logs?lines=2000&follow=false HTTP/2.0" 200 2346 "-" "-" 37663 "websecure-ploy-api@consulcatalog" "http://45.12.75.241:25510" 61ms
