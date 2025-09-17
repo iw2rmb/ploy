@@ -74,19 +74,7 @@ RUN set -eux; \
       -Dorg.gradle.java.installations.auto-download=true \
     || gradle -x test clean build \\
       -Dorg.gradle.java.installations.auto-detect=true \\
-      -Dorg.gradle.java.installations.auto-download=true ) \
-  || true; \
-  if ! ls /src/build/libs/*.jar >/dev/null 2>&1; then \
-    echo "Gradle build did not produce a JAR; falling back to javac"; \
-    mkdir -p /out/classes; \
-    if find src/main/java -name '*.java' | grep -q .; then \
-      find src/main/java -name '*.java' -print0 | xargs -0 javac -d /out/classes; \
-      mkdir -p /src/build/libs; \
-      jar --create --file /src/build/libs/app.jar -C /out/classes .; \
-    else \
-      echo "No Java sources found under src/main/java"; exit 1; \
-    fi; \
-  fi
+      -Dorg.gradle.java.installations.auto-download=true )
 
 FROM eclipse-temurin:%[1]s-jre
 WORKDIR /app

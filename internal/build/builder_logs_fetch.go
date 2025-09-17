@@ -39,12 +39,7 @@ func jobMgrPath() string { return "/opt/hashicorp/bin/nomad-job-manager.sh" }
 func runningAlloc(job string) string {
 	cmd := exec.Command(jobMgrPath(), "running-alloc", "--job", job)
 	b, _ := cmd.CombinedOutput()
-	re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-	all := re.FindAllString(string(b), -1)
-	if len(all) == 0 {
-		return ""
-	}
-	return all[len(all)-1]
+	return extractLatestUUID(string(b))
 }
 
 func runJobMgrLogs(alloc string, lines int, both bool) string {
@@ -78,9 +73,19 @@ func getAllocIDs(job string) []string {
 		ModifyTime int64  `json:"ModifyTime"`
 	}
 	var arr []alloc
-	if err := json.Unmarshal(b, &arr); err != nil || len(arr) == 0 {
-		re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
-		return re.FindAllString(string(b), -1)
+	use := jsonPayload(b)
+	if len(use) == 0 || json.Unmarshal(use, &arr) != nil || len(arr) == 0 {
+		// Fallback to extracting explicit ID fields from whatever text the wrapper emitted.
+		reID := regexp.MustCompile(`"ID":"([0-9a-f\-]{36})"`)
+		matches := reID.FindAllStringSubmatch(string(b), -1)
+		if len(matches) > 0 {
+			ids := make([]string, 0, len(matches))
+			for _, m := range matches {
+				ids = append(ids, m[1])
+			}
+			return ids
+		}
+		return extractAllUUIDs(string(b))
 	}
 	sort.Slice(arr, func(i, j int) bool { return arr[i].ModifyTime > arr[j].ModifyTime })
 	ids := make([]string, 0, len(arr))
@@ -90,4 +95,30 @@ func getAllocIDs(job string) []string {
 		}
 	}
 	return ids
+}
+
+func jsonPayload(raw []byte) []byte {
+	s := string(raw)
+	start := strings.Index(s, "[")
+	if start == -1 {
+		return nil
+	}
+	end := strings.LastIndex(s, "]")
+	if end == -1 || end <= start {
+		return nil
+	}
+	return []byte(s[start : end+1])
+}
+
+func extractLatestUUID(s string) string {
+	uuids := extractAllUUIDs(s)
+	if len(uuids) == 0 {
+		return ""
+	}
+	return uuids[len(uuids)-1]
+}
+
+func extractAllUUIDs(s string) []string {
+	re := regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	return re.FindAllString(s, -1)
 }

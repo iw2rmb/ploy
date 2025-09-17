@@ -41,10 +41,6 @@ job "{{APP_NAME}}-lane-c" {
     task "osv-jvm" {
       driver = "qemu"
 
-      {{#if VAULT_ENABLED}}
-      vault { policies = ["{{APP_NAME}}-policy"]; change_mode = "restart" }
-      {{/if}}
-
       config {
         image_path = "{{IMAGE_PATH}}"
         args = [
