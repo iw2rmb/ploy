@@ -93,6 +93,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Automatic Renewal**: Traefik handles certificate renewal before expiration
   - **Consul Catalog ACL Support** (Sep 2025): Traefik provider accepts Consul ACL tokens via `CONSUL_HTTP_TOKEN` (Nomad + Ansible wired)
 - **Fast Health Routing** (Sep 2025): Consul checks use lightweight `/live`; readiness stays on `/ready` for deep validation
+- ✅ **SeaweedFS Health Stability** (Sep 2025): Health checker now derives storage clients from the centralized config service so `/v1/health` and `/v1/ready` stay green during deployments even without optional metrics adapters.
 - **Tag Consolidation (in progress, Sep 2025)**: Shared `internal/routing` tag builder (`BuildTraefikTags`) to standardize Traefik configuration across components
  - **Env Helper Unification (Sep 2025)**: API, orchestration, and cleanup flows consistently read env via `internal/utils.Getenv` for predictable defaults
  - **Config Path Decoupling (Sep 2025)**: API server resolves storage config path internally (env → external → embedded) without `api/config` dependency; unit tests cover behavior

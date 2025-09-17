@@ -6,9 +6,11 @@ import (
 	"io"
 	"testing"
 
+	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockStorage is a mock implementation of the storage.Storage interface
@@ -105,6 +107,22 @@ func TestHealthChecker_CheckSeaweedFS_WithFactory(t *testing.T) {
 	// - dep.Error to contain appropriate error message
 	assert.NotNil(t, dep)
 	assert.Contains(t, dep.Status, "unhealthy")
+}
+
+func TestHealthChecker_CheckSeaweedFS_ConfigServiceMemoryProvider(t *testing.T) {
+	svc, err := cfgsvc.New(cfgsvc.WithDefaults(&cfgsvc.Config{
+		Storage: cfgsvc.StorageConfig{Provider: "memory"},
+	}))
+	require.NoError(t, err)
+
+	h := NewHealthChecker("", "", "")
+	h.SetConfigService(svc)
+
+	require.NotPanics(t, func() {
+		dep := h.checkSeaweedFS()
+		require.NotNil(t, dep)
+		assert.Equal(t, "healthy", dep.Status)
+	})
 }
 
 // Test the new storage factory health check behavior
