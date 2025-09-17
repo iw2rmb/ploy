@@ -76,6 +76,40 @@ Cycle State
  - Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs before deeper triage.
  - Cleanup: apps are destroyed after each cycle; if automated destroy fails, destroy manually: `ploy apps destroy --name <app> --force`.
 
+Next Steps (Java 17 NoJib)
+- Ensure Dev knobs are set (on the VPS/controller environment):
+  - `PLOY_KANIKO_MEMORY_JAVA_MB=2560` (bump to `3072` if OOM persists)
+  - Guard is active: runtime submit refuses empty image; digest-based refs are required (`tag@sha256:...`).
+
+- Re-run push (async) for Lane E Java 17 NoJib:
+  - Prereqs: `PLOY_CONTROLLER` points to Dev (e.g., `https://api.dev.ployman.app/v1`). If TLS issues on Dev, set `PLOY_TLS_INSECURE=1` for the CLI.
+  - From a fresh clone of the test repo (e.g., `ploy-lane-e-java-17-nojib`):
+    - Build CLI once if needed: `mkdir -p bin && GOCACHE=$(mktemp -d) go build -o ./bin/ploy ./cmd/ploy`
+    - Choose app name (sanitized): `APP=ploy-e-java-17-nojib`
+    - Run async push and capture build id:
+      - Option A (CLI): `RESP=$(PLOY_ASYNC=1 ./bin/ploy push -a "$APP" -lane E -sha "$(date +%Y%m%d-%H%M%S)") && echo "$RESP"`
+        - Extract id if JSON is returned: `ID=$(echo "$RESP" | jq -r 'try (.id // empty)')`
+      - Option B (curl, multipart): `tar -cf /tmp/src.tar . && ID=$(curl -sS -F file=@/tmp/src.tar "$PLOY_CONTROLLER/apps/$APP/builds?lane=E&sha=$(date +%s)&async=true" | jq -r .id)`
+
+- Fetch enriched builder logs and verify push/digest:
+  - `curl -sS "$PLOY_CONTROLLER/apps/$APP/builds/$ID/logs?lines=400" | tee ./builder.logs.json | jq`
+  - Expect when healthy:
+    - `.docker_image` contains `@sha256:...`
+    - `.push_verify.digest` is non-empty
+    - `.logs` shows Kaniko output (auth/manifest) or OOM clues if failing
+
+- Confirm rendered HCL uses the digest-based image:
+  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "ls -1 /opt/ploy/debug/jobs | grep '^${APP}-lane-e.*\.hcl$' | sort | tail -n 1"`
+  - Then: `ssh -o ConnectTimeout=10 root@$TARGET_HOST "sed -n '1,160p' /opt/ploy/debug/jobs/$(ls -1 /opt/ploy/debug/jobs | grep '^${APP}-lane-e.*\.hcl$' | sort | tail -n 1) | grep -E '(^\s*image\s*=|DOCKER_IMAGE|docker_image)' -n"`
+
+- Long-poll health (event-driven) to confirm running allocation:
+  - `curl -sS "$PLOY_CONTROLLER/apps/$APP/status/watch?wait=30s&timeout=30s" | jq`
+  - Expect a snapshot showing allocation in running/healthy and service registered; app serves `/healthz` on `PORT`.
+
+- Troubleshooting: if `.push_verify` is empty or Kaniko logs indicate OOM/auth issues:
+  - Increase `PLOY_KANIKO_MEMORY_JAVA_MB` to `3072` and re-run.
+  - Validate registry credentials and tag path; the verify step must target the exact pushed tag.
+
 Maintenance Rules
 - When a significant change to lane behavior, detection, or builders happens, update docs/LANES.md accordingly.
 - This document, docs/LANES.md, and AGENTS.md are the source of truth for detection/build/deploy rules and operator guidance.
