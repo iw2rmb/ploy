@@ -13,6 +13,7 @@ import (
 
 // renderAndDeployJob renders the Nomad job, validates, submits and waits for healthy
 func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, imagePath, dockerImage, sha, mainClass, detectedLanguage, detectedJavaVersion string, appEnvVars map[string]string, debug bool) (string, error) {
+	laneUpper := strings.ToUpper(lane)
 	if shouldSkipLaneDeploy(lane) {
 		fmt.Printf("[Build] Lane %s deploy skipped via MODS_SKIP_DEPLOY_LANES\n", strings.ToUpper(lane))
 		return "", nil
@@ -90,6 +91,19 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 	if vErr := orchestration.ValidateJob(jobFile); vErr != nil {
 		return "", fmt.Errorf("job validation failed: %w", vErr)
 	}
+	compileJobName := fmt.Sprintf("%s-c-build-%s", appName, sha)
+	if laneUpper == "C" {
+		if err := orchestration.SubmitAndWaitTerminal(jobFile, 10*time.Minute); err != nil {
+			snippet := strings.TrimSpace(getJobLogsSnippet(compileJobName, 200))
+			if snippet != "" {
+				fmt.Printf("[Build] Lane %s compile failed. Log tail:\n%s\n", laneUpper, snippet)
+				return "", fiber.NewError(500, fmt.Sprintf("deployment did not become healthy: %v\n%s", err, snippet))
+			}
+			return "", fiber.NewError(500, fmt.Sprintf("deployment did not become healthy: %v", err))
+		}
+		return compileJobName, nil
+	}
+
 	if err := orchestration.Submit(jobFile); err != nil {
 		return "", err
 	}
