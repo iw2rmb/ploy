@@ -18,18 +18,13 @@ job "{{APP_NAME}}-c-build-{{VERSION}}" {
       env {
         CONTEXT_URL  = "{{CONTEXT_URL}}"
         OUTPUT_PATH  = "{{OUTPUT_PATH}}"
-        BASE_IMAGE   = "{{BASE_IMAGE}}"
         MAIN_CLASS   = "{{MAIN_CLASS}}"
       }
 
       config {
-        image = "alpine:3.19"
+        image = "maven:3.9.6-eclipse-temurin-17"
         entrypoint = ["/bin/sh", "-lc"]
-        # Simple pack: ensure base image exists and copy to output; placeholder for OSv composition
-        args = [
-          "set -eu; mkdir -p /workspace; wget -qO /workspace/src.tar \"$CONTEXT_URL\" || true; mkdir -p $(dirname \"$OUTPUT_PATH\"); if [ ! -f \"$BASE_IMAGE\" ]; then echo 'Missing base image' >&2; exit 1; fi; cp \"$BASE_IMAGE\" \"$OUTPUT_PATH\"; echo packaged > /workspace/status.txt;"
-        ]
-        # Bind host /opt/ploy to write artifacts
+        args = ["set -eux; WORKDIR=/workspace/app; mkdir -p $WORKDIR; curl -fsSL \"$CONTEXT_URL\" -o /workspace/src.tar; tar -xf /workspace/src.tar -C $WORKDIR; cd $WORKDIR; mvn -B -q -DskipTests compile; mkdir -p $(dirname \"$OUTPUT_PATH\"); echo 'lane-c artifact placeholder' > \"$OUTPUT_PATH\";"]
         volumes = ["/opt/ploy:/host/opt/ploy"]
       }
 
@@ -39,4 +34,3 @@ job "{{APP_NAME}}-c-build-{{VERSION}}" {
     }
   }
 }
-
