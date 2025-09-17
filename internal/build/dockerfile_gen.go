@@ -62,19 +62,27 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
 WORKDIR /src
 COPY . .
-# Patch Kotlin DSL for JavaCompile if present; prefer toolchain-friendly flags
+# Inject a Gradle init script to enforce Java release and disable tests (no repo edits)
 RUN set -eux; \
-  if [ -f build.gradle.kts ]; then \
-    grep -q "org.gradle.api.tasks.compile.JavaCompile" build.gradle.kts || sed -i '1s;^;import org.gradle.api.tasks.compile.JavaCompile\n;' build.gradle.kts; \
-    sed -i -E 's/tasks\\.withType\\(JavaCompile\\)\\.configureEach \\{ options\\.release = ([0-9]+) \\}/tasks.withType(org.gradle.api.tasks.compile.JavaCompile::class).configureEach { options.release.set(\\1) }/' build.gradle.kts || true; \
-  fi; \
+  cat > /tmp/ploy-init.gradle <<'EOF'; \
+import org.gradle.api.tasks.compile.JavaCompile;\n
+allprojects {\n  // Disable tests\n  tasks.withType(Test).configureEach { enabled = false }\n  // Ensure JavaCompile release target\n  tasks.withType(JavaCompile).configureEach {\n    try {\n      options.release = %[1]s\n    } catch (Throwable ignored) {\n      try { options.release.set(%[1]s) } catch (Throwable ignored2) { }\n    }\n  }\n  // Toolchain when java plugin present\n  plugins.withId('java') {\n    try { java { toolchain { languageVersion = JavaLanguageVersion.of(%[1]s) } } } catch (Throwable ignored) { }\n  }\n}\nEOF\n; \
   chmod +x ./gradlew || true; \
-  ( ./gradlew -x test clean build \\
+  ( ./gradlew -I /tmp/ploy-init.gradle -x test clean build \\
       -Dorg.gradle.java.installations.auto-detect=true \\
       -Dorg.gradle.java.installations.auto-download=true \
-    || gradle -x test clean build \\
+    || gradle -I /tmp/ploy-init.gradle -x test clean build \\
       -Dorg.gradle.java.installations.auto-detect=true \\
-      -Dorg.gradle.java.installations.auto-download=true )
+      -Dorg.gradle.java.installations.auto-download=true ); \
+  # Robust JAR selection
+  SEL=""; \
+  mapfile -t CANDS < <(find . -path '*/build/libs/*.jar' -type f 2>/dev/null || true); \
+  if [ ${#CANDS[@]} -eq 0 ]; then echo "No JARs produced"; exit 1; fi; \
+  for j in "${CANDS[@]}"; do \
+    if echo "$j" | grep -Ei '(boot|shadow).*\.jar$' >/dev/null; then SEL="$j"; break; fi; \
+  done; \
+  if [ -z "$SEL" ]; then SEL=$(printf '%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%s %n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); fi; \
+  test -n "$SEL" && { mkdir -p /src/build/libs; cp "$SEL" /src/build/libs/app.jar; } || { echo "Failed to select JAR"; exit 1; }
 
 FROM eclipse-temurin:%[1]s-jre
 WORKDIR /app
