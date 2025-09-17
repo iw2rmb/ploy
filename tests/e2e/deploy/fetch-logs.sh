@@ -11,6 +11,7 @@ APP_NAME=${APP_NAME:-}
 LANE=${LANE:-}
 SHA=${SHA:-}
 LINES=${LINES:-200}
+FILTER_MARKERS=${FILTER_MARKERS:-}
 FOLLOW=${FOLLOW:-false}
 OUT_DIR=${OUT_DIR:-}
 BUILD_ID=${BUILD_ID:-}
@@ -40,6 +41,10 @@ if [[ -n "${PC:-}" ]]; then
   echo "== Platform API logs ($LINES, follow=$FOLLOW)" >&2
   if [[ -n "$OUT_DIR" ]]; then
     curl -sf "$PC/platform/api/logs?lines=$LINES&follow=$FOLLOW" | tee "$OUT_DIR/platform_api.log" || true; echo
+    if [[ -n "$FILTER_MARKERS" ]]; then
+      echo "== Platform API logs (filtered)" >&2
+      rg -n "$FILTER_MARKERS" "$OUT_DIR/platform_api.log" | tee "$OUT_DIR/platform_api.filtered.log" || true; echo
+    fi
   else
     curl -sf "$PC/platform/api/logs?lines=$LINES&follow=$FOLLOW" || true; echo
   fi
