@@ -54,3 +54,4 @@ test-template/
 .gopath/.gocache/
 
 tests/tmp/
+tests/mods/orw-apply-llm-plan-seq/logs/
