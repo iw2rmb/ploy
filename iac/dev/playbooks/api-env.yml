@@ -104,7 +104,7 @@
           MODS_LLM_EXEC_IMAGE="{{ lookup('env', 'MODS_LLM_EXEC_IMAGE') }}"
           # Optional defaults
           MODS_REGISTRY="{{ lookup('env', 'MODS_REGISTRY') }}"
-          MODS_SKIP_DEPLOY_LANES="{{ controller_mods_skip_deploy if controller_mods_skip_deploy | length > 0 else (fallback_mods_skip_deploy if fallback_mods_skip_deploy | length > 0 else 'C') }}"
+          MODS_SKIP_DEPLOY_LANES="{{ controller_mods_skip_deploy if controller_mods_skip_deploy | length > 0 else fallback_mods_skip_deploy }}"
           # Lane E builder image (Kaniko). Mirrored into internal registry in Dev.
           PLOY_KANIKO_IMAGE="{{ computed_kaniko_image }}"
           # Optional OSv base image URL for Lane C builder (Dev only)
