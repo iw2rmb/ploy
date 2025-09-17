@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	models "github.com/iw2rmb/ploy/internal/arf/models"
+	models "github.com/iw2rmb/ploy/api/recipes/models"
 )
 
 // PaginationInfo contains pagination metadata
