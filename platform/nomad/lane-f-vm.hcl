@@ -160,28 +160,6 @@ TIMEZONE={{.}}
 {{with key "ploy/shared/config/locale"}}
 LOCALE={{.}}
 {{end}}
-
-# Infrastructure services
-{{with key "ploy/shared/database/url"}}
-DATABASE_URL={{.}}
-{{end}}
-{{with key "ploy/shared/redis/url"}}
-REDIS_URL={{.}}
-{{end}}
-{{with key "ploy/shared/elasticsearch/url"}}
-ELASTICSEARCH_URL={{.}}
-{{end}}
-{{with key "ploy/shared/kafka/brokers"}}
-KAFKA_BROKERS={{.}}
-{{end}}
-
-# Monitoring configuration
-{{with key "ploy/shared/monitoring/prometheus_url"}}
-PROMETHEUS_URL={{.}}
-{{end}}
-{{with key "ploy/shared/monitoring/grafana_url"}}
-GRAFANA_URL={{.}}
-{{end}}
 EOF
         destination = "local/vm.env"
         env         = true
