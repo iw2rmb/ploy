@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	consulapi "github.com/hashicorp/consul/api"
 	platformnomad "github.com/iw2rmb/ploy/platform/nomad"
 )
 
@@ -53,27 +52,6 @@ type RenderData struct {
 
 	// Build metadata
 	BuildTime string
-}
-
-// ConsulTemplateClient wraps Consul client for template operations
-type ConsulTemplateClient struct {
-	client *consulapi.Client
-}
-
-// NewConsulTemplateClient creates a new Consul template client
-func NewConsulTemplateClient() (*ConsulTemplateClient, error) {
-	config := consulapi.DefaultConfig()
-	client, err := consulapi.NewClient(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create consul client: %w", err)
-	}
-	return &ConsulTemplateClient{client: client}, nil
-}
-
-// GetTemplate retrieves a template from Consul KV with platform file fallback
-func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) {
-	// Deprecated in API path: templates are now embedded and Consul is not used for reads here.
-	return nil, fmt.Errorf("template reads are embed-only in API: %s", templatePath)
 }
 
 func templateForLane(lane string) string {
