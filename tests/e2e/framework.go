@@ -14,9 +14,9 @@ import (
 )
 
 type TestEnvironment struct {
-	Config       Config
-	TransflowCLI *TransflowCLI
-	cleanup      []func()
+	Config  Config
+	PloyCLI *PloyCLI
+	cleanup []func()
 }
 
 type Config struct {
@@ -47,7 +47,7 @@ func (env *TestEnvironment) setupRealServices(t *testing.T) {
 }
 
 func (env *TestEnvironment) setupLocalServices(t *testing.T) {
-	env.TransflowCLI = &TransflowCLI{
+	env.PloyCLI = &PloyCLI{
 		binaryPath: "./bin/ploy",
 		env: map[string]string{
 			"CONSUL_HTTP_ADDR": "localhost:8500",
@@ -58,13 +58,13 @@ func (env *TestEnvironment) setupLocalServices(t *testing.T) {
 	}
 	// Propagate controller URL if set in outer environment
 	if v := os.Getenv("PLOY_CONTROLLER"); v != "" {
-		env.TransflowCLI.env["PLOY_CONTROLLER"] = v
+		env.PloyCLI.env["PLOY_CONTROLLER"] = v
 	}
 }
 
 func (env *TestEnvironment) setupVPSServices(t *testing.T) {
 	targetHost := os.Getenv("TARGET_HOST")
-	env.TransflowCLI = &TransflowCLI{
+	env.PloyCLI = &PloyCLI{
 		binaryPath: "./bin/ploy-linux",
 		env: map[string]string{
 			"TARGET_HOST": targetHost,
@@ -73,7 +73,7 @@ func (env *TestEnvironment) setupVPSServices(t *testing.T) {
 }
 
 func (env *TestEnvironment) setupMockServices(t *testing.T) {
-	env.TransflowCLI = &TransflowCLI{
+	env.PloyCLI = &PloyCLI{
 		binaryPath: "./bin/ploy",
 		env: map[string]string{
 			"MODS_TEST_MODE": "true",
@@ -95,7 +95,7 @@ func (env *TestEnvironment) ExecuteWorkflow(ctx context.Context, workflow *Trans
 	defer func() { _ = os.Remove(tempFile) }()
 
 	start := time.Now()
-	output, err := env.TransflowCLI.Run(ctx, "mod", "run", "-f", tempFile, "--output", "json")
+	output, err := env.PloyCLI.Run(ctx, "mod", "run", "-f", tempFile, "--output", "json")
 	duration := time.Since(start)
 
 	result := WorkflowResult{
@@ -121,19 +121,19 @@ func (env *TestEnvironment) Cleanup() {
 	}
 }
 
-type TransflowCLI struct {
+type PloyCLI struct {
 	binaryPath string
 	env        map[string]string
 }
 
-func (cli *TransflowCLI) Run(ctx context.Context, args ...string) (string, error) {
+func (cli *PloyCLI) Run(ctx context.Context, args ...string) (string, error) {
 	if os.Getenv("TARGET_HOST") != "" {
 		return cli.runVPS(ctx, args...)
 	}
 	return cli.runLocal(ctx, args...)
 }
 
-func (cli *TransflowCLI) runLocal(ctx context.Context, args ...string) (string, error) {
+func (cli *PloyCLI) runLocal(ctx context.Context, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, cli.binaryPath, args...)
 	cmd.Env = os.Environ()
 	for k, v := range cli.env {
@@ -143,7 +143,7 @@ func (cli *TransflowCLI) runLocal(ctx context.Context, args ...string) (string, 
 	return string(output), err
 }
 
-func (cli *TransflowCLI) runVPS(ctx context.Context, args ...string) (string, error) {
+func (cli *PloyCLI) runVPS(ctx context.Context, args ...string) (string, error) {
 	targetHost := os.Getenv("TARGET_HOST")
 	cmdArgs := append([]string{
 		fmt.Sprintf("root@%s", targetHost),
