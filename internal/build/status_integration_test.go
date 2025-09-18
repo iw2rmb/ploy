@@ -93,7 +93,6 @@ func TestStatusFunctionIntegration(t *testing.T) {
 				monitor.On("GetJobStatus", "test-app-lane-d").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "test-app-lane-e").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "test-app-lane-f").Return(nil, fmt.Errorf("job not found"))
-				monitor.On("GetJobStatus", "test-app-lane-g").Return(nil, fmt.Errorf("job not found"))
 			},
 			expectedStatus: 200,
 			expectedFields: []string{"status", "lane", "instances", "last_deploy"},
@@ -121,7 +120,6 @@ func TestStatusFunctionIntegration(t *testing.T) {
 				monitor.On("GetJobStatus", "java-service-lane-d").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "java-service-lane-e").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "java-service-lane-f").Return(nil, fmt.Errorf("job not found"))
-				monitor.On("GetJobStatus", "java-service-lane-g").Return(nil, fmt.Errorf("job not found"))
 			},
 			expectedStatus: 200,
 			expectedFields: []string{"status", "lane", "instances"},
@@ -132,7 +130,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 			appName: "nonexistent-app",
 			mockSetup: func(monitor *MockStatusHealthMonitor) {
 				// Mock all lanes returning "not found"
-				lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+				lanes := []string{"a", "b", "c", "d", "e", "f"}
 				for _, lane := range lanes {
 					jobName := fmt.Sprintf("nonexistent-app-lane-%s", lane)
 					monitor.On("GetJobStatus", jobName).Return(nil, fmt.Errorf("job not found"))
@@ -163,7 +161,6 @@ func TestStatusFunctionIntegration(t *testing.T) {
 				monitor.On("GetJobStatus", "failed-app-lane-d").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "failed-app-lane-e").Return(nil, fmt.Errorf("job not found"))
 				monitor.On("GetJobStatus", "failed-app-lane-f").Return(nil, fmt.Errorf("job not found"))
-				monitor.On("GetJobStatus", "failed-app-lane-g").Return(nil, fmt.Errorf("job not found"))
 			},
 			expectedStatus: 200,
 			expectedFields: []string{"status", "lane"},
@@ -204,7 +201,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 			appName: "monitor-error-app",
 			mockSetup: func(monitor *MockStatusHealthMonitor) {
 				// All lanes return errors (simulating Nomad API issues)
-				lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+				lanes := []string{"a", "b", "c", "d", "e", "f"}
 				for _, lane := range lanes {
 					jobName := fmt.Sprintf("monitor-error-app-lane-%s", lane)
 					monitor.On("GetJobStatus", jobName).Return(nil, fmt.Errorf("nomad API error"))
@@ -257,7 +254,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 				}
 
 				// Check status in all lanes (using mock monitor)
-				lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+				lanes := []string{"a", "b", "c", "d", "e", "f"}
 				var activeJob *MockNomadJobStatus
 				allErrors := true
 
@@ -381,7 +378,6 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 			"app123-lane-d":                              "D",
 			"my-app-v2-lane-e":                           "E",
 			"test-lane-app-lane-f":                       "F", // Lane in app name shouldn't confuse
-			"123-numeric-start-lane-g":                   "G",
 			"special-chars-app-lane-a":                   "A",
 		}
 
@@ -453,7 +449,7 @@ func TestStatusConcurrency(t *testing.T) {
 			}
 
 			// Simulate the lane checking logic with a small delay
-			lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+			lanes := []string{"a", "b", "c", "d", "e", "f"}
 			for _, lane := range lanes {
 				jobName := fmt.Sprintf("%s-lane-%s", appName, lane)
 				if job, err := mockMonitor.GetJobStatus(jobName); err == nil && job != nil {

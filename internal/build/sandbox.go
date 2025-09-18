@@ -3,7 +3,6 @@ package build
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -95,8 +94,8 @@ func (s *SandboxService) Run(ctx context.Context, req SandboxRequest) (*SandboxR
 	laneHint := strings.ToUpper(strings.TrimSpace(req.Lane))
 	mainHint := strings.TrimSpace(req.MainClass)
 
-	lane, language, _, mainClass, _ := detectBuildContext(req.RepoPath, laneHint, mainHint)
-	lane = "D"
+	_, language, _, mainClass, _ := detectBuildContext(req.RepoPath, laneHint, mainHint)
+	lane := "D"
 	if mainHint != "" {
 		mainClass = mainHint
 	}
@@ -147,28 +146,4 @@ func (s *SandboxService) runLaneBuild(ctx context.Context, lane, appName, sha, r
 		return nil, err
 	}
 	return &SandboxArtifact{Path: imageRef, Type: "oci"}, nil
-}
-
-func findWASMArtifact(repoPath string) (string, error) {
-	var wasmPath string
-	err := filepath.WalkDir(repoPath, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(strings.ToLower(d.Name()), ".wasm") {
-			wasmPath = path
-			return io.EOF
-		}
-		return nil
-	})
-	if err != nil && err != io.EOF {
-		return "", fmt.Errorf("scan wasm artifact: %w", err)
-	}
-	if wasmPath == "" {
-		return "", fmt.Errorf("no wasm artifact found in repository")
-	}
-	return wasmPath, nil
 }

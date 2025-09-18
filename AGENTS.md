@@ -16,7 +16,6 @@
 ## Ploy Overview
 
 Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `CHANGELOG.md` for changes.  
-**WASM features**: Reference `docs/WASM.md` for Lane G implementation.
 
 ## Go Tooling (MANDATORY)
 

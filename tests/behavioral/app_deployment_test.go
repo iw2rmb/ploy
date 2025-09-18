@@ -245,7 +245,6 @@ var _ = Describe("Application Deployment Workflow", func() {
 			Entry("Go application via Docker lane", "https://github.com/test/go-app.git", 6*time.Minute),
 			Entry("Node.js application via Docker lane", "https://github.com/test/node-app.git", 8*time.Minute),
 			Entry("Java application via Docker lane", "https://github.com/test/java-app.git", 10*time.Minute),
-			Entry("WASM assets packaged for Docker", "https://github.com/test/wasm-app.git", 6*time.Minute),
 		)
 	})
 })

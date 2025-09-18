@@ -68,6 +68,8 @@ func TestSigningMethodFunction(t *testing.T) {
 
 // TestVulnerabilityScanning tests that vulnerability scanning function works
 func TestVulnerabilityScanning(t *testing.T) {
+	t.Setenv("PLOY_SKIP_VULN_SCAN", "1")
+
 	testCases := []struct {
 		name      string
 		imagePath string

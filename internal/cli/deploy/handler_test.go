@@ -129,3 +129,37 @@ func TestPushCmdBlueGreen(t *testing.T) {
 		t.Fatalf("output missing guidance: %s", outBuf.String())
 	}
 }
+
+func TestPushCmdIgnoresLaneOverride(t *testing.T) {
+	restoreWD := moveToTempDir(t)
+	defer restoreWD()
+
+	reqCh := make(chan *http.Request, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqCh <- r
+		_, _ = io.Copy(io.Discard, r.Body)
+		_ = r.Body.Close()
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	outBuf, finish := captureStdout(t)
+
+	PushCmd([]string{"-a", "lane-override", "-lane", "G", "-sha", "123"}, server.URL)
+
+	finish()
+
+	select {
+	case req := <-reqCh:
+		if got := req.URL.Query().Get("lane"); got != "" {
+			t.Fatalf("lane query should be empty, got %q", got)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected request to controller")
+	}
+
+	if !strings.Contains(outBuf.String(), "Lane overrides are ignored") {
+		t.Fatalf("expected informational message about lane overrides, got: %s", outBuf.String())
+	}
+}

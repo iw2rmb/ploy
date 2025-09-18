@@ -38,9 +38,9 @@ import "syscall/js"
 func main() {}`,
 			},
 			expected: Result{
-				Lane:     "G",
+				Lane:     "A",
 				Language: "go",
-				Reasons:  []string{"Go js/wasm target detected"},
+				Reasons:  []string{"go.mod detected"},
 			},
 		},
 		{
@@ -50,9 +50,9 @@ func main() {}`,
 				"build.sh": "GOOS=js GOARCH=wasm go build",
 			},
 			expected: Result{
-				Lane:     "G",
+				Lane:     "A",
 				Language: "go",
-				Reasons:  []string{"Go js/wasm target detected"},
+				Reasons:  []string{"go.mod detected"},
 			},
 		},
 	}
@@ -99,9 +99,9 @@ wasm-bindgen = "0.2"`,
 				"src/lib.rs": "use wasm_bindgen::prelude::*;",
 			},
 			expected: Result{
-				Lane:     "G",
+				Lane:     "A",
 				Language: "rust",
-				Reasons:  []string{"Rust wasm32 target detected"},
+				Reasons:  []string{"Cargo.toml detected"},
 			},
 		},
 		{
@@ -114,9 +114,9 @@ name = "test"
 crate-type = ["cdylib"]`,
 			},
 			expected: Result{
-				Lane:     "G",
+				Lane:     "A",
 				Language: "rust",
-				Reasons:  []string{"Rust wasm32 target detected"},
+				Reasons:  []string{"Cargo.toml detected"},
 			},
 		},
 		{
@@ -126,9 +126,9 @@ crate-type = ["cdylib"]`,
 				"build.sh":   "cargo build --target wasm32-unknown-unknown",
 			},
 			expected: Result{
-				Lane:     "G",
+				Lane:     "A",
 				Language: "rust",
-				Reasons:  []string{"Rust wasm32 target detected"},
+				Reasons:  []string{"Cargo.toml detected"},
 			},
 		},
 	}
@@ -168,17 +168,17 @@ func TestDetect_NodeProject(t *testing.T) {
 			name: "assemblyscript wasm project",
 			files: map[string]string{
 				"package.json": `{
-					"name": "test",
-					"devDependencies": {
-						"assemblyscript": "^0.27.0"
-					}
-				}`,
+				"name": "test",
+				"devDependencies": {
+					"assemblyscript": "^0.27.0"
+				}
+			}`,
 				"assembly/index.ts": "export function add(a: i32, b: i32): i32 { return a + b; }",
 			},
 			expected: Result{
-				Lane:     "G",
-				Language: "assemblyscript",
-				Reasons:  []string{"AssemblyScript configuration detected"},
+				Lane:     "B",
+				Language: "node",
+				Reasons:  []string{"package.json detected"},
 			},
 		},
 		{
@@ -188,9 +188,9 @@ func TestDetect_NodeProject(t *testing.T) {
 				"src/module.as": "// AssemblyScript code",
 			},
 			expected: Result{
-				Lane:     "G",
-				Language: "assemblyscript",
-				Reasons:  []string{"AssemblyScript configuration detected"},
+				Lane:     "B",
+				Language: "node",
+				Reasons:  []string{"package.json detected"},
 			},
 		},
 	}
@@ -206,6 +206,19 @@ func TestDetect_NodeProject(t *testing.T) {
 			assert.Equal(t, tt.expected.Reasons, result.Reasons)
 		})
 	}
+}
+
+func TestDetect_WASMBinaryDefaultsToLaneA(t *testing.T) {
+	files := map[string]string{
+		"module.wasm": "",
+	}
+	tmpDir := createTestDir(t, files)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
+
+	result := Detect(tmpDir)
+	assert.Equal(t, "A", result.Lane)
+	assert.Equal(t, "unknown", result.Language)
+	assert.Empty(t, result.Reasons)
 }
 
 func TestDetect_PythonProject(t *testing.T) {
@@ -451,119 +464,6 @@ func TestDetect_DotNetProject(t *testing.T) {
 	}
 }
 
-func TestDetect_CppEmscripten(t *testing.T) {
-	tests := []struct {
-		name     string
-		files    map[string]string
-		expected Result
-	}{
-		{
-			name: "emscripten project",
-			files: map[string]string{
-				".emscripten": "# Emscripten config",
-				"main.cpp":    "#include <emscripten.h>",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "cpp",
-				Reasons:  []string{"C++ Emscripten configuration detected"},
-			},
-		},
-		{
-			name: "cmake with emscripten",
-			files: map[string]string{
-				"CMakeLists.txt": "set(CMAKE_TOOLCHAIN_FILE $ENV{EMSCRIPTEN}/cmake/Modules/Platform/Emscripten.cmake)",
-				"src/main.cpp":   "int main() { return 0; }",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "cpp",
-				Reasons:  []string{"C++ Emscripten configuration detected"},
-			},
-		},
-		{
-			name: "cpp with EMSCRIPTEN_KEEPALIVE",
-			files: map[string]string{
-				"module.cpp": `#include <emscripten.h>
-EMSCRIPTEN_KEEPALIVE
-int add(int a, int b) { return a + b; }`,
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "cpp",
-				Reasons:  []string{"C++ Emscripten configuration detected"},
-			},
-		},
-		{
-			name: "build script with emcc",
-			files: map[string]string{
-				"build.sh": "emcc main.c -o main.js -s WASM=1",
-				"main.c":   "int main() { return 0; }",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "cpp",
-				Reasons:  []string{"C++ Emscripten configuration detected"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := createTestDir(t, tt.files)
-			defer func() { _ = os.RemoveAll(tmpDir) }()
-
-			result := Detect(tmpDir)
-			assert.Equal(t, tt.expected.Lane, result.Lane)
-			assert.Equal(t, tt.expected.Language, result.Language)
-			assert.Equal(t, tt.expected.Reasons, result.Reasons)
-		})
-	}
-}
-
-func TestDetect_DirectWASMFiles(t *testing.T) {
-	tests := []struct {
-		name     string
-		files    map[string]string
-		expected Result
-	}{
-		{
-			name: "direct wasm file",
-			files: map[string]string{
-				"module.wasm": "binary wasm content",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "wasm",
-				Reasons:  []string{"Direct WASM files (.wasm/.wat) detected"},
-			},
-		},
-		{
-			name: "wat text format",
-			files: map[string]string{
-				"module.wat": "(module (func $add))",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "wasm",
-				Reasons:  []string{"Direct WASM files (.wasm/.wat) detected"},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := createTestDir(t, tt.files)
-			defer func() { _ = os.RemoveAll(tmpDir) }()
-
-			result := Detect(tmpDir)
-			assert.Equal(t, tt.expected.Lane, result.Lane)
-			assert.Equal(t, tt.expected.Language, result.Language)
-			assert.Equal(t, tt.expected.Reasons, result.Reasons)
-		})
-	}
-}
-
 func TestDetect_POSIXHeavy(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -623,29 +523,6 @@ func TestDetect_PriorityHandling(t *testing.T) {
 		files    map[string]string
 		expected Result
 	}{
-		{
-			name: "WASM takes priority over regular Go",
-			files: map[string]string{
-				"go.mod":  "module test",
-				"main.go": "package main\nimport \"syscall/js\"",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "go",
-				Reasons:  []string{"Go js/wasm target detected"},
-			},
-		},
-		{
-			name: "WASM takes priority over regular Rust",
-			files: map[string]string{
-				"Cargo.toml": "[package]\nname = \"test\"\n\n[dependencies]\nwasm-bindgen = \"0.2\"",
-			},
-			expected: Result{
-				Lane:     "G",
-				Language: "rust",
-				Reasons:  []string{"Rust wasm32 target detected"},
-			},
-		},
 		{
 			name: "Python C-extensions override basic Python",
 			files: map[string]string{
@@ -754,20 +631,6 @@ func BenchmarkDetect_ComplexProject(b *testing.B) {
 	}
 
 	tmpDir := createTestDir(b, files)
-	defer func() { _ = os.RemoveAll(tmpDir) }()
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = Detect(tmpDir)
-	}
-}
-
-func BenchmarkDetect_WASMDetection(b *testing.B) {
-	tmpDir := createTestDir(b, map[string]string{
-		"Cargo.toml": "[dependencies]\nwasm-bindgen = \"0.2\"",
-		"src/lib.rs": "use wasm_bindgen::prelude::*;",
-		"build.sh":   "wasm-pack build",
-	})
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	b.ResetTimer()

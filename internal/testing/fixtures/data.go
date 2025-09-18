@@ -114,21 +114,6 @@ func generateTestApps() []TestApp {
 			},
 		},
 		{
-			Name:      "rust-wasm",
-			Language:  "rust",
-			Lane:      "G",
-			Version:   "0.1.0",
-			GitURL:    "https://github.com/test/rust-wasm.git",
-			Branch:    "main",
-			BuildTime: 3 * time.Minute,
-			Status:    "running",
-			Instances: 1,
-			EnvVars: map[string]string{
-				"RUST_ENV":      "production",
-				"WASM_OPTIMIZE": "true",
-			},
-		},
-		{
 			Name:      "python-ml",
 			Language:  "python",
 			Lane:      "C",
@@ -215,19 +200,6 @@ func generateTestBuildConfigs() []TestBuildConfig {
 				"CONTAINER_RUNTIME": "firecracker",
 			},
 		},
-		{
-			Lane:    "G",
-			Builder: "wasm-pack",
-			Timeout: 240,
-			Resources: TestResources{
-				CPU:    "250m",
-				Memory: "256Mi",
-			},
-			EnvVars: map[string]string{
-				"WASM_TARGET": "wasm32-wasi",
-				"OPTIMIZE":    "true",
-			},
-		},
 	}
 }
 
@@ -256,13 +228,6 @@ func generateTestStorageItems() []TestStorageItem {
 			ContentType: "application/java-archive",
 			Checksum:    "sha256:ghi789jkl012",
 			CreatedAt:   baseTime.Add(2 * time.Hour),
-		},
-		{
-			Key:         "builds/rust-wasm/v0.1.0/module.wasm",
-			Size:        512 * 1024, // 512KB
-			ContentType: "application/wasm",
-			Checksum:    "sha256:jkl012mno345",
-			CreatedAt:   baseTime.Add(3 * time.Hour),
 		},
 		{
 			Key:         "logs/python-ml/2025-08-26.log",
@@ -317,7 +282,6 @@ const (
 	TestAppGoAPI          = "go-api"
 	TestAppNodeFrontend   = "node-frontend"
 	TestAppJavaService    = "java-service"
-	TestAppRustWasm       = "rust-wasm"
 	TestAppPythonML       = "python-ml"
 	TestAppScalaAnalytics = "scala-analytics"
 
@@ -326,7 +290,6 @@ const (
 	TestLaneB = "B" // Unikraft Node/Python
 	TestLaneC = "C" // OSv JVM
 	TestLaneE = "E" // Containers
-	TestLaneG = "G" // WASM
 
 	// Test versions
 	TestVersionLatest = "latest"

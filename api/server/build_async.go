@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,8 +76,8 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	// Normalize lane metadata (Docker-only)
 	lane = strings.TrimSpace(lane)
 	effectiveLane := "D"
-	if strings.EqualFold(lane, "d") {
-		effectiveLane = "D"
+	if lane != "" && !strings.EqualFold(lane, "d") {
+		log.Printf("[AsyncBuild] Ignoring lane override %q; forcing Docker lane D", lane)
 	}
 
 	// Initial status
@@ -94,9 +95,6 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 		writeStatus(id, buildStatus{ID: id, App: app, Status: "running", StartedAt: time.Now().Format(time.RFC3339)})
 		// Build internal URL (bypass ingress). Preserve relevant flags from original query.
 		q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
-		if lane != "" {
-			q = append(q, "lane="+strings.ToUpper(lane))
-		}
 		if main != "" {
 			q = append(q, "main="+main)
 		}
