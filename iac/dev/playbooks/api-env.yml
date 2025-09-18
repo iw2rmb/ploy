@@ -90,8 +90,9 @@
           PLOY_PLATFORM_DOMAIN="{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') | default('dev.ployman.app', true) }}"
           # Nomad/Mods runtime defaults
           NOMAD_DC="{{ lookup('env', 'NOMAD_DC') }}"
-          # SeaweedFS Filer URL base. If not provided from controller, default to node IP:8888 (resolvable by Docker tasks)
-          PLOY_SEAWEEDFS_URL="{{ (lookup('env', 'PLOY_SEAWEEDFS_URL') | default('', true)) | ternary(lookup('env','PLOY_SEAWEEDFS_URL'), 'http://' + (hostvars[inventory_hostname]['ansible_host'] | default(inventory_hostname)) + ':8888') }}"
+          # SeaweedFS Filer URL base. Fallback to public DNS so Nomad tasks resolve consistently.
+          PLOY_SEAWEEDFS_URL="{{ (lookup('env', 'PLOY_SEAWEEDFS_URL') | default('', true)) | ternary(lookup('env','PLOY_SEAWEEDFS_URL'), 'http://seaweedfs.dev.ployman.app:8888') }}"
+          SEAWEEDFS_URL="{{ (lookup('env', 'SEAWEEDFS_URL') | default('', true)) | ternary(lookup('env','SEAWEEDFS_URL'), 'http://seaweedfs.dev.ployman.app:8888') }}"
           # Lane G (WASM) distroless runner selection
           PLOY_WASM_DISTROLESS="{{ lookup('env', 'PLOY_WASM_DISTROLESS') | default('1', true) }}"
           PLOY_WASM_ENGINE="{{ lookup('env', 'PLOY_WASM_ENGINE') | default('wazero', true) }}"
