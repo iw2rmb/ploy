@@ -80,8 +80,13 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 	if !strings.Contains(res.Message, "Missing symbol Foo") {
 		t.Fatalf("expected result message to include builder logs, got %q", res.Message)
 	}
-	if !strings.Contains(res.Message, "builder logs archived at build-logs/"+deploymentID+".log") {
+	keySnippet := "builder logs archived at build-logs/" + deploymentID + ".log"
+	if !strings.Contains(res.Message, keySnippet) {
 		t.Fatalf("expected message to reference builder logs key, got %q", res.Message)
+	}
+	downloadURL := fmt.Sprintf("%s/apps/%s/builds/%s/logs/download", strings.TrimRight(server.URL, "/"), appName, deploymentID)
+	if !strings.Contains(res.Message, downloadURL) {
+		t.Fatalf("expected message to include download route, got %q", res.Message)
 	}
 	if !strings.Contains(res.Message, "error code: builder_failed") {
 		t.Fatalf("expected message to include error code, got %q", res.Message)

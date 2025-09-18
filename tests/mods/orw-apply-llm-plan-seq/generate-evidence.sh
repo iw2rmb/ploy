@@ -41,6 +41,21 @@ DIFF="$MOD_DIR/diff.patch"
       printf 'URL: '
       cat "$MOD_DIR/builder_logs.url"
     fi
+    BUILDER_JOB=$(basename "$(cat "$MOD_DIR/builder_logs.key")")
+    BUILDER_JOB=${BUILDER_JOB%.log}
+    APP_NAME=""
+    if [[ -s "$STAT" ]]; then
+      APP_NAME=$(jq -r 'try (.steps[] | select(.step == "build-gate") | capture("app=(?<name>[A-Za-z0-9_.:-]+)").name) // empty' "$STAT" 2>/dev/null | head -n1)
+    fi
+    if [[ -z "$APP_NAME" ]]; then
+      case "$BUILDER_JOB" in
+        *-c-build-*) APP_NAME="${BUILDER_JOB%%-c-build-*}" ;;
+        *-e-build-*) APP_NAME="${BUILDER_JOB%%-e-build-*}" ;;
+      esac
+    fi
+    if [[ -n "$APP_NAME" && -n "$BUILDER_JOB" ]]; then
+      echo "API route: /v1/apps/${APP_NAME}/builds/${BUILDER_JOB}/logs/download"
+    fi
   else
     echo "(no builder logs pointer detected)"
   fi
