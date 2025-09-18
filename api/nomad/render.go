@@ -76,16 +76,6 @@ func (c *ConsulTemplateClient) GetTemplate(templatePath string) ([]byte, error) 
 	return nil, fmt.Errorf("template reads are embed-only in API: %s", templatePath)
 }
 
-// PutTemplate stores a template in Consul KV
-func (c *ConsulTemplateClient) PutTemplate(templatePath string, content []byte) error {
-	keyPath := fmt.Sprintf("ploy/templates/%s", filepath.Base(templatePath))
-	_, err := c.client.KV().Put(&consulapi.KVPair{
-		Key:   keyPath,
-		Value: content,
-	}, nil)
-	return err
-}
-
 func templateForLane(lane string) string {
 	switch strings.ToUpper(lane) {
 	case "A":
