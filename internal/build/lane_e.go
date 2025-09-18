@@ -235,9 +235,18 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		useWrapper = true
 	}
 	fmt.Printf("[Lane E] Submitting Kaniko builder job: %s (tag=%s) use_wrapper=%t file=%s\n", builderJobName, tag, useWrapper, filepath.Base(builderHCL))
+	// Stream builder logs while the job runs (best-effort)
+	streamCtx, streamCancel := context.WithCancel(context.Background())
+	defer streamCancel()
+	logStreamer := orchestration.NewLogStreamer(builderJobName)
+	go logStreamer.Run(streamCtx)
 	if err := submitAndWaitFn(builderHCL, 10*time.Minute); err != nil {
 		// Fetch and upload builder logs for diagnostics (request a large tail)
-		fullLogs := fetchJobLogsFullFn(builderJobName, 40000)
+		streamCancel()
+		fullLogs, fullFile := logStreamer.Results()
+		if strings.TrimSpace(fullLogs) == "" {
+			fullLogs = fetchJobLogsFullFn(builderJobName, 40000)
+		}
 		fmt.Printf("[Lane E][ERROR] stage=kaniko_submit app=%s sha=%s job=%s err=%v\n", appName, sha, builderJobName, err)
 		be := &BuildError{
 			Type:    "lane_e_build",
@@ -249,8 +258,12 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		c.Set("X-Deployment-ID", builderJobName)
 		// Upload full logs and include pointer
 		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
-		if deps.Storage != nil && fullLogs != "" {
-			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
+		if deps.Storage != nil {
+			if fullFile != "" {
+				_ = uploadFileWithUnifiedStorage(context.Context(c.Context()), deps.Storage, fullFile, logsKey, "text/plain")
+			} else if fullLogs != "" {
+				_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
+			}
 		}
 		logsURL := buildLogsURL(logsKey)
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
