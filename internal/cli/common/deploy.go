@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -32,11 +33,17 @@ type DeployConfig struct {
 
 // DeployResult contains deployment outcome information
 type DeployResult struct {
-	Success      bool
-	Version      string
-	DeploymentID string
-	URL          string
-	Message      string
+	Success        bool
+	Version        string
+	DeploymentID   string
+	URL            string
+	Message        string
+	ErrorCode      string
+	ErrorDetails   string
+	BuilderJob     string
+	BuilderLogs    string
+	BuilderLogsKey string
+	BuilderLogsURL string
 }
 
 // SharedPush handles deployment for both ploy and ployman
@@ -196,6 +203,47 @@ func parseDeployResponse(resp *http.Response, rawBody []byte, config DeployConfi
 			}
 		} else {
 			result.Message = fmt.Sprintf("Deployment failed with status %d", resp.StatusCode)
+		}
+
+		// Attempt to parse structured error details from JSON payloads
+		var payload struct {
+			Error struct {
+				Code    string      `json:"code"`
+				Message string      `json:"message"`
+				Details interface{} `json:"details"`
+			} `json:"error"`
+			Builder struct {
+				Job     string `json:"job"`
+				Logs    string `json:"logs"`
+				LogsKey string `json:"logs_key"`
+				LogsURL string `json:"logs_url"`
+			} `json:"builder"`
+			Logs string `json:"logs"`
+		}
+		if err := json.Unmarshal(rawBody, &payload); err == nil {
+			if msg := strings.TrimSpace(payload.Error.Message); msg != "" {
+				result.Message = msg
+			}
+			result.ErrorCode = strings.TrimSpace(payload.Error.Code)
+			if payload.Error.Details != nil {
+				if detail := strings.TrimSpace(fmt.Sprint(payload.Error.Details)); detail != "" {
+					result.ErrorDetails = detail
+				}
+			}
+			if payload.Builder.Job != "" {
+				result.BuilderJob = strings.TrimSpace(payload.Builder.Job)
+			}
+			if logs := strings.TrimSpace(payload.Builder.Logs); logs != "" {
+				result.BuilderLogs = logs
+			} else if logs := strings.TrimSpace(payload.Logs); logs != "" {
+				result.BuilderLogs = logs
+			}
+			if key := strings.TrimSpace(payload.Builder.LogsKey); key != "" {
+				result.BuilderLogsKey = key
+			}
+			if url := strings.TrimSpace(payload.Builder.LogsURL); url != "" {
+				result.BuilderLogsURL = url
+			}
 		}
 	}
 

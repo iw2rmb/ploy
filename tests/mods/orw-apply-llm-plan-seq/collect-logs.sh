@@ -31,8 +31,25 @@ log() { echo "[collect] $*"; }
 
 # 1) Fetch status snapshot
 log "Fetching status JSON"
+BUILDER_LOG_KEY=""
+BUILDER_LOG_URL=""
 if curl -fsS "$PLOY_CONTROLLER/mods/$MOD_ID/status" -o "$OUT_DIR/status_latest.json"; then
   jq -r '{status,phase,error,last_job} | @json' "$OUT_DIR/status_latest.json" 2>/dev/null || true
+  if [[ -s "$OUT_DIR/status_latest.json" ]]; then
+    # Inspect error field for builder log pointers emitted by the build gate helper.
+    ERR_TEXT=$(jq -r '.error // empty' "$OUT_DIR/status_latest.json")
+    if [[ -n "$ERR_TEXT" ]]; then
+      BUILDER_LOG_KEY=$(printf '%s' "$ERR_TEXT" | rg -o 'build-logs/[A-Za-z0-9_.:-]+\.log' -m1 || true)
+      BUILDER_LOG_URL=$(printf '%s' "$ERR_TEXT" | rg -o 'https?://[^ )]+/build-logs/[A-Za-z0-9_.:-]+\.log' -m1 || true)
+    fi
+    # Fallback to structured fields if status payload exposes them separately.
+    if [[ -z "$BUILDER_LOG_KEY" ]]; then
+      BUILDER_LOG_KEY=$(jq -r 'try .result.builder_logs_key // .result.builder.logs_key // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
+    fi
+    if [[ -z "$BUILDER_LOG_URL" ]]; then
+      BUILDER_LOG_URL=$(jq -r 'try .result.builder_logs_url // .result.builder.logs_url // empty' "$OUT_DIR/status_latest.json" 2>/dev/null || true)
+    fi
+  fi
 else
   echo "warning: failed to fetch status" >&2
 fi
@@ -81,6 +98,15 @@ else
   log "No artifact keys found in events (ok if uploads did not occur)"
 fi
 
+# Persist builder log pointers if present for downstream download helpers
+if [[ -n "$BUILDER_LOG_KEY" ]]; then
+  echo "$BUILDER_LOG_KEY" > "$OUT_DIR/builder_logs.key"
+  if [[ -n "$BUILDER_LOG_URL" ]]; then
+    echo "$BUILDER_LOG_URL" > "$OUT_DIR/builder_logs.url"
+  fi
+  log "Builder logs pointer detected: $BUILDER_LOG_KEY"
+fi
+
 if [[ -n "${PLOY_SEAWEEDFS_URL:-}" && -s "$ART_KEYS_FILE" ]]; then
   log "Downloading artifacts from SeaweedFS"
   while IFS= read -r KEY; do
@@ -97,6 +123,19 @@ if [[ -n "${PLOY_SEAWEEDFS_URL:-}" && -s "$ART_KEYS_FILE" ]]; then
 else
   if [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
     log "PLOY_SEAWEEDFS_URL not set; skipping SeaweedFS artifact download"
+  fi
+fi
+
+# Fetch builder logs from SeaweedFS when the pointer is available.
+if [[ -n "$BUILDER_LOG_KEY" && -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+  BUILDER_DEST="$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
+  mkdir -p "$(dirname "$BUILDER_DEST")"
+  BUILDER_URL_FULL="${PLOY_SEAWEEDFS_URL%/}/artifacts/${BUILDER_LOG_KEY}"
+  if curl -fsS "$BUILDER_URL_FULL" -o "$BUILDER_DEST"; then
+    log "Downloaded builder logs to $BUILDER_DEST"
+  else
+    echo "warning: failed to download builder logs from $BUILDER_URL_FULL" >&2
+    rm -f "$BUILDER_DEST" || true
   fi
 fi
 
@@ -160,6 +199,18 @@ if [[ -z "${PLOY_SEAWEEDFS_URL:-}" && -n "${TARGET_HOST:-}" && -s "$ART_KEYS_FIL
   done < "$ART_KEYS_FILE"
 fi
 
+if [[ -z "${PLOY_SEAWEEDFS_URL:-}" && -n "${TARGET_HOST:-}" && -n "$BUILDER_LOG_KEY" ]]; then
+  log "Fetching builder logs from SeaweedFS via SSH"
+  DEST="$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
+  mkdir -p "$(dirname "$DEST")"
+  ssh -o ConnectTimeout=10 "root@$TARGET_HOST" \
+    "curl -fsS 'http://seaweedfs-filer.service.consul:8888/artifacts/${BUILDER_LOG_KEY}'" \
+    > "$DEST" 2>/dev/null || {
+      echo "warning: failed to fetch builder logs via SSH" >&2
+      rm -f "$DEST" || true
+    }
+fi
+
 # 6) Summarize
 SUMMARY="$OUT_DIR/summary.txt"
 {
@@ -179,6 +230,16 @@ SUMMARY="$OUT_DIR/summary.txt"
   if [[ -s "$ART_KEYS_FILE" ]]; then
     echo "Artifact keys (from events):"
     cat "$ART_KEYS_FILE"
+  fi
+  if [[ -n "$BUILDER_LOG_KEY" ]]; then
+    echo
+    echo "Builder logs key: $BUILDER_LOG_KEY"
+    if [[ -n "$BUILDER_LOG_URL" ]]; then
+      echo "Builder logs URL: $BUILDER_LOG_URL"
+    fi
+    if [[ -f "$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY" ]]; then
+      echo "Builder logs saved to: $OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
+    fi
   fi
   # Try to extract planner and llm-exec RUN_IDs from events to fetch context inputs.json (if SeaweedFS URL is set)
   if [[ -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then

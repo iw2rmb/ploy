@@ -43,6 +43,7 @@ Verify the Run
 - `./check-steps.sh <MOD_ID>` ensures the key phases occurred in order (ORW diff, build failure, planner -> llm-exec -> reducer).
 - `./generate-evidence.sh <logs/mod-*>` summarizes build errors, prompts, and diffs for attachments or regressions.
 - `./collect-logs.sh <MOD_ID>` downloads controller/platform logs plus referenced SeaweedFS artifacts when deeper debugging is required.
+- Builder failures now emit a SeaweedFS pointer (`build-logs/<JOB>.log`). `collect-logs.sh` writes the key to `builder_logs.key` and downloads the full log into `logs/<MOD_ID>/seaweedfs/` whenever SeaweedFS is reachable (or via SSH fallback when only `TARGET_HOST` is set).
 
 Next Step
 ---------

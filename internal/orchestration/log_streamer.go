@@ -24,6 +24,8 @@ type LogStreamer struct {
 	started  bool
 }
 
+var execCommandContext = exec.CommandContext
+
 // NewLogStreamer creates a new streamer for the given job.
 func NewLogStreamer(jobName string) *LogStreamer {
 	return &LogStreamer{jobName: jobName, maxBytes: 1 * 1024 * 1024}
@@ -73,7 +75,7 @@ func (s *LogStreamer) findRunningAlloc(ctx context.Context) string {
 			return ""
 		default:
 		}
-		cmd := exec.CommandContext(ctx, jobMgrPath(), "running-alloc", "--job", s.jobName)
+		cmd := execCommandContext(ctx, jobMgrPath(), "running-alloc", "--job", s.jobName)
 		b, _ := cmd.CombinedOutput()
 		id := extractLastUUID(string(b))
 		if strings.TrimSpace(id) != "" {
@@ -139,7 +141,7 @@ func (s *LogStreamer) Run(ctx context.Context) {
 		// try with known tasks first
 		var cmd *exec.Cmd
 		for _, t := range candidateTasks() {
-			cmd = exec.CommandContext(ctx, jobMgrPath(), "logs", "--alloc-id", alloc, "--task", t, "--both", "--follow")
+			cmd = execCommandContext(ctx, jobMgrPath(), "logs", "--alloc-id", alloc, "--task", t, "--both", "--follow")
 			if r, err := cmd.StdoutPipe(); err == nil {
 				if e, err2 := cmd.StderrPipe(); err2 == nil {
 					if err3 := cmd.Start(); err3 == nil {
@@ -152,7 +154,7 @@ func (s *LogStreamer) Run(ctx context.Context) {
 		}
 		if cmd == nil {
 			// try without task
-			cmd = exec.CommandContext(ctx, jobMgrPath(), "logs", "--alloc-id", alloc, "--both", "--follow")
+			cmd = execCommandContext(ctx, jobMgrPath(), "logs", "--alloc-id", alloc, "--both", "--follow")
 			if r, err := cmd.StdoutPipe(); err == nil {
 				if e, err2 := cmd.StderrPipe(); err2 == nil {
 					if err3 := cmd.Start(); err3 == nil {
