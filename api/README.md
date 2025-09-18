@@ -29,7 +29,7 @@ api/
 ├── nvd/                   # NVD database/types/lookup/converter
 ├── platform/              # Platform handler endpoints
 ├── recipes/               # Recipes API, registry adapter, models
-├── security/           # Remediation engine (security scans, guidance)
+├── security/           # Code modification engine (security scans, guidance)
 ├── consul_envstore/       # Consul-backed environment store
 ├── coordination/          # Leader election and TTL cleanup
 ├── selfupdate/            # Self-update executor and endpoints

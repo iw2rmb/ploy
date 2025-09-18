@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// SecurityEngine handles vulnerability remediation and security analysis
+// SecurityEngine handles code modification planning and security analysis
 type SecurityEngine struct {
 	grypePath    string
 	cveDatabase  CVEDatabase
-	remediator   VulnerabilityRemediator
+	modPlanner   VulnerabilityModPlanner
 	riskAnalyzer RiskAnalyzer
 	sbomAnalyzer SBOMSecurityAnalyzer
 	httpClient   *http.Client
@@ -22,7 +22,7 @@ func NewSecurityEngine() *SecurityEngine {
 	return &SecurityEngine{
 		grypePath:    "grype",
 		cveDatabase:  nil, // Would be initialized with real implementation
-		remediator:   nil, // Would be initialized with real implementation
+		modPlanner:   nil, // Would be initialized with real implementation
 		riskAnalyzer: nil, // Would be initialized with real implementation
 		sbomAnalyzer: nil, // Would be initialized with real implementation
 		httpClient: &http.Client{
@@ -84,21 +84,21 @@ func (s *SecurityEngine) ScanForVulnerabilities(ctx context.Context, target stri
 	return report, nil
 }
 
-// GenerateRemediationPlan creates a comprehensive remediation plan
-func (s *SecurityEngine) GenerateRemediationPlan(ctx context.Context, vulns []VulnerabilityInfo, codebase Codebase) (*RemediationPlan, error) {
+// GenerateModPlan creates a comprehensive modification plan
+func (s *SecurityEngine) GenerateModPlan(ctx context.Context, vulns []VulnerabilityInfo, codebase Codebase) (*ModPlan, error) {
 	// Create prioritized vulnerabilities
 	priorities := s.prioritizeVulnerabilities(vulns)
 
-	// Create remediation timeline
-	timeline := s.createRemediationTimeline(priorities)
+	// Create modification timeline
+	timeline := s.createModTimeline(priorities)
 
 	// Calculate estimated effort
 	effort := s.calculateEffort(vulns)
 
-	plan := &RemediationPlan{
+	plan := &ModPlan{
 		ID:              generateID(),
 		Vulnerabilities: vulns,
-		Recipes:         []RemediationRecipe{},
+		Recipes:         []ModRecipe{},
 		Timeline:        timeline,
 		EstimatedEffort: effort,
 		CreatedAt:       time.Now(),
@@ -145,8 +145,8 @@ func (s *SecurityEngine) prioritizeVulnerabilities(vulns []VulnerabilityInfo) []
 	return priorities
 }
 
-func (s *SecurityEngine) createRemediationTimeline(priorities []VulnerabilityPriority) RemediationTimeline {
-	timeline := RemediationTimeline{
+func (s *SecurityEngine) createModTimeline(priorities []VulnerabilityPriority) ModTimeline {
+	timeline := ModTimeline{
 		Immediate: []string{},
 		Short:     []string{},
 		Medium:    []string{},

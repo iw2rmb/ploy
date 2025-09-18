@@ -111,7 +111,7 @@ func (s *Server) setupRoutes() {
 		dns.SetupDNSRoutes(s.app, s.dependencies.DNSHandler)
 	}
 
-	// Legacy security endpoints (Automated Remediation Framework)
+	// Legacy security endpoints (Automated Modification Framework)
 	if s.dependencies.SecurityHandler != nil {
 		s.dependencies.SecurityHandler.RegisterRoutes(s.app)
 		log.Printf("Security routes registered successfully")

@@ -13,13 +13,13 @@ The Security Engine provides vulnerability scanning, recipe catalog helpers, and
   `POST /v1/recipes` (create custom), `POST /v1/recipes/upload`, `POST /v1/recipes/validate`, `GET /v1/recipes/:id/download`.
   
   Note: LLM model registry endpoints live under `/v1/llms/models/*` (including default model management via `/v1/llms/models/default`).
-- Security: `POST /v1/security/scan`, `POST /v1/security/remediation`, `GET /v1/security/{report|report/:id|compliance}`.
+- Security: `POST /v1/security/scan`, `POST /v1/security/mods/plan`, `GET /v1/security/{report|report/:id|compliance}`.
 - SBOM: see `/v1/sbom/*` endpoints for generation and analysis.
 - Sandboxes: `GET/POST /v1/security/sandboxes`, `DELETE /v1/security/sandboxes/:id` (legacy; Mods covers primary workflows).
 - SBOM moved to separate package:
   - `POST /v1/sbom/generate`, `POST /v1/sbom/analyze`
   - `GET /v1/sbom/{report|:id|compliance}`
-- Sandboxes: `GET/POST /v1/arf/sandboxes`, `DELETE /v1/arf/sandboxes/:id`.
+- Sandboxes: `GET/POST /v1/security/sandboxes`, `DELETE /v1/security/sandboxes/:id`.
  
 
 Removed/unsupported: hybrid pipeline and strategy selection, LLM dispatcher, local OpenRewrite engine, legacy benchmark endpoints, Security Engine healing coordinator and learning/metrics. Healing and planning are unified under Mods + LangGraph.

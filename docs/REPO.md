@@ -21,7 +21,7 @@ ploy/
 ├── .gitignore                # Git ignore rules
 └── roadmap/                  # Detailed implementation roadmaps
     ├── README.md             # Main roadmap overview and progress
-    ├── arf/                  # Automated Remediation Framework (see roadmap/arf/README.md)
+    ├── arf/                  # Automated Modification Framework (see roadmap/arf/README.md)
     ├── openrewrite/          # OpenRewrite Service Implementation (see roadmap/openrewrite/README.md)
     ├── static-analysis/      # Static Analysis Integration (see roadmap/static-analysis/README.md)
     ├── tdd/                  # Test-Driven Development (see roadmap/tdd/README.md)
