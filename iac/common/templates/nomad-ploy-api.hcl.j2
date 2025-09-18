@@ -106,14 +106,11 @@ job "ploy-api" {
         PLOY_WASM_DISTROLESS = 1
         PLOY_WASM_ENGINE = wazero
 
-        # SeaweedFS configuration (master via localhost, filer via consul DNS)
+        # SeaweedFS configuration. Use external DNS name so job containers resolve consistently.
         SEAWEEDFS_MASTER = "http://localhost:9333"
-        SEAWEEDFS_FILER = "http://seaweedfs-filer.service.consul:8888"
-
-        # Prefer direct filer IP for mods tasks to avoid DNS issues inside job containers
-        # Use the host's primary IPv4 for Filer port 8888
-        # Use Consul DNS for SeaweedFS Filer to avoid hardcoding host IPs
-        PLOY_SEAWEEDFS_URL = "http://seaweedfs-filer.service.consul:8888"
+        SEAWEEDFS_FILER = "http://seaweedfs.dev.ployman.app:8888"
+        PLOY_SEAWEEDFS_URL = "http://seaweedfs.dev.ployman.app:8888"
+        SEAWEEDFS_URL = "http://seaweedfs.dev.ployman.app:8888"
 
         # ARF (Automated Remediation Framework) configuration
         ARF_STORAGE_BACKEND = "seaweedfs"
