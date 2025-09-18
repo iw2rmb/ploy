@@ -75,7 +75,7 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 
 	if result != nil && !result.Success {
 		// Normalize the controller response into a readable message and capture builder logs (if present).
-		result.Message = enrichBuildFailureMessage(result.Message)
+		result.Message = enrichBuildFailureMessage(result)
 
 		// Attempt to fetch build logs to enrich error for downstream healing
 		logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
@@ -112,14 +112,16 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	return result, nil
 }
 
-// enrichBuildFailureMessage attempts to convert the raw controller error payload into a readable message.
-// It extracts `error.message`, `error.details`, and any builder logs (`builder.logs` or top-level `logs` fields),
-// ensuring the returned string surfaces actionable diagnostics instead of raw JSON blobs.
-func enrichBuildFailureMessage(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
+// enrichBuildFailureMessage attempts to convert controller error payloads into readable summaries.
+// It consults structured fields on DeployResult as well as any raw JSON fragments still present in
+// result.Message, producing a deduplicated multiline string that highlights root cause, details, and
+// SeaweedFS log pointers emitted by the build gate.
+func enrichBuildFailureMessage(result *common.DeployResult) string {
+	if result == nil {
 		return ""
 	}
+
+	trimmed := strings.TrimSpace(result.Message)
 
 	type builderPayload struct {
 		Error struct {
@@ -128,14 +130,15 @@ func enrichBuildFailureMessage(raw string) string {
 			Details interface{} `json:"details"`
 		} `json:"error"`
 		Builder struct {
-			Logs string `json:"logs"`
+			Job     string `json:"job"`
+			Logs    string `json:"logs"`
+			LogsKey string `json:"logs_key"`
+			LogsURL string `json:"logs_url"`
 		} `json:"builder"`
 		Logs string `json:"logs"`
 	}
 
 	var messageLines []string
-	var builderLogs string
-
 	appendIfNew := func(line string) {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -149,46 +152,70 @@ func enrichBuildFailureMessage(raw string) string {
 		messageLines = append(messageLines, line)
 	}
 
-	segments := strings.Split(trimmed, "\n")
 	parsed := false
-	for _, segment := range segments {
-		seg := strings.TrimSpace(segment)
-		if seg == "" {
-			continue
-		}
-		var payload builderPayload
-		if json.Unmarshal([]byte(seg), &payload) == nil {
-			parsed = true
-			if msg := strings.TrimSpace(payload.Error.Message); msg != "" {
-				appendIfNew(msg)
+	if trimmed != "" {
+		segments := strings.Split(trimmed, "\n")
+		for _, segment := range segments {
+			seg := strings.TrimSpace(segment)
+			if seg == "" {
+				continue
 			}
-			if payload.Error.Details != nil {
-				if detail := strings.TrimSpace(fmt.Sprint(payload.Error.Details)); detail != "" {
-					appendIfNew(detail)
+			var payload builderPayload
+			if json.Unmarshal([]byte(seg), &payload) == nil {
+				parsed = true
+				if msg := strings.TrimSpace(payload.Error.Message); msg != "" {
+					appendIfNew(msg)
 				}
+				if payload.Error.Details != nil {
+					if detail := strings.TrimSpace(fmt.Sprint(payload.Error.Details)); detail != "" {
+						appendIfNew(detail)
+					}
+				}
+				if logs := strings.TrimSpace(payload.Builder.Logs); logs != "" {
+					appendIfNew(logs)
+				}
+				if logs := strings.TrimSpace(payload.Logs); logs != "" {
+					appendIfNew(logs)
+				}
+				if job := strings.TrimSpace(payload.Builder.Job); job != "" {
+					appendIfNew(fmt.Sprintf("builder job: %s", job))
+				}
+				pointer := strings.TrimSpace(payload.Builder.LogsKey)
+				if pointer != "" {
+					line := fmt.Sprintf("builder logs archived at %s", pointer)
+					if url := strings.TrimSpace(payload.Builder.LogsURL); url != "" {
+						line = fmt.Sprintf("%s (%s)", line, url)
+					}
+					appendIfNew(line)
+				}
+				continue
 			}
-			if logs := strings.TrimSpace(payload.Builder.Logs); logs != "" {
-				builderLogs = logs
-			}
-			if logs := strings.TrimSpace(payload.Logs); logs != "" {
-				builderLogs = logs
-			}
-			continue
+			appendIfNew(seg)
 		}
-		appendIfNew(seg)
 	}
 
-	if builderLogs != "" {
-		appendIfNew(builderLogs)
+	// Include structured fields captured during response parsing
+	appendIfNew(result.ErrorDetails)
+	appendIfNew(result.BuilderLogs)
+	if job := strings.TrimSpace(result.BuilderJob); job != "" {
+		appendIfNew(fmt.Sprintf("builder job: %s", job))
+	}
+	if key := strings.TrimSpace(result.BuilderLogsKey); key != "" {
+		line := fmt.Sprintf("builder logs archived at %s", key)
+		if url := strings.TrimSpace(result.BuilderLogsURL); url != "" {
+			line = fmt.Sprintf("%s (%s)", line, url)
+		}
+		appendIfNew(line)
+	}
+	if code := strings.TrimSpace(result.ErrorCode); code != "" {
+		appendIfNew(fmt.Sprintf("error code: %s", code))
 	}
 
 	if len(messageLines) == 0 {
-		// Fallback to original payload if JSON parsing failed entirely.
 		return trimmed
 	}
 
 	sanitized := strings.Join(messageLines, "\n")
-	// If the sanitized output is empty (shouldn't happen), use the original raw payload.
 	if strings.TrimSpace(sanitized) == "" && !parsed {
 		return trimmed
 	}
