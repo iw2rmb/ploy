@@ -74,6 +74,9 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 
 	if result != nil && !result.Success {
+		// Normalize the controller response into a readable message and capture builder logs (if present).
+		result.Message = enrichBuildFailureMessage(result.Message)
+
 		// Attempt to fetch build logs to enrich error for downstream healing
 		logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
 		if logs != "" {
@@ -82,7 +85,7 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 				tail = tail[len(tail)-2000:]
 			}
 			// Append logs tail to result.Message
-			result.Message = strings.TrimSpace(result.Message + "\n" + tail)
+			result.Message = appendUniqueLine(result.Message, tail)
 		}
 		if modID := os.Getenv("MOD_ID"); modID != "" {
 			rep := NewControllerEventReporter(b.controllerURL, modID)
@@ -107,6 +110,104 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 	}
 	log.Printf("[Mods Build] Build check succeeded: controller=%s app=%s lane=%s env=%s version=%s", b.controllerURL, config.App, config.Lane, config.Environment, result.Version)
 	return result, nil
+}
+
+// enrichBuildFailureMessage attempts to convert the raw controller error payload into a readable message.
+// It extracts `error.message`, `error.details`, and any builder logs (`builder.logs` or top-level `logs` fields),
+// ensuring the returned string surfaces actionable diagnostics instead of raw JSON blobs.
+func enrichBuildFailureMessage(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+
+	type builderPayload struct {
+		Error struct {
+			Code    string      `json:"code"`
+			Message string      `json:"message"`
+			Details interface{} `json:"details"`
+		} `json:"error"`
+		Builder struct {
+			Logs string `json:"logs"`
+		} `json:"builder"`
+		Logs string `json:"logs"`
+	}
+
+	var messageLines []string
+	var builderLogs string
+
+	appendIfNew := func(line string) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return
+		}
+		for _, existing := range messageLines {
+			if existing == line {
+				return
+			}
+		}
+		messageLines = append(messageLines, line)
+	}
+
+	segments := strings.Split(trimmed, "\n")
+	parsed := false
+	for _, segment := range segments {
+		seg := strings.TrimSpace(segment)
+		if seg == "" {
+			continue
+		}
+		var payload builderPayload
+		if json.Unmarshal([]byte(seg), &payload) == nil {
+			parsed = true
+			if msg := strings.TrimSpace(payload.Error.Message); msg != "" {
+				appendIfNew(msg)
+			}
+			if payload.Error.Details != nil {
+				if detail := strings.TrimSpace(fmt.Sprint(payload.Error.Details)); detail != "" {
+					appendIfNew(detail)
+				}
+			}
+			if logs := strings.TrimSpace(payload.Builder.Logs); logs != "" {
+				builderLogs = logs
+			}
+			if logs := strings.TrimSpace(payload.Logs); logs != "" {
+				builderLogs = logs
+			}
+			continue
+		}
+		appendIfNew(seg)
+	}
+
+	if builderLogs != "" {
+		appendIfNew(builderLogs)
+	}
+
+	if len(messageLines) == 0 {
+		// Fallback to original payload if JSON parsing failed entirely.
+		return trimmed
+	}
+
+	sanitized := strings.Join(messageLines, "\n")
+	// If the sanitized output is empty (shouldn't happen), use the original raw payload.
+	if strings.TrimSpace(sanitized) == "" && !parsed {
+		return trimmed
+	}
+	return sanitized
+}
+
+// appendUniqueLine appends a new log fragment to an existing message, avoiding duplicate blocks.
+func appendUniqueLine(message, addition string) string {
+	addition = strings.TrimSpace(addition)
+	if addition == "" {
+		return strings.TrimSpace(message)
+	}
+	if strings.Contains(message, addition) {
+		return strings.TrimSpace(message)
+	}
+	if strings.TrimSpace(message) == "" {
+		return addition
+	}
+	return strings.TrimSpace(message + "\n" + addition)
 }
 
 func shouldSkipRemoteBuild(lane string) bool {
