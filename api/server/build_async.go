@@ -142,7 +142,32 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 		if resp.StatusCode == 200 {
 			writeStatus(id, buildStatus{ID: id, App: app, Status: "completed", Code: resp.StatusCode, Message: string(body), EndedAt: time.Now().Format(time.RFC3339)})
 		} else {
-			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Code: resp.StatusCode, Message: string(body), EndedAt: time.Now().Format(time.RFC3339)})
+			// On failure, enrich the message with builder logs metadata when available
+			msg := string(body)
+			// If the response body is not a builder-rich JSON, wrap it with a builder object
+			// Derive builder job name from meta (app/sha/lane)
+			builderJob := deriveBuilderJob(id, buildStatus{}, struct{ App, Sha, Lane string }{App: app, Sha: sha, Lane: lane})
+			if strings.TrimSpace(builderJob) != "" {
+				logsKey := fmt.Sprintf("build-logs/%s.log", builderJob)
+				// Build a public URL based on SeaweedFS env (fallback to default)
+				base := os.Getenv("PLOY_SEAWEEDFS_URL")
+				if strings.TrimSpace(base) == "" {
+					base = "http://seaweedfs-filer.service.consul:8888"
+				}
+				if !strings.HasPrefix(base, "http") {
+					base = "http://" + base
+				}
+				if !strings.HasSuffix(base, "/artifacts") {
+					base = strings.TrimRight(base, "/") + "/artifacts"
+				}
+				logsURL := strings.TrimRight(base, "/") + "/" + logsKey
+				// If original body already looks like a JSON with a builder, keep it; else wrap
+				trimmed := strings.TrimSpace(msg)
+				if !strings.HasPrefix(trimmed, "{") || !strings.Contains(trimmed, "\"builder\"") {
+					msg = fmt.Sprintf(`{"error":%q,"builder":{"job":%q,"logs_key":%q,"logs_url":%q}}`, trimmed, builderJob, logsKey, logsURL)
+				}
+			}
+			writeStatus(id, buildStatus{ID: id, App: app, Status: "failed", Code: resp.StatusCode, Message: msg, EndedAt: time.Now().Format(time.RFC3339)})
 		}
 	}()
 
