@@ -68,10 +68,10 @@ RUN set -eux; \
 import org.gradle.api.tasks.compile.JavaCompile;\n
 allprojects {\n  // Disable tests\n  tasks.withType(Test).configureEach { enabled = false }\n  // Ensure JavaCompile release target\n  tasks.withType(JavaCompile).configureEach {\n    try {\n      options.release = %[1]s\n    } catch (Throwable ignored) {\n      try { options.release.set(%[1]s) } catch (Throwable ignored2) { }\n    }\n  }\n  // Toolchain when java plugin present\n  plugins.withId('java') {\n    try { java { toolchain { languageVersion = JavaLanguageVersion.of(%[1]s) } } } catch (Throwable ignored) { }\n  }\n}\nEOF\n; \
   chmod +x ./gradlew || true; \
-  ( ./gradlew -I /tmp/ploy-init.gradle -x test clean build \\
+  ( ./gradlew -I /tmp/ploy-init.gradle -x test clean build --stacktrace --info \\
       -Dorg.gradle.java.installations.auto-detect=true \\
       -Dorg.gradle.java.installations.auto-download=true \
-    || gradle -I /tmp/ploy-init.gradle -x test clean build \\
+    || gradle -I /tmp/ploy-init.gradle -x test clean build --stacktrace --info \\
       -Dorg.gradle.java.installations.auto-detect=true \\
       -Dorg.gradle.java.installations.auto-download=true ); \
   # Robust JAR selection
