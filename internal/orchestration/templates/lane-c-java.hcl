@@ -57,6 +57,7 @@ job "{{APP_NAME}}-lane-c" {
           "runtime=jvm"
         ]
         check {
+          name     = "http-health"
           type     = "http"
           path     = "/health"
           interval = "10s"
@@ -75,6 +76,7 @@ job "{{APP_NAME}}-lane-c" {
           "runtime=jvm"
         ]
         check {
+          name     = "http-metrics"
           type     = "http"
           path     = "/metrics"
           interval = "15s"
@@ -93,6 +95,7 @@ job "{{APP_NAME}}-lane-c" {
           "runtime=jvm"
         ]
         check {
+          name     = "jmx-tcp"
           type     = "tcp"
           interval = "20s"
           timeout  = "2s"
