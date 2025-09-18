@@ -65,16 +65,7 @@ job "{{APP_NAME}}-lane-c" {
       
       connect {
         sidecar_service {
-          proxy {
-            upstreams {
-              destination_name = "database"
-              local_bind_port  = 5432
-            }
-            upstreams {
-              destination_name = "redis"
-              local_bind_port  = 6379
-            }
-          }
+          proxy {}
         }
       }
       
@@ -98,10 +89,8 @@ job "{{APP_NAME}}-lane-c" {
           "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}},hostfwd=tcp::${NOMAD_PORT_debug}-:9229",
           "-device", "virtio-net-pci,netdev=net0"
         ]
-        accelerator = "kvm"
-        kvm = true
-        machine = "q35"
-        cpu = "host"
+        # Dev VPS: disable accelerator flags that require host KVM support
+        kvm = false
       }
       
       {{#if VOLUME_ENABLED}}
@@ -134,12 +123,6 @@ job "{{APP_NAME}}-lane-c" {
         # Express/Fastify configuration
         TRUST_PROXY = "true"
         
-        # Database configuration (if using Connect)
-        DATABASE_HOST = "127.0.0.1"
-        DATABASE_PORT = "5432"
-        REDIS_HOST = "127.0.0.1"  
-        REDIS_PORT = "6379"
-        
         # Service registration (Consul service discovery only)
         SERVICE_NAME = "{{APP_NAME}}-lane-c"
         
@@ -158,13 +141,6 @@ job "{{APP_NAME}}-lane-c" {
 {{.Key}}={{.Value}}
 {{end}}
 
-# Database Configuration
-{{with key "ploy/shared/database/url"}}
-DATABASE_URL={{.}}
-{{end}}
-{{with key "ploy/shared/redis/url"}}  
-REDIS_URL={{.}}
-{{end}}
 EOF
         destination = "local/application.properties"
         change_mode = "restart"
