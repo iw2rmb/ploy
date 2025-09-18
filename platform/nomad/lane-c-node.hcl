@@ -89,8 +89,6 @@ job "{{APP_NAME}}-lane-c" {
           "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}},hostfwd=tcp::${NOMAD_PORT_debug}-:9229",
           "-device", "virtio-net-pci,netdev=net0"
         ]
-        # Dev VPS: disable accelerator flags that require host KVM support
-        kvm = false
       }
       
       {{#if VOLUME_ENABLED}}
