@@ -339,7 +339,7 @@
     - name: Test Consul service discovery from Go programs
       shell: |
         export GODEBUG=netdns=go+2
-        getent hosts consul-kv.coredns || nslookup consul-kv.coredns 127.0.0.1
+        getent hosts consul.service.consul || nslookup consul.service.consul 127.0.0.1
       register: go_dns_test
       failed_when: false
       changed_when: false
@@ -355,7 +355,7 @@
     - name: Display Go DNS compatibility test
       debug:
         msg: |
-          Go DNS Resolution Test (consul-kv.coredns):
+          Go DNS Resolution Test (consul.service.consul):
           {{ go_dns_test.stdout if go_dns_test.rc == 0 else 'FAILED - ' + (go_dns_test.stderr | default('No error output')) }}
           Status: {{ 'SUCCESS' if go_dns_test.rc == 0 else 'FAILED' }}
 
