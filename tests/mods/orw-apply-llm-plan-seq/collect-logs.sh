@@ -54,6 +54,15 @@ else
   echo "warning: failed to fetch status" >&2
 fi
 
+# Best-effort extraction of app name from events or status for API log downloads
+APP_NAME=""
+if compgen -G "$OUT_DIR/events*.sse" >/dev/null; then
+  APP_NAME=$(rg -o 'app=([A-Za-z0-9_.:-]+)' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | cut -d= -f2 || true)
+fi
+if [[ -z "$APP_NAME" && -s "$OUT_DIR/status_latest.json" ]]; then
+  APP_NAME=$(jq -r 'try (.steps[] | select(.step == "build-gate") | capture("app=(?<name>[A-Za-z0-9_.:-]+)").name) // empty' "$OUT_DIR/status_latest.json" 2>/dev/null | head -n1)
+fi
+
 # 2) Fetch an events snapshot stream (5s sample) and optionally a longer follow capture
 log "Fetching events SSE snapshot (5s sample)"
 curl -N -sS --max-time 5 "$PLOY_CONTROLLER/mods/$MOD_ID/logs?follow=1" \
@@ -107,6 +116,19 @@ if [[ -n "$BUILDER_LOG_KEY" ]]; then
   log "Builder logs pointer detected: $BUILDER_LOG_KEY"
 fi
 
+BUILDER_JOB=""
+if [[ -n "$BUILDER_LOG_KEY" ]]; then
+  BUILDER_JOB=${BUILDER_LOG_KEY##*/}
+  BUILDER_JOB=${BUILDER_JOB%.log}
+  if [[ -z "$APP_NAME" ]]; then
+    case "$BUILDER_JOB" in
+      *-c-build-*) APP_NAME="${BUILDER_JOB%%-c-build-*}" ;;
+      *-e-build-*) APP_NAME="${BUILDER_JOB%%-e-build-*}" ;;
+      *-lane-*)    APP_NAME="${BUILDER_JOB%%-lane-*}" ;;
+    esac
+  fi
+fi
+
 if [[ -n "${PLOY_SEAWEEDFS_URL:-}" && -s "$ART_KEYS_FILE" ]]; then
   log "Downloading artifacts from SeaweedFS"
   while IFS= read -r KEY; do
@@ -136,6 +158,19 @@ if [[ -n "$BUILDER_LOG_KEY" && -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
   else
     echo "warning: failed to download builder logs from $BUILDER_URL_FULL" >&2
     rm -f "$BUILDER_DEST" || true
+  fi
+fi
+
+BUILDER_API_DEST=""
+if [[ -n "$BUILDER_JOB" && -n "$APP_NAME" && -n "${PLOY_CONTROLLER:-}" ]]; then
+  DEPLOY_ID="$BUILDER_JOB"
+  BUILDER_API_URL="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds/${DEPLOY_ID}/logs/download"
+  BUILDER_API_DEST="$OUT_DIR/builder_logs.api.log"
+  if curl -fsS "$BUILDER_API_URL" -o "$BUILDER_API_DEST"; then
+    log "Downloaded builder logs via API to $BUILDER_API_DEST"
+  else
+    echo "warning: failed to download builder logs via API $BUILDER_API_URL" >&2
+    BUILDER_API_DEST=""
   fi
 fi
 
@@ -239,6 +274,11 @@ SUMMARY="$OUT_DIR/summary.txt"
     fi
     if [[ -f "$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY" ]]; then
       echo "Builder logs saved to: $OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
+    elif [[ -n "$BUILDER_API_DEST" ]]; then
+      echo "Builder logs saved via API to: $BUILDER_API_DEST"
+    fi
+    if [[ -n "$APP_NAME" && -n "$BUILDER_JOB" ]]; then
+      echo "Builder logs API route: ${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds/${BUILDER_JOB}/logs/download"
     fi
   fi
   # Try to extract planner and llm-exec RUN_IDs from events to fetch context inputs.json (if SeaweedFS URL is set)

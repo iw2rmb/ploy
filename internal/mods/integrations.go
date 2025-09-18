@@ -75,7 +75,7 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 
 	if result != nil && !result.Success {
 		// Normalize the controller response into a readable message and capture builder logs (if present).
-		result.Message = enrichBuildFailureMessage(result)
+		result.Message = enrichBuildFailureMessage(result, config.App, b.controllerURL)
 
 		// Attempt to fetch build logs to enrich error for downstream healing
 		logs := fetchBuildLogs(b.controllerURL, config.App, result.DeploymentID)
@@ -116,7 +116,7 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 // It consults structured fields on DeployResult as well as any raw JSON fragments still present in
 // result.Message, producing a deduplicated multiline string that highlights root cause, details, and
 // SeaweedFS log pointers emitted by the build gate.
-func enrichBuildFailureMessage(result *common.DeployResult) string {
+func enrichBuildFailureMessage(result *common.DeployResult, app, controller string) string {
 	if result == nil {
 		return ""
 	}
@@ -206,6 +206,19 @@ func enrichBuildFailureMessage(result *common.DeployResult) string {
 			line = fmt.Sprintf("%s (%s)", line, url)
 		}
 		appendIfNew(line)
+		if appName := strings.TrimSpace(app); appName != "" {
+			base := strings.TrimRight(strings.TrimSpace(controller), "/")
+			if base == "" {
+				base = "<controller>"
+			}
+			depID := strings.TrimSpace(result.DeploymentID)
+			if depID == "" {
+				depID = jobFromLogsKey(key)
+			}
+			if depID != "" {
+				appendIfNew(fmt.Sprintf("download full builder log via %s/apps/%s/builds/%s/logs/download", base, appName, depID))
+			}
+		}
 	}
 	if code := strings.TrimSpace(result.ErrorCode); code != "" {
 		appendIfNew(fmt.Sprintf("error code: %s", code))
@@ -235,6 +248,19 @@ func appendUniqueLine(message, addition string) string {
 		return addition
 	}
 	return strings.TrimSpace(message + "\n" + addition)
+}
+
+// jobFromLogsKey extracts the builder job name from a build-logs/<job>.log key.
+func jobFromLogsKey(key string) string {
+	trimmed := strings.TrimSpace(key)
+	if trimmed == "" {
+		return ""
+	}
+	trimmed = strings.TrimPrefix(trimmed, "build-logs/")
+	trimmed = strings.TrimPrefix(trimmed, "artifacts/")
+	trimmed = strings.TrimSuffix(trimmed, ".log")
+	trimmed = strings.Trim(trimmed, "/")
+	return trimmed
 }
 
 func shouldSkipRemoteBuild(lane string) bool {
