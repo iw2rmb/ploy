@@ -25,6 +25,8 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         DOCKERFILE_PATH = "{{DOCKERFILE_PATH}}"
         # Optional dev guard: delay before executor to allow log streamer to attach
         PLOY_KANIKO_ATTACH_DELAY = "{{ATTACH_DELAY}}"
+        # Upload target for builder log (stable key based on job name)
+        LOGS_UPLOAD_URL = "http://seaweedfs-filer.service.consul:8888/artifacts/build-logs/{{APP_NAME}}-e-build-{{VERSION}}.log"
       }
 
       config {
@@ -33,7 +35,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "set -euo pipefail; trap 'st=$?; echo KANIKO: exiting code $st 1>&2' EXIT; if [ -n \"$PLOY_KANIKO_ATTACH_DELAY\" ]; then echo 'KANIKO: attach delay' && sleep \"$PLOY_KANIKO_ATTACH_DELAY\"; fi; echo 'KANIKO: starting (pre-fetch)' && echo 'KANIKO: starting (pre-fetch)' 1>&2; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...' && sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; echo 'KANIKO: executing executor' && echo 'KANIKO: executing executor' 1>&2; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run --verbosity=debug;"
+          "set -euo pipefail; trap 'st=$?; echo KANIKO: exiting code $st 1>&2' EXIT; if [ -n \"$PLOY_KANIKO_ATTACH_DELAY\" ]; then echo 'KANIKO: attach delay' | tee -a /workspace/builder.log && sleep \"$PLOY_KANIKO_ATTACH_DELAY\"; fi; echo 'KANIKO: starting (pre-fetch)' | tee -a /workspace/builder.log; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...' | tee -a /workspace/builder.log && sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; echo 'KANIKO: executing executor' | tee -a /workspace/builder.log; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run --verbosity=debug >> /workspace/builder.log 2>&1; cat /workspace/builder.log; (wget -q --method=PUT --body-file=/workspace/builder.log $LOGS_UPLOAD_URL || wget -q --post-file=/workspace/builder.log $LOGS_UPLOAD_URL || true);"
         ]
 
         ports = ["http"]
