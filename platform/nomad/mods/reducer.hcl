@@ -9,6 +9,9 @@ job "mods-reducer" {
         image = "${REDUCER_IMAGE}"
         force_pull = true
         network_mode = "host"
+        tls {
+          insecure_skip_verify = true
+        }
       }
       env = {
         RUN_ID = "${RUN_ID}"

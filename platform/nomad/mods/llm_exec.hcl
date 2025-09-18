@@ -9,6 +9,9 @@ job "mods-llm-exec-${RUN_ID}" {
         image = "${LLM_EXEC_IMAGE}"
         force_pull = true
         network_mode = "host"
+        tls {
+          insecure_skip_verify = true
+        }
       }
       env = {
         MODEL       = "${MODEL}"

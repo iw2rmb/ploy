@@ -9,6 +9,9 @@ job "mods-planner" {
         image = "${PLANNER_IMAGE}"
         force_pull = true
         network_mode = "host"
+        tls {
+          insecure_skip_verify = true
+        }
       }
       env = {
         MODEL       = "${MODEL}"
