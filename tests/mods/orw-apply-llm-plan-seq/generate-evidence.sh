@@ -33,6 +33,18 @@ DIFF="$MOD_DIR/diff.patch"
     jq -r '.error // empty' "$STAT" | sed -n '1,120p'
   fi
   echo
+  echo "[3a] Builder logs pointer"
+  if [[ -f "$MOD_DIR/builder_logs.key" ]]; then
+    printf 'Key: '
+    cat "$MOD_DIR/builder_logs.key"
+    if [[ -f "$MOD_DIR/builder_logs.url" ]]; then
+      printf 'URL: '
+      cat "$MOD_DIR/builder_logs.url"
+    fi
+  else
+    echo "(no builder logs pointer detected)"
+  fi
+  echo
   echo "[4] LLM diff (first 120 lines if exists)"
   if [[ -s "$DIFF" ]]; then
     sed -n '1,120p' "$DIFF"
@@ -45,4 +57,3 @@ DIFF="$MOD_DIR/diff.patch"
 } > "$EVID"
 
 echo "Wrote $EVID"
-

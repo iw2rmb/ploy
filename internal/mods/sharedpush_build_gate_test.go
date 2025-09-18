@@ -36,7 +36,7 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("X-Deployment-ID", deploymentID)
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = fmt.Fprintf(w, `{"error":{"code":"builder_failed","message":"compile failed"},"builder":{"job":"%s","logs":%q,"logs_key":"build-logs/%s.log","logs_url":"https://storage.example/build-logs/%s.log"}}`, deploymentID, builderLogs, deploymentID, deploymentID)
+			_, _ = fmt.Fprintf(w, `{"error":{"code":"builder_failed","message":"compile failed","details":"mvn package failed"},"builder":{"job":"%s","logs":%q,"logs_key":"build-logs/%s.log","logs_url":"https://storage.example/build-logs/%s.log"}}`, deploymentID, builderLogs, deploymentID, deploymentID)
 		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/apps/") && strings.Contains(r.URL.Path, "/builds/") && strings.HasSuffix(r.URL.Path, "/logs"):
 			logRequests++
 			w.Header().Set("Content-Type", "application/json")
@@ -79,6 +79,30 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 	}
 	if !strings.Contains(res.Message, "Missing symbol Foo") {
 		t.Fatalf("expected result message to include builder logs, got %q", res.Message)
+	}
+	if !strings.Contains(res.Message, "builder logs archived at build-logs/"+deploymentID+".log") {
+		t.Fatalf("expected message to reference builder logs key, got %q", res.Message)
+	}
+	if !strings.Contains(res.Message, "error code: builder_failed") {
+		t.Fatalf("expected message to include error code, got %q", res.Message)
+	}
+	if !strings.Contains(res.Message, "builder job:") {
+		t.Fatalf("expected message to include builder job, got %q", res.Message)
+	}
+
+	if res.BuilderLogs != builderLogs {
+		t.Fatalf("expected DeployResult.BuilderLogs to match, got %q", res.BuilderLogs)
+	}
+	wantKey := fmt.Sprintf("build-logs/%s.log", deploymentID)
+	if res.BuilderLogsKey != wantKey {
+		t.Fatalf("expected logs key %q, got %q", wantKey, res.BuilderLogsKey)
+	}
+	wantURL := fmt.Sprintf("https://storage.example/build-logs/%s.log", deploymentID)
+	if res.BuilderLogsURL != wantURL {
+		t.Fatalf("expected logs url %q, got %q", wantURL, res.BuilderLogsURL)
+	}
+	if res.BuilderJob != deploymentID {
+		t.Fatalf("expected builder job %q, got %q", deploymentID, res.BuilderJob)
 	}
 	if buildRequests != 1 {
 		t.Fatalf("expected 1 build request, got %d", buildRequests)

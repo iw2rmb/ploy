@@ -54,6 +54,8 @@ func (s *Server) setupRoutes() {
 	api.Post("/_diag/echo", s.handleDiagEcho)
 	api.Get("/apps/:app/builds/:id/status", s.handleBuildStatus)
 	api.Get("/apps/:app/builds/:id/logs", s.handleBuildLogs)
+	api.Get("/apps/:app/builds/:id/logs/stream", s.handleBuildLogsStream)
+	api.Get("/apps/:app/builds/:id/logs/download", s.handleBuildLogsDownload)
 	api.Get("/apps/:app/builds/:id/events", s.handleBuildEvents)
 
 	// Platform service endpoints with platform namespace
