@@ -3,7 +3,9 @@ package orchestration
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -75,21 +77,101 @@ func (s *LogStreamer) findRunningAlloc(ctx context.Context) string {
 			return ""
 		default:
 		}
-		cmd := execCommandContext(ctx, jobMgrPath(), "running-alloc", "--job", s.jobName)
-		b, _ := cmd.CombinedOutput()
-		id := extractLastUUID(string(b))
-		if strings.TrimSpace(id) != "" {
+		// Deterministic selection via Nomad HTTP API
+		if id := s.selectAllocHTTP(ctx); strings.TrimSpace(id) != "" {
 			return id
 		}
-		// Fallback: try allocs --format json and pick the newest UUID
-		cmd2 := execCommandContext(ctx, jobMgrPath(), "allocs", "--job", s.jobName, "--format", "json")
-		if jb, err := cmd2.CombinedOutput(); err == nil {
-			if aid := extractLastUUID(string(jb)); strings.TrimSpace(aid) != "" {
-				return aid
-			}
+		// Last resort: wrapper fallbacks (free-form). Keep for maximal compatibility.
+		if id := s.selectAllocWrapper(ctx); strings.TrimSpace(id) != "" {
+			return id
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// nomadAddr resolves the Nomad HTTP address.
+func nomadAddr() string {
+	if v := os.Getenv("NOMAD_ADDR"); strings.TrimSpace(v) != "" {
+		return strings.TrimRight(v, "/")
+	}
+	return "http://nomad.service.consul:4646"
+}
+
+// selectAllocHTTP queries Nomad HTTP API for allocations of the job and picks a deterministic candidate.
+func (s *LogStreamer) selectAllocHTTP(ctx context.Context) string {
+	type taskState struct {
+		State string `json:"State"`
+	}
+	type alloc struct {
+		ID           string               `json:"ID"`
+		ClientStatus string               `json:"ClientStatus"`
+		ModifyTime   int64                `json:"ModifyTime"`
+		TaskStates   map[string]taskState `json:"TaskStates"`
+	}
+	url := nomadAddr() + "/v1/job/" + s.jobName + "/allocations"
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	cli := &http.Client{Timeout: 1500 * time.Millisecond}
+	resp, err := cli.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var arr []alloc
+	if err := json.NewDecoder(resp.Body).Decode(&arr); err != nil || len(arr) == 0 {
+		return ""
+	}
+	// Selection: running + kaniko running → running → newest ModifyTime
+	pick := func(pred func(a alloc) bool) string {
+		var bestID string
+		var bestMT int64
+		for _, a := range arr {
+			if pred(a) {
+				if a.ModifyTime >= bestMT {
+					bestMT = a.ModifyTime
+					bestID = a.ID
+				}
+			}
+		}
+		return bestID
+	}
+	// Prefer running alloc where kaniko task is running
+	if id := pick(func(a alloc) bool {
+		if strings.ToLower(a.ClientStatus) != "running" {
+			return false
+		}
+		if ts, ok := a.TaskStates["kaniko"]; ok {
+			return strings.ToLower(ts.State) == "running"
+		}
+		return false
+	}); id != "" {
+		return id
+	}
+	// Any running alloc
+	if id := pick(func(a alloc) bool { return strings.ToLower(a.ClientStatus) == "running" }); id != "" {
+		return id
+	}
+	// Newest by ModifyTime
+	return pick(func(a alloc) bool { return strings.TrimSpace(a.ID) != "" })
+}
+
+// selectAllocWrapper keeps the legacy wrapper-based selection as a fallback.
+func (s *LogStreamer) selectAllocWrapper(ctx context.Context) string {
+	cmd := execCommandContext(ctx, jobMgrPath(), "running-alloc", "--job", s.jobName)
+	b, _ := cmd.CombinedOutput()
+	id := extractLastUUID(string(b))
+	if strings.TrimSpace(id) != "" {
+		return id
+	}
+	cmd2 := execCommandContext(ctx, jobMgrPath(), "allocs", "--job", s.jobName, "--format", "json")
+	if jb, err := cmd2.CombinedOutput(); err == nil {
+		if aid := extractLastUUID(string(jb)); strings.TrimSpace(aid) != "" {
+			return aid
+		}
+	}
+	return ""
 }
 
 // extractLastUUID extracts the last UUID-like token from s.
