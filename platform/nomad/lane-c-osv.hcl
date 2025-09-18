@@ -82,8 +82,6 @@ job "{{APP_NAME}}-lane-c" {
           "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}},hostfwd=tcp::${NOMAD_PORT_jmx}-:9999",
           "-device", "virtio-net-pci,netdev=net0"
         ]
-        # Dev VPS: disable accelerator flags that are unavailable without KVM
-        kvm = false
       }
       
       # Comprehensive environment variables for JVM
