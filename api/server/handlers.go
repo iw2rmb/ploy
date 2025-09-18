@@ -54,13 +54,8 @@ func (s *Server) handleTriggerPlatformBuild(c *fiber.Ctx) error {
 func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 	log.Printf("[Handler] triggerAppBuild ENTER method=%s url=%s app=%s sha=%s lane=%s env=%s body_len=%d",
 		c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
-	// Use factory pattern to get unified storage interface
-	unifiedStorage, err := s.resolveUnifiedStorage()
-	if err != nil {
-		log.Printf("[Handler] triggerAppBuild resolveUnifiedStorage ERROR: %v", err)
-		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
-	}
 	// Async mode: accept upload and run build in background via local loopback call
+	// Do this before resolving storage so acceptance does not depend on storage availability.
 	if strings.ToLower(c.Query("async", "false")) == "true" {
 		app := c.Params("app")
 		id, aerr := s.startAsyncBuild(c, app, c.Query("sha", "dev"), c.Query("lane", ""), c.Query("main", ""))
@@ -74,6 +69,13 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 			"id":       id,
 			"status":   fmt.Sprintf("/v1/apps/%s/builds/%s/status", app, id),
 		})
+	}
+
+	// Use factory pattern to get unified storage interface
+	unifiedStorage, err := s.resolveUnifiedStorage()
+	if err != nil {
+		log.Printf("[Handler] triggerAppBuild resolveUnifiedStorage ERROR: %v", err)
+		return c.Status(503).JSON(fiber.Map{"error": "Storage initialization failed", "details": err.Error()})
 	}
 
 	err = build.TriggerAppBuildWithStorage(c, unifiedStorage, s.dependencies.EnvStore)

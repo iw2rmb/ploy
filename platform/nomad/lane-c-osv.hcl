@@ -192,6 +192,7 @@ EOF
         ]
         
         check { 
+          name     = "http-health"
           type     = "http" 
           path     = "/actuator/health" 
           interval = "15s" 
@@ -204,6 +205,7 @@ EOF
         }
         
         check {
+          name     = "http-ready"
           type     = "http"
           path     = "/actuator/health/readiness"
           interval = "30s"
@@ -238,6 +240,7 @@ EOF
         ]
         
         check {
+          name     = "jmx-tcp"
           type     = "tcp"
           interval = "30s"
           timeout  = "5s"
@@ -256,6 +259,7 @@ EOF
         ]
         
         check {
+          name     = "metrics-http"
           type     = "http"
           path     = "/actuator/prometheus"
           interval = "30s"
