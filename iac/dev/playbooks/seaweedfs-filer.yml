@@ -4,7 +4,7 @@
 # This playbook deploys the SeaweedFS Filer as a Nomad service:
 # - Ensures master and volume servers are running via systemd
 # - Deploys filer as Nomad job for better integration and management
-# - Configures Consul service discovery for seaweedfs-filer.service.consul
+# - Uses CoreDNS hostname seaweedfs-filer.storage.ploy.local for access
 # - Validates filer deployment and health checks
 #
 - name: Deploy SeaweedFS Filer via Nomad
@@ -14,6 +14,19 @@
     - ../vars/main.yml
   
   tasks:
+    - name: Ensure SeaweedFS domains resolve locally
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_default_ipv4.address }} {{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+        create: true
+      loop:
+        - "{{ seaweedfs.master_domain }}"
+        - "{{ seaweedfs.volume_domain }}"
+        - "{{ seaweedfs.filer_domain }}"
+
     - name: Ensure SeaweedFS master and volume servers are running
       block:
         - name: Wait for SeaweedFS master to be healthy
@@ -30,7 +43,7 @@
           
         - name: Verify master cluster status
           uri:
-            url: "http://localhost:{{ seaweedfs.master_port }}/cluster/status"
+            url: "http://{{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }}/cluster/status"
             method: GET
           register: cluster_status
           failed_when: cluster_status.status != 200
@@ -43,7 +56,7 @@
       block:
         - name: Verify Nomad cluster is ready
           uri:
-            url: "http://localhost:4646/v1/status/leader"
+            url: "http://nomad.control.ploy.local:4646/v1/status/leader"
             method: GET
             status_code: 200
           retries: 5
@@ -66,7 +79,7 @@
         - name: Validate job syntax
           shell: nomad job validate /opt/hashicorp/nomad/jobs/seaweedfs-filer.hcl
           environment:
-            NOMAD_ADDR: "http://localhost:4646"
+            NOMAD_ADDR: "http://{{ ploy.nomad_control_domain }}:4646"
           become_user: ploy
 
         - name: Copy job manager script (if not exists)
@@ -81,7 +94,7 @@
         - name: Stop existing filer job if running
           shell: /opt/hashicorp/bin/nomad-job-manager.sh stop --job seaweedfs-filer
           environment:
-            NOMAD_ADDR: "http://localhost:4646"
+            NOMAD_ADDR: "http://{{ ploy.nomad_control_domain }}:4646"
           register: stop_result
           failed_when: false
 
@@ -92,20 +105,20 @@
         - name: Deploy SeaweedFS filer job
           shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job seaweedfs-filer --file /opt/hashicorp/nomad/jobs/seaweedfs-filer.hcl
           environment:
-            NOMAD_ADDR: "http://localhost:4646"
+            NOMAD_ADDR: "http://{{ ploy.nomad_control_domain }}:4646"
           register: filer_deploy
 
         - name: Wait for filer allocation to be running
           shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job seaweedfs-filer --timeout 120
           environment:
-            NOMAD_ADDR: "http://localhost:4646"
+            NOMAD_ADDR: "http://{{ ploy.nomad_control_domain }}:4646"
           register: wait_result
           failed_when: wait_result.rc != 0
 
         - name: Get allocation status for verification
           shell: /opt/hashicorp/bin/nomad-job-manager.sh status --job seaweedfs-filer
           environment:
-            NOMAD_ADDR: "http://localhost:4646"
+            NOMAD_ADDR: "http://nomad.control.ploy.local:4646"
           register: filer_allocs
           failed_when: false
 
@@ -115,30 +128,21 @@
 
     - name: Validate SeaweedFS filer service
       block:
-        - name: Wait for filer to be available via Consul DNS
+        - name: Wait for filer endpoint to be reachable
           wait_for:
-            host: "seaweedfs-filer.service.consul"
+            host: "{{ seaweedfs.filer_domain }}"
             port: "{{ seaweedfs.filer_port }}"
             delay: 10
             timeout: 60
-          register: consul_dns_check
-          ignore_errors: true
 
         - name: Test filer HTTP endpoint directly
           uri:
-            url: "http://localhost:{{ seaweedfs.filer_port }}/"
+            url: "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/"
             method: GET
             status_code: 200
           register: filer_http_check
           retries: 5
           delay: 10
-
-        - name: Verify filer is registered in Consul
-          uri:
-            url: "http://localhost:8500/v1/catalog/service/seaweedfs-filer"
-            method: GET
-            status_code: 200
-          register: consul_service_check
 
         - name: Display final validation results
           debug:
@@ -146,9 +150,7 @@
               ✅ SeaweedFS Filer Deployment Complete:
               - Nomad job status: {{ 'running' if wait_result.rc == 0 else 'failed' }}
               - HTTP endpoint: {{ 'healthy' if filer_http_check.status == 200 else 'failed' }}
-              - Consul registration: {{ 'registered' if consul_service_check.status == 200 else 'failed' }}
-              - Consul DNS: {{ 'accessible' if consul_dns_check is success else 'not accessible (expected during bootstrap)' }}
-              - Access via: seaweedfs-filer.service.consul:{{ seaweedfs.filer_port }}
+              - Access via: {{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}
 
         - name: Create Knowledge Base (KB) namespace structure
           block:
@@ -165,7 +167,7 @@
 
             - name: Upload KB namespace structure to SeaweedFS filer
               uri:
-                url: "http://localhost:{{ seaweedfs.filer_port }}/kb/{{ item }}/"
+                url: "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/kb/{{ item }}/"
                 method: POST
                 body_format: form-multipart
                 body:

@@ -42,20 +42,19 @@ mask_sensitive() {
 }
 
 echo
-echo "📋 Checking Required Environment Variables..."
+echo "📋 Checking Optional Environment Variables..."
 echo "---------------------------------------------"
 
-# Required Namecheap variables for SSL certificates
-check_env_var "NAMECHEAP_API_KEY"
-check_env_var "NAMECHEAP_API_USER"  
-check_env_var "NAMECHEAP_USERNAME"
-check_env_var "NAMECHEAP_CLIENT_IP"
+if [ -n "$NAMECHEAP_API_KEY" ] || [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+    echo -e "${GREEN}✅ External DNS credentials detected (cert automation enabled)${NC}"
+else
+    echo -e "${YELLOW}ℹ️  No external DNS credentials set — CoreDNS defaults will be used${NC}"
+fi
 
-# Optional but recommended
 if [ -n "$GITHUB_PLOY_DEV_USERNAME" ] && [ -n "$GITHUB_PLOY_DEV_PAT" ]; then
     echo -e "${GREEN}✅ GitHub credentials configured${NC}"
 else
-    echo -e "${YELLOW}⚠️  GitHub credentials not set (optional but recommended)${NC}"
+    echo -e "${YELLOW}ℹ️  GitHub credentials not set (only required for private repos)${NC}"
 fi
 
 echo
@@ -115,11 +114,11 @@ echo "📊 Configuration Summary"
 echo "========================"
 
 if [ -n "$NAMECHEAP_API_USER" ]; then
-    echo "DNS Provider: Namecheap (user: $NAMECHEAP_API_USER)"
+    echo "Namecheap user: $NAMECHEAP_API_USER"
 fi
 
-if [ -n "$NAMECHEAP_CLIENT_IP" ]; then
-    echo "Client IP: $NAMECHEAP_CLIENT_IP"
+if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+    echo "Cloudflare token configured"
 fi
 
 if [ -n "$TARGET_HOST" ]; then

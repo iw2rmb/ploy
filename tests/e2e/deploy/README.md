@@ -1,133 +1,61 @@
-# Consolidated E2E: Language → Lane → Stack Detection and Deployment
+# Lane D Deployment E2E
 
-Purpose: exercise the full detection/build/deploy pipeline across all supported languages and major versions using a single, unified harness. This replaces prior lane‑specific app tests.
+These end-to-end tests exercise the Docker-only lane after the 2025-09 consolidation. The harness generates minimal Go and Node.js applications on the fly, commits them into throwaway git repos, pushes with `ploy push -lane D`, waits for the async build, and verifies health.
 
-Core flow (always reused):
-- Language detection: read repo markers (build files) to infer language and version (Java/Scala, Node, Python, Go, .NET, Rust).
-- Lane detection: run lane picker and apply explicit overrides for targeted runs.
-- Stack detection/build: choose the appropriate builder (e.g., Jib vs Kaniko; OSv pack vs full compose) and build the right image/artifact.
-- Deploy + health: submit Nomad jobs and verify HTTPS /healthz.
+## Running the suite
 
-Test repos
-- Generated and pushed to GitHub using GITHUB_PLOY_DEV_USERNAME and GITHUB_PLOY_DEV_PAT.
-- Naming: `ploy-lane-<x>-<lang>-<ver>` (e.g., `ploy-lane-c-scala-21`, `ploy-lane-e-node-20`).
-- Script: `tests/e2e/deploy/generate-test-repos.sh` creates repos, scaffolds minimal apps and pushes them.
+```bash
+# Ensure the controller endpoint is available
+export PLOY_CONTROLLER=https://api.dev.ployman.app/v1
 
-How to generate repos
-- ./tests/e2e/deploy/generate-test-repos.sh
+# Optional: point to a local ploy binary
+# export PLOY_CMD=/absolute/path/to/ploy
 
-How to run E2E
-- Ensure the ploy CLI is available. Either:
-  - Build locally: `mkdir -p bin && GOCACHE=$(mktemp -d) go build -o ./bin/ploy ./cmd/ploy`
-  - Or set `PLOY_CMD=/absolute/path/to/ploy`
-- Run: `go test ./tests/e2e/deploy -tags e2e -v -timeout 10m` (assumes `PLOY_CONTROLLER` is set)
-- Results are appended to:
-  - JSONL: tests/e2e/deploy/results.jsonl (one JSON per run)
-  - Markdown rows: tests/e2e/deploy/results.md (includes image size and build time)
+# Run the lane D matrix (Go + Node)
+go test ./tests/e2e/deploy -tags e2e -v -run TestDeployLaneD -timeout 8m
+```
 
-Quick filters
-- Single subtest: `go test ./tests/e2e/deploy -tags e2e -v -run 'TestDeployMatrix/E-node-20' -timeout 6m`
-- Explicit case (Java 17, no Jib): `go test ./tests/e2e/deploy -tags e2e -v -run TestDeploy_Java17_NoJib -timeout 10m`
+Results are appended to repository-relative files so multiple runs can be compared later:
 
-After each run: Inspect logs first
-- Preferred: `APP_NAME=<name> [LANE=<A|C|E>] [SHA=<sha12>] [BUILD_ID=<id>] [LINES=2000] [FILTER_MARKERS='<rg|pattern>'] [TARGET_HOST=<ip>] [OUT_DIR=./e2e-logs] ./tests/e2e/deploy/fetch-logs.sh`
-  - Pulls app status/logs, Platform API and Traefik logs.
-  - If `FILTER_MARKERS` is set (ripgrep syntax), also writes `platform_api.filtered.log` with only matching lines (useful for `[Lane E]` and `[Orch]` markers).
-  - If `BUILD_ID` is set (from async response), includes builder logs via API.
-  - If `TARGET_HOST` is set, fetches builder logs and app alloc status/logs via Nomad job-manager wrapper.
-  - Time-based slicing (recommended): set `START_TS="$(date '+%Y-%m-%d %H:%M:%S')"` just before triggering the build. `fetch-logs.sh` writes `platform_api.sliced.log` from that point onward, then applies `FILTER_MARKERS`.
-    - To avoid timezone skew (VPS often runs UTC), you can auto-resolve the timestamp origin:
-      - `START_TS_SOURCE=vps` (requires `TARGET_HOST`) — uses `date '+%Y-%m-%d %H:%M:%S'` on VPS.
-      - `START_TS_SOURCE=platform` — extracts the last bracketed timestamp from a small platform log snapshot.
-- Direct endpoints (fallback):
-  - Controller logs: `curl -sS "$PLOY_CONTROLLER/platform/api/logs?lines=200"`
-  - Traefik logs: `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"`
+- `tests/e2e/deploy/results.jsonl` — machine-readable log (one JSON record per run).
+- `tests/e2e/deploy/results.md` — quick Markdown table summarising lane/app/notes.
 
-Build error parsing (advanced)
-- Programmatic parsing is provided by the build error parser:
-  - `internal/build/build_errors_parser.go` → `ParseBuildErrors(language, tool, raw string) []ParsedBuildError`.
-  - Paired with `internal/build/build_errors.go` helpers (`RunCmd`, `BuildError`, `FormatBuildError`) for local command execution and formatting.
-- Typical flow:
-  1) Fetch raw builder logs (`builder.logs.json` → `.logs`) or platform logs (`platform_api.log`).
-  2) Parse with `ParseBuildErrors("java", "maven|gradle", raw)` in a small Go snippet to extract `{file,line,column,message}` entries.
-  3) Use `FormatBuildError` when wrapping local command failures to include stdout/stderr snippets alongside messages.
+The helper test `TestWriteResultPaths` ensures these files resolve correctly even when Go runs tests from temporary directories.
 
-Test matrix (seed)
-| Lane | Stack   | Version | Repo                                         | Image Size (compressed) | Uncompressed Size | Build Time | Builder CPU | Builder Memory | Current State |
-| ---- | ------- | ------- | -------------------------------------------- | ------------------------ | ----------------- | ---------- | ----------- | -------------- | ------------- |
-| A    | Go      | 1.22    | https://github.com/<u>/ploy-lane-a-go-1.22   | —                        | —                 | —          | —           | —              | pending       |
-| B    | Node    | 20      | https://github.com/<u>/ploy-lane-b-node-20   | —                        | —                 | —          | —           | —              | pending       |
-| B    | Python  | 3.12    | https://github.com/<u>/ploy-lane-b-python-3.12 | —                      | —                 | —          | —           | —              | pending       |
-| C    | Scala   | 21      | https://github.com/<u>/ploy-lane-c-scala-21  | —                        | —                 | —          | —           | —              | pending       |
-| C    | Java    | 8       | https://github.com/<u>/ploy-lane-c-java-8    | —                        | —                 | —          | —           | —              | pending       |
-| D    | Python  | 3.12    | https://github.com/<u>/ploy-lane-d-python-3.12 | —                      | —                 | —          | —           | —              | pending       |
-| D    | Node    | 20      | https://github.com/<u>/ploy-lane-d-node-20   | —                        | —                 | —          | —           | —              | pending       |
-| E    | Node    | 20      | https://github.com/<u>/ploy-lane-e-node-20   | 52.3MB                   | 128.2MB           | 23.5s      | 500         | 512MB          | passed        |
-| E    | Go      | 1.22    | https://github.com/<u>/ploy-lane-e-go-1.22   | 4.9MB                    | 8.7MB             | —          | 500         | 512MB          | passed        |
-| E    | Python  | 3.12    | https://github.com/<u>/ploy-lane-e-python-3.12 | 47.3MB                  | 113.7MB           | 22.2s      | 500         | 512MB          | passed        |
-| E    | .NET    | 8.0     | https://github.com/<u>/ploy-lane-e-dotnet-8  | 97.9MB                   | 207.6MB           | 125.0s     | 500         | 2048MB         | passed        |
-| E    | Java    | 17      | https://github.com/<u>/ploy-lane-e-java-17-nojib | —                   | —                 | —          | 500         | 1536MB         | RED (see notes) |
-| G    | Rust    | 1.79    | https://github.com/<u>/ploy-lane-g-rust-1.79 | —                        | —                 | —          | —           | —              | pending       |
+## Inspecting logs
 
-Notes
-- Start with major current versions; expand matrix incrementally.
-- Detection and image building must be precise:
-  - Java/Scala: detect major version (e.g., 8/11/17/21) from Gradle/Maven and use it in templates/builders.
-  - Node: detect engines.node and select appropriate base in autogen when applicable.
-  - Go/.NET/Python/Rust: detect project version/SDK and propagate to builders as needed.
-- OSv (Lane C) requires compatible base images per Java version; configure mappings on Dev and track status here.
-- Keep this table updated after each cycle.
+After an execution you can pull controller, Traefik, and runtime logs for an app via:
 
-Cycle State
-- Current key takeaways only; update each cycle and keep concise. For historical notes, use CHANGELOG.md.
+```bash
+APP_NAME=<app-name> \
+LANE=D \
+LINES=400 \
+TARGET_HOST=<vps-ip> \
+BUILD_ID=<async-id-from-push> \
+./tests/e2e/deploy/fetch-logs.sh
+```
 
- - App-name normalization: tests sanitize names to `[a-z0-9-]`, replacing dots in versions (e.g., `1.22` → `1-22`).
-- Lane E status: Node 20, Go 1.22, Python 3.12 pass with event-driven health; .NET 8 fixed by targeted Kaniko memory bump (2048MB). Env override: `PLOY_KANIKO_MEMORY_DOTNET_MB`.
-- Lane E (Java 17 NoJib): introduced embedded, template-driven Dockerfile autogen (Gradle/Maven/default) and strict verify+digest-based runtime images. Controller now guards against empty images and refuses submit. Current Dev state: Kaniko builder job not registering → no digest; guard blocks runtime submit (no app alloc). Added extensive diagnostics (autogen head/size, build-context/pre-upload logs, orchestration markers) and time-based log slicing to isolate runs.
-- Health waits are event-driven: tests subscribe to build SSE; health uses controller long-poll at `/v1/apps/:app/status/watch` with sensible timeouts.
-- Lane G status: Builder succeeds using prebuilt `module.wasm`; runtime initially failed due to silent setup errors. Updated runtime to add `-ignore-errors` and verbose logging. Next: confirm `/healthz` and record results.
-- Image size: captured from registry manifest (compressed) and Docker inspect (uncompressed) and recorded in results files.
-- Logs: use `fetch-logs.sh` with `BUILD_ID` and `TARGET_HOST` to retrieve builder and app alloc status/logs; set `START_TS` and `FILTER_MARKERS` to time-slice and filter platform logs without restarts.
- - Cleanup: apps are destroyed after each cycle; if automated destroy fails, destroy manually: `ploy apps destroy --name <app> --force`.
+Key behaviours:
+- Fetches `/apps/:app/status` and `/apps/:app/logs`.
+- Streams the latest platform API and Traefik logs.
+- When `BUILD_ID` is supplied, retrieves the controller-hosted builder logs (now produced by the host Docker build).
+- If `TARGET_HOST` is provided, uses `nomad-job-manager.sh` to tail the `docker-runtime` task for the deployed job (`<app>-lane-d`).
 
-Next Steps (Java 17 NoJib)
-- Ensure Dev knobs are set (on the VPS/controller environment):
-  - `PLOY_KANIKO_MEMORY_JAVA_MB=2560` (bump to `3072` if OOM persists)
-  - Guard is active: runtime submit refuses empty image; digest-based refs are required (`tag@sha256:...`).
+## Sample applications
 
-- Re-run push (async) for Lane E Java 17 NoJib:
-  - Prereqs: `PLOY_CONTROLLER` points to Dev (e.g., `https://api.dev.ployman.app/v1`). If TLS issues on Dev, set `PLOY_TLS_INSECURE=1` for the CLI.
-  - From a fresh clone of the test repo (e.g., `ploy-lane-e-java-17-nojib`):
-    - Build CLI once if needed: `mkdir -p bin && GOCACHE=$(mktemp -d) go build -o ./bin/ploy ./cmd/ploy`
-    - Choose app name (sanitized): `APP=ploy-e-java-17-nojib`
-    - Run async push and capture build id:
-      - Option A (CLI): `RESP=$(PLOY_ASYNC=1 ./bin/ploy push -a "$APP" -lane E -sha "$(date +%Y%m%d-%H%M%S)") && echo "$RESP"`
-        - Extract id if JSON is returned: `ID=$(echo "$RESP" | jq -r 'try (.id // empty)')`
-      - Option B (curl, multipart): `tar -cf /tmp/src.tar . && ID=$(curl -sS -F file=@/tmp/src.tar "$PLOY_CONTROLLER/apps/$APP/builds?lane=E&sha=$(date +%s)&async=true" | jq -r .id)`
+The harness produces two representative workloads:
+- **Go** — multi-stage Dockerfile compiling a small HTTP service.
+- **Node.js** — Node 20 Alpine image serving `/` and `/healthz`.
 
-- Fetch enriched builder logs and verify push/digest:
-  - `curl -sS "$PLOY_CONTROLLER/apps/$APP/builds/$ID/logs?lines=400" | tee ./builder.logs.json | jq`
-  - Expect when healthy:
-    - `.docker_image` contains `@sha256:...`
-    - `.push_verify.digest` is non-empty
-    - `.logs` shows Kaniko output (auth/manifest) or OOM clues if failing
+Each scenario validates that:
+1. The controller accepts the async Lane D build and returns a deployment id.
+2. The async status endpoint eventually reports `status=deployed`.
+3. `/apps/:app/status` shows at least one running allocation.
+4. The Nomad job is cleaned up via `ploy apps destroy --force`.
 
-- Confirm rendered HCL uses the digest-based image:
-  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "ls -1 /opt/ploy/debug/jobs | grep '^${APP}-lane-e.*\.hcl$' | sort | tail -n 1"`
-  - Then: `ssh -o ConnectTimeout=10 root@$TARGET_HOST "sed -n '1,160p' /opt/ploy/debug/jobs/$(ls -1 /opt/ploy/debug/jobs | grep '^${APP}-lane-e.*\.hcl$' | sort | tail -n 1) | grep -E '(^\s*image\s*=|DOCKER_IMAGE|docker_image)' -n"`
+## Utilities
 
-- Long-poll health (event-driven) to confirm running allocation:
-  - `curl -sS "$PLOY_CONTROLLER/apps/$APP/status/watch?wait=30s&timeout=30s" | jq`
-  - Expect a snapshot showing allocation in running/healthy and service registered; app serves `/healthz` on `PORT`.
+- `tests/e2e/deploy/fetch-logs.sh` — centralised log fetcher tuned for Lane D.
+- `tests/e2e/deploy/write_result_paths_test.go` — guards repo-relative result paths.
 
-- Troubleshooting: if `.push_verify` is empty or Kaniko logs indicate OOM/auth issues:
-  - Increase `PLOY_KANIKO_MEMORY_JAVA_MB` to `3072` and re-run.
-  - Validate registry credentials and tag path; the verify step must target the exact pushed tag.
-
-Maintenance Rules
-- When a significant change to lane behavior, detection, or builders happens, update docs/LANES.md accordingly.
-- This document, docs/LANES.md, and AGENTS.md are the source of truth for detection/build/deploy rules and operator guidance.
-
-Measurement notes
-- Image Size: use builder outputs (artifact size for unikernels/jails/VMs; manifest size for OCI) or registry/OS metrics where available.
-- Build Time: record total wall-clock for build step (async status can include timestamps; CLI logs may also be parsed).
+These tests intentionally avoid remote GitHub scaffolding—everything is created locally so the suite can run in CI/VPS environments without additional credentials.

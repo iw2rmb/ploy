@@ -11,7 +11,7 @@ import (
 
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 
-	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+	recipecatalog "github.com/iw2rmb/ploy/internal/recipes/catalog"
 )
 
 func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*ServiceDependencies, error) {
@@ -103,17 +103,17 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Prefer storage-backed recipes registry when storage is resolvable
-	var recipeCatalog tarfrecipes.Registry = tarfrecipes.NewInMemory()
+	var recipeCatalog recipecatalog.Registry = recipecatalog.NewInMemory()
 	if cfgService != nil {
 		if st, err := resolveStorageFromConfigService(cfgService); err == nil && st != nil {
-			recipeCatalog = tarfrecipes.NewStorageBacked(st)
+			recipeCatalog = recipecatalog.NewStorageBacked(st)
 		}
 	}
 
-	// Initialize remediation handler (legacy ARF functionality)
-	remediationHandler, recipesHandler, err := initializeRemediationHandlers(cfg, cfgService)
+	// Initialize security handler (legacy ARF functionality)
+	securityHandler, recipesHandler, err := initializeSecurityHandlers(cfg, cfgService)
 	if err != nil {
-		log.Printf("Warning: Failed to initialize remediation handler: %v", err)
+		log.Printf("Warning: Failed to initialize security handler: %v", err)
 	}
 
 	// Initialize Analysis Handler
@@ -165,7 +165,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		DNSHandler:              dnsHandler,
 		CertificateManager:      certificateManager,
 		PlatformWildcardManager: platformWildcardManager,
-		RemediationHandler:      remediationHandler,
+		SecurityHandler:         securityHandler,
 		RecipesHandler:          recipesHandler,
 		ModsHandler:             modsHandler,
 		AnalysisHandler:         analysisHandler,

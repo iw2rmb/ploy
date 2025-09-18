@@ -3,7 +3,7 @@ package nvd
 // moved from nvd_helpers.go
 
 import (
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 // NVDCVEInfo represents CVE information structure for remediation guidance
@@ -129,7 +129,7 @@ type NVDCVEInfo struct {
 }
 
 // generateRemediationGuidance creates remediation guidance for a CVE
-func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackages []arf.AffectedPackage) arf.RemediationGuidance {
+func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackages []security.AffectedPackage) security.RemediationGuidance {
 	remediationType := "upgrade"
 	instructions := "Update affected components to latest secure versions"
 	autoApplicable := true
@@ -159,7 +159,7 @@ func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackag
 	}
 
 	// Estimate effort based on CVSS score and complexity
-	effort := arf.EstimatedEffort{
+	effort := security.EstimatedEffort{
 		Level:       "medium",
 		TimeMinutes: 60,
 		Complexity:  5,
@@ -174,7 +174,7 @@ func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackag
 		effort.Risk = "high"
 	}
 
-	return arf.RemediationGuidance{
+	return security.RemediationGuidance{
 		Type:           remediationType,
 		Instructions:   instructions,
 		AutoApplicable: autoApplicable,

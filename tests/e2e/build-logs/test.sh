@@ -4,7 +4,7 @@ set -euo pipefail
 # One-shot E2E: submit → fetch → summarize
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_NAME=${APP_NAME:-kaniko-fail-app}
+APP_NAME=${APP_NAME:-docker-fail-app}
 PLOY_CONTROLLER=${PLOY_CONTROLLER:-}
 TARGET_HOST=${TARGET_HOST:-}
 
@@ -17,7 +17,7 @@ if [[ -z "$TARGET_HOST" ]]; then
   exit 2
 fi
 
-echo "== Submitting build (Lane E, build_only)"
+echo "== Submitting build (Lane D, build_only)"
 APP_NAME="$APP_NAME" PLOY_CONTROLLER="$PLOY_CONTROLLER" "$ROOT_DIR/run.sh"
 
 # Resolve last run id

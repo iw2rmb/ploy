@@ -56,7 +56,7 @@ job "ploy-api" {
 
       # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://{{ 'seaweedfs-filer.service.consul:8888' if seaweedfs.use_consul_discovery else 'localhost:8888' }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://localhost:8888/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
       }
@@ -83,8 +83,8 @@ job "ploy-api" {
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses
-        CONSUL_ADDR = "http://consul.service.consul:8500"
-        NOMAD_ADDR = "http://nomad.service.consul:4646"
+        CONSUL_ADDR = "http://controller.coredns:8500"
+        NOMAD_ADDR = "http://nomad.control.ploy.local:4646"
         # Nomad SDK resilience (used by API when talking to Nomad directly)
         NOMAD_HTTP_MAX_RETRIES = "{{ ploy.nomad_http_max_retries | default('5') }}"
         NOMAD_HTTP_BASE_DELAY = "{{ ploy.nomad_http_base_delay | default('500ms') }}"
@@ -95,50 +95,22 @@ job "ploy-api" {
         # Force SDK mode for Nomad submissions (disable wrapper inside API process)
         USE_NOMAD_JOB_MANAGER = 0
 
-        # Lane E/G knobs (builder/runtime)
-        # JVM builds often need more memory for Kaniko
-        PLOY_KANIKO_MEMORY_JAVA_MB = "{{ ploy.kaniko_memory_java_mb | default('4096') }}"
-        # Default Kaniko memory (fallback when language detection is missing)
-        PLOY_KANIKO_MEMORY_MB = "{{ ploy.kaniko_memory_mb | default('4096') }}"
-        # Optional: delay before Kaniko executor to help controller log streamer latch (dev/testing)
-        PLOY_KANIKO_ATTACH_DELAY = "{{ ploy.kaniko_attach_delay | default('') }}"
-        # WASM runner selection (Lane G distroless)
-        PLOY_WASM_DISTROLESS = 1
-        PLOY_WASM_ENGINE = wazero
-
         # SeaweedFS configuration. Use external DNS name so job containers resolve consistently.
         SEAWEEDFS_MASTER = "http://localhost:9333"
-        SEAWEEDFS_FILER = "http://seaweedfs.dev.ployman.app:8888"
-        PLOY_SEAWEEDFS_URL = "http://seaweedfs.dev.ployman.app:8888"
-        SEAWEEDFS_URL = "http://seaweedfs.dev.ployman.app:8888"
-
-        # ARF (Automated Remediation Framework) configuration
-        ARF_STORAGE_BACKEND = "seaweedfs"
-        ARF_SEAWEEDFS_MASTER_URL = "http://localhost:9333"
-        ARF_SEAWEEDFS_FILER_URL = "http://seaweedfs-filer.service.consul:8888"
-        ARF_FREEBSD_HOST = "{{ freebsd_vm_dynamic_ip | default(freebsd_vm.ip | default('192.168.100.10')) }}"
-        ARF_FREEBSD_USER = "root"
-        ARF_FREEBSD_PORT = "22"
-        ARF_JAIL_BASE_DIR = "/jail"
-        ARF_JAIL_TEMPLATE_DIR = "/jail/template"
-        ARF_JAIL_INTERFACE = "lo0"
+        SEAWEEDFS_FILER = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
+        PLOY_SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
+        SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
         
         # OpenRewrite configuration for transformations
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
-        ARF_OPENREWRITE_JAR = "/usr/local/bin/rewrite-maven.jar"
-        ARF_WORKING_DIR = "/tmp/arf"
 
         # Mods job image overrides (server-side) — use single env only
         MODS_ORW_APPLY_IMAGE = "{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') }}"
-        
-        # ARF Phase 3 - LLM Integration & Learning System (DB disabled)
-        ARF_LLM_CACHE_DIR = "/tmp/arf-llm-cache"
-        ARF_AB_TEST_DIR = "/tmp/arf-ab-tests"
-        
+                
         # Internal ARF Recipes Indexer
-        PLOY_ARF_REGISTRY = "{{ ploy.arf_registry | default('https://repo1.maven.org/maven2') }}"
-        PLOY_ARF_MAVEN_GROUP = "{{ ploy.arf_maven_group | default('org.openrewrite') }}"
-        PLOY_ARF_DEFAULT_PACKS = "{{ ploy.arf_default_packs | default('') }}"
+        PLOY_SECURITY_REGISTRY = "{{ ploy.security_registry | default('https://repo1.maven.org/maven2') }}"
+        PLOY_SECURITY_MAVEN_GROUP = "{{ ploy.security_maven_group | default('org.openrewrite') }}"
+        PLOY_SECURITY_DEFAULT_PACKS = "{{ ploy.security_default_packs | default('') }}"
 
         # LLM API Configuration (override via environment/secret store)
         LLM_PROVIDER = "{{ llm_provider | default('openai') }}"
@@ -275,11 +247,11 @@ EOF
           "traefik.enable=true",
           "traefik.http.routers.ploy-api.rule=Host(`api.{{ ploy.platform_domain }}`)",
           "traefik.http.routers.ploy-api.tls=true",
-          "traefik.http.routers.ploy-api.tls.certresolver=platform-wildcard",
           # Alias on apps domain (dev) so both domains work
           "traefik.http.routers.ploy-api-apps.rule=Host(`api.{{ ploy.apps_domain }}`)",
           "traefik.http.routers.ploy-api-apps.tls=true",
-          "traefik.http.routers.ploy-api-apps.tls.certresolver=apps-wildcard"
+          "traefik.http.routers.ploy-api.tls.certresolver=default-acme",
+          "traefik.http.routers.ploy-api-apps.tls.certresolver=default-acme",
         ]
 
         # Health check endpoint - simplified configuration

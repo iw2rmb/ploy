@@ -1,7 +1,5 @@
 package sbom
 
-// Types ported from ARF SBOM to decouple package
-
 type Dependency struct {
 	Name      string `json:"name"`
 	Version   string `json:"version"`

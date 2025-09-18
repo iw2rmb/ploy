@@ -1,6 +1,0 @@
-HTTP/2 500 
-content-type: application/json
-date: Wed, 17 Sep 2025 22:44:43 GMT
-x-deployment-id: kaniko-fail-app-e-build-1758149079-1758149080
-content-length: 110
-

@@ -7,16 +7,12 @@ import (
 	platformnomad "github.com/iw2rmb/ploy/platform/nomad"
 )
 
-// RED: verify builder templates are embedded via getEmbeddedTemplate
-func TestEmbeddedBuilderTemplatesPresent(t *testing.T) {
-	cases := []string{
-		"platform/nomad/lane-e-kaniko-builder.hcl",
-		"platform/nomad/lane-c-osv-builder.hcl",
+func TestEmbeddedTemplatesPresent(t *testing.T) {
+	if b := getEmbeddedTemplate("platform/nomad/lane-d-jail.hcl"); len(b) == 0 {
+		t.Fatalf("expected embedded template for lane D")
 	}
-	for _, p := range cases {
-		if b := getEmbeddedTemplate(p); len(b) == 0 {
-			t.Fatalf("expected embedded template for %s, got none", p)
-		}
+	if b := getEmbeddedTemplate("platform/nomad/debug-oci.hcl"); len(b) == 0 {
+		t.Fatalf("expected embedded debug template")
 	}
 }
 

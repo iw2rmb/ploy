@@ -1,6 +1,7 @@
 package build
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -33,11 +34,14 @@ func makeBuildResponse(lane, imagePath, dockerImage, namespace string, appType c
 		"bytes": sizeBytes,
 	}
 	// Builder info
-	if lane == "E" && builderJobName != "" {
-		resp["builder"] = fiber.Map{"job": builderJobName}
-	}
-	if lane == "C" {
-		resp["builder"] = fiber.Map{"job": appName + "-c-build-" + sha}
+	if lane == "D" && builderJobName != "" {
+		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+		resp["builder"] = fiber.Map{
+			"job":      builderJobName,
+			"logs_key": logsKey,
+			"logs_url": buildLogsURL(logsKey),
+			"log_path": fmt.Sprintf("/opt/ploy/build-logs/%s.log", builderJobName),
+		}
 	}
 	// Verify container push
 	if dockerImage != "" {

@@ -1,4 +1,4 @@
-# Mods (formerly Mods)
+# Mods
 
 This module provides end-to-end implementation of `ploy mod run` supporting complete transformation pipelines with production-ready self-healing capabilities. It applies code transformations via OpenRewrite recipes, validates results through automated builds, creates GitLab merge requests for review, and includes sophisticated self-healing workflows executed via production Nomad job orchestration.
 
@@ -75,10 +75,7 @@ ploy mod run -f java-migration.yaml
 # NOMAD_ADDR=http://localhost:4646
 # SEAWEEDFS_FILER=http://localhost:8888
 
-# KB Configuration
-# KB_ENABLED=true
-# KB_STORAGE_URL=http://localhost:8888
-# KB_TIMEOUT=10s
+# KB learning now relies on builtin defaults from the controller; dedicated `KB_*` environment variables have been retired.
 ```
 
 ### Mods Configuration

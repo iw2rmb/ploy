@@ -89,7 +89,9 @@ platform/nomad/
 
 ### Language Detection
 
-Templates are selected using the `templateForLaneAndLanguage(lane, language)` function:
+Templates are selected using the `templateForLaneAndLanguage(lane, language)` function.
+
+> **Status:** Only the Lane D Docker template is currently emitted; the legacy lane templates remain in version control for historical context and future lanes.
 
 ```go
 // Lane C language mapping

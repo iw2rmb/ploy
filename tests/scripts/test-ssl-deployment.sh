@@ -102,27 +102,29 @@ fi
 # Test 6: SSL prerequisites
 echo -e "${YELLOW}Test 6: SSL deployment prerequisites...${NC}"
 
-# Check if all environment variables are set for SSL
 SSL_ENV_CHECK=true
-if [ -z "$NAMECHEAP_API_USER" ]; then
-    echo -e "${YELLOW}⚠ NAMECHEAP_API_USER not set${NC}"
+ACME_EMAIL="${PLOY_PLATFORM_CERT_EMAIL:-admin@ployman.app}"
+echo "  ACME contact: $ACME_EMAIL"
+
+if [ -z "$PLOY_PLATFORM_CERT_EMAIL" ]; then
+    echo -e "${YELLOW}⚠ PLOY_PLATFORM_CERT_EMAIL not set (defaulting to admin@ployman.app)${NC}"
     SSL_ENV_CHECK=false
 fi
 
-if [ -z "$NAMECHEAP_API_KEY" ]; then
-    echo -e "${YELLOW}⚠ NAMECHEAP_API_KEY not set${NC}"
+if ! nc -z "$TARGET_HOST" 80 >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ Port 80 not reachable from current host${NC}"
     SSL_ENV_CHECK=false
 fi
 
-if [ -z "$NAMECHEAP_USERNAME" ]; then
-    echo -e "${YELLOW}⚠ NAMECHEAP_USERNAME not set${NC}"
+if ! nc -z "$TARGET_HOST" 443 >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠ Port 443 not reachable from current host${NC}"
     SSL_ENV_CHECK=false
 fi
 
 if [ "$SSL_ENV_CHECK" = true ]; then
-    echo -e "${GREEN}✓ DNS API credentials are set${NC}"
+    echo -e "${GREEN}✓ ACME prerequisites satisfied${NC}"
 else
-    echo -e "${YELLOW}⚠ DNS API credentials need to be set${NC}"
+    echo -e "${YELLOW}⚠ Review ACME prerequisites above${NC}"
 fi
 
 # Summary
@@ -136,7 +138,7 @@ if [ "$DNS_READY" = true ] && [ "$SSL_ENV_CHECK" = true ]; then
     echo "Run: ./scripts/deploy-with-ssl.sh"
     echo ""
     echo "Expected results:"
-    echo "  - Wildcard certificate: *.dev.ployd.app"
+    echo "  - Traefik issues certificates automatically (stored in /opt/ploy/traefik-data/default-acme.json)"
     echo "  - Controller HTTPS: https://api.dev.ployman.app"
     echo "  - App HTTPS pattern: https://{app}.dev.ployd.app"
 else
@@ -152,10 +154,9 @@ else
     fi
     
     if [ "$SSL_ENV_CHECK" = false ]; then
-        echo "🔑 API Credentials Required:"
-        echo "  export NAMECHEAP_API_USER=\"your-api-user\""
-        echo "  export NAMECHEAP_API_KEY=\"your-api-key\""
-        echo "  export NAMECHEAP_USERNAME=\"your-username\""
+        echo "🔑 ACME Prerequisites:" 
+        echo "  - Ensure PLOY_PLATFORM_CERT_EMAIL is exported"
+        echo "  - Confirm ports 80 and 443 are open on the VPS firewall"
         echo ""
     fi
     

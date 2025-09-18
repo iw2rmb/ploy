@@ -16,7 +16,6 @@ import (
 
 	"github.com/iw2rmb/ploy/api/acme"
 	"github.com/iw2rmb/ploy/api/analysis"
-	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/coordination"
 	"github.com/iw2rmb/ploy/api/dns"
@@ -27,16 +26,17 @@ import (
 	recipes "github.com/iw2rmb/ploy/api/recipes"
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/api/sbom"
+	"github.com/iw2rmb/ploy/api/security"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 
-	tarfrecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	apperr "github.com/iw2rmb/ploy/internal/errors"
 	policy "github.com/iw2rmb/ploy/internal/policy"
 	"github.com/iw2rmb/ploy/internal/preview"
+	recipecatalog "github.com/iw2rmb/ploy/internal/recipes/catalog"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
@@ -52,7 +52,7 @@ type ServiceDependencies struct {
 	ACMEHandler             *acme.Handler
 	CertificateManager      *certificates.CertificateManager
 	PlatformWildcardManager *certificates.PlatformWildcardCertificateManager
-	RemediationHandler      *arf.Handler
+	SecurityHandler         *security.Handler
 	RecipesHandler          *recipes.HTTPHandler
 	ModsHandler             *modsapi.Handler
 	AnalysisHandler         *analysis.Handler
@@ -63,7 +63,7 @@ type ServiceDependencies struct {
 	Metrics                 *metrics.Metrics
 	StorageConfigPath       string
 	// StorageFactory deprecated: use config service
-	RecipeCatalog tarfrecipes.Registry
+	RecipeCatalog recipecatalog.Registry
 }
 
 // Server represents the stateless controller server
@@ -82,7 +82,7 @@ func (s *Server) runRecipeIndexerIfConfigured() {
 	if s.config == nil {
 		return
 	}
-	packsSpec := strings.TrimSpace(s.config.RemediationDefaultPacks)
+	packsSpec := strings.TrimSpace(s.config.SecurityDefaultPacks)
 	if packsSpec == "" {
 		return
 	}
@@ -96,24 +96,24 @@ func (s *Server) runRecipeIndexerIfConfigured() {
 		s.indexerStorage = st
 	}
 
-	var fetcher tarfrecipes.Fetcher
+	var fetcher recipecatalog.Fetcher
 	switch {
-	case s.config.RemediationFetcher != nil:
-		fetcher = s.config.RemediationFetcher
-	case strings.TrimSpace(s.config.RemediationMavenGroup) != "":
-		base := strings.TrimSpace(s.config.RemediationRegistryURL)
+	case s.config.SecurityFetcher != nil:
+		fetcher = s.config.SecurityFetcher
+	case strings.TrimSpace(s.config.SecurityMavenGroup) != "":
+		base := strings.TrimSpace(s.config.SecurityRegistryURL)
 		if base == "" {
 			base = "https://repo1.maven.org/maven2"
 		}
-		fetcher = tarfrecipes.MavenFetcher{BaseURL: base, GroupID: s.config.RemediationMavenGroup}
-	case strings.TrimSpace(s.config.RemediationRegistryURL) != "":
-		fetcher = tarfrecipes.HTTPFetcher{BaseURL: strings.TrimRight(s.config.RemediationRegistryURL, "/")}
+		fetcher = recipecatalog.MavenFetcher{BaseURL: base, GroupID: s.config.SecurityMavenGroup}
+	case strings.TrimSpace(s.config.SecurityRegistryURL) != "":
+		fetcher = recipecatalog.HTTPFetcher{BaseURL: strings.TrimRight(s.config.SecurityRegistryURL, "/")}
 	default:
-		log.Printf("Skipping recipe catalog indexing: no remediation fetcher or registry configured")
+		log.Printf("Skipping recipe catalog indexing: no security fetcher or registry configured")
 		return
 	}
 
-	var packs []tarfrecipes.PackSpec
+	var packs []recipecatalog.PackSpec
 	for _, part := range strings.Split(packsSpec, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -121,16 +121,16 @@ func (s *Server) runRecipeIndexerIfConfigured() {
 		}
 		segments := strings.SplitN(part, ":", 2)
 		if len(segments) != 2 {
-			log.Printf("Skipping invalid remediation pack spec: %s", part)
+			log.Printf("Skipping invalid security pack spec: %s", part)
 			continue
 		}
 		pack := strings.TrimSpace(segments[0])
 		ver := strings.TrimSpace(segments[1])
 		if pack == "" || ver == "" {
-			log.Printf("Skipping remediation pack spec with empty fields: %s", part)
+			log.Printf("Skipping security pack spec with empty fields: %s", part)
 			continue
 		}
-		packs = append(packs, tarfrecipes.PackSpec{Name: pack, Version: ver})
+		packs = append(packs, recipecatalog.PackSpec{Name: pack, Version: ver})
 	}
 	if len(packs) == 0 {
 		return
@@ -138,12 +138,12 @@ func (s *Server) runRecipeIndexerIfConfigured() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	indexer := tarfrecipes.NewIndexer(fetcher, s.indexerStorage)
+	indexer := recipecatalog.NewIndexer(fetcher, s.indexerStorage)
 	if _, err := indexer.Refresh(ctx, packs); err != nil {
-		log.Printf("Warning: failed to index remediation packs: %v", err)
+		log.Printf("Warning: failed to index security packs: %v", err)
 		return
 	}
-	log.Printf("Indexed remediation packs: %s", packsSpec)
+	log.Printf("Indexed security packs: %s", packsSpec)
 }
 
 // resolveUnifiedStorage prefers the config service if available, otherwise

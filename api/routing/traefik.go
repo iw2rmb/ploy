@@ -111,7 +111,7 @@ type RouteConfig struct {
 func DefaultRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "apps-wildcard", // Use apps wildcard resolver by default for app subdomains
+		CertResolver:        "default-acme", // Let Traefik issue certificates automatically per domain
 		HealthPath:          "/healthz",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
@@ -130,7 +130,7 @@ func DefaultRouteConfig() *RouteConfig {
 func PlatformAppRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "platform-wildcard", // Uses platform wildcard certificate automatically
+		CertResolver:        "default-acme", // Shared ACME resolver handles platform domains
 		HealthPath:          "/healthz",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,
@@ -212,7 +212,7 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 func ControllerRouteConfig() *RouteConfig {
 	return &RouteConfig{
 		EnableTLS:           true,
-		CertResolver:        "platform-wildcard",
+		CertResolver:        "default-acme",
 		HealthPath:          "/health",
 		LoadBalanceMode:     "weighted_round_robin",
 		StickySession:       false,

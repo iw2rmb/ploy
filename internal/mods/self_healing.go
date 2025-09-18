@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/iw2rmb/ploy/api/arf"
 )
 
 // SelfHealConfig represents the self-healing configuration in mods.yaml
@@ -54,18 +52,18 @@ func GetDefaultSelfHealConfig() *SelfHealConfig {
 // ModHealingAttempt represents a single healing attempt in the Mods context
 // This is simpler than the complex ARF HealingAttempt and focused on Mods needs
 type ModHealingAttempt struct {
-	AttemptNumber    int              `json:"attempt_number"`
-	ErrorContext     arf.ErrorContext `json:"error_context"`
-	SuggestedRecipes []string         `json:"suggested_recipes"`
-	AppliedRecipes   []string         `json:"applied_recipes"`
-	Success          bool             `json:"success"`
-	ErrorMessage     string           `json:"error_message,omitempty"`
-	Duration         time.Duration    `json:"duration"`
-	Timestamp        time.Time        `json:"timestamp"`
+	AttemptNumber    int           `json:"attempt_number"`
+	ErrorContext     ErrorContext  `json:"error_context"`
+	SuggestedRecipes []string      `json:"suggested_recipes"`
+	AppliedRecipes   []string      `json:"applied_recipes"`
+	Success          bool          `json:"success"`
+	ErrorMessage     string        `json:"error_message,omitempty"`
+	Duration         time.Duration `json:"duration"`
+	Timestamp        time.Time     `json:"timestamp"`
 }
 
 // NewModHealingAttempt creates a new healing attempt
-func NewModHealingAttempt(attemptNumber int, errorContext arf.ErrorContext, suggestedRecipes []string) *ModHealingAttempt {
+func NewModHealingAttempt(attemptNumber int, errorContext ErrorContext, suggestedRecipes []string) *ModHealingAttempt {
 	return &ModHealingAttempt{
 		AttemptNumber:    attemptNumber,
 		ErrorContext:     errorContext,
@@ -168,7 +166,7 @@ func (a *ModErrorAnalyzer) AnalyzeBuildFailure(ctx context.Context, errors []str
 	// For MVP, use simple error pattern matching to suggest common recipes
 	// In the future, integrate with the full ARF LLM analyzer
 
-	errorContext := arf.ExtractErrorContext(errors, language)
+	errorContext := ExtractErrorContext(errors, language)
 
 	analysis := &BuildFailureAnalysis{
 		ErrorType:        errorContext.ErrorType,

@@ -7,79 +7,50 @@ import (
 )
 
 func TestTemplateForLane(t *testing.T) {
-	cases := map[string]string{
-		"A": "platform/nomad/lane-a-unikraft.hcl",
-		"B": "platform/nomad/lane-b-unikraft-posix.hcl",
-		"C": "platform/nomad/lane-c-osv.hcl",
-		"D": "platform/nomad/lane-d-jail.hcl",
-		"E": "platform/nomad/lane-e-oci-kontain.hcl",
-		"F": "platform/nomad/lane-f-vm.hcl",
-		"x": "platform/nomad/lane-c-osv.hcl",
-	}
-	for in, want := range cases {
-		if got := templateForLane(in); got != want {
-			t.Fatalf("templateForLane(%q)=%q, want %q", in, got, want)
+	for _, lane := range []string{"A", "D", "", "z"} {
+		if got := templateForLane(lane); got != "platform/nomad/lane-d-jail.hcl" {
+			t.Fatalf("templateForLane(%q)=%q, want lane D template", lane, got)
 		}
 	}
 }
 
 func TestTemplateForLaneAndLanguage(t *testing.T) {
-	if got := templateForLaneAndLanguage("C", "java"); got != "platform/nomad/lane-c-java.hcl" {
-		t.Fatalf("language-specific template not selected for C/java: %q", got)
+	if got := templateForLaneAndLanguage("C", "java"); got != "platform/nomad/lane-d-jail.hcl" {
+		t.Fatalf("expected lane D template, got %q", got)
 	}
-	if got := templateForLaneAndLanguage("C", "node"); got != "platform/nomad/lane-c-node.hcl" {
-		t.Fatalf("language-specific template not selected for C/node: %q", got)
-	}
-	// Fallback for other lanes/languages
-	if got := templateForLaneAndLanguage("E", "java"); got != templateForLane("E") {
-		t.Fatalf("expected fallback to generic for lane E: %q", got)
+	if got := templateForLaneAndLanguage("D", "node"); got != "platform/nomad/lane-d-jail.hcl" {
+		t.Fatalf("expected lane D template regardless of language, got %q", got)
 	}
 }
 
 func TestDebugTemplateForLane(t *testing.T) {
-	cases := map[string]string{
-		"A": "platform/nomad/debug-unikraft.hcl",
-		"B": "platform/nomad/debug-unikraft.hcl",
-		"C": "platform/nomad/debug-unikraft.hcl",
-		"D": "platform/nomad/debug-jail.hcl",
-		"E": "platform/nomad/debug-oci.hcl",
-		"F": "platform/nomad/debug-oci.hcl",
-		"x": "platform/nomad/debug-oci.hcl",
-	}
-	for in, want := range cases {
-		if got := debugTemplateForLane(in); got != want {
-			t.Fatalf("debugTemplateForLane(%q)=%q, want %q", in, got, want)
+	for _, lane := range []string{"A", "D", ""} {
+		if got := debugTemplateForLane(lane); got != "platform/nomad/debug-oci.hcl" {
+			t.Fatalf("debugTemplateForLane(%q)=%q, want debug-oci.hcl", lane, got)
 		}
 	}
 }
 
 func TestGetTaskNameForLane(t *testing.T) {
-	cases := map[string]string{
-		"A": "unikernel",
-		"B": "unikernel",
-		"C": "osv-jvm",
-		"D": "jail",
-		"E": "oci-kontain",
-		"F": "vm",
-		"X": "app",
-	}
-	for in, want := range cases {
-		if got := getTaskNameForLane(in); got != want {
-			t.Fatalf("getTaskNameForLane(%q)=%q, want %q", in, got, want)
+	for _, lane := range []string{"D", "A", ""} {
+		if got := getTaskNameForLane(lane); got != "docker-runtime" {
+			t.Fatalf("getTaskNameForLane(%q)=%q, want docker-runtime", lane, got)
 		}
 	}
 }
 
 func TestGetDriverConfigForLane(t *testing.T) {
-	d := RenderData{ImagePath: "/tmp/image", DockerImage: "example:latest", HttpPort: 8080, JvmMemory: 256}
-	if cfg := getDriverConfigForLane("E", d); cfg.Driver != "docker" {
-		t.Fatalf("expected docker driver for lane E, got %q", cfg.Driver)
+	d := RenderData{DockerImage: "example:latest"}
+	cfg := getDriverConfigForLane("D", d)
+	if cfg.Driver != "docker" {
+		t.Fatalf("expected docker driver, got %q", cfg.Driver)
 	}
-	if cfg := getDriverConfigForLane("D", d); cfg.Driver != "jail" {
-		t.Fatalf("expected jail driver for lane D, got %q", cfg.Driver)
+	if !strings.Contains(cfg.Config, d.DockerImage) {
+		t.Fatalf("expected config to reference docker image, got %q", cfg.Config)
 	}
-	if cfg := getDriverConfigForLane("A", d); cfg.Driver != "qemu" {
-		t.Fatalf("expected qemu driver for lane A, got %q", cfg.Driver)
+	// Non-D lanes fall back to the same docker config
+	if other := getDriverConfigForLane("A", d); other.Driver != "docker" {
+		t.Fatalf("expected docker driver fallback, got %q", other.Driver)
 	}
 }
 

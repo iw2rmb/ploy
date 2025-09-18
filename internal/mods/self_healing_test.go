@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -205,14 +204,14 @@ func TestModsHealingAttempt_Creation(t *testing.T) {
 	tests := []struct {
 		name             string
 		attemptNumber    int
-		errorContext     arf.ErrorContext
+		errorContext     ErrorContext
 		suggestedRecipes []string
 		expected         *ModHealingAttempt
 	}{
 		{
 			name:          "simple healing attempt",
 			attemptNumber: 1,
-			errorContext: arf.ErrorContext{
+			errorContext: ErrorContext{
 				ErrorMessage: "compilation failed",
 				ErrorType:    "compilation",
 				SourceFile:   "Main.java",
@@ -220,7 +219,7 @@ func TestModsHealingAttempt_Creation(t *testing.T) {
 			suggestedRecipes: []string{"com.acme.FixCompilation"},
 			expected: &ModHealingAttempt{
 				AttemptNumber: 1,
-				ErrorContext: arf.ErrorContext{
+				ErrorContext: ErrorContext{
 					ErrorMessage: "compilation failed",
 					ErrorType:    "compilation",
 					SourceFile:   "Main.java",

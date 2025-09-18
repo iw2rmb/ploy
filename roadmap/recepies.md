@@ -34,7 +34,7 @@ Server indexes OpenRewrite packs and serves a searchable catalog.
   - [x] Handler tests for list/search/detail/refresh endpoints
 
 Notes:
-- Legacy `RecipesHandler` + in-memory `RecipesCatalog` retired. Internal `internal/arf/recipes` registry and indexer are the source of truth; server routes are wired to internal handlers by default.
+- Legacy `RecipesHandler` + in-memory `RecipesCatalog` retired. Internal `internal/recipes/catalog` registry and indexer are the source of truth; server routes are wired to internal handlers by default.
 
 ## Phase 2 — CLI: Recipes List/Search (DONE)
 

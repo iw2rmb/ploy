@@ -12,11 +12,11 @@ import (
 
 // Handler provides HTTP endpoints for mod operations
 type Handler struct {
-	gitProvider            provider.GitProvider
-	storage                internalStorage.Storage
-	statusStore            orchestration.KV
-	remediationRegistryURL string
-	remediationMavenGroup  string
+	gitProvider         provider.GitProvider
+	storage             internalStorage.Storage
+	statusStore         orchestration.KV
+	securityRegistryURL string
+	securityMavenGroup  string
 }
 
 // NewHandler creates a new Mods HTTP handler
@@ -26,11 +26,11 @@ func NewHandler(
 	statusStore orchestration.KV,
 ) *Handler {
 	return &Handler{
-		gitProvider:            gitProvider,
-		storage:                storage,
-		statusStore:            statusStore,
-		remediationRegistryURL: os.Getenv("PLOY_ARF_REGISTRY"),
-		remediationMavenGroup:  os.Getenv("PLOY_ARF_MAVEN_GROUP"),
+		gitProvider:         gitProvider,
+		storage:             storage,
+		statusStore:         statusStore,
+		securityRegistryURL: os.Getenv("PLOY_SECURITY_REGISTRY"),
+		securityMavenGroup:  os.Getenv("PLOY_SECURITY_MAVEN_GROUP"),
 	}
 }
 

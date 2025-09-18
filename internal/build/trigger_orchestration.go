@@ -25,13 +25,13 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 		domainSuffix = "dev.ployd.app"
 	}
 
-	// Fail fast: Lane E requires a non-empty Docker image reference (preferably tag@digest)
-	if strings.ToUpper(lane) == "E" && strings.TrimSpace(dockerImage) == "" {
+	// Fail fast: Lane D requires a non-empty Docker image reference (preferably tag@digest)
+	if strings.ToUpper(lane) == "D" && strings.TrimSpace(dockerImage) == "" {
 		return "", fmt.Errorf("runtime render prerequisites not met: empty docker image after build (verify/push may have failed)")
 	}
 	// Log the resolved runtime image for observability
-	if strings.ToUpper(lane) == "E" {
-		fmt.Printf("[Build] Lane E docker image: %s\n", dockerImage)
+	if strings.ToUpper(lane) == "D" {
+		fmt.Printf("[Build] Lane D docker image: %s\n", dockerImage)
 	}
 
 	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
@@ -138,7 +138,7 @@ func filerBaseURL(lane string) string {
 	}
 	base := os.Getenv("PLOY_SEAWEEDFS_URL")
 	if base == "" {
-		base = "http://seaweedfs-filer.service.consul:8888"
+		base = "http://seaweedfs-filer.storage.ploy.local:8888"
 	}
 	if !strings.HasPrefix(base, "http") {
 		base = "http://" + base
@@ -152,7 +152,7 @@ func wasmModuleURL(lane, appName, sha string) string {
 	}
 	base := os.Getenv("PLOY_SEAWEEDFS_URL")
 	if base == "" {
-		base = "http://seaweedfs-filer.service.consul:8888"
+		base = "http://seaweedfs-filer.storage.ploy.local:8888"
 	}
 	if !strings.HasPrefix(base, "http") {
 		base = "http://" + base

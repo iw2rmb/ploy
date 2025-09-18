@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Test script for Platform Wildcard Certificate functionality
-# Tests automatic platform wildcard certificate provisioning and management
 
 set -e
 

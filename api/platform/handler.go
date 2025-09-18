@@ -1,15 +1,18 @@
 package platform
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/api/builders"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
@@ -52,7 +55,7 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 	}
 
 	sha := c.Query("sha", "latest")
-	lane := c.Query("lane", "E") // Platform services default to containers
+	lane := c.Query("lane", "D") // Platform services default to Docker lane
 	environment := c.Query("env", "dev")
 
 	// Create temp directory for build
@@ -88,25 +91,19 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 	serviceEnvVars["PLOY_SERVICE_NAME"] = serviceName
 	serviceEnvVars["PLOY_ENVIRONMENT"] = environment
 
-	// Build based on lane (platform services typically use Lane E)
-	var dockerImage string
-	switch strings.ToUpper(lane) {
-	case "E":
-		// Use registry domain name instead of localhost
-		tag := fmt.Sprintf("registry.dev.ployman.app/platform-%s:%s", serviceName, sha)
-		img, err := builders.BuildOCI(serviceName, srcDir, tag, serviceEnvVars)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{
-				"error":   "Failed to build platform service",
-				"details": err.Error(),
-			})
-		}
-		dockerImage = img
-	default:
+	// Build based on lane (platform services now use Docker lane)
+	if strings.ToUpper(lane) != "D" {
 		return c.Status(400).JSON(fiber.Map{
 			"error":   "Invalid lane for platform service",
-			"details": fmt.Sprintf("Platform services must use Lane E (containers), got %s", lane),
+			"details": fmt.Sprintf("Platform services must use Lane D (Docker), got %s", lane),
 		})
+	}
+
+	// Use registry domain name instead of localhost
+	dockerImage := fmt.Sprintf("registry.dev.ployman.app/platform-%s:%s", serviceName, sha)
+	builderID, err := h.buildPlatformDockerImage(c, serviceName, sha, srcDir, dockerImage, serviceEnvVars)
+	if err != nil {
+		return err
 	}
 
 	// Generate build timestamp
@@ -150,6 +147,7 @@ func (h *Handler) DeployPlatformService(c *fiber.Ctx) error {
 		"version":      sha,
 		"environment":  environment,
 		"docker_image": dockerImage,
+		"builder_id":   builderID,
 		"message":      fmt.Sprintf("Platform service %s deployed successfully to %s", serviceName, environment),
 	})
 }
@@ -213,7 +211,7 @@ func (h *Handler) deployToNomad(serviceName, dockerImage, environment string, en
 	// Render HCL for platform service and submit via orchestration (uses wrapper on VPS)
 	jobName := fmt.Sprintf("platform-%s", serviceName)
 	traefikHost := fmt.Sprintf("%s.%s.ployman.app", serviceName, environment)
-	hcl := orchestration.RenderServiceDockerJobHCL(jobName, serviceName, serviceName, dockerImage, envVars, traefikHost, "platform-wildcard", environment)
+	hcl := orchestration.RenderServiceDockerJobHCL(jobName, serviceName, serviceName, dockerImage, envVars, traefikHost, "default-acme", environment)
 
 	tmp, err := os.CreateTemp("", "platform-*.hcl")
 	if err != nil {
@@ -257,4 +255,85 @@ func SetupRoutes(app *fiber.App, handler *Handler) {
 	// api.Delete("/:service", handler.RemovePlatformService)
 	// api.Get("/:service/logs", handler.GetPlatformLogs)
 	// api.Post("/:service/scale", handler.ScalePlatformService)
+}
+
+func (h *Handler) buildPlatformDockerImage(c *fiber.Ctx, serviceName, sha, srcDir, dockerImage string, envVars map[string]string) (string, error) {
+	builderID := fmt.Sprintf("%s-d-build-%s-%d", serviceName, sha, time.Now().Unix())
+	logsKey := fmt.Sprintf("build-logs/%s.log", builderID)
+	logBuffer := &bytes.Buffer{}
+	logWriter := io.MultiWriter(logBuffer, os.Stdout)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	if err := runDockerCommand(ctx, logWriter, srcDir, []string{"build", "-t", dockerImage, "."}, envVars); err != nil {
+		_ = h.persistPlatformBuildLog(logBuffer.Bytes(), logsKey)
+		return "", fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("docker build failed for %s: %v", builderID, err))
+	}
+
+	if err := runDockerCommand(ctx, logWriter, srcDir, []string{"push", dockerImage}, envVars); err != nil {
+		_ = h.persistPlatformBuildLog(logBuffer.Bytes(), logsKey)
+		return "", fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("docker push failed for %s: %v", builderID, err))
+	}
+
+	if err := h.persistPlatformBuildLog(logBuffer.Bytes(), logsKey); err != nil {
+		fmt.Printf("[platform] warning: failed to persist build log for %s: %v\n", builderID, err)
+	}
+
+	c.Set("X-Deployment-ID", builderID)
+	return builderID, nil
+}
+
+func runDockerCommand(ctx context.Context, writer io.Writer, dir string, args []string, env map[string]string) error {
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd.Dir = dir
+	cmd.Stdout = writer
+	cmd.Stderr = writer
+	envList := os.Environ()
+	for k, v := range env {
+		if strings.TrimSpace(k) == "" {
+			continue
+		}
+		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
+	}
+	cmd.Env = envList
+	return cmd.Run()
+}
+
+func (h *Handler) persistPlatformBuildLog(data []byte, key string) error {
+	if len(data) == 0 || strings.TrimSpace(key) == "" {
+		return nil
+	}
+
+	if err := writeLocalPlatformBuildLog(key, data); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	if h.storage != nil {
+		reader := bytes.NewReader(data)
+		return h.storage.Put(ctx, key, reader, storage.WithContentType("text/plain"))
+	}
+
+	if h.storageClient != nil {
+		bucket := h.storageClient.GetArtifactsBucket()
+		reader := bytes.NewReader(data)
+		_, err := h.storageClient.PutObject(bucket, key, reader, "text/plain")
+		return err
+	}
+
+	return nil
+}
+
+func writeLocalPlatformBuildLog(key string, data []byte) error {
+	path := filepath.Join("/opt/ploy/build-logs", key)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create build log directory: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return fmt.Errorf("write build log: %w", err)
+	}
+	return nil
 }

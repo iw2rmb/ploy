@@ -75,7 +75,7 @@ func ResolveDefaults(get func(string) string) Defaults {
 	}
 	seaweed := get("PLOY_SEAWEEDFS_URL")
 	if seaweed == "" {
-		seaweed = "http://seaweedfs-filer.service.consul:8888"
+		seaweed = "http://seaweedfs-filer.storage.ploy.local:8888"
 	}
 	allowPartial := func() bool {
 		v := strings.ToLower(strings.TrimSpace(get("MODS_ALLOW_PARTIAL_ORW")))

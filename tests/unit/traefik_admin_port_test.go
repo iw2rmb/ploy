@@ -7,7 +7,7 @@ import (
 )
 
 func TestTraefikAdminPortTemplated(t *testing.T) {
-	p := filepath.FromSlash(filepath.Join("..", "..", "iac", "common", "templates", "nomad-traefik-system.hcl.j2"))
+	p := filepath.FromSlash(filepath.Join("iac", "common", "templates", "nomad-traefik-system.hcl.j2"))
 	content := mustReadFile(t, p)
 	// network port block should be templated
 	if !strings.Contains(content, "port \"admin\" {") || !strings.Contains(content, "static = {{ traefik_admin_port") {

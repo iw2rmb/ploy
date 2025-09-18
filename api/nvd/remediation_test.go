@@ -3,7 +3,7 @@ package nvd
 import (
 	"testing"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 func TestGenerateRemediationGuidance_CISAOverrides(t *testing.T) {
@@ -12,7 +12,7 @@ func TestGenerateRemediationGuidance_CISAOverrides(t *testing.T) {
 		EvaluatorSolution:  "update to latest",
 		CISARequiredAction: "Apply vendor patch immediately",
 	}
-	out := db.generateRemediationGuidance(cve, []arf.AffectedPackage{{Name: "acme/widget"}})
+	out := db.generateRemediationGuidance(cve, []security.AffectedPackage{{Name: "acme/widget"}})
 	if out.Instructions != "Apply vendor patch immediately" {
 		t.Fatalf("expected CISA to override, got %q", out.Instructions)
 	}

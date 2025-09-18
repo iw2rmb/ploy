@@ -5,9 +5,13 @@
 ![overall coverage](badges/overall-coverage.svg)
 
 ## Purpose
-Achieve **maximum performance** and **smallest footprint** by default using **unikernels on FreeBSD** (bhyve), while offering compatibility lanes when needed. Ploy makes the fast path the easy path.
+Achieve **maximum performance** and **smallest footprint** by default using lightweight container workflows. As of 2025-09-18 the lane architecture has been consolidated into a single **Lane D (Docker)** implementation while keeping the framework extensible for future lanes.
 
-## Lanes (A–G)
+> **Note:** Historical references to lanes A–G remain below for archival purposes and will be revisited as additional lanes are reintroduced.
+
+## Archived Lanes (A–G)
+
+> The entries below are preserved for historical reference. Only Lane D (Docker) is active in the current release.
 - **A. Ultra (Unikraft minimal)** — Greenfield Go/Rust/C; ms boot; 1–10 MB images; no SSH (debug variant optional).
 - **B. Fast-Compat (Unikraft+POSIX)** — Node/Python/nginx; 10–40 MB; 50–150 ms boot.
 - **C. Full-Compat (OSv/Hermit)** — JVM/.NET/CPython-heavy; 50–200+ MB; 200–800 ms boot.
@@ -15,6 +19,8 @@ Achieve **maximum performance** and **smallest footprint** by default using **un
 - **E. Secure-Container (OCI+Kontain/Firecracker)** — unchanged Docker images with VM isolation; Linux pool.
 - **F. Full VM (bhyve)** — stateful DBs/legacy; GB images; seconds to boot.
 - **G. WASM Runtime** — Universal polyglot target; 5–30 MB; 10–50 ms boot; hardware-enforced sandboxing.
+
+All lanes other than D are currently disabled; see `docs/LANES.md` for the active Docker workflow and consolidation details.
 
 ## Why this stack?
 - **FreeBSD + bhyve**: mature, stable, ZFS goodness, fast IO.
@@ -35,9 +41,9 @@ Achieve **maximum performance** and **smallest footprint** by default using **un
 
 Perf legend: 🔥 fastest, ⚡ fast.
 
-## Automated Remediation Framework (ARF) ✅ IMPLEMENTED
+## Security Engine (formerly Security Engine) ✅ IMPLEMENTED
 
-Ploy's **Automated Remediation Framework** provides enterprise-grade code transformation and self-healing capabilities. ARF combines OpenRewrite's semantic transformations with advanced error recovery, enabling **50-80% time reduction** in code migrations and **95% success rates** for well-defined transformations.
+Ploy's security platform provides enterprise-grade code transformation and self-healing capabilities. The Security Engine combines OpenRewrite's semantic transformations with automated error recovery, delivering **50–80% time reduction** in code migrations and **95% success rates** for well-defined transformations.
 
 **✅ Implemented Capabilities:**
 - **✅ OpenRewrite Integration** — 2,800+ recipes for Java transformations with pluggable analyzer architecture
@@ -46,10 +52,10 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - **✅ FreeBSD Jail Sandboxes** — Secure isolated environments with ZFS snapshot rollback (< 5 seconds)
 - **✅ High Availability** — Distributed processing with Consul leader election and state management
 - **✅ Pattern Learning Database** — Vector similarity matching for cross-repository learning
-- **✅ Comprehensive API & CLI** — Complete `/v1/arf/*` endpoints and `ploy arf` command suite
+- **✅ Comprehensive API & CLI** — Complete `/v1/security/*` endpoints and `ploy security` command suite
 - **✅ Lane C OSv Integration** — End-to-end Java→OSv unikernel deployment with 60-80MB image optimization
 - **✅ Benchmark System** — Comprehensive Java 11→17 migration testing with diff capture and timing analysis
-- **✅ CHTTP Static Analysis** — Production-ready Python Pylint integration with distributed architecture and ARF workflow compatibility
+- **✅ CHTTP Static Analysis** — Production-ready Python Pylint integration with distributed architecture and Security Engine workflow compatibility
 
 **✅ Production Features:**
 - **AST Caching** — Memory-mapped files with 10x performance improvement
@@ -63,7 +69,7 @@ Ploy's **Automated Remediation Framework** provides enterprise-grade code transf
 - SeaweedFS for AST cache storage and artifact management
 - Consul for distributed coordination and state management
 
-**Status:** ✅ **Phases ARF-1 through ARF-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 8→17 migration pipeline successfully validated with Java 8 Tutorial on production VPS infrastructure.
+**Status:** ✅ **Phases Security Engine-1 through Security Engine-4 Complete** - Foundation, self-healing, intelligence systems, and deployment integration fully operational. Java 8→17 migration pipeline successfully validated with Java 8 Tutorial on production VPS infrastructure.
 
 ## Platform Services vs User Applications
 
@@ -118,36 +124,20 @@ Ploy's **api is designed as a horizontally scalable, stateless application** tha
 
 This architecture makes the api "just another Ploy application" managed by the same infrastructure it controls, creating a self-contained, highly available platform.
 
-## E2E Lanes Status (Active Cycle)
-- Lanes A–G repos created and scaffolded with minimal hello apps exposing `/healthz`.
-- E2E harness added:
-  - Go test `tests/e2e/lanes_e2e_test.go` runs per-lane deployments against Dev API.
-  - Shell driver `tests/lanes/test-lane-deploy.sh` wraps the core deploy script.
-  - Logs helper `tests/lanes/check-app-logs.sh` fetches controller/alloc logs.
-- CLI/script improvements:
-  - Enforce overall TIMEOUT across push + health wait; no overrun beyond budget.
-  - Preview URL uses Dev domain: `https://<sha>.<app>.dev.ployd.app<HEALTH_PATH>`.
-  - Detect `ploy push` failures by output content; exit early and fetch logs; retry once on transient EOF.
-- API/template fixes (Lane E):
-  - Safer nested conditional processing in HCL templating to avoid stray braces.
-  - Use detected language from lane picker (no default Java for non-JVM apps).
-  - Lane E Nomad template simplified for Dev: reduced log retention (10x10MB) and removed service-level checks to avoid duplicates; rely on container healthcheck.
-- Current blocker: intermittent `unexpected EOF` on `ploy push` POST requests to Dev API. Next step is API task log inspection on VPS to confirm if the request handler exits early; mitigations added (retry + early failure detection).
-  - Update: POST path and body handling are confirmed OK via `/v1/_diag/echo` (200 with and without body). Small POSTs to legacy `/v1/builds/:app` and `/v1/apps/:app/builds` return 500 (`untar failed`) as expected, confirming handler reach.
-  - Root cause now appears to be reverse‑proxy timeouts on long‑running build POSTs (connection closed without response). Two fixes:
-    - Infra: increase forward/read/idle timeouts in ingress (Traefik) for build routes.
-    - App: add async build mode returning 202 + execution ID, with separate status/watch endpoints. CLI can adopt `--watch` to poll.
+## E2E Lanes Status (Archive)
+
+Historical notes about the per-lane E2E matrix are retained for posterity. The active E2E coverage now lives in the Lane D suite under `tests/e2e/deploy`.
 
 ## Security: NVD CVE Database Configuration
 
-The ARF Security Engine can use the NVD CVE database via the `api/nvd` package. Configure via environment variables:
+The Security Engine can use the NVD CVE database via the `api/nvd` package. Configure via environment variables:
 
 - `NVD_ENABLED` — enable/disable NVD integration (`1`/`0`, default: `1`).
 - `NVD_API_KEY` — optional NVD API key for higher rate limits.
 - `NVD_BASE_URL` — override API endpoint (default: NVD v2 CVEs endpoint).
 - `NVD_TIMEOUT_MS` — HTTP timeout in milliseconds (default: 30000).
 
-When enabled, the server initializer wires an `nvd.NVDDatabase` into the ARF security engine.
+When enabled, the server initializer wires an `nvd.NVDDatabase` into the Security Engine security engine.
 
 ## Mods Security Gate (Optional)
 

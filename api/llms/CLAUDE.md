@@ -41,7 +41,7 @@ The LLMs API module provides HTTP endpoints for managing LLM models in the regis
 
 ## Dependencies
 - External: github.com/gofiber/fiber/v2 for HTTP framework
-- Internal: internal/arf/models for model structures
+- Internal: internal/llms/models for model structures
 - Internal: internal/storage for persistence layer
 - Internal: internal/validation for model validation
 
@@ -86,6 +86,6 @@ The LLMs API module provides HTTP endpoints for managing LLM models in the regis
 ## Related Documentation
 - `../../cmd/ployman/README.md` - CLI client for these endpoints
 - `../../internal/storage/CLAUDE.md` - Storage layer implementation
-- `../../internal/arf/models/` - Core model data structures
+- `../../internal/llms/models/` - Core model data structures
 - `../../internal/validation/` - Model validation logic
 - `../server/` - Server registration and routing

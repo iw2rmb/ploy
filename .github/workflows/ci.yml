@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["**"]
 
+env:
+  GO_VERSION: '1.22.x'
+
 jobs:
   pre-commit:
     name: Pre-commit Hooks
@@ -14,329 +17,97 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Run pre-commit (all files)
         uses: pre-commit/action@v3.0.1
         with:
           extra_args: --all-files
 
-  validate-lanes:
-    name: Validate Lanes
+  lint:
+    name: GolangCI-Lint
     runs-on: ubuntu-latest
+    needs: pre-commit
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Go env
-        run: go env
-      - name: Validate lane selection
-        working-directory: tools/lane-pick
-        run: go run . --path ../../apps
+      - name: Install golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+      - name: Run make lint
+        run: make lint
 
-  mods-tests:
-    name: Mods Unit + Staticcheck
+  vet:
+    name: Go Vet
     runs-on: ubuntu-latest
+    needs: pre-commit
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Run go vet
+        run: make vet
+
+  staticcheck:
+    name: Staticcheck
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
           cache: true
       - name: Install staticcheck
         run: |
           go install honnef.co/go/tools/cmd/staticcheck@latest
           echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run mods unit tests
-        run: go test -vet=off -race -short -count=1 -v ./internal/mods
-      - name: Staticcheck mods
-        run: staticcheck ./internal/mods/...
+      - name: Run staticcheck
+        run: staticcheck ./...
 
-  format-check:
-    name: Go Format Check
+  tests:
+    name: Unit Tests & Coverage Threshold
     runs-on: ubuntu-latest
+    needs: pre-commit
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
-      - name: Install goimports
-        run: |
-          go install golang.org/x/tools/cmd/goimports@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Check formatting (gofmt)
-        run: |
-          fmt_out=$(gofmt -s -l .)
-          if [ -n "$fmt_out" ]; then
-            echo "The following files need gofmt -s:" >&2
-            echo "$fmt_out" >&2
-            exit 1
-          fi
-      - name: Check imports (goimports)
-        run: |
-          imp_out=$(goimports -l .)
-          if [ -n "$imp_out" ]; then
-            echo "The following files need goimports:" >&2
-            echo "$imp_out" >&2
-            exit 1
-          fi
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Enforce coverage threshold
+        run: make test-coverage-threshold
 
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
-    needs: [mods-tests, format-check]
+    needs: [tests, lint, vet, staticcheck]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22.x'
+          go-version: ${{ env.GO_VERSION }}
           cache: true
-      - name: Build API binary
-        run: |
-          mkdir -p bin
-          go build -v -o bin/api ./api
-      - name: Build CLI binary
-        run: |
-          mkdir -p bin
-          go build -v -o bin/ploy ./cmd/ploy
+      - name: Build CLI and API binaries
+        run: make build
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ploy-build
           path: |
-            bin/api
             bin/ploy
-
-  lint-analysis:
-    name: Lint api/analysis (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/analysis
-        run: make lint-analysis
-
-  lint-recipes:
-    name: Lint api/recipes (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/recipes
-        run: make lint-recipes
-
-  lint-arf:
-    name: Lint api/arf (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/arf
-        run: make lint-arf
-
-  lint-sbom:
-    name: Lint api/sbom (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/sbom
-        run: make lint-sbom
-
-  lint-dns:
-    name: Lint api/dns (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/dns
-        run: make lint-dns
-
-  lint-storage:
-    name: Lint internal/storage (errcheck, staticcheck, contextcheck, with tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on internal/storage (with tests)
-        run: make lint-storage
-
-  lint-certificates:
-    name: Lint api/certificates (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/certificates
-        run: make lint-certificates
-
-  lint-validation:
-    name: Lint internal/validation (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on internal/validation
-        run: make lint-validation
-
-  lint-health:
-    name: Lint api/health (errcheck, staticcheck, contextcheck)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/health
-        run: make lint-health
-
-  lint-utils:
-    name: Lint internal/utils (errcheck, staticcheck, contextcheck, no tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on internal/utils (core)
-        run: make lint-utils
-
-  lint-builders:
-    name: Lint api/builders (errcheck, staticcheck, contextcheck, no tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/builders (core)
-        run: make lint-builders
-
-  lint-orchestration:
-    name: Lint internal/orchestration (errcheck, staticcheck, contextcheck, no tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on internal/orchestration (core)
-        run: make lint-orchestration
-
-  lint-llms:
-    name: Lint api/llms (errcheck, staticcheck, contextcheck, no tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on api/llms (core)
-        run: make lint-llms
-
-  lint-monitoring:
-    name: Lint internal/monitoring (errcheck, staticcheck, contextcheck, no tests)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22.x'
-          cache: true
-      - name: Install golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
-      - name: Run focused lint on internal/monitoring (core)
-        run: make lint-monitoring
+            bin/api
 
   supply:
     name: Supply Chain (SBOM, Scan, Sign)
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: build
     steps:
       - uses: actions/checkout@v4
       - name: Install Syft and Grype

@@ -14,7 +14,7 @@ job "test-artifact-download" {
       
       # Test artifact download with corrected path (no artifacts prefix)
       artifact {
-        source = "http://seaweedfs-filer.service.consul:8888/artifacts/openrewrite/test-job/input.tar"
+        source = "http://seaweedfs-filer.storage.ploy.local:8888/artifacts/openrewrite/test-job/input.tar"
         destination = "local/"
       }
       

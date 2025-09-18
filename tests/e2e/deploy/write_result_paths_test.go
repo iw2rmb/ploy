@@ -20,7 +20,7 @@ func TestWriteResultPaths(t *testing.T) {
 	metrics := map[string]any{
 		"build": map[string]any{"duration_ms": float64(1234)},
 	}
-	writeResult(t, "T", "test://dummy-repo", "dummy-app", metrics)
+	writeResultEntry(t, "T", "dummy description", "dummy-app", metrics)
 
 	// Verify JSONL path
 	jsonl := resolveRepoPath(filepath.Join("tests", "e2e", "deploy", "results.jsonl"))
@@ -28,7 +28,7 @@ func TestWriteResultPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read results.jsonl: %v", err)
 	}
-	if !strings.Contains(string(b), "dummy-app") || !strings.Contains(string(b), "test://dummy-repo") {
+	if !strings.Contains(string(b), "dummy-app") || !strings.Contains(string(b), "dummy description") {
 		t.Fatalf("results.jsonl missing appended entry")
 	}
 
@@ -39,7 +39,7 @@ func TestWriteResultPaths(t *testing.T) {
 	}
 	// Ensure the row contains our lane and repo markers
 	mb, _ := os.ReadFile(md)
-	if !strings.Contains(string(mb), "| T |") {
+	if !strings.Contains(string(mb), "| T | dummy-app | dummy description |") {
 		t.Fatalf("results.md missing lane row")
 	}
 

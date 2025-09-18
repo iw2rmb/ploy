@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	recipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+	recipes "github.com/iw2rmb/ploy/internal/recipes/catalog"
 	providers_memory "github.com/iw2rmb/ploy/internal/storage/providers/memory"
 )
 

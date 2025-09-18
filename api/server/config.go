@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	trecipes "github.com/iw2rmb/ploy/internal/arf/recipes"
+	recipecatalog "github.com/iw2rmb/ploy/internal/recipes/catalog"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -21,14 +21,14 @@ type ControllerConfig struct {
 	CleanupAutoStart  bool
 	ShutdownTimeout   time.Duration
 	EnableCaching     bool
-	// Legacy remediation default packs (e.g., "rewrite-java:8.1.0,rewrite-spring:5.0.0"). If set, indexer runs at startup.
-	RemediationDefaultPacks string
-	// Optional fetcher for the remediation indexer (used in tests). When nil, indexing is skipped.
-	RemediationFetcher trecipes.Fetcher
-	// Optional registry URL for HTTPFetcher. Used only if RemediationFetcher is nil.
-	RemediationRegistryURL string
+	// Legacy security default packs (e.g., "rewrite-java:8.1.0,rewrite-spring:5.0.0"). If set, indexer runs at startup.
+	SecurityDefaultPacks string
+	// Optional fetcher for the security indexer (used in tests). When nil, indexing is skipped.
+	SecurityFetcher recipecatalog.Fetcher
+	// Optional registry URL for HTTPFetcher. Used only if SecurityFetcher is nil.
+	SecurityRegistryURL string
 	// Optional Maven group for MavenFetcher. If set, MavenFetcher is used.
-	RemediationMavenGroup string
+	SecurityMavenGroup string
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -50,19 +50,19 @@ func LoadConfigFromEnv() *ControllerConfig {
 	}
 
 	return &ControllerConfig{
-		Port:                    port,
-		ConsulAddr:              utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
-		NomadAddr:               utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
-		StorageConfigPath:       getStorageConfigPath(),
-		CleanupConfigPath:       utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
-		UseConsulEnv:            utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
-		EnvStorePath:            utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
-		CleanupAutoStart:        utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
-		ShutdownTimeout:         30 * time.Second, // Graceful shutdown timeout
-		EnableCaching:           utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
-		RemediationDefaultPacks: utils.Getenv("PLOY_ARF_DEFAULT_PACKS", ""),
-		RemediationRegistryURL:  utils.Getenv("PLOY_ARF_REGISTRY", "https://registry.dev.ployman.app"),
-		RemediationMavenGroup:   utils.Getenv("PLOY_ARF_MAVEN_GROUP", ""),
+		Port:                 port,
+		ConsulAddr:           utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
+		NomadAddr:            utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646"),
+		StorageConfigPath:    getStorageConfigPath(),
+		CleanupConfigPath:    utils.Getenv("PLOY_CLEANUP_CONFIG", ""),
+		UseConsulEnv:         utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true",
+		EnvStorePath:         utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store"),
+		CleanupAutoStart:     utils.Getenv("PLOY_CLEANUP_AUTO_START", "true") == "true",
+		ShutdownTimeout:      30 * time.Second, // Graceful shutdown timeout
+		EnableCaching:        utils.Getenv("PLOY_ENABLE_CACHING", "true") == "true",
+		SecurityDefaultPacks: utils.Getenv("PLOY_SECURITY_DEFAULT_PACKS", ""),
+		SecurityRegistryURL:  utils.Getenv("PLOY_SECURITY_REGISTRY", "https://registry.dev.ployman.app"),
+		SecurityMavenGroup:   utils.Getenv("PLOY_SECURITY_MAVEN_GROUP", ""),
 	}
 }
 

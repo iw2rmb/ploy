@@ -78,7 +78,7 @@ http:
       middlewares:
         - dev-api-buffering
       tls:
-        certResolver: platform-wildcard
+        certResolver: default-acme
       priority: 1000
 ${MARK_END}
 YAML"

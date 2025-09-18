@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	ibuilders "github.com/iw2rmb/ploy/internal/builders"
 	"github.com/iw2rmb/ploy/internal/config"
+	project "github.com/iw2rmb/ploy/internal/detect/project"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/git"
 	orchestration "github.com/iw2rmb/ploy/internal/orchestration"
@@ -31,6 +30,20 @@ type BuildDependencies struct {
 	StorageClient *storage.StorageClient
 	Storage       storage.Storage // NEW: Unified storage interface
 	EnvStore      envstore.EnvStoreInterface
+}
+
+type laneDBuildFuncType func(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, appEnvVars map[string]string) (dockerImage string, builderJobName string, err error)
+
+var laneDBuildFunc laneDBuildFuncType = buildLaneD
+
+// SetLaneDBuildFunc allows tests to override the lane D build implementation. The
+// returned function restores the previous implementation.
+func SetLaneDBuildFunc(fn laneDBuildFuncType) (restore func()) {
+	prev := laneDBuildFunc
+	laneDBuildFunc = fn
+	return func() {
+		laneDBuildFunc = prev
+	}
 }
 
 // BuildContext represents the build context for container namespace routing
@@ -60,6 +73,9 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	sha := c.Query("sha", "dev")
 	mainClass := c.Query("main", "")
 	lane := c.Query("lane", "")
+	if lane != "" && !strings.EqualFold(lane, "d") {
+		return RejectUnsupportedLane(c, lane)
+	}
 	// Diagnostic: request overview
 	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
 
@@ -88,107 +104,37 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	}
 
 	lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
-	log.Printf("[Build] Lane selected: %s (language=%s)", strings.ToUpper(lane), detectedLanguage)
-	// Precompute and expose a deployment identifier early for error paths (used by clients to fetch logs)
-	// Lane C builder jobs follow the pattern: <app>-c-build-<sha>
-	if strings.ToUpper(lane) == "C" {
-		depID := fmt.Sprintf("%s-c-build-%s", appName, sha)
-		if depID != "" {
-			c.Set("X-Deployment-ID", depID)
+	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+	if _, err := os.Stat(dockerfilePath); err != nil {
+		if os.IsNotExist(err) {
+			nonce := time.Now().Unix()
+			builderID := fmt.Sprintf("%s-d-build-%s-%d", appName, sha, nonce)
+			logsKey := fmt.Sprintf("build-logs/%s.log", builderID)
+			logMsg := []byte("Dockerfile not found in project root; provide a Dockerfile for Lane D builds.\n")
+			_ = persistBuildLog(context.Context(c.Context()), deps, logMsg, logsKey)
+			c.Set("X-Deployment-ID", builderID)
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    "missing_dockerfile",
+					"message": "Dockerfile not found in project root",
+				},
+				"builder": fiber.Map{
+					"job":      builderID,
+					"logs_key": logsKey,
+					"logs_url": buildLogsURL(logsKey),
+					"log_path": fmt.Sprintf("/opt/ploy/build-logs/%s.log", builderID),
+				},
+			})
 		}
 	}
-	if strings.ToUpper(lane) == "E" {
-		// Early Lane E marker to confirm flow reaches Lane E before builder-specific code
-		fmt.Printf("[Lane E] Begin app=%s sha=%s lang=%s tool=%s hasJib=%t hasDockerfile=%t java=%s autogen_q=%s env_autogen=%s\n",
-			appName, sha, facts.Language, facts.BuildTool, facts.HasJib, facts.HasDockerfile, facts.Versions.Java,
-			c.Query("autogen_dockerfile", ""), os.Getenv("PLOY_AUTOGEN_DOCKERFILE"))
-	}
+	lane = "D"
+	log.Printf("[Build] Lane enforced: %s (language=%s)", lane, detectedLanguage)
 
-	var imagePath, dockerImage string
-	var builderJobName string
-	switch strings.ToUpper(lane) {
-	case "A", "B":
-		img, err := buildLaneAB(c, deps, appName, lane, srcDir, sha, tmpDir, appEnvVars)
-		if err != nil {
-			log.Printf("[Build] Unikraft build error: %v", err)
-			return utils.ErrJSON(c, 500, err)
-		}
-		imagePath = img
-	case "C":
-		img, err := buildLaneC(c, deps, appName, srcDir, sha, mainClass, detectedJavaVersion, tmpDir)
-		if err != nil {
-			return err
-		}
-		imagePath = img
-	case "D":
-		img, err := buildLaneD(appName, srcDir, sha, tmpDir, appEnvVars)
-		if err != nil {
-			log.Printf("[Build] Jail build error: %v", err)
-			return utils.ErrJSON(c, 500, err)
-		}
-		imagePath = img
-	case "E":
-		img, tag, builder, err := buildLaneE(c, deps, buildCtx, appName, srcDir, sha, tmpDir, detectedLanguage, facts, appEnvVars)
-		if err != nil {
-			return err
-		}
-		imagePath, dockerImage, builderJobName = img, tag, builder
-	case "F":
-		img, err := buildLaneF(appName, sha, tmpDir, appEnvVars)
-		if err != nil {
-			log.Printf("[Build] VM build error: %v", err)
-			return utils.ErrJSON(c, 500, err)
-		}
-		imagePath = img
-	case "G":
-		img, err := buildLaneG(c, deps, appName, srcDir, sha)
-		if err != nil {
-			return err
-		}
-		imagePath = img
-
-		// Lane G (WASM): when using the distroless runner, ensure the runtime artifact is visible
-		// at the stable path before submitting the runtime job. This eliminates races between
-		// builder upload and runtime fetch.
-		if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
-			base := os.Getenv("PLOY_SEAWEEDFS_URL")
-			if base == "" {
-				base = "http://seaweedfs-filer.service.consul:8888"
-			}
-			if !strings.HasPrefix(base, "http") {
-				base = "http://" + base
-			}
-			artifactURL := strings.TrimRight(base, "/") + "/artifacts/module.wasm"
-			client := &http.Client{Timeout: 10 * time.Second}
-			req, _ := http.NewRequest("HEAD", artifactURL, nil)
-			resp, err := client.Do(req)
-			if err != nil || (resp != nil && resp.StatusCode >= 400) {
-				code := 0
-				if resp != nil {
-					code = resp.StatusCode
-				}
-				return utils.ErrJSON(c, 500, fmt.Errorf("wasm artifact not ready: %s (status %d): %v", artifactURL, code, err))
-			}
-			if resp != nil {
-				_ = resp.Body.Close()
-			}
-		}
-	default:
-		// Fallback to container lane if unspecified/unsupported
-		lane = "E"
-		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
-		tag := registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
-		img, err := ibuilders.BuildOCI(appName, srcDir, tag, appEnvVars)
-		if err != nil {
-			log.Printf("[Build] Default OCI build error: %v", err)
-			es := strings.ToLower(err.Error())
-			if strings.Contains(es, "no dockerfile or jib") || strings.Contains(es, "oci build failed") {
-				return utils.ErrJSON(c, 400, fmt.Errorf("OCI build prerequisites not found: add a Dockerfile or Jib configuration in your repo: %w", err))
-			}
-			return utils.ErrJSON(c, 500, err)
-		}
-		dockerImage = img
+	dockerImage, builderJobName, err := laneDBuildFunc(c, deps, buildCtx, appName, srcDir, sha, facts, appEnvVars)
+	if err != nil {
+		return err
 	}
+	var imagePath string
 	log.Printf("[Build] Build artifact ready. imagePath=%s dockerImage=%s", imagePath, dockerImage)
 
 	// Copy image to persistent location for Nomad access
@@ -214,7 +160,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 				}
 			}
 		} else if dockerImage != "" {
-			// Generate SBOM for container images (Lane E)
+			// Generate SBOM for container images (Lane D)
 			if err := supply.GenerateSBOM(dockerImage, lane, appName, sha); err != nil {
 				msg := fmt.Sprintf("SBOM generation failed for container %s: %v", dockerImage, err)
 				if sbomFailOnError() {
@@ -249,7 +195,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 			return utils.ErrJSON(c, 500, fmt.Errorf("artifact signing failed: %w", err))
 		}
 	} else if dockerImage != "" {
-		// Sign Docker images (Lane E)
+		// Sign Docker images (Lane D)
 		// Note: Docker image signing verification is more complex and handled by the registry
 		if err := supply.SignDockerImage(dockerImage); err != nil {
 			log.Printf("[Build] Docker signing failed: %v", err)
@@ -291,7 +237,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	var scanResult *security.ScanResult
 	var scanner *security.VulnerabilityScanner
 
-	// Only perform vulnerability scanning for container images (Lane E, G)
+	// Only perform vulnerability scanning for Docker lane (Lane D)
 	if dockerImage != "" {
 		// Skip authentication (Harbor removed)
 
@@ -419,4 +365,20 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	log.Printf("[Build] Success app=%s lane=%s sha=%s ctx=%s", appName, lane, sha, buildCtx.APIContext)
 	return c.JSON(response)
+}
+
+// RejectUnsupportedLane returns a standardized HTTP 400 response when a disabled lane is requested.
+func RejectUnsupportedLane(c *fiber.Ctx, lane string) error {
+	trimmed := strings.TrimSpace(lane)
+	if trimmed == "" {
+		trimmed = "unknown"
+	}
+	upper := strings.ToUpper(trimmed)
+	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		"error": fiber.Map{
+			"code":    "lane_disabled",
+			"message": fmt.Sprintf("Lane %s is disabled; only Docker lane D is supported", upper),
+		},
+		"supported_lane": "D",
+	})
 }

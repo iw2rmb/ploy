@@ -1,154 +1,120 @@
 # Certificate Management Architecture
 
-This document explains the proper separation between platform wildcard certificates and app domain certificates.
+This document explains how the platform issues and renews TLS certificates for both platform-managed subdomains and user-supplied custom domains.
 
 ## Architecture Overview
 
-Ploy has two distinct certificate management systems that serve different purposes:
+Ploy relies on two complementary mechanisms:
 
-### 1. Platform Wildcard Certificates (Infrastructure-Level)
+### 1. Traefik-Managed Platform Certificates (Infrastructure-Level)
 
-**Purpose**: Automatic HTTPS for all platform subdomains  
-**Scope**: `*.dev.ployd.app` (dev environment) or `*.ployd.app` (production)  
-**Management**: Infrastructure automation (Ansible)  
-**Implementation**: `api/certificates/wildcard.go`
+**Purpose**: Automatic HTTPS for all platform and app subdomains that Traefik routes (for example `api.dev.ployman.app`, `myapp.dev.ployd.app`).  
+**Scope**: Internal platform domains detected via Consul/Traefik tags.  
+**Management**: Traefik system job (`platform/nomad/traefik.hcl`, `iac/common/templates/nomad-traefik-system.hcl.j2`).
 
-#### Characteristics:
-- ✅ Provisioned automatically during infrastructure setup
-- ✅ Covers all platform subdomains (`api.dev.ployman.app`, `myapp.dev.ployd.app`, etc.)
-- ✅ Uses DNS-01 challenge with Namecheap API
-- ✅ Renewed automatically via cron job
-- ✅ Managed by platform administrators, not users
+#### Characteristics
+- ✅ Certificates are requested on-demand by Traefik using the `default-acme` resolver. No manual uploads are required.
+- ✅ ACME uses HTTP-01 with a TLS-ALPN fallback, so only ports 80/443 need to be reachable from the public internet.
+- ✅ Certificates are stored on each gateway node at `/opt/ploy/traefik-data/default-acme.json` and renewed automatically before expiry.
+- ✅ Contact e-mail defaults to `admin@ployman.app` (override via `PLOY_PLATFORM_CERT_EMAIL`).
+- ✅ Staging vs production ACME directory can be controlled via `PLOY_ACME_CA` if you need to test against Let’s Encrypt’s staging endpoint.
 
-#### Implementation:
-- **Provisioning**: Ansible playbook (`iac/dev/playbooks/main.yml`)
-- **Storage**: File system (`/etc/ploy/certs/`)
-- **Renewal**: Cron job with lego ACME client
-- **Integration**: API reads certificates from file system
+#### Implementation Notes
+- **Provisioning**: Nomad system job rendered from `iac/common/templates/nomad-traefik-system.hcl.j2` (deployed by `iac/dev/playbooks/hashicorp.yml`).
+- **Configuration**: Traefik entrypoint `websecure` has `http.tls` enabled with `certresolver=default-acme`, so any router tagged with TLS automatically triggers issuance.
+- **Storage & Rotation**: Traefik writes the certificate store to `/opt/ploy/traefik-data/default-acme.json`. The file persists across container restarts via a host bind mount.
 
-### 2. App Domain Certificates (User-Level)
+### 2. Custom Domain Certificates (User-Level)
 
-**Purpose**: Custom domains added by users to their deployed apps  
-**Scope**: User-owned domains (`custom-domain.com`, `mysite.org`, etc.)  
-**Management**: CLI commands and API calls  
-**Implementation**: `api/certificates/manager.go`
+**Purpose**: Enable HTTPS for user-owned domains attached through the CLI (e.g., `custom-domain.com`).  
+**Scope**: Any domain the user maps via `ploy domains:add`.  
+**Management**: API + CLI (`internal/cli/domains/handler.go`, `api/certificates/manager.go`).
 
-#### Characteristics:
-- ✅ Provisioned on-demand via CLI (`ploy domains:add custom-domain.com`)
-- ✅ Individual certificates per custom domain
-- ✅ Uses HTTP-01 or DNS-01 challenge based on domain
-- ✅ Managed by application users
-- ✅ Stored in SeaweedFS with metadata in Consul
-
-#### Implementation:
-- **Provisioning**: CLI commands (`internal/cli/domains/handler.go`)
-- **Storage**: SeaweedFS + Consul metadata
-- **Renewal**: ACME renewal service (`api/acme/renewal.go`)
-- **Integration**: Dynamic certificate loading
+#### Characteristics
+- ✅ Provisioned on-demand when a user adds a domain via `ploy` CLI or API.  
+- ✅ ACME challenge type is determined per provider (HTTP-01 by default; DNS-01 when required).  
+- ✅ Certificates are stored in SeaweedFS with metadata in Consul.  
+- ✅ Renewals are handled automatically by `api/acme/renewal.go`.
 
 ## Environment Configuration
 
 ### Development Environment (dev.ployd.app)
 
 ```bash
-# Platform wildcard certificate (infrastructure)
-# Ensure the following are set in your environment (once per shell):
-# PLOY_ENVIRONMENT=dev
-# PLOY_DEV_SUBDOMAIN=dev
-# PLOY_APPS_DOMAIN=ployd.app
-# NAMECHEAP_API_KEY=your-api-key
-# CERT_EMAIL=admin@ployd.app
+# Enable automatic certificate issuance by Traefik
+export PLOY_PLATFORM_DOMAIN=dev.ployman.app
+export PLOY_APPS_DOMAIN=dev.ployd.app
+export PLOY_PLATFORM_CERT_EMAIL=admin@ployman.app   # optional override
+# Optional: point to Let's Encrypt staging for dry runs
+# export PLOY_ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
-**Result**: Platform provides `*.dev.ployd.app` wildcard certificate
+Traefik will obtain certificates for any routed subdomain as soon as it receives traffic. No DNS API credentials are required for the default setup.
 
-### Production Environment (ployd.app)
+### Production Environment
 
 ```bash
-# Platform wildcard certificate (infrastructure)
-# Ensure the following are set in your environment (once per shell):
-# PLOY_APPS_DOMAIN=ployd.app
-# CLOUDFLARE_API_TOKEN=your-token  # Production uses Cloudflare
-# CERT_EMAIL=admin@ployd.app
+export PLOY_PLATFORM_DOMAIN=ployman.app
+export PLOY_APPS_DOMAIN=ployd.app
+export PLOY_PLATFORM_CERT_EMAIL=admin@ployman.app
 ```
 
-**Result**: Platform provides `*.ployd.app` wildcard certificate
+Ensure public DNS records for the platform domains point at the VPS gateway IPs so the ACME HTTP/TLS challenges succeed.
 
 ## Usage Examples
 
-### Platform Wildcard Certificate (Automatic)
+### Platform Certificates (Traefik Automatic)
 
 ```bash
-# Deployed via Ansible - no user action required
-curl https://api.dev.ployman.app/health          # ✅ Works automatically
-curl https://myapp.dev.ployd.app               # ✅ Works automatically
-./bin/ploy push -a testapp                   # ✅ HTTPS enabled automatically
-curl https://testapp.dev.ployd.app             # ✅ Works automatically
+# Works without --insecure once certificates are issued
+curl https://api.dev.ployman.app/health
+curl https://myapp.dev.ployd.app/healthz
 ```
 
-### App Domain Certificate (Manual via CLI)
+If the domain has not been requested before, the first HTTPS call triggers issuance; a follow-up request succeeds once Let’s Encrypt returns the certificate (usually within a few seconds).
+
+### Custom Domain Certificates (CLI Managed)
 
 ```bash
-# User adds custom domain to their app
 ./bin/ploy domains:add myapp custom-domain.com
-
-# Platform provisions individual certificate
 ./bin/ploy domains:list myapp
-# Output: custom-domain.com (SSL: active, expires: 2024-09-15)
-
-# User can access their app via custom domain
-curl https://custom-domain.com                 # ✅ Works with individual cert
+# custom-domain.com (SSL: active)
 ```
 
 ## File Structure
 
 ```
 ploy/
-├── api/certificates/
-│   ├── wildcard.go         # Platform wildcard certificate manager
-│   └── manager.go          # App domain certificate manager
-├── api/acme/
-│   ├── client.go           # ACME client for individual certificates
-│   ├── storage.go          # SeaweedFS certificate storage
-│   └── renewal.go          # Automatic renewal service
-├── internal/cli/domains/   # CLI domain management commands
-├── iac/dev/playbooks/      # Ansible infrastructure provisioning
-└── docs/CERTIFICATES.md    # This documentation
+├── platform/nomad/traefik.hcl          # Example Nomad job definition
+├── iac/common/templates/nomad-traefik-system.hcl.j2
+├── iac/common/templates/traefik-dynamic-config.yml.j2
+├── api/certificates/                   # Custom domain certificate handlers
+├── api/acme/                           # Renewal workers for custom domains
+└── docs/CERTIFICATES.md                # This document
 ```
 
 ## Key Principles
 
-1. **Separation of Concerns**: Platform certificates ≠ App domain certificates
-2. **Infrastructure vs User**: Platform certs are infrastructure, app domain certs are user-managed
-3. **Automatic vs On-Demand**: Platform certs are automatic, app domain certs are on-demand
-4. **Storage Separation**: Platform certs in filesystem, app domain certs in SeaweedFS
-5. **Management Separation**: Platform certs via Ansible, app domain certs via CLI
+1. **Traefik handles platform subdomains** using ACME HTTP/TLS challenges; no Namecheap credentials are required.
+2. **Custom domains remain user-managed** through the API/CLI, storing certificates in SeaweedFS.
+3. **Certificate storage separation**: Traefik keeps its ACME store on the gateway host; user certificates live in SeaweedFS.
+4. **Observability**: Platform certificates can be inspected via `curl -sS "$PLOY_CONTROLLER/platform/traefik/logs"`, while custom domain status is available through `/v1/apps/:app/domains`.
+5. **Staging support**: Override `PLOY_ACME_CA` when testing issuance to avoid rate limits in production.
 
 ## API Endpoints
 
-### Platform Certificate Health
 ```bash
-curl https://api.dev.ployman.app/health/platform-certificates
-```
+# Platform certificate status (Traefik exposes /ping and /traefik/logs)
+curl -sS "$PLOY_CONTROLLER/platform/traefik/logs?lines=200"
 
-### App Domain Certificate Management
-```bash
-# List app domain certificates
-curl -X GET https://api.dev.ployman.app/v1/apps/myapp/domains
-
-# Add custom domain (triggers certificate provisioning)
-curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
+# Custom domain management
+curl -X GET  "$PLOY_CONTROLLER/apps/myapp/domains"
+curl -X POST "$PLOY_CONTROLLER/apps/myapp/domains" \
   -d '{"domain": "custom-domain.com"}'
-
-# Remove custom domain and certificate
-curl -X DELETE https://api.dev.ployman.app/v1/apps/myapp/domains/custom-domain.com
 ```
 
 ## Migration Notes
 
-If you previously had mixed certificate management:
-
-1. ✅ Platform wildcard certificates are now handled by Ansible infrastructure provisioning
-2. ✅ App domain certificates remain CLI-managed for custom user domains
-3. ✅ No action required - existing certificates continue working
-4. ✅ Future platform deployments will provision wildcard certificates automatically
+- Existing wildcard certificates can be retired; Traefik will request fresh certificates automatically at runtime.
+- Remove legacy automation that wrote to `/etc/ploy/certs/` once Traefik ACME issuance is confirmed.
+- Ensure inbound ports 80/443 remain open in the VPS firewall so ACME challenges succeed.

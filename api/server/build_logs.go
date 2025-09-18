@@ -57,6 +57,13 @@ func (s *Server) handleBuildLogs(c *fiber.Ctx) error {
 		}
 	}
 	resp := buildLogsResponse{ID: id, App: app, Job: job, Lines: lines, Status: st.Status, Message: st.Message, Started: st.StartedAt, Ended: st.EndedAt}
+	if logPath := localBuildLogPath(id); logPath != "" {
+		if data, err := os.ReadFile(logPath); err == nil {
+			resp.Logs = string(data)
+			resp.AllocStatus = "local"
+			return c.JSON(resp)
+		}
+	}
 	if st.Message != "" {
 		var m map[string]any
 		if json.Unmarshal([]byte(st.Message), &m) == nil {
@@ -134,19 +141,15 @@ func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane str
 	}
 	lane := meta.Lane
 	if lane == "" {
-		lane = "E"
+		lane = "D"
 	}
-	lane = string([]byte{byte(([]rune(lane))[0])})
-	// For Lane E, try to find the most recent nonce-suffixed builder job from debug copies
-	if lane == "E" || lane == "e" {
+	switch strings.ToUpper(lane) {
+	case "D":
 		if j := findLatestBuilderJobFromDebug(meta.App, meta.Sha); j != "" {
 			return j
 		}
-	}
-	switch lane {
-	case "E", "e":
-		return fmt.Sprintf("%s-e-build-%s", meta.App, meta.Sha)
-	case "C", "c":
+		return fmt.Sprintf("%s-d-build-%s", meta.App, meta.Sha)
+	case "C":
 		return fmt.Sprintf("%s-c-build-%s", meta.App, meta.Sha)
 	default:
 		return ""
@@ -154,14 +157,14 @@ func deriveBuilderJob(id string, st buildStatus, meta struct{ App, Sha, Lane str
 }
 
 // findLatestBuilderJobFromDebug scans /opt/ploy/debug/jobs for the newest HCL
-// matching the Lane E builder pattern for a given app and sha, and returns the job name.
+// matching the Lane D builder pattern for a given app and sha, and returns the job name.
 func findLatestBuilderJobFromDebug(app, sha string) string {
 	dir := "/opt/ploy/debug/jobs"
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return ""
 	}
-	prefix := fmt.Sprintf("%s-e-build-%s-", app, sha)
+	prefix := fmt.Sprintf("%s-d-build-%s-", app, sha)
 	newestName := ""
 	var newestTime time.Time
 	for _, e := range entries {
@@ -299,4 +302,11 @@ func runCmdTimeout(cmd *exec.Cmd, timeout time.Duration) (string, error) {
 		_ = cmd.Process.Kill()
 		return "", fmt.Errorf("timeout")
 	}
+}
+
+func localBuildLogPath(id string) string {
+	if strings.TrimSpace(id) == "" {
+		return ""
+	}
+	return fmt.Sprintf("/opt/ploy/build-logs/%s.log", id)
 }

@@ -50,13 +50,13 @@ The validation module provides specialized validators for different types of pla
 - **Local**: Max 100K tokens (memory considerations), basic capabilities only
 
 ## Dependencies
-- Internal: internal/arf/models for LLM model structures
+- Internal: internal/llms/models for LLM model structures
 - Standard: regexp for pattern matching validation
 - Standard: strings for text processing and validation
 
 ## Integration Points
 ### Consumes
-- Model Structures: internal/arf/models.LLMModel for validation
+- Model Structures: internal/llms/models.LLMModel for validation
 - Configuration Maps: Provider-specific config validation
 
 ### Provides

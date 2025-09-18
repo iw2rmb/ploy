@@ -43,7 +43,7 @@ Ployman provides a unified command-line interface to the Ploy platform, with ded
 
 ## Dependencies
 - External: gopkg.in/yaml.v3 for YAML parsing
-- Internal: internal/arf/models for model structures
+- Internal: internal/llms/models for model structures
 - API: Communicates with /v1/llms/models/* endpoints
 - HTTP: 30-second timeout with proper error handling
 
@@ -80,5 +80,5 @@ Ployman provides a unified command-line interface to the Ploy platform, with ded
 ## Related Documentation
 - `../../api/llms/` - REST API endpoints for model operations
 - `../../internal/storage/CLAUDE.md` - Storage layer for model persistence
-- `../../internal/arf/models/` - Core model data structures
+- `../../internal/llms/models/` - Core model data structures
 - `../../internal/validation/` - Model validation logic

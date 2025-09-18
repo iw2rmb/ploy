@@ -310,7 +310,7 @@
         msg: "systemd-resolved status: {{ resolved_status.status.ActiveState }}"
 
     - name: Test Consul DNS resolution with resolvectl
-      shell: resolvectl query nomad.service.consul
+      shell: resolvectl query nomad.control.ploy.local
       register: consul_dns_test
       retries: 5
       delay: 3
@@ -321,7 +321,7 @@
       debug:
         msg: |
           Consul DNS Resolution Test:
-          Command: resolvectl query nomad.service.consul
+          Command: resolvectl query nomad.control.ploy.local
           Result: {{ consul_dns_test.stdout if consul_dns_test.rc == 0 else 'FAILED - ' + consul_dns_test.stderr }}
           Status: {{ 'SUCCESS' if consul_dns_test.rc == 0 else 'FAILED' }}
 
@@ -339,7 +339,7 @@
     - name: Test Consul service discovery from Go programs
       shell: |
         export GODEBUG=netdns=go+2
-        getent hosts consul.service.consul || nslookup consul.service.consul 127.0.0.1
+        getent hosts controller.coredns || nslookup controller.coredns 127.0.0.1
       register: go_dns_test
       failed_when: false
       changed_when: false
@@ -355,7 +355,7 @@
     - name: Display Go DNS compatibility test
       debug:
         msg: |
-          Go DNS Resolution Test (consul.service.consul):
+          Go DNS Resolution Test (controller.coredns):
           {{ go_dns_test.stdout if go_dns_test.rc == 0 else 'FAILED - ' + (go_dns_test.stderr | default('No error output')) }}
           Status: {{ 'SUCCESS' if go_dns_test.rc == 0 else 'FAILED' }}
 
@@ -481,6 +481,18 @@
         group: ploy
         mode: '0755'
 
+    - name: Ensure control-plane domains resolve locally
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ ansible_default_ipv4.address }} {{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+        create: true
+      loop:
+        - "{{ ploy.nomad_control_domain }}"
+        - "{{ ploy.registry_domain }}"
+
     - name: Check A-records for root domains (resilient)
       block:
         - name: Verify platform domain A-record
@@ -519,20 +531,15 @@
           debug:
             msg: "DNS Resolution Status - VPS IP: {{ ansible_default_ipv4.address }}, Platform DNS: {{ platform_dns_ip | default('') }}"
 
-    - name: Validate required environment variables for SSL certificates
+    - name: Validate required configuration for ACME certificates
       block:
-        - name: Check for Namecheap API credentials
-          fail:
-            msg: "Missing required environment variables for SSL certificate automation. Please set: NAMECHEAP_API_KEY, NAMECHEAP_API_USER, NAMECHEAP_USERNAME, NAMECHEAP_CLIENT_IP"
-          when: >
-            lookup('env', 'NAMECHEAP_API_KEY') == '' or
-            lookup('env', 'NAMECHEAP_API_USER') == '' or
-            lookup('env', 'NAMECHEAP_USERNAME') == '' or
-            lookup('env', 'NAMECHEAP_CLIENT_IP') == ''
+        - name: Determine ACME contact email
+          set_fact:
+            acme_contact_email: "{{ lookup('env', 'PLOY_PLATFORM_CERT_EMAIL') | default('admin@ployman.app') }}"
 
         - name: Display SSL automation status
           debug:
-            msg: "SSL certificate automation: ENABLED (Namecheap API configured)"
+            msg: "SSL certificate automation: ENABLED (Traefik ACME http-01/tls-alpn). Contact email: {{ acme_contact_email }}"
 
     - name: Create Nomad job and data directories
       file:
@@ -835,11 +842,11 @@
             method: GET
             status_code: 200
             validate_certs: no
-          environment:
-            PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
           register: api_health
           retries: 3
           delay: 10
+          failed_when: false
+          ignore_errors: true
 
         - name: Display deployment success summary
           debug:
@@ -850,7 +857,7 @@
               - Traefik: ✅ {{ 'Healthy' if service_health.results[0].status == 200 else 'Failed' }} (Port {{ traefik_admin_port | default(8090) }})
               - Nomad: ✅ {{ 'Healthy' if service_health.results[1].status == 200 else 'Failed' }} (Port 4646)  
               - Consul: ✅ {{ 'Healthy' if service_health.results[2].status == 200 else 'Failed' }} (Port 8500)
-              - API: ✅ {{ 'Healthy' if api_health.status == 200 else 'Failed' }} (via https://api.{{ ploy.platform_domain }})
+              - API: {{ '✅ Healthy' if api_health.status is defined and api_health.status == 200 else '⚠️ Pending (deploy step runs later)' }} (via https://api.{{ ploy.platform_domain }})
               
               SSL Certificates:
               - Platform (*.dev.ployman.app): ✅ Configured

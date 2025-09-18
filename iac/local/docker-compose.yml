@@ -153,10 +153,12 @@ services:
       - --providers.consul.rootkey=traefik
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.email=test@example.com
-      - --certificatesresolvers.letsencrypt.acme.storage=/acme.json
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --entrypoints.websecure.http.tls.certresolver=default-acme
+      - --certificatesresolvers.default-acme.acme.email=test@example.com
+      - --certificatesresolvers.default-acme.acme.storage=/acme.json
+      - --certificatesresolvers.default-acme.acme.httpchallenge=true
+      - --certificatesresolvers.default-acme.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.default-acme.acme.tlschallenge=true
     volumes:
       - traefik_data:/data
       - ./config/traefik.yml:/etc/traefik/traefik.yml:ro

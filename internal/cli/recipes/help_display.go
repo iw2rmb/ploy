@@ -5,12 +5,12 @@ import (
 	"strings"
 )
 
-// showGeneralHelp displays general ARF recipe help
+// showGeneralHelp displays general security recipe help
 func (hs *HelpSystem) showGeneralHelp() error {
-	fmt.Printf("Ploy ARF Recipe Management\n")
+	fmt.Printf("Ploy Security Engine Recipe Management\n")
 	fmt.Printf("===========================\n\n")
 
-	fmt.Printf("The Automated Remediation Framework (ARF) provides comprehensive code\n")
+	fmt.Printf("The security engine provides comprehensive code\n")
 	fmt.Printf("transformation capabilities through a recipe system. Recipes define\n")
 	fmt.Printf("multi-step transformations that can migrate, modernize, and fix codebases.\n\n")
 
@@ -52,7 +52,7 @@ func (hs *HelpSystem) showGeneralHelp() error {
 
 	fmt.Printf("\nDocumentation:\n")
 	fmt.Printf("  Recipe Format: https://docs.ployd.app/arf/recipes\n")
-	fmt.Printf("  ARF Guide:     https://docs.ployd.app/arf/guide\n")
+	fmt.Printf("  Security Engine Guide:     https://docs.ployd.app/arf/guide\n")
 	fmt.Printf("  Examples:      https://docs.ployd.app/arf/examples\n")
 
 	return nil

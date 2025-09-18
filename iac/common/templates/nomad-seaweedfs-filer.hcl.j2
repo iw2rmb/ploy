@@ -1,7 +1,7 @@
 # SeaweedFS Filer - Nomad Service Job
 # 
 # This job deploys the SeaweedFS Filer with:
-# - Service discovery via Consul DNS (seaweedfs-filer.service.consul)
+# - Access via CoreDNS hostname (seaweedfs-filer.storage.ploy.local)
 # - Integration with systemd-managed master and volume servers
 # - Health checks and automatic recovery
 # - Binary distribution via SeaweedFS artifact download
@@ -49,7 +49,7 @@ job "seaweedfs-filer" {
 
       # Environment variables for filer configuration
       env {
-        SEAWEEDFS_MASTER = "localhost:{{ seaweedfs.master_port }}"
+        SEAWEEDFS_MASTER = "{{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }}"
         SEAWEEDFS_DATA_CENTER = "dc1"
         SEAWEEDFS_RACK = "rack1"
         SEAWEEDFS_FILER_PORT = "{{ seaweedfs.filer_port }}"
@@ -74,8 +74,8 @@ job "seaweedfs-filer" {
 set -e
 
 # Ensure master is accessible before starting filer
-echo "[FILER] Waiting for SeaweedFS master at localhost:{{ seaweedfs.master_port }}..."
-timeout 60 bash -c 'until nc -z localhost {{ seaweedfs.master_port }}; do sleep 2; done'
+echo "[FILER] Waiting for SeaweedFS master at {{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }}..."
+timeout 60 bash -c 'until nc -z {{ seaweedfs.master_domain }} {{ seaweedfs.master_port }}; do sleep 2; done'
 echo "[FILER] ✓ Master is accessible"
 
 # Create filer data directory in the local allocation space
@@ -100,7 +100,7 @@ echo "[FILER] Starting SeaweedFS filer on port {{ seaweedfs.filer_port }}..."
 exec local/weed filer \
   -port={{ seaweedfs.filer_port }} \
   -ip.bind=0.0.0.0 \
-  -master=localhost:{{ seaweedfs.master_port }} \
+  -master={{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }} \
   -dataCenter=dc1 \
   -defaultReplicaPlacement=000 \
   -dirListLimit=1000 \

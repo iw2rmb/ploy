@@ -98,20 +98,7 @@ for _, suggestion := range suggestions.OrderByConfidence() {
 
 ## Configuration
 
-### Environment Variables
-```bash
-# Enable KB learning
-# Ensure KB_ENABLED=true
-
-# Storage configuration
-# Ensure KB_STORAGE_URL=http://localhost:8888
-# Ensure KB_STORAGE_TIMEOUT=10s
-
-# Learning parameters
-# Ensure KB_MIN_CONFIDENCE=0.7
-# Ensure KB_MAX_CASES_PER_ERROR=100
-# Ensure KB_SUMMARY_UPDATE_INTERVAL=1h
-```
+The KB service now derives its configuration from controller defaults and the active mod workflow. No manual environment variables are required; use the mod configuration (`kb_learning`, `kb_confidence_threshold`, etc.) to tune behaviour.
 
 ### Mods Integration
 Enable KB learning in mod configuration:
@@ -266,9 +253,6 @@ node-module-not-found
 
 #### KB Not Recording Cases
 ```bash
-# Check KB configuration
-echo $KB_ENABLED $KB_STORAGE_URL
-
 # Verify storage connectivity
 curl http://localhost:8888/
 
@@ -296,9 +280,6 @@ curl http://localhost:8888/v1/llms/kb/trends?period=7d&metric=case_count
 
 ### Debug Commands
 ```bash
-# Enable detailed KB logging
-# Ensure KB_LOG_LEVEL=debug
-
 # Test error canonicalization
 curl -X POST http://localhost:8888/v1/llms/kb/errors/canonicalize \
   -d '{"error": "cannot find symbol: class NonExistentClass"}'

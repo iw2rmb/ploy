@@ -31,7 +31,7 @@ Controller/registration endpointst   ⌃C quit   2450012 tokens used   1% contex
     - Where set: PLOY_CONTROLLER is passed from CLI; PLOY_API_URL is auto-derived by controller HCL substitution.
 -
 Storage endpoints
-    - PLOY_SEAWEEDFS_URL: http://seaweedfs-filer.service.consul:8888
+    - PLOY_SEAWEEDFS_URL: http://seaweedfs-filer.storage.ploy.local:8888
     - DIFF_KEY: mods//branches//steps//diff.patch (auto-set per run)
     - Artifact key policy: keys must start with `mods/` and cannot contain `..` or backslashes. Non-conforming keys are rejected client-side.
 -
@@ -54,7 +54,7 @@ Build gate teardown (ephemeral lane‑c)
 Where To Set
 
 - Persistent service env (VPS): /home/ploy/api.env
-    - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_IMAGEs, MODS_REGISTRY, GIT_AUTHOR/GIT_COMMITTER with sane defaults).
+    - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_ORW_APPLY_IMAGE, MODS_PLANNER_IMAGE, MODS_REDUCER_IMAGE, MODS_LLM_EXEC_IMAGE, MODS_REGISTRY, GIT_AUTHOR/GIT_COMMITTER with sane defaults).
     - `MODS_SKIP_DEPLOY_LANES` (comma-separated lane codes) optionally skips runtime deployment for specific lanes (leave unset to exercise full deploy). Override with `C` only when remote lane-C deploy is unavailable and compile-only validation is desired.
 - Job template (orw-apply): platform/nomad/mods/orw_apply.hcl
     - Resources, env block (ORW_IMAGE, PLOY_API_URL, SEAWEEDFS_URL, INPUT_URL, DIFF_KEY, controller/exec IDs).
@@ -65,8 +65,8 @@ Recommended Defaults (dev)
 
 - orw-apply: memory=1024 MB, cpu=300; MAVEN_OPTS unset unless needed (then -Xmx768m).
 - MODS_ORW_APPLY_IMAGE: registry.dev.ployman.app/openrewrite-jvm:latest
-- MODS_PLANNER/REDUCER/LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
-- NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.service.consul:8888
+- MODS_PLANNER_IMAGE / MODS_REDUCER_IMAGE / MODS_LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
+- NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.storage.ploy.local:8888
 - PLOY_CONTROLLER: ensure it is set to `https://api.dev.ployman.app/v1` for Dev; `PLOY_API_URL` auto-derived to https://api.dev.ployman.app
 - GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden. Only set `MODS_SKIP_DEPLOY_LANES` when you need to bypass remote deployments (e.g., lane-C compile-only dry runs).
 
@@ -142,7 +142,7 @@ Registry and Images
 
 Infrastructure
 - NOMAD_DC: Nomad datacenter (default: dc1)
-- PLOY_SEAWEEDFS_URL: SeaweedFS filer URL (default: http://seaweedfs-filer.service.consul:8888)
+- PLOY_SEAWEEDFS_URL: SeaweedFS filer URL (default: http://seaweedfs-filer.storage.ploy.local:8888)
 
 Security and Paths
 - MODS_ALLOWLIST: CSV allowlist globs for diff validation (default: "src/**,pom.xml")

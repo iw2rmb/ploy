@@ -69,7 +69,7 @@ func (suite *APIIntegrationSuite) TestErrorScenarios() {
 // TestBasicAPIConnectivity tests basic API connectivity without complex scenarios
 func (suite *APIIntegrationSuite) TestBasicAPIConnectivity() {
 	suite.T().Run("basic connectivity", func(t *testing.T) {
-		client := api.NewTestClient(t, suite.controllerURL)
+		client := integration.NewTestClient(t, suite.controllerURL)
 
 		// Test basic endpoints that should always work
 		resp := client.GET("/health").Execute()
@@ -86,7 +86,7 @@ func (suite *APIIntegrationSuite) TestBasicAPIConnectivity() {
 // TestControllerMetadata tests controller information endpoints
 func (suite *APIIntegrationSuite) TestControllerMetadata() {
 	suite.T().Run("controller metadata", func(t *testing.T) {
-		client := api.NewTestClient(t, suite.controllerURL)
+		client := integration.NewTestClient(t, suite.controllerURL)
 
 		// Test endpoints that provide controller information
 		endpoints := []string{"/health", "/ready", "/live", "/metrics"}

@@ -17,6 +17,7 @@ type RenderData struct {
 	DockerImage string
 	EnvVars     map[string]string
 	IsDebug     bool
+	Lane        string
 
 	// Enhanced configuration options
 	Version       string
@@ -54,65 +55,12 @@ type RenderData struct {
 	BuildTime string
 }
 
-func templateForLane(lane string) string {
-	switch strings.ToUpper(lane) {
-	case "A":
-		return "platform/nomad/lane-a-unikraft.hcl"
-	case "B":
-		return "platform/nomad/lane-b-unikraft-posix.hcl"
-	case "C":
-		return "platform/nomad/lane-c-osv.hcl" // Legacy fallback
-	case "D":
-		return "platform/nomad/lane-d-jail.hcl"
-	case "E":
-		return "platform/nomad/lane-e-oci-kontain.hcl"
-	case "F":
-		return "platform/nomad/lane-f-vm.hcl"
-	default:
-		return "platform/nomad/lane-c-osv.hcl"
-	}
-}
+func templateForLane(string) string { return "platform/nomad/lane-d-jail.hcl" }
 
-// templateForLaneAndLanguage returns language-specific template path
-func templateForLaneAndLanguage(lane, language string) string {
-	laneUpper := strings.ToUpper(lane)
-	languageLower := strings.ToLower(language)
+// Only the Docker lane is active, so language is ignored.
+func templateForLaneAndLanguage(lane, language string) string { return templateForLane(lane) }
 
-	// Check for language-specific template first
-	if languageLower != "" {
-		switch laneUpper {
-		case "C":
-			switch languageLower {
-			case "java", "jvm", "kotlin", "scala", "clojure":
-				return "platform/nomad/lane-c-java.hcl"
-			case "node", "nodejs", "javascript", "js", "typescript", "ts":
-				return "platform/nomad/lane-c-node.hcl"
-			case "python", "py":
-				// Future: return "platform/nomad/lane-c-python.hcl" when implemented
-			case "go", "golang":
-				// Future: return "platform/nomad/lane-c-go.hcl" when implemented
-			}
-		}
-	}
-
-	// Fallback to generic lane template
-	return templateForLane(lane)
-}
-
-func debugTemplateForLane(lane string) string {
-	switch strings.ToUpper(lane) {
-	case "A", "B":
-		return "platform/nomad/debug-unikraft.hcl"
-	case "C":
-		return "platform/nomad/debug-unikraft.hcl" // OSv also uses qemu
-	case "D":
-		return "platform/nomad/debug-jail.hcl"
-	case "E", "F":
-		return "platform/nomad/debug-oci.hcl"
-	default:
-		return "platform/nomad/debug-oci.hcl"
-	}
-}
+func debugTemplateForLane(string) string { return "platform/nomad/debug-oci.hcl" }
 
 // loadTemplateContent loads template content using hybrid approach: Consul KV first, then platform file fallback
 func loadTemplateContent(templatePath string) ([]byte, error) {
@@ -174,7 +122,7 @@ func applyTemplateSubstitutions(template string, data RenderData) string {
 	s = strings.ReplaceAll(s, "{{APP_NAME}}", data.App)
 	s = strings.ReplaceAll(s, "{{IMAGE_PATH}}", data.ImagePath)
 	s = strings.ReplaceAll(s, "{{DOCKER_IMAGE}}", data.DockerImage)
-	s = strings.ReplaceAll(s, "{{LANE}}", strings.ToUpper(data.Version)) // Lane identifier
+	s = strings.ReplaceAll(s, "{{LANE}}", "D") // Lane identifier
 	s = strings.ReplaceAll(s, "{{VERSION}}", data.Version)
 
 	// Network configuration
@@ -246,70 +194,14 @@ type DriverConfig struct {
 	Config string
 }
 
-func getTaskNameForLane(lane string) string {
-	switch lane {
-	case "A", "B":
-		return "unikernel"
-	case "C":
-		return "osv-jvm"
-	case "D":
-		return "jail"
-	case "E":
-		return "oci-kontain"
-	case "F":
-		return "vm"
-	default:
-		return "app"
-	}
-}
+func getTaskNameForLane(string) string { return "docker-runtime" }
 
-func getDriverConfigForLane(lane string, data RenderData) DriverConfig {
-	switch lane {
-	case "A", "B":
-		return DriverConfig{
-			Driver: "qemu",
-			Config: fmt.Sprintf(`image_path = "%s"
-        args = ["-nographic", "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-%d", "-device", "virtio-net-pci,netdev=net0"]
-        accelerator = "kvm"
-        kvm = true`, data.ImagePath, data.HttpPort),
-		}
-	case "C":
-		return DriverConfig{
-			Driver: "qemu",
-			Config: fmt.Sprintf(`image_path = "%s"
-        args = ["-nographic", "-m", "%dM", "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-%d", "-device", "virtio-net-pci,netdev=net0"]
-        accelerator = "kvm"
-        kvm = true`, data.ImagePath, data.JvmMemory, data.HttpPort),
-		}
-	case "D":
-		return DriverConfig{
-			Driver: "jail",
-			Config: fmt.Sprintf(`path = "%s"
-        allow_raw_exec = true
-        exec_timeout = "30s"`, data.ImagePath),
-		}
-	case "E":
-		return DriverConfig{
-			Driver: "docker",
-			Config: fmt.Sprintf(`image = "%s"
-        runtime = "io.kontain"
+func getDriverConfigForLane(_ string, data RenderData) DriverConfig {
+	return DriverConfig{
+		Driver: "docker",
+		Config: fmt.Sprintf(`image = "%s"
         ports = ["http", "metrics"]
         hostname = "{{APP_NAME}}-${NOMAD_ALLOC_INDEX}"`, data.DockerImage),
-		}
-	case "F":
-		return DriverConfig{
-			Driver: "qemu",
-			Config: fmt.Sprintf(`image_path = "%s"
-        args = ["-nographic", "-m", "2048M", "-smp", "2"]
-        accelerator = "kvm"
-        kvm = true`, data.ImagePath),
-		}
-	default:
-		return DriverConfig{
-			Driver: "docker",
-			Config: fmt.Sprintf(`image = "%s"
-        ports = ["http"]`, data.DockerImage),
-		}
 	}
 }
 
@@ -344,6 +236,9 @@ func renderLegacyEnvVars(envVars map[string]string) string {
 
 // SetDefaultValues sets reasonable defaults for render data
 func (r *RenderData) SetDefaults() {
+	if strings.TrimSpace(r.Lane) == "" {
+		r.Lane = "D"
+	}
 	if r.Version == "" {
 		r.Version = "latest"
 	}
@@ -354,10 +249,10 @@ func (r *RenderData) SetDefaults() {
 		r.HttpPort = 8080
 	}
 	if r.CpuLimit == 0 {
-		r.CpuLimit = 500
+		r.CpuLimit = 600
 	}
 	if r.MemoryLimit == 0 {
-		r.MemoryLimit = 256
+		r.MemoryLimit = 512
 	}
 	if r.JvmMemory == 0 {
 		r.JvmMemory = 512
@@ -378,10 +273,6 @@ func (r *RenderData) SetDefaults() {
 	case "node", "nodejs", "javascript", "js", "typescript", "ts":
 		if r.NodeVersion == "" {
 			r.NodeVersion = "18"
-		}
-		// Node.js typically uses less memory than JVM
-		if r.MemoryLimit == 256 { // Only adjust if still default
-			r.MemoryLimit = 512
 		}
 	}
 
