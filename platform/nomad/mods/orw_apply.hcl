@@ -10,9 +10,6 @@ job "${RUN_ID}" {
         image = "${ORW_IMAGE}"
         force_pull = true
         network_mode = "host"
-        tls {
-          insecure_skip_verify = true
-        }
       }
 
       env = {
