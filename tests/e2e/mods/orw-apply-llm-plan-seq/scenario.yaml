@@ -3,7 +3,7 @@ id: java11to17-orw-llm
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 target_branch: main
 base_ref: e2e/fail-missing-symbol
-lane: C
+lane: D
 build_timeout: 3m
 
 self_heal:

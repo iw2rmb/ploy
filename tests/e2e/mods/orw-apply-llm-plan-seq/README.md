@@ -5,11 +5,12 @@ This scenario exercises the full healing loop for the Java 11 -> 17 migration: O
 
 Current Cycle Key Takeaways
 ---------------------------
-- Lane C enables the compile, static-analysis, and vuln-scan gates; deploy and tests are disabled, so local compile success is the healing signal.
-- `run.sh` submits `scenario.yaml`, streams `/mods/{id}/logs`, polls status, and fetches artifacts to `logs/<MOD_ID>/`. Expect `plan_json`, `next_json`, and `diff.patch` when healing succeeds.
+- Lane D (Docker lane) enables the compile, static-analysis, and vuln-scan gates; deploy and tests are disabled, so a passing Dockerized compile is the healing signal.
+- `run.sh` submits `scenario.yaml`, streams `/mods/{id}/logs` in real time, polls status, and fetches artifacts to `logs/<MOD_ID>/`. Expect `plan_json`, `next_json`, and `diff.patch` when healing succeeds.
+- The runner aborts early when the controller repeatedly returns `not_found`, preventing long polls when a mod execution never persisted.
 - Build failures must be deterministic. Use the prepared `e2e/fail-missing-symbol` branch so orw-apply produces a diff yet Maven still fails, triggering self-heal.
 - Keep enough Nomad capacity free for the OpenRewrite task (about 1 GiB). If the run stalls, grab platform logs through `collect-logs.sh` and confirm the planner/executor received SeaweedFS and MOD_ID env vars.
-- Compile-gate diagnostics: controller may return a generic `internal_error`. Mods now emits build events with `(deployment_id=…)`; fetch Maven logs via `GET /v1/apps/:app/builds/:id/logs?lines=…` to see the real failure (wired for lanes C/E/G).
+- Compile-gate diagnostics: controller may return a generic `internal_error`. Mods now emits build events with `(deployment_id=…)`; fetch Maven logs via `GET /v1/apps/:app/builds/:id/logs?lines=…` to see the real failure (wired for lane D).
 - LLM-exec diffs: older runs can upload a sentinel `.llm-healing` patch (rejected by the allowlist). Ensure `langgraph-runner:latest` is deployed; it resolves `first_error_file:line` and emits `resolved target file: …` before generating a minimal edit diff.
 - Artifact access: when `PLOY_SEAWEEDFS_URL` is not resolvable from the workstation, use SSH within `collect-logs.sh` to pull SeaweedFS artifacts (planner plans, LLM diffs) and last_job logs from the VPS.
 - Nomad logs slicing: `collect-logs.sh` now derives a `--since` timestamp from SSE and passes it to the Nomad log wrapper to slice allocation logs by time for faster, targeted inspection.
@@ -33,8 +34,8 @@ Prerequisites
 
 Run the Cycle
 -------------
-1. Review or tweak `scenario.yaml` (lane C, compile gate, self-heal enabled).
-2. Execute `./run.sh` with the required environment variables exported.
+1. Review or tweak `scenario.yaml` (lane D, compile gate, self-heal enabled).
+2. Execute `zsh -lc 'source ~/.zshrc; ./run.sh'` with the required environment variables exported.
 3. The script prints `MOD_ID`, tails SSE events, downloads artifacts, and stores everything under `logs/<MOD_ID>/`.
 
 Verify the Run
