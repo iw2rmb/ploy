@@ -22,6 +22,7 @@ if [[ ! -f "$SCENARIO_YAML" ]]; then
 fi
 
 mkdir -p "$ROOT_DIR/logs"
+NOT_FOUND_LIMIT=${NOT_FOUND_LIMIT:-3}
 
 echo "Submitting mods run…"
 # Quick debug: show the base_ref and target_branch being sent
@@ -88,6 +89,8 @@ WATCH_PID=$!
 echo "Polling status…"
 TERM_STATUS=""
 MR_URL=""
+FAIL_REASON=""
+NOT_FOUND_COUNT=0
 START_TS=$(date +%s)
 TIMEOUT_SEC=${TIMEOUT_SEC:-3600}
 while :; do
@@ -98,6 +101,18 @@ while :; do
       TERM_STATUS=$(echo "$ST_JSON" | jq -r '.status // empty' 2>/dev/null || echo "")
       MR_URL=$(echo "$ST_JSON" | jq -r '.result.mr_url // empty' 2>/dev/null || echo "")
       PHASE=$(echo "$ST_JSON" | jq -r '.phase // empty' 2>/dev/null || echo "")
+      ERROR_CODE=$(echo "$ST_JSON" | jq -r '.error.code // empty' 2>/dev/null || echo "")
+      if [[ "$ERROR_CODE" == "not_found" ]]; then
+        ((NOT_FOUND_COUNT++))
+        echo "status response not_found (${NOT_FOUND_COUNT}/${NOT_FOUND_LIMIT})"
+        if (( NOT_FOUND_COUNT >= NOT_FOUND_LIMIT )); then
+          FAIL_REASON="status_not_found"
+          TERM_STATUS="failed"
+          break
+        fi
+      else
+        NOT_FOUND_COUNT=0
+      fi
       echo "status=$TERM_STATUS phase=$PHASE"
     else
       echo "non-json status response (len=${#ST_JSON})" >&2
@@ -136,10 +151,16 @@ echo "Summary:"
 echo "  MOD_ID: $MOD_ID"
 echo "  STATUS:  $TERM_STATUS"
 echo "  MR_URL:  ${MR_URL:-<none>}"
+if [[ -n "$FAIL_REASON" ]]; then
+  echo "  FAIL_REASON: $FAIL_REASON"
+fi
 echo "Logs and artifacts under: $LOG_DIR"
 
 if [[ "$TERM_STATUS" != "completed" ]]; then
   echo "Run did not complete successfully (status=$TERM_STATUS). Check $LOG_DIR for details." >&2
+  if [[ "$FAIL_REASON" == "status_not_found" ]]; then
+    echo "Detected repeated status not_found responses; exiting early." >&2
+  fi
   # Always collect logs (controller/platform) and referenced SeaweedFS artifacts for diagnosis
   if [[ -x "$ROOT_DIR/collect-logs.sh" ]]; then
     echo "Collecting logs and artifacts via collect-logs.sh …"
