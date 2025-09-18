@@ -82,7 +82,7 @@ Biome's Rust implementation achieves 10-35x formatting speedup through effective
 
 ## Use case recommendations
 
-### Security vulnerability scanning and remediation
+### Security vulnerability scanning and modification
 
 **Winner: SonarQube** dominates with support for 30+ languages, detecting SQL injection, XSS, and other vulnerabilities with framework-aware scanning that reduces false positives. Organizations report 60-80% reduction in manual security review time, with 95% of projects analyzed within targets on the cloud platform. The tool's integration with all major CI/CD platforms and regulatory compliance features make it the enterprise standard.
 
@@ -102,7 +102,7 @@ Biome's Rust implementation achieves 10-35x formatting speedup through effective
 
 ### Technical debt reduction
 
-**Integrated approach** combining SonarQube for detection, OpenRewrite for remediation, and vFunction for legacy modernization proves most effective. Organizations with structured debt tracking show 47% higher maintenance efficiency, with automated remediation reducing resolution time by 60-80%. SIG's Sigrid provides ROI calculations showing 20-50% productivity improvements from systematic debt reduction.
+**Integrated approach** combining SonarQube for detection, OpenRewrite for modification, and vFunction for legacy modernization proves most effective. Organizations with structured debt tracking show 47% higher maintenance efficiency, with automated modification reducing resolution time by 60-80%. SIG's Sigrid provides ROI calculations showing 20-50% productivity improvements from systematic debt reduction.
 
 ### Coding standards enforcement
 
@@ -114,7 +114,7 @@ Biome's Rust implementation achieves 10-35x formatting speedup through effective
 
 ### Enterprise transformation victories
 
-**Jabil's SAP migration** using smartShift remediated 5 million lines of custom code in 5 weeks, achieving 253% ROI with 20% reduction in dual maintenance costs. **BMW** fast-tracked their SAP S/4HANA upgrade from months to days using intelligent automation, maintaining business velocity during the transition.
+**Jabil's SAP migration** using smartShift modified 5 million lines of custom code in 5 weeks, achieving 253% ROI with 20% reduction in dual maintenance costs. **BMW** fast-tracked their SAP S/4HANA upgrade from months to days using intelligent automation, maintaining business velocity during the transition.
 
 **Evonik** became the first specialty chemicals company completing S/4HANA migration, successfully transforming 60,000+ in-house developments through automated dual maintenance. These successes demonstrate that proper tooling can transform seemingly impossible migrations into manageable projects.
 

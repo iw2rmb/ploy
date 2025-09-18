@@ -42,7 +42,7 @@ python:
       refactor: "low"
       info: "info"
     
-    # ARF recipe mappings for automatic remediation
+    # ARF recipe mappings for automatic modification
     arf_recipes:
       unused-import:
         - "org.openrewrite.python.cleanup.RemoveUnusedImports"

@@ -224,8 +224,8 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*security.CVEI
 		AttackComplexity: "low",
 	}
 
-	// Generate remediation guidance
-	guidance := n.generateRemediationGuidance(NVDCVEInfo(cve), affectedPackages)
+	// Generate modification guidance
+	guidance := n.generateModificationGuidance(NVDCVEInfo(cve), affectedPackages)
 
 	cveInfo := &security.CVEInfo{
 		ID:               cve.ID,
@@ -235,7 +235,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*security.CVEI
 		References:       refs,
 		PublishedDate:    publishedDate,
 		Severity:         severity,
-		Remediation:      guidance,
+		Modification:     guidance,
 		Exploitability:   exploitability,
 		Metadata: map[string]interface{}{
 			"source_identifier": cve.SourceIdentifier,

@@ -154,7 +154,7 @@ Research comparing 8 major tools reveals:
 **Semgrep** leads for:
 - Security-focused multi-language scenarios
 - 30+ language support with YAML-based patterns
-- Vulnerability detection and remediation
+- Vulnerability detection and modification
 
 **Language-specific champions**:
 - **Rector** (PHP): 80-90% automation for version upgrades

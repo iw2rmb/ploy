@@ -274,17 +274,17 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - ✅ Archive-based code transmission with gzip compression
   - ✅ Project type detection (pip, poetry, pipenv, conda, setuptools)
   - ✅ Configurable severity mapping and rule customization
-  - ✅ Security Engine recipe mapping for automatic Python issue remediation
+  - ✅ Security Engine recipe mapping for automatic Python issue modification
   - ✅ Comprehensive test coverage with integration tests
   - ✅ Ansible deployment automation for VPS environments
 
 ### Security Engine Integration
-- ✅ **Automated Remediation**: Direct pipeline to Security Engine for automatic fixes
+- ✅ **Automated Modification**: Direct pipeline to Security Engine for automatic fixes
   - Issue-to-recipe mapping for common patterns
   - Security Engine trigger generation from analysis results
   - Human-in-the-loop workflow creation for critical issues
   - Confidence scoring for automated fixes
-  - Batch remediation support
+  - Batch modification support
 
 ### API and CLI
 - ✅ **RESTful API**: Complete analysis API endpoints
@@ -316,7 +316,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - ✅ Go analysis with GolangCI-Lint
   - ✅ Unified output format across all analyzers
   - ✅ Resource limits and isolation per analysis job
-  - ✅ Security Engine integration for automatic remediation
+  - ✅ Security Engine integration for automatic modification
 
 ### Configuration
 - ✅ **Flexible Configuration**: YAML-based configuration system
@@ -672,13 +672,13 @@ LLM transformations now execute as distributed Nomad batch jobs, providing secur
 - **Security Model**: Docker sandboxing, input validation, resource limits, network isolation
 - **Integration**: Security Engine robust transform, OpenRewrite coordination, distributed storage
 
-## 🧬 Remediation Engine (Security Engine) ✅ OPERATIONAL
+## 🧬 Modification Engine (Security Engine) ✅ OPERATIONAL
 
 **STATUS: ✅ OPERATIONAL** - Enhanced with unified transform command and self-healing capabilities (August 2025). Comprehensive roadmap available in `roadmap/arf/`
 
-Security Engine represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
+Security Engine represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically modify common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
 
-- ♻️ September 2025: Removed the unused Security Engine core scaffolding package and server wiring to simplify the remediation surface ahead of future consolidation work.
+- ♻️ September 2025: Removed the unused Security Engine core scaffolding package and server wiring to simplify the modification surface ahead of future consolidation work.
 
 ### ✅ **Enhanced Transform Command with Self-Healing (August 2025)**
 - ✅ **Unified Transformation Engine**: Single `transform` command replacing sandbox, benchmark, and workflow commands
@@ -709,7 +709,7 @@ Security Engine represents Ploy's enterprise-grade automated code transformation
 - ✅ **Circuit Breaker Pattern**: 50% failure threshold with exponential backoff to prevent cascading failures
 - ✅ **Error Classification**: Automatic categorization (recipe_mismatch, compilation_failure, semantic_change, incomplete_transformation)
 - ✅ **Error-Driven Recipe Evolution**: Automatic recipe modification based on failure analysis with confidence scoring
-- ✅ **Parallel Solution Testing**: Fork-join framework for concurrent error remediation attempts with confidence scoring
+- ✅ **Parallel Solution Testing**: Fork-join framework for concurrent error modification attempts with confidence scoring
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination across multiple repositories
 
 ### ✅ **Implemented Deployment Integration & Application Testing**
@@ -771,7 +771,7 @@ Security Engine represents Ploy's enterprise-grade automated code transformation
 ### ✅ **Implemented API & CLI Integration**
 - ✅ **Comprehensive REST API**: `/v1/arf/*` endpoints for recipes, transformations, and monitoring (legacy sandboxes removed)
 - ✅ **Security Engine Phase 3 Endpoints**: 30+ new endpoints for LLM generation, hybrid pipelines, learning system, A/B testing
-- ✅ **Security Engine Phase 4 Endpoints**: Security scanning, remediation, workflow management, production metrics
+- ✅ **Security Engine Phase 4 Endpoints**: Security scanning, modification, workflow management, production metrics
 - ✅ **Ploy CLI Integration**: `ploy security` commands for recipe management, transformation, validation, patterns, testing
 - ✅ **Cache Management**: Cache statistics, clearing, and optimization through API and CLI
 - ✅ **System Monitoring**: Health checks, metrics collection, and operational statistics
@@ -831,7 +831,7 @@ Comprehensive transformation of Security Engine into a universal code transforma
 **Planned with Full Production (Phases 5-7):**
 - ⏳ **Framework Migrations**: Spring Boot upgrades, JUnit 4→5, Java 8→11→17→21
 - ⏳ **Dependency Resolution**: Automatic resolution of version conflicts and API changes
-- ⏳ **Security Patching**: CVE remediation with real vulnerability databases
+- ⏳ **Security Patching**: CVE modification with real vulnerability databases
 - ⏳ **Complex Refactoring**: Large-scale changes across 200-500 repositories
 - ⏳ **API Modernization**: Deprecated API removal and library upgrades
 

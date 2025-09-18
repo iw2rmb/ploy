@@ -175,7 +175,7 @@ languages:
 
 # ARF integration settings
 arf_integration_config:
-  auto_remediate: true
+  auto_modify: true
   require_approval_for:
     - "critical"
     - "security"

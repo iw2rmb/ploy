@@ -7,7 +7,7 @@ import (
 
 // showGeneralHelp displays general security recipe help
 func (hs *HelpSystem) showGeneralHelp() error {
-	fmt.Printf("Ploy Security Engine Recipe Management\n")
+	fmt.Printf("Ploy Recipe Management\n")
 	fmt.Printf("===========================\n\n")
 
 	fmt.Printf("The security engine provides comprehensive code\n")

@@ -67,7 +67,7 @@ func TestSecurityEngine_ScanForVulnerabilities(t *testing.T) {
 	}
 }
 
-func TestSecurityEngine_GenerateRemediationPlan(t *testing.T) {
+func TestSecurityEngine_GenerateModPlan(t *testing.T) {
 	engine := NewSecurityEngine()
 	ctx := context.Background()
 
@@ -96,13 +96,13 @@ func TestSecurityEngine_GenerateRemediationPlan(t *testing.T) {
 		Branch:     "main",
 	}
 
-	plan, err := engine.GenerateRemediationPlan(ctx, vulns, codebase)
+	plan, err := engine.GenerateModPlan(ctx, vulns, codebase)
 	if err != nil {
-		t.Fatalf("GenerateRemediationPlan() error = %v", err)
+		t.Fatalf("GenerateModPlan() error = %v", err)
 	}
 
 	if plan == nil {
-		t.Fatal("Expected non-nil remediation plan")
+		t.Fatal("Expected non-nil modification plan")
 	}
 
 	if plan.ID == "" {
@@ -182,7 +182,7 @@ func TestSecurityEngine_VulnerabilityPrioritization(t *testing.T) {
 	}
 }
 
-func TestSecurityEngine_RemediationTimeline(t *testing.T) {
+func TestSecurityEngine_ModTimeline(t *testing.T) {
 	engine := NewSecurityEngine()
 
 	priorities := []VulnerabilityPriority{
@@ -208,7 +208,7 @@ func TestSecurityEngine_RemediationTimeline(t *testing.T) {
 		},
 	}
 
-	timeline := engine.createRemediationTimeline(priorities)
+	timeline := engine.createModTimeline(priorities)
 
 	// Verify critical vulnerabilities are in immediate timeline
 	if len(timeline.Immediate) == 0 {

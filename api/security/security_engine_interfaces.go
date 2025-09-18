@@ -9,11 +9,11 @@ type CVEDatabase interface {
 	UpdateDatabase(ctx context.Context) error
 }
 
-// VulnerabilityRemediator generates remediation recipes for security issues
-type VulnerabilityRemediator interface {
-	GenerateRemediation(vuln VulnerabilityInfo, codebase Codebase) (*RemediationRecipe, error)
-	ValidateRemediation(recipe *RemediationRecipe) error
-	ApplyRemediation(ctx context.Context, recipe *RemediationRecipe, sandbox string) (*RemediationResult, error)
+// VulnerabilityModPlanner plans code modifications for security issues
+type VulnerabilityModPlanner interface {
+	GenerateModification(vuln VulnerabilityInfo, codebase Codebase) (*ModRecipe, error)
+	ValidateModification(recipe *ModRecipe) error
+	ApplyModification(ctx context.Context, recipe *ModRecipe, sandbox string) (*ModResult, error)
 }
 
 // RiskAnalyzer assesses security risk levels
