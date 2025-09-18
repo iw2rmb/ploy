@@ -47,12 +47,6 @@ job "{{APP_NAME}}-lane-c" {
       }
     }
     
-    # Persistent volume for JVM heap dumps and logs
-    volume "jvm-data" {
-      type      = "host"
-      source    = "jvm-data"
-      read_only = false
-    }
     
     # Consul service mesh integration (optional)
     {{#if CONNECT_ENABLED}}
@@ -99,12 +93,6 @@ job "{{APP_NAME}}-lane-c" {
         kvm = false
         machine = "q35"
         cpu = "max"
-      }
-      
-      # Volume mounting for JVM data
-      volume_mount {
-        volume      = "jvm-data"
-        destination = "/app/data"
       }
       
       # Comprehensive environment variables for JVM
