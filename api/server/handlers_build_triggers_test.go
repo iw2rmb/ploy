@@ -15,10 +15,7 @@ import (
 )
 
 func TestHandleTriggerAppBuild_AsyncAccepted(t *testing.T) {
-	// Resolve storage to in-memory to pass early checks
-	orig := resolveStorageFromConfigService
-	resolveStorageFromConfigService = func(_ *cfgsvc.Service) (istorage.Storage, error) { return memory.NewMemoryStorage(0), nil }
-	t.Cleanup(func() { resolveStorageFromConfigService = orig })
+	// Intentionally do NOT set up storage; async acceptance should not require it
 
 	// Redirect uploads path to a temp dir to avoid permission issues and allow 202 path
 	dir := t.TempDir()
