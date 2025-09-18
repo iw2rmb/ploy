@@ -81,7 +81,14 @@ func (s *LogStreamer) findRunningAlloc(ctx context.Context) string {
 		if strings.TrimSpace(id) != "" {
 			return id
 		}
-		time.Sleep(300 * time.Millisecond)
+		// Fallback: try allocs --format json and pick the newest UUID
+		cmd2 := execCommandContext(ctx, jobMgrPath(), "allocs", "--job", s.jobName, "--format", "json")
+		if jb, err := cmd2.CombinedOutput(); err == nil {
+			if aid := extractLastUUID(string(jb)); strings.TrimSpace(aid) != "" {
+				return aid
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
