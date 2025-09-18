@@ -80,10 +80,6 @@ job "{{APP_NAME}}-lane-c" {
           "-netdev", "user,id=net0,hostfwd=tcp::${NOMAD_PORT_http}-:{{HTTP_PORT}}",
           "-device", "virtio-net-pci,netdev=net0"
         ]
-        # Dev VPS: disable KVM/accelerator to avoid host dependency
-        kvm = false
-        machine = "q35"
-        cpu = "max"
       }
       
       # Comprehensive environment variables for JVM
