@@ -2,7 +2,6 @@ package templates
 
 import (
 	"fmt"
-	"net/http"
 	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
@@ -27,89 +26,12 @@ func NewHandler() (*Handler, error) {
 	}, nil
 }
 
-// SyncTemplatesRequest represents the request to sync templates
-type SyncTemplatesRequest struct {
-	Force bool `json:"force,omitempty"` // Force overwrite existing templates
-}
-
-// SyncTemplatesResponse represents the response from template sync
-type SyncTemplatesResponse struct {
-	Success      bool             `json:"success"`
-	Message      string           `json:"message"`
-	SyncedCount  int              `json:"synced_count"`
-	SkippedCount int              `json:"skipped_count"`
-	Templates    []TemplateStatus `json:"templates"`
-}
-
 // TemplateStatus represents the status of a template sync operation
 type TemplateStatus struct {
 	Name      string `json:"name"`
 	Status    string `json:"status"` // "synced", "skipped", "error"
 	Message   string `json:"message,omitempty"`
 	SizeBytes int    `json:"size_bytes,omitempty"`
-}
-
-// SyncTemplates synchronizes platform templates to Consul KV
-func (h *Handler) SyncTemplates(c *fiber.Ctx) error {
-	var req SyncTemplatesRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
-	}
-
-	// Use embedded templates as the sole source of truth
-	embeddedPaths := platformnomad.ListEmbeddedTemplatePaths()
-
-	var response SyncTemplatesResponse
-	response.Templates = make([]TemplateStatus, 0, len(embeddedPaths))
-
-	for _, fullPath := range embeddedPaths {
-		templateName := filepath.Base(fullPath)
-		status := TemplateStatus{Name: templateName}
-
-		// Read template content from embedded bytes
-		content := platformnomad.GetEmbeddedTemplate(fullPath)
-		if len(content) == 0 {
-			status.Status = "error"
-			status.Message = "Embedded template missing"
-			response.Templates = append(response.Templates, status)
-			continue
-		}
-
-		status.SizeBytes = len(content)
-
-		// Check if template already exists in Consul (unless force is true)
-		if !req.Force {
-			existing, err := h.consulClient.GetTemplate(templateName)
-			if err == nil && len(existing) > 0 {
-				status.Status = "skipped"
-				status.Message = "Template already exists in Consul KV (use force=true to overwrite)"
-				response.SkippedCount++
-				response.Templates = append(response.Templates, status)
-				continue
-			}
-		}
-
-		// Store template in Consul KV
-		err := h.consulClient.PutTemplate(templateName, content)
-		if err != nil {
-			status.Status = "error"
-			status.Message = fmt.Sprintf("Failed to store in Consul KV: %v", err)
-			response.Templates = append(response.Templates, status)
-			continue
-		}
-
-		status.Status = "synced"
-		status.Message = "Successfully synchronized to Consul KV"
-		response.SyncedCount++
-		response.Templates = append(response.Templates, status)
-	}
-
-	response.Success = true
-	response.Message = fmt.Sprintf("Synchronized %d templates, skipped %d", response.SyncedCount, response.SkippedCount)
-
-	return c.JSON(response)
 }
 
 // GetTemplateStatus returns the status of templates in both platform files and Consul KV
@@ -150,6 +72,5 @@ func SetupRoutes(app *fiber.App, handler *Handler) {
 	api := app.Group("/v1")
 
 	// Template management endpoints
-	api.Post("/templates/sync", handler.SyncTemplates)
 	api.Get("/templates/status", handler.GetTemplateStatus)
 }
