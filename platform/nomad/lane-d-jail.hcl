@@ -149,16 +149,6 @@ export TZ={{.}}
 {{with key "ploy/shared/config/locale"}}
 export LANG={{.}}
 {{end}}
-
-# Database configuration
-{{with key "ploy/shared/database/url"}}
-export DATABASE_URL={{.}}
-{{end}}
-
-# Cache configuration
-{{with key "ploy/shared/redis/url"}}
-export REDIS_URL={{.}}
-{{end}}
 EOF
         destination = "local/jail.env"
         env         = true

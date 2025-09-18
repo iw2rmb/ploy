@@ -53,8 +53,6 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 				By("Step 3: Configuring comprehensive environment variables")
 				envVars := map[string]interface{}{
 					"NODE_ENV":          "production",
-					"DATABASE_URL":      "postgres://prod-db:5432/app",
-					"REDIS_URL":         "redis://prod-redis:6379",
 					"LOG_LEVEL":         "info",
 					"METRICS_ENABLED":   "true",
 					"HEALTH_CHECK_PATH": "/health",
@@ -368,14 +366,7 @@ var _ = Describe("End-to-End Application Lifecycle", func() {
 					WithJSON(primaryEnvVars).
 					Execute()
 
-				// Configure API app
-				apiEnvVars := map[string]interface{}{
-					"DATABASE_URL": "postgres://shared-db:5432/production",
-					"REDIS_URL":    "redis://shared-redis:6379",
-				}
-
 				apiClient.POST("/v1/apps/" + apiApp + "/env").
-					WithJSON(apiEnvVars).
 					Execute()
 
 				By("Waiting for all services to be ready")

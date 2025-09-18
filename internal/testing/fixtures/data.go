@@ -287,9 +287,6 @@ func generateTestEnvVarSets() []envstore.AppEnvVars {
 		{
 			"JAVA_OPTS":      "-Xmx1g -Xms512m",
 			"SPRING_PROFILE": "prod",
-			"DB_URL":         "postgresql://db:5432/app",
-			"DB_USER":        "app_user",
-			"REDIS_URL":      "redis://cache:6379",
 		},
 		{
 			"PYTHON_ENV": "production",

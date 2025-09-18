@@ -36,10 +36,8 @@ var _ = Describe("Environment Variable Management", func() {
 
 			By("Setting multiple environment variables")
 			envVars := map[string]string{
-				"DATABASE_URL": "postgres://localhost:5432/myapp",
-				"REDIS_URL":    "redis://localhost:6379",
-				"LOG_LEVEL":    "info",
-				"DEBUG":        "false",
+				"LOG_LEVEL": "info",
+				"DEBUG":     "false",
 			}
 
 			resp = apiClient.POST("/v1/apps/" + appName + "/env").
@@ -64,8 +62,6 @@ var _ = Describe("Environment Variable Management", func() {
 					resp.JSON(&envResp)
 
 					if envMap, ok := envResp["env"].(map[string]interface{}); ok {
-						Expect(envMap["DATABASE_URL"]).To(Equal("postgres://localhost:5432/myapp"))
-						Expect(envMap["REDIS_URL"]).To(Equal("redis://localhost:6379"))
 						Expect(envMap["LOG_LEVEL"]).To(Equal("info"))
 						Expect(envMap["DEBUG"]).To(Equal("false"))
 					}

@@ -71,7 +71,6 @@ HEALTH_CHECKS[consul]="curl -s http://localhost:8500/v1/status/leader"
 HEALTH_CHECKS[nomad]="curl -s http://localhost:4646/v1/status/leader"
 HEALTH_CHECKS[seaweedfs-master]="curl -s http://localhost:9333/dir/status"
 HEALTH_CHECKS[seaweedfs-filer]="curl -s http://localhost:8888/"
-HEALTH_CHECKS[redis]="redis-cli -h localhost -p 6379 ping"
 HEALTH_CHECKS[traefik]="curl -s http://localhost:8080/ping"
 
 # Start timing
@@ -93,7 +92,7 @@ while true; do
     all_ready=true
     
     # Check Docker Compose services first
-    for service in consul nomad seaweedfs-master seaweedfs-volume seaweedfs-filer redis traefik; do
+    for service in consul nomad seaweedfs-master seaweedfs-volume seaweedfs-filer traefik; do
         if ! check_compose_service "$service"; then
             all_ready=false
         fi

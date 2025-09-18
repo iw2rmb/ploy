@@ -28,6 +28,7 @@
 
 ### Changed
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.
+- Infra: Split WASM runner image build/push into `iac/dev/playbooks/wasm-runners.yml` so API deploys reuse the existing artifacts and only verify presence before uploading to SeaweedFS.
 - CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
 - CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.

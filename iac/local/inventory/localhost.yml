@@ -31,7 +31,6 @@ all:
     seaweedfs_master_port: 9333
     seaweedfs_filer_port: 8888
     seaweedfs_volume_port: 8080
-    redis_port: 6379
     traefik_http_port: 80
     traefik_https_port: 443
     traefik_dashboard_port: 8080
