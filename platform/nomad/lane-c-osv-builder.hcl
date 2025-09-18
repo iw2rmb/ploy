@@ -28,9 +28,15 @@ job "{{APP_NAME}}-c-build-{{VERSION}}" {
         volumes = ["/opt/ploy:/host/opt/ploy"]
       }
 
-      resources { cpu = 200 memory = 256 }
+      resources {
+        cpu    = 200
+        memory = 256
+      }
 
-      logs { max_files = 3 max_file_size = 10 }
+      logs {
+        max_files     = 3
+        max_file_size = 10
+      }
     }
   }
 }
