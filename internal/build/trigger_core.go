@@ -74,7 +74,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	mainClass := c.Query("main", "")
 	lane := c.Query("lane", "")
 	if lane != "" && !strings.EqualFold(lane, "d") {
-		return RejectUnsupportedLane(c, lane)
+		log.Printf("[Build] Ignoring lane override %q; forcing Docker lane D", lane)
 	}
 	// Diagnostic: request overview
 	log.Printf("[Build] Trigger received app=%s sha=%s qlane=%s env=%s content_type=%s", appName, sha, lane, c.Query("env", "dev"), c.Get("Content-Type"))
@@ -103,7 +103,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 		appEnvVars = make(map[string]string)
 	}
 
-	lane, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
+	_, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
 	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
 	if _, err := os.Stat(dockerfilePath); err != nil {
 		if os.IsNotExist(err) {

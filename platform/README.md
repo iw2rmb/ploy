@@ -11,7 +11,6 @@ platform/
 │   ├── debug-*.hcl          # Debug and testing job definitions
 │   ├── analysis-*.hcl       # Static analysis job templates
 │   ├── arf-*.hcl.j2         # ARF transformation job templates
-│   └── wasm-*.hcl.j2        # WebAssembly deployment templates
 ├── traefik/                 # Traefik load balancer configuration
 │   ├── api-load-balancer.yml # API gateway load balancing rules
 │   └── middlewares.yml      # Traefik middleware definitions
@@ -31,7 +30,6 @@ platform/
 - **Lane D**: FreeBSD jails (`jail.hcl`, `debug-jail.hcl`)
 - **Lane E**: OCI containers (`oci.hcl`, `docker-*.hcl`)
 - **Lane F**: Full VMs (`vm-*.hcl`)
-- **Lane G**: WebAssembly (`wasm-*.hcl.j2`)
 
 ## Configuration Types
 

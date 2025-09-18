@@ -35,10 +35,7 @@ func TestDeployAppMultipartAndAutogen(t *testing.T) {
 	t.Setenv("PLOY_PUSH_MULTIPART", "1")
 	t.Setenv("PLOY_AUTOGEN_DOCKERFILE", "1")
 
-	outBuf, finish := captureStdout(t)
-
 	result, err := DeployApp("demo", "G", "main.Class", "sha-xyz", true, "")
-	finish()
 
 	if err != nil {
 		t.Fatalf("DeployApp error: %v", err)
@@ -57,8 +54,8 @@ func TestDeployAppMultipartAndAutogen(t *testing.T) {
 			t.Fatalf("content-type = %s, want multipart/form-data", ct)
 		}
 		q := req.URL.Query()
-		if q.Get("lane") != "G" {
-			t.Fatalf("lane query missing: %s", req.URL.RawQuery)
+		if q.Get("lane") != "" {
+			t.Fatalf("lane query unexpected: %s", req.URL.RawQuery)
 		}
 		if q.Get("main") != "main.Class" {
 			t.Fatalf("main query missing: %s", req.URL.RawQuery)
@@ -80,8 +77,8 @@ func TestDeployAppMultipartAndAutogen(t *testing.T) {
 		t.Fatalf("Dockerfile not generated: %v", err)
 	}
 
-	if !strings.Contains(outBuf.String(), "queued") {
-		t.Fatalf("stdout missing response body: %s", outBuf.String())
+	if !strings.Contains(result.Message, "queued") {
+		t.Fatalf("result message missing response body: %s", result.Message)
 	}
 }
 

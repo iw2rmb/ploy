@@ -34,7 +34,7 @@ func (s *Server) handleAppStatusWatch(c *fiber.Ctx) error {
 		return c.Status(503).JSON(fiber.Map{"error": "nomad client init failed", "details": err.Error()})
 	}
 
-	lanes := []string{"g", "e", "c", "d", "b", "a", "f"}
+	lanes := []string{"d"}
 	var jobName string
 	var fallback string
 	// Prefer a job with a running allocation; fallback to the first that exists

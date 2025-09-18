@@ -262,58 +262,8 @@ ENTRYPOINT ["dotnet", "HelloApp.dll"]
 EOF
 }
 
-scaffold_rust_docker() {
-  local dir=$1
-  write_file "$dir/Cargo.toml" << 'EOF'
-[package]
-name = "hello"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-hyper = { version = "0.14", features = ["server", "http1"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-EOF
-  write_file "$dir/src/main.rs" << 'EOF'
-use hyper::{Body, Request, Response, Server};
-use hyper::service::{make_service_fn, service_fn};
-use std::env;
-
-async fn handle(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-    match req.uri().path() {
-        "/healthz" => Ok(Response::new(Body::from("ok"))),
-        _ => Ok(Response::new(Body::from("hello from ploy"))),
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    let port = env::var("PORT").unwrap_or_else(|_| "8080".into());
-    let addr = format!("0.0.0.0:{}", port).parse().unwrap();
-    let make_svc = make_service_fn(|_conn| async { Ok::<_, hyper::Error>(service_fn(handle)) });
-    let server = Server::bind(&addr).serve(make_svc);
-    println!("listening on {}", addr);
-    if let Err(e) = server.await { eprintln!("server error: {}", e); }
-}
-EOF
-  write_file "$dir/Dockerfile" << 'EOF'
-FROM rust:1.79-slim AS build
-WORKDIR /src
-COPY Cargo.toml .
-RUN mkdir -p src && echo "fn main(){}" > src/main.rs && cargo build --release || true
-COPY . .
-RUN cargo build --release
-
-FROM debian:stable-slim
-ENV PORT=8080
-EXPOSE 8080
-COPY --from=build /src/target/release/hello /app
-ENTRYPOINT ["/app"]
-EOF
-}
-
 main() {
-  LANES=(A B C D E F G)
+  LANES=(A B C D E F)
   NAMES=(
     ploy-lane-a-go
     ploy-lane-b-node
@@ -321,7 +271,6 @@ main() {
     ploy-lane-d-python
     ploy-lane-e-go
     ploy-lane-f-dotnet
-    ploy-lane-g-rust
   )
 
   for i in "${!LANES[@]}"; do
@@ -337,7 +286,6 @@ main() {
       C) scaffold_java_docker "$dir" ;;
       D) scaffold_python_docker "$dir" ;;
       F) scaffold_dotnet_docker "$dir" ;;
-      G) scaffold_rust_docker "$dir" ;;
     esac
     write_file "$dir/README.md" << 'EOF'
 # $name

@@ -180,10 +180,9 @@ func TestGetLogsWithMonitor(t *testing.T) {
 			},
 		},
 		{
-			name:    "app found in last lane (lane g)",
+			name:    "app absent from supported lanes",
 			appName: "wasm-app",
 			setupMock: func(m *MockHealthMonitor) {
-				// App not found in first lanes, found in lane g (WASM)
 				lanes := []string{"a", "b", "c", "d", "e", "f"}
 				for _, lane := range lanes {
 					m.WithJobNotFound(fmt.Sprintf("wasm-app-lane-%s", lane))
@@ -191,12 +190,10 @@ func TestGetLogsWithMonitor(t *testing.T) {
 				m.WithJobFound("wasm-app-lane-g", "running")
 				m.WithAllocations("wasm-app-lane-g", 1)
 			},
-			expectedStatus: 200,
+			expectedStatus: 404,
 			expectedFields: map[string]interface{}{
-				"app_name": "wasm-app",
-				"job_name": "wasm-app-lane-g",
+				"error": "App not found or not deployed",
 			},
-			expectedContains: []string{"wasm-app-lane-g", "Allocations found: 1"},
 		},
 		{
 			name:        "custom lines parameter",

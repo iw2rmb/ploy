@@ -67,26 +67,26 @@ Next steps to implement:
 4. **Geographic Routing**: Add multi-region deployment support with geo-aware routing
 5. **Domain Storage Enhancement** (Optional): Evaluate if domain mapping should migrate from Consul KV to SeaweedFS
 
-**Phase WASM: WebAssembly Runtime Support**
+**Phase WASM: WebAssembly Runtime Support** *(Retired Oct 2025; lane G removed in favor of Docker lane D)*
 ✅ **COMPLETED (2025-08-21)** **Implementation Plan Created**: Comprehensive 2-phase implementation plan for Lane G WebAssembly runtime support with detailed technical specifications, test scenarios, and sample applications.
 
 **Implementation Tasks:**
-1. ✅ **COMPLETED (2025-08-21)** **WASM Runtime Integration**: Integrated wazero v1.5.0 pure Go WebAssembly runtime for Lane G deployment with security constraints and WASI Preview 1 support.
-2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `api/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches (archived after the Docker-only consolidation on 2025-09-18).
-3. ✅ **COMPLETED (2025-08-21)** **WASM Detection Logic**: Implemented comprehensive automatic detection of WASM compilation targets in lane picker with 95%+ accuracy:
+1. ✅ **COMPLETED (2025-08-21)** **WASM Runtime Integration**: Integrated wazero v1.5.0 pure Go WebAssembly runtime for Lane G deployment with security constraints and WASI Preview 1 support. (archived Oct 2025)
+2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `api/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches (archived after the Docker-only consolidation on 2025-09-18). (archived Oct 2025)
+3. ✅ **COMPLETED (2025-08-21)** **WASM Detection Logic**: Implemented comprehensive automatic detection of WASM compilation targets in lane picker with 95%+ accuracy: (archived Oct 2025)
    - Direct `.wasm` and `.wat` file detection with magic byte validation
    - Rust `wasm32-wasi` target detection in Cargo.toml with wasm-bindgen dependencies
    - AssemblyScript `.asc` files and compiler configuration detection
    - WASM-specific dependencies (wasm-bindgen, js-sys, web-sys, wasi crates)
    - Go with `GOOS=js GOARCH=wasm` build tags and syscall/js imports
    - C/C++ with Emscripten toolchain detection in CMakeLists.txt
-4. ✅ **COMPLETED (2025-08-21)** **WASM Build Pipeline**: Implemented multi-strategy build system with automatic strategy selection instead of separate scripts.
-5. ✅ **COMPLETED (2025-08-21)** **Nomad WASM Driver**: Created production-ready Nomad job template `platform/nomad/templates/wasm-app.hcl.j2` with resource limits, health checks, and Traefik routing.
-6. ✅ **COMPLETED (2025-08-21)** **WASI Support**: Implemented WASI Preview 1 filesystem and environment interfaces with controlled sandbox access in wazero runtime.
-7. ✅ **COMPLETED (2025-08-21)** **Component Model Integration**: Added complete WebAssembly Component Model support in `api/wasm/components.go` for multi-module WASM applications.
-8. ✅ **COMPLETED (2025-08-21)** **WASM Security Policies**: Created comprehensive OPA policies in `policies/wasm.rego` with environment-specific validation and WASM-specific constraints.
-9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`.
-10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures.
+4. ✅ **COMPLETED (2025-08-21)** **WASM Build Pipeline**: Implemented multi-strategy build system with automatic strategy selection instead of separate scripts. (archived Oct 2025)
+5. ✅ **COMPLETED (2025-08-21)** **Nomad WASM Driver**: Created production-ready Nomad job template `platform/nomad/templates/wasm-app.hcl.j2` with resource limits, health checks, and Traefik routing. (archived Oct 2025)
+6. ✅ **COMPLETED (2025-08-21)** **WASI Support**: Implemented WASI Preview 1 filesystem and environment interfaces with controlled sandbox access in wazero runtime. (archived Oct 2025)
+7. ✅ **COMPLETED (2025-08-21)** **Component Model Integration**: Added complete WebAssembly Component Model support in `api/wasm/components.go` for multi-module WASM applications. (archived Oct 2025)
+8. ✅ **COMPLETED (2025-08-21)** **WASM Security Policies**: Created comprehensive OPA policies in `policies/wasm.rego` with environment-specific validation and WASM-specific constraints. (archived Oct 2025)
+9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`. (archived Oct 2025)
+10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures. (archived Oct 2025)
 
 **Phase Automated Modification Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
 

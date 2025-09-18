@@ -27,7 +27,6 @@ func NewDefaultEnforcer() *EnvConfigurableEnforcer {
 			"D": 500,  // jails
 			"E": 1000, // OCI + Kontain
 			"F": 2000, // VMs
-			"G": 500,  // WASM
 		},
 	}
 	if s := strings.TrimSpace(os.Getenv("PLOY_POLICY_STRICT_ENVS")); s != "" {

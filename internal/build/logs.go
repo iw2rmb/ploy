@@ -35,7 +35,7 @@ func getLogsWithMonitor(c *fiber.Ctx, monitor HealthMonitorInterface) error {
 	_ = c.Query("follow", "false") == "true" // follow parameter for future streaming implementation
 
 	// Find the active job for this app across all lanes
-	lanes := []string{"a", "b", "c", "d", "e", "f", "g"}
+	lanes := []string{"a", "b", "c", "d", "e", "f"}
 	var activeJobName string
 
 	for _, lane := range lanes {
