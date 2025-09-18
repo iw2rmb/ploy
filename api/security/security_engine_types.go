@@ -11,7 +11,7 @@ type CVEInfo struct {
 	References       []CVEReference         `json:"references"`
 	PublishedDate    time.Time              `json:"published_date"`
 	Severity         string                 `json:"severity"`
-	Remediation      RemediationGuidance    `json:"remediation"`
+	Modification     ModificationGuidance   `json:"modification"`
 	Exploitability   ExploitabilityInfo     `json:"exploitability"`
 	Metadata         map[string]interface{} `json:"metadata"`
 }
@@ -41,27 +41,27 @@ type CVEReference struct {
 	Tags []string `json:"tags,omitempty"`
 }
 
-// RemediationGuidance provides guidance for fixing vulnerabilities
-type RemediationGuidance struct {
-	Type           string                 `json:"type"` // upgrade, patch, config, replace
-	Instructions   string                 `json:"instructions"`
-	AutoApplicable bool                   `json:"auto_applicable"`
-	Recipe         *AutoRemediationRecipe `json:"recipe,omitempty"`
-	Confidence     float64                `json:"confidence"`
-	Effort         EstimatedEffort        `json:"effort"`
+// ModificationGuidance provides guidance for fixing vulnerabilities
+type ModificationGuidance struct {
+	Type           string          `json:"type"` // upgrade, patch, config, replace
+	Instructions   string          `json:"instructions"`
+	AutoApplicable bool            `json:"auto_applicable"`
+	Recipe         *AutoModRecipe  `json:"recipe,omitempty"`
+	Confidence     float64         `json:"confidence"`
+	Effort         EstimatedEffort `json:"effort"`
 }
 
-// AutoRemediationRecipe contains automatic remediation instructions
-type AutoRemediationRecipe struct {
-	Type         string                 `json:"type"`
-	Operations   []RemediationOperation `json:"operations"`
-	Validation   ValidationCriteria     `json:"validation"`
-	Rollback     RollbackStrategy       `json:"rollback"`
-	Dependencies []string               `json:"dependencies"`
+// AutoModRecipe contains automatic modification instructions
+type AutoModRecipe struct {
+	Type         string             `json:"type"`
+	Operations   []ModOperation     `json:"operations"`
+	Validation   ValidationCriteria `json:"validation"`
+	Rollback     RollbackStrategy   `json:"rollback"`
+	Dependencies []string           `json:"dependencies"`
 }
 
-// RemediationOperation represents a specific remediation action
-type RemediationOperation struct {
+// ModOperation represents a specific modification action
+type ModOperation struct {
 	Action     string                 `json:"action"` // replace, upgrade, remove, configure
 	Target     OperationTarget        `json:"target"`
 	Parameters map[string]interface{} `json:"parameters"`
@@ -86,7 +86,7 @@ type OperationCondition struct {
 	Required bool        `json:"required"`
 }
 
-// ValidationCriteria defines how to validate remediation success
+// ValidationCriteria defines how to validate modification success
 type ValidationCriteria struct {
 	Tests       []ValidationTest `json:"tests"`
 	Metrics     []string         `json:"metrics"`
@@ -94,7 +94,7 @@ type ValidationCriteria struct {
 	SuccessRate float64          `json:"required_success_rate"`
 }
 
-// RollbackStrategy defines how to roll back failed remediations
+// RollbackStrategy defines how to roll back failed modifications
 type RollbackStrategy struct {
 	Type       string             `json:"type"`
 	Steps      []RollbackStep     `json:"steps"`
@@ -144,16 +144,16 @@ type CVSSRange struct {
 
 // VulnerabilityInfo represents comprehensive vulnerability information
 type VulnerabilityInfo struct {
-	CVE         CVEInfo                `json:"cve"`
-	Package     Dependency             `json:"package"`
-	Severity    string                 `json:"severity"`
-	CVSS        float64                `json:"cvss_score"`
-	Exploitable bool                   `json:"exploitable"`
-	HasFix      bool                   `json:"has_fix"`
-	FixVersion  string                 `json:"fix_version,omitempty"`
-	Remediation RemediationGuidance    `json:"remediation"`
-	Context     SecurityContext        `json:"context"`
-	Discovery   VulnerabilityDiscovery `json:"discovery"`
+	CVE          CVEInfo                `json:"cve"`
+	Package      Dependency             `json:"package"`
+	Severity     string                 `json:"severity"`
+	CVSS         float64                `json:"cvss_score"`
+	Exploitable  bool                   `json:"exploitable"`
+	HasFix       bool                   `json:"has_fix"`
+	FixVersion   string                 `json:"fix_version,omitempty"`
+	Modification ModificationGuidance   `json:"modification"`
+	Context      SecurityContext        `json:"context"`
+	Discovery    VulnerabilityDiscovery `json:"discovery"`
 }
 
 // SecurityContext provides context for security analysis
@@ -203,20 +203,20 @@ type SecuritySummary struct {
 	Status               string  `json:"status"`
 }
 
-// RemediationRecipe represents a complete remediation solution
-type RemediationRecipe struct {
+// ModRecipe represents a complete modification solution
+type ModRecipe struct {
 	ID              string                 `json:"id"`
 	Name            string                 `json:"name"`
 	Description     string                 `json:"description"`
 	Vulnerabilities []string               `json:"target_vulnerabilities"`
-	Recipe          AutoRemediationRecipe  `json:"recipe"`
+	Recipe          AutoModRecipe          `json:"recipe"`
 	Metadata        map[string]interface{} `json:"metadata"`
 	CreatedAt       time.Time              `json:"created_at"`
 	Version         string                 `json:"version"`
 }
 
-// RemediationResult represents the outcome of applying a remediation
-type RemediationResult struct {
+// ModResult represents the outcome of applying a modification
+type ModResult struct {
 	Success              bool               `json:"success"`
 	VulnerabilitiesFixed []string           `json:"vulnerabilities_fixed"`
 	Errors               []string           `json:"errors"`
@@ -227,7 +227,7 @@ type RemediationResult struct {
 	RollbackRequired     bool               `json:"rollback_required"`
 }
 
-// ChangeSummary summarizes changes made during remediation
+// ChangeSummary summarizes changes made during modification
 type ChangeSummary struct {
 	FilesModified        []string           `json:"files_modified"`
 	DependenciesChanged  []DependencyChange `json:"dependencies_changed"`
@@ -253,7 +253,7 @@ type ConfigChange struct {
 	Description string      `json:"description"`
 }
 
-// ChangeStatistics provides statistics about remediation changes
+// ChangeStatistics provides statistics about modification changes
 type ChangeStatistics struct {
 	TotalFiles      int `json:"total_files_changed"`
 	LinesAdded      int `json:"lines_added"`
@@ -289,12 +289,12 @@ type SBOMSecurityMetrics struct {
 	OutdatedDependencies   int     `json:"outdated_dependencies"`
 }
 
-// RemediationPlan represents a comprehensive plan for addressing vulnerabilities
-type RemediationPlan struct {
+// ModPlan represents a comprehensive plan for addressing vulnerabilities
+type ModPlan struct {
 	ID              string                 `json:"id"`
 	Vulnerabilities []VulnerabilityInfo    `json:"vulnerabilities"`
-	Recipes         []RemediationRecipe    `json:"recipes"`
-	Timeline        RemediationTimeline    `json:"timeline"`
+	Recipes         []ModRecipe            `json:"recipes"`
+	Timeline        ModTimeline            `json:"timeline"`
 	EstimatedEffort EstimatedEffort        `json:"estimated_effort"`
 	CreatedAt       time.Time              `json:"created_at"`
 	Metadata        map[string]interface{} `json:"metadata"`

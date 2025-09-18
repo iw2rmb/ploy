@@ -94,8 +94,8 @@ func (h *Handler) SecurityScan(c *fiber.Ctx) error {
 	return c.JSON(report)
 }
 
-// GenerateRemediationPlan generates a remediation plan for vulnerabilities
-func (h *Handler) GenerateRemediationPlan(c *fiber.Ctx) error {
+// GenerateModPlan generates a modification plan for vulnerabilities
+func (h *Handler) GenerateModPlan(c *fiber.Ctx) error {
 	var req struct {
 		Vulnerabilities []string `json:"vulnerabilities"`
 		Priority        string   `json:"priority"`
@@ -109,7 +109,7 @@ func (h *Handler) GenerateRemediationPlan(c *fiber.Ctx) error {
 		})
 	}
 
-	// Mock remediation plan
+	// Mock modification plan
 	planID := fmt.Sprintf("plan-%d", time.Now().Unix())
 
 	plan := fiber.Map{

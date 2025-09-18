@@ -88,9 +88,9 @@ Next steps to implement:
 9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`.
 10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures.
 
-**Phase Automated Remediation Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
+**Phase Automated Modification Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
 
-The Automated Remediation Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
+The Automated Modification Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically modify common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
 **Implementation Roadmap**: See detailed phase documentation in `roadmap/arf/`:
 

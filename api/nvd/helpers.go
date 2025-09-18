@@ -6,7 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/api/security"
 )
 
-// NVDCVEInfo represents CVE information structure for remediation guidance
+// NVDCVEInfo represents CVE information structure for modification guidance
 type NVDCVEInfo struct {
 	ID                 string `json:"id"`
 	SourceIdentifier   string `json:"sourceIdentifier"`
@@ -128,9 +128,9 @@ type NVDCVEInfo struct {
 	} `json:"vendorComments,omitempty"`
 }
 
-// generateRemediationGuidance creates remediation guidance for a CVE
-func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackages []security.AffectedPackage) security.RemediationGuidance {
-	remediationType := "upgrade"
+// generateModificationGuidance creates modification guidance for a CVE
+func (n *NVDDatabase) generateModificationGuidance(cve NVDCVEInfo, affectedPackages []security.AffectedPackage) security.ModificationGuidance {
+	modType := "upgrade"
 	instructions := "Update affected components to latest secure versions"
 	autoApplicable := true
 	confidence := 0.7
@@ -174,8 +174,8 @@ func (n *NVDDatabase) generateRemediationGuidance(cve NVDCVEInfo, affectedPackag
 		effort.Risk = "high"
 	}
 
-	return security.RemediationGuidance{
-		Type:           remediationType,
+	return security.ModificationGuidance{
+		Type:           modType,
 		Instructions:   instructions,
 		AutoApplicable: autoApplicable,
 		Confidence:     confidence,

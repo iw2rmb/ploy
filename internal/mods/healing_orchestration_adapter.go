@@ -22,8 +22,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		r.emit(ctx, "healing", "build-error", "info", msg)
 	}
 
-	// Fast-path local remediation to ensure E2E healing success when remote planner is unavailable
-	if err := r.localRemediation(repoPath, buildError); err == nil {
+	// Fast-path local fix to ensure E2E healing success when remote planner is unavailable
+	if err := r.localFix(repoPath, buildError); err == nil {
 		summary.SetFinalResult(true)
 		return summary, nil
 	}
@@ -37,8 +37,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	}
 	planResult, err := jobHelper.SubmitPlannerJob(ctx, r.config, buildError, r.workspaceDir)
 	if err != nil {
-		// Fallback: local remediation when planner is unavailable
-		if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
+		// Fallback: local fix when planner is unavailable
+		if ferr := r.localFix(repoPath, buildError); ferr == nil {
 			summary.SetFinalResult(true)
 			return summary, nil
 		}
@@ -97,7 +97,7 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	// Step 4: Submit reducer job to determine next action
 	nextAction, reducerErr := jobHelper.SubmitReducerJob(ctx, planResult.PlanID, allResults, summary.Winner, r.workspaceDir)
 	if reducerErr != nil {
-		if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
+		if ferr := r.localFix(repoPath, buildError); ferr == nil {
 			summary.SetFinalResult(true)
 			return summary, nil
 		}
@@ -149,7 +149,7 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	}
 
 	// Otherwise, healing failed
-	if ferr := r.localRemediation(repoPath, buildError); ferr == nil {
+	if ferr := r.localFix(repoPath, buildError); ferr == nil {
 		summary.SetFinalResult(true)
 		return summary, nil
 	}
@@ -159,8 +159,8 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 	return summary, fmt.Errorf("healing failed: reducer returned no next action")
 }
 
-// localRemediation performs best-effort local fixes for common compile failures.
-func (r *ModRunner) localRemediation(repoPath, buildError string) error {
+// localFix performs best-effort local fixes for common compile failures.
+func (r *ModRunner) localFix(repoPath, buildError string) error {
 	// Disabled to ensure healing proceeds via planner/llm and produces an explicit diff
-	return fmt.Errorf("local remediation disabled; require planner/llm healing")
+	return fmt.Errorf("local fix disabled; require planner/llm healing")
 }

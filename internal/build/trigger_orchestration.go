@@ -35,31 +35,15 @@ func renderAndDeployJob(c *fiber.Ctx, buildCtx *BuildContext, lane, appName, ima
 	}
 
 	jobFile, err := orchestration.RenderTemplate(lane, orchestration.RenderData{
-		App:           appName,
-		ImagePath:     imagePath,
-		DockerImage:   dockerImage,
-		EnvVars:       appEnvVars,
-		Version:       sha,
-		Lane:          lane,
-		MainClass:     mainClass,
-		IsDebug:       debug,
-		Language:      detectedLanguage,
-		WasmModuleURL: wasmModuleURL(lane, appName, sha),
-		WasmRuntimeImage: func() string {
-			if strings.ToUpper(lane) == "G" && os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
-				engine := strings.ToLower(os.Getenv("PLOY_WASM_ENGINE"))
-				switch engine {
-				case "wasmtime":
-					return "registry.dev.ployman.app/wasm/runner:wasmtime-distroless"
-				case "wasmedge":
-					return "registry.dev.ployman.app/wasm/runner:wasmedge-distroless"
-				default:
-					return "registry.dev.ployman.app/wasm/runner:wazero-distroless"
-				}
-			}
-			return ""
-		}(),
-		FilerBaseURL:        filerBaseURL(lane),
+		App:                 appName,
+		ImagePath:           imagePath,
+		DockerImage:         dockerImage,
+		EnvVars:             appEnvVars,
+		Version:             sha,
+		Lane:                lane,
+		MainClass:           mainClass,
+		IsDebug:             debug,
+		Language:            detectedLanguage,
 		ConsulConfigEnabled: true,
 		ConnectEnabled:      false,
 		VolumeEnabled:       false,
@@ -130,35 +114,4 @@ func shouldSkipLaneDeploy(lane string) bool {
 		}
 	}
 	return false
-}
-
-func filerBaseURL(lane string) string {
-	if strings.ToUpper(lane) != "G" {
-		return ""
-	}
-	base := os.Getenv("PLOY_SEAWEEDFS_URL")
-	if base == "" {
-		base = "http://seaweedfs-filer.storage.ploy.local:8888"
-	}
-	if !strings.HasPrefix(base, "http") {
-		base = "http://" + base
-	}
-	return strings.TrimRight(base, "/")
-}
-
-func wasmModuleURL(lane, appName, sha string) string {
-	if strings.ToUpper(lane) != "G" {
-		return ""
-	}
-	base := os.Getenv("PLOY_SEAWEEDFS_URL")
-	if base == "" {
-		base = "http://seaweedfs-filer.storage.ploy.local:8888"
-	}
-	if !strings.HasPrefix(base, "http") {
-		base = "http://" + base
-	}
-	if os.Getenv("PLOY_WASM_DISTROLESS") == "1" {
-		return strings.TrimRight(base, "/") + "/artifacts/module.wasm"
-	}
-	return strings.TrimRight(base, "/") + "/" + fmt.Sprintf("builds/%s/%s/module.wasm", appName, sha)
 }

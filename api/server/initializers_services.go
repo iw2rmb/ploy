@@ -28,71 +28,53 @@ import (
 func initializeSecurityHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*security.Handler, *recipes.HTTPHandler, error) {
 	log.Printf("Initializing security services")
 
-	// Load security configuration from environment
 	securityConfig := security.LoadConfigFromEnv()
-
-	// Validate configuration
 	if err := securityConfig.Validate(); err != nil {
 		return nil, nil, fmt.Errorf("security configuration validation failed: %w", err)
 	}
 
-	log.Printf("Security configuration loaded: storage=%s, index=%s",
-		securityConfig.Storage.Backend, securityConfig.Index.Backend)
+	securityHandler := security.NewHandler()
 
-	// Initialize storage backend
-	recipeStorage, err := securityConfig.InitializeStorage()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize security storage backend: %w", err)
-	}
-
-	// Initialize index backend
-	recipeIndex, err := securityConfig.InitializeIndex()
-	if err != nil {
-		log.Printf("Warning: Failed to initialize security index backend: %v", err)
-		recipeIndex = nil
-	}
-
-	// Create security handler - RecipeRegistry only (no fallback)
-	securityHandler := security.NewHandlerWithStorage(
-		recipeStorage,
-		recipeIndex,
-		nil,
-		nil, // No SeaweedFS provider required; registry optional
+	var (
+		recipeRegistry *recipes.RecipeRegistry
+		recipeStorage  recipes.RecipeStorage
+		recipeIndex    recipes.RecipeIndexStore
+		provider       internalStorage.StorageProvider
 	)
-	log.Printf("Security handler initialized (no RecipeRegistry storage provider)")
 
-	// Build recipes HTTP handler with same components
-	var recipeRegistry *recipes.RecipeRegistry
-	if regProvider, ok := recipeStorage.(interface {
-		Registry() *recipes.RecipeRegistry
-	}); ok {
-		recipeRegistry = regProvider.Registry()
-	}
-	recipesHandler := recipes.NewHTTPHandlerWithStorage(recipeStorage, recipeIndex, nil, nil, recipeRegistry)
-	log.Printf("Recipe HTTP handler initialized")
-
-	// Wire NVD CVE database into security engine (configurable via config)
-	{
-		nvdCfg := securityConfig.NVD
-		if nvdCfg.Enabled {
-			nvd := nvdapi.NewNVDDatabase()
-			if nvdCfg.APIKey != "" {
-				nvd.SetAPIKey(nvdCfg.APIKey)
-			}
-			if nvdCfg.BaseURL != "" {
-				nvd.SetBaseURL(nvdCfg.BaseURL)
-			}
-			if nvdCfg.Timeout > 0 {
-				nvd.SetHTTPTimeout(nvdCfg.Timeout)
-			}
-			securityHandler.SetCVEDatabase(nvd)
-			log.Printf("Security engine configured with NVD CVE database (enabled)")
+	if cfgService != nil {
+		storageClient, err := resolveStorageFromConfigService(cfgService)
+		if err != nil {
+			log.Printf("Warning: unable to resolve storage for recipe catalog: %v", err)
 		} else {
-			log.Printf("Security NVD CVE database disabled by configuration")
+			provider = internalStorage.NewProviderFromStorage(storageClient, "ploy-recipes")
+			recipeRegistry = recipes.NewRecipeRegistry(provider)
+			recipeStorage = recipes.NewRegistryStorageAdapter(recipeRegistry)
 		}
+	} else {
+		log.Printf("Warning: config service unavailable; recipe catalog endpoints will be disabled")
 	}
 
-	// Legacy async transforms and healing were removed; no Consul store is configured here.
+	recipesHandler := recipes.NewHTTPHandlerWithStorage(recipeStorage, recipeIndex, nil, provider, recipeRegistry)
+	log.Printf("Recipe HTTP handler initialized (registry available: %t)", recipeRegistry != nil)
+
+	nvdCfg := securityConfig.NVD
+	if nvdCfg.Enabled {
+		nvd := nvdapi.NewNVDDatabase()
+		if nvdCfg.APIKey != "" {
+			nvd.SetAPIKey(nvdCfg.APIKey)
+		}
+		if nvdCfg.BaseURL != "" {
+			nvd.SetBaseURL(nvdCfg.BaseURL)
+		}
+		if nvdCfg.Timeout > 0 {
+			nvd.SetHTTPTimeout(nvdCfg.Timeout)
+		}
+		securityHandler.SetCVEDatabase(nvd)
+		log.Printf("Security engine configured with NVD CVE database (enabled)")
+	} else {
+		log.Printf("Security NVD CVE database disabled by configuration")
+	}
 
 	log.Printf("Security handler initialized successfully")
 	return securityHandler, recipesHandler, nil

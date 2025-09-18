@@ -50,7 +50,7 @@ type RiskAssessment struct {
 	MediumCount      int                      `json:"medium_count"`
 	LowCount         int                      `json:"low_count"`
 	Recommendations  []SecurityRecommendation `json:"recommendations"`
-	Timeline         RemediationTimeline      `json:"timeline"`
+	Timeline         ModTimeline              `json:"timeline"`
 	ComplianceStatus ComplianceStatus         `json:"compliance"`
 	// Additional fields for strategy selector
 	Confidence float64  `json:"confidence,omitempty"`
@@ -70,8 +70,8 @@ type SecurityRecommendation struct {
 	Urgency     string          `json:"urgency"`
 }
 
-// RemediationTimeline provides timeline for addressing vulnerabilities
-type RemediationTimeline struct {
+// ModTimeline provides timeline for addressing vulnerabilities
+type ModTimeline struct {
 	Immediate []string `json:"immediate"`   // < 24 hours
 	Short     []string `json:"short_term"`  // < 1 week
 	Medium    []string `json:"medium_term"` // < 1 month
@@ -103,7 +103,7 @@ type ComplianceIssue struct {
 	Actions     []string `json:"required_actions"`
 }
 
-// EstimatedEffort represents the effort required for remediation
+// EstimatedEffort represents the effort required for modification
 type EstimatedEffort struct {
 	Level       string   `json:"level"` // low, medium, high, critical
 	TimeMinutes int      `json:"estimated_minutes"`

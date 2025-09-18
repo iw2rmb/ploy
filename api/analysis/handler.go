@@ -229,11 +229,11 @@ func (h *Handler) ApplyFix(c *fiber.Ctx) error {
 		})
 	}
 
-	// TODO: Implement fix application through remediation pipeline
+	// TODO: Implement fix application through mod pipeline
 	return c.JSON(fiber.Map{
 		"issue_id": issueID,
 		"status":   "pending",
-		"message":  "Fix application queued for remediation processing",
+		"message":  "Fix application queued for mod processing",
 	})
 }
 

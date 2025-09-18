@@ -14,7 +14,7 @@
 ## Mods Automation Platform
 - **LangGraph Runner** — Planner, reducer, and LLM-exec jobs executed as Nomad batch workloads; produces `plan.json`, `next.json`, and `diff.patch` artifacts.
 - **OpenRewrite** — Semantics-aware transformation engine invoked by Mods for JVM ecosystems.
-- **LLM Integrations** — Model fan-out with provider-specific adapters (OpenAI and internal endpoints) for error analysis and remediation suggestions.
+- **LLM Integrations** — Model fan-out with provider-specific adapters (OpenAI and internal endpoints) for error analysis and modification suggestions.
 - **Blueprints & Knowledge Base** — Mods persistence layer for playbooks, healing history, and auto-retry strategies.
 - **CLI & API** — `/v1/mods` endpoints and `ploy mod` commands orchestrate remote or local plan execution, artifact retrieval, and monitoring.
 
@@ -69,4 +69,4 @@
 - **JSON Test Reporting** — Structured output for CI pipelines and diagnostic dashboards.
 
 ## Historical Components
-- Legacy lanes (unikernel, WASM, and VM-based pipelines) and the Automated Remediation Framework (ARF) have been fully retired. Documentation and tooling only support the Docker lane (D) and the Mods automation surface going forward.
+- Legacy lanes (unikernel, WASM, and VM-based pipelines) and the Automated Modification Framework (ARF) have been fully retired. Documentation and tooling only support the Docker lane (D) and the Mods automation surface going forward.

@@ -69,7 +69,7 @@ func TestHelpSystemShowGeneralHelp(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(stdout, "Ploy ARF Recipe Management") {
+	if !strings.Contains(stdout, "Ploy Recipe Management") {
 		t.Fatalf("general help missing header: %s", stdout)
 	}
 	if !strings.Contains(stdout, "Recipe Management") {

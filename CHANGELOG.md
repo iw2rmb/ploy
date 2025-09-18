@@ -27,6 +27,8 @@
 - Nomad wrapper: Added `purge` command to `/opt/hashicorp/bin/nomad-job-manager.sh` supporting `--job` and `--prefix` modes with `--dry-run`, `--limit`, and `--yes` safety guard. Enables single-command cleanup of completed batch jobs (e.g., `orw-apply-*`, `mods-llm-exec-*`).
 
 ### Changed
+- Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.
+- API Deploys: Ansible now always uploads the freshly built API binary and metadata to SeaweedFS (the optional `PLOY_UPLOAD_API_BINARY` knob was removed) so Nomad jobs never refer to missing artifacts.
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.
 - Infra: Split WASM runner image build/push into `iac/dev/playbooks/wasm-runners.yml` so API deploys reuse the existing artifacts and only verify presence before uploading to SeaweedFS.
 - CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
@@ -206,7 +208,7 @@
 - All existing CLI commands and APIs remain unchanged
 
 ### Removed
-- Removed unused ARF core scaffolding package and controller wiring now that remediation relies solely on recipes.
+- Removed unused ARF core scaffolding package and controller wiring now that modification relies solely on recipes.
 - Removed legacy ARF `TransformationResult`/`TransformationError` data structures, `TransformRequest`, and their associated tests; controllers now rely exclusively on `TransformationStatus` snapshots.
 
 ## [2025-09-05] - Transflow: Complete Healing Branch Types Implementation
@@ -1156,7 +1158,7 @@
 - **CHTTP Static Analysis Framework**: Complete integration of CHTTP services for distributed static analysis
   - **Pylint CHTTP Service**: Dedicated Python static analysis service with secure sandboxed execution
   - **Archive Processing**: Gzipped tar archive transmission for secure code analysis
-  - **ARF Integration**: Full ARF recipe mapping for automatic Python issue remediation
+  - **ARF Integration**: Full ARF recipe mapping for automatic Python issue modification
   - **CHTTP Adapter**: `CHTPPylintAnalyzer` integration with existing static analysis engine
   - **Specialized Server**: `PylintServer` with `/analyze` endpoint for Python code archives
   - **Client Library**: RSA-signed HTTP client for secure CHTTP service communication
@@ -1934,7 +1936,7 @@
   - Full Pylint integration with JSON output parsing
   - Support for Python project type detection (pip, poetry, pipenv, conda, setuptools)
   - Configurable severity mapping and rule customization
-  - ARF recipe mapping for automatic Python issue remediation
+  - ARF recipe mapping for automatic Python issue modification
   - Support for .py and .pyw file extensions
   - Parallel analysis with configurable worker threads
 - **Python Analysis Configuration**: Comprehensive configuration for Python static analysis
@@ -2023,9 +2025,9 @@
   - Maven and Gradle build system integration with zero configuration changes
   - Custom Ploy-specific bug patterns (environment usage, configuration validation, security)
   - Incremental checking and performance optimization (<2 minutes for typical projects)
-- **✅ ARF Integration**: Automated Remediation Framework connectivity
+- **✅ ARF Integration**: Automated Modification Framework connectivity
   - Issue-to-OpenRewrite recipe mapping for 50+ common Java patterns
-  - Confidence scoring system for automatic vs manual remediation decisions
+  - Confidence scoring system for automatic vs manual modification decisions
   - Human-in-the-loop workflow for critical issues
   - Sandbox-based transformation testing
 - **✅ CLI Command**: `ploy analyze` command with comprehensive functionality
@@ -2033,7 +2035,7 @@
   - Status checking, results viewing, and historical listing
   - Configuration management (show/validate/update)
   - Multiple output formats (JSON, table, HTML)
-  - ARF auto-remediation with --fix flag and dry-run mode
+  - ARF auto-modification with --fix flag and dry-run mode
 - **✅ Configuration Files**: Comprehensive static analysis configuration
   - `configs/static-analysis-config.yaml` for global settings
   - `configs/java-errorprone-config.yaml` for Java-specific configuration
@@ -2469,7 +2471,7 @@
 ## [2025-08-23] - ARF Phase 4: Security & Production Hardening Complete
 
 ### Added
-- **✅ Vulnerability Remediation Engine**: Comprehensive security scanning with CVE integration and NVD API
+- **✅ Vulnerability Modification Engine**: Comprehensive security scanning with CVE integration and NVD API
 - **✅ SBOM Security Analysis**: Complete software bill of materials generation and vulnerability correlation  
 - **✅ Human-in-the-Loop Workflows**: Approval and review systems for security-critical changes
 - **✅ Production Optimization**: Performance monitoring, auto-scaling, and resource optimization
@@ -2479,10 +2481,10 @@
 ### Fixed  
 - **✅ Security Posture**: Enterprise-grade security hardening for production deployments
 - **✅ Compliance Coverage**: Complete security framework compliance with audit trails
-- **✅ Risk Management**: Comprehensive risk assessment and prioritization for vulnerability remediation
+- **✅ Risk Management**: Comprehensive risk assessment and prioritization for vulnerability modification
 
 ### Testing
-- **✅ Security Test Suite**: 9 comprehensive test scenarios covering vulnerability scanning, remediation, and compliance
+- **✅ Security Test Suite**: 9 comprehensive test scenarios covering vulnerability scanning, modification, and compliance
 - **✅ Production Validation**: Performance monitoring, load testing, and scaling verification
 - **✅ Integration Security**: API security, webhook validation, and database security testing
 
@@ -2611,7 +2613,7 @@
 - **✅ ARF Phase 2 Self-Healing Loop & Error Recovery Complete**: Successfully completed implementation of advanced self-healing capabilities
   - **Circuit Breaker System**: 50% failure threshold with distributed coordination across controller instances
   - **Error-Driven Recipe Evolution**: Automatic recipe modification based on failure analysis with confidence scoring
-  - **Parallel Error Resolution**: Fork-Join framework for concurrent error remediation with solution caching
+  - **Parallel Error Resolution**: Fork-Join framework for concurrent error modification with solution caching
   - **Multi-Repository Orchestration**: Dependency-aware transformation coordination across repositories
   - **High Availability Integration**: Consul leader election, distributed locking, and workload distribution
   - **Error Pattern Learning Database**: PostgreSQL vector similarity for cross-repository pattern matching
@@ -2638,10 +2640,10 @@
   - Complete REST API (`/v1/arf/*`) and CLI integration (`ploy arf` commands)
   - Production-ready monitoring, metrics, and operational capabilities
 
-## [2025-08-21] - Automated Remediation Framework Phase 1 (ARF-1)
+## [2025-08-21] - Automated Modification Framework Phase 1 (ARF-1)
 
 ### Added
-- **🧬 ARF Core Engine**: Complete implementation of Automated Remediation Framework foundation with OpenRewrite integration supporting 2,800+ Java transformation recipes
+- **🧬 ARF Core Engine**: Complete implementation of Automated Modification Framework foundation with OpenRewrite integration supporting 2,800+ Java transformation recipes
 - **🏺 FreeBSD Jail Sandboxes**: Secure isolated environments for code transformations with resource limits, TTL management, and automatic cleanup
 - **💾 Memory-Mapped AST Cache**: High-performance AST caching system with LRU eviction, achieving 60% reduction in analysis time for repeated operations
 - **📚 Recipe Catalog with Consul**: Distributed recipe storage and discovery system with usage statistics, confidence scoring, and metadata management
@@ -2654,7 +2656,7 @@
 - **AST Cache Performance**: Memory-mapped file caching with 10x performance improvement over database storage
 - **Sandbox Security**: FreeBSD jail isolation with network restrictions, resource limits, and automatic expiration
 - **Recipe Categories**: Organized transformation recipes by cleanup, modernize, security, performance, migration, style, and testing categories
-- **Confidence Scoring**: Machine learning-based confidence assessment for automatic vs manual remediation decisions
+- **Confidence Scoring**: Machine learning-based confidence assessment for automatic vs manual modification decisions
 
 ### Testing
 - **100% Test Coverage**: Comprehensive unit tests for all ARF components including engine, cache, catalog, sandbox manager, and HTTP handlers
@@ -3606,7 +3608,7 @@ The Git integration system now provides enterprise-grade repository analysis, se
   - Task event logging capturing complete lifecycle events for failed allocations
   - Log streaming capability for real-time debugging of allocation issues
   - Multiple allocation monitoring ensuring minimum healthy count before success declaration
-  - Detailed status reporting with actionable debugging information and remediation guidance
+  - Detailed status reporting with actionable debugging information and modification guidance
 
 ### Testing
 - **Comprehensive Test Coverage (Tests 301-320)**
