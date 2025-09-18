@@ -81,7 +81,7 @@ allprojects {\n  // Disable tests\n  tasks.withType(Test).configureEach { enable
   for j in "${CANDS[@]}"; do \
     if echo "$j" | grep -Ei '(boot|shadow).*\.jar$' >/dev/null; then SEL="$j"; break; fi; \
   done; \
-  if [ -z "$SEL" ]; then SEL=$(printf '%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%s %n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); fi; \
+  if [ -z "$SEL" ]; then SEL=$(printf '%%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%%s %%n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); fi; \
   test -n "$SEL" && { mkdir -p /src/build/libs; cp "$SEL" /src/build/libs/app.jar; } || { echo "Failed to select JAR"; exit 1; }
 
 FROM eclipse-temurin:%[1]s-jre
