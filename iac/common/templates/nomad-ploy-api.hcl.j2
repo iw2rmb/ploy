@@ -100,6 +100,8 @@ job "ploy-api" {
         PLOY_KANIKO_MEMORY_JAVA_MB = "{{ ploy.kaniko_memory_java_mb | default('4096') }}"
         # Default Kaniko memory (fallback when language detection is missing)
         PLOY_KANIKO_MEMORY_MB = "{{ ploy.kaniko_memory_mb | default('4096') }}"
+        # Optional: delay before Kaniko executor to help controller log streamer latch (dev/testing)
+        PLOY_KANIKO_ATTACH_DELAY = "{{ ploy.kaniko_attach_delay | default('') }}"
         # WASM runner selection (Lane G distroless)
         PLOY_WASM_DISTROLESS = 1
         PLOY_WASM_ENGINE = wazero
