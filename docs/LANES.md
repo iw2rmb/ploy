@@ -80,7 +80,7 @@ Lane selection can be explicit via `lane` query param or environment override. O
 - Build: produces `module.wasm` (wasm32-wasi or compatible)
 - Deploy: Nomad with WASM runtime template (`platform/nomad/lane-g-wasm.hcl`)
   - The template runs a small host runner that downloads and executes your module in a WASI sandbox.
-  - Runner location: uploaded by the API deploy to SeaweedFS under `artifacts/wazero-runner/linux/amd64/wazero-runner`.
+  - Runner location: maintained via `ansible-playbook playbooks/wasm-runners.yml`, which publishes to SeaweedFS under `artifacts/wazero-runner/linux/amd64/wazero-runner` for the API deploy to consume.
   - Module location: your repo’s first `*.wasm` is uploaded to SeaweedFS at `builds/<app>/<sha>/module.wasm` and passed to the template as `{{WASM_URL}}`.
 - Health: HTTP `:8080/healthz` served by the runner (200 OK when module started without errors; 503 with error details when `-ignore-errors` is enabled).
 - Failure semantics: strict-by-default — if the module fails to compile/instantiate, the runner exits non‑zero and the task fails.
@@ -94,7 +94,7 @@ Lane selection can be explicit via `lane` query param or environment override. O
 - Size and policy enforcement use the module file.
 
 #### Lane G deploy behavior (Dev VPS)
-- The runner is built on every API deploy and uploaded to SeaweedFS.
+- The runner is built with `ansible-playbook playbooks/wasm-runners.yml`; API deploy re-uploads the existing binary to SeaweedFS.
 - The Nomad job fetches the runner and your module, then runs the runner as PID 1 (foreground). Health is polled via `/healthz` on port 8080.
 - Status endpoint prefers Lane G before Lane E to avoid misreporting when both exist.
 
