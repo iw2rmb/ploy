@@ -26,7 +26,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         # Optional dev guard: delay before executor to allow log streamer to attach
         PLOY_KANIKO_ATTACH_DELAY = "{{ATTACH_DELAY}}"
         # Upload target for builder log (stable key based on job name)
-        LOGS_UPLOAD_URL = "http://seaweedfs-filer.service.consul:8888/artifacts/build-logs/{{APP_NAME}}-e-build-{{VERSION}}.log"
+        LOGS_UPLOAD_URL = "${SEAWEEDFS_URL:-${PLOY_SEAWEEDFS_URL:-http://seaweedfs-filer.service.consul:8888}}/artifacts/build-logs/{{APP_NAME}}-e-build-{{VERSION}}.log"
       }
 
       config {
@@ -35,7 +35,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "exec > >(tee -a /workspace/builder.log) 2>&1; set -exuo pipefail; trap 'st=$?; echo KANIKO: exiting code $st' EXIT; if [ -n \"$PLOY_KANIKO_ATTACH_DELAY\" ]; then echo 'KANIKO: attach delay' && sleep \"$PLOY_KANIKO_ATTACH_DELAY\"; fi; echo 'KANIKO: starting (pre-fetch)'; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...' && sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; echo 'KANIKO: executing executor'; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run --verbosity=debug; cat /workspace/builder.log; (wget -q --method=PUT --body-file=/workspace/builder.log $LOGS_UPLOAD_URL || wget -q --post-file=/workspace/builder.log $LOGS_UPLOAD_URL || true); for i in 1 2 3; do wget -q -O - $LOGS_UPLOAD_URL >/dev/null 2>&1 && echo 'KANIKO: log upload verified' && break; sleep 1; done;"
+          "set -euo pipefail; : > /workspace/builder.log; RC=0; (\n            if [ -n \"$PLOY_KANIKO_ATTACH_DELAY\" ]; then echo 'KANIKO: attach delay'; sleep \"$PLOY_KANIKO_ATTACH_DELAY\"; fi;\n            echo 'KANIKO: starting (pre-fetch)';\n            mkdir -p /workspace;\n            for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done;\n            test -s /workspace/src.tar;\n            tar -xf /workspace/src.tar -C /workspace;\n            echo 'KANIKO: executing executor';\n            /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run --verbosity=debug || RC=$?;\n            echo \"KANIKO: exiting code $RC\"\n          ) 2>&1 | busybox tee -a /workspace/builder.log;\n          cat /workspace/builder.log;\n          (wget -q --method=PUT --body-file=/workspace/builder.log $LOGS_UPLOAD_URL || wget -q --post-file=/workspace/builder.log $LOGS_UPLOAD_URL || true);\n          for i in 1 2 3; do wget -q -O - $LOGS_UPLOAD_URL >/dev/null 2>&1 && echo 'KANIKO: log upload verified' && break; sleep 1; done;"
         ]
 
         ports = ["http"]
