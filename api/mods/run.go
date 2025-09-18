@@ -211,7 +211,7 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 	_ = os.Setenv("MOD_ID", modID)
 	// Expose SeaweedFS URL default for task-side uploads
 	if os.Getenv("PLOY_SEAWEEDFS_URL") == "" {
-		_ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
+		_ = os.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.storage.ploy.local:8888")
 	}
 
 	// Image override: use MODS_ORW_APPLY_IMAGE only (set in API env when needed)

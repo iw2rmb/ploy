@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 // LookupCVE retrieves detailed information for a specific CVE
-func (n *NVDDatabase) LookupCVE(cveID string) (*arf.CVEInfo, error) {
+func (n *NVDDatabase) LookupCVE(cveID string) (*security.CVEInfo, error) {
 	// Check cache first
 	if cached, exists := n.cache[cveID]; exists {
 		return cached, nil

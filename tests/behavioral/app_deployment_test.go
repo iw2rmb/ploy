@@ -182,9 +182,10 @@ var _ = Describe("Application Deployment Workflow", func() {
 	})
 
 	Context("When deploying different application types", func() {
-		DescribeTable("should correctly detect lane and deploy",
-			func(repoURL, expectedLane string, buildTimeout time.Duration) {
-				By(fmt.Sprintf("Deploying %s application", expectedLane))
+		DescribeTable("should route everything through the Docker lane",
+			func(repoURL string, buildTimeout time.Duration) {
+				expectedLane := "D"
+				By(fmt.Sprintf("Deploying application via Lane %s", expectedLane))
 				buildRequest := map[string]interface{}{
 					"git_url": repoURL,
 					"branch":  "main",
@@ -196,7 +197,7 @@ var _ = Describe("Application Deployment Workflow", func() {
 
 				// Allow for various response codes during development
 				if resp.StatusCode == 202 {
-					By("Verifying correct lane detection")
+					By("Verifying Lane D detection regardless of source repo")
 					Eventually(func() string {
 						resp := apiClient.GET("/v1/apps/" + appName + "/status").
 							Execute()
@@ -238,13 +239,13 @@ var _ = Describe("Application Deployment Workflow", func() {
 					))
 				} else {
 					By("Acknowledging that the endpoint may not be fully implemented yet")
-					GinkgoWriter.Printf("Build endpoint returned %d for %s app, which is acceptable during development\n", resp.StatusCode, expectedLane)
+					GinkgoWriter.Printf("Build endpoint returned %d for repo %s; acceptable during development\n", resp.StatusCode, repoURL)
 				}
 			},
-			Entry("Go application (Lane A)", "https://github.com/test/go-app.git", "A", 5*time.Minute),
-			Entry("Node.js application (Lane B)", "https://github.com/test/node-app.git", "B", 8*time.Minute),
-			Entry("Java application (Lane C)", "https://github.com/test/java-app.git", "C", 10*time.Minute),
-			Entry("WASM application (Lane G)", "https://github.com/test/wasm-app.git", "G", 6*time.Minute),
+			Entry("Go application via Docker lane", "https://github.com/test/go-app.git", 6*time.Minute),
+			Entry("Node.js application via Docker lane", "https://github.com/test/node-app.git", 8*time.Minute),
+			Entry("Java application via Docker lane", "https://github.com/test/java-app.git", 10*time.Minute),
+			Entry("WASM assets packaged for Docker", "https://github.com/test/wasm-app.git", 6*time.Minute),
 		)
 	})
 })

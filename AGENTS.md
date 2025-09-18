@@ -21,6 +21,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 ## Go Tooling (MANDATORY)
 
 - Use the existing make targets for formatting and analysis: `make fmt`, `make vet`, `make lint`, `staticcheck ./...`, and `make test-coverage-threshold`.
+- Active deployment lane: **D (Docker)** only. Legacy references to lanes A/B/C/E/F/G remain for historical context.
 - Follow `.golangci.yml` and `staticcheck.conf` as the sources of truth for enabled checks.
 - Keep modules tidy with `go mod tidy -v && go mod verify` when dependencies change.
 - For security scans, run `make sec` and `govulncheck ./...` as required by the project.
@@ -107,7 +108,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
   - `SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"`
   - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since \"$SINCE_FMT\"'" > tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/last_job.logs`
   - Or set `START_TS_SOURCE=vps` (requires `TARGET_HOST`) to auto-resolve the timestamp in helpers like `tests/e2e/deploy/fetch-logs.sh`.
-  - If SeaweedFS isn’t reachable from the workstation, fetch artifacts via SSH on the VPS: `curl -fsS 'http://seaweedfs-filer.service.consul:8888/artifacts/<KEY>'`.
+  - If SeaweedFS isn’t reachable from the workstation, fetch artifacts via SSH on the VPS: `curl -fsS 'http://seaweedfs-filer.storage.ploy.local:8888/artifacts/<KEY>'`.
 
 ### Build-Gate Drill‑down
 

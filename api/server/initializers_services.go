@@ -10,12 +10,12 @@ import (
 	"github.com/iw2rmb/ploy/api/analysis"
 	javaanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/java"
 	pythonanalyzer "github.com/iw2rmb/ploy/api/analysis/analyzers/python"
-	"github.com/iw2rmb/ploy/api/arf"
 	"github.com/iw2rmb/ploy/api/llms"
 	modsapi "github.com/iw2rmb/ploy/api/mods"
 	nvdapi "github.com/iw2rmb/ploy/api/nvd"
 	recipes "github.com/iw2rmb/ploy/api/recipes"
 	"github.com/iw2rmb/ploy/api/sbom"
+	"github.com/iw2rmb/ploy/api/security"
 	"github.com/iw2rmb/ploy/api/templates"
 
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
@@ -25,41 +25,41 @@ import (
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
-func initializeRemediationHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*arf.Handler, *recipes.HTTPHandler, error) {
-	log.Printf("Initializing automated remediation framework")
+func initializeSecurityHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*security.Handler, *recipes.HTTPHandler, error) {
+	log.Printf("Initializing security services")
 
-	// Load remediation configuration from environment
-	arfConfig := arf.LoadConfigFromEnv()
+	// Load security configuration from environment
+	securityConfig := security.LoadConfigFromEnv()
 
 	// Validate configuration
-	if err := arfConfig.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("remediation configuration validation failed: %w", err)
+	if err := securityConfig.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("security configuration validation failed: %w", err)
 	}
 
-	log.Printf("Remediation configuration loaded: storage=%s, index=%s",
-		arfConfig.Storage.Backend, arfConfig.Index.Backend)
+	log.Printf("Security configuration loaded: storage=%s, index=%s",
+		securityConfig.Storage.Backend, securityConfig.Index.Backend)
 
 	// Initialize storage backend
-	recipeStorage, err := arfConfig.InitializeStorage()
+	recipeStorage, err := securityConfig.InitializeStorage()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialize remediation storage backend: %w", err)
+		return nil, nil, fmt.Errorf("failed to initialize security storage backend: %w", err)
 	}
 
 	// Initialize index backend
-	recipeIndex, err := arfConfig.InitializeIndex()
+	recipeIndex, err := securityConfig.InitializeIndex()
 	if err != nil {
-		log.Printf("Warning: Failed to initialize remediation index backend: %v", err)
+		log.Printf("Warning: Failed to initialize security index backend: %v", err)
 		recipeIndex = nil
 	}
 
-	// Create remediation handler - RecipeRegistry only (no fallback)
-	remediationHandler := arf.NewHandlerWithStorage(
+	// Create security handler - RecipeRegistry only (no fallback)
+	securityHandler := security.NewHandlerWithStorage(
 		recipeStorage,
 		recipeIndex,
 		nil,
 		nil, // No SeaweedFS provider required; registry optional
 	)
-	log.Printf("Remediation handler initialized (no RecipeRegistry storage provider)")
+	log.Printf("Security handler initialized (no RecipeRegistry storage provider)")
 
 	// Build recipes HTTP handler with same components
 	var recipeRegistry *recipes.RecipeRegistry
@@ -71,9 +71,9 @@ func initializeRemediationHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Ser
 	recipesHandler := recipes.NewHTTPHandlerWithStorage(recipeStorage, recipeIndex, nil, nil, recipeRegistry)
 	log.Printf("Recipe HTTP handler initialized")
 
-	// Wire NVD CVE database into remediation security engine (configurable via config)
+	// Wire NVD CVE database into security engine (configurable via config)
 	{
-		nvdCfg := arfConfig.NVD
+		nvdCfg := securityConfig.NVD
 		if nvdCfg.Enabled {
 			nvd := nvdapi.NewNVDDatabase()
 			if nvdCfg.APIKey != "" {
@@ -85,17 +85,17 @@ func initializeRemediationHandlers(cfg *ControllerConfig, cfgService *cfgsvc.Ser
 			if nvdCfg.Timeout > 0 {
 				nvd.SetHTTPTimeout(nvdCfg.Timeout)
 			}
-			remediationHandler.SetCVEDatabase(nvd)
-			log.Printf("Remediation security engine configured with NVD CVE database (enabled)")
+			securityHandler.SetCVEDatabase(nvd)
+			log.Printf("Security engine configured with NVD CVE database (enabled)")
 		} else {
-			log.Printf("Remediation NVD CVE database disabled by configuration")
+			log.Printf("Security NVD CVE database disabled by configuration")
 		}
 	}
 
 	// Legacy async transforms and healing were removed; no Consul store is configured here.
 
-	log.Printf("Remediation handler initialized successfully")
-	return remediationHandler, recipesHandler, nil
+	log.Printf("Security handler initialized successfully")
+	return securityHandler, recipesHandler, nil
 }
 
 func initializeAnalysisHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*analysis.Handler, error) {

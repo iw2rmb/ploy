@@ -102,17 +102,16 @@ test-unit: ## Run unit tests
 	@echo "$(BLUE)Running unit tests...$(NC)"
 	@mkdir -p $(TEST_RESULTS_DIR)
 	@mkdir -p $(COVERAGE_DIR)
-	@echo "$(YELLOW)Filtering env-sensitive packages (builders, llms, e2e, vps)...$(NC)"
+	@echo "$(YELLOW)Filtering env-sensitive packages (llms, e2e, vps)...$(NC)"
 	@UNIT_PKGS=$$(go list -f '{{if or (len .TestGoFiles) (len .XTestGoFiles)}}{{.ImportPath}}{{end}}' ./... | \
 		grep -v "/tests/e2e" | \
 		grep -v "/tests/vps" | \
 		grep -v "/tests/acceptance" | \
 		grep -v "/tests/behavioral" | \
 		grep -v "/internal/testing/integration" | \
-		grep -v "/api/arf" | \
+		grep -v "/api/security" | \
 		grep -v "/internal/validation" | \
 		grep -v "/cmd/" | \
-		grep -v "/api/builders" | \
 		grep -v "/api/llms" | \
 		grep -v "/tools/" ); \
 		go test $(TEST_FLAGS) -short -coverprofile=$(COVERAGE_DIR)/unit-coverage.out $$UNIT_PKGS || true
@@ -457,11 +456,11 @@ lint-recipes: ## Run focused lint (errcheck, staticcheck, contextcheck) on api/r
 	@echo "$(BLUE)Running focused lint on api/recipes (errcheck, staticcheck, contextcheck)$(NC)"
 	golangci-lint run -E errcheck,staticcheck,contextcheck ./api/recipes/...
 
-.PHONY: lint-arf
-lint-arf: ## Run focused lint (errcheck, staticcheck, contextcheck) on api/arf
+.PHONY: lint-security
+lint-security: ## Run focused lint (errcheck, staticcheck, contextcheck) on api/security
 	@which golangci-lint > /dev/null || (echo "$(RED)golangci-lint not found. Install with: go install github.com/golangci-lint/cmd/golangci-lint@latest$(NC)" && exit 1)
-	@echo "$(BLUE)Running focused lint on api/arf (errcheck, staticcheck, contextcheck)$(NC)"
-	golangci-lint run -E errcheck,staticcheck,contextcheck ./api/arf/...
+	@echo "$(BLUE)Running focused lint on api/security (errcheck, staticcheck, contextcheck)$(NC)"
+	golangci-lint run -E errcheck,staticcheck,contextcheck ./api/security/...
 
 .PHONY: lint-sbom
 lint-sbom: ## Run focused lint (errcheck, staticcheck, contextcheck) on api/sbom
@@ -669,12 +668,6 @@ lint-utils: ## Run focused lint on internal/utils (skip tests) with errcheck, st
 	@which golangci-lint > /dev/null || (echo "$(RED)golangci-lint not found. Install with: go install github.com/golangci-lint/cmd/golangci-lint@latest$(NC)" && exit 1)
 	@echo "$(BLUE)Running focused lint on internal/utils (no tests) (errcheck, staticcheck, contextcheck)$(NC)"
 	golangci-lint run --tests=false -E errcheck,staticcheck,contextcheck ./internal/utils/...
-.PHONY: lint-builders
-lint-builders: ## Run focused lint on api/builders (skip tests) with errcheck, staticcheck, contextcheck
-	@which golangci-lint > /dev/null || (echo "$(RED)golangci-lint not found. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest$(NC)" && exit 1)
-	@echo "$(BLUE)Running focused lint on api/builders (no tests) (errcheck, staticcheck, contextcheck)$(NC)"
-	golangci-lint run --tests=false -E errcheck,staticcheck,contextcheck ./api/builders/...
-
 .PHONY: lint-orchestration
 lint-orchestration: ## Run focused lint on internal/orchestration (skip tests) with errcheck, staticcheck, contextcheck
 	@which golangci-lint > /dev/null || (echo "$(RED)golangci-lint not found. Install with: go install github.com/golangci-lint/cmd/golangci-lint@latest$(NC)" && exit 1)

@@ -48,9 +48,9 @@ Usage:
   ploy bluegreen complete <app>
   ploy bluegreen rollback <app>
   ploy recipe generate --repo <path> --type <type>
-  ploy arf transform <path> --recipe <id>
-  ploy arf validate <recipe-file>
-  ploy arf patterns list
-  ploy arf test ab --recipe1 <id> --recipe2 <id>
-  ploy arf status`)
+  ploy security transform <path> --recipe <id>
+  ploy security validate <recipe-file>
+  ploy security patterns list
+  ploy security test ab --recipe1 <id> --recipe2 <id>
+  ploy security status`)
 }

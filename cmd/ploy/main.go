@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/iw2rmb/ploy/internal/cli/apps"
-	"github.com/iw2rmb/ploy/internal/cli/arf"
 	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
 	"github.com/iw2rmb/ploy/internal/cli/certs"
 	"github.com/iw2rmb/ploy/internal/cli/debug"
@@ -16,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/env"
 	"github.com/iw2rmb/ploy/internal/cli/recipes"
 	"github.com/iw2rmb/ploy/internal/cli/sbom"
+	"github.com/iw2rmb/ploy/internal/cli/security"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
@@ -45,8 +45,8 @@ func main() {
 			debug.DebugCmd(os.Args[2:], controllerURL)
 		case "rollback":
 			debug.RollbackCmd(os.Args[2:], controllerURL)
-		case "arf":
-			arf.Run(os.Args[2:], controllerURL)
+		case "security":
+			security.Run(os.Args[2:], controllerURL)
 		case "recipe", "recipes":
 			recipes.Run(os.Args[2:], controllerURL)
 		case "sbom":

@@ -103,6 +103,7 @@ func detectBuildContext(srcDir, laneQuery, mainQuery string) (lane, detectedLang
 	if mainClass == "" {
 		mainClass = "com.ploy.ordersvc.Main"
 	}
+	lane = "D"
 	return
 }
 

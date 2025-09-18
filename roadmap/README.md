@@ -2,6 +2,8 @@
 
 Changes implemented:
 - **Lane builds**: A/B (Unikraft), C (OSv Java), D (Jail), E (OCI+Kontain), F (VM).
+
+> **Status:** Only Lane D (Docker) remains active after the 2025-09 consolidation. The historical lane notes below are retained for reference as the architecture still supports future lane additions.
 - **Supply chain**: CI produces SBOM (Syft), scans (Grype), signs (Cosign); controller **OPA** check before deploy.
 - **Preview**: `https://<sha>.<app>.ployd.app` triggers build; naive readiness proxy.
 - **CLI**: `apps new`, `.gitignore`-aware `push`, `open`.
@@ -70,7 +72,7 @@ Next steps to implement:
 
 **Implementation Tasks:**
 1. ✅ **COMPLETED (2025-08-21)** **WASM Runtime Integration**: Integrated wazero v1.5.0 pure Go WebAssembly runtime for Lane G deployment with security constraints and WASI Preview 1 support.
-2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `api/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches.
+2. ✅ **COMPLETED (2025-08-21)** **Lane G Builder Implementation**: Created `api/builders/wasm.go` with comprehensive multi-strategy WASM building supporting 5 compilation approaches (archived after the Docker-only consolidation on 2025-09-18).
 3. ✅ **COMPLETED (2025-08-21)** **WASM Detection Logic**: Implemented comprehensive automatic detection of WASM compilation targets in lane picker with 95%+ accuracy:
    - Direct `.wasm` and `.wat` file detection with magic byte validation
    - Rust `wasm32-wasi` target detection in Cargo.toml with wasm-bindgen dependencies
@@ -273,10 +275,7 @@ The performance optimization implementation delivers significant improvements fo
 - **Improved throughput** for concurrent multi-instance operations
 - **Reduced external service load** through connection reuse and retry logic
 
-**🔧 New Configuration Options:**
-- `PLOY_CONSUL_POOL_SIZE` - Consul connection pool size (default: 10)
-- `PLOY_NOMAD_POOL_SIZE` - Nomad connection pool size (default: 8)
-- `PLOY_ENABLE_CACHING` - Enable/disable caching optimizations (default: true)
+**🔧 Configuration:** Connection pooling now auto-tunes based on deployment environment; legacy knobs (`PLOY_CONSUL_POOL_SIZE`, `PLOY_NOMAD_POOL_SIZE`, `PLOY_ENABLE_CACHING`) were retired with the consolidation work.
 
 **📊 Monitoring & Observability:**
 - Performance monitoring API endpoints: `/v1/performance/*`

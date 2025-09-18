@@ -20,6 +20,8 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
 - **Recipe Catalog Coverage** (Sep 2025): REST handlers assert invalid payload, storage failure, and missing registry behaviors; registry adapter tests verify semantic version ordering for latest lookups.
 - **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply), MCP budget parsing, and LLM diff-fetch resilience to improve lane readiness.
+- **CoreDNS Validation**: New integration tests cover CoreDNS A/SRV resolution, retry semantics, and a shell-based DNS health probe to replace Consul DNS checks.
+- **Lane D Enforcement**: Integration coverage ensures `/v1/apps/:app/builds` always reports lane D and rejects non-D overrides, aligning tests with the Docker-only pipeline.
 - **Mods API Handler Coverage** (Sep 2025): Status, cancel, events, artifacts, log streaming, and debug endpoints now have in-memory KV/storage-backed tests, raising `api/mods` unit coverage to ~61%.
 - **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides, lane G distroless runner selection, and Nomad monitor timeout behaviour.
 - **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.
@@ -49,7 +51,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ Per-lane scripts in `build/` directory
 - ✅ Auto SBOM (Syft) + signatures (Cosign)
 - ✅ Deterministic `<app>-<sha>` naming
-- ✅ WASM runner images rebuilt with dedicated Ansible playbook (`iac/dev/playbooks/wasm-runners.yml`) so API deploys don't trigger unnecessary image builds
+- ✅ WASM runner artifacts are published alongside the controller build; the legacy `wasm-runners` Ansible playbook has been retired.
 - ✅ Standalone or api invocation
 - ✅ Sandbox Build Service: Unified `internal/build` sandbox runner powers Mods build gate without deployment side effects.
 - ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
@@ -70,6 +72,12 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Automatic Integration**: Seamless signing immediately after successful builds
   - **Smart Prevention**: Avoids duplicate signing by checking existing signatures
   - **Cosign Compatible**: Full support for cosign key management and OIDC flows
+  - **Cosign Environment Controls**:
+    - `COSIGN_VERIFY_IDENTITY_REGEXP`: Restricts accepted certificate identities during verification.
+    - `COSIGN_OIDC_CLIENT_ID` / `COSIGN_OIDC_PROVIDER`: Override detected issuer metadata for keyless runs.
+    - `COSIGN_TLOG_UPLOAD`: Disable Rekor transparency log writes for air-gapped or test deployments (set to `0`).
+    - `COSIGN_TIMEOUT`: Extend cosign's HTTP timeout when OIDC or transparency services are slow.
+    - `COSIGN_PASSWORD`, `COSIGN_PRIVATE_KEY`, `COSIGN_PUBKEY`: Supply key material for key-based signing when OIDC is unavailable.
 - ✅ **Production-Ready SBOM Generation** (Aug 2025):
   - **Comprehensive SBOM Support**: All build scripts generate SBOM files using modern syft scan command
   - **Multi-Format Output**: SPDX-JSON for Unikraft lanes, JSON for other lanes with full metadata
@@ -95,10 +103,10 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Platform Services Domain**: `*.ployman.app` for platform services (API, OpenRewrite, metrics)
   - **Environment Separation**: Development (`*.dev.ployd.app`, `*.dev.ployman.app`) and production environments
 - ✅ **Automatic HTTPS with Traefik** (Aug 2025):
-  - **ACME Integration**: Let's Encrypt automatic certificate provisioning via DNS-01 challenge
-  - **Dual Wildcard Certificates**: Separate wildcard certificates for user apps and platform services
-  - **Certificate Storage**: Secure storage in `/opt/ploy/traefik-data/` with proper permissions
-  - **Automatic Renewal**: Traefik handles certificate renewal before expiration
+  - **ACME Integration**: Let's Encrypt automatic certificate provisioning via HTTP-01 with TLS-ALPN fallback
+  - **On-Demand Certificates**: Traefik issues certificates per routed subdomain using the shared `default-acme` resolver
+  - **Certificate Storage**: Secure storage in `/opt/ploy/traefik-data/default-acme.json` with host persistence
+  - **Automatic Renewal**: Traefik refreshes certificates before expiration without auxiliary cron jobs
   - **Consul Catalog ACL Support** (Sep 2025): Traefik provider accepts Consul ACL tokens via `CONSUL_HTTP_TOKEN` (Nomad + Ansible wired)
 - **Fast Health Routing** (Sep 2025): Consul checks use lightweight `/live`; readiness stays on `/ready` for deep validation
 - ✅ **SeaweedFS Health Stability** (Sep 2025): Health checker now derives storage clients from the centralized config service so `/v1/health` and `/v1/ready` stay green during deployments even without optional metrics adapters.
@@ -200,6 +208,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Deadline-Aware Error Handling** (Sep 2025): Health monitor stops retrying once the remaining timeout is exhausted even when Nomad allocation queries fail.
   - **Log Streaming**: Real-time allocation log following for debugging failed deployments
   - **Network Resilience**: Graceful handling of transient connectivity issues with retry classification
+  - **Environment Guardrails**: `PLOY_POLICY_STRICT_ENVS` (comma-separated, defaults to `prod,staging`) forces policy enforcement and break-glass review for sensitive targets.
 
 ⸻
 
@@ -265,14 +274,14 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - ✅ Archive-based code transmission with gzip compression
   - ✅ Project type detection (pip, poetry, pipenv, conda, setuptools)
   - ✅ Configurable severity mapping and rule customization
-  - ✅ ARF recipe mapping for automatic Python issue remediation
+  - ✅ Security Engine recipe mapping for automatic Python issue remediation
   - ✅ Comprehensive test coverage with integration tests
   - ✅ Ansible deployment automation for VPS environments
 
-### ARF Integration
-- ✅ **Automated Remediation**: Direct pipeline to ARF for automatic fixes
+### Security Engine Integration
+- ✅ **Automated Remediation**: Direct pipeline to Security Engine for automatic fixes
   - Issue-to-recipe mapping for common patterns
-  - ARF trigger generation from analysis results
+  - Security Engine trigger generation from analysis results
   - Human-in-the-loop workflow creation for critical issues
   - Confidence scoring for automated fixes
   - Batch remediation support
@@ -307,19 +316,19 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - ✅ Go analysis with GolangCI-Lint
   - ✅ Unified output format across all analyzers
   - ✅ Resource limits and isolation per analysis job
-  - ✅ ARF integration for automatic remediation
+  - ✅ Security Engine integration for automatic remediation
 
 ### Configuration
 - ✅ **Flexible Configuration**: YAML-based configuration system
   - Language-specific analyzer settings
   - Custom rule definitions
   - Quality gates and thresholds
-  - ARF integration settings
+  - Security Engine integration settings
   - Performance optimization controls
 
 ### Next Phases (Planned)
 - **Phase 2**: Multi-language support (Python, Go, JavaScript, C#, Rust)
-- **Phase 3**: Enterprise features and advanced ARF integration
+- **Phase 3**: Enterprise features and advanced Security Engine integration
 - **Phase 4**: CI/CD integration and team collaboration
 
 ## 🏗 High Availability API Architecture
@@ -335,6 +344,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
     - Comprehensive health check integration with stricter validation during updates  
     - Extended health validation timeout (5m) and graceful shutdown coordination (60s)
     - Update progress monitoring with Slack webhook alerts and deployment status tracking
+    - ✅ Mods-aligned status endpoint normalizes Nomad job states to `building`, `running`, `failed`, or `unknown` for `/v1/apps/:app/status`
     - Rolling update parallelism control with 30-second stagger delay for stability
   - ✅ **Unified Deployment System** (Aug 2025): Modern API deployment and version management
     - Bootstrap deployment via Nomad using local binaries for initial setup
@@ -589,7 +599,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - Job submission, status monitoring, and result retrieval
   - Health checks and service monitoring endpoints
   - Metrics collection for Prometheus integration
-- ✅ **CLI Commands**: `ploy arf benchmark` command suite
+- ✅ **CLI Commands**: `ploy security benchmark` command suite
   - Java 11→17 migration benchmarks with real repository testing
   - Parallel execution testing with dependency analysis
   - Status monitoring and log retrieval for debugging
@@ -597,7 +607,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 
 ## 🧠 LLM Transformation Service ✅ MIGRATED TO NOMAD
 
-**STATUS: ✅ MIGRATED TO NOMAD ARCHITECTURE** - Former CLLM service migrated to distributed Nomad batch jobs for improved scalability and consistency (August 2025). Original CLLM roadmap deprecated; functionality now integrated into ARF via Nomad dispatcher pattern.
+**STATUS: ✅ MIGRATED TO NOMAD ARCHITECTURE** - Former CLLM service migrated to distributed Nomad batch jobs for improved scalability and consistency (August 2025). Original CLLM roadmap deprecated; functionality now integrated into Security Engine via Nomad dispatcher pattern.
 
 LLM transformations now execute as distributed Nomad batch jobs, providing secure, sandboxed LLM-based code transformation and analysis capabilities. The system follows the same architecture as OpenRewrite and analysis services for consistency across the platform.
 
@@ -641,8 +651,8 @@ LLM transformations now execute as distributed Nomad batch jobs, providing secur
 - ✅ **Automatic Retry**: Exponential backoff and failure handling for robust execution
 - ✅ **Resource Management**: CPU, memory, and timeout limits enforced by Nomad scheduler
 
-### ✅ **ARF Integration Complete (August 2025)**
-- ✅ **Hybrid Pipeline Integration**: LLM transformations seamlessly integrated into ARF workflows
+### ✅ **Security Engine Integration Complete (August 2025)**
+- ✅ **Hybrid Pipeline Integration**: LLM transformations seamlessly integrated into Security Engine workflows
 - ✅ **Self-Healing Capabilities**: Automatic error correction using LLM-generated solutions
 - ✅ **Context-Aware Processing**: Error context and codebase analysis for targeted transformations
 - ✅ **Multi-Language Support**: Java, Python, JavaScript, Go, and other language transformations
@@ -660,15 +670,15 @@ LLM transformations now execute as distributed Nomad batch jobs, providing secur
 - **Job Templates**: `platform/nomad/llm-*-batch.hcl` - Docker-based LLM execution environments
 - **Technology Stack**: Nomad, Consul KV, SeaweedFS, Docker (Ollama/Python+OpenAI)
 - **Security Model**: Docker sandboxing, input validation, resource limits, network isolation
-- **Integration**: ARF robust transform, OpenRewrite coordination, distributed storage
+- **Integration**: Security Engine robust transform, OpenRewrite coordination, distributed storage
 
-## 🧬 Automated Remediation Framework (ARF) ✅ OPERATIONAL
+## 🧬 Remediation Engine (Security Engine) ✅ OPERATIONAL
 
 **STATUS: ✅ OPERATIONAL** - Enhanced with unified transform command and self-healing capabilities (August 2025). Comprehensive roadmap available in `roadmap/arf/`
 
-ARF represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
+Security Engine represents Ploy's enterprise-grade automated code transformation and self-healing system, designed to automatically remediate common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories. The system now features a unified `transform` command that consolidates all transformation, benchmarking, and testing capabilities with advanced self-healing powered by LLM.
 
-- ♻️ September 2025: Removed the unused ARF core scaffolding package and server wiring to simplify the remediation surface ahead of future consolidation work.
+- ♻️ September 2025: Removed the unused Security Engine core scaffolding package and server wiring to simplify the remediation surface ahead of future consolidation work.
 
 ### ✅ **Enhanced Transform Command with Self-Healing (August 2025)**
 - ✅ **Unified Transformation Engine**: Single `transform` command replacing sandbox, benchmark, and workflow commands
@@ -680,7 +690,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 
 ### ✅ **Recent Achievements: Java 11→17 Migration Success (August 2025)**
 - ✅ **Complete End-to-End Pipeline**: Successfully processing Java 8 Tutorial Java 8→17 migrations with full deployment validation
-- ✅ **Lane C Integration**: ARF benchmarks deploying to OSv unikernels via Lane C with 60-80MB image optimization
+- ✅ **Lane C Integration**: Security Engine benchmarks deploying to OSv unikernels via Lane C with 60-80MB image optimization
 - ✅ **Template Processing Resolution**: Resolved complex HCL conditional block parsing enabling seamless Nomad deployments
 - ✅ **Production Validation**: End-to-end testing on VPS infrastructure with real HTTP endpoint validation
 
@@ -716,7 +726,7 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ✅ **Multi-Lane Integration**: Leverages Ploy's existing lanes for language-specific build validation
 - ✅ **Sandbox Management**: TTL cleanup, resource monitoring, and automatic environment cleanup
 
-### ✅ **Implemented Intelligence & Learning (ARF Phase 3) - COMPLETE**
+### ✅ **Implemented Intelligence & Learning (Security Engine Phase 3) - COMPLETE**
 - ✅ **LLM Recipe Generation**: Distributed LLM integration via Nomad batch jobs (migrated from CLLM service, August 2025)
 - ✅ **Multi-Provider LLM Support**: Ollama and OpenAI providers with Docker-based sandboxed execution
 - ✅ **Hybrid Transformation Pipeline**: Intelligent combination of OpenRewrite and LLM approaches
@@ -726,21 +736,21 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 - ⏸️ Error Pattern Learning Database: planned (disabled; no SQL database in use)
 - ✅ **Confidence Scoring**: Multi-layered validation with recipe effectiveness tracking
 - ✅ **Pattern Matching Algorithms**: Vector embeddings for cross-repository learning and generalization
-- ✅ **Monitoring Infrastructure**: Comprehensive metrics, alerting, and distributed tracing for ARF operations
+- ✅ **Monitoring Infrastructure**: Comprehensive metrics, alerting, and distributed tracing for Security Engine operations
 
 ### ✅ **Implemented High Availability & Performance**
 - ✅ **Distributed Processing**: Consul leader election and state management for multi-api coordination
 - ✅ **AST Caching**: Memory-mapped files with 10x performance improvement and cache persistence
-- ✅ **Circuit Breaker Integration**: Distributed coordination across multiple ARF instances
+- ✅ **Circuit Breaker Integration**: Distributed coordination across multiple Security Engine instances
 - ✅ **Resource Management**: Nomad scheduler integration for parallel sandbox execution
 
-### ⚠️ **Integration Complete: Deployment & Testing (ARF Phase 4)**
+### ⚠️ **Integration Complete: Deployment & Testing (Security Engine Phase 4)**
 - ✅ **Complete Deployment Integration**: Native integration with core deployment system
 - ✅ **Multi-Stage Pipeline**: transformation → deployment → testing → error analysis → cleanup
 - ✅ **Application Testing**: Real HTTP endpoint validation of deployed applications
 - ✅ **Error Analysis**: Comprehensive deployment log parsing and build system validation
-- ✅ **API Endpoints**: Complete `/v1/arf/security/*` and `/v1/arf/workflow/*` endpoints
-- ✅ **Test Coverage**: Comprehensive Go test suites for ARF security workflows (policy enforcer unit tests, integration and behavioral tests)
+- ✅ **API Endpoints**: Complete `/v1/security/*` and `/v1/arf/workflow/*` endpoints
+- ✅ **Test Coverage**: Comprehensive Go test suites for Security Engine security workflows (policy enforcer unit tests, integration and behavioral tests)
 - ⚠️ **Mock OpenRewrite Engine**: Simulated transformations (real OpenRewrite execution required)
 - ✅ **Optional NVD Vulnerability Gate (Mods)**: When enabled, Mods queries NVD using SBOM dependencies and can fail the run on configurable severity.
 
@@ -755,19 +765,19 @@ ARF represents Ploy's enterprise-grade automated code transformation and self-he
 **What's Required for Real Java Migration Test:**
 - ⚠️ **Real OpenRewrite Execution**: Replace MockOpenRewriteEngine with actual Maven/Gradle OpenRewrite plugin execution
 - ⚠️ Production Infrastructure: VPS setup with Ollama; PostgreSQL-related steps are disabled for now
-- ⚠️ **CLI Integration**: `ploy arf benchmark` commands for end-to-end testing workflow
+- ⚠️ **CLI Integration**: `ploy security benchmark` commands for end-to-end testing workflow
 - ⚠️ **Actual Recipe Execution**: Real AST transformations instead of simulated file changes
 
 ### ✅ **Implemented API & CLI Integration**
 - ✅ **Comprehensive REST API**: `/v1/arf/*` endpoints for recipes, transformations, and monitoring (legacy sandboxes removed)
-- ✅ **ARF Phase 3 Endpoints**: 30+ new endpoints for LLM generation, hybrid pipelines, learning system, A/B testing
-- ✅ **ARF Phase 4 Endpoints**: Security scanning, remediation, workflow management, production metrics
-- ✅ **Ploy CLI Integration**: `ploy arf` commands for recipe management, transformation, validation, patterns, testing
+- ✅ **Security Engine Phase 3 Endpoints**: 30+ new endpoints for LLM generation, hybrid pipelines, learning system, A/B testing
+- ✅ **Security Engine Phase 4 Endpoints**: Security scanning, remediation, workflow management, production metrics
+- ✅ **Ploy CLI Integration**: `ploy security` commands for recipe management, transformation, validation, patterns, testing
 - ✅ **Cache Management**: Cache statistics, clearing, and optimization through API and CLI
 - ✅ **System Monitoring**: Health checks, metrics collection, and operational statistics
 
 ### ✅ **Phase 5: Universal Recipe Management Platform** - IN PROGRESS ✅
-Comprehensive transformation of ARF into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
+Comprehensive transformation of Security Engine into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
 
 **✅ Phase 5.1: Recipe Data Model & Storage** - ✅ **COMPLETED (2025-08-25)**
 - ✅ **Recipe Data Structures**: Complete models.Recipe with metadata, steps, and execution configuration

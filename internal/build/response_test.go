@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestMakeBuildResponse_BuilderFieldsLaneE(t *testing.T) {
+func TestMakeBuildResponse_BuilderFieldsLaneD(t *testing.T) {
 	start := time.Now().Add(-2 * time.Second)
 	resp := makeBuildResponse(
-		"E",
+		"D",
 		"/opt/ploy/artifacts/app.img",
-		"",
+		"registry.dev/app:sha",
 		"apps",
 		config.UserApp,
 		start,
@@ -39,30 +39,6 @@ func TestMakeBuildResponse_BuilderFieldsLaneE(t *testing.T) {
 	require.Equal(t, "app-e-build-123", b["job"])
 	// imageSize always present
 	require.Contains(t, resp, "imageSize")
-}
-
-func TestMakeBuildResponse_BuilderFieldsLaneC(t *testing.T) {
-	start := time.Now().Add(-1 * time.Second)
-	resp := makeBuildResponse(
-		"C",
-		"/opt/ploy/artifacts/app-osv.qemu",
-		"",
-		"platform",
-		config.PlatformApp,
-		start,
-		nil,
-		10,
-		"ignored",
-		"ordersvc",
-		"deadbeef",
-		"registry.dev",
-		"project",
-		nil,
-		nil,
-	)
-	require.Contains(t, resp, "builder")
-	b := resp["builder"].(fiber.Map)
-	require.Equal(t, "ordersvc-c-build-deadbeef", b["job"])
 }
 
 func TestMakeBuildResponse_PushVerificationAndSecurity(t *testing.T) {
@@ -85,7 +61,7 @@ func TestMakeBuildResponse_PushVerificationAndSecurity(t *testing.T) {
 	scan := &security.ScanResult{Passed: true, VulnCount: 1, CriticalCount: 0, HighCount: 0}
 	scanner := security.NewVulnerabilityScanner()
 	resp := makeBuildResponse(
-		"E",
+		"D",
 		"",
 		dockerTag,
 		"apps",
@@ -114,6 +90,11 @@ func TestMakeBuildResponse_PushVerificationAndSecurity(t *testing.T) {
 	assert.Equal(t, host, reg["endpoint"])
 	assert.Equal(t, dockerTag, reg["imageTag"])
 
+	// builder metadata preserved for lane D
+	builder, ok := resp["builder"].(fiber.Map)
+	require.True(t, ok)
+	assert.Equal(t, "builder-job", builder["job"])
+
 	// security summary present
 	sec, ok := resp["security"].(fiber.Map)
 	require.True(t, ok)
@@ -123,7 +104,7 @@ func TestMakeBuildResponse_PushVerificationAndSecurity(t *testing.T) {
 func TestMakeBuildResponse_NoSizeInfo_BytesZero(t *testing.T) {
 	start := time.Now().Add(-50 * time.Millisecond)
 	resp := makeBuildResponse(
-		"E",
+		"D",
 		"/opt/ploy/artifacts/app.img",
 		"", // no docker image -> no verify call
 		"apps",
@@ -131,7 +112,7 @@ func TestMakeBuildResponse_NoSizeInfo_BytesZero(t *testing.T) {
 		start,
 		nil, // sizeInfo nil
 		0,
-		"e-job-1",
+		"d-job-1",
 		"app",
 		"sha",
 		"",
@@ -145,20 +126,23 @@ func TestMakeBuildResponse_NoSizeInfo_BytesZero(t *testing.T) {
 	// When sizeInfo is nil, bytes should be 0
 	require.Equal(t, int64(0), sz["bytes"])
 
-	// Builder info present for lane E when builderJobName set
+	// Builder info present for lane D when builderJobName set
 	b, ok := resp["builder"].(fiber.Map)
 	require.True(t, ok)
-	require.Equal(t, "e-job-1", b["job"])
+	require.Equal(t, "d-job-1", b["job"])
+	require.Equal(t, "build-logs/d-job-1.log", b["logs_key"])
+	require.Equal(t, "http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/d-job-1.log", b["logs_url"])
+	require.Equal(t, "/opt/ploy/build-logs/d-job-1.log", b["log_path"])
 
 	// No pushVerification since dockerImage is empty
 	_, hasPV := resp["pushVerification"]
 	assert.False(t, hasPV)
 }
 
-func TestMakeBuildResponse_LaneE_NoBuilderJob_OmitsBuilder(t *testing.T) {
+func TestMakeBuildResponse_LaneD_NoBuilderJob_OmitsBuilder(t *testing.T) {
 	start := time.Now().Add(-10 * time.Millisecond)
 	resp := makeBuildResponse(
-		"E",
+		"D",
 		"/opt/ploy/artifacts/app.img",
 		"", // no docker image
 		"apps",

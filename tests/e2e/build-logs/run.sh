@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Submits a Lane E build-only tar for the sample app and saves response and headers.
+# Submits a Lane D build-only tar for the sample app and saves response and headers.
 
 : "${PLOY_CONTROLLER:?PLOY_CONTROLLER must be set (e.g., https://api.dev.ployman.app/v1)}"
-APP_NAME=${APP_NAME:-kaniko-fail-app}
+APP_NAME=${APP_NAME:-docker-fail-app}
 SHA=${SHA:-$(date +%s)}
 LINES=${LINES:-800}
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,8 +17,8 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 # Tar the app directory
 tar -cf "$TMP_DIR/src.tar" -C "$ROOT_DIR/app" .
 
-# Submit build (Lane E, build_only=true)
-BUILD_URL="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds?sha=${SHA}&lane=E&env=dev&build_only=true"
+# Submit build (Lane D, build_only=true)
+BUILD_URL="${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds?sha=${SHA}&lane=D&env=dev&build_only=true"
 RUN_DIR="$OUT_DIR/submission-$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$RUN_DIR"
 

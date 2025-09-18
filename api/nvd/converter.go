@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 // NVDVulnerability represents a single vulnerability from NVD response
@@ -135,7 +135,7 @@ type NVDVulnerability struct {
 }
 
 // convertToCVEInfo converts NVD vulnerability data to CVEInfo
-func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, error) {
+func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*security.CVEInfo, error) {
 	cve := nvdVuln.CVE
 
 	// Parse description
@@ -151,9 +151,9 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 	}
 
 	// Parse references
-	refs := make([]arf.CVEReference, len(cve.References))
+	refs := make([]security.CVEReference, len(cve.References))
 	for i, ref := range cve.References {
-		refs[i] = arf.CVEReference{
+		refs[i] = security.CVEReference{
 			Type: "external",
 			URL:  ref.URL,
 			Tags: ref.Tags,
@@ -164,13 +164,13 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 	publishedDate, _ := time.Parse("2006-01-02T15:04:05.000Z", cve.Published)
 
 	// Determine CVSS score and version
-	var cvssScore arf.CVSSScore
+	var cvssScore security.CVSSScore
 	var severity string
 
 	// Prefer CVSS v3.1, then v3.0, then v2
 	if len(cve.Metrics.CvssMetricV31) > 0 {
 		cvss := cve.Metrics.CvssMetricV31[0]
-		cvssScore = arf.CVSSScore{
+		cvssScore = security.CVSSScore{
 			Version:        cvss.CvssData.Version,
 			BaseScore:      cvss.CvssData.BaseScore,
 			Vector:         cvss.CvssData.VectorString,
@@ -180,7 +180,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 		severity = cvss.CvssData.BaseSeverity
 	} else if len(cve.Metrics.CvssMetricV30) > 0 {
 		cvss := cve.Metrics.CvssMetricV30[0]
-		cvssScore = arf.CVSSScore{
+		cvssScore = security.CVSSScore{
 			Version:        cvss.CvssData.Version,
 			BaseScore:      cvss.CvssData.BaseScore,
 			Vector:         cvss.CvssData.VectorString,
@@ -190,7 +190,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 		severity = cvss.CvssData.BaseSeverity
 	} else if len(cve.Metrics.CvssMetricV2) > 0 {
 		cvss := cve.Metrics.CvssMetricV2[0]
-		cvssScore = arf.CVSSScore{
+		cvssScore = security.CVSSScore{
 			Version:        cvss.CvssData.Version,
 			BaseScore:      cvss.CvssData.BaseScore,
 			Vector:         cvss.CvssData.VectorString,
@@ -201,7 +201,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 	}
 
 	// Parse affected packages from configurations
-	var affectedPackages []arf.AffectedPackage
+	var affectedPackages []security.AffectedPackage
 	for _, config := range cve.Configurations {
 		for _, node := range config.Nodes {
 			for _, cpeMatch := range node.CpeMatch {
@@ -217,7 +217,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 
 	// Determine exploitability
 	hasExploit := cve.CISAExploitAdd != ""
-	exploitability := arf.ExploitabilityInfo{
+	exploitability := security.ExploitabilityInfo{
 		HasExploit:       hasExploit,
 		ExploitMaturity:  "unknown",
 		AttackVector:     "network",
@@ -225,9 +225,9 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 	}
 
 	// Generate remediation guidance
-	remediation := n.generateRemediationGuidance(NVDCVEInfo(cve), affectedPackages)
+	guidance := n.generateRemediationGuidance(NVDCVEInfo(cve), affectedPackages)
 
-	cveInfo := &arf.CVEInfo{
+	cveInfo := &security.CVEInfo{
 		ID:               cve.ID,
 		Description:      description,
 		CVSS:             cvssScore,
@@ -235,7 +235,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 		References:       refs,
 		PublishedDate:    publishedDate,
 		Severity:         severity,
-		Remediation:      remediation,
+		Remediation:      guidance,
 		Exploitability:   exploitability,
 		Metadata: map[string]interface{}{
 			"source_identifier": cve.SourceIdentifier,
@@ -248,7 +248,7 @@ func (n *NVDDatabase) convertToCVEInfo(nvdVuln NVDVulnerability) (*arf.CVEInfo, 
 }
 
 // parseCPEToPackage converts a CPE string to a package structure
-func (n *NVDDatabase) parseCPEToPackage(cpe string) *arf.AffectedPackage {
+func (n *NVDDatabase) parseCPEToPackage(cpe string) *security.AffectedPackage {
 	// Simple CPE parsing - in practice, this would be more comprehensive
 	// CPE format: cpe:2.3:a:vendor:product:version:update:edition:language:sw_edition:target_sw:target_hw:other
 	parts := strings.Split(cpe, ":")
@@ -263,7 +263,7 @@ func (n *NVDDatabase) parseCPEToPackage(cpe string) *arf.AffectedPackage {
 		version = parts[5]
 	}
 
-	return &arf.AffectedPackage{
+	return &security.AffectedPackage{
 		Name:             fmt.Sprintf("%s/%s", vendor, product),
 		Ecosystem:        "generic",
 		AffectedVersions: []string{version},

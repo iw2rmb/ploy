@@ -24,7 +24,7 @@ func TestFilerBaseAndWASMModuleURL(t *testing.T) {
 	t.Run("default base with scheme added", func(t *testing.T) {
 		os.Unsetenv("PLOY_SEAWEEDFS_URL")
 		base := filerBaseURL("g")
-		require.Contains(t, base, "http://seaweedfs-filer.service.consul:8888")
+		require.Contains(t, base, "http://seaweedfs-filer.storage.ploy.local:8888")
 		u := wasmModuleURL("g", "demo", "abc")
 		require.Contains(t, u, "/builds/demo/abc/module.wasm")
 	})

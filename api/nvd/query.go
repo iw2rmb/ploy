@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 // QueryVulnerabilities searches for vulnerabilities based on criteria
-func (n *NVDDatabase) QueryVulnerabilities(criteria arf.VulnerabilityQuery) ([]arf.VulnerabilityInfo, error) {
+func (n *NVDDatabase) QueryVulnerabilities(criteria security.VulnerabilityQuery) ([]security.VulnerabilityInfo, error) {
 	// Build query parameters
 	params := make(map[string]string)
 
@@ -69,18 +69,18 @@ func (n *NVDDatabase) QueryVulnerabilities(criteria arf.VulnerabilityQuery) ([]a
 	}
 
 	// Convert to VulnerabilityInfo
-	vulns := make([]arf.VulnerabilityInfo, 0, len(nvdResp.Vulnerabilities))
+	vulns := make([]security.VulnerabilityInfo, 0, len(nvdResp.Vulnerabilities))
 	for _, nvdVuln := range nvdResp.Vulnerabilities {
 		cveInfo, err := n.convertToCVEInfo(NVDVulnerability(nvdVuln))
 		if err != nil {
 			continue // Skip problematic entries
 		}
 
-		vuln := arf.VulnerabilityInfo{
+		vuln := security.VulnerabilityInfo{
 			CVE:      *cveInfo,
 			Severity: cveInfo.Severity,
 			CVSS:     cveInfo.CVSS.BaseScore,
-			Discovery: arf.VulnerabilityDiscovery{
+			Discovery: security.VulnerabilityDiscovery{
 				Method:     "database_query",
 				Tool:       "nvd",
 				Timestamp:  time.Now(),

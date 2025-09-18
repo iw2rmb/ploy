@@ -15,25 +15,14 @@
     - ../vars/main.yml
   
   tasks:
-    - name: Ensure Docker Registry prerequisites
-      block:
-        - name: Verify Nomad is running
-          systemd:
-            name: nomad
-            state: started
-            enabled: true
-          
-        - name: Verify Consul is running
-          systemd:
-            name: consul
-            state: started
-            enabled: true
-          
-        - name: Verify Traefik is running
-          systemd:
-            name: traefik
-            state: started
-            enabled: true
+    - name: Ensure Nomad API is reachable for registry deployment
+      uri:
+        url: "http://{{ ploy.nomad_control_domain }}:4646/v1/status/leader"
+        method: GET
+        status_code: 200
+      register: nomad_leader_check
+      retries: 5
+      delay: 5
 
     - name: Create Docker Registry storage directory
       block:
@@ -55,7 +44,7 @@
       block:
         - name: Copy Docker Registry Nomad job file from controller
           copy:
-            src: "{{ playbook_dir }}/../../platform/nomad/docker-registry.hcl"
+            src: "{{ playbook_dir }}/../../../platform/nomad/docker-registry.hcl"
             dest: /home/ploy/ploy/platform/nomad/docker-registry.hcl
             owner: ploy
             group: ploy
@@ -83,34 +72,22 @@
           debug:
             msg: "Docker Registry deployment: {{ nomad_deploy.stdout }}"
 
-    - name: Wait for Docker Registry to be ready
-      block:
-        - name: Wait for Docker Registry service to be registered in Consul
-          uri:
-            url: "http://localhost:8500/v1/health/service/docker-registry?passing"
-            method: GET
-            status_code: 200
-          register: registry_consul_health
-          until: registry_consul_health.json | length > 0
-          retries: 30
-          delay: 10
-          
-        - name: Wait for Docker Registry API to respond
-          uri:
-            url: "https://registry.{{ ploy.platform_domain }}/v2/"
-            method: GET
-            status_code: 200
-            validate_certs: false
-          register: registry_api_health
-          until: registry_api_health.status == 200
-          retries: 20
-          delay: 15
+    - name: Wait for Docker Registry API to respond
+      uri:
+        url: "https://{{ ploy.registry_domain }}/v2/"
+        method: GET
+        status_code: 200
+        validate_certs: false
+      register: registry_api_health
+      until: registry_api_health.status == 200
+      retries: 20
+      delay: 15
 
     - name: Validate Docker Registry deployment
       block:
         - name: Test Docker Registry v2 API
           uri:
-            url: "https://registry.{{ ploy.platform_domain }}/v2/"
+            url: "https://{{ ploy.registry_domain }}/v2/"
             method: GET
             status_code: 200
             validate_certs: false
@@ -118,7 +95,7 @@
           
         - name: Test Docker Registry catalog endpoint
           uri:
-            url: "https://registry.{{ ploy.platform_domain }}/v2/_catalog"
+            url: "https://{{ ploy.registry_domain }}/v2/_catalog"
             method: GET
             status_code: 200
             validate_certs: false
@@ -161,15 +138,3 @@
           API Endpoints:
           - Registry API: https://registry.{{ ploy.platform_domain }}/v2/
           - Image Catalog: https://registry.{{ ploy.platform_domain }}/v2/_catalog
-          
-          Benefits vs Harbor:
-          - 90% less memory usage (~256MB vs ~2GB)
-          - Cloud-native Nomad deployment
-          - No complex RBAC or project namespacing
-          - Standards-compliant Docker Registry v2 API
-          - Anonymous push/pull access for development
-          
-          Next Steps:
-          1. Registry is ready for Ploy container builds
-          2. Test image push/pull with: docker tag/push registry.{{ ploy.platform_domain }}/test:latest
-          3. Ploy will automatically use this registry for all lanes

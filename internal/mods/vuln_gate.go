@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	arfapi "github.com/iw2rmb/ploy/api/arf"
 	nvdapi "github.com/iw2rmb/ploy/api/nvd"
 	sbomanalysis "github.com/iw2rmb/ploy/api/sbom"
+	securityapi "github.com/iw2rmb/ploy/api/security"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -101,7 +101,7 @@ func (r *ModRunner) runVulnerabilityGate(ctx context.Context, repoPath string) e
 	hitsAtOrAbove := 0
 
 	for _, d := range deps {
-		q := arfapi.VulnerabilityQuery{PackageName: d.Name}
+		q := securityapi.VulnerabilityQuery{PackageName: d.Name}
 		vulns, err := nvd.QueryVulnerabilities(q)
 		if err != nil {
 			// Non-fatal; log and continue

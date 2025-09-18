@@ -9,7 +9,7 @@ func TestBuildLogsURL_DefaultBase(t *testing.T) {
 	t.Cleanup(func() { _ = os.Unsetenv("PLOY_SEAWEEDFS_URL") })
 	_ = os.Unsetenv("PLOY_SEAWEEDFS_URL")
 	got := buildLogsURL("build-logs/sample.log")
-	want := "http://seaweedfs-filer.service.consul:8888/artifacts/build-logs/sample.log"
+	want := "http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/sample.log"
 	if got != want {
 		t.Fatalf("buildLogsURL default mismatch: got %q want %q", got, want)
 	}

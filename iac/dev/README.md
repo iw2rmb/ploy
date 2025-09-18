@@ -15,29 +15,31 @@ Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu V
 
 ## Quick Setup
 
-**Prerequisites:** Ubuntu 20.04+, 8GB RAM, 4 CPU, 80GB storage, SSH access, Ansible 2.9+
+**Prerequisites:**
+- Ubuntu 20.04+ VPS with 4 vCPU / 8 GB RAM / 80 GB disk (clean image recommended)
+- SSH access for the `root` user (public key already authorized)
+- Local workstation with Ansible ≥ 2.14 and Python 3
 
 ```bash
-# 1. Set required environment variables (CRITICAL)
-# Ensure the following are set in your shell (values shown as examples):
-# NAMECHEAP_API_KEY=your-api-key
-# NAMECHEAP_API_USER=your-username
-# NAMECHEAP_USERNAME=your-username
-# NAMECHEAP_CLIENT_IP=your-vps-ip
-# TARGET_HOST=your-vps-ip
+# 1. Clone the repo locally and pick your VPS address
+export TARGET_HOST=203.0.113.10
 
-# 2. Validate prerequisites (RECOMMENDED)
-cd iac/dev
-./scripts/validate-deployment.sh
+# 2. Declare required domains and providers (no defaults applied)
+export PLOY_APPS_DOMAIN=dev.ployd.app
+export PLOY_APPS_DOMAIN_PROVIDER=namecheap
+export PLOY_PLATFORM_DOMAIN=dev.ployman.app
+export PLOY_PLATFORM_DOMAIN_PROVIDER=namecheap
+export PLOY_REGISTRY_DOMAIN=registry.dev.ployman.app
 
-# 3. Deploy infrastructure (FULLY AUTOMATED)
-ansible-playbook site.yml -e target_host=$TARGET_HOST
+# 3. Run the bootstrap helper (validation runs automatically)
+./scripts/dev/bootstrap-vps.sh $TARGET_HOST
 
-# 4. Verify deployment
-curl -s https://api.dev.ployman.app/health | jq .status
+# 4. Verify core services once SSH'd into the VPS
+nomad node status
+systemctl status seaweedfs-master traefik nomad docker
 ```
 
-⚠️ **IMPORTANT**: Run `./scripts/validate-deployment.sh` to check all prerequisites before deployment.
+The helper always runs `iac/dev/scripts/validate-deployment.sh` before provisioning. Provide Namecheap/Cloudflare credentials only when you need live DNS automation or ACME certificates; otherwise the playbooks rely on CoreDNS with static host entries.
 
 ## API Deployment Options
 
@@ -67,7 +69,7 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 
 **Stack:** Nomad v1.10.4, Consul v1.21.4, Traefik v3.5.0, SeaweedFS v3.96, Docker Registry v2, Docker, Go
 
-**Lanes:** A/B (Unikraft), C (OSv/Hermit), D (FreeBSD jails), E (OCI containers), F (VMs)
+**Lane:** D (Docker)
 
 ## Playbooks
 
@@ -80,7 +82,6 @@ ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=
 | **docker-registry.yml** | Docker Registry v2 container storage | 🚀 New (Aug 2025) |
 | **api.yml** | Ploy API deployment via Nomad | ✅ Optimized |
 | **testing.yml** | Test environment and Ploy binaries | 🚀 Newly optimized (60-80% faster) |
-| **freebsd.yml** | FreeBSD VM with jails support | 🚀 Newly optimized |
 
 ## Configuration
 
@@ -139,27 +140,16 @@ Notes:
 ```
 iac/
 ├── common/templates/           # Shared configuration templates
-│   ├── consul-server.hcl.j2   # Linux Consul server configuration
-│   ├── consul-freebsd.hcl.j2  # FreeBSD Consul client configuration
-│   ├── nomad-server.hcl.j2    # Linux Nomad server configuration
-│   ├── nomad-freebsd.hcl.j2   # FreeBSD Nomad client configuration
-│   ├── nomad-ploy-api.hcl.j2  # Controller Nomad job
+│   ├── consul-server.hcl.j2    # Consul server configuration (Linux)
+│   ├── nomad-server.hcl.j2     # Nomad server/client configuration
+│   ├── nomad-ploy-api.hcl.j2   # Controller Nomad job
+│   ├── nomad-traefik-system.hcl.j2 # Traefik system job
+│   ├── nomad-seaweedfs-filer.hcl.j2 # Filer job template
 │   ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│   └── *.j2                   # Management scripts and service templates
-├── dev/playbooks/             # Dev-specific playbooks referencing common templates
-└── prod/playbooks/            # Prod-specific playbooks using same templates
+│   └── *.j2                    # Utility scripts and configs
+├── dev/playbooks/              # Dev-specific playbooks referencing common templates
+└── prod/playbooks/             # Prod-specific playbooks using same templates
 ```
-
-### FreeBSD Integration
-
-**FreeBSD Templates**: Specialized configurations for FreeBSD worker nodes with unique capabilities.
-
-**Key Features**:
-- **consul-freebsd.hcl.j2**: Client-only Consul configuration joining Linux servers
-- **nomad-freebsd.hcl.j2**: Nomad client with jail and bhyve driver support
-- **Lane Support**: Native FreeBSD jails (Lane D) and bhyve VMs (Lane F)
-- **FreeBSD Paths**: Uses proper FreeBSD filesystem locations (`/var/db/`, `/var/log/`)
-- **Service Integration**: Syslog integration and rc.d script generation
 
 ### Template Benefits
 
@@ -276,15 +266,11 @@ nomad job status ploy-api
 ./bin/ployman controller list
 
 # CLI operations
-./bin/ploy apps new --lang {go|node|java} --name myapp
-./bin/ploy push -a myapp [-lane {A|B|C|D|E|F}]
+./bin/ploy apps new --lang go --name myapp
+./bin/ploy push -a myapp
 
-# Lane selection testing
-./build/lane-pick --path apps/{go|node|java}-hello
-
-# FreeBSD VM
-virsh {list,start,stop} freebsd-dev
-ssh freebsd@192.168.100.10
+# Lane selection testing (always returns D; kept for diagnostics)
+./build/lane-pick --path apps/go-hello
 ```
 
 ## Templates
@@ -301,7 +287,6 @@ ssh freebsd@192.168.100.10
 | **seaweedfs-{master,volume,filer}.service.j2** | SeaweedFS systemd services |
 | **docker-daemon.json.j2** | Docker daemon with Kontain runtime |
 | **node-exporter.service.j2** | Prometheus metrics service |
-| **freebsd-{user,meta}-data.yml.j2** | FreeBSD VM cloud-init |
 | **ploy-{storage,seaweedfs}-config.yaml.j2** | Ploy storage configurations |
 | **test-*.sh.j2** | Automated test scripts |
 | **setup-env.sh.j2** | Environment setup script |
@@ -329,7 +314,7 @@ curl localhost:9333/{cluster,vol}/status
 curl localhost:8095/{ping,api/overview}
 
 # Performance
-time ansible-playbook playbooks/{testing,freebsd}.yml
+time ansible-playbook playbooks/testing.yml
 ```
 
 ## Docker Configuration Improvements

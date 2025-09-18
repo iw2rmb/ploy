@@ -54,7 +54,7 @@ func Status(c *fiber.Ctx) error {
 		})
 	}
 
-	// Map Nomad job status to ARF-compatible status
+	// Map Nomad job status to deployment status used by Mods-aware clients
 	status := mapNomadStatusToARF(activeJob.Status)
 
 	// Include allocation summaries with recent task events to enable event-driven clients
@@ -129,18 +129,21 @@ func Status(c *fiber.Ctx) error {
 	})
 }
 
-// mapNomadStatusToARF converts Nomad job status to ARF-compatible status
+// mapNomadStatusToARF converts Nomad job status to a Mods-aligned deployment status.
 func mapNomadStatusToARF(nomadStatus string) string {
-	switch strings.ToLower(nomadStatus) {
+	switch strings.TrimSpace(strings.ToLower(nomadStatus)) {
 	case "pending":
 		return "building"
 	case "running":
-		return "deploying"
-	case "dead":
-		return "stopped"
-	default:
-		// For running allocations, we need to check health
 		return "running"
+	case "dead", "failed":
+		return "failed"
+	case "complete", "completed", "successful":
+		return "running"
+	case "":
+		return "unknown"
+	default:
+		return "unknown"
 	}
 }
 

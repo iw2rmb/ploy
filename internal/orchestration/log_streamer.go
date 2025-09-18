@@ -94,7 +94,7 @@ func nomadAddr() string {
 	if v := os.Getenv("NOMAD_ADDR"); strings.TrimSpace(v) != "" {
 		return strings.TrimRight(v, "/")
 	}
-	return "http://nomad.service.consul:4646"
+	return "http://nomad.control.ploy.local:4646"
 }
 
 // selectAllocHTTP queries Nomad HTTP API for allocations of the job and picks a deterministic candidate.

@@ -111,10 +111,10 @@ func (s *Server) setupRoutes() {
 		dns.SetupDNSRoutes(s.app, s.dependencies.DNSHandler)
 	}
 
-	// Legacy remediation endpoints (Automated Remediation Framework)
-	if s.dependencies.RemediationHandler != nil {
-		s.dependencies.RemediationHandler.RegisterRoutes(s.app)
-		log.Printf("Remediation routes registered successfully")
+	// Legacy security endpoints (Automated Remediation Framework)
+	if s.dependencies.SecurityHandler != nil {
+		s.dependencies.SecurityHandler.RegisterRoutes(s.app)
+		log.Printf("Security routes registered successfully")
 	}
 
 	if s.dependencies.RecipesHandler != nil {
