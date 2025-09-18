@@ -152,6 +152,9 @@ func RenderKanikoBuilder(app, version, dockerImage, contextURL, dockerfilePath, 
 		}
 	}
 	s = strings.ReplaceAll(s, "{{KANIKO_IMAGE}}", kaniko)
+	// Optional dev-guarded attach delay before executor to help log streamer latch
+	attachDelay := utils.Getenv("PLOY_KANIKO_ATTACH_DELAY", "")
+	s = strings.ReplaceAll(s, "{{ATTACH_DELAY}}", attachDelay)
 
 	// Targeted memory bump per language (defaults 512MB)
 	memMB := utils.Getenv("PLOY_KANIKO_MEMORY_MB", "512")

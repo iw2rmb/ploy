@@ -23,6 +23,8 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         CONTEXT_URL     = "{{CONTEXT_URL}}"
         DOCKER_IMAGE    = "{{DOCKER_IMAGE}}"
         DOCKERFILE_PATH = "{{DOCKERFILE_PATH}}"
+        # Optional dev guard: delay before executor to allow log streamer to attach
+        PLOY_KANIKO_ATTACH_DELAY = "{{ATTACH_DELAY}}"
       }
 
       config {
@@ -31,7 +33,7 @@ job "{{APP_NAME}}-e-build-{{VERSION}}" {
         network_mode = "host"
         entrypoint = ["/busybox/sh", "-lc"]
         args = [
-          "set -euo pipefail; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
+          "set -euo pipefail; mkdir -p /workspace; for i in 1 2 3; do wget -qO /workspace/src.tar $CONTEXT_URL && break; echo 'retrying context fetch...'; sleep 2; done; test -s /workspace/src.tar; tar -xf /workspace/src.tar -C /workspace; if [ -n \"$PLOY_KANIKO_ATTACH_DELAY\" ]; then echo 'attach delay' && sleep \"$PLOY_KANIKO_ATTACH_DELAY\"; fi; /kaniko/executor --context=/workspace --dockerfile=$DOCKERFILE_PATH --destination=$DOCKER_IMAGE --reproducible --snapshotMode=redo --single-snapshot --use-new-run;"
         ]
 
         ports = ["http"]
