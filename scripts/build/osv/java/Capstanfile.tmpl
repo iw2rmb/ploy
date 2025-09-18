@@ -1,6 +1,0 @@
-# Java {{JAVA_VERSION}} application build for OSv
-base: cloudius/osv
-cmdline: >-
-  /java.so -XX:+UnlockExperimentalVMOptions -XX:+UseZGC
-  -cp /app/classes:/app/resources:/app/libs/* {{MAIN_CLASS}}
-name: ploy/{{APP}}

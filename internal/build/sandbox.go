@@ -96,9 +96,7 @@ func (s *SandboxService) Run(ctx context.Context, req SandboxRequest) (*SandboxR
 	mainHint := strings.TrimSpace(req.MainClass)
 
 	lane, language, _, mainClass, _ := detectBuildContext(req.RepoPath, laneHint, mainHint)
-	if laneHint != "" {
-		lane = laneHint
-	}
+	lane = "D"
 	if mainHint != "" {
 		mainClass = mainHint
 	}
@@ -140,62 +138,15 @@ func (s *SandboxService) runLaneBuild(ctx context.Context, lane, appName, sha, r
 	}
 	defer func() { _ = os.RemoveAll(tmpDir) }()
 
-	switch strings.ToUpper(lane) {
-	case "A", "B":
-		img, err := ibuilders.BuildUnikraft(appName, strings.ToUpper(lane), repoPath, sha, tmpDir, envVars)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: img, Type: "unikraft"}, nil
-	case "C":
-		outDir := filepath.Join(tmpDir, "osv")
-		if err := os.MkdirAll(outDir, 0o755); err != nil {
-			return nil, fmt.Errorf("create osv out dir: %w", err)
-		}
-		req := ibuilders.JavaOSVRequest{
-			App:       appName,
-			MainClass: mainClass,
-			SrcDir:    repoPath,
-			GitSHA:    sha,
-			OutDir:    outDir,
-			EnvVars:   envVars,
-		}
-		img, err := ibuilders.BuildOSVJava(req)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: img, Type: "osv"}, nil
-	case "D":
-		img, err := ibuilders.BuildJail(appName, repoPath, sha, tmpDir, envVars)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: img, Type: "jail"}, nil
-	case "E":
-		tag := sha
-		if tag == "" {
-			tag = fmt.Sprintf("sandbox-%d", time.Now().Unix())
-		}
-		imageRef, err := ibuilders.BuildOCI(appName, repoPath, tag, envVars)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: imageRef, Type: "oci"}, nil
-	case "F":
-		img, err := ibuilders.BuildVM(appName, sha, tmpDir, envVars)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: img, Type: "vm"}, nil
-	case "G":
-		wasmPath, err := findWASMArtifact(repoPath)
-		if err != nil {
-			return nil, err
-		}
-		return &SandboxArtifact{Path: wasmPath, Type: "wasm"}, nil
-	default:
-		return nil, fmt.Errorf("unsupported lane for sandbox build: %s", lane)
+	imageTag := sha
+	if strings.TrimSpace(imageTag) == "" {
+		imageTag = fmt.Sprintf("sandbox-%d", time.Now().Unix())
 	}
+	imageRef, err := ibuilders.BuildOCI(appName, repoPath, imageTag, envVars)
+	if err != nil {
+		return nil, err
+	}
+	return &SandboxArtifact{Path: imageRef, Type: "oci"}, nil
 }
 
 func findWASMArtifact(repoPath string) (string, error) {

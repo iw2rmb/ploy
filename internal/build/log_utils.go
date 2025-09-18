@@ -12,7 +12,7 @@ func buildLogsURL(logsKey string) string {
 	}
 	base := os.Getenv("PLOY_SEAWEEDFS_URL")
 	if strings.TrimSpace(base) == "" {
-		base = "http://seaweedfs-filer.service.consul:8888"
+		base = "http://seaweedfs-filer.storage.ploy.local:8888"
 	}
 	if !strings.HasPrefix(base, "http") {
 		base = "http://" + base

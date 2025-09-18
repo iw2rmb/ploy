@@ -11,7 +11,7 @@ api/
 ├── config/                # Configuration loading and validation
 ├── health/                # Health/readiness/liveness endpoints and types
 ├── metrics/               # Prometheus metrics integration
-├── builders/              # Lane builders (unikraft, oci, vm, wasm, jail, java_osv, jib)
+├── builders/              # Legacy builder adapters (mostly dormant after Lane D consolidation)
 ├── nomad/                 # Nomad client, render, submit (+ enhanced submit)
 ├── certificates/          # Certificate lifecycle (manager, wildcard)
 ├── dns/                   # DNS providers (Cloudflare, Namecheap) + handler
@@ -28,12 +28,12 @@ api/
 ├── sbom/                  # SBOM HTTP endpoints and analyzer helpers
 ├── nvd/                   # NVD database/types/lookup/converter
 ├── platform/              # Platform handler endpoints
-├── recipes/               # Recipes API, registry adapter, models/
+├── recipes/               # Recipes API, registry adapter, models
+├── security/           # Remediation engine (security scans, guidance)
 ├── consul_envstore/       # Consul-backed environment store
 ├── coordination/          # Leader election and TTL cleanup
 ├── selfupdate/            # Self-update executor and endpoints
-├── runtime/               # Runtime integrations (WASM)
-├── wasm/                  # WASM component wiring
+├── runtime/               # Archived runtime integrations (WASM sandbox)
 └── version/               # Version endpoint
 ```
 

@@ -8,9 +8,6 @@ go_arch: "amd64"
 # Docker configuration
 docker_compose_version: "2.29.2"  # Latest stable Docker Compose
 
-# Node.js configuration for WASM development
-nodejs_version: "20"  # LTS version for stability
-
 # Nomad/Consul versions
 nomad_version: "1.10.4"  # Latest stable Nomad available
 consul_version: "1.20.2"  # Compatible Consul version
@@ -30,30 +27,9 @@ traefik_admin_port: 8090
 
 # Certificate contact emails (used by Traefik ACME); override via env if needed
 ploy_platform_cert_email: "{{ lookup('env', 'PLOY_PLATFORM_CERT_EMAIL') | default('admin@ployman.app') }}"
-ploy_apps_cert_email: "{{ lookup('env', 'PLOY_APPS_CERT_EMAIL') | default('admin@ployd.app') }}"
-
-# DNS provider credential defaults (override via env or secrets manager in production)
-# For Namecheap provider used in dev by default; leave blank or populate via env overrides for local testing.
-namecheap_api_user_default: ""
-namecheap_api_key_default: ""
-namecheap_username_default: ""
-# If your Namecheap account requires API IP whitelist, set to VPS public IP
-namecheap_client_ip_default: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
-namecheap_sandbox_default: false
 
 # Node Exporter version
 node_exporter_version: "1.7.0"
-
-# FreeBSD VM configuration
-freebsd_vm:
-  name: "freebsd-dev"
-  cpus: 2
-  memory: 4096
-  disk_size: "20G"
-  network_interface: "em0"
-  ip: "192.168.100.10"
-  netmask: "255.255.255.0"
-  gateway: "192.168.100.1"
 
 # Testing tools
 testing_tools:
@@ -71,25 +47,25 @@ ploy_environment: "dev"  # Enables development environment features including wi
 ploy:
   storage_backend: "seaweedfs"
   dns:
-    provider: "namecheap"  # Use namecheap for dev environment
-    domain: "ployd.app" 
+    provider: "coredns"
+    domain: "deploy.local"
     target_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
     ttl: 300
     enable_ipv6: false
-  
-  # User apps domain configuration (iac/dev enforces dev subdomain)
-  apps_domain: "dev.ployd.app"
+
+  # User apps domain configuration (must be supplied via environment/options)
+  apps_domain: "{{ lookup('env', 'PLOY_APPS_DOMAIN') }}"
   apps_domain_provider: "{{ lookup('env', 'PLOY_APPS_DOMAIN_PROVIDER') }}"
-  
-  # Platform services domain configuration
+
+  # Platform services domain configuration (must be supplied via environment/options)
   platform_domain: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN') }}"
   platform_domain_provider: "{{ lookup('env', 'PLOY_PLATFORM_DOMAIN_PROVIDER') }}"
-  
+
   # API accessible at api.{platform_domain}
   api_subdomain: "api"
-
-  # Lane E (Kaniko) — small delay before executor to help controller log attach in dev
-  kaniko_attach_delay: "1"
+  nomad_control_domain: "nomad.control.ploy.local"
+  registry_domain: "{{ lookup('env', 'PLOY_REGISTRY_DOMAIN') }}"
+  upload_api_binary: "{{ lookup('env', 'PLOY_UPLOAD_API_BINARY') | default('false', true) | bool }}"
 
 # Nomad api deployment configuration
 nomad_api:
@@ -100,10 +76,6 @@ nomad_api:
 
 # Build tools for different lanes
 build_tools:
-  kraft: 
-    version: "0.11.6"  # Latest stable KraftKit
-  capstan:
-    version: "1.0.0"
   cosign:
     version: "2.4.0"   # Latest stable Cosign
   syft:
@@ -119,13 +91,11 @@ seaweedfs:
   master_port: 9333
   volume_port: 8080
   filer_port: 8888
-  
-  # Use Consul service discovery for multi-node deployments
-  use_consul_discovery: true
-  
-  # Service endpoints - master/volume via localhost (systemd), filer via consul DNS (nomad)
-  master_endpoint: "localhost:9333"
-  filer_endpoint: "seaweedfs-filer.service.consul:8888"
+  master_domain: "seaweedfs-master.storage.ploy.local"
+  volume_domain: "seaweedfs-volume.storage.ploy.local"
+  filer_domain: "seaweedfs-filer.storage.ploy.local"
+  master_endpoint: "seaweedfs-master.storage.ploy.local:9333"
+  filer_endpoint: "seaweedfs-filer.storage.ploy.local:8888"
   
   # Collection configuration for different artifact types (dev environment)
   collections:
@@ -142,8 +112,8 @@ seaweedfs:
 # External storage configuration for api
 storage_config:
   seaweedfs:
-    master: "localhost:9333"
-    filer: "seaweedfs-filer.service.consul:8888"
+    master: "seaweedfs-master.storage.ploy.local:9333"
+    filer: "seaweedfs-filer.storage.ploy.local:8888"
     collection: "artifacts"
     replication: "000"
     timeout: 30

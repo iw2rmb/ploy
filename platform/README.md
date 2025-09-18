@@ -24,6 +24,8 @@ platform/
 
 ## Deployment Lanes
 
+> **Status:** Only the Lane D Docker templates are active after the 2025-09 consolidation. The lane breakdown below is retained for historical reference and future expansion.
+
 - **Lane A/B**: Unikraft unikernels (`lane-a-unikraft.hcl`, `lane-b-unikraft-posix.hcl`)
 - **Lane C**: OSv/Hermit VMs for JVM (`java-*.hcl`)
 - **Lane D**: FreeBSD jails (`jail.hcl`, `debug-jail.hcl`)

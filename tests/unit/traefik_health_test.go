@@ -10,7 +10,7 @@ import (
 func TestTraefikPingEntrypointConfigured(t *testing.T) {
 	// Template should set ping entrypoint to admin
 	{
-		p := filepath.FromSlash(filepath.Join("..", "..", "iac", "common", "templates", "nomad-traefik-system.hcl.j2"))
+		p := filepath.FromSlash(filepath.Join("iac", "common", "templates", "nomad-traefik-system.hcl.j2"))
 		content := mustReadFile(t, p)
 		if !strings.Contains(content, "--ping.entryPoint=admin") {
 			t.Fatalf("missing --ping.entryPoint=admin in %s", p)
@@ -22,7 +22,7 @@ func TestTraefikPingEntrypointConfigured(t *testing.T) {
 	}
 	// Example job should also include ping entrypoint
 	{
-		p := filepath.FromSlash(filepath.Join("..", "..", "platform", "nomad", "traefik.hcl"))
+		p := filepath.FromSlash(filepath.Join("platform", "nomad", "traefik.hcl"))
 		content := mustReadFile(t, p)
 		if !strings.Contains(content, "--ping.entryPoint=admin") {
 			t.Fatalf("missing --ping.entryPoint=admin in %s", p)

@@ -57,13 +57,13 @@
       register: seaweedfs_status
 
     - name: Validate Consul DNS resolves filer (resolvectl)
-      shell: resolvectl query seaweedfs-filer.service.consul
+      shell: resolvectl query seaweedfs-filer.storage.ploy.local
       register: consul_dns_filer
       failed_when: consul_dns_filer.rc != 0
       changed_when: false
 
     - name: Validate Consul DNS resolves filer (getent)
-      shell: getent hosts seaweedfs-filer.service.consul
+      shell: getent hosts seaweedfs-filer.storage.ploy.local
       register: getent_filer
       failed_when: getent_filer.rc != 0
       changed_when: false

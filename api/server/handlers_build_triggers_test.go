@@ -49,7 +49,7 @@ func TestHandleTriggerAppBuild_AsyncAccepted(t *testing.T) {
 	}
 }
 
-func TestHandleTriggerAppBuild_LaneE_NoDockerfile_ReturnsBuilderPointer(t *testing.T) {
+func TestHandleTriggerAppBuild_NonDockerLaneRejected(t *testing.T) {
 	// In-memory storage
 	orig := resolveStorageFromConfigService
 	resolveStorageFromConfigService = func(_ *cfgsvc.Service) (istorage.Storage, error) { return memory.NewMemoryStorage(0), nil }
@@ -86,15 +86,18 @@ func TestHandleTriggerAppBuild_LaneE_NoDockerfile_ReturnsBuilderPointer(t *testi
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	b, ok := body["builder"].(map[string]any)
+	errObj, ok := body["error"].(map[string]any)
 	if !ok {
-		t.Fatalf("missing builder object: %#v", body)
+		t.Fatalf("missing error object: %#v", body)
 	}
-	if b["logs_key"] == nil || b["logs_url"] == nil {
-		t.Fatalf("missing logs_key/logs_url in builder: %#v", b)
+	if code := errObj["code"]; code != "lane_disabled" {
+		t.Fatalf("unexpected error code %#v", errObj)
 	}
-	if depID := resp.Header.Get("X-Deployment-ID"); depID == "" {
-		t.Fatalf("expected X-Deployment-ID header on error path")
+	if supported := body["supported_lane"]; supported != "D" {
+		t.Fatalf("expected supported_lane D, got %#v", supported)
+	}
+	if _, ok := body["builder"]; ok {
+		t.Fatalf("builder object should not be present: %#v", body)
 	}
 }
 

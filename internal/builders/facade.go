@@ -29,25 +29,9 @@ func touch(path string, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-func BuildUnikraft(app, lane, srcDir, sha, outDir string, envVars map[string]string) (string, error) {
-	img := filepath.Join(outDir, "final.img")
-	if err := touch(img, fmt.Sprintf("unikraft image for %s@%s", app, sha)); err != nil {
-		return "", err
-	}
-	return img, nil
-}
-
 func BuildOSVJava(req JavaOSVRequest) (string, error) {
 	img := filepath.Join(req.OutDir, "app-osv.img")
 	if err := touch(img, fmt.Sprintf("osv jvm image %s %s", req.App, req.MainClass)); err != nil {
-		return "", err
-	}
-	return img, nil
-}
-
-func BuildJail(app, srcDir, sha, outDir string, envVars map[string]string) (string, error) {
-	img := filepath.Join(outDir, "jail.img")
-	if err := touch(img, fmt.Sprintf("freebsd jail image for %s@%s", app, sha)); err != nil {
 		return "", err
 	}
 	return img, nil

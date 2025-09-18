@@ -47,7 +47,7 @@ job "docker-registry" {
         "traefik.enable=true",
         "traefik.http.routers.docker-registry.rule=Host(`registry.dev.ployman.app`)",
         "traefik.http.routers.docker-registry.tls=true",
-        "traefik.http.routers.docker-registry.tls.certresolver=platform-wildcard",
+        "traefik.http.routers.docker-registry.tls.certresolver=default-acme",
         "traefik.http.routers.docker-registry.tls.domains[0].main=dev.ployman.app",
         "traefik.http.routers.docker-registry.tls.domains[0].sans=*.dev.ployman.app",
         "traefik.http.services.docker-registry.loadbalancer.server.scheme=http",

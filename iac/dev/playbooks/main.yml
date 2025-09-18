@@ -2,7 +2,7 @@
 # Ploy Development Environment Setup Playbook
 # 
 # This playbook sets up a complete development environment including:
-# - Development tools (Go, Node.js, Java, Python)
+# - Development tools (Go, Java, Python)
 # - Build tools (KraftKit, Cosign, Syft, Grype)
 # - Container runtime (Docker)
 # - Object storage (SeaweedFS)
@@ -63,8 +63,6 @@
         - { path: "/opt/ploy/temp", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/traefik-data", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/traefik-data/certificates", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/home/ploy/ploy", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/home/ploy/ploy/configs", owner: "ploy", group: "ploy", mode: "0755" }
 
     - name: Update system packages
       block:
@@ -209,6 +207,17 @@
 
     - name: Setup Docker Registry for local image management
       block:
+        - name: Ensure registry domain resolves locally
+          lineinfile:
+            path: /etc/hosts
+            regexp: '.*{{ ploy.registry_domain | regex_escape }}$'
+            line: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }} {{ ploy.registry_domain }}"
+            owner: root
+            group: root
+            mode: '0644'
+            create: true
+          when: ploy.registry_domain is defined and ploy.registry_domain | length > 0
+
         - name: Create registry directory
           file:
             path: /var/lib/docker-registry
@@ -234,10 +243,12 @@
               - "5000:5000"
             volumes:
               - /var/lib/docker-registry:/var/lib/registry
+            etc_hosts:
+              "{{ ploy.registry_domain }}": "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
             env:
               REGISTRY_STORAGE_DELETE_ENABLED: "true"
             healthcheck:
-              test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://registry.dev.ployman.app/v2/"]
+              test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://{{ ploy.registry_domain }}:5000/v2/"]
               interval: 30s
               timeout: 10s
               retries: 3
@@ -248,7 +259,7 @@
 
         - name: Wait for Docker Registry to be ready
           uri:
-            url: http://registry.dev.ployman.app/v2/
+            url: http://{{ ploy.registry_domain }}:5000/v2/
             method: GET
             status_code: 200
           register: registry_health_check
@@ -256,49 +267,6 @@
           delay: 5
           until: registry_health_check.status == 200
 
-    - name: Prepare OSv base image directory
-      file:
-        path: /opt/ploy/osv/base
-        state: directory
-        owner: ploy
-        group: ploy
-        mode: '0755'
-
-    - name: Download OSv base image if URL provided
-      when: lookup('env', 'PLOY_OSV_BASE_URL') | length > 0
-      get_url:
-        url: "{{ lookup('env', 'PLOY_OSV_BASE_URL') }}"
-        dest: /opt/ploy/osv/base/java8.qemu
-        mode: '0644'
-        owner: ploy
-        group: ploy
-      register: osv_base_dl
-      retries: 3
-      delay: 5
-      until: osv_base_dl is succeeded
-
-    - name: Mirror Kaniko executor image into internal registry (Dev)
-      block:
-        - name: Pull Kaniko executor image
-          docker_image:
-            name: gcr.io/kaniko-project/executor:debug
-            source: pull
-          retries: 3
-          delay: 10
-
-        - name: Tag Kaniko image for internal registry
-          command: >-
-            docker tag gcr.io/kaniko-project/executor:debug
-            registry.dev.ployman.app/kaniko-executor:debug
-          changed_when: true
-
-        - name: Push Kaniko image to internal registry
-          command: docker push registry.dev.ployman.app/kaniko-executor:debug
-          register: push_result
-          retries: 3
-          delay: 10
-          until: push_result.rc == 0
-    
     - name: Install Docker Compose
       block:
         - name: Check if Docker Compose is already installed
@@ -464,17 +432,6 @@
             path: /root/go
             state: directory
 
-    - name: Install QEMU for OSv runtime support
-      apt:
-        name:
-          - qemu-system-x86
-          - qemu-utils
-          - qemu-system-common
-          - libvirt-daemon-system
-          - libvirt-clients
-        state: present
-        update_cache: yes
-
     - name: Install Python3 and pip
       apt:
         name:
@@ -577,224 +534,6 @@
               - cmake
               - pkg-config
             state: present
-
-        - name: Check if KraftKit is already installed
-          stat:
-            path: /usr/local/bin/kraft
-          register: kraft_binary
-
-        - name: Get current KraftKit version (if installed)
-          command: /usr/local/bin/kraft version
-          register: current_kraft_version
-          changed_when: false
-          ignore_errors: true
-          when: kraft_binary.stat.exists
-
-        - name: Remove old KraftKit version
-          file:
-            path: /usr/local/bin/kraft
-            state: absent
-          when: kraft_binary.stat.exists and build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
-
-        - name: Download KraftKit
-          get_url:
-            url: "https://github.com/unikraft/kraftkit/releases/download/v{{ build_tools.kraft.version }}/kraft_{{ build_tools.kraft.version }}_linux_amd64.tar.gz"
-            dest: /tmp/kraft.tar.gz
-          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
-
-        - name: Extract KraftKit
-          unarchive:
-            src: /tmp/kraft.tar.gz
-            dest: /usr/local/bin
-            remote_src: true
-          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
-
-        - name: Make KraftKit executable
-          file:
-            path: /usr/local/bin/kraft
-            mode: '0755'
-          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
-
-        - name: Verify KraftKit installation
-          command: /usr/local/bin/kraft version
-          register: kraft_version
-          changed_when: false
-          when: not kraft_binary.stat.exists or build_tools.kraft.version not in (current_kraft_version.stdout | default(''))
-
-        - name: Display KraftKit status
-          debug:
-            msg: "KraftKit is available on the host (installed or up-to-date)."
-          when: kraft_version is defined or kraft_binary.stat.exists
-
-        - name: Check if Capstan is already installed
-          stat:
-            path: /usr/local/bin/capstan
-          register: capstan_binary
-
-        - name: Get current Capstan version (if installed)
-          command: /usr/local/bin/capstan version
-          register: current_capstan_version
-          changed_when: false
-          ignore_errors: true
-          when: capstan_binary.stat.exists
-
-        - name: Download Capstan for OSv builds
-          get_url:
-            url: "https://github.com/cloudius-systems/capstan/releases/download/v{{ build_tools.capstan.version }}/capstan"
-            dest: /usr/local/bin/capstan
-            mode: '0755'
-          when: not capstan_binary.stat.exists or build_tools.capstan.version not in (current_capstan_version.stdout | default(''))
-
-        - name: Verify Capstan installation
-          command: /usr/local/bin/capstan --version
-          register: capstan_version
-          changed_when: false
-          ignore_errors: true
-
-        - name: Display Capstan version
-          debug:
-            msg: "Capstan installed successfully: {{ capstan_version.stdout if capstan_version.rc == 0 else 'Version check not available' }}"
-
-        - name: Setup OSv base image for Capstan
-          block:
-            # /opt/ploy directory already created in comprehensive structure above
-
-            - name: Create capstan repository structure for ploy user
-              file:
-                path: /opt/ploy/.capstan/repository/cloudius/osv/mike
-                state: directory
-                owner: ploy
-                group: ploy
-                mode: '0755'
-              become: true
-
-            - name: Download OSv loader image
-              get_url:
-                url: "https://github.com/cloudius-systems/osv/releases/download/v0.57.0/osv-loader.qemu.x86_64"
-                dest: /tmp/osv-loader.qemu
-                mode: '0644'
-                force: no  # Don't re-download if already exists
-              become: true
-
-            - name: Compress OSv loader image
-              archive:
-                path: /tmp/osv-loader.qemu
-                dest: /opt/ploy/.capstan/repository/cloudius/osv/mike/osv-loader.qemu.gz
-                format: gz
-                remove: true
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              become: true
-
-            - name: Create index.yaml for OSv base image
-              copy:
-                content: |
-                  format_version: "1"
-                  version: "v0.57.0"
-                  created: "2025-08-25T06:00:00Z"
-                  description: "OSv base image for capstan"
-                  platform: "x86_64"
-                dest: /opt/ploy/.capstan/repository/cloudius/osv/index.yaml
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              become: true
-
-        - name: Setup Capstan Java packages
-          block:
-            - name: Create capstan packages directory
-              file:
-                path: /opt/ploy/.capstan/packages
-                state: directory
-                owner: ploy
-                group: ploy
-                mode: '0755'
-              become: true
-
-            - name: Download osv.bootstrap package from GitHub
-              shell: |
-                sudo -u ploy capstan package pull osv.bootstrap
-              ignore_errors: true
-              become: true
-
-            - name: Check if openjdk8-zulu-full package exists
-              stat:
-                path: /opt/ploy/.capstan/packages/openjdk8-zulu-full.mpm
-              register: openjdk8_full_exists
-              become: true
-
-            - name: Download openjdk8-zulu-full package from S3
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.mpm"
-                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-full.mpm
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              when: not openjdk8_full_exists.stat.exists
-              become: true
-
-            - name: Download openjdk8-zulu-full package YAML from S3
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-full.yaml"
-                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-full.yaml
-                owner: ploy
-                group: ploy
-                mode: '0644'
-                force: no  # Don't re-download if already exists
-              become: true
-
-            - name: Check if openjdk8-zulu-compact1 package exists
-              stat:
-                path: /opt/ploy/.capstan/packages/openjdk8-zulu-compact1.mpm
-              register: openjdk8_compact_exists
-              become: true
-
-            - name: Download openjdk8-zulu-compact1 package from S3
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.mpm"
-                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-compact1.mpm
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              when: not openjdk8_compact_exists.stat.exists
-              become: true
-
-            - name: Download openjdk8-zulu-compact1 package YAML from S3
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/packages/openjdk8-zulu-compact1.yaml"
-                dest: /opt/ploy/.capstan/packages/openjdk8-zulu-compact1.yaml
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              become: true
-
-            - name: Ensure mike directory structure exists
-              file:
-                path: /opt/ploy/.capstan/repository/mike/osv-loader
-                state: directory
-                owner: ploy
-                group: ploy
-                mode: '0755'
-              become: true
-
-            - name: Download osv-loader from S3 to mike directory
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/osv-loader.qemu.gz"
-                dest: /opt/ploy/.capstan/repository/mike/osv-loader/osv-loader.qemu.gz
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              become: true
-
-            - name: Download osv-loader index from S3
-              get_url:
-                url: "https://mikelangelo-capstan.s3.amazonaws.com/mike/osv-loader/index.yaml"
-                dest: /opt/ploy/.capstan/repository/mike/osv-loader/index.yaml
-                owner: ploy
-                group: ploy
-                mode: '0644'
-              become: true
 
         - name: Check if Cosign is already installed
           stat:
@@ -961,30 +700,6 @@
                 - wasm-bindgen-cli  # For JavaScript bindings
                 - wasm-pack         # For building Rust WASM packages
 
-        - name: Install Node.js and AssemblyScript
-          block:
-            - name: Install Node.js using NodeSource repository
-              shell: |
-                curl -fsSL https://deb.nodesource.com/setup_{{ nodejs_version }}.x | sudo -E bash -
-                apt-get install -y nodejs
-              args:
-                creates: /usr/bin/node
-
-            - name: Install AssemblyScript globally (latest stable)
-              npm:
-                name: assemblyscript
-                global: true
-                state: latest
-
-            - name: Install additional WASM tools
-              npm:
-                name: "{{ item }}"
-                global: true
-                state: latest
-              loop:
-                - wasm-pack   # For Rust WASM builds
-                - wasmtime    # WASM runtime for testing
-
         - name: Install Emscripten toolchain
           become_user: ploy
           block:
@@ -1040,19 +755,14 @@
         owner: ploy
         group: ploy
 
-    - name: Validate GitHub credentials are available locally
-      fail:
+    - name: Warn if GitHub credentials are not configured (optional)
+      debug:
         msg: |
-          GitHub credentials not set in local environment.
-          Please set the following environment variables before running Ansible:
-          export GITHUB_PLOY_DEV_USERNAME="your-github-username"
-          export GITHUB_PLOY_DEV_PAT="your-github-personal-access-token"
-          
-          Then run the playbook again:
-          cd iac/dev && ansible-playbook site.yml -e target_host=$TARGET_HOST
+          GitHub credentials are not configured; cloning private repositories and recipe sync will be skipped.
+          Set GITHUB_PLOY_DEV_USERNAME / GITHUB_PLOY_DEV_PAT to enable authenticated access.
       when: lookup('env', 'GITHUB_PLOY_DEV_USERNAME') == '' or lookup('env', 'GITHUB_PLOY_DEV_PAT') == ''
 
-    - name: Set GitHub environment variables for ploy user
+    - name: Configure ploy shell environment defaults
       blockinfile:
         path: /home/ploy/.bashrc
         create: true
@@ -1060,10 +770,12 @@
         group: ploy
         mode: '0644'
         block: |
+          {% if lookup('env', 'GITHUB_PLOY_DEV_USERNAME') and lookup('env', 'GITHUB_PLOY_DEV_PAT') %}
           # GitHub environment variables for Ploy development
           export GITHUB_PLOY_DEV_USERNAME="{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
           export GITHUB_PLOY_DEV_PAT="{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
-          
+          {% endif %}
+
           # DNS provider environment variables
           {% if lookup('env', 'CLOUDFLARE_API_TOKEN') %}
           export CLOUDFLARE_API_TOKEN="{{ lookup('env', 'CLOUDFLARE_API_TOKEN') }}"
@@ -1079,7 +791,7 @@
           {% endif %}
           
           # DNS configuration environment variables
-          export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('namecheap') }}"
+          export PLOY_DNS_PROVIDER="{{ lookup('env', 'PLOY_DNS_PROVIDER') | default('coredns') }}"
           
           # Platform domain configuration
           export PLOY_PLATFORM_DOMAIN="{{ ploy.platform_domain }}"
@@ -1144,6 +856,7 @@
         - name: Display Git authentication status
           debug:
             msg: "Git authentication test: {{ 'PASSED' if git_auth_test.rc == 0 else 'FAILED' }}"
+      when: lookup('env', 'GITHUB_PLOY_DEV_USERNAME') != '' and lookup('env', 'GITHUB_PLOY_DEV_PAT') != ''
 
     - name: Clone Ploy repository
       git:
@@ -1152,67 +865,6 @@
         force: true
       become_user: ploy
       become: true
-
-    # Clean up Ollama if it was previously installed
-    - name: Remove Ollama and cleanup models
-      block:
-        - name: Check if Ollama service exists
-          stat:
-            path: /etc/systemd/system/ollama.service
-          register: ollama_service_file
-
-        - name: Stop and disable Ollama service if running
-          systemd:
-            name: ollama
-            state: stopped
-            enabled: false
-          when: ollama_service_file.stat.exists
-          ignore_errors: true
-
-        - name: Remove Ollama binary
-          file:
-            path: /usr/local/bin/ollama
-            state: absent
-          ignore_errors: true
-
-        - name: Remove Ollama models directory for ploy user
-          file:
-            path: /home/ploy/.ollama
-            state: absent
-          ignore_errors: true
-
-        - name: Remove root Ollama models directory
-          file:
-            path: /root/.ollama
-            state: absent
-          ignore_errors: true
-
-        - name: Remove Ollama models directory in /usr/share
-          file:
-            path: /usr/share/ollama
-            state: absent
-          ignore_errors: true
-
-        - name: Remove Ollama systemd service file
-          file:
-            path: /etc/systemd/system/ollama.service
-            state: absent
-          when: ollama_service_file.stat.exists
-
-        - name: Reload systemd daemon after removing Ollama service
-          systemd:
-            daemon_reload: yes
-          when: ollama_service_file.stat.exists
-
-        - name: Display Ollama cleanup status
-          debug:
-            msg: |
-              Ollama cleanup completed:
-              - Service stopped and disabled
-              - Binary removed from /usr/local/bin
-              - Model directories cleaned up
-              - Systemd service file removed
-              System now configured for external LLM APIs via model registry
 
     - name: Create external storage configuration directory
       file:
@@ -1370,6 +1022,7 @@
             src: /tmp/lego.tar.gz
             dest: /usr/local/bin
             remote_src: true
+          when: not lego_binary.stat.exists
 
         - name: Make lego executable
           file:
@@ -1428,50 +1081,6 @@
             state: absent
 
     # Manual certificate env and provisioning steps removed; Traefik handles ACME
-
-    # Platform wildcard certificate health check (after api deployment)
-    - name: Wait for api health endpoint to be available
-      uri:
-        url: "https://api.{{ ploy.platform_domain }}/health"
-        validate_certs: no
-        method: GET
-        status_code: 200
-      environment:
-        PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-      register: health_check
-      retries: 30
-      delay: 5
-      until: health_check.status == 200
-      when: ploy.apps_domain is defined and ploy.apps_domain != ""
-
-    - name: Check platform wildcard certificate health
-      uri:
-        url: "https://api.{{ ploy.platform_domain }}/health/platform-certificates"
-        validate_certs: no
-        method: GET
-        status_code: [200, 503]  # 503 is acceptable during initial provisioning
-      environment:
-        PLOY_PLATFORM_DOMAIN: "dev.ployman.app"
-      register: cert_health_check
-      retries: 60  # More retries for certificate provisioning
-      delay: 15
-      until: cert_health_check.status == 200
-      when: ploy.apps_domain is defined and ploy.apps_domain != ""
-      ignore_errors: true  # Don't fail playbook if certificate provisioning has issues
-
-    - name: Display platform certificate health status
-      debug:
-        msg: |
-          Platform Certificate Health Status: {{ cert_health_check.json.status if cert_health_check.json is defined else 'unavailable' }}
-          Domain: {{ cert_health_check.json.platform_domain if cert_health_check.json is defined and cert_health_check.json.platform_domain is defined else ploy.apps_domain }}
-          Wildcard: {{ cert_health_check.json.wildcard_domain if cert_health_check.json is defined and cert_health_check.json.wildcard_domain is defined else 'not provisioned' }}
-          {% if cert_health_check.json is defined and cert_health_check.json.expires_at is defined %}
-          Expires: {{ cert_health_check.json.expires_at }}
-          Days until expiry: {{ cert_health_check.json.days_until_expiry }}
-          {% endif %}
-      when: 
-        - ploy.apps_domain is defined and ploy.apps_domain != ""
-        - cert_health_check is defined
 
   handlers:
     - name: restart docker

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/iw2rmb/ploy/api/arf"
+	"github.com/iw2rmb/ploy/api/security"
 )
 
 // NVDDatabase implements CVEDatabase using the National Vulnerability Database
@@ -15,7 +15,7 @@ type NVDDatabase struct {
 	apiKey     string
 	baseURL    string
 	httpClient *http.Client
-	cache      map[string]*arf.CVEInfo
+	cache      map[string]*security.CVEInfo
 }
 
 // NewNVDDatabase creates a new NVD database client
@@ -25,7 +25,7 @@ func NewNVDDatabase() *NVDDatabase {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		cache: make(map[string]*arf.CVEInfo),
+		cache: make(map[string]*security.CVEInfo),
 	}
 }
 

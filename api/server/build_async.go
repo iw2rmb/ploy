@@ -72,10 +72,17 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	autogenVal := c.Query("autogen_dockerfile", "")
 	buildOnlyVal := c.Query("build_only", "")
 
+	// Normalize lane metadata (Docker-only)
+	lane = strings.TrimSpace(lane)
+	effectiveLane := "D"
+	if strings.EqualFold(lane, "d") {
+		effectiveLane = "D"
+	}
+
 	// Initial status
 	writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
 	// Persist meta for later log retrieval
-	_ = os.WriteFile(metaPath(id), []byte(fmt.Sprintf(`{"app":"%s","sha":"%s","lane":"%s"}`, app, sha, lane)), 0644)
+	_ = os.WriteFile(metaPath(id), []byte(fmt.Sprintf(`{"app":"%s","sha":"%s","lane":"%s"}`, app, sha, effectiveLane)), 0644)
 
 	// Fire background requester against local fiber listener
 	go func() {
@@ -88,7 +95,7 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 		// Build internal URL (bypass ingress). Preserve relevant flags from original query.
 		q := []string{fmt.Sprintf("sha=%s", sha), "async=false"}
 		if lane != "" {
-			q = append(q, "lane="+lane)
+			q = append(q, "lane="+strings.ToUpper(lane))
 		}
 		if main != "" {
 			q = append(q, "main="+main)
@@ -150,13 +157,16 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 			msg := string(body)
 			// If the response body is not a builder-rich JSON, wrap it with a builder object
 			// Derive builder job name from meta (app/sha/lane)
-			builderJob := deriveBuilderJob(id, buildStatus{}, struct{ App, Sha, Lane string }{App: app, Sha: sha, Lane: lane})
+			builderJob := deriveBuilderJob(id, buildStatus{}, struct{ App, Sha, Lane string }{App: app, Sha: sha, Lane: effectiveLane})
+			if strings.TrimSpace(builderJob) == "" {
+				builderJob = id
+			}
 			if strings.TrimSpace(builderJob) != "" {
 				logsKey := fmt.Sprintf("build-logs/%s.log", builderJob)
 				// Build a public URL based on SeaweedFS env (fallback to default)
 				base := os.Getenv("PLOY_SEAWEEDFS_URL")
 				if strings.TrimSpace(base) == "" {
-					base = "http://seaweedfs-filer.service.consul:8888"
+					base = "http://seaweedfs-filer.storage.ploy.local:8888"
 				}
 				if !strings.HasPrefix(base, "http") {
 					base = "http://" + base

@@ -83,7 +83,7 @@ func (s *KBIntegrationSuite) TestKBLearningIntegration() {
 		Signature: errorSig,
 		Context: &mods.CaseContext{
 			Language:        "java",
-			Lane:            "C",
+			Lane:            "D",
 			RepoURL:         "https://github.com/test/repo.git",
 			CompilerVersion: "javac 11.0.1",
 		},

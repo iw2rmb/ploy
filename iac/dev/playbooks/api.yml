@@ -292,6 +292,7 @@
             owner: ploy
             group: ploy
             mode: '0644'
+          when: ploy.upload_api_binary
 
         - name: Upload API binary to SeaweedFS
           shell: |
@@ -310,7 +311,7 @@
               --max-time 60 \
               --connect-timeout 10 \
               -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" \
-              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api"
+              "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api"
             
             RESULT=$?
             
@@ -321,7 +322,7 @@
             if [ $RESULT -eq 0 ]; then
               echo "Upload successful, verifying accessibility..."
               sleep 1
-              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api")
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/api")
               if [ "$HTTP_CODE" = "200" ]; then
                 echo "✓ Binary is accessible via HTTP"
               else
@@ -334,21 +335,12 @@
             fi
           register: binary_upload
           become_user: ploy
-
-        - name: Check wazero-runner binary exists
-          stat:
-            path: /home/ploy/ploy/bin/wazero-runner
-          register: wazero_runner_stat
-
-        - name: Fail if wazero-runner binary is missing
-          fail:
-            msg: "wazero-runner binary not found. Run playbooks/wasm-runners.yml before deploying the API to refresh the WASM runner."
-          when: not wazero_runner_stat.stat.exists
+          when: ploy.upload_api_binary
 
         - name: Upload wazero-runner to SeaweedFS
           shell: |
             RUNNER_PATH="/home/ploy/ploy/bin/wazero-runner"
-            DEST="http://localhost:{{ seaweedfs.filer_port }}/artifacts/wazero-runner/linux/amd64/wazero-runner"
+            DEST="http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/wazero-runner/linux/amd64/wazero-runner"
             echo "Uploading wazero-runner to SeaweedFS..."
             curl -X POST -F "file=@${RUNNER_PATH}" --max-time 60 --connect-timeout 10 -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" "$DEST"
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$DEST")
@@ -356,6 +348,7 @@
           become_user: ploy
           register: runner_upload
           changed_when: runner_upload.rc == 0
+          when: ploy.upload_api_binary
 
         - name: Upload metadata to SeaweedFS
           shell: |
@@ -369,7 +362,7 @@
               --max-time 30 \
               --connect-timeout 10 \
               -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" \
-              "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/metadata.json"
+              "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/${VERSION}/linux/amd64/metadata.json"
             
             RESULT=$?
             
@@ -381,13 +374,15 @@
             fi
           register: metadata_upload
           become_user: ploy
+          when: ploy.upload_api_binary
 
         - name: Verify upload by listing versions
           uri:
-            url: "http://localhost:{{ seaweedfs.filer_port }}/artifacts/api-binaries/?pretty=y"
+            url: "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/?pretty=y"
             method: GET
             timeout: 10
           register: version_list
+          when: ploy.upload_api_binary
           ignore_errors: true
           retries: 2
           delay: 3

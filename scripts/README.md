@@ -6,34 +6,27 @@ Shell scripts for build automation, deployment, and development utilities.
 
 ```
 scripts/
-├── build/                          # Lane-specific build helpers
-│   ├── common/                     # Shared build utilities
-│   ├── kraft/                      # Unikraft build scripts (Lanes A/B)
-│   ├── osv/                        # OSv build scripts (Lane C)
-│   ├── jail/                       # FreeBSD jail scripts (Lane D)
-│   ├── oci/                        # OCI container scripts (Lane E)
-│   ├── packer/                     # VM build scripts (Lane F)
-│   └── wasm/                       # WebAssembly build scripts (Lane G)
-├── ssl/                            # SSL certificate utilities
-│   └── validate-dns-records.sh     # DNS record validation
-├── build.sh                        # Main build automation
-├── build-openrewrite-container.sh  # OpenRewrite container build
-├── setup-dev-dns.sh                # Development DNS configuration
-├── setup-harbor-rbac.sh             # Harbor registry permissions
-├── setup-vps-transflow-testing.sh  # VPS mods environment setup
-├── validate-phase1-setup.sh        # Phase 1 environment validation
-├── validate-arf-openrewrite-setup.sh # ARF OpenRewrite validation
-├── validate-documentation-vps.sh   # Documentation validation on VPS
+├── build.sh                        # Main API/CLI build automation
+├── build-langgraph-runner.sh       # LangGraph runner image build helper
+├── build-openrewrite-container.sh  # OpenRewrite container build helper
+├── build-openrewrite-jvm.sh        # OpenRewrite JVM runner build helper
+├── dev/                            # Dev environment helpers and tools
+├── diagnose-ssl.sh                 # SSL certificate diagnostics
+├── get-api-url.sh                  # API URL retrieval utility
+├── lanes/                          # Lane metadata and selection tooling (archival; only Lane D active)
+├── registry/                       # Registry helpers (logins, tagging)
+├── run-mvp-acceptance-vps.sh       # MVP acceptance testing on VPS
+├── run-openrewrite-comprehensive-test.sh # Comprehensive OpenRewrite testing
 ├── run-phase1-sequential.sh        # Phase 1 sequential execution
 ├── run-phase2-llm.sh               # Phase 2 LLM integration testing
 ├── run-phase3-parallel.sh          # Phase 3 parallel execution
-├── run-mvp-acceptance-vps.sh       # MVP acceptance testing on VPS
-├── run-openrewrite-comprehensive-test.sh # Comprehensive OpenRewrite testing
-├── diagnose-ssl.sh                 # SSL certificate diagnostics
+├── setup-dev-dns.sh                # Development DNS configuration
+├── ssl/                            # SSL certificate utilities
 ├── test-ssl-certificate.sh         # SSL certificate testing
-├── get-api-url.sh                  # API URL retrieval utility
 ├── update-dev-dns.sh               # DNS record updates
-└── update-test-scripts.sh          # Test script maintenance
+├── update-test-scripts.sh          # Test script maintenance
+├── validate-documentation-vps.sh   # Documentation validation on VPS
+└── validate-phase1-setup.sh        # Phase 1 environment validation
 ```
 
 ## Script Categories
@@ -49,6 +42,4 @@ scripts/
 
 - Make scripts executable: `chmod +x scripts/*.sh`
 - Run from project root: `./scripts/script-name.sh`
-- Lane-specific builds: `scripts/build/*/`
-
 All scripts are designed to be executed from the repository root directory.

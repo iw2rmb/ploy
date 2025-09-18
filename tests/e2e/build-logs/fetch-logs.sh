@@ -20,7 +20,7 @@ curl -sS "${PLOY_CONTROLLER%/}/apps/${APP_NAME}/builds/${BUILD_ID}/logs?lines=${
 # Attempt to resolve logs_url from API response or derive from deployment id
 LOGS_URL=$(jq -r 'try .logs_url // .builder.logs_url // empty' "$OUT_DIR/builder.logs.json" 2>/dev/null || echo "")
 if [[ -z "$LOGS_URL" ]]; then
-  LOGS_URL="http://seaweedfs-filer.service.consul:8888/artifacts/build-logs/${BUILD_ID}.log"
+  LOGS_URL="http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/${BUILD_ID}.log"
 fi
 
 echo "Fetching full builder log via SSH: $LOGS_URL"

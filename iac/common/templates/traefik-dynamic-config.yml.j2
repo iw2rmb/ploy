@@ -1,46 +1,9 @@
-# Dynamic Traefik configuration for Ploy API with wildcard SSL certificates
-# ACME DNS-01 is used via configured resolvers (apps-wildcard, platform-wildcard).
+# Dynamic Traefik configuration for Ploy API. TLS certificates are handled by
+# the default ACME resolver configured on the Traefik entrypoints; this file
+# focuses on shared middlewares and TLS options used by routed services.
 
 http:
-  routers:
-    # Wildcard certificate provisioning routers
-    # These routers ensure wildcard certificates are acquired and available in the certificate store
-    # They use very low priority so Consul Catalog services take precedence, but ensure certs exist
-    
-    # Apps domain wildcard certificate provisioning (*.dev.ployd.app)
-    apps-wildcard-provisioner:
-      rule: 'HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.apps_domain | replace('.', '\.') }}`)'
-      entryPoints:
-        - websecure
-      service: noop-service
-      tls:
-        certResolver: "apps-wildcard"
-        domains:
-          - main: "{{ ploy.apps_domain }}"
-            sans:
-              - "*.{{ ploy.apps_domain }}"
-      priority: -100  # Low priority - Consul Catalog services will override this
-
-    # Platform domain wildcard certificate provisioning (*.dev.ployman.app)
-    platform-wildcard-provisioner:
-      rule: 'HostRegexp(`{subdomain:[a-z0-9-]+}\.{{ ploy.platform_domain | replace('.', '\.') }}`)'
-      entryPoints:
-        - websecure
-      service: noop-service
-      tls:
-        certResolver: "platform-wildcard"
-        domains:
-          - main: "{{ ploy.platform_domain }}"
-            sans:
-              - "*.{{ ploy.platform_domain }}"
-      priority: -100  # Low priority - Consul Catalog services will override this
-
-  services:
-    # Noop service for certificate provisioning only
-    noop-service:
-      loadBalancer:
-        servers:
-          - url: "http://127.0.0.1:65535"
+  routers: {}
 
   middlewares:
     https-redirect:

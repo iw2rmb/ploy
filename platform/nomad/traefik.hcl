@@ -128,27 +128,14 @@ job "traefik-system" {
           "--metrics.prometheus.addEntryPointsLabels=true",
           "--metrics.prometheus.addRoutersLabels=true",
           "--metrics.prometheus.addServicesLabels=true",
-          # Let's Encrypt ACME certificate resolver with Namecheap DNS challenge
-          "--certificatesresolvers.letsencrypt.acme.dnschallenge=true",
-          "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.letsencrypt.acme.email=admin@ployd.app",
-          "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
-          "--certificatesresolvers.letsencrypt.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Platform wildcard certificate resolver for dev.ployman.app (reuse existing storage)
-          "--certificatesresolvers.platform-wildcard.acme.dnschallenge=true",
-          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.platform-wildcard.acme.email=admin@ployman.app",
-          "--certificatesresolvers.platform-wildcard.acme.storage=/data/platform-acme.json",
-          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.platform-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
-          # Apps wildcard certificate resolver for dev.ployd.app (reuse existing storage)
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge=true",
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.provider=namecheap",
-          "--certificatesresolvers.apps-wildcard.acme.email=admin@ployd.app",
-          "--certificatesresolvers.apps-wildcard.acme.storage=/data/apps-acme.json",
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.delayBeforeCheck=30",
-          "--certificatesresolvers.apps-wildcard.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53",
+          # Default ACME resolver uses HTTP-01 (port 80) with TLS-ALPN fallback (port 443)
+          "--entrypoints.websecure.http.tls.certresolver=default-acme",
+          "--certificatesresolvers.default-acme.acme.email=admin@ployman.app",
+          "--certificatesresolvers.default-acme.acme.storage=/data/default-acme.json",
+          "--certificatesresolvers.default-acme.acme.httpchallenge=true",
+          "--certificatesresolvers.default-acme.acme.httpchallenge.entrypoint=web",
+          "--certificatesresolvers.default-acme.acme.tlschallenge=true",
+          "--certificatesresolvers.default-acme.acme.caserver=https://acme-v02.api.letsencrypt.org/directory",
           # HTTP to HTTPS redirect
           "--entrypoints.web.http.redirections.entrypoint.to=websecure",
           "--entrypoints.web.http.redirections.entrypoint.scheme=https"
@@ -177,15 +164,6 @@ job "traefik-system" {
         # Consul configuration
         CONSUL_HTTP_ADDR = "127.0.0.1:8500"
         
-        # Namecheap DNS provider for Let's Encrypt ACME challenges
-        NAMECHEAP_API_USER = "{{ lookup('env', 'NAMECHEAP_API_USER') | default('') }}"
-        NAMECHEAP_API_KEY = "{{ lookup('env', 'NAMECHEAP_API_KEY') | default('') }}"
-        NAMECHEAP_SANDBOX = "{{ lookup('env', 'NAMECHEAP_SANDBOX') | default('false') }}"
-        
-        # DNS challenge configuration
-        ACME_DNS_API_BASE = "https://api.namecheap.com/xml.response"
-        NAMECHEAP_CLIENT_IP = "{{ lookup('env', 'NAMECHEAP_CLIENT_IP') | default(hostvars[groups['all'][0]]['ansible_default_ipv4']['address']) }}"
-        NAMECHEAP_USERNAME = "{{ lookup('env', 'NAMECHEAP_USERNAME') | default('') }}"
       }
       
       resources {

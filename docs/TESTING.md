@@ -232,9 +232,7 @@ Key environment variables for testing:
 # Ensure SEAWEEDFS_FILER=http://localhost:8888
 
 
-# Testing flags
-# Ensure PLOY_TEST_MODE=true
-# Ensure PLOY_TEST_TIMEOUT=30s
+# Testing flags are provided via standard Go test arguments; dedicated PLOY_TEST_* env toggles were removed.
 ```
 
 ## Writing Tests
@@ -435,18 +433,17 @@ go test -bench=. ./...
 
 ### Test Configuration
 
-Set environment variables for test behavior:
+Use Go's native flags to tweak behaviour instead of historical `PLOY_TEST_*` variables:
 
 ```bash
-# Skip integration tests if services unavailable
-# Ensure PLOY_SKIP_INTEGRATION=true
+# Skip slow integration tests when backing services are down
+go test -short ./...
 
-# Increase test timeout for slow tests
-# Ensure PLOY_TEST_TIMEOUT=60s
+# Increase timeout for particularly heavy packages
+go test -v -timeout 2m ./internal/mods/...
 
-# Enable debug logging in tests
-# Ensure PLOY_TEST_DEBUG=true
-
+# Enable verbose logging during test runs
+go test -v ./tests/e2e -run TestDeploy
 ```
 
 ### Parallel Testing

@@ -42,7 +42,7 @@ type AnalysisDispatcher struct {
 // NewAnalysisDispatcher creates a new dispatcher
 func NewAnalysisDispatcherOrchestration(storage istorage.Storage) (*AnalysisDispatcher, error) {
 	// Get storage base URL from environment
-	storageBaseURL := "http://seaweedfs-filer.service.consul:8888"
+	storageBaseURL := "http://seaweedfs-filer.storage.ploy.local:8888"
 	if url := os.Getenv("SEAWEEDFS_URL"); url != "" {
 		storageBaseURL = url
 	}

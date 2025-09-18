@@ -59,7 +59,7 @@ register_recipe_metadata() {
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOJSON
-        curl -sS -X POST "${PLOY_API_URL}/v1/arf/recipes/register" \
+        curl -sS -X POST "${PLOY_API_URL}/v1/recipes/register" \
              -H "Content-Type: application/json" \
              -d @/tmp/recipe-registration.json \
              -o /dev/null || true
@@ -71,9 +71,9 @@ INPUT_TAR="${1:-/workspace/input.tar}"
 RECIPE_CLASS="${2:-${RECIPE}}"
 
 # Environment variables (set by Nomad job)
-SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs-filer.service.consul:8888}"
+SEAWEEDFS_URL="${SEAWEEDFS_URL:-http://seaweedfs-filer.storage.ploy.local:8888}"
 MAVEN_CACHE_PATH="${MAVEN_CACHE_PATH:-maven-repository}"
-PLOY_API_URL="${PLOY_API_URL:-http://api.service.consul:8081}"
+PLOY_API_URL="${PLOY_API_URL:-http://api.control.ploy.local:8081}"
 
 echo "[OpenRewrite] Starting transformation"
 echo "[OpenRewrite] Environment variables:"
@@ -437,7 +437,7 @@ register_recipe_metadata() {
 EOJSON
         
         # Register with Ploy API
-        curl -X POST "${PLOY_API_URL}/v1/arf/recipes/register" \
+        curl -X POST "${PLOY_API_URL}/v1/recipes/register" \
              -H "Content-Type: application/json" \
              -d @/tmp/recipe-registration.json \
              -s -o /dev/null 2>/dev/null && \

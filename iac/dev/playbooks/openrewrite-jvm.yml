@@ -112,6 +112,7 @@
               Build completed:
               - Image: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
               - Build status: {{ 'SUCCESS' if build_result.changed else 'ALREADY EXISTS' }}
+      when: build_openrewrite_image
 
     - name: Test the built image locally
       block:
@@ -151,6 +152,7 @@
           fail:
             msg: "OpenRewrite native image test failed. Please check the build."
           when: test_result.rc != 0
+      when: build_openrewrite_image
 
     - name: Push image to Docker Registry
       block:
@@ -184,6 +186,7 @@
               - Registry: {{ registry_endpoint }}
               - Image: {{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
               - Status: {{ 'PUSHED' if push_result.changed else 'ALREADY UP TO DATE' }}
+      when: build_openrewrite_image
 
     - name: Verify image in registry
       block:
@@ -204,6 +207,7 @@
               - Image: {{ registry_endpoint }}/{{ openrewrite_image_name }}:{{ openrewrite_image_tag }}
               - Manifest: Available in registry
               - Ready for use by ARF transformations
+      when: build_openrewrite_image
 
     - name: Prune old image tags in registry (keep latest + 2 previous)
       block:
@@ -285,12 +289,3 @@
           - Maven 3.9+ and Gradle 8.5
           - OpenRewrite runner script with SeaweedFS caching
           - Dynamic recipe loading from Maven Central
-          
-          Usage:
-          The image will be automatically used by Ploy ARF when running
-          OpenRewrite transformations through Nomad batch jobs.
-          
-          Next Steps:
-          1. The image is now available for ARF transformations
-          2. Run: ploy arf transform --recipe org.openrewrite.java.migrate.Java8toJava17
-          3. Monitor jobs: nomad job status -namespace=default
