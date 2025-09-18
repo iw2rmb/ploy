@@ -159,6 +159,10 @@ if [[ -n "$BUILDER_LOG_KEY" && -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
     echo "warning: failed to download builder logs from $BUILDER_URL_FULL" >&2
     rm -f "$BUILDER_DEST" || true
   fi
+else
+  if [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+    log "PLOY_SEAWEEDFS_URL not set in current shell; relying on SSH fallback if TARGET_HOST is provided"
+  fi
 fi
 
 BUILDER_API_DEST=""
