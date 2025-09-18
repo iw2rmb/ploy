@@ -30,9 +30,9 @@
 - Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.
 - API Deploys: Ansible now always uploads the freshly built API binary and metadata to SeaweedFS (the optional `PLOY_UPLOAD_API_BINARY` knob was removed) so Nomad jobs never refer to missing artifacts.
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.
-- Infra: Split WASM runner image build/push into `iac/dev/playbooks/wasm-runners.yml` so API deploys reuse the existing artifacts and only verify presence before uploading to SeaweedFS.
 - CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
 - CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
+- CLI/API: Lane overrides from `ploy push` and `/v1/apps/:app/builds` are now ignored with a log notice; all deployments normalise to Docker lane D to match the single-lane architecture.
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - Docs: Updated `internal/README.md` to reflect current internal package structure.
@@ -41,6 +41,7 @@
  - LLM/Recipes models migration: moved LLM models to `internal/llms/models` and CLI recipes to use `api/recipes/models`; removed legacy `internal/arf/models` package.
 - API: Fixed SeaweedFS health readiness regression by creating storage clients from the centralized config service without requiring a metrics shim, preventing Nomad canaries from failing `/v1/health` with nil-pointer panics.
 - API Recipes: Registry storage adapter now semver-sorts recipe versions so latest-version lookups favor the highest semantic release.
+- Tests: Updated `tests/e2e/mods/orw-apply-llm-plan-seq` to target Lane D (Docker), document streaming Mods log capture, and fail fast when status polling returns repeated `not_found` responses.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
 - internal/mods: Extracted DI/accessors and tiny helpers from `runner.go` into `runner_di.go` and `runner_helpers.go` to reduce LOC and improve maintainability. No behavior changes.
  - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.

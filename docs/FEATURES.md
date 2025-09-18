@@ -11,19 +11,19 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **TDD Phase 1 Complete**: Full testing foundation with 70%/20%/10% pyramid (Unit/Integration/E2E)
 - **Custom Assertions**: 20+ specialized assertions for JSON, async operations, file validation, error handling
 - **Mock Infrastructure**: Complete mock implementations for Nomad, Consul, Storage with realistic behavior
-- **Test Utilities**: Builder patterns, fixtures for Go/Node.js/Java/WASM apps, database testing framework
+- **Test Utilities**: Builder patterns, fixtures for Go/Node.js/Java apps, database testing framework
 - **CI/CD Pipeline**: GitHub Actions for testing; deployment via `ployman api deploy` with local Ansible execution
   - Improved reliability (Sep 2025): `ployman api deploy` ensures the VPS repo is up to date by cloning if missing (`/home/ploy/ploy`), enforcing the canonical `origin` remote, and using `git fetch --all --prune` before a hard reset to the target branch. Prevents stale code deployments due to missing clones, misconfigured remotes, or non-pruned refs.
 - **Local Development**: Docker Compose test environment with automated service orchestration
 - **Coverage Tracking**: 60% minimum threshold with unified reporting across test suites
-- **Build Module Coverage**: New unit tests exercise `internal/build` (error formatting/parsing, logs endpoint, request body ingestion, storage uploads, WASM artifact discovery, lane helpers) so the package is included and measured in local coverage runs.
+- **Build Module Coverage**: New unit tests exercise `internal/build` (error formatting/parsing, logs endpoint, request body ingestion, storage uploads, lane helpers) so the package is included and measured in local coverage runs.
 - **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
 - **Recipe Catalog Coverage** (Sep 2025): REST handlers assert invalid payload, storage failure, and missing registry behaviors; registry adapter tests verify semantic version ordering for latest lookups.
 - **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply), MCP budget parsing, and LLM diff-fetch resilience to improve lane readiness.
 - **CoreDNS Validation**: New integration tests cover CoreDNS A/SRV resolution, retry semantics, and a shell-based DNS health probe to replace Consul DNS checks.
-- **Lane D Enforcement**: Integration coverage ensures `/v1/apps/:app/builds` always reports lane D and rejects non-D overrides, aligning tests with the Docker-only pipeline.
+- **Lane D Enforcement**: Integration coverage ensures `/v1/apps/:app/builds` always reports lane D and ignores any non-D overrides, aligning tests with the Docker-only pipeline.
 - **Mods API Handler Coverage** (Sep 2025): Status, cancel, events, artifacts, log streaming, and debug endpoints now have in-memory KV/storage-backed tests, raising `api/mods` unit coverage to ~61%.
-- **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides, lane G distroless runner selection, and Nomad monitor timeout behaviour.
+- **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides and Nomad monitor timeout behaviour.
 - **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.
 - **TDD Workflow**: Watch mode, test generation, Red-Green-Refactor automation support
  - **Codebase Maintainability**: Ongoing large-file decomposition in `internal/mods` (e.g., runner split into DI/helpers/workflow files) to keep modules cohesive without behavior changes.
@@ -41,9 +41,9 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 
 ⸻
 
-## 🛠 Build Lanes (A–G)
+## 🛠 Build Lanes (A–F)
 
-For complete lane descriptions, detection rules, build flows, and best practices, see docs/LANES.md. This document is the single source of truth for lane-specific capabilities and limitations.
+For complete lane descriptions, detection rules, build flows, and best practices, see docs/LANES.md. Lane G (WASM) has been retired; Docker lane D now handles workloads that previously required specialized WASM handling.
 
 ⸻
 
@@ -51,7 +51,6 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ Per-lane scripts in `build/` directory
 - ✅ Auto SBOM (Syft) + signatures (Cosign)
 - ✅ Deterministic `<app>-<sha>` naming
-- ✅ WASM runner artifacts are published alongside the controller build; the legacy `wasm-runners` Ansible playbook has been retired.
 - ✅ Standalone or api invocation
 - ✅ Sandbox Build Service: Unified `internal/build` sandbox runner powers Mods build gate without deployment side effects.
 - ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
@@ -182,13 +181,6 @@ For complete lane descriptions, detection rules, build flows, and best practices
     - Library dependencies: numpy, scipy, pandas, psycopg2, lxml, pillow, cryptography
     - Build configuration: `ext_modules`, `Extension()`, `build_ext`, CMake integration
     - Cython support: Import detection and `.pyx` file analysis
-  - ✅ **WASM Target Detection** (Aug 2025): Comprehensive automatic detection for WASM compilation targets
-    - **Build Configuration**: `wasm32-wasi` target in Cargo.toml, `--target wasm32-wasi` flags, Go build constraints
-    - **Direct WASM Files**: `.wasm` and `.wat` file detection with magic byte validation
-    - **Language-Specific Dependencies**: wasm-bindgen, js-sys, web-sys, wasi crates for Rust; js/wasm build tags for Go
-    - **AssemblyScript Projects**: `.asc` files, AssemblyScript compiler configuration, and package.json scripts
-    - **Emscripten Detection**: CMakeLists.txt with Emscripten toolchain and C/C++ WASM compilation flags
-    - **Priority Detection**: WASM detection takes priority over standard language detection for Lane G assignment
 
 ⸻
 
@@ -710,6 +702,7 @@ Security Engine represents Ploy's enterprise-grade automated code transformation
 - ✅ **Error Classification**: Automatic categorization (recipe_mismatch, compilation_failure, semantic_change, incomplete_transformation)
 - ✅ **Error-Driven Recipe Evolution**: Automatic recipe modification based on failure analysis with confidence scoring
 - ✅ **Parallel Solution Testing**: Fork-join framework for concurrent error modification attempts with confidence scoring
+- ✅ **Docker Lane Self-Healing E2E**: `tests/e2e/mods/orw-apply-llm-plan-seq` runs on Lane D with streaming Mods event capture for full healing traces
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination across multiple repositories
 
 ### ✅ **Implemented Deployment Integration & Application Testing**
