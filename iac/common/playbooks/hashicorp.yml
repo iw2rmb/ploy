@@ -302,14 +302,6 @@
           export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience"
 
-    - name: Set PLOY_TEMPLATE_DIR for ploy user
-      lineinfile:
-        path: /home/ploy/.bashrc
-        line: "export PLOY_TEMPLATE_DIR=/home/ploy/ploy"
-        create: true
-        owner: ploy
-        group: ploy
-
     - name: Deploy Traefik system job to Nomad
       block:
         - name: Check if Traefik is already installed
