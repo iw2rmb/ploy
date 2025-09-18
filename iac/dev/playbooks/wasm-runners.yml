@@ -1,0 +1,69 @@
+---
+# WASM Runner Image Build and Distribution
+#
+# Builds the wazero runner binary and produces distroless runner images
+# for each supported engine variant. These images are pushed to the
+# platform registry and optionally warmed on the Nomad nodes.
+#
+- name: Build and Distribute WASM runner images
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+  vars:
+    wasm_registry: "registry.{{ ploy.platform_domain }}"
+    wasm_runner_binary: "/home/ploy/ploy/bin/wazero-runner"
+    wasm_build_context: "/home/ploy/ploy/build/wasm-runner"
+
+  tasks:
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Build wazero-runner binary
+      shell: |
+        cd /home/ploy/ploy
+        /usr/local/go/bin/go build -o bin/wazero-runner ./cmd/wazero-runner
+      become_user: ploy
+      register: wazero_runner_build
+      changed_when: wazero_runner_build.rc == 0
+
+    - name: Prepare distroless WASM runner build context
+      shell: |
+        set -e
+        mkdir -p {{ wasm_build_context }}
+        DOCKERFILE={{ wasm_build_context }}/Dockerfile.wazero
+        echo 'FROM gcr.io/distroless/base:nonroot' > "$DOCKERFILE"
+        echo 'COPY runner /runner' >> "$DOCKERFILE"
+        echo 'USER nonroot' >> "$DOCKERFILE"
+        echo 'ENTRYPOINT ["/runner"]' >> "$DOCKERFILE"
+        cp {{ wasm_runner_binary }} {{ wasm_build_context }}/runner
+      become_user: ploy
+
+    - name: Build and push distroless runner images (wazero/wasmtime/wasmedge)
+      shell: |
+        set -e
+        cd {{ wasm_build_context }}
+        docker build -f Dockerfile.wazero -t {{ wasm_registry }}/wasm/runner:wazero-distroless .
+        docker push {{ wasm_registry }}/wasm/runner:wazero-distroless
+        docker tag {{ wasm_registry }}/wasm/runner:wazero-distroless {{ wasm_registry }}/wasm/runner:wasmtime-distroless || true
+        docker tag {{ wasm_registry }}/wasm/runner:wazero-distroless {{ wasm_registry }}/wasm/runner:wasmedge-distroless || true
+        docker push {{ wasm_registry }}/wasm/runner:wasmtime-distroless || true
+        docker push {{ wasm_registry }}/wasm/runner:wasmedge-distroless || true
+      become: yes
+
+    - name: Pre-pull distroless runner images on node (warm cache)
+      shell: |
+        set -e
+        for tag in wazero-distroless wasmtime-distroless wasmedge-distroless; do
+          docker pull {{ wasm_registry }}/wasm/runner:$tag || true
+        done
+      become: yes
+
+    - name: Display WASM runner build status
+      debug:
+        msg: |
+          wazero runner binary rebuilt: {{ wazero_runner_build.rc == 0 }}
+          images published to {{ wasm_registry }}/wasm/runner

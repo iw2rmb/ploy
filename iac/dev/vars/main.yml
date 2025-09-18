@@ -88,6 +88,9 @@ ploy:
   # API accessible at api.{platform_domain}
   api_subdomain: "api"
 
+  # Lane E (Kaniko) — small delay before executor to help controller log attach in dev
+  kaniko_attach_delay: "0.3"
+
 # Nomad api deployment configuration
 nomad_api:
   replicas: 2

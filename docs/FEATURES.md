@@ -49,6 +49,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ Per-lane scripts in `build/` directory
 - ✅ Auto SBOM (Syft) + signatures (Cosign)
 - ✅ Deterministic `<app>-<sha>` naming
+- ✅ WASM runner images rebuilt with dedicated Ansible playbook (`iac/dev/playbooks/wasm-runners.yml`) so API deploys don't trigger unnecessary image builds
 - ✅ Standalone or api invocation
 - ✅ Sandbox Build Service: Unified `internal/build` sandbox runner powers Mods build gate without deployment side effects.
 - ✅ **Advanced Node.js Build Pipeline** (Aug 2025):
