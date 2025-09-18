@@ -189,7 +189,7 @@ func extractLastUUID(s string) string {
 
 // candidateTasks provides a small list to try when a task flag is required.
 func candidateTasks() []string {
-	return []string{"kaniko", "compile", "builder", "osv-jvm", "build-wasm"}
+	return []string{"kaniko", "compile", "builder", "osv-jvm"}
 }
 
 // Run starts streaming until ctx is canceled. Safe to call once.

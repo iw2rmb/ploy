@@ -41,6 +41,14 @@ func TestDetectAlwaysLaneD(t *testing.T) {
 			wantLanguage: "unknown",
 			wantReason:   "Lane D (Docker) selected: other lanes are disabled",
 		},
+		{
+			name: "wasm binary",
+			files: map[string]string{
+				"module.wasm": "",
+			},
+			wantLanguage: "unknown",
+			wantReason:   "",
+		},
 	}
 
 	for _, tc := range cases {

@@ -84,10 +84,6 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool, controllerO
 		url += "&main=" + utils.URLQueryEsc(mainClass)
 	}
 
-	if lane != "" {
-		url += "&lane=" + lane
-	}
-
 	if blueGreen {
 		url += "&blue_green=true"
 	}
@@ -166,8 +162,7 @@ func DeployApp(appName, lane, mainClass, sha string, blueGreen bool, controllerO
 		Message:      string(body),
 	}
 
-	// Output response body to console and clean up temp
-	_, _ = os.Stdout.Write(body)
+	// Clean up temp files after reading response body
 	_ = rf.Close()
 	_ = os.Remove(tmpPath)
 

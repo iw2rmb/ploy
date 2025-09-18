@@ -62,7 +62,7 @@ func runJobMgrLogs(alloc string, lines int, both bool) string {
 }
 
 func candidateLogTasks() []string {
-	return []string{"kaniko", "build-wasm", "osv-pack", "osv-jvm", "compile", "builder"}
+	return []string{"kaniko", "osv-pack", "osv-jvm", "compile", "builder"}
 }
 
 func getAllocIDs(job string) []string {

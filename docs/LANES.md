@@ -4,8 +4,9 @@ The build system now runs exclusively on **Lane D (Docker)**. Legacy lanes (A, B
 
 ## Detection & Selection
 - The lane picker preserves the multi-lane framework but now always resolves to `D`.
-- Explicit overrides (`?lane=D` or `LANE_OVERRIDE=D`) are honoured for forward compatibility; other values yield clear "lane disabled" errors.
+- Explicit overrides are ignored to prevent configuration drift—the controller always normalises to lane `D` while logging that the hint was dropped.
 - Tooling such as `tools/lane-pick` and build APIs surface the same Docker defaults to avoid diverging behaviour across clients.
+- Lane overrides from the CLI or API are ignored; every deployment uses Docker lane `D` regardless of hints to keep the system consistent.
 
 ## Build & Push Flow
 - Source archives are unpacked on the controller host.

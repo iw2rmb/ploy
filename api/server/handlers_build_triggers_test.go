@@ -49,7 +49,7 @@ func TestHandleTriggerAppBuild_AsyncAccepted(t *testing.T) {
 	}
 }
 
-func TestHandleTriggerAppBuild_NonDockerLaneRejected(t *testing.T) {
+func TestHandleTriggerAppBuild_IgnoresLaneOverride(t *testing.T) {
 	// In-memory storage
 	orig := resolveStorageFromConfigService
 	resolveStorageFromConfigService = func(_ *cfgsvc.Service) (istorage.Storage, error) { return memory.NewMemoryStorage(0), nil }
@@ -90,14 +90,11 @@ func TestHandleTriggerAppBuild_NonDockerLaneRejected(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing error object: %#v", body)
 	}
-	if code := errObj["code"]; code != "lane_disabled" {
+	if code := errObj["code"]; code != "missing_dockerfile" {
 		t.Fatalf("unexpected error code %#v", errObj)
 	}
-	if supported := body["supported_lane"]; supported != "D" {
-		t.Fatalf("expected supported_lane D, got %#v", supported)
-	}
-	if _, ok := body["builder"]; ok {
-		t.Fatalf("builder object should not be present: %#v", body)
+	if _, ok := body["builder"].(map[string]any); !ok {
+		t.Fatalf("expected builder object for missing Dockerfile: %#v", body)
 	}
 }
 

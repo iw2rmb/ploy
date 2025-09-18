@@ -67,9 +67,6 @@ func detectLanguage(root string) (string, []string) {
 	if exists(filepath.Join(root, "pom.xml")) || hasAny(root, "build.gradle") || hasAny(root, "build.gradle.kts") {
 		return "java", append(reasons, "Java build tool detected")
 	}
-	if hasAny(root, ".wasm") {
-		return "wasm", append(reasons, "WASM module detected")
-	}
 	return "unknown", reasons
 }
 

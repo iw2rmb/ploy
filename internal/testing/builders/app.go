@@ -72,7 +72,7 @@ func (b *AppBuilder) WithLanguage(language string) *AppBuilder {
 	return b
 }
 
-// InLane sets the deployment lane (A-G)
+// InLane sets the deployment lane (A-F)
 func (b *AppBuilder) InLane(lane string) *AppBuilder {
 	b.app.Lane = lane
 	return b
@@ -235,13 +235,4 @@ func DockerApp(name string) *AppBuilder {
 		WithLanguage("docker").
 		InLane("F").
 		WithBuildCommand(fmt.Sprintf("docker build -t %s .", name))
-}
-
-// WasmApp creates a typical WebAssembly application
-func WasmApp(name string) *AppBuilder {
-	return NewApp().
-		WithName(name).
-		WithLanguage("wasm").
-		InLane("G").
-		WithBuildCommand("cargo build --target wasm32-wasi")
 }

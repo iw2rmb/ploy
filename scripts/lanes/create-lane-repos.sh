@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create GitHub repos for lanes A–G using dev PAT/username.
+# Create GitHub repos for lanes A–F using dev PAT/username.
 # Repos are named ploy-lane-<lane-letter>-<language>.
 
 set -euo pipefail
@@ -12,7 +12,7 @@ if [[ -z "$USERNAME" || -z "$TOKEN" ]]; then
   exit 1
 fi
 
-LANES=(A B C D E F G)
+LANES=(A B C D E F)
 NAMES=(
   ploy-lane-a-go
   ploy-lane-b-node
@@ -20,7 +20,6 @@ NAMES=(
   ploy-lane-d-python
   ploy-lane-e-go
   ploy-lane-f-dotnet
-  ploy-lane-g-rust
 )
 DESCS=(
   'Lane A (Unikraft Minimal) hello app in Go'
@@ -29,7 +28,6 @@ DESCS=(
   'Lane D (FreeBSD Jails) hello app in Python'
   'Lane E (OCI+Kontain) hello app in Go'
   'Lane F (Full VM) hello app in .NET'
-  'Lane G (WASM Runtime) hello app in Rust (wasm32-wasi)'
 )
 
 api() {

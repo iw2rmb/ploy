@@ -292,7 +292,6 @@
             owner: ploy
             group: ploy
             mode: '0644'
-          when: ploy.upload_api_binary
 
         - name: Upload API binary to SeaweedFS
           shell: |
@@ -334,21 +333,6 @@
               exit $RESULT
             fi
           register: binary_upload
-          become_user: ploy
-          when: ploy.upload_api_binary
-
-        - name: Upload wazero-runner to SeaweedFS
-          shell: |
-            RUNNER_PATH="/home/ploy/ploy/bin/wazero-runner"
-            DEST="http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/wazero-runner/linux/amd64/wazero-runner"
-            echo "Uploading wazero-runner to SeaweedFS..."
-            curl -X POST -F "file=@${RUNNER_PATH}" --max-time 60 --connect-timeout 10 -w "\nHTTP Status: %{http_code}, Time: %{time_total}s\n" "$DEST"
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$DEST")
-            if [ "$HTTP_CODE" != "200" ]; then echo "runner not accessible (HTTP $HTTP_CODE)"; exit 1; fi
-          become_user: ploy
-          register: runner_upload
-          changed_when: runner_upload.rc == 0
-          when: ploy.upload_api_binary
 
         - name: Upload metadata to SeaweedFS
           shell: |
@@ -374,7 +358,6 @@
             fi
           register: metadata_upload
           become_user: ploy
-          when: ploy.upload_api_binary
 
         - name: Verify upload by listing versions
           uri:
@@ -382,7 +365,6 @@
             method: GET
             timeout: 10
           register: version_list
-          when: ploy.upload_api_binary
           ignore_errors: true
           retries: 2
           delay: 3

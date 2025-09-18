@@ -56,7 +56,7 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 		c.Method(), c.OriginalURL(), c.Params("app"), c.Query("sha"), c.Query("lane"), c.Query("env"), len(c.Body()))
 	lane := c.Query("lane", "")
 	if lane != "" && !strings.EqualFold(lane, "d") {
-		return build.RejectUnsupportedLane(c, lane)
+		log.Printf("[Handler] triggerAppBuild ignoring lane override %q; forcing Docker lane D", lane)
 	}
 	// Async mode: accept upload and run build in background via local loopback call
 	// Do this before resolving storage so acceptance does not depend on storage availability.

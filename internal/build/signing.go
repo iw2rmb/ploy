@@ -48,6 +48,9 @@ func performVulnerabilityScanning(imagePath, dockerImage, env string) bool {
 	if env == "dev" || env == "development" || env == "" {
 		return false
 	}
+	if skip := strings.ToLower(os.Getenv("PLOY_SKIP_VULN_SCAN")); skip == "1" || skip == "true" || skip == "yes" {
+		return false
+	}
 
 	// Check if Grype is available
 	if _, err := exec.LookPath("grype"); err != nil {

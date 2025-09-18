@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/iw2rmb/ploy/internal/detect/project"
+	lanedetect "github.com/iw2rmb/ploy/internal/lane"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -79,30 +80,31 @@ func untarToDir(tarPath, dstDir string) error {
 
 // detectBuildContext determines lane, language, main class and facts
 func detectBuildContext(srcDir, laneQuery, mainQuery string) (lane, detectedLanguage, detectedJavaVersion, mainClass string, facts project.BuildFacts) {
-	lane = laneQuery
+	_ = laneQuery // ignored but kept for signature stability
 	mainClass = mainQuery
-	if lane == "" {
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			lane = res.Lane
-			detectedLanguage = res.Language
-		} else {
-			lane = "E"
-		}
-	} else {
-		if res, err := utils.RunLanePick(srcDir); err == nil {
-			detectedLanguage = res.Language
-		}
+
+	// Lightweight detector avoids spawning external binaries while still surfacing language hints.
+	res := lanedetect.Detect(srcDir)
+	detectedLanguage = strings.ToLower(strings.TrimSpace(res.Language))
+	if detectedLanguage == "unknown" {
+		detectedLanguage = ""
 	}
-	facts = project.ComputeFacts(srcDir, strings.ToLower(detectedLanguage))
+
+	facts = project.ComputeFacts(srcDir, detectedLanguage)
+	if detectedLanguage == "" && facts.Language != "" {
+		detectedLanguage = facts.Language
+	}
 	if facts.Versions.Java != "" {
 		detectedJavaVersion = facts.Versions.Java
 	}
-	if facts.MainClass != "" && mainClass == "" {
-		mainClass = facts.MainClass
-	}
 	if mainClass == "" {
-		mainClass = "com.ploy.ordersvc.Main"
+		if facts.MainClass != "" {
+			mainClass = facts.MainClass
+		} else {
+			mainClass = "com.ploy.ordersvc.Main"
+		}
 	}
+
 	lane = "D"
 	return
 }

@@ -3,7 +3,9 @@ package server
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -14,8 +16,11 @@ import (
 // Optional query param: lane=A..G (defaults to E first).
 func (s *Server) handleAppProbe(c *fiber.Ctx) error {
 	app := c.Params("app")
-	lane := c.Query("lane", "E")
-	lanes := []string{lane, "E", "C", "D", "B", "A", "F", "G"}
+	lane := strings.TrimSpace(c.Query("lane", ""))
+	if lane != "" && !strings.EqualFold(lane, "d") {
+		log.Printf("[AppProbe] Ignoring lane override %q; probing Docker lane D", lane)
+	}
+	lanes := []string{"d"}
 	hm := orchestration.NewHealthMonitor()
 	var endpoint string
 	for _, l := range lanes {

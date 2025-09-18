@@ -47,7 +47,6 @@ Command-line interfaces for different aspects of Ploy management.
 cmd/
 ├── ploy/                     # Application-focused CLI (see cmd/ploy/README.md)
 ├── ployman/                  # Infrastructure management CLI (see cmd/ployman/README.md)
-├── ploy-wasm-runner/         # WebAssembly runtime HTTP server (see cmd/ploy-wasm-runner/README.md)
 ├── arf-benchmark/            # ARF benchmarking tool
 └── resource-monitor/         # System resource monitoring daemon
 ```
@@ -195,7 +194,6 @@ Open Policy Agent security policies.
 
 ```
 policies/
-└── wasm.rego                   # WebAssembly security policy
 ```
 
 ## Research and Extensions
@@ -236,7 +234,6 @@ docs/
 ├── STACK.md                    # Technology stack and dependencies
 ├── STORAGE.md                  # Storage abstraction and configuration
 ├── FEATURES.md                 # Feature list and capabilities
-├── WASM.md                     # WebAssembly compilation and Lane G
 ├── CERTIFICATES.md             # Certificate management documentation
 └── TESTING.md                  # Testing framework and best practices
 ```
@@ -261,7 +258,6 @@ Files that influence automatic lane selection:
 - **Lane D (FreeBSD Jail)**: `jail.conf`, `.freebsd/`, native binaries
 - **Lane E (OCI Container)**: `Dockerfile`, `container.yaml`
 - **Lane F (VM)**: `Vagrantfile`, `vm.yaml`, `packer.json`
-- **Lane G (WASM)**: `*.wasm`, `*.wat`, `Cargo.toml` (wasm32-wasi), `package.json` (AssemblyScript), `CMakeLists.txt` (Emscripten)
 
 ## Key File Locations Quick Reference
 

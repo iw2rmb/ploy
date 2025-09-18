@@ -4,7 +4,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/open-policy-agent/opa/ast" //nolint:staticcheck // using v0.x ast in tests for syntax checks
@@ -51,26 +50,5 @@ func TestRegoPolicies_SyntaxValid(t *testing.T) {
 	}
 	if filesChecked == 0 {
 		t.Skip("no rego files found under policies/")
-	}
-}
-
-// TestWasmPolicy_HasKeyRules checks presence of key rules for WASM policy if the file exists.
-func TestWasmPolicy_HasKeyRules(t *testing.T) {
-	path := filepath.Join("policies", "wasm.rego")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			t.Skip("policies/wasm.rego not present")
-			return
-		}
-		t.Fatalf("read wasm.rego: %v", err)
-	}
-	src := string(data)
-	// Minimal presence checks mirroring shell script expectations
-	if !strings.Contains(src, "allow_wasm_deployment") {
-		t.Errorf("expected rule 'allow_wasm_deployment' in %s", path)
-	}
-	if !strings.Contains(src, "max_wasm_size_mb") {
-		t.Errorf("expected variable or rule 'max_wasm_size_mb' in %s", path)
 	}
 }
