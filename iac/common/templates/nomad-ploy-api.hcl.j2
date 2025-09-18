@@ -56,7 +56,7 @@ job "ploy-api" {
 
       # Binary distribution via artifact download from SeaweedFS
       artifact {
-        source = "http://localhost:8888/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
+        source = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}/artifacts/api-binaries/{{ api_version }}/linux/amd64/api"
         destination = "local/api"
         mode = "file"
       }
@@ -96,7 +96,7 @@ job "ploy-api" {
         USE_NOMAD_JOB_MANAGER = 0
 
         # SeaweedFS configuration. Use external DNS name so job containers resolve consistently.
-        SEAWEEDFS_MASTER = "http://localhost:9333"
+        SEAWEEDFS_MASTER = "http://{{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }}"
         SEAWEEDFS_FILER = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
         PLOY_SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
         SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"

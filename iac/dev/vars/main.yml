@@ -65,7 +65,7 @@ ploy:
   api_subdomain: "api"
   nomad_control_domain: "nomad.control.ploy.local"
   registry_domain: "{{ lookup('env', 'PLOY_REGISTRY_DOMAIN') }}"
-  upload_api_binary: "{{ lookup('env', 'PLOY_UPLOAD_API_BINARY') | default('false', true) | bool }}"
+  upload_api_binary: "{{ lookup('env', 'PLOY_UPLOAD_API_BINARY') | default('true', true) | bool }}"
 
 # Nomad api deployment configuration
 nomad_api:
