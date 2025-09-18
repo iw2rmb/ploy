@@ -70,6 +70,7 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 	}
 	// Capture request-scoped flags BEFORE we return/exit handler (Fiber Ctx is not safe in goroutines)
 	autogenVal := c.Query("autogen_dockerfile", "")
+	buildOnlyVal := c.Query("build_only", "")
 
 	// Initial status
 	writeStatus(id, buildStatus{ID: id, App: app, Status: "accepted", StartedAt: time.Now().Format(time.RFC3339)})
@@ -94,6 +95,9 @@ func (s *Server) startAsyncBuild(c *fiber.Ctx, app, sha, lane, main string) (str
 		}
 		if autogenVal != "" {
 			q = append(q, "autogen_dockerfile="+autogenVal)
+		}
+		if buildOnlyVal != "" {
+			q = append(q, "build_only="+buildOnlyVal)
 		}
 		// Resolve controller port robustly in case server config is partially initialized
 		port := ""

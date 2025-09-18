@@ -67,6 +67,8 @@ func (s *Server) handleTriggerAppBuild(c *fiber.Ctx) error {
 		if aerr != nil {
 			return c.Status(500).JSON(fiber.Map{"error": aerr.Error()})
 		}
+		// Expose deployment id in header for robust client parsing
+		c.Set("X-Deployment-ID", id)
 		return c.Status(202).JSON(fiber.Map{
 			"accepted": true,
 			"id":       id,

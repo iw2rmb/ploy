@@ -32,6 +32,11 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	// Entry diagnostics for Lane E
 	fmt.Printf("[Lane E] Enter app=%s sha=%s lang=%s tool=%s hasJib=%t hasDockerfile=%t javaVersion=%s\n",
 		appName, sha, facts.Language, facts.BuildTool, facts.HasJib, facts.HasDockerfile, facts.Versions.Java)
+	// Compute a deterministic builder job name early for consistent log keys
+	nonce := time.Now().Unix()
+	versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
+	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
+
 	// Prefer Jib when detected
 	if facts.HasJib {
 		registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
@@ -70,9 +75,18 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 			if aerr := dockerfileGenerator(srcDir, facts); aerr != nil {
 				// Log autogen failure explicitly and surface details to async status
 				fmt.Printf("[Lane E][ERROR] stage=autogen app=%s sha=%s lang=%s tool=%s err=%v\n", appName, sha, facts.Language, facts.BuildTool, aerr)
+				// Upload a synthetic builder log for unified diagnostics
+				logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+				if deps.Storage != nil {
+					syn := fmt.Sprintf("[Lane E] stage=autogen error for app=%s sha=%s lang=%s tool=%s\n%v\n", appName, sha, facts.Language, facts.BuildTool, aerr)
+					_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(syn), logsKey, "text/plain")
+				}
+				logsURL := buildLogsURL(logsKey)
+				c.Set("X-Deployment-ID", builderJobName)
 				return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
 					"error":   "no Dockerfile and failed to autogenerate",
 					"details": aerr.Error(),
+					"builder": fiber.Map{"job": builderJobName, "logs_key": logsKey, "logs_url": logsURL},
 				})
 			}
 			// Stat and log head of generated Dockerfile for diagnostics
@@ -89,8 +103,17 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 				fmt.Printf("[Lane E] Autogen Dockerfile head (first %d bytes):\n%s\n", len(b), string(b))
 			}
 		} else {
+			// Upload a synthetic builder log to preserve diagnostics
+			logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+			if deps.Storage != nil {
+				syn := fmt.Sprintf("[Lane E] stage=dockerfile_missing app=%s sha=%s advice=pass autogen_dockerfile=true\n", appName, sha)
+				_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(syn), logsKey, "text/plain")
+			}
+			logsURL := buildLogsURL(logsKey)
+			c.Set("X-Deployment-ID", builderJobName)
 			return "", "", "", c.Status(400).JSON(fiber.Map{ //nolint:wrapcheck
-				"error": "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
+				"error":   "Dockerfile missing; pass autogen_dockerfile=true to generate a basic one",
+				"builder": fiber.Map{"job": builderJobName, "logs_key": logsKey, "logs_url": logsURL},
 			})
 		}
 	}
@@ -125,11 +148,20 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 		fmt.Printf("[Lane E] Proceeding to context upload app=%s sha=%s key=%s\n", appName, sha, contextKey)
 		if err := uploadWithUnifiedStorage(ctxUp, deps.Storage, builderTar, contextKey, "application/x-tar"); err != nil {
 			fmt.Printf("[Lane E][ERROR] stage=upload_context app=%s sha=%s key=%s err=%v\n", appName, sha, contextKey, err)
+			// Upload a synthetic builder log to preserve diagnostics
+			logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+			if deps.Storage != nil {
+				syn := fmt.Sprintf("[Lane E] stage=upload_context app=%s sha=%s key=%s error=%v\n", appName, sha, contextKey, err)
+				_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(syn), logsKey, "text/plain")
+			}
+			logsURL := buildLogsURL(logsKey)
+			c.Set("X-Deployment-ID", builderJobName)
 			return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 				"error":       "failed to upload build context",
 				"stage":       "upload_context",
 				"context_key": contextKey,
 				"details":     err.Error(),
+				"builder":     fiber.Map{"job": builderJobName, "logs_key": logsKey, "logs_url": logsURL},
 			})
 		}
 		base := os.Getenv("PLOY_SEAWEEDFS_URL")
@@ -183,8 +215,6 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	}
 
 	// Render and execute Kaniko builder job
-	nonce := time.Now().Unix()
-	versionWithNonce := fmt.Sprintf("%s-%d", sha, nonce)
 	langForBuilder := detectedLanguage
 	if langForBuilder == "" {
 		if cs := findFirstCsproj(srcDir); cs != "" {
@@ -194,10 +224,19 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	builderHCL, err := renderKanikoBuilderFn(appName, versionWithNonce, tag, contextURL, "Dockerfile", langForBuilder)
 	if err != nil {
 		fmt.Printf("[Lane E][ERROR] stage=render_builder app=%s sha=%s tag=%s err=%v\n", appName, sha, tag, err)
+		// Upload synthetic builder log
+		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+		if deps.Storage != nil {
+			syn := fmt.Sprintf("[Lane E] stage=render_builder app=%s sha=%s tag=%s error=%v\n", appName, sha, tag, err)
+			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(syn), logsKey, "text/plain")
+		}
+		logsURL := buildLogsURL(logsKey)
+		c.Set("X-Deployment-ID", builderJobName)
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   "render builder failed",
 			"stage":   "render_builder",
 			"details": err.Error(),
+			"builder": fiber.Map{"job": builderJobName, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
 	// Log builder HCL stats and head for diagnostics
@@ -219,14 +258,22 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	}()
 	if vErr := validateJobFn(builderHCL); vErr != nil {
 		fmt.Printf("[Lane E][ERROR] stage=validate_builder app=%s sha=%s job=%s err=%v\n", appName, sha, filepath.Base(builderHCL), vErr)
+		// Upload synthetic builder log
+		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+		if deps.Storage != nil {
+			syn := fmt.Sprintf("[Lane E] stage=validate_builder app=%s sha=%s job_hcl=%s error=%v\n", appName, sha, filepath.Base(builderHCL), vErr)
+			_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(syn), logsKey, "text/plain")
+		}
+		logsURL := buildLogsURL(logsKey)
+		c.Set("X-Deployment-ID", builderJobName)
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":       "builder job validation failed",
 			"stage":       "validate_builder",
 			"builder_hcl": builderHCL,
 			"details":     vErr.Error(),
+			"builder":     fiber.Map{"job": builderJobName, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
-	builderJobName = fmt.Sprintf("%s-e-build-%s", appName, versionWithNonce)
 	// Detect wrapper presence for visibility
 	useWrapper := false
 	if v := strings.ToLower(strings.TrimSpace(os.Getenv("USE_NOMAD_JOB_MANAGER"))); v != "" {
@@ -277,12 +324,29 @@ func buildLaneE(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	fmt.Printf("[Lane E] Verify push: tag=%s ok=%t status=%d digest=%s message=%s\n", tag, vr.OK, vr.Status, vr.Digest, vr.Message)
 	if !vr.OK || vr.Digest == "" {
 		fmt.Printf("[Lane E][ERROR] stage=verify_push app=%s sha=%s tag=%s status=%d msg=%s\n", appName, sha, tag, vr.Status, vr.Message)
+		// Stop streaming and archive full logs for diagnostics
+		streamCancel()
+		fullLogs, fullFile := logStreamer.Results()
+		if strings.TrimSpace(fullLogs) == "" {
+			fullLogs = fetchJobLogsFullFn(builderJobName, 40000)
+		}
+		logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+		if deps.Storage != nil {
+			if fullFile != "" {
+				_ = uploadFileWithUnifiedStorage(context.Context(c.Context()), deps.Storage, fullFile, logsKey, "text/plain")
+			} else if fullLogs != "" {
+				_ = uploadBytesWithUnifiedStorage(context.Context(c.Context()), deps.Storage, []byte(fullLogs), logsKey, "text/plain")
+			}
+		}
+		logsURL := buildLogsURL(logsKey)
+		c.Set("X-Deployment-ID", builderJobName)
 		return "", "", "", c.Status(500).JSON(fiber.Map{ //nolint:wrapcheck
 			"error":   "image push verification failed",
 			"stage":   "verify_push",
 			"image":   tag,
 			"status":  vr.Status,
 			"message": vr.Message,
+			"builder": fiber.Map{"job": builderJobName, "logs": fullLogs, "logs_key": logsKey, "logs_url": logsURL},
 		})
 	}
 	// Prefer digest-based reference to avoid tag drift at runtime
