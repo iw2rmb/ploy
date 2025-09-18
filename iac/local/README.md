@@ -297,7 +297,6 @@ chmod -R 755 iac/local/
 curl -f http://localhost:8500/v1/status/leader
 curl -f http://localhost:4646/v1/status/leader
 curl -f http://localhost:9333/dir/status
-redis-cli -h localhost -p 6379 ping
 ```
 
 ### Performance Tuning

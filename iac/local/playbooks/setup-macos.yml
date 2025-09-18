@@ -18,7 +18,6 @@
       - tree
       - watch
       - htop
-      - redis
       - ansible
       - docker
       - docker-compose
@@ -330,7 +329,6 @@
         - { name: "Git", command: "git --version" }
         - { name: "jq", command: "jq --version" }
         - { name: "curl", command: "curl --version" }
-        - { name: "Redis", command: "redis-cli --version" }
       changed_when: false
     
     - name: Display verification results

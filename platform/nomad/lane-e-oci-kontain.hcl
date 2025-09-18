@@ -167,17 +167,7 @@ job "{{APP_NAME}}-lane-e" {
         NOMAD_ALLOC_ID = "${NOMAD_ALLOC_ID}"
         NOMAD_TASK_NAME = "${NOMAD_TASK_NAME}"
         NOMAD_JOB_NAME = "${NOMAD_JOB_NAME}"
-        
-        # Database connections (via Connect)
-        {{#if CONNECT_ENABLED}}
-        DATABASE_HOST = "127.0.0.1"
-        DATABASE_PORT = "5432"
-        REDIS_HOST = "127.0.0.1"
-        REDIS_PORT = "6379"
-        ELASTICSEARCH_HOST = "127.0.0.1"
-        ELASTICSEARCH_PORT = "9200"
-        {{/if}}
-        
+                
         # Container runtime information
         KONTAIN_RUNTIME = "true"
         VM_ISOLATION = "true"
@@ -202,17 +192,6 @@ FEATURE_{{.Key | toUpper}}={{.Value}}
 # Environment-specific configuration
 {{range ls "ploy/shared/config"}}
 SHARED_{{.Key | toUpper}}={{.Value}}
-{{end}}
-
-# External service URLs
-{{with key "ploy/shared/database/url"}}
-DATABASE_URL={{.}}
-{{end}}
-{{with key "ploy/shared/redis/url"}}
-REDIS_URL={{.}}
-{{end}}
-{{with key "ploy/shared/elasticsearch/url"}}
-ELASTICSEARCH_URL={{.}}
 {{end}}
 EOF
         destination = "local/app.env"

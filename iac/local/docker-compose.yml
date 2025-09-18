@@ -138,26 +138,6 @@ services:
       timeout: 5s
       retries: 3
 
-  
-
-  # Caching
-  redis:
-    image: redis:7.2.1-alpine
-    container_name: ploy-redis
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes --appendfsync everysec
-    volumes:
-      - redis_data:/data
-    networks:
-      - ploy-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
   # Load Balancer / Reverse Proxy
   traefik:
     image: traefik:v3.0.4
@@ -202,8 +182,6 @@ volumes:
   seaweedfs_volume_data:
     driver: local
   seaweedfs_filer_data:
-    driver: local
-  redis_data:
     driver: local
   traefik_data:
     driver: local

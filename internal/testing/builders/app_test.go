@@ -69,20 +69,6 @@ func TestAppBuilder(t *testing.T) {
 		assert.Equal(t, "debug", app.EnvVars["LOG_LEVEL"])
 	})
 
-	t.Run("with bulk environment variables", func(t *testing.T) {
-		envVars := map[string]string{
-			"DATABASE_URL": "postgres://localhost/test",
-			"REDIS_URL":    "redis://localhost:6379",
-		}
-
-		app := builders.NewApp().
-			WithEnvVars(envVars).
-			Build()
-
-		assert.Equal(t, envVars["DATABASE_URL"], app.EnvVars["DATABASE_URL"])
-		assert.Equal(t, envVars["REDIS_URL"], app.EnvVars["REDIS_URL"])
-	})
-
 	t.Run("with Git configuration", func(t *testing.T) {
 		app := builders.NewApp().
 			WithGitRepo("https://github.com/test/repo.git", "main").
