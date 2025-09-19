@@ -31,6 +31,8 @@ type AnalysisDispatcher struct {
 	storage        istorage.Storage
 	jobTemplates   map[string]*template.Template
 	storageBaseURL string
+	submitFn       func(*AnalysisJob) error
+	deregisterFn   func(string, bool) error
 }
 
 // NewAnalysisDispatcherOrchestration creates a new dispatcher backed by the orchestration facade.
@@ -46,6 +48,9 @@ func NewAnalysisDispatcherOrchestration(storage istorage.Storage) (*AnalysisDisp
 		jobTemplates:   make(map[string]*template.Template),
 		storageBaseURL: storageBaseURL,
 	}
+
+	dispatcher.submitFn = dispatcher.submitToNomad
+	dispatcher.deregisterFn = orchestration.DeregisterJob
 
 	if err := dispatcher.loadJobTemplates(); err != nil {
 		return nil, err
