@@ -108,8 +108,17 @@ func (s *SandboxService) Run(ctx context.Context, req SandboxRequest) (*SandboxR
 
 	if buildErr != nil {
 		result.Success = false
-		result.Message = buildErr.Error()
 		result.Errors = ParseBuildErrors(language, strings.ToUpper(lane), buildErr.Error())
+		if len(result.Errors) > 0 {
+			first := result.Errors[0]
+			msg := first.Message
+			if strings.TrimSpace(first.File) != "" && first.Line > 0 {
+				msg = fmt.Sprintf("%s (%s:%d)", msg, first.File, first.Line)
+			}
+			result.Message = msg
+		} else {
+			result.Message = buildErr.Error()
+		}
 		return result, nil
 	}
 
