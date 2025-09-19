@@ -30,6 +30,20 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create runner: %v", err)
 	}
+	oldSubmit := submitAndWaitTerminal
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	oldPutFile := putFileFn
+	oldPutJSON := putJSONFn
+	putFileFn = func(string, string, string, string) error { return nil }
+	putJSONFn = func(string, string, []byte) error { return nil }
+	defer func() {
+		submitAndWaitTerminal = oldSubmit
+		putFileFn = oldPutFile
+		putJSONFn = oldPutJSON
+	}()
+	mockSubmitter := &MockJobSubmitter{JobResults: map[string]JobResult{}}
+	runner.SetJobSubmitter(mockSubmitter)
+	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 	_ = os.Setenv("GITLAB_TOKEN", "test-token-for-integration")
 	defer func() { _ = os.Unsetenv("GITLAB_TOKEN") }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
