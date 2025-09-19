@@ -362,6 +362,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	runner.SetRecipeExecutor(mockRecipe)
 	runner.SetBuildChecker(mockBuild)
 	runner.SetJobSubmitter(mockJobSubmitter)
+	runner.SetHCLSubmitter(okHCLSubmitter{})
 
 	// This should trigger self-healing
 	ctx := context.Background()
