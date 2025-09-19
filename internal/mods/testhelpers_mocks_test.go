@@ -73,6 +73,7 @@ type MockJobSubmitter struct {
 	SubmittedJobs []JobSpec
 	JobResults    map[string]JobResult
 	ArtifactPaths map[string]string
+	JobDelays     map[string]time.Duration
 	mu            sync.Mutex
 }
 
@@ -80,10 +81,24 @@ func (m *MockJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSp
 	m.mu.Lock()
 	m.SubmitCalled = true
 	m.SubmittedJobs = append(m.SubmittedJobs, spec)
+	delay := time.Duration(0)
+	if m.JobDelays != nil {
+		delay = m.JobDelays[spec.Name]
+	}
 	m.mu.Unlock()
 
 	if m.SubmitError != nil {
 		return JobResult{}, m.SubmitError
+	}
+
+	if delay > 0 {
+		select {
+		case <-ctx.Done():
+			return JobResult{JobID: fmt.Sprintf("job-%s-%d", spec.Name, time.Now().Unix()), Status: "cancelled", Duration: 0, Output: ctx.Err().Error()}, nil
+		case <-time.After(delay):
+		}
+	} else if ctx.Err() != nil {
+		return JobResult{JobID: fmt.Sprintf("job-%s-%d", spec.Name, time.Now().Unix()), Status: "cancelled", Duration: 0, Output: ctx.Err().Error()}, nil
 	}
 
 	// Return mock result
@@ -98,6 +113,14 @@ func (m *MockJobSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSp
 		result = mockResult
 	}
 	m.mu.Unlock()
+
+	if ctx.Err() != nil {
+		result.Status = "cancelled"
+		if result.Output == "" {
+			result.Output = ctx.Err().Error()
+		}
+		return result, nil
+	}
 
 	return result, m.WaitError
 }
