@@ -47,7 +47,9 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	runner.SetJobSubmitter(mockSubmitter)
 	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 	_ = os.Setenv("GITLAB_TOKEN", "test-token-for-integration")
+	_ = os.Setenv("MOD_ID", "mod-test-success")
 	defer func() {
+		_ = os.Unsetenv("MOD_ID")
 		_ = os.Unsetenv("GITLAB_TOKEN")
 		validateJob = oldValidate
 	}()
