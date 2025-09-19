@@ -12,9 +12,19 @@ import (
 // Layout:
 // - dockerfiles/
 //   - java/
-//     - gradle.Dockerfile.tmpl
-//     - maven.Dockerfile.tmpl
-//   - default.Dockerfile.tmpl (reserved for future generic fallback)
+//     - gradle.build.Dockerfile.tmpl
+//     - gradle.deploy.Dockerfile.tmpl
+//     - maven.build.Dockerfile.tmpl
+//     - maven.deploy.Dockerfile.tmpl
+//   - go/
+//     - default.build.Dockerfile.tmpl
+//     - default.deploy.Dockerfile.tmpl
+//   - node/
+//     - npm.build.Dockerfile.tmpl
+//     - npm.deploy.Dockerfile.tmpl
+//   - dotnet/
+//     - default.build.Dockerfile.tmpl
+//     - default.deploy.Dockerfile.tmpl
 
 //go:embed dockerfiles/**/*
 var Dockerfiles embed.FS

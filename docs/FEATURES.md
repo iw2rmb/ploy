@@ -25,6 +25,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Lane D Enforcement**: Integration coverage ensures `/v1/apps/:app/builds` always reports lane D and ignores any non-D overrides, aligning tests with the Docker-only pipeline.
 - **Integration Harness (Sep 2025)**: Mods and KB integration suites now use a shared `testenv` helper to bootstrap Nomad/Consul/SeaweedFS clients, enforce lane D defaults, and skip cleanly when services are unavailable on local runs.
 - **Lane D Dockerfile Autogen** (Sep 2025): Controller auto-composes multi-stage Dockerfiles for Maven/Gradle apps when no Dockerfile exists, emitting lean `eclipse-temurin:<ver>-jre-alpine` runtimes that stay within the 500MB OPA cap.
+- **Lane D Multi-step Templates** (Oct 2025): Shared build module renders `build.Dockerfile` and `deploy.Dockerfile` pairs for Gradle/Maven, Go, Node.js, Python, and .NET so Mods and controller builders reuse identical artifacts for compile and runtime stages.
 - **Mods API Handler Coverage** (Sep 2025): Status, cancel, events, artifacts, log streaming, and debug endpoints now have in-memory KV/storage-backed tests, raising `api/mods` unit coverage to ~61%.
 - **Orchestration Safety Nets** (Sep 2025): Regression tests cover Kaniko builder memory overrides and Nomad monitor timeout behaviour.
 - **CLI Help Coverage**: Unit tests exercise `ploy recipe` help, validation, and confirmation flows with deterministic topic ordering.
