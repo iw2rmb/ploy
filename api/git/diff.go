@@ -118,11 +118,13 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 	return diffs, nil
 }
 
+// lineStat tracks aggregated added and removed line counts for a path.
 type lineStat struct {
 	added   int
 	removed int
 }
 
+// collectLineCounts totals unstaged and staged line deltas per file using git numstat.
 func collectLineCounts(ctx context.Context, repoPath string) map[string]lineStat {
 	counts := make(map[string]lineStat)
 
@@ -160,6 +162,7 @@ func collectLineCounts(ctx context.Context, repoPath string) map[string]lineStat
 	return counts
 }
 
+// countFileLines determines the number of lines in a file snapshot.
 func countFileLines(content []byte) int {
 	if len(content) == 0 {
 		return 0

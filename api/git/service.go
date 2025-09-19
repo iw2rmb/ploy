@@ -48,8 +48,7 @@ func NewService(cfg ServiceConfig) *Service {
 	return &Service{runner: runner, sink: cfg.EventSink}
 }
 
-// NewGitOperations preserves the previous constructor signature for callers that
-// only need a service with default configuration.
+// NewGitOperations preserves the legacy constructor signature with default configuration.
 func NewGitOperations(workDir string) *Service {
 	_ = workDir // deprecated; service no longer requires a working directory hint
 	return NewService(ServiceConfig{})
@@ -60,6 +59,7 @@ func (g *Service) SetEventSink(sink EventSink) {
 	g.sink = sink
 }
 
+// emit publishes an event to the operation and the optional sink.
 func (g *Service) emit(op *Operation, event Event) {
 	op.emit(event)
 	if g.sink != nil {
@@ -67,6 +67,7 @@ func (g *Service) emit(op *Operation, event Event) {
 	}
 }
 
+// finalize publishes the terminal event and marks the operation complete.
 func (g *Service) finalize(op *Operation, event Event) {
 	op.finalize(event)
 	if g.sink != nil {

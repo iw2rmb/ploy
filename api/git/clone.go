@@ -10,6 +10,7 @@ import (
 	"strings"
 )
 
+// checkGitAvailable verifies that the git executable is reachable on the host.
 func (g *Service) checkGitAvailable() error {
 	ctx := context.Background()
 	cmd := exec.CommandContext(ctx, "git", "--version")
