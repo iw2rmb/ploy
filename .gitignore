@@ -54,7 +54,7 @@ test-template/
 .gopath/.gocache/
 
 tests/tmp/
-tests/mods/orw-apply-llm-plan-seq/logs/
+tests/e2e/mods/orw-apply-llm-plan-seq/logs/
 tmp/
 e2e-logs/
 tests/e2e/deploy/e2e-logs/
