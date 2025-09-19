@@ -17,11 +17,14 @@ func TestTimeoutAndErrorHandling(t *testing.T) {
 		mockSubmitter := &MockJobSubmitter{
 			JobResults:    make(map[string]JobResult),
 			ArtifactPaths: make(map[string]string),
+			JobDelays:     make(map[string]time.Duration),
 		}
 
 		// Configure slow jobs that would normally take longer than the timeout
 		mockSubmitter.JobResults["slow-branch-1"] = JobResult{JobID: "slow-1", Status: "completed", Output: "would eventually succeed"}
 		mockSubmitter.JobResults["slow-branch-2"] = JobResult{JobID: "slow-2", Status: "completed", Output: "would also eventually succeed"}
+		mockSubmitter.JobDelays["slow-branch-1"] = 200 * time.Millisecond
+		mockSubmitter.JobDelays["slow-branch-2"] = 300 * time.Millisecond
 
 		orchestrator := NewFanoutOrchestrator(mockSubmitter)
 
@@ -107,11 +110,16 @@ func TestTimeoutAndErrorHandling(t *testing.T) {
 	})
 
 	t.Run("fanout orchestration cancels other branches when first succeeds", func(t *testing.T) {
-		mockSubmitter := &MockJobSubmitter{JobResults: make(map[string]JobResult), ArtifactPaths: make(map[string]string)}
+		mockSubmitter := &MockJobSubmitter{
+			JobResults:    make(map[string]JobResult),
+			ArtifactPaths: make(map[string]string),
+			JobDelays:     make(map[string]time.Duration),
+		}
 
 		// Make first branch succeed quickly, second would succeed slowly
 		mockSubmitter.JobResults["fast-winner"] = JobResult{JobID: "fast-1", Status: "completed", Output: "quick success"}
 		mockSubmitter.JobResults["slow-branch"] = JobResult{JobID: "slow-1", Status: "completed", Output: "would succeed but cancelled"}
+		mockSubmitter.JobDelays["slow-branch"] = 500 * time.Millisecond
 
 		orchestrator := NewFanoutOrchestrator(mockSubmitter)
 
