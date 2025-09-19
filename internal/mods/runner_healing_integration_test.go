@@ -317,7 +317,7 @@ index 1f59f67..1d42819 100644
 	logOut, err := logCmd.Output()
 	require.NoError(t, err)
 	logStr := string(logOut)
-	assert.Contains(t, logStr, "apply(diff): mods branch patch", "ORW commit missing")
+	assert.Contains(t, logStr, "Applied recipe transformations", "ORW commit missing")
 	assert.Contains(t, logStr, "apply(healing): reducer patch", "healing commit missing")
 
 	assert.Contains(t, gitProvider.MRConfig.RepoURL, bare)

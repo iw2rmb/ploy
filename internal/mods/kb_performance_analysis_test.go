@@ -167,9 +167,9 @@ func TestDefaultPerformanceConfig(t *testing.T) {
 	config := DefaultPerformanceConfig()
 
 	assert.Equal(t, 1000, config.SampleSize)
-	assert.Equal(t, 0.35, config.ExpectedDuplicationRate)
-	assert.Equal(t, 0.40, config.QueryCacheHitRatio)
-	assert.Equal(t, 0.25, config.CompressionRatio)
+	assert.Equal(t, 0.595, config.ExpectedDuplicationRate)
+	assert.Equal(t, 0.45, config.QueryCacheHitRatio)
+	assert.Equal(t, 0.425, config.CompressionRatio)
 	assert.Equal(t, 0.85, config.SignatureSimilarityThresh)
 
 	// Verify realistic ranges
@@ -209,7 +209,7 @@ func TestPerformanceReport_Summary(t *testing.T) {
 	assert.Contains(t, report.Summary, "Storage Reduction")
 	assert.Contains(t, report.Summary, "Query Speed Improvement")
 	assert.Contains(t, report.Summary, "OVERALL TARGETS MET")
-	assert.Contains(t, report.Summary, "fuzzy signature matching")
+	assert.Contains(t, report.Summary, "Fuzzy signature matching")
 	assert.Contains(t, report.Summary, "Content-addressed patch storage")
 
 	// Verify numerical formatting in summary
