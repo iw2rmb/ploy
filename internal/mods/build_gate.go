@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	build "github.com/iw2rmb/ploy/internal/build"
@@ -42,10 +43,16 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		return nil, fmt.Errorf("sandbox build failed: %w", err)
 	}
 	if res != nil && !res.Success {
-		msg := res.Message
+		msg := strings.TrimSpace(res.Message)
 		if len(res.Errors) > 0 {
 			first := res.Errors[0]
-			msg = fmt.Sprintf("%s (%s:%d)", msg, first.File, first.Line)
+			msg = first.Message
+			if strings.TrimSpace(first.File) != "" && first.Line > 0 {
+				msg = fmt.Sprintf("%s (%s:%d)", msg, first.File, first.Line)
+			}
+		}
+		if msg == "" {
+			msg = "sandbox build failed"
 		}
 		return &common.DeployResult{Success: false, Message: msg}, nil
 	}
