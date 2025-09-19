@@ -129,7 +129,7 @@ func TestSubmitPlannerJobFallbacksToControllerArtifacts(t *testing.T) {
 
 	validateJob = func(string) error { return nil }
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
-	headURLFn = func(string) bool { return false }
+	headURLFn = func(string) bool { return true }
 	putFileFn = func(string, string, string, string) error { return nil }
 	waitForStepContainingFn = func(string, string, string, string, time.Duration) error { return nil }
 
