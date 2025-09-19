@@ -81,7 +81,7 @@ func (env *TestEnvironment) setupMockServices(t *testing.T) {
 	}
 }
 
-func (env *TestEnvironment) ExecuteWorkflow(ctx context.Context, workflow *TransflowWorkflow) (WorkflowResult, error) {
+func (env *TestEnvironment) ExecuteWorkflow(ctx context.Context, workflow *ModWorkflow) (WorkflowResult, error) {
 	yamlContent, err := workflow.ToYAML()
 	if err != nil {
 		return WorkflowResult{}, fmt.Errorf("failed to generate workflow YAML: %w", err)
