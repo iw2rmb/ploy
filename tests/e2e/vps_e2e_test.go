@@ -29,7 +29,7 @@ func TestVPSE2E_ProductionWorkflows(t *testing.T) {
 	})
 	defer env.Cleanup()
 
-	workflow := &TransflowWorkflow{
+	workflow := &ModWorkflow{
 		ID:           fmt.Sprintf("vps-e2e-%d", time.Now().Unix()),
 		Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		TargetBranch: "main",
@@ -101,7 +101,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 		go func(workflowNum int) {
 			defer wg.Done()
 
-			workflow := &TransflowWorkflow{
+			workflow := &ModWorkflow{
 				ID:           fmt.Sprintf("concurrent-%d-%d", time.Now().Unix(), workflowNum),
 				Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 				TargetBranch: "main",

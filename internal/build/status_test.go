@@ -61,21 +61,21 @@ func TestMapNomadStatusToAppState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, mapNomadStatusToARF(tt.nomadStatus))
+			assert.Equal(t, tt.expected, mapNomadStatusToMod(tt.nomadStatus))
 		})
 	}
 }
 
 func TestMapNomadStatusToAppStateDeterministic(t *testing.T) {
-	result1 := mapNomadStatusToARF("pending")
-	result2 := mapNomadStatusToARF("pending")
+	result1 := mapNomadStatusToMod("pending")
+	result2 := mapNomadStatusToMod("pending")
 	assert.Equal(t, result1, result2)
 }
 
 func TestMapNomadStatusToAppStateUnknowns(t *testing.T) {
 	inputs := []string{"unknown", "invalid", "corrupted", "starting"}
 	for _, status := range inputs {
-		assert.Equal(t, "unknown", mapNomadStatusToARF(status))
+		assert.Equal(t, "unknown", mapNomadStatusToMod(status))
 	}
 }
 
