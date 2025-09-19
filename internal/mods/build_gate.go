@@ -2,7 +2,11 @@ package mods
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -56,15 +60,66 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		}
 		return &common.DeployResult{Success: false, Message: msg}, nil
 	}
+	controllerURL := strings.TrimSpace(os.Getenv("PLOY_CONTROLLER"))
 	buildCfg := common.DeployConfig{
-		App:         appName,
-		Lane:        r.config.Lane,
-		Environment: "dev",
-		Timeout:     timeout,
-		Metadata:    map[string]string{"working_dir": repoPath},
+		App:           appName,
+		Lane:          r.config.Lane,
+		Environment:   "dev",
+		Timeout:       timeout,
+		Metadata:      map[string]string{"working_dir": repoPath},
+		ControllerURL: controllerURL,
+		BuildOnly:     true,
 	}
 	if r.buildGate != nil {
-		return r.buildGate.Check(ctx, buildCfg)
+		deployRes, err := r.buildGate.Check(ctx, buildCfg)
+		if err == nil && deployRes != nil && !deployRes.Success {
+			enrichBuilderLogs(controllerURL, appName, deployRes)
+		}
+		return deployRes, err
 	}
-	return r.buildChecker.CheckBuild(ctx, buildCfg)
+	deployRes, err := r.buildChecker.CheckBuild(ctx, buildCfg)
+	if err == nil && deployRes != nil && !deployRes.Success {
+		enrichBuilderLogs(controllerURL, appName, deployRes)
+	}
+	return deployRes, err
+}
+
+func enrichBuilderLogs(controllerURL, appName string, res *common.DeployResult) {
+	if res == nil {
+		return
+	}
+	if strings.TrimSpace(res.BuilderLogs) != "" {
+		return
+	}
+	if controllerURL == "" || strings.TrimSpace(res.DeploymentID) == "" {
+		return
+	}
+	logURL := fmt.Sprintf("%s/apps/%s/builds/%s/logs?lines=1200", strings.TrimRight(controllerURL, "/"), appName, res.DeploymentID)
+	req, err := http.NewRequest("GET", logURL, nil)
+	if err != nil {
+		return
+	}
+	client := &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	res.BuilderLogs = string(body)
+	if res.BuilderLogsKey == "" {
+		res.BuilderLogsKey = fmt.Sprintf("build-logs/%s.log", res.DeploymentID)
+	}
+	if res.BuilderLogsURL == "" {
+		res.BuilderLogsURL = logURL
+	}
 }
