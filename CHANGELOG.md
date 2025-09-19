@@ -26,6 +26,8 @@
 - API Recipes: Added handler regression tests covering invalid payloads, storage failures, and missing registry wiring, plus adapter latest-version coverage to lift recipe catalog confidence.
 - Build: Added unit tests for `internal/build` covering error formatting/parsing, log retrieval handler, request body ingestion, unified storage artifact uploads, WASM artifact discovery, and orchestration helpers. Improves `internal/build` unit coverage and ensures the package is exercised in local test runs.
 - Nomad wrapper: Added `purge` command to `/opt/hashicorp/bin/nomad-job-manager.sh` supporting `--job` and `--prefix` modes with `--dry-run`, `--limit`, and `--yes` safety guard. Enables single-command cleanup of completed batch jobs (e.g., `orw-apply-*`, `mods-llm-exec-*`).
+- Build: Added reusable `RenderDockerfilePair` helper with embedded build/deploy templates for Gradle, Maven, Go, Node.js, Python, and .NET so multi-step lane D builds share the same generator.
+- Mods: Lane D build gate now materializes `build.Dockerfile` and `deploy.Dockerfile` via the shared build module before invoking the controller build gate, covering Go/Node/Python/.NET stacks in addition to JVM.
 
 ### Changed
 - Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.

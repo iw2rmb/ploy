@@ -3,37 +3,75 @@ package mods
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnsureDockerfilePair_CreatesFiles(t *testing.T) {
-	dir := t.TempDir()
-	gradleFile := filepath.Join(dir, "build.gradle")
-	if err := os.WriteFile(gradleFile, []byte("apply plugin: 'java'"), 0o644); err != nil {
-		t.Fatalf("write build.gradle: %v", err)
+	cases := []struct {
+		name         string
+		setup        func(string)
+		expectBuild  string
+		expectDeploy string
+	}{
+		{
+			name: "gradle",
+			setup: func(dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "build.gradle"), []byte("apply plugin: 'java'"), 0o644))
+			},
+			expectBuild:  "FROM gradle:8-jdk",
+			expectDeploy: "FROM eclipse-temurin",
+		},
+		{
+			name: "go",
+			setup: func(dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example\n\ngo 1.22\n"), 0o644))
+			},
+			expectBuild:  "FROM golang:1.22-alpine AS build",
+			expectDeploy: "FROM gcr.io/distroless/static",
+		},
+		{
+			name: "node",
+			setup: func(dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"demo"}`), 0o644))
+			},
+			expectBuild:  "FROM node:20-alpine",
+			expectDeploy: "FROM node:20-alpine",
+		},
+		{
+			name: "python",
+			setup: func(dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("gunicorn==21.2.0"), 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('ok')"), 0o644))
+			},
+			expectBuild:  "FROM python:3.12-slim AS build",
+			expectDeploy: "exec gunicorn",
+		},
+		{
+			name: "dotnet",
+			setup: func(dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "Demo.csproj"), []byte("<Project></Project>"), 0o644))
+			},
+			expectBuild:  "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build",
+			expectDeploy: "ENTRYPOINT [\"dotnet\", \"Demo.dll\"]",
+		},
 	}
 
-	if err := ensureDockerfilePair(dir); err != nil {
-		t.Fatalf("ensureDockerfilePair returned error: %v", err)
-	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tc.setup(dir)
 
-	buildPath := filepath.Join(dir, "build.Dockerfile")
-	deployPath := filepath.Join(dir, "deploy.Dockerfile")
+			require.NoError(t, ensureDockerfilePair(dir))
 
-	buildBytes, err := os.ReadFile(buildPath)
-	if err != nil {
-		t.Fatalf("read build.Dockerfile: %v", err)
-	}
-	deployBytes, err := os.ReadFile(deployPath)
-	if err != nil {
-		t.Fatalf("read deploy.Dockerfile: %v", err)
-	}
+			buildBytes, err := os.ReadFile(filepath.Join(dir, "build.Dockerfile"))
+			require.NoError(t, err)
+			deployBytes, err := os.ReadFile(filepath.Join(dir, "deploy.Dockerfile"))
+			require.NoError(t, err)
 
-	if !strings.Contains(string(buildBytes), "FROM gradle:8-jdk") {
-		t.Fatalf("build.Dockerfile missing gradle base: %s", string(buildBytes))
-	}
-	if !strings.Contains(string(deployBytes), "FROM eclipse-temurin") {
-		t.Fatalf("deploy.Dockerfile missing temurin base: %s", string(deployBytes))
+			require.Contains(t, string(buildBytes), tc.expectBuild)
+			require.Contains(t, string(deployBytes), tc.expectDeploy)
+		})
 	}
 }
