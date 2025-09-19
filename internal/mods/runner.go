@@ -349,13 +349,18 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 		message = fmt.Sprintf("%s: %v", message, err)
 	}
 
-	{
-		const maxLen = 600
-		msg := message
-		if len(msg) > maxLen {
-			msg = msg[:maxLen] + "…"
+	trimForEvent := func(s string) string {
+		const maxLen = 2000
+		s = strings.TrimSpace(s)
+		if len(s) > maxLen {
+			return s[:maxLen] + "…"
 		}
-		r.emit(ctx, "build", "build-gate-error", "info", msg)
+		return s
+	}
+	if buildResult != nil && strings.TrimSpace(buildResult.BuilderLogs) != "" {
+		r.emit(ctx, "build", "build-gate-error", "info", trimForEvent(buildResult.BuilderLogs))
+	} else {
+		r.emit(ctx, "build", "build-gate-error", "info", trimForEvent(message))
 	}
 
 	result.StepResults = append(result.StepResults, StepResult{
