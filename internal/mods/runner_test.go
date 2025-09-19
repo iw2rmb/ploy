@@ -21,12 +21,17 @@ import (
 func TestModRunner_ORWApplyNoBuildFileError(t *testing.T) {
 	// Save and restore submitter
 	orig := submitAndWaitTerminal
-	defer func() { submitAndWaitTerminal = orig }()
+	oldValidate := validateJob
+	defer func() {
+		submitAndWaitTerminal = orig
+		validateJob = oldValidate
+	}()
 
 	// Stub submission to simulate container failure with meaningful message
 	submitAndWaitTerminal = func(hclPath string, timeout time.Duration) error {
 		return fmt.Errorf("No build file found (pom.xml, build.gradle) in project root")
 	}
+	validateJob = func(string) error { return nil }
 
 	// Create temp workspace and minimal template
 	workspaceDir := t.TempDir()
