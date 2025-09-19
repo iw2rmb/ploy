@@ -39,3 +39,19 @@ func (r *ModRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath st
 	}
 	return nil
 }
+
+// ApplyDiffOnly validates and applies a diff without invoking the build gate.
+// The caller is responsible for committing and running subsequent build checks.
+func (r *ModRunner) ApplyDiffOnly(ctx context.Context, repoPath, diffPath string) error {
+	allow := ResolveDefaultsFromEnv().Allowlist
+	if err := validateDiffPathsFn(diffPath, allow); err != nil {
+		return err
+	}
+	if err := validateUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
+		return err
+	}
+	if err := applyUnifiedDiffFn(ctx, repoPath, diffPath); err != nil {
+		return err
+	}
+	return stagePathsFromDiff(ctx, repoPath, diffPath)
+}

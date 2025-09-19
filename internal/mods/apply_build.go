@@ -40,3 +40,35 @@ func runApplyAndBuildWithEvents(
 		Duration: time.Since(stepStart),
 	}, nil
 }
+
+// runApplyDiffWithEvents applies a diff with event emission but skips build validation.
+func runApplyDiffWithEvents(
+	parent context.Context,
+	r *ModRunner,
+	repoPath, diffPath, stepID string,
+	stepStart time.Time,
+	apply func(context.Context, string, string) error,
+) (StepResult, error) {
+	applyTimeout := ResolveDefaultsFromEnv().BuildApplyTimeout
+	applyCtx, cancel := context.WithTimeout(parent, applyTimeout)
+	defer cancel()
+
+	r.emit(parent, "apply", "diff-apply-started", "info", "Applying diff to repository")
+	if err := apply(applyCtx, repoPath, diffPath); err != nil {
+		r.emit(parent, "apply", "diff-apply-failed", "error", fmt.Sprintf("apply failed: %v", err))
+		return StepResult{
+			StepID:   stepID,
+			Success:  false,
+			Message:  fmt.Sprintf("Apply failed: %v", err),
+			Duration: time.Since(stepStart),
+		}, err
+	}
+
+	r.emit(parent, "apply", "diff-applied", "info", "Diff applied")
+	return StepResult{
+		StepID:   stepID,
+		Success:  true,
+		Message:  "Applied ORW diff",
+		Duration: time.Since(stepStart),
+	}, nil
+}
