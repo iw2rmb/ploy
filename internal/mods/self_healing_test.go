@@ -425,9 +425,8 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 			t.Logf("Winner: %+v", *result.HealingSummary.Winner)
 		}
 		t.Logf("All results count: %d", len(result.HealingSummary.AllResults))
+		assert.True(t, result.HealingSummary.FinalSuccess)
 	}
-
-	assert.True(t, result.HealingSummary.FinalSuccess)
 }
 
 func TestSelfHealingBoundedRetries(t *testing.T) {
