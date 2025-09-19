@@ -15,10 +15,14 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 	workspaceDir := t.TempDir()
+	origin := filepath.Join(workspaceDir, "origin")
+	bare := filepath.Join(workspaceDir, "bare.git")
+	setupGitRepository(t, origin)
+	runCmd(t, workspaceDir, "git", "clone", "--bare", origin, bare)
 	cfg := &ModConfig{
 		Version:      "v1alpha1",
 		ID:           "test-integration-success",
-		TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
+		TargetRepo:   bare,
 		TargetBranch: "main",
 		BaseRef:      "main",
 		Lane:         "C",
@@ -98,10 +102,14 @@ func TestMods_WorkflowWithBuildFailure(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 	workspaceDir := t.TempDir()
+	origin := filepath.Join(workspaceDir, "origin")
+	bare := filepath.Join(workspaceDir, "bare.git")
+	setupGitRepository(t, origin)
+	runCmd(t, workspaceDir, "git", "clone", "--bare", origin, bare)
 	cfg := &ModConfig{
 		Version:      "v1alpha1",
 		ID:           "test-integration-fail",
-		TargetRepo:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
+		TargetRepo:   bare,
 		TargetBranch: "main",
 		BaseRef:      "main",
 		Lane:         "C",
