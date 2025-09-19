@@ -283,13 +283,14 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 	}
 	key := computeBranchDiffKey(modID, branchID, runID)
 	url := strings.TrimRight(seaweedURL, "/") + "/artifacts/" + key
+	infra := ResolveInfraFromEnv()
 	dlStart := time.Now()
 	if rep != nil {
 		_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download start: key=%s start_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
 	}
 	// Wait for job to report upload before starting download loop
-	if ctrl := ResolveInfraFromEnv().Controller; ctrl != "" {
-		_ = waitForStepContaining(ctrl, modID, "llm-exec", "uploaded diff to", 120*time.Second)
+	if infra.Controller != "" {
+		_ = waitForStepContainingFn(infra.Controller, modID, "llm-exec", "uploaded diff to", 120*time.Second)
 	}
 	// Event observed — wait for filer to index object using lightweight HEAD with backoff
 	// Try up to 30s with jitter
@@ -304,10 +305,26 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 	dlErr := downloadToFileFn(url, diffPath)
 	dlEnd := time.Now()
 	if dlErr != nil {
-		if rep != nil {
-			_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+		if infra.Controller != "" {
+			fallbackURL := strings.TrimRight(infra.Controller, "/") + "/mods/" + modID + "/artifacts/diff_patch"
+			if err2 := downloadToFileFn(fallbackURL, diffPath); err2 == nil {
+				dlEnd = time.Now()
+				if rep != nil {
+					_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("download fallback succeeded: key=%s via controller start_ts=%s end_ts=%s", key, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+				}
+				dlErr = nil
+			} else {
+				if rep != nil {
+					_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v fallback_error=%v start_ts=%s end_ts=%s", key, dlErr, err2, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+				}
+				return fmt.Errorf("LLM exec diff download failed: %v (controller fallback: %v)", dlErr, err2)
+			}
+		} else {
+			if rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed: key=%s error=%v start_ts=%s end_ts=%s", key, dlErr, dlStart.UTC().Format(time.RFC3339Nano), dlEnd.UTC().Format(time.RFC3339Nano)), Time: time.Now()})
+			}
+			return fmt.Errorf("LLM exec diff download failed: %v", dlErr)
 		}
-		return fmt.Errorf("LLM exec diff download failed: %v", dlErr)
 	}
 	if rep != nil {
 		var sz int64
