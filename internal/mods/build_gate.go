@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -115,11 +116,130 @@ func enrichBuilderLogs(controllerURL, appName string, res *common.DeployResult) 
 	if err != nil {
 		return
 	}
-	res.BuilderLogs = string(body)
+	logs := strings.TrimSpace(string(body))
+	if len(logs) == 0 {
+		return
+	}
+	logs = normalizeBuilderLogs(body, logs)
+	res.BuilderLogs = logs
 	if res.BuilderLogsKey == "" {
 		res.BuilderLogsKey = fmt.Sprintf("build-logs/%s.log", res.DeploymentID)
 	}
 	if res.BuilderLogsURL == "" {
 		res.BuilderLogsURL = logURL
 	}
+	if snippet := builderLogSnippet(logs, 3, 2000); snippet != "" {
+		res.Message = appendUniqueLine(res.Message, snippet)
+	}
+	if note := buildLogsPointerLine(res.BuilderLogsKey, res.BuilderLogsURL); note != "" {
+		res.Message = appendUniqueLine(res.Message, note)
+	}
+}
+
+func normalizeBuilderLogs(raw []byte, fallback string) string {
+	trimmed := strings.TrimSpace(fallback)
+	if trimmed == "" {
+		trimmed = strings.TrimSpace(string(raw))
+	}
+	if !json.Valid(raw) {
+		return trimmed
+	}
+	var plain string
+	if err := json.Unmarshal(raw, &plain); err == nil {
+		if v := strings.TrimSpace(plain); v != "" {
+			return v
+		}
+	}
+	var payload struct {
+		Logs     *string         `json:"logs"`
+		Stdout   *string         `json:"stdout"`
+		Stderr   *string         `json:"stderr"`
+		Lines    json.RawMessage `json:"lines"`
+		Messages json.RawMessage `json:"messages"`
+	}
+	if err := json.Unmarshal(raw, &payload); err == nil {
+		if payload.Logs != nil {
+			if v := strings.TrimSpace(*payload.Logs); v != "" {
+				return v
+			}
+		}
+		if payload.Stdout != nil {
+			if v := strings.TrimSpace(*payload.Stdout); v != "" {
+				return v
+			}
+		}
+		if payload.Stderr != nil {
+			if v := strings.TrimSpace(*payload.Stderr); v != "" {
+				return v
+			}
+		}
+		if v := decodeLines(payload.Lines); v != "" {
+			return v
+		}
+		if v := decodeLines(payload.Messages); v != "" {
+			return v
+		}
+	}
+	return trimmed
+}
+
+func decodeLines(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var arr []string
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		return strings.TrimSpace(strings.Join(arr, "\n"))
+	}
+	var generic []interface{}
+	if err := json.Unmarshal(raw, &generic); err == nil {
+		var parts []string
+		for _, item := range generic {
+			if s, ok := item.(string); ok {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					parts = append(parts, s)
+				}
+			}
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, "\n")
+		}
+	}
+	return ""
+}
+
+func builderLogSnippet(logs string, maxLines, maxLen int) string {
+	lines := strings.Split(logs, "\n")
+	var selected []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		selected = append(selected, line)
+		if maxLines > 0 && len(selected) >= maxLines {
+			break
+		}
+	}
+	if len(selected) == 0 {
+		return ""
+	}
+	snippet := strings.Join(selected, "\n")
+	if maxLen > 0 && len(snippet) > maxLen {
+		snippet = snippet[:maxLen] + "…"
+	}
+	return snippet
+}
+
+func buildLogsPointerLine(key, url string) string {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return ""
+	}
+	line := fmt.Sprintf("builder logs archived at %s", key)
+	if u := strings.TrimSpace(url); u != "" {
+		line = fmt.Sprintf("%s (%s)", line, u)
+	}
+	return line
 }
