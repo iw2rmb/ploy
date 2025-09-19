@@ -238,9 +238,6 @@
         - { path: "/opt/ploy", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/artifacts", owner: "ploy", group: "ploy", mode: "0755" }
         - { path: "/opt/ploy/logs", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/opt/ploy/transflow", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/opt/ploy/transflow/context", owner: "ploy", group: "ploy", mode: "0755" }
-        - { path: "/opt/ploy/transflow/out", owner: "ploy", group: "ploy", mode: "0755" }
 
     - name: Create Nomad log file with proper permissions
       file:
