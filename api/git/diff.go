@@ -1,11 +1,13 @@
 package git
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -31,6 +33,8 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 		return nil, fmt.Errorf("failed to get git status: %w", err)
 	}
 
+	lineCounts := collectLineCounts(ctx, repoPath)
+
 	var diffs []DiffCapture
 	lines := strings.Split(string(statusOutput), "\n")
 	for _, line := range lines {
@@ -46,6 +50,11 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 		file := parts[1]
 		diff := DiffCapture{File: file, Timestamp: time.Now()}
 
+		if stat, ok := lineCounts[file]; ok {
+			diff.LinesAdded = stat.added
+			diff.LinesRemoved = stat.removed
+		}
+
 		switch status {
 		case "M", "MM":
 			diff.Type = "modified"
@@ -58,6 +67,9 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 			content, _ := os.ReadFile(filepath.Join(repoPath, file))
 			diff.After = string(content)
 			diff.UnifiedDiff = fmt.Sprintf("+++ %s\n%s", file, diff.After)
+			if diff.LinesAdded == 0 {
+				diff.LinesAdded = countFileLines(content)
+			}
 		case "D":
 			diff.Type = "deleted"
 			diffCmd := exec.CommandContext(ctx, "git", "diff", "HEAD", file)
@@ -69,6 +81,9 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 			content, _ := os.ReadFile(filepath.Join(repoPath, file))
 			diff.After = string(content)
 			diff.UnifiedDiff = fmt.Sprintf("+++ %s (new file)\n%s", file, diff.After)
+			if diff.LinesAdded == 0 {
+				diff.LinesAdded = countFileLines(content)
+			}
 		}
 
 		diffs = append(diffs, diff)
@@ -87,12 +102,74 @@ func (g *Service) GetDiff(ctx context.Context, repoPath string) ([]DiffCapture, 
 			if len(parts) < 2 {
 				continue
 			}
-			diffCmd := exec.CommandContext(ctx, "git", "diff", "--cached", parts[1])
+			file := parts[1]
+			diffCmd := exec.CommandContext(ctx, "git", "diff", "--cached", file)
 			diffCmd.Dir = repoPath
 			diffOutput, _ := diffCmd.Output()
-			diffs = append(diffs, DiffCapture{File: parts[1], Type: "modified", UnifiedDiff: string(diffOutput), Timestamp: time.Now()})
+			diff := DiffCapture{File: file, Type: "modified", UnifiedDiff: string(diffOutput), Timestamp: time.Now()}
+			if stat, ok := lineCounts[file]; ok {
+				diff.LinesAdded = stat.added
+				diff.LinesRemoved = stat.removed
+			}
+			diffs = append(diffs, diff)
 		}
 	}
 
 	return diffs, nil
+}
+
+type lineStat struct {
+	added   int
+	removed int
+}
+
+func collectLineCounts(ctx context.Context, repoPath string) map[string]lineStat {
+	counts := make(map[string]lineStat)
+
+	parse := func(args ...string) {
+		cmd := exec.CommandContext(ctx, "git", args...)
+		cmd.Dir = repoPath
+		output, err := cmd.Output()
+		if err != nil {
+			return
+		}
+		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, "\t", 3)
+			if len(parts) < 3 {
+				continue
+			}
+			added, err1 := strconv.Atoi(parts[0])
+			removed, err2 := strconv.Atoi(parts[1])
+			if err1 != nil || err2 != nil {
+				continue
+			}
+			path := parts[2]
+			stat := counts[path]
+			stat.added += added
+			stat.removed += removed
+			counts[path] = stat
+		}
+	}
+
+	parse("diff", "--numstat")
+	parse("diff", "--cached", "--numstat")
+
+	return counts
+}
+
+func countFileLines(content []byte) int {
+	if len(content) == 0 {
+		return 0
+	}
+	lines := bytes.Count(content, []byte{'\n'})
+	if content[len(content)-1] != '\n' {
+		lines++
+	}
+	if lines == 0 {
+		lines = 1
+	}
+	return lines
 }
