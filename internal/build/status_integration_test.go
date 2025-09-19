@@ -269,7 +269,7 @@ func TestStatusFunctionIntegration(t *testing.T) {
 
 				if activeJob != nil {
 					// Map Nomad status to ARF status
-					arfStatus := mapNomadStatusToARF(activeJob.Status)
+					arfStatus := mapNomadStatusToMod(activeJob.Status)
 					lane := extractLaneFromJobName(activeJob.Name)
 
 					return c.JSON(fiber.Map{
@@ -366,7 +366,7 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 		}
 
 		for input, expected := range testCases {
-			result := mapNomadStatusToARF(input)
+			result := mapNomadStatusToMod(input)
 			assert.Equal(t, expected, result, "Status mapping for %q should be %q", input, expected)
 		}
 	})
@@ -393,10 +393,10 @@ func TestStatusHelperFunctionsAdvanced(t *testing.T) {
 		iterations := 10000
 
 		for i := 0; i < iterations; i++ {
-			_ = mapNomadStatusToARF("running")
-			_ = mapNomadStatusToARF("pending")
-			_ = mapNomadStatusToARF("dead")
-			_ = mapNomadStatusToARF("unknown")
+			_ = mapNomadStatusToMod("running")
+			_ = mapNomadStatusToMod("pending")
+			_ = mapNomadStatusToMod("dead")
+			_ = mapNomadStatusToMod("unknown")
 		}
 
 		duration := time.Since(start)
@@ -454,7 +454,7 @@ func TestStatusConcurrency(t *testing.T) {
 				jobName := fmt.Sprintf("%s-lane-%s", appName, lane)
 				if job, err := mockMonitor.GetJobStatus(jobName); err == nil && job != nil {
 					return c.JSON(fiber.Map{
-						"status": mapNomadStatusToARF(job.Status),
+						"status": mapNomadStatusToMod(job.Status),
 						"lane":   extractLaneFromJobName(job.Name),
 					})
 				}

@@ -33,7 +33,7 @@ func TestRemoteStartReturnsModID(t *testing.T) {
 	}
 }
 
-// TestExecuteRemoteTransflowPrintsModID ensures the CLI prints the id and completes when status becomes completed
+// TestExecuteRemoteModsPrintsModID ensures the CLI prints the id and completes when status becomes completed
 func TestExecuteRemoteModsPrintsModID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +92,7 @@ func TestExecuteRemoteModsPrintsModID(t *testing.T) {
 	}
 }
 
-// TestExecuteRemoteTransflowWatch attaches SSE watch and returns quickly
+// TestExecuteRemoteModsWatch attaches SSE watch and returns quickly
 func TestExecuteRemoteModsWatch(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +122,7 @@ func TestExecuteRemoteModsWatch(t *testing.T) {
 	}
 }
 
-// TestExecuteRemoteTransflowWatchAcceptsCharset verifies SSE watch accepts Content-Type with charset
+// TestExecuteRemoteModsWatchAcceptsCharset verifies SSE watch accepts Content-Type with charset
 func TestExecuteRemoteModsWatchAcceptsCharset(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
@@ -152,7 +152,7 @@ func TestExecuteRemoteModsWatchAcceptsCharset(t *testing.T) {
 	}
 }
 
-// TestExecuteRemoteTransflowJSONOutputsModID ensures --output=json prints a single JSON with mod_id
+// TestExecuteRemoteModsJSONOutputsModID ensures --output=json prints a single JSON with mod_id
 func TestExecuteRemoteModsJSONOutputsModID(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {

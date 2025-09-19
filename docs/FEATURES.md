@@ -20,6 +20,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 - **Analysis Engine Confidence** (Sep 2025): Unit tests cover analyzer registration, cache reuse, fallback recovery, and HTTP handler routes. Primary analyzer failures now automatically fall back to registered secondary analyzers, preserving issue aggregation while surfacing root-cause diagnostics.
 - **Recipe Catalog Coverage** (Sep 2025): REST handlers assert invalid payload, storage failure, and missing registry behaviors; registry adapter tests verify semantic version ordering for latest lookups.
 - **Mods Execution Coverage**: Unit tests exercise plan helpers (LLM exec and ORW apply), MCP budget parsing, and LLM diff-fetch resilience to improve lane readiness.
+- **Mods Integration Smoke Test**: Local bare Git fixtures and stubbed Nomad/SeaweedFS helpers keep the lane-D smoke workflow entirely offline so unit test runs stay fast.
 - **CoreDNS Validation**: New integration tests cover CoreDNS A/SRV resolution, retry semantics, and a shell-based DNS health probe to replace Consul DNS checks.
 - **CoreDNS Automation**: CoreDNS Corefile/zone templates and an Ansible playbook provision the `ploy.local` zone with platform service A/SRV records, keeping internal DNS reproducible.
 - **Lane D Enforcement**: Integration coverage ensures `/v1/apps/:app/builds` always reports lane D and ignores any non-D overrides, aligning tests with the Docker-only pipeline.

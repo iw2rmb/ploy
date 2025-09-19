@@ -42,7 +42,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 		t.Skip("Skipping: requires PLOY_CONTROLLER for remote controller-backed E2E")
 	}
 
-	workflow := &TransflowWorkflow{
+	workflow := &ModWorkflow{
 		ID:           fmt.Sprintf("e2e-java-migration-%d", time.Now().Unix()),
 		Repository:   repo,
 		TargetBranch: branch,
@@ -263,7 +263,7 @@ func TestModsE2E_SelfHealingScenario(t *testing.T) {
 	// Branch: prefer E2E_HEALING_BRANCH when provided, default to e2e/fail-missing-symbol
 	hBranch := getenvDefault("E2E_HEALING_BRANCH", "e2e/fail-missing-symbol")
 
-	workflow := &TransflowWorkflow{
+	workflow := &ModWorkflow{
 		ID:           fmt.Sprintf("e2e-healing-%d", time.Now().Unix()),
 		Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", // Use standard repo for now
 		TargetBranch: hBranch,
@@ -330,7 +330,7 @@ func TestModsE2E_KBLearningProgression(t *testing.T) {
 	})
 	defer env.Cleanup()
 
-	baseWorkflow := TransflowWorkflow{
+	baseWorkflow := ModWorkflow{
 		Repository:   "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
 		TargetBranch: getenvDefault("E2E_BRANCH", "e2e/success"),
 		Steps: []WorkflowStep{
@@ -411,7 +411,7 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 	})
 	defer env.Cleanup()
 
-	workflow := &TransflowWorkflow{
+	workflow := &ModWorkflow{
 		ID:           fmt.Sprintf("e2e-healing-orw-llm-%d", time.Now().Unix()),
 		Repository:   repo,
 		TargetBranch: getenvDefault("E2E_HEALING_BRANCH", "e2e/fail-missing-symbol"),

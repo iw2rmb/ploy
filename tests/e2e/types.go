@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type TransflowWorkflow struct {
+type ModWorkflow struct {
 	ID              string
 	Repository      string
 	TargetBranch    string
@@ -76,7 +76,7 @@ type ResourceStats struct {
 	CPUPercent  float64
 }
 
-func (w *TransflowWorkflow) ToYAML() (string, error) {
+func (w *ModWorkflow) ToYAML() (string, error) {
 	yaml := fmt.Sprintf(`version: v1alpha1
 id: %s
 target_repo: %s

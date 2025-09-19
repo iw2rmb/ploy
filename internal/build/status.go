@@ -55,7 +55,7 @@ func Status(c *fiber.Ctx) error {
 	}
 
 	// Map Nomad job status to deployment status used by Mods-aware clients
-	status := mapNomadStatusToARF(activeJob.Status)
+	status := mapNomadStatusToMod(activeJob.Status)
 
 	// Include allocation summaries with recent task events to enable event-driven clients
 	allocs, _ := orchestration.NewHealthMonitor().GetJobAllocations(activeJob.Name)
@@ -129,8 +129,8 @@ func Status(c *fiber.Ctx) error {
 	})
 }
 
-// mapNomadStatusToARF converts Nomad job status to a Mods-aligned deployment status.
-func mapNomadStatusToARF(nomadStatus string) string {
+// mapNomadStatusToMod converts Nomad job status to a Mods-aligned deployment status.
+func mapNomadStatusToMod(nomadStatus string) string {
 	switch strings.TrimSpace(strings.ToLower(nomadStatus)) {
 	case "pending":
 		return "building"
