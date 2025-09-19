@@ -306,6 +306,9 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	t.Setenv("PLOY_CONTROLLER", "https://controller.dev.ployman.app/v1")
 	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
 	t.Setenv("MOD_ID", "mod-self-heal-test")
+	oldValidate := validateJob
+	validateJob = func(string) error { return nil }
+	defer func() { validateJob = oldValidate }()
 	config := &ModConfig{
 		ID:         "test-healing",
 		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
