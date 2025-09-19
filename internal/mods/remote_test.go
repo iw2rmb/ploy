@@ -84,8 +84,8 @@ func TestExecuteRemoteModsPrintsModID(t *testing.T) {
 		t.Fatalf("executeRemoteMod error: %v", err)
 	}
 	out := buf.String()
-	if !strings.Contains(out, "Mod ID: mod-abc123") {
-		t.Fatalf("expected Mod ID in output, got: %s", out)
+	if !strings.Contains(out, "Execution ID: mod-abc123") {
+		t.Fatalf("expected execution ID in output, got: %s", out)
 	}
 	if !strings.Contains(out, "ploy mod watch -id mod-abc123") {
 		t.Fatalf("expected watch hint in output, got: %s", out)

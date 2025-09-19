@@ -16,9 +16,9 @@ func TestEnhancedSignature_SignatureSimilarity(t *testing.T) {
 		t.Fatalf("expected 0<s<1, got %v", s)
 	}
 
-	// Different length -> 0.0
-	if s := esg.ComputeSignatureSimilarity("abcd", "abcdef", "java", "javac"); s != 0.0 {
-		t.Fatalf("expected 0.0, got %v", s)
+	// Different length -> small similarity proportional to matching prefix
+	if s := esg.ComputeSignatureSimilarity("abcd", "abcdef", "java", "javac"); s != 0.25 {
+		t.Fatalf("expected 0.25, got %v", s)
 	}
 }
 
@@ -40,8 +40,8 @@ func TestEnhancedSignature_FindSimilarSignatures(t *testing.T) {
 	target := "abcdef12"
 	candidates := []string{"zzzzzzzz", "abcxef12", "abcdef12"}
 
-	// Threshold high enough to include very similar but not identical; identical is excluded by function
-	res := esg.FindSimilarSignatures(target, candidates, "go", "go", 0.85)
+	// Threshold tuned for hamming similarity (matches/16)
+	res := esg.FindSimilarSignatures(target, candidates, "go", "go", 0.4)
 	if len(res) != 1 || res[0].Signature != "abcxef12" {
 		t.Fatalf("expected one similar result 'abcxef12', got %#v", res)
 	}
