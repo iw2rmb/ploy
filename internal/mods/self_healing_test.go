@@ -303,6 +303,9 @@ func TestErrorAnalysisIntegration(t *testing.T) {
 
 func TestSelfHealingRunnerFlow(t *testing.T) {
 	// Test the complete self-healing flow (will fail until implemented)
+	t.Setenv("PLOY_CONTROLLER", "https://controller.dev.ployman.app/v1")
+	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
+	t.Setenv("MOD_ID", "mod-self-heal-test")
 	config := &ModConfig{
 		ID:         "test-healing",
 		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
