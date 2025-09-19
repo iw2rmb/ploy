@@ -3,6 +3,7 @@
 ## [Unreleased] - Transflow MVP Release
 
 ### Added
+- Analysis: Added concurrency-safe Consul KV and SeaweedFS storage fakes with regression tests for dispatcher submit/list/cleanup flows, enabling Nomad failure coverage and lifting `api/analysis` unit coverage to ~73%.
 - Infrastructure: Added CoreDNS templates and an Ansible playbook to manage the `ploy.local` zone, keeping platform service A/SRV records under configuration management.
 - Analysis: Added engine and HTTP handler unit tests covering analyzer registration, cache reuse, fallback execution, configuration validation, and API failure modes to increase confidence in the static-analysis pipeline.
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
@@ -28,6 +29,7 @@
 - Nomad wrapper: Added `purge` command to `/opt/hashicorp/bin/nomad-job-manager.sh` supporting `--job` and `--prefix` modes with `--dry-run`, `--limit`, and `--yes` safety guard. Enables single-command cleanup of completed batch jobs (e.g., `orw-apply-*`, `mods-llm-exec-*`).
 
 ### Changed
+- Integration: Mods and KB suites now share a `testenv` harness that provisions Nomad/Consul/SeaweedFS clients, enforces Docker lane D defaults, and gracefully skips when the services are unavailable locally.
 - Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.
 - API Deploys: Ansible now always uploads the freshly built API binary and metadata to SeaweedFS (the optional `PLOY_UPLOAD_API_BINARY` knob was removed) so Nomad jobs never refer to missing artifacts.
 - Orchestration: HealthMonitor.WaitForHealthyAllocations now stops sleeping once the timeout is exhausted even when allocation lookups fail, trimming deploy wait loops.

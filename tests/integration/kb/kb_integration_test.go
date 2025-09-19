@@ -10,62 +10,37 @@ import (
 
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/iw2rmb/ploy/internal/mods"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/testing/helpers"
+	"github.com/iw2rmb/ploy/tests/integration/internal/testenv"
 )
 
 // KBIntegrationSuite tests KB learning with real services
 type KBIntegrationSuite struct {
 	suite.Suite
-	consulClient  *consulapi.Client
-	storageClient *storage.StorageClient
-	kbStorage     *mods.SeaweedFSKBStorage
-	lockManager   *mods.ConsulKBLockManager
+	consulClient   *consulapi.Client
+	storageBackend storage.Storage
+	kbStorage      *mods.SeaweedFSKBStorage
+	lockManager    *mods.ConsulKBLockManager
 }
 
 func (s *KBIntegrationSuite) SetupSuite() {
-	s.skipIfNoServices()
+	t := s.T()
+	if testing.Short() {
+		t.Skip("skipping KB integration suite in short mode")
+	}
 
-	var err error
+	s.consulClient = testenv.RequireConsulClient(t)
+	helpers.WithEnvVar(t, "CONSUL_ADDR", helpers.GetEnvOrDefault("CONSUL_HTTP_ADDR", "localhost:8500"))
+	s.storageBackend = testenv.RequireSeaweedStorage(t)
 
-	// Consul client for locking
-	consulConfig := consulapi.DefaultConfig()
-	consulConfig.Address = "localhost:8500"
-	s.consulClient, err = consulapi.NewClient(consulConfig)
-	require.NoError(s.T(), err)
-
-	// Storage client
-	s.storageClient, err = storage.NewStorageClient(&storage.Config{
-		Endpoint: "http://localhost:8888",
-	})
-	require.NoError(s.T(), err)
-
-	// KB storage with real services
 	kv := orchestration.NewKV()
 	s.lockManager = mods.NewConsulKBLockManager(kv)
-	s.kbStorage = mods.NewSeaweedFSKBStorage(s.storageClient, s.lockManager)
-}
-
-func (s *KBIntegrationSuite) skipIfNoServices() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	// Quick health check
-	if s.consulClient == nil {
-		consulConfig := consulapi.DefaultConfig()
-		consulConfig.Address = "localhost:8500"
-		client, err := consulapi.NewClient(consulConfig)
-		if err != nil || func() bool {
-			_, err := client.Status().Leader()
-			return err != nil
-		}() {
-			s.T().Skip("Consul not available - run docker-compose up -d")
-		}
-	}
+	s.kbStorage = mods.NewSeaweedFSKBStorage(s.storageBackend, s.lockManager)
 }
 
 func (s *KBIntegrationSuite) TestKBLearningIntegration() {
