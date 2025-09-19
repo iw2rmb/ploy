@@ -231,23 +231,6 @@ func executeApplyFirst(runner *ModRunner) error {
 	return nil
 }
 
-// substituteHCLTemplate performs HCL template substitution (needs to be implemented based on original logic)
-func substituteORWTemplate(prePath, runID string) (string, error) {
-	// Backward-compatible wrapper that reads from process env
-	vars := map[string]string{
-		"MODS_CONTEXT_DIR":     os.Getenv("MODS_CONTEXT_DIR"),
-		"MODS_OUT_DIR":         os.Getenv("MODS_OUT_DIR"),
-		"MODS_ORW_APPLY_IMAGE": os.Getenv("MODS_ORW_APPLY_IMAGE"),
-		"MODS_REGISTRY":        os.Getenv("MODS_REGISTRY"),
-		"PLOY_CONTROLLER":      os.Getenv("PLOY_CONTROLLER"),
-		"MOD_ID":               os.Getenv("MOD_ID"),
-		"PLOY_SEAWEEDFS_URL":   os.Getenv("PLOY_SEAWEEDFS_URL"),
-		"MODS_DIFF_KEY":        os.Getenv("MODS_DIFF_KEY"),
-		"NOMAD_DC":             os.Getenv("NOMAD_DC"),
-	}
-	return substituteORWTemplateVars(prePath, runID, vars)
-}
-
 // substituteORWTemplateVars performs HCL substitution using provided variables (no global env mutation)
 func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (string, error) {
 	submittedPath := strings.ReplaceAll(prePath, ".pre.hcl", ".submitted.hcl")
