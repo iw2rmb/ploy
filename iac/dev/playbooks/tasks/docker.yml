@@ -1,0 +1,260 @@
+---
+# Docker engine, registry, and tooling
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+    state: present
+
+- name: Add ploy user to docker group
+  user:
+    name: ploy
+    groups: docker
+    append: true
+
+- name: Enhanced Docker service management
+  block:
+    - name: Check Docker service status
+      command: systemctl is-active docker
+      register: docker_service_status
+      ignore_errors: true
+      changed_when: false
+
+    - name: Check Docker service health if running
+      command: docker info
+      register: docker_info_check
+      ignore_errors: true
+      changed_when: false
+      when: docker_service_status.stdout == "active"
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+        daemon_reload: true
+      when: docker_service_status.stdout != "active"
+      register: docker_start_result
+      retries: 3
+      delay: 5
+      until: docker_start_result is succeeded
+
+    - name: Wait for Docker socket to be available
+      wait_for:
+        path: /var/run/docker.sock
+        state: present
+        timeout: 30
+      when: docker_service_status.stdout != "active" or docker_info_check is failed
+
+    - name: Verify Docker is responding
+      command: docker version
+      register: docker_version_check
+      retries: 3
+      delay: 5
+      until: docker_version_check.rc == 0
+      changed_when: false
+
+- name: Setup Docker Registry for local image management
+  block:
+    - name: Ensure registry domain resolves locally
+      lineinfile:
+        path: /etc/hosts
+        regexp: '.*{{ ploy.registry_domain | regex_escape }}$'
+        line: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }} {{ ploy.registry_domain }}"
+        owner: root
+        group: root
+        mode: '0644'
+        create: true
+      when: ploy.registry_domain is defined and ploy.registry_domain | length > 0
+
+    - name: Create registry directory
+      file:
+        path: /var/lib/docker-registry
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Pull Docker Registry image
+      docker_image:
+        name: registry:2
+        source: pull
+      retries: 3
+      delay: 10
+
+    - name: Run Docker Registry container
+      docker_container:
+        name: registry
+        image: registry:2
+        state: started
+        restart_policy: always
+        ports:
+          - "5000:5000"
+        volumes:
+          - /var/lib/docker-registry:/var/lib/registry
+        etc_hosts:
+          "{{ ploy.registry_domain }}": "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
+        env:
+          REGISTRY_STORAGE_DELETE_ENABLED: "true"
+        healthcheck:
+          test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://{{ ploy.registry_domain }}:5000/v2/"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+      register: registry_container_result
+      retries: 3
+      delay: 5
+      until: registry_container_result is succeeded
+
+    - name: Wait for Docker Registry to be ready
+      uri:
+        url: http://{{ ploy.registry_domain }}:5000/v2/
+        method: GET
+        status_code: 200
+      register: registry_health_check
+      retries: 10
+      delay: 5
+      until: registry_health_check.status == 200
+
+- name: Install Docker Compose
+  block:
+    - name: Check if Docker Compose is already installed
+      stat:
+        path: /usr/local/bin/docker-compose
+      register: docker_compose_binary
+
+    - name: Get current Docker Compose version (if installed)
+      command: /usr/local/bin/docker-compose version --short
+      register: current_docker_compose_version
+      changed_when: false
+      ignore_errors: true
+      when: docker_compose_binary.stat.exists
+
+    - name: Download Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+      when: not docker_compose_binary.stat.exists or docker_compose_version not in (current_docker_compose_version.stdout | default(''))
+
+- name: Setup Docker daemon configuration with optional Kontain runtime
+  block:
+    - name: Check if KVM is available
+      stat:
+        path: /dev/kvm
+      register: kvm_device
+
+    - name: Install Kontain using official script (if KVM available)
+      shell: |
+        curl -s https://raw.githubusercontent.com/kontainapp/km/current/km-releases/kontain-install.sh | bash
+      when: kvm_device.stat.exists
+      args:
+        creates: /opt/kontain/bin/krun
+
+    - name: Set KVM availability fact for template
+      set_fact:
+        kvm_available: "{{ kvm_device.stat.exists }}"
+
+    - name: Configure Docker daemon using standardized template
+      template:
+        src: ../../common/templates/docker-daemon.json.j2
+        dest: /etc/docker/daemon.json
+        backup: true
+        owner: root
+        group: root
+        mode: '0644'
+      register: docker_config_result
+
+    - name: Validate Docker daemon configuration
+      command: dockerd --validate --config-file=/etc/docker/daemon.json
+      register: docker_config_validation
+      failed_when: docker_config_validation.rc != 0
+      changed_when: false
+
+    - name: Restart Docker if configuration changed
+      systemd:
+        name: docker
+        state: restarted
+        daemon_reload: true
+      when: docker_config_result.changed
+      register: docker_restart_result
+      retries: 3
+      delay: 5
+      until: docker_restart_result is succeeded
+
+    - name: Verify Docker restart was successful
+      command: docker info
+      retries: 5
+      delay: 3
+      register: docker_info_verify
+      changed_when: false
+      when: docker_config_result.changed
+
+- name: Install Docker Buildx
+  block:
+    - name: Create Docker CLI plugins directory
+      file:
+        path: /usr/local/lib/docker/cli-plugins
+        state: directory
+        mode: '0755'
+
+    - name: Check if Docker Buildx is already installed
+      stat:
+        path: /usr/local/lib/docker/cli-plugins/docker-buildx
+      register: buildx_binary
+
+    - name: Get current Docker Buildx version (if installed)
+      command: /usr/local/lib/docker/cli-plugins/docker-buildx version
+      register: current_buildx_version
+      changed_when: false
+      ignore_errors: true
+      when: buildx_binary.stat.exists
+
+    - name: Download Docker Buildx plugin
+      get_url:
+        url: "https://github.com/docker/buildx/releases/download/v0.17.1/buildx-v0.17.1.linux-amd64"
+        dest: /usr/local/lib/docker/cli-plugins/docker-buildx
+        mode: '0755'
+      when: not buildx_binary.stat.exists or "0.17.1" not in (current_buildx_version.stdout | default(''))
+
+    - name: Create Docker config directory for ploy user
+      file:
+        path: /home/ploy/.docker
+        state: directory
+        owner: ploy
+        group: ploy
+        mode: '0755'
+
+    - name: Configure Docker to use buildx plugin
+      copy:
+        content: |
+          {
+            "cliPluginsExtraDirs": ["/usr/local/lib/docker/cli-plugins"]
+          }
+        dest: /home/ploy/.docker/config.json
+        owner: ploy
+        group: ploy
+        mode: '0644'

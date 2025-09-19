@@ -101,6 +101,7 @@
               path: "{{ build_directory }}"
               pull: true
               nocache: true
+              network: host
               args:
                 ORW_BUILD_TS: "{{ ansible_date_time.iso8601 }}"
             state: present
