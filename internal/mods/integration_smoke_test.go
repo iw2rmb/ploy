@@ -41,11 +41,16 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 		putFileFn = oldPutFile
 		putJSONFn = oldPutJSON
 	}()
+	oldValidate := validateJob
+	validateJob = func(string) error { return nil }
 	mockSubmitter := &MockJobSubmitter{JobResults: map[string]JobResult{}}
 	runner.SetJobSubmitter(mockSubmitter)
 	runner.SetHealingOrchestrator(NewProdHealingOrchestrator(runner.jobSubmitter, runner))
 	_ = os.Setenv("GITLAB_TOKEN", "test-token-for-integration")
-	defer func() { _ = os.Unsetenv("GITLAB_TOKEN") }()
+	defer func() {
+		_ = os.Unsetenv("GITLAB_TOKEN")
+		validateJob = oldValidate
+	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	result, err := runner.Run(ctx)
