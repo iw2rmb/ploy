@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -32,14 +33,24 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	}
 	oldSubmit := submitAndWaitTerminal
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	oldDownload := downloadToFileFn
 	oldPutFile := putFileFn
 	oldPutJSON := putJSONFn
+	oldGetJSON := getJSONFn
+	downloadToFileFn = func(_ string, dest string) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0755)
+		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+		return os.WriteFile(dest, []byte(diff), 0644)
+	}
 	putFileFn = func(string, string, string, string) error { return nil }
 	putJSONFn = func(string, string, []byte) error { return nil }
+	getJSONFn = func(string, string) ([]byte, int, error) { return nil, 404, nil }
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
+		downloadToFileFn = oldDownload
 		putFileFn = oldPutFile
 		putJSONFn = oldPutJSON
+		getJSONFn = oldGetJSON
 	}()
 	oldValidate := validateJob
 	validateJob = func(string) error { return nil }
