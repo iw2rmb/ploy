@@ -109,8 +109,12 @@ func (d *AnalysisDispatcher) CleanupOldJobs(ctx context.Context, maxAge time.Dur
 		if err := d.kv.Delete(fmt.Sprintf("ploy/analysis/jobs/%s", job.ID)); err != nil {
 			return fmt.Errorf("failed to delete job %s: %w", job.ID, err)
 		}
+		deregister := d.deregisterFn
+		if deregister == nil {
+			deregister = orchestration.DeregisterJob
+		}
 		jobName := fmt.Sprintf("analysis-%s-%s", job.Analyzer, job.ID)
-		_ = orchestration.DeregisterJob(jobName, false)
+		_ = deregister(jobName, false)
 	}
 
 	return nil

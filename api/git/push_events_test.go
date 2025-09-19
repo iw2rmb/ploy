@@ -127,3 +127,18 @@ func TestAuthenticatedRemoteURL(t *testing.T) {
 		t.Fatalf("expected oauth2 credentials injected, got %q", got)
 	}
 }
+
+// TestPushBranchReturnsErrorPropagated verifies the synchronous wrapper surfaces failures.
+func TestPushBranchReturnsErrorPropagated(t *testing.T) {
+	_ = os.Unsetenv("GITLAB_TOKEN")
+	runner := &fakeRunner{failAt: 2}
+	svc := NewService(ServiceConfig{Runner: runner})
+
+	err := svc.PushBranch(context.Background(), "/repo", "https://example.com/repo.git", "feature")
+	if err == nil {
+		t.Fatalf("expected push error when runner fails")
+	}
+	if !strings.Contains(err.Error(), "set remote origin") && !strings.Contains(err.Error(), "git push failed") {
+		t.Fatalf("expected error to mention git failure, got %v", err)
+	}
+}
