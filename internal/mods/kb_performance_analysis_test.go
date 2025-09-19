@@ -10,7 +10,7 @@ import (
 )
 
 func TestPerformanceAnalyzer_StorageAnalysis(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
@@ -36,7 +36,7 @@ func TestPerformanceAnalyzer_StorageAnalysis(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_QueryAnalysis(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
@@ -63,7 +63,7 @@ func TestPerformanceAnalyzer_QueryAnalysis(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_ComprehensiveReport(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
@@ -88,7 +88,7 @@ func TestPerformanceAnalyzer_ComprehensiveReport(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_ValidateTargets(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
@@ -99,7 +99,7 @@ func TestPerformanceAnalyzer_ValidateTargets(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_CustomConfig(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 
 	// Test with high deduplication scenario
 	highDedupConfig := &PerformanceConfig{
@@ -122,7 +122,7 @@ func TestPerformanceAnalyzer_CustomConfig(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_LowDuplicationScenario(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 
 	// Test with minimal deduplication scenario
 	lowDedupConfig := &PerformanceConfig{
@@ -145,7 +145,7 @@ func TestPerformanceAnalyzer_LowDuplicationScenario(t *testing.T) {
 }
 
 func TestPerformanceAnalyzer_RealisticTimings(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
@@ -181,7 +181,7 @@ func TestDefaultPerformanceConfig(t *testing.T) {
 
 // Benchmark test to ensure performance analysis is efficient
 func BenchmarkPerformanceAnalysis(b *testing.B) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	config.SampleSize = 10000 // Larger sample for benchmarking
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
@@ -197,7 +197,7 @@ func BenchmarkPerformanceAnalysis(b *testing.B) {
 }
 
 func TestPerformanceReport_Summary(t *testing.T) {
-	mockStorage := &CompatibilityMockKBStorage{}
+	mockStorage := newPerformanceTestKBStorage()
 	config := DefaultPerformanceConfig()
 	analyzer := NewPerformanceAnalyzer(mockStorage, config)
 
