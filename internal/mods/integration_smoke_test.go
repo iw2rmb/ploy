@@ -37,6 +37,10 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	oldPutFile := putFileFn
 	oldPutJSON := putJSONFn
 	oldGetJSON := getJSONFn
+	oldValidateDiffPaths := validateDiffPathsFn
+	oldValidateUnifiedDiff := validateUnifiedDiffFn
+	oldApplyDiff := applyUnifiedDiffFn
+	oldHasRepoChanges := hasRepoChangesFn
 	downloadToFileFn = func(_ string, dest string) error {
 		_ = os.MkdirAll(filepath.Dir(dest), 0755)
 		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
@@ -45,12 +49,20 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	putFileFn = func(string, string, string, string) error { return nil }
 	putJSONFn = func(string, string, []byte) error { return nil }
 	getJSONFn = func(string, string) ([]byte, int, error) { return nil, 404, nil }
+	validateDiffPathsFn = func(string, []string) error { return nil }
+	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDownload
 		putFileFn = oldPutFile
 		putJSONFn = oldPutJSON
 		getJSONFn = oldGetJSON
+		validateDiffPathsFn = oldValidateDiffPaths
+		validateUnifiedDiffFn = oldValidateUnifiedDiff
+		applyUnifiedDiffFn = oldApplyDiff
+		hasRepoChangesFn = oldHasRepoChanges
 	}()
 	oldValidate := validateJob
 	validateJob = func(string) error { return nil }
