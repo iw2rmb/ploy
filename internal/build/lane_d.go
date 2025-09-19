@@ -38,7 +38,8 @@ func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	defer cancel()
 
 	// docker build
-	if err := runDockerCommand(ctx, logWriter, srcDir, []string{"build", "-t", dockerImage, "."}, appEnvVars); err != nil {
+	buildArgs := []string{"build", "--network", "host", "-t", dockerImage, "."}
+	if err := runDockerCommand(ctx, logWriter, srcDir, buildArgs, appEnvVars); err != nil {
 		_ = persistBuildLog(context.Context(c.Context()), deps, logBuffer.Bytes(), logsKey)
 		return "", builderID, fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("docker build failed: %v", err))
 	}
