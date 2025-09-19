@@ -24,11 +24,11 @@ allprojects {\n  // Disable tests to speed up container builds\n  tasks.withType
     # pick largest by size
     SEL=$(printf '%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%s %n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); \
   fi; \
-  test -n "$SEL" && { mkdir -p /src/build/libs; cp "$SEL" /src/build/libs/app.jar; } || { echo "Failed to select JAR"; exit 1; }
+  test -n "$SEL" && { mkdir -p /out; cp "$SEL" /out/app.jar; } || { echo "Failed to select JAR"; exit 1; }
 
-FROM eclipse-temurin:{{ .JavaVersion }}-jre
+FROM eclipse-temurin:{{ .JavaVersion }}-jre-alpine
 WORKDIR /app
-COPY --from=build /src/build/libs/*.jar /app/app.jar
+COPY --from=build /out/app.jar /app/app.jar
 ENV PORT=8080
 EXPOSE 8080
 {{- if .MainClass }}

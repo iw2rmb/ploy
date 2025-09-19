@@ -40,8 +40,29 @@ func TestGenerateDockerfile_GradleMainClass(t *testing.T) {
 	require.NoError(t, err)
 	content := string(b)
 	require.Contains(t, content, "FROM gradle:8-jdk17 AS build")
+	require.Contains(t, content, "FROM eclipse-temurin:17-jre-alpine")
+	require.Contains(t, content, "COPY --from=build /out/app.jar /app/app.jar")
 	require.Contains(t, content, "ENTRYPOINT")
 	require.Contains(t, content, "com.example.App")
+}
+
+func TestGenerateDockerfile_MavenLeanRuntime(t *testing.T) {
+	dir := t.TempDir()
+	facts := project.BuildFacts{
+		Language:  "java",
+		BuildTool: "maven",
+		Versions:  project.Versions{Java: "11.0.20"},
+	}
+
+	require.NoError(t, generateDockerfileWithFacts(dir, facts))
+
+	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	require.NoError(t, err)
+	content := string(b)
+	require.Contains(t, content, "FROM maven:3-eclipse-temurin-11 AS build")
+	require.Contains(t, content, "JAR=\"$(find target")
+	require.Contains(t, content, "FROM eclipse-temurin:11-jre-alpine")
+	require.Contains(t, content, "COPY --from=build /out/app.jar /app/app.jar")
 }
 
 func TestGenerateDockerfile_NodeProject(t *testing.T) {

@@ -2,11 +2,15 @@ FROM maven:3-eclipse-temurin-{{ .JavaVersion }} AS build
 WORKDIR /src
 COPY . .
 RUN chmod +x ./mvnw || true \
- && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package )
+ && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package ) \
+ && JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)" \
+ && [ -n "$JAR" ] \
+ && mkdir -p /out \
+ && cp "$JAR" /out/app.jar
 
-FROM eclipse-temurin:{{ .JavaVersion }}-jre
+FROM eclipse-temurin:{{ .JavaVersion }}-jre-alpine
 WORKDIR /app
-COPY --from=build /src/target/*.jar /app/app.jar
+COPY --from=build /out/app.jar /app/app.jar
 ENV PORT=8080
 EXPOSE 8080
 {{- if .MainClass }}
@@ -14,4 +18,3 @@ ENTRYPOINT ["java","-cp","/app/app.jar","{{ .MainClass }}"]
 {{- else }}
 ENTRYPOINT ["java","-jar","/app/app.jar"]
 {{- end }}
-
