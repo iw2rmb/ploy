@@ -43,6 +43,7 @@ type Operation struct {
 	err    error
 }
 
+// newOperation constructs an Operation with pre-wired channels for event delivery.
 func newOperation(name string) *Operation {
 	return &Operation{name: name, events: make(chan Event, 6), done: make(chan struct{})}
 }
@@ -61,10 +62,12 @@ func (o *Operation) Wait() error {
 // Err is an alias for Wait to interoperate with legacy call sites.
 func (o *Operation) Err() error { return o.Wait() }
 
+// emit queues an intermediate event for observers without closing the operation.
 func (o *Operation) emit(event Event) {
 	o.events <- event
 }
 
+// finalize records the terminal event, captures any error, and closes the operation channels.
 func (o *Operation) finalize(event Event) {
 	o.mu.Lock()
 	o.err = event.Err
