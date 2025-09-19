@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -309,6 +310,33 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	oldValidate := validateJob
 	validateJob = func(string) error { return nil }
 	defer func() { validateJob = oldValidate }()
+	oldSubmit := submitAndWaitTerminal
+	oldDL := downloadToFileFn
+	oldPut := putFileFn
+	oldHas := hasRepoChangesFn
+	oldVDP := validateDiffPathsFn
+	oldVUD := validateUnifiedDiffFn
+	oldAD := applyUnifiedDiffFn
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	downloadToFileFn = func(_ string, dest string) error {
+		_ = os.MkdirAll(filepath.Dir(dest), 0755)
+		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
+		return os.WriteFile(dest, []byte(diff), 0644)
+	}
+	putFileFn = func(string, string, string, string) error { return nil }
+	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
+	validateDiffPathsFn = func(string, []string) error { return nil }
+	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
+	defer func() {
+		submitAndWaitTerminal = oldSubmit
+		downloadToFileFn = oldDL
+		putFileFn = oldPut
+		hasRepoChangesFn = oldHas
+		validateDiffPathsFn = oldVDP
+		validateUnifiedDiffFn = oldVUD
+		applyUnifiedDiffFn = oldAD
+	}()
 	config := &ModConfig{
 		ID:         "test-healing",
 		TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
