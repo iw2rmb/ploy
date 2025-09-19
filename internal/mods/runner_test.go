@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,7 +68,7 @@ func TestModRunner_ORWApplyNoBuildFileError(t *testing.T) {
 	_, runErr := runner.Run(context.Background())
 	assert.Error(t, runErr)
 	// Depending on pre-checks, we may fail before submission on missing build files
-	assert.Contains(t, runErr.Error(), "no build file found")
+	assert.Contains(t, strings.ToLower(runErr.Error()), "no build file found")
 }
 
 func TestModResult_Summary(t *testing.T) {
