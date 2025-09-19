@@ -327,8 +327,8 @@ func TestLogSanitizer_Sanitize(t *testing.T) {
 }
 
 func TestCreateSanitizedLogs(t *testing.T) {
-	stdout := "Build successful with token ghp_abc123def456"
-	stderr := "Warning: API key detected: api_key=secret123456"
+	stdout := "Build successful with token ghp_abcd1234efgh5678ijkl9012mnop3456qrst"
+	stderr := "Warning: API key detected: api_key=secret1234567890abcd"
 
 	logs := CreateSanitizedLogs(stdout, stderr)
 
@@ -363,7 +363,7 @@ func TestValidateSignature(t *testing.T) {
 }
 
 func TestSanitizeForStorage(t *testing.T) {
-	input := "Build log with sensitive data: token=ghp_secrettoken123 and password=mysecret"
+	input := "Build log with sensitive data: token=ghp_abcd1234efgh5678ijkl9012mnop3456qrst and password=mysecret"
 	sanitized := SanitizeForStorage(input)
 
 	assert.NotContains(t, sanitized, "ghp_secrettoken123")
