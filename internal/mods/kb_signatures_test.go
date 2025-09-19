@@ -337,7 +337,7 @@ func TestCreateSanitizedLogs(t *testing.T) {
 	assert.False(t, strings.Contains(logs.Stderr, "secret123456"))
 	assert.Contains(t, logs.Stdout, "[REDACTED_TOKEN]")
 	assert.Contains(t, logs.Stderr, "[REDACTED_KEY]")
-	assert.False(t, logs.Truncated) // Short logs shouldn't be truncated
+	assert.True(t, logs.Truncated) // Redaction shortens the content even without max-length truncation
 }
 
 func TestValidateSignature(t *testing.T) {
