@@ -1,0 +1,135 @@
+---
+# Build tooling installations (cosign, syft, grype, opa)
+- name: Install build tools
+  block:
+    - name: Install make and build-essential
+      apt:
+        name:
+          - build-essential
+          - cmake
+          - pkg-config
+        state: present
+
+    - name: Check if Cosign is already installed
+      stat:
+        path: /usr/local/bin/cosign
+      register: cosign_binary
+
+    - name: Get current Cosign version (if installed)
+      command: /usr/local/bin/cosign version
+      register: current_cosign_version
+      changed_when: false
+      ignore_errors: true
+      when: cosign_binary.stat.exists
+
+    - name: Download Cosign
+      get_url:
+        url: "https://github.com/sigstore/cosign/releases/download/v{{ build_tools.cosign.version }}/cosign-linux-amd64"
+        dest: /usr/local/bin/cosign
+        mode: '0755'
+      when: not cosign_binary.stat.exists or build_tools.cosign.version not in (current_cosign_version.stdout | default(''))
+
+    - name: Verify Cosign installation
+      command: /usr/local/bin/cosign version
+      register: cosign_version
+      changed_when: false
+
+    - name: Display Cosign version
+      debug:
+        msg: "Cosign installed successfully: {{ cosign_version.stdout_lines[0] if cosign_version.stdout_lines else 'Version info not available' }}"
+
+    - name: Check if Syft is already installed
+      stat:
+        path: /usr/local/bin/syft
+      register: syft_binary
+
+    - name: Get current Syft version (if installed)
+      command: /usr/local/bin/syft version
+      register: current_syft_version
+      changed_when: false
+      ignore_errors: true
+      when: syft_binary.stat.exists
+
+    - name: Download Syft
+      get_url:
+        url: "https://github.com/anchore/syft/releases/download/v{{ build_tools.syft.version }}/syft_{{ build_tools.syft.version }}_linux_amd64.tar.gz"
+        dest: /tmp/syft.tar.gz
+      when: not syft_binary.stat.exists or build_tools.syft.version not in (current_syft_version.stdout | default(''))
+
+    - name: Extract Syft
+      unarchive:
+        src: /tmp/syft.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+      when: not syft_binary.stat.exists or build_tools.syft.version not in (current_syft_version.stdout | default(''))
+
+    - name: Verify Syft installation
+      command: /usr/local/bin/syft version
+      register: syft_version
+      changed_when: false
+
+    - name: Display Syft version
+      debug:
+        msg: "Syft installed successfully: {{ syft_version.stdout_lines[1] if syft_version.stdout_lines|length > 1 else 'Version info not available' }}"
+
+    - name: Check if Grype is already installed
+      stat:
+        path: /usr/local/bin/grype
+      register: grype_binary
+
+    - name: Get current Grype version (if installed)
+      command: /usr/local/bin/grype version
+      register: current_grype_version
+      changed_when: false
+      ignore_errors: true
+      when: grype_binary.stat.exists
+
+    - name: Download Grype
+      get_url:
+        url: "https://github.com/anchore/grype/releases/download/v{{ build_tools.grype.version }}/grype_{{ build_tools.grype.version }}_linux_amd64.tar.gz"
+        dest: /tmp/grype.tar.gz
+      when: not grype_binary.stat.exists or build_tools.grype.version not in (current_grype_version.stdout | default(''))
+
+    - name: Extract Grype
+      unarchive:
+        src: /tmp/grype.tar.gz
+        dest: /usr/local/bin
+        remote_src: true
+      when: not grype_binary.stat.exists or build_tools.grype.version not in (current_grype_version.stdout | default(''))
+
+    - name: Verify Grype installation
+      command: /usr/local/bin/grype version
+      register: grype_version
+      changed_when: false
+
+    - name: Display Grype version
+      debug:
+        msg: "Grype installed successfully: {{ grype_version.stdout_lines[0] if grype_version.stdout_lines else 'Version info not available' }}"
+
+    - name: Check if OPA is already installed
+      stat:
+        path: /usr/local/bin/opa
+      register: opa_binary
+
+    - name: Get current OPA version (if installed)
+      command: /usr/local/bin/opa version
+      register: current_opa_version
+      changed_when: false
+      ignore_errors: true
+      when: opa_binary.stat.exists
+
+    - name: Download OPA
+      get_url:
+        url: "https://github.com/open-policy-agent/opa/releases/download/v{{ build_tools.opa.version }}/opa_linux_amd64"
+        dest: /usr/local/bin/opa
+        mode: '0755'
+      when: not opa_binary.stat.exists or build_tools.opa.version not in (current_opa_version.stdout | default(''))
+
+    - name: Verify OPA installation
+      command: /usr/local/bin/opa version
+      register: opa_version
+      changed_when: false
+
+    - name: Display OPA version
+      debug:
+        msg: "OPA installed successfully: {{ opa_version.stdout_lines[0] if opa_version.stdout_lines else 'Version info not available' }}"

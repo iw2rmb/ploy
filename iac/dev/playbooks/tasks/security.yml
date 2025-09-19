@@ -1,0 +1,69 @@
+---
+# Security and monitoring configuration
+- name: Configure NVD API for vulnerability data
+  block:
+    - name: Create NVD API configuration directory
+      file:
+        path: /etc/ploy/nvd
+        state: directory
+        mode: '0755'
+        owner: ploy
+        group: ploy
+
+    - name: Create NVD API configuration file
+      copy:
+        content: |
+          # NVD API Configuration for ARF Phase 4
+          # API documentation: https://nvd.nist.gov/developers/vulnerabilities
+          api_endpoint: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+          rate_limit: 5
+          timeout: 30
+          cache_duration: 3600
+          # To use enhanced rate limits, add your API key:
+          # api_key: "your-nvd-api-key-here"
+        dest: /etc/ploy/nvd/config.yaml
+        owner: ploy
+        group: ploy
+        mode: '0644'
+
+- name: Install production monitoring dependencies
+  apt:
+    name:
+      - htop
+      - iotop
+      - netstat-nat
+      - tcpdump
+      - strace
+      - lsof
+      - sysstat
+      - procps
+    state: present
+
+- name: Configure performance monitoring tools
+  block:
+    - name: Enable sysstat data collection
+      replace:
+        path: /etc/default/sysstat
+        regexp: '^ENABLED="false"'
+        replace: 'ENABLED="true"'
+
+    - name: Start sysstat service
+      systemd:
+        name: sysstat
+        state: started
+        enabled: true
+
+- name: Create ARF Phase 4 configuration directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: ploy
+    group: ploy
+  loop:
+    - /etc/ploy/security
+    - /etc/ploy/workflows
+    - /etc/ploy/monitoring
+    - /var/log/ploy/security
+    - /var/log/ploy/workflows
+    - /var/cache/ploy/vulnerability-db
