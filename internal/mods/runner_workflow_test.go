@@ -137,7 +137,7 @@ func TestModRunner_Run(t *testing.T) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
 				assert.False(t, git.CommitCalled)
-				assert.False(t, build.BuildCalled)
+				assert.True(t, build.BuildCalled) // baseline build runs before validation error surfaces
 				assert.False(t, git.PushCalled)
 				// restore for following tests
 				validateJob = baseValidate
@@ -161,11 +161,11 @@ func TestModRunner_Run(t *testing.T) {
 				}
 			},
 			expectError:    true,
-			expectedErrMsg: "build check failed",
+			expectedErrMsg: "Baseline build failed",
 			verifyMocks: func(t *testing.T, git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
 				assert.True(t, git.CloneCalled)
 				assert.True(t, git.CreateBranchCalled)
-				assert.True(t, git.CommitCalled)
+				assert.False(t, git.CommitCalled) // abort before commit when baseline build fails
 				assert.True(t, build.BuildCalled)
 				assert.False(t, git.PushCalled) // Should not push on build failure
 			},
