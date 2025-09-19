@@ -367,9 +367,9 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 
 	if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {
 		r.emit(ctx, "build", "build", "error", message)
-		result.ErrorMessage = opts.FailureMessage
+		result.ErrorMessage = message
 		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("%s: %s", opts.FailureMessage, message)
+		return nil, fmt.Errorf("%s", message)
 	}
 
 	maxRetries := r.config.SelfHeal.MaxRetries
