@@ -48,7 +48,7 @@ ploy:
   storage_backend: "seaweedfs"
   dns:
     provider: "coredns"
-    domain: "deploy.local"
+    domain: "ploy.local"
     target_ip: "{{ hostvars[groups['all'][0]]['ansible_default_ipv4']['address'] }}"
     ttl: 300
     enable_ipv6: false
@@ -108,6 +108,45 @@ seaweedfs:
     debug:
       name: "ploy-debug"
       replication: "000"  # No replication for ephemeral debug artifacts
+
+# CoreDNS configuration
+coredns:
+  version: "1.11.1"
+  port: 1053
+  ttl: 300
+  cache_ttl: 120
+  zone: "{{ ploy.dns.domain }}"
+  service_ip: "{{ ploy.dns.target_ip }}"
+  upstream:
+    - "1.1.1.1"
+    - "8.8.8.8"
+  health_port: 8088
+  ready_port: 8181
+  serial: 2025091801
+  soa_rname: "hostmaster.{{ ploy.dns.domain }}."
+  refresh: 7200
+  retry: 3600
+  expire: 1209600
+  minimum: 300
+  ns: "ns1.{{ ploy.dns.domain }}."
+  ns_host: "ns1"
+  a_records:
+    - name: "@"
+      target: "{{ ploy.dns.target_ip }}"
+    - name: "nomad.control"
+      target: "{{ ploy.dns.target_ip }}"
+    - name: "seaweedfs-master.storage"
+      target: "{{ ploy.dns.target_ip }}"
+    - name: "seaweedfs-volume.storage"
+      target: "{{ ploy.dns.target_ip }}"
+    - name: "seaweedfs-filer.storage"
+      target: "{{ ploy.dns.target_ip }}"
+  srv_records:
+    - name: "_seaweedfs._tcp.seaweedfs-filer.storage"
+      priority: 10
+      weight: 10
+      port: "{{ seaweedfs.filer_port }}"
+      target: "seaweedfs-filer.storage.{{ ploy.dns.domain }}."
 
 # External storage configuration for api
 storage_config:

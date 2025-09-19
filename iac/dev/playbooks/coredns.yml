@@ -1,0 +1,177 @@
+---
+- name: Install and configure CoreDNS
+  hosts: linux_hosts
+  become: true
+  vars_files:
+    - ../vars/main.yml
+
+  handlers:
+    - name: restart coredns
+      systemd:
+        name: coredns
+        state: restarted
+        enabled: true
+        daemon_reload: true
+
+    - name: restart dnsmasq
+      systemd:
+        name: dnsmasq
+        state: restarted
+        enabled: true
+
+    - name: restart systemd-resolved
+      systemd:
+        name: systemd-resolved
+        state: restarted
+
+  tasks:
+    - name: Ensure coredns group exists
+      group:
+        name: coredns
+        system: true
+
+    - name: Ensure coredns user exists
+      user:
+        name: coredns
+        group: coredns
+        home: /var/lib/coredns
+        shell: /usr/sbin/nologin
+        system: true
+        create_home: true
+
+    - name: Ensure CoreDNS directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: coredns
+        group: coredns
+        mode: '0750'
+      loop:
+        - /etc/coredns
+        - /etc/coredns/zones
+        - /var/lib/coredns
+
+    - name: Check for existing CoreDNS binary
+      stat:
+        path: /usr/local/bin/coredns
+      register: coredns_binary
+
+    - name: Get installed CoreDNS version
+      command: /usr/local/bin/coredns -version
+      register: coredns_version_check
+      changed_when: false
+      failed_when: false
+      when: coredns_binary.stat.exists
+
+    - name: Determine if CoreDNS needs installation
+      set_fact:
+        coredns_install_needed: "{{ (not coredns_binary.stat.exists) or (coredns_version_check.stdout is not defined) or (('CoreDNS-' ~ coredns.version) not in (coredns_version_check.stdout | default(''))) }}"
+
+    - name: Download CoreDNS archive
+      get_url:
+        url: "https://github.com/coredns/coredns/releases/download/v{{ coredns.version }}/coredns_{{ coredns.version }}_linux_amd64.tgz"
+        dest: /tmp/coredns.tgz
+        mode: '0644'
+      when: coredns_install_needed | bool
+
+    - name: Ensure CoreDNS temp directory exists
+      file:
+        path: /tmp/coredns
+        state: directory
+        mode: '0755'
+      when: coredns_install_needed | bool
+
+    - name: Extract CoreDNS archive
+      unarchive:
+        src: /tmp/coredns.tgz
+        dest: /tmp/coredns
+        remote_src: true
+        creates: /tmp/coredns/coredns
+      when: coredns_install_needed | bool
+
+    - name: Install CoreDNS binary
+      copy:
+        src: /tmp/coredns/coredns
+        dest: /usr/local/bin/coredns
+        owner: root
+        group: root
+        mode: '0755'
+        remote_src: true
+      when: coredns_install_needed | bool
+      notify: restart coredns
+
+    - name: Clean up CoreDNS archive
+      file:
+        path: /tmp/coredns.tgz
+        state: absent
+      when: coredns_install_needed | bool
+
+    - name: Clean up CoreDNS extraction directory
+      file:
+        path: /tmp/coredns
+        state: absent
+      when: coredns_install_needed | bool
+      notify: restart coredns
+
+    - name: Deploy CoreDNS Corefile
+      template:
+        src: ../../common/templates/coredns/Corefile.j2
+        dest: /etc/coredns/Corefile
+        owner: root
+        group: coredns
+        mode: '0640'
+      notify: restart coredns
+
+    - name: Deploy CoreDNS zone file
+      template:
+        src: ../../common/templates/coredns/zone.db.j2
+        dest: "/etc/coredns/zones/{{ coredns.zone }}.db"
+        owner: root
+        group: coredns
+        mode: '0640'
+      notify: restart coredns
+
+    - name: Install CoreDNS systemd unit
+      template:
+        src: ../../common/templates/coredns.service.j2
+        dest: /etc/systemd/system/coredns.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart coredns
+
+    - name: Configure dnsmasq forwarding for CoreDNS zone
+      copy:
+        dest: /etc/dnsmasq.d/ploy.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          # Forward {{ ploy.dns.domain }} to CoreDNS on localhost:{{ coredns.port | default(1053) }}
+          server=/{{ ploy.dns.domain }}/127.0.0.1#{{ coredns.port | default(1053) }}
+      notify: restart dnsmasq
+
+    - name: Ensure systemd-resolved routes CoreDNS zone
+      replace:
+        path: /etc/systemd/resolved.conf
+        regexp: '^Domains=~consul.*$'
+        replace: 'Domains=~consul ~{{ ploy.dns.domain }}'
+      notify: restart systemd-resolved
+
+    - name: Ensure systemd-resolved uses localhost DNS
+      replace:
+        path: /etc/systemd/resolved.conf
+        regexp: '^DNS=.*$'
+        replace: 'DNS=127.0.0.1'
+      notify: restart systemd-resolved
+
+    - name: Ensure CoreDNS service is enabled and running
+      systemd:
+        name: coredns
+        state: started
+        enabled: true
+      register: coredns_service
+
+    - name: Display CoreDNS deployment status
+      debug:
+        msg: "CoreDNS deployed - service status: {{ coredns_service.status.ActiveState | default('unknown') }}"
