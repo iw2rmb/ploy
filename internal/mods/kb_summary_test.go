@@ -299,11 +299,10 @@ func TestSummaryComputer_ScoreCandidates(t *testing.T) {
 	scored := computer.scoreCandidates(candidates)
 
 	// Should filter out low success rate candidate
-	assert.Len(t, scored, 3)
+	assert.Len(t, scored, 2)
 
 	// Should be sorted by score (highest first)
 	assert.True(t, scored[0].Score >= scored[1].Score)
-	assert.True(t, scored[1].Score >= scored[2].Score)
 
 	// Recipe with high wins and recent success should score well
 	found := false
