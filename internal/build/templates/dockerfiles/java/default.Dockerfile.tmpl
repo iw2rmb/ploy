@@ -8,7 +8,7 @@ RUN if [ -d src/main/java ]; then \
       echo "No src/main/java found"; \
     fi
 
-FROM eclipse-temurin:{{ .JavaVersion }}-jre
+FROM eclipse-temurin:{{ .JavaVersion }}-jre-alpine
 WORKDIR /app
 COPY --from=build /out /app
 ENV PORT=8080
@@ -18,4 +18,3 @@ ENTRYPOINT ["java","-cp","/app","{{ .MainClass }}"]
 {{- else }}
 CMD ["sh","-lc","echo 'Set MainClass to run application' && sleep 30"]
 {{- end }}
-

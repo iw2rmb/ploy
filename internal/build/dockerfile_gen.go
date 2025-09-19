@@ -82,11 +82,11 @@ allprojects {\n  // Disable tests\n  tasks.withType(Test).configureEach { enable
     if echo "$j" | grep -Ei '(boot|shadow).*\.jar$' >/dev/null; then SEL="$j"; break; fi; \
   done; \
   if [ -z "$SEL" ]; then SEL=$(printf '%%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%%s %%n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); fi; \
-  test -n "$SEL" && { mkdir -p /src/build/libs; cp "$SEL" /src/build/libs/app.jar; } || { echo "Failed to select JAR"; exit 1; }
+  test -n "$SEL" && { mkdir -p /out; cp "$SEL" /out/app.jar; } || { echo "Failed to select JAR"; exit 1; }
 
-FROM eclipse-temurin:%[1]s-jre
+FROM eclipse-temurin:%[1]s-jre-alpine
 WORKDIR /app
-COPY --from=build /src/build/libs/*.jar /app/app.jar
+COPY --from=build /out/app.jar /app/app.jar
 ENV PORT=8080
 EXPOSE 8080
 %s
@@ -100,11 +100,15 @@ EXPOSE 8080
 WORKDIR /src
 COPY . .
 RUN chmod +x ./mvnw || true \
- && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package )
+ && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package ) \
+ && JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)" \
+ && [ -n "$JAR" ] \
+ && mkdir -p /out \
+ && cp "$JAR" /out/app.jar
 
-FROM eclipse-temurin:%[1]s-jre
+FROM eclipse-temurin:%[1]s-jre-alpine
 WORKDIR /app
-COPY --from=build /src/target/*.jar /app/app.jar
+COPY --from=build /out/app.jar /app/app.jar
 ENV PORT=8080
 EXPOSE 8080
 %s
@@ -120,7 +124,7 @@ WORKDIR /src
 COPY . .
 RUN if [ -d src/main/java ]; then find src/main/java -name "*.java" -print0 | xargs -0 javac -d /out; else echo "No src/main/java found"; fi
 
-FROM eclipse-temurin:%[1]s-jre
+FROM eclipse-temurin:%[1]s-jre-alpine
 WORKDIR /app
 COPY --from=build /out /app
 ENV PORT=8080
