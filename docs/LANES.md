@@ -10,7 +10,7 @@ The build system now runs exclusively on **Lane D (Docker)**. Legacy lanes (A, B
 
 ## Build & Push Flow
 - Source archives are unpacked on the controller host.
-- Lane D builds invoke `docker build` locally, respecting either the repository's Dockerfile or the optional autogeneration heuristics for simple apps.
+- Lane D builds invoke `docker build` locally. When a Dockerfile is absent the controller now synthesises one from project facts (Gradle/Maven/JVM) that stages the JAR into `/out/app.jar` and uses `eclipse-temurin:<ver>-jre-alpine` as the runtime.
 - CLI upload toggles (`PLOY_ASYNC`, `PLOY_AUTOGEN_DOCKERFILE`, `PLOY_PUSH_MULTIPART`, `PLOY_TLS_INSECURE`) adjust how Lane D receives source archives and should be coordinated with CLI users (see `cmd/ploy/README.md`).
 - Images push to `registry.dev.ployman.app` with canonical `<app>:<sha>` tags derived from detection metadata.
 - Logs stream back to the caller and mirror to `/opt/ploy/build-logs/<builder-id>.log`; when configured, the controller also uploads them to unified storage for remote retrieval.
