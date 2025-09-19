@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/git/provider"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	supply "github.com/iw2rmb/ploy/internal/supply"
@@ -50,6 +51,13 @@ type ModRunner struct {
 	healer         HealingOrchestrator
 	hcl            HCLSubmitter
 	jobHelper      JobSubmissionHelper
+}
+
+type buildPhaseOptions struct {
+	StepID             string
+	SuccessMessage     string
+	FailureMessage     string
+	UpdateBuildVersion bool
 }
 
 // NewModRunner creates a new Mod runner with the given configuration
@@ -188,6 +196,18 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	// Capture initial HEAD to detect later if steps produced a commit
 	initialHead, _ := getHeadHash(repoPath)
 
+	// Baseline compile/build gate before running transformation steps
+	if _, err := r.runBuildPhase(ctx, repoPath, result, startTime, buildPhaseOptions{
+		StepID:             "baseline-build",
+		SuccessMessage:     "Baseline build completed successfully",
+		FailureMessage:     "Baseline build failed",
+		UpdateBuildVersion: false,
+	}); err != nil {
+		return nil, err
+	}
+	// Ensure subsequent build phase summaries reflect post-transformation healing
+	result.HealingSummary = nil
+
 	// Step 3: Execute transformation steps
 	for _, step := range r.config.Steps {
 		switch step.Type {
@@ -220,154 +240,18 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	} else {
 		// committed=false implies already committed by apply step
 		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
-		goto build_step
 	}
 
-build_step:
-	// Step 5: Run build check
-	buildStart := time.Now()
-	buildResult, err := r.runBuildGate(ctx, repoPath)
-	if err != nil || (buildResult != nil && !buildResult.Success) {
-		message := "Build check failed"
-		if buildResult != nil && buildResult.Message != "" {
-			message = buildResult.Message
-		}
-		if err != nil {
-			message = fmt.Sprintf("%s: %v", message, err)
-		}
-
-		// Emit a diagnostic event with a truncated build error message to aid planner/LLM debugging
-		{
-			const maxLen = 600
-			msg := message
-			if len(msg) > maxLen {
-				msg = msg[:maxLen] + "…"
-			}
-			r.emit(ctx, "build", "build-gate-error", "info", msg)
-		}
-
-		result.StepResults = append(result.StepResults, StepResult{
-			StepID:   "build",
-			Success:  false,
-			Message:  message,
-			Duration: time.Since(buildStart),
-		})
-
-		// Check if self-healing is enabled
-		if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {
-			r.emit(ctx, "build", "build", "error", message)
-			result.ErrorMessage = "build check failed"
-			result.Duration = time.Since(startTime)
-			return nil, fmt.Errorf("build check failed: %s", message)
-		}
-
-		// Healing retry loop: planner → fanout → reducer; optionally apply winner and re-build
-		maxRetries := r.config.SelfHeal.MaxRetries
-		if maxRetries <= 0 {
-			maxRetries = 1
-		}
-		var healingSuccess bool
-		var lastErr error
-		for attempt := 1; attempt <= maxRetries; attempt++ {
-			r.emit(ctx, "healing", "healing", "info", fmt.Sprintf("attempt %d/%d", attempt, maxRetries))
-			healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
-			result.HealingSummary = healingSummary
-			if healingErr != nil {
-				lastErr = healingErr
-				if attempt == maxRetries {
-					break
-				}
-				continue
-			}
-			// If reducer requested apply, ensure branch chain is replayed into working tree before rebuild.
-			if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
-				if sid := healingSummary.NextAction.StepID; sid != "" {
-					seaweed := ResolveInfraFromEnv().SeaweedURL
-					if seaweed != "" {
-						r.emit(ctx, "healing", "apply", "info", fmt.Sprintf("replay starting: branch_id=%s", sid))
-						baseDir := filepath.Join(r.workspaceDir, "branch-apply")
-						_ = os.MkdirAll(baseDir, 0755)
-						_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
-						if msg := buildFirstErrorSnippet(repoPath, message); strings.TrimSpace(msg) != "" {
-							r.emit(ctx, "healing", "apply", "info", msg)
-						}
-						if files := workingTreeDiffNames(ctx, repoPath, 8); len(files) > 0 {
-							joined := strings.Join(files, ", ")
-							if len(joined) > 400 {
-								joined = joined[:400] + "…"
-							}
-							r.emit(ctx, "healing", "apply", "info", "post-replay changed files: "+joined)
-						}
-						if head := firstErrorFileHead(repoPath, message, 10); strings.TrimSpace(head) != "" {
-							r.emit(ctx, "healing", "apply", "info", head)
-						}
-					}
-				}
-				// Build check before committing healing changes
-				r.emit(ctx, "build", "post-healing-build-start", "info", "Running post-healing build gate")
-				buildStart2 := time.Now()
-				if br2, err2 := r.runBuildGate(ctx, repoPath); err2 != nil || (br2 != nil && !br2.Success) {
-					// Revert working tree and retry if attempts remain
-					cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
-					cmd.Dir = repoPath
-					_ = cmd.Run()
-					msg2 := "post-healing build failed"
-					if br2 != nil && br2.Message != "" {
-						msg2 = br2.Message
-					}
-					if err2 != nil {
-						msg2 = fmt.Sprintf("%s: %v", msg2, err2)
-					}
-					r.emit(ctx, "build", "post-healing-build-failed", "error", msg2)
-					result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg2 + " (reverted healing patch)", Duration: time.Since(buildStart2)})
-					lastErr = fmt.Errorf("%s", msg2)
-					if attempt == maxRetries {
-						break
-					}
-					continue
-				}
-				// Commit healing changes and proceed
-				if r.repoManager != nil {
-					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
-				} else {
-					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
-				}
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
-				r.emit(ctx, "build", "post-healing-build-succeeded", "info", "Build completed successfully (post-healing)")
-				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
-				healingSuccess = true
-				break
-			}
-			// If reducer chose stop, accept healing as succeeded (no additional apply)
-			if strings.ToLower(healingSummary.NextAction.Action) == "stop" && healingSummary.Winner != nil {
-				healingSuccess = true
-				break
-			}
-			// Unknown or no action; prepare to retry or fail
-			lastErr = fmt.Errorf("reducer returned no actionable next step")
-			if attempt == maxRetries {
-				break
-			}
-		}
-
-		if !healingSuccess {
-			r.emit(ctx, "healing", "healing", "error", "healing failed after retries")
-			result.ErrorMessage = fmt.Sprintf("build check failed and healing failed: %v", lastErr)
-			result.Duration = time.Since(startTime)
-			return nil, fmt.Errorf("build check failed: %s (healing failed: %v)", message, lastErr)
-		}
-	}
-
-	if buildResult != nil {
-		result.BuildVersion = buildResult.Version
-	}
-	r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", result.BuildVersion))
-	result.StepResults = append(result.StepResults, StepResult{
-		StepID:   "build",
-		Success:  true,
-		Message:  "Build completed successfully",
-		Duration: time.Since(buildStart),
+	// Step 5: Run build check after transformations
+	_, err := r.runBuildPhase(ctx, repoPath, result, startTime, buildPhaseOptions{
+		StepID:             "build",
+		SuccessMessage:     "Build completed successfully",
+		FailureMessage:     "Build check failed",
+		UpdateBuildVersion: true,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Step 6: If healing requested applying additional diffs, commit them and re-run build gate
 	if result.HealingSummary != nil && result.HealingSummary.FinalSuccess {
@@ -428,6 +312,167 @@ build_step:
 	result.Success = true
 	result.Duration = time.Since(startTime)
 	return result, nil
+}
+
+func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *ModResult, startTime time.Time, opts buildPhaseOptions) (*common.DeployResult, error) {
+	if opts.StepID == "" {
+		opts.StepID = "build"
+	}
+	if opts.SuccessMessage == "" {
+		opts.SuccessMessage = "Build completed successfully"
+	}
+	if opts.FailureMessage == "" {
+		opts.FailureMessage = "Build check failed"
+	}
+
+	buildStart := time.Now()
+	buildResult, err := r.runBuildGate(ctx, repoPath)
+	if err == nil && (buildResult == nil || buildResult.Success) {
+		if opts.UpdateBuildVersion && buildResult != nil && buildResult.Version != "" {
+			result.BuildVersion = buildResult.Version
+		}
+		r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", result.BuildVersion))
+		result.StepResults = append(result.StepResults, StepResult{
+			StepID:   opts.StepID,
+			Success:  true,
+			Message:  opts.SuccessMessage,
+			Duration: time.Since(buildStart),
+		})
+		return buildResult, nil
+	}
+
+	message := opts.FailureMessage
+	if buildResult != nil && buildResult.Message != "" {
+		message = buildResult.Message
+	}
+	if err != nil {
+		message = fmt.Sprintf("%s: %v", message, err)
+	}
+
+	{
+		const maxLen = 600
+		msg := message
+		if len(msg) > maxLen {
+			msg = msg[:maxLen] + "…"
+		}
+		r.emit(ctx, "build", "build-gate-error", "info", msg)
+	}
+
+	result.StepResults = append(result.StepResults, StepResult{
+		StepID:   opts.StepID,
+		Success:  false,
+		Message:  message,
+		Duration: time.Since(buildStart),
+	})
+
+	if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {
+		r.emit(ctx, "build", "build", "error", message)
+		result.ErrorMessage = opts.FailureMessage
+		result.Duration = time.Since(startTime)
+		return nil, fmt.Errorf("%s: %s", opts.FailureMessage, message)
+	}
+
+	maxRetries := r.config.SelfHeal.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
+	var healingSuccess bool
+	var lastErr error
+	var finalBuildResult *common.DeployResult
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		r.emit(ctx, "healing", "healing", "info", fmt.Sprintf("attempt %d/%d", attempt, maxRetries))
+		healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
+		result.HealingSummary = healingSummary
+		if healingErr != nil {
+			lastErr = healingErr
+			if attempt == maxRetries {
+				break
+			}
+			continue
+		}
+		if strings.ToLower(healingSummary.NextAction.Action) == "apply" {
+			if sid := healingSummary.NextAction.StepID; sid != "" {
+				seaweed := ResolveInfraFromEnv().SeaweedURL
+				if seaweed != "" {
+					r.emit(ctx, "healing", "apply", "info", fmt.Sprintf("replay starting: branch_id=%s", sid))
+					baseDir := filepath.Join(r.workspaceDir, "branch-apply")
+					_ = os.MkdirAll(baseDir, 0755)
+					_ = r.reconstructBranchState(ctx, seaweed, os.Getenv("MOD_ID"), sid, baseDir, repoPath)
+					if msg := buildFirstErrorSnippet(repoPath, message); strings.TrimSpace(msg) != "" {
+						r.emit(ctx, "healing", "apply", "info", msg)
+					}
+					if files := workingTreeDiffNames(ctx, repoPath, 8); len(files) > 0 {
+						joined := strings.Join(files, ", ")
+						if len(joined) > 400 {
+							joined = joined[:400] + "…"
+						}
+						r.emit(ctx, "healing", "apply", "info", "post-replay changed files: "+joined)
+					}
+					if head := firstErrorFileHead(repoPath, message, 10); strings.TrimSpace(head) != "" {
+						r.emit(ctx, "healing", "apply", "info", head)
+					}
+				}
+			}
+			r.emit(ctx, "build", "post-healing-build-start", "info", "Running post-healing build gate")
+			buildStart2 := time.Now()
+			br2, err2 := r.runBuildGate(ctx, repoPath)
+			if err2 != nil || (br2 != nil && !br2.Success) {
+				cmd := exec.CommandContext(ctx, "git", "reset", "--hard", "HEAD")
+				cmd.Dir = repoPath
+				_ = cmd.Run()
+				msg2 := "post-healing build failed"
+				if br2 != nil && br2.Message != "" {
+					msg2 = br2.Message
+				}
+				if err2 != nil {
+					msg2 = fmt.Sprintf("%s: %v", msg2, err2)
+				}
+				r.emit(ctx, "build", "post-healing-build-failed", "error", msg2)
+				result.StepResults = append(result.StepResults, StepResult{StepID: opts.StepID, Success: false, Message: msg2 + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+				lastErr = fmt.Errorf("%s", msg2)
+				if attempt == maxRetries {
+					break
+				}
+				continue
+			}
+			if r.repoManager != nil {
+				_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
+			} else {
+				_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
+			}
+			result.StepResults = append(result.StepResults, StepResult{StepID: opts.StepID, Success: true, Message: opts.SuccessMessage + " (post-healing)", Duration: time.Since(buildStart2)})
+			r.emit(ctx, "build", "post-healing-build-succeeded", "info", opts.SuccessMessage+" (post-healing)")
+			r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
+			healingSuccess = true
+			finalBuildResult = br2
+			if opts.UpdateBuildVersion && br2 != nil && br2.Version != "" {
+				result.BuildVersion = br2.Version
+			}
+			break
+		}
+		if strings.ToLower(healingSummary.NextAction.Action) == "stop" && healingSummary.Winner != nil {
+			healingSuccess = true
+			finalBuildResult = buildResult
+			break
+		}
+		lastErr = fmt.Errorf("reducer returned no actionable next step")
+		if attempt == maxRetries {
+			break
+		}
+	}
+
+	if !healingSuccess {
+		r.emit(ctx, "healing", "healing", "error", "healing failed after retries")
+		result.ErrorMessage = fmt.Sprintf("%s and healing failed: %v", opts.FailureMessage, lastErr)
+		result.Duration = time.Since(startTime)
+		return nil, fmt.Errorf("%s: %s (healing failed: %v)", opts.FailureMessage, message, lastErr)
+	}
+
+	if finalBuildResult != nil {
+		buildResult = finalBuildResult
+	}
+	return buildResult, nil
 }
 
 // SBOM helpers moved to vuln_gate.go
