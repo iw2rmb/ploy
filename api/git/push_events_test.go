@@ -8,11 +8,13 @@ import (
 	"testing"
 )
 
+// fakeRunner records git invocations for assertions in tests.
 type fakeRunner struct {
 	calls  []string
 	failAt int
 }
 
+// Run appends the executed command and optionally fails at the configured call.
 func (f *fakeRunner) Run(ctx context.Context, dir string, name string, args ...string) error {
 	f.calls = append(f.calls, name+" "+joinArgs(args))
 	if f.failAt == len(f.calls) {
@@ -21,6 +23,7 @@ func (f *fakeRunner) Run(ctx context.Context, dir string, name string, args ...s
 	return nil
 }
 
+// joinArgs joins command arguments for compact comparison.
 func joinArgs(args []string) string {
 	if len(args) == 0 {
 		return ""
@@ -32,6 +35,7 @@ func joinArgs(args []string) string {
 	return s
 }
 
+// TestPushBranchPublishesEventsOnSuccess verifies that push events include start and completion states.
 func TestPushBranchPublishesEventsOnSuccess(t *testing.T) {
 	// Ensure token injection does not alter the expected remote URL in this test
 	_ = os.Unsetenv("GITLAB_TOKEN")
@@ -78,6 +82,7 @@ func TestPushBranchPublishesEventsOnSuccess(t *testing.T) {
 	}
 }
 
+// TestPushBranchPublishesFailureEvent verifies failure events propagate errors to observers.
 func TestPushBranchPublishesFailureEvent(t *testing.T) {
 	_ = os.Unsetenv("GITLAB_TOKEN")
 	runner := &fakeRunner{failAt: 3}
@@ -105,6 +110,7 @@ func TestPushBranchPublishesFailureEvent(t *testing.T) {
 	}
 }
 
+// TestAuthenticatedRemoteURL ensures credentials are injected only when a token is present.
 func TestAuthenticatedRemoteURL(t *testing.T) {
 	svc := NewService(ServiceConfig{})
 	original := "https://gitlab.com/namespace/project.git"

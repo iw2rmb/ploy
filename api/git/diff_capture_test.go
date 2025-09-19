@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestGetDiffIncludesLineCounts validates diff captures include per-file metrics.
 func TestGetDiffIncludesLineCounts(t *testing.T) {
 	repo := initGitRepo(t)
 
@@ -66,6 +67,7 @@ func TestGetDiffIncludesLineCounts(t *testing.T) {
 	}
 }
 
+// initGitRepo creates a temporary repository seeded with one commit for testing.
 func initGitRepo(t *testing.T) string {
 	t.Helper()
 	repo := t.TempDir()
@@ -80,6 +82,7 @@ func initGitRepo(t *testing.T) string {
 	return repo
 }
 
+// runGit executes a git command in the provided directory, failing the test on error.
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := execCommand(dir, args...)
@@ -88,6 +91,7 @@ func runGit(t *testing.T, dir string, args ...string) {
 	}
 }
 
+// execCommand builds a git command scoped to the supplied directory.
 func execCommand(dir string, args ...string) *exec.Cmd {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir

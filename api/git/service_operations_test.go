@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestCommitChangesCreatesCommitWithDefaults confirms commits work with default author info.
 func TestCommitChangesCreatesCommitWithDefaults(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -39,6 +40,7 @@ func TestCommitChangesCreatesCommitWithDefaults(t *testing.T) {
 	}
 }
 
+// TestBranchOperations verifies branch creation and checkout helpers.
 func TestBranchOperations(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -71,6 +73,7 @@ func TestBranchOperations(t *testing.T) {
 	}
 }
 
+// TestResetToCommit ensures the repository resets to an earlier commit hash.
 func TestResetToCommit(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -95,6 +98,7 @@ func TestResetToCommit(t *testing.T) {
 	}
 }
 
+// TestRepositoryStatsHelpers exercises change counting, line stats, and history queries.
 func TestRepositoryStatsHelpers(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -149,6 +153,7 @@ func TestRepositoryStatsHelpers(t *testing.T) {
 	}
 }
 
+// runGitOutput returns trimmed command output or fails the test on error.
 func runGitOutput(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	cmd := execCommand(dir, args...)

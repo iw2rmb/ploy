@@ -36,6 +36,7 @@ func (g *Service) CommitChanges(ctx context.Context, repoPath, message string) e
 	return nil
 }
 
+// ensureGitConfig seeds default author metadata when unset in the repository.
 func (g *Service) ensureGitConfig(ctx context.Context, repoPath string) error {
 	nameCmd := exec.CommandContext(ctx, "git", "config", "user.name")
 	nameCmd.Dir = repoPath
