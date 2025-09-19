@@ -207,30 +207,26 @@ func TestModRunner_RenderAssets(t *testing.T) {
 
 	t.Run("RenderPlannerAssets", func(t *testing.T) {
 		assets, err := runner.RenderPlannerAssets()
-		// Expected to fail due to missing template files
-		assert.Error(t, err)
-		assert.Nil(t, assets)
+		assert.NoError(t, err)
+		assert.NotNil(t, assets)
 	})
 
 	t.Run("RenderLLMExecAssets", func(t *testing.T) {
 		jobSpec, err := runner.RenderLLMExecAssets("test-option")
-		// Expected to fail due to missing template files
-		assert.Error(t, err)
-		assert.Empty(t, jobSpec)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, jobSpec)
 	})
 
 	t.Run("RenderORWApplyAssets", func(t *testing.T) {
 		jobSpec, err := runner.RenderORWApplyAssets("test-option")
-		// Expected to fail due to missing template files
-		assert.Error(t, err)
-		assert.Empty(t, jobSpec)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, jobSpec)
 	})
 
 	t.Run("RenderReducerAssets", func(t *testing.T) {
 		assets, err := runner.RenderReducerAssets()
-		// Expected to fail due to missing template files
-		assert.Error(t, err)
-		assert.Nil(t, assets)
+		assert.NoError(t, err)
+		assert.NotNil(t, assets)
 	})
 }
 
