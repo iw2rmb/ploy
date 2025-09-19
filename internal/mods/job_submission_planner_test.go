@@ -3,7 +3,10 @@ package mods
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,5 +82,75 @@ func TestSubmitPlannerJob(t *testing.T) {
 			require.Len(t, mockSubmitter.SubmittedJobs, 1)
 			assert.Equal(t, tt.expectJobType, mockSubmitter.SubmittedJobs[0].Type)
 		})
+	}
+}
+
+type stubPlannerSubmitter struct{}
+
+func (stubPlannerSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobSpec) (JobResult, error) {
+	return JobResult{JobID: "planner-job", Status: "completed"}, nil
+}
+
+func TestSubmitPlannerJobFallbacksToControllerArtifacts(t *testing.T) {
+	t.Setenv("MOD_ID", "mod-xyz")
+	t.Setenv("PLOY_CONTROLLER", "https://controller.example/v1")
+	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweed.local")
+	t.Setenv("NOMAD_DC", "dc1")
+
+	workspace := t.TempDir()
+	cfg := &ModConfig{
+		ID:         "workflow",
+		TargetRepo: "https://git.example/repo.git",
+		BaseRef:    "main",
+		Lane:       "D",
+		Steps: []ModStep{{
+			ID:   "s1",
+			Type: string(StepTypeLLMExec),
+		}},
+	}
+
+	runner, err := NewModRunner(cfg, workspace)
+	require.NoError(t, err)
+
+	origValidate := validateJob
+	origSubmit := submitAndWaitTerminal
+	origDownload := downloadToFileFn
+	origHead := headURLFn
+	origPut := putFileFn
+	origWait := waitForStepContainingFn
+	defer func() {
+		validateJob = origValidate
+		submitAndWaitTerminal = origSubmit
+		downloadToFileFn = origDownload
+		headURLFn = origHead
+		putFileFn = origPut
+		waitForStepContainingFn = origWait
+	}()
+
+	validateJob = func(string) error { return nil }
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	headURLFn = func(string) bool { return false }
+	putFileFn = func(string, string, string, string) error { return nil }
+	waitForStepContainingFn = func(string, string, string, string, time.Duration) error { return nil }
+
+	planJSON := `{"plan_id":"fallback","options":[{"id":"llm-1","type":"llm-exec"}]}`
+	downloadToFileFn = func(url, dest string) error {
+		if strings.Contains(url, "/artifacts/mods/mod-xyz/planner/") {
+			return fmt.Errorf("http 404")
+		}
+		if strings.Contains(url, "/mods/mod-xyz/artifacts/plan_json") {
+			return os.WriteFile(dest, []byte(planJSON), 0o644)
+		}
+		return fmt.Errorf("unexpected url: %s", url)
+	}
+
+	helper := NewJobSubmissionHelperWithRunner(stubPlannerSubmitter{}, runner)
+	plan, err := helper.SubmitPlannerJob(context.Background(), cfg, "compilation failed", workspace)
+	require.NoError(t, err)
+	require.NotNil(t, plan)
+	assert.Equal(t, "fallback", plan.PlanID)
+	require.Len(t, plan.Options, 1)
+	if typ, _ := plan.Options[0]["type"].(string); typ != "llm-exec" {
+		t.Fatalf("unexpected option type: %s", typ)
 	}
 }

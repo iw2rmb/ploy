@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var waitForStepContainingFn = waitForStepContaining
+
 // waitForStepContaining waits until the controller emits an event whose message contains
 // the provided substring. Prefers the event SSE stream; falls back to status polling.
 // Returns nil when observed, or an error if a failure event is detected or timeout elapses.

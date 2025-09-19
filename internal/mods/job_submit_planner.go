@@ -167,7 +167,7 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 		key := fmt.Sprintf("mods/%s/planner/%s/plan.json", modID, runID)
 		url := strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
 		// Event-driven: wait for upload event, then HEAD+jitter for filer readiness, single download
-		_ = waitForStepContaining(infra.Controller, modID, "planner", "uploaded plan to", 120*time.Second)
+		_ = waitForStepContainingFn(infra.Controller, modID, "planner", "uploaded plan to", 120*time.Second)
 		for i := 0; i < 30; i++ { // up to ~2s
 			if headURLFn(url) {
 				break
@@ -175,7 +175,14 @@ func (h *jobSubmissionHelper) SubmitPlannerJob(ctx context.Context, config *ModC
 			time.Sleep(300*time.Millisecond + time.Duration(i%5)*80*time.Millisecond)
 		}
 		if err := downloadToFileFn(url, artifactPath); err != nil {
-			return nil, fmt.Errorf("failed to download planner artifact: %w", err)
+			if infra.Controller != "" {
+				fallbackURL := strings.TrimRight(infra.Controller, "/") + "/mods/" + modID + "/artifacts/plan_json"
+				if err2 := downloadToFileFn(fallbackURL, artifactPath); err2 != nil {
+					return nil, fmt.Errorf("failed to download planner artifact: %w (controller fallback: %v)", err, err2)
+				}
+			} else {
+				return nil, fmt.Errorf("failed to download planner artifact: %w", err)
+			}
 		}
 
 		// Parse plan.json to PlanResult
