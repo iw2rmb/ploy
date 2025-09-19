@@ -178,6 +178,9 @@ func (esg *DefaultEnhancedSignatureGenerator) analyzePatchStructure(lines []stri
 		if len(line) == 0 {
 			continue
 		}
+		if strings.HasPrefix(line, "+++") || strings.HasPrefix(line, "---") {
+			continue
+		}
 		switch line[0] {
 		case '+':
 			s.additions++
