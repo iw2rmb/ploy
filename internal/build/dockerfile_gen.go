@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/build/templates"
 	"github.com/iw2rmb/ploy/internal/detect/project"
 )
 
@@ -23,233 +22,95 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			facts.BuildTool = "maven"
 		}
 	}
-	// Java/Scala (JVM) via Gradle/Maven using embedded templates; fallback to inline if template missing
 	if facts.Language == "java" || facts.Language == "scala" || facts.BuildTool == "gradle" || facts.BuildTool == "maven" {
-		v := facts.Versions.Java
-		if v == "" {
-			v = "17"
+		facts.Language = "java"
+		if facts.BuildTool == "" {
+			if fileExists(filepath.Join(srcDir, "build.gradle.kts")) || fileExists(filepath.Join(srcDir, "build.gradle")) {
+				facts.BuildTool = "gradle"
+			} else if fileExists(filepath.Join(srcDir, "pom.xml")) {
+				facts.BuildTool = "maven"
+			} else {
+				facts.BuildTool = "default"
+			}
 		}
-		if i := strings.Index(v, "."); i > 0 {
-			v = v[:i]
-		}
-		type data struct {
-			JavaVersion string
-			MainClass   string
-		}
-		d := data{JavaVersion: v, MainClass: facts.MainClass}
-		var path string
-		switch facts.BuildTool {
-		case "gradle":
-			path = "dockerfiles/java/gradle.Dockerfile.tmpl"
-		case "maven":
-			path = "dockerfiles/java/maven.Dockerfile.tmpl"
+		tool := strings.ToLower(strings.TrimSpace(facts.BuildTool))
+		var opts []DockerfilePairOption
+		switch tool {
+		case "gradle", "maven":
+			opts = append(opts, WithCopyInstruction("COPY --from=build /out/app.jar /app/app.jar"))
+		case "default":
+			opts = append(opts, WithCopyInstruction("COPY --from=build /out /app"))
 		default:
-			path = "dockerfiles/java/default.Dockerfile.tmpl"
+			facts.BuildTool = "default"
+			opts = append(opts, WithCopyInstruction("COPY --from=build /out /app"))
 		}
-		if path != "" {
-			if rendered, err := templates.Render(path, d); err == nil {
-				return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-			}
+		if err := writePairForFacts(srcDir, facts, opts...); err != nil {
+			return err
 		}
-		// Fallback to previous inline generation if template missing
-		var dockerfile string
-		switch facts.BuildTool {
-		case "gradle":
-			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-			if facts.MainClass != "" {
-				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
-			}
-			dockerfile = fmt.Sprintf(`FROM gradle:8-jdk%[1]s AS build
-WORKDIR /src
-COPY . .
-# Inject a Gradle init script to enforce Java release and disable tests (no repo edits)
-RUN set -eux; \
-  cat > /tmp/ploy-init.gradle <<'EOF'; \
-import org.gradle.api.tasks.compile.JavaCompile;\n
-allprojects {\n  // Disable tests\n  tasks.withType(Test).configureEach { enabled = false }\n  // Ensure JavaCompile release target\n  tasks.withType(JavaCompile).configureEach {\n    try {\n      options.release = %[1]s\n    } catch (Throwable ignored) {\n      try { options.release.set(%[1]s) } catch (Throwable ignored2) { }\n    }\n  }\n  // Toolchain when java plugin present\n  plugins.withId('java') {\n    try { java { toolchain { languageVersion = JavaLanguageVersion.of(%[1]s) } } } catch (Throwable ignored) { }\n  }\n}\nEOF\n; \
-  chmod +x ./gradlew || true; \
-  ( ./gradlew -I /tmp/ploy-init.gradle -x test clean build --stacktrace --info \\
-      -Dorg.gradle.java.installations.auto-detect=true \\
-      -Dorg.gradle.java.installations.auto-download=true \
-    || gradle -I /tmp/ploy-init.gradle -x test clean build --stacktrace --info \\
-      -Dorg.gradle.java.installations.auto-detect=true \\
-      -Dorg.gradle.java.installations.auto-download=true ); \
-  # Robust JAR selection
-  SEL=""; \
-  mapfile -t CANDS < <(find . -path '*/build/libs/*.jar' -type f 2>/dev/null || true); \
-  if [ ${#CANDS[@]} -eq 0 ]; then echo "No JARs produced"; exit 1; fi; \
-  for j in "${CANDS[@]}"; do \
-    if echo "$j" | grep -Ei '(boot|shadow).*\.jar$' >/dev/null; then SEL="$j"; break; fi; \
-  done; \
-  if [ -z "$SEL" ]; then SEL=$(printf '%%s\n' "${CANDS[@]}" | xargs -I{} stat -c '%%s %%n' {} | sort -nr | awk 'NR==1{ $1=""; sub(/^ /,""); print }'); fi; \
-  test -n "$SEL" && { mkdir -p /out; cp "$SEL" /out/app.jar; } || { echo "Failed to select JAR"; exit 1; }
-
-FROM eclipse-temurin:%[1]s-jre-alpine
-WORKDIR /app
-COPY --from=build /out/app.jar /app/app.jar
-ENV PORT=8080
-EXPOSE 8080
-%s
-`, v, entry)
-		case "maven":
-			entry := "ENTRYPOINT [\\\"java\\\",\\\"-jar\\\",\\\"/app/app.jar\\\"]"
-			if facts.MainClass != "" {
-				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app/app.jar\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
-			}
-			dockerfile = fmt.Sprintf(`FROM maven:3-eclipse-temurin-%[1]s AS build
-WORKDIR /src
-COPY . .
-RUN chmod +x ./mvnw || true \
- && ( ./mvnw -B -DskipTests package || mvn -B -DskipTests package ) \
- && JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n1)" \
- && [ -n "$JAR" ] \
- && mkdir -p /out \
- && cp "$JAR" /out/app.jar
-
-FROM eclipse-temurin:%[1]s-jre-alpine
-WORKDIR /app
-COPY --from=build /out/app.jar /app/app.jar
-ENV PORT=8080
-EXPOSE 8080
-%s
-`, v, entry)
-		default:
-			// Fallback default: compile sources with javac into classes and run MainClass
-			entry := "CMD [\\\"sh\\\",\\\"-lc\\\",\\\"echo 'Set MainClass to run application' && sleep 30\\\"]"
-			if facts.MainClass != "" {
-				entry = fmt.Sprintf("ENTRYPOINT [\\\\\\\"java\\\\\\\",\\\\\\\"-cp\\\\\\\",\\\\\\\"/app\\\\\\\",\\\\\\\"%s\\\\\\\"]", facts.MainClass)
-			}
-			dockerfile = fmt.Sprintf(`FROM eclipse-temurin:%[1]s-jdk AS build
-WORKDIR /src
-COPY . .
-RUN if [ -d src/main/java ]; then find src/main/java -name "*.java" -print0 | xargs -0 javac -d /out; else echo "No src/main/java found"; fi
-
-FROM eclipse-temurin:%[1]s-jre-alpine
-WORKDIR /app
-COPY --from=build /out /app
-ENV PORT=8080
-EXPOSE 8080
-%s
-`, v, entry)
-		}
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(dockerfile), 0644)
+		return nil
 	}
 
 	// Go
 	goMod := filepath.Join(srcDir, "go.mod")
 	if _, err := os.Stat(goMod); err == nil {
-		content := `FROM golang:1.22-alpine AS build
-WORKDIR /src
-COPY go.mod .
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/app ./...
-
-FROM gcr.io/distroless/static
-ENV PORT=8080
-ENV PORT=8080
-EXPOSE 8080
-COPY --from=build /out/app /app
-ENTRYPOINT ["/app"]
-`
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+		goFacts := facts
+		goFacts.Language = "go"
+		if goFacts.Versions.Go == "" {
+			goFacts.Versions.Go = "1.22"
+		}
+		return writePairForFacts(srcDir, goFacts, WithCopyInstruction("COPY --from=build /out/app /app"))
 	}
 	// Node via template (npm)
 	pkgJSON := filepath.Join(srcDir, "package.json")
 	if _, err := os.Stat(pkgJSON); err == nil {
-		v := facts.Versions.Node
-		if v == "" {
-			v = "20"
+		nFacts := facts
+		nFacts.Language = "node"
+		if nFacts.Versions.Node == "" {
+			nFacts.Versions.Node = "20"
 		}
-		type data struct{ NodeVersion string }
-		d := data{NodeVersion: v}
-		if rendered, err := templates.Render("dockerfiles/node/npm.Dockerfile.tmpl", d); err == nil {
-			return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-		}
-		// Fallback inline
-		content := fmt.Sprintf(`FROM node:%s-alpine
-WORKDIR /app
-COPY package.json .
-RUN npm install --omit=dev || true
-COPY . .
-ENV PORT=8080
-EXPOSE 8080
-CMD ["node", "index.js"]
-`, v)
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+		return writePairForFacts(srcDir, nFacts, WithCopyInstruction("COPY --from=build /app /app"))
 	}
 	// Python via template
 	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
 	// Also support minimal apps with app.py only (no requirements.txt/pyproject.toml).
 	if facts.Language == "python" || fileExists(filepath.Join(srcDir, "requirements.txt")) || fileExists(filepath.Join(srcDir, "pyproject.toml")) || fileExists(filepath.Join(srcDir, "app.py")) {
-		v := facts.Versions.Python
-		if v == "" {
-			v = "3.12"
+		pyFacts := facts
+		pyFacts.Language = "python"
+		if pyFacts.Versions.Python == "" {
+			pyFacts.Versions.Python = "3.12"
 		}
-		if parts := strings.Split(v, "."); len(parts) >= 2 {
-			v = parts[0] + "." + parts[1]
+		// normalize version to major.minor
+		if parts := strings.Split(pyFacts.Versions.Python, "."); len(parts) >= 2 {
+			pyFacts.Versions.Python = parts[0] + "." + parts[1]
 		}
 		hasGunicorn := pythonDepPresent(srcDir, "gunicorn")
 		hasUvicorn := pythonDepPresent(srcDir, "uvicorn")
-		type data struct {
-			PythonVersion string
-			UseGunicorn   bool
-			UseUvicorn    bool
-		}
-		d := data{PythonVersion: v, UseGunicorn: hasGunicorn, UseUvicorn: hasUvicorn}
-		if rendered, err := templates.Render("dockerfiles/python/default.Dockerfile.tmpl", d); err == nil {
-			return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(rendered), 0644)
-		}
-		// Fallback inline
-		base := fmt.Sprintf("python:%s-slim", v)
-		cmd := `CMD ["python", "app.py"]`
+		gunicornCmd := ""
+		uvicornCmd := ""
 		if hasGunicorn {
-			cmd = `CMD ["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]`
-		} else if hasUvicorn {
-			cmd = `CMD ["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]`
+			gunicornCmd = `["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]`
 		}
-		content := fmt.Sprintf(`FROM %s
-WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-ENV PORT=8080
-COPY . .
-RUN if [ -f requirements.txt ] && [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi || true
-EXPOSE 8080
-%s
-`, base, cmd)
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+		if hasUvicorn {
+			uvicornCmd = `["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]`
+		}
+		opts := []DockerfilePairOption{WithPythonRuntimeCommands(gunicornCmd, uvicornCmd)}
+		return writePairForFacts(srcDir, pyFacts, opts...)
 	}
 	// .NET
 	// Detect .NET projects by presence of *.csproj
 	if csproj := findFirstCsproj(srcDir); csproj != "" {
-		// Derive version tag
-		v := facts.Versions.Dotnet
-		if v == "" {
-			v = "8.0"
+		dnFacts := facts
+		dnFacts.Language = "dotnet"
+		if dnFacts.Versions.Dotnet == "" {
+			dnFacts.Versions.Dotnet = "8.0"
 		}
-		// Normalize to major.minor (e.g., 8.0)
-		if parts := strings.Split(v, "."); len(parts) >= 2 {
-			v = parts[0] + "." + parts[1]
-		} else if len(v) == 1 {
-			v = v + ".0"
+		if parts := strings.Split(dnFacts.Versions.Dotnet, "."); len(parts) >= 2 {
+			dnFacts.Versions.Dotnet = parts[0] + "." + parts[1]
+		} else if len(dnFacts.Versions.Dotnet) == 1 {
+			dnFacts.Versions.Dotnet = dnFacts.Versions.Dotnet + ".0"
 		}
 		projName := strings.TrimSuffix(filepath.Base(csproj), filepath.Ext(csproj))
-		content := fmt.Sprintf(`FROM mcr.microsoft.com/dotnet/sdk:%[1]s AS build
-WORKDIR /src
-COPY . .
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/out
-
-FROM mcr.microsoft.com/dotnet/aspnet:%[1]s
-WORKDIR /app
-COPY --from=build /app/out .
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
-EXPOSE 8080
-ENTRYPOINT ["dotnet", "%[2]s.dll"]
-`, v, projName)
-		return os.WriteFile(filepath.Join(srcDir, "Dockerfile"), []byte(content), 0644)
+		return writePairForFacts(srcDir, dnFacts, WithDotnetProjectName(projName))
 	}
 	return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
 }
