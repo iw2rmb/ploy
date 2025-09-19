@@ -174,9 +174,8 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 		r.emit(ctx, "apply", "diff-stat", "warn", fmt.Sprintf("diff stat failed: %v", err))
 	}
 
-	// Apply + build via helper with events and timeout
-	r.emit(ctx, "build", "build-gate-start", "info", fmt.Sprintf("Applying diff and running build gate: repo=%s diff=%s", repoPath, diffPath))
-	sr, err := runApplyAndBuildWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffAndBuild)
+	// Apply diff (build gate will be executed later in the workflow)
+	sr, err := runApplyDiffWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffOnly)
 	if err != nil {
 		return sr, err
 	}
