@@ -38,7 +38,11 @@ func (d *AnalysisDispatcher) SubmitJob(ctx context.Context, analyzer string, inp
 		return nil, fmt.Errorf("failed to store job: %w", err)
 	}
 
-	if err := d.submitToNomad(job); err != nil {
+	submit := d.submitFn
+	if submit == nil {
+		submit = d.submitToNomad
+	}
+	if err := submit(job); err != nil {
 		job.Status = "failed"
 		job.Error = err.Error()
 		_ = d.storeJob(job)

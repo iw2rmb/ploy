@@ -17,6 +17,7 @@ import (
 
 	mods "github.com/iw2rmb/ploy/internal/mods"
 	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/tests/integration/internal/testenv"
 )
 
 // ModsIntegrationSuite tests mods with real services
@@ -24,40 +25,26 @@ type ModsIntegrationSuite struct {
 	suite.Suite
 	nomadClient   *nomadapi.Client
 	consulClient  *consulapi.Client
-	storageClient *storage.StorageClient
+	storageClient storage.Storage
 	config        *mods.ModConfig
 }
 
 func (s *ModsIntegrationSuite) SetupSuite() {
-	// Skip if services not available
-	s.skipIfNoServices()
+	t := s.T()
+	if testing.Short() {
+		t.Skip("skipping mods integration suite in short mode")
+	}
 
-	// Setup real service clients
-	var err error
+	s.nomadClient = testenv.RequireNomadClient(t)
+	s.consulClient = testenv.RequireConsulClient(t)
+	s.storageClient = testenv.RequireSeaweedStorage(t)
 
-	// Nomad client
-	nomadConfig := nomadapi.DefaultConfig()
-	nomadConfig.Address = "http://localhost:4646"
-	s.nomadClient, err = nomadapi.NewClient(nomadConfig)
-	require.NoError(s.T(), err)
-
-	// Consul client
-	consulConfig := consulapi.DefaultConfig()
-	consulConfig.Address = "localhost:8500"
-	s.consulClient, err = consulapi.NewClient(consulConfig)
-	require.NoError(s.T(), err)
-
-	// Storage client
-	s.storageClient, err = storage.NewStorageClient(&storage.Config{
-		Endpoint: "http://localhost:8888",
-	})
-	require.NoError(s.T(), err)
-
-	// Mods config with real service endpoints
 	s.config = &mods.ModConfig{
 		ID:           "integration-test-workflow",
 		TargetRepo:   "https://github.com/example/test-repo.git", // Will fail - test repo
+		TargetBranch: "main",
 		BaseRef:      "refs/heads/main",
+		Lane:         "D",
 		BuildTimeout: "10m",
 		Steps: []mods.ModStep{
 			{
@@ -67,26 +54,10 @@ func (s *ModsIntegrationSuite) SetupSuite() {
 				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
 			},
 		},
-		SelfHeal: mods.SelfHealConfig{
+		SelfHeal: &mods.SelfHealConfig{
 			Enabled:    true,
 			MaxRetries: 2,
 		},
-	}
-}
-
-func (s *ModsIntegrationSuite) skipIfNoServices() {
-	// Check if Docker services are available
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := s.nomadClient.Status().Leader()
-	if err != nil {
-		s.T().Skip("Nomad service not available - run docker-compose up -d")
-	}
-
-	_, err = s.consulClient.Status().Leader()
-	if err != nil {
-		s.T().Skip("Consul service not available - run docker-compose up -d")
 	}
 }
 
@@ -146,14 +117,17 @@ func (s *ModsIntegrationSuite) TestNomadJobSubmission() {
 	jobID := fmt.Sprintf("test-job-%d", time.Now().Unix())
 
 	// This is a minimal test job that should succeed
+	jobType := nomadapi.JobTypeService
+	groupName := "test-group"
+	count := 1
 	job := &nomadapi.Job{
 		ID:   &jobID,
 		Name: &jobID,
-		Type: nomadapi.JobTypeService.Ptr(),
+		Type: &jobType,
 		TaskGroups: []*nomadapi.TaskGroup{
 			{
-				Name:  nomadapi.StringToPtr("test-group"),
-				Count: nomadapi.IntToPtr(1),
+				Name:  &groupName,
+				Count: &count,
 				Tasks: []*nomadapi.Task{
 					{
 						Name:   "test-task",
