@@ -61,6 +61,11 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		}
 		return &common.DeployResult{Success: false, Message: msg}, nil
 	}
+	if strings.EqualFold(r.config.Lane, "D") {
+		if err := ensureDockerfilePair(repoPath); err != nil {
+			r.emit(ctx, "build", "dockerfile-pair", "warn", fmt.Sprintf("failed to prepare Dockerfile pair: %v", err))
+		}
+	}
 	controllerURL := strings.TrimSpace(os.Getenv("PLOY_CONTROLLER"))
 	buildCfg := common.DeployConfig{
 		App:           appName,
