@@ -3,8 +3,10 @@ package mods
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	"github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
 )
@@ -336,12 +338,12 @@ func (kr *KBModRunner) SetJobSubmitter(submitter JobSubmitter) {
 }
 
 // attemptHealing overrides the base implementation to use KB-enhanced healing
-func (kr *KBModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
-	return kr.attemptHealingWithKB(ctx, repoPath, buildError)
+func (kr *KBModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string, buildRes *common.DeployResult) (*ModHealingSummary, error) {
+	return kr.attemptHealingWithKB(ctx, repoPath, buildError, buildRes)
 }
 
 // attemptHealingWithKB is an enhanced version of attemptHealing that uses KB
-func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
+func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string, buildError string, buildRes *common.DeployResult) (*ModHealingSummary, error) {
 	summary := &ModHealingSummary{
 		Enabled:       true,
 		AttemptsCount: 1,
@@ -383,11 +385,24 @@ func (kr *KBModRunner) attemptHealingWithKB(ctx context.Context, repoPath string
 			branchType = string(NormalizeStepType(t))
 		}
 
-		branches = append(branches, BranchSpec{
-			ID:     branchID,
-			Type:   branchType,
-			Inputs: option,
-		})
+		inputs := map[string]interface{}{}
+		for k, v := range option {
+			inputs[k] = v
+		}
+		if buildError != "" {
+			inputs["build_error"] = buildError
+		}
+		if buildRes != nil {
+			if key := strings.TrimSpace(buildRes.BuilderLogsKey); key != "" {
+				inputs["builder_logs_key"] = key
+			} else if dep := strings.TrimSpace(buildRes.DeploymentID); dep != "" {
+				inputs["builder_logs_key"] = fmt.Sprintf("build-logs/%s.log", dep)
+			}
+			if url := strings.TrimSpace(buildRes.BuilderLogsURL); url != "" {
+				inputs["builder_logs_url"] = url
+			}
+		}
+		branches = append(branches, BranchSpec{ID: branchID, Type: branchType, Inputs: inputs})
 	}
 
 	// Execute fanout orchestration using production runner (Nomad HCL submit)

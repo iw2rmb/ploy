@@ -6,10 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/common"
 )
 
 // attemptHealing orchestrates the healing workflow: planner → fanout → reducer
-func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string) (*ModHealingSummary, error) {
+func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildError string, buildRes *common.DeployResult) (*ModHealingSummary, error) {
 	summary := &ModHealingSummary{Enabled: true, AttemptsCount: 1}
 
 	// Log the captured build error (truncated) to help diagnose planner inputs
@@ -66,6 +68,16 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		}
 		if buildError != "" {
 			inputs["build_error"] = buildError
+		}
+		if buildRes != nil {
+			if key := strings.TrimSpace(buildRes.BuilderLogsKey); key != "" {
+				inputs["builder_logs_key"] = key
+			} else if dep := strings.TrimSpace(buildRes.DeploymentID); dep != "" {
+				inputs["builder_logs_key"] = fmt.Sprintf("build-logs/%s.log", dep)
+			}
+			if url := strings.TrimSpace(buildRes.BuilderLogsURL); url != "" {
+				inputs["builder_logs_url"] = url
+			}
 		}
 		branches = append(branches, BranchSpec{ID: branchID, Type: branchType, Inputs: inputs})
 	}

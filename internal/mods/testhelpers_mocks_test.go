@@ -61,6 +61,22 @@ func (s *seqBuildChecker) CheckBuild(ctx context.Context, cfg common.DeployConfi
 	return nil, fmt.Errorf("compilation failed: undefined symbol")
 }
 
+type capturingHealer struct {
+	branches []BranchSpec
+}
+
+func (h *capturingHealer) RunFanout(ctx context.Context, runCtx interface{}, branches []BranchSpec, maxParallel int) (BranchResult, []BranchResult, error) {
+	if len(branches) == 0 {
+		return BranchResult{}, nil, fmt.Errorf("no branches")
+	}
+	h.branches = append([]BranchSpec(nil), branches...)
+	results := make([]BranchResult, len(branches))
+	for i, b := range branches {
+		results[i] = BranchResult{ID: b.ID, Status: "completed"}
+	}
+	return results[0], results, nil
+}
+
 // Mock job submission interfaces for testing - move these to a shared file
 // to be available to all tests in the package
 type MockJobSubmitter struct {
