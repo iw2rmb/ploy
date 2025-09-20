@@ -61,7 +61,7 @@ func TestExecuteWithPlanExecLLM(t *testing.T) {
 func TestExecuteWithPlanExecORW(t *testing.T) {
 	t.Setenv("MODS_SUBMIT", "0")
 	t.Setenv("MOD_ID", "mod-99")
-	t.Setenv("PLOY_CONTROLLER", "https://controller.dev/v1")
+	t.Setenv("PLOY_CONTROLLER", "https://api.dev.ployman.app/v1")
 
 	workspace := t.TempDir()
 	runner := &ModRunner{
