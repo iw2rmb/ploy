@@ -6,12 +6,36 @@ import (
 	"time"
 )
 
+// ReportDiff captures diff metadata for reporting purposes.
+type ReportDiff struct {
+	Path    string `json:"path,omitempty"`
+	Content string `json:"content,omitempty"`
+}
+
+// ReportReference links a step to supporting artifacts (diffs, plans, prompts, etc.).
+type ReportReference struct {
+	Kind  string `json:"kind,omitempty"`
+	Label string `json:"label,omitempty"`
+	Value string `json:"value,omitempty"`
+}
+
+// StepReportMeta stores optional metadata used when constructing reports.
+type StepReportMeta struct {
+	Type        string            `json:"type,omitempty"`
+	Prompts     []string          `json:"prompts,omitempty"`
+	Recipes     []RecipeEntry     `json:"recipes,omitempty"`
+	Diff        *ReportDiff       `json:"diff,omitempty"`
+	References  []ReportReference `json:"references,omitempty"`
+	ErrorSolved string            `json:"error_solved,omitempty"`
+}
+
 // StepResult represents the result of executing a single step
 type StepResult struct {
 	StepID   string
 	Success  bool
 	Message  string
 	Duration time.Duration
+	Report   *StepReportMeta
 }
 
 // ModResult represents the overall result of a Mod execution
@@ -26,6 +50,47 @@ type ModResult struct {
 	Duration       time.Duration
 	HealingSummary *ModHealingSummary
 	MRURL          string // GitLab merge request URL if created
+	StartedAt      time.Time
+	FinishedAt     time.Time
+}
+
+// ReportStep captures an entry in the happy path timeline.
+type ReportStep struct {
+	ID          string        `json:"id"`
+	Type        string        `json:"type,omitempty"`
+	Message     string        `json:"message,omitempty"`
+	Duration    time.Duration `json:"duration,omitempty"`
+	Prompts     []string      `json:"prompts,omitempty"`
+	Recipes     []RecipeEntry `json:"recipes,omitempty"`
+	Diff        *ReportDiff   `json:"diff,omitempty"`
+	ErrorSolved string        `json:"error_solved,omitempty"`
+}
+
+// ReportStepNode is used to represent the complete step tree (successes and failures).
+type ReportStepNode struct {
+	ID          string            `json:"id"`
+	Type        string            `json:"type,omitempty"`
+	Success     bool              `json:"success"`
+	Message     string            `json:"message,omitempty"`
+	Duration    time.Duration     `json:"duration,omitempty"`
+	References  []ReportReference `json:"references,omitempty"`
+	Prompts     []string          `json:"prompts,omitempty"`
+	Recipes     []RecipeEntry     `json:"recipes,omitempty"`
+	Children    []ReportStepNode  `json:"children,omitempty"`
+	ErrorSolved string            `json:"error_solved,omitempty"`
+}
+
+// ModReport is the canonical Mods execution report structure exposed via the API.
+type ModReport struct {
+	RepoName   string           `json:"repo_name"`
+	WorkflowID string           `json:"workflow_id"`
+	BranchName string           `json:"branch_name,omitempty"`
+	MRURL      string           `json:"mr_url,omitempty"`
+	StartedAt  time.Time        `json:"started_at"`
+	EndedAt    time.Time        `json:"ended_at"`
+	Duration   time.Duration    `json:"duration"`
+	HappyPath  []ReportStep     `json:"happy_path"`
+	StepTree   []ReportStepNode `json:"step_tree"`
 }
 
 // Summary returns a human-readable summary of the Mods execution

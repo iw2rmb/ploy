@@ -18,7 +18,8 @@ func mrAppendFailure(result *ModResult, err error) {
 	if result == nil || err == nil {
 		return
 	}
-	result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: false, Message: fmt.Sprintf("MR creation failed: %v", err)})
+	msg := fmt.Sprintf("MR creation failed: %v", err)
+	result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: false, Message: msg, Report: &StepReportMeta{Type: "mr", ErrorSolved: msg}})
 }
 
 // mrAppendSuccess appends a success step result and sets the MR URL on the workflow result.
@@ -30,6 +31,6 @@ func mrAppendSuccess(result *ModResult, url string, created bool) {
 	if !created {
 		action = "updated"
 	}
-	result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: true, Message: fmt.Sprintf("MR %s: %s", action, url)})
+	result.StepResults = append(result.StepResults, StepResult{StepID: "mr", Success: true, Message: fmt.Sprintf("MR %s: %s", action, url), Report: &StepReportMeta{Type: "mr"}})
 	result.MRURL = url
 }

@@ -194,7 +194,49 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 
 	// Apply diff (build gate will be executed later in the workflow)
 	sr, err := runApplyDiffWithEvents(ctx, r, repoPath, diffPath, step.ID, stepStart, r.ApplyDiffOnly)
+	meta := &StepReportMeta{
+		Type:    string(StepTypeORWApply),
+		Prompts: append([]string(nil), step.Prompts...),
+		Recipes: func() []RecipeEntry {
+			if len(step.Recipes) == 0 {
+				return nil
+			}
+			cp := make([]RecipeEntry, len(step.Recipes))
+			copy(cp, step.Recipes)
+			return cp
+		}(),
+	}
+
+	references := []ReportReference{}
+	if submittedPath != "" {
+		references = append(references, ReportReference{Kind: "plan", Label: "submitted_hcl", Value: submittedPath})
+	}
+	if prePath != "" {
+		references = append(references, ReportReference{Kind: "plan", Label: "pre_hcl", Value: prePath})
+	}
+	if inputTar != "" {
+		references = append(references, ReportReference{Kind: "artifact", Label: "input.tar", Value: inputTar})
+	}
+	if diffPath != "" {
+		references = append(references, ReportReference{Kind: "diff", Label: "diff.patch", Value: diffPath})
+	}
+	meta.References = references
+
+	if diffPath != "" {
+		if b, errRead := os.ReadFile(diffPath); errRead == nil {
+			content := string(b)
+			if len(content) > maxDiffPreviewBytes {
+				content = content[:maxDiffPreviewBytes] + "\n... (diff truncated)"
+			}
+			meta.Diff = &ReportDiff{Path: diffPath, Content: content}
+		} else {
+			meta.Diff = &ReportDiff{Path: diffPath}
+		}
+	}
+
+	sr.Report = meta
 	if err != nil {
+		meta.ErrorSolved = sr.Message
 		return sr, err
 	}
 

@@ -292,6 +292,10 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 				}
 				status.Result["artifacts"] = failedArtifacts
 			}
+			if result != nil {
+				rep := mods.BuildModReport(config, result)
+				status.Report = &rep
+			}
 			if err := h.storeStatus(status); err != nil {
 				log.Printf("Failed to store error status: %v", err)
 			}
@@ -355,6 +359,8 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 			"artifacts":     artifacts,
 		},
 	}
+	report := mods.BuildModReport(config, result)
+	status.Report = &report
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store final status: %v", err)
 	}

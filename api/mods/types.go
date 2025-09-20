@@ -1,6 +1,10 @@
 package mods
 
-import "time"
+import (
+	"time"
+
+	mods "github.com/iw2rmb/ploy/internal/mods"
+)
 
 // ModRunRequest represents the request body for running a mod
 type ModRunRequest struct {
@@ -24,6 +28,7 @@ type ModStatus struct {
 	Duration string          `json:"duration,omitempty"`
 	Steps    []ModStepStatus `json:"steps,omitempty"`
 	LastJob  *ModLastJob     `json:"last_job,omitempty"`
+	Report   *mods.ModReport `json:"report,omitempty"`
 }
 
 // ModStepStatus represents a single step update with timestamp

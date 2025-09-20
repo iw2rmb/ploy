@@ -43,6 +43,7 @@ Verify the Run
 - Success criteria: status `completed`, non-empty `result.mr_url`, compile gate passes after healing, diff captured from LLM executor.
 - `./check-steps.sh <MOD_ID>` ensures the key phases occurred in order (ORW diff, build failure, planner -> llm-exec -> reducer).
 - `./generate-evidence.sh <logs/mod-*>` summarizes build errors, prompts, and diffs for attachments or regressions.
+- Fetch the Mods execution report in both formats for audit history: `curl -fsS "$PLOY_CONTROLLER/mods/$MOD_ID/report?format=json" | jq '.' > REPORT.json` and `curl -fsS "$PLOY_CONTROLLER/mods/$MOD_ID/report?format=markdown" > REPORT.md`. The Markdown artifact lives alongside this README for quick sharing.
 - `./collect-logs.sh <MOD_ID>` downloads controller/platform logs. SeaweedFS artifact downloads are skipped by default (set `SKIP_SEAWEEDFS_DOWNLOADS=0` if you need them).
 - Builder failures now emit a SeaweedFS pointer (`build-logs/<JOB>.log`). `collect-logs.sh` writes the key to `builder_logs.key`, fetches the artifact locally, and also downloads the full log through the controller route `GET /v1/apps/<app>/builds/<JOB>/logs/download` when SeaweedFS isn’t reachable.
 

@@ -90,7 +90,19 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	result := &ModResult{
 		WorkflowID:  r.config.ID,
 		StepResults: []StepResult{},
+		StartedAt:   startTime,
 	}
+	defer func() {
+		if result == nil {
+			return
+		}
+		if result.Duration == 0 {
+			result.Duration = time.Since(startTime)
+		}
+		if result.FinishedAt.IsZero() {
+			result.FinishedAt = startTime.Add(result.Duration)
+		}
+	}()
 
 	// Step 1: Clone repository
 	r.emit(ctx, "clone", "clone", "info", fmt.Sprintf("Cloning repository: repo=%s ref=%s", r.config.TargetRepo, r.config.BaseRef))
@@ -98,8 +110,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	if err := r.gitOps.CloneRepository(ctx, r.config.TargetRepo, r.config.BaseRef, repoPath); err != nil {
 		r.emit(ctx, "clone", "clone", "error", fmt.Sprintf("clone failed: %v", err))
 		result.ErrorMessage = fmt.Sprintf("failed to clone repository: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to clone repository: %w", err)
+		result.FinishedAt = time.Now()
+		return result, fmt.Errorf("failed to clone repository: %w", err)
 	}
 	// Post-clone verification and diagnostics
 	if entries, err := os.ReadDir(repoPath); err == nil {
@@ -129,8 +141,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			msg := fmt.Sprintf("clone produced empty working tree: repo=%s ref=%s", r.config.TargetRepo, r.config.BaseRef)
 			r.emit(ctx, "clone", "clone-failed", "error", msg)
 			result.ErrorMessage = msg
-			result.Duration = time.Since(startTime)
-			return nil, errors.New(msg)
+			result.FinishedAt = time.Now()
+			return result, errors.New(msg)
 		}
 	}
 
@@ -138,6 +150,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 		StepID:  "clone",
 		Success: true,
 		Message: fmt.Sprintf("Cloned %s at %s", r.config.TargetRepo, r.config.BaseRef),
+		Report:  &StepReportMeta{Type: "system"},
 	})
 
 	// Optional controller-side source SBOM generation (baseline)
@@ -153,8 +166,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			if r.sbomFailOnError() {
 				r.emit(ctx, "sbom", "source", "error", msg)
 				result.ErrorMessage = msg
-				result.Duration = time.Since(startTime)
-				return nil, errors.New(msg)
+				result.FinishedAt = time.Now()
+				return result, errors.New(msg)
 			}
 			// Non-fatal: log and continue
 			r.emit(ctx, "sbom", "source", "warn", msg)
@@ -172,8 +185,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	if r.vulnEnabled() {
 		if err := r.runVulnerabilityGate(ctx, repoPath); err != nil {
 			result.ErrorMessage = err.Error()
-			result.Duration = time.Since(startTime)
-			return nil, err
+			result.FinishedAt = time.Now()
+			return result, err
 		}
 	}
 
@@ -184,13 +197,14 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	if err := r.gitOps.CreateBranchAndCheckout(ctx, repoPath, branchName); err != nil {
 		r.emit(ctx, "branch", "create-branch", "error", fmt.Sprintf("branch failed: %v", err))
 		result.ErrorMessage = fmt.Sprintf("failed to create branch: %v", err)
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to create branch: %w", err)
+		result.FinishedAt = time.Now()
+		return result, fmt.Errorf("failed to create branch: %w", err)
 	}
 	result.StepResults = append(result.StepResults, StepResult{
 		StepID:  "create-branch",
 		Success: true,
 		Message: fmt.Sprintf("Created workflow branch: %s", branchName),
+		Report:  &StepReportMeta{Type: "system"},
 	})
 
 	// Capture initial HEAD to detect later if steps produced a commit
@@ -203,7 +217,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 		FailureMessage:     "Baseline build failed",
 		UpdateBuildVersion: false,
 	}); err != nil {
-		return nil, err
+		result.FinishedAt = time.Now()
+		return result, err
 	}
 	// Ensure we continue with the most recent HEAD even if healing already committed changes.
 	if headAfter, err := getHeadHash(repoPath); err == nil && headAfter != "" {
@@ -221,29 +236,31 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 			result.StepResults = append(result.StepResults, sr)
 			if err != nil {
 				result.ErrorMessage = sr.Message
-				result.Duration = time.Since(startTime)
-				return nil, err
+				result.FinishedAt = time.Now()
+				return result, err
 			}
 			// proceed to next step
 			continue
 		case "recipe":
 			// Deprecated: recipe step is no longer supported in main workflow
-			return nil, fmt.Errorf("recipe step is no longer supported; use orw-apply")
+			result.ErrorMessage = "recipe step is no longer supported; use orw-apply"
+			result.FinishedAt = time.Now()
+			return result, fmt.Errorf("recipe step is no longer supported; use orw-apply")
 		}
 	}
 
 	// Step 4: Commit changes (only if not already committed by an apply step)
 	if committed, msg, err := r.runCommitStep(ctx, repoPath, initialHead); err != nil {
 		r.emit(ctx, "commit", "commit", "error", msg)
-		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: false, Message: msg})
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: false, Message: msg, Report: &StepReportMeta{Type: "commit"}})
 		result.ErrorMessage = err.Error()
-		result.Duration = time.Since(startTime)
-		return nil, err
+		result.FinishedAt = time.Now()
+		return result, err
 	} else if committed {
-		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg, Report: &StepReportMeta{Type: "commit"}})
 	} else {
 		// committed=false implies already committed by apply step
-		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg})
+		result.StepResults = append(result.StepResults, StepResult{StepID: "commit", Success: true, Message: msg, Report: &StepReportMeta{Type: "commit"}})
 	}
 
 	// Step 5: Run build check after transformations
@@ -254,7 +271,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 		UpdateBuildVersion: true,
 	})
 	if err != nil {
-		return nil, err
+		result.FinishedAt = time.Now()
+		return result, err
 	}
 
 	// Step 6: If healing requested applying additional diffs, commit them and re-run build gate
@@ -280,7 +298,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 				}
 				// Record failed post-healing build but continue with normal flow (ORW-only)
 				r.emit(ctx, "build", "post-healing-build-failed", "error", msg)
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2)})
+				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2), Report: &StepReportMeta{Type: "build", ErrorSolved: msg}})
 			} else {
 				// Commit post-healing changes after successful build
 				if r.repoManager != nil {
@@ -288,7 +306,7 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 				} else {
 					_ = r.gitOps.CommitChanges(ctx, repoPath, "apply(healing): reducer patch")
 				}
-				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2)})
+				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: true, Message: "Build completed successfully (post-healing)", Duration: time.Since(buildStart2), Report: &StepReportMeta{Type: "build"}})
 				r.emit(ctx, "build", "post-healing-build-succeeded", "info", "Build completed successfully (post-healing)")
 				r.emit(ctx, "build", "build-gate-succeeded", "info", fmt.Sprintf("Build version %s", ""))
 			}
@@ -301,8 +319,8 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 	if sr, err := runPushWithEvents(r, ctx, repoPath, branchName); err != nil {
 		result.StepResults = append(result.StepResults, sr)
 		result.ErrorMessage = sr.Message
-		result.Duration = time.Since(startTime)
-		return nil, fmt.Errorf("failed to push branch: %w", err)
+		result.FinishedAt = time.Now()
+		return result, fmt.Errorf("failed to push branch: %w", err)
 	} else {
 		result.StepResults = append(result.StepResults, sr)
 	}
@@ -314,7 +332,9 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 
 	// Success!
 	result.Success = true
-	result.Duration = time.Since(startTime)
+	now := time.Now()
+	result.FinishedAt = now
+	result.Duration = now.Sub(startTime)
 	return result, nil
 }
 
@@ -331,6 +351,10 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 
 	buildStart := time.Now()
 	buildResult, err := r.runBuildGate(ctx, repoPath)
+	stepType := opts.StepID
+	if stepType == "" || stepType == "baseline-build" {
+		stepType = "build"
+	}
 	if err == nil && (buildResult == nil || buildResult.Success) {
 		if opts.UpdateBuildVersion && buildResult != nil && buildResult.Version != "" {
 			result.BuildVersion = buildResult.Version
@@ -341,6 +365,7 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 			Success:  true,
 			Message:  opts.SuccessMessage,
 			Duration: time.Since(buildStart),
+			Report:   &StepReportMeta{Type: stepType},
 		})
 		return buildResult, nil
 	}
@@ -375,6 +400,7 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 		Success:  false,
 		Message:  message,
 		Duration: time.Since(buildStart),
+		Report:   &StepReportMeta{Type: stepType, ErrorSolved: message},
 	})
 
 	if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {

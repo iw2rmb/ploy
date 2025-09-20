@@ -43,6 +43,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	tf.Get("/:id/status", h.GetModStatus)
 	tf.Get("", h.ListMods)
 	tf.Delete("/:id", h.CancelMod)
+	tf.Get("/:id/report", h.GetModReport)
 	tf.Get("/:id/artifacts", h.GetArtifacts)
 	tf.Get("/:id/artifacts/:name", h.DownloadArtifact)
 	tf.Put("/:id/artifacts/:name", h.UploadArtifact)
