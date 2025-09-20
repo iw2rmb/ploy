@@ -22,6 +22,7 @@ func (r *ModRunner) ApplyDiffAndBuild(ctx context.Context, repoPath, diffPath st
 	if err := stagePathsFromDiff(ctx, repoPath, diffPath); err != nil {
 		return err
 	}
+	pruneGeneratedDockerfiles(repoPath)
 	if r.repoManager != nil {
 		if err := r.repoManager.Commit(ctx, repoPath, "apply(diff): mods branch patch"); err != nil {
 			return fmt.Errorf("commit failed: %w", err)
