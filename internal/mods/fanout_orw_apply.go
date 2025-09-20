@@ -3,7 +3,9 @@ package mods
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -32,10 +34,55 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 
 	// Provide host directories for bind mounts (no global env)
 	baseDir := filepath.Dir(hclPath)
-	vars := orwMakeVars(baseDir)
+	modID := os.Getenv("MOD_ID")
+	infra := ResolveInfraFromEnv()
+	seaweedURL := infra.SeaweedURL
+	runID := ORWRunID(branch.ID)
+	diffKey := computeBranchDiffKey(modID, branch.ID, runID)
+	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
+
+	// Prepare input tar from the repo and upload to SeaweedFS for task-side download
+	repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
+	inputTar := filepath.Join(baseDir, "input.tar")
+	if err := createTarFromDir(repoRoot, inputTar); err != nil {
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("failed to create ORW input tar: %v", err)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
+	if modID == "" || seaweedURL == "" {
+		result.Status = "failed"
+		result.Notes = "missing MOD_ID or SeaweedFS URL for ORW branch"
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
+	if err := uploadInputTar(seaweedURL, modID, inputTar); err != nil {
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("failed to upload ORW input tar: %v", err)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
+	inputURL := strings.TrimRight(seaweedURL, "/") + "/artifacts/mods/" + modID + "/input.tar"
+	available := false
+	for i := 0; i < 10; i++ {
+		if headURLFn(inputURL) {
+			available = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !available {
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("input.tar not yet available at %s", inputURL)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
 
 	// Step 2b: Substitute environment variables in HCL template
-	runID := ORWRunID(branch.ID)
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
 	if err != nil {
 		result.Status = "failed"
