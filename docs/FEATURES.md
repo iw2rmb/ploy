@@ -859,6 +859,7 @@ Comprehensive transformation of Security Engine into a universal code transforma
 - Knowledge Base learning: signatures, deduplication, compaction, suggestions.
 - Build/SBOM/Vuln gates; artifact handling; event streaming and logs.
 - OpenRewrite steps require per-recipe `coords` (group/artifact/version) in Mods YAML so every branch submits explicit Maven coordinates to OpenRewrite jobs.
+- Mods runs persist structured execution reports (JSON and Markdown) with repo, MR, timing, happy path, and full step tree details via `/v1/mods/:id/report`.
 - See `internal/mods/README.md` for detailed features and per-file map.
 
 ⸻

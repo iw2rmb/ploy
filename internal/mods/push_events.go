@@ -17,7 +17,7 @@ func runPushWithEvents(r *ModRunner, ctx context.Context, repoPath, branchName s
 			r.emit(ctx, "push", "push-failed-rc-128", "error", "push failed (rc=128)")
 		}
 		r.emit(ctx, "push", "push", "error", msg)
-		return StepResult{StepID: "push", Success: false, Message: fmt.Sprintf("Push failed: %v", err), Duration: time.Since(start)}, err
+		return StepResult{StepID: "push", Success: false, Message: fmt.Sprintf("Push failed: %v", err), Duration: time.Since(start), Report: &StepReportMeta{Type: "push", ErrorSolved: msg}}, err
 	}
-	return StepResult{StepID: "push", Success: true, Message: fmt.Sprintf("Pushed branch %s", branchName), Duration: time.Since(start)}, nil
+	return StepResult{StepID: "push", Success: true, Message: fmt.Sprintf("Pushed branch %s", branchName), Duration: time.Since(start), Report: &StepReportMeta{Type: "push"}}, nil
 }
