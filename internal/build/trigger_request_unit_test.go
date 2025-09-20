@@ -28,6 +28,7 @@ func TestReadRequestBodyToTar_RawBody(t *testing.T) {
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 }
 
 func TestReadRequestBodyToTar_Multipart(t *testing.T) {
@@ -54,4 +55,5 @@ func TestReadRequestBodyToTar_Multipart(t *testing.T) {
 	resp, err := app.Test(req)
 	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 }

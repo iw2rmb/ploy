@@ -180,9 +180,14 @@ func classifyError(err error, context ErrorContext) (ErrorType, bool, time.Durat
 // isNetworkError checks if an error is network-related
 func isNetworkError(err error) bool {
 	if netErr, ok := err.(net.Error); ok {
-		// Treat temporary network errors as network-related; non-temporary isn't.
-		if netErr.Temporary() {
+		if netErr.Timeout() {
 			return true
+		}
+		if tempErr, ok := netErr.(interface{ Temporary() bool }); ok {
+			if tempErr.Temporary() { //nolint:staticcheck
+				return true
+			}
+			return false
 		}
 		return false
 	}

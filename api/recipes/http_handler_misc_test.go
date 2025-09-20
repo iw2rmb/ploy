@@ -16,6 +16,7 @@ func TestHTTPHandler_SearchRecipes_MissingQueryAndSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -26,6 +27,7 @@ func TestHTTPHandler_SearchRecipes_MissingQueryAndSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp2.StatusCode)
 	}
@@ -45,6 +47,7 @@ func TestHTTPHandler_DownloadRecipe_SetsHeadersAndNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -61,6 +64,7 @@ func TestHTTPHandler_DownloadRecipe_SetsHeadersAndNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp2.StatusCode)
 	}
@@ -74,6 +78,7 @@ func TestHTTPHandler_ListRecipes_WithTypeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}

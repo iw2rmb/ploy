@@ -56,6 +56,7 @@ func TestTriggerWrappers_InvalidAppNameFastFail(t *testing.T) {
 			resp, err := app.Test(req, 10000)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
+			require.NoError(t, resp.Body.Close())
 		})
 	}
 }

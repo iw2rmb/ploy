@@ -110,7 +110,7 @@ func TestLLMModelValidator_ValidateLLMModel(t *testing.T) {
 				MaxTokens:    8192,
 			},
 			wantErr: true,
-			errMsg:  "Azure models require 'deployment_name'",
+			errMsg:  "azure models require 'deployment_name'",
 		},
 		{
 			name: "model with low token limit",
@@ -312,7 +312,7 @@ func TestLLMModelValidator_validateProviderSpecificConfig(t *testing.T) {
 			provider: "azure",
 			config:   map[string]string{"api_version": "2023-05-15"},
 			wantErr:  true,
-			errMsg:   "Azure models require 'deployment_name'",
+			errMsg:   "azure models require 'deployment_name'",
 		},
 		{
 			name:     "valid local config",

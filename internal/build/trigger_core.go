@@ -32,7 +32,7 @@ type BuildDependencies struct {
 	EnvStore      envstore.EnvStoreInterface
 }
 
-type laneDBuildFuncType func(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, appEnvVars map[string]string) (dockerImage string, builderJobName string, err error)
+type laneDBuildFuncType func(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, dockerfileInline string, appEnvVars map[string]string) (dockerImage string, builderJobName string, err error)
 
 var laneDBuildFunc laneDBuildFuncType = buildLaneD
 
@@ -105,9 +105,12 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	_, detectedLanguage, detectedJavaVersion, mainClass, facts := detectBuildContext(srcDir, lane, mainClass)
 	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
+	var dockerfileInline string
 	if _, err := os.Stat(dockerfilePath); err != nil {
 		if os.IsNotExist(err) {
-			if genErr := generateDockerfileWithFacts(srcDir, facts); genErr != nil {
+			var genErr error
+			dockerfileInline, genErr = generateDockerfileWithFacts(srcDir, facts)
+			if genErr != nil {
 				nonce := time.Now().Unix()
 				builderID := fmt.Sprintf("%s-d-build-%s-%d", appName, sha, nonce)
 				logsKey := fmt.Sprintf("build-logs/%s.log", builderID)
@@ -135,7 +138,7 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 	lane = "D"
 	log.Printf("[Build] Lane enforced: %s (language=%s)", lane, detectedLanguage)
 
-	dockerImage, builderJobName, err := laneDBuildFunc(c, deps, buildCtx, appName, srcDir, sha, facts, appEnvVars)
+	dockerImage, builderJobName, err := laneDBuildFunc(c, deps, buildCtx, appName, srcDir, sha, facts, dockerfileInline, appEnvVars)
 	if err != nil {
 		if strings.TrimSpace(builderJobName) != "" {
 			logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)

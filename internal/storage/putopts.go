@@ -15,9 +15,5 @@ func ResolvePutOptions(opts ...PutOption) PutOptionsResolved {
 			fn(&o)
 		}
 	}
-	return PutOptionsResolved{
-		ContentType:  o.ContentType,
-		Metadata:     o.Metadata,
-		CacheControl: o.CacheControl,
-	}
+	return PutOptionsResolved(o)
 }
