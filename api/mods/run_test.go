@@ -79,7 +79,7 @@ func TestExecuteModRecordsErrorOnInvalidConfig(t *testing.T) {
 	kv := &kvMem{}
 	h := NewHandler(nil, nil, kv)
 
-	h.executeMod("mod-invalid", &internalmods.ModConfig{}, false)
+	h.executeMod("mod-invalid", &internalmods.ModConfig{}, false, nil)
 
 	st, err := h.getStatus("mod-invalid")
 	if err != nil {

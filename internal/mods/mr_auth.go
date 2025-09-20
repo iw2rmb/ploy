@@ -18,7 +18,7 @@ func (r *ModRunner) applyMRAuthFromConfig(ctx context.Context) {
 	if name := strings.TrimSpace(r.config.MR.TokenEnv); name != "" {
 		val := os.Getenv(name)
 		if val != "" {
-			_ = os.Setenv("GITLAB_TOKEN", val)
+			_ = os.Setenv("PLOY_GITLAB_PAT", val)
 			r.emit(ctx, "mr", "mr-config", "info", fmt.Sprintf("using token_env=%s", name))
 		} else {
 			r.emit(ctx, "mr", "mr-config", "warn", fmt.Sprintf("token_env=%s not set", name))
