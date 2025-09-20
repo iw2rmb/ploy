@@ -116,6 +116,7 @@ func TestModRunner_AttemptHealingIncludesBuilderLogsKey(t *testing.T) {
 		ID:         "builder-log-test",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
+		Steps:      []ModStep{{ID: "s", Type: "recipe"}},
 		SelfHeal: &SelfHealConfig{
 			Enabled:    true,
 			MaxRetries: 1,
