@@ -25,7 +25,7 @@ func NewGitLabProvider() *GitLabProvider {
 		baseURL = "https://gitlab.com"
 	}
 
-	token := os.Getenv("GITLAB_TOKEN")
+	token := os.Getenv("PLOY_GITLAB_PAT")
 
 	return &GitLabProvider{
 		baseURL: baseURL,
@@ -37,7 +37,7 @@ func NewGitLabProvider() *GitLabProvider {
 // ValidateConfiguration validates that required configuration is present
 func (g *GitLabProvider) ValidateConfiguration() error {
 	if g.token == "" {
-		return fmt.Errorf("GITLAB_TOKEN environment variable is required")
+		return fmt.Errorf("PLOY_GITLAB_PAT environment variable is required")
 	}
 	return nil
 }

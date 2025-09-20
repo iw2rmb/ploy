@@ -38,7 +38,7 @@ func joinArgs(args []string) string {
 // TestPushBranchPublishesEventsOnSuccess verifies that push events include start and completion states.
 func TestPushBranchPublishesEventsOnSuccess(t *testing.T) {
 	// Ensure token injection does not alter the expected remote URL in this test
-	_ = os.Unsetenv("GITLAB_TOKEN")
+	_ = os.Unsetenv("PLOY_GITLAB_PAT")
 	runner := &fakeRunner{}
 	svc := NewService(ServiceConfig{Runner: runner})
 
@@ -120,8 +120,8 @@ func TestAuthenticatedRemoteURL(t *testing.T) {
 		t.Fatalf("expected unchanged URL when token missing, got %q", got)
 	}
 
-	_ = os.Setenv("GITLAB_TOKEN", "test-token-123")
-	defer func() { _ = os.Unsetenv("GITLAB_TOKEN") }()
+	_ = os.Setenv("PLOY_GITLAB_PAT", "test-token-123")
+	defer func() { _ = os.Unsetenv("PLOY_GITLAB_PAT") }()
 	got := svc.authenticatedRemoteURL(original)
 	if !strings.HasPrefix(got, "https://oauth2:test-token-123@") {
 		t.Fatalf("expected oauth2 credentials injected, got %q", got)
