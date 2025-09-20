@@ -709,6 +709,7 @@ Security Engine represents Ploy's enterprise-grade automated code transformation
 - ✅ **Parallel Solution Testing**: Fork-join framework for concurrent error modification attempts with confidence scoring
 - ✅ **Docker Lane Self-Healing E2E**: `tests/e2e/mods/orw-apply-llm-plan-seq` runs on Lane D with streaming Mods event capture for full healing traces
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination across multiple repositories
+- ✅ **Builder Log Fallback**: Lane D healing propagates builder log pointers to LLM branches; `llmPrepareContext` downloads the log to recover file/line context when controller responses are opaque, replacing `.llm-healing` placeholders with actionable diffs.
 
 ### ✅ **Implemented Deployment Integration & Application Testing**
 - ✅ **Sandbox Build Service**: Unified build sandbox in `internal/build` powers Mods/analysis without bespoke DeploymentSandboxManager.
