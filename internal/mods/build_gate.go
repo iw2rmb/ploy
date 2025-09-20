@@ -78,13 +78,13 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 	}
 	if r.buildGate != nil {
 		deployRes, err := r.buildGate.Check(ctx, buildCfg)
-		if err == nil && deployRes != nil && !deployRes.Success {
+		if deployRes != nil && !deployRes.Success {
 			enrichBuilderLogs(controllerURL, appName, deployRes)
 		}
 		return deployRes, err
 	}
 	deployRes, err := r.buildChecker.CheckBuild(ctx, buildCfg)
-	if err == nil && deployRes != nil && !deployRes.Success {
+	if deployRes != nil && !deployRes.Success {
 		enrichBuilderLogs(controllerURL, appName, deployRes)
 	}
 	return deployRes, err
