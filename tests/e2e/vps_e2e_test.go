@@ -35,13 +35,10 @@ func TestVPSE2E_ProductionWorkflows(t *testing.T) {
 		TargetBranch: "main",
 		Steps: []WorkflowStep{
 			{
-				Type:   "recipe",
-				ID:     "vps-java-migration",
-				Engine: "openrewrite",
-				Recipes: []string{
-					"org.openrewrite.java.migrate.Java11toJava17",
-					"org.openrewrite.java.cleanup.CommonStaticAnalysis",
-				},
+				Type:    "recipe",
+				ID:      "vps-java-migration",
+				Engine:  "openrewrite",
+				Recipes: []WorkflowRecipe{{Name: "org.openrewrite.java.migrate.Java11toJava17"}, {Name: "org.openrewrite.java.cleanup.CommonStaticAnalysis"}},
 			},
 		},
 		SelfHeal: SelfHealConfig{
@@ -110,7 +107,7 @@ func TestVPSE2E_ConcurrentWorkflows(t *testing.T) {
 						Type:    "recipe",
 						ID:      fmt.Sprintf("concurrent-recipe-%d", workflowNum),
 						Engine:  "openrewrite",
-						Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
+						Recipes: []WorkflowRecipe{{Name: "org.openrewrite.java.migrate.Java11toJava17"}},
 					},
 				},
 				MaxDuration: 12 * time.Minute,

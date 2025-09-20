@@ -12,24 +12,49 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type RecipeCoordinates struct {
+	Group    string `yaml:"group"`
+	Artifact string `yaml:"artifact"`
+	Version  string `yaml:"version"`
+}
+
+type RecipeEntry struct {
+	Name   string            `yaml:"name"`
+	Coords RecipeCoordinates `yaml:"coords"`
+}
+
+func (r *RecipeEntry) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		r.Name = strings.TrimSpace(value.Value)
+		return nil
+	}
+	type raw struct {
+		Name   string            `yaml:"name"`
+		Coords RecipeCoordinates `yaml:"coords"`
+	}
+	var aux raw
+	if err := value.Decode(&aux); err != nil {
+		return err
+	}
+	r.Name = strings.TrimSpace(aux.Name)
+	r.Coords = aux.Coords
+	return nil
+}
+
 type ModStep struct {
-	Type    string   `yaml:"type"`
-	ID      string   `yaml:"id"`
-	Engine  string   `yaml:"engine"`
-	Recipes []string `yaml:"recipes"`
-	// OpenRewrite-specific optional overrides
-	RecipeGroup        string     `yaml:"recipe_group,omitempty"`
-	RecipeArtifact     string     `yaml:"recipe_artifact,omitempty"`
-	RecipeVersion      string     `yaml:"recipe_version,omitempty"`
-	MavenPluginVersion string     `yaml:"maven_plugin_version,omitempty"`
-	DiscoverRecipe     *bool      `yaml:"discover_recipe,omitempty"`
-	Model              string     `yaml:"model,omitempty"`
-	Prompts            []string   `yaml:"prompts,omitempty"`
-	MCPTools           []MCPTool  `yaml:"mcp_tools,omitempty"`
-	Context            []string   `yaml:"context,omitempty"`
-	Budgets            MCPBudgets `yaml:"budgets,omitempty"`
-	Parallel           bool       `yaml:"parallel,omitempty"`
-	MaxParallel        int        `yaml:"max_parallel_execs,omitempty"`
+	Type               string        `yaml:"type"`
+	ID                 string        `yaml:"id"`
+	Engine             string        `yaml:"engine"`
+	Recipes            []RecipeEntry `yaml:"recipes"`
+	MavenPluginVersion string        `yaml:"maven_plugin_version,omitempty"`
+	DiscoverRecipe     *bool         `yaml:"discover_recipe,omitempty"`
+	Model              string        `yaml:"model,omitempty"`
+	Prompts            []string      `yaml:"prompts,omitempty"`
+	MCPTools           []MCPTool     `yaml:"mcp_tools,omitempty"`
+	Context            []string      `yaml:"context,omitempty"`
+	Budgets            MCPBudgets    `yaml:"budgets,omitempty"`
+	Parallel           bool          `yaml:"parallel,omitempty"`
+	MaxParallel        int           `yaml:"max_parallel_execs,omitempty"`
 }
 
 type ModConfig struct {
@@ -145,9 +170,14 @@ func (c *ModConfig) Validate() error {
 		if step.Type == "" {
 			return fmt.Errorf("step %d (%s) must have a type", i, step.ID)
 		}
-		if len(step.Recipes) > 0 {
-			if step.RecipeGroup == "" || step.RecipeArtifact == "" || step.RecipeVersion == "" {
-				return fmt.Errorf("step %s must define recipe_group, recipe_artifact, and recipe_version when recipes are provided", step.ID)
+		for idx, recipe := range step.Recipes {
+			if strings.TrimSpace(recipe.Name) == "" {
+				return fmt.Errorf("step %s recipe[%d] must provide name", step.ID, idx)
+			}
+			if strings.EqualFold(step.Type, string(StepTypeORWApply)) {
+				if recipe.Coords.Group == "" || recipe.Coords.Artifact == "" || recipe.Coords.Version == "" {
+					return fmt.Errorf("step %s recipe %q must define coords.group/artifact/version", step.ID, recipe.Name)
+				}
 			}
 		}
 

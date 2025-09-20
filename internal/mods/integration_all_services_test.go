@@ -35,7 +35,7 @@ func TestMods_WorkflowWithAllRealServices(t *testing.T) {
 		testConsulOperations(t, serviceConfig.ConsulAddr)
 		testGitLabOperations(t, serviceConfig.GitLabURL, serviceConfig.GitLabToken)
 	})
-	cfg := &ModConfig{Version: "v1alpha1", ID: "test-all-services-real", TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", TargetBranch: "main", BaseRef: "main", Lane: "C", BuildTimeout: "15m", Steps: []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"}}, SelfHeal: &SelfHealConfig{Enabled: true, MaxRetries: 3, Cooldown: "10m"}}
+	cfg := &ModConfig{Version: "v1alpha1", ID: "test-all-services-real", TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", TargetBranch: "main", BaseRef: "main", Lane: "C", BuildTimeout: "15m", Steps: []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}}, SelfHeal: &SelfHealConfig{Enabled: true, MaxRetries: 3, Cooldown: "10m"}}
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("failed to create runner with all services: %v", err)

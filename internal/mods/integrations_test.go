@@ -16,7 +16,7 @@ func TestCreateConfiguredRunner_WiresDefaultModules(t *testing.T) {
 			Type:    "orw-apply",
 			ID:      "s1",
 			Engine:  "openrewrite",
-			Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
+			Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "", "", "")},
 		}},
 		SelfHeal: GetDefaultSelfHealConfig(),
 	}

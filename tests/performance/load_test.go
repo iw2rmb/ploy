@@ -63,7 +63,7 @@ func setupLoadTestEnvironment(t *testing.T) *LoadTestEnvironment {
 				Type:    "recipe",
 				ID:      "java-migration-load",
 				Engine:  "openrewrite",
-				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
+				Recipes: []mods.RecipeEntry{mods.RecipeEntry{Name: "org.openrewrite.java.migrate.Java11toJava17"}},
 			},
 		},
 		SelfHeal: mods.SelfHealConfig{

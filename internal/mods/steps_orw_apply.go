@@ -47,13 +47,16 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 	}
 
 	// Pre-substitute recipe class and input tar host path into template
-	rclass := ""
+	var recipeCfg RecipeEntry
 	if len(step.Recipes) > 0 {
-		rclass = step.Recipes[0]
+		recipeCfg = step.Recipes[0]
 	}
+	rclass := recipeCfg.Name
+	rgroup := recipeCfg.Coords.Group
+	rartifact := recipeCfg.Coords.Artifact
+	rversion := recipeCfg.Coords.Version
 	// Determine coordinates strictly from YAML (no discovery)
-	rgroup, rartifact, rversion := step.RecipeGroup, step.RecipeArtifact, step.RecipeVersion
-	if err := validateRecipeCoords(rgroup, rartifact, rversion, step.ID); err != nil {
+	if err := validateRecipeCoords(rgroup, rartifact, rversion, step.ID, rclass); err != nil {
 		return StepResult{StepID: step.ID, Success: false, Message: err.Error()}, err
 	}
 	// Optional Maven plugin version (prefer YAML, then env; runner defaults internally if unset)
