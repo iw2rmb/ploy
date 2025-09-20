@@ -47,10 +47,10 @@ steps:
 						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "openrewrite-updates",
 						Engine: "openrewrite",
-						Recipes: recipeNames(
-							"com.acme.FixNulls",
-							"com.acme.UpdateApi",
-						),
+						Recipes: []RecipeEntry{
+							recipeEntry("com.acme.FixNulls", "", "", ""),
+							recipeEntry("com.acme.UpdateApi", "", "", ""),
+						},
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
@@ -82,7 +82,7 @@ steps:
 						Type:    "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:      "simple-recipe",
 						Engine:  "openrewrite",
-						Recipes: recipeNames("com.acme.SimpleRecipe"),
+						Recipes: []RecipeEntry{recipeEntry("com.acme.SimpleRecipe", "", "", "")},
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
