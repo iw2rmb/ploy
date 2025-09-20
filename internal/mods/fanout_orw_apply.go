@@ -51,7 +51,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 			log.Printf("[Mods] ORW input.tar creation failed: %v", err)
 		}
 		result.Status = "failed"
-		result.Notes = fmt.Sprintf("failed to create ORW input tar: %v", err)
+		result.Notes = fmt.Sprintf("ORW apply job failed: %v", err)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
@@ -112,7 +112,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 	if uploadErr != nil {
 		result.Status = "failed"
-		result.Notes = fmt.Sprintf("failed to prepare ORW input tar: %v", uploadErr)
+		result.Notes = fmt.Sprintf("ORW apply job failed: %v", uploadErr)
 		result.FinishedAt = time.Now()
 		result.Duration = time.Since(result.StartedAt)
 		return result
