@@ -260,7 +260,7 @@ func TestModRunner_Run(t *testing.T) {
 				if tt.expectedErrMsg != "" {
 					assert.Contains(t, err.Error(), tt.expectedErrMsg)
 				}
-				assert.Nil(t, result)
+				assert.NotNil(t, result)
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, result)

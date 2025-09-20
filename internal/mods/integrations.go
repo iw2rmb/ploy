@@ -165,6 +165,10 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 		if strings.Contains(line, "seaweedfs-filer") {
 			return
 		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "builder logs") {
+			return
+		}
 		appendIfNew(line)
 	}
 

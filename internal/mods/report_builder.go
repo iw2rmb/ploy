@@ -52,12 +52,12 @@ func BuildModReport(cfg *ModConfig, result *ModResult) ModReport {
 			ID:          sr.StepID,
 			Type:        stepType,
 			Success:     sr.Success,
-			Message:     sr.Message,
+			Message:     sanitizeStepMessage(sr.Message),
 			Duration:    sr.Duration,
 			Prompts:     copyStrings(metaPrompts(meta)),
 			Recipes:     copyRecipes(metaRecipes(meta)),
 			References:  normalizeReferences(meta),
-			ErrorSolved: metaErrorSolved(meta),
+			ErrorSolved: sanitizeStepMessage(metaErrorSolved(meta)),
 		}
 		report.StepTree = append(report.StepTree, node)
 
@@ -392,4 +392,31 @@ func orFallback(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func sanitizeStepMessage(message string) string {
+	trimmed := strings.TrimSpace(message)
+	if trimmed == "" {
+		return ""
+	}
+	lines := strings.Split(trimmed, "\n")
+	var kept []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "builder_log:") {
+			continue
+		}
+		if strings.Contains(lower, "builder logs") {
+			continue
+		}
+		if strings.Contains(lower, "seaweedfs") {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
