@@ -105,34 +105,6 @@ func TestTriggerAppBuildWithUnifiedStorage(t *testing.T) {
 	assert.NotNil(t, resp)
 }
 
-// TestBackwardCompatibilityBuildTriggers tests that legacy functions still work
-func TestBackwardCompatibilityBuildTriggers(t *testing.T) {
-	// Ensure backward compatibility is maintained
-	t.Skip("Integration test - requires builders/orchestration; skipping in unit suite")
-
-	mockEnvStore := mocks.NewEnvStore()
-	mockEnvStore.On("GetAll", "legacy-app").Return(envstore.AppEnvVars{}, nil)
-
-	// Create test fiber app
-	app := fiber.New()
-	app.Post("/builds/:app", func(c *fiber.Ctx) error {
-		// Original function should still work with nil StorageClient
-		return TriggerBuild(c, nil, mockEnvStore)
-	})
-
-	// Create test request
-	tarContent := createTestTarball(t, map[string]string{"README.md": "ok"})
-	req := httptest.NewRequest("POST", "/builds/legacy-app", bytes.NewReader(tarContent))
-	req.Header.Set("Content-Type", "application/x-tar")
-
-	// Execute request
-	resp, err := app.Test(req, 30000)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-
-	// (No assertion; path is skipped in unit suite)
-}
-
 // TestBuildDependenciesWithUnifiedStorage tests that BuildDependencies works with unified storage
 func TestBuildDependenciesWithUnifiedStorage(t *testing.T) {
 	mockStorage := new(MockUnifiedStorage)

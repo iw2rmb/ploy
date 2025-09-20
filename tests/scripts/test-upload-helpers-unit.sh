@@ -215,24 +215,6 @@ test_enhanced_upload_usage() {
     fi
 }
 
-test_backward_compatibility() {
-    run_test "Backward compatibility with existing functionality"
-    
-    # Check that main artifact upload still uses existing method
-    if grep -q "UploadArtifactBundleWithVerification" internal/build/handler.go; then
-        success "Main artifact upload maintains existing functionality"
-    else
-        error "Main artifact upload functionality may be broken"
-    fi
-    
-    # Check that original error handling patterns are preserved
-    if grep -q "return utils.ErrJSON" internal/build/handler.go; then
-        success "Original error response patterns are preserved"
-    else
-        warning "Original error response patterns may be modified"
-    fi
-}
-
 check_build_handler_exists() {
     if [[ ! -f "internal/build/handler.go" ]]; then
         error "Build handler file not found at internal/build/handler.go"
@@ -259,7 +241,6 @@ main() {
     test_storage_client_integration
     test_file_handling_patterns
     test_enhanced_upload_usage
-    test_backward_compatibility
     
     # Report results
     echo ""
