@@ -7,6 +7,7 @@
 - [ ] Plan local unit tests and coverage checks before touching code or docs.
 - [ ] Verify required environment variables (`TARGET_HOST`, `PLOY_CONTROLLER`, etc.) are discoverable.
 - [ ] Confirm you understand the VPS vs workstation split for the task at hand.
+- [ ] Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
 
 ## Local Development
 
@@ -209,3 +210,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 ### Specialized Agents
 
 Use Task tool for complex domain-specific tasks. Available agents in `.claude/agents.json`.
+
+### Documentation
+
+Keep this file and every README under subdirectories consistent with the guidance in [`docs/DOCS.md`](docs/DOCS.md). Update that document if you change the expected structure.

@@ -19,6 +19,7 @@ ploy/
 ├── docker-compose.integration.yml # Integration testing environment
 ├── test-mod-java11to17.yaml # Mods test configuration
 ├── .gitignore                # Git ignore rules
+├── docs/                     # Documentation bundle (see docs/DOCS.md for conventions)
 └── roadmap/                  # Detailed implementation roadmaps
     ├── README.md             # Main roadmap overview and progress
     ├── arf/                  # Automated Modification Framework (see roadmap/arf/README.md)
@@ -57,6 +58,18 @@ Reusable modules used by both API and CLI applications providing core functional
 **For detailed package structure and comprehensive documentation, see [`internal/README.md`](../internal/README.md).**
 
 Key packages include storage abstraction, CLI modules, Git integration, lane detection, monitoring, validation, Knowledge Base (KB) system, and comprehensive testing infrastructure.
+
+## Documentation
+
+### `/docs/` - Documentation Hub
+Primary reference material for contributors.
+
+- [`DOCS.md`](DOCS.md) — conventions for AGENTS.md and scoped README files
+- [`FEATURES.md`](FEATURES.md) — catalogue of platform capabilities
+- [`LANES.md`](LANES.md) — deployment lane overview and status
+- [`TESTING.md`](TESTING.md) — testing standards and troubleshooting guide
+- [`STACK.md`](STACK.md) / [`STORAGE.md`](STORAGE.md) — infrastructure reference material
+- [`kb/`](kb) and [`mods/`](mods) — knowledge base and mods-focused deep dives
 
 ## Configuration and Infrastructure
 
