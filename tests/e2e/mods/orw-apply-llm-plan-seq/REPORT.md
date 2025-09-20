@@ -2,20 +2,31 @@
 
 ## Summary
 - Repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
-- Branch: workflow/java11to17-orw-llm/1758400788
-- Merge Request: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68
-- Started: 2025-09-20T20:39:47Z
-- Ended: 2025-09-20T20:41:43Z
-- Duration: 1m56.135532688s
+- Branch: workflow/java11to17-orw-llm/1758409861
+- Merge Request: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82
+- Started: 2025-09-20T23:10:59Z
+- Ended: 2025-09-20T23:12:51Z
+- Duration: 1m51.968253093s
 
 ## Happy Path
-1. [success] clone (system)
-   - Message: Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol
-2. [success] create-branch (system)
-   - Message: Created workflow branch: workflow/java11to17-orw-llm/1758400788
-3. [success] baseline-build
-   - Message: Baseline build completed successfully (post-healing)
-4. [success] java11to17-migration (orw-apply)
+1. [success] llm-1 (llm-exec)
+   - Message: LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch
+
+```diff
+--- a/src/main/java/e2e/FailMissingSymbol.java
++++ b/src/main/java/e2e/FailMissingSymbol.java
+@@ -3,7 +3,7 @@
+ public class FailMissingSymbol {
+     public static void main(String[] args) {
+         // Intentional reference to an unknown symbol (compile error)
+-        UnknownClass obj = new UnknownClass();
+-        System.out.println(obj);
++//         UnknownClass obj = new UnknownClass();
++//         System.out.println(obj);
+     }
+ }
+```
+2. [success] java11to17-migration (orw-apply)
    - Message: Applied ORW diff
    - Recipes:
      * org.openrewrite.java.migrate.UpgradeToJava17 (org.openrewrite.recipe:rewrite-migrate-java@3.17.0)
@@ -50,50 +61,35 @@ index 32d75b2..ca9f41c 100644
              </plugin>
              
 ```
-5. [success] commit
-   - Message: Committed changes
-6. [success] build
-   - Message: Build completed successfully
-7. [success] push
-   - Message: Pushed branch workflow/java11to17-orw-llm/1758400788
-8. [success] mr
-   - Message: MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68
 
 ## Step Tree
 - [success] clone (system) — Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol
-- [success] create-branch (system) — Created workflow branch: workflow/java11to17-orw-llm/1758400788
+- [success] create-branch (system) — Created workflow branch: workflow/java11to17-orw-llm/1758409861
 - [failed] baseline-build (build) — docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788
-builder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)
-download full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download
+builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
 error code: build_failed
-{"id":"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788","app":"mod-java11to17-orw-llm-1758400788","lines":1200,"logs":""}: build check unsuccessful (controller=https://api.dev.ployman.app/v1 app=mod-java11to17-orw-llm-1758400788 lane=D env=dev): docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788
-builder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)
-download full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download
+builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
 error code: build_failed
-{"id":"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788","app":"mod-java11to17-orw-llm-1758400788","lines":1200,"logs":""}
   • Addressed Error: docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788
-builder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)
-download full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download
+builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
 error code: build_failed
-{"id":"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788","app":"mod-java11to17-orw-llm-1758400788","lines":1200,"logs":""}: build check unsuccessful (controller=https://api.dev.ployman.app/v1 app=mod-java11to17-orw-llm-1758400788 lane=D env=dev): docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788
-builder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)
-download full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download
+builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
 error code: build_failed
-{"id":"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788","app":"mod-java11to17-orw-llm-1758400788","lines":1200,"logs":""}
+  • References:
+    - builder logs: [build-logs/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861.log](https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758409861/builds/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861/logs/download)
 - [success] baseline-build — Baseline build completed successfully (post-healing)
+- [success] llm-1 (llm-exec) — LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch
+  • References:
+    - diff.patch: (diff.patch)[mods/mod-a17f5d35/branches/llm-1/steps/llm-exec-llm-1-1758409871/diff.patch]
 - [success] java11to17-migration (orw-apply) — Applied ORW diff
   • Recipes:
     - org.openrewrite.java.migrate.UpgradeToJava17 (org.openrewrite.recipe:rewrite-migrate-java@3.17.0)
   • References:
-    - submitted_hcl: /tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/orw_apply.submitted.hcl
-    - pre_hcl: /tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/orw_apply.pre.hcl
-    - input.tar: /tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/input.tar
-    - diff.patch: /tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/out/diff.patch
+    - submitted_hcl: (submitted_hcl)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.submitted.hcl]
+    - pre_hcl: (pre_hcl)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.pre.hcl]
+    - input.tar: (input.tar)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/input.tar]
+    - diff.patch: (diff.patch)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/out/diff.patch]
 - [success] commit — Committed changes
 - [success] build — Build completed successfully
-- [success] push — Pushed branch workflow/java11to17-orw-llm/1758400788
-- [success] mr — MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68
+- [success] push — Pushed branch workflow/java11to17-orw-llm/1758409861
+- [success] mr — MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82
