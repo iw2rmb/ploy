@@ -111,7 +111,6 @@ job "ploy-api" {
         MODS_REDUCER_IMAGE = "{{ ploy.mods.reducer_image }}"
         MODS_LLM_EXEC_IMAGE = "{{ ploy.mods.llm_exec_image }}"
         MODS_REGISTRY = "{{ ploy.mods.registry }}"
-        MODS_SKIP_DEPLOY_LANES = "{{ ploy.mods.skip_deploy_lanes }}"
                 
         # Internal ARF Recipes Indexer
         PLOY_SECURITY_REGISTRY = "{{ ploy.security_registry | default('https://repo1.maven.org/maven2') }}"
