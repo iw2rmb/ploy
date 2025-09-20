@@ -176,8 +176,8 @@ func TestModRunner_HealingMRIncludesORWAndLLMDiffs(t *testing.T) {
 
 	modID := "mod-healing-mr"
 	seaweedBase := "http://seaweed.test"
-	os.Setenv("MOD_ID", modID)
-	os.Setenv("PLOY_SEAWEEDFS_URL", seaweedBase)
+	require.NoError(t, os.Setenv("MOD_ID", modID))
+	require.NoError(t, os.Setenv("PLOY_SEAWEEDFS_URL", seaweedBase))
 	defer func() {
 		_ = os.Unsetenv("MOD_ID")
 		_ = os.Unsetenv("PLOY_SEAWEEDFS_URL")
