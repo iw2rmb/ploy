@@ -333,6 +333,14 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 		}
 		return fmt.Errorf("LLM exec diff download failed validation: %w", err)
 	}
+	if data, readErr := os.ReadFile(diffPath); readErr == nil {
+		if strings.Contains(string(data), ".llm-healing") {
+			if rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "warn", Message: "downloaded diff only touched placeholder .llm-healing", Time: time.Now()})
+			}
+			return fmt.Errorf("LLM exec diff contained placeholder .llm-healing marker")
+		}
+	}
 	if rep != nil {
 		var sz int64
 		if fi, err := os.Stat(diffPath); err == nil {
