@@ -449,3 +449,22 @@ steps:
 		assert.Equal(t, false, *s.DiscoverRecipe)
 	}
 }
+
+func TestModStepRecipesRequireCoordinates(t *testing.T) {
+	yamlContent := `version: v1alpha1
+id: missing-coords
+target_repo: https://example.com/x/y.git
+base_ref: main
+steps:
+  - type: orw-apply
+    id: java11to17
+    recipes:
+      - org.openrewrite.java.migrate.UpgradeToJava17
+`
+	tmp := filepath.Join(t.TempDir(), "mod_missing.yaml")
+	require.NoError(t, os.WriteFile(tmp, []byte(yamlContent), 0644))
+
+	_, err := LoadConfig(tmp)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "recipe_group")
+}
