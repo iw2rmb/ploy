@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Load project environment (secrets may be filtered by the CLI harness otherwise)
+if [[ -f "$HOME/.zshenv" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.zshenv"
+fi
+
 # End-to-end runner for the orw-apply → build fail → llm-plan → llm-exec scenario
 # - Posts scenario.yaml to /v1/mods/run
 # - Streams SSE events
