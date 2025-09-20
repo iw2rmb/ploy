@@ -326,6 +326,13 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 			return fmt.Errorf("LLM exec diff download failed: %v", dlErr)
 		}
 	}
+	allowed := ResolveDefaultsFromEnv().Allowlist
+	if err := validateDiffPathsFn(diffPath, allowed); err != nil {
+		if rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "error", Message: fmt.Sprintf("download failed validation: key=%s error=%v", key, err), Time: time.Now()})
+		}
+		return fmt.Errorf("LLM exec diff download failed validation: %w", err)
+	}
 	if rep != nil {
 		var sz int64
 		if fi, err := os.Stat(diffPath); err == nil {
