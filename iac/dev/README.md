@@ -1,364 +1,102 @@
-# Ploy Development Environment
+# Dev Infrastructure Playbooks
 
-Optimized Ansible playbooks for complete Ploy testing infrastructure on Ubuntu VPS.
+Ansible playbooks for bootstrapping a single VPS with everything required to run Ploy lane D: Nomad+Consul, SeaweedFS, Traefik, Docker registry, LangGraph/OpenRewrite helpers, API, and validation tooling. The playbooks are idempotent and tuned for quick re-runs while developing infrastructure.
 
-## Playbook Management Rules
+## Prerequisites
+- Ubuntu 20.04+ host with `root` SSH access (4 vCPU / 8 GB RAM / 80 GB disk minimum).
+- Local machine with Python 3.9+, Ansible ≥ 2.14, `ssh-agent` or key-based auth.
+- Environment variables exported before invoking playbooks or scripts:
+  - `TARGET_HOST` (required) – public IP / hostname of the VPS.
+  - `TARGET_PORT` (optional) – SSH port (defaults to 22).
+  - `PLOY_APPS_DOMAIN`, `PLOY_APPS_DOMAIN_PROVIDER` – app wildcard domain + DNS provider name.
+  - `PLOY_PLATFORM_DOMAIN`, `PLOY_PLATFORM_DOMAIN_PROVIDER` – control-plane domain + DNS provider.
+  - `PLOY_REGISTRY_DOMAIN` – registry hostname when enabling the Docker registry job.
+  - Any DNS provider credentials (Namecheap/Cloudflare) exported according to the playbooks when requesting live certificates.
 
-**Idempotency:** Always add presence checks before installations (`dpkg -l`, `stat`, `systemctl is-active`)
-**Performance:** Use `when` conditions to skip redundant operations (60-80% faster reruns)
-**Validation:** Include version verification and service status checks after installations
-**Cleanup:** Remove conflicting configurations (PATH duplicates, env var conflicts)
-**Templates:** Use Jinja2 templates for all configuration files, never hardcode values
-**Error Handling:** Set `failed_when: false` for optional components, proper status codes for API calls
-**Rolling Updates:** Configure Nomad jobs with canary deployments, health checks, and automatic rollback
-**Docker Reliability:** Robust Docker setup with configuration validation, graceful restarts, and comprehensive error handling
-
-## Quick Setup
-
-**Prerequisites:**
-- Ubuntu 20.04+ VPS with 4 vCPU / 8 GB RAM / 80 GB disk (clean image recommended)
-- SSH access for the `root` user (public key already authorized)
-- Local workstation with Ansible ≥ 2.14 and Python 3
-
+Install dependencies locally:
 ```bash
-# 1. Clone the repo locally and pick your VPS address
-export TARGET_HOST=203.0.113.10
-
-# 2. Declare required domains and providers (no defaults applied)
-export PLOY_APPS_DOMAIN=dev.ployd.app
-export PLOY_APPS_DOMAIN_PROVIDER=namecheap
-export PLOY_PLATFORM_DOMAIN=dev.ployman.app
-export PLOY_PLATFORM_DOMAIN_PROVIDER=namecheap
-export PLOY_REGISTRY_DOMAIN=registry.dev.ployman.app
-
-# 3. Run the bootstrap helper (validation runs automatically)
-./scripts/dev/bootstrap-vps.sh $TARGET_HOST
-
-# 4. Verify core services once SSH'd into the VPS
-nomad node status
-systemctl status seaweedfs-master traefik nomad docker
+python3 -m pip install --upgrade ansible
+ansible-galaxy collection install community.docker community.general
 ```
 
-The helper always runs `iac/dev/scripts/validate-deployment.sh` before provisioning. Provide Namecheap/Cloudflare credentials only when you need live DNS automation or ACME certificates; otherwise the playbooks rely on CoreDNS with static host entries.
+## Inventory & configuration layout
+```
+iac/dev/
+├── ansible.cfg                # Connection defaults (fact caching off, retry tuning)
+├── inventory/hosts.yml        # Dynamic inventory that uses TARGET_HOST/TARGET_PORT
+├── vars/main.yml              # Central version pins and defaults (Nomad, Consul, Traefik, etc.)
+├── playbooks/                 # Individual roles/playbooks (see table below)
+├── tasks/                     # Shared Ansible task snippets referenced by playbooks
+├── scripts/validate-deployment.sh  # Post-deploy smoke checks
+└── site.yml                   # Full environment orchestration (recommended entry point)
+```
+Override anything in `vars/main.yml` by defining the variable in your play command (e.g. `-e nomad_version=1.10.5`) or through environment variables—the defaults target the latest vetted versions in this repo.
 
-## API Deployment Options
+## Typical workflow
+1. Export the required environment variables (host, domains, provider credentials).
+2. Run the validation script to confirm SSH connectivity and prerequisites:
+   ```bash
+   iac/dev/scripts/validate-deployment.sh $TARGET_HOST
+   ```
+3. Provision or update the entire stack:
+   ```bash
+   cd iac/dev
+   ansible-playbook site.yml -e target_host=$TARGET_HOST
+   ```
+4. Verify: `nomad status`, `consul members`, `docker ps`, and check `https://api.$PLOY_PLATFORM_DOMAIN/health` once DNS/certificates propagate.
 
-The Ploy API can be deployed in two ways:
-
-### Option 1: Using ployman (Recommended)
+### Targeted updates
+Each playbook under `playbooks/` can be rerun independently when you only need to touch a subsystem. Examples:
 ```bash
-# Ensure TARGET_HOST and PLOY_CONTROLLER are set
-ployman api deploy
+ansible-playbook playbooks/hashicorp.yml -e target_host=$TARGET_HOST      # only Nomad/Consul
+ansible-playbook playbooks/docker-registry.yml -e target_host=$TARGET_HOST # deploy or refresh registry
+ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=develop
 ```
+The playbooks are idempotent—only dirty resources change, and most tasks include guards (`when`, checksum comparisons) so repeat runs are quick.
 
-This command:
-1. **Primary**: Attempts deployment via API (fastest for running API)
-2. **Fallback**: Runs Ansible playbook locally if API is unreachable (for cold start scenarios)
-   - Ansible executes from your local machine (requires local Ansible installation)
-   - Provides direct output and better debugging visibility
-   - No Ansible installation needed on production servers
-   - Cleaner separation between control plane (local) and data plane (VPS)
+## Playbook catalog
+| Playbook | Purpose | Notes |
+|----------|---------|-------|
+| `site.yml` | Orchestrates the full environment in dependency order. | Includes connection warm-up step. |
+| `playbooks/main.yml` | Base OS prep: packages, Docker engine, Go toolchain, build utilities. | Uses reusable task snippets from `playbooks/tasks/`. |
+| `playbooks/seaweedfs.yml` | Installs SeaweedFS master & volume services (systemd). | Collection defaults from `vars/main.yml`. |
+| `playbooks/seaweedfs-filer.yml` | Runs the SeaweedFS filer via Nomad (Job + config). | Requires Nomad to be up first. |
+| `playbooks/hashicorp.yml` | Deploys Nomad servers/clients, Consul servers, Traefik system job. | Constrains Traefik to nodes with `node_class=gateway`. |
+| `playbooks/coredns.yml` | Configures CoreDNS for the dev zone (`ploy.local` by default). | Generates zone files & systemd service. |
+| `playbooks/docker-registry.yml` | Installs local Docker Registry v2 (Nomad job + TLS). | Uses `PLOY_REGISTRY_DOMAIN`. |
+| `playbooks/langgraph-runner.yml` | Installs LangGraph runner container & dependencies. | Used by Mods workflows. |
+| `playbooks/openrewrite-jvm.yml` | Deploys OpenRewrite JVM image assets. | Required for Mods Java migrations. |
+| `playbooks/mods-env.yml` | Seeds environment/env vars needed by Mods planner/reducer jobs. | Applies Consul KV data and Nomad policies. |
+| `playbooks/api.yml` | Deploys the Ploy API Nomad job (plus config push). | Supports `deploy_branch` override. |
+| `playbooks/gitlab-token.yml` | Stores GitLab credentials (if provided) for Mods integration tests. | Safe no-op if env variables absent. |
+| `playbooks/testing.yml` | Installs CLI binaries, testing tools, Node exporter, and smoke-run scripts. | Tagged tasks for selective execution. |
+| `playbooks/validation.yml` | Final health checks: service pings, Nomad job status, certificate status. | Mirrors `scripts/validate-deployment.sh`. |
+| `playbooks/tasks/*.yml` | Shared chunks (Docker install, security hardening, build tools). | Imported by top-level playbooks. |
 
-### Option 2: Direct Ansible
+## Post-deploy checks
+Run `iac/dev/scripts/validate-deployment.sh $TARGET_HOST` to execute the same probes as `validation.yml`: Nomad/Consul health, Traefik dashboard, SeaweedFS endpoints, registry status, and base controller health. The script exits non-zero on failure and prints the offending command.
+
+Manual sanity checks:
 ```bash
-cd iac/dev
-ansible-playbook playbooks/api.yml -e target_host=$TARGET_HOST -e deploy_branch=main
+ssh root@$TARGET_HOST
+nomad status
+consul members
+systemctl status seaweedfs-master seaweedfs-volume docker traefik
+curl -sf https://api.$PLOY_PLATFORM_DOMAIN/ready
 ```
 
-## Architecture
-
-**Stack:** Nomad v1.10.4, Consul v1.21.4, Traefik v3.5.0, SeaweedFS v3.96, Docker Registry v2, Docker, Go
-
-**Lane:** D (Docker)
-
-## Playbooks
-
-| Playbook | Purpose | Optimization Status |
-|----------|---------|--------------------|
-| **site.yml** | Complete infrastructure orchestration with service ordering | N/A |
-| **main.yml** | Base VPS setup, Docker, Go, build tools | ✅ Optimized |
-| **seaweedfs.yml** | Distributed storage with collections | ✅ Optimized |
-| **hashicorp.yml** | Nomad, Consul, Traefik deployment (Nomad system job; node.class=gateway) | ✅ Optimized |
-| **docker-registry.yml** | Docker Registry v2 container storage | 🚀 New (Aug 2025) |
-| **api.yml** | Ploy API deployment via Nomad | ✅ Optimized |
-| **testing.yml** | Test environment and Ploy binaries | 🚀 Newly optimized (60-80% faster) |
-
-## Configuration
-
-**Variables** (`vars/main.yml`): Latest stable versions (Nomad 1.10.4, Consul 1.21.4, Traefik 3.5.0, SeaweedFS 3.96, Go 1.22.0)
-
-### Traefik placement
-
-Traefik runs as a Nomad system job only on gateway/edge nodes. Set `node_class = "gateway"` in the Nomad client config on the nodes that should run Traefik. Consul ACLs: Traefik's Consul Catalog provider reads the ACL token from the `CONSUL_HTTP_TOKEN` environment variable; no inline token is set in the job args.
-
-Example (`/etc/nomad.d/client.hcl`):
-
-```
-client {
-  enabled    = true
-  node_class = "gateway"
-}
-```
-
-Restart the Nomad client after changing node_class.
-
-### Storage Configuration (Centralized Config Service)
-
-The controller now uses a centralized configuration Service. For fresh installs and bare‑metal bootstrap, the Ansible playbooks generate `/etc/ploy/storage/config.yaml` including both legacy SeaweedFS fields and the new endpoint:
-
-```
-storage:
-  provider: seaweedfs
-  endpoint: http://localhost:9333   # NEW: used by the centralized config Service
-  master:   localhost:9333          # legacy
-  filer:    localhost:8888          # legacy
-  collection: artifacts
-```
-
-Keeping both ensures backward compatibility while allowing the controller to prefer the new Service immediately.
-
-Optional Consul-backed config source (feature-flag):
-
-Set these environment variables on the controller host to enable merging a YAML document from Consul KV into the centralized config Service:
-
-```
-export PLOY_CONFIG_CONSUL_ADDR="http://127.0.0.1:8500"   # Consul address
-export PLOY_CONFIG_CONSUL_KEY="ploy/config"              # KV key containing YAML
-export PLOY_CONFIG_CONSUL_REQUIRED="false"               # If "true", fail startup on Consul errors
-```
-
-Notes:
-- When `PLOY_CONFIG_CONSUL_REQUIRED` is not set or not "true", Consul connectivity or parse errors are logged and ignored (file/env sources still load).
-- Use this to overlay secrets or operational toggles without changing files on disk.
-
-## Template System (Aug 2025)
-
-**Unified Templates**: All development environment configurations use shared templates from `../common/templates/` for consistency with production.
-
-### Template Structure
-
-```
-iac/
-├── common/templates/           # Shared configuration templates
-│   ├── consul-server.hcl.j2    # Consul server configuration (Linux)
-│   ├── nomad-server.hcl.j2     # Nomad server/client configuration
-│   ├── nomad-ploy-api.hcl.j2   # Controller Nomad job
-│   ├── nomad-traefik-system.hcl.j2 # Traefik system job
-│   ├── nomad-seaweedfs-filer.hcl.j2 # Filer job template
-│   ├── seaweedfs-*.service.j2  # SeaweedFS systemd services
-│   └── *.j2                    # Utility scripts and configs
-├── dev/playbooks/              # Dev-specific playbooks referencing common templates
-└── prod/playbooks/             # Prod-specific playbooks using same templates
-```
-
-### Template Benefits
-
-- **Consistency**: Same configuration logic across dev and prod environments
-- **Maintainability**: Single location for template updates and bug fixes
-- **Validation**: Unified syntax checking and testing across environments
-- **Flexibility**: Environment-specific variable customization via vars files
-
-## Platform Wildcard Certificate Configuration (Aug 2025)
-
-### DNS Provider Setup
-
-**Required Environment Variables:**
-
-```bash
-# Platform domain configuration
-# Ensure PLOY_APPS_DOMAIN=ployd.app              # Your platform domain
-# Ensure PLOY_APPS_DOMAIN_PROVIDER=namecheap     # DNS provider (namecheap or cloudflare)
-
-# REQUIRED: Namecheap configuration for SSL certificate automation
-# Ensure NAMECHEAP_API_KEY=your-api-key          # Production API key (REQUIRED)
-# Ensure NAMECHEAP_API_USER=your-username        # Namecheap username (REQUIRED)
-# Ensure NAMECHEAP_USERNAME=your-username        # Same as API user (REQUIRED)
-# Ensure NAMECHEAP_CLIENT_IP=vps-ip-address      # Your VPS IP address (REQUIRED)
-# Ensure NAMECHEAP_SANDBOX=false                 # Use sandbox for testing (set to "true" for testing)
-
-# Optional: GitHub credentials for private repository access
-# Ensure GITHUB_PLOY_DEV_USERNAME=your-github-username
-# Ensure GITHUB_PLOY_DEV_PAT=your-github-token
-
-# CloudFlare configuration (alternative to Namecheap)
-# Ensure CLOUDFLARE_API_TOKEN=your-token
-# Ensure CLOUDFLARE_ZONE_ID=your-zone-id
-```
-
-⚠️ **CRITICAL**: The Namecheap environment variables are REQUIRED for SSL certificate automation. The playbook will fail if they are not set.
-
-### Platform Certificate Features
-
-- **Automatic Wildcard Certificate**: Single `*.ployd.app` certificate covers all platform subdomains
-- **Controller Access**: Automatically accessible at `api.ployd.app`
-- **App Routing**: Apps automatically get `{app}.ployd.app` subdomains
-- **DNS-01 Challenge**: ACME DNS-01 validation for wildcard certificates
-- **Automatic Renewal**: Background certificate renewal with 30-day threshold
-- **Health Monitoring**: `/health/platform-certificates` endpoint for status
-
-### Certificate Management
-
-```bash
-# Deploy with certificate configuration
-ansible-playbook site.yml -e target_host=$TARGET_HOST
-
-# Verify platform certificate status
-curl https://api.dev.ployman.app/health/platform-certificates
-
-# Add domain to app (automatic certificate provisioning)
-curl -X POST https://api.dev.ployman.app/v1/apps/myapp/domains \
-  -H "Content-Type: application/json" \
-  -d '{"domain":"myapp.ployd.app","certificate":"auto"}'
-```
-
-### Traefik Integration
-
-- Platform subdomains use wildcard certificate automatically
-- External domains provision individual certificates
-- Controller registered at `api.{PLOY_APPS_DOMAIN}`
-- Apps registered at `{app}.{PLOY_APPS_DOMAIN}`
-
-**Collections**: `artifacts` (build outputs), `ploy-metadata` (SBOMs, signatures), `ploy-debug` (ephemeral)
-
-## Services After Setup
-
-**Services:** Ploy Controller via Nomad (dynamic port, accessed via https://api.dev.ployman.app), Traefik (8080), Docker Registry v2 (5000), SeaweedFS (9333/8888/8080), Nomad (4646), Consul (8500), Metrics (9100)
-
-**Container Registry:** Docker Registry v2 at `registry.dev.ployman.app` (lightweight alternative to Harbor)
-- **Storage**: Local filesystem persistence
-- **Authentication**: Anonymous access enabled for development
-- **Integration**: Automatic Traefik routing with SSL termination
-- **Benefits**: 90% less memory usage vs Harbor (~256MB vs ~2GB)
-
-## Testing
-
-```bash
-# Infrastructure
-su - ploy -c "./test-traefik-integration.sh"
-curl localhost:{4646,8500,8200}/v1/status/leader
-
-# Docker Registry
-curl https://registry.dev.ployman.app/v2/
-curl https://registry.dev.ployman.app/v2/_catalog
-
-# Lane detection and API
-./tests/scripts/test-{lane-detection,build-pipeline,api}.sh
-
-# Storage and routing
-curl localhost:9333/{vol/status,cluster/status}
-curl localhost:8095/{ping,api/overview,metrics}
-
-# Container registry
-curl https://registry.dev.ployman.app/v2/
-nomad job status docker-registry
-```
-
-## Usage
-
-```bash
-# Controller (now managed by Nomad)
-nomad job status ploy-api
-/home/ploy/controller-scripts/controller-status.sh
-
-# Controller management
-/home/ploy/controller-scripts/update-api.sh
-/home/ploy/controller-scripts/rollback-api.sh <version>
-./bin/ployman controller list
-
-# CLI operations
-./bin/ploy apps new --lang go --name myapp
-./bin/ploy push -a myapp
-
-# Lane selection testing (always returns D; kept for diagnostics)
-./build/lane-pick --path apps/go-hello
-```
-
-## Templates
-
-| Template | Purpose |
-|----------|----------|
-| **consul-server.hcl.j2** | Consul cluster configuration |
-| **nomad-server.hcl.j2** | Nomad scheduler configuration |
-| **nomad-ploy-api.hcl.j2** | Controller Nomad job with HA deployment |
-| **update-api.sh.j2** | Controller rolling update script |
-| **rollback-api.sh.j2** | Controller rollback script |
-| **controller-status.sh.j2** | Controller status monitoring script |
-| **migrate-api.sh.j2** | Migration assistance script |
-| **seaweedfs-{master,volume,filer}.service.j2** | SeaweedFS systemd services |
-| **docker-daemon.json.j2** | Docker daemon with Kontain runtime |
-| **node-exporter.service.j2** | Prometheus metrics service |
-| **ploy-{storage,seaweedfs}-config.yaml.j2** | Ploy storage configurations |
-| **test-*.sh.j2** | Automated test scripts |
-| **setup-env.sh.j2** | Environment setup script |
+## Customisation tips
+- **Version bumps**: edit `vars/main.yml` (Nomad, Consul, Traefik, SeaweedFS, Go, build tools) and rerun targeted playbooks.
+- **Gateway node placement**: adjust `ploy_gateway_node_class` / `ploy_gateway_node_meta_key`; update Nomad client `node_class` and rerun `hashicorp.yml`.
+- **DNS providers**: playbooks default to CoreDNS; set the Namecheap/Cloudflare vars to enable ACME automation for real domains.
+- **Single-node SeaweedFS**: tune replication/volume counts via `seaweedfs_single_node` in `vars/main.yml`.
+- **Mods secrets / GitLab token**: export `GITLAB_TOKEN` (and related envs) before running `gitlab-token.yml` to populate Consul/KV entries.
 
 ## Troubleshooting
+- **SSH/Ansible timeouts**: the inventory disables host key checking and retries connections 3 times. Verify `TARGET_HOST` and inbound firewall rules.
+- **Nomad jobs pending**: check `nomad alloc status <job>`; missing TLS certs or node class mismatches are common causes.
+- **Traefik certificate errors**: confirm DNS TXT records (for ACME) exist or enable the CoreDNS internal zone for dev-only usage.
+- **SeaweedFS inconsistencies**: rerun `playbooks/seaweedfs.yml` and `playbooks/seaweedfs-filer.yml`; volume replication is `000` by default, so single-node restarts are safe.
+- **Registry authentication**: the registry runs behind Traefik with TLS; make sure `PLOY_REGISTRY_DOMAIN` resolves to the gateway IP and the wildcard cert is issued.
 
-```bash
-# Services
-systemctl status {nomad,consul,seaweedfs-*,node-exporter,docker}
-journalctl -u {service-name} -f
-
-# HashiCorp cluster
-nomad {node status,job status traefik}
-consul members
-
-# Docker troubleshooting
-systemctl status docker
-docker info && docker version
-docker ps -a && docker images
-curl http://registry.dev.ployman.app/v2/
-docker system df && docker system prune -f
-
-# Storage and routing
-curl localhost:9333/{cluster,vol}/status
-curl localhost:8095/{ping,api/overview}
-
-# Performance
-time ansible-playbook playbooks/testing.yml
-```
-
-## Docker Configuration Improvements
-
-**Enhanced Reliability:**
-- Consolidated daemon.json configuration template with proper validation
-- Graceful service restart with cleanup and verification steps
-- Comprehensive error handling and retry logic
-- Automatic KVM/Kontain runtime detection and configuration
-
-**Registry Setup:**
-- Local Docker Registry v2 at registry.dev.ployman.app for development
-- Insecure registry configuration for local testing
-- Healthcheck validation and automatic startup
-- Registry cleanup and management features
-
-**Service Management:**
-- Docker service health validation before configuration changes
-- Socket availability verification
-- Configuration validation before service restart
-- Rollback capability for failed configurations
-
-## Security & Performance
-
-**Development Mode:** Consul no ACLs, Traefik insecure, SeaweedFS no auth
-**Production:** Enable proper secrets, ACLs, TLS, authentication
-
-**Optimizations:** 60-80% faster redeployments, smart package management, conditional builds, service reuse
-
-## Cleanup
-
-```bash
-# Stop services
-sudo systemctl stop nomad consul seaweedfs-* node-exporter docker
-
-# Clean data
-rm -rf /home/ploy/ploy/build/* /opt/ploy/* /var/lib/seaweedfs/*
-rm -rf /opt/hashicorp/{nomad/alloc,consul/data}/*
-
-# Docker cleanup
-docker system prune -af
-docker volume prune -f
-rm -rf /var/lib/docker-registry/*
-
-# VM cleanup
-virsh destroy freebsd-dev && virsh undefine freebsd-dev
-```
+For deeper debugging, rerun the relevant playbook with `-vvv` for verbose logging or attach to Nomad/Consul logs directly on the VPS.

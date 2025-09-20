@@ -79,6 +79,6 @@ Ployman provides a unified command-line interface to the Ploy platform, with ded
 
 ## Related Documentation
 - `../../api/llms/` - REST API endpoints for model operations
-- `../../internal/storage/CLAUDE.md` - Storage layer for model persistence
+- `../../internal/storage/README.md` - Storage layer for model persistence
 - `../../internal/llms/models/` - Core model data structures
 - `../../internal/validation/` - Model validation logic
