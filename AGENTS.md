@@ -2,10 +2,6 @@
 
 **MANDATORY**: Follow this file for every prompt execution.
 
-## Startup (MANDATORY)
-
-- First action for every session: `source ~/.zshrc` to load project tooling.
-
 ## TDD Framework (CRITICAL)
 
 - **LOCAL**: Unit tests, build compilation (RED/GREEN phases)  
