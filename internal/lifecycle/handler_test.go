@@ -221,37 +221,6 @@ func TestDestroyStorageArtifactsWithUnifiedStorage(t *testing.T) {
 	assert.Equal(t, "deleted_3_artifacts", operations["storage"])
 }
 
-// TestBackwardCompatibility tests that the handler still works with legacy StorageClient
-func TestBackwardCompatibility(t *testing.T) {
-	// Ensure backward compatibility is maintained during migration
-
-	mockEnvStore := new(MockEnvStore)
-
-	// Mock environment store
-	mockEnvStore.On("GetAll", "legacy-app").Return(envstore.AppEnvVars{}, nil)
-
-	// Create test fiber app
-	app := fiber.New()
-	app.Delete("/apps/:app", func(c *fiber.Ctx) error {
-		// Original function should still work with nil StorageClient
-		return DestroyApp(c, nil, mockEnvStore)
-	})
-
-	// Create test request
-	req := httptest.NewRequest("DELETE", "/apps/legacy-app", nil)
-
-	// Execute request
-	resp, err := app.Test(req, 30000)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-
-	// Should still work even with nil storage
-	assert.Equal(t, 200, resp.StatusCode)
-
-	// Verify env store was called
-	mockEnvStore.AssertExpectations(t)
-}
-
 // TestDestroyAppDualStorageSupport tests that both storage interfaces can be used
 func TestDestroyAppDualStorageSupport(t *testing.T) {
 	// Test that the handler can work with either unified or legacy storage

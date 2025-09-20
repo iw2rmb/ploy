@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,62 @@ func (h *Handler) DownloadArtifact(c *fiber.Ctx) error {
 	}
 	_, _ = io.Copy(c, reader)
 	return nil
+}
+
+// UploadArtifact accepts planner/reducer/apply artifacts from remote executors when SeaweedFS is unreachable.
+func (h *Handler) UploadArtifact(c *fiber.Ctx) error {
+	if h.storage == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": fiber.Map{"code": "storage_disabled", "message": "artifact storage not configured"}})
+	}
+	id := c.Params("id")
+	name := c.Params("name")
+	target, ok := artifactUploadTargets[name]
+	if !ok {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "invalid_artifact", "message": "unsupported artifact name"}})
+	}
+	filename := target.filename
+	contentType := target.contentType
+	body := c.Body()
+	if len(body) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fiber.Map{"code": "empty_artifact", "message": "artifact payload is empty"}})
+	}
+	key := fmt.Sprintf("artifacts/mods/%s/%s", id, filename)
+	if err := h.storage.Put(c.Context(), key, bytes.NewReader(body), internalStorage.WithContentType(contentType)); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": fiber.Map{"code": "storage_error", "message": err.Error()}})
+	}
+	if err := h.recordArtifactKey(id, name, key); err != nil {
+		log.Printf("[Mods] warning: failed to record artifact key for %s/%s: %v", id, name, err)
+	}
+	return c.JSON(fiber.Map{"ok": true, "key": key})
+}
+
+var artifactUploadTargets = map[string]struct {
+	filename    string
+	contentType string
+}{
+	"plan_json":  {filename: "plan.json", contentType: "application/json"},
+	"next_json":  {filename: "next.json", contentType: "application/json"},
+	"diff_patch": {filename: "diff.patch", contentType: "text/plain"},
+}
+
+func (h *Handler) recordArtifactKey(modID, name, key string) error {
+	if h.statusStore == nil {
+		return nil
+	}
+	st, err := h.getStatus(modID)
+	if err != nil || st == nil {
+		return err
+	}
+	if st.Result == nil {
+		st.Result = map[string]any{}
+	}
+	arts, _ := st.Result["artifacts"].(map[string]any)
+	if arts == nil {
+		arts = map[string]any{}
+	}
+	arts[name] = key
+	st.Result["artifacts"] = arts
+	return h.storeStatus(*st)
 }
 
 // validTransflowArtifactKey enforces prefix and path safety for artifact keys.

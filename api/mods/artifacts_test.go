@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"os"
@@ -91,6 +92,71 @@ func TestMods_ArtifactsExposedOnFailure(t *testing.T) {
 	if resp != nil && resp.Body != nil {
 		_ = resp.Body.Close()
 	}
+}
+
+func TestUploadsPersistArtifacts(t *testing.T) {
+	storage := newFakeStorage()
+	app := fiber.New()
+	kv := &kvMem{m: map[string][]byte{}}
+	h := NewHandler(nil, storage, kv)
+	h.RegisterRoutes(app)
+
+	t.Run("plan_json", func(t *testing.T) {
+		baseStatus, err := json.Marshal(ModStatus{ID: "mod-abc", Result: map[string]any{}})
+		if err != nil {
+			t.Fatalf("marshal status: %v", err)
+		}
+		if err := kv.Put("mods/status/mod-abc", baseStatus); err != nil {
+			t.Fatalf("seed status: %v", err)
+		}
+		body := bytes.NewBufferString(`{"plan_id":"p1","options":[]}`)
+		req := httptest.NewRequest("PUT", "/v1/mods/mod-abc/artifacts/plan_json", body)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.Body != nil {
+			defer func() { _ = resp.Body.Close() }()
+		}
+		if resp.StatusCode != 200 {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
+		}
+		key := "artifacts/mods/mod-abc/plan.json"
+		if got := string(storage.files[key]); got != `{"plan_id":"p1","options":[]}` {
+			t.Fatalf("unexpected stored payload: %s", got)
+		}
+		storedStatus, err := kv.Get("mods/status/mod-abc")
+		if err != nil {
+			t.Fatalf("get status: %v", err)
+		}
+		var st ModStatus
+		if err := json.Unmarshal(storedStatus, &st); err != nil {
+			t.Fatalf("unmarshal status: %v", err)
+		}
+		arts, _ := st.Result["artifacts"].(map[string]any)
+		if arts == nil {
+			t.Fatalf("expected artifacts map in status")
+		}
+		if val, ok := arts["plan_json"].(string); !ok || val != key {
+			t.Fatalf("status not updated with plan_json, got=%v", arts["plan_json"])
+		}
+	})
+
+	t.Run("rejects unknown", func(t *testing.T) {
+		body := bytes.NewBufferString("irrelevant")
+		req := httptest.NewRequest("PUT", "/v1/mods/mod-abc/artifacts/unknown", body)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		if resp.Body != nil {
+			defer func() { _ = resp.Body.Close() }()
+		}
+		if resp.StatusCode != 400 {
+			t.Fatalf("expected 400, got %d", resp.StatusCode)
+		}
+	})
 }
 
 func TestPersistArtifactsUploadsKnownFiles(t *testing.T) {

@@ -45,6 +45,7 @@ func (h *Handler) RegisterRoutes(app *fiber.App) {
 	tf.Delete("/:id", h.CancelMod)
 	tf.Get("/:id/artifacts", h.GetArtifacts)
 	tf.Get("/:id/artifacts/:name", h.DownloadArtifact)
+	tf.Put("/:id/artifacts/:name", h.UploadArtifact)
 	// Real-time events push endpoint
 	tf.Post("/:id/events", h.ReportEvent)
 	// Logs streaming (SSE stub)

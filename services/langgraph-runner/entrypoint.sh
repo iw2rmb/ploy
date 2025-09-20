@@ -209,7 +209,18 @@ EOF
       post_event "info" "planner" "planner" "uploaded plan to ${KEY} (status ${HTTP_CODE})"
     else
       ERR_MSG=$(tr -d '\r' </tmp/plan_upload.out | head -c 300)
-      post_event "error" "planner" "planner" "plan upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      post_event "warn" "planner" "planner" "plan upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      if [ -n "$CONTROLLER_URL" ]; then
+        CTRL_URL="${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/artifacts/plan_json"
+        HTTP_CODE_CTRL=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/plan.json" "$CTRL_URL" -o /tmp/plan_upload_ctrl.out || echo "000")
+        if [ "$HTTP_CODE_CTRL" = "200" ]; then
+          post_event "info" "planner" "planner" "uploaded plan via controller artifacts endpoint (status ${HTTP_CODE_CTRL})"
+        else
+          ERR_CTRL=$(tr -d '\r' </tmp/plan_upload_ctrl.out | head -c 300)
+          post_event "error" "planner" "planner" "controller plan upload failed (status ${HTTP_CODE_CTRL}) to ${CTRL_URL}: ${ERR_CTRL}"
+        fi
+        rm -f /tmp/plan_upload_ctrl.out || true
+      fi
     fi
     rm -f /tmp/plan_upload.out || true
   fi
@@ -234,7 +245,18 @@ EOF
       post_event "info" "reducer" "reducer" "uploaded next to ${KEY} (status ${HTTP_CODE})"
     else
       ERR_MSG=$(tr -d '\r' </tmp/next_upload.out | head -c 300)
-      post_event "error" "reducer" "reducer" "next upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      post_event "warn" "reducer" "reducer" "next upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      if [ -n "$CONTROLLER_URL" ]; then
+        CTRL_URL="${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/artifacts/next_json"
+        HTTP_CODE_CTRL=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: application/json' --data-binary @"$OUT_DIR/next.json" "$CTRL_URL" -o /tmp/next_upload_ctrl.out || echo "000")
+        if [ "$HTTP_CODE_CTRL" = "200" ]; then
+          post_event "info" "reducer" "reducer" "uploaded next via controller artifacts endpoint (status ${HTTP_CODE_CTRL})"
+        else
+          ERR_CTRL=$(tr -d '\r' </tmp/next_upload_ctrl.out | head -c 300)
+          post_event "error" "reducer" "reducer" "controller next upload failed (status ${HTTP_CODE_CTRL}) to ${CTRL_URL}: ${ERR_CTRL}"
+        fi
+        rm -f /tmp/next_upload_ctrl.out || true
+      fi
     fi
     rm -f /tmp/next_upload.out || true
   fi
@@ -387,7 +409,18 @@ EOF
       post_event "info" "llm-exec" "llm-exec" "uploaded diff to ${KEY} (status ${HTTP_CODE})"
     else
       ERR_MSG=$(tr -d '\r' </tmp/diff_upload.out | head -c 300)
-      post_event "error" "llm-exec" "llm-exec" "diff upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      post_event "warn" "llm-exec" "llm-exec" "diff upload failed (status ${HTTP_CODE}) to ${KEY}: ${ERR_MSG}"
+      if [ -n "$CONTROLLER_URL" ]; then
+        CTRL_URL="${CONTROLLER_URL%/}/mods/${MOD_ID_ENV}/artifacts/diff_patch"
+        HTTP_CODE_CTRL=$(curl "${CURL_OPTS[@]}" -w '%{http_code}' -X PUT -H 'Content-Type: text/plain' --data-binary @"$OUT_DIR/diff.patch" "$CTRL_URL" -o /tmp/diff_upload_ctrl.out || echo "000")
+        if [ "$HTTP_CODE_CTRL" = "200" ]; then
+          post_event "info" "llm-exec" "llm-exec" "uploaded diff via controller artifacts endpoint (status ${HTTP_CODE_CTRL})"
+        else
+          ERR_CTRL=$(tr -d '\r' </tmp/diff_upload_ctrl.out | head -c 300)
+          post_event "error" "llm-exec" "llm-exec" "controller diff upload failed (status ${HTTP_CODE_CTRL}) to ${CTRL_URL}: ${ERR_CTRL}"
+        fi
+        rm -f /tmp/diff_upload_ctrl.out || true
+      fi
     fi
     rm -f /tmp/diff_upload.out || true
   fi
