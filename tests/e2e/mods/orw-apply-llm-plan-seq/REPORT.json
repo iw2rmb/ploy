@@ -1,1 +1,156 @@
-{"repo_name":"https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git","workflow_id":"java11to17-orw-llm","branch_name":"workflow/java11to17-orw-llm/1758400788","mr_url":"https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68","started_at":"2025-09-20T20:39:47.798465987Z","ended_at":"2025-09-20T20:41:43.933998665Z","duration":116135532688,"happy_path":[{"id":"clone","type":"system","message":"Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol"},{"id":"create-branch","type":"system","message":"Created workflow branch: workflow/java11to17-orw-llm/1758400788"},{"id":"baseline-build","type":"baseline-build","message":"Baseline build completed successfully (post-healing)","duration":14031193612},{"id":"java11to17-migration","type":"orw-apply","message":"Applied ORW diff","duration":47693793500,"recipes":[{"Name":"org.openrewrite.java.migrate.UpgradeToJava17","Coords":{"Group":"org.openrewrite.recipe","Artifact":"rewrite-migrate-java","Version":"3.17.0"}}],"diff":{"path":"/tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/out/diff.patch","content":"diff --git a/pom.xml b/pom.xml\nindex 32d75b2..ca9f41c 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -14,8 +14,8 @@\n     \u003cdescription\u003eTest Java 11 project for OpenRewrite migration testing\u003c/description\u003e\n \n     \u003cproperties\u003e\n-        \u003cmaven.compiler.source\u003e11\u003c/maven.compiler.source\u003e\n-        \u003cmaven.compiler.target\u003e11\u003c/maven.compiler.target\u003e\n+        \u003cmaven.compiler.source\u003e17\u003c/maven.compiler.source\u003e\n+        \u003cmaven.compiler.target\u003e17\u003c/maven.compiler.target\u003e\n         \u003cproject.build.sourceEncoding\u003eUTF-8\u003c/project.build.sourceEncoding\u003e\n         \u003cjunit.version\u003e5.9.3\u003c/junit.version\u003e\n         \u003ccommons-lang3.version\u003e3.12.0\u003c/commons-lang3.version\u003e\n@@ -64,10 +64,9 @@\n             \u003cplugin\u003e\n                 \u003cgroupId\u003eorg.apache.maven.plugins\u003c/groupId\u003e\n                 \u003cartifactId\u003emaven-compiler-plugin\u003c/artifactId\u003e\n-                \u003cversion\u003e3.11.0\u003c/version\u003e\n+                \u003cversion\u003e3.14.0\u003c/version\u003e\n                 \u003cconfiguration\u003e\n-                    \u003csource\u003e11\u003c/source\u003e\n-                    \u003ctarget\u003e11\u003c/target\u003e\n+                    \u003crelease\u003e17\u003c/release\u003e\n                 \u003c/configuration\u003e\n             \u003c/plugin\u003e\n             \n"}},{"id":"commit","type":"commit","message":"Committed changes"},{"id":"build","type":"build","message":"Build completed successfully","duration":14488429169},{"id":"push","type":"push","message":"Pushed branch workflow/java11to17-orw-llm/1758400788","duration":1934617639},{"id":"mr","type":"mr","message":"MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68"}],"step_tree":[{"id":"clone","type":"system","success":true,"message":"Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol"},{"id":"create-branch","type":"system","success":true,"message":"Created workflow branch: workflow/java11to17-orw-llm/1758400788"},{"id":"baseline-build","type":"build","success":false,"message":"docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\nbuilder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)\ndownload full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download\nerror code: build_failed\n{\"id\":\"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\",\"app\":\"mod-java11to17-orw-llm-1758400788\",\"lines\":1200,\"logs\":\"\"}: build check unsuccessful (controller=https://api.dev.ployman.app/v1 app=mod-java11to17-orw-llm-1758400788 lane=D env=dev): docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\nbuilder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)\ndownload full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download\nerror code: build_failed\n{\"id\":\"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\",\"app\":\"mod-java11to17-orw-llm-1758400788\",\"lines\":1200,\"logs\":\"\"}","duration":8745227346,"error_solved":"docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\nbuilder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)\ndownload full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download\nerror code: build_failed\n{\"id\":\"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\",\"app\":\"mod-java11to17-orw-llm-1758400788\",\"lines\":1200,\"logs\":\"\"}: build check unsuccessful (controller=https://api.dev.ployman.app/v1 app=mod-java11to17-orw-llm-1758400788 lane=D env=dev): docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\nbuilder logs archived at build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log (http://seaweedfs-filer.storage.ploy.local:8888/artifacts/build-logs/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788.log)\ndownload full builder log via https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758400788/builds/mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788/logs/download\nerror code: build_failed\n{\"id\":\"mod-java11to17-orw-llm-1758400788-d-build-20250920-203948-1758400788\",\"app\":\"mod-java11to17-orw-llm-1758400788\",\"lines\":1200,\"logs\":\"\"}"},{"id":"baseline-build","type":"baseline-build","success":true,"message":"Baseline build completed successfully (post-healing)","duration":14031193612},{"id":"java11to17-migration","type":"orw-apply","success":true,"message":"Applied ORW diff","duration":47693793500,"references":[{"kind":"plan","label":"submitted_hcl","value":"/tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/orw_apply.submitted.hcl"},{"kind":"plan","label":"pre_hcl","value":"/tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/orw_apply.pre.hcl"},{"kind":"artifact","label":"input.tar","value":"/tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/input.tar"},{"kind":"diff","label":"diff.patch","value":"/tmp/mods-mod-4f5be165-174065877/orw-apply/java11to17-migration/out/diff.patch"}],"recipes":[{"Name":"org.openrewrite.java.migrate.UpgradeToJava17","Coords":{"Group":"org.openrewrite.recipe","Artifact":"rewrite-migrate-java","Version":"3.17.0"}}]},{"id":"commit","type":"commit","success":true,"message":"Committed changes"},{"id":"build","type":"build","success":true,"message":"Build completed successfully","duration":14488429169},{"id":"push","type":"push","success":true,"message":"Pushed branch workflow/java11to17-orw-llm/1758400788","duration":1934617639},{"id":"mr","type":"mr","success":true,"message":"MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/68"}]}
+{
+  "repo_name": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
+  "workflow_id": "java11to17-orw-llm",
+  "branch_name": "workflow/java11to17-orw-llm/1758409861",
+  "mr_url": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82",
+  "started_at": "2025-09-20T23:10:59.838638374Z",
+  "ended_at": "2025-09-20T23:12:51.806891457Z",
+  "duration": 111968253093,
+  "happy_path": [
+    {
+      "id": "llm-1",
+      "type": "llm-exec",
+      "message": "LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch",
+      "duration": 3438241433,
+      "diff": {
+        "path": "mods/mod-a17f5d35/branches/llm-1/steps/llm-exec-llm-1-1758409871/diff.patch",
+        "content": "--- a/src/main/java/e2e/FailMissingSymbol.java\n+++ b/src/main/java/e2e/FailMissingSymbol.java\n@@ -3,7 +3,7 @@\n public class FailMissingSymbol {\n     public static void main(String[] args) {\n         // Intentional reference to an unknown symbol (compile error)\n-        UnknownClass obj = new UnknownClass();\n-        System.out.println(obj);\n+//         UnknownClass obj = new UnknownClass();\n+//         System.out.println(obj);\n     }\n }\n"
+      }
+    },
+    {
+      "id": "java11to17-migration",
+      "type": "orw-apply",
+      "message": "Applied ORW diff",
+      "duration": 45451157276,
+      "recipes": [
+        {
+          "Name": "org.openrewrite.java.migrate.UpgradeToJava17",
+          "Coords": {
+            "Group": "org.openrewrite.recipe",
+            "Artifact": "rewrite-migrate-java",
+            "Version": "3.17.0"
+          }
+        }
+      ],
+      "diff": {
+        "path": "/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/out/diff.patch",
+        "content": "diff --git a/pom.xml b/pom.xml\nindex 32d75b2..ca9f41c 100644\n--- a/pom.xml\n+++ b/pom.xml\n@@ -14,8 +14,8 @@\n     <description>Test Java 11 project for OpenRewrite migration testing</description>\n \n     <properties>\n-        <maven.compiler.source>11</maven.compiler.source>\n-        <maven.compiler.target>11</maven.compiler.target>\n+        <maven.compiler.source>17</maven.compiler.source>\n+        <maven.compiler.target>17</maven.compiler.target>\n         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>\n         <junit.version>5.9.3</junit.version>\n         <commons-lang3.version>3.12.0</commons-lang3.version>\n@@ -64,10 +64,9 @@\n             <plugin>\n                 <groupId>org.apache.maven.plugins</groupId>\n                 <artifactId>maven-compiler-plugin</artifactId>\n-                <version>3.11.0</version>\n+                <version>3.14.0</version>\n                 <configuration>\n-                    <source>11</source>\n-                    <target>11</target>\n+                    <release>17</release>\n                 </configuration>\n             </plugin>\n             \n"
+      }
+    }
+  ],
+  "step_tree": [
+    {
+      "id": "clone",
+      "type": "system",
+      "success": true,
+      "message": "Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol"
+    },
+    {
+      "id": "create-branch",
+      "type": "system",
+      "success": true,
+      "message": "Created workflow branch: workflow/java11to17-orw-llm/1758409861"
+    },
+    {
+      "id": "baseline-build",
+      "type": "build",
+      "success": false,
+      "message": "docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861\nerror code: build_failed\nbuilder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861\nerror code: build_failed",
+      "duration": 8448236795,
+      "references": [
+        {
+          "kind": "builder_log",
+          "label": "build-logs/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861.log",
+          "value": "https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758409861/builds/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861/logs/download"
+        }
+      ],
+      "error_solved": "docker build failed: exit status 1\nbuilder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861\nerror code: build_failed\nbuilder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861\nerror code: build_failed"
+    },
+    {
+      "id": "baseline-build",
+      "type": "baseline-build",
+      "success": true,
+      "message": "Baseline build completed successfully (post-healing)",
+      "duration": 14093044605
+    },
+    {
+      "id": "llm-1",
+      "type": "llm-exec",
+      "success": true,
+      "message": "LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch",
+      "duration": 3438241433,
+      "references": [
+        {
+          "kind": "diff",
+          "label": "diff.patch",
+          "value": "mods/mod-a17f5d35/branches/llm-1/steps/llm-exec-llm-1-1758409871/diff.patch"
+        }
+      ]
+    },
+    {
+      "id": "java11to17-migration",
+      "type": "orw-apply",
+      "success": true,
+      "message": "Applied ORW diff",
+      "duration": 45451157276,
+      "references": [
+        {
+          "kind": "plan",
+          "label": "submitted_hcl",
+          "value": "/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.submitted.hcl"
+        },
+        {
+          "kind": "plan",
+          "label": "pre_hcl",
+          "value": "/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.pre.hcl"
+        },
+        {
+          "kind": "artifact",
+          "label": "input.tar",
+          "value": "/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/input.tar"
+        },
+        {
+          "kind": "diff",
+          "label": "diff.patch",
+          "value": "/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/out/diff.patch"
+        }
+      ],
+      "recipes": [
+        {
+          "Name": "org.openrewrite.java.migrate.UpgradeToJava17",
+          "Coords": {
+            "Group": "org.openrewrite.recipe",
+            "Artifact": "rewrite-migrate-java",
+            "Version": "3.17.0"
+          }
+        }
+      ]
+    },
+    {
+      "id": "commit",
+      "type": "commit",
+      "success": true,
+      "message": "Committed changes"
+    },
+    {
+      "id": "build",
+      "type": "build",
+      "success": true,
+      "message": "Build completed successfully",
+      "duration": 14058205432
+    },
+    {
+      "id": "push",
+      "type": "push",
+      "success": true,
+      "message": "Pushed branch workflow/java11to17-orw-llm/1758409861",
+      "duration": 1956649677
+    },
+    {
+      "id": "mr",
+      "type": "mr",
+      "success": true,
+      "message": "MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82"
+    }
+  ]
+}
