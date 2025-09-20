@@ -137,6 +137,33 @@ func triggerBuildWithDependencies(c *fiber.Ctx, deps *BuildDependencies, buildCt
 
 	dockerImage, builderJobName, err := laneDBuildFunc(c, deps, buildCtx, appName, srcDir, sha, facts, appEnvVars)
 	if err != nil {
+		if strings.TrimSpace(builderJobName) != "" {
+			logsKey := fmt.Sprintf("build-logs/%s.log", builderJobName)
+			status := fiber.StatusBadGateway
+			if fe, ok := err.(*fiber.Error); ok && fe.Code > 0 {
+				status = fe.Code
+			}
+			message := strings.TrimSpace(err.Error())
+			if fe, ok := err.(*fiber.Error); ok && strings.TrimSpace(fe.Message) != "" {
+				message = strings.TrimSpace(fe.Message)
+			}
+			if message == "" {
+				message = "build failed"
+			}
+			log.Printf("[Build] Lane D build failed: builder=%s status=%d msg=%s", builderJobName, status, message)
+			return c.Status(status).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    "build_failed",
+					"message": message,
+				},
+				"builder": fiber.Map{
+					"job":      builderJobName,
+					"logs_key": logsKey,
+					"logs_url": buildLogsURL(logsKey),
+					"log_path": fmt.Sprintf("/opt/ploy/build-logs/%s.log", builderJobName),
+				},
+			})
+		}
 		return err
 	}
 	var imagePath string

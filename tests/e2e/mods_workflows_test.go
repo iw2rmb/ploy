@@ -50,10 +50,7 @@ func TestModsE2E_JavaMigrationComplete(t *testing.T) {
 			{
 				Type:               "orw-apply",
 				ID:                 "java11to17-migration",
-				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Recipes:            []WorkflowRecipe{{Name: "org.openrewrite.java.migrate.UpgradeToJava17", Group: "org.openrewrite.recipe", Artifact: "rewrite-migrate-java", Version: "3.17.0"}},
 				MavenPluginVersion: "6.18.0",
 			},
 		},
@@ -269,14 +266,9 @@ func TestModsE2E_SelfHealingScenario(t *testing.T) {
 		TargetBranch: hBranch,
 		Steps: []WorkflowStep{
 			{
-				Type: "orw-apply",
-				ID:   "healing-test",
-				Recipes: []string{
-					"org.openrewrite.java.migrate.UpgradeToJava17",
-				},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Type:               "orw-apply",
+				ID:                 "healing-test",
+				Recipes:            []WorkflowRecipe{{Name: "org.openrewrite.java.migrate.UpgradeToJava17", Group: "org.openrewrite.recipe", Artifact: "rewrite-migrate-java", Version: "3.17.0"}},
 				MavenPluginVersion: "6.18.0",
 			},
 		},
@@ -337,10 +329,7 @@ func TestModsE2E_KBLearningProgression(t *testing.T) {
 			{
 				Type:               "orw-apply",
 				ID:                 "learning-test",
-				Recipes:            []string{"org.openrewrite.java.cleanup.SimplifyBooleanExpression"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-java-dependencies",
-				RecipeVersion:      "latest",
+				Recipes:            []WorkflowRecipe{{Name: "org.openrewrite.java.cleanup.SimplifyBooleanExpression", Group: "org.openrewrite.recipe", Artifact: "rewrite-java-dependencies", Version: "latest"}},
 				MavenPluginVersion: "6.18.0",
 			},
 		},
@@ -419,10 +408,7 @@ func TestModsE2E_HealingFlow_ORWFail_LLMSucceeds(t *testing.T) {
 			{
 				Type:               "orw-apply",
 				ID:                 "java11to17-migration",
-				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Recipes:            []WorkflowRecipe{{Name: "org.openrewrite.java.migrate.UpgradeToJava17", Group: "org.openrewrite.recipe", Artifact: "rewrite-migrate-java", Version: "3.17.0"}},
 				MavenPluginVersion: "6.18.0",
 			},
 		},

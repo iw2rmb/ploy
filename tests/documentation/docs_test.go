@@ -184,9 +184,9 @@ func TestConfigurationValidation(t *testing.T) {
 					Type:   "recipe",
 					ID:     "test-step",
 					Engine: "openrewrite",
-					Recipes: []string{
-						"org.openrewrite.java.migrate.Java11toJava17",
-					},
+					Recipes: []mods.RecipeEntry{{
+						Name: "org.openrewrite.java.migrate.Java11toJava17",
+					}},
 				},
 			},
 		}

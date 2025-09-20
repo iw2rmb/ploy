@@ -34,6 +34,9 @@ func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	logWriter := io.MultiWriter(logBuffer, os.Stdout)
 	logsKey := fmt.Sprintf("build-logs/%s.log", builderID)
 
+	// Always surface the deployment id header so clients can correlate failures
+	c.Set("X-Deployment-ID", builderID)
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -53,8 +56,6 @@ func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	if err := persistBuildLog(context.Context(c.Context()), deps, logBuffer.Bytes(), logsKey); err != nil {
 		fmt.Printf("[Lane D] warning: failed to persist build log: %v\n", err)
 	}
-
-	c.Set("X-Deployment-ID", builderID)
 	return dockerImage, builderID, nil
 }
 

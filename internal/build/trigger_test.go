@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/iw2rmb/ploy/internal/config"
+	"github.com/iw2rmb/ploy/internal/detect/project"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	"github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/testing/helpers"
@@ -223,6 +224,56 @@ func TestBuildHandlerUsesUnifiedStorageInterface(t *testing.T) {
 	// These assertions will pass once we complete the migration
 	// mockStorage.AssertExpectations(t)
 	// mockEnvStore.AssertExpectations(t)
+}
+
+func TestLaneDBuildFailureSurfacesBuilderMetadata(t *testing.T) {
+	envStore := mocks.NewEnvStore()
+	envStore.On("GetAll", "test-app").Return(envstore.AppEnvVars{}, nil)
+
+	deps := &BuildDependencies{
+		Storage:  nil,
+		EnvStore: envStore,
+	}
+	buildCtx := &BuildContext{APIContext: "apps", AppType: config.UserApp}
+
+	builderID := "test-app-d-build-testsha-123"
+	restore := SetLaneDBuildFunc(func(c *fiber.Ctx, deps *BuildDependencies, ctx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, appEnvVars map[string]string) (string, string, error) {
+		c.Set("X-Deployment-ID", builderID)
+		return "", builderID, fiber.NewError(fiber.StatusBadGateway, "docker build failed: exit 1")
+	})
+	defer restore()
+
+	app := fiber.New()
+	app.Post("/v1/apps/:app/builds", func(c *fiber.Ctx) error {
+		return triggerBuildWithDependencies(c, deps, buildCtx)
+	})
+
+	body := createTestTarball(t, map[string]string{
+		"pom.xml":    "<project></project>",
+		"Dockerfile": "FROM busybox",
+	})
+	req := httptest.NewRequest("POST", "/v1/apps/test-app/builds?lane=D&sha=testsha", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-tar")
+
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	require.Equal(t, fiber.StatusBadGateway, resp.StatusCode)
+	require.Equal(t, builderID, resp.Header.Get("X-Deployment-ID"))
+
+	var payload map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+
+	errObj, ok := payload["error"].(map[string]any)
+	require.True(t, ok, "missing error object")
+	assert.Equal(t, "build_failed", errObj["code"])
+	assert.Contains(t, errObj["message"], "docker build failed")
+
+	builderObj, ok := payload["builder"].(map[string]any)
+	require.True(t, ok, "missing builder metadata")
+	assert.Equal(t, builderID, builderObj["job"])
+	assert.Equal(t, "build-logs/"+builderID+".log", builderObj["logs_key"])
+	assert.Contains(t, builderObj["logs_url"], builderID+".log")
 }
 
 // TestUnifiedStorageOperations tests the specific method calls that should change

@@ -60,7 +60,7 @@ func TestRunnerEmitsApplyEvent(t *testing.T) {
 		ID:         "wf-ev2",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.Java11to17", "", "", "")}}},
 	}
 	work := t.TempDir()
 	// Provide template expected by runner
@@ -101,7 +101,7 @@ func TestRunnerEmitsApplyErrorEvent(t *testing.T) {
 		ID:         "wf-ev3",
 		TargetRepo: "https://example.com/repo.git",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []string{"org.openrewrite.java.migrate.Java11to17"}}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "opt1", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.Java11to17", "", "", "")}}},
 	}
 	work := t.TempDir()
 	// Provide template expected by runner

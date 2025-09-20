@@ -58,11 +58,11 @@ steps:
   - type: orw-apply
     id: java11to17-migration
     recipes:
-      - org.openrewrite.java.migrate.UpgradeToJava17
-    # Explicit OpenRewrite configuration (no discovery)
-    recipe_group: org.openrewrite.recipe
-    recipe_artifact: rewrite-migrate-java
-    recipe_version: 3.17.0
+      - name: org.openrewrite.java.migrate.UpgradeToJava17
+        coords:
+          group: org.openrewrite.recipe
+          artifact: rewrite-migrate-java
+          version: 3.17.0
     maven_plugin_version: 6.18.0
 
   - type: llm-plan
