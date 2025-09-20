@@ -304,8 +304,8 @@ func TestErrorAnalysisIntegration(t *testing.T) {
 
 func TestSelfHealingRunnerFlow(t *testing.T) {
 	// Test the complete self-healing flow (will fail until implemented)
-	t.Setenv("PLOY_CONTROLLER", "https://controller.dev.ployman.app/v1")
-	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.service.consul:8888")
+	t.Setenv("PLOY_CONTROLLER", "https://api.dev.ployman.app/v1")
+	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs-filer.storage.ploy.local:8888")
 	t.Setenv("MOD_ID", "mod-self-heal-test")
 	oldValidate := validateJob
 	validateJob = func(string) error { return nil }

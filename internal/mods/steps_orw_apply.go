@@ -87,6 +87,21 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 	}
 	// Substitute HCL with explicit variables to avoid global env writes
 	vars := makeORWVars(baseDir, modID, diffKey, seaweed)
+	if rclass != "" {
+		vars["RECIPE_CLASS"] = rclass
+	}
+	if rgroup != "" {
+		vars["RECIPE_GROUP"] = rgroup
+	}
+	if rartifact != "" {
+		vars["RECIPE_ARTIFACT"] = rartifact
+	}
+	if rversion != "" {
+		vars["RECIPE_VERSION"] = rversion
+	}
+	if pluginVersion != "" {
+		vars["MAVEN_PLUGIN_VERSION"] = pluginVersion
+	}
 	submittedPath, err := substituteORWTemplateVars(prePath, runID, vars)
 	if err != nil {
 		return StepResult{StepID: step.ID, Success: false, Message: fmt.Sprintf("Failed to substitute ORW HCL: %v", err)}, fmt.Errorf("failed to substitute ORW HCL: %w", err)

@@ -277,7 +277,7 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 	// Compute API base (without /v1) for PLOY_API_URL used by runner metadata registration
 	apiBase := strings.TrimSuffix(controllerURL, "/v1")
 
-	rendered := strings.NewReplacer(
+	pairs := []string{
 		"${RUN_ID}", runID,
 		"${CONTEXT_HOST_DIR}", contextDir,
 		"${OUT_HOST_DIR}", outDir,
@@ -290,7 +290,23 @@ func substituteORWTemplateVars(prePath, runID string, vars map[string]string) (s
 		"${INPUT_KEY}", inputKey,
 		"${INPUT_URL}", inputURL,
 		"${NOMAD_DC}", dc,
-	).Replace(string(content))
+	}
+	if v := strings.TrimSpace(vars["RECIPE_CLASS"]); v != "" {
+		pairs = append(pairs, "${RECIPE_CLASS}", v)
+	}
+	if v := strings.TrimSpace(vars["RECIPE_GROUP"]); v != "" {
+		pairs = append(pairs, "${RECIPE_GROUP}", v)
+	}
+	if v := strings.TrimSpace(vars["RECIPE_ARTIFACT"]); v != "" {
+		pairs = append(pairs, "${RECIPE_ARTIFACT}", v)
+	}
+	if v := strings.TrimSpace(vars["RECIPE_VERSION"]); v != "" {
+		pairs = append(pairs, "${RECIPE_VERSION}", v)
+	}
+	if v := strings.TrimSpace(vars["MAVEN_PLUGIN_VERSION"]); v != "" {
+		pairs = append(pairs, "${MAVEN_PLUGIN_VERSION}", v)
+	}
+	rendered := strings.NewReplacer(pairs...).Replace(string(content))
 
 	if err := os.WriteFile(submittedPath, []byte(rendered), 0644); err != nil {
 		return "", err
