@@ -71,11 +71,15 @@ func (r *ModRunner) attemptHealing(ctx context.Context, repoPath string, buildEr
 		}
 		if buildRes != nil {
 			if key := strings.TrimSpace(buildRes.BuilderLogsKey); key != "" {
+				r.emit(ctx, "healing", "build-error", "info", fmt.Sprintf("builder logs key=%s", key))
 				inputs["builder_logs_key"] = key
 			} else if dep := strings.TrimSpace(buildRes.DeploymentID); dep != "" {
-				inputs["builder_logs_key"] = fmt.Sprintf("build-logs/%s.log", dep)
+				derived := fmt.Sprintf("build-logs/%s.log", dep)
+				r.emit(ctx, "healing", "build-error", "info", fmt.Sprintf("builder logs key derived from deployment=%s", derived))
+				inputs["builder_logs_key"] = derived
 			}
 			if url := strings.TrimSpace(buildRes.BuilderLogsURL); url != "" {
+				r.emit(ctx, "healing", "build-error", "info", fmt.Sprintf("builder logs url=%s", url))
 				inputs["builder_logs_url"] = url
 			}
 		}
