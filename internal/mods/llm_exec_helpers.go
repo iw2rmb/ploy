@@ -2,6 +2,7 @@ package mods
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,29 @@ import (
 	"github.com/iw2rmb/ploy/internal/orchestration"
 )
 
+type llmInputsPayload struct {
+	Language       string       `json:"language"`
+	Lane           string       `json:"lane"`
+	LastError      llmLastError `json:"last_error"`
+	FirstErrorFile string       `json:"first_error_file,omitempty"`
+	FirstErrorLine int          `json:"first_error_line,omitempty"`
+	Errors         []llmError   `json:"errors"`
+	BuilderLogsKey string       `json:"builder_logs_key,omitempty"`
+	BuilderLogsURL string       `json:"builder_logs_url,omitempty"`
+}
+
+type llmLastError struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
+type llmError struct {
+	File    string `json:"file"`
+	Line    int    `json:"line"`
+	Column  int    `json:"column"`
+	Message string `json:"message"`
+}
+
 // llmPrepareContext builds a context directory under baseDir for LLM exec and
 // populates inputs.json, optional source files, precomputed diff, and delete_paths.
 // Returns the context directory path.
@@ -25,9 +49,14 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 	_ = os.WriteFile(filepath.Join(ctxDir, ".keep"), []byte("llm-context"), 0644)
 
 	// Inject inputs.json with last_error if provided
-	if be, ok := branch.Inputs["build_error"].(string); ok && strings.TrimSpace(be) != "" {
-		parsed := build.ParseBuildErrors("java", "maven", be)
-		// Fallback: also parse compact "(.../File.java:123)" pattern often used in summary messages
+	be := strings.TrimSpace(stringValue(branch.Inputs["build_error"]))
+	hasBuildError := be != ""
+	builderLogsKey := strings.TrimSpace(stringValue(branch.Inputs["builder_logs_key"]))
+	builderLogsURL := strings.TrimSpace(stringValue(branch.Inputs["builder_logs_url"]))
+	var parsed []build.ParsedBuildError
+
+	if hasBuildError && be != "" {
+		parsed = build.ParseBuildErrors("java", "maven", be)
 		if len(parsed) == 0 {
 			re := regexp.MustCompile(`([A-Za-z0-9_./\\\-]+\.java):([0-9]+)`) // accept windows and linux seps
 			if m := re.FindStringSubmatch(be); len(m) == 3 {
@@ -36,45 +65,85 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 				parsed = append(parsed, build.ParsedBuildError{File: file, Line: line, Column: 0, Message: "compile error"})
 			}
 		}
-		var b strings.Builder
-		b.WriteString("{\n  \"language\": \"java\",\n  \"lane\": \"\",\n  \"last_error\": {\n    \"stdout\": \"\",\n    \"stderr\": ")
-		b.WriteString(strconv.Quote(be))
-		b.WriteString("\n  }")
-		if len(parsed) > 0 {
-			b.WriteString(",\n  \"first_error_file\": ")
-			b.WriteString(strconv.Quote(parsed[0].File))
-			b.WriteString(",\n  \"first_error_line\": ")
-			b.WriteString(strconv.Itoa(parsed[0].Line))
-		}
-		b.WriteString(",\n  \"errors\": [")
-		for i, e := range parsed {
-			if i > 0 {
-				b.WriteString(",")
+	}
+
+	// Fallback: fetch builder logs to parse errors if build_error lacked details
+	var builderLogsBytes []byte
+	if len(parsed) == 0 && builderLogsKey != "" {
+		if logs, usedURL, err := downloadBuilderLogs(ctxDir, builderLogsKey, builderLogsURL); err == nil {
+			builderLogsBytes = logs
+			parsed = build.ParseBuildErrors("java", "maven", string(logs))
+			if rep != nil && len(parsed) > 0 {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("parsed compile error from builder logs (%s)", usedURL), Time: time.Now()})
 			}
-			b.WriteString("{\"file\":")
-			b.WriteString(strconv.Quote(e.File))
-			b.WriteString(",\"line\":")
-			b.WriteString(strconv.Itoa(e.Line))
-			b.WriteString(",\"column\":")
-			b.WriteString(strconv.Itoa(e.Column))
-			b.WriteString(",\"message\":")
-			b.WriteString(strconv.Quote(e.Message))
-			b.WriteString("}")
+		} else if rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "warn", Message: fmt.Sprintf("failed to download builder logs: %v", err), Time: time.Now()})
 		}
-		b.WriteString("]\n}\n")
-		inputsJSON := b.String()
-		_ = os.WriteFile(filepath.Join(ctxDir, "inputs.json"), []byte(inputsJSON), 0644)
+	}
+
+	normalizeParsedErrors(repoRoot, parsed)
+
+	if hasBuildError && be != "" {
+		payload := llmInputsPayload{
+			Language: "java",
+			Lane:     "",
+			LastError: llmLastError{
+				Stdout: "",
+				Stderr: be,
+			},
+			BuilderLogsKey: builderLogsKey,
+			BuilderLogsURL: builderLogsURL,
+		}
+
+		if len(parsed) > 0 {
+			payload.FirstErrorFile = parsed[0].File
+			payload.FirstErrorLine = parsed[0].Line
+		}
+
+		payload.Errors = make([]llmError, 0, len(parsed))
+		for _, e := range parsed {
+			payload.Errors = append(payload.Errors, llmError{
+				File:    e.File,
+				Line:    e.Line,
+				Column:  e.Column,
+				Message: e.Message,
+			})
+		}
+		if len(payload.Errors) == 0 {
+			payload.Errors = []llmError{}
+		}
+
+		inputsJSON, err := json.MarshalIndent(payload, "", "  ")
+		if err != nil {
+			return "", err
+		}
+		inputsJSON = append(inputsJSON, '\n')
+		if err := os.WriteFile(filepath.Join(ctxDir, "inputs.json"), inputsJSON, 0644); err != nil {
+			return "", err
+		}
 		if rep != nil {
 			_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("prepared inputs.json (bytes=%d)", len(inputsJSON)), Time: time.Now()})
-			// Emit a compact summary of first error for downstream visibility
-			if len(parsed) > 0 {
-				sum := parsed[0]
-				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("first_error file=%s line=%d", sum.File, sum.Line), Time: time.Now()})
+			if payload.FirstErrorFile != "" && payload.FirstErrorLine > 0 {
+				_ = rep.Report(ctx, Event{Phase: "llm-exec", Step: "llm-exec", Level: "info", Message: fmt.Sprintf("first_error file=%s line=%d", payload.FirstErrorFile, payload.FirstErrorLine), Time: time.Now()})
 			}
 		}
+
+		// Ensure builder logs are persisted alongside context for debuggability when fetched
+		if len(builderLogsBytes) > 0 {
+			_ = os.WriteFile(filepath.Join(ctxDir, "builder.log"), builderLogsBytes, 0644)
+		}
+
 		// Collect a small set of related sources to aid diffing
 		seen := make(map[string]struct{})
 		paths := extractJavaPathsFromError(be, 5)
+		for _, e := range parsed {
+			if strings.TrimSpace(e.File) != "" {
+				paths = append(paths, e.File)
+			}
+		}
+		if len(paths) == 0 && len(builderLogsBytes) > 0 {
+			paths = append(paths, extractJavaPathsFromError(string(builderLogsBytes), 5)...)
+		}
 		if len(paths) == 0 {
 			classNames := parseClassNamesFromError(be, 5)
 			guessed := findJavaFilesByBasename(repoRoot, classNames, 5)
@@ -105,7 +174,6 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 		if len(manifest) > 0 {
 			_ = os.WriteFile(filepath.Join(ctxDir, "source_manifest.txt"), []byte(strings.Join(manifest, "\n")+"\n"), 0644)
 			if rep != nil {
-				// Emit just the first few entries to avoid noisy payloads
 				show := manifest
 				if len(show) > 3 {
 					show = show[:3]
@@ -140,6 +208,82 @@ func llmPrepareContext(baseDir string, branch BranchSpec, repoRoot string, rep E
 	}
 
 	return ctxDir, nil
+}
+
+func stringValue(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	default:
+		return fmt.Sprint(t)
+	}
+}
+
+func downloadBuilderLogs(ctxDir, key, directURL string) ([]byte, string, error) {
+	var urls []string
+	if strings.TrimSpace(key) != "" {
+		seaweed := strings.TrimSpace(ResolveInfraFromEnv().SeaweedURL)
+		if seaweed != "" {
+			url := strings.TrimRight(seaweed, "/") + "/artifacts/" + strings.TrimLeft(key, "/")
+			urls = append(urls, url)
+		}
+	}
+	if strings.TrimSpace(directURL) != "" {
+		urls = append(urls, directURL)
+	}
+	if len(urls) == 0 {
+		return nil, "", fmt.Errorf("no builder logs endpoint available")
+	}
+	dest := filepath.Join(ctxDir, "builder.log")
+	var lastErr error
+	for _, u := range urls {
+		err := downloadToFileFn(u, dest)
+		if err == nil {
+			data, err := os.ReadFile(dest)
+			if err != nil {
+				return nil, u, err
+			}
+			return data, u, nil
+		}
+		lastErr = err
+	}
+	_ = os.Remove(dest)
+	return nil, urls[len(urls)-1], fmt.Errorf("builder logs download failed: %w", lastErr)
+}
+
+func normalizeParsedErrors(repoRoot string, errs []build.ParsedBuildError) {
+	for i := range errs {
+		file := strings.TrimSpace(errs[i].File)
+		if file == "" {
+			continue
+		}
+		candidates := candidateRepoRelativePaths(repoRoot, file)
+		var chosen string
+		for _, rel := range candidates {
+			rel = filepath.ToSlash(strings.TrimSpace(rel))
+			if rel == "" {
+				continue
+			}
+			if chosen == "" {
+				chosen = rel
+			}
+			if _, err := os.Stat(filepath.Join(repoRoot, filepath.FromSlash(rel))); err == nil {
+				chosen = rel
+				break
+			}
+		}
+		if chosen == "" {
+			chosen = strings.TrimPrefix(strings.ReplaceAll(file, "\\", "/"), "/")
+		}
+		chosen = strings.TrimPrefix(chosen, "/")
+		if strings.HasPrefix(chosen, "src/src/") {
+			chosen = strings.TrimPrefix(chosen, "src/")
+		}
+		errs[i].File = chosen
+	}
 }
 
 func candidateRepoRelativePaths(repoRoot, cand string) []string {
