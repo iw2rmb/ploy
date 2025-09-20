@@ -9,8 +9,8 @@ ploy/
 ├── README.md                 # Project overview
 ├── CHANGELOG.md              # Dated change log with Added/Fixed/Testing sections
 ├── AGENTS.md                 # LLM agent system configuration
-├── CLAUDE.md                 # LLM guidance and development protocols
-├── CLAUDE.sessions.md        # Claude AI session management guidance
+├── tests/vps/README.md       # VPS integration testing protocol
+├── internal/git/provider/README.md # Git provider module overview
 ├── PRODUCTION_READY_STATUS.md # Production readiness status
 ├── WARP.md                   # Warp-specific deployment instructions
 ├── Makefile                  # Build automation and test commands

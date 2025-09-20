@@ -1,4 +1,4 @@
-# Git Provider Module CLAUDE.md
+# Git Provider Module Guide
 
 ## Purpose
 Provides Git forge provider integration for automated merge request creation and management in mods workflows, with specialized support for human-step healing branch workflows. Currently implements GitLab REST API with GitHub support infrastructure ready.
@@ -9,13 +9,13 @@ The git provider module implements a clean interface for interacting with Git fo
 The provider follows the principle of graceful degradation - MR creation failures do not break the parent workflow, allowing transformations to complete even when Git forge integration is unavailable. It includes comprehensive mock implementations for testing and CI/CD workflows.
 
 ## Key Files
-- `interface.go:5-26` - GitProvider interface and data structures
-- `gitlab.go:14-272` - Complete GitLab REST API implementation
-- `gitlab.go:45-80` - Main CreateOrUpdateMR orchestration logic
-- `gitlab.go:82-117` - Existing MR detection and conflict resolution
-- `gitlab.go:119-180` - MR creation and update API calls
-- `gitlab.go:218-272` - GitLab project URL parsing and validation with nested namespace support
-- `gitlab_test.go:1-300` - Comprehensive unit tests with mock HTTP responses and edge case handling
+- [`interface.go#L5`](./interface.go#L5) — `GitProvider` interface and data structures
+- [`gitlab.go#L14`](./gitlab.go#L14) — Complete GitLab REST API implementation
+- [`gitlab.go#L45`](./gitlab.go#L45) — Main `CreateOrUpdateMR` orchestration logic
+- [`gitlab.go#L82`](./gitlab.go#L82) — Existing MR detection and conflict resolution
+- [`gitlab.go#L119`](./gitlab.go#L119) — Merge request creation and update API calls
+- [`gitlab.go#L218`](./gitlab.go#L218) — GitLab project URL parsing and validation with nested namespace support
+- [`gitlab_test.go#L1`](./gitlab_test.go#L1) — Comprehensive unit tests with mock HTTP responses and edge case handling
 
 ## API Interface
 ### GitProvider Interface
@@ -61,7 +61,7 @@ Supported repository URL formats:
 
 ## Key Patterns
 - Interface-based design for provider extensibility (GitProvider interface)
-- URL parsing with comprehensive validation supporting nested namespaces (see gitlab.go:218-272)
+- URL parsing with comprehensive validation supporting nested namespaces (see [`gitlab.go#L218`](./gitlab.go#L218))
 - Idempotent operations - safe to retry MR creation with branch-based conflict resolution
 - Context-aware HTTP requests with proper timeout and cancellation support
 - Rich MR descriptions with workflow metadata and transformation summaries
@@ -69,7 +69,7 @@ Supported repository URL formats:
 - Comprehensive mock infrastructure for testing without external dependencies
 
 ## Related Documentation
-- `../../cli/transflow/CLAUDE.md` - Main consumer module with complete workflow integration
-- `../../../iac/CLAUDE.md` - VPS GitHub authentication setup for future GitHub provider support
+- [`../../cli/README.md`](../../cli/README.md) - Main consumer module with complete workflow integration
+- [`../../../iac/README.md`](../../../iac/README.md) - VPS GitHub authentication setup for future GitHub provider support
 - GitLab REST API documentation for projects and merge requests endpoints
 - Test repository: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git

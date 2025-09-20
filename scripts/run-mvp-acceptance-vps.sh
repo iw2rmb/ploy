@@ -93,7 +93,7 @@ deploy_latest_to_vps() {
     cd "$PROJECT_ROOT"
     make build-all
     
-    # Deploy API via ployman (as per CLAUDE.md requirements)
+    # Deploy API via ployman (per AGENTS.md requirements)
     log_info "Deploying API to VPS..."
     if command -v ployman >/dev/null 2>&1; then
         ./bin/ployman api deploy --monitor

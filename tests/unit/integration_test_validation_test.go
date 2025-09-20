@@ -192,7 +192,7 @@ func TestProdDeploymentIntegrationTestExists(t *testing.T) {
 
 func TestIntegrationTestExecutionProtocol(t *testing.T) {
 	// This test documents that the integration tests should NOT be run locally
-	// per CLAUDE.md testing protocol: LOCAL unit tests, VPS integration tests
+	// per AGENTS.md testing protocol: LOCAL unit tests, VPS integration tests
 
 	t.Log("📋 Integration test execution protocol:")
 	t.Log("   - LOCAL: Unit tests only (this test)")
