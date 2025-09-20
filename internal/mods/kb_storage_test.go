@@ -1,397 +1,263 @@
 package mods
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/storage"
+	seastorage "github.com/iw2rmb/ploy/internal/storage/providers/seaweedfs"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
-// Mock implementations for testing
+const (
+	seaweedMasterAddr     = "http://localhost:9333"
+	seaweedFilerAddr      = "http://localhost:8888"
+	seaweedTestCollection = "kb-tests"
+)
 
-type MockStorage struct {
-	mock.Mock
+type noopLockManager struct{}
+
+func (noopLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
+	return &Lock{Key: key, TTL: ttl}, nil
 }
 
-func (m *MockStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
-	args := m.Called(ctx, key)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func (noopLockManager) ReleaseLock(ctx context.Context, lock *Lock) error { return nil }
+
+func (noopLockManager) IsLocked(ctx context.Context, key string) (bool, error) { return false, nil }
+
+func (noopLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
+	if fn != nil {
+		return fn()
 	}
-	return args.Get(0).(io.ReadCloser), args.Error(1)
+	return nil
 }
 
-func (m *MockStorage) Put(ctx context.Context, key string, reader io.Reader, opts ...storage.PutOption) error {
-	args := m.Called(ctx, key, reader, opts)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Delete(ctx context.Context, key string) error {
-	args := m.Called(ctx, key)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Exists(ctx context.Context, key string) (bool, error) {
-	args := m.Called(ctx, key)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockStorage) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
-	args := m.Called(ctx, opts)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func requireSeaweedStorage(t *testing.T) storage.Storage {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping SeaweedFS-backed tests in short mode")
 	}
-	return args.Get(0).([]storage.Object), args.Error(1)
-}
 
-func (m *MockStorage) DeleteBatch(ctx context.Context, keys []string) error {
-	args := m.Called(ctx, keys)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Head(ctx context.Context, key string) (*storage.Object, error) {
-	args := m.Called(ctx, key)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(seaweedFilerAddr + "/healthz")
+	if err != nil {
+		t.Skipf("SeaweedFS not available locally: %v", err)
 	}
-	return args.Get(0).(*storage.Object), args.Error(1)
-}
+	_ = resp.Body.Close()
 
-func (m *MockStorage) UpdateMetadata(ctx context.Context, key string, metadata map[string]string) error {
-	args := m.Called(ctx, key, metadata)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Copy(ctx context.Context, src, dst string) error {
-	args := m.Called(ctx, src, dst)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Move(ctx context.Context, src, dst string) error {
-	args := m.Called(ctx, src, dst)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Health(ctx context.Context) error {
-	args := m.Called(ctx)
-	return args.Error(0)
-}
-
-func (m *MockStorage) Metrics() *storage.StorageMetrics {
-	args := m.Called()
-	if args.Get(0) == nil {
-		return nil
+	cfg := seastorage.Config{
+		Master:      strings.TrimPrefix(seaweedMasterAddr, "http://"),
+		Filer:       strings.TrimPrefix(seaweedFilerAddr, "http://"),
+		Collection:  seaweedTestCollection,
+		Replication: "000",
+		Timeout:     15,
 	}
-	return args.Get(0).(*storage.StorageMetrics)
+
+	provider, err := seastorage.New(cfg)
+	require.NoError(t, err)
+
+	return provider
 }
 
-type MockLockManager struct {
-	mock.Mock
+func uniqueSignature(t *testing.T) string {
+	return fmt.Sprintf("sig-%s-%d", sanitizeComponent(t.Name()), time.Now().UnixNano())
 }
 
-func (m *MockLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
-	args := m.Called(ctx, key, ttl)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
+func uniqueRunID() string {
+	return fmt.Sprintf("run-%d", time.Now().UnixNano())
+}
+
+func uniqueFingerprint(t *testing.T) string {
+	return fmt.Sprintf("fp-%s-%d", sanitizeComponent(t.Name()), time.Now().UnixNano())
+}
+
+func sanitizeComponent(name string) string {
+	name = strings.ToLower(name)
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			if b.Len() == 0 || b.String()[b.Len()-1] != '-' {
+				b.WriteRune('-')
+			}
+		}
 	}
-	return args.Get(0).(*Lock), args.Error(1)
-}
-
-func (m *MockLockManager) ReleaseLock(ctx context.Context, lock *Lock) error {
-	args := m.Called(ctx, lock)
-	return args.Error(0)
-}
-
-func (m *MockLockManager) IsLocked(ctx context.Context, key string) (bool, error) {
-	args := m.Called(ctx, key)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
-	args := m.Called(ctx, key, config, fn)
-	return args.Error(0)
-}
-
-// Test data
-
-func createTestCaseRecord() *CaseRecord {
-	return &CaseRecord{
-		RunID:     "test-run-123",
-		Timestamp: time.Now(),
-		Language:  "java",
-		Signature: "abc123def456",
-		Context: &CaseContext{
-			Language:        "java",
-			Lane:            "A",
-			RepoURL:         "https://github.com/test/repo.git",
-			CompilerVersion: "javac 11.0.1",
-		},
-		Attempt: &HealingAttempt{
-			Type:   "orw_recipe",
-			Recipe: "org.openrewrite.java.RemoveUnusedImports",
-		},
-		Outcome: &HealingOutcome{
-			Success:     true,
-			BuildStatus: "passed",
-			Duration:    5000, // 5 seconds in ms
-			CompletedAt: time.Now(),
-		},
-		BuildLogs: &SanitizedLogs{
-			Stdout:    "Build successful",
-			Stderr:    "",
-			Truncated: false,
-		},
+	cleaned := strings.Trim(b.String(), "-")
+	if cleaned == "" {
+		return "test"
 	}
+	return cleaned
 }
-
-func createTestSummaryRecord() *SummaryRecord {
-	return &SummaryRecord{
-		Language:  "java",
-		Signature: "abc123def456",
-		Promoted: []PromotedFix{
-			{
-				Kind:          "orw_recipe",
-				Ref:           "org.openrewrite.java.RemoveUnusedImports",
-				Score:         0.85,
-				Wins:          5,
-				Failures:      1,
-				LastSuccessAt: time.Now(),
-				FirstSeenAt:   time.Now().Add(-24 * time.Hour),
-			},
-		},
-		Stats: &SummaryStats{
-			TotalCases:   6,
-			SuccessCount: 5,
-			FailureCount: 1,
-			SuccessRate:  0.833,
-			LastUpdated:  time.Now(),
-			AvgDuration:  4500,
-		},
-	}
-}
-
-// Unit Tests
 
 func TestSeaweedFSKBStorage_WriteCase(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
-	caseRecord := createTestCaseRecord()
+	lang := "java"
+	signature := uniqueSignature(t)
+	runID := uniqueRunID()
 
-	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/cases/test-run-123.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
+	record := createTestCaseRecord()
+	record.RunID = runID
+	record.Signature = signature
+	record.Language = lang
 
-	err := kbStorage.WriteCase(ctx, "java", "abc123def456", "test-run-123", caseRecord)
+	key := kbStorage.buildCaseKey(lang, signature, runID)
+	t.Cleanup(func() { _ = storageClient.Delete(ctx, key) })
 
-	assert.NoError(t, err)
-	mockStorage.AssertExpectations(t)
+	require.NoError(t, kbStorage.WriteCase(ctx, lang, signature, runID, record))
+
+	reader, err := storageClient.Get(ctx, key)
+	require.NoError(t, err)
+	defer func() { _ = reader.Close() }()
+
+	data, err := io.ReadAll(reader)
+	require.NoError(t, err)
+
+	var stored CaseRecord
+	require.NoError(t, json.Unmarshal(data, &stored))
+	assert.Equal(t, runID, stored.RunID)
+	assert.Equal(t, signature, stored.Signature)
+	assert.Equal(t, lang, stored.Language)
 }
 
 func TestSeaweedFSKBStorage_ReadCases(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
+	lang := "java"
+	signature := uniqueSignature(t)
 
-	// Create test data
-	caseJSON := `{
-		"run_id": "test-run-123",
-		"timestamp": "2023-12-01T10:00:00Z",
-		"language": "java",
-		"signature": "abc123def456",
-		"context": {
-			"language": "java",
-			"lane": "A"
-		},
-		"attempt": {
-			"type": "orw_recipe",
-			"recipe": "org.openrewrite.java.RemoveUnusedImports"
-		},
-		"outcome": {
-			"success": true,
-			"build_status": "passed",
-			"duration_ms": 5000,
-			"completed_at": "2023-12-01T10:00:05Z"
-		}
-	}`
+	record1 := createTestCaseRecord()
+	record1.RunID = uniqueRunID()
+	record1.Signature = signature
+	record1.Language = lang
 
-	// Mock objects returned by List
-	objects := []storage.Object{
-		{
-			Key: "kb/healing/errors/java/abc123def456/cases/test-run-123.json",
-		},
+	record2 := createTestCaseRecord()
+	record2.RunID = uniqueRunID()
+	record2.Signature = signature
+	record2.Language = lang
+
+	key1 := kbStorage.buildCaseKey(lang, signature, record1.RunID)
+	key2 := kbStorage.buildCaseKey(lang, signature, record2.RunID)
+	t.Cleanup(func() {
+		_ = storageClient.Delete(ctx, key1)
+		_ = storageClient.Delete(ctx, key2)
+	})
+
+	require.NoError(t, kbStorage.WriteCase(ctx, lang, signature, record1.RunID, record1))
+	require.NoError(t, kbStorage.WriteCase(ctx, lang, signature, record2.RunID, record2))
+
+	cases, err := kbStorage.ReadCases(ctx, lang, signature)
+	require.NoError(t, err)
+	assert.Len(t, cases, 2)
+
+	runIDs := map[string]bool{}
+	for _, c := range cases {
+		runIDs[c.RunID] = true
 	}
-
-	// Mock List call
-	mockStorage.On("List", ctx, storage.ListOptions{
-		Prefix:  "kb/healing/errors/java/abc123def456/cases/",
-		MaxKeys: 1000,
-	}).Return(objects, nil)
-
-	// Mock Get call
-	reader := io.NopCloser(bytes.NewReader([]byte(caseJSON)))
-	mockStorage.On("Get", ctx, "kb/healing/errors/java/abc123def456/cases/test-run-123.json").Return(reader, nil)
-
-	cases, err := kbStorage.ReadCases(ctx, "java", "abc123def456")
-
-	assert.NoError(t, err)
-	assert.Len(t, cases, 1)
-	assert.Equal(t, "test-run-123", cases[0].RunID)
-	assert.Equal(t, "java", cases[0].Language)
-	assert.Equal(t, "orw_recipe", cases[0].Attempt.Type)
-	mockStorage.AssertExpectations(t)
+	assert.True(t, runIDs[record1.RunID])
+	assert.True(t, runIDs[record2.RunID])
 }
 
-func TestSeaweedFSKBStorage_WriteSummary(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+func TestSeaweedFSKBStorage_SummaryRoundTrip(t *testing.T) {
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
+	lang := "java"
+	signature := uniqueSignature(t)
 	summary := createTestSummaryRecord()
+	summary.Language = lang
+	summary.Signature = signature
 
-	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/errors/java/abc123def456/summary.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
+	key := kbStorage.buildSummaryKey(lang, signature)
+	t.Cleanup(func() { _ = storageClient.Delete(ctx, key) })
 
-	err := kbStorage.WriteSummary(ctx, "java", "abc123def456", summary)
+	require.NoError(t, kbStorage.WriteSummary(ctx, lang, signature, summary))
 
-	assert.NoError(t, err)
-	mockStorage.AssertExpectations(t)
+	loaded, err := kbStorage.ReadSummary(ctx, lang, signature)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	assert.Equal(t, lang, loaded.Language)
+	assert.Equal(t, signature, loaded.Signature)
+	if assert.Len(t, loaded.Promoted, 1) {
+		assert.Equal(t, summary.Promoted[0].Ref, loaded.Promoted[0].Ref)
+	}
 }
 
-func TestSeaweedFSKBStorage_ReadSummary(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+func TestSeaweedFSKBStorage_PatchRoundTrip(t *testing.T) {
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
-
-	summaryJSON := `{
-		"language": "java",
-		"signature": "abc123def456",
-		"promoted": [
-			{
-				"kind": "orw_recipe",
-				"ref": "org.openrewrite.java.RemoveUnusedImports",
-				"score": 0.85,
-				"wins": 5,
-				"failures": 1
-			}
-		],
-		"stats": {
-			"total_cases": 6,
-			"success_count": 5,
-			"failure_count": 1,
-			"success_rate": 0.833
-		}
-	}`
-
-	reader := io.NopCloser(bytes.NewReader([]byte(summaryJSON)))
-	mockStorage.On("Get", ctx, "kb/healing/errors/java/abc123def456/summary.json").Return(reader, nil)
-
-	summary, err := kbStorage.ReadSummary(ctx, "java", "abc123def456")
-
-	assert.NoError(t, err)
-	assert.Equal(t, "java", summary.Language)
-	assert.Equal(t, "abc123def456", summary.Signature)
-	assert.Len(t, summary.Promoted, 1)
-	assert.Equal(t, "orw_recipe", summary.Promoted[0].Kind)
-	assert.Equal(t, 6, summary.Stats.TotalCases)
-	mockStorage.AssertExpectations(t)
-}
-
-func TestSeaweedFSKBStorage_StorePatch(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
-
-	ctx := context.Background()
-	patchContent := []byte("--- a/Test.java\n+++ b/Test.java\n@@ -1,3 +1,3 @@\n-import java.util.*;\n+\n class Test {\n }")
-	fingerprint := "abcd1234567890ef"
-
-	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/patches/abcd1234567890ef.patch", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
-
-	err := kbStorage.StorePatch(ctx, fingerprint, patchContent)
-
-	assert.NoError(t, err)
-	mockStorage.AssertExpectations(t)
-}
-
-func TestSeaweedFSKBStorage_GetPatch(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
-
-	ctx := context.Background()
-	fingerprint := "abcd1234567890ef"
+	fingerprint := uniqueFingerprint(t)
 	patchContent := []byte("--- a/Test.java\n+++ b/Test.java\n@@ -1,3 +1,3 @@\n-import java.util.*;\n+\n class Test {\n }")
 
-	reader := io.NopCloser(bytes.NewReader(patchContent))
-	mockStorage.On("Get", ctx, "kb/healing/patches/abcd1234567890ef.patch").Return(reader, nil)
+	key := kbStorage.buildPatchKey(fingerprint)
+	t.Cleanup(func() { _ = storageClient.Delete(ctx, key) })
 
-	result, err := kbStorage.GetPatch(ctx, fingerprint)
+	require.NoError(t, kbStorage.StorePatch(ctx, fingerprint, patchContent))
 
-	assert.NoError(t, err)
-	assert.Equal(t, patchContent, result)
-	mockStorage.AssertExpectations(t)
+	loaded, err := kbStorage.GetPatch(ctx, fingerprint)
+	require.NoError(t, err)
+	assert.Equal(t, patchContent, loaded)
 }
 
-func TestSeaweedFSKBStorage_WriteSnapshot(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+func TestSeaweedFSKBStorage_SnapshotRoundTrip(t *testing.T) {
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
 	snapshot := &SnapshotManifest{
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC().Round(time.Second),
 		Languages: map[string]int{
-			"java":       100,
-			"typescript": 50,
+			"java":       10,
+			"typescript": 3,
 		},
-		TotalCases: 150,
-		TotalSigs:  75,
-		Version:    "v1.0",
+		TotalCases: 13,
+		TotalSigs:  5,
+		Version:    "v1.0.0",
 	}
 
-	// Mock storage Put call
-	mockStorage.On("Put", ctx, "kb/healing/snapshot.json", mock.AnythingOfType("*bytes.Reader"), mock.AnythingOfType("[]storage.PutOption")).Return(nil)
+	key := "kb/healing/snapshot.json"
+	t.Cleanup(func() { _ = storageClient.Delete(ctx, key) })
 
-	err := kbStorage.WriteSnapshot(ctx, snapshot)
+	require.NoError(t, kbStorage.WriteSnapshot(ctx, snapshot))
 
-	assert.NoError(t, err)
-	mockStorage.AssertExpectations(t)
+	loaded, err := kbStorage.ReadSnapshot(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	assert.Equal(t, snapshot.TotalCases, loaded.TotalCases)
+	assert.Equal(t, snapshot.TotalSigs, loaded.TotalSigs)
+	assert.Equal(t, snapshot.Version, loaded.Version)
 }
 
 func TestSeaweedFSKBStorage_Health(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+	storageClient := requireSeaweedStorage(t)
+	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
-
-	// Mock health check
-	mockStorage.On("Health", ctx).Return(nil)
-
-	err := kbStorage.Health(ctx)
-
-	assert.NoError(t, err)
-	mockStorage.AssertExpectations(t)
+	assert.NoError(t, kbStorage.Health(ctx))
 }
 
-// Integration test style - testing key building logic
 func TestSeaweedFSKBStorage_KeyBuilding(t *testing.T) {
-	mockStorage := new(MockStorage)
-	mockLockMgr := new(MockLockManager)
-	kbStorage := NewSeaweedFSKBStorage(mockStorage, mockLockMgr)
+	kbStorage := NewSeaweedFSKBStorage(nil, noopLockManager{})
 
 	tests := []struct {
 		name     string
@@ -440,5 +306,63 @@ func TestSeaweedFSKBStorage_KeyBuilding(t *testing.T) {
 			}
 			assert.Equal(t, test.expected, result)
 		})
+	}
+}
+
+// Test data builders used across scenarios
+
+func createTestCaseRecord() *CaseRecord {
+	return &CaseRecord{
+		RunID:     "test-run-123",
+		Timestamp: time.Now(),
+		Language:  "java",
+		Signature: "abc123def456",
+		Context: &CaseContext{
+			Language:        "java",
+			Lane:            "A",
+			RepoURL:         "https://github.com/test/repo.git",
+			CompilerVersion: "javac 11.0.1",
+		},
+		Attempt: &HealingAttempt{
+			Type:   "orw_recipe",
+			Recipe: "org.openrewrite.java.RemoveUnusedImports",
+		},
+		Outcome: &HealingOutcome{
+			Success:     true,
+			BuildStatus: "passed",
+			Duration:    5000,
+			CompletedAt: time.Now(),
+		},
+		BuildLogs: &SanitizedLogs{
+			Stdout:    "Build successful",
+			Stderr:    "",
+			Truncated: false,
+		},
+	}
+}
+
+func createTestSummaryRecord() *SummaryRecord {
+	return &SummaryRecord{
+		Language:  "java",
+		Signature: "abc123def456",
+		Promoted: []PromotedFix{
+			{
+				Kind:          "orw_recipe",
+				Ref:           "org.openrewrite.java.RemoveUnusedImports",
+				Score:         0.85,
+				Wins:          5,
+				Failures:      1,
+				LastSuccessAt: time.Now(),
+				FirstSeenAt:   time.Now().Add(-24 * time.Hour),
+			},
+		},
+		Stats: &SummaryStats{
+			TotalCases:   6,
+			SuccessCount: 5,
+			FailureCount: 1,
+			SuccessRate:  0.833,
+			LastUpdated:  time.Now(),
+			AvgDuration:  4500,
+		},
 	}
 }
