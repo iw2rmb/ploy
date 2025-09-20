@@ -129,38 +129,37 @@ if [[ -n "$BUILDER_LOG_KEY" ]]; then
   fi
 fi
 
-if [[ -n "${PLOY_SEAWEEDFS_URL:-}" && -s "$ART_KEYS_FILE" ]]; then
-  log "Downloading artifacts from SeaweedFS"
-  while IFS= read -r KEY; do
-    # Mirror path under logs: logs/<MOD_ID>/seaweedfs/mods/.../file
-    DEST="$OUT_DIR/seaweedfs/$KEY"
-    mkdir -p "$(dirname "$DEST")"
-    URL="${PLOY_SEAWEEDFS_URL%/}/artifacts/${KEY}"
-    if curl -fsS "$URL" -o "$DEST"; then
-      log "Downloaded $KEY"
-    else
-      echo "warning: failed to download $KEY from $URL" >&2
-    fi
-  done < "$ART_KEYS_FILE"
+SKIP_SEAWEEDFS_DOWNLOADS="${SKIP_SEAWEEDFS_DOWNLOADS:-1}"
+if [[ "$SKIP_SEAWEEDFS_DOWNLOADS" != "0" ]]; then
+  log "Skipping direct SeaweedFS downloads (unset SKIP_SEAWEEDFS_DOWNLOADS=0 to enable)"
 else
-  if [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+  if [[ -n "${PLOY_SEAWEEDFS_URL:-}" && -s "$ART_KEYS_FILE" ]]; then
+    log "Downloading artifacts from SeaweedFS"
+    while IFS= read -r KEY; do
+      DEST="$OUT_DIR/seaweedfs/$KEY"
+      mkdir -p "$(dirname "$DEST")"
+      URL="${PLOY_SEAWEEDFS_URL%/}/artifacts/${KEY}"
+      if curl -fsS "$URL" -o "$DEST"; then
+        log "Downloaded $KEY"
+      else
+        echo "warning: failed to download $KEY from $URL" >&2
+      fi
+    done < "$ART_KEYS_FILE"
+  elif [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
     log "PLOY_SEAWEEDFS_URL not set; skipping SeaweedFS artifact download"
   fi
-fi
 
-# Fetch builder logs from SeaweedFS when the pointer is available.
-if [[ -n "$BUILDER_LOG_KEY" && -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
-  BUILDER_DEST="$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
-  mkdir -p "$(dirname "$BUILDER_DEST")"
-  BUILDER_URL_FULL="${PLOY_SEAWEEDFS_URL%/}/artifacts/${BUILDER_LOG_KEY}"
-  if curl -fsS "$BUILDER_URL_FULL" -o "$BUILDER_DEST"; then
-    log "Downloaded builder logs to $BUILDER_DEST"
-  else
-    echo "warning: failed to download builder logs from $BUILDER_URL_FULL" >&2
-    rm -f "$BUILDER_DEST" || true
-  fi
-else
-  if [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+  if [[ -n "$BUILDER_LOG_KEY" && -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
+    BUILDER_DEST="$OUT_DIR/seaweedfs/$BUILDER_LOG_KEY"
+    mkdir -p "$(dirname "$BUILDER_DEST")"
+    BUILDER_URL_FULL="${PLOY_SEAWEEDFS_URL%/}/artifacts/${BUILDER_LOG_KEY}"
+    if curl -fsS "$BUILDER_URL_FULL" -o "$BUILDER_DEST"; then
+      log "Downloaded builder logs to $BUILDER_DEST"
+    else
+      echo "warning: failed to download builder logs from $BUILDER_URL_FULL" >&2
+      rm -f "$BUILDER_DEST" || true
+    fi
+  elif [[ -z "${PLOY_SEAWEEDFS_URL:-}" ]]; then
     log "PLOY_SEAWEEDFS_URL not set in current shell; relying on SSH fallback if TARGET_HOST is provided"
   fi
 fi

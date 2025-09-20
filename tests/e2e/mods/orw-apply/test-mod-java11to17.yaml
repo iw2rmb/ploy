@@ -24,7 +24,7 @@ artifacts:
 mr:
   forge: gitlab
   repo_url_env: GITLAB_URL
-  token_env: GITLAB_TOKEN
+  token_env: PLOY_GITLAB_PAT
   labels: ["ploy", "tfl", "java11to17"]
 
 branch_naming:

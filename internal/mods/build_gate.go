@@ -61,6 +61,15 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		}
 		return &common.DeployResult{Success: false, Message: msg}, nil
 	}
+	var tarExtras map[string][]byte
+	if strings.EqualFold(r.config.Lane, "D") {
+		extras, err := dockerfileExtrasForLaneD(repoPath)
+		if err != nil {
+			r.emit(ctx, "build", "dockerfile-pair", "warn", fmt.Sprintf("failed to prepare Dockerfile pair: %v", err))
+		} else {
+			tarExtras = extras
+		}
+	}
 	controllerURL := strings.TrimSpace(os.Getenv("PLOY_CONTROLLER"))
 	buildCfg := common.DeployConfig{
 		App:           appName,
@@ -70,6 +79,9 @@ func (r *ModRunner) runBuildGate(ctx context.Context, repoPath string) (*common.
 		Metadata:      map[string]string{"working_dir": repoPath},
 		ControllerURL: controllerURL,
 		BuildOnly:     true,
+	}
+	if len(tarExtras) > 0 {
+		buildCfg.TarExtras = tarExtras
 	}
 	if r.buildGate != nil {
 		deployRes, err := r.buildGate.Check(ctx, buildCfg)

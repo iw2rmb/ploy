@@ -283,7 +283,6 @@ func (r *ModRunner) Run(ctx context.Context) (*ModResult, error) {
 				result.StepResults = append(result.StepResults, StepResult{StepID: "build", Success: false, Message: msg + " (reverted healing patch)", Duration: time.Since(buildStart2)})
 			} else {
 				// Commit post-healing changes after successful build
-				pruneGeneratedDockerfiles(repoPath)
 				if r.repoManager != nil {
 					_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
 				} else {
@@ -449,7 +448,6 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 				}
 				continue
 			}
-			pruneGeneratedDockerfiles(repoPath)
 			if r.repoManager != nil {
 				_ = r.repoManager.Commit(ctx, repoPath, "apply(healing): reducer patch")
 			} else {

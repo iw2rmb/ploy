@@ -35,7 +35,7 @@ Prerequisites
 Run the Cycle
 -------------
 1. Review or tweak `scenario.yaml` (lane D, compile gate, self-heal enabled).
-2. Execute `zsh -lc 'source ~/.zshrc; ./run.sh'` with the required environment variables exported.
+2. Execute `zsh -lc 'export PLOY_GITLAB_PAT=$(tr -d "\n" < ~/.gitlab_token); cd /Users/vk/@iw2rmb/ploy/tests/e2e/mods/orw-apply-llm-plan-seq && ./run.sh'` so the controller receives a GitLab token for the push/MR step.
 3. The script prints `MOD_ID`, tails SSE events, downloads artifacts, and stores everything under `logs/<MOD_ID>/`.
 
 Verify the Run
@@ -43,7 +43,7 @@ Verify the Run
 - Success criteria: status `completed`, non-empty `result.mr_url`, compile gate passes after healing, diff captured from LLM executor.
 - `./check-steps.sh <MOD_ID>` ensures the key phases occurred in order (ORW diff, build failure, planner -> llm-exec -> reducer).
 - `./generate-evidence.sh <logs/mod-*>` summarizes build errors, prompts, and diffs for attachments or regressions.
-- `./collect-logs.sh <MOD_ID>` downloads controller/platform logs plus referenced SeaweedFS artifacts when deeper debugging is required.
+- `./collect-logs.sh <MOD_ID>` downloads controller/platform logs. SeaweedFS artifact downloads are skipped by default (set `SKIP_SEAWEEDFS_DOWNLOADS=0` if you need them).
 - Builder failures now emit a SeaweedFS pointer (`build-logs/<JOB>.log`). `collect-logs.sh` writes the key to `builder_logs.key`, fetches the artifact locally, and also downloads the full log through the controller route `GET /v1/apps/<app>/builds/<JOB>/logs/download` when SeaweedFS isn’t reachable.
 
 Next Step

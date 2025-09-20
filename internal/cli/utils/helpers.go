@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 func Getenv(k, d string) string {
@@ -96,10 +97,23 @@ func MatchAny(rel string, globs []string) bool {
 	return false
 }
 
+type TarExtra struct {
+	Data []byte
+	Mode os.FileMode
+}
+
+type TarOptions struct {
+	Extras map[string]TarExtra
+}
+
 func TarDir(dir string, w io.Writer, ign Ignore) error {
+	return TarDirWithOptions(dir, w, ign, TarOptions{})
+}
+
+func TarDirWithOptions(dir string, w io.Writer, ign Ignore, opts TarOptions) error {
 	tw := tar.NewWriter(w)
 	defer func() { _ = tw.Close() }()
-	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -127,7 +141,7 @@ func TarDir(dir string, w io.Writer, ign Ignore) error {
 			return nil
 		}
 		hdr, _ := tar.FileInfoHeader(info, "")
-		hdr.Name = rel
+		hdr.Name = filepath.ToSlash(rel)
 		if err := tw.WriteHeader(hdr); err != nil {
 			return err
 		}
@@ -135,5 +149,36 @@ func TarDir(dir string, w io.Writer, ign Ignore) error {
 		defer func() { _ = f.Close() }()
 		_, err = io.Copy(tw, f)
 		return err
-	})
+	}); err != nil {
+		return err
+	}
+	if len(opts.Extras) == 0 {
+		return nil
+	}
+	for name, extra := range opts.Extras {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			continue
+		}
+		mode := extra.Mode
+		if mode == 0 {
+			mode = 0o644
+		}
+		data := extra.Data
+		hdr := &tar.Header{
+			Name:    filepath.ToSlash(trimmed),
+			Mode:    int64(mode),
+			Size:    int64(len(data)),
+			ModTime: time.Now(),
+		}
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+		if len(data) > 0 {
+			if _, err := tw.Write(data); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

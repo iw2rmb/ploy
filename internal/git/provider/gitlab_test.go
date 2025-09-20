@@ -124,14 +124,14 @@ func TestGitLabProvider_CreateOrUpdateMR(t *testing.T) {
 			}
 
 			if tt.envToken != "" {
-				_ = os.Setenv("GITLAB_TOKEN", tt.envToken)
+				_ = os.Setenv("PLOY_GITLAB_PAT", tt.envToken)
 			} else {
-				_ = os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("PLOY_GITLAB_PAT")
 			}
 
 			defer func() {
 				_ = os.Unsetenv("GITLAB_URL")
-				_ = os.Unsetenv("GITLAB_TOKEN")
+				_ = os.Unsetenv("PLOY_GITLAB_PAT")
 			}()
 
 			// Create mock GitLab server
