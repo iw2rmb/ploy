@@ -214,7 +214,7 @@ build_timeout: 20m  # Increase for complex projects
 ```bash
 # Verify GitLab token has correct permissions
 # Ensure GITLAB_TOKEN is set (glpat-...)
-curl -H "Authorization: Bearer $GITLAB_TOKEN" https://gitlab.com/api/v4/user
+curl -H "Authorization: Bearer $PLOY_GITLAB_PAT" https://gitlab.com/api/v4/user
 ```
 
 #### Service Connectivity

@@ -64,7 +64,7 @@ func (g *Service) PushBranch(ctx context.Context, repoPath, remoteURL, branchNam
 
 // authenticatedRemoteURL injects credentials into the remote URL when possible.
 func (g *Service) authenticatedRemoteURL(remote string) string {
-	token := os.Getenv("GITLAB_TOKEN")
+	token := os.Getenv("PLOY_GITLAB_PAT")
 	if token == "" {
 		return remote
 	}

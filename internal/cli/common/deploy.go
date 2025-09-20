@@ -29,6 +29,7 @@ type DeployConfig struct {
 	Timeout       time.Duration
 	BuildOnly     bool   // when true, API should run build gate and tear down app (no long-lived service)
 	WorkingDir    string // optional: directory to tar instead of current working directory
+	TarExtras     map[string][]byte
 }
 
 // DeployResult contains deployment outcome information
@@ -74,7 +75,15 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 	pr, pw := io.Pipe()
 	go func() {
 		defer func() { _ = pw.Close() }()
-		_ = utils.TarDir(wd, pw, ign)
+		opts := utils.TarOptions{}
+		if len(config.TarExtras) > 0 {
+			extras := make(map[string]utils.TarExtra, len(config.TarExtras))
+			for name, data := range config.TarExtras {
+				extras[name] = utils.TarExtra{Data: data}
+			}
+			opts.Extras = extras
+		}
+		_ = utils.TarDirWithOptions(wd, pw, ign, opts)
 	}()
 
 	// Build deployment URL

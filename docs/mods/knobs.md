@@ -68,7 +68,7 @@ Recommended Defaults (dev)
 - MODS_PLANNER_IMAGE / MODS_REDUCER_IMAGE / MODS_LLM_EXEC_IMAGE: registry.dev.ployman.app/langgraph-runner:latest
 - NOMAD_DC=dc1, PLOY_SEAWEEDFS_URL=http://seaweedfs-filer.storage.ploy.local:8888
 - PLOY_CONTROLLER: ensure it is set to `https://api.dev.ployman.app/v1` for Dev; `PLOY_API_URL` auto-derived to https://api.dev.ployman.app
-- GITLAB_URL=https://gitlab.com, GITLAB_TOKEN=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden. Only set `MODS_SKIP_DEPLOY_LANES` when you need to bypass remote deployments (e.g., lane-C compile-only dry runs).
+- GITLAB_URL=https://gitlab.com, PLOY_GITLAB_PAT=glpat-… (write scope); Git identity defaults to `Ploy Bot <ploy-bot@dev.ployman.app>` unless overridden. Only set `MODS_SKIP_DEPLOY_LANES` when you need to bypass remote deployments (e.g., lane-C compile-only dry runs).
 
 Per-run MR auth selection (mods.yaml)
 
@@ -77,12 +77,12 @@ Per-run MR auth selection (mods.yaml)
   mr:
     forge: gitlab
     repo_url_env: GITLAB_URL
-    token_env: GITLAB_TOKEN
+    token_env: PLOY_GITLAB_PAT
     labels: ["ploy", "tfl", "healing-llm"]
 
 - Behavior:
   - `repo_url_env`: name of the env var that holds the GitLab base URL (e.g., https://gitlab.com). The runner maps it to `GITLAB_URL` internally.
-  - `token_env`: name of the env var that holds the token. The runner maps it to `GITLAB_TOKEN` internally. Token must have write_repository (and usually api) scopes.
+  - `token_env`: name of the env var that holds the token. The runner maps it to `PLOY_GITLAB_PAT` internally. Token must have write_repository (and usually api) scopes.
   - `labels`: optional MR labels override; defaults to ["ploy", "tfl"].
 
 - Notes:

@@ -78,7 +78,7 @@ Inspect VPS logs (as `ploy` user):
 
 Verify MR & diff (GitLab):
 - Project: `iw2rmb/ploy-orw-java11-maven` → `iw2rmb%2Fploy-orw-java11-maven`
-- `curl -sS -H "Authorization: Bearer $GITLAB_TOKEN" "https://gitlab.com/api/v4/projects/iw2rmb%2Fploy-orw-java11-maven/merge_requests/<iid>/changes" | jq`
+- `curl -sS -H "Authorization: Bearer $PLOY_GITLAB_PAT" "https://gitlab.com/api/v4/projects/iw2rmb%2Fploy-orw-java11-maven/merge_requests/<iid>/changes" | jq`
 
 ## Detailed Plan: Real-Time Observability + Fail-Fast (Critical)
 
