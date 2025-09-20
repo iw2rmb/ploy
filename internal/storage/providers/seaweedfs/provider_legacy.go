@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/storage"
 )
@@ -132,8 +133,16 @@ func (p *Provider) ListObjects(bucket, prefix string) ([]storage.ObjectInfo, err
 	}
 	var objects []storage.ObjectInfo
 	for _, entry := range result.Entries {
-		name := filepath.Base(entry.FullPath)
-		objects = append(objects, storage.ObjectInfo{Key: name, Size: entry.FileSize, LastModified: entry.Mtime, ContentType: "application/octet-stream"})
+		relKey := strings.TrimPrefix(entry.FullPath, "/")
+		if bucket != "" {
+			bucketPrefix := bucket + "/"
+			relKey = strings.TrimPrefix(relKey, bucketPrefix)
+		}
+		relKey = strings.TrimPrefix(relKey, "/")
+		if relKey == "" || relKey == "." {
+			continue
+		}
+		objects = append(objects, storage.ObjectInfo{Key: relKey, Size: entry.FileSize, LastModified: entry.Mtime, ContentType: "application/octet-stream"})
 	}
 	return objects, nil
 }
