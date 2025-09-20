@@ -121,14 +121,22 @@ func (p *Provider) List(ctx context.Context, opts storage.ListOptions) ([]storag
 	}
 	var objects []storage.Object
 	for _, entry := range result.Entries {
-		name := path.Base(entry.FullPath)
+		relKey := strings.TrimPrefix(entry.FullPath, "/")
+		if p.collection != "" {
+			collectionPrefix := p.collection + "/"
+			relKey = strings.TrimPrefix(relKey, collectionPrefix)
+		}
+		relKey = strings.TrimPrefix(relKey, "/")
+		if relKey == "" || relKey == "." {
+			continue
+		}
 		var lastModified time.Time
 		if entry.Mtime != "" {
 			if parsed, err := time.Parse(time.RFC3339, entry.Mtime); err == nil {
 				lastModified = parsed
 			}
 		}
-		objects = append(objects, storage.Object{Key: name, Size: entry.FileSize, LastModified: lastModified, ContentType: "application/octet-stream", Metadata: make(map[string]string)})
+		objects = append(objects, storage.Object{Key: relKey, Size: entry.FileSize, LastModified: lastModified, ContentType: "application/octet-stream", Metadata: make(map[string]string)})
 	}
 	return objects, nil
 }
