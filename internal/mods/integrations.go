@@ -84,8 +84,10 @@ func (b *SharedPushBuildChecker) CheckBuild(ctx context.Context, config common.D
 			if len(tail) > 2000 {
 				tail = tail[len(tail)-2000:]
 			}
-			// Append logs tail to result.Message
-			result.Message = appendUniqueLine(result.Message, tail)
+			if !isJSONBlock(tail) {
+				// Append logs tail to result.Message
+				result.Message = appendUniqueLine(result.Message, tail)
+			}
 		}
 		if modID := os.Getenv("MOD_ID"); modID != "" {
 			rep := NewControllerEventReporter(b.controllerURL, modID)
@@ -152,6 +154,39 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 		messageLines = append(messageLines, line)
 	}
 
+	appendReadable := func(line string) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			return
+		}
+		if isJSONBlock(line) {
+			return
+		}
+		appendIfNew(line)
+	}
+
+	formatBuilderLogsLine := func(key, url string) string {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return ""
+		}
+		url = strings.TrimSpace(url)
+		if url != "" {
+			return fmt.Sprintf("  builder logs: [%s](%s)", key, url)
+		}
+		return fmt.Sprintf("  builder logs: %s", key)
+	}
+
+	resolveDownloadURL := func(candidate string) string {
+		appName := strings.TrimSpace(app)
+		base := strings.TrimRight(strings.TrimSpace(controller), "/")
+		dep := strings.TrimSpace(candidate)
+		if appName == "" || base == "" || dep == "" {
+			return ""
+		}
+		return fmt.Sprintf("%s/apps/%s/builds/%s/logs/download", base, appName, dep)
+	}
+
 	parsed := false
 	if trimmed != "" {
 		segments := strings.Split(trimmed, "\n")
@@ -164,60 +199,54 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 			if json.Unmarshal([]byte(seg), &payload) == nil {
 				parsed = true
 				if msg := strings.TrimSpace(payload.Error.Message); msg != "" {
-					appendIfNew(msg)
+					appendReadable(msg)
 				}
 				if payload.Error.Details != nil {
 					if detail := strings.TrimSpace(fmt.Sprint(payload.Error.Details)); detail != "" {
-						appendIfNew(detail)
+						appendReadable(detail)
 					}
 				}
 				if logs := strings.TrimSpace(payload.Builder.Logs); logs != "" {
-					appendIfNew(logs)
+					appendReadable(logs)
 				}
 				if logs := strings.TrimSpace(payload.Logs); logs != "" {
-					appendIfNew(logs)
+					appendReadable(logs)
 				}
 				if job := strings.TrimSpace(payload.Builder.Job); job != "" {
 					appendIfNew(fmt.Sprintf("builder job: %s", job))
 				}
 				pointer := strings.TrimSpace(payload.Builder.LogsKey)
 				if pointer != "" {
-					line := fmt.Sprintf("builder logs archived at %s", pointer)
-					if url := strings.TrimSpace(payload.Builder.LogsURL); url != "" {
-						line = fmt.Sprintf("%s (%s)", line, url)
+					download := resolveDownloadURL(payload.Builder.Job)
+					if download == "" {
+						download = resolveDownloadURL(jobFromLogsKey(pointer))
 					}
-					appendIfNew(line)
+					if download == "" {
+						download = resolveDownloadURL(result.DeploymentID)
+					}
+					if line := formatBuilderLogsLine(pointer, download); line != "" {
+						appendIfNew(line)
+					}
 				}
 				continue
 			}
-			appendIfNew(seg)
+			appendReadable(seg)
 		}
 	}
 
 	// Include structured fields captured during response parsing
-	appendIfNew(result.ErrorDetails)
-	appendIfNew(result.BuilderLogs)
+	appendReadable(result.ErrorDetails)
+	appendReadable(result.BuilderLogs)
 	if job := strings.TrimSpace(result.BuilderJob); job != "" {
 		appendIfNew(fmt.Sprintf("builder job: %s", job))
 	}
 	if key := strings.TrimSpace(result.BuilderLogsKey); key != "" {
-		line := fmt.Sprintf("builder logs archived at %s", key)
-		if url := strings.TrimSpace(result.BuilderLogsURL); url != "" {
-			line = fmt.Sprintf("%s (%s)", line, url)
+		download := resolveDownloadURL(result.DeploymentID)
+		if download == "" {
+			download = resolveDownloadURL(jobFromLogsKey(key))
 		}
-		appendIfNew(line)
-		if appName := strings.TrimSpace(app); appName != "" {
-			base := strings.TrimRight(strings.TrimSpace(controller), "/")
-			if base == "" {
-				base = "<controller>"
-			}
-			depID := strings.TrimSpace(result.DeploymentID)
-			if depID == "" {
-				depID = jobFromLogsKey(key)
-			}
-			if depID != "" {
-				appendIfNew(fmt.Sprintf("download full builder log via %s/apps/%s/builds/%s/logs/download", base, appName, depID))
-			}
+		if line := formatBuilderLogsLine(key, download); line != "" {
+			appendIfNew(line)
 		}
 	}
 	if code := strings.TrimSpace(result.ErrorCode); code != "" {
@@ -261,6 +290,18 @@ func jobFromLogsKey(key string) string {
 	trimmed = strings.TrimSuffix(trimmed, ".log")
 	trimmed = strings.Trim(trimmed, "/")
 	return trimmed
+}
+
+func isJSONBlock(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return false
+	}
+	if (!strings.HasPrefix(trimmed, "{") || !strings.HasSuffix(trimmed, "}")) && (!strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]")) {
+		return false
+	}
+	var probe interface{}
+	return json.Unmarshal([]byte(trimmed), &probe) == nil
 }
 
 func shouldSkipRemoteBuild(lane string) bool {

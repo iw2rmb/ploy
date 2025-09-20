@@ -252,9 +252,8 @@ func buildLogsPointerLine(key, url string) string {
 	if key == "" {
 		return ""
 	}
-	line := fmt.Sprintf("builder logs archived at %s", key)
 	if u := strings.TrimSpace(url); u != "" {
-		line = fmt.Sprintf("%s (%s)", line, u)
+		return fmt.Sprintf("  builder logs: [%s](%s)", key, u)
 	}
-	return line
+	return fmt.Sprintf("  builder logs: %s", key)
 }
