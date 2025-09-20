@@ -162,6 +162,9 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 		if isJSONBlock(line) {
 			return
 		}
+		if strings.Contains(line, "seaweedfs-filer") {
+			return
+		}
 		appendIfNew(line)
 	}
 
@@ -253,6 +256,21 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 		appendIfNew(fmt.Sprintf("error code: %s", code))
 	}
 
+	if len(messageLines) == 0 {
+		return trimmed
+	}
+
+	filtered := messageLines[:0]
+	for _, line := range messageLines {
+		if isJSONBlock(line) {
+			continue
+		}
+		if strings.Contains(line, "seaweedfs-filer") {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	messageLines = filtered
 	if len(messageLines) == 0 {
 		return trimmed
 	}
