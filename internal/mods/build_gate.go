@@ -232,6 +232,12 @@ func builderLogSnippet(logs string, maxLines, maxLen int) string {
 		if line == "" {
 			continue
 		}
+		if looksLikeJSONLine(line) {
+			continue
+		}
+		if strings.Contains(line, "seaweedfs-filer") {
+			continue
+		}
 		selected = append(selected, line)
 		if maxLines > 0 && len(selected) >= maxLines {
 			break
@@ -256,4 +262,16 @@ func buildLogsPointerLine(key, url string) string {
 		return fmt.Sprintf("  builder logs: [%s](%s)", key, u)
 	}
 	return fmt.Sprintf("  builder logs: %s", key)
+}
+
+func looksLikeJSONLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return false
+	}
+	if (!strings.HasPrefix(trimmed, "{") || !strings.HasSuffix(trimmed, "}")) && (!strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]")) {
+		return false
+	}
+	var probe interface{}
+	return json.Unmarshal([]byte(trimmed), &probe) == nil
 }
