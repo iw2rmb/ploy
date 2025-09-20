@@ -168,17 +168,8 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 		appendIfNew(line)
 	}
 
-	formatBuilderLogsLine := func(key, url string) string {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			return ""
-		}
-		url = strings.TrimSpace(url)
-		if url != "" {
-			return fmt.Sprintf("  builder logs: [%s](%s)", key, url)
-		}
-		return fmt.Sprintf("  builder logs: %s", key)
-	}
+	builderKey := strings.TrimSpace(result.BuilderLogsKey)
+	builderDownload := strings.TrimSpace(result.BuilderLogsURL)
 
 	resolveDownloadURL := func(candidate string) string {
 		appName := strings.TrimSpace(app)
@@ -219,6 +210,9 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 					appendIfNew(fmt.Sprintf("builder job: %s", job))
 				}
 				pointer := strings.TrimSpace(payload.Builder.LogsKey)
+				if pointer != "" && builderKey == "" {
+					builderKey = pointer
+				}
 				if pointer != "" {
 					download := resolveDownloadURL(payload.Builder.Job)
 					if download == "" {
@@ -227,8 +221,8 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 					if download == "" {
 						download = resolveDownloadURL(result.DeploymentID)
 					}
-					if line := formatBuilderLogsLine(pointer, download); line != "" {
-						appendIfNew(line)
+					if download != "" {
+						builderDownload = download
 					}
 				}
 				continue
@@ -243,17 +237,25 @@ func enrichBuildFailureMessage(result *common.DeployResult, app, controller stri
 	if job := strings.TrimSpace(result.BuilderJob); job != "" {
 		appendIfNew(fmt.Sprintf("builder job: %s", job))
 	}
-	if key := strings.TrimSpace(result.BuilderLogsKey); key != "" {
-		download := resolveDownloadURL(result.DeploymentID)
-		if download == "" {
-			download = resolveDownloadURL(jobFromLogsKey(key))
-		}
-		if line := formatBuilderLogsLine(key, download); line != "" {
-			appendIfNew(line)
-		}
+	if key := strings.TrimSpace(result.BuilderLogsKey); key != "" && builderKey == "" {
+		builderKey = key
+	}
+	apiDownload := resolveDownloadURL(result.DeploymentID)
+	if apiDownload == "" {
+		apiDownload = resolveDownloadURL(jobFromLogsKey(builderKey))
+	}
+	if apiDownload != "" {
+		builderDownload = apiDownload
 	}
 	if code := strings.TrimSpace(result.ErrorCode); code != "" {
 		appendIfNew(fmt.Sprintf("error code: %s", code))
+	}
+	if builderDownload != "" {
+		appendIfNew(fmt.Sprintf("builder_log:%s", builderDownload))
+	}
+	result.BuilderLogsKey = builderKey
+	if strings.TrimSpace(builderDownload) != "" {
+		result.BuilderLogsURL = builderDownload
 	}
 
 	if len(messageLines) == 0 {

@@ -81,9 +81,8 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 		t.Fatalf("expected result message to include builder logs, got %q", res.Message)
 	}
 	downloadURL := fmt.Sprintf("%s/apps/%s/builds/%s/logs/download", strings.TrimRight(server.URL, "/"), appName, deploymentID)
-	keySnippet := fmt.Sprintf("builder logs: [build-logs/%s.log](%s)", deploymentID, downloadURL)
-	if !strings.Contains(res.Message, keySnippet) {
-		t.Fatalf("expected message to include markdown builder log link, got %q", res.Message)
+	if !strings.Contains(res.Message, fmt.Sprintf("builder_log:%s", downloadURL)) {
+		t.Fatalf("expected message to include builder_log reference, got %q", res.Message)
 	}
 	if strings.Contains(res.Message, "download full builder log via") {
 		t.Fatalf("expected message to omit legacy download helper text, got %q", res.Message)
@@ -108,7 +107,7 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 	if res.BuilderLogsKey != wantKey {
 		t.Fatalf("expected logs key %q, got %q", wantKey, res.BuilderLogsKey)
 	}
-	wantURL := fmt.Sprintf("https://storage.example/build-logs/%s.log", deploymentID)
+	wantURL := downloadURL
 	if res.BuilderLogsURL != wantURL {
 		t.Fatalf("expected logs url %q, got %q", wantURL, res.BuilderLogsURL)
 	}
