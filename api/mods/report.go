@@ -1,6 +1,9 @@
 package mods
 
 import (
+	"context"
+	"encoding/json"
+	"io"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
@@ -29,7 +32,28 @@ func (h *Handler) GetModReport(c *fiber.Ctx) error {
 		})
 	}
 
-	if status.Report == nil {
+	if h.storage == nil {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "report_storage_disabled",
+				"message": "Report storage is not configured",
+			},
+		})
+	}
+
+	ctx := context.Background()
+	key := reportStorageKey(modID)
+	exists, err := h.storage.Exists(ctx, key)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "storage_error",
+				"message": "Failed to check report availability",
+				"details": err.Error(),
+			},
+		})
+	}
+	if !exists {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": fiber.Map{
 				"code":    "report_unavailable",
@@ -38,15 +62,49 @@ func (h *Handler) GetModReport(c *fiber.Ctx) error {
 		})
 	}
 
+	rc, err := h.storage.Get(ctx, key)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "storage_error",
+				"message": "Failed to load report",
+				"details": err.Error(),
+			},
+		})
+	}
+	defer func() { _ = rc.Close() }()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": fiber.Map{
+				"code":    "storage_error",
+				"message": "Failed to read report",
+				"details": err.Error(),
+			},
+		})
+	}
+
 	format := strings.ToLower(strings.TrimSpace(c.Query("format", "json")))
 	switch format {
 	case "markdown", "md":
-		markdown := internalmods.RenderModReportMarkdown(*status.Report)
+		var report internalmods.ModReport
+		if err := json.Unmarshal(data, &report); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fiber.Map{
+					"code":    "report_decode_error",
+					"message": "Failed to decode stored report",
+					"details": err.Error(),
+				},
+			})
+		}
+		markdown := internalmods.RenderModReportMarkdown(report)
 		c.Set(fiber.HeaderContentType, "text/markdown; charset=utf-8")
 		return c.SendString(markdown)
 	case "json", "":
 		fallthrough
 	default:
-		return c.JSON(status.Report)
+		c.Set(fiber.HeaderContentType, "application/json")
+		return c.Send(data)
 	}
 }

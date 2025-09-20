@@ -1,6 +1,8 @@
 package mods
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,17 +13,19 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	internalmods "github.com/iw2rmb/ploy/internal/mods"
+	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 )
 
 func TestGetModReportJSON(t *testing.T) {
 	kv := &kvMem{}
-	h := NewHandler(nil, nil, kv)
+	storage := newFakeStorage()
+	h := NewHandler(nil, storage, kv)
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
 	start := time.Date(2025, 1, 2, 15, 4, 5, 0, time.UTC)
 	end := start.Add(5 * time.Minute)
-	report := &internalmods.ModReport{
+	report := internalmods.ModReport{
 		RepoName:   "https://git.example.com/org/service.git",
 		WorkflowID: "report-json",
 		MRURL:      "https://git.example.com/org/service/merge_requests/7",
@@ -41,15 +45,14 @@ func TestGetModReportJSON(t *testing.T) {
 		}},
 	}
 
-	status := ModStatus{
-		ID:        "mod-report-json",
-		Status:    "completed",
-		StartTime: start,
-		EndTime:   &end,
-		Report:    report,
-	}
+	status := ModStatus{ID: "mod-report-json", Status: "completed", StartTime: start, EndTime: &end}
 	if err := h.storeStatus(status); err != nil {
 		t.Fatalf("store status: %v", err)
+	}
+
+	payload, _ := json.Marshal(report)
+	if err := storage.Put(context.Background(), reportStorageKey("mod-report-json"), bytes.NewReader(payload), internalStorage.WithContentType("application/json")); err != nil {
+		t.Fatalf("put report: %v", err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/mod-report-json/report", nil)
@@ -82,13 +85,14 @@ func TestGetModReportJSON(t *testing.T) {
 
 func TestGetModReportMarkdown(t *testing.T) {
 	kv := &kvMem{}
-	h := NewHandler(nil, nil, kv)
+	storage := newFakeStorage()
+	h := NewHandler(nil, storage, kv)
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
 	start := time.Date(2025, 3, 4, 10, 0, 0, 0, time.UTC)
 	end := start.Add(3 * time.Minute)
-	report := &internalmods.ModReport{
+	report := internalmods.ModReport{
 		RepoName:   "https://git.example.com/org/service.git",
 		WorkflowID: "report-md",
 		StartedAt:  start,
@@ -108,15 +112,14 @@ func TestGetModReportMarkdown(t *testing.T) {
 		}},
 	}
 
-	status := ModStatus{
-		ID:        "mod-report-md",
-		Status:    "completed",
-		StartTime: start,
-		EndTime:   &end,
-		Report:    report,
-	}
+	status := ModStatus{ID: "mod-report-md", Status: "completed", StartTime: start, EndTime: &end}
 	if err := h.storeStatus(status); err != nil {
 		t.Fatalf("store status: %v", err)
+	}
+
+	payload, _ := json.Marshal(report)
+	if err := storage.Put(context.Background(), reportStorageKey("mod-report-md"), bytes.NewReader(payload), internalStorage.WithContentType("application/json")); err != nil {
+		t.Fatalf("put report: %v", err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/v1/mods/mod-report-md/report?format=markdown", nil)
@@ -133,12 +136,12 @@ func TestGetModReportMarkdown(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
-	bytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read body: %v", err)
 	}
 
-	content := string(bytes)
+	content := string(body)
 	if !strings.Contains(content, "```diff") {
 		t.Fatalf("expected diff fence in markdown response, got:\n%s", content)
 	}
@@ -149,7 +152,8 @@ func TestGetModReportMarkdown(t *testing.T) {
 
 func TestGetModReportMissingReportReturnsNotFound(t *testing.T) {
 	kv := &kvMem{}
-	h := NewHandler(nil, nil, kv)
+	storage := newFakeStorage()
+	h := NewHandler(nil, storage, kv)
 	app := fiber.New()
 	h.RegisterRoutes(app)
 
@@ -171,5 +175,32 @@ func TestGetModReportMissingReportReturnsNotFound(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+func TestGetModReportStorageDisabled(t *testing.T) {
+	kv := &kvMem{}
+	h := NewHandler(nil, nil, kv)
+	app := fiber.New()
+	h.RegisterRoutes(app)
+
+	status := ModStatus{ID: "mod-no-storage", Status: "completed", StartTime: time.Now()}
+	if err := h.storeStatus(status); err != nil {
+		t.Fatalf("store status: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/mod-no-storage/report", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	})
+
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", resp.StatusCode)
 	}
 }
