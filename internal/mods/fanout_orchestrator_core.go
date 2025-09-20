@@ -132,6 +132,7 @@ func (o *fanoutOrchestrator) executeBranch(ctx context.Context, branch BranchSpe
 
 	result := BranchResult{
 		ID:        branch.ID,
+		Type:      branch.Type,
 		Status:    "failed", // Default to failed
 		StartedAt: startTime,
 	}

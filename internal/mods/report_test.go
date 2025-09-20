@@ -2,6 +2,8 @@ package mods
 
 import (
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -157,6 +159,68 @@ func TestBuildModReportCapturesFailedStepsInTree(t *testing.T) {
 	}
 	if !strings.Contains(n.Message, "compile error") {
 		t.Fatalf("expected error message to be preserved, got %q", n.Message)
+	}
+}
+
+func TestBuildModReportIncludesLLMBranchDiff(t *testing.T) {
+	start := time.Date(2025, 2, 1, 12, 0, 0, 0, time.UTC)
+	end := start.Add(2 * time.Minute)
+	diffDir := t.TempDir()
+	diffPath := filepath.Join(diffDir, "diff.patch")
+	if err := os.WriteFile(diffPath, []byte("diff --git a/file b/file\n+llm-change\n"), 0644); err != nil {
+		t.Fatalf("write diff: %v", err)
+	}
+
+	result := &ModResult{
+		WorkflowID: "healing-mod",
+		StartedAt:  start,
+		FinishedAt: end,
+		Duration:   end.Sub(start),
+		HealingSummary: &ModHealingSummary{
+			AllResults: []BranchResult{{
+				ID:       "option-1",
+				Type:     string(StepTypeLLMExec),
+				Status:   "completed",
+				JobID:    "llm-exec-option-1",
+				Notes:    "LLM exec job completed successfully, diff.patch at: " + diffPath,
+				Duration: 30 * time.Second,
+				DiffPath: diffPath,
+				DiffKey:  "mods/mod-healing/branches/option-1/steps/llm-exec-option-1/diff.patch",
+			}},
+		},
+	}
+
+	report := BuildModReport(&ModConfig{}, result)
+
+	found := false
+	for _, node := range report.StepTree {
+		if node.ID == "option-1" {
+			found = true
+			if node.Type != string(StepTypeLLMExec) {
+				t.Fatalf("expected llm-exec type, got %s", node.Type)
+			}
+			if len(node.References) == 0 ||
+				node.References[0].Value != "mods/mod-healing/branches/option-1/steps/llm-exec-option-1/diff.patch" {
+				t.Fatalf("expected diff reference with key, got %+v", node.References)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected llm branch node in step tree")
+	}
+
+	var llmStep *ReportStep
+	for _, step := range report.HappyPath {
+		if step.ID == "option-1" {
+			llmStep = &step
+			break
+		}
+	}
+	if llmStep == nil {
+		t.Fatalf("expected llm branch in happy path")
+	}
+	if llmStep.Diff == nil || !strings.Contains(llmStep.Diff.Content, "+llm-change") {
+		t.Fatalf("expected llm diff content, got %+v", llmStep.Diff)
 	}
 }
 

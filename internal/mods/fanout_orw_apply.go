@@ -154,6 +154,11 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	if o.runner != nil && o.runner.GetEventReporter() != nil {
 		_ = o.runner.GetEventReporter().Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: fmt.Sprintf("branch %s completed", branch.ID), Time: time.Now()})
 	}
+	result.JobID = runID
+	result.DiffPath = filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
+	if modID != "" {
+		result.DiffKey = diffKey
+	}
 	orwFinalize(&result, renderedHCLPath, branch.ID)
 	return result
 }
