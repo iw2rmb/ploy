@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,35 +40,85 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	seaweedURL := infra.SeaweedURL
 	runID := ORWRunID(branch.ID)
 	diffKey := computeBranchDiffKey(modID, branch.ID, runID)
-	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
 
 	// Prepare input tar from the repo and upload to SeaweedFS for task-side download (best effort)
 	repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
 	inputTar := filepath.Join(baseDir, "input.tar")
-	if err := createTarFromDir(repoRoot, inputTar); err == nil {
-		if modID != "" && seaweedURL != "" {
-			if err := uploadInputTar(seaweedURL, modID, inputTar); err == nil {
-				inputURL := strings.TrimRight(seaweedURL, "/") + "/artifacts/mods/" + modID + "/input.tar"
-				available := false
-				for i := 0; i < 10; i++ {
-					if headURLFn(inputURL) {
-						available = true
-						break
-					}
-					time.Sleep(200 * time.Millisecond)
-				}
-				if !available {
-					if rep := o.runner.GetEventReporter(); rep != nil {
-						_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar not reachable at %s", inputURL), Time: time.Now()})
-					}
-				}
-			} else if rep := o.runner.GetEventReporter(); rep != nil {
-				_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar upload failed: %v", err), Time: time.Now()})
-			}
+	if err := createTarFromDir(repoRoot, inputTar); err != nil {
+		if rep := o.runner.GetEventReporter(); rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "error", Message: fmt.Sprintf("input.tar creation failed: %v", err), Time: time.Now()})
+		} else {
+			log.Printf("[Mods] ORW input.tar creation failed: %v", err)
 		}
-	} else if rep := o.runner.GetEventReporter(); rep != nil {
-		_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar creation failed: %v", err), Time: time.Now()})
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("failed to create ORW input tar: %v", err)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
 	}
+
+	seaweedCandidates := []string{}
+	if seaweedURL != "" {
+		seaweedCandidates = append(seaweedCandidates, seaweedURL)
+	}
+	if !strings.Contains(seaweedURL, "storage.ploy.local") {
+		seaweedCandidates = append(seaweedCandidates, "http://seaweedfs-filer.storage.ploy.local:8888")
+	}
+	if len(seaweedCandidates) == 0 {
+		seaweedCandidates = append(seaweedCandidates, "http://seaweedfs-filer.storage.ploy.local:8888")
+	}
+
+	var uploadErr error
+	for _, candidate := range seaweedCandidates {
+		if candidate == "" || modID == "" {
+			continue
+		}
+		if rep := o.runner.GetEventReporter(); rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: fmt.Sprintf("uploading input.tar to %s", candidate), Time: time.Now()})
+		}
+		if err := uploadInputTar(candidate, modID, inputTar); err != nil {
+			uploadErr = err
+			if rep := o.runner.GetEventReporter(); rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar upload failed: %v", err), Time: time.Now()})
+			} else {
+				log.Printf("[Mods] ORW input.tar upload failed: %v", err)
+			}
+			continue
+		}
+		inputURL := strings.TrimRight(candidate, "/") + "/artifacts/mods/" + modID + "/input.tar"
+		available := false
+		for i := 0; i < 10; i++ {
+			if headURLFn(inputURL) {
+				available = true
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		if !available {
+			uploadErr = fmt.Errorf("input.tar not reachable at %s", inputURL)
+			if rep := o.runner.GetEventReporter(); rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: uploadErr.Error(), Time: time.Now()})
+			} else {
+				log.Printf("[Mods] %s", uploadErr.Error())
+			}
+			continue
+		}
+		seaweedURL = candidate
+		uploadErr = nil
+		if rep := o.runner.GetEventReporter(); rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: fmt.Sprintf("input.tar available at %s", inputURL), Time: time.Now()})
+		}
+		break
+	}
+	if uploadErr != nil {
+		result.Status = "failed"
+		result.Notes = fmt.Sprintf("failed to prepare ORW input tar: %v", uploadErr)
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		return result
+	}
+
+	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
 
 	// Step 2b: Substitute environment variables in HCL template
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
