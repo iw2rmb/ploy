@@ -145,6 +145,11 @@ func (c *ModConfig) Validate() error {
 		if step.Type == "" {
 			return fmt.Errorf("step %d (%s) must have a type", i, step.ID)
 		}
+		if len(step.Recipes) > 0 {
+			if step.RecipeGroup == "" || step.RecipeArtifact == "" || step.RecipeVersion == "" {
+				return fmt.Errorf("step %s must define recipe_group, recipe_artifact, and recipe_version when recipes are provided", step.ID)
+			}
+		}
 
 		// Validate MCP configuration for steps that have it
 		if len(step.MCPTools) > 0 || len(step.Context) > 0 {
