@@ -27,5 +27,6 @@ func TestRenderAndDeployJob_SkipViaEnv(t *testing.T) {
 	require.Equal(t, 200, resp.StatusCode)
 	var body map[string]string
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.NoError(t, resp.Body.Close())
 	require.Equal(t, "", body["job"])
 }

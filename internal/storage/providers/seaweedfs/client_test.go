@@ -277,11 +277,15 @@ func TestSeaweedFSProvider_AdvancedOperations(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := context.Background()
+	data := "advanced-op-test"
+	require.NoError(t, provider.Put(ctx, "source-key", strings.NewReader(data)))
 
 	// Test Copy method
 	err = provider.Copy(ctx, "source-key", "dest-key")
 	// This will fail until Copy is implemented
 	assert.NoError(t, err)
+	require.NoError(t, provider.Delete(ctx, "source-key"))
+	require.NoError(t, provider.Put(ctx, "move-source", strings.NewReader(data)))
 
 	// Test Move method
 	err = provider.Move(ctx, "move-source", "move-dest")

@@ -2,8 +2,6 @@ package build
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/build/templates"
@@ -228,19 +226,11 @@ func RenderDockerfilePair(facts project.BuildFacts, opts ...DockerfilePairOption
 	return DockerfilePair{}, fmt.Errorf("dockerfile pair unsupported for language=%s", lang)
 }
 
-func writePairForFacts(srcDir string, facts project.BuildFacts, opts ...DockerfilePairOption) error {
-	pair, err := RenderDockerfilePair(facts, opts...)
-	if err != nil {
-		return err
-	}
-	return writeCombinedDockerfile(srcDir, pair)
-}
-
-func writeCombinedDockerfile(srcDir string, pair DockerfilePair) error {
+func combineDockerfilePair(pair DockerfilePair) (string, error) {
 	build := strings.TrimSpace(pair.Build)
 	deploy := strings.TrimSpace(pair.Deploy)
 	if build == "" && deploy == "" {
-		return fmt.Errorf("rendered dockerfile pair empty")
+		return "", fmt.Errorf("rendered dockerfile pair empty")
 	}
 	var out strings.Builder
 	if build != "" {
@@ -251,6 +241,5 @@ func writeCombinedDockerfile(srcDir string, pair DockerfilePair) error {
 		out.WriteString(deploy)
 		out.WriteString("\n")
 	}
-	dockerfilePath := filepath.Join(srcDir, "Dockerfile")
-	return os.WriteFile(dockerfilePath, []byte(out.String()), 0o644)
+	return out.String(), nil
 }

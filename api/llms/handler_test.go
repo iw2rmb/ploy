@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
@@ -17,6 +18,7 @@ import (
 
 // MockStorage for testing API handler
 type MockAPIStorage struct {
+	mu   sync.RWMutex
 	data map[string][]byte
 }
 
@@ -27,7 +29,9 @@ func NewMockAPIStorage() *MockAPIStorage {
 }
 
 func (m *MockAPIStorage) Get(ctx context.Context, key string) (io.ReadCloser, error) {
+	m.mu.RLock()
 	data, exists := m.data[key]
+	m.mu.RUnlock()
 	if !exists {
 		return nil, fmt.Errorf("not found")
 	}
@@ -39,22 +43,29 @@ func (m *MockAPIStorage) Put(ctx context.Context, key string, reader io.Reader, 
 	if err != nil {
 		return err
 	}
+	m.mu.Lock()
 	m.data[key] = data
+	m.mu.Unlock()
 	return nil
 }
 
 func (m *MockAPIStorage) Delete(ctx context.Context, key string) error {
+	m.mu.Lock()
 	delete(m.data, key)
+	m.mu.Unlock()
 	return nil
 }
 
 func (m *MockAPIStorage) Exists(ctx context.Context, key string) (bool, error) {
+	m.mu.RLock()
 	_, exists := m.data[key]
+	m.mu.RUnlock()
 	return exists, nil
 }
 
 func (m *MockAPIStorage) List(ctx context.Context, opts storage.ListOptions) ([]storage.Object, error) {
 	var objects []storage.Object
+	m.mu.RLock()
 	for key := range m.data {
 		if strings.HasPrefix(key, opts.Prefix) {
 			objects = append(objects, storage.Object{
@@ -63,6 +74,7 @@ func (m *MockAPIStorage) List(ctx context.Context, opts storage.ListOptions) ([]
 			})
 		}
 	}
+	m.mu.RUnlock()
 
 	if opts.MaxKeys > 0 && len(objects) > opts.MaxKeys {
 		objects = objects[:opts.MaxKeys]
@@ -72,14 +84,18 @@ func (m *MockAPIStorage) List(ctx context.Context, opts storage.ListOptions) ([]
 }
 
 func (m *MockAPIStorage) DeleteBatch(ctx context.Context, keys []string) error {
+	m.mu.Lock()
 	for _, key := range keys {
 		delete(m.data, key)
 	}
+	m.mu.Unlock()
 	return nil
 }
 
 func (m *MockAPIStorage) Head(ctx context.Context, key string) (*storage.Object, error) {
+	m.mu.RLock()
 	data, exists := m.data[key]
+	m.mu.RUnlock()
 	if !exists {
 		return nil, fmt.Errorf("not found")
 	}
@@ -94,12 +110,17 @@ func (m *MockAPIStorage) UpdateMetadata(ctx context.Context, key string, metadat
 }
 
 func (m *MockAPIStorage) Copy(ctx context.Context, src, dst string) error {
+	m.mu.RLock()
 	data, exists := m.data[src]
+	m.mu.RUnlock()
 	if !exists {
 		return fmt.Errorf("source not found")
 	}
-	m.data[dst] = make([]byte, len(data))
-	copy(m.data[dst], data)
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	m.mu.Lock()
+	m.data[dst] = copyData
+	m.mu.Unlock()
 	return nil
 }
 

@@ -19,7 +19,7 @@ import (
 // buildLaneD builds the application using Docker directly on the controller host.
 // It returns the fully qualified image reference and a synthetic builder identifier
 // used for log retrieval.
-func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, appEnvVars map[string]string) (dockerImage, builderID string, err error) {
+func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, dockerfileInline string, appEnvVars map[string]string) (dockerImage, builderID string, err error) {
 	_ = facts
 	registry := config.GetRegistryConfigForAppType(buildCtx.AppType)
 	dockerImage = registry.GetDockerImageTag(appName, sha, buildCtx.AppType)
@@ -41,14 +41,20 @@ func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	defer cancel()
 
 	// docker build
-	buildArgs := []string{"build", "--network", "host", "-t", dockerImage, "."}
-	if err := runDockerCommand(ctx, logWriter, srcDir, buildArgs, appEnvVars); err != nil {
+	buildArgs := []string{"build", "--network", "host", "-t", dockerImage}
+	var stdin io.Reader
+	if strings.TrimSpace(dockerfileInline) != "" {
+		buildArgs = append(buildArgs, "-f", "-")
+		stdin = strings.NewReader(dockerfileInline)
+	}
+	buildArgs = append(buildArgs, ".")
+	if err := runDockerCommand(ctx, logWriter, srcDir, buildArgs, appEnvVars, stdin); err != nil {
 		_ = persistBuildLog(context.Context(c.Context()), deps, logBuffer.Bytes(), logsKey)
 		return "", builderID, fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("docker build failed: %v", err))
 	}
 
 	// docker push
-	if err := runDockerCommand(ctx, logWriter, srcDir, []string{"push", dockerImage}, appEnvVars); err != nil {
+	if err := runDockerCommand(ctx, logWriter, srcDir, []string{"push", dockerImage}, appEnvVars, nil); err != nil {
 		_ = persistBuildLog(context.Context(c.Context()), deps, logBuffer.Bytes(), logsKey)
 		return "", builderID, fiber.NewError(fiber.StatusBadGateway, fmt.Sprintf("docker push failed: %v", err))
 	}
@@ -59,11 +65,14 @@ func buildLaneD(c *fiber.Ctx, deps *BuildDependencies, buildCtx *BuildContext, a
 	return dockerImage, builderID, nil
 }
 
-func runDockerCommand(ctx context.Context, writer io.Writer, dir string, args []string, env map[string]string) error {
+func runDockerCommand(ctx context.Context, writer io.Writer, dir string, args []string, env map[string]string, stdin io.Reader) error {
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = dir
 	cmd.Stdout = writer
 	cmd.Stderr = writer
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
 	envList := os.Environ()
 	for k, v := range env {
 		if strings.TrimSpace(k) == "" {

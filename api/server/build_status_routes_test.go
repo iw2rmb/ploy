@@ -35,6 +35,7 @@ func TestHandleBuildStatus_ExistingFile_ReturnsJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -55,6 +56,7 @@ func TestHandleBuildStatus_NotFound_Returns404(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 404 {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}

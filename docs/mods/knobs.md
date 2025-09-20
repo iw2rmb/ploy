@@ -53,9 +53,9 @@ Build gate teardown (ephemeral lane‑c)
 
 Where To Set
 
-- Persistent service env (VPS): /home/ploy/api.env
-    - Managed by Ansible: iac/dev/playbooks/api-env.yml (prefers workstation GITLAB_TOKEN; writes NOMAD_DC, PLOY_SEAWEEDFS_URL, MODS_ORW_APPLY_IMAGE, MODS_PLANNER_IMAGE, MODS_REDUCER_IMAGE, MODS_LLM_EXEC_IMAGE, MODS_REGISTRY, GIT_AUTHOR/GIT_COMMITTER with sane defaults).
-    - `MODS_SKIP_DEPLOY_LANES` (comma-separated lane codes) optionally skips runtime deployment for specific lanes (leave unset to exercise full deploy). Override with `C` only when remote lane-C deploy is unavailable and compile-only validation is desired.
+- Inventory defaults: `iac/dev/vars/main.yml`
+    - Provide `ploy.gitlab_*` identities, `ploy.mods.*` image overrides, and optional `ploy.nomad_dc` so Nomad jobs receive consistent configuration.
+    - Override via host/group vars or `--extra-vars` when running `iac/dev/playbooks/api.yml`. `MODS_SKIP_DEPLOY_LANES` (comma-separated lane codes) optionally skips runtime deployment for specific lanes (leave unset to exercise full deploy). Override with `C` only when remote lane-C deploy is unavailable and compile-only validation is desired.
 - Job template (orw-apply): platform/nomad/mods/orw_apply.hcl
     - Resources, env block (ORW_IMAGE, PLOY_API_URL, SEAWEEDFS_URL, INPUT_URL, DIFF_KEY, controller/exec IDs).
 - Controller substitution: internal/mods/execution.go

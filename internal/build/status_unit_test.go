@@ -18,4 +18,5 @@ func TestStatus_InvalidAppName(t *testing.T) {
 	resp, err := app.Test(req, 5000)
 	require.NoError(t, err)
 	assert.Equal(t, 400, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 }

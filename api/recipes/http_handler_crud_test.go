@@ -20,6 +20,7 @@ func TestHTTPHandler_GetRecipe_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
@@ -33,6 +34,7 @@ func TestHTTPHandler_GetRecipe_RegistryUnavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp.StatusCode)
 	}
@@ -64,6 +66,7 @@ func TestHTTPHandler_UpdateRecipe_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -78,6 +81,7 @@ func TestHTTPHandler_UpdateRecipe_InvalidJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp.StatusCode)
 	}
@@ -109,6 +113,7 @@ func TestHTTPHandler_DeleteRecipe_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}

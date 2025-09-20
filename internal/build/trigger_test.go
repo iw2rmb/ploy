@@ -237,7 +237,7 @@ func TestLaneDBuildFailureSurfacesBuilderMetadata(t *testing.T) {
 	buildCtx := &BuildContext{APIContext: "apps", AppType: config.UserApp}
 
 	builderID := "test-app-d-build-testsha-123"
-	restore := SetLaneDBuildFunc(func(c *fiber.Ctx, deps *BuildDependencies, ctx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, appEnvVars map[string]string) (string, string, error) {
+	restore := SetLaneDBuildFunc(func(c *fiber.Ctx, deps *BuildDependencies, ctx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, dockerfileInline string, appEnvVars map[string]string) (string, string, error) {
 		c.Set("X-Deployment-ID", builderID)
 		return "", builderID, fiber.NewError(fiber.StatusBadGateway, "docker build failed: exit 1")
 	})
@@ -274,6 +274,48 @@ func TestLaneDBuildFailureSurfacesBuilderMetadata(t *testing.T) {
 	assert.Equal(t, builderID, builderObj["job"])
 	assert.Equal(t, "build-logs/"+builderID+".log", builderObj["logs_key"])
 	assert.Contains(t, builderObj["logs_url"], builderID+".log")
+}
+
+func TestTriggerBuildAutogenDockerfileProvidedInline(t *testing.T) {
+	envStore := mocks.NewEnvStore()
+	envStore.On("GetAll", "node-app").Return(envstore.AppEnvVars{}, nil)
+
+	deps := &BuildDependencies{EnvStore: envStore}
+	buildCtx := &BuildContext{APIContext: "apps", AppType: config.UserApp}
+
+	var capturedDockerfile string
+	var capturedSrcDir string
+	restore := SetLaneDBuildFunc(func(c *fiber.Ctx, deps *BuildDependencies, ctx *BuildContext, appName, srcDir, sha string, facts project.BuildFacts, dockerfileInline string, appEnvVars map[string]string) (string, string, error) {
+		capturedDockerfile = dockerfileInline
+		capturedSrcDir = srcDir
+		_, err := os.Stat(filepath.Join(srcDir, "Dockerfile"))
+		require.ErrorIs(t, err, os.ErrNotExist)
+		require.NotEmpty(t, dockerfileInline)
+		c.Set("X-Deployment-ID", "builder-123")
+		return "registry.example/node-app:dev", "builder-123", nil
+	})
+	defer restore()
+
+	app := fiber.New()
+	app.Post("/v1/apps/:app/builds", func(c *fiber.Ctx) error {
+		return triggerBuildWithDependencies(c, deps, buildCtx)
+	})
+
+	body := createTestTarball(t, map[string]string{
+		"package.json": `{"name":"demo"}`,
+		"index.js":     "console.log('ok')",
+	})
+	req := httptest.NewRequest("POST", "/v1/apps/node-app/builds?lane=D&sha=dev", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-tar")
+
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	assert.NotEqual(t, fiber.StatusBadRequest, resp.StatusCode)
+
+	require.NotEmpty(t, capturedDockerfile)
+	require.Contains(t, capturedDockerfile, "FROM node:20")
+	require.NotEmpty(t, capturedSrcDir)
 }
 
 // TestUnifiedStorageOperations tests the specific method calls that should change
