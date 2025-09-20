@@ -1,40 +1,52 @@
 # Platform Infrastructure
 
-Core platform configurations and job definitions for deployment orchestration.
+Core platform definitions that back the Ploy deployment lanes, load balancer, and policy enforcement.
 
-## Directory Structure
+## Layout
 
 ```
 platform/
-├── nomad/                   # Nomad job definitions for all deployment lanes
-│   ├── lane-*.hcl           # Lane-specific deployment jobs (A-G)
-│   ├── debug-*.hcl          # Debug and testing job definitions
-│   ├── analysis-*.hcl       # Static analysis job templates
-│   ├── arf-*.hcl.j2         # ARF transformation job templates
-├── traefik/                 # Traefik load balancer configuration
-│   ├── api-load-balancer.yml # API gateway load balancing rules
-│   └── middlewares.yml      # Traefik middleware definitions
-├── ingress/                 # Ingress controller configuration
-│   ├── haproxy.cfg          # HAProxy ingress configuration
-│   └── certbot-hook.sh      # SSL certificate automation hooks
-└── opa/                     # Open Policy Agent security policies
-    └── policy.rego          # Security policy definitions
+├── nomad/                     # Lane and platform Nomad jobs shipped with the CLI
+│   ├── analysis-pylint-batch.hcl
+│   ├── debug-oci.hcl
+│   ├── docker-registry.hcl
+│   ├── lane-d-jail.hcl        # Active lane template (Docker runtime)
+│   ├── llm-ollama-batch.hcl
+│   ├── llm-openai-batch.hcl
+│   ├── traefik.hcl
+│   ├── embed.go               # go:embed helper that packs the .hcl files above
+│   ├── README.md
+│   └── mods/                  # Mods (planner / reducer / apply / exec) Nomad jobs
+│       ├── llm_exec.hcl
+│       ├── orw_apply.hcl
+│       ├── planner.hcl
+│       ├── reducer.hcl
+│       ├── schemas/           # JSON schemas shipped to the controller
+│       │   └── *.schema.json
+│       └── templates_embed.go
+├── traefik/                   # Traefik load balancer configuration
+│   ├── api-load-balancer.yml
+│   └── middlewares.yml
+├── ingress/                   # Lightweight ingress helpers
+│   └── certbot-hook.sh
+└── opa/                       # Open Policy Agent policies
+    └── policy.rego
 ```
 
-## Deployment Lanes
+## Active Deployment Lane
 
-> **Status:** Only the Lane D Docker templates are active after the 2025-09 consolidation. The lane breakdown below is retained for historical reference and future expansion.
+- Only **Lane D** is emitted by the CLI after the consolidation to Docker-based workloads. The template lives at `platform/nomad/lane-d-jail.hcl` (name retained for history) and runs applications with the Nomad Docker driver.
+- Legacy lane templates (A, B, C, E, F, G) were removed during the 2025 clean-up and no longer ship with the platform bundle.
+- The debug (`debug-oci.hcl`) and registry (`docker-registry.hcl`) jobs serve the same Docker runtime and are used for ad-hoc diagnostics and internal registry management.
 
-- **Lane A/B**: Unikraft unikernels (`lane-a-unikraft.hcl`, `lane-b-unikraft-posix.hcl`)
-- **Lane C**: OSv/Hermit VMs for JVM (`java-*.hcl`)
-- **Lane D**: FreeBSD jails (`jail.hcl`, `debug-jail.hcl`)
-- **Lane E**: OCI containers (`oci.hcl`, `docker-*.hcl`)
-- **Lane F**: Full VMs (`vm-*.hcl`)
+## Nomad Templates
 
-## Configuration Types
+- Every `.hcl` file in `platform/nomad/` is embedded directly into the CLI via `embed.go` so that jobs can be rendered without touching the filesystem at runtime.
+- The `mods/` subdirectory groups batch jobs that orchestrate planner/reducer/LLM pipelines. JSON schemas inside `mods/schemas/` are bundled to validate controller payloads before submission.
+- Supporting batch jobs (`analysis-pylint-batch.hcl`, `llm-*.hcl`) provide shared services for static analysis and language model workflows.
 
-- **Job Definitions**: `.hcl` files for direct Nomad deployment
-- **Templates**: `.hcl.j2` files for parameterized job generation
-- **Load Balancing**: Traefik YAML configurations
-- **Security**: OPA Rego policy files
-- **Ingress**: HAProxy and SSL automation
+## Supporting Configuration
+
+- `platform/traefik/` supplies the production Traefik static configuration and middleware definitions used by the Docker lane.
+- `platform/ingress/certbot-hook.sh` is a helper hook for certificate issuance and renewals when running Certbot against the platform entrypoint.
+- `platform/opa/policy.rego` houses the platform-wide OPA policies that enforce deployment guardrails.

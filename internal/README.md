@@ -8,10 +8,10 @@ Modules shared by API and CLI. This folder contains the core building blocks for
 internal/
 ├── arf/            # ARF migration target: engine/models/recipes (consolidating from api/arf)
 ├── bluegreen/      # Blue‑green deployment helpers
-├── build/          # Build service (lanes A–G, artifacts, logs, SBOM, signing, sandbox, Dockerfile templates)
+├── build/          # Build service (see internal/build/README.md)
 ├── builders/       # Builder facades and debug utilities
 ├── cleanup/        # TTL cleanup service (config, handler, TTL workers)
-├── cli/            # CLI modules (recipes, platform, deploy, ARF, SBOM, common utils)
+├── cli/            # CLI modules (see internal/cli/README.md)
 ├── config/         # Config loader/validator, registry/factory, Consul source, cache
 ├── debug/          # Debug HTTP handlers
 ├── detect/         # Project/language detection (java, node, scala, dotnet, rust, project facts)
@@ -30,9 +30,9 @@ internal/
 ├── preview/        # Preview router (SHA‑based preview host mapping)
 ├── routing/        # Routing metadata (tags, KV helpers)
 ├── security/       # Security scanners and helpers
-├── storage/        # Object storage abstraction (SeaweedFS provider, middleware: retry/metrics/cache, factory)
+├── storage/        # Object storage abstraction (see internal/storage/README.md)
 ├── supply/         # Supply‑chain integration facade
-├── testing/        # Test builders, fixtures, mocks, helpers, integration client
+├── testing/        # Test builders, fixtures, mocks, helpers (see internal/testing/README.md)
 ├── utils/          # Shared helpers (files/strings/http), image size utilities
 ├── validation/     # Input validation (env vars, resources, app name)
 └── version/        # Version constants
@@ -40,13 +40,13 @@ internal/
 
 ## Highlights
 
-- Build service: unified sandboxed build execution; lane A–G flows; SBOM/signing; Dockerfile generation under `internal/build/templates/`.
+- Build service: see [internal/build/README.md](build/README.md) for triggers, builder orchestration, and supply-chain helpers.
 - Orchestration: renders Nomad HCL specs, submits jobs, and monitors health with retries and timeouts. Templates embedded via `templates_embed.go`.
 - Storage: robust SeaweedFS client with middleware for retries, metrics, and caching; integrity verification helpers.
 - Mods: end‑to‑end “healing” orchestration including planning, execution, diffing, KB learning, MR integration, and job submission/logging.
-- CLI: cohesive command implementations for recipes, platform deploys, model registry, and ARF workflows.
+- CLI: cohesive `ploy`/`ployman` command surface—see [internal/cli/README.md](cli/README.md).
+- Testing: shared mocks, builders, and integration harness—see [internal/testing/README.md](testing/README.md).
 
 ## Notes
 
-- ARF is being migrated into `internal/arf` from `api/arf` incrementally; see `internal/arf/README.md` for status.
 - When adding new internal modules, prefer small, focused packages and wire them through `internal/config` and `internal/orchestration` seams when applicable.
