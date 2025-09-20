@@ -66,10 +66,7 @@ func TestModRunner_Run(t *testing.T) {
 					{
 						Type:               "orw-apply",
 						ID:                 "java-migration",
-						Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-						RecipeGroup:        "org.openrewrite.recipe",
-						RecipeArtifact:     "rewrite-migrate-java",
-						RecipeVersion:      "3.17.0",
+						Recipes:            []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")},
 						MavenPluginVersion: "6.18.0",
 					},
 				},
@@ -102,7 +99,7 @@ func TestModRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -124,7 +121,7 @@ func TestModRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -150,7 +147,7 @@ func TestModRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -177,7 +174,7 @@ func TestModRunner_Run(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -201,7 +198,7 @@ func TestModRunner_Run(t *testing.T) {
 				BaseRef:      "refs/heads/main",
 				BuildTimeout: "5m",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {
@@ -220,7 +217,7 @@ func TestModRunner_Run(t *testing.T) {
 				BaseRef:    "refs/heads/main",
 				Lane:       "D",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"},
 				},
 			},
 			setupMocks: func(git *MockGitOperations, recipe *MockRecipeExecutor, build *MockBuildChecker) {

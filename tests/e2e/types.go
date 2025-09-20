@@ -20,15 +20,18 @@ type ModWorkflow struct {
 	MaxDuration     time.Duration
 }
 
+type WorkflowRecipe struct {
+	Name     string
+	Group    string
+	Artifact string
+	Version  string
+}
+
 type WorkflowStep struct {
-	Type    string
-	ID      string
-	Engine  string
-	Recipes []string
-	// OpenRewrite explicit coordinates (for orw-apply)
-	RecipeGroup        string
-	RecipeArtifact     string
-	RecipeVersion      string
+	Type               string
+	ID                 string
+	Engine             string
+	Recipes            []WorkflowRecipe
 	MavenPluginVersion string
 }
 
@@ -89,37 +92,23 @@ steps:
 `, w.ID, w.Repository, w.TargetBranch, w.TargetBranch)
 
 	for _, step := range w.Steps {
+		yaml += fmt.Sprintf("  - type: %s\n    id: %s\n", step.Type, step.ID)
 		if step.Type == "orw-apply" {
-			yaml += fmt.Sprintf(`  - type: orw-apply
-    id: %s
-    recipes:
-`, step.ID)
+			yaml += "    recipes:\n"
 			for _, recipe := range step.Recipes {
-				yaml += fmt.Sprintf(`      - %s
-`, recipe)
-			}
-			if step.RecipeGroup != "" {
-				yaml += fmt.Sprintf("    recipe_group: %s\n", step.RecipeGroup)
-			}
-			if step.RecipeArtifact != "" {
-				yaml += fmt.Sprintf("    recipe_artifact: %s\n", step.RecipeArtifact)
-			}
-			if step.RecipeVersion != "" {
-				yaml += fmt.Sprintf("    recipe_version: %s\n", step.RecipeVersion)
+				yaml += fmt.Sprintf("      - name: %s\n        coords:\n          group: %s\n          artifact: %s\n          version: %s\n", recipe.Name, recipe.Group, recipe.Artifact, recipe.Version)
 			}
 			if step.MavenPluginVersion != "" {
 				yaml += fmt.Sprintf("    maven_plugin_version: %s\n", step.MavenPluginVersion)
 			}
 		} else {
-			// Legacy recipe step (engine-based) retained for backwards compatibility
-			yaml += fmt.Sprintf(`  - type: %s
-    id: %s
-    engine: %s
-    recipes:
-`, step.Type, step.ID, step.Engine)
+			yaml += fmt.Sprintf("    engine: %s\n    recipes:\n", step.Engine)
 			for _, recipe := range step.Recipes {
-				yaml += fmt.Sprintf(`      - %s
-`, recipe)
+				name := recipe.Name
+				if name == "" {
+					continue
+				}
+				yaml += fmt.Sprintf("      - %s\n", name)
 			}
 		}
 	}

@@ -256,11 +256,11 @@ else
     
     # Download recipe and its dependencies
     mvn dependency:get \
-        -DgroupId="${RECIPE_GROUP}" \
-        -DartifactId="${RECIPE_ARTIFACT}" \
-        -Dversion="${RECIPE_VERSION}" \
-        -Dtransitive=true \
-        -DremoteRepositories=https://repo.maven.apache.org/maven2 \
+        "-DgroupId=${RECIPE_GROUP}" \
+        "-DartifactId=${RECIPE_ARTIFACT}" \
+        "-Dversion=${RECIPE_VERSION}" \
+        "-Dtransitive=true" \
+        "-DremoteRepositories=https://repo.maven.apache.org/maven2" \
         || {
             echo "[Error] Failed to download recipe from Maven Central"
             exit 1

@@ -47,7 +47,7 @@ func TestModRunner_ORWApplyNoBuildFileError(t *testing.T) {
 		ID:         "java11to17-test",
 		TargetRepo: "https://example.com/org/repo.git",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0"}},
+		Steps:      []ModStep{{Type: "orw-apply", ID: "java11to17-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}}},
 	}
 
 	runner, err := NewModRunner(config, workspaceDir)
@@ -138,7 +138,7 @@ func TestModRunner_PrepareRepo(t *testing.T) {
 				ID:         "test",
 				TargetRepo: "https://github.com/org/repo",
 				BaseRef:    "main",
-				Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+				Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 			}
 
 			runner, err := NewModRunner(config, t.TempDir())
@@ -170,7 +170,7 @@ func TestModRunner_ApplyDiffAndBuild(t *testing.T) {
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 	}
 
 	runner, err := NewModRunner(config, t.TempDir())
@@ -196,7 +196,7 @@ func TestModRunner_RenderAssets(t *testing.T) {
 		ID:         "test-workflow",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 	}
 
 	runner, err := NewModRunner(config, t.TempDir())
@@ -235,7 +235,7 @@ func TestModRunner_GenerateMRDescription(t *testing.T) {
 		ID:         "test-workflow",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 	}
 
 	runner, err := NewModRunner(config, t.TempDir())
@@ -273,7 +273,7 @@ func TestModRunner_CleanupWorkspace(t *testing.T) {
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 	}
 
 	runner, err := NewModRunner(config, workspaceDir)

@@ -51,7 +51,7 @@ func (s *ModsIntegrationSuite) SetupSuite() {
 				Type:    "recipe",
 				ID:      "java-migration",
 				Engine:  "openrewrite",
-				Recipes: []string{"org.openrewrite.java.migrate.Java11toJava17"},
+				Recipes: []mods.RecipeEntry{mods.RecipeEntry{Name: "org.openrewrite.java.migrate.Java11toJava17"}},
 			},
 		},
 		SelfHeal: &mods.SelfHealConfig{

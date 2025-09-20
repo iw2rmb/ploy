@@ -27,7 +27,7 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 		BaseRef:      "main",
 		Lane:         "C",
 		BuildTimeout: "10m",
-		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"}},
+		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}},
 		SelfHeal:     GetDefaultSelfHealConfig(),
 	}
 	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
@@ -114,7 +114,7 @@ func TestMods_WorkflowWithBuildFailure(t *testing.T) {
 		BaseRef:      "main",
 		Lane:         "C",
 		BuildTimeout: "10m",
-		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}, RecipeGroup: "org.openrewrite.recipe", RecipeArtifact: "rewrite-migrate-java", RecipeVersion: "3.17.0", MavenPluginVersion: "6.18.0"}},
+		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}},
 		SelfHeal:     GetDefaultSelfHealConfig(),
 	}
 	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)

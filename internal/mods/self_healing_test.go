@@ -349,10 +349,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 			{
 				Type:               "orw-apply",
 				ID:                 "java-migration",
-				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Recipes:            []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")},
 				MavenPluginVersion: "6.18.0",
 			},
 		},
@@ -440,7 +437,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 			Enabled:    true,
 		},
 		Steps: []ModStep{
-			{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
+			{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}},
 		},
 	}
 

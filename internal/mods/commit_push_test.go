@@ -44,7 +44,7 @@ func (e *errGitOps) CommitChanges(ctx context.Context, repoPath, message string)
 }
 
 func TestRunCommitStep_DoCommitError(t *testing.T) {
-	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []RecipeEntry{{Name: "r", Coords: RecipeCoordinates{Group: "g", Artifact: "a", Version: "v"}}}}}}
 	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errGitOps{})
 	oldHas := hasRepoChangesFn
@@ -68,7 +68,7 @@ func (e *errPushGitOps) PushBranchAsync(ctx context.Context, repoPath, remoteURL
 }
 
 func TestRunPushStep_Error(t *testing.T) {
-	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []RecipeEntry{{Name: "r", Coords: RecipeCoordinates{Group: "g", Artifact: "a", Version: "v"}}}}}}
 	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errPushGitOps{})
 	if err := r.runPushStep(context.Background(), "/repo", "branch"); err == nil {
@@ -77,7 +77,7 @@ func TestRunPushStep_Error(t *testing.T) {
 }
 
 func TestRunPushWithEvents_Error(t *testing.T) {
-	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []string{"r"}, RecipeGroup: "g", RecipeArtifact: "a", RecipeVersion: "v"}}}
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{Type: "orw-apply", ID: "s", Recipes: []RecipeEntry{{Name: "r", Coords: RecipeCoordinates{Group: "g", Artifact: "a", Version: "v"}}}}}}
 	r, _ := NewModRunner(cfg, t.TempDir())
 	r.SetGitOperations(&errPushGitOps{})
 	sr, err := runPushWithEvents(r, context.Background(), "/repo", "branch")

@@ -12,7 +12,7 @@ func TestModRunner_Setters(t *testing.T) {
 		ID:         "test",
 		TargetRepo: "https://github.com/org/repo",
 		BaseRef:    "main",
-		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: []string{"com.acme.Recipe"}}},
+		Steps:      []ModStep{{Type: "recipe", ID: "test", Engine: "openrewrite", Recipes: recipeNames("com.acme.Recipe")}},
 	}
 
 	runner, err := NewModRunner(config, t.TempDir())

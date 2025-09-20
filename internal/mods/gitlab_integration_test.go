@@ -78,10 +78,7 @@ func TestModRunner_GitLabIntegration(t *testing.T) {
 			{
 				ID:                 "java-migration",
 				Type:               "orw-apply",
-				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Recipes:            []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")},
 				MavenPluginVersion: "6.18.0",
 			},
 		},
@@ -234,10 +231,7 @@ func TestModRunner_GitLabIntegration_ConfigurationInvalid(t *testing.T) {
 			{
 				ID:                 "java-migration",
 				Type:               "orw-apply",
-				Recipes:            []string{"org.openrewrite.java.migrate.UpgradeToJava17"},
-				RecipeGroup:        "org.openrewrite.recipe",
-				RecipeArtifact:     "rewrite-migrate-java",
-				RecipeVersion:      "3.17.0",
+				Recipes:            []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")},
 				MavenPluginVersion: "6.18.0",
 			},
 		},

@@ -50,6 +50,9 @@
 - Tests: Updated `tests/e2e/mods/orw-apply-llm-plan-seq` to target Lane D (Docker), document streaming Mods log capture, and fail fast when status polling returns repeated `not_found` responses.
 - Mods tests: Integration smoke workflow now uses local bare Git repositories and stubs for Nomad/SeaweedFS/GitLab helpers, eliminating external network calls so unit test runs stay fast and deterministic.
 - Mods: Branch chain replay now explicitly selects and applies only the HEAD step when multiple steps exist, and logs "applying HEAD step <SID>" for observability. Prevents context conflicts and ensures reducer/apply path replays the intended change.
+- Mods schema: `orw-apply` steps now require each recipe to declare nested `coords` (group/artifact/version) so OpenRewrite jobs receive explicit Maven coordinates per option; YAML generator/tests updated accordingly.
+- Mods build gate: controller `SharedPush` failure responses now always include `builder.job/logs_key/logs_url` metadata so healing branches can fetch build logs without relying on inferred IDs.
+- OpenRewrite runner: Maven `dependency:get` invocation now quotes `-D` arguments to support coordinates containing shell-special characters and avoid losing recipe env substitution.
 - internal/mods: Extracted DI/accessors and tiny helpers from `runner.go` into `runner_di.go` and `runner_helpers.go` to reduce LOC and improve maintainability. No behavior changes.
  - internal/mods: Refactor large runner and tests into cohesive modules without behavior change. Split runner into assets_*.go, repo_ops_adapter.go, apply_and_build_adapter.go, events_emit.go, mr_auth.go, vuln_gate.go, healing_orchestration_adapter.go, cleanup.go, and runner_results.go. Split monolithic job_submission_test.go into focused test files (planner, reducer, fanout, branches, integration, timeouts). This reduces file size and improves maintainability.
 - Build: Split `internal/build/trigger_core.go` into focused helpers:

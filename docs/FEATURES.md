@@ -856,6 +856,7 @@ Comprehensive transformation of Security Engine into a universal code transforma
 - Fanout healing with first-success-wins; production Nomad submission and MR integration.
 - Knowledge Base learning: signatures, deduplication, compaction, suggestions.
 - Build/SBOM/Vuln gates; artifact handling; event streaming and logs.
+- OpenRewrite steps require per-recipe `coords` (group/artifact/version) in Mods YAML so every branch submits explicit Maven coordinates to OpenRewrite jobs.
 - See `internal/mods/README.md` for detailed features and per-file map.
 
 ⸻

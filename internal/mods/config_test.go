@@ -47,10 +47,10 @@ steps:
 						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
 						ID:     "openrewrite-updates",
 						Engine: "openrewrite",
-						Recipes: []string{
+						Recipes: recipeNames(
 							"com.acme.FixNulls",
 							"com.acme.UpdateApi",
-						},
+						),
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
@@ -79,12 +79,10 @@ steps:
 				BuildTimeout: "",
 				Steps: []ModStep{
 					{
-						Type:   "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
-						ID:     "simple-recipe",
-						Engine: "openrewrite",
-						Recipes: []string{
-							"com.acme.SimpleRecipe",
-						},
+						Type:    "recipe", // legacy YAML uses recipe; runner maps orw-apply in execution paths
+						ID:      "simple-recipe",
+						Engine:  "openrewrite",
+						Recipes: recipeNames("com.acme.SimpleRecipe"),
 					},
 				},
 				SelfHeal: GetDefaultSelfHealConfig(),
@@ -203,7 +201,7 @@ func TestConfigValidation(t *testing.T) {
 						Type:    "orw-apply",
 						ID:      "test-recipe",
 						Engine:  "openrewrite",
-						Recipes: []string{"com.acme.Recipe"},
+						Recipes: recipeNames("com.acme.Recipe"),
 					},
 				},
 			},
@@ -216,7 +214,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "", "", "")}},
 				},
 			},
 			expectError: true,
@@ -229,7 +227,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "",
 				BaseRef:    "refs/heads/main",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "", "", "")}},
 				},
 			},
 			expectError: true,
@@ -242,7 +240,7 @@ func TestConfigValidation(t *testing.T) {
 				TargetRepo: "https://github.com/org/project",
 				BaseRef:    "",
 				Steps: []ModStep{
-					{Type: "orw-apply", ID: "java-migration", Recipes: []string{"org.openrewrite.java.migrate.UpgradeToJava17"}},
+					{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "", "", "")}},
 				},
 			},
 			expectError: true,
@@ -425,10 +423,11 @@ steps:
   - type: orw-apply
     id: java11to17
     recipes:
-      - org.openrewrite.java.migrate.UpgradeToJava17
-    recipe_group: org.openrewrite.recipe
-    recipe_artifact: rewrite-migrate-java
-    recipe_version: 3.17.0
+      - name: org.openrewrite.java.migrate.UpgradeToJava17
+        coords:
+          group: org.openrewrite.recipe
+          artifact: rewrite-migrate-java
+          version: 3.17.0
     maven_plugin_version: 6.18.0
     discover_recipe: false
 `
@@ -441,9 +440,11 @@ steps:
 	s := cfg.Steps[0]
 	assert.Equal(t, "orw-apply", s.Type)
 	assert.Equal(t, "java11to17", s.ID)
-	assert.Equal(t, "org.openrewrite.recipe", s.RecipeGroup)
-	assert.Equal(t, "rewrite-migrate-java", s.RecipeArtifact)
-	assert.Equal(t, "3.17.0", s.RecipeVersion)
+	require.NotEmpty(t, s.Recipes)
+	assert.Equal(t, "org.openrewrite.java.migrate.UpgradeToJava17", s.Recipes[0].Name)
+	assert.Equal(t, "org.openrewrite.recipe", s.Recipes[0].Coords.Group)
+	assert.Equal(t, "rewrite-migrate-java", s.Recipes[0].Coords.Artifact)
+	assert.Equal(t, "3.17.0", s.Recipes[0].Coords.Version)
 	assert.Equal(t, "6.18.0", s.MavenPluginVersion)
 	if assert.NotNil(t, s.DiscoverRecipe) {
 		assert.Equal(t, false, *s.DiscoverRecipe)
@@ -459,12 +460,12 @@ steps:
   - type: orw-apply
     id: java11to17
     recipes:
-      - org.openrewrite.java.migrate.UpgradeToJava17
+      - name: org.openrewrite.java.migrate.UpgradeToJava17
 `
 	tmp := filepath.Join(t.TempDir(), "mod_missing.yaml")
 	require.NoError(t, os.WriteFile(tmp, []byte(yamlContent), 0644))
 
 	_, err := LoadConfig(tmp)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "recipe_group")
+	assert.Contains(t, err.Error(), "coords.group")
 }
