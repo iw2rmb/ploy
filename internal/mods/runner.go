@@ -387,7 +387,7 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		r.emit(ctx, "healing", "healing", "info", fmt.Sprintf("attempt %d/%d", attempt, maxRetries))
-		healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message)
+		healingSummary, healingErr := r.attemptHealing(ctx, repoPath, message, buildResult)
 		result.HealingSummary = healingSummary
 		if healingErr != nil {
 			lastErr = healingErr

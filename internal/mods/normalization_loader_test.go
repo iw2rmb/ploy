@@ -40,7 +40,7 @@ func TestPlannerHumanAliasIsNormalizedBeforeFanout(t *testing.T) {
 	r.SetJobHelper(fh)
 	r.SetHealingOrchestrator(ch)
 
-	_, err = r.attemptHealing(context.Background(), "/dev/null", "build failed")
+	_, err = r.attemptHealing(context.Background(), "/dev/null", "build failed", nil)
 	if err != nil {
 		t.Fatalf("attemptHealing err: %v", err)
 	}
