@@ -23,6 +23,6 @@ POST /v1/arf/recipes/refresh
 The refresh job fetches the configured packs, parses `META-INF/rewrite/*.yml` descriptors, and persists an updated snapshot. Observe the job status via `tests/e2e` logs or controller metrics when debugging catalog drift.
 
 ## Additional Resources
-- `roadmap/recipes.md` — implementation milestones and remaining enhancements
-- `CHANGELOG.md` — search for "recipes" entries to see historic improvements
-- `tests/e2e/mods/orw-apply` — integration scenarios exercising OpenRewrite recipes within Mods workflows
+- [`roadmap/recipes.md`](../roadmap/recipes.md) — implementation milestones and remaining enhancements
+- [`CHANGELOG.md`](../CHANGELOG.md) — search for "recipes" entries to see historic improvements
+- [`tests/e2e/mods/orw-apply`](../tests/e2e/mods/orw-apply) — integration scenarios exercising OpenRewrite recipes within Mods workflows

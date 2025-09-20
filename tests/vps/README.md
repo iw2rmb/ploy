@@ -42,14 +42,13 @@ Core validation workflow: VPS service health → distributed service topology �
 - **✅ System Services**: Service management and health monitoring with systemctl integration
 
 ### Provides (✅ MVP Complete)
-- **✅ Production Validation**: Complete VPS environment readiness and service health validation
-- **✅ Service Topology Testing**: Distributed service coordination and leader election validation
-- **✅ Performance Baselines**: KB storage response time measurement and performance validation
-- **✅ CLI Availability Testing**: Mods command execution and functionality validation
-- **✅ Storage Setup Validation**: KB namespace creation and SeaweedFS operational testing
-- **✅ User Context Validation**: Ploy user permissions and service access validation
-- **✅ Integration Readiness**: Complete production environment preparation and validation
-- **✅ Real-world Testing**: Actual service interactions with production performance validation
+- **✅ Validation Reports**: Health summaries for Consul, Nomad, SeaweedFS, and CLI readiness
+- **✅ Topology Evidence**: Leader election snapshots and coordination logs for audit trails
+- **✅ Performance Baselines**: KB storage latency metrics with acceptance thresholds
+- **✅ CLI Playbooks**: Verified commands for mods workflows in the production environment
+- **✅ Storage Setup Proofs**: Namespace creation logs and verification scripts
+- **✅ Access Checks**: Permission verification steps for the `ploy` user context
+- **✅ Integration Checklist**: Gate list for declaring VPS readiness prior to E2E execution
 
 ## Configuration
 
