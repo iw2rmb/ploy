@@ -348,6 +348,9 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 	if err != nil {
 		message = fmt.Sprintf("%s: %v", message, err)
 	}
+	if buildResult == nil {
+		r.emit(ctx, "build", "build-gate-error", "warn", "build result missing details")
+	}
 
 	trimForEvent := func(s string) string {
 		const maxLen = 2000
