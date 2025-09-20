@@ -1,3 +1,6 @@
+{% set registry_host_value = registry_host %}
+{% set api_host_value = api_host %}
+{% raw %}
 job "docker-registry" {
   datacenters = ["dc1"]
   type = "service"
@@ -45,11 +48,11 @@ job "docker-registry" {
         "docker",
         "container-registry",
         "traefik.enable=true",
-        "traefik.http.routers.docker-registry.rule=Host(`registry.dev.ployman.app`)",
+        "traefik.http.routers.docker-registry.rule=Host(`{% endraw %}{{ registry_host_value }}{% raw %}`)",
         "traefik.http.routers.docker-registry.tls=true",
         "traefik.http.routers.docker-registry.tls.certresolver=default-acme",
-        "traefik.http.routers.docker-registry.tls.domains[0].main=dev.ployman.app",
-        "traefik.http.routers.docker-registry.tls.domains[0].sans=*.dev.ployman.app",
+        "traefik.http.routers.docker-registry.tls.domains[0].main={% endraw %}{{ api_host_value }}{% raw %}",
+        "traefik.http.routers.docker-registry.tls.domains[0].sans={% endraw %}{{ registry_host_value }}{% raw %}",
         "traefik.http.services.docker-registry.loadbalancer.server.scheme=http",
         "traefik.http.services.docker-registry.loadbalancer.healthcheck.path=/",
         "traefik.http.services.docker-registry.loadbalancer.healthcheck.interval=10s",
@@ -199,3 +202,4 @@ job "docker-registry" {
     }
   }
 }
+{% endraw %}

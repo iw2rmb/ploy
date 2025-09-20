@@ -38,6 +38,7 @@
 - CLI: Sorted recipe help topics for deterministic `ploy recipe --help` output.
 - CLI: Promoted recipe management to a top-level `ploy recipe` command and moved the CLI implementation to `internal/cli/recipes`.
 - CLI/API: Lane overrides from `ploy push` and `/v1/apps/:app/builds` are now ignored with a log notice; all deployments normalise to Docker lane D to match the single-lane architecture.
+- Mods: Healing fanout now forwards builder log pointers to LLM branches, and `llmPrepareContext` downloads builder logs to recover file/line context, eliminating `.llm-healing` placeholder diffs on lane D by generating actionable edits.
 - Git: Consolidated git helpers into new `api/git` service with asynchronous event emission for pushes; Mods runner now consumes these events instead of using fixed push timeouts.
 - Build: Introduced unified sandbox build service in `internal/build` and wired Mods build gate to reuse it; build log parsing moved to shared build utilities.
 - Docs: Updated `internal/README.md` to reflect current internal package structure.
@@ -3978,7 +3979,7 @@ The Git integration system now provides enterprise-grade repository analysis, se
 - ✅ **Metadata Extraction**: App name and main entry point correctly extracted from package.json
 - ✅ **Configuration Generation**: Node.js-specific kernel and runtime optimizations applied
 - ✅ **VPS Testing**: All functionality verified on production VPS environment
-- ✅ **Backward Compatibility**: Non-Node.js applications continue to work correctly
+- ✅ **Regression Coverage**: Non-Node.js applications validated against the streamlined template flow
 - ✅ **Error Handling**: Graceful fallback when Node.js runtime unavailable
 - Added 12 test scenarios (198-209) covering all Node.js-specific configuration features
 
@@ -3991,7 +3992,7 @@ The Git integration system now provides enterprise-grade repository analysis, se
 ### Status
 **COMPLETED** - Phase 2, Step 4 from PLAN.md: "Create Node.js-specific Unikraft configuration within existing template system"
 
-The template system now provides intelligent, application-aware configuration generation with specialized Node.js optimizations while maintaining full backward compatibility for all existing applications across all lanes.
+The template system now provides intelligent, application-aware configuration generation with specialized Node.js optimizations while relying exclusively on the streamlined template pipeline across all lanes.
 
 ## [2025-08-19] - Advanced Node.js Dependency Handling & Package Bundling
 
@@ -4463,7 +4464,7 @@ All essential CLI operations are now implemented, providing users with complete 
 - ✅ **Debug Operations**: SSH-enabled debug instances working
 - ✅ **Rollback Operations**: SHA-based rollbacks working
 - ✅ **Error Handling**: 400 responses for invalid requests
-- ✅ **Backward Compatibility**: Existing endpoints unaffected
+- ✅ **Regression Sweep**: Existing endpoints validated after controller fixes
 - ✅ **CLI Integration**: Commands successfully communicate with API
 
 ## [2025-08-18] - Lane Picker Jib Detection Enhancement

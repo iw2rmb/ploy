@@ -34,12 +34,11 @@ type ResourceUtilization struct {
 
 // PerformanceMetrics represents system performance measurements
 type PerformanceMetrics struct {
-	Timestamp       time.Time              `json:"timestamp"`
-	SystemMetrics   SystemMetrics          `json:"system_metrics"`
-	ARFMetrics      ARFPerformanceMetrics  `json:"arf_metrics"`
-	DatabaseMetrics DatabaseMetrics        `json:"database_metrics"`
-	NetworkMetrics  NetworkMetrics         `json:"network_metrics"`
-	CustomMetrics   map[string]interface{} `json:"custom_metrics"`
+	Timestamp      time.Time              `json:"timestamp"`
+	SystemMetrics  SystemMetrics          `json:"system_metrics"`
+	ARFMetrics     ARFPerformanceMetrics  `json:"arf_metrics"`
+	NetworkMetrics NetworkMetrics         `json:"network_metrics"`
+	CustomMetrics  map[string]interface{} `json:"custom_metrics"`
 }
 
 // SystemMetrics represents general system metrics
@@ -67,17 +66,6 @@ type ARFPerformanceMetrics struct {
 	CacheHitRate             float64             `json:"cache_hit_rate"`
 	ResourceUtilization      ResourceUtilization `json:"resource_utilization"`
 	SecurityMetrics          SecurityMetrics     `json:"security_metrics"`
-}
-
-// DatabaseMetrics represents database performance metrics
-type DatabaseMetrics struct {
-	ConnectionCount int           `json:"connection_count"`
-	ActiveQueries   int           `json:"active_queries"`
-	QueryLatency    time.Duration `json:"query_latency"`
-	TransactionRate float64       `json:"transaction_rate"`
-	CacheHitRatio   float64       `json:"cache_hit_ratio"`
-	DeadlockCount   int           `json:"deadlock_count"`
-	SlowQueryCount  int           `json:"slow_query_count"`
 }
 
 // NetworkMetrics represents network performance metrics

@@ -42,13 +42,16 @@
 
     - name: Deploy Docker Registry via Nomad
       block:
-        - name: Copy Docker Registry Nomad job file from controller
-          copy:
+        - name: Render Docker Registry Nomad job file
+          template:
             src: "{{ playbook_dir }}/../../../platform/nomad/docker-registry.hcl"
             dest: /home/ploy/ploy/platform/nomad/docker-registry.hcl
             owner: ploy
             group: ploy
             mode: '0644'
+          vars:
+            registry_host: "{{ ploy.registry_domain if ((ploy.registry_domain | default('')) | length) > 0 else 'registry.' + ploy.platform_domain }}"
+            api_host: "{{ ploy.api_subdomain }}.{{ ploy.platform_domain }}"
         
         - name: Validate Docker Registry job syntax
           command: nomad job validate platform/nomad/docker-registry.hcl
