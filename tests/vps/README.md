@@ -1,7 +1,7 @@
-# VPS Integration Testing CLAUDE.md
+# VPS Integration Testing Guide
 
 ## Purpose
-VPS production environment integration testing infrastructure providing comprehensive validation of mods workflows, KB learning systems, and distributed service coordination in real production environment (45.12.75.241). **MVP COMPLETE**: All production services validated and operational.
+VPS production environment integration testing infrastructure providing comprehensive validation of mods workflows, KB learning systems, and distributed service coordination in the real production environment (`$TARGET_HOST`). **MVP COMPLETE**: All production services validated and operational.
 
 ## Narrative Summary
 The VPS integration testing module provides production environment validation for the complete mods system including distributed job orchestration, KB learning integration, and real-world service interactions. Framework validates service topology (Consul, Nomad, SeaweedFS), performance baselines, KB storage operations, and complete mods workflow execution in production environment.
@@ -11,16 +11,16 @@ The VPS integration testing module provides production environment validation fo
 Core validation workflow: VPS service health → distributed service topology → KB storage performance → mods CLI availability → production workflow execution → GitLab integration → comprehensive result validation. Framework ensures production readiness with real-world service interactions and distributed system coordination.
 
 ## Key Files
-- `vps_client.go:1-150` - VPS client implementation with SSH operations and service health checking
-- `vps_client.go:15-40` - VPSClient structure with SSH connection management and command execution
-- `vps_client.go:42-80` - Service health checking with Consul, Nomad, and SeaweedFS validation
-- `vps_client.go:82-120` - Command execution framework with proper user context (ploy user)
-- `vps_integration_test.go:1-100` - Core VPS service validation and readiness testing
-- `vps_integration_test.go:12-40` - TestVPSEnvironmentReadiness with service health validation
-- `vps_integration_test.go:42-70` - TestVPSKBStorageSetup with SeaweedFS namespace validation
-- `production_validation_test.go:1-150` - Production-grade validation testing with performance baselines
-- `production_validation_test.go:13-36` - TestVPSProductionReadiness with service topology validation
-- `production_validation_test.go:38-50` - Performance baseline testing with KB storage response time validation
+- [`vps_client.go#L1`](./vps_client.go#L1) — VPS client implementation with SSH operations and service health checking
+- [`vps_client.go#L15`](./vps_client.go#L15) — `VPSClient` structure with SSH connection management and command execution
+- [`vps_client.go#L42`](./vps_client.go#L42) — Service health checking with Consul, Nomad, and SeaweedFS validation
+- [`vps_client.go#L82`](./vps_client.go#L82) — Command execution framework with proper user context (ploy user)
+- [`vps_integration_test.go#L1`](./vps_integration_test.go#L1) — Core VPS service validation and readiness testing
+- [`vps_integration_test.go#L12`](./vps_integration_test.go#L12) — `TestVPSEnvironmentReadiness` with service health validation
+- [`vps_integration_test.go#L42`](./vps_integration_test.go#L42) — `TestVPSKBStorageSetup` with SeaweedFS namespace validation
+- [`production_validation_test.go#L1`](./production_validation_test.go#L1) — Production-grade validation testing with performance baselines
+- [`production_validation_test.go#L13`](./production_validation_test.go#L13) — `TestVPSProductionReadiness` with service topology validation
+- [`production_validation_test.go#L38`](./production_validation_test.go#L38) — Performance baseline testing with KB storage response time validation
 
 ### Production Service Validation
 - Complete service health checking for Consul, Nomad, SeaweedFS-master, SeaweedFS-filer
@@ -33,7 +33,7 @@ Core validation workflow: VPS service health → distributed service topology �
 ## Integration Points
 
 ### Consumes (✅ Production Operational)
-- **✅ VPS Environment**: Production server (45.12.75.241) with complete service stack deployment
+- **✅ VPS Environment**: Production server (`$TARGET_HOST`) with complete service stack deployment
 - **✅ SSH Access**: Remote command execution with proper authentication and user context
 - **✅ Consul Cluster**: Distributed coordination service with member validation and health checking
 - **✅ Nomad Orchestration**: Job execution platform with leader election and cluster status validation
@@ -54,7 +54,7 @@ Core validation workflow: VPS service health → distributed service topology �
 ## Configuration
 
 Environment variables:
-- `TARGET_HOST=45.12.75.241` - VPS production server for integration testing
+- `TARGET_HOST=<production host>` - VPS production server for integration testing
 - SSH authentication via SSH keys (production deployment pattern)
 - Service endpoints validated: Consul (8500), Nomad (4646), SeaweedFS (9333, 8888)
 
@@ -72,11 +72,11 @@ User Context:
 
 ## Key Patterns
 
-- VPS client abstraction with SSH command execution and error handling (see vps_client.go:15-40)
-- Service health validation with timeout management and comprehensive status checking (see vps_client.go:42-80)
-- Production user context with proper privilege escalation and permission validation (see vps_integration_test.go:32-38)
-- Performance baseline testing with response time measurement and acceptance criteria (see production_validation_test.go:39-49)
-- Service topology validation with leader election and cluster coordination testing (see production_validation_test.go:21-35)
+- VPS client abstraction with SSH command execution and error handling (see [`vps_client.go#L15`](./vps_client.go#L15))
+- Service health validation with timeout management and comprehensive status checking (see [`vps_client.go#L42`](./vps_client.go#L42))
+- Production user context with proper privilege escalation and permission validation (see [`vps_integration_test.go#L32`](./vps_integration_test.go#L32))
+- Performance baseline testing with response time measurement and acceptance criteria (see [`production_validation_test.go#L39`](./production_validation_test.go#L39))
+- Service topology validation with leader election and cluster coordination testing (see [`production_validation_test.go#L21`](./production_validation_test.go#L21))
 - Comprehensive error handling with detailed test output and debugging information
 - Production readiness validation with real service interactions and distributed system coordination
 - Test skip patterns for environments without VPS access (graceful degradation)
@@ -85,7 +85,7 @@ User Context:
 
 **✅ MVP COMPLETE - All VPS Integration Components Operational:**
 - **Service Stack**: Complete Consul + Nomad + SeaweedFS deployment validated and operational
-- **VPS Environment**: Production server (45.12.75.241) with full service topology deployment
+- **VPS Environment**: Production server (`$TARGET_HOST`) with full service topology deployment
 - **CLI Integration**: Ploy mods commands available and functional in production environment
 - **KB Storage**: SeaweedFS backend operational with namespace setup and performance validation
 - **Service Health**: All critical services (consul, nomad, seaweedfs-master, seaweedfs-filer) healthy
@@ -103,7 +103,7 @@ User Context:
 - ✅ Security model: Ploy user permissions and service access validated
 
 ## Related Documentation
-- `../e2e/CLAUDE.md` - E2E testing framework with VPS integration (✅ operational)
-- `../../internal/mods/README.md` - Mods CLI with VPS deployment support (MVP complete)
+- [`../e2e/README.md`](../e2e/README.md) - E2E testing framework with VPS integration (✅ operational)
+- [`../../internal/mods/README.md`](../../internal/mods/README.md) - Mods CLI with VPS deployment support (MVP complete)
 - Root `Makefile` - VPS integration test targets and TARGET_HOST configuration
 - Production deployment documentation for service stack configuration

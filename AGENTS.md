@@ -2,18 +2,22 @@
 
 **MANDATORY**: Follow this file for every prompt execution.
 
-## TDD Framework (CRITICAL)
+## Before You Start
+- [ ] Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.
+- [ ] Plan local unit tests and coverage checks before touching code or docs.
+- [ ] Verify required environment variables (`TARGET_HOST`, `PLOY_CONTROLLER`, etc.) are discoverable.
+- [ ] Confirm you understand the VPS vs workstation split for the task at hand.
 
-- **LOCAL**: Unit tests, build compilation (RED/GREEN phases)  
+## Local Development
+
+### TDD Framework (CRITICAL)
+
+- **LOCAL**: Unit tests, build compilation (RED/GREEN phases)
 - **VPS**: Integration/E2E tests (REFACTOR phase)
 - **Coverage**: 60% minimum, 90% for critical components
 - **Cycle**: RED (write failing tests) → GREEN (minimal code) → REFACTOR (on VPS)
 
-## Ploy Overview
-
-Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `CHANGELOG.md` for changes.  
-
-## Go Tooling (MANDATORY)
+### Go Tooling (MANDATORY)
 
 - Use the existing make targets for formatting and analysis: `make fmt`, `make vet`, `make lint`, `staticcheck ./...`, and `make test-coverage-threshold`.
 - Active deployment lane: **D (Docker)** only. Legacy references to lanes A/B/C/E/F/G remain for historical context.
@@ -24,7 +28,7 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
 ### Test File Naming (MANDATORY)
 
 - Use descriptive, focused test filenames (e.g., `handler_crud_test.go`, `platform_handlers_test.go`).
-- Do not use catch‑all names like `_more_test.go`, `_extra_test.go`, or `_ext_test.go`.
+- Do not use catch-all names like `_more_test.go`, `_extra_test.go`, or `_ext_test.go`.
 - Split tests by concern when it improves readability and navigation.
 
 ### Pre-commit Hooks
@@ -38,9 +42,11 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
   - If Probot Settings is installed, `.github/settings.yml` enforces this for `main` and `develop`.
   - Otherwise, set it manually in GitHub → Settings → Branches → Branch protection rules.
 
-## VPS Testing
+## VPS Workflows
 
-**Setup**: `ssh root@$TARGET_HOST` → `su - ploy`  
+### VPS Testing
+
+**Setup**: `ssh root@$TARGET_HOST` → `su - ploy`
 **Nomad**: ONLY use `/opt/hashicorp/bin/nomad-job-manager.sh` (never direct `nomad` commands)
 
 ### Environment & Context (MANDATORY)
@@ -64,7 +70,8 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
   - If a command may be slow (playbooks, large uploads), report progress and prefer controller/API paths when available.
   - On repeated failures/timeouts, fall back to Ansible playbooks to reconcile state instead of tight SSH loops.
 
-**E2E via Dev API (Allowed from Workstation)**
+### E2E via Dev API (Allowed from Workstation)
+
 - You may run E2E tests locally when they call the VPS Dev API endpoint (ensure `PLOY_CONTROLLER` points to `https://api.dev.ployman.app/v1`).
 - These tests exercise VPS services remotely and are considered VPS-side execution (REFACTOR phase), even if invoked from the workstation.
 - Do not spin up or depend on local Nomad/Consul/Gateway for these tests.
@@ -98,37 +105,79 @@ Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `
        - Or pre-set `START_TS` manually and optionally combine with `FILTER_MARKERS` to narrow to key markers (e.g., `[Lane E]`, `[Orch]`).
 - This keeps log slices small and focused per run without bouncing the API allocations.
 
-- Mods scenario SINCE_FMT (practical): For `tests/mods/orw-apply-llm-plan-seq`, derive a VPS-friendly timestamp from SSE and pass it to the Nomad log wrapper when fetching allocation logs.
-  - `SINCE_RAW=$(grep -hEo '"time":"[^"]+"' tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/events*.sse | head -n1 | sed -E 's/.*"time":"([^\"]+)".*/\1/')`
+#### Mods Scenario `SINCE_FMT` (Practical)
+
+- For `tests/mods/orw-apply-llm-plan-seq`, derive a VPS-friendly timestamp from SSE and pass it to the Nomad log wrapper when fetching allocation logs.
+  - `SINCE_RAW=$(grep -hEo '"time":"[^"]+"' tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/events*.sse | head -n1 | sed -E 's/.*"time":"([^"]+)".*/\1/')`
   - `SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"`
-  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since \"$SINCE_FMT\"'" > tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/last_job.logs`
+  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since "$SINCE_FMT"'" > tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/last_job.logs`
   - Or set `START_TS_SOURCE=vps` (requires `TARGET_HOST`) to auto-resolve the timestamp in helpers like `tests/e2e/deploy/fetch-logs.sh`.
   - If SeaweedFS isn’t reachable from the workstation, fetch artifacts via SSH on the VPS: `curl -fsS 'http://seaweedfs-filer.storage.ploy.local:8888/artifacts/<KEY>'`.
 
-### Build-Gate Drill‑down
+### Build-Gate Drill-down
 
 - Build-gate errors may include `(deployment_id=…)` in events and an `X-Deployment-ID` header in API responses. Use it to fetch detailed logs:
   - `curl -sS "$PLOY_CONTROLLER/apps/<app>/builds/<deployment_id>/logs?lines=1200"`
   - Attach relevant excerpts to scenario summaries and use time slicing for focused inspection.
 
-## Commands
+### Nomad Integration (RECOMMENDED)
 
-**LOCAL**: 
+- VPS (production/test clusters):
+  - Mandatory: submit jobs via `/opt/hashicorp/bin/nomad-job-manager.sh`.
+  - Rationale: central retries/backoff for 429/5xx, HCL→JSON conversion via `nomad job run -output`, environment defaults, and Consul service cleanup.
+  - In code, the orchestration layer auto-detects the wrapper and uses it for submit/wait/log flows.
+
+- Non-VPS (local/dev tools, CI):
+  - Use the official Nomad SDK with resilience:
+    - HTTP retry/backoff for 429/5xx with jitter (config via env: `NOMAD_HTTP_MAX_RETRIES`, `NOMAD_HTTP_BASE_DELAY`, `NOMAD_HTTP_MAX_DELAY`).
+    - Concurrency limits for submissions (env: `NOMAD_SUBMIT_MAX_CONCURRENCY`, default 4).
+    - Prefer blocking queries for status when possible; avoid tight polling.
+    - Use blocking queries with index/wait (config via env: `NOMAD_BLOCKING_WAIT`, default `30s`).
+
+- Never call raw `nomad` CLI from app code on the VPS. If a direct CLI call is unavoidable, route it through the job manager wrapper.
+
+### Docker Registry Usage (VPS)
+
+- The VPS provides an internal Docker Registry (Docker Registry v2) for storing and serving images used by Nomad jobs.
+- All platform images should be published to this registry and referenced by fully qualified names in Nomad specs and environment variables.
+- Typical images:
+  - `openrewrite-jvm` — ORW apply job (produces `output.tar` and `diff.patch`)
+  - `langgraph-runner` — Planner/Reducer/LLM-exec jobs (produces `plan.json`, `next.json`, `diff.patch`)
+- Avoid external registries (e.g., GHCR) for VPS job execution paths unless explicitly allowed.
+
+## Deploy & Release
+
+### Commands
+
+**LOCAL**:
 - `make test-unit`, `make test-coverage-threshold`, build verification
 - Deploy API: `./bin/ployman api deploy --monitor` (run on workstation)
 
-Git hygiene (MANDATORY) before any deploy:
+**Git hygiene (MANDATORY) before any deploy:**
 - Always commit and push your changes to the remote branch before invoking any deploy commands.
   - Run `pre-commit run --all-files` locally and ensure it passes.
   - `git add -A && git commit -m "<message>" && git push`.
   - Only then run `./bin/ployman api deploy --monitor` or other deployment commands.
 
-Notes:
+**Notes:**
 - Run `./bin/ployman api deploy --monitor` on your workstation. Do not run it on the VPS.
 - Never use direct Nomad commands; if needed remotely, only via `/opt/hashicorp/bin/nomad-job-manager.sh` as invoked by platform tooling.
 - Container images (platform services and job runners) must be pushed to the VPS Docker Registry (Docker Registry v2). Do not rely on public registries in VPS workflows.
   - Examples: `openrewrite-jvm`, `langgraph-runner`, lane-specific images.
   - Configure image refs in environment (e.g., `MODS_ORW_APPLY_IMAGE`, `MODS_PLANNER_IMAGE`, `MODS_REDUCER_IMAGE`, `MODS_LLM_EXEC_IMAGE`) to point at the internal registry.
+
+### Mandatory Update Protocol (CRITICAL)
+
+For EVERY code change:
+
+1. **Write failing tests** (RED phase)
+2. **Write minimal code** to pass tests (GREEN phase)
+3. Ensure all changes are committed and pushed to the remote repository
+4. **Deploy to VPS** for integration testing (REFACTOR phase)
+5. **Update documentation** (`CHANGELOG.md`, `FEATURES.md`, and `docs/LANES.md` for lane behavior)
+6. **Merge to main** and return to worktree branch
+
+**NO EXCEPTIONS**.
 
 ### API Deployment (Correct Procedure)
 
@@ -151,45 +200,12 @@ Notes:
 **NEVER**: Integration tests against local infrastructure, direct Nomad commands
   - Exception: Running E2E tests from your workstation that target the VPS Dev API is allowed (see above).
 
-## Nomad Integration (RECOMMENDED)
+## Reference
 
-- VPS (production/test clusters):
-  - Mandatory: submit jobs via `/opt/hashicorp/bin/nomad-job-manager.sh`.
-  - Rationale: central retries/backoff for 429/5xx, HCL→JSON conversion via `nomad job run -output`, environment defaults, and Consul service cleanup.
-  - In code, the orchestration layer auto-detects the wrapper and uses it for submit/wait/log flows.
+### Ploy Overview
 
-- Non‑VPS (local/dev tools, CI):
-  - Use the official Nomad SDK with resilience:
-    - HTTP retry/backoff for 429/5xx with jitter (config via env: `NOMAD_HTTP_MAX_RETRIES`, `NOMAD_HTTP_BASE_DELAY`, `NOMAD_HTTP_MAX_DELAY`).
-    - Concurrency limits for submissions (env: `NOMAD_SUBMIT_MAX_CONCURRENCY`, default 4).
-    - Prefer blocking queries for status when possible; avoid tight polling.
-    - Use blocking queries with index/wait (config via env: `NOMAD_BLOCKING_WAIT`, default `30s`).
+Deployment lanes A-G auto-selected by project structure. Update `FEATURES.md`, `CHANGELOG.md` for changes.
 
-- Never call raw `nomad` CLI from app code on the VPS. If a direct CLI call is unavoidable, route it through the job manager wrapper.
-
-## Docker Registry Usage (VPS)
-
-- The VPS provides an internal Docker Registry (Docker Registry v2) for storing and serving images used by Nomad jobs.
-- All platform images should be published to this registry and referenced by fully qualified names in Nomad specs and environment variables.
-- Typical images:
-  - `openrewrite-jvm` — ORW apply job (produces `output.tar` and `diff.patch`)
-  - `langgraph-runner` — Planner/Reducer/LLM-exec jobs (produces `plan.json`, `next.json`, `diff.patch`)
-- Avoid external registries (e.g., GHCR) for VPS job execution paths unless explicitly allowed.
-
-
-## Mandatory Update Protocol (CRITICAL)
-
-For EVERY code change:
-
-1. **Write failing tests** (RED phase)
-2. **Write minimal code** to pass tests (GREEN phase)  
-3. Ensure all changes are committed and pushed to the remote repository
-4. **Deploy to VPS** for integration testing (REFACTOR phase)
-4. **Update documentation** (`CHANGELOG.md`, `FEATURES.md`, and `docs/LANES.md` for lane behavior)
-5. **Merge to main** and return to worktree branch
-
-**NO EXCEPTIONS**.
-
-## Specialized Agents
+### Specialized Agents
 
 Use Task tool for complex domain-specific tasks. Available agents in `.claude/agents.json`.

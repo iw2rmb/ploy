@@ -654,7 +654,7 @@ jobs:
 
 2. **✅ Updated documentation**:
    - ✅ Removed old deployment methods from README.md
-   - ✅ Updated CLAUDE.md deployment commands and priority order
+   - ✅ Updated AGENTS.md deployment commands and priority order
    - ✅ Updated iac/prod/README.md deployment procedures
    - ✅ Created comprehensive CHANGELOG.md entry
 
