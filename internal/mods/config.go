@@ -58,18 +58,19 @@ type ModStep struct {
 }
 
 type ModConfig struct {
-	Version      string          `yaml:"version"`
-	ID           string          `yaml:"id"`
-	TargetRepo   string          `yaml:"target_repo"`
-	TargetBranch string          `yaml:"target_branch"`
-	BaseRef      string          `yaml:"base_ref"`
-	Lane         string          `yaml:"lane"`
-	BuildTimeout string          `yaml:"build_timeout"`
-	Steps        []ModStep       `yaml:"steps"`
-	SelfHeal     *SelfHealConfig `yaml:"self_heal"`
-	SBOM         *SBOMConfig     `yaml:"sbom,omitempty"`
-	Security     *SecurityConfig `yaml:"security,omitempty"`
-	MR           *MRConfigYAML   `yaml:"mr,omitempty"`
+	Version      string            `yaml:"version"`
+	ID           string            `yaml:"id"`
+	TargetRepo   string            `yaml:"target_repo"`
+	TargetBranch string            `yaml:"target_branch"`
+	BaseRef      string            `yaml:"base_ref"`
+	Lane         string            `yaml:"lane"`
+	BuildTimeout string            `yaml:"build_timeout"`
+	Steps        []ModStep         `yaml:"steps"`
+	SelfHeal     *SelfHealConfig   `yaml:"self_heal"`
+	SBOM         *SBOMConfig       `yaml:"sbom,omitempty"`
+	Security     *SecurityConfig   `yaml:"security,omitempty"`
+	MR           *MRConfigYAML     `yaml:"mr,omitempty"`
+	Env          map[string]string `yaml:"env,omitempty"`
 }
 
 // MRConfigYAML allows selecting which environment variables to use for

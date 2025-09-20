@@ -6,6 +6,7 @@ import "time"
 type ModRunRequest struct {
 	Config     string                 `json:"config,omitempty"`      // YAML config as string
 	ConfigData map[string]interface{} `json:"config_data,omitempty"` // Or as structured data
+	Env        map[string]string      `json:"env,omitempty"`         // Per-run env overrides
 	TestMode   bool                   `json:"test_mode,omitempty"`
 }
 
