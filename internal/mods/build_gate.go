@@ -238,6 +238,9 @@ func builderLogSnippet(logs string, maxLines, maxLen int) string {
 		if strings.Contains(line, "seaweedfs-filer") {
 			continue
 		}
+		if strings.Contains(strings.ToLower(line), "builder logs") {
+			continue
+		}
 		selected = append(selected, line)
 		if maxLines > 0 && len(selected) >= maxLines {
 			break
