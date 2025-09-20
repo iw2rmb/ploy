@@ -390,6 +390,11 @@ dev-status: ## Show status of local development services
 	@echo "$(BLUE)Local development services status:$(NC)"
 	@cd $(IAC_DIR)/local && docker-compose ps
 
+.PHONY: seaweedfs-bootstrap
+seaweedfs-bootstrap: ## Ensure local SeaweedFS collections (test-collection, artifacts, test-bucket) exist
+	@echo "$(BLUE)Bootstrapping SeaweedFS collections...$(NC)"
+	@./scripts/dev/seaweedfs_bootstrap.sh
+
 .PHONY: dev-logs
 dev-logs: ## Show logs from local development services
 	@echo "$(BLUE)Local development services logs:$(NC)"

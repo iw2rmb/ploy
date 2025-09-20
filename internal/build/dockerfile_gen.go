@@ -9,9 +9,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/detect/project"
 )
 
-// generateDockerfileWithFacts writes a simple Dockerfile into srcDir based on detected project markers.
+// generateDockerfileWithFacts composes a multi-stage Dockerfile string based on detected project markers.
 // Supports Go, Node.js, Python, .NET, and JVM via Gradle/Maven. For other stacks, returns an error.
-func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error {
+func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) (string, error) {
 	// Ensure we infer JVM build tool even if facts weren't populated upstream
 	if facts.BuildTool == "" && facts.Language == "" {
 		if fileExists(filepath.Join(srcDir, "build.gradle.kts")) || fileExists(filepath.Join(srcDir, "build.gradle")) {
@@ -44,10 +44,7 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			facts.BuildTool = "default"
 			opts = append(opts, WithCopyInstruction("COPY --from=build /out /app"))
 		}
-		if err := writePairForFacts(srcDir, facts, opts...); err != nil {
-			return err
-		}
-		return nil
+		return renderCombinedDockerfile(facts, opts...)
 	}
 
 	// Go
@@ -58,7 +55,7 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 		if goFacts.Versions.Go == "" {
 			goFacts.Versions.Go = "1.22"
 		}
-		return writePairForFacts(srcDir, goFacts, WithCopyInstruction("COPY --from=build /out/app /app"))
+		return renderCombinedDockerfile(goFacts, WithCopyInstruction("COPY --from=build /out/app /app"))
 	}
 	// Node via template (npm)
 	pkgJSON := filepath.Join(srcDir, "package.json")
@@ -68,7 +65,7 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 		if nFacts.Versions.Node == "" {
 			nFacts.Versions.Node = "20"
 		}
-		return writePairForFacts(srcDir, nFacts, WithCopyInstruction("COPY --from=build /app /app"))
+		return renderCombinedDockerfile(nFacts, WithCopyInstruction("COPY --from=build /app /app"))
 	}
 	// Python via template
 	// Use detected Python version for base image (python:<ver>-slim). Fallback to 3.12.
@@ -94,7 +91,7 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			uvicornCmd = `["sh", "-lc", "exec uvicorn app:app --host 0.0.0.0 --port $PORT"]`
 		}
 		opts := []DockerfilePairOption{WithPythonRuntimeCommands(gunicornCmd, uvicornCmd)}
-		return writePairForFacts(srcDir, pyFacts, opts...)
+		return renderCombinedDockerfile(pyFacts, opts...)
 	}
 	// .NET
 	// Detect .NET projects by presence of *.csproj
@@ -110,9 +107,17 @@ func generateDockerfileWithFacts(srcDir string, facts project.BuildFacts) error 
 			dnFacts.Versions.Dotnet = dnFacts.Versions.Dotnet + ".0"
 		}
 		projName := strings.TrimSuffix(filepath.Base(csproj), filepath.Ext(csproj))
-		return writePairForFacts(srcDir, dnFacts, WithDotnetProjectName(projName))
+		return renderCombinedDockerfile(dnFacts, WithDotnetProjectName(projName))
 	}
-	return fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
+	return "", fmt.Errorf("unsupported autogeneration: no go.mod or package.json detected")
+}
+
+func renderCombinedDockerfile(facts project.BuildFacts, opts ...DockerfilePairOption) (string, error) {
+	pair, err := RenderDockerfilePair(facts, opts...)
+	if err != nil {
+		return "", err
+	}
+	return combineDockerfilePair(pair)
 }
 
 // fileExists wraps os.Stat for brevity

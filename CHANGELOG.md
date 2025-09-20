@@ -9,6 +9,7 @@
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
 - Mods: Added MCP config parsing coverage (numeric budget coercion) and LLM diff-fetch tests to harden fanout execution.
 - Mods API: Added handler coverage for status enrichment, cancellation guards, event ingestion, artifact streaming/SBOM pointers, log SSE, and debug Nomad endpoints using in-memory KV and storage doubles; lifted `api/mods` coverage to ~61%.
+- Tooling: Added `scripts/dev/seaweedfs_bootstrap.sh` plus a Homebrew launchd template so macOS services expose test collections (`test-collection`, `artifacts`, `test-bucket`) with replication `000`.
 - CLI: Added high-coverage unit tests for `ploy recipe` help, validation, and confirmation flows.
 - Lanes: E2E scaffolding added for A–G
   - tests/lanes/README.md with comprehensive plan and envs
@@ -31,6 +32,7 @@
 - Mods: Lane D build gate now materializes `build.Dockerfile` and `deploy.Dockerfile` via the shared build module before invoking the controller build gate, covering Go/Node/Python/.NET stacks in addition to JVM.
 
 ### Changed
+- Infrastructure: API environment configuration is now inventory-driven. Removed the dedicated `iac/dev/playbooks/api-env.yml` flow and the `/home/ploy/api.env` sourcing; overrides live under `ploy.gitlab_*`, `ploy.mods.*`, and `ploy.nomad_dc` in `iac/dev/vars/main.yml`, and the Nomad start script only trusts those values.
 - Integration: Mods and KB suites now share a `testenv` harness that provisions Nomad/Consul/SeaweedFS clients, enforces Docker lane D defaults, and gracefully skips when the services are unavailable locally.
 - Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.
 - API Deploys: Ansible now always uploads the freshly built API binary and metadata to SeaweedFS (the optional `PLOY_UPLOAD_API_BINARY` knob was removed) so Nomad jobs never refer to missing artifacts.
@@ -93,7 +95,6 @@
 - API platform deploys: switch TLS certresolver from `dev-wildcard` to `platform-wildcard` for `*.dev.ployman.app` routes.
 - Traefik (Nomad-only): Update system job template to load dynamic config from `/data/dynamic-config.yml` and remove the read-only `/etc/traefik/*` bind mount that caused container start failures. This aligns the file provider path with the mounted host volume `/opt/ploy/traefik-data`.
 - Traefik: Ensure ACME resolvers remain in static configuration (CLI args) and clean up dynamic config to not duplicate `certificatesResolvers` (avoids early “nonexistent resolver” warnings).
-- API env: Include `PLOY_PLATFORM_DOMAIN` in `/home/ploy/api.env` with a sensible default (`dev.ployman.app`) so platform domain is persisted on the VPS and available to API processes.
 - Traefik: Add private `acme` entrypoint (9443) and bind helper wildcard routers to it with very low priority. This avoids intercepting public traffic while keeping ACME-managed wildcard provisioning available.
 - Dev IaC: Switch Traefik deployment to Nomad-only. Removed systemd-based playbook (`iac/dev/playbooks/traefik.yml`) and its import from `iac/dev/site.yml`. Traefik now deploys exclusively as a Nomad system job via `iac/dev/playbooks/hashicorp.yml` using `/opt/hashicorp/bin/nomad-job-manager.sh`. Placement is restricted to edge/gateway nodes via `node.class = "gateway"`. Consul ACL token is supplied via `CONSUL_HTTP_TOKEN` environment variable, not inline in job args.
  - Traefik DNS env import: `hashicorp.yml` auto-imports legacy Namecheap envs from `/etc/systemd/system/traefik.service` (if present) into Nomad job env, without persisting secrets in the repo. This preserves renewals for existing `*.dev.ployd.app` and `*.dev.ployman.app` certificates after migrating from systemd to Nomad.

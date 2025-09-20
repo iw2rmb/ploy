@@ -9,6 +9,21 @@ This document explains how Ploy abstracts storage using an S3-compatible API wit
 ## Configuration
 See `configs/storage-config.yaml`.
 
+### Local SeaweedFS (Homebrew)
+
+For macOS dev machines that rely on the Homebrew formula:
+
+1. Install the service: `brew install seaweedfs`.
+2. Copy `configs/seaweedfs/homebrew-launchd.plist.example` to `~/Library/LaunchAgents/homebrew.mxcl.seaweedfs.plist`, replacing `@HOMEBREW_PREFIX@` with the output of `brew --prefix` and adjusting paths as needed.
+3. (Re)load the customized service:
+   ```bash
+   launchctl unload ~/Library/LaunchAgents/homebrew.mxcl.seaweedfs.plist 2>/dev/null || true
+   launchctl load -w ~/Library/LaunchAgents/homebrew.mxcl.seaweedfs.plist
+   ```
+4. After the filer is listening on `http://localhost:8888`, run `make seaweedfs-bootstrap` to provision the collections (`test-collection`, `artifacts`, `test-bucket`) used by unit tests and local dev flows.
+
+The bootstrap step is idempotent and safe to run after every restart; it ensures the directories exist and pins each collection to replication `000` so local writes do not require additional volumes.
+
 ## Code
 `internal/storage/storage.go` initializes an S3 client. Artifacts are uploaded under `artifacts/<app>/<sha>/` by the api.
 

@@ -25,6 +25,7 @@ func TestCertificateHandlers_Unavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp1.Body.Close() }()
 	if resp1.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp1.StatusCode)
 	}
@@ -34,6 +35,7 @@ func TestCertificateHandlers_Unavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp2.StatusCode)
 	}
@@ -43,6 +45,7 @@ func TestCertificateHandlers_Unavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp3.Body.Close() }()
 	if resp3.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp3.StatusCode)
 	}
@@ -59,6 +62,7 @@ func TestCertificateHandlers_Unavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp4.Body.Close() }()
 	if resp4.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp4.StatusCode)
 	}
@@ -68,6 +72,7 @@ func TestCertificateHandlers_Unavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp5.Body.Close() }()
 	if resp5.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp5.StatusCode)
 	}

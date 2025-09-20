@@ -138,7 +138,7 @@ func (v *LLMModelValidator) validateAnthropicConfig(config map[string]string) er
 func (v *LLMModelValidator) validateAzureConfig(config map[string]string) error {
 	// Azure requires deployment name
 	if _, exists := config["deployment_name"]; !exists {
-		return fmt.Errorf("Azure models require 'deployment_name'")
+		return fmt.Errorf("azure models require 'deployment_name'")
 	}
 
 	validKeys := map[string]bool{

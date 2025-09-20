@@ -42,6 +42,7 @@ func TestGetLogsWithMonitor_ValidationAndNotFound(t *testing.T) {
 	resp, err := app.Test(req, 5000)
 	require.NoError(t, err)
 	assert.Equal(t, 400, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 
 	// For missing app, all lanes return not found
 	m.ExpectedCalls = nil
@@ -50,6 +51,7 @@ func TestGetLogsWithMonitor_ValidationAndNotFound(t *testing.T) {
 	resp, err = app.Test(req, 5000)
 	require.NoError(t, err)
 	assert.Equal(t, 404, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 }
 
 func TestGetLogsWithMonitor_SuccessPath(t *testing.T) {
@@ -70,6 +72,7 @@ func TestGetLogsWithMonitor_SuccessPath(t *testing.T) {
 
 	var body map[string]any
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.NoError(t, resp.Body.Close())
 	assert.Equal(t, "svc", body["app_name"])
 	assert.Equal(t, "svc-lane-a", body["job_name"])
 	assert.Equal(t, "5", body["lines_requested"])
@@ -86,4 +89,5 @@ func TestGetLogs_WiresRealMonitorFunction(t *testing.T) {
 	require.NoError(t, err)
 	// function executed and returned validation error
 	assert.Equal(t, 400, resp.StatusCode)
+	require.NoError(t, resp.Body.Close())
 }

@@ -25,6 +25,7 @@ func TestHandleStorageHealth_SuccessAndFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -35,6 +36,7 @@ func TestHandleStorageHealth_SuccessAndFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503, got %d", resp2.StatusCode)
 	}
@@ -60,6 +62,7 @@ func TestHandleStorageMetrics_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -77,6 +80,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp1.Body.Close() }()
 	if resp1.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", resp1.StatusCode)
 	}
@@ -85,6 +89,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp2.Body.Close() }()
 	if resp2.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", resp2.StatusCode)
 	}
@@ -93,6 +98,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp3.Body.Close() }()
 	if resp3.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", resp3.StatusCode)
 	}
@@ -108,6 +114,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp4.Body.Close() }()
 	if resp4.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp4.StatusCode)
 	}
@@ -116,6 +123,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp5.Body.Close() }()
 	if resp5.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp5.StatusCode)
 	}
@@ -124,6 +132,7 @@ func TestStorageConfigEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
+	defer func() { _ = resp6.Body.Close() }()
 	if resp6.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp6.StatusCode)
 	}

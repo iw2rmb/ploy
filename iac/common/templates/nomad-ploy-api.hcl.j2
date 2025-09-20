@@ -85,6 +85,7 @@ job "ploy-api" {
         # HashiCorp service addresses
         CONSUL_ADDR = "http://consul.service.consul:8500"
         NOMAD_ADDR = "http://nomad.control.ploy.local:4646"
+        NOMAD_DC = "{{ ploy.nomad_dc }}"
         # Nomad SDK resilience (used by API when talking to Nomad directly)
         NOMAD_HTTP_MAX_RETRIES = "{{ ploy.nomad_http_max_retries | default('5') }}"
         NOMAD_HTTP_BASE_DELAY = "{{ ploy.nomad_http_base_delay | default('500ms') }}"
@@ -95,17 +96,30 @@ job "ploy-api" {
         # Force SDK mode for Nomad submissions (disable wrapper inside API process)
         USE_NOMAD_JOB_MANAGER = 0
 
+        # GitLab configuration propagated via Ansible inventory
+        GITLAB_URL = "{{ ploy.gitlab_url }}"
+        GITLAB_TOKEN = "{{ ploy.gitlab_token }}"
+        GIT_AUTHOR_NAME = "{{ ploy.git_author_name }}"
+        GIT_AUTHOR_EMAIL = "{{ ploy.git_author_email }}"
+        GIT_COMMITTER_NAME = "{{ ploy.git_committer_name }}"
+        GIT_COMMITTER_EMAIL = "{{ ploy.git_committer_email }}"
+
         # SeaweedFS configuration. Use external DNS name so job containers resolve consistently.
         SEAWEEDFS_MASTER = "http://{{ seaweedfs.master_domain }}:{{ seaweedfs.master_port }}"
         SEAWEEDFS_FILER = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
         PLOY_SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
         SEAWEEDFS_URL = "http://{{ seaweedfs.filer_domain }}:{{ seaweedfs.filer_port }}"
-        
+
         # OpenRewrite configuration for transformations
         JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-amd64"
 
-        # Mods job image overrides (server-side) — use single env only
-        MODS_ORW_APPLY_IMAGE = "{{ lookup('env', 'MODS_ORW_APPLY_IMAGE') }}"
+        # Mods job image overrides (server-side) — managed by inventory
+        MODS_ORW_APPLY_IMAGE = "{{ ploy.mods.orw_apply_image }}"
+        MODS_PLANNER_IMAGE = "{{ ploy.mods.planner_image }}"
+        MODS_REDUCER_IMAGE = "{{ ploy.mods.reducer_image }}"
+        MODS_LLM_EXEC_IMAGE = "{{ ploy.mods.llm_exec_image }}"
+        MODS_REGISTRY = "{{ ploy.mods.registry }}"
+        MODS_SKIP_DEPLOY_LANES = "{{ ploy.mods.skip_deploy_lanes }}"
                 
         # Internal ARF Recipes Indexer
         PLOY_SECURITY_REGISTRY = "{{ ploy.security_registry | default('https://repo1.maven.org/maven2') }}"
@@ -202,30 +216,6 @@ echo "[SETUP] GitLab probe result: ${GL_PROBE}"
 set -e
 
 # Attempt to load credentials if not provided via Nomad env
-if [ -z "$GITLAB_TOKEN" ]; then
-  # Source ploy user's bashrc if available (may contain exported token)
-  if [ -r /home/ploy/.bashrc ]; then
-    set +o allexport
-    . /home/ploy/.bashrc || true
-  fi
-  # Also source repo-local bashrc if used as stash for env
-  if [ -r /home/ploy/ploy/.bashrc ]; then
-    set +o allexport
-    . /home/ploy/ploy/.bashrc || true
-  fi
-  # Source explicit per-service env file (auto-export)
-  if [ -r /home/ploy/api.env ]; then
-    set -a
-    . /home/ploy/api.env || true
-    set +a
-  fi
-fi
-
-if [ -z "$GITLAB_TOKEN" ] && [ -r /etc/environment ]; then
-  # Extract from /etc/environment if present
-  eval $(grep -E '^GITLAB_TOKEN=' /etc/environment | sed 's/^/export /') || true
-fi
-
 if [ -z "$GITLAB_TOKEN" ] && [ -r /home/ploy/.gitlab_token ]; then
   export GITLAB_TOKEN="$(tr -d '\n' </home/ploy/.gitlab_token 2>/dev/null)"
 fi

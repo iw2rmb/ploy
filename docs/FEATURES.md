@@ -191,6 +191,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 
 ## 🚀 Deployment
 - ✅ Nomad templates per lane in `platform/nomad/`
+- ✅ Inventory-driven API envs: `iac/dev/vars/main.yml` supplies `ploy.gitlab_*`, `ploy.mods.*`, and `ploy.nomad_dc`; the API start script no longer sources `/home/ploy/api.env`.
 - ✅ Jobs include health checks, canary rollouts, Consul registration, and explicit secret templating via Consul KV
 - ✅ API handles rendering, submission, health polling
 - ✅ **Enhanced Health Monitoring** (Aug 2025):
@@ -449,6 +450,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - Automated upload of complete deployment packages (artifact + SBOM + signature + certificate)
   - Upload retry logic with FileID verification for reliable storage operations
   - Enhanced metadata tracking with timestamps and artifact status information
+- ✅ **Local SeaweedFS Bootstrap** (Oct 2025): Homebrew launchd template (`configs/seaweedfs/homebrew-launchd.plist.example`) and `make seaweedfs-bootstrap` keep `test-collection`, `artifacts`, and `test-bucket` ready for unit tests on macOS workstations.
 - ✅ **Comprehensive Error Handling & Resilience** (Aug 2025):
   - Advanced error classification system with 10+ error types (network, timeout, corruption, rate limit, etc.)
   - Exponential backoff retry logic with configurable policies and jitter randomization

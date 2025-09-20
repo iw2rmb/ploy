@@ -14,12 +14,12 @@ func TestGenerateDockerfile_PythonAppPyOnly(t *testing.T) {
 	// minimal python app marker
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "app.py"), []byte("print('ok')"), 0644))
 
-	err := generateDockerfileWithFacts(dir, project.BuildFacts{})
+	s, err := generateDockerfileWithFacts(dir, project.BuildFacts{})
 	require.NoError(t, err)
+	require.NotEmpty(t, s)
 
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
-	require.NoError(t, err)
-	s := string(b)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, s, "FROM python:3.12-slim AS build")
 	require.Contains(t, s, "COPY --from=build /out/app ./app")
 	require.Contains(t, s, "CMD [\"python\", \"app/app.py\"]")
@@ -34,11 +34,11 @@ func TestGenerateDockerfile_GradleMainClass(t *testing.T) {
 		Versions:  project.Versions{Java: "17.0.2"},
 	}
 
-	require.NoError(t, generateDockerfileWithFacts(dir, facts))
-
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	content, err := generateDockerfileWithFacts(dir, facts)
 	require.NoError(t, err)
-	content := string(b)
+	require.NotEmpty(t, content)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, content, "FROM gradle:8-jdk17 AS build")
 	require.Contains(t, content, "FROM eclipse-temurin:17-jre-alpine")
 	require.Contains(t, content, "COPY --from=build /out/app.jar /app/app.jar")
@@ -105,11 +105,11 @@ func TestGenerateDockerfile_MavenLeanRuntime(t *testing.T) {
 		Versions:  project.Versions{Java: "11.0.20"},
 	}
 
-	require.NoError(t, generateDockerfileWithFacts(dir, facts))
-
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	content, err := generateDockerfileWithFacts(dir, facts)
 	require.NoError(t, err)
-	content := string(b)
+	require.NotEmpty(t, content)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, content, "FROM maven:3-eclipse-temurin-11 AS build")
 	require.Contains(t, content, "JAR=\"$(find target")
 	require.Contains(t, content, "FROM eclipse-temurin:11-jre-alpine")
@@ -120,11 +120,11 @@ func TestGenerateDockerfile_NodeProject(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"demo"}`), 0644))
 
-	require.NoError(t, generateDockerfileWithFacts(dir, project.BuildFacts{}))
-
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	s, err := generateDockerfileWithFacts(dir, project.BuildFacts{})
 	require.NoError(t, err)
-	s := string(b)
+	require.NotEmpty(t, s)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, s, "FROM node:20-alpine")
 	require.Contains(t, s, `CMD ["node", "index.js"]`)
 }
@@ -133,11 +133,11 @@ func TestGenerateDockerfile_GoProject(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example\n\ngo 1.22\n"), 0644))
 
-	require.NoError(t, generateDockerfileWithFacts(dir, project.BuildFacts{}))
-
-	output, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	content, err := generateDockerfileWithFacts(dir, project.BuildFacts{})
 	require.NoError(t, err)
-	content := string(output)
+	require.NotEmpty(t, content)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, content, "FROM golang:1.22-alpine AS build")
 	require.Contains(t, content, "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/app ./...")
 	require.Contains(t, content, "FROM gcr.io/distroless/static")
@@ -149,11 +149,11 @@ func TestGenerateDockerfile_DotnetProject(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "Demo.csproj"), []byte("<Project></Project>"), 0644))
 	facts := project.BuildFacts{Language: "dotnet", Versions: project.Versions{Dotnet: "8.0.1"}}
 
-	require.NoError(t, generateDockerfileWithFacts(dir, facts))
-
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	s, err := generateDockerfileWithFacts(dir, facts)
 	require.NoError(t, err)
-	s := string(b)
+	require.NotEmpty(t, s)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, s, "FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build")
 	require.Contains(t, s, "FROM mcr.microsoft.com/dotnet/aspnet:8.0")
 	require.Contains(t, s, "ENTRYPOINT [\"dotnet\", \"Demo.dll\"]")
@@ -164,18 +164,18 @@ func TestGenerateDockerfile_PythonGunicornDetection(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("gunicorn==21.2.0"), 0644))
 	facts := project.BuildFacts{Language: "python", Versions: project.Versions{Python: "3.11.5"}}
 
-	require.NoError(t, generateDockerfileWithFacts(dir, facts))
-
-	b, err := os.ReadFile(filepath.Join(dir, "Dockerfile"))
+	s, err := generateDockerfileWithFacts(dir, facts)
 	require.NoError(t, err)
-	s := string(b)
+	require.NotEmpty(t, s)
+	_, statErr := os.Stat(filepath.Join(dir, "Dockerfile"))
+	require.ErrorIs(t, statErr, os.ErrNotExist)
 	require.Contains(t, s, "FROM python:3.11-slim AS build")
 	require.Contains(t, s, `["sh", "-lc", "exec gunicorn -b 0.0.0.0:$PORT app:app"]`)
 }
 
 func TestGenerateDockerfile_Unsupported(t *testing.T) {
 	dir := t.TempDir()
-	err := generateDockerfileWithFacts(dir, project.BuildFacts{Language: "rust"})
+	_, err := generateDockerfileWithFacts(dir, project.BuildFacts{Language: "rust"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "unsupported autogeneration")
 }
