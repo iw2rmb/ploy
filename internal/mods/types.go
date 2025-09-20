@@ -51,12 +51,15 @@ type BranchSpec struct {
 // BranchResult contains the result of executing a healing branch
 type BranchResult struct {
 	ID         string        `json:"id"`
+	Type       string        `json:"type,omitempty"`
 	Status     string        `json:"status"`
 	JobID      string        `json:"job_id"`
 	Notes      string        `json:"notes"`
 	StartedAt  time.Time     `json:"started_at"`
 	FinishedAt time.Time     `json:"finished_at"`
 	Duration   time.Duration `json:"duration"`
+	DiffPath   string        `json:"diff_path,omitempty"`
+	DiffKey    string        `json:"diff_key,omitempty"`
 }
 
 // Interface definitions

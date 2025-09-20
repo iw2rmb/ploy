@@ -110,8 +110,14 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 
 	// Cleanup job registration after successful artifact retrieval
 	_ = orchestration.DeregisterJob(runID, true)
+	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 	result.Status = "completed"
-	result.Notes = fmt.Sprintf("LLM exec job completed successfully, diff.patch at: %s", filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch"))
+	result.JobID = runID
+	result.DiffPath = diffPath
+	if modID != "" {
+		result.DiffKey = computeBranchDiffKey(modID, branch.ID, runID)
+	}
+	result.Notes = fmt.Sprintf("LLM exec job completed successfully, diff.patch at: %s", diffPath)
 	result.FinishedAt = time.Now()
 	result.Duration = time.Since(result.StartedAt)
 	return result
