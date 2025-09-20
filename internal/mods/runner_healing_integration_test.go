@@ -111,6 +111,34 @@ func TestModRunnerWithHealing(t *testing.T) {
 	})
 }
 
+func TestModRunner_AttemptHealingIncludesBuilderLogsKey(t *testing.T) {
+	config := &ModConfig{
+		ID:         "builder-log-test",
+		TargetRepo: "https://example.com/repo.git",
+		BaseRef:    "main",
+		SelfHeal: &SelfHealConfig{
+			Enabled:    true,
+			MaxRetries: 1,
+		},
+	}
+
+	runner, err := NewModRunner(config, t.TempDir())
+	require.NoError(t, err)
+	runner.SetJobHelper(testJobHelper{})
+	capHealer := &capturingHealer{}
+	runner.SetHealingOrchestrator(capHealer)
+
+	buildRes := &common.DeployResult{Success: false, DeploymentID: "mod-app-123", BuilderLogsKey: ""}
+
+	_, healErr := runner.attemptHealing(context.Background(), t.TempDir(), "build failed", buildRes)
+	require.NoError(t, healErr)
+	require.NotEmpty(t, capHealer.branches, "expected healing branches to be constructed")
+	inputs := capHealer.branches[0].Inputs
+	key, ok := inputs["builder_logs_key"].(string)
+	require.True(t, ok, "builder_logs_key not present in branch inputs")
+	assert.Equal(t, "build-logs/mod-app-123.log", key)
+}
+
 func TestModRunner_HealingMRIncludesORWAndLLMDiffs(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git binary not available")

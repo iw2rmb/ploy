@@ -94,6 +94,9 @@ func enrichBuilderLogs(controllerURL, appName string, res *common.DeployResult) 
 	if res == nil {
 		return
 	}
+	if strings.TrimSpace(res.BuilderLogsKey) == "" && strings.TrimSpace(res.DeploymentID) != "" {
+		res.BuilderLogsKey = fmt.Sprintf("build-logs/%s.log", strings.TrimSpace(res.DeploymentID))
+	}
 	if strings.TrimSpace(res.BuilderLogs) != "" {
 		return
 	}
