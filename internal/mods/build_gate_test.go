@@ -47,16 +47,10 @@ func TestEnrichBuilderLogsParsesJSONPayload(t *testing.T) {
 	if result.Message == "" {
 		t.Fatalf("expected result message to capture log snippet")
 	}
-	if !containsAll(result.Message, []string{"Compilation failure", result.BuilderLogsKey}) {
-		t.Fatalf("expected message to include log snippet and key, got %q", result.Message)
+	if !strings.Contains(result.Message, "Compilation failure") {
+		t.Fatalf("expected message to include log snippet, got %q", result.Message)
 	}
-}
-
-func containsAll(haystack string, needles []string) bool {
-	for _, needle := range needles {
-		if !strings.Contains(haystack, needle) {
-			return false
-		}
+	if !strings.Contains(result.Message, fmt.Sprintf("builder_log:%s", result.BuilderLogsURL)) {
+		t.Fatalf("expected message to include builder_log reference, got %q", result.Message)
 	}
-	return true
 }
