@@ -1,7 +1,9 @@
 package mods
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	mods "github.com/iw2rmb/ploy/internal/mods"
+	internalStorage "github.com/iw2rmb/ploy/internal/storage"
 	nomadtpl "github.com/iw2rmb/ploy/platform/nomad/mods"
 	"gopkg.in/yaml.v3"
 )
@@ -295,6 +298,7 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 			if result != nil {
 				rep := mods.BuildModReport(config, result)
 				status.Report = &rep
+				h.storeModReport(ctx, modID, rep)
 			}
 			if err := h.storeStatus(status); err != nil {
 				log.Printf("Failed to store error status: %v", err)
@@ -361,8 +365,27 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 	}
 	report := mods.BuildModReport(config, result)
 	status.Report = &report
+	h.storeModReport(ctx, modID, report)
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store final status: %v", err)
+	}
+}
+
+func reportStorageKey(modID string) string {
+	return fmt.Sprintf("artifacts/mods/%s/report.json", modID)
+}
+
+func (h *Handler) storeModReport(ctx context.Context, modID string, report mods.ModReport) {
+	if h == nil || h.storage == nil {
+		return
+	}
+	data, err := json.Marshal(report)
+	if err != nil {
+		log.Printf("[Mod] warning: failed to marshal report for %s: %v", modID, err)
+		return
+	}
+	if err := h.storage.Put(ctx, reportStorageKey(modID), bytes.NewReader(data), internalStorage.WithContentType("application/json")); err != nil {
+		log.Printf("[Mod] warning: failed to persist report for %s: %v", modID, err)
 	}
 }
 
