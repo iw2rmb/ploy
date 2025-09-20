@@ -41,45 +41,32 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	diffKey := computeBranchDiffKey(modID, branch.ID, runID)
 	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
 
-	// Prepare input tar from the repo and upload to SeaweedFS for task-side download
+	// Prepare input tar from the repo and upload to SeaweedFS for task-side download (best effort)
 	repoRoot := filepath.Join(o.runner.GetWorkspaceDir(), "repo")
 	inputTar := filepath.Join(baseDir, "input.tar")
-	if err := createTarFromDir(repoRoot, inputTar); err != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("failed to create ORW input tar: %v", err)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
-	if modID == "" || seaweedURL == "" {
-		result.Status = "failed"
-		result.Notes = "missing MOD_ID or SeaweedFS URL for ORW branch"
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
-	if err := uploadInputTar(seaweedURL, modID, inputTar); err != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("failed to upload ORW input tar: %v", err)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
-	inputURL := strings.TrimRight(seaweedURL, "/") + "/artifacts/mods/" + modID + "/input.tar"
-	available := false
-	for i := 0; i < 10; i++ {
-		if headURLFn(inputURL) {
-			available = true
-			break
+	if err := createTarFromDir(repoRoot, inputTar); err == nil {
+		if modID != "" && seaweedURL != "" {
+			if err := uploadInputTar(seaweedURL, modID, inputTar); err == nil {
+				inputURL := strings.TrimRight(seaweedURL, "/") + "/artifacts/mods/" + modID + "/input.tar"
+				available := false
+				for i := 0; i < 10; i++ {
+					if headURLFn(inputURL) {
+						available = true
+						break
+					}
+					time.Sleep(200 * time.Millisecond)
+				}
+				if !available {
+					if rep := o.runner.GetEventReporter(); rep != nil {
+						_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar not reachable at %s", inputURL), Time: time.Now()})
+					}
+				}
+			} else if rep := o.runner.GetEventReporter(); rep != nil {
+				_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar upload failed: %v", err), Time: time.Now()})
+			}
 		}
-		time.Sleep(200 * time.Millisecond)
-	}
-	if !available {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("input.tar not yet available at %s", inputURL)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
+	} else if rep := o.runner.GetEventReporter(); rep != nil {
+		_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar creation failed: %v", err), Time: time.Now()})
 	}
 
 	// Step 2b: Substitute environment variables in HCL template
