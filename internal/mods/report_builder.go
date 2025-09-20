@@ -61,7 +61,7 @@ func BuildModReport(cfg *ModConfig, result *ModResult) ModReport {
 		}
 		report.StepTree = append(report.StepTree, node)
 
-		if sr.Success {
+		if sr.Success && meta != nil && meta.Diff != nil && meta.Diff.Path != "" {
 			happy := ReportStep{
 				ID:          sr.StepID,
 				Type:        stepType,
@@ -214,20 +214,18 @@ func appendHealingBranches(report *ModReport, summary *ModHealingSummary, existi
 		}
 
 		var happy *ReportStep
-		if node.Success {
+		if node.Success && diffPath != "" {
 			happy = &ReportStep{
 				ID:       br.ID,
 				Type:     stepType,
 				Message:  br.Notes,
 				Duration: br.Duration,
+				Diff:     &ReportDiff{Path: diffPath, Content: diffContent},
 			}
 		}
 
 		if diffPath != "" {
 			node.References = append(node.References, ReportReference{Kind: "diff", Label: "diff.patch", Value: diffPath})
-		}
-		if happy != nil && (diffPath != "" || diffContent != "") {
-			happy.Diff = &ReportDiff{Path: diffPath, Content: diffContent}
 		}
 
 		additions = append(additions, healingEntry{node: node, step: happy, started: br.StartedAt})
@@ -367,7 +365,11 @@ func writeStepNodeMarkdown(sb *strings.Builder, node ReportStepNode, indent int)
 			if label == "" {
 				label = ref.Kind
 			}
-			fmt.Fprintf(sb, "%s    - %s: %s\n", prefix, label, ref.Value)
+			if label == "" {
+				label = "link"
+			}
+			formatted := fmt.Sprintf("(%s)[%s]", label, ref.Value)
+			fmt.Fprintf(sb, "%s    - %s: %s\n", prefix, label, formatted)
 		}
 	}
 

@@ -88,11 +88,11 @@ func TestBuildModReportHappyPathIncludesDiffs(t *testing.T) {
 	if !report.StartedAt.Equal(start) || !report.EndedAt.Equal(end) {
 		t.Fatalf("expected start/end to match run timestamps")
 	}
-	if len(report.HappyPath) != 3 {
-		t.Fatalf("expected 3 happy-path steps, got %d", len(report.HappyPath))
+	if len(report.HappyPath) != 1 {
+		t.Fatalf("expected 1 happy-path step with diff, got %d", len(report.HappyPath))
 	}
 
-	applyStep := report.HappyPath[1]
+	applyStep := report.HappyPath[0]
 	if applyStep.Type != string(StepTypeORWApply) {
 		t.Fatalf("expected happy path step type %q, got %q", StepTypeORWApply, applyStep.Type)
 	}
