@@ -9,6 +9,7 @@
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
 - Mods: Added MCP config parsing coverage (numeric budget coercion) and LLM diff-fetch tests to harden fanout execution.
 - Mods API: Added handler coverage for status enrichment, cancellation guards, event ingestion, artifact streaming/SBOM pointers, log SSE, and debug Nomad endpoints using in-memory KV and storage doubles; lifted `api/mods` coverage to ~61%.
+- Mods: Persist structured execution reports and expose `/v1/mods/:id/report` in JSON or Markdown with repo, MR, timing, and step tree details.
 - Tooling: Added `scripts/dev/seaweedfs_bootstrap.sh` plus a Homebrew launchd template so macOS services expose test collections (`test-collection`, `artifacts`, `test-bucket`) with replication `000`.
 - CLI: Added high-coverage unit tests for `ploy recipe` help, validation, and confirmation flows.
 - Lanes: E2E scaffolding added for A–G
