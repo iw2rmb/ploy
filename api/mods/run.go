@@ -99,7 +99,7 @@ func (h *Handler) RunMod(c *fiber.Ctx) error {
 	}
 
 	// Execute mod asynchronously
-	go h.executeMod(modID, config, req.TestMode)
+	go h.executeMod(modID, config, req.TestMode, req.Env)
 
 	// Return immediate response
 	return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
@@ -111,7 +111,7 @@ func (h *Handler) RunMod(c *fiber.Ctx) error {
 }
 
 // executeMod runs the workflow asynchronously
-func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool) {
+func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool, reqEnv map[string]string) {
 	// Top-level guard: always convert panics to a terminal failure status
 	defer func() {
 		if r := recover(); r != nil {
@@ -129,6 +129,9 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 	parentCtx := context.Background()
 	ctx, cancel := context.WithTimeout(parentCtx, execTimeout)
 	defer cancel()
+
+	restoreEnv := applyEnvOverrides(config.Env, reqEnv)
+	defer restoreEnv()
 
 	// Update status to running
 	status := ModStatus{
@@ -354,6 +357,44 @@ func (h *Handler) executeMod(modID string, config *mods.ModConfig, testMode bool
 	}
 	if err := h.storeStatus(status); err != nil {
 		log.Printf("Failed to store final status: %v", err)
+	}
+}
+
+func applyEnvOverrides(configEnv, requestEnv map[string]string) func() {
+	merged := make(map[string]string)
+	for k, v := range configEnv {
+		if strings.TrimSpace(k) == "" {
+			continue
+		}
+		merged[k] = v
+	}
+	for k, v := range requestEnv {
+		if strings.TrimSpace(k) == "" {
+			continue
+		}
+		merged[k] = v
+	}
+	if len(merged) == 0 {
+		return func() {}
+	}
+	previous := make(map[string]*string, len(merged))
+	for k, v := range merged {
+		if existing, ok := os.LookupEnv(k); ok {
+			val := existing
+			previous[k] = &val
+		} else {
+			previous[k] = nil
+		}
+		_ = os.Setenv(k, v)
+	}
+	return func() {
+		for k, val := range previous {
+			if val == nil {
+				_ = os.Unsetenv(k)
+			} else {
+				_ = os.Setenv(k, *val)
+			}
+		}
 	}
 }
 

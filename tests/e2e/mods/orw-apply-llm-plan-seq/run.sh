@@ -37,9 +37,17 @@ if command -v grep >/dev/null 2>&1; then
   echo "Scenario target_branch: $(grep -E '^target_branch:' -m1 "$SCENARIO_YAML" || echo '<none>')"
 fi
 CONFIG_ESCAPED=$(jq -Rs . < "$SCENARIO_YAML")
+ENV_MAP="{}"
+if [[ -n "${PLOY_GITLAB_PAT:-}" ]]; then
+  ENV_MAP=$(jq -n --arg token "$PLOY_GITLAB_PAT" '{PLOY_GITLAB_PAT: $token}')
+fi
+if [[ -n "${GITLAB_URL:-}" ]]; then
+  ENV_MAP=$(jq --arg url "$GITLAB_URL" '. + {GITLAB_URL: $url}' <<<"$ENV_MAP")
+fi
 BODY=$(cat <<EOF
 {
   "config": $CONFIG_ESCAPED,
+  "env": $ENV_MAP,
   "test_mode": false
 }
 EOF
