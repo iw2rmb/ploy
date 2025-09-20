@@ -80,19 +80,25 @@ func TestSharedPushBuildGateIntegration_AppendsBuilderLogs(t *testing.T) {
 	if !strings.Contains(res.Message, "Missing symbol Foo") {
 		t.Fatalf("expected result message to include builder logs, got %q", res.Message)
 	}
-	keySnippet := "builder logs archived at build-logs/" + deploymentID + ".log"
-	if !strings.Contains(res.Message, keySnippet) {
-		t.Fatalf("expected message to reference builder logs key, got %q", res.Message)
-	}
 	downloadURL := fmt.Sprintf("%s/apps/%s/builds/%s/logs/download", strings.TrimRight(server.URL, "/"), appName, deploymentID)
-	if !strings.Contains(res.Message, downloadURL) {
-		t.Fatalf("expected message to include download route, got %q", res.Message)
+	keySnippet := fmt.Sprintf("builder logs: [build-logs/%s.log](%s)", deploymentID, downloadURL)
+	if !strings.Contains(res.Message, keySnippet) {
+		t.Fatalf("expected message to include markdown builder log link, got %q", res.Message)
+	}
+	if strings.Contains(res.Message, "download full builder log via") {
+		t.Fatalf("expected message to omit legacy download helper text, got %q", res.Message)
+	}
+	if strings.Contains(res.Message, "storage.example") {
+		t.Fatalf("expected message to omit direct storage URLs, got %q", res.Message)
 	}
 	if !strings.Contains(res.Message, "error code: builder_failed") {
 		t.Fatalf("expected message to include error code, got %q", res.Message)
 	}
 	if !strings.Contains(res.Message, "builder job:") {
 		t.Fatalf("expected message to include builder job, got %q", res.Message)
+	}
+	if strings.Contains(res.Message, "{\"id\"") {
+		t.Fatalf("expected message to omit raw JSON detail chunks, got %q", res.Message)
 	}
 
 	if res.BuilderLogs != builderLogs {
