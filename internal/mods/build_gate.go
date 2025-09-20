@@ -253,15 +253,12 @@ func builderLogSnippet(logs string, maxLines, maxLen int) string {
 	return snippet
 }
 
-func buildLogsPointerLine(key, url string) string {
-	key = strings.TrimSpace(key)
-	if key == "" {
+func buildLogsPointerLine(_, url string) string {
+	u := strings.TrimSpace(url)
+	if u == "" {
 		return ""
 	}
-	if u := strings.TrimSpace(url); u != "" {
-		return fmt.Sprintf("  builder logs: [%s](%s)", key, u)
-	}
-	return fmt.Sprintf("  builder logs: %s", key)
+	return fmt.Sprintf("builder_log:%s", u)
 }
 
 func looksLikeJSONLine(line string) bool {

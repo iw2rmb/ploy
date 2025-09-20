@@ -397,12 +397,22 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 		r.emit(ctx, "build", "build-gate-error", "info", trimForEvent(message))
 	}
 
+	references := []ReportReference(nil)
+	if buildResult != nil {
+		if url := strings.TrimSpace(buildResult.BuilderLogsURL); url != "" {
+			label := strings.TrimSpace(buildResult.BuilderLogsKey)
+			if label == "" {
+				label = "builder log"
+			}
+			references = append(references, ReportReference{Kind: "builder_log", Label: label, Value: url})
+		}
+	}
 	result.StepResults = append(result.StepResults, StepResult{
 		StepID:   opts.StepID,
 		Success:  false,
 		Message:  message,
 		Duration: time.Since(buildStart),
-		Report:   &StepReportMeta{Type: stepType, ErrorSolved: message},
+		Report:   &StepReportMeta{Type: stepType, ErrorSolved: message, References: references},
 	})
 
 	if r.config.SelfHeal == nil || !r.config.SelfHeal.Enabled {
