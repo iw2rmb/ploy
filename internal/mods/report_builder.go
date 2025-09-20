@@ -2,6 +2,8 @@ package mods
 
 import (
 	"fmt"
+	"os"
+	"sort"
 	"strings"
 	"time"
 )
@@ -40,9 +42,11 @@ func BuildModReport(cfg *ModConfig, result *ModResult) ModReport {
 		}
 	}
 
+	existingSteps := map[string]struct{}{}
 	for _, sr := range result.StepResults {
 		meta := sr.Report
 		stepType := inferStepTypeForReport(sr.StepID, meta, stepTypeByID)
+		existingSteps[sr.StepID] = struct{}{}
 
 		node := ReportStepNode{
 			ID:          sr.StepID,
@@ -71,6 +75,8 @@ func BuildModReport(cfg *ModConfig, result *ModResult) ModReport {
 			report.HappyPath = append(report.HappyPath, happy)
 		}
 	}
+
+	appendHealingBranches(&report, result.HealingSummary, existingSteps)
 
 	return report
 }
@@ -156,6 +162,90 @@ func copyRecipes(in []RecipeEntry) []RecipeEntry {
 	out := make([]RecipeEntry, len(in))
 	copy(out, in)
 	return out
+}
+
+func appendHealingBranches(report *ModReport, summary *ModHealingSummary, existing map[string]struct{}) {
+	if report == nil || summary == nil {
+		return
+	}
+
+	type healingEntry struct {
+		node    ReportStepNode
+		step    *ReportStep
+		started time.Time
+	}
+
+	var additions []healingEntry
+	for _, br := range summary.AllResults {
+		stepType := string(NormalizeStepType(br.Type))
+		if stepType == "" {
+			stepType = br.Type
+		}
+		if stepType == string(StepTypeORWApply) {
+			if _, ok := existing[br.ID]; ok {
+				continue
+			}
+		}
+
+		node := ReportStepNode{
+			ID:       br.ID,
+			Type:     stepType,
+			Success:  strings.EqualFold(br.Status, "completed"),
+			Message:  br.Notes,
+			Duration: br.Duration,
+		}
+
+		var diffContent string
+		if br.DiffPath != "" {
+			if data, err := os.ReadFile(br.DiffPath); err == nil {
+				if len(data) > maxDiffPreviewBytes {
+					diffContent = string(data[:maxDiffPreviewBytes]) + "\n... (diff truncated)"
+				} else {
+					diffContent = string(data)
+				}
+			}
+		}
+
+		var diffPath string
+		if br.DiffKey != "" {
+			diffPath = br.DiffKey
+		} else if br.DiffPath != "" {
+			diffPath = br.DiffPath
+		}
+
+		var happy *ReportStep
+		if node.Success {
+			happy = &ReportStep{
+				ID:       br.ID,
+				Type:     stepType,
+				Message:  br.Notes,
+				Duration: br.Duration,
+			}
+		}
+
+		if diffPath != "" {
+			node.References = append(node.References, ReportReference{Kind: "diff", Label: "diff.patch", Value: diffPath})
+		}
+		if happy != nil && (diffPath != "" || diffContent != "") {
+			happy.Diff = &ReportDiff{Path: diffPath, Content: diffContent}
+		}
+
+		additions = append(additions, healingEntry{node: node, step: happy, started: br.StartedAt})
+	}
+
+	sort.SliceStable(additions, func(i, j int) bool {
+		if additions[i].started.IsZero() || additions[j].started.IsZero() {
+			return additions[i].node.ID < additions[j].node.ID
+		}
+		return additions[i].started.Before(additions[j].started)
+	})
+
+	for _, entry := range additions {
+		report.StepTree = append(report.StepTree, entry.node)
+		if entry.step != nil {
+			report.HappyPath = append(report.HappyPath, *entry.step)
+		}
+	}
 }
 
 // RenderModReportMarkdown renders a ModReport into a Markdown document.
