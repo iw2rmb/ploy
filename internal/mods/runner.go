@@ -28,6 +28,8 @@ var validateUnifiedDiffFn = ValidateUnifiedDiff
 var applyUnifiedDiffFn = ApplyUnifiedDiff
 var hasRepoChangesFn = hasRepoChanges
 
+const healingDiffPreviewLimit = 200 * 1024
+
 // ErrNoBuildFile indicates missing supported build files in repository.
 var ErrNoBuildFile = errors.New("no build file found in repository")
 
@@ -507,10 +509,55 @@ func (r *ModRunner) runBuildPhase(ctx context.Context, repoPath string, result *
 		return nil, fmt.Errorf("%s: %s (healing failed: %v)", opts.FailureMessage, message, lastErr)
 	}
 
+	appendHealingStepsFromSummary(result)
+
 	if finalBuildResult != nil {
 		buildResult = finalBuildResult
 	}
 	return buildResult, nil
+}
+
+func appendHealingStepsFromSummary(result *ModResult) {
+	if result == nil || result.HealingSummary == nil {
+		return
+	}
+	for _, br := range result.HealingSummary.AllResults {
+		if NormalizeStepType(br.Type) != StepTypeLLMExec {
+			continue
+		}
+		meta := &StepReportMeta{Type: string(StepTypeLLMExec)}
+		diffPath := br.DiffKey
+		if diffPath == "" {
+			diffPath = br.DiffPath
+		}
+		if br.DiffKey != "" {
+			meta.References = append(meta.References, ReportReference{Kind: "diff", Label: "diff.patch", Value: br.DiffKey})
+		}
+		if content := healingDiffPreview(br.DiffPath); content != "" || diffPath != "" {
+			meta.Diff = &ReportDiff{Path: diffPath, Content: content}
+		}
+		result.StepResults = append(result.StepResults, StepResult{
+			StepID:   br.ID,
+			Success:  strings.EqualFold(br.Status, "completed"),
+			Message:  br.Notes,
+			Duration: br.Duration,
+			Report:   meta,
+		})
+	}
+}
+
+func healingDiffPreview(path string) string {
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	if len(data) > healingDiffPreviewLimit {
+		return string(data[:healingDiffPreviewLimit]) + "\n... (diff truncated)"
+	}
+	return string(data)
 }
 
 // SBOM helpers moved to vuln_gate.go
