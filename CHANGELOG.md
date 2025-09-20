@@ -190,7 +190,7 @@
 - Improved error handling across all service integrations
 - Optimized storage operations for better performance characteristics
 - Fixed ARF config storage initialization to match updated NewRecipeRegistry signature (no error return)
-- IAC docs: consolidated `iac/README.md` (clean, non-duplicative) and removed redundant `iac/CLAUDE.md`
+- IAC docs: consolidated `iac/README.md` (clean, non-duplicative) and retired the redundant supplemental guide
 - Transflow orw-apply HCL: mount prepared `input.tar` into the container (`/workspace/input.tar`) alongside context/out mounts to ensure source files are available. Fixes orw-apply failing with "No build file found" when the archive wasn’t accessible in-container.
 - Transflow API docs: aligned endpoints with implementation (singular `/v1/transflow/*`, artifacts endpoints). Removed non-implemented logs streaming section.
 - OpenRewrite runner image: added error.log emission on failures (missing build file, missing tools, tar issues, transformation failure) to improve server-side status messages and artifact capture.
@@ -1358,7 +1358,7 @@
   - Unit tests for circuit breaker state transitions and concurrent access  
   - Unit tests for metrics tracking and isolation
   - Integration tests for end-to-end pipeline execution
-  - Test coverage exceeds 60% minimum requirement per CLAUDE.md
+  - Test coverage exceeds 60% minimum requirement per AGENTS.md
 
 ### Documentation
 - **Phase 4 Roadmap Updated**: Refocused on external service orchestration
@@ -1716,7 +1716,7 @@
 ### Fixed  
 - **Documentation Updates**: Replaced deprecated tool references
   - Updated README.md deployment instructions to use `ployman push`
-  - Updated CLAUDE.md deployment commands and priority order
+  - Updated AGENTS.md deployment commands and priority order
   - Updated iac/prod/README.md deployment procedures
   - Removed references to obsolete api-dist and deploy.sh tools
 
@@ -1726,7 +1726,7 @@
   - Created tests/integration/test-prod-deployment.sh for production deployment testing
   - Added production safety confirmations and infrastructure validation (DNS, SSL)
   - Comprehensive domain routing tests: *.dev.ployd.app, *.ployd.app, *.dev.ployman.app, *.ployman.app
-  - All integration tests following CLAUDE.md VPS testing protocol
+  - All integration tests following tests/vps/README.md VPS testing protocol
 
 - **Cleanup Verification Tests**: Comprehensive test coverage for Phase 5 cleanup
   - Added tests/unit/cleanup_test.go with removal verification
