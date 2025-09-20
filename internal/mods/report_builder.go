@@ -368,7 +368,16 @@ func writeStepNodeMarkdown(sb *strings.Builder, node ReportStepNode, indent int)
 			if label == "" {
 				label = "link"
 			}
-			formatted := fmt.Sprintf("(%s)[%s]", label, ref.Value)
+			value := strings.TrimSpace(ref.Value)
+			if ref.Kind == "builder_log" && value != "" {
+				display := label
+				if display == "" || display == ref.Kind {
+					display = "builder log"
+				}
+				fmt.Fprintf(sb, "%s    - builder logs: [%s](%s)\n", prefix, display, value)
+				continue
+			}
+			formatted := fmt.Sprintf("(%s)[%s]", label, value)
 			fmt.Fprintf(sb, "%s    - %s: %s\n", prefix, label, formatted)
 		}
 	}
