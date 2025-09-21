@@ -2,15 +2,15 @@
 
 ## Summary
 - Repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
-- Branch: workflow/java11to17-orw-llm/1758409861
-- Merge Request: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82
-- Started: 2025-09-20T23:10:59Z
-- Ended: 2025-09-20T23:12:51Z
-- Duration: 1m51.968253093s
+- Branch: workflow/java11to17-orw-llm/1758434672
+- Merge Request: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/83
+- Started: 2025-09-21T06:04:31Z
+- Ended: 2025-09-21T06:06:26Z
+- Duration: 1m55.028383625s
 
 ## Happy Path
 1. [success] llm-1 (llm-exec)
-   - Message: LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch
+   - Message: LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-598dbb0a-1273308681/llm-exec/llm-1/out/diff.patch
 
 ```diff
 --- a/src/main/java/e2e/FailMissingSymbol.java
@@ -64,32 +64,32 @@ index 32d75b2..ca9f41c 100644
 
 ## Step Tree
 - [success] clone (system) — Cloned https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git at e2e/fail-missing-symbol
-- [success] create-branch (system) — Created workflow branch: workflow/java11to17-orw-llm/1758409861
+- [success] create-branch (system) — Created workflow branch: workflow/java11to17-orw-llm/1758434672
 - [failed] baseline-build (build) — docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
+builder job: mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672
 error code: build_failed
-builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
+builder job: mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672
 error code: build_failed
   • Addressed Error: docker build failed: exit status 1
-builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
+builder job: mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672
 error code: build_failed
-builder job: mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861
+builder job: mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672
 error code: build_failed
   • References:
-    - builder logs: [build-logs/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861.log](https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758409861/builds/mod-java11to17-orw-llm-1758409861-d-build-20250920-231101-1758409861/logs/download)
+    - builder logs: [build-logs/mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672.log](https://api.dev.ployman.app/v1/apps/mod-java11to17-orw-llm-1758434672/builds/mod-java11to17-orw-llm-1758434672-d-build-20250921-060432-1758434672/logs/download)
 - [success] baseline-build — Baseline build completed successfully (post-healing)
-- [success] llm-1 (llm-exec) — LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-a17f5d35-1446619571/llm-exec/llm-1/out/diff.patch
+- [success] llm-1 (llm-exec) — LLM exec job completed successfully, diff.patch at: /tmp/mods-mod-598dbb0a-1273308681/llm-exec/llm-1/out/diff.patch
   • References:
-    - diff.patch: (diff.patch)[mods/mod-a17f5d35/branches/llm-1/steps/llm-exec-llm-1-1758409871/diff.patch]
+    - diff.patch: [diff.patch](mods/mod-598dbb0a/branches/llm-1/steps/llm-exec-llm-1-1758434682/diff.patch)
 - [success] java11to17-migration (orw-apply) — Applied ORW diff
   • Recipes:
     - org.openrewrite.java.migrate.UpgradeToJava17 (org.openrewrite.recipe:rewrite-migrate-java@3.17.0)
   • References:
-    - submitted_hcl: (submitted_hcl)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.submitted.hcl]
-    - pre_hcl: (pre_hcl)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/orw_apply.pre.hcl]
-    - input.tar: (input.tar)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/input.tar]
-    - diff.patch: (diff.patch)[/tmp/mods-mod-a17f5d35-1446619571/orw-apply/java11to17-migration/out/diff.patch]
+    - submitted_hcl: [submitted_hcl](/tmp/mods-mod-598dbb0a-1273308681/orw-apply/java11to17-migration/orw_apply.submitted.hcl)
+    - pre_hcl: [pre_hcl](/tmp/mods-mod-598dbb0a-1273308681/orw-apply/java11to17-migration/orw_apply.pre.hcl)
+    - input.tar: [input.tar](/tmp/mods-mod-598dbb0a-1273308681/orw-apply/java11to17-migration/input.tar)
+    - diff.patch: [diff.patch](/tmp/mods-mod-598dbb0a-1273308681/orw-apply/java11to17-migration/out/diff.patch)
 - [success] commit — Committed changes
 - [success] build — Build completed successfully
-- [success] push — Pushed branch workflow/java11to17-orw-llm/1758409861
-- [success] mr — MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/82
+- [success] push — Pushed branch workflow/java11to17-orw-llm/1758434672
+- [success] mr — MR created: https://gitlab.com/iw2rmb/ploy-orw-java11-maven/-/merge_requests/83
