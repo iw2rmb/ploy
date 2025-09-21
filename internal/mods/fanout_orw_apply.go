@@ -156,6 +156,26 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		result.Duration = time.Since(result.StartedAt)
 		return result
 	}
+	if rep := o.runner.GetEventReporter(); rep != nil {
+		summary := []string{}
+		if data, readErr := os.ReadFile(renderedHCLPath); readErr == nil {
+			for _, line := range strings.Split(string(data), "\n") {
+				trim := strings.TrimSpace(line)
+				if strings.HasPrefix(trim, "RECIPE_") || strings.HasPrefix(trim, "MAVEN_PLUGIN_VERSION") {
+					summary = append(summary, trim)
+				}
+			}
+		} else {
+			summary = append(summary, fmt.Sprintf("failed to read submitted HCL: %v", readErr))
+		}
+		_ = rep.Report(ctx, Event{
+			Phase:   "fanout",
+			Step:    string(StepTypeORWApply),
+			Level:   "info",
+			Message: fmt.Sprintf("orw submitted env: %s", strings.Join(summary, "; ")),
+			Time:    time.Now(),
+		})
+	}
 
 	// Step 3: Report job metadata asynchronously (job name == runID)
 	var rep2 EventReporter
