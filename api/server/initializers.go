@@ -54,7 +54,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 
 	// Initialize Traefik router
 	log.Printf("Initializing Traefik router with Consul address: %s", cfg.ConsulAddr)
-	traefikRouter, err := initializeTraefikRouter(cfg.ConsulAddr)
+	traefikRouter, err := initializeTraefikRouter(cfg, metricsInstance)
 	if err != nil {
 		log.Printf("⚠️  Failed to initialize Traefik router: %v", err)
 	} else {

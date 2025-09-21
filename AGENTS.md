@@ -20,11 +20,16 @@
 
 ### Go Tooling (MANDATORY)
 
-- Use the existing make targets for formatting and analysis: `make fmt`, `make vet`, `make lint`, `staticcheck ./...`, and `make test-coverage-threshold`.
+- Prefer the MCP tools shipped with `mcp-golang` for common tasks:
+  - `mcp_golang__format_source` (or the `format-lint-test` playbook) instead of `make fmt`.
+  - `mcp_golang__lint_package` for lint/static analysis.
+  - `mcp_golang__test_with_coverage` for unit tests + coverage.
+  - `run_playbook` → `format-lint-test` to chain the full RED/GREEN cycle when you want a single command.
+- If the MCP server is unavailable, fall back to the legacy commands (`make fmt`, `make lint`, `staticcheck ./...`, `make test-coverage-threshold`, etc.).
 - Active deployment lane: **D (Docker)** only. Legacy references to lanes A/B/C/E/F/G remain for historical context.
 - Follow `.golangci.yml` and `staticcheck.conf` as the sources of truth for enabled checks.
 - Keep modules tidy with `go mod tidy -v && go mod verify` when dependencies change.
-- For security scans, run `make sec` and `govulncheck ./...` as required by the project.
+- For security scans, prefer `mcp_golang__dependency_hygiene` with `enableGovulnCheck: true`; fall back to `make sec` / `govulncheck ./...` only if the MCP server is unavailable.
 
 ### Test File Naming (MANDATORY)
 
