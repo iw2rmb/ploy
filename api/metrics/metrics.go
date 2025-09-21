@@ -38,6 +38,10 @@ type Metrics struct {
 	StorageOperations *prometheus.CounterVec
 	StorageErrors     *prometheus.CounterVec
 
+	// Env store metrics
+	EnvStoreOperations *prometheus.CounterVec
+	EnvStoreLatency    *prometheus.HistogramVec
+
 	// Certificate metrics
 	CertificatesTotal     prometheus.Gauge
 	CertificateOperations *prometheus.CounterVec
@@ -179,6 +183,24 @@ func (m *Metrics) initializeMetrics() {
 		[]string{"operation", "error_type"},
 	)
 
+	// Env store metrics
+	m.EnvStoreOperations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_api_envstore_operations_total",
+			Help: "Total number of environment store operations by backend",
+		},
+		[]string{"target", "operation", "status"}, // consul/jetstream; set/delete; success/failure
+	)
+
+	m.EnvStoreLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ploy_api_envstore_operation_duration_seconds",
+			Help:    "Duration of environment store operations by backend",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1},
+		},
+		[]string{"target", "operation"},
+	)
+
 	// Certificate metrics
 	m.CertificatesTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -268,6 +290,8 @@ func (m *Metrics) registerMetrics() {
 		m.TTLCleanedJobs,
 		m.StorageOperations,
 		m.StorageErrors,
+		m.EnvStoreOperations,
+		m.EnvStoreLatency,
 		m.CertificatesTotal,
 		m.CertificateOperations,
 		m.CertificateExpiry,
@@ -341,6 +365,15 @@ func (m *Metrics) RecordStorageOperation(operation, status string) {
 // RecordStorageError records a storage error
 func (m *Metrics) RecordStorageError(operation, errorType string) {
 	m.StorageErrors.WithLabelValues(operation, errorType).Inc()
+}
+
+// RecordEnvStoreOperation records dual-write metrics for environment store backends.
+func (m *Metrics) RecordEnvStoreOperation(target, operation, status string, duration time.Duration) {
+	if m == nil {
+		return
+	}
+	m.EnvStoreOperations.WithLabelValues(target, operation, status).Inc()
+	m.EnvStoreLatency.WithLabelValues(target, operation).Observe(duration.Seconds())
 }
 
 // RecordCertificateOperation records a certificate operation

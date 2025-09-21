@@ -1,11 +1,13 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"log"
 
 	consulapi "github.com/hashicorp/consul/api"
 	nomadapi "github.com/hashicorp/nomad/api"
+	nats "github.com/nats-io/nats.go"
 
 	"github.com/iw2rmb/ploy/api/consul_envstore"
 	"github.com/iw2rmb/ploy/api/coordination"
@@ -16,18 +18,39 @@ import (
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 )
 
-func initializeEnvStore(cfg *ControllerConfig) (envstore.EnvStoreInterface, error) {
+func initializeEnvStore(cfg *ControllerConfig, recorder consul_envstore.MetricsRecorder) (envstore.EnvStoreInterface, error) {
+	var options []consul_envstore.Option
+	if recorder != nil {
+		options = append(options, consul_envstore.WithMetrics(recorder))
+	}
+
+	var jsWriter *jetStreamKVWriter
 	if cfg.UseConsulEnv {
-		if consulEnvStore, err := consul_envstore.New(cfg.ConsulAddr, "ploy/apps"); err == nil {
-			// Test Consul connectivity
+		if cfg.JetStreamEnv.DualWrite {
+			writer, err := newJetStreamEnvWriter(cfg.JetStreamEnv)
+			if err != nil {
+				log.Printf("Warning: JetStream dual-write disabled (initialization failed): %v", err)
+			} else {
+				log.Printf("JetStream dual-write enabled for env store (bucket=%s)", cfg.JetStreamEnv.Bucket)
+				jsWriter = writer
+				options = append(options, consul_envstore.WithSecondary(writer))
+			}
+		}
+
+		if consulEnvStore, err := consul_envstore.New(cfg.ConsulAddr, "ploy/apps", options...); err == nil {
 			if err := consulEnvStore.HealthCheck(); err == nil {
 				log.Printf("Using Consul KV store for environment variables at %s", cfg.ConsulAddr)
 				return consulEnvStore, nil
-			} else {
-				log.Printf("Consul env store health check failed, falling back to file-based store: %v", err)
 			}
+			log.Printf("Consul env store health check failed, falling back to file-based store: %v", err)
 		} else {
 			log.Printf("Failed to initialize Consul env store, falling back to file-based store: %v", err)
+		}
+
+		if jsWriter != nil {
+			if err := jsWriter.Close(); err != nil {
+				log.Printf("Warning: failed to close JetStream connection during fallback: %v", err)
+			}
 		}
 	}
 
@@ -35,6 +58,83 @@ func initializeEnvStore(cfg *ControllerConfig) (envstore.EnvStoreInterface, erro
 	fileEnvStore := envstore.New(cfg.EnvStorePath)
 	log.Printf("Using file-based environment store at %s", cfg.EnvStorePath)
 	return fileEnvStore, nil
+}
+
+type jetStreamKVWriter struct {
+	conn   *nats.Conn
+	bucket nats.KeyValue
+}
+
+func (w *jetStreamKVWriter) Put(key string, value []byte) error {
+	if w == nil || w.bucket == nil {
+		return fmt.Errorf("jetstream bucket unavailable")
+	}
+	_, err := w.bucket.Put(key, value)
+	return err
+}
+
+func (w *jetStreamKVWriter) Delete(key string) error {
+	if w == nil || w.bucket == nil {
+		return fmt.Errorf("jetstream bucket unavailable")
+	}
+	err := w.bucket.Delete(key)
+	if errors.Is(err, nats.ErrKeyNotFound) {
+		return nil
+	}
+	return err
+}
+
+func (w *jetStreamKVWriter) Close() error {
+	if w == nil || w.conn == nil {
+		return nil
+	}
+	if err := w.conn.Drain(); err != nil {
+		w.conn.Close()
+		return err
+	}
+	w.conn.Close()
+	return nil
+}
+
+func newJetStreamEnvWriter(cfg JetStreamEnvConfig) (*jetStreamKVWriter, error) {
+	if cfg.URL == "" {
+		return nil, fmt.Errorf("jetstream url not configured")
+	}
+
+	opts := []nats.Option{nats.Name("ploy-envstore-dual-writer")}
+	if cfg.CredentialsPath != "" {
+		opts = append(opts, nats.UserCredentials(cfg.CredentialsPath))
+	}
+	if cfg.User != "" {
+		opts = append(opts, nats.UserInfo(cfg.User, cfg.Password))
+	}
+
+	conn, err := nats.Connect(cfg.URL, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	js, err := conn.JetStream()
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	bucket := cfg.Bucket
+	if bucket == "" {
+		bucket = "ploy_env"
+	}
+
+	kv, err := js.KeyValue(bucket)
+	if errors.Is(err, nats.ErrBucketNotFound) {
+		kv, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: bucket})
+	}
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return &jetStreamKVWriter{conn: conn, bucket: kv}, nil
 }
 
 func initializeTraefikRouter(consulAddr string) (*routing.TraefikRouter, error) {

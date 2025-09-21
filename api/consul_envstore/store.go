@@ -132,18 +132,82 @@ func (c *SimpleCache) GetCacheStats() CacheStats {
 	}
 }
 
+// consulKV abstracts the subset of the Consul KV API used by the env store so tests
+// can inject a fake implementation without requiring a Consul agent.
+type consulKV interface {
+	Get(key string, opts *api.QueryOptions) (*api.KVPair, *api.QueryMeta, error)
+	Put(pair *api.KVPair, opts *api.WriteOptions) (*api.WriteMeta, error)
+	Delete(key string, opts *api.WriteOptions) (*api.WriteMeta, error)
+}
+
+// SecondaryKV represents an optional shadow key-value store (e.g., JetStream) that
+// receives dual writes when enabled.
+type SecondaryKV interface {
+	Put(key string, value []byte) error
+	Delete(key string) error
+}
+
+// MetricsRecorder captures dual-write metrics for observability. Implementations
+// may emit Prometheus metrics or act as no-ops in tests.
+type MetricsRecorder interface {
+	RecordEnvStoreOperation(target, operation, status string, duration time.Duration)
+}
+
+// Option configures the ConsulEnvStore during construction.
+type Option func(*ConsulEnvStore)
+
+const (
+	metricsTargetConsul    = "consul"
+	metricsTargetJetStream = "jetstream"
+
+	operationSet    = "set"
+	operationDelete = "delete"
+)
+
+type noopMetrics struct{}
+
+func (noopMetrics) RecordEnvStoreOperation(string, string, string, time.Duration) {}
+
+// WithKV injects a custom Consul KV client implementation (primarily used in tests).
+func WithKV(kv consulKV) Option {
+	return func(store *ConsulEnvStore) {
+		store.kv = kv
+	}
+}
+
+// WithSecondary configures an optional secondary key-value store for dual writes.
+func WithSecondary(secondary SecondaryKV) Option {
+	return func(store *ConsulEnvStore) {
+		store.secondary = secondary
+		if secondary != nil {
+			store.dualWrite = true
+		}
+	}
+}
+
+// WithMetrics wires a metrics recorder used to emit success/failure telemetry.
+func WithMetrics(metrics MetricsRecorder) Option {
+	return func(store *ConsulEnvStore) {
+		store.metrics = metrics
+	}
+}
+
 type ConsulEnvStore struct {
 	client    *api.Client
 	keyPrefix string
 	mu        sync.RWMutex
 	cache     *SimpleCache
 	batchSize int
+	kv        consulKV
+	secondary SecondaryKV
+	metrics   MetricsRecorder
+	dualWrite bool
 }
 
 // Ensure ConsulEnvStore implements the EnvStoreInterface
 var _ envstore.EnvStoreInterface = (*ConsulEnvStore)(nil)
 
-func New(consulAddr, keyPrefix string) (*ConsulEnvStore, error) {
+func New(consulAddr, keyPrefix string, opts ...Option) (*ConsulEnvStore, error) {
 	config := api.DefaultConfig()
 	if consulAddr != "" {
 		config.Address = consulAddr
@@ -161,12 +225,32 @@ func New(consulAddr, keyPrefix string) (*ConsulEnvStore, error) {
 	// Create cache with 5-minute TTL for environment variables
 	cache := NewSimpleCache(5 * time.Minute)
 
-	return &ConsulEnvStore{
+	kv := client.KV()
+	store := &ConsulEnvStore{
 		client:    client,
 		keyPrefix: keyPrefix,
 		cache:     cache,
 		batchSize: 10,
-	}, nil
+		kv:        kv,
+	}
+
+	for _, opt := range opts {
+		opt(store)
+	}
+
+	if store.kv == nil {
+		store.kv = kv
+	}
+
+	if store.metrics == nil {
+		store.metrics = noopMetrics{}
+	}
+
+	if store.secondary != nil {
+		store.dualWrite = true
+	}
+
+	return store, nil
 }
 
 func (s *ConsulEnvStore) appEnvKey(app string) string {
@@ -188,8 +272,7 @@ func (s *ConsulEnvStore) GetAll(app string) (envstore.AppEnvVars, error) {
 	key := s.appEnvKey(app)
 
 	// Use direct client
-	kv := s.client.KV()
-	pair, _, err := kv.Get(key, nil)
+	pair, _, err := s.kv.Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get from Consul: %w", err)
 	}
@@ -228,7 +311,7 @@ func (s *ConsulEnvStore) Set(app, key, value string) error {
 	}
 
 	envVars[key] = value
-	return s.saveUnsafe(app, envVars)
+	return s.saveUnsafe(app, envVars, operationSet)
 }
 
 func (s *ConsulEnvStore) SetAll(app string, envVars envstore.AppEnvVars) error {
@@ -239,7 +322,7 @@ func (s *ConsulEnvStore) SetAll(app string, envVars envstore.AppEnvVars) error {
 	cacheKey := fmt.Sprintf("app:%s:env", app)
 	s.cache.Delete(cacheKey)
 
-	return s.saveUnsafe(app, envVars)
+	return s.saveUnsafe(app, envVars, operationSet)
 }
 
 func (s *ConsulEnvStore) Get(app, key string) (string, bool, error) {
@@ -270,14 +353,12 @@ func (s *ConsulEnvStore) Delete(app, key string) error {
 	}
 
 	delete(envVars, key)
-	return s.saveUnsafe(app, envVars)
+	return s.saveUnsafe(app, envVars, operationDelete)
 }
 
 func (s *ConsulEnvStore) getUnsafe(app string) (envstore.AppEnvVars, error) {
 	key := s.appEnvKey(app)
-	kv := s.client.KV()
-
-	pair, _, err := kv.Get(key, nil)
+	pair, _, err := s.kv.Get(key, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get from Consul: %w", err)
 	}
@@ -294,27 +375,59 @@ func (s *ConsulEnvStore) getUnsafe(app string) (envstore.AppEnvVars, error) {
 	return envVars, nil
 }
 
-func (s *ConsulEnvStore) saveUnsafe(app string, envVars envstore.AppEnvVars) error {
+func (s *ConsulEnvStore) saveUnsafe(app string, envVars envstore.AppEnvVars, operation string) error {
 	data, err := json.Marshal(envVars)
 	if err != nil {
 		return fmt.Errorf("failed to marshal environment variables: %w", err)
 	}
 
 	key := s.appEnvKey(app)
-	kv := s.client.KV()
+	start := time.Now()
+	pair := &api.KVPair{Key: key, Value: data}
 
-	pair := &api.KVPair{
-		Key:   key,
-		Value: data,
-	}
-
-	_, err = kv.Put(pair, nil)
-	if err != nil {
+	if _, err = s.kv.Put(pair, nil); err != nil {
+		s.recordOperation(metricsTargetConsul, operation, "failure", time.Since(start))
 		return fmt.Errorf("failed to save to Consul: %w", err)
 	}
 
-	log.Printf("[ConsulEnvStore] Saved %d environment variables for app %s to key %s", len(envVars), app, key)
+	duration := time.Since(start)
+	s.recordOperation(metricsTargetConsul, operation, "success", duration)
+
+	log.Printf("[ConsulEnvStore] Saved %d environment variables for app %s to key %s (operation=%s)", len(envVars), app, key, operation)
+
+	s.writeSecondary(key, operation, data, len(envVars))
 	return nil
+}
+
+func (s *ConsulEnvStore) writeSecondary(key, operation string, data []byte, envCount int) {
+	if !s.dualWrite || s.secondary == nil {
+		return
+	}
+
+	start := time.Now()
+	var err error
+
+	if operation == operationDelete && envCount == 0 {
+		err = s.secondary.Delete(key)
+	} else {
+		err = s.secondary.Put(key, data)
+	}
+
+	duration := time.Since(start)
+	if err != nil {
+		s.recordOperation(metricsTargetJetStream, operation, "failure", duration)
+		log.Printf("[ConsulEnvStore] Secondary write failed for key %s (operation=%s): %v", key, operation, err)
+		return
+	}
+
+	s.recordOperation(metricsTargetJetStream, operation, "success", duration)
+}
+
+func (s *ConsulEnvStore) recordOperation(target, operation, status string, duration time.Duration) {
+	if s.metrics == nil {
+		return
+	}
+	s.metrics.RecordEnvStoreOperation(target, operation, status, duration)
 }
 
 func (s *ConsulEnvStore) ToStringArray(app string) ([]string, error) {
@@ -333,8 +446,7 @@ func (s *ConsulEnvStore) ToStringArray(app string) ([]string, error) {
 
 // Health check for the Consul connection
 func (s *ConsulEnvStore) HealthCheck() error {
-	kv := s.client.KV()
-	_, _, err := kv.Get("ploy/health", nil)
+	_, _, err := s.kv.Get("ploy/health", nil)
 	if err != nil {
 		return fmt.Errorf("consul health check failed: %w", err)
 	}

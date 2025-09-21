@@ -9,6 +9,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
+// JetStreamEnvConfig captures dual-write configuration for the environment store.
+type JetStreamEnvConfig struct {
+	DualWrite       bool
+	URL             string
+	Bucket          string
+	CredentialsPath string
+	User            string
+	Password        string
+}
+
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
 	Port              string
@@ -29,12 +39,23 @@ type ControllerConfig struct {
 	SecurityRegistryURL string
 	// Optional Maven group for MavenFetcher. If set, MavenFetcher is used.
 	SecurityMavenGroup string
+	// JetStream dual write configuration for the env store.
+	JetStreamEnv JetStreamEnvConfig
 }
 
 // parseIntEnv parses integer from environment variable with fallback
 func parseIntEnv(envVar string, defaultVal int) int {
 	if val := os.Getenv(envVar); val != "" {
 		if parsed, err := strconv.Atoi(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultVal
+}
+
+func parseBoolEnv(envVar string, defaultVal bool) bool {
+	if val := os.Getenv(envVar); val != "" {
+		if parsed, err := strconv.ParseBool(val); err == nil {
 			return parsed
 		}
 	}
@@ -48,6 +69,21 @@ func LoadConfigFromEnv() *ControllerConfig {
 	if port == "" {
 		port = utils.Getenv("PORT", "8081")
 	}
+
+	dualWrite := parseBoolEnv("PLOY_ENVSTORE_JETSTREAM_DUAL_WRITE", false)
+	if !dualWrite {
+		dualWrite = parseBoolEnv("PLOY_USE_JETSTREAM_KV", false)
+	}
+
+	jsURL := utils.Getenv("PLOY_JETSTREAM_URL", "")
+	jsBucket := utils.Getenv("PLOY_JETSTREAM_ENV_BUCKET", "")
+	if jsBucket == "" {
+		jsBucket = utils.Getenv("PLOY_JETSTREAM_KV_BUCKET", "ploy_env")
+	}
+
+	jsCreds := utils.Getenv("PLOY_JETSTREAM_CREDS", "")
+	jsUser := utils.Getenv("PLOY_JETSTREAM_USER", "")
+	jsPassword := utils.Getenv("PLOY_JETSTREAM_PASSWORD", "")
 
 	return &ControllerConfig{
 		Port:                 port,
@@ -63,6 +99,14 @@ func LoadConfigFromEnv() *ControllerConfig {
 		SecurityDefaultPacks: utils.Getenv("PLOY_SECURITY_DEFAULT_PACKS", ""),
 		SecurityRegistryURL:  utils.Getenv("PLOY_SECURITY_REGISTRY", "https://registry.dev.ployman.app"),
 		SecurityMavenGroup:   utils.Getenv("PLOY_SECURITY_MAVEN_GROUP", ""),
+		JetStreamEnv: JetStreamEnvConfig{
+			DualWrite:       dualWrite,
+			URL:             jsURL,
+			Bucket:          jsBucket,
+			CredentialsPath: jsCreds,
+			User:            jsUser,
+			Password:        jsPassword,
+		},
 	}
 }
 
