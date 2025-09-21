@@ -1,17 +1,19 @@
 version: v1alpha1
-id: java11to17-test
+id: java11to17-parallel-fanout
 target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
 target_branch: main
-base_ref: main
-lane: C
-build_timeout: 10m
+base_ref: e2e/fail-parallel
+lane: D
+build_timeout: 3m
 
 self_heal:
+  enabled: true
+  kb_learning: true
   max_retries: 2
 
 budgets:
   run_max_tokens: 0
-  run_max_cost: 0  
+  run_max_cost: 0
   run_timeout: 0s
 
 artifacts:
@@ -22,15 +24,15 @@ mr:
   forge: gitlab
   repo_url_env: GITLAB_URL
   token_env: PLOY_GITLAB_PAT
-  labels: ["ploy", "tfl", "java11to17"]
+  labels: ["ploy", "tfl", "parallel-heal", "java11to17"]
 
 branch_naming:
   workflow_branch: "workflow/${id}/${timestamp}"
   exec_branch: "exec/${id}/${seq}"
 
 job_defaults:
-  retries: 3
-  timeout: 30m
+  retries: 2
+  timeout: 8m
 
 network:
   default_policy: deny
@@ -63,7 +65,8 @@ steps:
     maven_plugin_version: 6.18.0
 
   - type: llm-plan
-    id: plan-build-fixes
+    id: plan-parallel-fixes
+    model: gpt-4o-mini@2024-08-06
     parallel: true
     max_parallel_execs: 3
     mcp_tools:
@@ -79,5 +82,3 @@ steps:
       max_tokens: 0
       max_cost: 0
       timeout: 30m
-
-  # human-step is intentionally omitted; it will be injected by llm-plan if needed

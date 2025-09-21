@@ -610,10 +610,10 @@ func resolveModsCollectorPath() string {
 	// Use caller path to derive repo root
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
-		return "tests/mods/orw-apply-llm-plan-seq/collect-logs.sh"
+		return "tests/e2e/mods/collect-logs.sh"
 	}
 	base := filepath.Dir(file) // .../tests/e2e
 	root := filepath.Dir(base) // .../tests
 	root = filepath.Dir(root)  // repo root
-	return filepath.Join(root, "tests/mods/orw-apply-llm-plan-seq/collect-logs.sh")
+	return filepath.Join(root, "tests/e2e/mods/collect-logs.sh")
 }

@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load project environment (secrets may be filtered by the CLI harness otherwise)
+# Load secrets from shell profile when available
 if [[ -f "$HOME/.zshenv" ]]; then
   # shellcheck disable=SC1090
   source "$HOME/.zshenv"
 fi
-
-# End-to-end runner for the orw-apply → build fail → llm-plan → llm-exec scenario
-# - Posts scenario.yaml to /v1/mods/run
-# - Streams SSE events
-# - Polls status until terminal
-# - Downloads artifacts
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MODS_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
@@ -19,7 +13,7 @@ LOG_ROOT="$MODS_ROOT/logs"
 SCENARIO_YAML="${SCENARIO_YAML:-$ROOT_DIR/scenario.yaml}"
 API_BASE="${PLOY_CONTROLLER:-}"
 
-if [[ -z "${API_BASE}" ]]; then
+if [[ -z "$API_BASE" ]]; then
   echo "PLOY_CONTROLLER env must point to controller base with /v1 (e.g., https://api.dev.ployman.app/v1)" >&2
   exit 1
 fi
@@ -33,7 +27,6 @@ mkdir -p "$LOG_ROOT"
 NOT_FOUND_LIMIT=${NOT_FOUND_LIMIT:-3}
 
 echo "Submitting mods run…"
-# Quick debug: show the base_ref and target_branch being sent
 if command -v grep >/dev/null 2>&1; then
   echo "Scenario base_ref: $(grep -E '^base_ref:' -m1 "$SCENARIO_YAML" || echo '<none>')"
   echo "Scenario target_branch: $(grep -E '^target_branch:' -m1 "$SCENARIO_YAML" || echo '<none>')"
@@ -57,12 +50,10 @@ EOF
 
 RESP=$(curl -sS -w "\nHTTP_CODE:%{http_code}" -H "Content-Type: application/json" \
   -X POST "$API_BASE/mods" -d "$BODY")
-
 HTTP_CODE=$(echo "$RESP" | awk -FHTTP_CODE: 'END{print $2}')
 JSON=$(echo "$RESP" | sed '/HTTP_CODE:/d')
 if [[ "$HTTP_CODE" != "202" && "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
   echo "Run submission failed: HTTP $HTTP_CODE" >&2
-  # Pretty-print JSON if possible; otherwise show raw body without jq noise
   if echo "$JSON" | jq . 1>&2 2>/dev/null; then :; else echo "$JSON" >&2; fi
   exit 1
 fi
@@ -87,11 +78,9 @@ echo "Streaming events to $LOG_DIR/events.sse …"
 ) &
 SSE_PID=$!
 
-# Start an event-driven watcher to detect terminal status from SSE and signal early exit
-# Creates $LOG_DIR/terminated.flag when a meta event includes status completed/failed/cancelled
 (
   set +e
-  for i in $(seq 1 720); do # up to ~12 minutes
+  for i in $(seq 1 720); do
     if rg -n '"status":"(completed|failed|cancelled)"' -S "$LOG_DIR/events.sse" >/dev/null 2>&1; then
       touch "$LOG_DIR/terminated.flag"
       break
@@ -101,7 +90,6 @@ SSE_PID=$!
 ) &
 WATCH_PID=$!
 
-# Poll status
 echo "Polling status…"
 TERM_STATUS=""
 MR_URL=""
@@ -134,7 +122,6 @@ while :; do
       echo "non-json status response (len=${#ST_JSON})" >&2
     fi
   fi
-  # Event-driven short-circuit: if watcher detected terminal in SSE, break after one final status fetch
   if [[ -f "$LOG_DIR/terminated.flag" && -n "$TERM_STATUS" ]]; then
     break
   fi
@@ -150,7 +137,6 @@ while :; do
 done
 
 echo "Stopping SSE (pid=$SSE_PID)…"
-# Gracefully terminate children of the SSE subshell to avoid noisy 'Terminated: 15' messages
 if ps -p "$SSE_PID" >/dev/null 2>&1; then
   pkill -TERM -P "$SSE_PID" >/dev/null 2>&1 || true
   wait "$SSE_PID" >/dev/null 2>&1 || true
@@ -177,7 +163,6 @@ if [[ "$TERM_STATUS" != "completed" ]]; then
   if [[ "$FAIL_REASON" == "status_not_found" ]]; then
     echo "Detected repeated status not_found responses; exiting early." >&2
   fi
-  # Always collect logs (controller/platform) and referenced SeaweedFS artifacts for diagnosis
   if [[ -x "$ROOT_DIR/../collect-logs.sh" ]]; then
     echo "Collecting logs and artifacts via collect-logs.sh …"
     MOD_LOG_DIR="$LOG_DIR" PLOY_CONTROLLER="$API_BASE" PLOY_SEAWEEDFS_URL="${PLOY_SEAWEEDFS_URL:-}" "$ROOT_DIR/../collect-logs.sh" "$MOD_ID" || true
@@ -185,7 +170,6 @@ if [[ "$TERM_STATUS" != "completed" ]]; then
   exit 2
 fi
 
-# On success also collect logs for traceability (optional, non-fatal)
 if [[ -x "$ROOT_DIR/../collect-logs.sh" ]]; then
   echo "Collecting logs and artifacts via collect-logs.sh …"
   MOD_LOG_DIR="$LOG_DIR" PLOY_CONTROLLER="$API_BASE" PLOY_SEAWEEDFS_URL="${PLOY_SEAWEEDFS_URL:-}" "$ROOT_DIR/../collect-logs.sh" "$MOD_ID" || true
