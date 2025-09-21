@@ -3,6 +3,8 @@ package mods
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,30 +96,63 @@ group "main" {
 	})
 
 	t.Run("orw-gen branch substitutes recipe variables in HCL template", func(t *testing.T) {
-		orchestrator := &fanoutOrchestrator{
-			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsError: nil,
-				ORWApplyAssetsPath:  "/tmp/test-orw-subst.hcl",
-			},
+		workspace := t.TempDir()
+		repoDir := filepath.Join(workspace, "repo")
+		if err := os.MkdirAll(repoDir, 0o755); err != nil {
+			t.Fatalf("failed to create repo dir: %v", err)
+		}
+		// Minimal file so createTarFromDir emits data
+		if err := os.WriteFile(filepath.Join(repoDir, "pom.xml"), []byte("<project/>"), 0o644); err != nil {
+			t.Fatalf("failed to write pom.xml: %v", err)
 		}
 
-		testHCL := `job "orw-test" {}`
-		tempFile := "/tmp/test-orw-subst.hcl"
-		err := os.WriteFile(tempFile, []byte(testHCL), 0644)
-		if err != nil {
+		templatePath := filepath.Join(workspace, "orw-apply.rendered.hcl")
+		template := `job "orw-test" {
+  group "orw-apply" {
+    task "openrewrite-apply" {
+      env = {
+        RECIPE_CLASS    = "${RECIPE_CLASS}"
+        RECIPE_COORDS   = "${RECIPE_COORDS}"
+        RECIPE_GROUP    = "${RECIPE_GROUP}"
+        RECIPE_ARTIFACT = "${RECIPE_ARTIFACT}"
+        RECIPE_VERSION  = "${RECIPE_VERSION}"
+        MAVEN_PLUGIN_VERSION = "${MAVEN_PLUGIN_VERSION}"
+      }
+    }
+  }
+}`
+		if err := os.WriteFile(templatePath, []byte(template), 0o644); err != nil {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
-		defer func() { _ = os.Remove(tempFile) }()
+
+		oldPut := putFileFn
+		putFileFn = func(string, string, string, string) error { return nil }
+		defer func() { putFileFn = oldPut }()
+		oldHead := headURLFn
+		headURLFn = func(string) bool { return true }
+		defer func() { headURLFn = oldHead }()
+
+		t.Setenv("MOD_ID", "mod-subst-test")
+		t.Setenv("PLOY_CONTROLLER", "https://api.dev.ployman.app/v1")
+		t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs:8888")
+
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				ORWApplyAssetsPath: templatePath,
+				WorkspaceDir:       workspace,
+			},
+		}
 
 		branch := BranchSpec{
 			ID:   "orw-subst-test",
 			Type: "orw-gen",
 			Inputs: map[string]interface{}{
 				"recipe_config": map[string]interface{}{
-					"class":   "org.openrewrite.java.migrate.Java8toJava11",
-					"coords":  "org.openrewrite.recipe:rewrite-migrate-java:1.21.0",
+					"class":   "org.openrewrite.java.migrate.UpgradeToJava17",
+					"coords":  "org.openrewrite.recipe:rewrite-migrate-java:3.17.0",
 					"timeout": "10m",
 				},
+				"maven_plugin_version": "6.18.0",
 			},
 		}
 
@@ -127,7 +162,17 @@ group "main" {
 			Status:    "failed",
 		})
 
-		// Will fail at submission step in test environment
+		submittedPath := strings.ReplaceAll(templatePath, ".rendered.hcl", ".submitted.hcl")
+		b, err := os.ReadFile(submittedPath)
+		assert.NoError(t, err)
+		s := string(b)
+		assert.Contains(t, s, "RECIPE_CLASS    = \"org.openrewrite.java.migrate.UpgradeToJava17\"")
+		assert.Contains(t, s, "RECIPE_GROUP    = \"org.openrewrite.recipe\"")
+		assert.Contains(t, s, "RECIPE_ARTIFACT = \"rewrite-migrate-java\"")
+		assert.Contains(t, s, "RECIPE_VERSION  = \"3.17.0\"")
+		assert.Contains(t, s, "MAVEN_PLUGIN_VERSION = \"6.18.0\"")
+
+		// Submission still fails in test mode, but substitution should happen first
 		assert.Equal(t, "failed", result.Status)
 	})
 

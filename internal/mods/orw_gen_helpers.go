@@ -10,8 +10,8 @@ import (
 )
 
 // buildORWRecipeConfig extracts recipe class, coords and timeout from branch inputs.
-func buildORWRecipeConfig(inputs map[string]interface{}) (class, coords, timeout string) {
-	class, coords, timeout = "", "", "10m"
+func buildORWRecipeConfig(inputs map[string]interface{}) (class, coords, timeout, pluginVersion string) {
+	class, coords, timeout, pluginVersion = "", "", "10m", ""
 	if inputs == nil {
 		return
 	}
@@ -25,6 +25,9 @@ func buildORWRecipeConfig(inputs map[string]interface{}) (class, coords, timeout
 		if v, ok := cfg["timeout"].(string); ok {
 			timeout = v
 		}
+	}
+	if v, ok := inputs["maven_plugin_version"].(string); ok {
+		pluginVersion = v
 	}
 	return
 }
