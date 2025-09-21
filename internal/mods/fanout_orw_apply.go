@@ -136,7 +136,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 			Step:  string(StepTypeORWApply),
 			Level: "info",
 			Message: fmt.Sprintf(
-				"orw env coords: class=%q group=%q artifact=%q version=%q plugin=%q",
+				"orw env coords resolved: class=%q group=%q artifact=%q version=%q plugin=%q",
 				rclass,
 				vars["RECIPE_GROUP"],
 				vars["RECIPE_ARTIFACT"],
