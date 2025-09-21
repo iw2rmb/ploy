@@ -55,6 +55,10 @@ job "traefik-system" {
         static = 8095
         to = 8095
       }
+      port "nats" {
+        static = 4222
+        to = 4222
+      }
     }
     
     # Consul service registration for Traefik
@@ -100,8 +104,8 @@ job "traefik-system" {
       config {
         image = "traefik:v3.5.0"
         network_mode = "host"
-        
-        ports = ["http", "https", "admin", "metrics", "traefik"]
+
+        ports = ["http", "https", "admin", "metrics", "traefik", "nats"]
         
         args = [
           "--global.checkNewVersion=false",
@@ -116,6 +120,7 @@ job "traefik-system" {
           "--entrypoints.admin.address=:8090",
           "--entrypoints.metrics.address=:8091",
           "--entrypoints.traefik.address=:8095",
+          "--entrypoints.nats.address=:4222",
           "--providers.consulcatalog=true",
           "--providers.consulcatalog.prefix=traefik",
           "--providers.consulcatalog.exposedByDefault=false",

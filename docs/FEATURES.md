@@ -46,6 +46,12 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 
 ⸻
 
+## ☁️ Platform Control Plane
+
+- ✅ **JetStream Control Plane** (Sep 2025): Nomad job `platform/nomad/jetstream.nomad.hcl` provisions a three-node NATS JetStream cluster with persistent host volumes, Traefik TCP routing at `nats.ploy.local:4222`, CoreDNS coverage, and a detailed operator runbook (`docs/runbooks/jetstream.md`).
+
+⸻
+
 ## 🛠 Build Lanes (A–F)
 
 For complete lane descriptions, detection rules, build flows, and best practices, see docs/LANES.md. Lane G (WASM) has been retired; Docker lane D now handles workloads that previously required specialized WASM handling.

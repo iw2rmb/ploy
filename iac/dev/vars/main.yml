@@ -155,6 +155,8 @@ coredns:
       target: "{{ ploy.dns.target_ip }}"
     - name: "nomad.control"
       target: "{{ ploy.dns.target_ip }}"
+    - name: "nats"
+      target: "{{ ploy.dns.target_ip }}"
     - name: "seaweedfs-master.storage"
       target: "{{ ploy.dns.target_ip }}"
     - name: "seaweedfs-volume.storage"
