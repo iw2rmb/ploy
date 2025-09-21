@@ -108,10 +108,10 @@
 
 #### Mods Scenario `SINCE_FMT` (Practical)
 
-- For `tests/mods/orw-apply-llm-plan-seq`, derive a VPS-friendly timestamp from SSE and pass it to the Nomad log wrapper when fetching allocation logs.
-  - `SINCE_RAW=$(grep -hEo '"time":"[^"]+"' tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/events*.sse | head -n1 | sed -E 's/.*"time":"([^"]+)".*/\1/')`
+- For `tests/e2e/mods/orw-apply-llm-plan-seq`, derive a VPS-friendly timestamp from SSE and pass it to the Nomad log wrapper when fetching allocation logs.
+  - `SINCE_RAW=$(grep -hEo '"time":"[^"]+"' tests/e2e/mods/logs/<MOD_ID>/events*.sse | head -n1 | sed -E 's/.*"time":"([^"]+)".*/\1/')`
   - `SINCE_FMT="${SINCE_RAW:0:10} ${SINCE_RAW:11:8}"`
-  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since "$SINCE_FMT"'" > tests/mods/orw-apply-llm-plan-seq/logs/<MOD_ID>/last_job.logs`
+  - `ssh -o ConnectTimeout=10 root@$TARGET_HOST "su - ploy -c '/opt/hashicorp/bin/nomad-job-manager.sh logs --alloc-id <ALLOC_ID> --both --lines 800 --since "$SINCE_FMT"'" > tests/e2e/mods/logs/<MOD_ID>/last_job.logs`
   - Or set `START_TS_SOURCE=vps` (requires `TARGET_HOST`) to auto-resolve the timestamp in helpers like `tests/e2e/deploy/fetch-logs.sh`.
   - If SeaweedFS isn’t reachable from the workstation, fetch artifacts via SSH on the VPS: `curl -fsS 'http://seaweedfs-filer.storage.ploy.local:8888/artifacts/<KEY>'`.
 

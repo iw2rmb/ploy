@@ -2,15 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="${MOD_LOG_DIR:-$ROOT_DIR/logs}"
 MOD_DIR="${1:-}"
 
 if [[ -z "$MOD_DIR" ]]; then
-  # Pick most recent mod-*/ by mtime
-  MOD_DIR=$(ls -td "$ROOT_DIR"/logs/mod-* 2>/dev/null | head -n1 || true)
+  MOD_DIR=$(ls -td "$BASE_DIR"/mod-* 2>/dev/null | head -n1 || true)
 fi
 
 if [[ -z "$MOD_DIR" || ! -d "$MOD_DIR" ]]; then
-  echo "No logs/mod-*/ directory found. Run ./run.sh first." >&2
+  echo "No logs/mod-*/ directory found under ${BASE_DIR}. Run the scenario first." >&2
   exit 1
 fi
 
