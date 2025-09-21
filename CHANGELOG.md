@@ -5,6 +5,7 @@
 ### Added
 - Analysis: Added concurrency-safe Consul KV and SeaweedFS storage fakes with regression tests for dispatcher submit/list/cleanup flows, enabling Nomad failure coverage and lifting `api/analysis` unit coverage to ~73%.
 - Infrastructure: Added CoreDNS templates and an Ansible playbook to manage the `ploy.local` zone, keeping platform service A/SRV records under configuration management.
+- Infrastructure: Provisioned a Nomad-managed NATS JetStream cluster (`platform/nomad/jetstream.nomad.hcl`) with Traefik TCP routing at `nats.ploy.local:4222`, CoreDNS records, and an operator runbook (`docs/runbooks/jetstream.md`).
 - Analysis: Added engine and HTTP handler unit tests covering analyzer registration, cache reuse, fallback execution, configuration validation, and API failure modes to increase confidence in the static-analysis pipeline.
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
 - Mods: Added MCP config parsing coverage (numeric budget coercion) and LLM diff-fetch tests to harden fanout execution.
@@ -82,14 +83,14 @@
    - `provider_legacy.go` (legacy StorageProvider methods + verification)
    - `helpers.go` (request helpers, volume assignment, directory creation)
    No behavior changes; compile verified. Tests depending on real SeaweedFS remain skipped/failing without services.
-- Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
- - Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
-- Docs: Updated `tests/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.
+- Docs: Updated `tests/e2e/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-cb976b3a). Healing not exercised; build gate did not fail. Added notes on ensuring deterministic failure and required envs.
+- Docs: Updated `tests/e2e/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-eddd8c37). Healing completed and MR created (MR 37). Prior runs captured auth troubleshooting and recovery.
+- Docs: Updated `tests/e2e/mods/orw-apply-llm-plan-seq/README.md` Cycle State with latest run (MOD_ID mod-a246d18f). Healing produced plan/diff/next artifacts; push/MR failed due to missing GitLab token.
 - Workstation docs and examples: replaced inline `export` assignments with “Ensure … is set” guidance to avoid double-exporting env vars that are already populated.
 - Scripts: default to Dev API and other values only when unset (e.g., `PLOY_CONTROLLER`, `ARF_LLM_PROVIDER`, `ARF_LLM_MODEL`).
 - E2E log helpers:
   - tests/e2e/deploy/fetch-logs.sh now supports `BUILD_ID`, `FOLLOW`, and `OUT_DIR`, writes logs to files when `OUT_DIR` is set, includes builder logs via API, and optionally tails app task logs via SSH job-manager. Platform logs accept `follow`.
-  - tests/mods/orw-apply-llm-plan-seq/collect-logs.sh adds `FOLLOW_SECONDS` to capture longer SSE streams, optional `TARGET_HOST` to fetch `last_job` allocation logs via SSH job-manager, and optional gzip compression for large files.
+  - tests/e2e/mods/collect-logs.sh adds `FOLLOW_SECONDS` to capture longer SSE streams, optional `TARGET_HOST` to fetch `last_job` allocation logs via SSH job-manager, and optional gzip compression for large files.
 - E2E deploy docs: expanded tests/e2e/deploy/README.md with quick subtest filters and log collection tips (controller/Traefik endpoints and fetch-logs.sh usage). Updated ongoing TLS investigation notes and matrix guidance. Documented app-name normalization and current Lane E Go/Python findings.
 - E2E harness: results writer now uses repo-root-relative paths to ensure results.jsonl/results.md are appended regardless of package working directory. Added a targeted test (TestWriteResultPaths) under the e2e tag to validate this behavior. Also sanitize app names in E2E to comply with API name policy (replace dots with hyphens, restrict to [a-z0-9-]).
 - Dev IaC: remove Traefik `dev-wildcard` ACME resolver and stop managing `/opt/ploy/traefik-data/dev-wildcard-acme.json`; `apps-wildcard` is now the sole wildcard resolver for dev.

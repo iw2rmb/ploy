@@ -29,4 +29,11 @@ Authoritative guidance for maintaining agent instructions and scoped READMEs. Ap
 - Ensure cross-references resolve (e.g., renamed files, new anchors). Use `rg` or `go test ./...` documentation checks as needed.
 - Mention documentation updates in the CHANGELOG when behaviour changes or when a new guide is introduced.
 
+## Runbooks
+- Location: `docs/runbooks/`
+- Audience: Operators executing repeatable infrastructure workflows (deployments, credential rotation).
+- Structure: Start with an overview and prerequisites, then provide ordered sections for deployment, verification, operations, and troubleshooting. Link back to authoritative code paths (e.g., Nomad specs) instead of duplicating full context.
+- Keep secret handling instructions generic (reference Nomad variables, masked outputs). Avoid embedding literal credentials or tokens.
+- Reference new runbooks from `docs/REPO.md` (and vice versa) so navigation surfaces operational content alongside architectural guides.
+
 Keeping these documents in sync prevents token-heavy prompts and conflicting instructions. When in doubt, document the rule here and reference it from the affected Markdown.
