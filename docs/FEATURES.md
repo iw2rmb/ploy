@@ -49,6 +49,7 @@ Maximum performance PaaS using unikernels, jails, and VMs with Heroku-like devel
 ## ☁️ Platform Control Plane
 
 - ✅ **JetStream Control Plane** (Sep 2025): Nomad job `platform/nomad/jetstream.nomad.hcl` provisions a three-node NATS JetStream cluster with persistent host volumes, Traefik TCP routing at `nats.ploy.local:4222`, CoreDNS coverage, and a detailed operator runbook (`docs/runbooks/jetstream.md`).
+- ✅ **JetStream KV Adapter** (Sep 2025): `internal/orchestration.NewKV` can target JetStream when `PLOY_USE_JETSTREAM_KV` is enabled, wiring `PLOY_JETSTREAM_URL` and bucket settings so env/analysis/mods consumers transition without code changes.
 
 ⸻
 

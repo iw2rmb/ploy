@@ -21,6 +21,7 @@ func TestNomadAPITemplateExportsGitlabEnvVars(t *testing.T) {
 	require.NoError(t, err)
 
 	text := string(content)
+	normalised := shrinkSpaces(text)
 
 	expectedSnippets := []string{
 		"GITLAB_URL = \"{{ ploy.gitlab_url }}\"",
@@ -38,10 +39,18 @@ func TestNomadAPITemplateExportsGitlabEnvVars(t *testing.T) {
 	}
 
 	for _, snippet := range expectedSnippets {
-		if !strings.Contains(text, snippet) {
+		if !strings.Contains(normalised, snippet) {
 			t.Fatalf("nomad template missing expected snippet %q", snippet)
 		}
 	}
 
 	require.NotContains(t, text, "api.env", "template should no longer reference dedicated api.env file")
+}
+
+func shrinkSpaces(in string) string {
+	out := in
+	for strings.Contains(out, "  ") {
+		out = strings.ReplaceAll(out, "  ", " ")
+	}
+	return out
 }

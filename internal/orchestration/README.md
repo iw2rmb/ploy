@@ -8,7 +8,7 @@
 ## Feature Highlights
 - **Job Rendering & Submission**: Render Nomad job templates with context-aware substitutions, validate HCL, submit jobs, and wait for success or failure with timeout and retry controls.
 - **Monitoring & Health Checks**: Wrap Consul health APIs and the SDK adapter so services, allocations, and orchestrated jobs expose consistent readiness signals.
-- **KV Coordination**: Lightweight Consul KV client for locks, heartbeat data, and cross-component configuration shared by KB maintenance, builders, and Mods runners.
+- **KV Coordination**: Lightweight Consul KV client with optional JetStream backend (feature flag `PLOY_USE_JETSTREAM_KV`) for locks, heartbeat data, and cross-component configuration shared by KB maintenance, builders, and Mods runners.
 - **Streaming & Logging**: Attach to Nomad allocations, stream task logs, and surface structured events back to API/CLI callers for realtime feedback.
 - **Retry Transport**: HTTP transport with exponential backoff, jitter, and error classification tailored for Nomad/Consul bursty workloads.
 
@@ -17,7 +17,7 @@
 - `submit.go` – Public job submission helpers (`Submit`, `SubmitAndWaitHealthy`, `SubmitAndWaitTerminal`, `ValidateJob`, `DeregisterJob`).
 - `monitor.go` / `monitor_sdk_adapter.go` – Generic monitoring interfaces and adapters for health probing, service readiness, and log streaming.
 - `consul_health.go` / `monitor_endpoint_test.go` – Consul-specific health polling and endpoint verification utilities.
-- `kv.go` – Minimal Consul KV wrapper for get/set/lock-style coordination.
+- `kv.go` – KV wrapper that defaults to Consul but can route to JetStream when enabled.
 - `log_streamer.go` – Helpers that tail Nomad allocation logs with backoff and bounded buffers.
 - `retry_transport.go` – Shared HTTP client wrapper with retry, timeout, and rate-limit handling tuned for control-plane calls.
 - `templates_embed.go` – Embedded Nomad job templates (planner, reducer, builders) and related test fixtures.

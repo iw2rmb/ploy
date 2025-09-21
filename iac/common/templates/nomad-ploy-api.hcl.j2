@@ -153,14 +153,19 @@ job "ploy-api" {
         GITHUB_PLOY_DEV_USERNAME = "{{ lookup('env', 'GITHUB_PLOY_DEV_USERNAME') }}"
         GITHUB_PLOY_DEV_PAT = "{{ lookup('env', 'GITHUB_PLOY_DEV_PAT') }}"
 
+        GIT_AUTHOR_NAME = "{{ ploy.git_author_name }}"
+        GIT_AUTHOR_EMAIL = "{{ ploy.git_author_email }}"
+        GIT_COMMITTER_NAME = "{{ ploy.git_committer_name }}"
+        GIT_COMMITTER_EMAIL = "{{ ploy.git_committer_email }}"
+
         # Deployment metadata
         PLOY_DEPLOYMENT_METHOD = "nomad"
         PLOY_NODE_ID = "${node.unique.name}"
 
         # GitLab integration (populated from local env via Ansible)
-        GITLAB_TOKEN = "{{ lookup('env', 'GITLAB_TOKEN') }}"
-        GITLAB_URL   = "{{ lookup('env', 'GITLAB_URL') }}"
-        MODS_SKIP_DEPLOY_LANES = "{{ lookup('env', 'MODS_SKIP_DEPLOY_LANES') | default('', true) }}"
+        GITLAB_TOKEN = "{{ ploy.gitlab_token }}"
+        GITLAB_URL   = "{{ ploy.gitlab_url }}"
+        MODS_SKIP_DEPLOY_LANES = "{{ ploy.mods.skip_deploy_lanes }}"
       }
 
       # Make binary executable and start
