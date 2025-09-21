@@ -45,6 +45,61 @@ func TestORWGenBranchValidation(t *testing.T) {
 		assert.Contains(t, result.Notes, "failed to read ORW HCL template")
 	})
 
+	t.Run("orw-gen branch fails fast when recipe coords missing", func(t *testing.T) {
+		workspace := t.TempDir()
+		if err := os.WriteFile(filepath.Join(workspace, "orw-apply.rendered.hcl"), []byte("job \"orw-test\" {}"), 0o644); err != nil {
+			t.Fatalf("failed to create template: %v", err)
+		}
+		branch := BranchSpec{
+			ID:   "orw-missing",
+			Type: "orw-gen",
+			Inputs: map[string]interface{}{
+				"recipe_config": map[string]interface{}{
+					"class": "org.openrewrite.java.migrate.UpgradeToJava17",
+				},
+			},
+		}
+		orchestrator := &fanoutOrchestrator{
+			runner: &MockProductionBranchRunner{
+				ORWApplyAssetsPath: filepath.Join(workspace, "orw-apply.rendered.hcl"),
+				WorkspaceDir:       workspace,
+			},
+		}
+		result := orchestrator.executeORWGenBranch(context.Background(), branch, BranchResult{ID: branch.ID, StartedAt: time.Now(), Status: "failed"})
+		if result.Status != "failed" {
+			t.Fatalf("expected failure when coords missing; got status %q", result.Status)
+		}
+		if !strings.Contains(result.Notes, "recipe coords") {
+			t.Fatalf("expected error about recipe coords, got %q", result.Notes)
+		}
+	})
+
+	t.Run("orw-gen branch normalizes rewrite-java-latest alias", func(t *testing.T) {
+		workspace := t.TempDir()
+		if err := os.WriteFile(filepath.Join(workspace, "orw-apply.rendered.hcl"), []byte("job \"orw-test\" { env = { RECIPE_GROUP = \"${RECIPE_GROUP}\" RECIPE_ARTIFACT = \"${RECIPE_ARTIFACT}\" RECIPE_VERSION = \"${RECIPE_VERSION}\" } }"), 0o644); err != nil {
+			t.Fatalf("failed to create template: %v", err)
+		}
+		branch := BranchSpec{
+			ID:   "orw-alias",
+			Type: "orw-gen",
+			Inputs: map[string]interface{}{
+				"recipe_config": map[string]interface{}{
+					"class":  "org.openrewrite.java.RemoveUnusedImports",
+					"coords": "org.openrewrite.recipe:rewrite-java-latest:latest",
+				},
+			},
+		}
+		testRunner := &MockProductionBranchRunner{
+			ORWApplyAssetsPath: filepath.Join(workspace, "orw-apply.rendered.hcl"),
+			WorkspaceDir:       workspace,
+		}
+		orchestrator := &fanoutOrchestrator{runner: testRunner}
+		result := orchestrator.executeORWGenBranch(context.Background(), branch, BranchResult{ID: branch.ID, StartedAt: time.Now(), Status: "failed"})
+		if strings.Contains(result.Notes, "recipe coords") {
+			t.Fatalf("expected alias to normalize; got %s", result.Notes)
+		}
+	})
+
 	t.Run("orw-gen branch extracts recipe configuration from inputs", func(t *testing.T) {
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{

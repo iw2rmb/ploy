@@ -23,7 +23,17 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 
 	// Step 2: Pre-substitute recipe variables and prepare env
-	rclass, rcoords, rtimeout, pluginVersion := buildORWRecipeConfig(branch.Inputs)
+	rclass, rcoords, rtimeout, pluginVersion, cfgErr := buildORWRecipeConfig(branch.Inputs)
+	if cfgErr != nil {
+		result.Status = "failed"
+		result.Notes = cfgErr.Error()
+		result.FinishedAt = time.Now()
+		result.Duration = time.Since(result.StartedAt)
+		if rep := o.runner.GetEventReporter(); rep != nil {
+			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(StepTypeORWApply), Level: "error", Message: cfgErr.Error(), Time: time.Now()})
+		}
+		return result
+	}
 	prePath, err := orwPreSubstitute(hclPath, rclass, rcoords, rtimeout)
 	if err != nil {
 		result.Status = "failed"
@@ -158,11 +168,19 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 	if rep := o.runner.GetEventReporter(); rep != nil {
 		summary := []string{}
+		placeholderDetected := false
 		if data, readErr := os.ReadFile(renderedHCLPath); readErr == nil {
 			for _, line := range strings.Split(string(data), "\n") {
 				trim := strings.TrimSpace(line)
 				if strings.HasPrefix(trim, "RECIPE_") || strings.HasPrefix(trim, "MAVEN_PLUGIN_VERSION") {
 					summary = append(summary, trim)
+					hasPlaceholder := strings.Contains(trim, "${RECIPE_") || strings.Contains(trim, "${MAVEN_PLUGIN_VERSION}")
+					if hasPlaceholder {
+						if strings.Contains(trim, "${MAVEN_PLUGIN_VERSION}") && pluginVersion == "" {
+							continue
+						}
+						placeholderDetected = true
+					}
 				}
 			}
 		} else {
@@ -175,6 +193,15 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 			Message: fmt.Sprintf("orw submitted env: %s", strings.Join(summary, "; ")),
 			Time:    time.Now(),
 		})
+		if placeholderDetected {
+			placeholderErr := fmt.Errorf("ORW submitted HCL contains unresolved recipe placeholders")
+			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(StepTypeORWApply), Level: "error", Message: placeholderErr.Error(), Time: time.Now()})
+			result.Status = "failed"
+			result.Notes = placeholderErr.Error()
+			result.FinishedAt = time.Now()
+			result.Duration = time.Since(result.StartedAt)
+			return result
+		}
 	}
 
 	// Step 3: Report job metadata asynchronously (job name == runID)
