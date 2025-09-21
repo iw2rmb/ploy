@@ -9,27 +9,70 @@ import (
 	"time"
 )
 
-// buildORWRecipeConfig extracts recipe class, coords and timeout from branch inputs.
-func buildORWRecipeConfig(inputs map[string]interface{}) (class, coords, timeout, pluginVersion string) {
+// buildORWRecipeConfig extracts and validates recipe coordinates from branch inputs.
+func buildORWRecipeConfig(inputs map[string]interface{}) (class, coords, timeout, pluginVersion string, err error) {
 	class, coords, timeout, pluginVersion = "", "", "10m", ""
 	if inputs == nil {
-		return
+		return "", "", timeout, pluginVersion, fmt.Errorf("missing recipe_config inputs")
 	}
-	if cfg, ok := inputs["recipe_config"].(map[string]interface{}); ok {
-		if v, ok := cfg["class"].(string); ok {
-			class = v
+	cfgAny, ok := inputs["recipe_config"]
+	if !ok {
+		if nested, okNested := inputs["inputs"].(map[string]interface{}); okNested {
+			cfgAny, ok = nested["recipe_config"]
+			if pluginVersion == "" {
+				if pv, okPV := inputs["maven_plugin_version"].(string); okPV {
+					pluginVersion = strings.TrimSpace(pv)
+				} else if pv, okPV := nested["maven_plugin_version"].(string); okPV {
+					pluginVersion = strings.TrimSpace(pv)
+				}
+			}
 		}
-		if v, ok := cfg["coords"].(string); ok {
-			coords = v
-		}
-		if v, ok := cfg["timeout"].(string); ok {
-			timeout = v
-		}
+	}
+	if !ok {
+		return "", "", timeout, pluginVersion, fmt.Errorf("missing recipe_config inputs")
+	}
+	cfg, ok := cfgAny.(map[string]interface{})
+	if !ok {
+		return "", "", timeout, pluginVersion, fmt.Errorf("recipe_config must be a map")
+	}
+	if v, ok := cfg["class"].(string); ok {
+		class = strings.TrimSpace(v)
+	}
+	if v, ok := cfg["coords"].(string); ok {
+		coords = strings.TrimSpace(v)
+	}
+	if v, ok := cfg["timeout"].(string); ok && strings.TrimSpace(v) != "" {
+		timeout = strings.TrimSpace(v)
 	}
 	if v, ok := inputs["maven_plugin_version"].(string); ok {
-		pluginVersion = v
+		pluginVersion = strings.TrimSpace(v)
 	}
-	return
+
+	if class == "" {
+		return "", "", timeout, pluginVersion, fmt.Errorf("recipe class is required for orw-gen branch")
+	}
+	if coords == "" {
+		return "", "", timeout, pluginVersion, fmt.Errorf("recipe coords are required for orw-gen branch")
+	}
+	parts := strings.Split(coords, ":")
+	if len(parts) != 3 {
+		return "", "", timeout, pluginVersion, fmt.Errorf("recipe coords must be 'group:artifact:version' (got %q)", coords)
+	}
+	group := strings.TrimSpace(parts[0])
+	artifact := strings.TrimSpace(parts[1])
+	version := strings.TrimSpace(parts[2])
+	if group == "" || artifact == "" || version == "" {
+		return "", "", timeout, pluginVersion, fmt.Errorf("recipe coords must include non-empty group, artifact, and version")
+	}
+	if artifact == "rewrite-java-latest" && version == "latest" {
+		artifact = "rewrite-migrate-java"
+		version = "3.17.0"
+		if pluginVersion == "" {
+			pluginVersion = "6.18.0"
+		}
+	}
+	coords = fmt.Sprintf("%s:%s:%s", group, artifact, version)
+	return class, coords, timeout, pluginVersion, nil
 }
 
 // orwPreSubstitute writes a pre-substituted HCL with recipe-specific variables.
