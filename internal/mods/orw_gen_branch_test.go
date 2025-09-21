@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -132,9 +133,28 @@ group "main" {
 		headURLFn = func(string) bool { return true }
 		defer func() { headURLFn = oldHead }()
 
+		ensureEnv := func(key string) string {
+			val := os.Getenv(key)
+			if strings.TrimSpace(val) != "" {
+				return val
+			}
+			cmd := exec.Command("zsh", "-lc", "source ~/.zshenv >/dev/null 2>&1; printenv "+key)
+			out, err := cmd.Output()
+			if err != nil {
+				t.Skipf("%s not available (failed to load via ~/.zshenv): %v", key, err)
+				return ""
+			}
+			val = strings.TrimSpace(string(out))
+			if val == "" {
+				t.Skipf("%s not set after sourcing ~/.zshenv", key)
+			}
+			t.Setenv(key, val)
+			return val
+		}
+
+		ensureEnv("PLOY_CONTROLLER")
+		ensureEnv("PLOY_SEAWEEDFS_URL")
 		t.Setenv("MOD_ID", "mod-subst-test")
-		t.Setenv("PLOY_CONTROLLER", "https://api.dev.ployman.app/v1")
-		t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweedfs:8888")
 
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
