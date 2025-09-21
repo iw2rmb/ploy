@@ -75,6 +75,27 @@ func TestCoreDNSAuthoritativeRecords(t *testing.T) {
 		}
 	})
 
+	t.Run("nats tcp a record", func(t *testing.T) {
+		query := new(dns.Msg)
+		query.SetQuestion(dns.Fqdn("nats.ploy.local."), dns.TypeA)
+
+		resp, _, err := client.Exchange(query, addr)
+		require.NoError(t, err, "CoreDNS query failed")
+		require.Equal(t, dns.RcodeSuccess, resp.Rcode, "unexpected dns response code")
+		require.NotEmpty(t, resp.Answer, "expected A record for nats.ploy.local")
+
+		for _, ans := range resp.Answer {
+			arec, ok := ans.(*dns.A)
+			if !ok {
+				continue
+			}
+			ttl := arec.Hdr.Ttl
+			assert.Greater(t, ttl, uint32(0), "TTL must be > 0")
+			assert.LessOrEqual(t, ttl, uint32(300), "TTL should remain bounded to avoid long caches")
+			assert.NotEmpty(t, arec.A.String(), "IPv4 address should be populated")
+		}
+	})
+
 	t.Run("retry behaviour", func(t *testing.T) {
 		query := new(dns.Msg)
 		query.SetQuestion(dns.Fqdn("nomad.control.ploy.local."), dns.TypeA)

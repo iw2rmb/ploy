@@ -14,6 +14,9 @@ func TestEmbeddedTemplatesPresent(t *testing.T) {
 	if b := getEmbeddedTemplate("platform/nomad/debug-oci.hcl"); len(b) == 0 {
 		t.Fatalf("expected embedded debug template")
 	}
+	if b := getEmbeddedTemplate("platform/nomad/jetstream.nomad.hcl"); len(b) == 0 {
+		t.Fatalf("expected embedded jetstream template")
+	}
 }
 
 func TestEmbeddedTemplatesHaveNoVaultReferences(t *testing.T) {

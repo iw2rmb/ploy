@@ -69,6 +69,7 @@ Primary reference material for contributors.
 - [`LANES.md`](LANES.md) — deployment lane overview and status
 - [`TESTING.md`](TESTING.md) — testing standards and troubleshooting guide
 - [`STACK.md`](STACK.md) / [`STORAGE.md`](STORAGE.md) — infrastructure reference material
+- [`runbooks/`](runbooks) — operational guides (see [`runbooks/jetstream.md`](runbooks/jetstream.md) for the NATS control plane)
 - [`kb/`](kb) and [`mods/`](mods) — knowledge base and mods-focused deep dives
 
 ## Configuration and Infrastructure
