@@ -377,8 +377,11 @@ func writeStepNodeMarkdown(sb *strings.Builder, node ReportStepNode, indent int)
 				fmt.Fprintf(sb, "%s    - builder logs: [%s](%s)\n", prefix, display, value)
 				continue
 			}
-			formatted := fmt.Sprintf("(%s)[%s]", label, value)
-			fmt.Fprintf(sb, "%s    - %s: %s\n", prefix, label, formatted)
+			if value != "" {
+				fmt.Fprintf(sb, "%s    - %s: [%s](%s)\n", prefix, label, label, value)
+			} else {
+				fmt.Fprintf(sb, "%s    - %s\n", prefix, label)
+			}
 		}
 	}
 
