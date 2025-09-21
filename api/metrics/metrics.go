@@ -42,6 +42,10 @@ type Metrics struct {
 	EnvStoreOperations *prometheus.CounterVec
 	EnvStoreLatency    *prometheus.HistogramVec
 
+	// Routing metrics
+	RoutingOperations             *prometheus.CounterVec
+	RoutingObjectStoreCreateTotal *prometheus.CounterVec
+
 	// Certificate metrics
 	CertificatesTotal     prometheus.Gauge
 	CertificateOperations *prometheus.CounterVec
@@ -201,6 +205,23 @@ func (m *Metrics) initializeMetrics() {
 		[]string{"target", "operation"},
 	)
 
+	// Routing metrics
+	m.RoutingOperations = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_api_routing_operations_total",
+			Help: "Total routing persistence operations by backend",
+		},
+		[]string{"operation", "status"}, // jetstream_save, jetstream_delete
+	)
+
+	m.RoutingObjectStoreCreateTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "routing_objectstore_create_total",
+			Help: "Routing object store bootstrap attempts grouped by result",
+		},
+		[]string{"status"}, // success, error
+	)
+
 	// Certificate metrics
 	m.CertificatesTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -292,6 +313,8 @@ func (m *Metrics) registerMetrics() {
 		m.StorageErrors,
 		m.EnvStoreOperations,
 		m.EnvStoreLatency,
+		m.RoutingOperations,
+		m.RoutingObjectStoreCreateTotal,
 		m.CertificatesTotal,
 		m.CertificateOperations,
 		m.CertificateExpiry,
@@ -374,6 +397,14 @@ func (m *Metrics) RecordEnvStoreOperation(target, operation, status string, dura
 	}
 	m.EnvStoreOperations.WithLabelValues(target, operation, status).Inc()
 	m.EnvStoreLatency.WithLabelValues(target, operation).Observe(duration.Seconds())
+}
+
+// RecordRoutingObjectStoreBootstrap records controller bootstrap attempts for the routing object store.
+func (m *Metrics) RecordRoutingObjectStoreBootstrap(status string) {
+	if m == nil || m.RoutingObjectStoreCreateTotal == nil {
+		return
+	}
+	m.RoutingObjectStoreCreateTotal.WithLabelValues(status).Inc()
 }
 
 // RecordCertificateOperation records a certificate operation

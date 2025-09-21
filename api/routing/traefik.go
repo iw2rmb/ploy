@@ -1,25 +1,39 @@
 package routing
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/iw2rmb/ploy/api/metrics"
 	irouting "github.com/iw2rmb/ploy/internal/routing"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
+
+// TraefikRouter handles app routing via Traefik and Consul integration
+// RouterOptions configures Traefik router behaviour.
+type RouterOptions struct {
+	Store        *irouting.Store
+	Metrics      *metrics.Metrics
+	StoreTimeout time.Duration
+}
 
 // TraefikRouter handles app routing via Traefik and Consul integration
 type TraefikRouter struct {
 	consul             *consulapi.Client
 	platformAppsDomain string
 	platformDomain     string
+	storeTimeout       time.Duration
+	store              *irouting.Store
+	metrics            *metrics.Metrics
 }
 
 // NewTraefikRouter creates a new Traefik router instance
-func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
+func NewTraefikRouter(consulAddr string, opts RouterOptions) (*TraefikRouter, error) {
 	config := consulapi.DefaultConfig()
 	if consulAddr != "" {
 		config.Address = consulAddr
@@ -44,10 +58,18 @@ func NewTraefikRouter(consulAddr string) (*TraefikRouter, error) {
 		log.Printf("PLOY_PLATFORM_DOMAIN not set, using default: %s", platformDomain)
 	}
 
+	storeTimeout := opts.StoreTimeout
+	if storeTimeout <= 0 {
+		storeTimeout = 5 * time.Second
+	}
+
 	return &TraefikRouter{
 		consul:             client,
 		platformAppsDomain: platformAppsDomain,
 		platformDomain:     platformDomain,
+		storeTimeout:       storeTimeout,
+		store:              opts.Store,
+		metrics:            opts.Metrics,
 	}, nil
 }
 
@@ -59,6 +81,41 @@ func (tr *TraefikRouter) GetConsulClient() *consulapi.Client {
 // GetPlatformAppsDomain returns the configured platform apps domain
 func (tr *TraefikRouter) GetPlatformAppsDomain() string {
 	return tr.platformAppsDomain
+}
+
+// GetRouteStore returns the JetStream-backed route store when configured.
+func (tr *TraefikRouter) GetRouteStore() *irouting.Store {
+	return tr.store
+}
+
+// SetRouteStoreTimeout overrides the default timeout for store operations.
+func (tr *TraefikRouter) SetRouteStoreTimeout(d time.Duration) {
+	if d > 0 {
+		tr.storeTimeout = d
+	}
+}
+
+func (tr *TraefikRouter) recordRoutingMetric(operation string, err error) {
+	if tr.metrics == nil {
+		return
+	}
+	status := "success"
+	if err != nil {
+		status = "error"
+	}
+	tr.metrics.RoutingOperations.WithLabelValues(operation, status).Inc()
+}
+
+func (tr *TraefikRouter) RemoveRouteMetadata(app, domain string) {
+	if tr.store != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), tr.storeTimeout)
+		err := tr.store.DeleteAppRoute(ctx, app, domain)
+		cancel()
+		tr.recordRoutingMetric("jetstream_delete", err)
+		if err != nil {
+			log.Printf("Warning: failed to remove routing metadata for %s/%s: %v", app, domain, err)
+		}
+	}
 }
 
 // GenerateAppDomain generates a platform subdomain for an app
@@ -191,7 +248,7 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 	}
 
 	// Store domain mapping for persistence
-	if err := irouting.SaveAppRoute(tr.consul, irouting.DomainRoute{
+	domainRoute := irouting.DomainRoute{
 		App:        route.App,
 		Domain:     route.Domain,
 		Port:       route.Port,
@@ -201,8 +258,16 @@ func (tr *TraefikRouter) RegisterApp(route *AppRoute, config *RouteConfig) error
 		Aliases:    route.Aliases,
 		TLSEnabled: route.TLSEnabled,
 		CreatedAt:  route.CreatedAt,
-	}); err != nil {
-		log.Printf("Warning: failed to store domain mapping for %s: %v", route.App, err)
+	}
+
+	if tr.store != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), tr.storeTimeout)
+		err := tr.store.SaveAppRoute(ctx, domainRoute)
+		cancel()
+		tr.recordRoutingMetric("jetstream_save", err)
+		if err != nil {
+			log.Printf("Warning: failed to persist routing metadata for %s: %v", route.App, err)
+		}
 	}
 
 	return nil
@@ -343,39 +408,41 @@ func (tr *TraefikRouter) UnregisterApp(appName, allocID string) error {
 
 // GetAppRoutes returns all routes for a specific app
 func (tr *TraefikRouter) GetAppRoutes(appName string) ([]*AppRoute, error) {
-	services, _, err := tr.consul.Catalog().Service(appName, "", nil)
+	if tr.store == nil {
+		return nil, fmt.Errorf("routing store not configured")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), tr.storeTimeout)
+	defer cancel()
+
+	storeRoutes, err := tr.store.GetAppRoutes(ctx, appName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query Consul catalog: %w", err)
+		return nil, fmt.Errorf("load routes from object store: %w", err)
 	}
 
-	var routes []*AppRoute
-	for _, service := range services {
-		if managedBy, ok := service.ServiceMeta["managed_by"]; !ok || managedBy != "ploy" {
-			continue
-		}
-
-		route := &AppRoute{
-			App:     service.ServiceName,
-			Domain:  service.ServiceMeta["domain"],
-			Port:    service.ServicePort,
-			AllocID: service.ServiceMeta["alloc_id"],
-			AllocIP: service.ServiceAddress,
-		}
-
-		if createdAtStr, ok := service.ServiceMeta["created_at"]; ok {
-			if createdAt, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
-				route.CreatedAt = createdAt
-			}
-		}
-
-		routes = append(routes, route)
+	domains := make([]string, 0, len(storeRoutes))
+	for domain := range storeRoutes {
+		domains = append(domains, domain)
+	}
+	sort.Strings(domains)
+	result := make([]*AppRoute, 0, len(domains))
+	for _, domain := range domains {
+		r := storeRoutes[domain]
+		result = append(result, &AppRoute{
+			App:        r.App,
+			Domain:     r.Domain,
+			Port:       r.Port,
+			AllocID:    r.AllocID,
+			AllocIP:    r.AllocIP,
+			HealthPath: r.HealthPath,
+			Aliases:    append([]string(nil), r.Aliases...),
+			TLSEnabled: r.TLSEnabled,
+			CreatedAt:  r.CreatedAt,
+		})
 	}
 
-	return routes, nil
+	return result, nil
 }
-
-// storeDomainMapping stores domain mapping in Consul KV for persistence
-// Domain mapping storage moved to internal/routing helpers (SaveAppRoute/GetAppRoutes)
 
 // HealthCheck verifies Traefik service is running and accessible
 func (tr *TraefikRouter) HealthCheck() error {

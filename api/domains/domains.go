@@ -91,6 +91,7 @@ func (h *DomainHandler) RemoveDomain(c *fiber.Ctx) error {
 			if err := h.router.UnregisterApp(appName, route.AllocID); err != nil {
 				log.Printf("Failed to unregister route for %s: %v", domain, err)
 			}
+			h.router.RemoveRouteMetadata(appName, route.Domain)
 		}
 	}
 

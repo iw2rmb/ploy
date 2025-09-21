@@ -410,6 +410,12 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Service Control**: Start/stop service management with automatic startup integration
   - **Statistics & Monitoring**: Age distribution analytics and cleanup operation statistics
   - **Error Resilience**: Graceful handling of Nomad API failures and missing jobs
+- ✅ **JetStream Routing Persistence** (Nov 2025):
+  - **Object Store Bucket**: Controller writes per-app route maps to `routing_maps` with checksum metadata and revision digests.
+  - **Event Fan-out**: Every change publishes `routing.app.<app>` events; Traefik sidecars consume durable pull subscribers (`traefik-routing-sync`).
+  - **CLI & Runbooks**: `ploy routing resync` rebroadcasts the latest object; operational guidance lives in `docs/runbooks/routing-object-store.md`.
+  - **Controller Metrics**: `routing_objectstore_create_total` and `ploy_api_routing_operations_total{operation="jetstream_*"}` expose bootstrap and persistence health.
+
 - ✅ **Heroku-Style Domain Management** (Aug 2025): Complete domain and certificate automation
   - **Platform Domain Pattern**: Automatic `{app}.ployd.app` subdomain assignment for all apps
   - **API Access Domain**: API accessible at `api.ployd.app` via Traefik
@@ -418,7 +424,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - **Custom Certificate Upload**: Support for uploading custom SSL certificates via API
   - **Domain Type Detection**: Automatic detection of platform vs external domains
   - **Traefik Integration**: Automatic routing configuration for all registered domains
-  - **Consul KV Storage**: Persistent domain-to-app mapping storage
+  - **JetStream Object Store**: Route and domain metadata lives in the `routing_maps` bucket with push events on `routing.app.*`
 - ✅ TLS: Full Let's Encrypt integration with DNS-01 challenges, BYOC supported
 
 ⸻
