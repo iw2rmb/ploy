@@ -24,7 +24,7 @@ fi
 
 LINES="${LINES:-800}"
 FOLLOW_SECONDS="${FOLLOW_SECONDS:-0}"
-OUT_DIR="$ROOT_DIR/logs/$MOD_ID"
+OUT_DIR="${MOD_LOG_DIR:-$ROOT_DIR/logs/$MOD_ID}"
 mkdir -p "$OUT_DIR"
 
 log() { echo "[collect] $*"; }
@@ -57,7 +57,7 @@ fi
 # Best-effort extraction of app name from events or status for API log downloads
 APP_NAME=""
 if compgen -G "$OUT_DIR/events*.sse" >/dev/null; then
-  APP_NAME=$(rg -o 'app=([A-Za-z0-9_.:-]+)' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | cut -d= -f2 || true)
+  APP_NAME=$(rg --no-filename -o 'app=([A-Za-z0-9_.:-]+)' "$OUT_DIR"/events*.sse 2>/dev/null | head -n1 | cut -d= -f2 || true)
 fi
 if [[ -z "$APP_NAME" && -s "$OUT_DIR/status_latest.json" ]]; then
   APP_NAME=$(jq -r 'try (.steps[] | select(.step == "build-gate") | capture("app=(?<name>[A-Za-z0-9_.:-]+)").name) // empty' "$OUT_DIR/status_latest.json" 2>/dev/null | head -n1)
@@ -89,15 +89,15 @@ curl -fsS "$PLOY_CONTROLLER/platform/traefik/logs?lines=${LINES}" -o "$OUT_DIR/t
 log "Filtering errors and key-step events"
 {
   echo "# Errors"
-  grep -E 'level\":\"error\"' "$OUT_DIR"/events*.sse 2>/dev/null || true
+  grep -hE 'level\":\"error\"' "$OUT_DIR"/events*.sse 2>/dev/null || true
   echo
   echo "# Planner/LLM/Reducer/Apply steps"
-  grep -E 'step\":\"(planner|llm-exec|reducer|apply)' "$OUT_DIR"/events*.sse 2>/dev/null || true
+  grep -hE 'step\":\"(planner|llm-exec|reducer|apply)' "$OUT_DIR"/events*.sse 2>/dev/null || true
 } > "$OUT_DIR/events.filtered.txt" || true
 
 # 5) Extract artifact keys from events and download from SeaweedFS (if URL set)
 ART_KEYS_FILE="$OUT_DIR/artifact_keys.txt"
-grep -E 'uploaded (plan|diff) to ' "$OUT_DIR"/events*.sse 2>/dev/null \
+grep -hE 'uploaded (plan|diff) to ' "$OUT_DIR"/events*.sse 2>/dev/null \
  | sed -E 's/.*uploaded (plan|diff) to ([^"} ]+).*/\2/' \
  | sort -u > "$ART_KEYS_FILE" || true
 
@@ -287,9 +287,9 @@ SUMMARY="$OUT_DIR/summary.txt"
   # Try to extract planner and llm-exec RUN_IDs from events to fetch context inputs.json (if SeaweedFS URL is set)
   if [[ -n "${PLOY_SEAWEEDFS_URL:-}" ]]; then
     # Planner RUN_ID: from uploaded plan key mods/<MOD_ID>/planner/<RUN_ID>/plan.json
-    PLANNER_RUN_ID=$(grep -Eo 'planner/[A-Za-z0-9_.:-]+/plan.json' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#planner/([^/]+)/plan\.json#\1#' | head -n1)
+    PLANNER_RUN_ID=$(grep -hEo 'planner/[A-Za-z0-9_.:-]+/plan.json' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#planner/([^/]+)/plan\.json#\1#' | head -n1)
     # LLM RUN_ID: from steps/<RUN_ID>/diff.patch in llm-exec events
-    LLM_RUN_ID=$(grep -Eo 'steps/[A-Za-z0-9_.:-]+/diff\.patch' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#steps/([^/]+)/diff\.patch#\1#' | head -n1)
+    LLM_RUN_ID=$(grep -hEo 'steps/[A-Za-z0-9_.:-]+/diff\.patch' "$OUT_DIR"/events*.sse 2>/dev/null | sed -E 's#steps/([^/]+)/diff\.patch#\1#' | head -n1)
     if [[ -n "$PLANNER_RUN_ID" ]]; then
       echo "Planner RUN_ID: $PLANNER_RUN_ID"
     fi

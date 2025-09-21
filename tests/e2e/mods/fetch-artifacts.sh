@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Usage: ./fetch-artifacts.sh <MOD_ID>
-# Downloads known artifacts (plan_json, next_json, diff_patch) into logs/<MOD_ID>/
+# Downloads known artifacts (plan_json, next_json, diff_patch) into ${MOD_LOG_DIR:-tests/e2e/mods/logs/<MOD_ID>}.
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <MOD_ID>" >&2
@@ -12,7 +12,7 @@ fi
 MOD_ID="$1"
 API_BASE="${PLOY_CONTROLLER:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOG_DIR="$ROOT_DIR/logs/$MOD_ID"
+LOG_DIR="${MOD_LOG_DIR:-$ROOT_DIR/logs/$MOD_ID}"
 
 mkdir -p "$LOG_DIR"
 

@@ -19,9 +19,6 @@ budgets:
 artifacts:
   type: mr
   target_repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git
-  storage:
-    diffs: seaweedfs
-    process_state: consul_kv
 
 mr:
   forge: gitlab
