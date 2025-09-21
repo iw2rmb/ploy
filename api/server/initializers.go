@@ -41,9 +41,11 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		}
 	}
 
+	metricsInstance := metrics.NewMetrics()
+
 	// Initialize environment store with fallback logic
 	log.Printf("Initializing environment store...")
-	envStore, err := initializeEnvStore(cfg)
+	envStore, err := initializeEnvStore(cfg, metricsInstance)
 	if err != nil {
 		log.Printf("❌ Failed to initialize environment store: %v", err)
 		return nil, fmt.Errorf("failed to initialize environment store: %w", err)
@@ -139,9 +141,6 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	if err != nil {
 		log.Printf("Warning: Failed to initialize SBOM handler: %v", err)
 	}
-
-	// Initialize Metrics
-	metricsInstance := metrics.NewMetrics()
 
 	// Initialize Coordination Manager with metrics
 	coordinationManager, err := initializeCoordinationManagerWithMetrics(cfg, metricsInstance)
