@@ -130,6 +130,22 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	if strings.TrimSpace(pluginVersion) != "" {
 		vars["MAVEN_PLUGIN_VERSION"] = pluginVersion
 	}
+	if rep := o.runner.GetEventReporter(); rep != nil {
+		_ = rep.Report(ctx, Event{
+			Phase: "fanout",
+			Step:  string(StepTypeORWApply),
+			Level: "info",
+			Message: fmt.Sprintf(
+				"orw env coords: class=%q group=%q artifact=%q version=%q plugin=%q",
+				rclass,
+				vars["RECIPE_GROUP"],
+				vars["RECIPE_ARTIFACT"],
+				vars["RECIPE_VERSION"],
+				vars["MAVEN_PLUGIN_VERSION"],
+			),
+			Time: time.Now(),
+		})
+	}
 
 	// Step 2b: Substitute environment variables in HCL template
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
