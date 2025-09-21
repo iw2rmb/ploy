@@ -106,7 +106,7 @@ func TestTimeoutAndErrorHandling(t *testing.T) {
 
 		// Should handle malformed config gracefully by using defaults
 		assert.Equal(t, "failed", result.Status)
-		assert.Contains(t, result.Notes, "ORW apply job failed")
+		assert.Contains(t, result.Notes, "recipe_config must be a map")
 	})
 
 	t.Run("fanout orchestration cancels other branches when first succeeds", func(t *testing.T) {
