@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
 	nomadapi "github.com/hashicorp/nomad/api"
@@ -16,6 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/bluegreen"
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
+	irouting "github.com/iw2rmb/ploy/internal/routing"
 )
 
 func initializeEnvStore(cfg *ControllerConfig, recorder consul_envstore.MetricsRecorder) (envstore.EnvStoreInterface, error) {
@@ -137,12 +140,53 @@ func newJetStreamEnvWriter(cfg JetStreamEnvConfig) (*jetStreamKVWriter, error) {
 	return &jetStreamKVWriter{conn: conn, bucket: kv}, nil
 }
 
-func initializeTraefikRouter(consulAddr string) (*routing.TraefikRouter, error) {
-	traefikRouter, err := routing.NewTraefikRouter(consulAddr)
+func initializeTraefikRouter(cfg *ControllerConfig, metrics *metrics.Metrics) (*routing.TraefikRouter, error) {
+	var store *irouting.Store
+	if cfg.JetStreamRouting.Enabled {
+		if cfg.JetStreamRouting.URL == "" && cfg.JetStreamRouting.CredentialsPath == "" && cfg.JetStreamRouting.User == "" {
+			log.Printf("Warning: JetStream routing enabled without connection details; skipping initialization")
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			storeCfg := irouting.StoreConfig{
+				URL:           cfg.JetStreamRouting.URL,
+				Bucket:        cfg.JetStreamRouting.Bucket,
+				Stream:        cfg.JetStreamRouting.Stream,
+				SubjectPrefix: cfg.JetStreamRouting.SubjectPrefix,
+				ChunkSize:     cfg.JetStreamRouting.ChunkSize,
+				Replicas:      cfg.JetStreamRouting.Replicas,
+			}
+			if cfg.JetStreamRouting.CredentialsPath != "" {
+				storeCfg.UserCreds = cfg.JetStreamRouting.CredentialsPath
+			}
+			if cfg.JetStreamRouting.User != "" {
+				storeCfg.User = cfg.JetStreamRouting.User
+				storeCfg.Password = cfg.JetStreamRouting.Password
+			}
+			createdStore, err := irouting.NewStore(ctx, storeCfg)
+			if err != nil {
+				log.Printf("[routing] Error during routing object store bootstrap (bucket=%s, stream=%s): %v", cfg.JetStreamRouting.Bucket, cfg.JetStreamRouting.Stream, err)
+				if metrics != nil {
+					metrics.RecordRoutingObjectStoreBootstrap("error")
+				}
+			} else {
+				store = createdStore
+				if metrics != nil {
+					metrics.RecordRoutingObjectStoreBootstrap("success")
+				}
+				log.Printf("[routing] JetStream routing object store bootstrap complete (bucket=%s, stream=%s)", cfg.JetStreamRouting.Bucket, cfg.JetStreamRouting.Stream)
+			}
+		}
+	}
+
+	traefikRouter, err := routing.NewTraefikRouter(cfg.ConsulAddr, routing.RouterOptions{
+		Store:   store,
+		Metrics: metrics,
+	})
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Traefik router initialized with Consul address: %s", consulAddr)
+	log.Printf("Traefik router initialized with Consul address: %s", cfg.ConsulAddr)
 	return traefikRouter, nil
 }
 

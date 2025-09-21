@@ -11,7 +11,7 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 ## Key Files
 - `api/consul_envstore/store.go#L135` – Consul-backed app environment store and cache.
 - `internal/orchestration/kv.go#L10` – Thin Consul KV adapter used throughout orchestration helpers.
-- `internal/routing/kv.go#L24` – Domain routing persistence for Traefik coordination.
+- `internal/routing/README.md` – JetStream routing store, sync helpers, and operational guidance.
 - `api/acme/storage.go#L248` – Certificate metadata storage in Consul KV.
 - `api/certificates/manager.go#L296` – App certificate registry persisted via Consul KV.
 - `api/dns/handler.go#L88` – DNS configuration snapshotting into Consul KV.
@@ -20,7 +20,7 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 
 ## Current Consul KV Footprint
 - **Environment variables** (`api/consul_envstore`, `api/server/initializers_infra.go`) cache JSON blobs per app with optional batching and invalidation.
-- **Routing + DNS metadata** (`internal/routing/kv.go`, `api/dns/handler.go`) persists domain → alloc mappings and wildcard DNS settings for later reconciliation jobs.
+- **Routing + DNS metadata**: JetStream object storage now owns route maps (see `internal/routing/README.md`); `api/dns/handler.go` still snapshots DNS settings until certificate migration completes.
 - **Certificates & ACME state** (`api/acme/storage.go`, `api/certificates/manager.go`) store certificate metadata, renewal status, and custom uploads.
 - **Self-update coordination** (`api/selfupdate/executor.go`) locks rolling updates and records progress to unblock dashboards/CLI calls.
 - **Mods knowledge base** (`internal/mods/kb_locks.go`, `internal/mods/kb_integration.go`) uses sessions for coarse locking and retry loops during KB writes.
@@ -43,16 +43,16 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 ## Migration Plan
 ### Phase 0 — Foundations
 - ✅ **COMPLETED (2025-09-24)** `roadmap/nats/01-jetstream-cluster.md` – Deployed the JetStream cluster via `platform/nomad/jetstream.nomad.hcl`, published the operator runbook, and wired Traefik/CoreDNS so clients reach `nats.ploy.local:4222`.
-- `roadmap/nats/02-kv-adapter.md` – Ship a JetStream-backed KV adapter with feature flag control over backend selection.
+- ✅ **COMPLETED** `roadmap/nats/02-kv-adapter.md` – JetStream-backed KV adapter documented with feature-flag wiring, adapter implementation steps, and test coverage expectations.
 - Build integration tests that run against ephemeral NATS (docker-compose) mirroring existing Consul KV unit coverage.
 
 ### Phase 1 — Config & Environment State
-- `roadmap/nats/03-envstore-dual-write.md` – Dual-write env updates to Consul and JetStream with rollout telemetry.
-- `roadmap/nats/04-envstore-watchers.md` – Cut reads to JetStream and wire watcher-driven cache invalidation with CAS enforcement.
+- ✅ **COMPLETED** `roadmap/nats/03-envstore-dual-write.md` – Env store dual-write rollout guide detailing Consul + JetStream writes, metrics, and validation strategy.
+- ✅ **COMPLETED** `roadmap/nats/04-envstore-watchers.md` – JetStream read cutover plan with watcher-driven cache invalidation, CAS handling, and documentation steps.
 - Promote JetStream as primary after validation; retire Consul dependency for env store reads.
 
 ### Phase 2 — Routing & Certificate Metadata
-- `roadmap/nats/05-routing-object-store.md` – Persist routing metadata in JetStream object storage and drive Traefik updates via events.
+- ✅ **COMPLETED (2025-11-04)** `roadmap/nats/05-routing-object-store.md` – Persist routing metadata in JetStream object storage and drive Traefik updates via events.
 - `roadmap/nats/06-certificate-metadata.md` – Migrate certificate metadata and renewal flows to JetStream with broadcast notifications.
 
 ### Phase 3 — Controller Coordination & Locks

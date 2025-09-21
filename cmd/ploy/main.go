@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/domains"
 	"github.com/iw2rmb/ploy/internal/cli/env"
 	"github.com/iw2rmb/ploy/internal/cli/recipes"
+	"github.com/iw2rmb/ploy/internal/cli/routing"
 	"github.com/iw2rmb/ploy/internal/cli/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/security"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
@@ -39,6 +40,8 @@ func main() {
 			env.EnvCmd(os.Args[2:], controllerURL)
 		case "domains":
 			domains.DomainsCmd(os.Args[2:], controllerURL)
+		case "routing":
+			routing.RoutingCmd(os.Args[2:], controllerURL)
 		case "certs":
 			certs.CertsCmd(os.Args[2:], controllerURL)
 		case "debug":

@@ -95,9 +95,9 @@ job "traefik-system" {
         port = "metrics"
         interval = "30s"
         timeout = "5s"
-      }
     }
-    
+  }
+
     task "traefik" {
       driver = "docker"
       
@@ -184,6 +184,35 @@ job "traefik-system" {
       
       # Kill timeout
       kill_timeout = "30s"
+    }
+
+    task "routing-sync" {
+      driver = "docker"
+
+      config {
+        image        = "registry.dev.ployman.app/ploy/traefik-sync:latest"
+        network_mode = "host"
+
+        mount {
+          type   = "bind"
+          source = "/opt/ploy/traefik-data"
+          target = "/data"
+        }
+      }
+
+      env {
+        PLOY_ROUTING_JETSTREAM_URL          = "nats://127.0.0.1:4222"
+        PLOY_ROUTING_OBJECT_BUCKET          = "routing_maps"
+        PLOY_ROUTING_EVENT_STREAM           = "routing_events"
+        PLOY_ROUTING_EVENT_SUBJECT_PREFIX   = "routing.app"
+        PLOY_TRAEFIK_DYNAMIC_CONFIG         = "/data/dynamic-config.yml"
+        PLOY_TRAEFIK_ROUTING_DURABLE        = "traefik-routing-sync"
+      }
+
+      resources {
+        cpu    = 100
+        memory = 64
+      }
     }
   }
 }

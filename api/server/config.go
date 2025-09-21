@@ -19,6 +19,20 @@ type JetStreamEnvConfig struct {
 	Password        string
 }
 
+// JetStreamRoutingConfig captures routing persistence configuration.
+type JetStreamRoutingConfig struct {
+	Enabled         bool
+	URL             string
+	Bucket          string
+	Stream          string
+	SubjectPrefix   string
+	CredentialsPath string
+	User            string
+	Password        string
+	ChunkSize       int
+	Replicas        int
+}
+
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
 	Port              string
@@ -41,6 +55,8 @@ type ControllerConfig struct {
 	SecurityMavenGroup string
 	// JetStream dual write configuration for the env store.
 	JetStreamEnv JetStreamEnvConfig
+	// JetStream routing persistence/event configuration.
+	JetStreamRouting JetStreamRoutingConfig
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -85,6 +101,20 @@ func LoadConfigFromEnv() *ControllerConfig {
 	jsUser := utils.Getenv("PLOY_JETSTREAM_USER", "")
 	jsPassword := utils.Getenv("PLOY_JETSTREAM_PASSWORD", "")
 
+	routingEnabled := parseBoolEnv("PLOY_ROUTING_JETSTREAM_ENABLED", false)
+	routingURL := utils.Getenv("PLOY_ROUTING_JETSTREAM_URL", jsURL)
+	routingBucket := utils.Getenv("PLOY_ROUTING_OBJECT_BUCKET", "routing_maps")
+	routingStream := utils.Getenv("PLOY_ROUTING_EVENT_STREAM", "routing_events")
+	routingSubject := utils.Getenv("PLOY_ROUTING_EVENT_SUBJECT_PREFIX", "routing.app")
+	routingCreds := utils.Getenv("PLOY_ROUTING_JETSTREAM_CREDS", jsCreds)
+	routingUser := utils.Getenv("PLOY_ROUTING_JETSTREAM_USER", jsUser)
+	routingPassword := utils.Getenv("PLOY_ROUTING_JETSTREAM_PASSWORD", jsPassword)
+	routingChunkSize := parseIntEnv("PLOY_ROUTING_OBJECT_CHUNK_SIZE", 128*1024)
+	routingReplicas := parseIntEnv("PLOY_ROUTING_JETSTREAM_REPLICAS", 3)
+	if routingURL != "" && !routingEnabled {
+		routingEnabled = true
+	}
+
 	return &ControllerConfig{
 		Port:                 port,
 		ConsulAddr:           utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
@@ -106,6 +136,18 @@ func LoadConfigFromEnv() *ControllerConfig {
 			CredentialsPath: jsCreds,
 			User:            jsUser,
 			Password:        jsPassword,
+		},
+		JetStreamRouting: JetStreamRoutingConfig{
+			Enabled:         routingEnabled,
+			URL:             routingURL,
+			Bucket:          routingBucket,
+			Stream:          routingStream,
+			SubjectPrefix:   routingSubject,
+			CredentialsPath: routingCreds,
+			User:            routingUser,
+			Password:        routingPassword,
+			ChunkSize:       routingChunkSize,
+			Replicas:        routingReplicas,
 		},
 	}
 }
