@@ -23,7 +23,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 
 	// Step 2: Pre-substitute recipe variables and prepare env
-	rclass, rcoords, rtimeout := buildORWRecipeConfig(branch.Inputs)
+	rclass, rcoords, rtimeout, pluginVersion := buildORWRecipeConfig(branch.Inputs)
 	prePath, err := orwPreSubstitute(hclPath, rclass, rcoords, rtimeout)
 	if err != nil {
 		result.Status = "failed"
@@ -119,6 +119,17 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 	}
 
 	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
+	if strings.TrimSpace(rclass) != "" {
+		vars["RECIPE_CLASS"] = rclass
+	}
+	if parts := strings.SplitN(rcoords, ":", 3); len(parts) == 3 {
+		vars["RECIPE_GROUP"] = parts[0]
+		vars["RECIPE_ARTIFACT"] = parts[1]
+		vars["RECIPE_VERSION"] = parts[2]
+	}
+	if strings.TrimSpace(pluginVersion) != "" {
+		vars["MAVEN_PLUGIN_VERSION"] = pluginVersion
+	}
 
 	// Step 2b: Substitute environment variables in HCL template
 	renderedHCLPath, err := substituteORWTemplateVars(prePath, runID, vars)
