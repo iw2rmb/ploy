@@ -108,7 +108,7 @@ job "jetstream-cluster" {
       env {
         NATS_LOG_LEVEL     = "info"
         NATS_CLUSTER_NAME  = "ploy-jetstream"
-        NATS_DOMAIN        = "nats.ploy.local"
+        NATS_DOMAIN        = "ployjetstream"
         NATS_STORE_DIR     = "/data/jetstream"
         NATS_RESOLVER_DIR  = "/data/accounts"
         NATS_CONNECT_RETRY = "30"
