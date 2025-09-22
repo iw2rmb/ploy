@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	recipecatalog "github.com/iw2rmb/ploy/internal/recipes/catalog"
@@ -48,6 +49,28 @@ type JetStreamCertificatesConfig struct {
 	Replicas        int
 }
 
+// JetStreamUpdatesConfig captures controller self-update queue configuration.
+type JetStreamUpdatesConfig struct {
+	Enabled             bool
+	URL                 string
+	CredentialsPath     string
+	User                string
+	Password            string
+	Stream              string
+	SubjectPrefix       string
+	DurablePrefix       string
+	Lane                string
+	AckWait             time.Duration
+	MaxAckPending       int
+	MaxDeliver          int
+	Replicas            int
+	StatusStream        string
+	StatusSubjectPrefix string
+	StatusDurablePrefix string
+	StatusReplicas      int
+	StatusMaxAge        time.Duration
+}
+
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
 	Port              string
@@ -74,6 +97,8 @@ type ControllerConfig struct {
 	JetStreamRouting JetStreamRoutingConfig
 	// JetStream certificate metadata/bundle configuration.
 	JetStreamCertificates JetStreamCertificatesConfig
+	// JetStream controller self-update configuration.
+	JetStreamUpdates JetStreamUpdatesConfig
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -89,6 +114,15 @@ func parseIntEnv(envVar string, defaultVal int) int {
 func parseBoolEnv(envVar string, defaultVal bool) bool {
 	if val := os.Getenv(envVar); val != "" {
 		if parsed, err := strconv.ParseBool(val); err == nil {
+			return parsed
+		}
+	}
+	return defaultVal
+}
+
+func parseDurationEnv(envVar string, defaultVal time.Duration) time.Duration {
+	if val := os.Getenv(envVar); val != "" {
+		if parsed, err := time.ParseDuration(val); err == nil {
 			return parsed
 		}
 	}
@@ -147,6 +181,25 @@ func LoadConfigFromEnv() *ControllerConfig {
 		certsEnabled = true
 	}
 
+	updatesURL := utils.Getenv("PLOY_UPDATES_JETSTREAM_URL", jsURL)
+	updatesCreds := utils.Getenv("PLOY_UPDATES_JETSTREAM_CREDS", jsCreds)
+	updatesUser := utils.Getenv("PLOY_UPDATES_JETSTREAM_USER", jsUser)
+	updatesPassword := utils.Getenv("PLOY_UPDATES_JETSTREAM_PASSWORD", jsPassword)
+	updatesEnabled := parseBoolEnv("PLOY_UPDATES_JETSTREAM_ENABLED", updatesURL != "")
+	if updatesURL != "" && !updatesEnabled {
+		updatesEnabled = true
+	}
+	updatesLane := strings.ToLower(strings.TrimSpace(utils.Getenv("PLOY_UPDATES_LANE", "d")))
+	if updatesLane == "" {
+		updatesLane = "d"
+	}
+	updatesAckWait := parseDurationEnv("PLOY_UPDATES_ACK_WAIT", 2*time.Minute)
+	updatesMaxAckPending := parseIntEnv("PLOY_UPDATES_MAX_ACK_PENDING", 1)
+	updatesMaxDeliver := parseIntEnv("PLOY_UPDATES_MAX_DELIVER", 5)
+	updatesReplicas := parseIntEnv("PLOY_UPDATES_JETSTREAM_REPLICAS", 1)
+	statusReplicas := parseIntEnv("PLOY_UPDATES_STATUS_REPLICAS", updatesReplicas)
+	statusMaxAge := parseDurationEnv("PLOY_UPDATES_STATUS_MAX_AGE", 72*time.Hour)
+
 	return &ControllerConfig{
 		Port:                 port,
 		ConsulAddr:           utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
@@ -193,6 +246,26 @@ func LoadConfigFromEnv() *ControllerConfig {
 			Password:        certsPassword,
 			ChunkSize:       certsChunkSize,
 			Replicas:        certsReplicas,
+		},
+		JetStreamUpdates: JetStreamUpdatesConfig{
+			Enabled:             updatesEnabled,
+			URL:                 updatesURL,
+			CredentialsPath:     updatesCreds,
+			User:                updatesUser,
+			Password:            updatesPassword,
+			Stream:              utils.Getenv("PLOY_UPDATES_STREAM", "updates.control-plane"),
+			SubjectPrefix:       utils.Getenv("PLOY_UPDATES_SUBJECT_PREFIX", "updates.control-plane.tasks"),
+			DurablePrefix:       utils.Getenv("PLOY_UPDATES_DURABLE_PREFIX", "updates-control-plane"),
+			Lane:                updatesLane,
+			AckWait:             updatesAckWait,
+			MaxAckPending:       updatesMaxAckPending,
+			MaxDeliver:          updatesMaxDeliver,
+			Replicas:            updatesReplicas,
+			StatusStream:        utils.Getenv("PLOY_UPDATES_STATUS_STREAM", "updates.control-plane.status"),
+			StatusSubjectPrefix: utils.Getenv("PLOY_UPDATES_STATUS_SUBJECT_PREFIX", "updates.control-plane.status"),
+			StatusDurablePrefix: utils.Getenv("PLOY_UPDATES_STATUS_DURABLE_PREFIX", "updates-status"),
+			StatusReplicas:      statusReplicas,
+			StatusMaxAge:        statusMaxAge,
 		},
 	}
 }

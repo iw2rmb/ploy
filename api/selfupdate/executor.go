@@ -8,98 +8,47 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/hashicorp/consul/api"
 	"github.com/iw2rmb/ploy/internal/distribution"
 )
 
-// createUpdateSession creates a Consul session for update coordination
-func (h *Handler) createUpdateSession(ctx context.Context, request UpdateRequest) (string, error) {
-	session := h.consulClient.Session()
-
-	// Create session for coordination
-	sessionEntry := &api.SessionEntry{
-		Name:      "ploy-api-update",
-		TTL:       h.sessionTTL.String(),
-		Behavior:  api.SessionBehaviorRelease,
-		LockDelay: 5 * time.Second,
-	}
-
-	sessionID, _, err := session.Create(sessionEntry, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create session: %w", err)
-	}
-
-	// Initialize update status
-	status := UpdateStatus{
-		Status:         "preparing",
-		CurrentVersion: h.currentVersion,
-		TargetVersion:  request.TargetVersion,
-		Progress:       0,
-		StartedAt:      time.Now(),
-		Metadata:       request.Metadata,
-	}
-
-	kv := h.consulClient.KV()
-	statusData, _ := toJSON(status)
-
-	// Store update status in Consul
-	kvPair := &api.KVPair{
-		Key:     h.leaderPrefix + "/status",
-		Value:   statusData,
-		Session: sessionID,
-	}
-
-	acquired, _, err := kv.Acquire(kvPair, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to acquire update lock: %w", err)
-	}
-
-	if !acquired {
-		return "", fmt.Errorf("another update is already in progress")
-	}
-
-	log.Printf("Created update session %s for version %s", sessionID, request.TargetVersion)
-	return sessionID, nil
-}
-
 // executeRollingUpdate performs a rolling update strategy
-func (h *Handler) executeRollingUpdate(ctx context.Context, sessionID string, request UpdateRequest) error {
+func (h *Handler) executeRollingUpdate(ctx context.Context, deploymentID string, request UpdateRequest, metadata map[string]string) error {
 	log.Printf("Executing rolling update to version %s", request.TargetVersion)
 
-	// Download and validate target binary
+	stageMeta := func(stage string) map[string]string {
+		return mergeMetadata(metadata, map[string]string{"stage": stage})
+	}
+
 	binaryPath, info, err := h.distributor.DownloadBinary(request.TargetVersion, h.platform, h.architecture)
 	if err != nil {
-		h.updateStatus(sessionID, "failed", "Failed to download binary: "+err.Error(), 0)
+		errMeta := mergeMetadata(stageMeta("download"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Failed to download binary: "+err.Error(), 0, errMeta)
 		return fmt.Errorf("failed to download binary: %w", err)
 	}
 
-	// Update status - binary downloaded
-	h.updateStatus(sessionID, "downloading", "Binary downloaded successfully", 25)
+	h.updateStatus(ctx, deploymentID, request, "downloading", "Binary downloaded successfully", 25, stageMeta("download"))
 
-	// Validate binary integrity
 	if err := h.validateBinary(binaryPath, info); err != nil {
-		h.updateStatus(sessionID, "failed", "Binary validation failed: "+err.Error(), 25)
+		errMeta := mergeMetadata(stageMeta("validate"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Binary validation failed: "+err.Error(), 25, errMeta)
 		return fmt.Errorf("binary validation failed: %w", err)
 	}
 
-	// Update status - validation complete
-	h.updateStatus(sessionID, "validating", "Binary validation completed", 50)
+	h.updateStatus(ctx, deploymentID, request, "validating", "Binary validation completed", 50, stageMeta("validate"))
 
-	// Execute staged deployment
-	if err := h.deployUpdate(ctx, sessionID, binaryPath, info, request); err != nil {
-		h.updateStatus(sessionID, "failed", "Deployment failed: "+err.Error(), 50)
+	if err := h.deployUpdate(ctx, deploymentID, binaryPath, info, request, stageMeta("deploy")); err != nil {
+		errMeta := mergeMetadata(stageMeta("deploy"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Deployment failed: "+err.Error(), 50, errMeta)
 		return fmt.Errorf("deployment failed: %w", err)
 	}
 
-	// Update status - deployment complete
-	h.updateStatus(sessionID, "completed", "Update completed successfully", 100)
-
+	h.updateStatus(ctx, deploymentID, request, "completed", "Update completed successfully", 100, stageMeta("completed"))
 	log.Printf("Rolling update to version %s completed successfully", request.TargetVersion)
 	return nil
 }
 
 // executeBlueGreenUpdate performs a blue-green update strategy
-func (h *Handler) executeBlueGreenUpdate(ctx context.Context, sessionID string, request UpdateRequest) error {
+func (h *Handler) executeBlueGreenUpdate(ctx context.Context, deploymentID string, request UpdateRequest, metadata map[string]string) error {
 	// TODO: Implement blue-green update logic
 	// This would involve:
 	// 1. Starting new controller instances with new version
@@ -110,35 +59,39 @@ func (h *Handler) executeBlueGreenUpdate(ctx context.Context, sessionID string, 
 }
 
 // executeEmergencyUpdate performs an emergency update (fastest, least safe)
-func (h *Handler) executeEmergencyUpdate(ctx context.Context, sessionID string, request UpdateRequest) error {
+func (h *Handler) executeEmergencyUpdate(ctx context.Context, deploymentID string, request UpdateRequest, metadata map[string]string) error {
 	log.Printf("Executing emergency update to version %s", request.TargetVersion)
 
-	// Download binary
+	stageMeta := func(stage string) map[string]string {
+		return mergeMetadata(metadata, map[string]string{"stage": stage})
+	}
+
 	binaryPath, info, err := h.distributor.DownloadBinary(request.TargetVersion, h.platform, h.architecture)
 	if err != nil {
-		h.updateStatus(sessionID, "failed", "Failed to download binary: "+err.Error(), 0)
+		errMeta := mergeMetadata(stageMeta("download"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Failed to download binary: "+err.Error(), 0, errMeta)
 		return fmt.Errorf("failed to download binary: %w", err)
 	}
 
-	// Minimal validation for emergency updates
 	if err := h.quickValidateBinary(binaryPath, info); err != nil {
-		h.updateStatus(sessionID, "failed", "Quick validation failed: "+err.Error(), 25)
+		errMeta := mergeMetadata(stageMeta("validate"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Quick validation failed: "+err.Error(), 25, errMeta)
 		return fmt.Errorf("quick validation failed: %w", err)
 	}
 
-	// Immediate deployment
 	if err := h.emergencyDeploy(ctx, binaryPath, info); err != nil {
-		h.updateStatus(sessionID, "failed", "Emergency deployment failed: "+err.Error(), 50)
+		errMeta := mergeMetadata(stageMeta("deploy"), map[string]string{"error": err.Error()})
+		h.updateStatus(ctx, deploymentID, request, "failed", "Emergency deployment failed: "+err.Error(), 50, errMeta)
 		return fmt.Errorf("emergency deployment failed: %w", err)
 	}
 
-	h.updateStatus(sessionID, "completed", "Emergency update completed", 100)
+	h.updateStatus(ctx, deploymentID, request, "completed", "Emergency update completed", 100, stageMeta("completed"))
 	log.Printf("Emergency update to version %s completed", request.TargetVersion)
 	return nil
 }
 
 // deployUpdate performs the actual binary deployment
-func (h *Handler) deployUpdate(ctx context.Context, sessionID string, binaryPath string, info *distribution.BinaryInfo, request UpdateRequest) error {
+func (h *Handler) deployUpdate(ctx context.Context, deploymentID string, binaryPath string, info *distribution.BinaryInfo, request UpdateRequest, metadata map[string]string) error {
 	// Create backup of current binary
 	currentBinary := os.Args[0]
 	backupPath := currentBinary + ".backup." + h.currentVersion
@@ -148,7 +101,7 @@ func (h *Handler) deployUpdate(ctx context.Context, sessionID string, binaryPath
 	}
 
 	// Update status - backup created
-	h.updateStatus(sessionID, "deploying", "Backup created, deploying new binary", 75)
+	h.updateStatus(ctx, deploymentID, request, "deploying", "Backup created, deploying new binary", 75, metadata)
 
 	// Use atomic replacement to avoid "text file busy" error
 	if err := h.atomicBinaryReplacement(binaryPath, currentBinary, backupPath); err != nil {
@@ -308,39 +261,4 @@ func (h *Handler) quickValidateBinary(binaryPath string, info *distribution.Bina
 	return nil
 }
 
-// updateStatus updates the update status in Consul
-func (h *Handler) updateStatus(sessionID, status, message string, progress int) {
-	kv := h.consulClient.KV()
-
-	updateStatus := UpdateStatus{
-		Status:         status,
-		CurrentVersion: h.currentVersion,
-		Progress:       progress,
-		Message:        message,
-		StartedAt:      time.Now(),
-	}
-
-	if status == "completed" || status == "failed" {
-		updateStatus.CompletedAt = time.Now()
-	}
-
-	statusData, _ := toJSON(updateStatus)
-	kvPair := &api.KVPair{
-		Key:     h.leaderPrefix + "/status",
-		Value:   statusData,
-		Session: sessionID,
-	}
-
-	_, _ = kv.Put(kvPair, nil)
-}
-
-// cleanupSession cleans up the update session
-func (h *Handler) cleanupSession(sessionID string) {
-	session := h.consulClient.Session()
-	_, _ = session.Destroy(sessionID, nil)
-
-	kv := h.consulClient.KV()
-	_, _ = kv.Delete(h.leaderPrefix+"/status", nil)
-
-	log.Printf("Cleaned up update session %s", sessionID)
-}
+// Consul coordination helpers removed in favour of JetStream work queue.
