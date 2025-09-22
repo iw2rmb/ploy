@@ -185,9 +185,6 @@ job "jetstream-cluster" {
         cluster {
           name: "{{ env "NATS_CLUSTER_NAME" }}"
           port: {{ env "NOMAD_PORT_cluster" }}
-          routes = [
-            "nats-route://nats.ploy.local:6222"
-          ]
           connect_retries: {{ env "NATS_CONNECT_RETRY" }}
           advertise: "{{ env "NOMAD_ADDR_cluster" }}"
         }
