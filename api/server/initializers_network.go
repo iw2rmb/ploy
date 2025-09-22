@@ -1,16 +1,19 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/dns"
 	"github.com/iw2rmb/ploy/api/selfupdate"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	internalStorage "github.com/iw2rmb/ploy/internal/storage"
+	nats "github.com/nats-io/nats.go"
 )
 
 func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
@@ -105,7 +108,6 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 }
 
 func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*selfupdate.Handler, error) {
-	// Create storage client for self-update operations
 	if cfgService == nil {
 		return nil, fmt.Errorf("config service required for self-update handler")
 	}
@@ -115,15 +117,75 @@ func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servi
 	}
 	provider := internalStorage.NewProviderFromStorage(unified, "artifacts")
 
-	// Get current controller version
-	currentVersion := selfupdate.GetCurrentVersion()
+	updatesCfg := cfg.JetStreamUpdates
+	if !updatesCfg.Enabled {
+		return nil, fmt.Errorf("jetstream updates configuration disabled")
+	}
+	if updatesCfg.URL == "" {
+		return nil, fmt.Errorf("jetstream updates url not configured")
+	}
 
-	// Create self-update handler
-	handler, err := selfupdate.NewHandler(provider, cfg.ConsulAddr, currentVersion)
+	opts := []nats.Option{nats.Name("ploy-selfupdate-handler")}
+	if updatesCfg.CredentialsPath != "" {
+		opts = append(opts, nats.UserCredentials(updatesCfg.CredentialsPath))
+	}
+	if updatesCfg.User != "" {
+		opts = append(opts, nats.UserInfo(updatesCfg.User, updatesCfg.Password))
+	}
+
+	conn, err := nats.Connect(updatesCfg.URL, opts...)
 	if err != nil {
+		return nil, fmt.Errorf("connect jetstream updates: %w", err)
+	}
+
+	js, err := conn.JetStream()
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("create jetstream context: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	queueCfg := selfupdate.WorkQueueConfig{
+		Stream:        updatesCfg.Stream,
+		SubjectPrefix: updatesCfg.SubjectPrefix,
+		DurablePrefix: updatesCfg.DurablePrefix,
+		Lane:          updatesCfg.Lane,
+		AckWait:       updatesCfg.AckWait,
+		MaxAckPending: updatesCfg.MaxAckPending,
+		MaxDeliver:    updatesCfg.MaxDeliver,
+		Replicas:      updatesCfg.Replicas,
+	}
+	queue, err := selfupdate.NewJetStreamWorkQueue(ctx, js, queueCfg)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("bootstrap self-update work queue: %w", err)
+	}
+
+	statusCfg := selfupdate.StatusStreamConfig{
+		Stream:        updatesCfg.StatusStream,
+		SubjectPrefix: updatesCfg.StatusSubjectPrefix,
+		DurablePrefix: updatesCfg.StatusDurablePrefix,
+		Replicas:      updatesCfg.StatusReplicas,
+		MaxAge:        updatesCfg.StatusMaxAge,
+	}
+	statusPublisher, err := selfupdate.NewStatusPublisher(ctx, js, statusCfg)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("bootstrap self-update status stream: %w", err)
+	}
+
+	currentVersion := selfupdate.GetCurrentVersion()
+	handler, err := selfupdate.NewHandler(provider, queue, statusPublisher, currentVersion)
+	if err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("failed to create self-update handler: %w", err)
 	}
 
-	log.Printf("Self-update handler initialized (current version: %s)", currentVersion)
+	// Start executor to process queued updates.
+	handler.StartExecutor(context.Background())
+
+	log.Printf("Self-update handler initialized (current version: %s, lane=%s)", currentVersion, updatesCfg.Lane)
 	return handler, nil
 }

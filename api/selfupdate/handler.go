@@ -2,16 +2,23 @@ package selfupdate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/hashicorp/consul/api"
+	"github.com/google/uuid"
+	consulapi "github.com/hashicorp/consul/api"
+	nomadapi "github.com/hashicorp/nomad/api"
 	"github.com/iw2rmb/ploy/internal/distribution"
+	"github.com/iw2rmb/ploy/internal/orchestration"
 	"github.com/iw2rmb/ploy/internal/storage"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // Build-time variables injected via ldflags
@@ -24,26 +31,38 @@ var (
 
 // Handler handles controller self-update operations
 type Handler struct {
-	distributor    *distribution.BinaryDistributor
-	consulClient   *api.Client
-	currentVersion string
-	gitCommit      string
-	gitBranch      string
-	buildTime      string
-	platform       string
-	architecture   string
-	leaderPrefix   string
-	sessionTTL     time.Duration
+	distributor      *distribution.BinaryDistributor
+	queue            *JetStreamWorkQueue
+	statusPublisher  *StatusPublisher
+	currentVersion   string
+	gitCommit        string
+	gitBranch        string
+	buildTime        string
+	platform         string
+	architecture     string
+	executorID       string
+	statusMu         sync.RWMutex
+	statusCache      map[string]*UpdateStatus
+	latestDeployment string
+	workerOnce       sync.Once
 }
 
-// NewHandler creates a new self-update handler with Git integration
-func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVersion string) (*Handler, error) {
-	// Initialize binary distributor with proper cache directory
-	cacheDir := "/var/cache/ploy-api"
+var (
+	checkNomadCluster   = defaultNomadClusterCheck
+	checkTraefikCluster = defaultTraefikClusterCheck
+)
 
-	// Ensure cache directory exists with proper permissions
+// NewHandler creates a new self-update handler with Git integration
+func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQueue, statusPublisher *StatusPublisher, currentVersion string) (*Handler, error) {
+	if queue == nil {
+		return nil, fmt.Errorf("jetstream work queue required")
+	}
+	if statusPublisher == nil {
+		return nil, fmt.Errorf("status publisher required")
+	}
+
+	cacheDir := "/var/cache/ploy-api"
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		// Fallback to /tmp if /var/cache is not writable
 		cacheDir = filepath.Join(os.TempDir(), "ploy-api-cache")
 		if err := os.MkdirAll(cacheDir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create cache directory: %w", err)
@@ -52,41 +71,42 @@ func NewHandler(storageProvider storage.StorageProvider, consulAddr, currentVers
 
 	distributor := distribution.NewBinaryDistributor(storageProvider, "artifacts", cacheDir)
 
-	// Initialize Consul client
-	config := api.DefaultConfig()
-	config.Address = consulAddr
-	consulClient, err := api.NewClient(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create consul client: %w", err)
-	}
-
-	// Get Git metadata from environment or build variables
 	gitCommit := os.Getenv("GIT_COMMIT")
 	if gitCommit == "" {
-		gitCommit = GitCommit // Build-time variable
+		gitCommit = GitCommit
 	}
 
 	gitBranch := os.Getenv("GIT_BRANCH")
 	if gitBranch == "" {
-		gitBranch = GitBranch // Build-time variable
+		gitBranch = GitBranch
 	}
 
 	buildTime := os.Getenv("BUILD_TIME")
 	if buildTime == "" {
-		buildTime = BuildTime // Build-time variable
+		buildTime = BuildTime
+	}
+
+	executorID := os.Getenv("NOMAD_ALLOC_ID")
+	if executorID == "" {
+		if hostname, err := os.Hostname(); err == nil {
+			executorID = hostname
+		} else {
+			executorID = "controller"
+		}
 	}
 
 	return &Handler{
-		distributor:    distributor,
-		consulClient:   consulClient,
-		currentVersion: currentVersion,
-		gitCommit:      gitCommit,
-		gitBranch:      gitBranch,
-		buildTime:      buildTime,
-		platform:       "linux", // TODO: detect from runtime
-		architecture:   "amd64", // TODO: detect from runtime
-		leaderPrefix:   "ploy/api/update-coordination",
-		sessionTTL:     30 * time.Second,
+		distributor:     distributor,
+		queue:           queue,
+		statusPublisher: statusPublisher,
+		currentVersion:  currentVersion,
+		gitCommit:       gitCommit,
+		gitBranch:       gitBranch,
+		buildTime:       buildTime,
+		platform:        "linux", // TODO: detect from runtime
+		architecture:    "amd64", // TODO: detect from runtime
+		executorID:      executorID,
+		statusCache:     make(map[string]*UpdateStatus),
 	}, nil
 }
 
@@ -109,6 +129,7 @@ const (
 
 // UpdateStatus represents the current update status
 type UpdateStatus struct {
+	DeploymentID     string            `json:"deployment_id,omitempty"`
 	Status           string            `json:"status"`
 	CurrentVersion   string            `json:"current_version"`
 	TargetVersion    string            `json:"target_version,omitempty"`
@@ -143,7 +164,7 @@ func SetupRoutes(app *fiber.App, handler *Handler) {
 
 }
 
-// HandleUpdate initiates a controller update
+// HandleUpdate enqueues a controller update request onto the JetStream work queue
 func (h *Handler) HandleUpdate(c *fiber.Ctx) error {
 	var request UpdateRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -158,28 +179,40 @@ func (h *Handler) HandleUpdate(c *fiber.Ctx) error {
 		})
 	}
 
-	// Default strategy
 	if request.Strategy == "" {
 		request.Strategy = RollingUpdate
 	}
 
-	// Validate update request
+	if request.Metadata == nil {
+		request.Metadata = map[string]string{}
+	}
+
 	if err := h.ValidateUpdate(request.TargetVersion); err != nil && !request.Force {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("Update validation failed: %v", err),
 		})
 	}
 
-	// Start update in background
-	go func() {
-		ctx := context.Background()
-		if err := h.StartUpdate(ctx, request); err != nil {
-			log.Printf("Update failed: %v", err)
-		}
-	}()
+	submittedBy := c.Get("X-Ploy-User")
+	if submittedBy == "" {
+		submittedBy = c.Get("X-Authenticated-User")
+	}
+	if submittedBy == "" {
+		submittedBy = c.IP()
+	}
+
+	ctx := context.Background()
+	deploymentID, err := h.enqueueUpdate(ctx, request, submittedBy)
+	if err != nil {
+		log.Printf("[selfupdate] enqueue failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to enqueue update task",
+		})
+	}
 
 	return c.JSON(fiber.Map{
-		"message":        "Update initiated",
+		"message":        "Update queued",
+		"deployment_id":  deploymentID,
 		"target_version": request.TargetVersion,
 		"strategy":       request.Strategy,
 	})
@@ -187,7 +220,10 @@ func (h *Handler) HandleUpdate(c *fiber.Ctx) error {
 
 // HandleGetUpdateStatus returns current update status
 func (h *Handler) HandleGetUpdateStatus(c *fiber.Ctx) error {
-	status, err := h.GetUpdateStatus()
+	deploymentID := c.Query("deployment_id")
+	ctx := context.Background()
+
+	status, err := h.GetUpdateStatus(ctx, deploymentID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("Failed to get update status: %v", err),
@@ -229,7 +265,7 @@ func (h *Handler) HandleValidateUpdate(c *fiber.Ctx) error {
 	})
 }
 
-// HandleRollback initiates a controller rollback
+// HandleRollback enqueues a rollback request using the emergency strategy
 func (h *Handler) HandleRollback(c *fiber.Ctx) error {
 	var request RollbackRequest
 	if err := c.BodyParser(&request); err != nil {
@@ -242,17 +278,36 @@ func (h *Handler) HandleRollback(c *fiber.Ctx) error {
 		request.Reason = "Manual rollback initiated"
 	}
 
-	// Start rollback in background
-	go func() {
-		ctx := context.Background()
-		if err := h.RollbackUpdate(ctx, request); err != nil {
-			log.Printf("Rollback failed: %v", err)
-		}
-	}()
+	ctx := context.Background()
+	updateRequest, err := h.RollbackUpdate(ctx, request)
+	if err != nil {
+		log.Printf("[selfupdate] prepare rollback failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to prepare rollback",
+		})
+	}
+
+	submittedBy := c.Get("X-Ploy-User")
+	if submittedBy == "" {
+		submittedBy = c.Get("X-Authenticated-User")
+	}
+	if submittedBy == "" {
+		submittedBy = c.IP()
+	}
+
+	deploymentID, err := h.enqueueUpdate(ctx, updateRequest, submittedBy)
+	if err != nil {
+		log.Printf("[selfupdate] enqueue rollback failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to enqueue rollback",
+		})
+	}
 
 	return c.JSON(fiber.Map{
-		"message": "Rollback initiated",
-		"reason":  request.Reason,
+		"message":        "Rollback queued",
+		"deployment_id":  deploymentID,
+		"target_version": updateRequest.TargetVersion,
+		"reason":         request.Reason,
 	})
 }
 
@@ -312,42 +367,43 @@ func (h *Handler) ValidateUpdate(targetVersion string) error {
 	return nil
 }
 
-// StartUpdate initiates a coordinated controller update
-func (h *Handler) StartUpdate(ctx context.Context, request UpdateRequest) error {
-	log.Printf("Starting controller update to version %s with strategy %s", request.TargetVersion, request.Strategy)
+// StartUpdate runs the update strategy for a claimed deployment task
+func (h *Handler) StartUpdate(ctx context.Context, deploymentID string, request UpdateRequest, metadata map[string]string) error {
+	log.Printf("Starting controller update to version %s with strategy %s (deployment=%s)", request.TargetVersion, request.Strategy, deploymentID)
 
-	// Create update coordination session
-	sessionID, err := h.createUpdateSession(ctx, request)
-	if err != nil {
-		return fmt.Errorf("failed to create update session: %w", err)
-	}
-	defer h.cleanupSession(sessionID)
+	metadata = mergeMetadata(metadata, map[string]string{
+		"deployment_id": deploymentID,
+	})
 
-	// Execute update based on strategy
 	switch request.Strategy {
 	case RollingUpdate:
-		return h.executeRollingUpdate(ctx, sessionID, request)
+		return h.executeRollingUpdate(ctx, deploymentID, request, metadata)
 	case BlueGreenUpdate:
-		return h.executeBlueGreenUpdate(ctx, sessionID, request)
+		return h.executeBlueGreenUpdate(ctx, deploymentID, request, metadata)
 	case EmergencyUpdate:
-		return h.executeEmergencyUpdate(ctx, sessionID, request)
+		return h.executeEmergencyUpdate(ctx, deploymentID, request, metadata)
 	default:
-		return h.executeRollingUpdate(ctx, sessionID, request)
+		return h.executeRollingUpdate(ctx, deploymentID, request, metadata)
 	}
 }
 
-// GetUpdateStatus returns the current update status
-func (h *Handler) GetUpdateStatus() (*UpdateStatus, error) {
-	kv := h.consulClient.KV()
-
-	// Check for active update session
-	kvPair, _, err := kv.Get(h.leaderPrefix+"/status", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get update status: %w", err)
+// GetUpdateStatus returns the most recent status for the given deployment (or the latest overall when empty)
+func (h *Handler) GetUpdateStatus(ctx context.Context, deploymentID string) (*UpdateStatus, error) {
+	h.statusMu.RLock()
+	if deploymentID == "" {
+		deploymentID = h.latestDeployment
 	}
+	if deploymentID != "" {
+		if cached, ok := h.statusCache[deploymentID]; ok {
+			copy := *cached
+			copy.Metadata = cloneMetadata(cached.Metadata)
+			h.statusMu.RUnlock()
+			return &copy, nil
+		}
+	}
+	h.statusMu.RUnlock()
 
-	if kvPair == nil {
-		// No active update
+	if deploymentID == "" {
 		return &UpdateStatus{
 			Status:         "idle",
 			CurrentVersion: h.currentVersion,
@@ -355,51 +411,61 @@ func (h *Handler) GetUpdateStatus() (*UpdateStatus, error) {
 		}, nil
 	}
 
-	// Parse status from Consul
-	var status UpdateStatus
-	if err := parseJSON(kvPair.Value, &status); err != nil {
-		return nil, fmt.Errorf("failed to parse update status: %w", err)
+	event, err := h.statusPublisher.LastEvent(ctx, deploymentID)
+	if err != nil {
+		if errors.Is(err, ErrStatusEventNotFound) {
+			return &UpdateStatus{
+				DeploymentID:   deploymentID,
+				Status:         "idle",
+				CurrentVersion: h.currentVersion,
+				Progress:       100,
+			}, nil
+		}
+		return nil, err
 	}
 
-	return &status, nil
+	status := h.statusFromEvent(event)
+	h.statusMu.Lock()
+	h.statusCache[deploymentID] = status
+	h.latestDeployment = deploymentID
+	h.statusMu.Unlock()
+
+	copy := *status
+	copy.Metadata = cloneMetadata(status.Metadata)
+	return &copy, nil
 }
 
-// RollbackUpdate performs rollback to previous version
-func (h *Handler) RollbackUpdate(ctx context.Context, request RollbackRequest) error {
-	log.Printf("Starting controller rollback: %s", request.Reason)
+// RollbackUpdate constructs an emergency update request targeting the last known good version
+func (h *Handler) RollbackUpdate(ctx context.Context, request RollbackRequest) (UpdateRequest, error) {
+	log.Printf("Preparing controller rollback: %s", request.Reason)
 
 	var targetVersion string
 	if request.TargetVersion != "" {
 		targetVersion = request.TargetVersion
 	} else {
-		// Get last known good version
 		rollbackManager := distribution.NewRollbackManager(h.distributor, h.platform, h.architecture)
 		lastGood, err := rollbackManager.GetLastKnownGood(h.currentVersion)
 		if err != nil {
-			return fmt.Errorf("failed to find rollback target: %w", err)
+			return UpdateRequest{}, fmt.Errorf("failed to find rollback target: %w", err)
 		}
 		targetVersion = lastGood
 	}
 
-	// Execute emergency rollback
+	metadata := map[string]string{
+		"rollback_reason":    request.Reason,
+		"rollback_from":      h.currentVersion,
+		"rollback_initiated": time.Now().Format(time.RFC3339),
+	}
+	metadata = mergeMetadata(metadata, request.Metadata)
+
 	rollbackRequest := UpdateRequest{
 		TargetVersion: targetVersion,
 		Force:         request.Force,
 		Strategy:      EmergencyUpdate,
-		Metadata: map[string]string{
-			"rollback_reason":    request.Reason,
-			"rollback_from":      h.currentVersion,
-			"rollback_initiated": time.Now().Format(time.RFC3339),
-		},
+		Metadata:      metadata,
 	}
 
-	if request.Metadata != nil {
-		for k, v := range request.Metadata {
-			rollbackRequest.Metadata[k] = v
-		}
-	}
-
-	return h.StartUpdate(ctx, rollbackRequest)
+	return rollbackRequest, nil
 }
 
 // checkSystemResources validates system resources for update
@@ -427,17 +493,278 @@ func (h *Handler) checkSystemResources() error {
 
 // validateClusterHealth checks if cluster is healthy enough for update
 func (h *Handler) validateClusterHealth() error {
-	// Check Consul health
-	agent := h.consulClient.Agent()
-	_, err := agent.Self()
-	if err != nil {
-		return fmt.Errorf("consul health check failed: %w", err)
+	var errs []string
+	if err := checkNomadCluster(); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if err := checkTraefikCluster(); err != nil {
+		errs = append(errs, err.Error())
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("cluster health validation failed: %s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func defaultNomadClusterCheck() error {
+	monitor := orchestration.NewHealthMonitor()
+	jobs := []string{}
+	if controllerJob := utils.Getenv("PLOY_CONTROLLER_NOMAD_JOB", utils.Getenv("NOMAD_CONTROLLER_JOB", "")); controllerJob != "" {
+		jobs = append(jobs, controllerJob)
+	}
+	jobs = append(jobs, utils.Getenv("PLOY_TRAEFIK_NOMAD_JOB", "traefik-system"))
+	if len(jobs) == 0 {
+		jobs = append(jobs, "ploy-api")
+	}
+	var errs []string
+	for _, job := range jobs {
+		if job == "" {
+			continue
+		}
+		allocs, err := monitor.GetJobAllocations(job)
+		if err != nil {
+			errs = append(errs, fmt.Sprintf("nomad job %s allocation query failed: %v", job, err))
+			continue
+		}
+		healthy := false
+		for _, alloc := range allocs {
+			if alloc.ClientStatus == "running" {
+				healthy = true
+				break
+			}
+		}
+		if !healthy {
+			errs = append(errs, fmt.Sprintf("nomad job %s has no running allocations", job))
+		}
 	}
 
-	// TODO: Add more comprehensive cluster health checks
-	// - Check Nomad connectivity
-	// - Verify service registrations
-	// - Check load balancer status
+	nomadAddr := utils.Getenv("NOMAD_ADDR", "http://127.0.0.1:4646")
+	cfg := nomadapi.DefaultConfig()
+	cfg.Address = nomadAddr
+	client, err := nomadapi.NewClient(cfg)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("nomad client init failed: %v", err))
+	} else if _, err := client.Status().Leader(); err != nil {
+		errs = append(errs, fmt.Sprintf("failed to query nomad leader: %v", err))
+	}
+
+	if len(errs) > 0 {
+		return errors.New(strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func defaultTraefikClusterCheck() error {
+	consulAddr := utils.Getenv("CONSUL_HTTP_ADDR", utils.Getenv("CONSUL_ADDR", "127.0.0.1:8500"))
+	config := consulapi.DefaultConfig()
+	config.Address = consulAddr
+	client, err := consulapi.NewClient(config)
+	if err != nil {
+		return fmt.Errorf("failed to create consul client: %w", err)
+	}
+
+	services, _, err := client.Catalog().Service("traefik", "", nil)
+	if err != nil {
+		return fmt.Errorf("failed to query traefik service catalog: %w", err)
+	}
+	if len(services) == 0 {
+		return fmt.Errorf("no traefik service registered in consul at %s", consulAddr)
+	}
+
+	healthEntries, _, err := client.Health().Service("traefik", "", true, nil)
+	if err != nil {
+		return fmt.Errorf("failed to fetch traefik health: %w", err)
+	}
+	if len(healthEntries) == 0 {
+		return fmt.Errorf("traefik service has no passing health checks in consul")
+	}
 
 	return nil
+}
+
+func (h *Handler) StartExecutor(ctx context.Context) {
+	h.workerOnce.Do(func() {
+		go h.runExecutor(ctx)
+	})
+}
+
+func (h *Handler) runExecutor(ctx context.Context) {
+	backoff := time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		timeout := h.queue.DefaultFetchTimeout()
+		msg, err := h.queue.Fetch(ctx, timeout)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				continue
+			}
+			log.Printf("[selfupdate] work queue fetch error: %v", err)
+			time.Sleep(backoff)
+			if backoff < 10*time.Second {
+				backoff *= 2
+			}
+			continue
+		}
+
+		backoff = time.Second
+		if msg == nil {
+			continue
+		}
+
+		if err := h.processTask(ctx, msg); err != nil {
+			log.Printf("[selfupdate] task %s failed: %v", msg.DeploymentID, err)
+		}
+	}
+}
+
+func (h *Handler) processTask(ctx context.Context, msg *WorkQueueMessage) error {
+	req := msg.Request
+	if req.Metadata == nil {
+		req.Metadata = map[string]string{}
+	}
+
+	combined := mergeMetadata(req.Metadata, msg.Metadata)
+	if msg.Lane != "" {
+		combined["lane"] = msg.Lane
+	}
+	if msg.SubmittedBy != "" {
+		combined["submitted_by"] = msg.SubmittedBy
+	}
+	combined["executor"] = h.executorID
+
+	h.updateStatus(ctx, msg.DeploymentID, req, "preparing", "Update task claimed", 0, combined)
+
+	if err := h.StartUpdate(ctx, msg.DeploymentID, req, combined); err != nil {
+		h.updateStatus(ctx, msg.DeploymentID, req, "failed", err.Error(), 0, combined)
+		if err := msg.Ack(); err != nil {
+			log.Printf("[selfupdate] ack failed task %s: %v", msg.DeploymentID, err)
+		}
+		return err
+	}
+
+	if err := msg.Ack(); err != nil {
+		log.Printf("[selfupdate] ack task %s: %v", msg.DeploymentID, err)
+	}
+
+	return nil
+}
+
+func mergeMetadata(sets ...map[string]string) map[string]string {
+	result := make(map[string]string)
+	for _, m := range sets {
+		for k, v := range m {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+func cloneMetadata(meta map[string]string) map[string]string {
+	if len(meta) == 0 {
+		return nil
+	}
+	copy := make(map[string]string, len(meta))
+	for k, v := range meta {
+		copy[k] = v
+	}
+	return copy
+}
+
+func (h *Handler) updateStatus(ctx context.Context, deploymentID string, request UpdateRequest, status, message string, progress int, metadata map[string]string) {
+	event := StatusEvent{
+		DeploymentID: deploymentID,
+		Phase:        status,
+		Progress:     progress,
+		Message:      message,
+		Executor:     h.executorID,
+		Metadata:     cloneMetadata(metadata),
+	}
+
+	if err := h.statusPublisher.Publish(ctx, event); err != nil {
+		log.Printf("[selfupdate] publish status event failed: %v", err)
+	}
+
+	h.statusMu.Lock()
+	defer h.statusMu.Unlock()
+
+	cached, ok := h.statusCache[deploymentID]
+	if !ok {
+		cached = &UpdateStatus{
+			DeploymentID:   deploymentID,
+			CurrentVersion: h.currentVersion,
+			TargetVersion:  request.TargetVersion,
+			StartedAt:      event.Timestamp,
+		}
+	}
+
+	cached.Status = status
+	cached.Progress = progress
+	cached.Message = message
+	cached.TargetVersion = request.TargetVersion
+	cached.Metadata = mergeMetadata(cached.Metadata, metadata)
+	if status == "completed" || status == "failed" {
+		cached.CompletedAt = event.Timestamp
+	}
+	if cached.StartedAt.IsZero() {
+		cached.StartedAt = event.Timestamp
+	}
+
+	h.statusCache[deploymentID] = cached
+	h.latestDeployment = deploymentID
+}
+
+func (h *Handler) enqueueUpdate(ctx context.Context, request UpdateRequest, submittedBy string) (string, error) {
+	deploymentID := uuid.New().String()
+
+	metadata := mergeMetadata(request.Metadata, map[string]string{
+		"target_version": request.TargetVersion,
+		"strategy":       string(request.Strategy),
+	})
+	metadata["lane"] = h.queue.cfg.Lane
+	if submittedBy != "" {
+		metadata["submitted_by"] = submittedBy
+	}
+
+	task := WorkQueueTask{
+		DeploymentID: deploymentID,
+		SubmittedBy:  submittedBy,
+		Request:      request,
+		Metadata:     metadata,
+	}
+
+	if err := h.queue.Enqueue(ctx, task); err != nil {
+		return "", err
+	}
+
+	h.updateStatus(ctx, deploymentID, request, "queued", "Update request queued", 0, metadata)
+	return deploymentID, nil
+}
+
+func (h *Handler) statusFromEvent(event *StatusEvent) *UpdateStatus {
+	status := &UpdateStatus{
+		DeploymentID:   event.DeploymentID,
+		Status:         event.Phase,
+		Progress:       event.Progress,
+		Message:        event.Message,
+		Metadata:       cloneMetadata(event.Metadata),
+		CurrentVersion: h.currentVersion,
+		StartedAt:      event.Timestamp,
+	}
+
+	if status.Metadata != nil {
+		if target, ok := status.Metadata["target_version"]; ok {
+			status.TargetVersion = target
+		}
+	}
+
+	if event.Phase == "completed" || event.Phase == "failed" {
+		status.CompletedAt = event.Timestamp
+	}
+
+	return status
 }
