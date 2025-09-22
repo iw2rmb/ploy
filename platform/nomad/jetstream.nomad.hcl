@@ -51,10 +51,6 @@ job "jetstream-cluster" {
         to = 4222
       }
 
-      port "cluster" {
-        static = 6222
-        to = 6222
-      }
 
       port "monitoring" {
         static = 8222
@@ -90,18 +86,6 @@ job "jetstream-cluster" {
       }
     }
 
-    service {
-      name = "nats-cluster"
-      port = "cluster"
-
-      check {
-        name     = "cluster-tcp"
-        type     = "tcp"
-        port     = "cluster"
-        interval = "15s"
-        timeout  = "5s"
-      }
-    }
 
     service {
       name = "nats-monitoring"
@@ -132,7 +116,7 @@ job "jetstream-cluster" {
 
       config {
         image = "nats:2.10.18-alpine"
-        ports = ["client", "cluster", "monitoring"]
+        ports = ["client", "monitoring"]
 
         entrypoint = ["/bin/sh", "-ec"]
         args = [
@@ -172,21 +156,22 @@ job "jetstream-cluster" {
         data = <<-EOT
         server_name: "jetstream-{{ env "NOMAD_ALLOC_INDEX" }}"
         port: {{ env "NOMAD_PORT_client" }}
-        http: {{ env "NOMAD_PORT_monitoring" }}
+        host: "0.0.0.0"
+        http_port: {{ env "NOMAD_PORT_monitoring" }}
         trace: false
         debug: false
-        
+
         jetstream {
           store_dir: "{{ env "NATS_STORE_DIR" }}"
-          max_mem: 1024Mb
-          max_file: 64Gb
+          max_mem: 1024MB
+          max_file: 64GB
+          domain: "{{ env "NATS_DOMAIN" }}"
         }
 
-        cluster {
-          name: "{{ env "NATS_CLUSTER_NAME" }}"
-          port: {{ env "NOMAD_PORT_cluster" }}
-          connect_retries: {{ env "NATS_CONNECT_RETRY" }}
-          advertise: "{{ env "NOMAD_ADDR_cluster" }}"
+        accounts {
+          $SYS {
+            users = [{user: "sys", password: "sys"}]
+          }
         }
 
         EOT
