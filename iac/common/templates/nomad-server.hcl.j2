@@ -67,6 +67,11 @@ client {
     read_only = false
   }
 
+  host_volume "jetstream-data" {
+    path      = "/opt/ploy/jetstream"
+    read_only = false
+  }
+
   # Host volumes for Mods planner/LLM/ORW jobs (optional if using docker bind mounts)
   host_volume "mods-context" {
     path      = "/opt/ploy/mods/context"
