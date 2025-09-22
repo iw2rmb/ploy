@@ -154,7 +154,7 @@ job "jetstream-cluster" {
         destination = "local/nats.conf"
         change_mode = "restart"
         data = <<-EOT
-        server_name: "jetstream-{{ env "NOMAD_ALLOC_INDEX" }}"
+        server_name: "jetstream_{{ env "NOMAD_ALLOC_INDEX" }}"
         port: {{ env "NOMAD_PORT_client" }}
         host: "0.0.0.0"
         http_port: {{ env "NOMAD_PORT_monitoring" }}
