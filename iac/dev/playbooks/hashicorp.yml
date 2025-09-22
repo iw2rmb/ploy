@@ -606,6 +606,79 @@
           export NOMAD_BLOCKING_WAIT="${NOMAD_BLOCKING_WAIT:-30s}"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Nomad SDK Resilience (dev)"
 
+    - name: Deploy JetStream cluster to Nomad
+      block:
+        - name: Copy JetStream job file from platform/nomad
+          copy:
+            src: "{{ playbook_dir }}/../../../platform/nomad/jetstream.nomad.hcl"
+            dest: /opt/hashicorp/nomad/jobs/jetstream-cluster.hcl
+            owner: ploy
+            group: ploy
+            mode: '0644'
+
+        - name: Validate JetStream job syntax
+          command: nomad job validate /opt/hashicorp/nomad/jobs/jetstream-cluster.hcl
+          register: jetstream_validate
+          changed_when: false
+
+        - name: Display JetStream job validation results
+          debug:
+            msg: "JetStream job validation: {{ jetstream_validate.stdout }}"
+
+        - name: Deploy JetStream cluster job
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh run --job jetstream-cluster --file /opt/hashicorp/nomad/jobs/jetstream-cluster.hcl
+          register: jetstream_deploy
+
+        - name: Wait for JetStream cluster to be running
+          shell: /opt/hashicorp/bin/nomad-job-manager.sh wait --job jetstream-cluster --timeout 180
+          register: jetstream_wait
+
+        - name: Verify JetStream connectivity
+          wait_for:
+            host: "{{ ansible_host }}"
+            port: 4222
+            delay: 10
+            timeout: 60
+            msg: "JetStream not accessible on port 4222"
+
+        - name: Display JetStream deployment status
+          debug:
+            msg: "JetStream cluster deployed successfully and is accessible on port 4222"
+
+    - name: Initialize JetStream resources (buckets and streams)
+      block:
+        - name: Copy JetStream initialization binary
+          copy:
+            src: "{{ playbook_dir }}/../../../bin/init-jetstream-linux"
+            dest: /tmp/init-jetstream
+            mode: '0755'
+          when: ansible_facts['os_family'] == "Debian"
+
+        - name: Run JetStream resource initialization
+          command: /tmp/init-jetstream
+          register: jetstream_init
+          ignore_errors: yes  # Resources might already exist
+
+        - name: Display JetStream initialization results
+          debug:
+            msg: "JetStream initialization: {{ jetstream_init.stdout }}"
+
+        - name: Copy routing initialization binary
+          copy:
+            src: "{{ playbook_dir }}/../../../bin/init-routing-linux"
+            dest: /tmp/init-routing
+            mode: '0755'
+          when: ansible_facts['os_family'] == "Debian"
+
+        - name: Initialize default routing configuration
+          command: /tmp/init-routing
+          register: routing_init
+          ignore_errors: yes  # Configuration might already exist
+
+        - name: Display routing initialization results
+          debug:
+            msg: "Routing initialization: {{ routing_init.stdout }}"
+
     - name: Deploy Traefik system job to Nomad (Nomad-only; systemd Traefik disabled)
       block:
         - name: Ensure Traefik ACME storage files exist with strict permissions

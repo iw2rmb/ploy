@@ -183,8 +183,14 @@ job "traefik-system" {
       kill_timeout = "30s"
     }
 
+{% if enable_routing_sync | default(true) %}
     task "routing-sync" {
       driver = "docker"
+
+      lifecycle {
+        hook = "poststart"
+        sidecar = true
+      }
 
       config {
         image        = "{{ routing_sync_image | default('registry.dev.ployman.app/ploy/traefik-sync:latest') }}"
@@ -211,5 +217,6 @@ job "traefik-system" {
         memory = 64
       }
     }
+{% endif %}
   }
 }

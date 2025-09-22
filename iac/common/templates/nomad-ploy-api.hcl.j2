@@ -166,6 +166,14 @@ job "ploy-api" {
         GITLAB_TOKEN = "{{ ploy.gitlab_token }}"
         GITLAB_URL   = "{{ ploy.gitlab_url }}"
         MODS_SKIP_DEPLOY_LANES = "{{ ploy.mods.skip_deploy_lanes }}"
+
+        # JetStream configuration for self-update work queue
+        PLOY_UPDATES_JETSTREAM_ENABLED = "true"
+        PLOY_UPDATES_JETSTREAM_URL = "nats://nats.ploy.local:4222"
+        PLOY_UPDATES_STREAM = "updates_control_plane"
+        PLOY_UPDATES_STATUS_STREAM = "updates_control_plane_status"
+        PLOY_UPDATES_STREAM_SUBJECT = "updates.control-plane.tasks"
+        PLOY_UPDATES_STATUS_SUBJECT = "updates.control-plane.status"
       }
 
       # Make binary executable and start
