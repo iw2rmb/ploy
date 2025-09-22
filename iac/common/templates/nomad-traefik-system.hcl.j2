@@ -198,7 +198,7 @@ job "traefik-system" {
       }
 
       env {
-        PLOY_ROUTING_JETSTREAM_URL        = "{{ routing_jetstream_url | default('nats://127.0.0.1:4222') }}"
+        PLOY_ROUTING_JETSTREAM_URL        = "{{ routing_jetstream_url | default('nats://nats.ploy.local:4222') }}"
         PLOY_ROUTING_OBJECT_BUCKET        = "{{ routing_object_bucket | default('routing_maps') }}"
         PLOY_ROUTING_EVENT_STREAM         = "{{ routing_event_stream | default('routing_events') }}"
         PLOY_ROUTING_EVENT_SUBJECT_PREFIX = "{{ routing_event_subject_prefix | default('routing.app') }}"

@@ -34,7 +34,7 @@
         - /etc/nomad.d
         - /etc/consul.d
 
-    - name: Create Mods host volume directories for Nomad
+    - name: Create host volume directories for Nomad workloads
       file:
         path: "{{ item }}"
         state: directory
@@ -45,6 +45,7 @@
         - /opt/ploy/mods
         - /opt/ploy/mods/context
         - /opt/ploy/mods/out
+        - /opt/ploy/jetstream
 
     - name: Download and install Nomad
       block:

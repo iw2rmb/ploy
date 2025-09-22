@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -31,5 +32,20 @@ func TestJetstreamSpecValidatesWithNomadCLI(t *testing.T) {
 	cmd.Stderr = &out
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("nomad job validate failed: %v\n%s", err, out.String())
+	}
+}
+
+func TestJetstreamSpecUsesCoreDNSRouting(t *testing.T) {
+	content := string(GetEmbeddedTemplate("platform/nomad/jetstream.nomad.hcl"))
+	if content == "" {
+		t.Fatalf("jetstream template not embedded")
+	}
+
+	if strings.Contains(content, "service.consul") {
+		t.Fatalf("jetstream spec should not reference consul DNS\n%s", content)
+	}
+
+	if !strings.Contains(content, "nats.ploy.local") {
+		t.Fatalf("jetstream spec should reference CoreDNS host nats.ploy.local\n%s", content)
 	}
 }

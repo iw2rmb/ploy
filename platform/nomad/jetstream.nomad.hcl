@@ -9,7 +9,7 @@ job "jetstream-cluster" {
   }
 
   group "jetstream" {
-    count = 3
+    count = 1
 
     restart {
       attempts = 5
@@ -44,7 +44,7 @@ job "jetstream-cluster" {
     }
 
     network {
-      mode = "bridge"
+      mode = "host"
 
       port "client" {
         to = 4222
@@ -52,14 +52,6 @@ job "jetstream-cluster" {
 
       port "cluster" {
         to = 6222
-      }
-
-      port "leaf" {
-        to = 7422
-      }
-
-      port "gateway" {
-        to = 7522
       }
 
       port "monitoring" {
@@ -137,7 +129,7 @@ job "jetstream-cluster" {
 
       config {
         image = "nats:2.10.18-alpine"
-        ports = ["client", "cluster", "leaf", "gateway", "monitoring"]
+        ports = ["client", "cluster", "monitoring"]
 
         entrypoint = ["/bin/sh", "-ec"]
         args = [
@@ -191,77 +183,12 @@ job "jetstream-cluster" {
           name: "{{ env "NATS_CLUSTER_NAME" }}"
           port: {{ env "NOMAD_PORT_cluster" }}
           routes = [
-            "nats-route://nats-cluster.service.consul:6222"
+            "nats-route://nats.ploy.local:6222"
           ]
           connect_retries: {{ env "NATS_CONNECT_RETRY" }}
           advertise: "{{ env "NOMAD_ADDR_cluster" }}"
         }
 
-        leafnodes {
-          listen: "0.0.0.0:{{ env "NOMAD_PORT_leaf" }}"
-        }
-
-        gateways {
-          name: "{{ env "NATS_CLUSTER_NAME" }}"
-          listen: "0.0.0.0:{{ env "NOMAD_PORT_gateway" }}"
-        }
-
-        operator: "/secrets/operator.jwt"
-        system_account: "SYS"
-
-        resolver: {
-          type: "memory"
-          dir: "{{ env "NATS_RESOLVER_DIR" }}"
-        }
-
-        resolver_preload: {
-          SYS: "/secrets/system.jwt"
-        }
-
-        accounts: {
-          SYS: {
-            jetstream: enabled
-            users: [
-              { user: "system", cred_file: "/secrets/system.creds" }
-            ]
-          }
-        }
-        EOT
-      }
-
-      template {
-        destination = "secrets/operator.jwt"
-        change_mode = "signal"
-        change_signal = "SIGHUP"
-        perms = "0400"
-        data = <<-EOT
-        {{- with nomadVar "nats/operator" -}}
-        {{- .Data.data.jwt -}}
-        {{- end -}}
-        EOT
-      }
-
-      template {
-        destination = "secrets/system.jwt"
-        change_mode = "signal"
-        change_signal = "SIGHUP"
-        perms = "0400"
-        data = <<-EOT
-        {{- with nomadVar "nats/system" -}}
-        {{- .Data.data.jwt -}}
-        {{- end -}}
-        EOT
-      }
-
-      template {
-        destination = "secrets/system.creds"
-        change_mode = "signal"
-        change_signal = "SIGHUP"
-        perms = "0400"
-        data = <<-EOT
-        {{- with nomadVar "nats/system-creds" -}}
-        {{- .Data.data.creds -}}
-        {{- end -}}
         EOT
       }
     }
