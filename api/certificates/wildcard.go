@@ -92,8 +92,14 @@ func (pwm *PlatformWildcardCertificateManager) EnsurePlatformWildcardCertificate
 		return fmt.Errorf("failed to issue platform wildcard certificate: %w", err)
 	}
 
-	// Store in SeaweedFS with metadata in Consul
-	if err := pwm.certificateStorage.StoreCertificate(ctx, cert); err != nil {
+	// Store in JetStream
+	if _, err := pwm.certificateStorage.StoreCertificate(ctx, cert, acme.StoreOptions{
+		App:       "platform",
+		Provider:  "platform-wildcard",
+		AutoRenew: false,
+		Status:    "active",
+		CertURL:   cert.CertURL,
+	}); err != nil {
 		return fmt.Errorf("failed to store platform wildcard certificate: %w", err)
 	}
 

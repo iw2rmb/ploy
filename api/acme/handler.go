@@ -10,9 +10,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	consulapi "github.com/hashicorp/consul/api"
 	"github.com/iw2rmb/ploy/api/dns"
-	"github.com/iw2rmb/ploy/internal/storage"
+	certstore "github.com/iw2rmb/ploy/internal/certificates"
 	"github.com/iw2rmb/ploy/internal/utils"
 )
 
@@ -36,7 +35,7 @@ type ACMEConfig struct {
 }
 
 // NewHandler creates a new ACME handler
-func NewHandler(consulClient *consulapi.Client, storageClient storage.Storage, dnsProvider dns.Provider) (*Handler, error) {
+func NewHandler(store *certstore.Store, dnsProvider dns.Provider) (*Handler, error) {
 	// Load configuration
 	config, err := loadACMEConfig()
 	if err != nil {
@@ -49,8 +48,11 @@ func NewHandler(consulClient *consulapi.Client, storageClient storage.Storage, d
 		return nil, fmt.Errorf("failed to create ACME client: %w", err)
 	}
 
-	// Create certificate storage directly with Storage interface
-	certStorage := NewCertificateStorage(consulClient, storageClient)
+	if store == nil {
+		return nil, fmt.Errorf("certificate store is required")
+	}
+
+	certStorage := NewCertificateStorage(store)
 
 	// Create renewal service
 	renewalConfig := DefaultRenewalConfig()
@@ -129,7 +131,13 @@ func (h *Handler) IssueCertificate(c *fiber.Ctx) error {
 	}
 
 	// Store certificate
-	if err := h.storage.StoreCertificate(ctx, cert); err != nil {
+	if _, err := h.storage.StoreCertificate(ctx, cert, StoreOptions{
+		App:       "",
+		Provider:  "letsencrypt",
+		AutoRenew: true,
+		Status:    "active",
+		CertURL:   cert.CertURL,
+	}); err != nil {
 		log.Printf("Warning: failed to store certificate: %v", err)
 	}
 
@@ -165,7 +173,13 @@ func (h *Handler) IssueWildcardCertificate(c *fiber.Ctx) error {
 	}
 
 	// Store certificate
-	if err := h.storage.StoreCertificate(ctx, cert); err != nil {
+	if _, err := h.storage.StoreCertificate(ctx, cert, StoreOptions{
+		App:       "",
+		Provider:  "letsencrypt",
+		AutoRenew: true,
+		Status:    "active",
+		CertURL:   cert.CertURL,
+	}); err != nil {
 		log.Printf("Warning: failed to store certificate: %v", err)
 	}
 
@@ -190,18 +204,27 @@ func (h *Handler) ListCertificates(c *fiber.Ctx) error {
 	var certList []fiber.Map
 	for _, cert := range certificates {
 		status := "valid"
-		if time.Now().After(cert.ExpiresAt) {
+		if time.Now().After(cert.NotAfter) {
 			status = "expired"
-		} else if time.Until(cert.ExpiresAt) < 30*24*time.Hour {
+		} else if time.Until(cert.NotAfter) < 30*24*time.Hour {
 			status = "expiring_soon"
+		}
+
+		issued := ""
+		if !cert.IssuedAt.IsZero() {
+			issued = cert.IssuedAt.Format("2006-01-02")
+		}
+		expires := ""
+		if !cert.NotAfter.IsZero() {
+			expires = cert.NotAfter.Format("2006-01-02")
 		}
 
 		certList = append(certList, fiber.Map{
 			"domain":        cert.Domain,
 			"status":        status,
-			"expires":       cert.ExpiresAt.Format("2006-01-02"),
-			"issued":        cert.IssuedAt.Format("2006-01-02"),
-			"is_wildcard":   cert.IsWildcard,
+			"expires":       expires,
+			"issued":        issued,
+			"is_wildcard":   strings.HasPrefix(cert.Domain, "*"),
 			"auto_renew":    cert.AutoRenew,
 			"renewal_count": cert.RenewalCount,
 		})
@@ -227,22 +250,36 @@ func (h *Handler) GetCertificate(c *fiber.Ctx) error {
 	}
 
 	status := "valid"
-	if time.Now().After(metadata.ExpiresAt) {
+	if time.Now().After(metadata.NotAfter) {
 		status = "expired"
-	} else if time.Until(metadata.ExpiresAt) < 30*24*time.Hour {
+	} else if time.Until(metadata.NotAfter) < 30*24*time.Hour {
 		status = "expiring_soon"
+	}
+
+	issued := ""
+	if !metadata.IssuedAt.IsZero() {
+		issued = metadata.IssuedAt.Format("2006-01-02 15:04:05")
+	}
+	expires := ""
+	if !metadata.NotAfter.IsZero() {
+		expires = metadata.NotAfter.Format("2006-01-02 15:04:05")
+	}
+	renewed := ""
+	if !metadata.RenewedAt.IsZero() {
+		renewed = metadata.RenewedAt.Format("2006-01-02 15:04:05")
 	}
 
 	return c.JSON(fiber.Map{
 		"domain":        metadata.Domain,
 		"status":        status,
-		"expires":       metadata.ExpiresAt.Format("2006-01-02 15:04:05"),
-		"issued":        metadata.IssuedAt.Format("2006-01-02 15:04:05"),
-		"is_wildcard":   metadata.IsWildcard,
+		"expires":       expires,
+		"issued":        issued,
+		"is_wildcard":   strings.HasPrefix(metadata.Domain, "*"),
 		"auto_renew":    metadata.AutoRenew,
 		"renewal_count": metadata.RenewalCount,
-		"last_renewal":  metadata.LastRenewal.Format("2006-01-02 15:04:05"),
+		"last_renewal":  renewed,
 		"cert_url":      metadata.CertURL,
+		"bundle":        metadata.BundleObject,
 	})
 }
 
@@ -346,12 +383,16 @@ func (h *Handler) CheckRenewal(c *fiber.Ctx) error {
 
 	var expiringList []fiber.Map
 	for _, cert := range expiring {
-		daysUntilExpiry := int(time.Until(cert.ExpiresAt).Hours() / 24)
+		daysUntilExpiry := int(time.Until(cert.NotAfter).Hours() / 24)
+		expires := ""
+		if !cert.NotAfter.IsZero() {
+			expires = cert.NotAfter.Format("2006-01-02")
+		}
 		expiringList = append(expiringList, fiber.Map{
 			"domain":            cert.Domain,
-			"expires":           cert.ExpiresAt.Format("2006-01-02"),
+			"expires":           expires,
 			"days_until_expiry": daysUntilExpiry,
-			"is_wildcard":       cert.IsWildcard,
+			"is_wildcard":       strings.HasPrefix(cert.Domain, "*"),
 			"auto_renew":        cert.AutoRenew,
 		})
 	}
