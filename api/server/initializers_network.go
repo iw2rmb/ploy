@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 
-	consulapi "github.com/hashicorp/consul/api"
-
 	"github.com/iw2rmb/ploy/api/certificates"
 	"github.com/iw2rmb/ploy/api/dns"
 	"github.com/iw2rmb/ploy/api/selfupdate"
@@ -26,35 +24,18 @@ func initializeDNSHandler(consulAddr string) (*dns.Handler, error) {
 }
 
 func initializeCertificateManager(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*certificates.CertificateManager, error) {
-	// Create Consul client
-	consulConfig := consulapi.DefaultConfig()
-	if cfg.ConsulAddr != "" {
-		consulConfig.Address = cfg.ConsulAddr
-	}
-	consulClient, err := consulapi.NewClient(consulConfig)
+	store, err := initializeCertificateStore(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Consul client: %w", err)
+		return nil, err
 	}
 
-	// Create storage client
-	if cfgService == nil {
-		return nil, fmt.Errorf("config service required for certificate manager")
-	}
-	storageClient, err := resolveStorageFromConfigService(cfgService)
-	if err != nil {
-		return nil, fmt.Errorf("resolve storage for certificates: %w", err)
-	}
-
-	// Create DNS provider (for ACME DNS-01 challenges)
-	// Note: DNS provider can be nil for now, certificate manager should handle this gracefully
 	dnsProvider, err := initializeDNSProvider()
 	if err != nil {
 		log.Printf("Warning: DNS provider initialization failed, certificates may not work: %v", err)
 		dnsProvider = nil
 	}
 
-	// Create certificate manager (it should handle nil DNS provider gracefully)
-	certificateManager, err := certificates.NewCertificateManager(consulClient, storageClient, dnsProvider)
+	certificateManager, err := certificates.NewCertificateManager(store, dnsProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate manager: %w", err)
 	}
