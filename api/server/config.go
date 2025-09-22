@@ -33,6 +33,21 @@ type JetStreamRoutingConfig struct {
 	Replicas        int
 }
 
+// JetStreamCertificatesConfig captures certificate persistence configuration.
+type JetStreamCertificatesConfig struct {
+	Enabled         bool
+	URL             string
+	MetadataBucket  string
+	BundleBucket    string
+	EventsStream    string
+	RenewedSubject  string
+	CredentialsPath string
+	User            string
+	Password        string
+	ChunkSize       int
+	Replicas        int
+}
+
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
 	Port              string
@@ -57,6 +72,8 @@ type ControllerConfig struct {
 	JetStreamEnv JetStreamEnvConfig
 	// JetStream routing persistence/event configuration.
 	JetStreamRouting JetStreamRoutingConfig
+	// JetStream certificate metadata/bundle configuration.
+	JetStreamCertificates JetStreamCertificatesConfig
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -115,6 +132,21 @@ func LoadConfigFromEnv() *ControllerConfig {
 		routingEnabled = true
 	}
 
+	certsEnabled := parseBoolEnv("PLOY_CERTS_JETSTREAM_ENABLED", true)
+	certsURL := utils.Getenv("PLOY_CERTS_JETSTREAM_URL", jsURL)
+	certsMetadataBucket := utils.Getenv("PLOY_CERTS_METADATA_BUCKET", "certs_metadata")
+	certsBundleBucket := utils.Getenv("PLOY_CERTS_BUNDLE_BUCKET", "certs_bundle")
+	certsEventsStream := utils.Getenv("PLOY_CERTS_EVENTS_STREAM", "certs_events")
+	certsRenewedSubject := utils.Getenv("PLOY_CERTS_RENEWED_SUBJECT", "certs.renewed")
+	certsCreds := utils.Getenv("PLOY_CERTS_JETSTREAM_CREDS", jsCreds)
+	certsUser := utils.Getenv("PLOY_CERTS_JETSTREAM_USER", jsUser)
+	certsPassword := utils.Getenv("PLOY_CERTS_JETSTREAM_PASSWORD", jsPassword)
+	certsChunkSize := parseIntEnv("PLOY_CERTS_OBJECT_CHUNK_SIZE", 128*1024)
+	certsReplicas := parseIntEnv("PLOY_CERTS_JETSTREAM_REPLICAS", 3)
+	if certsURL != "" && !certsEnabled {
+		certsEnabled = true
+	}
+
 	return &ControllerConfig{
 		Port:                 port,
 		ConsulAddr:           utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
@@ -148,6 +180,19 @@ func LoadConfigFromEnv() *ControllerConfig {
 			Password:        routingPassword,
 			ChunkSize:       routingChunkSize,
 			Replicas:        routingReplicas,
+		},
+		JetStreamCertificates: JetStreamCertificatesConfig{
+			Enabled:         certsEnabled,
+			URL:             certsURL,
+			MetadataBucket:  certsMetadataBucket,
+			BundleBucket:    certsBundleBucket,
+			EventsStream:    certsEventsStream,
+			RenewedSubject:  certsRenewedSubject,
+			CredentialsPath: certsCreds,
+			User:            certsUser,
+			Password:        certsPassword,
+			ChunkSize:       certsChunkSize,
+			Replicas:        certsReplicas,
 		},
 	}
 }

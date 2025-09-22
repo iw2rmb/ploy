@@ -16,6 +16,7 @@ import (
 	"github.com/iw2rmb/ploy/api/metrics"
 	"github.com/iw2rmb/ploy/api/routing"
 	"github.com/iw2rmb/ploy/internal/bluegreen"
+	certstore "github.com/iw2rmb/ploy/internal/certificates"
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	envstore "github.com/iw2rmb/ploy/internal/envstore"
 	irouting "github.com/iw2rmb/ploy/internal/routing"
@@ -188,6 +189,50 @@ func initializeTraefikRouter(cfg *ControllerConfig, metrics *metrics.Metrics) (*
 	}
 	log.Printf("Traefik router initialized with Consul address: %s", cfg.ConsulAddr)
 	return traefikRouter, nil
+}
+
+func initializeCertificateStore(cfg *ControllerConfig) (*certstore.Store, error) {
+	if cfg.JetStreamCertificates.URL == "" {
+		return nil, fmt.Errorf("jetstream certificates url not configured")
+	}
+	if cfg.JetStreamCertificates.MetadataBucket == "" {
+		return nil, fmt.Errorf("jetstream certificate metadata bucket not configured")
+	}
+	if cfg.JetStreamCertificates.BundleBucket == "" {
+		return nil, fmt.Errorf("jetstream certificate bundle bucket not configured")
+	}
+	if cfg.JetStreamCertificates.EventsStream == "" {
+		return nil, fmt.Errorf("jetstream certificate events stream not configured")
+	}
+	if cfg.JetStreamCertificates.RenewedSubject == "" {
+		return nil, fmt.Errorf("jetstream certificate renewed subject not configured")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	storeCfg := certstore.StoreConfig{
+		URL:            cfg.JetStreamCertificates.URL,
+		MetadataBucket: cfg.JetStreamCertificates.MetadataBucket,
+		BundleBucket:   cfg.JetStreamCertificates.BundleBucket,
+		EventsStream:   cfg.JetStreamCertificates.EventsStream,
+		RenewedSubject: cfg.JetStreamCertificates.RenewedSubject,
+		ChunkSize:      cfg.JetStreamCertificates.ChunkSize,
+		Replicas:       cfg.JetStreamCertificates.Replicas,
+	}
+	if cfg.JetStreamCertificates.CredentialsPath != "" {
+		storeCfg.UserCreds = cfg.JetStreamCertificates.CredentialsPath
+	}
+	if cfg.JetStreamCertificates.User != "" {
+		storeCfg.User = cfg.JetStreamCertificates.User
+		storeCfg.Password = cfg.JetStreamCertificates.Password
+	}
+
+	store, err := certstore.NewStore(ctx, storeCfg)
+	if err != nil {
+		return nil, fmt.Errorf("initialize certificate store: %w", err)
+	}
+	return store, nil
 }
 
 func initializeCleanupService(cfg *ControllerConfig) (*cleanup.CleanupHandler, *cleanup.TTLCleanupService, error) {

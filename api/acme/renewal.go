@@ -136,8 +136,8 @@ func (rs *RenewalService) RenewCertificate(ctx context.Context, domain string) (
 		Timestamp: start,
 	}
 
-	// Get existing certificate
-	cert, _, err := rs.storage.GetCertificate(ctx, domain)
+	// Get existing certificate and metadata
+	cert, meta, err := rs.storage.GetCertificate(ctx, domain)
 	if err != nil {
 		result.Error = fmt.Sprintf("failed to get certificate: %v", err)
 		result.Duration = time.Since(start)
@@ -153,7 +153,14 @@ func (rs *RenewalService) RenewCertificate(ctx context.Context, domain string) (
 	}
 
 	// Store renewed certificate
-	if err := rs.storage.StoreCertificate(ctx, newCert); err != nil {
+	if _, err := rs.storage.StoreCertificate(ctx, newCert, StoreOptions{
+		App:          meta.App,
+		Provider:     meta.Provider,
+		AutoRenew:    meta.AutoRenew,
+		Status:       "active",
+		CertURL:      newCert.CertURL,
+		RenewalCount: meta.RenewalCount,
+	}); err != nil {
 		result.Error = fmt.Sprintf("failed to store renewed certificate: %v", err)
 		result.Duration = time.Since(start)
 		return result, err
