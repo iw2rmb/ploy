@@ -53,7 +53,7 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 
 ### Phase 2 — Routing & Certificate Metadata
 - ✅ **COMPLETED (2025-11-04)** `roadmap/nats/05-routing-object-store.md` – Persist routing metadata in JetStream object storage and drive Traefik updates via events.
-- `roadmap/nats/06-certificate-metadata.md` – Migrate certificate metadata and renewal flows to JetStream with broadcast notifications.
+- ✅ **COMPLETED (2025-09-22)** `roadmap/nats/06-certificate-metadata.md` – Migrate certificate metadata and renewal flows to JetStream with broadcast notifications.
 
 ### Phase 3 — Controller Coordination & Locks
 - `roadmap/nats/07-selfupdate-workqueue.md` – Move self-update coordination onto a JetStream work-queue stream with status events.
