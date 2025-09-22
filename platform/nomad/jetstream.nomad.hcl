@@ -47,14 +47,17 @@ job "jetstream-cluster" {
       mode = "host"
 
       port "client" {
+        static = 4222
         to = 4222
       }
 
       port "cluster" {
+        static = 6222
         to = 6222
       }
 
       port "monitoring" {
+        static = 8222
         to = 8222
       }
     }
