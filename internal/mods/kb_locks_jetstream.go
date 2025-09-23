@@ -219,26 +219,28 @@ func (m *JetstreamKBLockManager) TryWithLockRetry(ctx context.Context, key strin
 
 	var lastErr error
 	for attempt := 0; attempt < config.MaxRetries; attempt++ {
+		// Add exponential backoff with jitter to reduce thundering herd
+		if attempt > 0 {
+			delay := time.Duration(attempt) * config.RetryInterval
+			jitter := time.Duration(float64(delay) * 0.1) // 10% jitter
+			totalDelay := delay + jitter
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(totalDelay):
+			}
+		}
+
 		lock, err := m.AcquireLock(ctx, key, config.DefaultTTL)
 		if err != nil {
 			lastErr = err
 			// Check for JetStream-specific contention signals
 			if err == nats.ErrKeyExists || containsString(err.Error(), "lock already held") {
-				// Wait before retrying on contention
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(config.RetryInterval):
-					continue
-				}
-			}
-			// For other errors, still retry but with shorter delay
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(config.RetryInterval / 2):
+				// Continue to next retry on contention
 				continue
 			}
+			// For other errors, still retry
+			continue
 		}
 
 		// Execute function with lock held
@@ -266,7 +268,12 @@ func (m *JetstreamKBLockManager) buildLockKey(key string) string {
 
 // publishLockEvent publishes a lock state change event
 func (m *JetstreamKBLockManager) publishLockEvent(ctx context.Context, event, key string, lockData *JetstreamLockData) error {
-	subject := fmt.Sprintf("kb.lock.%s.%s", event, key)
+	// Remove the "kb/locks/" prefix from the key for cleaner event subjects
+	cleanKey := key
+	if strings.HasPrefix(key, "kb/locks/") {
+		cleanKey = strings.TrimPrefix(key, "kb/locks/")
+	}
+	subject := fmt.Sprintf("kb.lock.%s.%s", event, cleanKey)
 
 	eventData := map[string]interface{}{
 		"event":       event,
@@ -283,7 +290,8 @@ func (m *JetstreamKBLockManager) publishLockEvent(ctx context.Context, event, ke
 		return fmt.Errorf("failed to marshal event data: %w", err)
 	}
 
-	_, err = m.js.Publish(subject, eventBytes)
+	// Use core NATS for event publishing (no need for JetStream persistence for events)
+	err = m.conn.Publish(subject, eventBytes)
 	return err
 }
 
