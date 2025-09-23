@@ -85,4 +85,36 @@ Run all commands from the controller workstation; never apply changes directly o
 - **Cluster does not form quorum**: Confirm `nats.ploy.local` resolves to the active JetStream node and that port `6222` is reachable. The job manager logs include the advertised address per allocation.
 - **Client connection refused**: Verify Traefik is running with the `nats` entrypoint and that `nats.ploy.local` resolves to the gateway. Falls back to `nomad alloc exec` with `nats bench` for internal connectivity tests.
 
+## KB Locking Integration
+
+The Mods Knowledge Base can use JetStream KV for distributed locking instead of Consul sessions when `PLOY_USE_JETSTREAM_KV=true`.
+
+### Lock Operations
+- **Acquisition**: Uses KV Create/Update with Compare-And-Swap semantics
+- **Release**: Uses KV Delete with revision verification
+- **Expiry**: Based on TTL comparison rather than session heartbeats
+- **Events**: Publishes lock state changes to `kb.lock.acquired.<key>` and `kb.lock.released.<key>`
+
+### Event-Driven Maintenance
+When enabled, maintenance jobs subscribe to `kb.lock.released.*` events for immediate triggering:
+```bash
+# Example: Subscribe to lock events
+nats sub "kb.lock.released.*" --creds system.creds --server nats://nats.ploy.local:4222
+```
+
+### Monitoring
+KB lock operations appear in JetStream KV bucket metrics:
+```bash
+# View KB lock keys
+nats kv ls ploy_kv --creds system.creds --server nats://nats.ploy.local:4222 | grep "kb/locks"
+
+# Monitor lock events
+nats sub "kb.lock.*" --creds system.creds --server nats://nats.ploy.local:4222
+```
+
+### Troubleshooting
+- **Lock contention**: Check `nats.ErrKeyExists` errors in application logs
+- **Orphaned locks**: Expired locks are cleaned up automatically on next access
+- **Event delivery**: Verify maintenance scheduler subscription to lock events
+
 Maintain this runbook alongside updates to the job spec, Traefik entrypoint, or credential workflow so operators have a single authoritative reference.

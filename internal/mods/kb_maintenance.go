@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/utils"
+	"github.com/nats-io/nats.go"
 )
 
 // MaintenanceConfig contains configuration for KB maintenance jobs
@@ -101,6 +105,11 @@ type MaintenanceScheduler struct {
 	// Internal state
 	activeJobs map[string]*MaintenanceJob
 	lastRun    map[MaintenanceJobType]time.Time
+
+	// Event subscription for JetStream lock events
+	conn         *nats.Conn
+	js           nats.JetStreamContext
+	subscription *nats.Subscription
 }
 
 // NewMaintenanceScheduler creates a new maintenance scheduler
@@ -115,7 +124,7 @@ func NewMaintenanceScheduler(
 		config = DefaultMaintenanceConfig()
 	}
 
-	return &MaintenanceScheduler{
+	scheduler := &MaintenanceScheduler{
 		storage:         storage,
 		sigGenerator:    sigGenerator,
 		lockMgr:         lockMgr,
@@ -124,12 +133,40 @@ func NewMaintenanceScheduler(
 		activeJobs:      make(map[string]*MaintenanceJob),
 		lastRun:         make(map[MaintenanceJobType]time.Time),
 	}
+
+	// Initialize JetStream connection if using JetStream KV
+	if useJetstreamKV() {
+		if conn, js, err := initJetstreamConnection(); err != nil {
+			fmt.Printf("Warning: failed to initialize JetStream for maintenance events: %v\n", err)
+		} else {
+			scheduler.conn = conn
+			scheduler.js = js
+		}
+	}
+
+	return scheduler
 }
 
 // StartScheduler begins the maintenance job scheduling loop
 func (ms *MaintenanceScheduler) StartScheduler(ctx context.Context) error {
 	ticker := time.NewTicker(5 * time.Minute) // Check every 5 minutes
 	defer ticker.Stop()
+
+	// Subscribe to lock release events if JetStream is available
+	if ms.js != nil {
+		if err := ms.subscribeLockEvents(ctx); err != nil {
+			fmt.Printf("Warning: failed to subscribe to lock events: %v\n", err)
+		}
+	}
+
+	defer func() {
+		if ms.subscription != nil {
+			_ = ms.subscription.Unsubscribe()
+		}
+		if ms.conn != nil {
+			ms.conn.Close()
+		}
+	}()
 
 	for {
 		select {
@@ -473,4 +510,144 @@ func (ms *MaintenanceScheduler) GetMaintenanceStatus(ctx context.Context) (*Main
 	}
 
 	return status, nil
+}
+
+// initJetstreamConnection initializes a JetStream connection for events
+func initJetstreamConnection() (*nats.Conn, nats.JetStreamContext, error) {
+	url := utils.Getenv("PLOY_JETSTREAM_URL", "")
+	if url == "" {
+		url = utils.Getenv("NATS_ADDR", nats.DefaultURL)
+	}
+	if url == "" {
+		return nil, nil, fmt.Errorf("jetstream url not configured")
+	}
+
+	opts := []nats.Option{nats.Name("ploy-maintenance-scheduler")}
+	if creds := utils.Getenv("PLOY_JETSTREAM_CREDS", ""); creds != "" {
+		opts = append(opts, nats.UserCredentials(creds))
+	}
+	user := utils.Getenv("PLOY_JETSTREAM_USER", "")
+	if user != "" {
+		opts = append(opts, nats.UserInfo(user, utils.Getenv("PLOY_JETSTREAM_PASSWORD", "")))
+	}
+
+	conn, err := nats.Connect(url, opts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to NATS: %w", err)
+	}
+
+	js, err := conn.JetStream()
+	if err != nil {
+		conn.Close()
+		return nil, nil, fmt.Errorf("failed to get JetStream context: %w", err)
+	}
+
+	return conn, js, nil
+}
+
+// subscribeLockEvents subscribes to lock release events to trigger maintenance jobs
+func (ms *MaintenanceScheduler) subscribeLockEvents(ctx context.Context) error {
+	// Subscribe to all lock release events
+	subject := "kb.lock.released.*"
+
+	sub, err := ms.conn.Subscribe(subject, func(msg *nats.Msg) {
+		ms.handleLockEvent(ctx, msg)
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to lock events: %w", err)
+	}
+
+	ms.subscription = sub
+	fmt.Printf("Subscribed to KB lock events on subject: %s\n", subject)
+	return nil
+}
+
+// handleLockEvent processes lock release events and triggers appropriate maintenance jobs
+func (ms *MaintenanceScheduler) handleLockEvent(ctx context.Context, msg *nats.Msg) {
+	var eventData map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &eventData); err != nil {
+		fmt.Printf("Error unmarshaling lock event: %v\n", err)
+		return
+	}
+
+	// Extract the lock key from the event
+	key, ok := eventData["key"].(string)
+	if !ok {
+		fmt.Printf("Error: lock event missing key field\n")
+		return
+	}
+
+	fmt.Printf("Received lock release event for key: %s\n", key)
+
+	// Trigger appropriate maintenance jobs based on the lock key
+	if err := ms.triggerMaintenanceForKey(ctx, key); err != nil {
+		fmt.Printf("Error triggering maintenance for key %s: %v\n", key, err)
+	}
+}
+
+// triggerMaintenanceForKey triggers maintenance jobs based on the released lock key
+func (ms *MaintenanceScheduler) triggerMaintenanceForKey(ctx context.Context, key string) error {
+	// Determine what type of maintenance is needed based on the lock key pattern
+
+	// Pattern: lang/signature -> trigger summary rebuild for that signature
+	if strings.Contains(key, "/") && !strings.HasPrefix(key, "maintenance/") {
+		parts := strings.Split(key, "/")
+		if len(parts) >= 2 {
+			// This looks like a signature lock (lang/signature)
+			if ms.config.EnableSummaryJobs {
+				return ms.triggerSignatureSummaryRebuild(ctx, parts[0], parts[1])
+			}
+		}
+	}
+
+	// Pattern: maintenance/* -> already handled by regular scheduling
+	if strings.HasPrefix(key, "maintenance/") {
+		// Don't trigger additional maintenance for maintenance locks
+		return nil
+	}
+
+	// For other patterns, trigger general maintenance
+	if ms.config.EnableCompactionJobs && ms.shouldTriggerCompaction() {
+		return ms.scheduleCompactionJob(ctx)
+	}
+
+	return nil
+}
+
+// triggerSignatureSummaryRebuild triggers a summary rebuild for a specific signature
+func (ms *MaintenanceScheduler) triggerSignatureSummaryRebuild(ctx context.Context, lang, signature string) error {
+	if len(ms.activeJobs) >= ms.config.MaxConcurrentJobs {
+		return fmt.Errorf("max concurrent jobs reached (%d)", ms.config.MaxConcurrentJobs)
+	}
+
+	jobID := fmt.Sprintf("event-summary-rebuild-%s-%s-%d", lang, signature, time.Now().Unix())
+	job := &MaintenanceJob{
+		ID:   jobID,
+		Type: SummaryRebuildJobType,
+		Parameters: map[string]interface{}{
+			"language":     lang,
+			"signature":    signature,
+			"force_update": true,
+			"triggered_by": "lock_release_event",
+		},
+		SubmittedAt: time.Now(),
+		Status:      JobStatusPending,
+	}
+
+	err := ms.submitNomadJob(ctx, job)
+	if err != nil {
+		return fmt.Errorf("failed to submit event-triggered summary rebuild: %w", err)
+	}
+
+	ms.activeJobs[jobID] = job
+	fmt.Printf("Triggered summary rebuild job %s for %s/%s\n", jobID, lang, signature)
+	return nil
+}
+
+// shouldTriggerCompaction determines if compaction should be triggered
+func (ms *MaintenanceScheduler) shouldTriggerCompaction() bool {
+	lastCompaction := ms.lastRun[CompactionJobType]
+	minInterval := time.Hour // Don't trigger compaction more than once per hour via events
+	return time.Since(lastCompaction) >= minInterval
 }
