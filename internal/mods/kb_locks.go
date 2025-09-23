@@ -3,11 +3,14 @@ package mods
 import (
 	"context"
 	"fmt"
+	"log"
 	"path"
+	"strings"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/iw2rmb/ploy/internal/orchestration"
+	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // Lock represents an acquired lock with metadata
@@ -15,6 +18,8 @@ type Lock struct {
 	Key       string
 	SessionID string
 	TTL       time.Duration
+	Revision  uint64 // JetStream KV revision for CAS operations
+	Backend   string // "consul" or "jetstream"
 	client    *consulapi.Client
 }
 
@@ -24,6 +29,29 @@ type KBLockManager interface {
 	ReleaseLock(ctx context.Context, lock *Lock) error
 	IsLocked(ctx context.Context, key string) (bool, error)
 	TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error
+}
+
+// NewKBLockManager creates a new KB lock manager using the configured backend.
+// Uses JetStream if PLOY_USE_JETSTREAM_KV is truthy, otherwise falls back to Consul.
+func NewKBLockManager(kv orchestration.KV) KBLockManager {
+	if useJetstreamKV() {
+		if mgr, err := NewJetstreamKBLockManager(); err != nil {
+			log.Printf("mods: jetstream lock manager unavailable, falling back to Consul: %v", err)
+		} else if mgr != nil {
+			return mgr
+		}
+	}
+	return NewConsulKBLockManager(kv)
+}
+
+// useJetstreamKV checks if JetStream KV should be used for locking
+func useJetstreamKV() bool {
+	switch strings.ToLower(utils.Getenv("PLOY_USE_JETSTREAM_KV", "")) {
+	case "1", "true", "on", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 // ConsulKBLockManager implements KBLockManager using Consul KV
@@ -86,6 +114,7 @@ func (m *ConsulKBLockManager) AcquireLock(ctx context.Context, key string, ttl t
 		Key:       lockKey,
 		SessionID: sessionID,
 		TTL:       ttl,
+		Backend:   "consul",
 		client:    m.client,
 	}, nil
 }
