@@ -72,7 +72,7 @@ func NewKBIntegration(storageBackend storage.Storage, kvStore orchestration.KV, 
 		config = DefaultKBConfig()
 	}
 
-	lockMgr := NewConsulKBLockManager(kvStore)
+	lockMgr := NewKBLockManager(kvStore)
 	kbStorage := NewSeaweedFSKBStorage(storageBackend, lockMgr)
 	sigGen := NewDefaultSignatureGenerator()
 	summaryComputer := NewSummaryComputer(kbStorage, lockMgr, DefaultSummaryConfig())

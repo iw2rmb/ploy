@@ -10,7 +10,7 @@ The Mods subsystem orchestrates end-to-end code transformation and self-healing 
 - Merge Requests: auth, templating, reporter; Git operations (clone/branch/commit/push)
 - Diff apply + build gate: unified diff validation, path allowlist, staged commits, build check
 - Gates: SBOM hooks and optional vulnerability gate; configurable timeouts and limits
-- Knowledge Base: signatures, normalization, deduplication, compaction, locks, metrics, maintenance, summary
+- Knowledge Base: signatures, normalization, deduplication, compaction, locks (Consul/JetStream), metrics, maintenance, summary
 - Events: controller reporter, MR events, structured event emission, log sanitization
 - Defaults: image/model defaults, LLM tools/limits; MCP integration and env var generation
 - Templates: planner/reducer/llm-exec/orw-apply HCL with variable substitution
@@ -63,7 +63,8 @@ The Mods subsystem orchestrates end-to-end code transformation and self-healing 
 - job_template_subst.go — HCL template substitution for job env vars
 - kb_compaction.go — KB storage compaction and maintenance
 - kb_integration.go — KB recording and suggestion integration
-- kb_locks.go — KB distributed locking (Consul KV)
+- kb_locks.go — KB distributed locking interface and Consul implementation
+- kb_locks_jetstream.go — KB distributed locking using JetStream KV CAS operations
 - kb_maintenance.go — KB maintenance job triggers and utilities
 - kb_metrics.go — KB metrics and counters
 - kb_performance_analysis.go — KB performance/analysis helpers
@@ -109,4 +110,31 @@ The Mods subsystem orchestrates end-to-end code transformation and self-healing 
 - types.go — Job/plan/branch types and interfaces
 - utilities.go — Generic utility helpers (paths, files, HTTP)
 - vuln_gate.go — Vulnerability gate based on SBOM/NVD
+
+## KB Locking Model
+
+The Knowledge Base uses distributed locking to ensure data consistency during concurrent operations. Two backend implementations are supported:
+
+### Consul KV Locking (Default)
+- Uses Consul sessions for lock management with TTL-based expiry
+- Lock acquisition creates a session and attempts to acquire the KV lock
+- Lock release destroys the session, automatically releasing the lock
+- Suitable for existing Consul-based deployments
+
+### JetStream KV Locking (Recommended)
+- Uses NATS JetStream KV Compare-And-Swap (CAS) operations for lock management
+- Lock acquisition uses KV Create/Update with revision-based ownership verification
+- Lock release uses KV Delete with revision check to ensure ownership
+- Publishes lock events on `kb.lock.acquired.<key>` and `kb.lock.released.<key>` subjects
+- Enables immediate maintenance job triggering via event subscription
+- Eliminates need for session heartbeats
+
+### Configuration
+Set `PLOY_USE_JETSTREAM_KV=true` to enable JetStream locking. The system falls back to Consul if JetStream is unavailable.
+
+### Lock Event Integration
+When using JetStream, maintenance jobs can subscribe to lock release events for immediate triggering:
+- `kb.lock.released.java/signature` → triggers summary rebuild for that signature
+- `kb.lock.released.maintenance/*` → ignored (prevents recursive triggering)
+- Other patterns → may trigger general maintenance based on configuration
 
