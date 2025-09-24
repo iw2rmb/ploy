@@ -1,45 +1,41 @@
 package mods
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestUploadInputTar_InvokesPutFileWithExpectedKey(t *testing.T) {
+func TestUploadInputTar_InvokesArtifactUploader(t *testing.T) {
 	tmp := t.TempDir()
 	tarPath := filepath.Join(tmp, "input.tar")
 	if err := os.WriteFile(tarPath, []byte("dummy"), 0644); err != nil {
 		t.Fatalf("prepare tar: %v", err)
 	}
-	called := false
-	var gotBase, gotKey, gotCT, gotPath string
-	prev := putFileFn
-	putFileFn = func(seaweedBase, key, srcPath, contentType string) error {
-		called = true
-		gotBase, gotKey, gotPath, gotCT = seaweedBase, key, srcPath, contentType
-		return nil
-	}
-	defer func() { putFileFn = prev }()
+	fake := &recordingUploader{}
+	runner := &ModRunner{}
+	runner.SetArtifactUploader(fake)
 
-	err := uploadInputTar("http://filer:8888", "exec-123", tarPath)
+	err := runner.uploadInputTar(context.Background(), "http://filer:8888", "exec-123", tarPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !called {
-		t.Fatalf("expected putFileFn to be called")
+	if len(fake.files) != 1 {
+		t.Fatalf("expected one upload, got %d", len(fake.files))
 	}
-	if gotBase != "http://filer:8888" {
-		t.Fatalf("base mismatch: %s", gotBase)
+	req := fake.files[0]
+	if req.base != "http://filer:8888" {
+		t.Fatalf("base mismatch: %s", req.base)
 	}
-	if gotKey != "mods/exec-123/input.tar" {
-		t.Fatalf("key mismatch: %s", gotKey)
+	if req.key != "mods/exec-123/input.tar" {
+		t.Fatalf("key mismatch: %s", req.key)
 	}
-	if gotPath != tarPath {
-		t.Fatalf("path mismatch: %s", gotPath)
+	if req.path != tarPath {
+		t.Fatalf("path mismatch: %s", req.path)
 	}
-	if gotCT != "application/octet-stream" {
-		t.Fatalf("content-type mismatch: %s", gotCT)
+	if req.contentType != "application/octet-stream" {
+		t.Fatalf("content-type mismatch: %s", req.contentType)
 	}
 }
 
@@ -92,4 +88,26 @@ func TestSubstituteORWTemplateVars_ReplacesValuesWithoutEnv(t *testing.T) {
 
 func contains(s, sub string) bool {
 	return len(s) >= len(sub) && (s == sub || (len(s) > len(sub) && (s[0:len(sub)] == sub || contains(s[1:], sub))))
+}
+
+type recordingUploader struct {
+	files []struct{ base, key, path, contentType string }
+}
+
+func (r *recordingUploader) UploadFile(ctx context.Context, baseURL, key, srcPath, contentType string) error {
+	r.files = append(r.files, struct{ base, key, path, contentType string }{
+		base:        baseURL,
+		key:         key,
+		path:        srcPath,
+		contentType: contentType,
+	})
+	return nil
+}
+
+func (r *recordingUploader) UploadJSON(ctx context.Context, baseURL, key string, body []byte) error {
+	r.files = append(r.files, struct{ base, key, path, contentType string }{
+		base: baseURL,
+		key:  key,
+	})
+	return nil
 }

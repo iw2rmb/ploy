@@ -397,7 +397,7 @@ func (f *healingFanout) RunFanout(ctx context.Context, runCtx interface{}, branc
 		diffBytes = append(diffBytes, '\n')
 	}
 	f.store.setFile(key, diffBytes)
-	if err := writeBranchChainStepMeta(f.seaweedURL, f.modID, branch.ID, stepID, key); err != nil {
+	if err := writeBranchChainStepMeta(context.Background(), NewHTTPArtifactUploader(), f.seaweedURL, f.modID, branch.ID, stepID, key); err != nil {
 		return BranchResult{}, nil, err
 	}
 	now := time.Now()

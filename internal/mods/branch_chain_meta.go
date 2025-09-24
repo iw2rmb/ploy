@@ -1,6 +1,7 @@
 package mods
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -8,7 +9,10 @@ import (
 
 // writeBranchChainStepMeta records chain metadata for a branch step and updates HEAD.
 // It reads previous HEAD (if exists), writes steps/<stepID>/meta.json, and updates HEAD.json.
-func writeBranchChainStepMeta(seaweed, modID, branchID, stepID, diffKey string) error {
+func writeBranchChainStepMeta(ctx context.Context, uploader ArtifactUploader, seaweed, modID, branchID, stepID, diffKey string) error {
+	if uploader == nil {
+		uploader = NewHTTPArtifactUploader()
+	}
 	headKey := fmt.Sprintf("mods/%s/branches/%s/HEAD.json", modID, branchID)
 	prevID := ""
 	if b, code, _ := getJSONFn(seaweed, headKey); code == 200 {
@@ -25,10 +29,10 @@ func writeBranchChainStepMeta(seaweed, modID, branchID, stepID, diffKey string) 
 		"ts":           time.Now().UTC().Format(time.RFC3339),
 	}
 	if mb, e := json.Marshal(meta); e == nil {
-		if err := putJSONFn(seaweed, fmt.Sprintf("mods/%s/branches/%s/steps/%s/meta.json", modID, branchID, stepID), mb); err != nil {
+		if err := uploader.UploadJSON(ctx, seaweed, fmt.Sprintf("mods/%s/branches/%s/steps/%s/meta.json", modID, branchID, stepID), mb); err != nil {
 			return err
 		}
-		if err := putJSONFn(seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", stepID))); err != nil {
+		if err := uploader.UploadJSON(ctx, seaweed, headKey, []byte(fmt.Sprintf("{\"step_id\":\"%s\"}", stepID))); err != nil {
 			return err
 		}
 	}
