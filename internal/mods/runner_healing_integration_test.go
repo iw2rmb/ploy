@@ -19,23 +19,21 @@ import (
 // Test runner integration
 func TestModRunnerWithHealing(t *testing.T) {
 	t.Run("healing triggered on build failure", func(t *testing.T) {
-		// Stub out external interactions via injectable seams
+		store := newSeaweedStub()
+
 		oldDL := downloadToFileFn
 		oldGet := getJSONFn
-		oldPut := putJSONFn
 		oldVDP := validateDiffPathsFn
 		oldVUD := validateUnifiedDiffFn
 		oldAD := applyUnifiedDiffFn
 		oldHasChanges := hasRepoChangesFn
-		// Stub remote artifact calls: write minimal content to dest, and no-op JSON interactions
+		// Stub remote artifact calls to avoid network access
 		downloadToFileFn = func(_ string, dest string) error {
 			_ = os.MkdirAll(filepath.Dir(dest), 0755)
 			diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
 			return os.WriteFile(dest, []byte(diff), 0644)
 		}
 		getJSONFn = func(string, string) ([]byte, int, error) { return nil, 404, nil }
-		putJSONFn = func(string, string, []byte) error { return nil }
-		// Skip path validation and patch application in unit test
 		validateDiffPathsFn = func(string, []string) error { return nil }
 		validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
 		applyUnifiedDiffFn = func(context.Context, string, string) error { return nil }
@@ -44,7 +42,6 @@ func TestModRunnerWithHealing(t *testing.T) {
 		defer func() {
 			downloadToFileFn = oldDL
 			getJSONFn = oldGet
-			putJSONFn = oldPut
 			validateDiffPathsFn = oldVDP
 			validateUnifiedDiffFn = oldVUD
 			applyUnifiedDiffFn = oldAD
@@ -88,8 +85,8 @@ func TestModRunnerWithHealing(t *testing.T) {
 		runner.SetHCLSubmitter(okHCLSubmitter{})
 		// Non-nil jobSubmitter enables healing path; injected jobHelper handles planner/reducer
 		runner.SetJobSubmitter(NoopJobSubmitter{})
-		// Healer that returns a successful winner without submitting real jobs
 		runner.SetHealingOrchestrator(okHealer{})
+		runner.SetArtifactUploader(store)
 
 		// Ensure a minimal build file exists to pass ORW guard
 		_ = os.MkdirAll("/tmp/workspace/repo", 0755)
@@ -214,17 +211,8 @@ index 1f59f67..1d42819 100644
 
 	store := newSeaweedStub()
 	oldDL := downloadToFileFn
-	oldPutFile := putFileFn
-	oldPutJSON := putJSONFn
 	oldGetJSON := getJSONFn
 	oldHead := headURLFn
-	defer func() {
-		downloadToFileFn = oldDL
-		putFileFn = oldPutFile
-		putJSONFn = oldPutJSON
-		getJSONFn = oldGetJSON
-		headURLFn = oldHead
-	}()
 
 	downloadToFileFn = func(url, dest string) error {
 		key := seaweedKey(seaweedBase, url)
@@ -246,24 +234,6 @@ index 1f59f67..1d42819 100644
 		}
 		return fmt.Errorf("artifact not found: %s", key)
 	}
-	putFileFn = func(base, key, srcPath, contentType string) error {
-		if base != seaweedBase {
-			return fmt.Errorf("unexpected base: %s", base)
-		}
-		data, err := os.ReadFile(srcPath)
-		if err != nil {
-			return err
-		}
-		store.setFile(key, data)
-		return nil
-	}
-	putJSONFn = func(base, key string, body []byte) error {
-		if base != seaweedBase {
-			return fmt.Errorf("unexpected base: %s", base)
-		}
-		store.setJSON(key, body)
-		return nil
-	}
 	getJSONFn = func(base, key string) ([]byte, int, error) {
 		if base != seaweedBase {
 			return nil, 0, fmt.Errorf("unexpected base: %s", base)
@@ -281,6 +251,12 @@ index 1f59f67..1d42819 100644
 		_, ok := store.getFile(key)
 		return ok
 	}
+
+	defer func() {
+		downloadToFileFn = oldDL
+		getJSONFn = oldGetJSON
+		headURLFn = oldHead
+	}()
 
 	oldValidate := validateJob
 	oldSubmit := submitAndWaitTerminal
@@ -302,6 +278,7 @@ index 1f59f67..1d42819 100644
 		diff:       []byte(llmDiff),
 		store:      store,
 	})
+	runner.SetArtifactUploader(store)
 
 	gitProvider := NewMockGitProvider()
 	runner.SetGitProvider(gitProvider)
@@ -413,6 +390,25 @@ type seaweedStub struct {
 
 func newSeaweedStub() *seaweedStub {
 	return &seaweedStub{files: make(map[string][]byte), json: make(map[string][]byte)}
+}
+
+func (s *seaweedStub) UploadFile(ctx context.Context, baseURL, key, srcPath, contentType string) error {
+	_ = ctx
+	_ = baseURL
+	_ = contentType
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return err
+	}
+	s.setFile(key, data)
+	return nil
+}
+
+func (s *seaweedStub) UploadJSON(ctx context.Context, baseURL, key string, body []byte) error {
+	_ = ctx
+	_ = baseURL
+	s.setJSON(key, body)
+	return nil
 }
 
 func (s *seaweedStub) setFile(key string, data []byte) {

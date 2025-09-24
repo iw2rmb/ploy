@@ -17,8 +17,9 @@ func TestORWGenBranchValidation(t *testing.T) {
 	t.Run("orw-gen branch renders ORW apply assets correctly", func(t *testing.T) {
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsError: nil,
-				ORWApplyAssetsPath:  "/tmp/test-orw-assets/orw-apply.rendered.hcl",
+				ORWApplyAssetsError:  nil,
+				ORWApplyAssetsPath:   "/tmp/test-orw-assets/orw-apply.rendered.hcl",
+				ArtifactUploaderMock: noopArtifactUploader{},
 			},
 		}
 
@@ -61,8 +62,9 @@ func TestORWGenBranchValidation(t *testing.T) {
 		}
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsPath: filepath.Join(workspace, "orw-apply.rendered.hcl"),
-				WorkspaceDir:       workspace,
+				ORWApplyAssetsPath:   filepath.Join(workspace, "orw-apply.rendered.hcl"),
+				WorkspaceDir:         workspace,
+				ArtifactUploaderMock: noopArtifactUploader{},
 			},
 		}
 		result := orchestrator.executeORWGenBranch(context.Background(), branch, BranchResult{ID: branch.ID, StartedAt: time.Now(), Status: "failed"})
@@ -90,8 +92,9 @@ func TestORWGenBranchValidation(t *testing.T) {
 			},
 		}
 		testRunner := &MockProductionBranchRunner{
-			ORWApplyAssetsPath: filepath.Join(workspace, "orw-apply.rendered.hcl"),
-			WorkspaceDir:       workspace,
+			ORWApplyAssetsPath:   filepath.Join(workspace, "orw-apply.rendered.hcl"),
+			WorkspaceDir:         workspace,
+			ArtifactUploaderMock: noopArtifactUploader{},
 		}
 		orchestrator := &fanoutOrchestrator{runner: testRunner}
 		result := orchestrator.executeORWGenBranch(context.Background(), branch, BranchResult{ID: branch.ID, StartedAt: time.Now(), Status: "failed"})
@@ -103,8 +106,9 @@ func TestORWGenBranchValidation(t *testing.T) {
 	t.Run("orw-gen branch extracts recipe configuration from inputs", func(t *testing.T) {
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsError: nil,
-				ORWApplyAssetsPath:  "/tmp/test-orw-config.hcl",
+				ORWApplyAssetsError:  nil,
+				ORWApplyAssetsPath:   "/tmp/test-orw-config.hcl",
+				ArtifactUploaderMock: noopArtifactUploader{},
 			},
 		}
 
@@ -181,9 +185,6 @@ group "main" {
 			t.Fatalf("failed to create test HCL file: %v", err)
 		}
 
-		oldPut := putFileFn
-		putFileFn = func(string, string, string, string) error { return nil }
-		defer func() { putFileFn = oldPut }()
 		oldHead := headURLFn
 		headURLFn = func(string) bool { return true }
 		defer func() { headURLFn = oldHead }()
@@ -213,8 +214,9 @@ group "main" {
 
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsPath: templatePath,
-				WorkspaceDir:       workspace,
+				ORWApplyAssetsPath:   templatePath,
+				WorkspaceDir:         workspace,
+				ArtifactUploaderMock: noopArtifactUploader{},
 			},
 		}
 
@@ -254,8 +256,9 @@ group "main" {
 	t.Run("orw-gen branch validates artifact presence", func(t *testing.T) {
 		orchestrator := &fanoutOrchestrator{
 			runner: &MockProductionBranchRunner{
-				ORWApplyAssetsError: nil,
-				ORWApplyAssetsPath:  "/tmp/test-orw-artifact.hcl",
+				ORWApplyAssetsError:  nil,
+				ORWApplyAssetsPath:   "/tmp/test-orw-artifact.hcl",
+				ArtifactUploaderMock: noopArtifactUploader{},
 			},
 		}
 

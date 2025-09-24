@@ -312,7 +312,6 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	defer func() { validateJob = oldValidate }()
 	oldSubmit := submitAndWaitTerminal
 	oldDL := downloadToFileFn
-	oldPut := putFileFn
 	oldHas := hasRepoChangesFn
 	oldVDP := validateDiffPathsFn
 	oldVUD := validateUnifiedDiffFn
@@ -323,7 +322,6 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
 		return os.WriteFile(dest, []byte(diff), 0644)
 	}
-	putFileFn = func(string, string, string, string) error { return nil }
 	hasRepoChangesFn = func(string) (bool, error) { return true, nil }
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
@@ -331,7 +329,6 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDL
-		putFileFn = oldPut
 		hasRepoChangesFn = oldHas
 		validateDiffPathsFn = oldVDP
 		validateUnifiedDiffFn = oldVUD
@@ -390,6 +387,7 @@ func TestSelfHealingRunnerFlow(t *testing.T) {
 
 	runner, err := NewModRunner(config, "/tmp/test")
 	require.NoError(t, err)
+	runner.SetArtifactUploader(noopArtifactUploader{})
 
 	runner.SetGitOperations(mockGit)
 	runner.SetRecipeExecutor(mockRecipe)
@@ -451,6 +449,7 @@ func TestSelfHealingBoundedRetries(t *testing.T) {
 
 	runner, err := NewModRunner(config, "/tmp/test")
 	require.NoError(t, err)
+	runner.SetArtifactUploader(noopArtifactUploader{})
 
 	runner.SetGitOperations(&MockGitOperations{})
 	runner.SetRecipeExecutor(&MockRecipeExecutor{})
