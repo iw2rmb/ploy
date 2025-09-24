@@ -85,7 +85,7 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 	modID = os.Getenv("MOD_ID")
 	seaweed := ResolveInfraFromEnv().SeaweedURL
 	// Upload best-effort to artifacts/mods/<id>/input.tar using HTTP client
-	if err := uploadInputTar(seaweed, modID, inputTar); err != nil {
+	if err := r.uploadInputTar(ctx, seaweed, modID, inputTar); err != nil {
 		r.emit(ctx, "apply", "input-upload", "warn", fmt.Sprintf("input.tar upload failed: %v", err))
 	}
 	// Substitute HCL with explicit variables to avoid global env writes
@@ -244,7 +244,7 @@ func (r *ModRunner) runORWApplyStep(ctx context.Context, repoPath string, step M
 	{
 		branchID := step.ID
 		branchDiffKey := computeBranchDiffKey(modID, branchID, curStepID)
-		_ = writeBranchChainStepMeta(seaweed, modID, branchID, curStepID, branchDiffKey)
+		_ = writeBranchChainStepMeta(ctx, r.GetArtifactUploader(), seaweed, modID, branchID, curStepID, branchDiffKey)
 	}
 
 	return sr, nil

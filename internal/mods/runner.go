@@ -66,15 +66,68 @@ type buildPhaseOptions struct {
 }
 
 // NewModRunner creates a new Mod runner with the given configuration
+
+func (r *ModRunner) artifactClient() ArtifactUploader {
+	if r == nil {
+		return nil
+	}
+	if r.artifactUploader == nil {
+		r.artifactUploader = NewHTTPArtifactUploader()
+	}
+	return r.artifactUploader
+}
+
+func (r *ModRunner) uploadArtifactFile(ctx context.Context, baseURL, key, srcPath, contentType string) error {
+	client := r.artifactClient()
+	if client == nil {
+		return putFile(baseURL, key, srcPath, contentType)
+	}
+	return client.UploadFile(ctx, baseURL, key, srcPath, contentType)
+}
+
+func (r *ModRunner) uploadArtifactJSON(ctx context.Context, baseURL, key string, body []byte) error {
+	client := r.artifactClient()
+	if client == nil {
+		return putJSON(baseURL, key, body)
+	}
+	return client.UploadJSON(ctx, baseURL, key, body)
+}
+
+func (r *ModRunner) builderClient() BuilderSubmitter {
+	if r == nil {
+		return nil
+	}
+	if r.builderSubmitter == nil {
+		r.builderSubmitter = NewNomadBuilderSubmitter()
+		if def, ok := r.hcl.(*DefaultHCLSubmitter); ok && def != nil {
+			def.SetBuilder(r.builderSubmitter)
+		}
+	}
+	return r.builderSubmitter
+}
+
+func (r *ModRunner) gitPushClient() GitPusher {
+	if r == nil {
+		return nil
+	}
+	if r.gitPusher == nil {
+		r.gitPusher = newGitOpsPusher(r.gitOps)
+	}
+	return r.gitPusher
+}
+
 func NewModRunner(config *ModConfig, workspaceDir string) (*ModRunner, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	builder := NewNomadBuilderSubmitter()
 	return &ModRunner{
-		config:       config,
-		workspaceDir: workspaceDir,
-		hcl:          DefaultHCLSubmitter{},
+		config:           config,
+		workspaceDir:     workspaceDir,
+		artifactUploader: NewHTTPArtifactUploader(),
+		builderSubmitter: builder,
+		hcl:              NewDefaultHCLSubmitter(builder),
 	}, nil
 }
 

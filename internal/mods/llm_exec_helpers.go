@@ -496,12 +496,15 @@ func llmFetchDiffIfProd(ctx context.Context, rep EventReporter, seaweedURL, modI
 }
 
 // llmUploadDiffAndMeta best-effort uploads diff.patch and writes chain metadata.
-func llmUploadDiffAndMeta(seaweedURL, modID, branchID, stepID, renderedHCLPath string) {
+func llmUploadDiffAndMeta(ctx context.Context, uploader ArtifactUploader, seaweedURL, modID, branchID, stepID, renderedHCLPath string) {
 	if seaweedURL == "" || modID == "" {
 		return
 	}
+	if uploader == nil {
+		uploader = NewHTTPArtifactUploader()
+	}
 	diffPath := filepath.Join(filepath.Dir(renderedHCLPath), "out", "diff.patch")
 	diffKey := computeBranchDiffKey(modID, branchID, stepID)
-	_ = putFileFn(seaweedURL, diffKey, diffPath, "text/plain")
-	_ = writeBranchChainStepMeta(seaweedURL, modID, branchID, stepID, diffKey)
+	_ = uploader.UploadFile(ctx, seaweedURL, diffKey, diffPath, "text/plain")
+	_ = writeBranchChainStepMeta(ctx, uploader, seaweedURL, modID, branchID, stepID, diffKey)
 }

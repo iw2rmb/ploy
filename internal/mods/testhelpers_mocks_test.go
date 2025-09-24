@@ -208,3 +208,5 @@ func (m *MockProductionBranchRunner) GetTargetRepo() string {
 }
 
 func (m *MockProductionBranchRunner) GetEventReporter() EventReporter { return nil }
+
+func (m *MockProductionBranchRunner) GetArtifactUploader() ArtifactUploader { return nil }

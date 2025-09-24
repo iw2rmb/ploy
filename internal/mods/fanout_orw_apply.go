@@ -86,7 +86,15 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		if rep := o.runner.GetEventReporter(); rep != nil {
 			_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "info", Message: fmt.Sprintf("uploading input.tar to %s", candidate), Time: time.Now()})
 		}
-		if err := uploadInputTar(candidate, modID, inputTar); err != nil {
+		uploadKey := fmt.Sprintf("mods/%s/input.tar", modID)
+		uploader := o.runner.GetArtifactUploader()
+		var err error
+		if uploader != nil {
+			err = uploader.UploadFile(ctx, candidate, uploadKey, inputTar, "application/octet-stream")
+		} else {
+			err = putFileFn(candidate, uploadKey, inputTar, "application/octet-stream")
+		}
+		if err != nil {
 			uploadErr = err
 			if rep := o.runner.GetEventReporter(); rep != nil {
 				_ = rep.Report(ctx, Event{Phase: "fanout", Step: string(NormalizeStepType(branch.Type)), Level: "warn", Message: fmt.Sprintf("input.tar upload failed: %v", err), Time: time.Now()})
@@ -95,6 +103,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 			}
 			continue
 		}
+
 		inputURL := strings.TrimRight(candidate, "/") + "/artifacts/mods/" + modID + "/input.tar"
 		available := false
 		for i := 0; i < 10; i++ {
@@ -113,6 +122,7 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 			}
 			continue
 		}
+
 		seaweedURL = candidate
 		uploadErr = nil
 		if rep := o.runner.GetEventReporter(); rep != nil {
@@ -120,14 +130,6 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		}
 		break
 	}
-	if uploadErr != nil {
-		result.Status = "failed"
-		result.Notes = fmt.Sprintf("ORW apply job failed: %v", uploadErr)
-		result.FinishedAt = time.Now()
-		result.Duration = time.Since(result.StartedAt)
-		return result
-	}
-
 	vars := makeORWVars(baseDir, modID, diffKey, seaweedURL)
 	if strings.TrimSpace(rclass) != "" {
 		vars["RECIPE_CLASS"] = rclass

@@ -28,8 +28,22 @@ func (r *ModRunner) runCommitStep(ctx context.Context, repoPath, initialHead str
 
 // runPushStep pushes the branch with a timeout.
 func (r *ModRunner) runPushStep(ctx context.Context, repoPath, branchName string) error {
-	op := r.gitOps.PushBranchAsync(ctx, repoPath, r.config.TargetRepo, branchName)
-	for event := range op.Events() {
+	pusher := r.gitPushClient()
+	if pusher == nil {
+		r.emit(ctx, "git", "push", "error", "no git pusher configured")
+		return fmt.Errorf("git pusher not configured")
+	}
+	op := pusher.PushBranchAsync(ctx, repoPath, r.config.TargetRepo, branchName)
+	var events <-chan gitapi.Event
+	if op != nil {
+		events = op.Events()
+	}
+	if events == nil {
+		ch := make(chan gitapi.Event)
+		close(ch)
+		events = ch
+	}
+	for event := range events {
 		level := "info"
 		switch event.Type {
 		case gitapi.EventFailed:
@@ -47,8 +61,10 @@ func (r *ModRunner) runPushStep(ctx context.Context, repoPath, branchName string
 		}
 		r.emit(ctx, "git", "push", level, message)
 	}
-	if err := op.Err(); err != nil {
-		return err
+	if op != nil {
+		if err := op.Err(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

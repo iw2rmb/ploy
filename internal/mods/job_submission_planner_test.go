@@ -118,25 +118,24 @@ func TestSubmitPlannerJobFallbacksToControllerArtifacts(t *testing.T) {
 	runner, err := NewModRunner(cfg, workspace)
 	require.NoError(t, err)
 
+	runner.SetArtifactUploader(&recordingArtifactUploader{})
+
 	origValidate := validateJob
 	origSubmit := submitAndWaitTerminal
 	origDownload := downloadToFileFn
 	origHead := headURLFn
-	origPut := putFileFn
 	origWait := waitForStepContainingFn
 	defer func() {
 		validateJob = origValidate
 		submitAndWaitTerminal = origSubmit
 		downloadToFileFn = origDownload
 		headURLFn = origHead
-		putFileFn = origPut
 		waitForStepContainingFn = origWait
 	}()
 
 	validateJob = func(string) error { return nil }
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
 	headURLFn = func(string) bool { return true }
-	putFileFn = func(string, string, string, string) error { return nil }
 	waitForStepContainingFn = func(string, string, string, string, time.Duration) error { return nil }
 
 	planJSON := `{"plan_id":"fallback","options":[{"id":"llm-1","type":"llm-exec"}]}`
@@ -185,6 +184,7 @@ func TestSubmitPlannerJobUsesArtifactUploader(t *testing.T) {
 		ID:         "workflow",
 		TargetRepo: "https://git.example/repo.git",
 		BaseRef:    "main",
+		Steps:      []ModStep{{ID: "s", Type: string(StepTypeORWApply), Recipes: []RecipeEntry{{Name: "r", Coords: RecipeCoordinates{Group: "g", Artifact: "a", Version: "v"}}}}},
 	}
 
 	runner, err := NewModRunner(cfg, workspace)
@@ -198,14 +198,12 @@ func TestSubmitPlannerJobUsesArtifactUploader(t *testing.T) {
 	origSubmit := submitAndWaitTerminal
 	origDownload := downloadToFileFn
 	origHead := headURLFn
-	origPut := putFileFn
 	origWait := waitForStepContainingFn
 	defer func() {
 		validateJob = origValidate
 		submitAndWaitTerminal = origSubmit
 		downloadToFileFn = origDownload
 		headURLFn = origHead
-		putFileFn = origPut
 		waitForStepContainingFn = origWait
 	}()
 

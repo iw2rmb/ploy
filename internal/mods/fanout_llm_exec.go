@@ -40,7 +40,9 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 			if err := createTarFromDir(ctxDir, tarPath); err == nil {
 				if modID != "" {
 					key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
-					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					if uploader := o.runner.GetArtifactUploader(); uploader != nil {
+						_ = uploader.UploadFile(ctx, infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					}
 					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
 				}
 			}
@@ -105,7 +107,7 @@ func (o *fanoutOrchestrator) executeLLMExecBranch(ctx context.Context, branch Br
 	// Step 6b: Upload LLM diff to SeaweedFS with step-scoped key (align with ORW convention)
 	// mods/<modID>/branches/<branchID>/steps/<stepID>/diff.patch (reuse computed IDs)
 	if o.hcl != nil {
-		llmUploadDiffAndMeta(infra.SeaweedURL, modID, branch.ID, runID, renderedHCLPath)
+		llmUploadDiffAndMeta(ctx, o.runner.GetArtifactUploader(), infra.SeaweedURL, modID, branch.ID, runID, renderedHCLPath)
 	}
 
 	// Cleanup job registration after successful artifact retrieval

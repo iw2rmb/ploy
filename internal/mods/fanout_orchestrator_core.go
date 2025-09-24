@@ -20,6 +20,7 @@ type ProductionBranchRunner interface {
 	GetWorkspaceDir() string
 	GetTargetRepo() string
 	GetEventReporter() EventReporter
+	GetArtifactUploader() ArtifactUploader
 }
 
 // fanoutOrchestrator implements the FanoutOrchestrator interface
@@ -31,12 +32,12 @@ type fanoutOrchestrator struct {
 
 // NewFanoutOrchestrator creates a new fanout orchestrator
 func NewFanoutOrchestrator(submitter JobSubmitter) FanoutOrchestrator {
-	return &fanoutOrchestrator{submitter: submitter, runner: nil, hcl: DefaultHCLSubmitter{}}
+	return &fanoutOrchestrator{submitter: submitter, runner: nil, hcl: NewDefaultHCLSubmitter(nil)}
 }
 
 // NewFanoutOrchestratorWithRunner creates a new fanout orchestrator with runner access for production
 func NewFanoutOrchestratorWithRunner(submitter JobSubmitter, runner ProductionBranchRunner) FanoutOrchestrator {
-	return &fanoutOrchestrator{submitter: submitter, runner: runner, hcl: DefaultHCLSubmitter{}}
+	return &fanoutOrchestrator{submitter: submitter, runner: runner, hcl: NewDefaultHCLSubmitter(nil)}
 }
 
 // SetHCLSubmitterForFanout attempts to inject a custom HCLSubmitter into the

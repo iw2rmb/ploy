@@ -5,6 +5,7 @@ type ProductionJobSubmitter interface {
 	RenderPlannerAssets() (*PlannerAssets, error)
 	RenderReducerAssets() (*ReducerAssets, error)
 	GetHCLSubmitter() HCLSubmitter
+	GetArtifactUploader() ArtifactUploader
 }
 
 // jobSubmissionHelper implements the JobSubmissionHelper interface

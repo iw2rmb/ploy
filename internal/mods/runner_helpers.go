@@ -1,6 +1,7 @@
 package mods
 
 import (
+	"context"
 	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -14,7 +15,10 @@ func randomStepID() string {
 }
 
 // uploadInputTar uploads input.tar to artifacts/mods/<modID>/input.tar (best-effort)
-func uploadInputTar(seaweedBase, modID, inputTarPath string) error {
+func (r *ModRunner) uploadInputTar(ctx context.Context, seaweedBase, modID, inputTarPath string) error {
+	if modID == "" || seaweedBase == "" {
+		return nil
+	}
 	key := fmt.Sprintf("mods/%s/input.tar", modID)
-	return putFileFn(seaweedBase, key, inputTarPath, "application/octet-stream")
+	return r.uploadArtifactFile(ctx, seaweedBase, key, inputTarPath, "application/octet-stream")
 }

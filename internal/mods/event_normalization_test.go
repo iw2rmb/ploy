@@ -19,6 +19,7 @@ func (m *minimalRunner) GetBuildChecker() BuildCheckerInterface               { 
 func (m *minimalRunner) GetWorkspaceDir() string                              { return "" }
 func (m *minimalRunner) GetTargetRepo() string                                { return "" }
 func (m *minimalRunner) GetEventReporter() EventReporter                      { return m.rep }
+func (m *minimalRunner) GetArtifactUploader() ArtifactUploader                { return nil }
 
 // quickSubmitter returns instant success
 type quickSubmitter struct{}

@@ -1,6 +1,7 @@
 package mods
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestWriteBranchChainStepMeta_WritesMetaAndHead(t *testing.T) {
 	}
 	defer func() { putJSONFn = prevPut }()
 
-	if err := writeBranchChainStepMeta("http://filer:8888", "e-1", "b-1", "s-2", "mods/e-1/branches/b-1/steps/s-2/diff.patch"); err != nil {
+	if err := writeBranchChainStepMeta(context.Background(), NewHTTPArtifactUploader(), "http://filer:8888", "e-1", "b-1", "s-2", "mods/e-1/branches/b-1/steps/s-2/diff.patch"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	// Expect two writes: meta.json and HEAD.json
@@ -76,7 +77,7 @@ func TestWriteBranchChainStepMeta_NoPrevHead(t *testing.T) {
 	}
 	defer func() { putJSONFn = prevPut }()
 
-	if err := writeBranchChainStepMeta("http://filer:8888", "e-2", "b-2", "s-1", "mods/e-2/branches/b-2/steps/s-1/diff.patch"); err != nil {
+	if err := writeBranchChainStepMeta(context.Background(), NewHTTPArtifactUploader(), "http://filer:8888", "e-2", "b-2", "s-1", "mods/e-2/branches/b-2/steps/s-1/diff.patch"); err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}
 	if count != 2 {
