@@ -161,14 +161,15 @@ func (m *MockJobSubmitter) CollectArtifacts(ctx context.Context, jobID string, o
 
 // MockProductionBranchRunner for testing production branch execution
 type MockProductionBranchRunner struct {
-	LLMExecAssetsPath   string
-	LLMExecAssetsError  error
-	ORWApplyAssetsPath  string
-	ORWApplyAssetsError error
-	GitProviderMock     provider.GitProvider
-	BuildCheckerMock    BuildCheckerInterface
-	WorkspaceDir        string
-	TargetRepo          string
+	LLMExecAssetsPath    string
+	LLMExecAssetsError   error
+	ORWApplyAssetsPath   string
+	ORWApplyAssetsError  error
+	GitProviderMock      provider.GitProvider
+	BuildCheckerMock     BuildCheckerInterface
+	WorkspaceDir         string
+	TargetRepo           string
+	ArtifactUploaderMock ArtifactUploader
 }
 
 func (m *MockProductionBranchRunner) RenderLLMExecAssets(optionID string) (string, error) {
@@ -209,4 +210,6 @@ func (m *MockProductionBranchRunner) GetTargetRepo() string {
 
 func (m *MockProductionBranchRunner) GetEventReporter() EventReporter { return nil }
 
-func (m *MockProductionBranchRunner) GetArtifactUploader() ArtifactUploader { return nil }
+func (m *MockProductionBranchRunner) GetArtifactUploader() ArtifactUploader {
+	return m.ArtifactUploaderMock
+}

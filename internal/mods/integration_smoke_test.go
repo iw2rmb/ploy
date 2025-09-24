@@ -35,11 +35,10 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create runner: %v", err)
 	}
+	runner.SetArtifactUploader(noopArtifactUploader{})
 	oldSubmit := submitAndWaitTerminal
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
 	oldDownload := downloadToFileFn
-	oldPutFile := putFileFn
-	oldPutJSON := putJSONFn
 	oldGetJSON := getJSONFn
 	oldValidateDiffPaths := validateDiffPathsFn
 	oldValidateUnifiedDiff := validateUnifiedDiffFn
@@ -50,8 +49,6 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 		diff := "--- a/pom.xml\n+++ b/pom.xml\n@@ -1 +1 @@\n-<project></project>\n+<project><modelVersion>4.0.0</modelVersion></project>\n"
 		return os.WriteFile(dest, []byte(diff), 0644)
 	}
-	putFileFn = func(string, string, string, string) error { return nil }
-	putJSONFn = func(string, string, []byte) error { return nil }
 	getJSONFn = func(string, string) ([]byte, int, error) { return nil, 404, nil }
 	validateDiffPathsFn = func(string, []string) error { return nil }
 	validateUnifiedDiffFn = func(context.Context, string, string) error { return nil }
@@ -60,8 +57,6 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 	defer func() {
 		submitAndWaitTerminal = oldSubmit
 		downloadToFileFn = oldDownload
-		putFileFn = oldPutFile
-		putJSONFn = oldPutJSON
 		getJSONFn = oldGetJSON
 		validateDiffPathsFn = oldValidateDiffPaths
 		validateUnifiedDiffFn = oldValidateUnifiedDiff

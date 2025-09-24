@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/storage"
+	memorystorage "github.com/iw2rmb/ploy/internal/storage/providers/memory"
 	seastorage "github.com/iw2rmb/ploy/internal/storage/providers/seaweedfs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,31 +41,35 @@ func (noopLockManager) TryWithLockRetry(ctx context.Context, key string, config 
 	return nil
 }
 
-func requireSeaweedStorage(t *testing.T) storage.Storage {
+func newTestStorage(t *testing.T) storage.Storage {
 	t.Helper()
-	if testing.Short() {
-		t.Skip("skipping SeaweedFS-backed tests in short mode")
+
+	if os.Getenv("PLOY_TEST_SEAWEEDFS") != "" {
+		if testing.Short() {
+			t.Skip("skipping SeaweedFS-backed tests in short mode")
+		}
+
+		client := &http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get(seaweedFilerAddr + "/healthz")
+		if err != nil {
+			t.Skipf("SeaweedFS not available locally: %v", err)
+		}
+		_ = resp.Body.Close()
+
+		cfg := seastorage.Config{
+			Master:      strings.TrimPrefix(seaweedMasterAddr, "http://"),
+			Filer:       strings.TrimPrefix(seaweedFilerAddr, "http://"),
+			Collection:  seaweedTestCollection,
+			Replication: "000",
+			Timeout:     15,
+		}
+
+		provider, err := seastorage.New(cfg)
+		require.NoError(t, err)
+		return provider
 	}
 
-	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get(seaweedFilerAddr + "/healthz")
-	if err != nil {
-		t.Skipf("SeaweedFS not available locally: %v", err)
-	}
-	_ = resp.Body.Close()
-
-	cfg := seastorage.Config{
-		Master:      strings.TrimPrefix(seaweedMasterAddr, "http://"),
-		Filer:       strings.TrimPrefix(seaweedFilerAddr, "http://"),
-		Collection:  seaweedTestCollection,
-		Replication: "000",
-		Timeout:     15,
-	}
-
-	provider, err := seastorage.New(cfg)
-	require.NoError(t, err)
-
-	return provider
+	return memorystorage.NewMemoryStorage(0)
 }
 
 func uniqueSignature(t *testing.T) string {
@@ -101,7 +107,7 @@ func sanitizeComponent(name string) string {
 }
 
 func TestSeaweedFSKBStorage_WriteCase(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
@@ -134,7 +140,7 @@ func TestSeaweedFSKBStorage_WriteCase(t *testing.T) {
 }
 
 func TestSeaweedFSKBStorage_ReadCases(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
@@ -174,7 +180,7 @@ func TestSeaweedFSKBStorage_ReadCases(t *testing.T) {
 }
 
 func TestSeaweedFSKBStorage_SummaryRoundTrip(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
@@ -201,7 +207,7 @@ func TestSeaweedFSKBStorage_SummaryRoundTrip(t *testing.T) {
 }
 
 func TestSeaweedFSKBStorage_PatchRoundTrip(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
@@ -219,7 +225,7 @@ func TestSeaweedFSKBStorage_PatchRoundTrip(t *testing.T) {
 }
 
 func TestSeaweedFSKBStorage_SnapshotRoundTrip(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
@@ -249,7 +255,7 @@ func TestSeaweedFSKBStorage_SnapshotRoundTrip(t *testing.T) {
 }
 
 func TestSeaweedFSKBStorage_Health(t *testing.T) {
-	storageClient := requireSeaweedStorage(t)
+	storageClient := newTestStorage(t)
 	kbStorage := NewSeaweedFSKBStorage(storageClient, noopLockManager{})
 
 	ctx := context.Background()
