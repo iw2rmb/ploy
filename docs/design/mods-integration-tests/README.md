@@ -27,5 +27,6 @@ Establish a repeatable way to execute Mods integration tests that currently depe
 
 ## Updates
 - Added harness configuration loader (`HarnessConfig`) to centralize controller and SeaweedFS endpoints with env overrides.
+- Introduced artifact/builder/git dependency seams in `ModRunner`, plus memory-based storage and noop uploaders so workstation tests avoid SeaweedFS/NATS.
 
 Maintain this design as tasks progress. Link additional tasks or notes here, and ensure status checkboxes in the roadmap stay accurate.

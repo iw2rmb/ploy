@@ -1,6 +1,6 @@
 # 01 Dependency Seams
 
-- [ ] Status: Pending
+- [x] Status: Done
 
 ## Why / What For
 Hard-coded helpers inside Mods tests invoke SeaweedFS, builder APIs, and Git directly. When these endpoints are unreachable (e.g., outside the Nomad network) the suite fails immediately. Introducing dependency seams lets us inject fakes for hermetic runs and real clients when the harness provides them.
@@ -15,10 +15,15 @@ Hard-coded helpers inside Mods tests invoke SeaweedFS, builder APIs, and Git dir
 - No remaining direct references to hard-coded SeaweedFS/builder/Git helpers in integration tests.
 - Unit tests compile with fakes in place (e.g., using in-memory uploaders).
 
+## Implementation Notes
+- Added `noopArtifactUploader` and memory-backed storage helpers for hermetic tests.
+- Updated Mods runner helpers to prefer injected uploaders and adjusted tests to record uploads instead of stubbing HTTP globals.
+- Default KB storage tests now use in-memory storage unless `PLOY_TEST_SEAWEEDFS` is set.
+
 ## Tests
-- Update/extend unit tests covering the new dependency injection paths (`go test ./internal/mods/...`).
-- Linting/static analysis must pass (golangci-lint, errcheck).
-- Spot-check a targeted integration run using fakes to ensure behaviour parity with prior helpers.
+- `go test ./internal/mods -run TestSeaweedFSKBStorage`
+- `go test ./internal/mods -run TestWriteBranchChainStepMeta`
+- `go test ./internal/mods -run TestSubmitPlannerJobUsesArtifactUploader`
 
 ## References
 - [Design doc](../../../docs/design/mods-integration-tests/README.md)

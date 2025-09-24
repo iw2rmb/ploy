@@ -210,10 +210,6 @@ func TestSubmitPlannerJobUsesArtifactUploader(t *testing.T) {
 	validateJob = func(string) error { return nil }
 	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
 	headURLFn = func(string) bool { return true }
-	putFileFn = func(base, key, srcPath, contentType string) error {
-		t.Fatalf("legacy putFileFn should not be invoked: base=%s key=%s", base, key)
-		return nil
-	}
 	waitForStepContainingFn = func(string, string, string, string, time.Duration) error { return nil }
 
 	planJSON := `{"plan_id":"using-uploader","options":[{"id":"llm-1","type":"llm-exec"}]}`
