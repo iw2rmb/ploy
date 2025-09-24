@@ -30,6 +30,7 @@ type BuildCheckerInterface interface {
 // SetGitOperations sets the Git operations implementation (for dependency injection/testing)
 func (r *ModRunner) SetGitOperations(gitOps GitOperationsInterface) {
 	r.gitOps = gitOps
+	r.gitPusher = newGitOpsPusher(gitOps)
 	if gitOps != nil {
 		r.repoManager = NewRepoManagerAdapter(gitOps)
 	} else {
@@ -83,25 +84,35 @@ func (r *ModRunner) SetEventReporter(reporter EventReporter) {
 func (r *ModRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h }
 
 // SetHCLSubmitter sets the indirection used for HCL validate/submit flows.
-func (r *ModRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
+func (r *ModRunner) SetHCLSubmitter(h HCLSubmitter) {
+	r.hcl = h
+	if def, ok := h.(*DefaultHCLSubmitter); ok && def != nil {
+		def.SetBuilder(r.builderClient())
+	}
+}
 
 // SetArtifactUploader sets the artifact uploader dependency for Mods helpers.
 func (r *ModRunner) SetArtifactUploader(u ArtifactUploader) { r.artifactUploader = u }
 
 // GetArtifactUploader returns the configured artifact uploader implementation.
-func (r *ModRunner) GetArtifactUploader() ArtifactUploader { return r.artifactUploader }
+func (r *ModRunner) GetArtifactUploader() ArtifactUploader { return r.artifactClient() }
 
 // SetBuilderSubmitter sets the builder submitter dependency for Nomad job execution.
-func (r *ModRunner) SetBuilderSubmitter(b BuilderSubmitter) { r.builderSubmitter = b }
+func (r *ModRunner) SetBuilderSubmitter(b BuilderSubmitter) {
+	r.builderSubmitter = b
+	if def, ok := r.hcl.(*DefaultHCLSubmitter); ok && def != nil {
+		def.SetBuilder(b)
+	}
+}
 
 // GetBuilderSubmitter exposes the configured builder submitter implementation.
-func (r *ModRunner) GetBuilderSubmitter() BuilderSubmitter { return r.builderSubmitter }
+func (r *ModRunner) GetBuilderSubmitter() BuilderSubmitter { return r.builderClient() }
 
 // SetGitPusher overrides the git push dependency used during branch push operations.
 func (r *ModRunner) SetGitPusher(p GitPusher) { r.gitPusher = p }
 
 // GetGitPusher returns the git pusher dependency.
-func (r *ModRunner) GetGitPusher() GitPusher { return r.gitPusher }
+func (r *ModRunner) GetGitPusher() GitPusher { return r.gitPushClient() }
 
 // SetJobHelper allows injecting a planner/reducer submission helper for testing.
 func (r *ModRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }

@@ -75,7 +75,9 @@ func (h *jobSubmissionHelper) SubmitReducerJob(ctx context.Context, planID strin
 						modID = "mod-" + modID
 					}
 					key := fmt.Sprintf("mods/%s/contexts/%s.tar", modID, runID)
-					_ = putFileFn(infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					if uploader := h.runner.GetArtifactUploader(); uploader != nil {
+						_ = uploader.UploadFile(ctx, infra.SeaweedURL, key, tarPath, "application/octet-stream")
+					}
 					vars["MODS_CONTEXT_URL"] = strings.TrimRight(infra.SeaweedURL, "/") + "/artifacts/" + key
 				}
 			}
