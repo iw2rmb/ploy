@@ -225,15 +225,20 @@ The local environment includes:
 Key environment variables for testing:
 
 ```bash
-# Service endpoints
-# Ensure CONSUL_HTTP_ADDR=localhost:8500
-# Ensure NOMAD_ADDR=http://localhost:4646
-# Ensure SEAWEEDFS_MASTER=http://localhost:9333
-# Ensure SEAWEEDFS_FILER=http://localhost:8888
+# Core service endpoints
+export CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR:-localhost:8500}
+export NOMAD_ADDR=${NOMAD_ADDR:-http://localhost:4646}
+export SEAWEEDFS_MASTER=${SEAWEEDFS_MASTER:-http://localhost:9333}
+export SEAWEEDFS_FILER=${SEAWEEDFS_FILER:-http://localhost:8888}
 
-
-# Testing flags are provided via standard Go test arguments; dedicated PLOY_TEST_* env toggles were removed.
+# Mods harness overrides (optional)
+export PLOY_CONTROLLER=${PLOY_CONTROLLER:-http://localhost:8080/v1}
+export PLOY_SEAWEEDFS_URL=${PLOY_SEAWEEDFS_URL:-http://seaweedfs-filer.storage.ploy.local:8888}
+export MODS_SEAWEED_FALLBACKS=${MODS_SEAWEED_FALLBACKS:-}
+export MODS_SEAWEED_MASTER=${MODS_SEAWEED_MASTER:-}
 ```
+
+The Mods harness helpers automatically apply these defaults for local testing. Setting the overrides allows integration runs to target remote infrastructure without code changes.
 
 ## Writing Tests
 
