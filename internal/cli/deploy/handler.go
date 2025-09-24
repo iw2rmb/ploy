@@ -1,11 +1,15 @@
 package deploy
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/common"
 	utils "github.com/iw2rmb/ploy/internal/cli/utils"
 )
 
@@ -18,7 +22,6 @@ func PushCmd(args []string, controllerURL string) {
 	bluegreen := fs.Bool("blue-green", false, "use blue-green deployment")
 	_ = fs.Parse(args)
 
-	// Check if blue-green deployment is requested
 	if *bluegreen {
 		fmt.Printf("🔄 Starting blue-green deployment for %s...\n", *app)
 		fmt.Println("Blue-green deployments are handled via the bluegreen command")
@@ -26,7 +29,6 @@ func PushCmd(args []string, controllerURL string) {
 		return
 	}
 
-	// Display deployment info
 	fmt.Printf("🚀 Deploying %s to %s.ployd.app...\n", *app, *app)
 
 	requestedLane := strings.TrimSpace(*lane)
@@ -34,14 +36,38 @@ func PushCmd(args []string, controllerURL string) {
 		fmt.Println("ℹ️ Lane overrides are ignored; Docker lane D is always used")
 	}
 
-	// Use app-specific deployment (no platform logic, simplified)
-	result, err := DeployApp(*app, "", *main, *sha, false, controllerURL)
+	metadata := map[string]string{}
+	if shouldUseAsyncUploads() {
+		metadata["async"] = "true"
+	}
+	if shouldPropagateAutogen() {
+		metadata["autogen_dockerfile"] = "true"
+	}
+	if len(metadata) == 0 {
+		metadata = nil
+	}
+
+	var respBuf bytes.Buffer
+	config := common.DeployConfig{
+		App:           *app,
+		MainClass:     *main,
+		SHA:           *sha,
+		ControllerURL: controllerURL,
+		Metadata:      metadata,
+		Timeout:       3 * time.Minute,
+		UseMultipart:  shouldUseMultipart(),
+		Deps: &common.SharedPushDeps{
+			Stdout: &respBuf,
+		},
+	}
+
+	result, err := common.SharedPush(config)
 	if err != nil {
 		fmt.Printf("❌ Deployment failed: %v\n", err)
+		flushControllerResponse(&respBuf)
 		return
 	}
 
-	// Display result metadata before printing the controller payload so JSON remains the final output line.
 	if result.Success {
 		fmt.Printf("✅ Successfully deployed to %s\n", result.URL)
 		if result.DeploymentID != "" {
@@ -51,15 +77,33 @@ func PushCmd(args []string, controllerURL string) {
 		fmt.Println("❌ Deployment failed")
 	}
 
-	// Always surface the controller response body last so automated parsers can consume its JSON directly.
-	if msg := result.Message; msg != "" {
-		fmt.Print(msg)
-		if !strings.HasSuffix(msg, "\n") {
-			fmt.Println()
-		}
+	flushControllerResponse(&respBuf)
+}
+
+func flushControllerResponse(buf *bytes.Buffer) {
+	if buf == nil || buf.Len() == 0 {
+		return
+	}
+	output := buf.String()
+	fmt.Print(output)
+	if output[len(output)-1] != '\n' {
+		fmt.Println()
 	}
 }
 
+func shouldUseAsyncUploads() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("PLOY_ASYNC")))
+	return v == "" || (v != "0" && v != "false" && v != "off")
+}
+
+func shouldPropagateAutogen() bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv("PLOY_AUTOGEN_DOCKERFILE")))
+	return v == "1" || v == "true" || v == "on"
+}
+
+func shouldUseMultipart() bool {
+	return os.Getenv("PLOY_PUSH_MULTIPART") == "1"
+}
 func OpenCmd(args []string) {
 	if len(args) < 1 {
 		fmt.Println("usage: ploy open <app>")
