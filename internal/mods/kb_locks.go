@@ -50,9 +50,9 @@ func NewKBLockManager(kv orchestration.KV) KBLockManager {
 // useJetstreamKV checks if JetStream KV should be used for locking
 func useJetstreamKV() bool {
 	switch strings.ToLower(strings.TrimSpace(utils.Getenv("PLOY_USE_JETSTREAM_KV", ""))) {
-	case "0", "false", "off", "no":
+	case "", "0", "false", "off", "no":
 		return false
-	case "", "1", "true", "on", "yes":
+	case "1", "true", "on", "yes":
 		return true
 	default:
 		return true
