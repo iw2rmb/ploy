@@ -38,21 +38,24 @@ var ErrNoBuildFile = errors.New("no build file found in repository")
 
 // ModRunner orchestrates the execution of Mod steps
 type ModRunner struct {
-	config         *ModConfig
-	workspaceDir   string
-	gitOps         GitOperationsInterface
-	repoManager    RepoManager
-	recipeExecutor RecipeExecutorInterface
-	transformExec  TransformationExecutor
-	buildChecker   BuildCheckerInterface
-	buildGate      BuildGate
-	jobSubmitter   JobSubmitter         // For healing workflows
-	gitProvider    provider.GitProvider // For MR creation
-	mrManager      MRManager
-	eventReporter  EventReporter // Optional real-time event reporter
-	healer         HealingOrchestrator
-	hcl            HCLSubmitter
-	jobHelper      JobSubmissionHelper
+	config           *ModConfig
+	workspaceDir     string
+	gitOps           GitOperationsInterface
+	repoManager      RepoManager
+	recipeExecutor   RecipeExecutorInterface
+	transformExec    TransformationExecutor
+	buildChecker     BuildCheckerInterface
+	buildGate        BuildGate
+	jobSubmitter     JobSubmitter         // For healing workflows
+	gitProvider      provider.GitProvider // For MR creation
+	mrManager        MRManager
+	eventReporter    EventReporter // Optional real-time event reporter
+	healer           HealingOrchestrator
+	hcl              HCLSubmitter
+	jobHelper        JobSubmissionHelper
+	artifactUploader ArtifactUploader
+	builderSubmitter BuilderSubmitter
+	gitPusher        GitPusher
 }
 
 type buildPhaseOptions struct {

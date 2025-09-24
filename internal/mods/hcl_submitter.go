@@ -13,7 +13,14 @@ type HCLSubmitter interface {
 }
 
 // DefaultHCLSubmitter delegates to orchestration helpers.
-type DefaultHCLSubmitter struct{}
+type DefaultHCLSubmitter struct {
+	builder BuilderSubmitter
+}
+
+// NewDefaultHCLSubmitter creates a submitter that optionally delegates to a builder submitter.
+func NewDefaultHCLSubmitter(builder BuilderSubmitter) *DefaultHCLSubmitter {
+	return &DefaultHCLSubmitter{builder: builder}
+}
 
 // Delegate to package-level indirections to allow unit tests to stub behavior
 // without requiring a running Nomad.
