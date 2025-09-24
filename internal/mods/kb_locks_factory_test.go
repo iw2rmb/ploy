@@ -92,7 +92,7 @@ func TestBuildSignatureLockKey_Compatibility(t *testing.T) {
 	// Test with JetStream manager
 	mgr := &JetstreamKBLockManager{}
 	fullKey := mgr.buildLockKey(key)
-	expectedFull := "kb/locks/java/abcd1234"
+	expectedFull := "writers/java/abcd1234"
 
 	if fullKey != expectedFull {
 		t.Errorf("Expected full key %q, got %q", expectedFull, fullKey)

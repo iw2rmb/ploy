@@ -14,7 +14,7 @@ Dual-write lets us validate JetStream persistence without risking an immediate c
 ## How to Implement
 1. Inject the JetStream KV adapter when the feature flag is enabled.
 2. On `Set`/`BatchSet`, write to both Consul and JetStream; track failures independently with structured logs.
-3. Emit Prometheus counters/gauges for JetStream write latency and failure rates.
+3. Emit metrics counters/gauges for JetStream write latency and failure rates.
 4. Optionally enable a read shadow mode that compares Consul vs JetStream payloads for drift detection.
 5. Update documentation immediately after the stage to explain dual-write safeguards and monitoring.
 

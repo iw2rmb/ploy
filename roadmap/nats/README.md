@@ -72,7 +72,7 @@ After closing any stage or task, refresh impacted READMEs and `docs/*` entries s
 - **Certificate Rotation**: Renewal events on `certs.renewed` notify Traefik + apps to reload TLS without manual hooks (`api/certificates/manager.go`), streaming bundles through Object Store chunk readers.
 - **Self-Update Monitoring**: CLI subscribes to `updates.control-plane.status` via durable pull consumer to render live progress instead of polling the REST endpoint backed by Consul KV.
 - **Mods Telemetry**: Mods runner emits structured events to JetStream, enabling multiple observers (controller UI, analytics) without HTTP fan-out; pull consumers distribute load safely.
-- **Knowledge Base Maintenance**: Maintenance jobs watch `kb.lock.*` subjects to trigger compaction when writers finish, avoiding periodic Consul scans; single-delivery streams guarantee one worker per lock release.
+- **Knowledge Base Maintenance**: Maintenance jobs watch `mods.kb.lock.*` subjects to trigger compaction when writers finish, avoiding periodic Consul scans; single-delivery streams guarantee one worker per lock release.
 - **Build Pipeline Signals**: Orchestration layer pushes `nomad.alloc.ready` events to JetStream; CLI uses demand fetchers to tail status without busy loops.
 
 ## Risks & Open Questions
