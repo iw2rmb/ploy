@@ -25,7 +25,7 @@ func TestRunnerEmitsCloneAndBranchEvents(t *testing.T) {
 		Steps: []ModStep{{Type: "recipe", ID: "noop"}},
 	}
 	work := t.TempDir()
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsFromEnv(work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)
@@ -68,7 +68,7 @@ func TestRunnerEmitsApplyEvent(t *testing.T) {
 	_ = os.MkdirAll(jobsDir, 0755)
 	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), []byte("job \"orw-apply\" {}"), 0644)
 
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsFromEnv(work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)
@@ -109,7 +109,7 @@ func TestRunnerEmitsApplyErrorEvent(t *testing.T) {
 	_ = os.MkdirAll(jobsDir, 0755)
 	_ = os.WriteFile(filepath.Join(jobsDir, "orw_apply.hcl"), []byte("job \"orw-apply\" {}"), 0644)
 
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080/v1", work, true)
+	integrations := NewModIntegrationsFromEnv(work, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("runner create: %v", err)

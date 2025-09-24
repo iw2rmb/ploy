@@ -18,7 +18,7 @@ func TestMods_WorkflowWithConsulKV(t *testing.T) {
 	_ = os.Setenv("CONSUL_HTTP_ADDR", serviceConfig.ConsulAddr)
 	defer func() { _ = os.Unsetenv("CONSUL_HTTP_ADDR") }()
 	workspaceDir := t.TempDir()
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+	integrations := NewModIntegrationsFromEnv(workspaceDir, false)
 	t.Run("validate_consul_operations", func(t *testing.T) { testConsulOperations(t, serviceConfig.ConsulAddr) })
 	cfg := &ModConfig{Version: "v1alpha1", ID: "test-consul-real", TargetRepo: "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git", TargetBranch: "main", BaseRef: "main", Lane: "C", BuildTimeout: "10m", Steps: []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}}, SelfHeal: &SelfHealConfig{Enabled: true, MaxRetries: 1, Cooldown: "15m"}}
 	runner, err := integrations.CreateConfiguredRunner(cfg)

@@ -434,6 +434,12 @@ func NewModIntegrationsWithTestMode(controllerURL, workDir string, testMode bool
 	}
 }
 
+// NewModIntegrationsFromEnv constructs integrations using harness configuration derived from environment variables.
+func NewModIntegrationsFromEnv(workDir string, testMode bool) *ModIntegrations {
+	harness := ResolveHarnessFromEnv()
+	return NewModIntegrationsWithTestMode(harness.Infra.Controller, workDir, testMode)
+}
+
 // APIGitOperations wraps the API git service to satisfy the Mods interface
 type APIGitOperations struct{ *gitapi.Service }
 
@@ -486,9 +492,18 @@ func (i *ModIntegrations) CreateKBIntegration() KBIntegrator {
 	}
 
 	// Create production KB integration
+	harness := ResolveHarnessFromEnv()
+	filerHost := harness.SeaweedFilerHost()
+	if filerHost == "" {
+		filerHost = "localhost:8888"
+	}
+	masterHost := harness.SeaweedMasterHost()
+	if masterHost == "" {
+		masterHost = strings.Replace(filerHost, "8888", "9333", 1)
+	}
 	storageConfig := storage.Config{
-		Master:      "localhost:9333", // Default SeaweedFS master
-		Filer:       "localhost:8888", // Default SeaweedFS filer
+		Master:      masterHost,
+		Filer:       filerHost,
 		Collection:  "kb",
 		Replication: "000", // No replication for development
 		Timeout:     30,
