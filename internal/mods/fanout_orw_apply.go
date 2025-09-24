@@ -67,16 +67,8 @@ func (o *fanoutOrchestrator) executeORWGenBranch(ctx context.Context, branch Bra
 		return result
 	}
 
-	seaweedCandidates := []string{}
-	if seaweedURL != "" {
-		seaweedCandidates = append(seaweedCandidates, seaweedURL)
-	}
-	if !strings.Contains(seaweedURL, "storage.ploy.local") {
-		seaweedCandidates = append(seaweedCandidates, "http://seaweedfs-filer.storage.ploy.local:8888")
-	}
-	if len(seaweedCandidates) == 0 {
-		seaweedCandidates = append(seaweedCandidates, "http://seaweedfs-filer.storage.ploy.local:8888")
-	}
+	harness := ResolveHarnessFromEnv()
+	seaweedCandidates := harness.SeaweedCandidates()
 
 	var uploadErr error
 	for _, candidate := range seaweedCandidates {

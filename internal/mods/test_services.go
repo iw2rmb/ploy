@@ -28,6 +28,7 @@ type ServicesConfig struct {
 // RequireServices enforces that services are running - no fallback to mocks
 func RequireServices(t *testing.T, services ...string) *ServicesConfig {
 	t.Helper()
+	harness := ResolveHarnessFromEnv()
 	config := &ServicesConfig{}
 	var failures []string
 	for _, service := range services {
@@ -45,11 +46,19 @@ func RequireServices(t *testing.T, services ...string) *ServicesConfig {
 				config.NomadAddr = "http://localhost:4646"
 			}
 		case "seaweedfs":
-			if !isSeaweedFSHealthy() {
-				failures = append(failures, "SeaweedFS not available at http://localhost:8888")
+			filerURL := harness.Infra.SeaweedURL
+			if filerURL == "" {
+				filerURL = "http://localhost:8888"
+			}
+			masterHost := harness.SeaweedMasterHost()
+			if masterHost == "" {
+				masterHost = "localhost:9333"
+			}
+			if !isSeaweedFSHealthy(harness) {
+				failures = append(failures, fmt.Sprintf("SeaweedFS not available at %s (master %s)", filerURL, masterHost))
 			} else {
-				config.SeaweedFSFiler = "http://localhost:8888"
-				config.SeaweedFSMaster = "http://localhost:9333"
+				config.SeaweedFSFiler = filerURL
+				config.SeaweedFSMaster = fmt.Sprintf("http://%s", masterHost)
 			}
 		case "gitlab":
 			token := os.Getenv("GITLAB_TOKEN")
@@ -88,10 +97,22 @@ func isNomadHealthy() bool {
 	return err == nil
 }
 
-func isSeaweedFSHealthy() bool {
+func isSeaweedFSHealthy(h HarnessConfig) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	return isServiceHealthyHTTP(ctx, "http://localhost:8888/") && isServiceHealthyHTTP(ctx, "http://localhost:9333/cluster/status")
+	filer := h.Infra.SeaweedURL
+	if filer == "" {
+		filer = "http://localhost:8888"
+	}
+	master := h.SeaweedMasterHost()
+	if master == "" {
+		master = "localhost:9333"
+	}
+	if !strings.HasSuffix(filer, "/") {
+		filer += "/"
+	}
+	masterURL := fmt.Sprintf("http://%s/cluster/status", master)
+	return isServiceHealthyHTTP(ctx, filer) && isServiceHealthyHTTP(ctx, masterURL)
 }
 
 func isServiceHealthyHTTP(ctx context.Context, url string) bool {
@@ -109,9 +130,9 @@ func isServiceHealthyHTTP(ctx context.Context, url string) bool {
 }
 
 // Service operation tests
-func testSeaweedFSOperations(t *testing.T, filerURL string) {
+func testSeaweedFSOperations(t *testing.T, filerURL, master string) {
 	t.Helper()
-	storageClient, err := factory.New(factory.FactoryConfig{Provider: "seaweedfs", Endpoint: filerURL, Extra: map[string]interface{}{"master": strings.Replace(filerURL, "8888", "9333", 1), "filer": filerURL}})
+	storageClient, err := factory.New(factory.FactoryConfig{Provider: "seaweedfs", Endpoint: filerURL, Extra: map[string]interface{}{"master": master, "filer": filerURL}})
 	if err != nil {
 		t.Fatalf("failed to create SeaweedFS client: %v", err)
 	}
