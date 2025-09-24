@@ -206,6 +206,13 @@ For EVERY code change:
 **NEVER**: Integration tests against local infrastructure, direct Nomad commands
   - Exception: Running E2E tests from your workstation that target the VPS Dev API is allowed (see above).
 
+## Feature Design & Task Tracking
+- Create or update a design doc for every net-new feature/refactor at `docs/design/<feature>/README.md` before starting implementation.
+- Break the design into executable tasks and document each one in `roadmap/<feature>/<order>-<short-desc>.md` (e.g. `roadmap/mods-integration-tests/01-dependencies.md`).
+- Every task document must include: **Why / What For**, **Required Changes**, **Definition of Done**, **Tests** (unit / integration / e2e expectations), and a status checkbox (`- [ ] Pending`, `- [x] Done`).
+- Cross-reference the roadmap tasks from the design doc so contributors can jump between high-level intent and actionable work.
+- Update both design doc and task files as implementation evolves; mark status checkboxes when finishing work.
+
 ## Reference
 
 ### Ploy Overview
