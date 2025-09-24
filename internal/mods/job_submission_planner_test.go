@@ -91,6 +91,12 @@ func (stubPlannerSubmitter) SubmitAndWaitTerminal(ctx context.Context, spec JobS
 	return JobResult{JobID: "planner-job", Status: "completed"}, nil
 }
 
+type fakeHCLSubmitter struct{}
+
+func (fakeHCLSubmitter) Validate(string) error                                  { return nil }
+func (fakeHCLSubmitter) Submit(string, time.Duration) error                     { return nil }
+func (fakeHCLSubmitter) SubmitCtx(context.Context, string, time.Duration) error { return nil }
+
 func TestSubmitPlannerJobFallbacksToControllerArtifacts(t *testing.T) {
 	t.Setenv("MOD_ID", "mod-xyz")
 	t.Setenv("PLOY_CONTROLLER", "https://controller.example/v1")
@@ -153,4 +159,79 @@ func TestSubmitPlannerJobFallbacksToControllerArtifacts(t *testing.T) {
 	if typ, _ := plan.Options[0]["type"].(string); typ != "llm-exec" {
 		t.Fatalf("unexpected option type: %s", typ)
 	}
+}
+
+type recordingArtifactUploader struct {
+	files []string
+}
+
+func (r *recordingArtifactUploader) UploadFile(ctx context.Context, baseURL, key, srcPath, contentType string) error {
+	r.files = append(r.files, fmt.Sprintf("%s|%s|%s", baseURL, key, contentType))
+	return nil
+}
+
+func (r *recordingArtifactUploader) UploadJSON(ctx context.Context, baseURL, key string, body []byte) error {
+	return nil
+}
+
+func TestSubmitPlannerJobUsesArtifactUploader(t *testing.T) {
+	t.Setenv("MOD_ID", "mod-abc")
+	t.Setenv("PLOY_CONTROLLER", "https://controller.example/v1")
+	t.Setenv("PLOY_SEAWEEDFS_URL", "http://seaweed.local")
+	t.Setenv("NOMAD_DC", "dc1")
+
+	workspace := t.TempDir()
+	cfg := &ModConfig{
+		ID:         "workflow",
+		TargetRepo: "https://git.example/repo.git",
+		BaseRef:    "main",
+	}
+
+	runner, err := NewModRunner(cfg, workspace)
+	require.NoError(t, err)
+
+	uploader := &recordingArtifactUploader{}
+	runner.SetArtifactUploader(uploader)
+	runner.SetHCLSubmitter(fakeHCLSubmitter{})
+
+	origValidate := validateJob
+	origSubmit := submitAndWaitTerminal
+	origDownload := downloadToFileFn
+	origHead := headURLFn
+	origPut := putFileFn
+	origWait := waitForStepContainingFn
+	defer func() {
+		validateJob = origValidate
+		submitAndWaitTerminal = origSubmit
+		downloadToFileFn = origDownload
+		headURLFn = origHead
+		putFileFn = origPut
+		waitForStepContainingFn = origWait
+	}()
+
+	validateJob = func(string) error { return nil }
+	submitAndWaitTerminal = func(string, time.Duration) error { return nil }
+	headURLFn = func(string) bool { return true }
+	putFileFn = func(base, key, srcPath, contentType string) error {
+		t.Fatalf("legacy putFileFn should not be invoked: base=%s key=%s", base, key)
+		return nil
+	}
+	waitForStepContainingFn = func(string, string, string, string, time.Duration) error { return nil }
+
+	planJSON := `{"plan_id":"using-uploader","options":[{"id":"llm-1","type":"llm-exec"}]}`
+	downloadToFileFn = func(url, dest string) error {
+		if !strings.Contains(url, "/mods/mod-abc/artifacts/plan_json") {
+			return fmt.Errorf("unexpected url: %s", url)
+		}
+		return os.WriteFile(dest, []byte(planJSON), 0o644)
+	}
+
+	helper := NewJobSubmissionHelperWithRunner(stubPlannerSubmitter{}, runner)
+	plan, err := helper.SubmitPlannerJob(context.Background(), cfg, "compilation failed", workspace)
+	if err == nil {
+		require.NotNil(t, plan)
+	} else {
+		t.Fatalf("expected planner submission to succeed: %v", err)
+	}
+	require.NotEmpty(t, uploader.files, "expected artifact uploader to capture uploads")
 }

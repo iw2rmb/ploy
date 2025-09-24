@@ -85,3 +85,51 @@ func TestRunPushWithEvents_Error(t *testing.T) {
 		t.Fatalf("expected push error with failed step, got err=%v sr=%+v", err, sr)
 	}
 }
+
+type panicGitOpsOnPush struct {
+	MockGitOperations
+	t *testing.T
+}
+
+func (p *panicGitOpsOnPush) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) *gitapi.Operation {
+	p.t.Fatalf("unexpected call to gitOps.PushBranchAsync with branch=%s", branchName)
+	return nil
+}
+
+type fakeGitPushOp struct {
+	events chan gitapi.Event
+	err    error
+}
+
+func (f *fakeGitPushOp) Events() <-chan gitapi.Event { return f.events }
+func (f *fakeGitPushOp) Err() error                  { return f.err }
+
+type fakeGitPusher struct {
+	called bool
+}
+
+func (f *fakeGitPusher) PushBranchAsync(ctx context.Context, repoPath, remoteURL, branchName string) GitPushOperation {
+	f.called = true
+	events := make(chan gitapi.Event, 1)
+	events <- gitapi.Event{Type: gitapi.EventCompleted, Message: "done"}
+	close(events)
+	return &fakeGitPushOp{events: events}
+}
+
+func TestRunPushStepUsesGitPusher(t *testing.T) {
+	cfg := &ModConfig{ID: "w", TargetRepo: "https://example/repo", BaseRef: "main", Steps: []ModStep{{ID: "s", Type: string(StepTypeORWApply), Recipes: []RecipeEntry{{Name: "r", Coords: RecipeCoordinates{Group: "g", Artifact: "a", Version: "v"}}}}}}
+	r, _ := NewModRunner(cfg, t.TempDir())
+
+	panicOps := &panicGitOpsOnPush{t: t}
+	r.SetGitOperations(panicOps)
+
+	fakePusher := &fakeGitPusher{}
+	r.SetGitPusher(fakePusher)
+
+	if err := r.runPushStep(context.Background(), "/repo", "branch"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fakePusher.called {
+		t.Fatalf("expected git pusher to be invoked")
+	}
+}

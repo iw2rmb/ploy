@@ -85,6 +85,24 @@ func (r *ModRunner) SetHealingOrchestrator(h HealingOrchestrator) { r.healer = h
 // SetHCLSubmitter sets the indirection used for HCL validate/submit flows.
 func (r *ModRunner) SetHCLSubmitter(h HCLSubmitter) { r.hcl = h }
 
+// SetArtifactUploader sets the artifact uploader dependency for Mods helpers.
+func (r *ModRunner) SetArtifactUploader(u ArtifactUploader) { r.artifactUploader = u }
+
+// GetArtifactUploader returns the configured artifact uploader implementation.
+func (r *ModRunner) GetArtifactUploader() ArtifactUploader { return r.artifactUploader }
+
+// SetBuilderSubmitter sets the builder submitter dependency for Nomad job execution.
+func (r *ModRunner) SetBuilderSubmitter(b BuilderSubmitter) { r.builderSubmitter = b }
+
+// GetBuilderSubmitter exposes the configured builder submitter implementation.
+func (r *ModRunner) GetBuilderSubmitter() BuilderSubmitter { return r.builderSubmitter }
+
+// SetGitPusher overrides the git push dependency used during branch push operations.
+func (r *ModRunner) SetGitPusher(p GitPusher) { r.gitPusher = p }
+
+// GetGitPusher returns the git pusher dependency.
+func (r *ModRunner) GetGitPusher() GitPusher { return r.gitPusher }
+
 // SetJobHelper allows injecting a planner/reducer submission helper for testing.
 func (r *ModRunner) SetJobHelper(h JobSubmissionHelper) { r.jobHelper = h }
 
