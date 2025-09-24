@@ -264,7 +264,7 @@ func TestJetStreamKBLockManager_Integration_EventPublishing(t *testing.T) {
 
 	// Subscribe to lock events
 	eventReceived := make(chan bool, 2)
-	sub, err := mgr.conn.Subscribe("kb.lock.*.*", func(msg *nats.Msg) {
+	sub, err := mgr.conn.Subscribe("mods.kb.lock.*.*", func(msg *nats.Msg) {
 		t.Logf("Received event on subject: %s", msg.Subject)
 		eventReceived <- true
 	})
@@ -320,11 +320,11 @@ func TestJetStreamKBLockManager_Integration_MaintenanceEvents(t *testing.T) {
 
 	// Subscribe to lock release events (simulating maintenance scheduler)
 	eventReceived := make(chan string, 1)
-	sub, err := mgr.conn.Subscribe("kb.lock.released.*", func(msg *nats.Msg) {
+	sub, err := mgr.conn.Subscribe("mods.kb.lock.released.*", func(msg *nats.Msg) {
 		// Extract key from subject
 		parts := strings.Split(msg.Subject, ".")
-		if len(parts) >= 4 {
-			eventReceived <- parts[3] // The key part
+		if len(parts) >= 5 {
+			eventReceived <- parts[4] // The kb identifier part
 		}
 	})
 	if err != nil {

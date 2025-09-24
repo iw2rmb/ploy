@@ -15,12 +15,15 @@ import (
 
 // Lock represents an acquired lock with metadata
 type Lock struct {
-	Key       string
-	SessionID string
-	TTL       time.Duration
-	Revision  uint64 // JetStream KV revision for CAS operations
-	Backend   string // "consul" or "jetstream"
-	client    *consulapi.Client
+	Key            string
+	SessionID      string
+	TTL            time.Duration
+	Revision       uint64 // JetStream KV revision for CAS operations
+	Backend        string // "consul" or "jetstream"
+	Owner          string
+	AcquiredAt     time.Time
+	LeaseExpiresAt time.Time
+	client         *consulapi.Client
 }
 
 // KBLockManager provides distributed locking for KB operations
@@ -46,11 +49,13 @@ func NewKBLockManager(kv orchestration.KV) KBLockManager {
 
 // useJetstreamKV checks if JetStream KV should be used for locking
 func useJetstreamKV() bool {
-	switch strings.ToLower(utils.Getenv("PLOY_USE_JETSTREAM_KV", "")) {
-	case "1", "true", "on", "yes":
+	switch strings.ToLower(strings.TrimSpace(utils.Getenv("PLOY_USE_JETSTREAM_KV", ""))) {
+	case "0", "false", "off", "no":
+		return false
+	case "", "1", "true", "on", "yes":
 		return true
 	default:
-		return false
+		return true
 	}
 }
 
@@ -111,11 +116,14 @@ func (m *ConsulKBLockManager) AcquireLock(ctx context.Context, key string, ttl t
 	}
 
 	return &Lock{
-		Key:       lockKey,
-		SessionID: sessionID,
-		TTL:       ttl,
-		Backend:   "consul",
-		client:    m.client,
+		Key:            lockKey,
+		SessionID:      sessionID,
+		TTL:            ttl,
+		Backend:        "consul",
+		Owner:          sessionID,
+		AcquiredAt:     time.Now(),
+		LeaseExpiresAt: time.Now().Add(ttl),
+		client:         m.client,
 	}, nil
 }
 

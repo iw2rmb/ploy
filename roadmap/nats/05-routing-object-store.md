@@ -39,7 +39,7 @@
    - After upload, download the object, compare JSON canonicalized output, and emit diffs to stdout + metrics. Store a manifest for verification.
 3. **Object Store Update Path**
    - Modify `internal/routing` helpers so `SaveAppRoute` persists exclusively to JetStream. Wrap writes in CAS using the last known digest to prevent lost updates.
-   - On failures, surface structured errors and Prometheus counters; return errors immediately so operators can react before drift accumulates.
+   - On failures, surface structured errors and metrics counters; return errors immediately so operators can react before drift accumulates.
 4. **Read & Cache Layer**
    - Introduce `GetAppRoutesJS` that streams the object in 128 KiB chunks, decodes JSON progressively (avoid loading entire payload in memory), and exposes revision/checksum to callers.
    - Remove Consul lookups from read paths; error if the object store is unavailable so issues surface immediately.
@@ -60,7 +60,7 @@
 - Keep targeted tests that publish and delete routes as the primary signal for rollout readiness (see `internal/routing/store_test.go`). Automate them in CI before toggling feature flags.
 - Alerting falls back to controller logs and metrics scraping via `/metrics`; ensure on-call runbooks capture the log patterns emitted during bootstrap failures.
 - Provide `ploy routing-resync <app>` CLI command invoking an ephemeral consumer to force-fetch latest revision for troubleshooting.
-- Expose Prometheus counters (`ploy_api_routing_operations_total`, `routing_objectstore_create_total`) for JetStream operations; rely on scripted checks rather than dashboards.
+- Expose metrics counters (`ploy_api_routing_operations_total`, `routing_objectstore_create_total`) for JetStream operations; rely on scripted checks rather than dashboards.
 
 ## Deliverables
 - Refactored routing helpers with JetStream-only persistence, feature flags, telemetry, and documentation updates in `internal/routing/README.md` & `docs/networking.md`.

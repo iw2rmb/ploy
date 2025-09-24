@@ -387,7 +387,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ **Production Hardening** (Aug 2025): Complete no-SPOF architecture with operational excellence
   - ✅ **Leader Election System**: Consul-based leader election for coordination-heavy operations with automatic failover
   - ✅ **Graceful Shutdown**: Enhanced SIGTERM handling with connection draining and coordination resource cleanup
-  - ✅ **Prometheus Metrics**: Comprehensive metrics collection for leadership, builds, performance, and operational visibility
+  - ✅ **Metrics Pipeline**: Comprehensive metrics collection for leadership, builds, performance, and operational visibility
   - ✅ **TTL Cleanup Coordination**: Leader-only TTL cleanup with automatic task transfer on failover
   - ✅ **Health Monitoring**: `/health/coordination` endpoint for real-time leader election status
   - ✅ **Metrics Observatory**: `/metrics` endpoint with 15+ api metrics for operational monitoring
@@ -569,7 +569,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
   - Priority job queue with concurrent processing capabilities
   - Worker pool management with job cancellation support
 - ✅ **Stream C: Production Readiness** ✅ 2025-08-26
-  - Prometheus metrics collection for comprehensive monitoring
+  - Metrics collection for comprehensive monitoring
   - OpenTelemetry distributed tracing with OTLP exporter
   - Health and readiness endpoints for Kubernetes/Nomad integration
   - Auto-scaling and resource management capabilities
@@ -589,7 +589,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ **Stateless Design**: All state externalized to Consul and SeaweedFS for zero-SPOF architecture
 - ✅ **Job Queue**: Priority-based processing with concurrent execution and cancellation support
 
-### ✅ **Production Monitoring & Observability**
+### ✅ **Production Monitoring**
 - ✅ **Comprehensive Metrics**: Job metrics, transformation metrics, resource metrics, storage metrics
 - ✅ **Distributed Tracing**: OpenTelemetry integration with job tracing, transformation tracing, storage operation tracing
 - ✅ **Health Monitoring**: Multi-component health checks (SeaweedFS, Consul, worker pool utilization)
@@ -610,7 +610,7 @@ For complete lane descriptions, detection rules, build flows, and best practices
 - ✅ **RESTful API**: Complete `/v1/openrewrite/*` endpoint suite
   - Job submission, status monitoring, and result retrieval
   - Health checks and service monitoring endpoints
-  - Metrics collection for Prometheus integration
+  - Metrics collection for monitoring integration
 - ✅ **CLI Commands**: `ploy security benchmark` command suite
   - Java 11→17 migration benchmarks with real repository testing
   - Parallel execution testing with dependency analysis
@@ -672,7 +672,7 @@ LLM transformations now execute as distributed Nomad batch jobs, providing secur
 - ✅ **Performance Optimization**: Efficient execution through distributed Nomad architecture
 
 ### ✅ **Production Features Active**
-- ✅ **Observability**: Comprehensive job monitoring and status tracking via Consul
+- ✅ **Monitoring**: Comprehensive job monitoring and status tracking via Consul
 - ✅ **Auto-Scaling**: Nomad-based scaling with resource optimization and queue management
 - ✅ **Security Model**: Sandboxed Docker execution with input validation and resource limits
 - ✅ **Error Handling**: Robust failure detection, retry mechanisms, and graceful degradation
@@ -880,7 +880,6 @@ Comprehensive transformation of Security Engine into a universal code transforma
 ## 🔮 Next Steps
 - Per-app Unikraft recipes and custom configurations
 - E2E testing suite with full Nomad cluster validation
-- Observability stack integration (Loki/Prometheus/Grafana)
 - Secrets management via Consul KV templates
 - Multi-region deployment support
 - Cost optimization and resource usage analytics

@@ -1,107 +1,199 @@
 package mods
 
 import (
+	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 	"time"
+
+	server "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 )
 
-func TestJetstreamLockData_Marshal(t *testing.T) {
-	lockData := &JetstreamLockData{
-		SessionID:  "test-session",
-		Holder:     "test-holder",
-		TTL:        300,
-		AcquiredAt: time.Now(),
+func runTestJetStream(t *testing.T) (*server.Server, string) {
+	t.Helper()
+
+	opts := &server.Options{
+		Host:      "127.0.0.1",
+		Port:      -1,
+		JetStream: true,
+		StoreDir:  filepath.Join(t.TempDir(), "nats"),
 	}
 
-	data, err := json.Marshal(lockData)
+	srv, err := server.NewServer(opts)
 	if err != nil {
-		t.Fatalf("Failed to marshal lock data: %v", err)
+		t.Fatalf("failed to create nats server: %v", err)
 	}
 
-	var unmarshaled JetstreamLockData
-	err = json.Unmarshal(data, &unmarshaled)
+	go srv.Start()
+	if !srv.ReadyForConnections(10 * time.Second) {
+		t.Fatalf("nats server not ready in time")
+	}
+
+	t.Cleanup(func() {
+		srv.Shutdown()
+		srv.WaitForShutdown()
+	})
+
+	return srv, srv.ClientURL()
+}
+
+func setJetStreamEnv(t *testing.T, url string) {
+	t.Helper()
+
+	t.Setenv("PLOY_JETSTREAM_URL", url)
+	t.Setenv("NATS_ADDR", url)
+	t.Setenv("PLOY_JETSTREAM_CREDS", "")
+	t.Setenv("PLOY_JETSTREAM_USER", "")
+	t.Setenv("PLOY_JETSTREAM_PASSWORD", "")
+}
+
+func TestJetstreamKBLockManager_AcquirePersistsMetadata(t *testing.T) {
+	_, url := runTestJetStream(t)
+	setJetStreamEnv(t, url)
+
+	mgr, err := NewJetstreamKBLockManager()
 	if err != nil {
-		t.Fatalf("Failed to unmarshal lock data: %v", err)
+		t.Fatalf("failed to create jetstream lock manager: %v", err)
+	}
+	t.Cleanup(func() { _ = mgr.Close() })
+
+	ctx := context.Background()
+	lock, err := mgr.AcquireLock(ctx, "tenant/app/mod", 3*time.Second)
+	if err != nil {
+		t.Fatalf("expected first acquisition to succeed: %v", err)
 	}
 
-	if unmarshaled.SessionID != lockData.SessionID {
-		t.Errorf("Expected session ID %q, got %q", lockData.SessionID, unmarshaled.SessionID)
+	if lock.Backend != "jetstream" {
+		t.Fatalf("expected backend jetstream, got %q", lock.Backend)
 	}
 
-	if unmarshaled.Holder != lockData.Holder {
-		t.Errorf("Expected holder %q, got %q", lockData.Holder, unmarshaled.Holder)
+	if lock.Key != "writers/tenant/app/mod" {
+		t.Fatalf("unexpected lock key: %s", lock.Key)
 	}
 
-	if unmarshaled.TTL != lockData.TTL {
-		t.Errorf("Expected TTL %d, got %d", lockData.TTL, unmarshaled.TTL)
-	}
-}
-
-func TestJetstreamKBLockManager_buildLockKey(t *testing.T) {
-	mgr := &JetstreamKBLockManager{}
-
-	key := mgr.buildLockKey("test-key")
-	expected := "kb/locks/test-key"
-
-	if key != expected {
-		t.Errorf("Expected lock key %q, got %q", expected, key)
-	}
-}
-
-func TestContainsString(t *testing.T) {
-	tests := []struct {
-		s      string
-		substr string
-		expect bool
-	}{
-		{"hello world", "world", true},
-		{"hello world", "foo", false},
-		{"lock already held", "already held", true},
-		{"", "test", false},
-		{"test", "", true},
+	if lock.Revision == 0 {
+		t.Fatal("expected lock revision to be populated")
 	}
 
-	for _, test := range tests {
-		result := containsString(test.s, test.substr)
-		if result != test.expect {
-			t.Errorf("containsString(%q, %q) = %v, expected %v", test.s, test.substr, result, test.expect)
-		}
-	}
-}
-
-// Test that the default lock config works
-func TestDefaultLockConfig(t *testing.T) {
-	config := DefaultLockConfig()
-
-	if config.DefaultTTL != 5*time.Second {
-		t.Errorf("Expected DefaultTTL to be 5s, got %v", config.DefaultTTL)
+	if lock.LeaseExpiresAt.IsZero() {
+		t.Fatal("expected lease expiry timestamp to be set")
 	}
 
-	if config.MaxRetries != 3 {
-		t.Errorf("Expected MaxRetries to be 3, got %d", config.MaxRetries)
+	if time.Until(lock.LeaseExpiresAt) > 3*time.Second+1*time.Second || time.Until(lock.LeaseExpiresAt) < 1*time.Second {
+		t.Fatalf("unexpected lease expiry window: %v", lock.LeaseExpiresAt)
 	}
 
-	if config.RetryInterval != 100*time.Millisecond {
-		t.Errorf("Expected RetryInterval to be 100ms, got %v", config.RetryInterval)
+	entry, err := mgr.bucket.Get("writers/tenant/app/mod")
+	if err != nil {
+		t.Fatalf("expected kv entry to exist: %v", err)
+	}
+
+	var stored map[string]interface{}
+	if err := json.Unmarshal(entry.Value(), &stored); err != nil {
+		t.Fatalf("failed to decode lock record: %v", err)
+	}
+
+	if entry.Revision() != lock.Revision {
+		t.Fatalf("expected revision %d to match entry revision %d", lock.Revision, entry.Revision())
+	}
+
+	if owner, ok := stored["owner"].(string); !ok || owner == "" {
+		t.Fatalf("expected stored owner to be populated, got %v", stored["owner"])
+	}
+
+	if expires, ok := stored["lease_expires_at"].(string); !ok || expires == "" {
+		t.Fatalf("expected lease_expires_at timestamp, got %v", stored["lease_expires_at"])
+	}
+
+	if _, err := mgr.AcquireLock(ctx, "tenant/app/mod", 3*time.Second); err == nil {
+		t.Fatal("expected contention error when acquiring held lock")
 	}
 }
 
-// Test signature lock key building
-func TestBuildSignatureLockKey_WithJetStream(t *testing.T) {
-	key := BuildSignatureLockKey("java", "abcd1234")
-	expected := "java/abcd1234"
+func TestJetstreamKBLockManager_PublishesLifecycleEvents(t *testing.T) {
+	_, url := runTestJetStream(t)
+	setJetStreamEnv(t, url)
 
-	if key != expected {
-		t.Errorf("Expected %q, got %q", expected, key)
+	conn, err := nats.Connect(url)
+	if err != nil {
+		t.Fatalf("failed to create nats connection: %v", err)
+	}
+	defer conn.Close()
+
+	js, err := conn.JetStream()
+	if err != nil {
+		t.Fatalf("failed to get jetstream context: %v", err)
 	}
 
-	// Test with jetstream manager
-	mgr := &JetstreamKBLockManager{}
-	fullKey := mgr.buildLockKey(key)
-	expectedFull := "kb/locks/java/abcd1234"
+	mgr, err := NewJetstreamKBLockManager()
+	if err != nil {
+		t.Fatalf("failed to create jetstream lock manager: %v", err)
+	}
+	t.Cleanup(func() { _ = mgr.Close() })
 
-	if fullKey != expectedFull {
-		t.Errorf("Expected full key %q, got %q", expectedFull, fullKey)
+	if _, err := js.StreamInfo("mods_kb_lock_events"); err != nil {
+		t.Fatalf("expected lock event stream to be created, got error: %v", err)
+	}
+
+	acquiredSub, err := js.SubscribeSync("mods.kb.lock.acquired.*")
+	if err != nil {
+		t.Fatalf("failed to subscribe to acquired events: %v", err)
+	}
+	releasedSub, err := js.SubscribeSync("mods.kb.lock.released.*")
+	if err != nil {
+		t.Fatalf("failed to subscribe to released events: %v", err)
+	}
+
+	ctx := context.Background()
+	lock, err := mgr.AcquireLock(ctx, "tenant/app/mod", 2*time.Second)
+	if err != nil {
+		t.Fatalf("expected acquisition success: %v", err)
+	}
+
+	msg, err := acquiredSub.NextMsg(2 * time.Second)
+	if err != nil {
+		t.Fatalf("expected acquisition event: %v", err)
+	}
+	validateLockEvent(t, msg, "acquired", "tenant/app/mod", lock.Revision)
+
+	if err := mgr.ReleaseLock(ctx, lock); err != nil {
+		t.Fatalf("expected release success: %v", err)
+	}
+
+	msg, err = releasedSub.NextMsg(2 * time.Second)
+	if err != nil {
+		t.Fatalf("expected release event: %v", err)
+	}
+	validateLockEvent(t, msg, "released", "tenant/app/mod", lock.Revision)
+}
+
+func validateLockEvent(t *testing.T, msg *nats.Msg, event, kbID string, revision uint64) {
+	t.Helper()
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(msg.Data, &payload); err != nil {
+		t.Fatalf("failed to decode event payload: %v", err)
+	}
+
+	if payload["event"] != event {
+		t.Fatalf("expected event %q, got %v", event, payload["event"])
+	}
+
+	if payload["kb_id"] != kbID {
+		t.Fatalf("expected kb_id %q, got %v", kbID, payload["kb_id"])
+	}
+
+	if gotRevision, ok := payload["revision"].(float64); !ok || uint64(gotRevision) != revision {
+		t.Fatalf("expected revision %d, got %v", revision, payload["revision"])
+	}
+
+	if _, ok := payload["owner"].(string); !ok {
+		t.Fatalf("expected owner string in payload, got %v", payload["owner"])
+	}
+
+	if _, ok := payload["timestamp"].(string); !ok {
+		t.Fatalf("expected timestamp string in payload, got %v", payload["timestamp"])
 	}
 }

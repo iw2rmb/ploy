@@ -274,7 +274,7 @@ go test -tags=performance -run=TestVPSValidation ./tests/performance/
 
 ### Monitoring Integration
 - **Prometheus**: Metrics collection
-- **Grafana**: Performance dashboards  
+- **Dashboard tooling**: Performance dashboards  
 - **AlertManager**: Performance alerting
 - **Jaeger**: Distributed tracing
 

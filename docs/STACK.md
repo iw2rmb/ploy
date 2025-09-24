@@ -55,9 +55,7 @@
 - **Ansible** — Provisioning and lifecycle automation for VPS infrastructure and Nomad jobs.
 - **Terraform / Packer (Historical)** — Retained for infrastructure bootstrapping and image baking when needed.
 
-## Monitoring & Observability
-- **Prometheus** — Metrics collection for controller, Mods pipelines, and infrastructure components.
-- **Grafana** — Dashboarding and visualization of deployment health.
+## Monitoring
 - **Loki** — Centralized log aggregation with controller and job streaming support.
 - **OpenTelemetry** — Tracing integration for latency analysis across services.
 - **Node Exporter** — Host-level metrics for capacity planning and alerting.
