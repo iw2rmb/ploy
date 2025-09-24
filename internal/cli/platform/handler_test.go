@@ -1,131 +1,211 @@
 package platform
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
-
-	"github.com/iw2rmb/ploy/internal/cli/common"
+	"time"
 )
 
-func TestPushCmd(t *testing.T) {
-	tests := []struct {
+func captureStdout(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+
+	original := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+
+	buf := &bytes.Buffer{}
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(buf, r)
+		_ = r.Close()
+		close(done)
+	}()
+
+	cleanup := func() {
+		os.Stdout = original
+		_ = w.Close()
+		<-done
+	}
+
+	return buf, cleanup
+}
+
+func moveToTempDir(t *testing.T) func() {
+	t.Helper()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	tmp := t.TempDir()
+	if err := os.Chdir(tmp); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	if err := os.WriteFile("sample.txt", []byte("hello"), 0o644); err != nil {
+		t.Fatalf("write sample: %v", err)
+	}
+
+	return func() {
+		_ = os.Chdir(cwd)
+	}
+}
+
+func TestPushCmdRoutesPlatformRequest(t *testing.T) {
+	restoreWD := moveToTempDir(t)
+	defer restoreWD()
+
+	cases := []struct {
 		name         string
 		args         []string
-		wantApp      string
-		wantPlatform bool
-		wantEnv      string
-		wantLane     string
-		wantDomain   string
+		expectEnv    string
+		expectLane   string
+		expectDomain string
 	}{
 		{
-			name:         "platform service default",
+			name:         "dev default",
 			args:         []string{"-a", "ploy-api"},
-			wantApp:      "ploy-api",
-			wantPlatform: true,
-			wantEnv:      "dev",
-			wantDomain:   "ploy-api.dev.ployman.app",
+			expectEnv:    "dev",
+			expectLane:   "E",
+			expectDomain: "ploy-api.dev.ployman.app",
 		},
 		{
-			name:         "platform service prod",
+			name:         "prod environment",
 			args:         []string{"-a", "ploy-api", "-env", "prod"},
-			wantApp:      "ploy-api",
-			wantPlatform: true,
-			wantEnv:      "prod",
-			wantDomain:   "ploy-api.ployman.app",
+			expectEnv:    "prod",
+			expectLane:   "E",
+			expectDomain: "ploy-api.ployman.app",
 		},
 		{
-			name:         "platform service with lane",
+			name:         "custom lane",
 			args:         []string{"-a", "openrewrite", "-lane", "C"},
-			wantApp:      "openrewrite",
-			wantPlatform: true,
-			wantEnv:      "dev",
-			wantLane:     "C",
-			wantDomain:   "openrewrite.dev.ployman.app",
-		},
-		{
-			name:         "platform service staging",
-			args:         []string{"-a", "metrics", "-env", "staging"},
-			wantApp:      "metrics",
-			wantPlatform: true,
-			wantEnv:      "staging",
-			wantDomain:   "metrics.ployman.app", // staging uses prod domain
+			expectEnv:    "dev",
+			expectLane:   "C",
+			expectDomain: "openrewrite.dev.ployman.app",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test server to capture the request
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reqCh := make(chan *http.Request, 1)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify headers for platform service
-				if r.Header.Get("X-Platform-Service") != "true" {
-					t.Error("Expected X-Platform-Service header to be true")
-				}
-				if r.Header.Get("X-Target-Domain") != "ployman.app" {
-					t.Errorf("Expected X-Target-Domain to be ployman.app, got %s", r.Header.Get("X-Target-Domain"))
-				}
-
-				// Verify environment header
-				if tt.wantEnv != "" && r.Header.Get("X-Environment") != tt.wantEnv {
-					t.Errorf("Expected X-Environment to be %s, got %s", tt.wantEnv, r.Header.Get("X-Environment"))
-				}
-
-				// Verify URL parameters
-				if !strings.Contains(r.URL.Path, tt.wantApp) {
-					t.Errorf("URL path should contain app name %s", tt.wantApp)
-				}
-
-				if !strings.Contains(r.URL.Query().Get("platform"), "true") {
-					t.Error("URL should contain platform=true")
-				}
-
-				if tt.wantLane != "" && r.URL.Query().Get("lane") != tt.wantLane {
-					t.Errorf("URL should contain lane=%s, got %s", tt.wantLane, r.URL.Query().Get("lane"))
-				}
-
-				w.Header().Set("X-Deployment-ID", "platform-deploy-456")
+				reqCh <- r
+				_, _ = io.Copy(io.Discard, r.Body)
+				_ = r.Body.Close()
+				w.Header().Set("X-Deployment-ID", "platform-456")
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"status": "success"}`))
+				_, _ = w.Write([]byte(`{"status":"success"}`))
 			}))
 			defer server.Close()
 
-			// Note: In actual implementation, we'll need to mock or refactor
-			// PushCmd to be testable. For now, this shows the test structure
+			outBuf, finish := captureStdout(t)
+			PushCmd(tc.args, server.URL)
+			finish()
+
+			select {
+			case req := <-reqCh:
+				if got := req.Header.Get("X-Platform-Service"); got != "true" {
+					t.Fatalf("expected X-Platform-Service header true, got %q", got)
+				}
+				if got := req.Header.Get("X-Target-Domain"); got != "ployman.app" {
+					t.Fatalf("expected target domain ployman.app, got %q", got)
+				}
+				if got := req.Header.Get("X-Environment"); got != tc.expectEnv {
+					t.Fatalf("expected environment header %q, got %q", tc.expectEnv, got)
+				}
+				query := req.URL.Query()
+				if query.Get("platform") != "true" {
+					t.Fatalf("platform query missing: %s", query.Encode())
+				}
+				if lane := query.Get("lane"); lane != tc.expectLane {
+					t.Fatalf("expected lane %q, got %q (query %s)", tc.expectLane, lane, query.Encode())
+				}
+				if env := query.Get("env"); env != tc.expectEnv {
+					t.Fatalf("expected env query %q, got %q", tc.expectEnv, env)
+				}
+				if query.Get("autogen_dockerfile") != "" {
+					t.Fatalf("autogen flag should be absent by default: %s", query.Encode())
+				}
+			case <-time.After(time.Second):
+				t.Fatalf("expected request to controller")
+			}
+
+			output := outBuf.String()
+			if !strings.Contains(output, "✅ Successfully deployed") {
+				t.Fatalf("missing success marker: %s", output)
+			}
+			if !strings.Contains(output, tc.expectDomain) {
+				t.Fatalf("missing expected domain %s in output %s", tc.expectDomain, output)
+			}
+			if !strings.Contains(output, "\"status\":\"success\"") {
+				t.Fatalf("missing controller payload: %s", output)
+			}
 		})
 	}
 }
 
-func TestPushCmdValidation(t *testing.T) {
-	tests := []struct {
-		name      string
-		args      []string
-		wantError bool
-		errorMsg  string
-	}{
-		{
-			name:      "missing app name",
-			args:      []string{},
-			wantError: true,
-			errorMsg:  "platform service name required",
-		},
-		{
-			name:      "valid platform service",
-			args:      []string{"-a", "ploy-api"},
-			wantError: false,
-		},
-		{
-			name:      "reserved user app name used for platform",
-			args:      []string{"-a", "api"},
-			wantError: false, // "api" is reserved but valid for platform
-		},
+func TestPushCmdRequiresServiceName(t *testing.T) {
+	reqCh := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		reqCh <- struct{}{}
+	}))
+	defer server.Close()
+
+	outBuf, finish := captureStdout(t)
+	PushCmd([]string{}, server.URL)
+	finish()
+
+	select {
+	case <-reqCh:
+		t.Fatalf("push should not contact controller when service missing")
+	default:
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// This test will validate platform service requirements
-			// Implementation will be added when refactoring PushCmd
-		})
+	if !strings.Contains(outBuf.String(), "platform service name required") {
+		t.Fatalf("expected validation message, got %s", outBuf.String())
+	}
+}
+
+func TestPushCmdPropagatesAutogen(t *testing.T) {
+	restoreWD := moveToTempDir(t)
+	defer restoreWD()
+
+	t.Setenv("PLOY_AUTOGEN_DOCKERFILE", "1")
+
+	reqCh := make(chan *http.Request, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqCh <- r
+		_, _ = io.Copy(io.Discard, r.Body)
+		_ = r.Body.Close()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"success"}`))
+	}))
+	defer server.Close()
+
+	outBuf, finish := captureStdout(t)
+	PushCmd([]string{"-a", "ploy-api"}, server.URL)
+	finish()
+
+	select {
+	case req := <-reqCh:
+		if req.URL.Query().Get("autogen_dockerfile") != "true" {
+			t.Fatalf("autogen flag missing: %s", req.URL.RawQuery)
+		}
+	case <-time.After(time.Second):
+		t.Fatalf("expected request to controller")
+	}
+
+	if !strings.Contains(outBuf.String(), "status") {
+		t.Fatalf("missing controller output: %s", outBuf.String())
 	}
 }
 
@@ -164,7 +244,6 @@ func TestGetPlatformDomain(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set environment for testing
 			t.Setenv("PLOY_PLATFORM_DOMAIN", "")
 			t.Setenv("PLOY_ENVIRONMENT", tt.environment)
 
@@ -173,25 +252,5 @@ func TestGetPlatformDomain(t *testing.T) {
 				t.Errorf("getPlatformDomain() = %v, want %v", got, tt.want)
 			}
 		})
-	}
-}
-
-func TestSharedPushIntegration(t *testing.T) {
-	// Test that platform handler correctly uses SharedPush
-	config := common.DeployConfig{
-		App:           "test-platform",
-		IsPlatform:    true,
-		Environment:   "dev",
-		Lane:          "E",
-		ControllerURL: "http://test-api",
-	}
-
-	// Verify config has correct platform settings
-	if !config.IsPlatform {
-		t.Error("Platform service should have IsPlatform=true")
-	}
-
-	if config.Environment != "dev" {
-		t.Errorf("Expected environment=dev, got %s", config.Environment)
 	}
 }

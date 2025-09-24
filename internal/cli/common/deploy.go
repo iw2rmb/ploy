@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +26,7 @@ type DeployConfig struct {
 	SHA           string
 	IsPlatform    bool // true for ployman, false for ploy
 	BlueGreen     bool
+	UseMultipart  bool
 	Environment   string // dev, staging, prod
 	ControllerURL string
 	Metadata      map[string]string
@@ -30,6 +34,7 @@ type DeployConfig struct {
 	BuildOnly     bool   // when true, API should run build gate and tear down app (no long-lived service)
 	WorkingDir    string // optional: directory to tar instead of current working directory
 	TarExtras     map[string][]byte
+	Deps          *SharedPushDeps
 }
 
 // DeployResult contains deployment outcome information
@@ -49,12 +54,12 @@ type DeployResult struct {
 
 // SharedPush handles deployment for both ploy and ployman
 func SharedPush(config DeployConfig) (*DeployResult, error) {
-	// Validate configuration
 	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Generate SHA if not provided
+	deps := resolveSharedPushDeps(config.Deps)
+
 	if config.SHA == "" {
 		if v := utils.GitSHA(); v != "" {
 			config.SHA = v
@@ -63,18 +68,17 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 		}
 	}
 
-	// Create tar archive (optionally autogenerating a minimal Dockerfile for known stacks)
 	wd := config.WorkingDir
 	if wd == "" {
 		wd = "."
 	}
 	if v := os.Getenv("PLOY_AUTOGEN_DOCKERFILE"); v == "1" || v == "true" || v == "TRUE" || v == "on" || v == "ON" {
-		_ = tryAutogenDockerfile(wd)
+		_ = deps.autogenDockerfile(wd)
 	}
-	ign, _ := utils.ReadGitignore(wd)
-	pr, pw := io.Pipe()
+	ign, _ := deps.readGitignore(wd)
+
+	tarReader, tarWriter := io.Pipe()
 	go func() {
-		defer func() { _ = pw.Close() }()
 		opts := utils.TarOptions{}
 		if len(config.TarExtras) > 0 {
 			extras := make(map[string]utils.TarExtra, len(config.TarExtras))
@@ -83,17 +87,46 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 			}
 			opts.Extras = extras
 		}
-		_ = utils.TarDirWithOptions(wd, pw, ign, opts)
+		if err := deps.tarBuilder(wd, tarWriter, ign, opts); err != nil {
+			_ = tarWriter.CloseWithError(err)
+			return
+		}
+		_ = tarWriter.Close()
 	}()
 
-	// Build deployment URL
 	url := buildDeployURL(config)
 
-	// Create HTTP request
-	req, _ := http.NewRequest("POST", url, pr)
-	req.Header.Set("Content-Type", "application/x-tar")
+	var bodyReader io.Reader = tarReader
+	var contentType string
 
-	// Add platform-specific headers
+	if config.UseMultipart {
+		reqReader, reqWriter := io.Pipe()
+		mw := multipart.NewWriter(reqWriter)
+		go func() {
+			defer func() { _ = reqWriter.Close() }()
+			defer func() { _ = mw.Close() }()
+			part, err := mw.CreateFormFile("file", "src.tar")
+			if err != nil {
+				_ = reqWriter.CloseWithError(err)
+				return
+			}
+			if _, err = io.Copy(part, tarReader); err != nil {
+				_ = reqWriter.CloseWithError(err)
+				return
+			}
+		}()
+		bodyReader = reqReader
+		contentType = mw.FormDataContentType()
+	} else {
+		contentType = "application/x-tar"
+	}
+
+	req, err := http.NewRequest("POST", url, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", contentType)
+
 	if config.IsPlatform {
 		req.Header.Set("X-Platform-Service", "true")
 		req.Header.Set("X-Target-Domain", "ployman.app")
@@ -101,29 +134,26 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 		req.Header.Set("X-Target-Domain", "ployd.app")
 	}
 
-	// Add environment header
 	if config.Environment != "" {
 		req.Header.Set("X-Environment", config.Environment)
 	}
 
-	// Execute request with optional timeout
-	client := &http.Client{}
-	if config.Timeout > 0 {
+	if client, ok := deps.httpClient.(*http.Client); ok && config.Timeout > 0 {
 		client.Timeout = config.Timeout
 	}
+
 	log.Printf("[SharedPush] POST %s app=%s lane=%s env=%s", url, config.App, config.Lane, config.Environment)
-	resp, err := client.Do(req)
+
+	resp, err := deps.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("deployment request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	// Parse response
 	var respBody []byte
-	if resp.StatusCode != http.StatusOK {
-		// Read and log response body for diagnostics, then restore body for downstream readers
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		if b, rerr := io.ReadAll(resp.Body); rerr == nil {
-			log.Printf("[SharedPush] Non-200 response status=%d body=%s", resp.StatusCode, string(b))
+			log.Printf("[SharedPush] Non-OK response status=%d body=%s", resp.StatusCode, string(b))
 			respBody = b
 			resp.Body = io.NopCloser(bytes.NewReader(b))
 		}
@@ -133,11 +163,10 @@ func SharedPush(config DeployConfig) (*DeployResult, error) {
 		return nil, err
 	}
 
-	// Output to console
 	if len(respBody) > 0 {
-		_, _ = os.Stdout.Write(respBody)
+		_, _ = deps.stdout.Write(respBody)
 	} else {
-		_, _ = io.Copy(os.Stdout, resp.Body)
+		_, _ = io.Copy(deps.stdout, resp.Body)
 	}
 
 	return result, nil
@@ -156,35 +185,47 @@ func validateConfig(config DeployConfig) error {
 
 // buildDeployURL constructs the deployment URL with query parameters
 func buildDeployURL(config DeployConfig) string {
-	url := fmt.Sprintf("%s/apps/%s/builds?sha=%s",
-		config.ControllerURL, config.App, config.SHA)
+	base := fmt.Sprintf("%s/apps/%s/builds?sha=%s", config.ControllerURL, config.App, config.SHA)
 
 	if config.MainClass != "" {
-		url += "&main=" + utils.URLQueryEsc(config.MainClass)
+		base += "&main=" + utils.URLQueryEsc(config.MainClass)
 	}
 
 	if config.Lane != "" {
-		url += "&lane=" + config.Lane
+		base += "&lane=" + config.Lane
 	}
 
 	if config.IsPlatform {
-		url += "&platform=true"
+		base += "&platform=true"
 	}
 
 	if config.BlueGreen {
-		url += "&blue_green=true"
+		base += "&blue_green=true"
 	}
 
 	if config.Environment != "" {
-		url += "&env=" + config.Environment
+		base += "&env=" + config.Environment
 	}
 
-	// Signal build-only mode so API can clean up sandboxed app after gate
 	if config.BuildOnly {
-		url += "&build_only=true"
+		base += "&build_only=true"
 	}
 
-	return url
+	if len(config.Metadata) > 0 {
+		keys := make([]string, 0, len(config.Metadata))
+		for k := range config.Metadata {
+			if strings.TrimSpace(k) == "" {
+				continue
+			}
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			base += "&" + k + "=" + url.QueryEscape(config.Metadata[k])
+		}
+	}
+
+	return base
 }
 
 // parseDeployResponse parses the HTTP response into a DeployResult
@@ -193,8 +234,9 @@ func parseDeployResponse(resp *http.Response, rawBody []byte, config DeployConfi
 	domain := getTargetDomain(config)
 
 	// Construct the result
+	success := resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusAccepted
 	result := &DeployResult{
-		Success:      resp.StatusCode == http.StatusOK,
+		Success:      success,
 		Version:      config.SHA,
 		DeploymentID: resp.Header.Get("X-Deployment-ID"),
 		URL:          fmt.Sprintf("https://%s.%s", config.App, domain),
