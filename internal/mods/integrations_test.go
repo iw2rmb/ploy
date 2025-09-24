@@ -20,7 +20,7 @@ func TestCreateConfiguredRunner_WiresDefaultModules(t *testing.T) {
 		}},
 		SelfHeal: GetDefaultSelfHealConfig(),
 	}
-	integ := NewModIntegrationsWithTestMode("http://controller/v1", t.TempDir(), false)
+	integ := NewModIntegrationsFromEnv(t.TempDir(), false)
 	r, err := integ.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("CreateConfiguredRunner: %v", err)

@@ -28,9 +28,9 @@ func TestMods_WorkflowWithAllRealServices(t *testing.T) {
 		_ = os.Unsetenv("GITLAB_TOKEN")
 	}()
 	workspaceDir := t.TempDir()
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, false)
+	integrations := NewModIntegrationsFromEnv(workspaceDir, false)
 	t.Run("validate_all_service_operations", func(t *testing.T) {
-		testSeaweedFSOperations(t, serviceConfig.SeaweedFSFiler)
+		testSeaweedFSOperations(t, serviceConfig.SeaweedFSFiler, serviceConfig.SeaweedFSMaster)
 		testNomadOperations(t, serviceConfig.NomadAddr)
 		testConsulOperations(t, serviceConfig.ConsulAddr)
 		testGitLabOperations(t, serviceConfig.GitLabURL, serviceConfig.GitLabToken)

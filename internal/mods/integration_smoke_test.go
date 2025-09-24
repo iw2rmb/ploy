@@ -30,7 +30,7 @@ func TestMods_SuccessfulWorkflowWithMocks(t *testing.T) {
 		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}},
 		SelfHeal:     GetDefaultSelfHealConfig(),
 	}
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
+	integrations := NewModIntegrationsFromEnv(workspaceDir, true)
 	runner, err := integrations.CreateConfiguredRunner(cfg)
 	if err != nil {
 		t.Fatalf("failed to create runner: %v", err)
@@ -117,7 +117,7 @@ func TestMods_WorkflowWithBuildFailure(t *testing.T) {
 		Steps:        []ModStep{{Type: "orw-apply", ID: "java-migration", Recipes: []RecipeEntry{recipeEntry("org.openrewrite.java.migrate.UpgradeToJava17", "org.openrewrite.recipe", "rewrite-migrate-java", "3.17.0")}, MavenPluginVersion: "6.18.0"}},
 		SelfHeal:     GetDefaultSelfHealConfig(),
 	}
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", workspaceDir, true)
+	integrations := NewModIntegrationsFromEnv(workspaceDir, true)
 	failing := &ModIntegrations{ControllerURL: integrations.ControllerURL, WorkDir: integrations.WorkDir, TestMode: true}
 	runner, err := failing.CreateConfiguredRunner(cfg)
 	if err != nil {
@@ -137,7 +137,7 @@ func TestMods_WorkflowWithBuildFailure(t *testing.T) {
 
 func TestMods_TestModeIntegrationsMocks(t *testing.T) {
 	work := t.TempDir()
-	integrations := NewModIntegrationsWithTestMode("http://localhost:8080", work, true)
+	integrations := NewModIntegrationsFromEnv(work, true)
 	if bc := integrations.CreateBuildChecker(); bc == nil {
 		t.Error("expected build checker but got nil")
 	} else {
