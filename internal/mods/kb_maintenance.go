@@ -548,7 +548,7 @@ func initJetstreamConnection() (*nats.Conn, nats.JetStreamContext, error) {
 // subscribeLockEvents subscribes to lock release events to trigger maintenance jobs
 func (ms *MaintenanceScheduler) subscribeLockEvents(ctx context.Context) error {
 	// Subscribe to all lock release events
-	subject := "kb.lock.released.*"
+	subject := "mods.kb.lock.released.*"
 
 	sub, err := ms.conn.Subscribe(subject, func(msg *nats.Msg) {
 		ms.handleLockEvent(ctx, msg)
@@ -572,17 +572,21 @@ func (ms *MaintenanceScheduler) handleLockEvent(ctx context.Context, msg *nats.M
 	}
 
 	// Extract the lock key from the event
-	key, ok := eventData["key"].(string)
-	if !ok {
-		fmt.Printf("Error: lock event missing key field\n")
+	kbID, hasKBID := eventData["kb_id"].(string)
+	key, hasKey := eventData["key"].(string)
+	if !hasKBID && hasKey {
+		kbID = strings.TrimPrefix(key, "writers/")
+	}
+	if kbID == "" {
+		fmt.Printf("Error: lock event missing kb_id/key field\n")
 		return
 	}
 
-	fmt.Printf("Received lock release event for key: %s\n", key)
+	fmt.Printf("Received lock release event for key: %s\n", kbID)
 
 	// Trigger appropriate maintenance jobs based on the lock key
-	if err := ms.triggerMaintenanceForKey(ctx, key); err != nil {
-		fmt.Printf("Error triggering maintenance for key %s: %v\n", key, err)
+	if err := ms.triggerMaintenanceForKey(ctx, kbID); err != nil {
+		fmt.Printf("Error triggering maintenance for key %s: %v\n", kbID, err)
 	}
 }
 

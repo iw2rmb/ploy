@@ -3,8 +3,11 @@ package mods
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math/rand"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,22 +15,48 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+const (
+	kbLockBucketEnv          = "MODS_KB_LOCK_BUCKET"
+	kbLockEventReplicasEnv   = "MODS_KB_LOCK_EVENT_REPLICAS"
+	defaultKBLockBucket      = "mods_kb_locks"
+	kbLockEventStreamName    = "mods_kb_lock_events"
+	kbLockEventSubjectPrefix = "mods.kb.lock"
+	kbLockKeyPrefix          = "writers"
+)
+
+var (
+	ErrLockHeld = errors.New("mods: kb lock already held")
+)
+
 // JetstreamKBLockManager implements KBLockManager using NATS JetStream KV
+// for optimistic CAS locking and subject-based notifications.
 type JetstreamKBLockManager struct {
 	conn   *nats.Conn
 	bucket nats.KeyValue
 	js     nats.JetStreamContext
 }
 
-// JetstreamLockData represents the lock data stored in JetStream KV
-type JetstreamLockData struct {
-	SessionID  string    `json:"session_id"`
-	Holder     string    `json:"holder"`
-	TTL        int64     `json:"ttl_seconds"`
-	AcquiredAt time.Time `json:"acquired_at"`
+// JetstreamLockRecord represents the lock metadata stored in JetStream KV.
+type JetstreamLockRecord struct {
+	KBID           string    `json:"kb_id"`
+	Owner          string    `json:"owner"`
+	OwnerInstance  string    `json:"owner_instance,omitempty"`
+	LeaseSeconds   int64     `json:"lease_seconds"`
+	AcquiredAt     time.Time `json:"acquired_at"`
+	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 }
 
-// NewJetstreamKBLockManager creates a new JetStream-based lock manager
+func (r JetstreamLockRecord) expired(now time.Time) bool {
+	if r.LeaseExpiresAt.IsZero() {
+		if r.LeaseSeconds <= 0 {
+			return false
+		}
+		return r.AcquiredAt.Add(time.Duration(r.LeaseSeconds) * time.Second).Before(now)
+	}
+	return now.After(r.LeaseExpiresAt)
+}
+
+// NewJetstreamKBLockManager creates a new JetStream-based lock manager.
 func NewJetstreamKBLockManager() (*JetstreamKBLockManager, error) {
 	url := utils.Getenv("PLOY_JETSTREAM_URL", "")
 	if url == "" {
@@ -37,8 +66,8 @@ func NewJetstreamKBLockManager() (*JetstreamKBLockManager, error) {
 		return nil, fmt.Errorf("jetstream url not configured")
 	}
 
-	opts := []nats.Option{nats.Name("ploy-jetstream-kb-locks")}
-	if creds := utils.Getenv("PLOY_JETSTREAM_CREDS", ""); creds != "" {
+	opts := []nats.Option{nats.Name("ploy-mods-kb-locks")}
+	if creds := strings.TrimSpace(utils.Getenv("PLOY_JETSTREAM_CREDS", "")); creds != "" {
 		opts = append(opts, nats.UserCredentials(creds))
 	}
 	user := utils.Getenv("PLOY_JETSTREAM_USER", "")
@@ -54,256 +83,386 @@ func NewJetstreamKBLockManager() (*JetstreamKBLockManager, error) {
 	js, err := conn.JetStream()
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("failed to get JetStream context: %w", err)
+		return nil, fmt.Errorf("failed to create JetStream context: %w", err)
 	}
 
-	bucketName := utils.Getenv("PLOY_JETSTREAM_KV_BUCKET", "ploy_kv")
+	bucketName := utils.Getenv(kbLockBucketEnv, defaultKBLockBucket)
 	bucket, err := js.KeyValue(bucketName)
 	if err == nats.ErrBucketNotFound {
-		bucket, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: bucketName})
+		bucket, err = js.CreateKeyValue(&nats.KeyValueConfig{
+			Bucket:      bucketName,
+			Description: "Mods KB lock leases",
+			History:     1,
+			TTL:         10 * time.Minute,
+			Replicas:    1,
+		})
 	}
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("failed to get/create KV bucket: %w", err)
+		return nil, fmt.Errorf("failed to get/create lock bucket %q: %w", bucketName, err)
 	}
 
-	return &JetstreamKBLockManager{
-		conn:   conn,
-		bucket: bucket,
-		js:     js,
-	}, nil
+	if err := ensureLockEventStream(js); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return &JetstreamKBLockManager{conn: conn, bucket: bucket, js: js}, nil
 }
 
-// AcquireLock attempts to acquire a distributed lock using JetStream KV CAS operations
-func (m *JetstreamKBLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
-	lockKey := m.buildLockKey(key)
-
-	// Generate a unique session ID for this lock attempt
-	sessionID := fmt.Sprintf("kb-lock-%d-%s", time.Now().UnixNano(), key)
-
-	lockData := &JetstreamLockData{
-		SessionID:  sessionID,
-		Holder:     utils.Getenv("HOSTNAME", "unknown"),
-		TTL:        int64(ttl.Seconds()),
-		AcquiredAt: time.Now(),
+func ensureLockEventStream(js nats.JetStreamContext) error {
+	if _, err := js.StreamInfo(kbLockEventStreamName); err == nil {
+		return nil
 	}
 
-	lockValue, err := json.Marshal(lockData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal lock data: %w", err)
-	}
-
-	// Try to create the lock (CAS operation with revision 0)
-	revision, err := m.bucket.Create(lockKey, lockValue)
-	if err != nil {
-		if err == nats.ErrKeyExists {
-			// Check if the existing lock has expired
-			existing, err := m.bucket.Get(lockKey)
-			if err != nil {
-				return nil, fmt.Errorf("lock already held by another session")
-			}
-
-			var existingData JetstreamLockData
-			if err := json.Unmarshal(existing.Value(), &existingData); err != nil {
-				return nil, fmt.Errorf("lock already held by another session")
-			}
-
-			// Check if the lock has expired
-			if time.Since(existingData.AcquiredAt) < time.Duration(existingData.TTL)*time.Second {
-				return nil, fmt.Errorf("lock already held by another session")
-			}
-
-			// Try to update the expired lock
-			revision, err = m.bucket.Update(lockKey, lockValue, existing.Revision())
-			if err != nil {
-				return nil, fmt.Errorf("failed to acquire expired lock: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("failed to create lock: %w", err)
+	replicas := 1
+	if raw := utils.Getenv(kbLockEventReplicasEnv, ""); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			replicas = parsed
 		}
 	}
 
-	// Publish lock acquisition event
-	if err := m.publishLockEvent(ctx, "acquired", key, lockData); err != nil {
-		// Log but don't fail the lock acquisition
-		fmt.Printf("Warning: failed to publish lock acquisition event: %v\n", err)
+	cfg := &nats.StreamConfig{
+		Name:              kbLockEventStreamName,
+		Description:       "Mods KB lock lifecycle events",
+		Subjects:          []string{kbLockEventSubjectPrefix + ".>"},
+		Retention:         nats.LimitsPolicy,
+		MaxMsgsPerSubject: 128,
+		MaxAge:            72 * time.Hour,
+		Replicas:          replicas,
+		Storage:           nats.FileStorage,
 	}
 
-	return &Lock{
-		Key:       lockKey,
-		SessionID: sessionID,
-		TTL:       ttl,
-		Revision:  revision,
-		Backend:   "jetstream",
-	}, nil
+	if _, err := js.AddStream(cfg); err != nil && !errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
+		return fmt.Errorf("failed to create lock event stream: %w", err)
+	}
+	return nil
 }
 
-// ReleaseLock releases a previously acquired lock
+// AcquireLock attempts to acquire a distributed lock using JetStream KV CAS operations.
+func (m *JetstreamKBLockManager) AcquireLock(ctx context.Context, key string, ttl time.Duration) (*Lock, error) {
+	normalized := normalizeLockKey(key)
+	lockKey := m.buildLockKey(normalized)
+	owner := lockOwner()
+	now := time.Now().UTC()
+	expiresAt := now.Add(ttl)
+
+	record := JetstreamLockRecord{
+		KBID:           normalized,
+		Owner:          owner,
+		LeaseSeconds:   int64(ttl.Round(time.Second) / time.Second),
+		AcquiredAt:     now,
+		LeaseExpiresAt: expiresAt,
+	}
+
+	payload, err := json.Marshal(record)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal lock record: %w", err)
+	}
+
+	revision, err := m.bucket.Create(lockKey, payload)
+	if err != nil {
+		if !errors.Is(err, nats.ErrKeyExists) {
+			return nil, fmt.Errorf("failed to create lock entry: %w", err)
+		}
+
+		entry, getErr := m.bucket.Get(lockKey)
+		if getErr != nil {
+			return nil, fmt.Errorf("failed to read existing lock: %w", getErr)
+		}
+
+		existing, parseErr := parseLockRecord(entry)
+		if parseErr != nil {
+			return nil, fmt.Errorf("failed to parse existing lock: %w", parseErr)
+		}
+
+		if !existing.expired(now) {
+			return nil, fmt.Errorf("%w: %s held by %s", ErrLockHeld, normalized, existing.Owner)
+		}
+
+		// Publish expiration notification before attempting CAS takeover.
+		_ = m.publishLockEvent(ctx, "expired", normalized, existing, entry.Revision())
+
+		revision, err = m.bucket.Update(lockKey, payload, entry.Revision())
+		if err != nil {
+			if errors.Is(err, nats.ErrKeyExists) {
+				return nil, fmt.Errorf("%w: %s", ErrLockHeld, normalized)
+			}
+			return nil, fmt.Errorf("failed to acquire expired lock: %w", err)
+		}
+	}
+
+	lock := &Lock{
+		Key:            lockKey,
+		TTL:            ttl,
+		Revision:       revision,
+		Backend:        "jetstream",
+		Owner:          owner,
+		AcquiredAt:     now,
+		LeaseExpiresAt: expiresAt,
+	}
+
+	if err := m.publishLockEvent(ctx, "acquired", normalized, record, revision); err != nil {
+		fmt.Printf("Warning: failed to publish KB lock acquired event for %s: %v\n", normalized, err)
+	}
+
+	return lock, nil
+}
+
+// ReleaseLock releases a previously acquired lock.
 func (m *JetstreamKBLockManager) ReleaseLock(ctx context.Context, lock *Lock) error {
 	if lock == nil {
 		return fmt.Errorf("cannot release nil lock")
 	}
-
 	if lock.Backend != "jetstream" {
 		return fmt.Errorf("cannot release non-jetstream lock with jetstream manager")
 	}
 
-	// Get the current lock to verify ownership
-	existing, err := m.bucket.Get(lock.Key)
+	entry, err := m.bucket.Get(lock.Key)
 	if err != nil {
-		if err == nats.ErrKeyNotFound {
-			// Lock already released or expired
+		if errors.Is(err, nats.ErrKeyNotFound) {
 			return nil
 		}
-		return fmt.Errorf("failed to get lock for release: %w", err)
+		return fmt.Errorf("failed to load lock state: %w", err)
 	}
 
-	var existingData JetstreamLockData
-	if err := json.Unmarshal(existing.Value(), &existingData); err != nil {
-		return fmt.Errorf("failed to unmarshal existing lock data: %w", err)
+	record, err := parseLockRecord(entry)
+	if err != nil {
+		return fmt.Errorf("failed to parse stored lock: %w", err)
 	}
 
-	// Verify we own this lock
-	if existingData.SessionID != lock.SessionID {
-		return fmt.Errorf("cannot release lock owned by different session")
+	if lock.Owner != "" && record.Owner != lock.Owner {
+		return fmt.Errorf("lock ownership mismatch: stored=%s requested=%s", record.Owner, lock.Owner)
 	}
 
-	// Delete the lock using the revision to ensure we still own it
-	err = m.bucket.Delete(lock.Key)
-	if err != nil && err != nats.ErrKeyNotFound {
-		return fmt.Errorf("failed to delete lock: %w", err)
+	if lock.Revision != 0 && entry.Revision() != lock.Revision {
+		return fmt.Errorf("lock revision mismatch: stored=%d requested=%d", entry.Revision(), lock.Revision)
 	}
 
-	// Publish lock release event
-	if err := m.publishLockEvent(ctx, "released", lock.Key, &existingData); err != nil {
-		// Log but don't fail the lock release
-		fmt.Printf("Warning: failed to publish lock release event: %v\n", err)
+	if err := m.bucket.Delete(lock.Key, nats.LastRevision(entry.Revision())); err != nil {
+		if errors.Is(err, nats.ErrKeyNotFound) {
+			return nil
+		}
+		return fmt.Errorf("failed to delete lock revision: %w", err)
+	}
+
+	if err := m.publishLockEvent(ctx, "released", record.KBID, record, lock.Revision); err != nil {
+		fmt.Printf("Warning: failed to publish KB lock released event for %s: %v\n", record.KBID, err)
+		return nil
 	}
 
 	return nil
 }
 
-// IsLocked checks if a key is currently locked
+// IsLocked checks if a key is currently locked.
 func (m *JetstreamKBLockManager) IsLocked(ctx context.Context, key string) (bool, error) {
-	lockKey := m.buildLockKey(key)
+	normalized := normalizeLockKey(key)
+	lockKey := m.buildLockKey(normalized)
 
-	existing, err := m.bucket.Get(lockKey)
+	entry, err := m.bucket.Get(lockKey)
 	if err != nil {
-		if err == nats.ErrKeyNotFound {
+		if errors.Is(err, nats.ErrKeyNotFound) {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to check lock status: %w", err)
+		return false, fmt.Errorf("failed to read lock state: %w", err)
 	}
 
-	var lockData JetstreamLockData
-	if err := json.Unmarshal(existing.Value(), &lockData); err != nil {
-		// If we can't unmarshal, assume it's locked
-		return true, nil
+	record, err := parseLockRecord(entry)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse lock record: %w", err)
 	}
 
-	// Check if the lock has expired
-	if time.Since(lockData.AcquiredAt) >= time.Duration(lockData.TTL)*time.Second {
-		// Lock has expired, clean it up
-		_ = m.bucket.Delete(lockKey)
+	if record.expired(time.Now().UTC()) {
+		_ = m.bucket.Delete(lockKey, nats.LastRevision(entry.Revision()))
 		return false, nil
 	}
 
 	return true, nil
 }
 
-// TryWithLockRetry attempts to acquire a lock with retries, handling JetStream-specific errors
+// TryWithLockRetry attempts to acquire a lock with retries, handling JetStream-specific errors.
 func (m *JetstreamKBLockManager) TryWithLockRetry(ctx context.Context, key string, config *LockConfig, fn func() error) error {
 	if config == nil {
 		config = DefaultLockConfig()
 	}
 
-	var lastErr error
-	for attempt := 0; attempt < config.MaxRetries; attempt++ {
-		// Add exponential backoff with jitter to reduce thundering herd
-		if attempt > 0 {
-			delay := time.Duration(attempt) * config.RetryInterval
-			jitter := time.Duration(float64(delay) * 0.1) // 10% jitter
-			totalDelay := delay + jitter
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(totalDelay):
-			}
+	attempts := 0
+	lastErr := error(nil)
+	start := time.Now()
+	deadline := time.Time{}
+	if config.MaxWaitTime > 0 {
+		deadline = start.Add(config.MaxWaitTime)
+	}
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	for {
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 
 		lock, err := m.AcquireLock(ctx, key, config.DefaultTTL)
-		if err != nil {
-			lastErr = err
-			// Check for JetStream-specific contention signals
-			if err == nats.ErrKeyExists || containsString(err.Error(), "lock already held") {
-				// Continue to next retry on contention
-				continue
-			}
-			// For other errors, still retry
-			continue
-		}
-
-		// Execute function with lock held
-		err = fn()
-		releaseErr := m.ReleaseLock(ctx, lock)
-		if releaseErr != nil {
-			// Best-effort: ignore release error; lock TTL will expire
-			fmt.Printf("Warning: failed to release lock %s: %v\n", lock.Key, releaseErr)
-		}
-
 		if err == nil {
-			return nil // Success
+			runErr := fn()
+			releaseErr := m.ReleaseLock(ctx, lock)
+			if releaseErr != nil {
+				fmt.Printf("Warning: failed to release lock %s: %v\n", lock.Key, releaseErr)
+			}
+			if runErr != nil {
+				return runErr
+			}
+			return nil
 		}
 
 		lastErr = err
+		attempts++
+
+		if deadlineReached(deadline) {
+			break
+		}
+		if config.MaxRetries > 0 && attempts >= config.MaxRetries {
+			break
+		}
+
+		wait := backoffWithJitter(config.RetryInterval, attempts, rng)
+		if deadlineReachedWithDelay(deadline, wait) {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(wait):
+		}
 	}
 
-	return fmt.Errorf("failed after %d attempts, last error: %w", config.MaxRetries, lastErr)
+	if lastErr == nil {
+		lastErr = fmt.Errorf("lock acquisition failed")
+	}
+	return fmt.Errorf("failed to acquire KB lock for %s after %d attempts: %w", key, attempts, lastErr)
 }
 
-// buildLockKey builds the full JetStream KV key for a lock
+func deadlineReached(deadline time.Time) bool {
+	return !deadline.IsZero() && time.Now().After(deadline)
+}
+
+func deadlineReachedWithDelay(deadline time.Time, delay time.Duration) bool {
+	return !deadline.IsZero() && time.Now().Add(delay).After(deadline)
+}
+
+func backoffWithJitter(base time.Duration, attempt int, rng *rand.Rand) time.Duration {
+	if base <= 0 {
+		base = 100 * time.Millisecond
+	}
+	factor := time.Duration(1) << uint(min(attempt, 6))
+	wait := base * factor
+	jitter := time.Duration(rng.Int63n(int64(wait/3 + time.Millisecond)))
+	return wait + jitter
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// buildLockKey builds the JetStream KV key for a lock.
 func (m *JetstreamKBLockManager) buildLockKey(key string) string {
-	return path.Join("kb/locks", key)
+	cleaned := normalizeLockKey(key)
+	return path.Join(kbLockKeyPrefix, cleaned)
 }
 
-// publishLockEvent publishes a lock state change event
-func (m *JetstreamKBLockManager) publishLockEvent(ctx context.Context, event, key string, lockData *JetstreamLockData) error {
-	// Remove the "kb/locks/" prefix from the key for cleaner event subjects
-	cleanKey := key
-	if strings.HasPrefix(key, "kb/locks/") {
-		cleanKey = strings.TrimPrefix(key, "kb/locks/")
-	}
-	subject := fmt.Sprintf("kb.lock.%s.%s", event, cleanKey)
+func normalizeLockKey(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	trimmed = strings.TrimPrefix(trimmed, kbLockKeyPrefix+"/")
 
-	eventData := map[string]interface{}{
-		"event":       event,
-		"key":         key,
-		"session_id":  lockData.SessionID,
-		"holder":      lockData.Holder,
-		"ttl":         lockData.TTL,
-		"acquired_at": lockData.AcquiredAt,
-		"timestamp":   time.Now(),
+	segments := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+
+	var cleaned []string
+	for _, seg := range segments {
+		seg = strings.TrimSpace(seg)
+		if seg == "" || seg == "." || seg == ".." {
+			continue
+		}
+		cleaned = append(cleaned, seg)
+	}
+	if len(cleaned) == 0 {
+		return "default"
+	}
+	return strings.Join(cleaned, "/")
+}
+
+func lockOwner() string {
+	if alloc := utils.Getenv("NOMAD_ALLOC_ID", ""); alloc != "" {
+		return alloc
+	}
+	if host := utils.Getenv("HOSTNAME", ""); host != "" {
+		return host
+	}
+	return "unknown"
+}
+
+func parseLockRecord(entry nats.KeyValueEntry) (JetstreamLockRecord, error) {
+	var record JetstreamLockRecord
+	if err := json.Unmarshal(entry.Value(), &record); err != nil {
+		return record, err
+	}
+	if record.KBID == "" {
+		record.KBID = normalizeLockKey(strings.TrimPrefix(entry.Key(), kbLockKeyPrefix+"/"))
+	}
+	if record.AcquiredAt.IsZero() {
+		record.AcquiredAt = entry.Created().UTC()
+	}
+	if record.LeaseExpiresAt.IsZero() && record.LeaseSeconds > 0 {
+		record.LeaseExpiresAt = record.AcquiredAt.Add(time.Duration(record.LeaseSeconds) * time.Second)
+	}
+	return record, nil
+}
+
+func (m *JetstreamKBLockManager) publishLockEvent(ctx context.Context, event, kbID string, record JetstreamLockRecord, revision uint64) error {
+	subject := fmt.Sprintf("%s.%s.%s", kbLockEventSubjectPrefix, event, sanitizeSubjectToken(kbID))
+	payload := map[string]interface{}{
+		"event":            event,
+		"kb_id":            kbID,
+		"owner":            record.Owner,
+		"owner_instance":   record.OwnerInstance,
+		"lease_expires_at": record.LeaseExpiresAt.UTC().Format(time.RFC3339Nano),
+		"lease_seconds":    record.LeaseSeconds,
+		"revision":         revision,
+		"timestamp":        time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
-	eventBytes, err := json.Marshal(eventData)
+	data, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal event data: %w", err)
+		return fmt.Errorf("failed to marshal lock event payload: %w", err)
 	}
 
-	// Use core NATS for event publishing (no need for JetStream persistence for events)
-	err = m.conn.Publish(subject, eventBytes)
-	return err
+	msg := &nats.Msg{Subject: subject, Data: data, Header: nats.Header{}}
+	msg.Header.Set("Nats-Msg-Id", fmt.Sprintf("%s-%s-%d", event, kbID, revision))
+
+	if _, err := m.js.PublishMsg(msg); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// Close closes the JetStream connection
+func sanitizeSubjectToken(token string) string {
+	token = strings.ReplaceAll(token, " ", "_")
+	token = strings.ReplaceAll(token, "*", "-")
+	token = strings.ReplaceAll(token, ">", "-")
+	if token == "" {
+		return "default"
+	}
+	return token
+}
+
+// Close closes the JetStream connection.
 func (m *JetstreamKBLockManager) Close() error {
 	if m.conn != nil {
 		m.conn.Close()
 	}
 	return nil
-}
-
-// Helper function to check if a string contains a substring
-func containsString(s, substr string) bool {
-	return strings.Contains(s, substr)
 }

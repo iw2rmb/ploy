@@ -115,26 +115,24 @@ The Mods subsystem orchestrates end-to-end code transformation and self-healing 
 
 The Knowledge Base uses distributed locking to ensure data consistency during concurrent operations. Two backend implementations are supported:
 
-### Consul KV Locking (Default)
+### Consul KV Locking (Legacy)
 - Uses Consul sessions for lock management with TTL-based expiry
 - Lock acquisition creates a session and attempts to acquire the KV lock
 - Lock release destroys the session, automatically releasing the lock
 - Suitable for existing Consul-based deployments
 
-### JetStream KV Locking (Recommended)
+### JetStream KV Locking (Default)
 - Uses NATS JetStream KV Compare-And-Swap (CAS) operations for lock management
 - Lock acquisition uses KV Create/Update with revision-based ownership verification
 - Lock release uses KV Delete with revision check to ensure ownership
-- Publishes lock events on `kb.lock.acquired.<key>` and `kb.lock.released.<key>` subjects
-- Enables immediate maintenance job triggering via event subscription
-- Eliminates need for session heartbeats
+- Publishes lock events on `mods.kb.lock.acquired.<kb-id>`, `mods.kb.lock.released.<kb-id>`, and `mods.kb.lock.expired.<kb-id>`
+- Enables immediate maintenance job triggering via event subscription and removes session heartbeats
 
 ### Configuration
-Set `PLOY_USE_JETSTREAM_KV=true` to enable JetStream locking. The system falls back to Consul if JetStream is unavailable.
+JetStream is enabled by default. Set `PLOY_USE_JETSTREAM_KV=false` only for emergency fallback to Consul (rollback plan required). Locks live in the `mods_kb_locks` bucket under `writers/<kb-id>`.
 
 ### Lock Event Integration
 When using JetStream, maintenance jobs can subscribe to lock release events for immediate triggering:
-- `kb.lock.released.java/signature` → triggers summary rebuild for that signature
-- `kb.lock.released.maintenance/*` → ignored (prevents recursive triggering)
+- `mods.kb.lock.released.java/signature` → triggers summary rebuild for that signature
+- `mods.kb.lock.released.maintenance/*` → ignored (prevents recursive triggering)
 - Other patterns → may trigger general maintenance based on configuration
-
