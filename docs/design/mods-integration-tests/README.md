@@ -26,4 +26,6 @@ Establish a repeatable way to execute Mods integration tests that currently depe
 - [04-fixture-and-ci-alignment](../../../roadmap/mods-integration-tests/04-fixture-and-ci-alignment.md)
 
 ## Updates
+- Added harness configuration loader (`HarnessConfig`) to centralize controller and SeaweedFS endpoints with env overrides.
+
 Maintain this design as tasks progress. Link additional tasks or notes here, and ensure status checkboxes in the roadmap stay accurate.
