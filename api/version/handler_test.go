@@ -28,6 +28,9 @@ func TestRegisterRoutes_VersionEndpoints(t *testing.T) {
 	if _, ok := body["version"]; !ok {
 		t.Fatalf("expected 'version' field in response: %#v", body)
 	}
+	if _, ok := body["git_commit"]; !ok {
+		t.Fatalf("expected 'git_commit' field in response: %#v", body)
+	}
 
 	// /v1/version/detailed
 	req2 := httptest.NewRequest("GET", "/v1/version/detailed", nil)
