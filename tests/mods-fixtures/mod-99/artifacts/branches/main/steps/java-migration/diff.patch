@@ -1,0 +1,5 @@
+--- a/README.md
++++ b/README.md
+@@
+-This minimal repository content is packaged into SeaweedFS as `input.tar` to unblock Mods integration tests.
++This minimal repository content is packaged into SeaweedFS as `input.tar` to unblock Mods integration tests. Updated via seeded diff to simulate OpenRewrite output.

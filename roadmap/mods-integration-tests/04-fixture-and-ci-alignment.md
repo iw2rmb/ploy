@@ -1,6 +1,6 @@
 # 04 Fixture & CI Alignment
 
-- [ ] Status: Pending
+- [x] Status: Done
 
 ## Why / What For
 Fixtures (SeaweedFS artifacts, Git repos) and CI pipelines must align with the new harness. Without curated data and automation, test runs will continue to fail due to missing repositories or credentials.
@@ -15,9 +15,14 @@ Fixtures (SeaweedFS artifacts, Git repos) and CI pipelines must align with the n
 - CI pipelines execute the harness in at least one stage and gate merges on its outcome.
 - Documentation clearly states how to prepare fixtures locally and on the VPS.
 
+## Implementation Notes
+- Added SeaweedFS seeding script (`scripts/mods-seed-fixtures.sh`) that uploads fixture payloads from `tests/mods-fixtures` and validates Git remotes.
+- Curated fixture inputs in `tests/mods-fixtures/` for mod-99, mod-gitlab-test, and self-healing scenarios.
+- Wired GitHub Actions job `mods-integration-harness` to seed fixtures and invoke `make mods-integration-vps` gated on VPS secrets.
+
 ## Tests
-- Run fixture scripts on the dev VPS and confirm tests consume the seeded data successfully.
-- Validate CI run(s) that exercise the new job complete and publish logs/artifacts.
+- `./scripts/mods-seed-fixtures.sh` (locally or via CI) populates SeaweedFS and exits successfully.
+- `make mods-integration-vps` (workstation or CI with secrets) completes using the seeded fixtures.
 
 ## References
 - [Design doc](../../../docs/design/mods-integration-tests/README.md)
