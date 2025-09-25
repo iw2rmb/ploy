@@ -3,26 +3,26 @@
 - [x] Status: Done
 
 ## Why / What For
-Creating a dedicated Nomad job allows the full Mods integration suite to run inside the same network as SeaweedFS, builder jobs, and the controller. This delivers a reproducible VPS workflow instead of ad-hoc SSH runs.
+The initial plan called for a dedicated Nomad job so Mods integration tests could reach SeaweedFS, builder jobs, and the controller from inside the cluster network. After prototyping, we replaced the batch job with an SSH-driven runner that reuses the existing `/home/ploy/ploy` checkout, keeping the workflow simple while still exercising real services on the VPS.
 
 ## Required Changes
-- Author a Nomad job (e.g., `tests/mods-integration.nomad.hcl`) that sets the required environment variables, volumes, and credentials.
-- Include steps to fetch the repo at the requested revision and execute `go test ./internal/mods -tags=integration` (or equivalent).
-- Provide helper scripts/CLI entrypoints (`make mods-integration-vps`) to submit the job and stream results.
+- Provide a helper (`scripts/run-mods-integration-vps.sh`) that SSHes to the VPS, ensures the desired commit is fetched, and executes `go test ./internal/mods -tags=integration` as the `ploy` user.
+- Keep the Makefile entry (`mods-integration-vps`) so workstation developers can trigger the suite with a single command once their branch is pushed.
+- Document the expectation that fixes require a redeploy (or manual `git pull`) so `/home/ploy/ploy` stays in sync with the tested commit.
 
 ## Definition of Done
-- Submitting the Nomad job on the dev cluster provisions the test container, runs the suite, and exits with the correct status code.
-- Logs and artifacts are retrievable for debugging (either via Nomad log wrappers or stored files).
-- Documentation explains how to trigger the job and interpret results.
+- Running `make mods-integration-vps` fetches the current worktree commit on `TARGET_HOST` and executes the integration suite without additional manual steps.
+- Failures surface directly in the CLI output, with logs available in `go test` output on the VPS.
+- Documentation calls out the SSH workflow and the requirement to push changes before invoking the runner.
 
 ## Implementation Notes
-- Added Nomad job specification at `tests/nomad-jobs/mods-integration.nomad.hcl` with environment-driven configuration placeholders.
-- Created `scripts/run-mods-integration-vps.sh` to render the job via `envsubst`, submit it through `/opt/hashicorp/bin/nomad-job-manager.sh`, and stream logs.
-- Exposed a `make mods-integration-vps` entrypoint so workstation operators can trigger the VPS run with existing env vars.
+- `scripts/run-mods-integration-vps.sh` now orchestrates the SSH workflow, performs `git fetch`/`git checkout <commit>`, and runs `go test -tags=integration ./internal/mods` under `ploy`.
+- The earlier Nomad job (`tests/nomad-jobs/mods-integration.nomad.hcl`) was removed to avoid double-maintaining harness logic and to rely on the existing `/home/ploy/ploy` checkout.
+- The Makefile target remains so CLI usage is unchanged (`make mods-integration-vps`).
 
 ## Tests
-- Validate template presence locally: `go test ./internal/mods -run TestModsIntegrationNomadJobSpec`.
-- Run the VPS integration job: `make mods-integration-vps` (requires TARGET_HOST, controller, storage, and Git credentials).
+- `go test ./internal/mods -run TestModsFixtureScriptsAndHarness` verifies the presence and expectations of the helper scripts.
+- Manual run: `TARGET_HOST=<vps> make mods-integration-vps` (commit must be pushed to the remote referenced by the VPS repo).
 
 ## References
 - [Design doc](../../../docs/design/mods-integration-tests/README.md)
