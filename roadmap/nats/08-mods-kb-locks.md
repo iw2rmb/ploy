@@ -1,6 +1,6 @@
 # Mods Knowledge Base Locking Migration
 
-> **Status (2025-09-25):** JetStream locking is the default path; setting `PLOY_USE_JETSTREAM_KV=false` now acts as the documented emergency override.
+> **Status (2025-09-25):** Completed — JetStream locking is mandatory and the legacy `PLOY_USE_JETSTREAM_KV=false` override has been removed.
 
 ## What to Achieve
 - Eliminate Consul sessions/locks for Mods knowledge base (KB) writers and rely on JetStream Key-Value buckets for optimistic locking and state handoff.
@@ -14,9 +14,9 @@
 - Cutting the Consul dependency keeps Mods aligned with the broader JetStream migration and simplifies rollout to additional deployment lanes.
 
 ## Current State & Pain Points
-- `internal/mods/kb_locks.go:15` maintains a dual backend (Consul vs JetStream) behind `PLOY_USE_JETSTREAM_KV`; JetStream path is incomplete and lacks metrics/events.
-- Maintenance routines (`internal/mods/kb_maintenance.go`, `internal/mods/kb_integration.go`) poll Consul for lock status, delaying clean-up and leaving stale sessions.
-- Runbooks still instruct operators to inspect Consul keys under `kb/locks/*`, creating inconsistency during incidents.
+- JetStream KV owns KB locking across all lanes; Consul-based paths have been removed from `internal/mods` packages.
+- Maintenance routines (`internal/mods/kb_maintenance.go`, `internal/mods/kb_integration.go`) subscribe to JetStream events instead of polling Consul.
+- Operator guidance is aligned on JetStream tooling (`docs/runbooks/mods-kb-locks.md`).
 
 ## Prerequisites
 - JetStream cluster/workload credentials provisioned via roadmap stages 01-06 and distributed to Mods API workers (`NATS_CREDS_MODS` secret).
@@ -54,7 +54,7 @@
    - Update `internal/mods/kb_maintenance.go` to subscribe to `mods.kb.lock.released.*` and trigger compaction immediately instead of periodic scans.
    - Ensure maintenance jobs acknowledge events and de-duplicate using message IDs derived from revision numbers.
 6. **Configuration Cleanup**
-   - Remove `PLOY_USE_JETSTREAM_KV` toggle once JetStream path is default; keep temporary override flag for rollback documented in runbook. *(Completed Sep 25 2025 — JetStream is now default, `PLOY_USE_JETSTREAM_KV=false` is the only rollback path.)*
+   - Remove `PLOY_USE_JETSTREAM_KV` toggle once JetStream path is default; keep temporary override flag for rollback documented in runbook. *(Completed Sep 25 2025 — toggle removed, Consul fallback disabled.)*
    - Delete Consul ACL policies and Terraform entries referencing `kb/locks/*`.
 7. **Documentation & Runbooks**
    - Update `internal/mods/README.md` with JetStream locking diagrams, CLI snippets for inspecting bucket state (`nats kv info mods_kb_locks`).

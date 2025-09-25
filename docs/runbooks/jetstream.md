@@ -87,7 +87,7 @@ Run all commands from the controller workstation; never apply changes directly o
 
 ## KB Locking Integration
 
-The Mods Knowledge Base can use JetStream KV for distributed locking instead of Consul sessions when `PLOY_USE_JETSTREAM_KV=true`.
+The Mods Knowledge Base now uses JetStream KV for distributed locking across all lanes; the legacy `PLOY_USE_JETSTREAM_KV` flag has been removed.
 
 ### Lock Operations
 - **Acquisition**: Uses KV Create/Update with Compare-And-Swap semantics
