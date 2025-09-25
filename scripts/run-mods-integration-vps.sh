@@ -137,6 +137,7 @@ if resolved=$(resolve_jetstream_addr); then
 fi
 
 if [[ -n "${JETSTREAM_ADDR}" ]]; then
+  export PLOY_JETSTREAM_URL="${JETSTREAM_ADDR}"
   export NATS_ADDR="${JETSTREAM_ADDR}"
   echo "Using JetStream endpoint: ${NATS_ADDR}"
 else
