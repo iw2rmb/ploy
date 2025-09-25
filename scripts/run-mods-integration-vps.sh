@@ -47,6 +47,7 @@ done
 
 REMOTE_SCRIPT=$(cat <<'EOSCRIPT'
 set -euo pipefail
+__ENV_EXPORT_BLOCK__
 cd /home/ploy/ploy
 
 ensure_commit() {
@@ -94,10 +95,13 @@ resolve_jetstream_addr() {
     if [[ -n "${payload}" ]]; then
       if command -v python3 >/dev/null 2>&1; then
         local parsed
-        parsed=$(printf '%s\n' "${payload}" | python3 - <<'PY'
-import json, sys
+        parsed=$(P="${payload}" python3 - <<'PY' 2>/dev/null
+import json, os, sys
+value = os.environ.get("P")
+if not value:
+    sys.exit(0)
 try:
-    data = json.load(sys.stdin)
+    data = json.loads(value)
 except json.JSONDecodeError:
     sys.exit(0)
 if not data:
@@ -177,11 +181,12 @@ else
   export NATS_ADDR="nats://127.0.0.1:${NATS_PORT}"
 fi
 
-${ENV_EXPORT_BLOCK}go test -tags=integration -run Integration -v ./internal/mods
+go test -tags=integration -run Integration -v ./internal/mods
 EOSCRIPT
 )
 
 REMOTE_SCRIPT=${REMOTE_SCRIPT//__COMMIT_SHA__/$COMMIT_SHA}
+REMOTE_SCRIPT=${REMOTE_SCRIPT//__ENV_EXPORT_BLOCK__/$ENV_EXPORT_BLOCK}
 REMOTE_SCRIPT=${REMOTE_SCRIPT//__BRANCH_NAME__/$BRANCH_NAME}
 REMOTE_SCRIPT=${REMOTE_SCRIPT//__REMOTE_NAME__/$REMOTE_NAME}
 
@@ -191,4 +196,3 @@ EOS"
 
 ssh -o ConnectTimeout=10 "root@${TARGET_HOST}" "chmod +x /tmp/mods-integration-run.sh && su - ploy -c '/tmp/mods-integration-run.sh'"
 ssh -o ConnectTimeout=10 "root@${TARGET_HOST}" 'rm -f /tmp/mods-integration-run.sh'
-
