@@ -21,8 +21,8 @@ Fixtures (SeaweedFS artifacts, Git repos) and CI pipelines must align with the n
 - Wired GitHub Actions job `mods-integration-harness` to seed fixtures and invoke `make mods-integration-vps` gated on VPS secrets.
 
 ## Tests
-- `./scripts/mods-seed-fixtures.sh` (locally or via CI) populates SeaweedFS and exits successfully.
-- `make mods-integration-vps` (workstation or CI with secrets) completes using the seeded fixtures.
+- `./scripts/mods-seed-fixtures.sh` populates SeaweedFS and exits successfully.
+- `make mods-integration-vps` (with `TARGET_HOST` set) runs the integration suite on the VPS using the SSH helper.
 
 ## References
 - [Design doc](../../../docs/design/mods-integration-tests/README.md)

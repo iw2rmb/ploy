@@ -242,13 +242,12 @@ The Mods harness helpers automatically apply these defaults for local testing. S
 
 ### Mods Integration on VPS
 
-Use the Nomad-backed harness to exercise Mods integration tests against real services:
+Run Mods integration tests directly on the provisioned VPS so they can talk to SeaweedFS, Nomad, Consul, and GitLab inside the cluster boundary:
 
-- Ensure `TARGET_HOST`, `PLOY_CONTROLLER`, `PLOY_SEAWEEDFS_URL`, `GITHUB_PLOY_DEV_USERNAME`, and `GITHUB_PLOY_DEV_PAT` are exported.
-- Seed SeaweedFS and remote Git fixtures with `./scripts/mods-seed-fixtures.sh` (requires curl, git, `PLOY_GITLAB_PAT`, and GitHub credentials).
-- Optional overrides: `MODS_INTEGRATION_IMAGE`, `MODS_INTEGRATION_REF`, `MODS_INTEGRATION_SHA`, `NOMAD_ADDR`, `CONSUL_HTTP_ADDR`.
-- Run `make mods-integration-vps` to render `tests/nomad-jobs/mods-integration.nomad.hcl`, submit it via `/opt/hashicorp/bin/nomad-job-manager.sh`, and stream batch job logs.
-- Logs/exit code propagate back to the workstation; inspect `${MODS_INTEGRATION_JOB_NAME:-mods-integration-tests}` allocations if post-mortem analysis is needed.
+- Ensure `TARGET_HOST` (root SSH access) and any service env vars (`PLOY_CONTROLLER`, `PLOY_SEAWEEDFS_URL`, `PLOY_GITLAB_PAT`, etc.) are exported in your workstation shell.
+- Seed SeaweedFS fixtures with `./scripts/mods-seed-fixtures.sh` (requires curl, git, and the scoped tokens mentioned above).
+- Run `make mods-integration-vps`; the helper script SSHes to the VPS, fetches the commit referenced by your local worktree, and executes `go test ./internal/mods -tags=integration` as the `ploy` user.
+- When tests fail due to code changes, push the branch and redeploy the API before retrying so the VPS checkout tracks your latest sources.
 
 
 ## Writing Tests
