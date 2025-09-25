@@ -4,16 +4,17 @@
 
 ## Usage
 ```
-ploy workflow run --ticket <ticket-id>
+ploy workflow run --tenant <tenant> --ticket <ticket-id>
 ```
-At this stage the command validates the ticket flag and returns `ErrNotImplemented`. Subsequent roadmap items will connect the CLI to JetStream, resolve workflow DAGs, and publish job specs back to Grid.
+The command boots an in-memory JetStream stub, claims the requested ticket, and publishes an initial `claimed` checkpoint. Upcoming roadmap slices will wire the CLI to real JetStream, resolve DAGs, and publish job specs back to Grid.
 
 ## Flags
-- `--ticket` — JetStream/Queue identifier to resolve. Required until automatic ticket discovery lands in `02-workflow-runner-cli`.
+- `--tenant` — Tenant slug used to resolve subject namespaces. Required until automatic ticket discovery lands in `02-workflow-runner-cli`.
+- `--ticket` — JetStream ticket identifier to claim. Required until ticket auto-discovery lands in a later slice.
 
 ## Exit Codes
-- `0` — success (future slices will signify completed workflows).
-- `1` — error (missing ticket, unsupported subcommand, or stubbed implementation).
+- `0` — success (ticket claimed and checkpoint published locally).
+- `1` — error (missing flags, unsupported subcommand, or downstream failure).
 
 ## Development
 - Build via `make build` (outputs to `dist/ploy`).

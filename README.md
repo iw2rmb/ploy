@@ -5,8 +5,8 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 ## Current Status
 - ✅ Repository reduced to CLI-only entrypoint (`ploy workflow run`).
 - ✅ Legacy binaries, Nomad orchestration code, and SeaweedFS adapters removed.
-- ✅ Documentation rewritten to describe the Grid-first model.
-- 🚧 Workflow runner currently returns `ErrNotImplemented` after validating tickets. Subsequent roadmap items layer in JetStream contracts, lane engine, snapshot tooling, and integration manifests.
+- ✅ Event contract scaffolding in place: the CLI claims a ticket and publishes an initial checkpoint via the JetStream stub.
+- 🚧 Next roadmap slices will connect to real JetStream, layer in the lane engine, snapshot tooling, and integration manifests.
 
 ## Getting Started
 1. **Clone & build**
@@ -18,22 +18,22 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 
 2. **Run the CLI stub**
    ```bash
-   ./dist/ploy workflow run --ticket TICKET-123
+   ./dist/ploy workflow run --tenant acme --ticket TICKET-123
    ```
-   The command validates the ticket flag and exits with `ErrNotImplemented` while downstream integrations are implemented.
+   The command hydrates the event contract stub, claims the ticket, and publishes a `claimed` checkpoint locally.
 
 3. **Tests**
    ```bash
    make test
    ```
-   Unit tests assert that only the workflow CLI remains and that the legacy dependency surface is gone.
+   Unit tests assert that only the workflow CLI remains and that the event contract schema stays consistent.
 
 ## Roadmap Alignment
-The active roadmap lives under `roadmap/shift/`. Completed item:
+The active roadmap lives under `roadmap/shift/`. Completed items:
 - [x] `00-legacy-teardown` — repository scoped to CLI-only workflow runner stub.
+- [x] `01-event-contracts` — subject map + schema definitions with a stubbed JetStream client.
 
 Upcoming items:
-- `01-event-contracts` — define JetStream subjects and schemas shared with Grid.
 - `02-workflow-runner-cli` — connect the CLI to JetStream, reconstruct DAGs, and submit Grid jobs.
 - `03-lane-engine` onward — lanes, snapshot tooling, integration manifests, commit-scoped environments, and Aster hook integration.
 
