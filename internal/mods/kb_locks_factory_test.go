@@ -13,35 +13,29 @@ func (m *MockKV) Get(key string) ([]byte, error)                  { return nil, 
 func (m *MockKV) Keys(prefix, separator string) ([]string, error) { return nil, nil }
 func (m *MockKV) Delete(key string) error                         { return nil }
 
-func TestNewKBLockManager_DefaultsToConsul(t *testing.T) {
-	// Ensure env var is not set
+func TestNewKBLockManager_DefaultsToJetStream(t *testing.T) {
 	_ = os.Unsetenv("PLOY_USE_JETSTREAM_KV")
+
+	_, url := runTestJetStream(t)
+	setJetStreamEnv(t, url)
 
 	kv := &MockKV{}
 	mgr := NewKBLockManager(kv)
 
-	// Should return Consul lock manager
-	if _, ok := mgr.(*ConsulKBLockManager); !ok {
-		t.Errorf("Expected ConsulKBLockManager, got %T", mgr)
+	if _, ok := mgr.(*JetstreamKBLockManager); !ok {
+		t.Fatalf("expected JetstreamKBLockManager by default, got %T", mgr)
 	}
 }
 
-func TestNewKBLockManager_JetStreamWithEnvVar(t *testing.T) {
-	// Set env var to enable JetStream
-	_ = os.Setenv("PLOY_USE_JETSTREAM_KV", "true")
+func TestNewKBLockManager_ConsulFallbackWhenDisabled(t *testing.T) {
+	_ = os.Setenv("PLOY_USE_JETSTREAM_KV", "false")
 	defer func() { _ = os.Unsetenv("PLOY_USE_JETSTREAM_KV") }()
 
-	// Force connection failure by setting invalid NATS address
-	_ = os.Setenv("NATS_ADDR", "nats://invalid:4222")
-	defer func() { _ = os.Unsetenv("NATS_ADDR") }()
-
-	// JetStream will fail to connect, so should fall back to Consul
 	kv := &MockKV{}
 	mgr := NewKBLockManager(kv)
 
-	// Should fall back to Consul due to connection failure
 	if _, ok := mgr.(*ConsulKBLockManager); !ok {
-		t.Errorf("Expected fallback to ConsulKBLockManager, got %T", mgr)
+		t.Fatalf("expected ConsulKBLockManager when override disables JetStream, got %T", mgr)
 	}
 }
 
@@ -50,7 +44,7 @@ func TestUseJetstreamKV(t *testing.T) {
 		envValue string
 		expected bool
 	}{
-		{"", false},
+		{"", true},
 		{"false", false},
 		{"0", false},
 		{"no", false},
