@@ -80,7 +80,7 @@ func ResolveDefaults(get func(string) string) Defaults {
 	}
 	jetstream := get("PLOY_JETSTREAM_URL")
 	if jetstream == "" {
-		jetstream = "nats://nats.ploy.local:4222"
+		jetstream = "nats://nats.ploy.local:4223"
 	}
 	allowPartial := func() bool {
 		v := strings.ToLower(strings.TrimSpace(get("MODS_ALLOW_PARTIAL_ORW")))
