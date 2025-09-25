@@ -4,7 +4,7 @@ Operational checklist for deploying and maintaining the NATS JetStream control p
 
 ## Overview
 - **Job Spec**: `platform/nomad/jetstream.nomad.hcl`
-- **Service Address**: `nats.ploy.local:4222` (TLS-terminated by Traefik TCP entrypoint)
+- **Service Address**: `nats.ploy.local:4223` (direct JetStream listener; Traefik TCP entrypoint on `:4222` is now optional)
 - **Cluster Size**: 3 allocations scheduled on distinct Nomad clients
 - **Auth Model**: Operator + system account JWTs stored in Nomad's variable store and rendered into the allocation at runtime
 
@@ -25,7 +25,7 @@ Operational checklist for deploying and maintaining the NATS JetStream control p
    - Generate the artifacts with `nsc` (operator, system account, and creds bundle).
    - The values are single-line JWTs (`jwt`) and the multi-line creds file (`creds`).
    - Confirm with `nomad var get nats/operator` (output masked) before deployment.
-3. **Traefik Dynamic Config**: Ensure the Traefik job from this repo is deployed so the `nats` TCP entrypoint (`:4222`) terminates TLS and forwards traffic to the JetStream allocation.
+3. **Gateway (Optional)**: Deploy the Traefik job if TLS termination on `:4222` is required for external clients; internal services now connect directly to `nats://nats.ploy.local:4223`.
 4. **CoreDNS Zone**: Apply the `iac/common/templates/coredns/zone.db.j2` rendered zone so `nats.ploy.local` resolves to the gateway IP.
 
 ## Deployment
@@ -60,8 +60,8 @@ Run all commands from the controller workstation; never apply changes directly o
    ```
 2. **CLI Smoke Tests** (from controller shell with creds)
    ```bash
-   nats account info --creds system.creds --server nats://nats.ploy.local:4222
-   nats kv ls --creds system.creds --server nats://nats.ploy.local:4222
+   nats account info --creds system.creds --server nats://nats.ploy.local:4223
+   nats kv ls --creds system.creds --server nats://nats.ploy.local:4223
    ```
 3. **Cluster Topology**
    ```bash
@@ -83,7 +83,7 @@ Run all commands from the controller workstation; never apply changes directly o
 ## Troubleshooting
 - **Allocation fails to start**: Inspect `/opt/hashicorp/bin/nomad-job-manager.sh logs --job jetstream-cluster --alloc <id> --both --lines 200`. Missing Nomad variables or host volume permissions are the usual root causes.
 - **Cluster does not form quorum**: Confirm `nats.ploy.local` resolves to the active JetStream node and that port `6222` is reachable. The job manager logs include the advertised address per allocation.
-- **Client connection refused**: Verify Traefik is running with the `nats` entrypoint and that `nats.ploy.local` resolves to the gateway. Falls back to `nomad alloc exec` with `nats bench` for internal connectivity tests.
+- **Client connection refused**: Verify `nats.ploy.local:4223` is reachable from the caller (use `nc -vz nats.ploy.local 4223`). If TLS termination via Traefik is required, confirm the optional `nats` entrypoint on `:4222` is healthy.
 
 ## KB Locking Integration
 
@@ -99,17 +99,17 @@ The Mods Knowledge Base now uses JetStream KV for distributed locking across all
 When enabled, maintenance jobs subscribe to `kb.lock.released.*` events for immediate triggering:
 ```bash
 # Example: Subscribe to lock events
-nats sub "kb.lock.released.*" --creds system.creds --server nats://nats.ploy.local:4222
+nats sub "kb.lock.released.*" --creds system.creds --server nats://nats.ploy.local:4223
 ```
 
 ### Monitoring
 KB lock operations appear in JetStream KV bucket metrics:
 ```bash
 # View KB lock keys
-nats kv ls ploy_kv --creds system.creds --server nats://nats.ploy.local:4222 | grep "kb/locks"
+nats kv ls ploy_kv --creds system.creds --server nats://nats.ploy.local:4223 | grep "kb/locks"
 
 # Monitor lock events
-nats sub "kb.lock.*" --creds system.creds --server nats://nats.ploy.local:4222
+nats sub "kb.lock.*" --creds system.creds --server nats://nats.ploy.local:4223
 ```
 
 ### Troubleshooting
