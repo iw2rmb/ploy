@@ -50,5 +50,6 @@ func TestModsFixtureScriptsAndHarness(t *testing.T) {
 	runner := string(runnerBody)
 	assert.Contains(t, runner, "ssh -o ConnectTimeout=10 \"root@${TARGET_HOST}\"", "runner should execute on the VPS via SSH")
 	assert.Contains(t, runner, "git fetch", "runner should fetch the target commit")
-	assert.Contains(t, runner, "go test -tags=integration", "runner should invoke the mods integration suite")
+	assert.Contains(t, runner, "NATS_ADDR=", "runner should propagate NATS connectivity")
+	assert.Contains(t, runner, "go test -tags=integration -run Integration", "runner should invoke the mods integration suite")
 }

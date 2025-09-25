@@ -27,7 +27,8 @@ Establish a repeatable way to execute Mods integration tests that currently depe
 
 ## Updates
 - Added fixture seeding helper (`scripts/mods-seed-fixtures.sh`) to preload SeaweedFS artifacts (via `PLOY_GITLAB_PAT`) before running the suite.
-- Replaced the Nomad batch harness with an SSH-driven runner (`scripts/run-mods-integration-vps.sh`) so the worktree’s commit is fetched on the VPS and tested in-place under `/home/ploy/ploy`.
+- Replaced the Nomad batch harness with an SSH-driven runner (`scripts/run-mods-integration-vps.sh`) so the worktree’s commit is fetched on the VPS and tested in-place under `/home/ploy/ploy`, while resolving controller/Seaweed/JetStream endpoints from the environment.
+- Harness auto-discovers the live JetStream service via Consul (falling back to a local ephemeral `nats-server` only when discovery fails) so integration tests exercise the deployed cluster by default.
 - Added harness configuration loader (`HarnessConfig`) to centralize controller and SeaweedFS endpoints with env overrides.
 - Introduced artifact/builder/git dependency seams in `ModRunner`, plus memory-based storage and noop uploaders so workstation tests avoid SeaweedFS/NATS.
 
