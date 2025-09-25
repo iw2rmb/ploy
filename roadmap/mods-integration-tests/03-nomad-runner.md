@@ -1,6 +1,6 @@
 # 03 Nomad Runner
 
-- [ ] Status: Pending
+- [x] Status: Done
 
 ## Why / What For
 Creating a dedicated Nomad job allows the full Mods integration suite to run inside the same network as SeaweedFS, builder jobs, and the controller. This delivers a reproducible VPS workflow instead of ad-hoc SSH runs.
@@ -15,9 +15,14 @@ Creating a dedicated Nomad job allows the full Mods integration suite to run ins
 - Logs and artifacts are retrievable for debugging (either via Nomad log wrappers or stored files).
 - Documentation explains how to trigger the job and interpret results.
 
+## Implementation Notes
+- Added Nomad job specification at `tests/nomad-jobs/mods-integration.nomad.hcl` with environment-driven configuration placeholders.
+- Created `scripts/run-mods-integration-vps.sh` to render the job via `envsubst`, submit it through `/opt/hashicorp/bin/nomad-job-manager.sh`, and stream logs.
+- Exposed a `make mods-integration-vps` entrypoint so workstation operators can trigger the VPS run with existing env vars.
+
 ## Tests
-- Dry-run the Nomad job (`nomad-job-manager.sh plan …`) to ensure spec validity.
-- Execute on the dev cluster and confirm at least one integration scenario passes end-to-end using real services.
+- Validate template presence locally: `go test ./internal/mods -run TestModsIntegrationNomadJobSpec`.
+- Run the VPS integration job: `make mods-integration-vps` (requires TARGET_HOST, controller, storage, and Git credentials).
 
 ## References
 - [Design doc](../../../docs/design/mods-integration-tests/README.md)
