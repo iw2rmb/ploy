@@ -28,13 +28,19 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 		status.Dependencies["jetstream"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["nomad"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["seaweedfs"] = DependencyHealth{Status: "healthy"}
+		status.Dependencies["env_store"] = DependencyHealth{Status: "healthy"}
 		h.metricsCollector.HealthyResponses++
 		return status
 	}
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
-	status.Dependencies["jetstream"] = h.checkJetStream()
+	jetstreamDep, jsConn, jsCtx, _ := h.jetStreamHealth("ploy-health-jetstream")
+	status.Dependencies["jetstream"] = jetstreamDep
+	if jsConn != nil {
+		defer jsConn.Close()
+	}
 	status.Dependencies["nomad"] = h.checkNomad()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
+	status.Dependencies["env_store"] = h.checkEnvStore(jsConn, jsCtx)
 	for depName, dep := range status.Dependencies {
 		if dep.Status == "unhealthy" {
 			h.metricsCollector.DependencyFailures[depName]++
@@ -66,10 +72,14 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 		return status
 	}
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
-	status.Dependencies["jetstream"] = h.checkJetStream()
+	jetstreamDep, jsConn, jsCtx, _ := h.jetStreamHealth("ploy-readiness-jetstream")
+	status.Dependencies["jetstream"] = jetstreamDep
+	if jsConn != nil {
+		defer jsConn.Close()
+	}
 	status.Dependencies["nomad"] = h.checkNomad()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
-	status.Dependencies["env_store"] = h.checkEnvStore()
+	status.Dependencies["env_store"] = h.checkEnvStore(jsConn, jsCtx)
 	for depName, dep := range status.Dependencies {
 		if dep.Status == "unhealthy" {
 			h.metricsCollector.DependencyFailures[depName]++
@@ -118,102 +128,11 @@ func (h *HealthChecker) checkStorageConfig() DependencyHealth {
 	return dep
 }
 
-func (h *HealthChecker) connectJetStream(clientName string) (*nats.Conn, nats.JetStreamContext, error) {
-	cfg := h.jetstreamCfg
-	if strings.TrimSpace(cfg.URL) == "" {
-		return nil, nil, fmt.Errorf("jetstream url not configured")
-	}
-	timeout := cfg.Timeout
-	if timeout <= 0 {
-		timeout = 5 * time.Second
-	}
-	opts := []nats.Option{
-		nats.Timeout(timeout),
-		nats.Name(clientName),
-	}
-	if strings.TrimSpace(cfg.CredentialsPath) != "" {
-		opts = append(opts, nats.UserCredentials(cfg.CredentialsPath))
-	}
-	if strings.TrimSpace(cfg.User) != "" {
-		opts = append(opts, nats.UserInfo(cfg.User, cfg.Password))
-	}
-	conn, err := h.jetstreamDialer.Connect(cfg.URL, opts...)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := conn.FlushTimeout(timeout); err != nil {
-		conn.Close()
-		return nil, nil, err
-	}
-	js, err := conn.JetStream()
-	if err != nil {
-		conn.Close()
-		return nil, nil, err
-	}
-	return conn, js, nil
-}
-
 func (h *HealthChecker) checkJetStream() DependencyHealth {
-	start := time.Now()
-	dep := DependencyHealth{Status: "healthy", Latency: time.Since(start)}
-	conn, js, err := h.connectJetStream("ploy-health-jetstream")
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("jetstream connection failed: %v", err)
-		dep.Latency = time.Since(start)
-		return dep
+	dep, conn, _, _ := h.jetStreamHealth("ploy-health-jetstream")
+	if conn != nil {
+		conn.Close()
 	}
-	defer conn.Close()
-	details := map[string]interface{}{"url": h.jetstreamCfg.URL}
-	var errs []string
-	if info, err := js.AccountInfo(); err == nil {
-		details["account"] = map[string]interface{}{
-			"domain":        info.Domain,
-			"streams":       info.Streams,
-			"consumers":     info.Consumers,
-			"store_bytes":   info.Store,
-			"memory_bytes":  info.Memory,
-			"max_streams":   info.Limits.MaxStreams,
-			"max_consumers": info.Limits.MaxConsumers,
-		}
-	} else {
-		errs = append(errs, fmt.Sprintf("account info: %v", err))
-	}
-	if bucket := strings.TrimSpace(h.jetstreamCfg.EnvBucket); bucket != "" {
-		if kv, err := js.KeyValue(bucket); err != nil {
-			errs = append(errs, fmt.Sprintf("env bucket %s: %v", bucket, err))
-		} else if status, err := kv.Status(); err == nil {
-			details["env_bucket"] = map[string]interface{}{
-				"name":        status.Bucket(),
-				"values":      status.Values(),
-				"history":     status.History(),
-				"ttl_seconds": int(status.TTL().Seconds()),
-				"bytes":       status.Bytes(),
-				"compressed":  status.IsCompressed(),
-				"store":       status.BackingStore(),
-			}
-		} else {
-			errs = append(errs, fmt.Sprintf("env bucket status %s: %v", bucket, err))
-		}
-	}
-	if stream := strings.TrimSpace(h.jetstreamCfg.UpdatesStream); stream != "" {
-		if info, err := js.StreamInfo(stream); err == nil {
-			details["updates_stream"] = map[string]interface{}{
-				"name":      info.Config.Name,
-				"messages":  info.State.Msgs,
-				"consumers": info.State.Consumers,
-				"replicas":  info.Config.Replicas,
-			}
-		} else {
-			errs = append(errs, fmt.Sprintf("updates stream %s: %v", stream, err))
-		}
-	}
-	if len(errs) > 0 {
-		dep.Status = "unhealthy"
-		dep.Error = strings.Join(errs, "; ")
-	}
-	dep.Details = details
-	dep.Latency = time.Since(start)
 	return dep
 }
 
@@ -289,7 +208,7 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 	return dep
 }
 
-func (h *HealthChecker) checkEnvStore() DependencyHealth {
+func (h *HealthChecker) checkEnvStore(jsConn *nats.Conn, jsCtx nats.JetStreamContext) DependencyHealth {
 	start := time.Now()
 	dep := DependencyHealth{Status: "healthy", Latency: time.Since(start)}
 	if strings.TrimSpace(h.jetstreamCfg.URL) == "" {
@@ -297,19 +216,27 @@ func (h *HealthChecker) checkEnvStore() DependencyHealth {
 		dep.Latency = time.Since(start)
 		return dep
 	}
-	conn, js, err := h.connectJetStream("ploy-health-envstore")
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("jetstream env store connection failed: %v", err)
-		dep.Latency = time.Since(start)
-		return dep
+	createdConn := false
+	if jsCtx == nil {
+		conn, js, _, err := h.connectJetStream("ploy-health-envstore")
+		if err != nil {
+			dep.Status = "unhealthy"
+			dep.Error = fmt.Sprintf("jetstream env store connection failed: %v", err)
+			dep.Latency = time.Since(start)
+			return dep
+		}
+		jsConn = conn
+		jsCtx = js
+		createdConn = true
 	}
-	defer conn.Close()
+	if createdConn {
+		defer jsConn.Close()
+	}
 	bucket := strings.TrimSpace(h.jetstreamCfg.EnvBucket)
 	if bucket == "" {
 		bucket = "ploy_env"
 	}
-	kv, err := js.KeyValue(bucket)
+	kv, err := jsCtx.KeyValue(bucket)
 	if err != nil {
 		if errors.Is(err, nats.ErrBucketNotFound) {
 			dep.Error = fmt.Sprintf("env bucket %s not found", bucket)
