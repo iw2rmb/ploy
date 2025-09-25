@@ -107,7 +107,7 @@ func initializeNamecheapProvider() (dns.Provider, error) {
 	return provider, nil
 }
 
-func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service) (*selfupdate.Handler, error) {
+func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Service, metricsRecorder selfupdate.MetricsRecorder) (*selfupdate.Handler, error) {
 	if cfgService == nil {
 		return nil, fmt.Errorf("config service required for self-update handler")
 	}
@@ -159,8 +159,14 @@ func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servi
 	}
 	queue, err := selfupdate.NewJetStreamWorkQueue(ctx, js, queueCfg)
 	if err != nil {
+		if metricsRecorder != nil {
+			metricsRecorder.RecordSelfUpdateBootstrap(queueCfg.Stream, "error")
+		}
 		conn.Close()
 		return nil, fmt.Errorf("bootstrap self-update work queue: %w", err)
+	}
+	if metricsRecorder != nil {
+		metricsRecorder.RecordSelfUpdateBootstrap(queueCfg.Stream, "success")
 	}
 
 	statusCfg := selfupdate.StatusStreamConfig{
@@ -172,12 +178,18 @@ func initializeSelfUpdateHandler(cfg *ControllerConfig, cfgService *cfgsvc.Servi
 	}
 	statusPublisher, err := selfupdate.NewStatusPublisher(ctx, js, statusCfg)
 	if err != nil {
+		if metricsRecorder != nil {
+			metricsRecorder.RecordSelfUpdateBootstrap(statusCfg.Stream, "error")
+		}
 		conn.Close()
 		return nil, fmt.Errorf("bootstrap self-update status stream: %w", err)
 	}
+	if metricsRecorder != nil {
+		metricsRecorder.RecordSelfUpdateBootstrap(statusCfg.Stream, "success")
+	}
 
 	currentVersion := selfupdate.GetCurrentVersion()
-	handler, err := selfupdate.NewHandler(provider, queue, statusPublisher, currentVersion)
+	handler, err := selfupdate.NewHandler(provider, queue, statusPublisher, currentVersion, metricsRecorder)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to create self-update handler: %w", err)

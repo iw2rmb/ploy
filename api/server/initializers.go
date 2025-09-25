@@ -75,7 +75,7 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 	}
 
 	// Initialize self-update handler
-	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg, cfgService)
+	selfUpdateHandler, err := initializeSelfUpdateHandler(cfg, cfgService, metricsInstance)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize self-update handler: %v", err)
 	}

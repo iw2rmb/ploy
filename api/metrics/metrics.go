@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -45,6 +46,14 @@ type Metrics struct {
 	// Routing metrics
 	RoutingOperations             *prometheus.CounterVec
 	RoutingObjectStoreCreateTotal *prometheus.CounterVec
+
+	// Self-update metrics
+	SelfUpdateJSBootstrapTotal     *prometheus.CounterVec
+	SelfUpdateTasksSubmittedTotal  *prometheus.CounterVec
+	SelfUpdateExecutorDuration     *prometheus.HistogramVec
+	SelfUpdateStatusPublishedTotal *prometheus.CounterVec
+	SelfUpdateRedeliveriesTotal    *prometheus.CounterVec
+	SelfUpdateStatusConsumerLag    *prometheus.GaugeVec
 
 	// Certificate metrics
 	CertificatesTotal     prometheus.Gauge
@@ -222,6 +231,56 @@ func (m *Metrics) initializeMetrics() {
 		[]string{"status"}, // success, error
 	)
 
+	// Self-update metrics
+	m.SelfUpdateJSBootstrapTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_updates_js_bootstrap_total",
+			Help: "Self-update JetStream bootstrap attempts grouped by stream and status",
+		},
+		[]string{"stream", "status"},
+	)
+
+	m.SelfUpdateTasksSubmittedTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_updates_tasks_submitted_total",
+			Help: "Self-update tasks submitted via HTTP handler grouped by lane, strategy, and result",
+		},
+		[]string{"lane", "strategy", "result"},
+	)
+
+	m.SelfUpdateExecutorDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ploy_updates_executor_duration_seconds",
+			Help:    "Duration of self-update executor runs grouped by lane, strategy, and result",
+			Buckets: []float64{1, 5, 15, 30, 60, 120, 300, 600, 900},
+		},
+		[]string{"lane", "strategy", "result"},
+	)
+
+	m.SelfUpdateStatusPublishedTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_updates_status_published_total",
+			Help: "Self-update status events published grouped by lane and phase",
+		},
+		[]string{"lane", "phase"},
+	)
+
+	m.SelfUpdateRedeliveriesTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ploy_updates_redeliveries_total",
+			Help: "Self-update work-queue redeliveries grouped by lane and reason",
+		},
+		[]string{"lane", "reason"},
+	)
+
+	m.SelfUpdateStatusConsumerLag = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ploy_updates_status_consumer_lag_seconds",
+			Help: "Lag between status event publication and consumer processing",
+		},
+		[]string{"consumer", "lane"},
+	)
+
 	// Certificate metrics
 	m.CertificatesTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -315,6 +374,12 @@ func (m *Metrics) registerMetrics() {
 		m.EnvStoreLatency,
 		m.RoutingOperations,
 		m.RoutingObjectStoreCreateTotal,
+		m.SelfUpdateJSBootstrapTotal,
+		m.SelfUpdateTasksSubmittedTotal,
+		m.SelfUpdateExecutorDuration,
+		m.SelfUpdateStatusPublishedTotal,
+		m.SelfUpdateRedeliveriesTotal,
+		m.SelfUpdateStatusConsumerLag,
 		m.CertificatesTotal,
 		m.CertificateOperations,
 		m.CertificateExpiry,
@@ -351,6 +416,103 @@ func (m *Metrics) SetLeaderStatus(isLeader bool) {
 // RecordLeadershipChange records a leadership change
 func (m *Metrics) RecordLeadershipChange(changeType string) {
 	m.LeadershipChanges.WithLabelValues(changeType).Inc()
+}
+
+// RecordSelfUpdateBootstrap records JetStream bootstrap attempts for self-update streams.
+func (m *Metrics) RecordSelfUpdateBootstrap(stream, status string) {
+	if m == nil || m.SelfUpdateJSBootstrapTotal == nil {
+		return
+	}
+	if stream == "" {
+		stream = "unknown"
+	}
+	if status == "" {
+		status = "unknown"
+	}
+	m.SelfUpdateJSBootstrapTotal.WithLabelValues(stream, status).Inc()
+}
+
+// RecordSelfUpdateTaskSubmission records HTTP submissions into the self-update work queue.
+func (m *Metrics) RecordSelfUpdateTaskSubmission(lane, strategy, result string) {
+	if m == nil || m.SelfUpdateTasksSubmittedTotal == nil {
+		return
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	if strategy == "" {
+		strategy = "unknown"
+	}
+	if result == "" {
+		result = "unknown"
+	}
+	m.SelfUpdateTasksSubmittedTotal.WithLabelValues(lane, strategy, result).Inc()
+}
+
+// ObserveSelfUpdateExecutorDuration observes executor runtimes per strategy/result.
+func (m *Metrics) ObserveSelfUpdateExecutorDuration(lane, strategy, result string, duration time.Duration) {
+	if m == nil || m.SelfUpdateExecutorDuration == nil {
+		return
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	if strategy == "" {
+		strategy = "unknown"
+	}
+	if result == "" {
+		result = "unknown"
+	}
+	if duration < 0 {
+		duration = 0
+	}
+	m.SelfUpdateExecutorDuration.WithLabelValues(lane, strategy, result).Observe(duration.Seconds())
+}
+
+// RecordSelfUpdateStatusPublished records status events emitted for updates.
+func (m *Metrics) RecordSelfUpdateStatusPublished(lane, phase string) {
+	if m == nil || m.SelfUpdateStatusPublishedTotal == nil {
+		return
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	if phase == "" {
+		phase = "unknown"
+	}
+	m.SelfUpdateStatusPublishedTotal.WithLabelValues(lane, phase).Inc()
+}
+
+// RecordSelfUpdateRedelivery tracks work-queue redeliveries triggered by the executor.
+func (m *Metrics) RecordSelfUpdateRedelivery(lane, reason string) {
+	if m == nil || m.SelfUpdateRedeliveriesTotal == nil {
+		return
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	if reason == "" {
+		reason = "unknown"
+	}
+	m.SelfUpdateRedeliveriesTotal.WithLabelValues(lane, reason).Inc()
+}
+
+// RecordSelfUpdateStatusConsumerLag updates the lag gauge for a status consumer.
+func (m *Metrics) RecordSelfUpdateStatusConsumerLag(consumer, lane string, lag time.Duration) {
+	if m == nil || m.SelfUpdateStatusConsumerLag == nil {
+		return
+	}
+	if consumer == "" {
+		consumer = "unknown"
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	seconds := lag.Seconds()
+	if seconds < 0 || math.IsNaN(seconds) {
+		seconds = 0
+	}
+	m.SelfUpdateStatusConsumerLag.WithLabelValues(consumer, lane).Set(seconds)
 }
 
 // RecordRequest records an HTTP request

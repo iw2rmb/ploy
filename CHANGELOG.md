@@ -9,7 +9,7 @@
 - Infrastructure: JetStream Key-Value adapter optional behind `PLOY_USE_JETSTREAM_KV`, enabling `internal/orchestration.NewKV` callers to swap backends without code changes.
 - Networking: Added the JetStream-driven Traefik routing sync sidecar (`cmd/traefik-sync`) and Nomad wiring so `routing.app.*` events rewrite `/data/dynamic-config.yml` without Consul polling.
 - Domains: Domain configuration helpers now persist via the routing object store instead of Consul KV, keeping custom domain state in JetStream.
-- Self-Update: Migrated controller updates to the JetStream work queue (`updates.control-plane`) with duplicate submission detection (`ErrDuplicateTask`), delayed redelivery, status streaming, the `ploy updates tail` CLI command, and a dedicated runbook (`docs/runbooks/selfupdate-jetstream.md`).
+- Self-Update: Migrated controller updates to the JetStream work queue (`updates.control-plane`) with duplicate submission detection (`ErrDuplicateTask`), delayed redelivery, status streaming, full `ploy_updates_*` Prometheus instrumentation, the `ploy updates tail` CLI command, and a dedicated runbook (`docs/runbooks/selfupdate-jetstream.md`).
 - Tooling: Introduced `cmd/ploy-migrate-routing` for Consul→JetStream backfills with manifest output and `ploy routing resync` to rebroadcast live events on demand.
 - Routing: Domain route metadata now persists to the JetStream object store (`routing_maps`) and publishes `routing.app.*` events for Traefik sidecars, replacing the Consul KV polling path.
 - Analysis: Added engine and HTTP handler unit tests covering analyzer registration, cache reuse, fallback execution, configuration validation, and API failure modes to increase confidence in the static-analysis pipeline.
