@@ -8,7 +8,7 @@ import (
 
 func main() {
 	// Test basic NATS connectivity
-	conn, err := nats.Connect("nats://nats.ploy.local:4222", nats.Name("connectivity-test"))
+	conn, err := nats.Connect("nats://nats.ploy.local:4223", nats.Name("connectivity-test"))
 	if err != nil {
 		log.Fatalf("failed to connect to NATS: %v", err)
 	}
