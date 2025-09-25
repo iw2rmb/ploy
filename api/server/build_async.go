@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,6 +45,7 @@ func metaPath(id string) string {
 func writeStatus(id string, st buildStatus) {
 	b, _ := json.Marshal(st)
 	_ = os.WriteFile(statusPath(id), b, 0644)
+	buildStatusPublisherFn(context.Background(), st)
 }
 
 // handleBuildStatus returns status JSON for async builds

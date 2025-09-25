@@ -1,7 +1,9 @@
 package orchestration
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 )
@@ -51,4 +53,50 @@ func (e *errorOnlyAdapter) ListAllocations(jobID string) ([]*AllocationStatus, e
 
 func (e *errorOnlyAdapter) AllocationEndpoint(string) (string, error) {
 	return "", fmt.Errorf("not implemented")
+}
+
+func TestWaitForHealthyAllocationsPublishesReadyEvent(t *testing.T) {
+	adapter := &fakeNomadAdapter{allocs: []AllocationStatus{{ID: "alloc-1", ClientStatus: "running"}}}
+	var (
+		mu       sync.Mutex
+		recorded []struct {
+			jobID   string
+			alloc   *AllocationStatus
+			healthy int
+		}
+	)
+	SetReadyNotifier(func(ctx context.Context, jobID string, alloc *AllocationStatus, healthy int) {
+		if ctx == nil {
+			t.Fatalf("expected context, got nil")
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		recorded = append(recorded, struct {
+			jobID   string
+			alloc   *AllocationStatus
+			healthy int
+		}{jobID: jobID, alloc: alloc, healthy: healthy})
+	})
+	t.Cleanup(func() { SetReadyNotifier(nil) })
+
+	hm := NewHealthMonitorWithClient(adapter)
+
+	if err := hm.WaitForHealthyAllocations("job-ready", 1, 50*time.Millisecond); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(recorded) == 0 {
+		t.Fatalf("expected readiness event to be published")
+	}
+	if recorded[0].jobID != "job-ready" {
+		t.Fatalf("unexpected job id: %s", recorded[0].jobID)
+	}
+	if recorded[0].alloc == nil || recorded[0].alloc.ID != "alloc-1" {
+		t.Fatalf("unexpected alloc payload: %+v", recorded[0].alloc)
+	}
+	if recorded[0].healthy != 1 {
+		t.Fatalf("expected healthy count 1, got %d", recorded[0].healthy)
+	}
 }

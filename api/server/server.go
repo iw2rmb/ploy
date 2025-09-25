@@ -34,6 +34,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cleanup"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	apperr "github.com/iw2rmb/ploy/internal/errors"
+	eventsfabric "github.com/iw2rmb/ploy/internal/events/fabric"
 	policy "github.com/iw2rmb/ploy/internal/policy"
 	"github.com/iw2rmb/ploy/internal/preview"
 	recipecatalog "github.com/iw2rmb/ploy/internal/recipes/catalog"
@@ -64,6 +65,7 @@ type ServiceDependencies struct {
 	StorageConfigPath       string
 	// StorageFactory deprecated: use config service
 	RecipeCatalog recipecatalog.Registry
+	EventFabric   *eventsfabric.Fabric
 }
 
 // Server represents the stateless controller server
@@ -342,6 +344,10 @@ func (s *Server) Shutdown() error {
 
 	// Cancel coordination context to stop leader election
 	s.coordinationCancel()
+
+	if s.dependencies != nil && s.dependencies.EventFabric != nil {
+		s.dependencies.EventFabric.Close()
+	}
 
 	// Stop all TTL cleanup services if available
 	if s.dependencies.TTLCleanupService != nil {

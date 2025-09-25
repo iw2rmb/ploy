@@ -177,6 +177,13 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 		RecipeCatalog:           recipeCatalog,
 	}
 
+	eventsFabric, err := initializeEventFabric(cfg, deps)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize event fabric: %v", err)
+	} else {
+		deps.EventFabric = eventsFabric
+	}
+
 	// Record startup time
 	startupDuration := time.Since(startTime)
 	if metricsInstance != nil {
