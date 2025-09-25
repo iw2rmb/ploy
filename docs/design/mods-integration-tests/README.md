@@ -26,6 +26,7 @@ Establish a repeatable way to execute Mods integration tests that currently depe
 - [04-fixture-and-ci-alignment](../../../roadmap/mods-integration-tests/04-fixture-and-ci-alignment.md)
 
 ## Updates
+- Added fixture seeding helper (`scripts/mods-seed-fixtures.sh`) and CI job (`mods-integration-harness`) to preload SeaweedFS artifacts and gate merges via the Nomad harness.
 - Added VPS Nomad runner (`tests/nomad-jobs/mods-integration.nomad.hcl`) plus helper script (`scripts/run-mods-integration-vps.sh`) and Makefile entry (`mods-integration-vps`) to execute the integration suite via Nomad.
 - Added harness configuration loader (`HarnessConfig`) to centralize controller and SeaweedFS endpoints with env overrides.
 - Introduced artifact/builder/git dependency seams in `ModRunner`, plus memory-based storage and noop uploaders so workstation tests avoid SeaweedFS/NATS.
