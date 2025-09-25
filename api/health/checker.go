@@ -267,7 +267,11 @@ func (h *HealthChecker) connectJetStreamOnce(clientName string, useTLS bool, tls
 		}
 		opts = append(opts, nats.Secure(tlsCfg))
 	}
-	conn, err := h.jetstreamDialer.Connect(cfg.URL, opts...)
+	dialURL := cfg.URL
+	if useTLS {
+		dialURL = toTLSURL(cfg.URL)
+	}
+	conn, err := h.jetstreamDialer.Connect(dialURL, opts...)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -281,6 +285,16 @@ func (h *HealthChecker) connectJetStreamOnce(clientName string, useTLS bool, tls
 		return nil, nil, err
 	}
 	return conn, js, nil
+}
+
+func toTLSURL(raw string) string {
+	if strings.HasPrefix(raw, "tls://") || raw == "" {
+		return raw
+	}
+	if strings.HasPrefix(raw, "nats://") {
+		return "tls://" + strings.TrimPrefix(raw, "nats://")
+	}
+	return raw
 }
 
 func shouldRetryWithTLS(err error) bool {
