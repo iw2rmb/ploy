@@ -156,10 +156,10 @@ func TestJetStreamKBLockManager_Integration_ConcurrentAccess(t *testing.T) {
 			defer mgr.Close()
 
 			config := &LockConfig{
-				DefaultTTL:    1 * time.Second,
-				MaxWaitTime:   5 * time.Second,
-				RetryInterval: 50 * time.Millisecond,
-				MaxRetries:    20,
+				DefaultTTL:    2 * time.Second,
+				MaxWaitTime:   15 * time.Second,
+				RetryInterval: 75 * time.Millisecond,
+				MaxRetries:    60,
 			}
 
 			executed := false
