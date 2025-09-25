@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestModsFixtureScriptsAndCI ensures fixture seeding automation and CI wiring exist.
-func TestModsFixtureScriptsAndCI(t *testing.T) {
+// TestModsFixtureScriptsAndHarness verifies fixture seeding and VPS runner scripts.
+func TestModsFixtureScriptsAndHarness(t *testing.T) {
 	t.Parallel()
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -20,28 +20,35 @@ func TestModsFixtureScriptsAndCI(t *testing.T) {
 	}
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
 
-	scriptPath := filepath.Join(repoRoot, "scripts", "mods-seed-fixtures.sh")
-	info, err := os.Stat(scriptPath)
+	seedPath := filepath.Join(repoRoot, "scripts", "mods-seed-fixtures.sh")
+	seedInfo, err := os.Stat(seedPath)
 	if err != nil {
-		t.Fatalf("mods fixture seed script missing at %s: %v", scriptPath, err)
+		t.Fatalf("mods fixture seed script missing at %s: %v", seedPath, err)
 	}
-	if info.IsDir() {
-		t.Fatalf("expected script file at %s, found directory", scriptPath)
+	if seedInfo.IsDir() {
+		t.Fatalf("expected script file at %s, found directory", seedPath)
 	}
 
-	scriptBody, err := os.ReadFile(scriptPath)
+	seedBody, err := os.ReadFile(seedPath)
 	require.NoError(t, err, "failed reading mods fixture seed script")
-	script := string(scriptBody)
-	assert.Contains(t, script, "PLOY_SEAWEEDFS_URL", "script should honor SeaweedFS endpoint overrides")
-	assert.Contains(t, script, "PLOY_GITLAB_PAT", "script should use PLOY_GITLAB_PAT for GitLab fixtures")
-	assert.Contains(t, script, "artifacts/mods", "script should upload mods artifacts into SeaweedFS")
-	assert.Contains(t, script, "GITHUB_PLOY_DEV_USERNAME", "script should support authenticated Git operations for fixtures")
+	seed := string(seedBody)
+	assert.Contains(t, seed, "PLOY_SEAWEEDFS_URL", "seed script should honor SeaweedFS endpoint overrides")
+	assert.Contains(t, seed, "PLOY_GITLAB_PAT", "seed script should rely on PLOY_GITLAB_PAT for GitLab access")
+	assert.Contains(t, seed, "artifacts/mods", "seed script should upload fixtures into the mods namespace")
 
-	workflowPath := filepath.Join(repoRoot, ".github", "workflows", "ci.yml")
-	workflowBody, err := os.ReadFile(workflowPath)
-	require.NoError(t, err, "failed reading CI workflow")
-	workflow := string(workflowBody)
-	assert.Contains(t, workflow, "mods-integration-harness", "CI should define mods integration harness job")
-	assert.Contains(t, workflow, "make mods-integration-vps", "CI job should invoke mods integration harness")
-	assert.Contains(t, workflow, "PLOY_GITLAB_PAT", "CI job should propagate PLOY_GITLAB_PAT to mods harness")
+	runnerPath := filepath.Join(repoRoot, "scripts", "run-mods-integration-vps.sh")
+	runnerInfo, err := os.Stat(runnerPath)
+	if err != nil {
+		t.Fatalf("mods integration runner script missing at %s: %v", runnerPath, err)
+	}
+	if runnerInfo.IsDir() {
+		t.Fatalf("expected runner script file at %s, found directory", runnerPath)
+	}
+
+	runnerBody, err := os.ReadFile(runnerPath)
+	require.NoError(t, err, "failed reading mods integration runner script")
+	runner := string(runnerBody)
+	assert.Contains(t, runner, "ssh -o ConnectTimeout=10 \"root@${TARGET_HOST}\"", "runner should execute on the VPS via SSH")
+	assert.Contains(t, runner, "git fetch", "runner should fetch the target commit")
+	assert.Contains(t, runner, "go test -tags=integration", "runner should invoke the mods integration suite")
 }
