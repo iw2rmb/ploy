@@ -1,6 +1,8 @@
 package mods
 
-import "testing"
+import (
+	"testing"
+)
 
 // MockKV implements orchestration.KV for testing
 type MockKV struct{}
@@ -10,7 +12,7 @@ func (m *MockKV) Get(key string) ([]byte, error)                  { return nil, 
 func (m *MockKV) Keys(prefix, separator string) ([]string, error) { return nil, nil }
 func (m *MockKV) Delete(key string) error                         { return nil }
 
-func TestNewKBLockManager_DefaultsToJetStream(t *testing.T) {
+func TestNewKBLockManager_UsesJetStreamWhenAvailable(t *testing.T) {
 	_, url := runTestJetStream(t)
 	setJetStreamEnv(t, url)
 
@@ -18,16 +20,17 @@ func TestNewKBLockManager_DefaultsToJetStream(t *testing.T) {
 	mgr := NewKBLockManager(kv)
 
 	if _, ok := mgr.(*JetstreamKBLockManager); !ok {
-		t.Fatalf("expected JetstreamKBLockManager by default, got %T", mgr)
+		t.Fatalf("expected JetstreamKBLockManager when JetStream available, got %T", mgr)
 	}
 }
 
-func TestNewKBLockManagerFallsBackToConsulWhenJetStreamUnavailable(t *testing.T) {
+func TestNewKBLockManager_FallsBackWhenJetStreamUnavailable(t *testing.T) {
+	t.Setenv("PLOY_JETSTREAM_URL", "nats://127.0.0.1:1")
 	kv := &MockKV{}
 	mgr := NewKBLockManager(kv)
 
 	if _, ok := mgr.(*ConsulKBLockManager); !ok {
-		t.Fatalf("expected ConsulKBLockManager when JetStream is unavailable, got %T", mgr)
+		t.Fatalf("expected ConsulKBLockManager when JetStream unavailable, got %T", mgr)
 	}
 }
 
