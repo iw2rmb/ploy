@@ -8,7 +8,7 @@
 ## Feature Highlights
 - **Job Rendering & Submission**: Render Nomad job templates with context-aware substitutions, validate HCL, submit jobs, and wait for success or failure with timeout and retry controls.
 - **Monitoring & Health Checks**: Wrap Consul health APIs and the SDK adapter so services, allocations, and orchestrated jobs expose consistent readiness signals.
-- **KV Coordination**: Lightweight Consul KV client with optional JetStream backend (feature flag `PLOY_USE_JETSTREAM_KV`) for locks, heartbeat data, and cross-component configuration shared by KB maintenance, builders, and Mods runners.
+- **KV Coordination**: Lightweight KV client that prefers JetStream buckets for locks, heartbeat data, and shared configuration, falling back to Consul only when JetStream is unavailable.
 - **Streaming & Logging**: Attach to Nomad allocations, stream task logs, and surface structured events back to API/CLI callers for realtime feedback.
 - **Retry Transport**: HTTP transport with exponential backoff, jitter, and error classification tailored for Nomad/Consul bursty workloads.
 

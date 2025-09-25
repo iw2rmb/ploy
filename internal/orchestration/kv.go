@@ -20,16 +20,13 @@ type KV interface {
 	Delete(key string) error
 }
 
-// NewKV returns the configured KV adapter. Defaults to Consul unless
-// PLOY_USE_JETSTREAM_KV is truthy, in which case a JetStream-backed adapter is
-// attempted. Failures fall back to Consul.
+// NewKV returns the configured KV adapter. JetStream is preferred; if JetStream
+// bootstrap fails, the Consul adapter is used as a fallback so callers remain functional.
 func NewKV() KV {
-	if useJetstreamKV() {
-		if kv, err := newJetstreamKV(); err != nil {
-			log.Printf("orchestration: jetstream KV unavailable, falling back to Consul: %v", err)
-		} else if kv != nil {
-			return kv
-		}
+	if kv, err := newJetstreamKV(); err != nil {
+		log.Printf("orchestration: jetstream KV unavailable, falling back to Consul: %v", err)
+	} else if kv != nil {
+		return kv
 	}
 	return &consulKV{client: newConsul()}
 }
@@ -86,15 +83,6 @@ func (k *consulKV) Delete(key string) error {
 type jetstreamKV struct {
 	conn   *nats.Conn
 	bucket nats.KeyValue
-}
-
-func useJetstreamKV() bool {
-	switch strings.ToLower(utils.Getenv("PLOY_USE_JETSTREAM_KV", "")) {
-	case "1", "true", "on", "yes":
-		return true
-	default:
-		return false
-	}
 }
 
 func newJetstreamKV() (*jetstreamKV, error) {
