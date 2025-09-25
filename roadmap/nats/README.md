@@ -42,7 +42,7 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 
 ## Migration Plan
 ### Phase 0 — Foundations
-- ✅ **COMPLETED (2025-09-24)** `roadmap/nats/01-jetstream-cluster.md` – Deployed the JetStream cluster via `platform/nomad/jetstream.nomad.hcl`, published the operator runbook, and wired Traefik/CoreDNS so clients reach `nats.ploy.local:4222`.
+- ✅ **COMPLETED (2025-09-24)** `roadmap/nats/01-jetstream-cluster.md` – Deployed the JetStream cluster via `platform/nomad/jetstream.nomad.hcl`, published the operator runbook, and wired CoreDNS so clients reach `nats.ploy.local:4223` (Traefik TCP routing on `:4222` is now optional).
 - ✅ **COMPLETED** `roadmap/nats/02-kv-adapter.md` – JetStream-backed KV adapter documented with feature-flag wiring, adapter implementation steps, and test coverage expectations.
 - Build integration tests that run against ephemeral NATS (docker-compose) mirroring existing Consul KV unit coverage.
 

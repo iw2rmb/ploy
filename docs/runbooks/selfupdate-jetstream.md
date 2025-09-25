@@ -33,7 +33,7 @@ nats stream info updates_control-plane --server "$PLOY_UPDATES_JETSTREAM_URL" --
 
 ### Tail Status Events
 ```bash
-export PLOY_UPDATES_JETSTREAM_URL=nats://nats.ploy.local:4222
+export PLOY_UPDATES_JETSTREAM_URL=nats://nats.ploy.local:4223
 export NATS_UPDATES_CREDS=~/.config/ploy/updates.creds
 ploy updates tail "$DEPLOYMENT_ID"
 ```

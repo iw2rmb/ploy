@@ -5,7 +5,7 @@
 ### Added
 - Analysis: Added concurrency-safe Consul KV and SeaweedFS storage fakes with regression tests for dispatcher submit/list/cleanup flows, enabling Nomad failure coverage and lifting `api/analysis` unit coverage to ~73%.
 - Infrastructure: Added CoreDNS templates and an Ansible playbook to manage the `ploy.local` zone, keeping platform service A/SRV records under configuration management.
-- Infrastructure: Provisioned a Nomad-managed NATS JetStream cluster (`platform/nomad/jetstream.nomad.hcl`) with Traefik TCP routing at `nats.ploy.local:4222`, CoreDNS records, and an operator runbook (`docs/runbooks/jetstream.md`).
+- Infrastructure: Provisioned a Nomad-managed NATS JetStream cluster (`platform/nomad/jetstream.nomad.hcl`) with direct access on `nats.ploy.local:4223`, optional Traefik TCP routing on `:4222`, CoreDNS records, and an operator runbook (`docs/runbooks/jetstream.md`).
 - Infrastructure: JetStream Key-Value adapter now powers `internal/orchestration.NewKV` by default; Consul is used only as a runtime fallback when JetStream is unreachable.
 - Networking: Added the JetStream-driven Traefik routing sync sidecar (`cmd/traefik-sync`) and Nomad wiring so `routing.app.*` events rewrite `/data/dynamic-config.yml` without Consul polling.
 - Domains: Domain configuration helpers now persist via the routing object store instead of Consul KV, keeping custom domain state in JetStream.

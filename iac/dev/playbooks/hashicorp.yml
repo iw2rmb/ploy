@@ -626,14 +626,14 @@
         - name: Verify JetStream connectivity
           wait_for:
             host: "{{ ansible_host }}"
-            port: 4222
+            port: 4223
             delay: 10
             timeout: 60
-            msg: "JetStream not accessible on port 4222"
+            msg: "JetStream not accessible on port 4223"
 
         - name: Display JetStream deployment status
           debug:
-            msg: "JetStream cluster deployed successfully and is accessible on port 4222"
+            msg: "JetStream cluster deployed successfully and is accessible on port 4223"
 
     - name: Initialize JetStream resources (buckets and streams)
       block:

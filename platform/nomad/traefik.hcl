@@ -201,7 +201,7 @@ job "traefik-system" {
       }
 
       env {
-        PLOY_ROUTING_JETSTREAM_URL          = "nats://nats.ploy.local:4222"
+        PLOY_ROUTING_JETSTREAM_URL          = "nats://nats.ploy.local:4223"
         PLOY_ROUTING_OBJECT_BUCKET          = "routing_maps"
         PLOY_ROUTING_EVENT_STREAM           = "routing_events"
         PLOY_ROUTING_EVENT_SUBJECT_PREFIX   = "routing.app"

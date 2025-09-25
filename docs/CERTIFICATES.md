@@ -87,7 +87,7 @@ Consumers persist the `bundle_object` and `revision` locally to guard against du
 
 ```bash
 export PLOY_CERTS_JETSTREAM_ENABLED=1
-export PLOY_CERTS_JETSTREAM_URL="nats://nats.ploy.local:4222"
+export PLOY_CERTS_JETSTREAM_URL="nats://nats.ploy.local:4223"
 export PLOY_CERTS_METADATA_BUCKET=certs_metadata
 export PLOY_CERTS_BUNDLE_BUCKET=certs_bundle
 export PLOY_CERTS_EVENTS_STREAM=certs_events
@@ -103,7 +103,7 @@ Set these before deploying the controller so `initializeCertificateStore` can bo
 ### Traefik/App Sidecars
 
 ```bash
-export CERTS_JETSTREAM_URL="nats://nats.ploy.local:4222"
+export CERTS_JETSTREAM_URL="nats://nats.ploy.local:4223"
 export CERTS_RENEWED_SUBJECT=certs.renewed
 export CERTS_BUNDLE_BUCKET=certs_bundle
 export CERTS_TLS_DIR=/opt/ploy/tls
@@ -139,7 +139,7 @@ cmd/ploy-migrate-certs --dry-run \
 # Execute migration into JetStream
 cmd/ploy-migrate-certs \
   --consul-addr=http://127.0.0.1:8500 \
-  --jetstream-url=nats://nats.ploy.local:4222 \
+  --jetstream-url=nats://nats.ploy.local:4223 \
   --metadata-bucket=certs_metadata \
   --bundle-bucket=certs_bundle \
   --events-stream=certs_events

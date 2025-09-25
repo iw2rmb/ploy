@@ -24,7 +24,7 @@ A running Nomad-deployed JetStream cluster accessible at `nats.ploy.local:<port>
 
 ## Deliverables (2025-09-24)
 - `platform/nomad/jetstream.nomad.hcl` job spec creating a three-instance JetStream cluster with host volumes, Nomad variable rendered credentials, and Traefik/Consul registration.
-- Traefik system job updated to expose a TCP entrypoint on port 4222 so traffic to `nats.ploy.local` is balanced across healthy allocations.
+- Traefik system job updated to expose an optional TCP entrypoint on port 4222 while internal clients connect directly to JetStream on `nats.ploy.local:4223`.
 - CoreDNS zone (`iac/dev/vars/main.yml`) now publishes an A record for `nats.ploy.local` with an integration test in `tests/integration/dns/coredns_integration_test.go`.
 - Runbook published at `docs/runbooks/jetstream.md` covering credential bootstrap, deployment, verification, and troubleshooting.
 

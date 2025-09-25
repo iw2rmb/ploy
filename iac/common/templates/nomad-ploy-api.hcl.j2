@@ -168,8 +168,9 @@ job "ploy-api" {
         MODS_SKIP_DEPLOY_LANES = "{{ ploy.mods.skip_deploy_lanes }}"
 
         # JetStream configuration for self-update work queue
+        PLOY_JETSTREAM_URL = "nats://nats.ploy.local:4223"
         PLOY_UPDATES_JETSTREAM_ENABLED = "true"
-        PLOY_UPDATES_JETSTREAM_URL = "nats://nats.ploy.local:4222"
+        PLOY_UPDATES_JETSTREAM_URL = "nats://nats.ploy.local:4223"
         PLOY_UPDATES_STREAM = "updates_control_plane"
         PLOY_UPDATES_STATUS_STREAM = "updates_control_plane_status"
         PLOY_UPDATES_STREAM_SUBJECT = "updates.control-plane.tasks"

@@ -27,7 +27,7 @@ type appConfig struct {
 
 func loadConfig() appConfig {
 	return appConfig{
-		URL:           utils.Getenv("PLOY_ROUTING_JETSTREAM_URL", "nats://nats.ploy.local:4222"),
+		URL:           utils.Getenv("PLOY_ROUTING_JETSTREAM_URL", "nats://nats.ploy.local:4223"),
 		Credentials:   utils.Getenv("PLOY_ROUTING_JETSTREAM_CREDS", ""),
 		User:          utils.Getenv("PLOY_ROUTING_JETSTREAM_USER", ""),
 		Password:      utils.Getenv("PLOY_ROUTING_JETSTREAM_PASSWORD", ""),
