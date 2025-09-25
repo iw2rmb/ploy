@@ -58,9 +58,12 @@ func (r JetstreamLockRecord) expired(now time.Time) bool {
 
 // NewJetstreamKBLockManager creates a new JetStream-based lock manager.
 func NewJetstreamKBLockManager() (*JetstreamKBLockManager, error) {
-	url := utils.Getenv("PLOY_JETSTREAM_URL", "")
+	url := strings.TrimSpace(utils.Getenv("PLOY_JETSTREAM_URL", ""))
 	if url == "" {
-		url = utils.Getenv("NATS_ADDR", nats.DefaultURL)
+		url = strings.TrimSpace(ResolveInfraFromEnv().JetStreamURL)
+	}
+	if url == "" {
+		url = strings.TrimSpace(utils.Getenv("NATS_ADDR", nats.DefaultURL))
 	}
 	if url == "" {
 		return nil, fmt.Errorf("jetstream url not configured")

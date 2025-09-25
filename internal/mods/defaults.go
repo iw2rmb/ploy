@@ -16,6 +16,7 @@ type Defaults struct {
 	DC                string
 	Allowlist         []string
 	SeaweedURL        string
+	JetStreamURL      string
 	PlannerTimeout    time.Duration
 	ReducerTimeout    time.Duration
 	LLMExecTimeout    time.Duration
@@ -77,6 +78,10 @@ func ResolveDefaults(get func(string) string) Defaults {
 	if seaweed == "" {
 		seaweed = "http://seaweedfs-filer.storage.ploy.local:8888"
 	}
+	jetstream := get("PLOY_JETSTREAM_URL")
+	if jetstream == "" {
+		jetstream = "nats://nats.ploy.local:4222"
+	}
 	allowPartial := func() bool {
 		v := strings.ToLower(strings.TrimSpace(get("MODS_ALLOW_PARTIAL_ORW")))
 		return v == "1" || v == "true" || v == "yes"
@@ -90,6 +95,7 @@ func ResolveDefaults(get func(string) string) Defaults {
 		DC:                dc,
 		Allowlist:         allow,
 		SeaweedURL:        seaweed,
+		JetStreamURL:      jetstream,
 		PlannerTimeout:    parseDur("MODS_PLANNER_TIMEOUT", "15m"),
 		ReducerTimeout:    parseDur("MODS_REDUCER_TIMEOUT", "10m"),
 		LLMExecTimeout:    parseDur("MODS_LLM_EXEC_TIMEOUT", "30m"),
