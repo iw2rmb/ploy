@@ -1,5 +1,7 @@
 # Self-Update Work-Queue Migration
 
+> **Status (2025-09-25):** In progress — JetStream queue deployed, but metrics instrumentation (`ploy_updates_*`) remains outstanding.
+
 ## What to Achieve
 - Replace Consul sessions + KV status records with a JetStream work-queue stream (`updates.control-plane`) governing controller self-update tasks.
 - Deliver real-time progress via JetStream status events so the CLI/UI renders updates without polling REST endpoints backed by Consul.
