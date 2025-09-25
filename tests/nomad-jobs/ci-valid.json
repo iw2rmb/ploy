@@ -1,9 +1,0 @@
-{
-  "Job": {
-    "ID": "ci-valid",
-    "Name": "ci-valid",
-    "Type": "service",
-    "TaskGroups": []
-  }
-}
-
