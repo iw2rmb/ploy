@@ -26,7 +26,7 @@ func TestCheckNomad_RetriesOn429(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	hc := NewHealthChecker("", "", srv.URL)
+	hc := NewHealthChecker("", srv.URL)
 	dep := hc.checkNomad()
 	if dep.Status != "healthy" {
 		t.Fatalf("expected healthy after retries, got: %+v", dep)

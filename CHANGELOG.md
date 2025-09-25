@@ -43,6 +43,7 @@
 - Mods: Lane D build gate now materializes `build.Dockerfile` and `deploy.Dockerfile` via the shared build module before invoking the controller build gate, covering Go/Node/Python/.NET stacks in addition to JVM.
 
 ### Changed
+- API Health: `/health` and `/ready` now probe JetStream connectivity (account info, env bucket, update stream) and remove the Consul KV dependency; deployment status surfaces JetStream details and legacy Consul checks are gone.
 - Infrastructure: API environment configuration is now inventory-driven. Removed the dedicated `iac/dev/playbooks/api-env.yml` flow and the `/home/ploy/api.env` sourcing; overrides live under `ploy.gitlab_*`, `ploy.mods.*`, and `ploy.nomad_dc` in `iac/dev/vars/main.yml`, and the Nomad start script only trusts those values.
 - Integration: Mods and KB suites now share a `testenv` harness that provisions Nomad/Consul/SeaweedFS clients, enforces Docker lane D defaults, and gracefully skips when the services are unavailable locally.
 - Traefik ACME: unified all Traefik jobs and Ansible roles around the `default-acme` resolver (HTTP-01 with TLS-ALPN fallback), dropped the Namecheap DNS resolver wiring, ensured `/opt/ploy/traefik-data/default-acme.json` is the only managed storage file, and updated auxiliary routers (e.g., Docker registry) to eliminate resolver warnings.

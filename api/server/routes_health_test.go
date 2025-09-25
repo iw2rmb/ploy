@@ -14,7 +14,7 @@ func TestServerRoutes_HealthReadyLive(t *testing.T) {
 		app: fiber.New(),
 		dependencies: &ServiceDependencies{
 			HealthChecker: func() *health.HealthChecker {
-				hc := health.NewHealthChecker("", "", "")
+				hc := health.NewHealthChecker("", "")
 				hc.SetDependencyChecksEnabled(false)
 				return hc
 			}(),
