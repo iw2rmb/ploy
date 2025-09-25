@@ -122,8 +122,8 @@ for repo in "${repo_array[@]}"; do
       auth_url=$(printf '%s' "${repo}" | sed -e "s#https://#https://${GITHUB_PLOY_DEV_USERNAME}:${GITHUB_PLOY_DEV_PAT}@#")
       ;;
     https://gitlab.com/*)
-      require_env GITLAB_TOKEN
-      auth_url=$(printf '%s' "${repo}" | sed -e "s#https://#https://oauth2:${GITLAB_TOKEN}@#")
+      require_env PLOY_GITLAB_PAT
+      auth_url=$(printf '%s' "${repo}" | sed -e "s#https://#https://oauth2:${PLOY_GITLAB_PAT}@#")
       ;;
   esac
   log "Validating fixture repository access: ${repo}"
