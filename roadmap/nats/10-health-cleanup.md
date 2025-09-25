@@ -1,5 +1,7 @@
 # Health Checks & Consul Cleanup
 
+> **Status (2025-09-25):** Completed — JetStream health probes back `/health`/`/ready`, Consul KV paths removed, and documentation refreshed.
+
 ## What to Achieve
 Update platform health checks to cover JetStream readiness, deprecate Consul KV dependencies, and remove legacy Consul code once migration tasks complete.
 

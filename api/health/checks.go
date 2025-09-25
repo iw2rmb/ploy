@@ -2,18 +2,19 @@ package health
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
-	consul "github.com/hashicorp/consul/api"
 	nomad "github.com/hashicorp/nomad/api"
-	"github.com/iw2rmb/ploy/api/consul_envstore"
 	cfgsvc "github.com/iw2rmb/ploy/internal/config"
 	orch "github.com/iw2rmb/ploy/internal/orchestration"
 	istorage "github.com/iw2rmb/ploy/internal/storage"
 	"github.com/iw2rmb/ploy/internal/utils"
+	"github.com/nats-io/nats.go"
 )
 
 // GetHealthStatus performs basic health checks
@@ -24,14 +25,14 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 	h.metricsCollector.LastHealthCheck = time.Now()
 	if h.disableChecks {
 		status.Dependencies["storage_config"] = DependencyHealth{Status: "healthy"}
-		status.Dependencies["consul"] = DependencyHealth{Status: "healthy"}
+		status.Dependencies["jetstream"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["nomad"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["seaweedfs"] = DependencyHealth{Status: "healthy"}
 		h.metricsCollector.HealthyResponses++
 		return status
 	}
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
-	status.Dependencies["consul"] = h.checkConsul()
+	status.Dependencies["jetstream"] = h.checkJetStream()
 	status.Dependencies["nomad"] = h.checkNomad()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
 	for depName, dep := range status.Dependencies {
@@ -52,12 +53,12 @@ func (h *HealthChecker) GetHealthStatus() HealthStatus {
 // GetReadinessStatus performs comprehensive readiness checks
 func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 	startTime := time.Now()
-	status := ReadinessStatus{Ready: true, Timestamp: time.Now(), Dependencies: make(map[string]DependencyHealth), CriticalDependencies: []string{"storage_config", "consul", "nomad"}}
+	status := ReadinessStatus{Ready: true, Timestamp: time.Now(), Dependencies: make(map[string]DependencyHealth), CriticalDependencies: []string{"storage_config", "jetstream", "nomad"}}
 	h.metricsCollector.TotalReadinessChecks++
 	h.metricsCollector.LastReadinessCheck = time.Now()
 	if h.disableChecks {
 		status.Dependencies["storage_config"] = DependencyHealth{Status: "healthy"}
-		status.Dependencies["consul"] = DependencyHealth{Status: "healthy"}
+		status.Dependencies["jetstream"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["nomad"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["seaweedfs"] = DependencyHealth{Status: "healthy"}
 		status.Dependencies["env_store"] = DependencyHealth{Status: "healthy"}
@@ -65,7 +66,7 @@ func (h *HealthChecker) GetReadinessStatus() ReadinessStatus {
 		return status
 	}
 	status.Dependencies["storage_config"] = h.checkStorageConfig()
-	status.Dependencies["consul"] = h.checkConsul()
+	status.Dependencies["jetstream"] = h.checkJetStream()
 	status.Dependencies["nomad"] = h.checkNomad()
 	status.Dependencies["seaweedfs"] = h.checkSeaweedFS()
 	status.Dependencies["env_store"] = h.checkEnvStore()
@@ -117,25 +118,101 @@ func (h *HealthChecker) checkStorageConfig() DependencyHealth {
 	return dep
 }
 
-func (h *HealthChecker) checkConsul() DependencyHealth {
+func (h *HealthChecker) connectJetStream(clientName string) (*nats.Conn, nats.JetStreamContext, error) {
+	cfg := h.jetstreamCfg
+	if strings.TrimSpace(cfg.URL) == "" {
+		return nil, nil, fmt.Errorf("jetstream url not configured")
+	}
+	timeout := cfg.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	opts := []nats.Option{
+		nats.Timeout(timeout),
+		nats.Name(clientName),
+	}
+	if strings.TrimSpace(cfg.CredentialsPath) != "" {
+		opts = append(opts, nats.UserCredentials(cfg.CredentialsPath))
+	}
+	if strings.TrimSpace(cfg.User) != "" {
+		opts = append(opts, nats.UserInfo(cfg.User, cfg.Password))
+	}
+	conn, err := h.jetstreamDialer.Connect(cfg.URL, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := conn.FlushTimeout(timeout); err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+	js, err := conn.JetStream()
+	if err != nil {
+		conn.Close()
+		return nil, nil, err
+	}
+	return conn, js, nil
+}
+
+func (h *HealthChecker) checkJetStream() DependencyHealth {
 	start := time.Now()
 	dep := DependencyHealth{Status: "healthy", Latency: time.Since(start)}
-	config := consul.DefaultConfig()
-	config.Address = h.consulAddr
-	client, err := consul.NewClient(config)
+	conn, js, err := h.connectJetStream("ploy-health-jetstream")
 	if err != nil {
 		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Failed to create Consul client: %v", err)
+		dep.Error = fmt.Sprintf("jetstream connection failed: %v", err)
 		dep.Latency = time.Since(start)
 		return dep
 	}
-	leader, err := client.Status().Leader()
-	if err != nil {
-		dep.Status = "unhealthy"
-		dep.Error = fmt.Sprintf("Failed to get Consul leader: %v", err)
+	defer conn.Close()
+	details := map[string]interface{}{"url": h.jetstreamCfg.URL}
+	var errs []string
+	if info, err := js.AccountInfo(); err == nil {
+		details["account"] = map[string]interface{}{
+			"domain":        info.Domain,
+			"streams":       info.Streams,
+			"consumers":     info.Consumers,
+			"store_bytes":   info.Store,
+			"memory_bytes":  info.Memory,
+			"max_streams":   info.Limits.MaxStreams,
+			"max_consumers": info.Limits.MaxConsumers,
+		}
 	} else {
-		dep.Details = map[string]interface{}{"leader": leader, "address": h.consulAddr}
+		errs = append(errs, fmt.Sprintf("account info: %v", err))
 	}
+	if bucket := strings.TrimSpace(h.jetstreamCfg.EnvBucket); bucket != "" {
+		if kv, err := js.KeyValue(bucket); err != nil {
+			errs = append(errs, fmt.Sprintf("env bucket %s: %v", bucket, err))
+		} else if status, err := kv.Status(); err == nil {
+			details["env_bucket"] = map[string]interface{}{
+				"name":        status.Bucket(),
+				"values":      status.Values(),
+				"history":     status.History(),
+				"ttl_seconds": int(status.TTL().Seconds()),
+				"bytes":       status.Bytes(),
+				"compressed":  status.IsCompressed(),
+				"store":       status.BackingStore(),
+			}
+		} else {
+			errs = append(errs, fmt.Sprintf("env bucket status %s: %v", bucket, err))
+		}
+	}
+	if stream := strings.TrimSpace(h.jetstreamCfg.UpdatesStream); stream != "" {
+		if info, err := js.StreamInfo(stream); err == nil {
+			details["updates_stream"] = map[string]interface{}{
+				"name":      info.Config.Name,
+				"messages":  info.State.Msgs,
+				"consumers": info.State.Consumers,
+				"replicas":  info.Config.Replicas,
+			}
+		} else {
+			errs = append(errs, fmt.Sprintf("updates stream %s: %v", stream, err))
+		}
+	}
+	if len(errs) > 0 {
+		dep.Status = "unhealthy"
+		dep.Error = strings.Join(errs, "; ")
+	}
+	dep.Details = details
 	dep.Latency = time.Since(start)
 	return dep
 }
@@ -215,21 +292,51 @@ func (h *HealthChecker) checkSeaweedFS() DependencyHealth {
 func (h *HealthChecker) checkEnvStore() DependencyHealth {
 	start := time.Now()
 	dep := DependencyHealth{Status: "healthy", Latency: time.Since(start)}
-	if utils.Getenv("PLOY_USE_CONSUL_ENV", "true") == "true" {
-		consulEnvStore, err := consul_envstore.New(h.consulAddr, "ploy/apps")
-		if err != nil {
-			dep.Status = "unhealthy"
-			dep.Error = fmt.Sprintf("Failed to create Consul env store: %v", err)
-		} else {
-			if err := consulEnvStore.HealthCheck(); err != nil {
-				dep.Status = "unhealthy"
-				dep.Error = fmt.Sprintf("Consul env store health check failed: %v", err)
-			} else {
-				dep.Details = map[string]interface{}{"type": "consul", "address": h.consulAddr}
-			}
-		}
-	} else {
+	if strings.TrimSpace(h.jetstreamCfg.URL) == "" {
 		dep.Details = map[string]interface{}{"type": "file", "path": utils.Getenv("PLOY_ENV_STORE_PATH", "/tmp/ploy-env-store")}
+		dep.Latency = time.Since(start)
+		return dep
+	}
+	conn, js, err := h.connectJetStream("ploy-health-envstore")
+	if err != nil {
+		dep.Status = "unhealthy"
+		dep.Error = fmt.Sprintf("jetstream env store connection failed: %v", err)
+		dep.Latency = time.Since(start)
+		return dep
+	}
+	defer conn.Close()
+	bucket := strings.TrimSpace(h.jetstreamCfg.EnvBucket)
+	if bucket == "" {
+		bucket = "ploy_env"
+	}
+	kv, err := js.KeyValue(bucket)
+	if err != nil {
+		if errors.Is(err, nats.ErrBucketNotFound) {
+			dep.Error = fmt.Sprintf("env bucket %s not found", bucket)
+		} else {
+			dep.Error = fmt.Sprintf("env bucket %s: %v", bucket, err)
+		}
+		dep.Status = "unhealthy"
+		dep.Latency = time.Since(start)
+		return dep
+	}
+	status, err := kv.Status()
+	if err != nil {
+		dep.Status = "unhealthy"
+		dep.Error = fmt.Sprintf("env bucket status %s: %v", bucket, err)
+		dep.Latency = time.Since(start)
+		return dep
+	}
+	dep.Details = map[string]interface{}{
+		"type":          "jetstream",
+		"url":           h.jetstreamCfg.URL,
+		"bucket":        status.Bucket(),
+		"values":        status.Values(),
+		"history":       status.History(),
+		"ttl_seconds":   int(status.TTL().Seconds()),
+		"bytes":         status.Bytes(),
+		"compressed":    status.IsCompressed(),
+		"backing_store": status.BackingStore(),
 	}
 	dep.Latency = time.Since(start)
 	return dep
@@ -238,12 +345,17 @@ func (h *HealthChecker) checkEnvStore() DependencyHealth {
 // GetDeploymentStatus returns blue-green deployment and service mesh status
 func (h *HealthChecker) GetDeploymentStatus() DeploymentStatus {
 	status := DeploymentStatus{Status: "healthy", Timestamp: time.Now(), DeploymentColor: utils.Getenv("DEPLOYMENT_COLOR", "blue"), DeploymentWeight: utils.ParseIntEnv("DEPLOYMENT_WEIGHT", 100), DeploymentID: utils.Getenv("DEPLOYMENT_ID", "unknown"), ServiceMeshEnabled: utils.Getenv("SERVICE_MESH_ENABLED", "false") == "true", ServiceMeshConnect: utils.Getenv("SERVICE_MESH_CONNECT", "false") == "true", TraefikEnabled: utils.Getenv("TRAEFIK_ENABLED", "false") == "true", ServiceRegistration: make(map[string]interface{})}
-	consulHealth := h.checkConsul()
-	if consulHealth.Status == "healthy" {
-		status.ServiceRegistration["consul"] = map[string]interface{}{"status": "registered", "service_name": utils.Getenv("SERVICE_NAME", "ploy-api"), "service_version": utils.Getenv("SERVICE_VERSION", "1.0.0"), "instance_id": utils.Getenv("INSTANCE_ID", "unknown")}
-	} else {
+	jetstreamHealth := h.checkJetStream()
+	jsReg := map[string]interface{}{"status": jetstreamHealth.Status, "url": h.jetstreamCfg.URL}
+	if jetstreamHealth.Error != "" {
+		jsReg["error"] = jetstreamHealth.Error
+	}
+	if details, ok := jetstreamHealth.Details.(map[string]interface{}); ok {
+		jsReg["details"] = details
+	}
+	status.ServiceRegistration["jetstream"] = jsReg
+	if jetstreamHealth.Status != "healthy" {
 		status.Status = "degraded"
-		status.ServiceRegistration["consul"] = map[string]interface{}{"status": "failed", "error": consulHealth.Error}
 	}
 	if status.ServiceMeshEnabled {
 		if !status.ServiceMeshConnect {

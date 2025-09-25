@@ -65,7 +65,36 @@ func initializeDependenciesWithService(cfg *ControllerConfig, cfgService *cfgsvc
 
 	// Initialize health checker
 	log.Printf("Initializing health checker...")
-	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.ConsulAddr, cfg.NomadAddr)
+	jsHealthCfg := health.JetStreamHealthConfig{
+		URL:             cfg.JetStreamEnv.URL,
+		CredentialsPath: cfg.JetStreamEnv.CredentialsPath,
+		User:            cfg.JetStreamEnv.User,
+		Password:        cfg.JetStreamEnv.Password,
+		EnvBucket:       cfg.JetStreamEnv.Bucket,
+		UpdatesStream:   cfg.JetStreamUpdates.StatusStream,
+		Timeout:         5 * time.Second,
+	}
+	if jsHealthCfg.URL == "" {
+		jsHealthCfg.URL = cfg.JetStreamUpdates.URL
+	}
+	if jsHealthCfg.CredentialsPath == "" {
+		jsHealthCfg.CredentialsPath = cfg.JetStreamUpdates.CredentialsPath
+	}
+	if jsHealthCfg.User == "" {
+		jsHealthCfg.User = cfg.JetStreamUpdates.User
+		jsHealthCfg.Password = cfg.JetStreamUpdates.Password
+	}
+	if jsHealthCfg.EnvBucket == "" {
+		jsHealthCfg.EnvBucket = cfg.JetStreamEnv.Bucket
+	}
+	if jsHealthCfg.UpdatesStream == "" {
+		jsHealthCfg.UpdatesStream = cfg.JetStreamUpdates.Stream
+	}
+	healthOpts := []health.Option{}
+	if jsHealthCfg.URL != "" || jsHealthCfg.CredentialsPath != "" || jsHealthCfg.User != "" || jsHealthCfg.EnvBucket != "" || jsHealthCfg.UpdatesStream != "" {
+		healthOpts = append(healthOpts, health.WithJetStreamConfig(jsHealthCfg))
+	}
+	healthChecker := health.NewHealthChecker(cfg.StorageConfigPath, cfg.NomadAddr, healthOpts...)
 	log.Printf("✓ Health checker initialized")
 
 	// Initialize TTL cleanup service
