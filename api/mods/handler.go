@@ -1,6 +1,7 @@
 package mods
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -17,6 +18,7 @@ type Handler struct {
 	statusStore         orchestration.KV
 	securityRegistryURL string
 	securityMavenGroup  string
+	eventPublisher      func(context.Context, ModEvent)
 }
 
 // NewHandler creates a new Mods HTTP handler
@@ -31,7 +33,18 @@ func NewHandler(
 		statusStore:         statusStore,
 		securityRegistryURL: os.Getenv("PLOY_SECURITY_REGISTRY"),
 		securityMavenGroup:  os.Getenv("PLOY_SECURITY_MAVEN_GROUP"),
+		eventPublisher:      func(context.Context, ModEvent) {},
 	}
+}
+
+// SetEventPublisher configures the optional event fabric publisher for Mods telemetry.
+// Passing nil resets the publisher to a no-op implementation.
+func (h *Handler) SetEventPublisher(fn func(context.Context, ModEvent)) {
+	if fn == nil {
+		h.eventPublisher = func(context.Context, ModEvent) {}
+		return
+	}
+	h.eventPublisher = fn
 }
 
 // RegisterRoutes registers Mods routes with the Fiber app
@@ -148,6 +161,13 @@ func (h *Handler) ReportEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": fiber.Map{"code": "storage_error", "message": "failed to persist status", "details": err.Error()},
 		})
+	}
+	if h.eventPublisher != nil {
+		ctx := c.UserContext()
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		h.eventPublisher(ctx, ev)
 	}
 	return c.JSON(fiber.Map{"ok": true})
 }
