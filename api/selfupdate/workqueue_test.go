@@ -99,6 +99,43 @@ func TestJetStreamWorkQueueEnqueueAndFetch(t *testing.T) {
 	require.Equal(t, "deploy-123", msg.Headers.Get("Nats-Msg-Id"))
 }
 
+func TestJetStreamWorkQueueDuplicateTaskReturnsErrDuplicateTask(t *testing.T) {
+	url, shutdown := startJetStream(t)
+	defer shutdown()
+
+	conn, err := nats.Connect(url)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	js, err := conn.JetStream()
+	require.NoError(t, err)
+
+	cfg := WorkQueueConfig{
+		Stream:        "updates.control-plane",
+		SubjectPrefix: "updates.control-plane.tasks",
+		DurablePrefix: "updates-control-plane",
+		Lane:          "d",
+	}
+
+	ctx := context.Background()
+	queue, err := NewJetStreamWorkQueue(ctx, js, cfg)
+	require.NoError(t, err)
+
+	task := WorkQueueTask{
+		DeploymentID: "deploy-duplicate",
+		Request: UpdateRequest{
+			TargetVersion: "2025.11.1",
+			Strategy:      RollingUpdate,
+		},
+	}
+
+	require.NoError(t, queue.Enqueue(ctx, task))
+
+	err = queue.Enqueue(ctx, task)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrDuplicateTask)
+}
+
 func TestStatusPublisherEmitsEvents(t *testing.T) {
 	url, shutdown := startJetStream(t)
 	defer shutdown()

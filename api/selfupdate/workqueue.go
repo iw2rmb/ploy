@@ -10,6 +10,8 @@ import (
 	nats "github.com/nats-io/nats.go"
 )
 
+var ErrDuplicateTask = errors.New("duplicate self-update task")
+
 type WorkQueueConfig struct {
 	Stream        string
 	SubjectPrefix string
@@ -37,18 +39,33 @@ type WorkQueueMessage struct {
 	Lane         string
 	Headers      nats.Header
 	msg          *nats.Msg
+	AckWait      time.Duration
+	ackFn        func() error
+	nakFn        func(time.Duration) error
 }
 
 func (m *WorkQueueMessage) Ack() error {
 	if m.msg == nil {
+		if m.ackFn != nil {
+			return m.ackFn()
+		}
 		return errors.New("nil message ack")
+	}
+	if m.ackFn != nil {
+		return m.ackFn()
 	}
 	return m.msg.Ack()
 }
 
 func (m *WorkQueueMessage) NakWithDelay(delay time.Duration) error {
 	if m.msg == nil {
+		if m.nakFn != nil {
+			return m.nakFn(delay)
+		}
 		return errors.New("nil message nack")
+	}
+	if m.nakFn != nil {
+		return m.nakFn(delay)
 	}
 	return m.msg.NakWithDelay(delay)
 }
@@ -209,8 +226,12 @@ func (q *JetStreamWorkQueue) Enqueue(ctx context.Context, task WorkQueueTask) er
 	msg.Header.Set("X-Ploy-Deployment", task.DeploymentID)
 	msg.Header.Set("X-Ploy-Lane", q.cfg.Lane)
 
-	if _, err := q.js.PublishMsg(msg, nats.Context(ctx)); err != nil {
+	ack, err := q.js.PublishMsg(msg, nats.Context(ctx))
+	if err != nil {
 		return fmt.Errorf("publish task: %w", err)
+	}
+	if ack != nil && ack.Duplicate {
+		return ErrDuplicateTask
 	}
 
 	return nil
@@ -248,6 +269,13 @@ func (q *JetStreamWorkQueue) Fetch(ctx context.Context, wait time.Duration) (*Wo
 		Lane:         payload.Lane,
 		Headers:      msg.Header,
 		msg:          msg,
+		AckWait:      q.ackWait,
+		ackFn: func() error {
+			return msg.Ack()
+		},
+		nakFn: func(delay time.Duration) error {
+			return msg.NakWithDelay(delay)
+		},
 	}, nil
 }
 

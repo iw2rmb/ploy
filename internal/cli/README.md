@@ -25,6 +25,7 @@
 - `sbom/` – SBOM fetch, diff, verification, and signing status commands.
 - `security/` – Security scanner integrations, provenance verification, and vulnerability report helpers.
 - `ui/` – Interactive prompts, selection menus, and other TUI helpers consumed by commands.
+- `updates/` – Self-update status tailers backed by JetStream (`ploy updates tail`).
 - `utils/` – Low-level helpers (table printers, ANSI styling, file I/O) reused across command packages.
 - `version/` – CLI version metadata and formatting helpers.
 

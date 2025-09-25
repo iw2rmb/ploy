@@ -71,7 +71,7 @@ job "jetstream-cluster" {
         "nats",
         "jetstream",
         "traefik.enable=true",
-        "traefik.tcp.routers.nats.rule=HostSNI(`*`)",
+        "traefik.tcp.routers.nats.rule=HostSNI(`nats.ploy.local`)",
         "traefik.tcp.routers.nats.entrypoints=nats",
         "traefik.tcp.routers.nats.tls=false",
         "traefik.tcp.routers.nats.service=nats"
