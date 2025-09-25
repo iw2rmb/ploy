@@ -71,6 +71,25 @@ type JetStreamUpdatesConfig struct {
 	StatusMaxAge        time.Duration
 }
 
+// JetStreamEventsConfig captures platform event fabric configuration (builds, allocs, mods).
+type JetStreamEventsConfig struct {
+	Enabled            bool
+	URL                string
+	CredentialsPath    string
+	User               string
+	Password           string
+	MaxAge             time.Duration
+	BuildStream        string
+	BuildSubjectPrefix string
+	BuildReplicas      int
+	AllocStream        string
+	AllocSubjectPrefix string
+	AllocReplicas      int
+	ModsStream         string
+	ModsSubjectPrefix  string
+	ModsReplicas       int
+}
+
 // ControllerConfig holds configuration for controller initialization
 type ControllerConfig struct {
 	Port              string
@@ -99,6 +118,8 @@ type ControllerConfig struct {
 	JetStreamCertificates JetStreamCertificatesConfig
 	// JetStream controller self-update configuration.
 	JetStreamUpdates JetStreamUpdatesConfig
+	// JetStream event fabric configuration.
+	JetStreamEvents JetStreamEventsConfig
 }
 
 // parseIntEnv parses integer from environment variable with fallback
@@ -197,6 +218,25 @@ func LoadConfigFromEnv() *ControllerConfig {
 	statusReplicas := parseIntEnv("PLOY_UPDATES_STATUS_REPLICAS", updatesReplicas)
 	statusMaxAge := parseDurationEnv("PLOY_UPDATES_STATUS_MAX_AGE", 72*time.Hour)
 
+	eventsURL := utils.Getenv("PLOY_EVENTS_JETSTREAM_URL", jsURL)
+	eventsCreds := utils.Getenv("PLOY_EVENTS_JETSTREAM_CREDS", jsCreds)
+	eventsUser := utils.Getenv("PLOY_EVENTS_JETSTREAM_USER", jsUser)
+	eventsPassword := utils.Getenv("PLOY_EVENTS_JETSTREAM_PASSWORD", jsPassword)
+	eventsEnabled := parseBoolEnv("PLOY_EVENTS_JETSTREAM_ENABLED", eventsURL != "")
+	if eventsURL != "" && !eventsEnabled {
+		eventsEnabled = true
+	}
+	eventsMaxAge := parseDurationEnv("PLOY_EVENTS_MAX_AGE", 72*time.Hour)
+	buildStream := utils.Getenv("PLOY_EVENTS_BUILD_STREAM", "platform.builds")
+	buildSubject := utils.Getenv("PLOY_EVENTS_BUILD_SUBJECT", "build.status")
+	buildReplicas := parseIntEnv("PLOY_EVENTS_BUILD_REPLICAS", 3)
+	allocStream := utils.Getenv("PLOY_EVENTS_ALLOC_STREAM", "platform.allocs")
+	allocSubject := utils.Getenv("PLOY_EVENTS_ALLOC_SUBJECT", "alloc.ready")
+	allocReplicas := parseIntEnv("PLOY_EVENTS_ALLOC_REPLICAS", 3)
+	modsStream := utils.Getenv("PLOY_EVENTS_MODS_STREAM", "platform.mods")
+	modsSubject := utils.Getenv("PLOY_EVENTS_MODS_SUBJECT", "mods.events")
+	modsReplicas := parseIntEnv("PLOY_EVENTS_MODS_REPLICAS", 3)
+
 	return &ControllerConfig{
 		Port:                 port,
 		ConsulAddr:           utils.Getenv("CONSUL_HTTP_ADDR", "127.0.0.1:8500"),
@@ -263,6 +303,23 @@ func LoadConfigFromEnv() *ControllerConfig {
 			StatusDurablePrefix: utils.Getenv("PLOY_UPDATES_STATUS_DURABLE_PREFIX", "updates-status"),
 			StatusReplicas:      statusReplicas,
 			StatusMaxAge:        statusMaxAge,
+		},
+		JetStreamEvents: JetStreamEventsConfig{
+			Enabled:            eventsEnabled,
+			URL:                eventsURL,
+			CredentialsPath:    eventsCreds,
+			User:               eventsUser,
+			Password:           eventsPassword,
+			MaxAge:             eventsMaxAge,
+			BuildStream:        buildStream,
+			BuildSubjectPrefix: buildSubject,
+			BuildReplicas:      buildReplicas,
+			AllocStream:        allocStream,
+			AllocSubjectPrefix: allocSubject,
+			AllocReplicas:      allocReplicas,
+			ModsStream:         modsStream,
+			ModsSubjectPrefix:  modsSubject,
+			ModsReplicas:       modsReplicas,
 		},
 	}
 }

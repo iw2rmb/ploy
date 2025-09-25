@@ -1,6 +1,7 @@
 package orchestration
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -52,7 +53,10 @@ type TaskEvent struct {
 }
 
 // HealthMonitor provides basic health queries for Nomad jobs
-type HealthMonitor struct{ client nomadAdapter }
+type HealthMonitor struct {
+	client        nomadAdapter
+	readyNotifier func(context.Context, string, *AllocationStatus, int)
+}
 
 // nomadAdapter is a small interface wrapper to allow testing/mocking and SDK usage
 type nomadAdapter interface {
@@ -62,12 +66,12 @@ type nomadAdapter interface {
 
 // NewHealthMonitor creates a new health monitor instance reading env defaults
 func NewHealthMonitor() *HealthMonitor {
-	return &HealthMonitor{client: newSDKNomadAdapter()}
+	return &HealthMonitor{client: newSDKNomadAdapter(), readyNotifier: readyNotifierFn}
 }
 
 // NewHealthMonitorWithClient constructs a monitor with a provided adapter (used in tests)
 func NewHealthMonitorWithClient(adapter nomadAdapter) *HealthMonitor {
-	return &HealthMonitor{client: adapter}
+	return &HealthMonitor{client: adapter, readyNotifier: readyNotifierFn}
 }
 
 // GetJobStatus fetches the current status of a job
@@ -141,6 +145,7 @@ func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, 
 	// Prefer blocking queries when using SDK adapter to reduce polling load
 	var lastIndex uint64
 	waitTime := envDur("NOMAD_BLOCKING_WAIT", 30*time.Second)
+	notified := false
 	for time.Now().Before(deadline) {
 		var (
 			allocs []*AllocationStatus
@@ -188,18 +193,31 @@ func (h *HealthMonitor) WaitForHealthyAllocations(jobID string, minHealthy int, 
 			continue
 		}
 		healthy := 0
+		var firstHealthy *AllocationStatus
 		for _, a := range allocs {
 			if a.ClientStatus == "running" {
 				if a.DeploymentStatus != nil && a.DeploymentStatus.Healthy != nil {
 					if *a.DeploymentStatus.Healthy {
 						healthy++
+						if firstHealthy == nil {
+							copy := *a
+							firstHealthy = &copy
+						}
 					}
 				} else {
 					healthy++
+					if firstHealthy == nil {
+						copy := *a
+						firstHealthy = &copy
+					}
 				}
 			}
 		}
 		if healthy >= minHealthy {
+			if !notified && h.readyNotifier != nil && firstHealthy != nil {
+				notified = true
+				h.readyNotifier(context.Background(), jobID, firstHealthy, healthy)
+			}
 			return nil
 		}
 		// No explicit sleep; blocking query above already waited
