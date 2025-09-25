@@ -305,10 +305,6 @@ func TestJetStreamKBLockManager_Integration_MaintenanceEvents(t *testing.T) {
 	skipIfNoJetStream(t)
 
 	// This test verifies that maintenance scheduler can receive lock events
-	// Set up environment for JetStream KV
-	os.Setenv("PLOY_USE_JETSTREAM_KV", "true")
-	defer os.Unsetenv("PLOY_USE_JETSTREAM_KV")
-
 	// Create a lock manager
 	mgr, err := NewJetstreamKBLockManager()
 	if err != nil {

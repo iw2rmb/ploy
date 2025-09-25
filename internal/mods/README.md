@@ -129,7 +129,7 @@ The Knowledge Base uses distributed locking to ensure data consistency during co
 - Enables immediate maintenance job triggering via event subscription and removes session heartbeats
 
 ### Configuration
-JetStream is enabled by default. Set `PLOY_USE_JETSTREAM_KV=false` only for emergency fallback to Consul (rollback plan required). Locks live in the `mods_kb_locks` bucket under `writers/<kb-id>`.
+JetStream is required for KB locking; the legacy `PLOY_USE_JETSTREAM_KV` Consul fallback has been removed. Locks live in the `mods_kb_locks` bucket under `writers/<kb-id>`.
 
 ### Lock Event Integration
 When using JetStream, maintenance jobs can subscribe to lock release events for immediate triggering:

@@ -138,9 +138,6 @@ func LoadConfigFromEnv() *ControllerConfig {
 	}
 
 	dualWrite := parseBoolEnv("PLOY_ENVSTORE_JETSTREAM_DUAL_WRITE", false)
-	if !dualWrite {
-		dualWrite = parseBoolEnv("PLOY_USE_JETSTREAM_KV", false)
-	}
 
 	jsURL := utils.Getenv("PLOY_JETSTREAM_URL", "")
 	jsBucket := utils.Getenv("PLOY_JETSTREAM_ENV_BUCKET", "")

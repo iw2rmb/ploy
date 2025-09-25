@@ -134,14 +134,11 @@ func NewMaintenanceScheduler(
 		lastRun:         make(map[MaintenanceJobType]time.Time),
 	}
 
-	// Initialize JetStream connection if using JetStream KV
-	if useJetstreamKV() {
-		if conn, js, err := initJetstreamConnection(); err != nil {
-			fmt.Printf("Warning: failed to initialize JetStream for maintenance events: %v\n", err)
-		} else {
-			scheduler.conn = conn
-			scheduler.js = js
-		}
+	if conn, js, err := initJetstreamConnection(); err != nil {
+		fmt.Printf("Warning: failed to initialize JetStream for maintenance events: %v\n", err)
+	} else {
+		scheduler.conn = conn
+		scheduler.js = js
 	}
 
 	return scheduler

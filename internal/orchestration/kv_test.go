@@ -8,21 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewKVDefaultsToConsul(t *testing.T) {
-	t.Setenv("PLOY_USE_JETSTREAM_KV", "")
-	kv := NewKV()
-	_, ok := kv.(*consulKV)
-	require.True(t, ok, "expected fallback to consul KV when flag disabled")
-}
-
-func TestJetstreamKVOperations(t *testing.T) {
+func TestNewKVPrefersJetStreamWhenAvailable(t *testing.T) {
 	srv := runJetstreamServer(t)
 	t.Cleanup(func() {
 		srv.Shutdown()
 		srv.WaitForShutdown()
 	})
 
-	t.Setenv("PLOY_USE_JETSTREAM_KV", "true")
 	t.Setenv("PLOY_JETSTREAM_URL", srv.ClientURL())
 	// ensure a dedicated bucket for isolation
 	t.Setenv("PLOY_JETSTREAM_KV_BUCKET", "test_kv")
@@ -56,6 +48,14 @@ func TestJetstreamKVOperations(t *testing.T) {
 	missing, err := kv.Get(key)
 	require.NoError(t, err)
 	require.Nil(t, missing)
+}
+
+func TestNewKVFallsBackToConsulWhenJetStreamUnavailable(t *testing.T) {
+	// Point to an invalid JetStream endpoint so connection fails quickly.
+	t.Setenv("PLOY_JETSTREAM_URL", "nats://invalid:4222")
+	kv := NewKV()
+	_, ok := kv.(*consulKV)
+	require.True(t, ok, "expected consul KV fallback when JetStream unavailable")
 }
 
 func runJetstreamServer(t *testing.T) *server.Server {
