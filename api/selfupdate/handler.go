@@ -34,6 +34,7 @@ type Handler struct {
 	distributor      *distribution.BinaryDistributor
 	queue            *JetStreamWorkQueue
 	statusPublisher  *StatusPublisher
+	metrics          MetricsRecorder
 	currentVersion   string
 	gitCommit        string
 	gitBranch        string
@@ -54,7 +55,7 @@ var (
 )
 
 // NewHandler creates a new self-update handler with Git integration
-func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQueue, statusPublisher *StatusPublisher, currentVersion string) (*Handler, error) {
+func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQueue, statusPublisher *StatusPublisher, currentVersion string, metricsRecorder MetricsRecorder) (*Handler, error) {
 	if queue == nil {
 		return nil, fmt.Errorf("jetstream work queue required")
 	}
@@ -100,6 +101,7 @@ func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQue
 		distributor:     distributor,
 		queue:           queue,
 		statusPublisher: statusPublisher,
+		metrics:         metricsRecorder,
 		currentVersion:  currentVersion,
 		gitCommit:       gitCommit,
 		gitBranch:       gitBranch,
@@ -207,6 +209,12 @@ func (h *Handler) HandleUpdate(c *fiber.Ctx) error {
 	ctx := context.Background()
 	deploymentID, err := h.enqueueUpdate(ctx, request, submittedBy)
 	if err != nil {
+		if errors.Is(err, ErrDuplicateTask) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error":    "Update already queued",
+				"strategy": request.Strategy,
+			})
+		}
 		log.Printf("[selfupdate] enqueue failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to enqueue update task",
@@ -300,6 +308,12 @@ func (h *Handler) HandleRollback(c *fiber.Ctx) error {
 
 	deploymentID, err := h.enqueueUpdate(ctx, updateRequest, submittedBy)
 	if err != nil {
+		if errors.Is(err, ErrDuplicateTask) {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error":  "Rollback already queued",
+				"reason": request.Reason,
+			})
+		}
 		log.Printf("[selfupdate] enqueue rollback failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to enqueue rollback",
@@ -639,6 +653,7 @@ func (h *Handler) processTask(ctx context.Context, msg *WorkQueueMessage) error 
 		combined["submitted_by"] = msg.SubmittedBy
 	}
 	combined["executor"] = h.executorID
+	lane := h.laneFromMetadata(combined)
 
 	h.updateStatus(ctx, msg.DeploymentID, req, "preparing", "Update task claimed", 0, combined)
 
@@ -647,12 +662,21 @@ func (h *Handler) processTask(ctx context.Context, msg *WorkQueueMessage) error 
 		updateFn = h.StartUpdate
 	}
 
-	if err := updateFn(ctx, msg.DeploymentID, req, combined); err != nil {
+	start := time.Now()
+	err := updateFn(ctx, msg.DeploymentID, req, combined)
+	result := "success"
+	if err != nil {
+		result = "failed"
+	}
+	h.observeExecutorDuration(lane, req.Strategy, result, time.Since(start))
+
+	if err != nil {
 		h.updateStatus(ctx, msg.DeploymentID, req, "failed", err.Error(), 0, combined)
 		delay := msg.AckWait / 2
 		if delay <= 0 {
 			delay = time.Second
 		}
+		h.recordRedelivery(lane, "executor_error")
 		if nakErr := msg.NakWithDelay(delay); nakErr != nil {
 			log.Printf("[selfupdate] nak failed task %s: %v", msg.DeploymentID, nakErr)
 			if ackErr := msg.Ack(); ackErr != nil {
@@ -690,6 +714,58 @@ func cloneMetadata(meta map[string]string) map[string]string {
 	return copy
 }
 
+func (h *Handler) laneFromMetadata(meta map[string]string) string {
+	if meta != nil {
+		if lane := strings.TrimSpace(meta["lane"]); lane != "" {
+			return lane
+		}
+	}
+	if h.queue != nil && h.queue.cfg.Lane != "" {
+		return h.queue.cfg.Lane
+	}
+	return "unknown"
+}
+
+func (h *Handler) recordTaskSubmission(strategy UpdateStrategy, result string) {
+	if h.metrics == nil {
+		return
+	}
+	lane := h.laneFromMetadata(nil)
+	strat := string(strategy)
+	if strat == "" {
+		strat = string(RollingUpdate)
+	}
+	h.metrics.RecordSelfUpdateTaskSubmission(lane, strat, result)
+}
+
+func (h *Handler) observeExecutorDuration(lane string, strategy UpdateStrategy, result string, duration time.Duration) {
+	if h.metrics == nil {
+		return
+	}
+	if lane == "" {
+		lane = "unknown"
+	}
+	strat := string(strategy)
+	if strat == "" {
+		strat = string(RollingUpdate)
+	}
+	h.metrics.ObserveSelfUpdateExecutorDuration(lane, strat, result, duration)
+}
+
+func (h *Handler) recordStatusPublished(lane, phase string) {
+	if h.metrics == nil {
+		return
+	}
+	h.metrics.RecordSelfUpdateStatusPublished(lane, phase)
+}
+
+func (h *Handler) recordRedelivery(lane, reason string) {
+	if h.metrics == nil {
+		return
+	}
+	h.metrics.RecordSelfUpdateRedelivery(lane, reason)
+}
+
 func (h *Handler) updateStatus(ctx context.Context, deploymentID string, request UpdateRequest, status, message string, progress int, metadata map[string]string) {
 	event := StatusEvent{
 		DeploymentID: deploymentID,
@@ -700,8 +776,12 @@ func (h *Handler) updateStatus(ctx context.Context, deploymentID string, request
 		Metadata:     cloneMetadata(metadata),
 	}
 
+	lane := h.laneFromMetadata(metadata)
+
 	if err := h.statusPublisher.Publish(ctx, event); err != nil {
 		log.Printf("[selfupdate] publish status event failed: %v", err)
+	} else {
+		h.recordStatusPublished(lane, status)
 	}
 
 	h.statusMu.Lock()
@@ -753,9 +833,15 @@ func (h *Handler) enqueueUpdate(ctx context.Context, request UpdateRequest, subm
 	}
 
 	if err := h.queue.Enqueue(ctx, task); err != nil {
+		result := "error"
+		if errors.Is(err, ErrDuplicateTask) {
+			result = "duplicate"
+		}
+		h.recordTaskSubmission(request.Strategy, result)
 		return "", err
 	}
 
+	h.recordTaskSubmission(request.Strategy, "accepted")
 	h.updateStatus(ctx, deploymentID, request, "queued", "Update request queued", 0, metadata)
 	return deploymentID, nil
 }
