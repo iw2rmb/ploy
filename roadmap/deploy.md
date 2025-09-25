@@ -28,6 +28,11 @@ This roadmap outlines the unification of Ploy's deployment systems to create a s
    - Inconsistent deployment experiences
    - Complex debugging when issues arise
 
+### Recent Enhancements (2025-09-25)
+- Controller self-update pipeline now uses a JetStream work queue (`updates.control-plane.tasks.<lane>`) with duplicate submission protection and delayed redelivery instead of Consul sessions.
+- Status updates stream through `updates.control-plane.status.<deployment_id>` and surface via the new CLI helper `ploy updates tail <deployment-id>` (see `internal/cli/updates`).
+- Operational playbook recorded in `docs/runbooks/selfupdate-jetstream.md`; roadmap stage 07 checklist updated to reflect JetStream rollout.
+
 ## Proposed Architecture
 
 ### Core Principle: Unified Deployment with Domain Separation

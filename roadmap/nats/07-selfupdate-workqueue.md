@@ -56,7 +56,7 @@
    - Record rollback checkpoints in the status payload; ensure emergency/rollback flows produce matching events.
    - On startup, drain outstanding tasks (fetch without ack) to detect stuck deployments and emit `phase=aborted` before requesting manual intervention.
 6. **Client Consumption Changes**
-   - Update CLI to open a pull consumer on `updates.control-plane.status` filtered by `deployment_id`; map phases to progress bars/log lines.
+   - Update CLI to open a pull consumer on `updates.control-plane.status` filtered by `deployment_id`; map phases to progress bars/log lines. *(Implemented via `internal/cli/updates` and `ploy updates tail`, Sep 25 2025.)*
    - For dashboards, embed the same consumer via WebSocket or SSE bridge; include exponential backoff when the JetStream connection drops.
    - Maintain REST `/update/status` endpoint temporarily by proxying JetStream history (fetch latest message for each deployment) to support older clients.
 7. **Configuration & Secrets**
@@ -72,7 +72,7 @@
 - Logs: Structured events on submission, executor start/finish, redelivery, and status publication (mask sensitive metadata).
 - Alerts: page on high redelivery counts, tasks older than SLA (no status updates for >5m), or consumer lag exceeding threshold.
 - Runbooks:
-  - Add `docs/runbooks/selfupdate-jetstream.md` detailing stream inspection, forced nack, and manual rollback.
+  - Add `docs/runbooks/selfupdate-jetstream.md` detailing stream inspection, forced nack, and manual rollback. *(Added Sep 25 2025.)*
   - Update `docs/deployments.md` with instructions on tailing status events and requeueing tasks.
 - Tooling: Provide `cmd/ploy updates tail` CLI command that binds to status consumer for ad-hoc monitoring.
 

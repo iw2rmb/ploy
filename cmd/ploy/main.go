@@ -18,6 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/sbom"
 	"github.com/iw2rmb/ploy/internal/cli/security"
 	"github.com/iw2rmb/ploy/internal/cli/ui"
+	"github.com/iw2rmb/ploy/internal/cli/updates"
 	"github.com/iw2rmb/ploy/internal/cli/utils"
 	"github.com/iw2rmb/ploy/internal/cli/version"
 	"github.com/iw2rmb/ploy/internal/mods"
@@ -52,6 +53,8 @@ func main() {
 			security.Run(os.Args[2:], controllerURL)
 		case "recipe", "recipes":
 			recipes.Run(os.Args[2:], controllerURL)
+		case "updates":
+			updates.UpdatesCmd(os.Args[2:], controllerURL)
 		case "sbom":
 			sbom.SBOMCmd(os.Args[2:], controllerURL)
 		case "bluegreen":
