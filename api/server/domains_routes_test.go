@@ -11,7 +11,7 @@ import (
 )
 
 func TestDomainRoutes_FallbackHandlers(t *testing.T) {
-	s := &Server{app: fiber.New(), config: &ControllerConfig{Port: "18082"}, dependencies: &ServiceDependencies{HealthChecker: health.NewHealthChecker("", "", "")}}
+	s := &Server{app: fiber.New(), config: &ControllerConfig{Port: "18082"}, dependencies: &ServiceDependencies{HealthChecker: health.NewHealthChecker("", "")}}
 	s.setupRoutes()
 
 	// List domains

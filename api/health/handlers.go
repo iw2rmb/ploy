@@ -68,7 +68,7 @@ func (h *HealthChecker) UpdateStatusHandler(c *fiber.Ctx) error {
 		"update_phase":     phase,
 		"canary_status":    canary,
 		"rollback_capable": true,
-		"health_summary":   map[string]interface{}{"overall": "healthy", "dependencies": map[string]string{"consul": "healthy", "nomad": "healthy", "seaweedfs": "healthy"}},
+		"health_summary":   map[string]interface{}{"overall": "healthy", "dependencies": map[string]string{"jetstream": "healthy", "nomad": "healthy", "seaweedfs": "healthy"}},
 	}
 	if phase != "stable" {
 		status["status"] = "updating"

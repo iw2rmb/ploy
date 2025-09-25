@@ -92,7 +92,7 @@ func TestHealthChecker_CheckSeaweedFS_WithFactory(t *testing.T) {
 	// This test will initially fail because checkSeaweedFS still uses CreateStorageClientFromConfig
 	// After migration, it should use CreateStorageFromFactory and the Storage interface
 
-	h := NewHealthChecker("/tmp/test-config.yaml", "http://consul:8500", "http://nomad:4646")
+	h := NewHealthChecker("/tmp/test-config.yaml", "http://nomad:4646")
 
 	// The test should verify that:
 	// 1. CreateStorageFromFactory is called instead of CreateStorageClientFromConfig
@@ -115,7 +115,7 @@ func TestHealthChecker_CheckSeaweedFS_ConfigServiceMemoryProvider(t *testing.T) 
 	}))
 	require.NoError(t, err)
 
-	h := NewHealthChecker("", "", "")
+	h := NewHealthChecker("", "")
 	h.SetConfigService(svc)
 
 	require.NotPanics(t, func() {
