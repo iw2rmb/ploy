@@ -56,8 +56,8 @@ Consul remains the only strongly stateful dependency after SeaweedFS; its KV usa
 - ✅ **COMPLETED (2025-09-22)** `roadmap/nats/06-certificate-metadata.md` – Migrate certificate metadata and renewal flows to JetStream with broadcast notifications.
 
 ### Phase 3 — Controller Coordination & Locks
-- `roadmap/nats/07-selfupdate-workqueue.md` – Move self-update coordination onto a JetStream work-queue stream with status events.
-- `roadmap/nats/08-mods-kb-locks.md` – Replace Mods KB locks with JetStream CAS and lock event notifications.
+- 🚧 `roadmap/nats/07-selfupdate-workqueue.md` – Move self-update coordination onto a JetStream work-queue stream with status events (metrics instrumentation pending).
+- ✅ **COMPLETED (2025-09-25)** `roadmap/nats/08-mods-kb-locks.md` – Replace Mods KB locks with JetStream CAS, lifecycle events, and make JetStream the default locking backend.
 
 ### Phase 4 — Event Fabric & Cleanup
 - `roadmap/nats/09-event-fabric.md` – Consolidate platform telemetry on JetStream streams with pull-consumer clients.

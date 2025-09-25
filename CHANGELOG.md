@@ -16,6 +16,7 @@
 - Mods: Added focused unit tests for plan execution helpers (llm-exec and orw-gen).
 - Mods: Added MCP config parsing coverage (numeric budget coercion) and LLM diff-fetch tests to harden fanout execution.
 - Mods: Replaced Consul-based KB locks with JetStream CAS locking, lifecycle events (`mods.kb.lock.*`), and an operator runbook (`docs/runbooks/mods-kb-locks.md`).
+- Mods: JetStream locking is now the default path; set `PLOY_USE_JETSTREAM_KV=false` only as an emergency Consul fallback.
 - Mods API: Added handler coverage for status enrichment, cancellation guards, event ingestion, artifact streaming/SBOM pointers, log SSE, and debug Nomad endpoints using in-memory KV and storage doubles; lifted `api/mods` coverage to ~61%.
 - Mods: Persist structured execution reports and expose `/v1/mods/:id/report` in JSON or Markdown with repo, MR, timing, and step tree details.
 - Tooling: Added `scripts/dev/seaweedfs_bootstrap.sh` plus a Homebrew launchd template so macOS services expose test collections (`test-collection`, `artifacts`, `test-bucket`) with replication `000`.
