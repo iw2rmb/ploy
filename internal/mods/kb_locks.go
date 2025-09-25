@@ -34,21 +34,14 @@ type KBLockManager interface {
 
 // NewKBLockManager creates a new KB lock manager using the configured backend.
 // JetStream is always used; the legacy Consul toggle has been removed.
+
 func NewKBLockManager(kv orchestration.KV) KBLockManager {
-	if useJetstreamKV() {
-		if mgr, err := NewJetstreamKBLockManager(); err != nil {
-			log.Printf("mods: jetstream lock manager unavailable, falling back to Consul: %v", err)
-		} else if mgr != nil {
-			return mgr
-		}
+	if mgr, err := NewJetstreamKBLockManager(); err != nil {
+		log.Printf("mods: jetstream lock manager unavailable, falling back to Consul: %v", err)
+	} else if mgr != nil {
+		return mgr
 	}
 	return NewConsulKBLockManager(kv)
-}
-
-// useJetstreamKV checks if JetStream KV should be used for locking
-func useJetstreamKV() bool {
-	// JetStream is now mandatory for Mods KB locking; the legacy Consul fallback has been removed.
-	return true
 }
 
 // ConsulKBLockManager implements KBLockManager using Consul KV
