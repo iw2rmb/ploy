@@ -96,7 +96,7 @@ func (defaultJetStreamDialer) Connect(url string, opts ...nats.Option) (*nats.Co
 }
 
 func newJetStreamHealthConfigFromEnv() JetStreamHealthConfig {
-	timeout := 5 * time.Second
+	timeout := 10 * time.Second
 	if v := utils.Getenv("PLOY_JETSTREAM_HEALTH_TIMEOUT", ""); v != "" {
 		if parsed, err := time.ParseDuration(v); err == nil && parsed > 0 {
 			timeout = parsed
