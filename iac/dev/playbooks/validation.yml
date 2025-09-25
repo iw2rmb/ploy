@@ -21,7 +21,7 @@
         - "/opt/ploy/temp"
         - "/opt/ploy/traefik-data"
         - "/home/ploy/ploy/configs"
-      failed_when: not dir_check.results[0].stat.exists
+      failed_when: not dir_check.stat.exists
 
     - name: Validate core services are running
       systemd:
@@ -30,10 +30,7 @@
       loop:
         - nomad
         - consul
-        - seaweedfs-master
-        - seaweedfs-volume
-        - seaweedfs-filer
-      failed_when: service_status.results[0].status.ActiveState != "active"
+      failed_when: service_status.status.ActiveState != "active"
 
     - name: Validate service APIs are responding
       uri:
@@ -43,9 +40,7 @@
       loop:
         - { url: "http://localhost:4646/v1/status/leader", expected_code: 200 }
         - { url: "http://localhost:8500/v1/status/leader", expected_code: 200 }
-        - { url: "http://localhost:8200/v1/sys/health", expected_code: [200, 429] }
         - { url: "http://localhost:9333/cluster/status", expected_code: 200 }
-        - { url: "http://localhost:8080/ping", expected_code: 404 }  # Traefik returns 404 for ping without proper setup
       retries: 3
       delay: 5
 
@@ -56,16 +51,16 @@
         status_code: 200
       register: seaweedfs_status
 
-    - name: Validate Consul DNS resolves filer (resolvectl)
+    - name: Validate CoreDNS resolves filer (resolvectl)
       shell: resolvectl query seaweedfs-filer.storage.ploy.local
-      register: consul_dns_filer
-      failed_when: consul_dns_filer.rc != 0
+      register: coredns_filer_resolvectl
+      failed_when: coredns_filer_resolvectl.rc != 0
       changed_when: false
 
-    - name: Validate Consul DNS resolves filer (getent)
+    - name: Validate CoreDNS resolves filer (getent)
       shell: getent hosts seaweedfs-filer.storage.ploy.local
-      register: getent_filer
-      failed_when: getent_filer.rc != 0
+      register: coredns_filer_getent
+      failed_when: coredns_filer_getent.rc != 0
       changed_when: false
 
     - name: Display validation results

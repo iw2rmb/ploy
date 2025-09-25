@@ -41,7 +41,7 @@ func main() {
 		"api.dev.ployman.app": {
 			App:    "ploy-api",
 			Domain: "api.dev.ployman.app",
-			Target: "ploy-api.service.consul",
+			Target: "ploy-api.ploy.local",
 			Secure: true,
 		},
 	}

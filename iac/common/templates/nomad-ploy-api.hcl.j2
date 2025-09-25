@@ -83,7 +83,7 @@ job "ploy-api" {
         PLOY_STORAGE_CONFIG = "/etc/ploy/storage/config.yaml"
         
         # HashiCorp service addresses
-        CONSUL_ADDR = "http://consul.service.consul:8500"
+        CONSUL_ADDR = "http://127.0.0.1:8500"
         NOMAD_ADDR = "http://nomad.control.ploy.local:4646"
         NOMAD_DC = "{{ ploy.nomad_dc }}"
         # Nomad SDK resilience (used by API when talking to Nomad directly)
