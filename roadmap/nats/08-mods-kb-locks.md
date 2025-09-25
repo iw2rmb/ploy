@@ -1,5 +1,7 @@
 # Mods Knowledge Base Locking Migration
 
+> **Status (2025-09-25):** JetStream locking is the default path; setting `PLOY_USE_JETSTREAM_KV=false` now acts as the documented emergency override.
+
 ## What to Achieve
 - Eliminate Consul sessions/locks for Mods knowledge base (KB) writers and rely on JetStream Key-Value buckets for optimistic locking and state handoff.
 - Emit lock lifecycle events on JetStream subjects so maintenance workers react immediately to lock release/expiry.
@@ -52,7 +54,7 @@
    - Update `internal/mods/kb_maintenance.go` to subscribe to `mods.kb.lock.released.*` and trigger compaction immediately instead of periodic scans.
    - Ensure maintenance jobs acknowledge events and de-duplicate using message IDs derived from revision numbers.
 6. **Configuration Cleanup**
-   - Remove `PLOY_USE_JETSTREAM_KV` toggle once JetStream path is default; keep temporary override flag for rollback documented in runbook.
+   - Remove `PLOY_USE_JETSTREAM_KV` toggle once JetStream path is default; keep temporary override flag for rollback documented in runbook. *(Completed Sep 25 2025 — JetStream is now default, `PLOY_USE_JETSTREAM_KV=false` is the only rollback path.)*
    - Delete Consul ACL policies and Terraform entries referencing `kb/locks/*`.
 7. **Documentation & Runbooks**
    - Update `internal/mods/README.md` with JetStream locking diagrams, CLI snippets for inspecting bucket state (`nats kv info mods_kb_locks`).

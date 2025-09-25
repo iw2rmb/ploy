@@ -51,6 +51,7 @@ func NewKBLockManager(kv orchestration.KV) KBLockManager {
 func useJetstreamKV() bool {
 	value := strings.ToLower(strings.TrimSpace(utils.Getenv("PLOY_USE_JETSTREAM_KV", "")))
 	if value == "" {
+		// Fallback to JetStream by default; Consul requires explicit opt-out for emergencies.
 		return true
 	}
 	switch value {
