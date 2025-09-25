@@ -7,8 +7,8 @@
 - API embeds all Mods HCL templates and writes them to a per-run temp workspace:
   - `platform/nomad/mods/{planner.hcl,llm_exec.hcl,reducer.hcl,orw_apply.hcl}` (embedded at build time)
   - Runner reads templates relative to its `workspaceDir`.
-- orw-apply I/O stabilized (SeaweedFS-only, Consul DNS):
-  - Container always downloads `input.tar` from SeaweedFS via `INPUT_URL` (Consul DNS: `seaweedfs-filer.storage.ploy.local`).
+- orw-apply I/O stabilized (SeaweedFS-only, CoreDNS):
+  - Container always downloads `input.tar` from SeaweedFS via `INPUT_URL` (CoreDNS: `seaweedfs-filer.storage.ploy.local`).
   - Container uploads `diff.patch` to SeaweedFS via `DIFF_KEY`.
   - Runner writes `/workspace/out/error.log` on failures; controller persists and includes a snippet in status.
 - Status reliability improved:
@@ -100,7 +100,7 @@ Verify MR & diff (GitLab):
 - Nomad event stream: subscribe to alloc events; update status on Start/Terminated.
 - Standard job status.json: each job writes `/workspace/out/status.json` (step/state/message/ts/metrics) for the controller to persist.
 - Wrapper alloc guard: mirror the 90s no‑allocs guard for the job-manager wrapper wait path to avoid long waits when no allocations can be placed.
-- SeaweedFS reachability: ensure `PLOY_SEAWEEDFS_URL` points to a resolvable/healthy filer; consider fallbacks (host IP) for environments without Consul DNS.
+- SeaweedFS reachability: ensure `PLOY_SEAWEEDFS_URL` points to a resolvable/healthy filer; consider fallbacks (host IP) for environments without CoreDNS.
 
 ### Longer-Term (3–5 days)
 - Live logs endpoint (SSE): `GET /v1/mods/:id/logs?follow=true` streams step events + job tails. CLI `ploy mod watch` displays live progress.

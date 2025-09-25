@@ -234,7 +234,7 @@
         state: present
       when: ansible_os_family == "Debian"
 
-    - name: Install and configure dnsmasq for Consul DNS forwarding
+    - name: Install and configure dnsmasq for local DNS forwarding
       block:
         - name: Ensure dnsmasq is installed
           apt:
@@ -242,16 +242,21 @@
             state: present
           when: ansible_os_family == "Debian"
 
-        - name: Configure dnsmasq to forward .consul to Consul DNS
+        - name: Remove legacy Consul dnsmasq config
+          file:
+            path: /etc/dnsmasq.d/consul.conf
+            state: absent
+
+        - name: Configure dnsmasq to forward platform zone
           copy:
-            dest: /etc/dnsmasq.d/consul.conf
+            dest: /etc/dnsmasq.d/ploy.conf
             owner: root
             group: root
             mode: '0644'
             content: |
-              # Forward .consul to local Consul DNS on port 8600
-              server=/consul/127.0.0.1#8600
-              # Upstream resolvers for non-consul domains
+              # Forward {{ ploy.dns.domain }} to CoreDNS on localhost:{{ coredns.port | default(1053) }}
+              server=/{{ ploy.dns.domain }}/127.0.0.1#{{ coredns.port | default(1053) }}
+              # Upstream resolvers for non-platform domains
               server=1.1.1.1
               server=8.8.8.8
               # Bind only to loopback
@@ -269,15 +274,15 @@
             enabled: true
           when: dnsmasq_cfg.changed
 
-    - name: Configure systemd-resolved for Consul domain routing
+    - name: Configure systemd-resolved for platform DNS routing
       blockinfile:
         path: /etc/systemd/resolved.conf
         create: yes
         block: |
           [Resolve]
           DNS=127.0.0.1
-          Domains=~consul
-        marker: "# {mark} CONSUL DNS CONFIGURATION"
+          Domains=~{{ ploy.dns.domain }}
+        marker: "# {mark} PLATFORM DNS CONFIGURATION"
         backup: yes
       notify: restart systemd-resolved
       register: dns_config_changed
@@ -310,21 +315,21 @@
       debug:
         msg: "systemd-resolved status: {{ resolved_status.status.ActiveState }}"
 
-    - name: Test Consul DNS resolution with resolvectl
+    - name: Test CoreDNS resolution with resolvectl
       shell: resolvectl query nomad.control.ploy.local
-      register: consul_dns_test
+      register: platform_dns_test
       retries: 5
       delay: 3
-      until: consul_dns_test.rc == 0
+      until: platform_dns_test.rc == 0
       failed_when: false
 
-    - name: Display Consul DNS test result
+    - name: Display CoreDNS test result
       debug:
         msg: |
-          Consul DNS Resolution Test:
+          CoreDNS Resolution Test:
           Command: resolvectl query nomad.control.ploy.local
-          Result: {{ consul_dns_test.stdout if consul_dns_test.rc == 0 else 'FAILED - ' + consul_dns_test.stderr }}
-          Status: {{ 'SUCCESS' if consul_dns_test.rc == 0 else 'FAILED' }}
+          Result: {{ platform_dns_test.stdout if platform_dns_test.rc == 0 else 'FAILED - ' + platform_dns_test.stderr }}
+          Status: {{ 'SUCCESS' if platform_dns_test.rc == 0 else 'FAILED' }}
 
     - name: Verify /etc/resolv.conf configuration
       shell: cat /etc/resolv.conf
@@ -337,14 +342,6 @@
           /etc/resolv.conf configuration:
           {{ resolv_conf_content.stdout_lines | join('\n') }}
 
-    - name: Test Consul service discovery from Go programs
-      shell: |
-        export GODEBUG=netdns=go+2
-        getent hosts consul.service.consul || nslookup consul.service.consul 127.0.0.1
-      register: go_dns_test
-      failed_when: false
-      changed_when: false
-
     - name: Ensure nsswitch uses systemd-resolved first for hosts
       lineinfile:
         path: /etc/nsswitch.conf
@@ -352,13 +349,6 @@
         line: 'hosts:          files resolve dns mymachines'
         backrefs: no
       notify: restart systemd-resolved
-
-    - name: Display Go DNS compatibility test
-      debug:
-        msg: |
-          Go DNS Resolution Test (consul.service.consul):
-          {{ go_dns_test.stdout if go_dns_test.rc == 0 else 'FAILED - ' + (go_dns_test.stderr | default('No error output')) }}
-          Status: {{ 'SUCCESS' if go_dns_test.rc == 0 else 'FAILED' }}
 
     - name: Check Nomad service status
       command: systemctl is-active nomad
