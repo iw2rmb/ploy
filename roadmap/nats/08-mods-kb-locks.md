@@ -72,7 +72,7 @@
 - Tooling: Provide `cmd/ploy mods locks tail --kb <id>` to stream event subjects and surface lock health alongside Mods telemetry.
 
 ## Risks & Mitigations
-- **JetStream Outage**: Document fallback to Consul (feature flag) and ensure writers fail-fast rather than hang; include circuit breaker.
+- **JetStream Outage**: Writers now fail-fast; incident response requires restoring JetStream availability rather than toggling to Consul. Document manual drain procedures and circuit breakers in runbooks.
 - **Stale Locks**: TTL-based expiry plus release events guard against stuck locks; schedule watchdog to scan for buckets lacking release events beyond SLA.
 - **Credential Scope**: Limit Mods creds to `mods.kb.*` subjects; rotate via existing secret pipeline and track with `NATS_CREDS_MODS` expiry monitors.
 - **High Churn**: Size bucket MaxValues appropriately; consider sharding (`mods_kb_locks.<region>`) if contention increases.
