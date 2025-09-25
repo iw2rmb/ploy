@@ -31,4 +31,3 @@ Event payloads include `kb_id`, `owner`, `revision`, and `lease_expires_at`. The
 - **Contention**: Inspect lock acquisition failures and stream events to identify current owners.
 - **Stuck Locks**: Fetch lock record and compare `lease_expires_at` with current time; use manual release if overdue.
 - **Event Gaps**: Confirm `mods_kb_lock_events` stream exists and consumer cursors are current; re-create durable if necessary.
-- **Fallback**: Set `PLOY_USE_JETSTREAM_KV=false` temporarily to revert to Consul, but file an incident and plan rollback ASAP.

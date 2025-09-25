@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"log"
 	"path"
-	"strings"
 	"time"
 
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/iw2rmb/ploy/internal/orchestration"
-	"github.com/iw2rmb/ploy/internal/utils"
 )
 
 // Lock represents an acquired lock with metadata
@@ -35,7 +33,7 @@ type KBLockManager interface {
 }
 
 // NewKBLockManager creates a new KB lock manager using the configured backend.
-// Uses JetStream if PLOY_USE_JETSTREAM_KV is truthy, otherwise falls back to Consul.
+// JetStream is always used; the legacy Consul toggle has been removed.
 func NewKBLockManager(kv orchestration.KV) KBLockManager {
 	if useJetstreamKV() {
 		if mgr, err := NewJetstreamKBLockManager(); err != nil {
@@ -49,19 +47,8 @@ func NewKBLockManager(kv orchestration.KV) KBLockManager {
 
 // useJetstreamKV checks if JetStream KV should be used for locking
 func useJetstreamKV() bool {
-	value := strings.ToLower(strings.TrimSpace(utils.Getenv("PLOY_USE_JETSTREAM_KV", "")))
-	if value == "" {
-		// Fallback to JetStream by default; Consul requires explicit opt-out for emergencies.
-		return true
-	}
-	switch value {
-	case "0", "false", "off", "no", "consul", "legacy":
-		return false
-	case "1", "true", "on", "yes", "jetstream", "js":
-		return true
-	default:
-		return true
-	}
+	// JetStream is now mandatory for Mods KB locking; the legacy Consul fallback has been removed.
+	return true
 }
 
 // ConsulKBLockManager implements KBLockManager using Consul KV

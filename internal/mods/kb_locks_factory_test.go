@@ -27,15 +27,18 @@ func TestNewKBLockManager_DefaultsToJetStream(t *testing.T) {
 	}
 }
 
-func TestNewKBLockManager_ConsulFallbackWhenDisabled(t *testing.T) {
+func TestNewKBLockManager_IgnoresDisableFlag(t *testing.T) {
 	_ = os.Setenv("PLOY_USE_JETSTREAM_KV", "false")
 	defer func() { _ = os.Unsetenv("PLOY_USE_JETSTREAM_KV") }()
+
+	_, url := runTestJetStream(t)
+	setJetStreamEnv(t, url)
 
 	kv := &MockKV{}
 	mgr := NewKBLockManager(kv)
 
-	if _, ok := mgr.(*ConsulKBLockManager); !ok {
-		t.Fatalf("expected ConsulKBLockManager when override disables JetStream, got %T", mgr)
+	if _, ok := mgr.(*JetstreamKBLockManager); !ok {
+		t.Fatalf("expected JetstreamKBLockManager even when flag disables, got %T", mgr)
 	}
 }
 
@@ -45,9 +48,9 @@ func TestUseJetstreamKV(t *testing.T) {
 		expected bool
 	}{
 		{"", true},
-		{"false", false},
-		{"0", false},
-		{"no", false},
+		{"false", true},
+		{"0", true},
+		{"no", true},
 		{"true", true},
 		{"1", true},
 		{"yes", true},
