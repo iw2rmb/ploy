@@ -141,21 +141,30 @@
       notify: restart coredns
 
     - name: Configure dnsmasq forwarding for CoreDNS zone
-      copy:
-        dest: /etc/dnsmasq.d/ploy.conf
-        owner: root
-        group: root
-        mode: '0644'
-        content: |
-          # Forward {{ ploy.dns.domain }} to CoreDNS on localhost:{{ coredns.port | default(1053) }}
-          server=/{{ ploy.dns.domain }}/127.0.0.1#{{ coredns.port | default(1053) }}
-      notify: restart dnsmasq
+      block:
+        - name: Remove legacy Consul dnsmasq config
+          file:
+            path: /etc/dnsmasq.d/consul.conf
+            state: absent
+
+        - name: Install CoreDNS forwarding rules
+          copy:
+            dest: /etc/dnsmasq.d/ploy.conf
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              # Forward {{ ploy.dns.domain }} to CoreDNS on localhost:{{ coredns.port | default(1053) }}
+              server=/{{ ploy.dns.domain }}/127.0.0.1#{{ coredns.port | default(1053) }}
+          notify: restart dnsmasq
+
+      when: ansible_os_family == "Debian"
 
     - name: Ensure systemd-resolved routes CoreDNS zone
       replace:
         path: /etc/systemd/resolved.conf
-        regexp: '^Domains=~consul.*$'
-        replace: 'Domains=~consul ~{{ ploy.dns.domain }}'
+        regexp: '^Domains=.*$'
+        replace: 'Domains=~{{ ploy.dns.domain }}'
       notify: restart systemd-resolved
 
     - name: Ensure systemd-resolved uses localhost DNS

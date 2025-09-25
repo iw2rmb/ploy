@@ -40,4 +40,4 @@ All active scripts rely on `common/test-utils.sh` for logging helpers; sourcing 
 2. Reuse helpers from `common/test-utils.sh` for colourised output and assertions.
 3. Add new scripts alongside the relevant category above, and update this README with a one-line description.
 
-The previous lane matrix (A–G) has been fully removed. New scripts should validate Docker runtime behaviour and avoid referencing deprecated lanes or Consul DNS endpoints.
+The previous lane matrix (A–G) has been fully removed. New scripts should validate Docker runtime behaviour and avoid referencing deprecated lanes or legacy Consul DNS endpoints—prefer the CoreDNS `ploy.local` zone instead.
