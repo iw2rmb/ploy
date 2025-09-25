@@ -108,6 +108,14 @@ func ConsumeStatusEvents(ctx context.Context, js nats.JetStreamContext, opts Tai
 				event.Timestamp = time.Now().UTC().Round(time.Millisecond)
 			}
 
+			lane := "unknown"
+			if event.Metadata != nil {
+				if candidate := strings.TrimSpace(event.Metadata["lane"]); candidate != "" {
+					lane = candidate
+				}
+			}
+			recordStatusLag("cli", lane, time.Since(event.Timestamp))
+
 			handler(event)
 			_ = msg.Ack()
 
