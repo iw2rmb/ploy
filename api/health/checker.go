@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -203,19 +204,45 @@ func (h *HealthChecker) jetStreamHealth(clientName string) (DependencyHealth, *n
 }
 
 func (h *HealthChecker) connectJetStream(clientName string) (*nats.Conn, nats.JetStreamContext, bool, error) {
+	tlsCfg := h.jetStreamTLSConfig()
+	var firstErr error
+	if tlsCfg != nil {
+		if conn, js, err := h.connectJetStreamOnce(clientName, true, tlsCfg); err == nil {
+			return conn, js, true, nil
+		} else {
+			firstErr = err
+		}
+	}
 	conn, js, err := h.connectJetStreamOnce(clientName, false, nil)
 	if err == nil {
 		return conn, js, false, nil
 	}
-	if shouldRetryWithTLS(err) {
-		tlsCfg := &tls.Config{InsecureSkipVerify: true}
-		connTLS, jsTLS, errTLS := h.connectJetStreamOnce(clientName, true, tlsCfg)
-		if errTLS == nil {
+	if tlsCfg != nil && shouldRetryWithTLS(err) {
+		if connTLS, jsTLS, errTLS := h.connectJetStreamOnce(clientName, true, tlsCfg); errTLS == nil {
 			return connTLS, jsTLS, true, nil
+		} else if firstErr == nil {
+			firstErr = errTLS
 		}
-		return nil, nil, false, errTLS
+	}
+	if firstErr != nil {
+		return nil, nil, false, firstErr
 	}
 	return nil, nil, false, err
+}
+
+func (h *HealthChecker) jetStreamTLSConfig() *tls.Config {
+	if strings.TrimSpace(h.jetstreamCfg.URL) == "" {
+		return nil
+	}
+	u, err := url.Parse(h.jetstreamCfg.URL)
+	if err != nil {
+		return &tls.Config{InsecureSkipVerify: true}
+	}
+	host := u.Hostname()
+	if host == "" {
+		return &tls.Config{InsecureSkipVerify: true}
+	}
+	return &tls.Config{InsecureSkipVerify: true, ServerName: host}
 }
 
 func (h *HealthChecker) connectJetStreamOnce(clientName string, useTLS bool, tlsCfg *tls.Config) (*nats.Conn, nats.JetStreamContext, error) {
