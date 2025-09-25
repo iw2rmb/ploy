@@ -329,6 +329,10 @@ test-mods: ## Run mods unit tests + staticcheck
 	go test -vet=off -race -short -count=1 -v ./internal/mods
 	@$(MAKE) staticcheck-mods
 
+.PHONY: mods-integration-vps
+mods-integration-vps: ## Run Mods integration suite on VPS via Nomad job
+	@./scripts/run-mods-integration-vps.sh
+
 .PHONY: generate-mocks
 generate-mocks: ## Generate test mocks
 	@echo "$(BLUE)Generating test mocks...$(NC)"
