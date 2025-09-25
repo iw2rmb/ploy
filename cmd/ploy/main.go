@@ -1,74 +1,85 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/iw2rmb/ploy/internal/cli/apps"
-	"github.com/iw2rmb/ploy/internal/cli/bluegreen"
-	"github.com/iw2rmb/ploy/internal/cli/certs"
-	"github.com/iw2rmb/ploy/internal/cli/debug"
-	"github.com/iw2rmb/ploy/internal/cli/deploy"
-	"github.com/iw2rmb/ploy/internal/cli/domains"
-	"github.com/iw2rmb/ploy/internal/cli/env"
-	"github.com/iw2rmb/ploy/internal/cli/recipes"
-	"github.com/iw2rmb/ploy/internal/cli/routing"
-	"github.com/iw2rmb/ploy/internal/cli/sbom"
-	"github.com/iw2rmb/ploy/internal/cli/security"
-	"github.com/iw2rmb/ploy/internal/cli/ui"
-	"github.com/iw2rmb/ploy/internal/cli/updates"
-	"github.com/iw2rmb/ploy/internal/cli/utils"
-	"github.com/iw2rmb/ploy/internal/cli/version"
-	"github.com/iw2rmb/ploy/internal/mods"
+	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-var controllerURL = utils.ResolveControllerURLFromEnv()
-
 func main() {
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "mod":
-			mods.ModCmd(os.Args[2:], controllerURL)
-		case "apps":
-			apps.AppsCmd(os.Args[2:], controllerURL)
-		case "push":
-			deploy.PushCmd(os.Args[2:], controllerURL)
-		case "open":
-			deploy.OpenCmd(os.Args[2:])
-		case "env":
-			env.EnvCmd(os.Args[2:], controllerURL)
-		case "domains":
-			domains.DomainsCmd(os.Args[2:], controllerURL)
-		case "routing":
-			routing.RoutingCmd(os.Args[2:], controllerURL)
-		case "certs":
-			certs.CertsCmd(os.Args[2:], controllerURL)
-		case "debug":
-			debug.DebugCmd(os.Args[2:], controllerURL)
-		case "rollback":
-			debug.RollbackCmd(os.Args[2:], controllerURL)
-		case "security":
-			security.Run(os.Args[2:], controllerURL)
-		case "recipe", "recipes":
-			recipes.Run(os.Args[2:], controllerURL)
-		case "updates":
-			updates.UpdatesCmd(os.Args[2:], controllerURL)
-		case "sbom":
-			sbom.SBOMCmd(os.Args[2:], controllerURL)
-		case "bluegreen":
-			bluegreen.BlueGreenCmd(os.Args[2:], controllerURL)
-		case "version":
-			version.VersionCmd(os.Args[2:], controllerURL)
-		default:
-			ui.Usage()
-		}
-		return
-	}
-	p := tea.NewProgram(ui.Model{})
-	if _, err := p.Run(); err != nil {
-		fmt.Println("error:", err)
+	if err := execute(os.Args[1:], os.Stderr); err != nil {
+		reportError(err, os.Stderr)
 		os.Exit(1)
 	}
+}
+
+func execute(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printUsage(stderr)
+		return errors.New("command required")
+	}
+
+	switch args[0] {
+	case "workflow":
+		return handleWorkflow(args[1:], stderr)
+	default:
+		printUsage(stderr)
+		return fmt.Errorf("unknown command %q", args[0])
+	}
+}
+
+func handleWorkflow(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printWorkflowUsage(stderr)
+		return errors.New("workflow subcommand required")
+	}
+
+	switch args[0] {
+	case "run":
+		return handleWorkflowRun(args[1:], stderr)
+	default:
+		printWorkflowUsage(stderr)
+		return fmt.Errorf("unknown workflow subcommand %q", args[0])
+	}
+}
+
+func handleWorkflowRun(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("workflow run", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	ticket := fs.String("ticket", "", "ticket identifier to consume")
+	if err := fs.Parse(args); err != nil {
+		printWorkflowRunUsage(stderr)
+		return err
+	}
+
+	opts := runner.Options{Ticket: strings.TrimSpace(*ticket)}
+	err := runner.Run(context.Background(), opts)
+	if errors.Is(err, runner.ErrTicketRequired) {
+		printWorkflowRunUsage(stderr)
+	}
+	return err
+}
+
+func reportError(err error, stderr io.Writer) {
+	_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
+}
+
+func printUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run [--ticket <ticket-id>]")
+}
+
+func printWorkflowUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow <command>")
+	_, _ = fmt.Fprintln(w, "\nCommands:")
+	_, _ = fmt.Fprintln(w, "  run    Consume a ticket and execute the workflow (stub)")
+}
+
+func printWorkflowRunUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --ticket <ticket-id>")
 }
