@@ -45,6 +45,7 @@ type Handler struct {
 	statusCache      map[string]*UpdateStatus
 	latestDeployment string
 	workerOnce       sync.Once
+	updateFn         func(context.Context, string, UpdateRequest, map[string]string) error
 }
 
 var (
@@ -95,7 +96,7 @@ func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQue
 		}
 	}
 
-	return &Handler{
+	handler := &Handler{
 		distributor:     distributor,
 		queue:           queue,
 		statusPublisher: statusPublisher,
@@ -107,7 +108,9 @@ func NewHandler(storageProvider storage.StorageProvider, queue *JetStreamWorkQue
 		architecture:    "amd64", // TODO: detect from runtime
 		executorID:      executorID,
 		statusCache:     make(map[string]*UpdateStatus),
-	}, nil
+	}
+	handler.updateFn = handler.StartUpdate
+	return handler, nil
 }
 
 // UpdateRequest represents a controller update request
@@ -639,10 +642,22 @@ func (h *Handler) processTask(ctx context.Context, msg *WorkQueueMessage) error 
 
 	h.updateStatus(ctx, msg.DeploymentID, req, "preparing", "Update task claimed", 0, combined)
 
-	if err := h.StartUpdate(ctx, msg.DeploymentID, req, combined); err != nil {
+	updateFn := h.updateFn
+	if updateFn == nil {
+		updateFn = h.StartUpdate
+	}
+
+	if err := updateFn(ctx, msg.DeploymentID, req, combined); err != nil {
 		h.updateStatus(ctx, msg.DeploymentID, req, "failed", err.Error(), 0, combined)
-		if err := msg.Ack(); err != nil {
-			log.Printf("[selfupdate] ack failed task %s: %v", msg.DeploymentID, err)
+		delay := msg.AckWait / 2
+		if delay <= 0 {
+			delay = time.Second
+		}
+		if nakErr := msg.NakWithDelay(delay); nakErr != nil {
+			log.Printf("[selfupdate] nak failed task %s: %v", msg.DeploymentID, nakErr)
+			if ackErr := msg.Ack(); ackErr != nil {
+				log.Printf("[selfupdate] fallback ack failed task %s: %v", msg.DeploymentID, ackErr)
+			}
 		}
 		return err
 	}
