@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -53,14 +54,23 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("workflow run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	ticket := fs.String("ticket", "", "ticket identifier to consume")
+	tenant := fs.String("tenant", "", "tenant slug for subject mapping")
 	if err := fs.Parse(args); err != nil {
 		printWorkflowRunUsage(stderr)
 		return err
 	}
 
-	opts := runner.Options{Ticket: strings.TrimSpace(*ticket)}
+	trimmedTicket := strings.TrimSpace(*ticket)
+	trimmedTenant := strings.TrimSpace(*tenant)
+	if trimmedTenant == "" {
+		printWorkflowRunUsage(stderr)
+		return errors.New("tenant required")
+	}
+
+	bus := contracts.NewInMemoryBus(trimmedTenant)
+	opts := runner.Options{Ticket: trimmedTicket, Events: bus}
 	err := runner.Run(context.Background(), opts)
-	if errors.Is(err, runner.ErrTicketRequired) {
+	if errors.Is(err, runner.ErrTicketRequired) || errors.Is(err, runner.ErrEventsClientRequired) {
 		printWorkflowRunUsage(stderr)
 	}
 	return err
@@ -71,7 +81,7 @@ func reportError(err error, stderr io.Writer) {
 }
 
 func printUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run [--ticket <ticket-id>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run [--tenant <tenant>] --ticket <ticket-id>")
 }
 
 func printWorkflowUsage(w io.Writer) {
@@ -81,5 +91,5 @@ func printWorkflowUsage(w io.Writer) {
 }
 
 func printWorkflowRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --ticket <ticket-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> --ticket <ticket-id>")
 }

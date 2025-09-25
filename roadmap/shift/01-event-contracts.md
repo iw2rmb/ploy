@@ -1,5 +1,5 @@
 # Event Contract Rollout
-- [ ] Pending
+- [x] Done
 
 ## Why / What For
 Define the JetStream subjects, message schemas, and retention policies that let Ploy stay stateless while Grid retains control-surface ownership.
