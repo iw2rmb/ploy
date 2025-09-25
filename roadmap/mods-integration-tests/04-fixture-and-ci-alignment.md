@@ -16,7 +16,7 @@ Fixtures (SeaweedFS artifacts, Git repos) and CI pipelines must align with the n
 - Documentation clearly states how to prepare fixtures locally and on the VPS.
 
 ## Implementation Notes
-- Added SeaweedFS seeding script (`scripts/mods-seed-fixtures.sh`) that uploads fixture payloads from `tests/mods-fixtures` and validates Git remotes.
+- Added SeaweedFS seeding script (`scripts/mods-seed-fixtures.sh`) that uploads fixture payloads from `tests/mods-fixtures` and validates Git remotes using `PLOY_GITLAB_PAT`.
 - Curated fixture inputs in `tests/mods-fixtures/` for mod-99, mod-gitlab-test, and self-healing scenarios.
 - Wired GitHub Actions job `mods-integration-harness` to seed fixtures and invoke `make mods-integration-vps` gated on VPS secrets.
 

@@ -155,7 +155,7 @@ jobs:
           SEAWEEDFS_FILER: ${{ secrets.PLOY_SEAWEEDFS_URL }}
           GITHUB_PLOY_DEV_USERNAME: ${{ secrets.GITHUB_PLOY_DEV_USERNAME }}
           GITHUB_PLOY_DEV_PAT: ${{ secrets.GITHUB_PLOY_DEV_PAT }}
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          PLOY_GITLAB_PAT: ${{ secrets.PLOY_GITLAB_PAT }}
           MODS_FIXTURE_REPOS: ${{ secrets.MODS_FIXTURE_REPOS }}
       - name: Run Mods integration harness
         run: make mods-integration-vps
@@ -165,7 +165,7 @@ jobs:
           PLOY_SEAWEEDFS_URL: ${{ secrets.PLOY_SEAWEEDFS_URL }}
           GITHUB_PLOY_DEV_USERNAME: ${{ secrets.GITHUB_PLOY_DEV_USERNAME }}
           GITHUB_PLOY_DEV_PAT: ${{ secrets.GITHUB_PLOY_DEV_PAT }}
-          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          PLOY_GITLAB_PAT: ${{ secrets.PLOY_GITLAB_PAT }}
           NOMAD_DC: ${{ secrets.NOMAD_DC }}
           MODS_INTEGRATION_REPO: ${{ secrets.MODS_INTEGRATION_REPO }}
           MODS_INTEGRATION_REF: ${{ secrets.MODS_INTEGRATION_REF }}
