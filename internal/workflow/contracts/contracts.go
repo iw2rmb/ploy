@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const SchemaVersion = "2025-09-25"
+const SchemaVersion = "2025-09-26"
 
 type SubjectSet struct {
 	TicketInbox      string
@@ -77,6 +77,7 @@ type WorkflowCheckpoint struct {
 	TicketID      string           `json:"ticket_id"`
 	Stage         string           `json:"stage"`
 	Status        CheckpointStatus `json:"status"`
+	CacheKey      string           `json:"cache_key,omitempty"`
 }
 
 func (c WorkflowCheckpoint) Validate() error {

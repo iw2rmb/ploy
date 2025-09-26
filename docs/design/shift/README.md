@@ -34,7 +34,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 ## Architecture Outline
 1. **JetStream Subjects**
    - `grid.webhook.<tenant>` (Grid-owned) delivers tickets that Ploy claims via pull consumer.
-   - `ploy.workflow.<ticket>.checkpoints` stores DAG reconstructions, lane assignments, cache keys, and retry markers.
+   - `ploy.workflow.<ticket>.checkpoints` stores DAG reconstructions, lane assignments, cache keys, and retry markers. Each checkpoint now carries the computed lane cache key so Grid can reason about cache reuse without introspecting stage payloads.
    - `ploy.artifact.<ticket>` publishes IPFS hashes for build outputs, DB snapshot bundles, and diff reports.
    - `grid.status.<ticket>` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
 2. **Workflow Runner CLI**

@@ -13,7 +13,7 @@ Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate
 - **WorkflowTicket** — minimal claim payload pulled from `grid.webhook.<tenant>`.
   ```json
   {
-    "schema_version": "2025-09-25",
+    "schema_version": "2025-09-26",
     "ticket_id": "ticket-123",
     "tenant": "acme"
   }
@@ -21,14 +21,15 @@ Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate
 - **WorkflowCheckpoint** — checkpoint envelope published to `ploy.workflow.<ticket>.checkpoints`.
   ```json
   {
-    "schema_version": "2025-09-25",
+    "schema_version": "2025-09-26",
     "ticket_id": "ticket-123",
     "stage": "ticket-claimed",
-    "status": "claimed"
+    "status": "claimed",
+    "cache_key": "go-native/go-native@commit=none@snapshot=none@manifest=2025-09-26@aster=plan"
   }
   ```
 
-The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), ensuring the CLI and future Grid integrations consume identical versions.
+The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), ensuring the CLI and future Grid integrations consume identical versions. Checkpoints now carry the lane cache key so Grid can coordinate cache hydration and reuse.
 
 ## Stubbed JetStream Client
 - `internal/workflow/contracts.InMemoryBus` implements `runner.EventsClient` and records claimed tickets and checkpoints.
