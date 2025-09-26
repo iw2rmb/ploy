@@ -77,6 +77,8 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 					ParallelStages:  []string{"orw-apply", "orw-gen"},
 					HumanGate:       true,
 					Summary:         "apply recipe.alpha then review",
+					PlanTimeout:     "2m",
+					MaxParallel:     4,
 				},
 				Human: &ModsHumanMetadata{
 					Required:  true,
@@ -156,6 +158,23 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 
 	if subject := envelope.Subject(); subject != "ploy.artifact.ticket-123" {
 		t.Fatalf("unexpected artifact subject: %s", subject)
+	}
+}
+
+func TestModsPlanMetadataValidateRejectsInvalidValues(t *testing.T) {
+	invalidTimeout := ModsPlanMetadata{PlanTimeout: "not-a-duration"}
+	if err := invalidTimeout.Validate(); err == nil {
+		t.Fatal("expected validation error for invalid plan timeout")
+	}
+
+	invalidParallel := ModsPlanMetadata{MaxParallel: -1}
+	if err := invalidParallel.Validate(); err == nil {
+		t.Fatal("expected validation error for negative max parallel")
+	}
+
+	valid := ModsPlanMetadata{PlanTimeout: "90s", MaxParallel: 3}
+	if err := valid.Validate(); err != nil {
+		t.Fatalf("expected valid metadata, got %v", err)
 	}
 }
 

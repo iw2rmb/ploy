@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Mods Planner CLI Controls
+- Added `--mods-plan-timeout` and `--mods-max-parallel` flags to `ploy workflow run`, forwarding planner tuning options into the runner so operators can timebox plan evaluation and cap concurrent Mods stages.
+- Updated the default planner to push the new options into Mods stage metadata, publish concurrency hints in checkpoints/artifact envelopes, and include the hints when dispatching stages to the Grid client.
+- Documented the flags across CLI docs, marked `roadmap/mods/03-cli-grid-wiring.md` complete, and refreshed the Mods design record to note the CLI/Grid wiring milestone.
+
 ## [2025-09-26] Mods Knowledge Base Metadata
 - Extended the Mods planner with a knowledge base advisor that records recipe selections, concurrency hints, and human expectations inside `stage_metadata.mods` for plan and human stages.
 - Updated workflow contracts and the runner to serialize Mods plan/human/recommendation metadata in checkpoints and artifact envelopes, exercising the new schema in unit tests.

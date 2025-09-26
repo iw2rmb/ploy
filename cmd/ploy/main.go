@@ -261,9 +261,20 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	asterGlobal := fs.String("aster", "", "comma-separated optional Aster toggles to include")
 	var stageOverrides stageOverrideFlag
 	fs.Var(&stageOverrides, "aster-step", "per-stage Aster toggles in the form stage=toggle1,toggle2 or stage=off")
+	modsPlanTimeout := fs.Duration("mods-plan-timeout", 0, "planner timeout for Mods plan evaluation (e.g. 2m30s)")
+	modsMaxParallel := fs.Int("mods-max-parallel", 0, "maximum Mods stages to run in parallel")
 	if err := fs.Parse(args); err != nil {
 		printWorkflowRunUsage(stderr)
 		return err
+	}
+
+	if *modsPlanTimeout < 0 {
+		printWorkflowRunUsage(stderr)
+		return fmt.Errorf("mods plan timeout must be non-negative")
+	}
+	if *modsMaxParallel < 0 {
+		printWorkflowRunUsage(stderr)
+		return fmt.Errorf("mods max parallel must be non-negative")
 	}
 
 	trimmedTenant := strings.TrimSpace(*tenant)
@@ -308,15 +319,17 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("load Aster bundles: %w", err)
 	}
+	modsOptions := runner.ModsOptions{PlanTimeout: *modsPlanTimeout, MaxParallel: *modsMaxParallel}
 	opts := runner.Options{
 		Ticket:           ticketValue,
 		Tenant:           trimmedTenant,
 		Events:           events,
 		Grid:             gridClient,
-		Planner:          runner.NewDefaultPlanner(),
+		Planner:          runner.NewDefaultPlannerWithMods(modsOptions),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
 		CacheComposer:    laneCacheComposer{lanes: laneReg},
+		Mods:             modsOptions,
 		Aster: runner.AsterOptions{
 			Locator:           locator,
 			AdditionalToggles: splitToggles(*asterGlobal),
@@ -359,7 +372,7 @@ func printWorkflowUsage(w io.Writer) {
 }
 
 func printWorkflowRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]")
 }
 
 func printAsterSummary(w io.Writer, invocations []runner.StageInvocation) {

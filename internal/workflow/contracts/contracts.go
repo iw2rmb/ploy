@@ -3,6 +3,7 @@ package contracts
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const SchemaVersion = "2025-09-26.1"
@@ -155,6 +156,8 @@ type ModsPlanMetadata struct {
 	ParallelStages  []string `json:"parallel_stages,omitempty"`
 	HumanGate       bool     `json:"human_gate"`
 	Summary         string   `json:"summary,omitempty"`
+	PlanTimeout     string   `json:"plan_timeout,omitempty"`
+	MaxParallel     int      `json:"max_parallel,omitempty"`
 }
 
 // Validate ensures Mods plan metadata entries contain non-empty values.
@@ -168,6 +171,14 @@ func (m ModsPlanMetadata) Validate() error {
 		if strings.TrimSpace(stage) == "" {
 			return fmt.Errorf("parallel stage %d is empty", i)
 		}
+	}
+	if trimmed := strings.TrimSpace(m.PlanTimeout); trimmed != "" {
+		if _, err := time.ParseDuration(trimmed); err != nil {
+			return fmt.Errorf("plan timeout invalid: %w", err)
+		}
+	}
+	if m.MaxParallel < 0 {
+		return fmt.Errorf("max parallel cannot be negative")
 	}
 	return nil
 }
