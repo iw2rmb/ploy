@@ -148,6 +148,14 @@ var (
 			}
 			opts.ArtifactPublisher = publisher
 		}
+		jetstreamURL := strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
+		if jetstreamURL != "" {
+			metadataPublisher, err := snapshots.NewJetStreamMetadataPublisher(jetstreamURL, snapshots.JetStreamMetadataOptions{})
+			if err != nil {
+				return nil, err
+			}
+			opts.MetadataPublisher = metadataPublisher
+		}
 		return snapshots.LoadDirectory(dir, opts)
 	}
 	snapshotConfigDir = "configs/snapshots"
