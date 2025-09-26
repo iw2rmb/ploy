@@ -95,12 +95,12 @@ func TestJetStreamClientPublishCheckpoint(t *testing.T) {
 	checkpoint := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
 		TicketID:      "ticket-123",
-		Stage:         "mods",
+		Stage:         modsStage,
 		Status:        CheckpointStatusRunning,
 		CacheKey:      "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
-			Name:     "mods",
-			Kind:     "mods",
+			Name:     modsStage,
+			Kind:     modsStage,
 			Lane:     "node-wasm",
 			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		},
@@ -166,11 +166,11 @@ func TestJetStreamClientPublishArtifact(t *testing.T) {
 	envelope := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
 		TicketID:      "ticket-123",
-		Stage:         "mods",
+		Stage:         modsStage,
 		CacheKey:      "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
-			Name:     "mods",
-			Kind:     "mods",
+			Name:     modsStage,
+			Kind:     modsStage,
 			Lane:     "node-wasm",
 			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		},
