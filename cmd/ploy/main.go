@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
@@ -52,6 +53,25 @@ type environmentService interface {
 
 type environmentFactoryFunc func(l laneRegistry, s snapshotRegistry) (environmentService, error)
 
+type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
+
+type stageOverrideFlag struct {
+	values []string
+}
+
+func (f *stageOverrideFlag) String() string {
+	return strings.Join(f.values, ",")
+}
+
+func (f *stageOverrideFlag) Set(value string) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return errors.New("aster-step value cannot be empty")
+	}
+	f.values = append(f.values, trimmed)
+	return nil
+}
+
 var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
 	eventsFactory  eventsFactoryFunc = func(tenant string) runner.EventsClient {
@@ -78,6 +98,11 @@ var (
 		return registryCompiler{registry: registry}, nil
 	}
 	manifestConfigDir = "configs/manifests"
+
+	asterLocatorLoader asterLocatorLoaderFunc = func(dir string) (aster.Locator, error) {
+		return aster.NewFilesystemLocator(dir)
+	}
+	asterConfigDir = "configs/aster"
 
 	environmentServiceFactory environmentFactoryFunc = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
 		if l == nil {
@@ -159,6 +184,9 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	ticket := fs.String("ticket", "auto", "ticket identifier to consume or 'auto'")
 	tenant := fs.String("tenant", "", "tenant slug for subject mapping")
+	asterGlobal := fs.String("aster", "", "comma-separated optional Aster toggles to include")
+	var stageOverrides stageOverrideFlag
+	fs.Var(&stageOverrides, "aster-step", "per-stage Aster toggles in the form stage=toggle1,toggle2 or stage=off")
 	if err := fs.Parse(args); err != nil {
 		printWorkflowRunUsage(stderr)
 		return err
@@ -168,6 +196,12 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	if trimmedTenant == "" {
 		printWorkflowRunUsage(stderr)
 		return errors.New("tenant required")
+	}
+
+	overrides, err := parseStageOverrides(stageOverrides.values)
+	if err != nil {
+		printWorkflowRunUsage(stderr)
+		return err
 	}
 
 	compiler, err := manifestRegistryLoader(manifestConfigDir)
@@ -182,6 +216,10 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 
 	events := eventsFactory(trimmedTenant)
 	grid := runner.NewInMemoryGrid()
+	locator, err := asterLocatorLoader(asterConfigDir)
+	if err != nil {
+		return fmt.Errorf("load Aster bundles: %w", err)
+	}
 	opts := runner.Options{
 		Ticket:           ticketValue,
 		Tenant:           trimmedTenant,
@@ -190,12 +228,25 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		Planner:          runner.NewDefaultPlanner(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
+		Aster: runner.AsterOptions{
+			Locator:           locator,
+			AdditionalToggles: splitToggles(*asterGlobal),
+			StageOverrides:    overrides,
+		},
 	}
 	err = runnerExecutor.Run(context.Background(), opts)
 	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
 		printWorkflowRunUsage(stderr)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	if reporter, ok := interface{}(grid).(interface {
+		Invocations() []runner.StageInvocation
+	}); ok {
+		printAsterSummary(stderr, reporter.Invocations())
+	}
+	return nil
 }
 
 func reportError(err error, stderr io.Writer) {
@@ -219,6 +270,51 @@ func printWorkflowUsage(w io.Writer) {
 
 func printWorkflowRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]")
+}
+
+func printAsterSummary(w io.Writer, invocations []runner.StageInvocation) {
+	if len(invocations) == 0 {
+		return
+	}
+	latest := make(map[string]runner.Stage)
+	for _, invocation := range invocations {
+		stage := invocation.Stage
+		if strings.TrimSpace(stage.Name) == "" {
+			continue
+		}
+		latest[stage.Name] = stage
+	}
+	if len(latest) == 0 {
+		return
+	}
+	names := make([]string, 0, len(latest))
+	for name := range latest {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	_, _ = fmt.Fprintln(w, "Aster Bundles:")
+	for _, name := range names {
+		stage := latest[name]
+		if !stage.Aster.Enabled || len(stage.Aster.Bundles) == 0 {
+			_, _ = fmt.Fprintf(w, "  %s: disabled\n", name)
+			continue
+		}
+		bundleSummaries := make([]string, len(stage.Aster.Bundles))
+		for i, bundle := range stage.Aster.Bundles {
+			id := strings.TrimSpace(bundle.BundleID)
+			if id == "" {
+				id = fmt.Sprintf("%s-%s", bundle.Stage, bundle.Toggle)
+			}
+			if bundle.ArtifactCID != "" {
+				bundleSummaries[i] = fmt.Sprintf("%s (%s)", id, bundle.ArtifactCID)
+			} else if bundle.Digest != "" {
+				bundleSummaries[i] = fmt.Sprintf("%s [%s]", id, bundle.Digest)
+			} else {
+				bundleSummaries[i] = id
+			}
+		}
+		_, _ = fmt.Fprintf(w, "  %s: %s (toggles: %s)\n", name, strings.Join(bundleSummaries, ", "), strings.Join(stage.Aster.Toggles, ", "))
+	}
 }
 
 func handleLanes(args []string, stderr io.Writer) error {
@@ -295,6 +391,39 @@ func splitToggles(raw string) []string {
 		}
 	}
 	return result
+}
+
+func parseStageOverrides(values []string) (map[string]runner.AsterStageOverride, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	result := make(map[string]runner.AsterStageOverride)
+	for _, value := range values {
+		parts := strings.SplitN(value, "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid --aster-step value: %s", value)
+		}
+		stage := strings.ToLower(strings.TrimSpace(parts[0]))
+		if stage == "" {
+			return nil, fmt.Errorf("invalid --aster-step value: stage is required (%s)", value)
+		}
+		payload := strings.TrimSpace(parts[1])
+		override := result[stage]
+		if strings.EqualFold(payload, "off") {
+			override.Disable = true
+			override.ExtraToggles = nil
+			result[stage] = override
+			continue
+		}
+		toggles := splitToggles(payload)
+		if len(toggles) == 0 {
+			return nil, fmt.Errorf("invalid --aster-step toggles for stage %s", stage)
+		}
+		override.Disable = false
+		override.ExtraToggles = append(override.ExtraToggles, toggles...)
+		result[stage] = override
+	}
+	return result, nil
 }
 
 func printLaneDescription(w io.Writer, desc lanes.Description) {

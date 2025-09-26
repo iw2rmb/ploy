@@ -1,0 +1,6 @@
+{
+  "bundle_id": "mods-plan-2025-09-26",
+  "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "artifact_cid": "bafy-mods-plan",
+  "source": "build/aster/mods-plan.tar.zst"
+}

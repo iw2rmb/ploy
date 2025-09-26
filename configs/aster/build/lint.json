@@ -1,0 +1,6 @@
+{
+  "bundle_id": "build-lint-2025-09-26",
+  "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "artifact_cid": "bafy-build-lint",
+  "source": "build/aster/build-lint.tar.zst"
+}
