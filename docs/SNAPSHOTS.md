@@ -1,17 +1,18 @@
 # Snapshot Toolkit
 
 ## Purpose
-Describe how the snapshot toolkit transforms database fixtures during the SHIFT reboot, keeping captures deterministic while the Grid/IPFS integration is stubbed locally.
+Describe how the snapshot toolkit transforms database fixtures during the SHIFT reboot, keeping captures deterministic while supporting real IPFS publishing when a gateway is available.
 
 ## Current Status
 - `ploy snapshot plan` and `ploy snapshot capture` are available locally and operate against fixtures defined in `configs/snapshots/*.toml`.
-- Strip, mask, and synthetic rules execute via the in-memory rule engine; metadata flows to the JetStream/IPFS stubs until real services are wired in.
+- Strip, mask, and synthetic rules execute via the in-memory rule engine; metadata flows to the JetStream stub until the snapshot streams are provisioned.
+- Artifact payloads upload to the configured IPFS gateway (via ``IPFS_GATEWAY``); when unset, the deterministic in-memory publisher returns repeatable fake CIDs for offline development.
 - Container-backed replays are deferred to the JetStream integration slice; captures currently rely on deterministic JSON fixtures.
 - Nomad snapshot tooling is retired; IPFS/JetStream publishing described here replaces SeaweedFS pipelines.
 
 ## Usage / Commands
 - `ploy snapshot plan --snapshot <snapshot-name>` — Summarises strip/mask/synthetic rules, tables touched, and highlights before a capture runs.
-- `ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>` — Applies the rule engine, emits a deterministic fingerprint, publishes metadata to the JetStream stub, and returns the fake IPFS CID.
+- `ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>` — Applies the rule engine, emits a deterministic fingerprint, uploads the payload to the configured IPFS gateway (or the in-memory stub when the gateway is absent), publishes metadata to the current stub, and returns the CID reported by the gateway.
 
 ## Development Notes
 - Specs use TOML:
@@ -44,7 +45,7 @@ Describe how the snapshot toolkit transforms database fixtures during the SHIFT 
   - Synthetic: `uuid` (deterministic `uuid-<table>-<row>` tokens) and `static` (`STATIC`).
 - `internal/workflow/snapshots` exposes `LoadDirectory`, `Plan`, and `Capture` helpers for other packages; tests keep coverage ≥90% to honour the critical path status.
 
-Representative fixtures now cover the three primary engines we target locally: Postgres (`dev-db`, `commit-db`), MySQL (`mysql-orders`), and a document store (`doc-events`). Each ships with TOML specs and JSON fixtures under `configs/snapshots/` so `ploy snapshot plan|capture` can exercise real-world rule combinations before Grid or IPFS endpoints are available.
+Representative fixtures now cover the three primary engines we target locally: Postgres (`dev-db`, `commit-db`), MySQL (`mysql-orders`), and a document store (`doc-events`). Each ships with TOML specs and JSON fixtures under `configs/snapshots/` so `ploy snapshot plan|capture` can exercise real-world rule combinations whether publishing to a live IPFS gateway or the deterministic stub.
 
 ## Related Docs
 - `docs/design/shift/README.md` — Overall SHIFT architecture.

@@ -9,6 +9,13 @@
 - [ ] Confirm you understand the workstation-only scope for the current roadmap slice (VPS/Grid integration resumes once JetStream wiring lands).
 - [ ] Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
 
+## Documentation
+1. Keep documentation synchronized with the codebase. After each code change, update relevant docs and mark tasks complete where applicable. Ensure every doc is referenced; remove or link orphaned files.
+2. For each feature, author `docs/design/<feature>/README.md` then decompose work into `roadmap/<feature>/<n>-<step>.md` entries capturing purpose, approach, required code changes, expected outcomes, and test strategy across unit/integration/e2e levels.
+3. Follow Test-Driven Development: write or update tests before implementing behavior; keep test coverage meaningful.
+4. Ask clarifying questions whenever requirements or constraints are uncertain.
+5. Update design document checklists as tasks ship; mark completed items explicitly before closing a slice.
+
 ## Local Development
 
 ### TDD Framework (CRITICAL)
