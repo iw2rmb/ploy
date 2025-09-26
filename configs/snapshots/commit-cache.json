@@ -1,0 +1,14 @@
+{
+  "feature_flags": [
+    {
+      "key": "checkout_experiment",
+      "value": "enabled",
+      "updated_at": "2025-09-24T09:00:00Z"
+    },
+    {
+      "key": "new_dashboard",
+      "value": "control",
+      "updated_at": "2025-09-24T09:05:00Z"
+    }
+  ]
+}

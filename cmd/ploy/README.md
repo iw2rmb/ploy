@@ -8,6 +8,7 @@ ploy lanes describe --lane <lane-name> [--commit <sha>] [--snapshot <fingerprint
 ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>
+ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
@@ -17,12 +18,18 @@ ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <tic
 
 `snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, publishes artifact metadata to the JetStream stub, and returns the fake IPFS CID assigned by the in-memory publisher.
 
+`environment materialize` evaluates the integration manifest for a given app/commit pair, validates required snapshots, optionally captures them (execution mode), composes deterministic cache keys for each required lane, and hydrates those caches through an in-memory hydrator. Dry-run mode avoids snapshot capture/hydration and surfaces any gaps before Grid integration lands.
+
 ## Flags
 - `--lane` — Lane identifier defined under `configs/lanes/*.toml` (required for `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key preview inputs consumed by the lane engine.
-- `--tenant` — Tenant slug used to resolve subject namespaces. Required for `workflow run` and `snapshot capture`.
+- `--tenant` — Tenant slug used to resolve subject namespaces. Required for `workflow run`, `snapshot capture`, and execution-mode `environment materialize`.
 - `--ticket` — JetStream ticket identifier to claim (`workflow run`) or metadata tag for snapshot captures. Defaults to `auto` for workflows; required for snapshot captures.
 - `--snapshot` — Snapshot identifier defined under `configs/snapshots/*.toml` (required for `snapshot plan` and `snapshot capture`).
+- `--app` — Application identifier resolved to an integration manifest (required for `environment materialize`).
+- `--dry-run` — Skip snapshot capture and cache hydration while still reporting required resources (`environment materialize`).
+- `--manifest` — Override manifest name/version in `<name>@<version>` form (`environment materialize`).
+- `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `environment materialize`).
 
 ## Exit Codes
 - `0` — success (ticket claimed, stages completed, workspace cleaned).
