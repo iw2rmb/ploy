@@ -4,14 +4,27 @@
 Document the TOML-based lane descriptors consumed by the SHIFT lane engine and the `ploy lanes describe` inspection workflow.
 
 ## Current Status
-- Lane specs live under `configs/lanes/*.toml` with `name`, `runtime_family`, `cache_namespace`, and `commands` blocks.
+- Lane specs live under `configs/lanes/*.toml` with `name`, `description`, `runtime_family`, `cache_namespace`, and `commands` blocks.
+- Required fields: `description`, `runtime_family`, `cache_namespace`, `commands.build`, and `commands.test`.
+- Optional fields: `commands.setup` runs before build/test when present.
 - `ploy lanes describe` loads the specs, validates required fields, and prints runtime metadata plus a cache-key preview.
 - The workflow runner assigns `node-wasm` to the `mods` stage and `go-native` to `build`/`test`, ensuring Grid submissions carry explicit lane metadata.
 
 ## Usage / Commands
 - Inspect the default Go lane:
   ```bash
-  ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db --manifest smoke --aster plan,exec
+  ploy lanes describe --lane go-native --commit deadbeef --snapshot dev-db --manifest smoke --aster plan,exec
+  ```
+  Example output:
+  ```text
+  Lane: go-native
+  Description: Go builds targeting native Grid runners with race-enabled tests
+  Runtime Family: go-native
+  Cache Namespace: go-native
+  Build Command: go build ./...
+  Test Command: go test -race ./...
+  Cache Key Preview: go-native/go-native@commit=deadbeef@snapshot=dev-db@manifest=smoke@aster=exec+plan
+  Inputs: commit=deadbeef; snapshot=dev-db; manifest=smoke; aster=plan,exec
   ```
 - Add a new lane by dropping a TOML file into `configs/lanes/`. Required fields:
   ```toml
@@ -27,6 +40,7 @@ Document the TOML-based lane descriptors consumed by the SHIFT lane engine and t
 
 ## Development Notes
 - Keep cache namespaces unique; collisions trigger loader errors.
+- Loader rejects specs without a description, runtime family, cache namespace, build command, or test command.
 - `commands.setup` is optional and only printed when present.
 - Cache-key previews collapse empty inputs to `none` and sort Aster toggles alphabetically (`exec+plan`).
 - Nomad-era lane descriptors were removed; TOML specs here are the single source of truth for Grid submissions.

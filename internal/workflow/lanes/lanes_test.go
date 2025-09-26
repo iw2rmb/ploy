@@ -59,3 +59,25 @@ build = ["true"]
 		t.Fatal("expected error for missing fields")
 	}
 }
+
+func TestLoadDirectoryRequiresDescription(t *testing.T) {
+	tmp := t.TempDir()
+	lanePath := filepath.Join(tmp, "missing-desc.toml")
+	content := `name = "missing-desc"
+
+runtime_family = "custom"
+cache_namespace = "missing-desc"
+
+[commands]
+build = ["true"]
+test = ["true"]
+`
+	if err := os.WriteFile(lanePath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write lane file: %v", err)
+	}
+
+	_, err := LoadDirectory(tmp)
+	if err == nil {
+		t.Fatal("expected error for missing description")
+	}
+}
