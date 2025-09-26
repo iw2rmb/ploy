@@ -15,6 +15,7 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 
 ## Development Notes
 - Keep manifests workstation-friendly. Defer any live `JETSTREAM_URL`, `GRID_ENDPOINT`, or `IPFS_GATEWAY` references until the JetStream slice resumes; mark them as TODOs when new manifests depend on remote endpoints.
+- Nomad manifests are historical; favour TOML manifests documented here so Grid remains the sole execution surface.
 - Each manifest must include:
   - `summary` (Markdown), `topology.allow` flows, optional `topology.deny` blocks with reasons.
   - `fixtures.required` references (snapshots or services) and optional fixtures with reasons.
@@ -24,5 +25,7 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 
 ## Related Docs
 - `docs/design/shift/README.md` — overarching SHIFT design.
+- `docs/DOCS.md` — documentation matrix and editing conventions.
 - `docs/SNAPSHOTS.md` — snapshot toolkit referenced by manifest fixtures.
 - `roadmap/shift/05-integration-manifests.md` — roadmap slice covering this work.
+- `roadmap/shift/08-documentation-cleanup.md` — documentation alignment status and verification notes.
