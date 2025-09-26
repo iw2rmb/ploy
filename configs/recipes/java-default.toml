@@ -1,0 +1,16 @@
+name = "java-default"
+description = "Baseline Java recipe packs for OpenRewrite transformations"
+default = true
+languages = ["java"]
+
+[[packs]]
+id = "rewrite-java"
+version = "7.40.0"
+
+[[packs]]
+id = "rewrite-migrate-java"
+version = "7.40.0"
+
+[[packs]]
+id = "rewrite-spring"
+version = "7.40.0"

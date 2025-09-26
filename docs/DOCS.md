@@ -11,6 +11,7 @@ The SHIFT reboot simplifies the documentation surface so every contributor can f
 - `README.md` — overview of the CLI-first Grid integration, plus quickstarts for the workflow runner, snapshot toolkit, and environment materialisation.
 - `docs/LANES.md` — lane spec format, cache-key guidance, and Grid runtime expectations.
 - `docs/MANIFESTS.md` — manifest schema, validation flow, and how payloads travel to Grid topology enforcement.
+- `docs/RECIPES.md` — recipe pack registry layout, default pack lists, and future Kotlin/Gradle extensibility.
 - `docs/SNAPSHOTS.md` — snapshot planning/capture behaviour and IPFS/JetStream publishing notes.
 - `cmd/ploy/README.md` — command-level flag reference and environment placeholders.
 - `roadmap/shift/08-documentation-cleanup.md` — status log for this documentation slice, including verification expectations.

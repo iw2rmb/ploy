@@ -9,6 +9,7 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 - ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
 - ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
 - ✅ Integration manifest compiler validates TOML manifests under `configs/manifests/`, attaches compiled payloads to workflow stages, and enforces lane allowlists in the Grid stub.
+- ✅ Recipe pack registry loads pluggable pack list specs from `configs/recipes/` for the OpenRewrite catalog, paving the way for Kotlin/Gradle support.
 - ✅ Commit-scoped environment command (`ploy environment materialize`) assembles manifest fixtures, validates required snapshots, and hydrates lane caches via in-memory stubs.
 
 ## Getting Started
