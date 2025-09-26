@@ -1,0 +1,9 @@
+name = "gpu-ml"
+description = "Accelerated lane for ML workloads leveraging GPU-enabled Grid runners"
+runtime_family = "cuda-ml"
+cache_namespace = "gpu-ml"
+
+[commands]
+setup = ["pip", "install", "-r", "requirements.txt"]
+build = ["python", "-m", "build_model"]
+test = ["pytest", "tests/ml"]

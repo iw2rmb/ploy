@@ -1,0 +1,25 @@
+{
+  "customers": [
+    {
+      "id": "cust-1",
+      "email": "cass@example.com",
+      "phone": "+15550000001",
+      "api_token": "",
+      "created_at": "2025-09-20T12:00:00Z"
+    },
+    {
+      "id": "cust-2",
+      "email": "mike@example.com",
+      "phone": "+15550000002",
+      "api_token": "",
+      "created_at": "2025-09-21T15:30:00Z"
+    }
+  ],
+  "audit_logs": [
+    {
+      "id": "log-1",
+      "payload": "{\"event\":\"login\"}",
+      "created_at": "2025-09-21T16:00:00Z"
+    }
+  ]
+}

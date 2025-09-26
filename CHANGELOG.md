@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-26] Commit-Scoped Environments
+- Added `internal/workflow/environments` service with TDD coverage for dry-run planning, execution hydration, and snapshot gap reporting.
+- Introduced `ploy environment materialize` CLI command with dry-run/execute modes, manifest override support, and human-readable summaries.
+- Published new snapshot specs (`commit-db`, `commit-cache`) and GPU lane profile (`configs/lanes/gpu-ml.toml`) to back commit-scoped runs.
+- Documented the workflow in `README.md` and `cmd/ploy/README.md`; roadmap slice `06-commit-environments` marked complete.
+
 ## [2025-09-26] Integration Manifest Compiler
 - Introduced `internal/workflow/manifests` with TOML schema validation, JSON compilation helpers, and unit tests covering happy/failure paths.
 - Extended the workflow runner to require manifest compilation, attach compiled payloads to every stage, and let the in-memory Grid stub enforce lane allowlists.
