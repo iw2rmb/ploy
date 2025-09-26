@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-26] JetStream Client Wiring
+- Introduced `internal/workflow/contracts.JetStreamClient` to consume real tickets from `grid.webhook.<tenant>` and publish checkpoints to `ploy.workflow.<ticket>.checkpoints`.
+- Updated `ploy workflow run` to honour ``JETSTREAM_URL`` by dialing JetStream (falling back to the in-memory stub when unset) and surfacing connection failures to the caller.
+- Added unit tests that exercise the client against an in-process JetStream server plus CLI coverage for misconfiguration errors.
+- Refreshed documentation and roadmap entries to describe the live JetStream behaviour and new configuration toggle.
+
 ## [2025-09-26] Workflow Checkpoint Cache Keys
 - Extended the workflow event contract to include lane cache keys on every checkpoint and bumped the schema version to `2025-09-26`.
 - Updated the workflow runner to compute cache keys via injected composers, ensuring JetStream checkpoints surface cache-coordination signals.

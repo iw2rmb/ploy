@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -68,7 +70,7 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	}()
 
 	runnerExecutor = fakeRunner
-	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
 	stubCompiler := &stubManifestCompiler{compiled: defaultManifestPayload()}
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return stubCompiler, nil
@@ -125,7 +127,7 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	}()
 
 	runnerExecutor = fakeRunner
-	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
@@ -206,7 +208,7 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	}()
 
 	runnerExecutor = fakeRunner
-	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
@@ -224,6 +226,37 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	}
 	if fakeRunner.opts.Ticket != "ticket-456" {
 		t.Fatalf("expected trimmed ticket, got %q", fakeRunner.opts.Ticket)
+	}
+}
+
+func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
+	prevFactory := eventsFactory
+	prevManifestDir := manifestConfigDir
+	prevLaneDir := laneConfigDir
+	prevAsterDir := asterConfigDir
+	defer func() {
+		eventsFactory = prevFactory
+		manifestConfigDir = prevManifestDir
+		laneConfigDir = prevLaneDir
+		asterConfigDir = prevAsterDir
+	}()
+
+	eventsFactory = defaultEventsFactory
+
+	t.Setenv("JETSTREAM_URL", "nats://127.0.0.1:1")
+
+	_, file, _, _ := runtime.Caller(0)
+	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+	manifestConfigDir = filepath.Join(repoRoot, "configs", "manifests")
+	laneConfigDir = filepath.Join(repoRoot, "configs", "lanes")
+	asterConfigDir = filepath.Join(repoRoot, "configs", "aster")
+
+	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
+	if err == nil {
+		t.Fatal("expected error when JetStream connection fails")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "jetstream") {
+		t.Fatalf("expected jetstream error context, got %v", err)
 	}
 }
 
@@ -249,7 +282,7 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 	}()
 
 	runnerExecutor = fakeRunner
-	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
