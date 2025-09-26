@@ -42,6 +42,7 @@ type Stage struct {
 	Dependencies []string
 	Constraints  StageConstraints
 	Aster        StageAster
+	CacheKey     string
 }
 
 type StageConstraints struct {
@@ -70,6 +71,15 @@ type StageOutcome struct {
 	Status    StageStatus
 	Retryable bool
 	Message   string
+}
+
+type CacheComposeRequest struct {
+	Stage  Stage
+	Ticket contracts.WorkflowTicket
+}
+
+type CacheComposer interface {
+	Compose(ctx context.Context, req CacheComposeRequest) (string, error)
 }
 
 type ExecutionPlan struct {
@@ -123,6 +133,7 @@ type Options struct {
 	MaxStageRetries  int
 	ManifestCompiler ManifestCompiler
 	Aster            AsterOptions
+	CacheComposer    CacheComposer
 }
 
 type AsterOptions struct {
@@ -172,6 +183,11 @@ func Run(ctx context.Context, opts Options) (err error) {
 		return err
 	}
 
+	composer := opts.CacheComposer
+	if composer == nil {
+		composer = defaultCacheComposer{}
+	}
+
 	workspaceRoot := strings.TrimSpace(opts.WorkspaceRoot)
 	if workspaceRoot == "" {
 		workspaceRoot = os.TempDir()
@@ -193,7 +209,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 	}()
 
-	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "ticket-claimed", StageStatusCompleted); err != nil {
+	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "ticket-claimed", StageStatusCompleted, ""); err != nil {
 		return err
 	}
 
@@ -212,8 +228,13 @@ func Run(ctx context.Context, opts Options) (err error) {
 			return err
 		}
 		stage.Aster = asterMeta
+		cacheKey, err := composer.Compose(ctx, CacheComposeRequest{Stage: stage, Ticket: ticket})
+		if err != nil {
+			return fmt.Errorf("compose cache key for stage %s: %w", stage.Name, err)
+		}
+		stage.CacheKey = strings.TrimSpace(cacheKey)
 		for attempt := 0; ; attempt++ {
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning); err != nil {
+			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning, stage.CacheKey); err != nil {
 				return err
 			}
 
@@ -233,16 +254,16 @@ func Run(ctx context.Context, opts Options) (err error) {
 
 			if status == StageStatusFailed {
 				if outcome.Retryable && attempt < maxRetries {
-					if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRetrying); err != nil {
+					if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRetrying, stage.CacheKey); err != nil {
 						return err
 					}
 					continue
 				}
 
-				if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusFailed); err != nil {
+				if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusFailed, stage.CacheKey); err != nil {
 					return err
 				}
-				_ = publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusFailed)
+				_ = publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusFailed, "")
 
 				message := outcome.Message
 				if strings.TrimSpace(message) == "" {
@@ -251,31 +272,51 @@ func Run(ctx context.Context, opts Options) (err error) {
 				return fmt.Errorf("%w: stage %s: %s", ErrStageFailed, stage.Name, message)
 			}
 
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusCompleted); err != nil {
+			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusCompleted, stage.CacheKey); err != nil {
 				return err
 			}
 			break
 		}
 	}
 
-	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted); err != nil {
+	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted, ""); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage string, status StageStatus) error {
+func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage string, status StageStatus, cacheKey string) error {
 	checkpoint := contracts.WorkflowCheckpoint{
 		SchemaVersion: contracts.SchemaVersion,
 		TicketID:      ticketID,
 		Stage:         stage,
 		Status:        contracts.CheckpointStatus(status),
+		CacheKey:      cacheKey,
 	}
 	if err := checkpoint.Validate(); err != nil {
 		return fmt.Errorf("%w: %v", ErrCheckpointValidationFailed, err)
 	}
 	return events.PublishCheckpoint(ctx, checkpoint)
+}
+
+type defaultCacheComposer struct{}
+
+func (defaultCacheComposer) Compose(ctx context.Context, req CacheComposeRequest) (string, error) {
+	_ = ctx
+	lane := strings.TrimSpace(req.Stage.Lane)
+	if lane == "" {
+		return "", fmt.Errorf("lane missing")
+	}
+	manifest := strings.TrimSpace(req.Stage.Constraints.Manifest.Manifest.Version)
+	if manifest == "" {
+		manifest = "unknown"
+	}
+	toggles := "none"
+	if len(req.Stage.Aster.Toggles) > 0 {
+		toggles = strings.Join(req.Stage.Aster.Toggles, "+")
+	}
+	return fmt.Sprintf("%s/%s@manifest=%s@aster=%s", lane, lane, manifest, toggles), nil
 }
 
 func resolveStageAster(ctx context.Context, stage Stage, manifest manifests.Compilation, opts AsterOptions) (StageAster, error) {

@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Workflow Checkpoint Cache Keys
+- Extended the workflow event contract to include lane cache keys on every checkpoint and bumped the schema version to `2025-09-26`.
+- Updated the workflow runner to compute cache keys via injected composers, ensuring JetStream checkpoints surface cache-coordination signals.
+- Wired the CLI to derive cache keys from lane specs so Grid integrations can rely on consistent cache metadata ahead of JetStream wiring.
+
 ## [2025-09-26] Mods Terminology Guard
 - Replaced remaining ARF references with mods terminology across roadmap and recipe documentation.
 - Added `terminology_guard_test.go` to enforce the naming convention and block regressions.
