@@ -74,4 +74,4 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 ## Next Steps
 - ✅ Completed 2025-09-26: Harden lane-spec documentation (`docs/LANES.md`) and keep CLI examples (`ploy lanes describe`) in sync with TOML schema updates.
 - ✅ Completed 2025-09-26: Validate snapshot tooling against representative databases (Postgres, MySQL, document store).
-- Draft integration manifest schema ahead of the workflow runner wiring slice.
+- ✅ Completed 2025-09-26: Draft integration manifest schema ahead of the workflow runner wiring slice.

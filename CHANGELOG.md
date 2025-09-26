@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Integration Manifest Schema
+- Published `docs/schemas/integration_manifest.schema.json` capturing required manifest fields and constraints for topology, fixtures, lanes, and Aster toggles.
+- Added `ploy manifest schema` to surface the schema for downstream tooling and validation flows.
+- Updated documentation (`docs/MANIFESTS.md`, `docs/design/shift/README.md`, `docs/DOCS.md`) and recorded roadmap slice `13-integration-manifest-schema` as complete.
+
 ## [2025-09-26] Snapshot Catalog Validation
 - Added MySQL (`mysql-orders`) and document-store (`doc-events`) fixtures alongside the existing Postgres snapshots so `ploy snapshot plan|capture` exercises all representative engines locally.
 - Implemented the `last4` masking strategy and wired regression coverage that loads the in-repo catalog and executes captures with stub publishers.

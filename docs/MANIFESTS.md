@@ -12,6 +12,14 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 - `ploy workflow run --tenant <tenant>` automatically loads the referenced manifest and surfaces actionable errors when validation fails. Combine `--aster` with `--aster-step <stage=toggle|stage=off>` to enable or disable Aster toggles on a per-stage basis while keeping manifests canonical.
 - Manifests compile to JSON payloads that the workflow runner attaches to each stage before dispatching to Grid.
 - Use TOML files under `configs/manifests/` to add or update manifests. Run `go test ./internal/workflow/manifests` to exercise schema validation helpers.
+- `ploy manifest schema` prints the machine-readable schema located at `docs/schemas/integration_manifest.schema.json` so other tools can validate manifests without embedding Ploy's loader.
+
+## Schema
+- JSON Schema (Draft 2020-12): `docs/schemas/integration_manifest.schema.json`.
+- Top-level fields are required: `name`, `version`, `summary`, `topology`, `fixtures`, `lanes`.
+- `topology.allow` must list at least one flow (`from`/`to`), while `topology.deny` entries require explicit reasons.
+- `fixtures.required` and `lanes.required` demand at least one entry, ensuring workflow runs always enumerate baseline fixtures/lanes.
+- `aster.required`/`aster.optional` accept unique toggle names so cache keys remain deterministic.
 
 ## Development Notes
 - Keep manifests workstation-friendly. Defer any live `JETSTREAM_URL`, `GRID_ENDPOINT`, or `IPFS_GATEWAY` references until the JetStream slice resumes; mark them as TODOs when new manifests depend on remote endpoints.
