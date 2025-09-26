@@ -5,14 +5,14 @@ Describe how the snapshot toolkit transforms database fixtures during the SHIFT 
 
 ## Current Status
 - `ploy snapshot plan` and `ploy snapshot capture` are available locally and operate against fixtures defined in `configs/snapshots/*.toml`.
-- Strip, mask, and synthetic rules execute via the in-memory rule engine; metadata flows to the JetStream stub until the snapshot streams are provisioned.
+- Strip, mask, and synthetic rules execute via the in-memory rule engine; metadata now publishes to JetStream (`JETSTREAM_URL`) when available and falls back to the in-memory stub otherwise.
 - Artifact payloads upload to the configured IPFS gateway (via ``IPFS_GATEWAY``); when unset, the deterministic in-memory publisher returns repeatable fake CIDs for offline development.
 - Container-backed replays are deferred to the JetStream integration slice; captures currently rely on deterministic JSON fixtures.
 - Nomad snapshot tooling is retired; IPFS/JetStream publishing described here replaces SeaweedFS pipelines.
 
 ## Usage / Commands
 - `ploy snapshot plan --snapshot <snapshot-name>` — Summarises strip/mask/synthetic rules, tables touched, and highlights before a capture runs.
-- `ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>` — Applies the rule engine, emits a deterministic fingerprint, uploads the payload to the configured IPFS gateway (or the in-memory stub when the gateway is absent), publishes metadata to the current stub, and returns the CID reported by the gateway.
+- `ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>` — Applies the rule engine, emits a deterministic fingerprint, uploads the payload to the configured IPFS gateway (or the in-memory stub when the gateway is absent), publishes metadata to JetStream when ``JETSTREAM_URL`` is configured (falling back to the stub otherwise), and returns the CID reported by the gateway.
 
 ## Development Notes
 - Specs use TOML:
