@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Snapshot Catalog Validation
+- Added MySQL (`mysql-orders`) and document-store (`doc-events`) fixtures alongside the existing Postgres snapshots so `ploy snapshot plan|capture` exercises all representative engines locally.
+- Implemented the `last4` masking strategy and wired regression coverage that loads the in-repo catalog and executes captures with stub publishers.
+- Updated snapshot documentation and the SHIFT roadmap to record the validation slice ahead of JetStream/Grid wiring.
+
 ## [2025-09-26] JetStream Client Wiring
 - Introduced `internal/workflow/contracts.JetStreamClient` to consume real tickets from `grid.webhook.<tenant>` and publish checkpoints to `ploy.workflow.<ticket>.checkpoints`.
 - Updated `ploy workflow run` to honour ``JETSTREAM_URL`` by dialing JetStream (falling back to the in-memory stub when unset) and surfacing connection failures to the caller.

@@ -448,9 +448,23 @@ func applyMaskStrategy(strategy, value, table string, rowIndex int) (string, err
 		return fmt.Sprintf("hash-%x", sum[:8]), nil
 	case "redact":
 		return "REDACTED", nil
+	case "last4":
+		return maskLast4(value), nil
 	default:
 		return "", fmt.Errorf("%w: mask strategy %s for table %s", ErrInvalidRule, strategy, table)
 	}
+}
+
+func maskLast4(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "last4-"
+	}
+	runes := []rune(trimmed)
+	if len(runes) > 4 {
+		runes = runes[len(runes)-4:]
+	}
+	return "last4-" + string(runes)
 }
 
 func applySynthetic(data dataset, rules []SyntheticRule, diff DiffSummary) error {
