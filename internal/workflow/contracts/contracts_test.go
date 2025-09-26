@@ -89,3 +89,32 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 		t.Fatalf("expected checkpoint to be recorded")
 	}
 }
+
+func TestInMemoryBusAutoTicketFallback(t *testing.T) {
+	bus := NewInMemoryBus("acme")
+	bus.EnqueueTicket("queued-1")
+	ticket, err := bus.ClaimTicket(context.Background(), "")
+	if err != nil {
+		t.Fatalf("claim error: %v", err)
+	}
+	if ticket.TicketID != "queued-1" {
+		t.Fatalf("expected queued ticket, got %s", ticket.TicketID)
+	}
+	if len(bus.ClaimedTickets) != 1 || bus.ClaimedTickets[0] != "queued-1" {
+		t.Fatalf("unexpected claimed tickets: %v", bus.ClaimedTickets)
+	}
+
+	second, err := bus.ClaimTicket(context.Background(), "")
+	if err != nil {
+		t.Fatalf("claim error: %v", err)
+	}
+	if second.TicketID == "" {
+		t.Fatal("expected auto-generated ticket id")
+	}
+	if second.TicketID == "queued-1" {
+		t.Fatal("expected different ticket id for auto fallback")
+	}
+	if len(bus.ClaimedTickets) != 2 {
+		t.Fatalf("expected two claimed tickets, got %v", bus.ClaimedTickets)
+	}
+}
