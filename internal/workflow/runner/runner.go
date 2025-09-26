@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 )
@@ -22,6 +24,7 @@ var (
 	ErrCheckpointValidationFailed = errors.New("checkpoint payload failed validation")
 	ErrStageFailed                = errors.New("workflow stage failed")
 	ErrLaneRequired               = errors.New("lane is required")
+	ErrAsterLocatorRequired       = errors.New("aster locator is required")
 )
 
 type StageKind string
@@ -38,10 +41,17 @@ type Stage struct {
 	Lane         string
 	Dependencies []string
 	Constraints  StageConstraints
+	Aster        StageAster
 }
 
 type StageConstraints struct {
 	Manifest manifests.Compilation
+}
+
+type StageAster struct {
+	Enabled bool
+	Toggles []string
+	Bundles []aster.Metadata
 }
 
 type StageStatus = contracts.CheckpointStatus
@@ -112,6 +122,18 @@ type Options struct {
 	WorkspaceRoot    string
 	MaxStageRetries  int
 	ManifestCompiler ManifestCompiler
+	Aster            AsterOptions
+}
+
+type AsterOptions struct {
+	Locator           aster.Locator
+	AdditionalToggles []string
+	StageOverrides    map[string]AsterStageOverride
+}
+
+type AsterStageOverride struct {
+	Disable      bool
+	ExtraToggles []string
 }
 
 func Run(ctx context.Context, opts Options) (err error) {
@@ -185,6 +207,11 @@ func Run(ctx context.Context, opts Options) (err error) {
 			return fmt.Errorf("%w: %s", ErrLaneRequired, stage.Name)
 		}
 		stage.Constraints.Manifest = compiledManifest
+		asterMeta, err := resolveStageAster(ctx, stage, compiledManifest, opts.Aster)
+		if err != nil {
+			return err
+		}
+		stage.Aster = asterMeta
 		for attempt := 0; ; attempt++ {
 			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning); err != nil {
 				return err
@@ -249,4 +276,68 @@ func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage
 		return fmt.Errorf("%w: %v", ErrCheckpointValidationFailed, err)
 	}
 	return events.PublishCheckpoint(ctx, checkpoint)
+}
+
+func resolveStageAster(ctx context.Context, stage Stage, manifest manifests.Compilation, opts AsterOptions) (StageAster, error) {
+	stageKey := strings.ToLower(strings.TrimSpace(stage.Name))
+	override := opts.StageOverrides
+	if override == nil {
+		override = map[string]AsterStageOverride{}
+	}
+	config := override[stageKey]
+	if config.Disable {
+		return StageAster{}, nil
+	}
+
+	active := make([]string, 0, len(manifest.Aster.Required)+len(opts.AdditionalToggles)+len(config.ExtraToggles))
+	active = append(active, manifest.Aster.Required...)
+	active = append(active, opts.AdditionalToggles...)
+	active = append(active, config.ExtraToggles...)
+	toggles := normalizeAsterToggles(active)
+	if len(toggles) == 0 {
+		return StageAster{}, nil
+	}
+	if opts.Locator == nil {
+		return StageAster{}, ErrAsterLocatorRequired
+	}
+	bundles := make([]aster.Metadata, 0, len(toggles))
+	stageName := strings.TrimSpace(stage.Name)
+	for _, toggle := range toggles {
+		if err := ctx.Err(); err != nil {
+			return StageAster{}, err
+		}
+		meta, err := opts.Locator.Locate(ctx, aster.Request{Stage: stageName, Toggle: toggle})
+		if err != nil {
+			return StageAster{}, fmt.Errorf("locate Aster bundle for stage %s toggle %s: %w", stageName, toggle, err)
+		}
+		if strings.TrimSpace(meta.Stage) == "" {
+			meta.Stage = stageName
+		}
+		if strings.TrimSpace(meta.Toggle) == "" {
+			meta.Toggle = toggle
+		}
+		bundles = append(bundles, meta)
+	}
+	return StageAster{Enabled: true, Toggles: toggles, Bundles: bundles}, nil
+}
+
+func normalizeAsterToggles(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if trimmed := strings.ToLower(strings.TrimSpace(value)); trimmed != "" {
+			set[trimmed] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(set))
+	for value := range set {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
 }

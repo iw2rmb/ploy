@@ -5,14 +5,14 @@
 ## Usage
 ```
 ploy lanes describe --lane <lane-name> [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] [--aster <toggle,...>]
-ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]
+ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--aster <toggle,...>] [--aster-step <stage=toggle,...|stage=off>]
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>
 ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
-`workflow run` boots in-memory JetStream and Grid stubs, claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition, executes mods/build/test against a temporary workspace, and cleans up before exit. The Grid stub refuses stages whose lanes are not declared in the manifest. Upcoming roadmap slices will swap the stubs for real JetStream connections and Grid RPC calls.
+`workflow run` boots in-memory JetStream and Grid stubs, claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition, executes mods/build/test against a temporary workspace, and cleans up before exit. The Grid stub refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Upcoming roadmap slices will swap the stubs for real JetStream connections and Grid RPC calls.
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
@@ -29,7 +29,8 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 - `--app` — Application identifier resolved to an integration manifest (required for `environment materialize`).
 - `--dry-run` — Skip snapshot capture and cache hydration while still reporting required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form (`environment materialize`).
-- `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `environment materialize`).
+- `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `workflow run`, `environment materialize`).
+- `--aster-step` — Stage-specific overrides for Aster behaviour when running workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional toggles or `stage=off` to disable Aster for that stage.
 
 ## Exit Codes
 - `0` — success (ticket claimed, stages completed, workspace cleaned).

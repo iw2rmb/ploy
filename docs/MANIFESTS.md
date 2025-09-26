@@ -9,7 +9,7 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 - Grid enforcement is stubbed locally: the in-memory Grid rejects stages that target lanes not declared in the manifest. JetStream/Grid wiring will replace the stub once `GRID_ENDPOINT` integration resumes.
 
 ## Usage / Commands
-- `ploy workflow run --tenant <tenant>` automatically loads the referenced manifest and surfaces actionable errors when validation fails.
+- `ploy workflow run --tenant <tenant>` automatically loads the referenced manifest and surfaces actionable errors when validation fails. Combine `--aster` with `--aster-step <stage=toggle|stage=off>` to enable or disable Aster toggles on a per-stage basis while keeping manifests canonical.
 - Manifests compile to JSON payloads that the workflow runner attaches to each stage before dispatching to Grid.
 - Use TOML files under `configs/manifests/` to add or update manifests. Run `go test ./internal/workflow/manifests` to exercise schema validation helpers.
 

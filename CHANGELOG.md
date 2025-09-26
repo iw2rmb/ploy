@@ -1,5 +1,12 @@
 # Changelog
 
+## [2025-09-26] Aster Hook Integration
+- Added `internal/workflow/aster` with a filesystem-backed locator that discovers per-stage bundle metadata from `configs/aster/` and surfaces provenance data for Grid submissions.
+- Extended the workflow runner to require an Aster locator, attach sorted toggle metadata to every stage, and honour per-stage disablement while keeping cache keys deterministic.
+- Introduced `--aster` and `--aster-step` flags on `ploy workflow run`, along with post-run bundle summaries so operators can verify toggles before Grid wiring lands.
+- Expanded CLI and runner test suites to cover bundle detection, metadata propagation, per-stage overrides, and regression behaviour when Aster is disabled.
+- Documented the workflow in `cmd/ploy/README.md`, `docs/MANIFESTS.md`, and `docs/design/shift/README.md`; roadmap slice `07-aster-hook` marked complete.
+
 ## [2025-09-26] Commit-Scoped Environments
 - Added `internal/workflow/environments` service with TDD coverage for dry-run planning, execution hydration, and snapshot gap reporting.
 - Introduced `ploy environment materialize` CLI command with dry-run/execute modes, manifest override support, and human-readable summaries.
