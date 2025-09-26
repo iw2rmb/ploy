@@ -10,11 +10,8 @@ Follow the global workflow rules in `~/.codex/AGENTS.md`. Repository-specific ad
 - Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
 
 ## Documentation
-1. Keep documentation synchronized with the codebase. After each code change, update relevant docs and mark tasks complete where applicable. Ensure every doc is referenced; remove or link orphaned files.
-2. For each feature, author `docs/design/<feature>/README.md` then decompose work into `roadmap/<feature>/<n>-<step>.md` entries capturing purpose, approach, required code changes, expected outcomes, and test strategy across unit/integration/e2e levels.
-3. Follow Test-Driven Development: write or update tests before implementing behavior; keep test coverage meaningful.
-4. Ask clarifying questions whenever requirements or constraints are uncertain.
-5. Update design document checklists as tasks ship; mark completed items explicitly before closing a slice.
+1. Keep documentation synchronized with the codebase. After each change, update the affected docs, link or remove orphaned files, and note completion states where applicable.
+2. When documentation conventions change, reflect them across `docs/DOCS.md`, the design index, and related README files so repo guidance stays consistent.
 
 ## Local Development
 
@@ -51,12 +48,12 @@ Follow the global workflow rules in `~/.codex/AGENTS.md`. Repository-specific ad
 ## Documentation Discipline
 - Root README describes the CLI-first model; update it whenever behaviour changes.
 - Roadmap updates must mark the relevant checklist item (`roadmap/shift/<nn>-*.md`).
-- Any new behaviour must appear in `CHANGELOG.md` with concrete dates (YYYY-MM-DD).
+- When recording new behaviour in `CHANGELOG.md`, include the roadmap slice reference and a concrete YYYY-MM-DD date.
 
 ## Delivery Checklist
 1. RED: add failing unit tests capturing the target behaviour.
 2. GREEN: implement the minimal code to satisfy tests.
 3. go test -cover ./...
-4. Update documentation and roadmap entries.
+4. Update documentation, the design index, and the relevant roadmap entry.
 5. (Once Grid integration lands) perform REFACTOR verification against the Dev API.
 6. Commit with a clear message and ensure branch is ready for PR.

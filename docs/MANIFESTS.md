@@ -32,7 +32,7 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 - The manifest compiler deduplicates and sorts Aster toggles; keep files readable to minimise churn in golden JSON payloads.
 
 ## Related Docs
-- `docs/design/shift/README.md` — overarching SHIFT design.
+- `docs/design/overview/README.md` — overarching feature design.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `docs/SNAPSHOTS.md` — snapshot toolkit referenced by manifest fixtures.
 - `roadmap/shift/05-integration-manifests.md` — roadmap slice covering this work.
