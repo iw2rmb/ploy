@@ -155,6 +155,8 @@ var (
 			Hydrator:  hydrator,
 		}), nil
 	}
+
+	manifestSchemaPath = "docs/schemas/integration_manifest.schema.json"
 )
 
 type registryCompiler struct {
@@ -195,6 +197,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleSnapshot(args[1:], stderr)
 	case "environment":
 		return handleEnvironment(args[1:], stderr)
+	case "manifest":
+		return handleManifest(args[1:], stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -309,6 +313,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  lanes     Inspect lane definitions and cache previews")
 	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
 	_, _ = fmt.Fprintln(w, "  environment  Materialize commit-scoped environments")
+	_, _ = fmt.Fprintln(w, "  manifest  Inspect integration manifest assets")
 }
 
 func printWorkflowUsage(w io.Writer) {
@@ -830,6 +835,52 @@ func printEnvironmentMaterialize(w io.Writer, result environments.Result) {
 			_, _ = fmt.Fprintf(w, "  - %s -> %s (%s)\n", cache.Lane, cache.CacheKey, status)
 		}
 	}
+}
+
+func handleManifest(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printManifestUsage(stderr)
+		return errors.New("manifest subcommand required")
+	}
+
+	switch args[0] {
+	case "schema":
+		return handleManifestSchema(args[1:], stderr)
+	default:
+		printManifestUsage(stderr)
+		return fmt.Errorf("unknown manifest subcommand %q", args[0])
+	}
+}
+
+func printManifestUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy manifest <command>")
+	_, _ = fmt.Fprintln(w, "\nCommands:")
+	_, _ = fmt.Fprintln(w, "  schema  Print the integration manifest JSON schema")
+}
+
+func handleManifestSchema(args []string, stderr io.Writer) error {
+	if len(args) > 0 {
+		printManifestSchemaUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(args, " "))
+	}
+
+	data, err := os.ReadFile(manifestSchemaPath)
+	if err != nil {
+		return fmt.Errorf("read manifest schema: %w", err)
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Ploy integration manifest schema (%s):\n", manifestSchemaPath)
+	if _, err := stderr.Write(data); err != nil {
+		return fmt.Errorf("write manifest schema: %w", err)
+	}
+	if len(data) == 0 || data[len(data)-1] != '\n' {
+		_, _ = fmt.Fprintln(stderr)
+	}
+	return nil
+}
+
+func printManifestSchemaUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy manifest schema")
 }
 
 func parseManifestOverride(candidate, fallback string) (string, string, error) {
