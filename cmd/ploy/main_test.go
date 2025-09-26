@@ -11,6 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 type recordingRunner struct {
@@ -205,5 +206,102 @@ func TestHandleLanesRequiresSubcommand(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "Usage: ploy lanes") {
 		t.Fatalf("expected usage output, got %q", buf.String())
+	}
+}
+
+type fakeSnapshotRegistry struct {
+	planReport    snapshots.PlanReport
+	captureResult snapshots.CaptureResult
+	planErr       error
+	captureErr    error
+}
+
+func (f *fakeSnapshotRegistry) Plan(ctx context.Context, name string) (snapshots.PlanReport, error) {
+	return f.planReport, f.planErr
+}
+
+func (f *fakeSnapshotRegistry) Capture(ctx context.Context, name string, opts snapshots.CaptureOptions) (snapshots.CaptureResult, error) {
+	return f.captureResult, f.captureErr
+}
+
+func TestHandleSnapshotPlanPrintsSummary(t *testing.T) {
+	buf := &bytes.Buffer{}
+	prevLoader := snapshotRegistryLoader
+	prevDir := snapshotConfigDir
+	defer func() {
+		snapshotRegistryLoader = prevLoader
+		snapshotConfigDir = prevDir
+	}()
+
+	report := snapshots.PlanReport{
+		SnapshotName: "dev-db",
+		Engine:       "postgres",
+		Stripping:    snapshots.RuleSummary{Total: 1, Tables: map[string]int{"users": 1}},
+		Masking:      snapshots.RuleSummary{Total: 2, Tables: map[string]int{"users": 2}},
+		Synthetic:    snapshots.RuleSummary{Total: 1, Tables: map[string]int{"orders": 1}},
+		Highlights:   []string{"mask users.email -> hash"},
+	}
+
+	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) {
+		return &fakeSnapshotRegistry{planReport: report}, nil
+	}
+	snapshotConfigDir = "ignored"
+
+	err := handleSnapshot([]string{"plan", "--snapshot", "dev-db"}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	for _, fragment := range []string{"Snapshot: dev-db", "Engine: postgres", "Mask Rules: 2"} {
+		if !strings.Contains(output, fragment) {
+			t.Fatalf("expected output to contain %q, got %q", fragment, output)
+		}
+	}
+}
+
+func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
+	buf := &bytes.Buffer{}
+	prevLoader := snapshotRegistryLoader
+	prevDir := snapshotConfigDir
+	defer func() {
+		snapshotRegistryLoader = prevLoader
+		snapshotConfigDir = prevDir
+	}()
+
+	result := snapshots.CaptureResult{
+		ArtifactCID: "cid-dev",
+		Fingerprint: "fp-123",
+		Metadata: snapshots.SnapshotMetadata{
+			SnapshotName: "dev-db",
+			Tenant:       "acme",
+			TicketID:     "ticket-123",
+		},
+	}
+
+	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) {
+		return &fakeSnapshotRegistry{captureResult: result}, nil
+	}
+	snapshotConfigDir = "ignored"
+
+	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-123"}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	for _, fragment := range []string{"Artifact CID: cid-dev", "Fingerprint: fp-123"} {
+		if !strings.Contains(output, fragment) {
+			t.Fatalf("expected output to contain %q, got %q", fragment, output)
+		}
+	}
+}
+
+func TestHandleSnapshotRequiresSubcommand(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleSnapshot(nil, buf)
+	if err == nil {
+		t.Fatal("expected error for missing snapshot subcommand")
+	}
+	if !strings.Contains(buf.String(), "Usage: ploy snapshot") {
+		t.Fatalf("expected snapshot usage, got %q", buf.String())
 	}
 }

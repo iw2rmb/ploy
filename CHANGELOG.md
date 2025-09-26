@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-26] Snapshot Toolkit CLI
+- Added `internal/workflow/snapshots` with TOML spec loader, rule engine (strip/mask/synthetic), deterministic fingerprinting, and metadata publishing hooks backed by in-memory IPFS/JetStream stubs.
+- Introduced `ploy snapshot plan` and `ploy snapshot capture` commands, plus CLI tests covering usage, summary output, and capture reporting.
+- Published default snapshot spec/fixture under `configs/snapshots/` to exercise the toolkit locally.
+- Documented snapshot workflow in `README.md` and `cmd/ploy/README.md`; roadmap slice `04-snapshot-toolkit` marked complete with container replay hook deferred to the JetStream integration slice.
+
 ## [2025-09-26] Lane Engine & Describe CLI
 - Added `internal/workflow/lanes` with TOML loader, cache-key composer, validation, and unit tests covering required fields and deterministic outputs.
 - Introduced `configs/lanes/node-wasm.toml` and `configs/lanes/go-native.toml` as the first Grid-ready lane profiles.
