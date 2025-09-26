@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
@@ -51,11 +52,15 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	prevBusFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
+	prevLocatorLoader := asterLocatorLoader
+	prevAsterDir := asterConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
+		asterLocatorLoader = prevLocatorLoader
+		asterConfigDir = prevAsterDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -65,6 +70,8 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 		return stubCompiler, nil
 	}
 	manifestConfigDir = "ignored"
+	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
+	asterConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err != nil {
@@ -91,11 +98,15 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	prevBusFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
+	prevLocatorLoader := asterLocatorLoader
+	prevAsterDir := asterConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
+		asterLocatorLoader = prevLocatorLoader
+		asterConfigDir = prevAsterDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -104,6 +115,8 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
 	manifestConfigDir = "ignored"
+	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
+	asterConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if !errors.Is(err, fakeRunner.err) {
@@ -150,11 +163,15 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	prevBusFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
+	prevLocatorLoader := asterLocatorLoader
+	prevAsterDir := asterConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
+		asterLocatorLoader = prevLocatorLoader
+		asterConfigDir = prevAsterDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -163,6 +180,8 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
 	manifestConfigDir = "ignored"
+	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
+	asterConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
 	if err != nil {
@@ -170,6 +189,75 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	}
 	if fakeRunner.opts.Ticket != "ticket-456" {
 		t.Fatalf("expected trimmed ticket, got %q", fakeRunner.opts.Ticket)
+	}
+}
+
+func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
+	fakeRunner := &recordingRunner{}
+	prevRunner := runnerExecutor
+	prevBusFactory := eventsFactory
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
+	prevLocatorLoader := asterLocatorLoader
+	prevAsterDir := asterConfigDir
+	defer func() {
+		runnerExecutor = prevRunner
+		eventsFactory = prevBusFactory
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
+		asterLocatorLoader = prevLocatorLoader
+		asterConfigDir = prevAsterDir
+	}()
+
+	runnerExecutor = fakeRunner
+	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
+	}
+	manifestConfigDir = "ignored"
+	locator := &recordingLocator{}
+	asterLocatorLoader = func(dir string) (aster.Locator, error) {
+		locator.dir = dir
+		return locator, nil
+	}
+	asterConfigDir = "configs/aster"
+
+	buf := &bytes.Buffer{}
+	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build=lint", "--aster-step", "test=off"}
+	if err := handleWorkflowRun(args, buf); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	opts := fakeRunner.opts.Aster
+	if opts.Locator != locator {
+		t.Fatalf("expected locator to be injected, got %T", opts.Locator)
+	}
+	if len(opts.AdditionalToggles) != 1 || opts.AdditionalToggles[0] != "exec" {
+		t.Fatalf("unexpected additional toggles: %+v", opts.AdditionalToggles)
+	}
+	buildOverride, ok := opts.StageOverrides["build"]
+	if !ok {
+		t.Fatalf("expected build override to exist")
+	}
+	if buildOverride.Disable {
+		t.Fatalf("did not expect build to disable Aster: %+v", buildOverride)
+	}
+	if len(buildOverride.ExtraToggles) != 1 || buildOverride.ExtraToggles[0] != "lint" {
+		t.Fatalf("unexpected build override toggles: %+v", buildOverride.ExtraToggles)
+	}
+	testOverride, ok := opts.StageOverrides["test"]
+	if !ok {
+		t.Fatalf("expected test override to exist")
+	}
+	if !testOverride.Disable {
+		t.Fatalf("expected test override to disable Aster, got %+v", testOverride)
+	}
+	if len(testOverride.ExtraToggles) != 0 {
+		t.Fatalf("expected no extra toggles for disabled test stage, got %+v", testOverride.ExtraToggles)
+	}
+
+	if locator.dir != "configs/aster" {
+		t.Fatalf("expected locator to receive directory, got %s", locator.dir)
 	}
 }
 
@@ -218,6 +306,15 @@ func TestPrintHelpers(t *testing.T) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}
 	}
+}
+
+type recordingLocator struct {
+	dir string
+}
+
+func (r *recordingLocator) Locate(ctx context.Context, req aster.Request) (aster.Metadata, error) {
+	_ = ctx
+	return aster.Metadata{Stage: req.Stage, Toggle: req.Toggle}, nil
 }
 
 type recordingEnvironmentService struct {

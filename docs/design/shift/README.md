@@ -58,6 +58,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 7. **Aster Hook**
    - Discover Aster-generated AST-pruned bundles per workflow step.
    - Emit metadata into cache keys and attach bundle pointers to job submissions so Grid can select appropriate runtime accelerators.
+   - Allow operators to toggle bundles per stage via CLI flags and surface bundle provenance after each workflow run.
 
 ## Testing Strategy
 - All unit tests run locally against JetStream/Grid stubs (no Nomad fakes).
