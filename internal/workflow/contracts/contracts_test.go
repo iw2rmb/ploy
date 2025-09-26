@@ -71,6 +71,23 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 					ArtifactCID: "cid-mods-plan",
 				}},
 			},
+			Mods: &ModsStageMetadata{
+				Plan: &ModsPlanMetadata{
+					SelectedRecipes: []string{"recipe.alpha"},
+					ParallelStages:  []string{"orw-apply", "orw-gen"},
+					HumanGate:       true,
+					Summary:         "apply recipe.alpha then review",
+				},
+				Human: &ModsHumanMetadata{
+					Required:  true,
+					Playbooks: []string{"playbook.mods.review"},
+				},
+				Recommendations: []ModsRecommendation{{
+					Source:     "knowledge-base",
+					Message:    "Apply recipe.alpha before llm-exec",
+					Confidence: 0.9,
+				}},
+			},
 		},
 		Artifacts: []CheckpointArtifact{{
 			Name:        "mods-plan-bundle",
@@ -94,8 +111,12 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	if err := json.Unmarshal(payload, &decoded); err != nil {
 		t.Fatalf("unmarshal payload: %v", err)
 	}
-	if _, ok := decoded["stage_metadata"].(map[string]any); !ok {
+	meta, ok := decoded["stage_metadata"].(map[string]any)
+	if !ok {
 		t.Fatalf("expected stage metadata in payload: %v", decoded)
+	}
+	if _, ok := meta["mods"].(map[string]any); !ok {
+		t.Fatalf("expected mods metadata in stage metadata: %v", meta)
 	}
 	if artifacts, ok := decoded["artifacts"].([]any); !ok || len(artifacts) == 0 {
 		t.Fatalf("expected artifacts in payload: %v", decoded)
@@ -213,5 +234,31 @@ func TestInMemoryBusAutoTicketFallback(t *testing.T) {
 	}
 	if second.Manifest.Name == "" || second.Manifest.Version == "" {
 		t.Fatalf("expected auto manifest assignment, got %+v", second.Manifest)
+	}
+}
+
+// TestModsStageMetadataValidateRequiresMessage ensures recommendations require messages.
+func TestModsStageMetadataValidateRequiresMessage(t *testing.T) {
+	meta := ModsStageMetadata{
+		Recommendations: []ModsRecommendation{{Source: "knowledge-base", Message: ""}},
+	}
+	if err := meta.Validate(); err == nil {
+		t.Fatal("expected validation error for empty recommendation message")
+	}
+}
+
+// TestModsRecommendationValidateBounds enforces confidence bounds.
+func TestModsRecommendationValidateBounds(t *testing.T) {
+	rec := ModsRecommendation{Message: "ok", Confidence: 1.2}
+	if err := rec.Validate(); err == nil {
+		t.Fatal("expected confidence validation error")
+	}
+}
+
+// TestModsHumanMetadataValidate ensures blank playbooks are rejected.
+func TestModsHumanMetadataValidate(t *testing.T) {
+	meta := ModsHumanMetadata{Required: true, Playbooks: []string{"", "playbook.mods.review"}}
+	if err := meta.Validate(); err == nil {
+		t.Fatal("expected validation error for blank playbook")
 	}
 }

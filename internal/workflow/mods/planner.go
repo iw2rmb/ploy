@@ -35,15 +35,89 @@ type Stage struct {
 	Kind         string
 	Lane         string
 	Dependencies []string
+	Metadata     StageMetadata
 }
 
-// Options configures the Mods planner output lanes.
+// StageMetadata holds Mods-specific metadata for a workflow stage.
+type StageMetadata struct {
+	Mods *StageModsMetadata
+}
+
+// StageModsMetadata captures Mods plan, human, and recommendation payloads.
+type StageModsMetadata struct {
+	Plan            *StageModsPlan
+	Human           *StageModsHuman
+	Recommendations []StageModsRecommendation
+}
+
+// StageModsPlan describes the Mods planner output that Grid consumers rely on.
+type StageModsPlan struct {
+	SelectedRecipes []string
+	ParallelStages  []string
+	HumanGate       bool
+	Summary         string
+}
+
+// StageModsHuman outlines expectations for the human-in-the-loop checkpoint.
+type StageModsHuman struct {
+	Required  bool
+	Playbooks []string
+}
+
+// StageModsRecommendation records individual recommendations surfaced by the
+// Mods advisor.
+type StageModsRecommendation struct {
+	Source     string
+	Message    string
+	Confidence float64
+}
+
+// Advisor exposes Mods knowledge base guidance to the planner.
+type Advisor interface {
+	Advise(ctx context.Context, req AdviceRequest) (Advice, error)
+}
+
+// AdviceRequest wraps the workflow ticket passed to the advisor.
+type AdviceRequest struct {
+	Ticket contracts.WorkflowTicket
+}
+
+// Advice aggregates planner hints, human expectations, and recommendations.
+type Advice struct {
+	Plan            AdvicePlan
+	Human           AdviceHuman
+	Recommendations []AdviceRecommendation
+}
+
+// AdvicePlan represents the Mods planner advice returned by the knowledge base.
+type AdvicePlan struct {
+	SelectedRecipes []string
+	ParallelStages  []string
+	HumanGate       bool
+	Summary         string
+}
+
+// AdviceHuman captures human-stage cues returned by the knowledge base.
+type AdviceHuman struct {
+	Required  bool
+	Playbooks []string
+}
+
+// AdviceRecommendation captures a single knowledge base recommendation.
+type AdviceRecommendation struct {
+	Source     string
+	Message    string
+	Confidence float64
+}
+
+// Options configures the Mods planner output lanes and advisor.
 type Options struct {
 	PlanLane        string
 	OpenRewriteLane string
 	LLMPlanLane     string
 	LLMExecLane     string
 	HumanLane       string
+	Advisor         Advisor
 }
 
 // PlanInput carries ticket context for planner evaluation.
@@ -63,9 +137,6 @@ func NewPlanner(opts Options) Planner {
 
 // Plan assembles the Mods stage graph for the given ticket.
 func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
-	_ = ctx
-	_ = in
-
 	plan := []Stage{
 		{Name: StageNamePlan, Kind: StageKindPlan, Lane: p.opts.PlanLane},
 		{Name: StageNameORWApply, Kind: StageKindORWApply, Lane: p.opts.OpenRewriteLane, Dependencies: []string{StageNamePlan}},
@@ -74,6 +145,8 @@ func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
 		{Name: StageNameLLMExec, Kind: StageKindLLMExec, Lane: p.opts.LLMExecLane, Dependencies: []string{StageNameORWApply, StageNameORWGenerate, StageNameLLMPlan}},
 		{Name: StageNameHuman, Kind: StageKindHuman, Lane: p.opts.HumanLane, Dependencies: []string{StageNameLLMExec}},
 	}
+
+	p.applyAdvisor(ctx, plan, in.Ticket)
 
 	for i := range plan {
 		plan[i].Lane = strings.TrimSpace(plan[i].Lane)
@@ -99,4 +172,136 @@ func applyDefaults(opts Options) Options {
 		result.HumanLane = defaultHumanLane
 	}
 	return result
+}
+
+// applyAdvisor enriches the Mods stages with advisor metadata when available.
+func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contracts.WorkflowTicket) {
+	advisor := p.opts.Advisor
+	if advisor == nil {
+		return
+	}
+	advice, err := advisor.Advise(ctx, AdviceRequest{Ticket: ticket})
+	if err != nil {
+		return
+	}
+	planStage := stageByName(stages, StageNamePlan)
+	if planStage != nil {
+		modsMeta := ensureModsMetadata(planStage)
+		if plan := buildStagePlanMetadata(advice.Plan); plan != nil {
+			modsMeta.Plan = plan
+		}
+		if recs := buildStageRecommendations(advice.Recommendations); len(recs) > 0 {
+			modsMeta.Recommendations = recs
+		}
+		if modsMeta.Plan == nil && len(modsMeta.Recommendations) == 0 {
+			planStage.Metadata.Mods = nil
+		}
+	}
+	humanStage := stageByName(stages, StageNameHuman)
+	if humanStage != nil {
+		modsMeta := ensureModsMetadata(humanStage)
+		if human := buildStageHumanMetadata(advice.Human); human != nil {
+			modsMeta.Human = human
+		}
+		if modsMeta.Human == nil {
+			humanStage.Metadata.Mods = nil
+		}
+	}
+}
+
+// stageByName returns the pointer to the stage matching the provided name.
+func stageByName(stages []Stage, name string) *Stage {
+	for i := range stages {
+		if stages[i].Name == name {
+			return &stages[i]
+		}
+	}
+	return nil
+}
+
+// ensureModsMetadata initialises Mods metadata on a stage when needed.
+func ensureModsMetadata(stage *Stage) *StageModsMetadata {
+	if stage.Metadata.Mods == nil {
+		stage.Metadata.Mods = &StageModsMetadata{}
+	}
+	return stage.Metadata.Mods
+}
+
+// buildStagePlanMetadata converts advisor plan guidance into stage metadata.
+func buildStagePlanMetadata(advice AdvicePlan) *StageModsPlan {
+	recipes := copyStrings(advice.SelectedRecipes)
+	parallel := copyStrings(advice.ParallelStages)
+	summary := strings.TrimSpace(advice.Summary)
+	if len(parallel) == 0 {
+		parallel = []string{StageNameORWApply, StageNameORWGenerate}
+	}
+	if len(recipes) == 0 && !advice.HumanGate && summary == "" {
+		return nil
+	}
+	return &StageModsPlan{
+		SelectedRecipes: recipes,
+		ParallelStages:  parallel,
+		HumanGate:       advice.HumanGate,
+		Summary:         summary,
+	}
+}
+
+// buildStageHumanMetadata maps advisor human guidance into stage metadata.
+func buildStageHumanMetadata(advice AdviceHuman) *StageModsHuman {
+	playbooks := copyStrings(advice.Playbooks)
+	if !advice.Required && len(playbooks) == 0 {
+		return nil
+	}
+	return &StageModsHuman{
+		Required:  advice.Required,
+		Playbooks: playbooks,
+	}
+}
+
+// buildStageRecommendations normalises advisor recommendations.
+func buildStageRecommendations(values []AdviceRecommendation) []StageModsRecommendation {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]StageModsRecommendation, 0, len(values))
+	for _, value := range values {
+		message := strings.TrimSpace(value.Message)
+		if message == "" {
+			continue
+		}
+		source := strings.TrimSpace(value.Source)
+		confidence := value.Confidence
+		if confidence < 0 {
+			confidence = 0
+		}
+		if confidence > 1 {
+			confidence = 1
+		}
+		result = append(result, StageModsRecommendation{
+			Source:     source,
+			Message:    message,
+			Confidence: confidence,
+		})
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// copyStrings trims and copies non-empty string values.
+func copyStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	clean := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			clean = append(clean, trimmed)
+		}
+	}
+	if len(clean) == 0 {
+		return nil
+	}
+	return clean
 }
