@@ -47,3 +47,4 @@ The current stubs ignore these values; they are documented so workstation enviro
 - Run unit tests with `make test` (ensures `go test -cover ./...` stays ≥60% overall, ≥90% on the runner package).
 - Roadmap slices should extend `internal/workflow/runner` and keep the CLI focused on stateless execution against JetStream/Grid contracts.
 - See `docs/MANIFESTS.md` for schema details and authoring guidance on integration manifests.
+- Review `docs/DOCS.md` for the documentation matrix and editing conventions that keep the CLI guides aligned.

@@ -7,6 +7,14 @@ The SHIFT reboot simplifies the documentation surface so every contributor can f
 - `docs/design/shift/README.md` — canonical design for the SHIFT program. All new roadmap slices must link back to this document.
 - Roadmap files under `roadmap/shift/` — task-by-task status with **Why / Required Changes / Definition of Done / Tests** sections.
 
+## Documentation Matrix
+- `README.md` — overview of the CLI-first Grid integration, plus quickstarts for the workflow runner, snapshot toolkit, and environment materialisation.
+- `docs/LANES.md` — lane spec format, cache-key guidance, and Grid runtime expectations.
+- `docs/MANIFESTS.md` — manifest schema, validation flow, and how payloads travel to Grid topology enforcement.
+- `docs/SNAPSHOTS.md` — snapshot planning/capture behaviour and IPFS/JetStream publishing notes.
+- `cmd/ploy/README.md` — command-level flag reference and environment placeholders.
+- `roadmap/shift/08-documentation-cleanup.md` — status log for this documentation slice, including verification expectations.
+
 ## README Expectations
 - Scope README files to their directory. `README.md` at the repo root explains the CLI-first architecture; subfolder READMEs should describe local behaviour, not legacy services or Nomad-era flows.
 - Use the structure: `Purpose`, `Current Status`, `Usage/Commands`, `Development Notes`, `Related Docs`.

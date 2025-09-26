@@ -29,9 +29,12 @@ Document the TOML-based lane descriptors consumed by the SHIFT lane engine and t
 - Keep cache namespaces unique; collisions trigger loader errors.
 - `commands.setup` is optional and only printed when present.
 - Cache-key previews collapse empty inputs to `none` and sort Aster toggles alphabetically (`exec+plan`).
+- Nomad-era lane descriptors were removed; TOML specs here are the single source of truth for Grid submissions.
 - Unit tests cover loader validation, cache-key composition, CLI output, and runner/grid lane enforcement (≥90% coverage on critical packages).
 
 ## Related Docs
 - `docs/design/shift/README.md` — architectural context for lanes within the SHIFT roadmap.
+- `docs/DOCS.md` — documentation matrix and editing conventions.
 - `roadmap/shift/03-lane-engine.md` — scope, definition of done, and verification expectations.
+- `roadmap/shift/08-documentation-cleanup.md` — roadmap slice tracking doc alignment work.
 - `cmd/ploy/README.md` — CLI flag reference for `lanes describe` and `workflow run`.
