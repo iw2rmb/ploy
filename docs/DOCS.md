@@ -1,14 +1,15 @@
 # Documentation Conventions
 
-The SHIFT reboot simplifies the documentation surface so every contributor can focus on the workflow runner CLI and its contracts with Grid. Keep these rules in mind when editing `AGENTS.md` or adding new docs.
+The feature reboot simplifies the documentation surface so every contributor can focus on the workflow runner CLI and its contracts with Grid. Keep these rules in mind when editing `AGENTS.md` or adding new docs.
 
 ## Core Documents
 - `AGENTS.md` — operational rules for contributors (TDD cadence, local vs. VPS responsibilities, deployment protocol once reintroduced).
-- `docs/design/shift/README.md` — canonical design for the SHIFT program. All new roadmap slices must link back to this document.
+- `docs/design/README.md` — design index spanning the feature slices. Each roadmap entry links to its detailed spec under `docs/design/shift/`.
 - Roadmap files under `roadmap/shift/` — task-by-task status with **Why / Required Changes / Definition of Done / Tests** sections.
 
 ## Documentation Matrix
 - `README.md` — overview of the CLI-first Grid integration, plus quickstarts for the workflow runner, snapshot toolkit, and environment materialisation.
+- `docs/design/README.md` — index pointing to every design record with status checkboxes.
 - `docs/LANES.md` — lane spec format, cache-key guidance, and Grid runtime expectations.
 - `docs/MANIFESTS.md` — manifest schema, validation flow, and how payloads travel to Grid topology enforcement.
 - `docs/schemas/integration_manifest.schema.json` — JSON schema backing integration manifests (also exposed via `ploy manifest schema`).
@@ -30,7 +31,7 @@ The SHIFT reboot simplifies the documentation surface so every contributor can f
 - Cross-link roadmap tasks and design docs rather than duplicating requirements.
 
 ## When Adding Docs
-1. Confirm the topic is part of the active SHIFT roadmap.
+1. Confirm the topic is part of the active feature roadmap (see `roadmap/shift/`).
 2. Reference the relevant roadmap task and design subsection.
 3. Note where unit vs. integration work happens (workstation vs. Grid/VPS).
 4. Run `go test ./...` (or the appropriate doc linter) to ensure helper tests such as `legacy_dependencies_test.go` still pass.

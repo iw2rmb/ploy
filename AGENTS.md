@@ -1,13 +1,13 @@
 # AGENTS.md
 
-**MANDATORY**: Follow this file for every prompt execution.
+Follow the global workflow rules in `~/.codex/AGENTS.md`. Repository-specific addendum:
 
 ## Before You Start
-- [ ] Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.
-- [ ] Plan local unit tests and coverage checks before touching code or docs.
-- [ ] Verify required environment variables (`GRID_ENDPOINT`, `JETSTREAM_URL`, `IPFS_GATEWAY`) are discoverable or called out as TODOs for future slices.
-- [ ] Confirm you understand the workstation-only scope for the current roadmap slice (VPS/Grid integration resumes once JetStream wiring lands).
-- [ ] Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
+- Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.
+- Plan local unit tests and coverage checks before touching code or docs.
+- Verify required environment variables (`GRID_ENDPOINT`, `JETSTREAM_URL`, `IPFS_GATEWAY`) are discoverable or called out as TODOs for future slices.
+- Confirm you understand the workstation-only scope for the current roadmap slice (VPS/Grid integration resumes once JetStream wiring lands).
+- Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
 
 ## Documentation
 1. Keep documentation synchronized with the codebase. After each code change, update relevant docs and mark tasks complete where applicable. Ensure every doc is referenced; remove or link orphaned files.
