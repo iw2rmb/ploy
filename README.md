@@ -5,7 +5,7 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 ## Current Status
 - ✅ Repository reduced to CLI-only entrypoint (`ploy workflow run`).
 - ✅ Legacy binaries, Nomad orchestration code, and SeaweedFS adapters removed.
-- ✅ Event contract scaffolding in place: the CLI claims a ticket and publishes checkpoints via the JetStream stub.
+- ✅ Event contract slice now supports live JetStream connections when ``JETSTREAM_URL`` is set (falling back to the in-memory stub).
 - ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
 - ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
 - ✅ Integration manifest compiler validates TOML manifests under `configs/manifests/`, attaches compiled payloads to workflow stages, and enforces lane allowlists in the Grid stub.
@@ -26,11 +26,11 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    ```
    The command parses `configs/lanes/go-native.toml`, previews the composed cache key, and lists the build/test commands bound to that lane.
 
-3. **Run the workflow CLI stub**
+3. **Run the workflow CLI**
    ```bash
-   ./dist/ploy workflow run --tenant acme --ticket TICKET-123
+   JETSTREAM_URL=nats://127.0.0.1:4222 ./dist/ploy workflow run --tenant acme --ticket auto
    ```
-   The command hydrates the event contract stub, claims the ticket, and publishes a `claimed` checkpoint locally.
+   With ``JETSTREAM_URL`` set the CLI connects to JetStream, claims the next ticket, and publishes checkpoints on the real stream. When omitted it boots the in-memory stub for offline development.
 
 4. **Preview snapshot rules**
    ```bash
@@ -67,14 +67,16 @@ The active roadmap lives under `roadmap/shift/`. Completed slices:
 - [x] `06-commit-environments` — commit-scoped environment materialisation with dry-run/execute modes.
 - [x] `07-aster-hook` — Aster bundle discovery, cache toggle plumbing, and CLI flags.
 - [x] `08-documentation-cleanup` — doc set refreshed to highlight the CLI-first/Grid model.
+- [x] `09-cache-coordination` — workflow checkpoints carry lane cache keys for Grid reuse.
+- [x] `10-jetstream-client` — workflow runs connect to live JetStream when available and keep the stub fallback for offline slices.
 
-Next up once JetStream wiring resumes: swap the in-memory stubs for real endpoints and exercise the workflow runner against Grid via the Dev API (tracked outside the workstation slice).
+Next up: replace the Grid stub with the real Workflow RPC client and exercise the runner against the Dev API once GRID integration resumes.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
 
 ## Environment Placeholders
-Workstation builds still rely on in-memory stubs; the real services land once JetStream/Grid wiring resumes. Keep the following environment variables handy (currently marked TODO until integration testing moves off the workstation):
-- ``JETSTREAM_URL`` — JetStream endpoint used by the workflow runner and snapshot publisher.
+Workstation builds still rely on the in-memory Grid stub; JetStream is now live-optional. Keep the following environment variables handy:
+- ``JETSTREAM_URL`` — JetStream endpoint used by the workflow runner and snapshot publisher (optional; falls back to stub).
 - ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid.
 - ``IPFS_GATEWAY`` — Gateway for retrieving snapshot artifacts published by `ploy snapshot capture`.
 
