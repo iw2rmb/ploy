@@ -55,6 +55,26 @@ type environmentFactoryFunc func(l laneRegistry, s snapshotRegistry) (environmen
 
 type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 
+type laneCacheComposer struct {
+	lanes laneRegistry
+}
+
+func (c laneCacheComposer) Compose(ctx context.Context, req runner.CacheComposeRequest) (string, error) {
+	_ = ctx
+	if c.lanes == nil {
+		return "", fmt.Errorf("lane registry unavailable")
+	}
+	manifestVersion := req.Stage.Constraints.Manifest.Manifest.Version
+	desc, err := c.lanes.Describe(req.Stage.Lane, lanes.DescribeOptions{
+		ManifestVersion: manifestVersion,
+		AsterToggles:    req.Stage.Aster.Toggles,
+	})
+	if err != nil {
+		return "", err
+	}
+	return desc.CacheKey, nil
+}
+
 type stageOverrideFlag struct {
 	values []string
 }
@@ -209,6 +229,11 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("load manifests: %w", err)
 	}
 
+	laneReg, err := laneRegistryLoader(laneConfigDir)
+	if err != nil {
+		return fmt.Errorf("load lanes: %w", err)
+	}
+
 	ticketValue := strings.TrimSpace(*ticket)
 	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
 		ticketValue = ""
@@ -228,6 +253,7 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		Planner:          runner.NewDefaultPlanner(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
+		CacheComposer:    laneCacheComposer{lanes: laneReg},
 		Aster: runner.AsterOptions{
 			Locator:           locator,
 			AdditionalToggles: splitToggles(*asterGlobal),

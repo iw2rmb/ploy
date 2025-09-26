@@ -571,6 +571,52 @@ func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
 	}
 }
 
+func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	grid := runner.NewInMemoryGrid()
+	composer := &recordingCacheComposer{}
+	opts := runner.Options{
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
+		CacheComposer:    composer,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(composer.calls) == 0 {
+		t.Fatal("expected cache composer to be invoked")
+	}
+	stageChecks := map[string]int{"mods": 0, "build": 0, "test": 0}
+	for _, checkpoint := range events.checkpoints {
+		switch checkpoint.Stage {
+		case "mods", "build", "test":
+			if checkpoint.CacheKey == "" {
+				t.Fatalf("expected cache key for stage %s", checkpoint.Stage)
+			}
+			expected := fmt.Sprintf("cache-%s", checkpoint.Stage)
+			if checkpoint.CacheKey != expected {
+				t.Fatalf("unexpected cache key for %s: %s", checkpoint.Stage, checkpoint.CacheKey)
+			}
+			stageChecks[checkpoint.Stage]++
+		case "ticket-claimed", "workflow":
+			if checkpoint.CacheKey != "" {
+				t.Fatalf("expected no cache key for %s checkpoint", checkpoint.Stage)
+			}
+		}
+	}
+	for stage, count := range stageChecks {
+		if count == 0 {
+			t.Fatalf("expected cache key checkpoints for stage %s", stage)
+		}
+	}
+}
+
 func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
@@ -968,6 +1014,16 @@ func (g errorGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 	_ = stage
 	_ = workspace
 	return runner.StageOutcome{}, g.err
+}
+
+type recordingCacheComposer struct {
+	calls []runner.CacheComposeRequest
+}
+
+func (r *recordingCacheComposer) Compose(ctx context.Context, req runner.CacheComposeRequest) (string, error) {
+	_ = ctx
+	r.calls = append(r.calls, req)
+	return fmt.Sprintf("cache-%s", strings.ToLower(req.Stage.Name)), nil
 }
 
 type errorEvents struct {

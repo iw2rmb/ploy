@@ -54,6 +54,8 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -61,6 +63,8 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -72,6 +76,10 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+	}
+	laneConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err != nil {
@@ -90,6 +98,9 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	if compiler != stubCompiler {
 		t.Fatalf("expected stub compiler, got %T", compiler)
 	}
+	if fakeRunner.opts.CacheComposer == nil {
+		t.Fatal("expected cache composer to be configured")
+	}
 }
 
 func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
@@ -100,6 +111,8 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -107,6 +120,8 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -117,6 +132,10 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+	}
+	laneConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if !errors.Is(err, fakeRunner.err) {
@@ -127,15 +146,23 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
 	prevLoader := manifestRegistryLoader
 	prevDir := manifestConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
 	defer func() {
 		manifestRegistryLoader = prevLoader
 		manifestConfigDir = prevDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
 	}()
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return nil, errors.New("manifest load failed")
 	}
 	manifestConfigDir = "ignored"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+	}
+	laneConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err == nil {
@@ -165,6 +192,8 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -172,6 +201,8 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -182,6 +213,10 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+	}
+	laneConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
 	if err != nil {
@@ -200,6 +235,8 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -207,6 +244,8 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
 	}()
 
 	runnerExecutor = fakeRunner
@@ -221,6 +260,10 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 		return locator, nil
 	}
 	asterConfigDir = "configs/aster"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+	}
+	laneConfigDir = "ignored"
 
 	buf := &bytes.Buffer{}
 	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build=lint", "--aster-step", "test=off"}
