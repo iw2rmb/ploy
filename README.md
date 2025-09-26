@@ -42,7 +42,7 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme --ticket SNAPSHOT-1
    ```
-   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, emits a fake IPFS CID, and publishes metadata to the JetStream stub.
+   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the configured IPFS gateway (or the in-memory stub when unset), and publishes metadata through the current stub path.
 
 6. **Dry-run a commit-scoped environment**
    ```bash
@@ -69,9 +69,13 @@ The active roadmap lives under `roadmap/shift/`. Completed slices:
 - [x] `08-documentation-cleanup` — doc set refreshed to highlight the CLI-first/Grid model.
 - [x] `09-cache-coordination` — workflow checkpoints carry lane cache keys for Grid reuse.
 - [x] `10-jetstream-client` — workflow runs connect to live JetStream when available and keep the stub fallback for offline slices.
+- [x] `11-lane-doc-hardening` — lane schema enforcement and documentation refresh.
+- [x] `12-snapshot-validation` — snapshot fixtures validated across engines.
+- [x] `13-integration-manifest-schema` — JSON schema + CLI hook for manifests.
 - [x] `14-grid-workflow-client` — workflow stages now execute through the Grid Workflow RPC when `GRID_ENDPOINT` is set, falling back to the in-memory stub offline.
+- [x] `15-ipfs-artifact-publishing` — snapshot captures stream artifacts to IPFS when `IPFS_GATEWAY` is present, retaining the stub fallback offline.
 
-Next up: wire the snapshot/IPFS publishing path (`IPFS_GATEWAY`) so captured artifacts travel through the same stateless workflow pipeline.
+Next up: replace the snapshot metadata stub with a JetStream-backed publisher once snapshot streams are provisioned.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
 

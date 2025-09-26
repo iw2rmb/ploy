@@ -5,9 +5,13 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
@@ -851,6 +855,74 @@ func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
 		if !strings.Contains(output, fragment) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}
+	}
+}
+
+func TestHandleSnapshotCaptureUsesIPFSGatewayWhenConfigured(t *testing.T) {
+	buf := &bytes.Buffer{}
+	serverCalled := int32(0)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&serverCalled, 1)
+		if r.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/api/v0/add" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if err := r.ParseMultipartForm(2 << 20); err != nil {
+			t.Fatalf("parse multipart form: %v", err)
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			t.Fatalf("read file: %v", err)
+		}
+		defer func() { _ = file.Close() }()
+		body, err := io.ReadAll(file)
+		if err != nil {
+			t.Fatalf("read artifact body: %v", err)
+		}
+		if !strings.Contains(string(body), "users") {
+			t.Fatalf("expected artifact body to contain users table, got %q", string(body))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"Hash":"bafyrehandledcid","Name":"dev-db","Size":"42"}`)
+	}))
+	defer server.Close()
+
+	dir := t.TempDir()
+	fixturePath := filepath.Join(dir, "dev-db.json")
+	fixture := `{"users":[{"id":"1","email":"alice@example.com"}]}`
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	specContent := `name = "dev-db"
+description = "Development database"
+[source]
+engine = "postgres"
+dsn = "postgres://dev"
+fixture = "dev-db.json"
+`
+	specPath := filepath.Join(dir, "dev-db.toml")
+	if err := os.WriteFile(specPath, []byte(specContent), 0o600); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	prevDir := snapshotConfigDir
+	snapshotConfigDir = dir
+	defer func() { snapshotConfigDir = prevDir }()
+
+	t.Setenv("IPFS_GATEWAY", server.URL)
+
+	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-42"}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if atomic.LoadInt32(&serverCalled) == 0 {
+		t.Fatal("expected IPFS gateway to be invoked")
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Artifact CID: bafyrehandledcid") {
+		t.Fatalf("expected output to include IPFS CID, got %q", output)
 	}
 }
 

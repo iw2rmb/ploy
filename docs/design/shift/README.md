@@ -75,4 +75,4 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - ✅ Completed 2025-09-26: Harden lane-spec documentation (`docs/LANES.md`) and keep CLI examples (`ploy lanes describe`) in sync with TOML schema updates.
 - ✅ Completed 2025-09-26: Validate snapshot tooling against representative databases (Postgres, MySQL, document store).
 - ✅ Completed 2025-09-26: Draft integration manifest schema ahead of the workflow runner wiring slice.
-- ☐ Implement IPFS artifact publishing once the gateway (`IPFS_GATEWAY`) is provisioned for workstation slices.
+- ✅ Completed 2025-09-26: Implement IPFS artifact publishing once the gateway (`IPFS_GATEWAY`) is provisioned for workstation slices (see `docs/design/shift/ipfs-artifacts.md`).

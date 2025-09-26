@@ -16,7 +16,7 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
-`snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, publishes artifact metadata to the JetStream stub, and returns the fake IPFS CID assigned by the in-memory publisher.
+`snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, uploads the payload to the configured IPFS gateway (falling back to the deterministic in-memory publisher when ``IPFS_GATEWAY`` is unset), publishes metadata to the current stub, and prints the returned CID.
 
 `environment materialize` evaluates the integration manifest for a given app/commit pair, validates required snapshots, optionally captures them (execution mode), composes deterministic cache keys for each required lane, and hydrates those caches through an in-memory hydrator. Dry-run mode avoids snapshot capture/hydration and surfaces any gaps before Grid integration lands.
 
@@ -39,7 +39,7 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 ## Environment
 - ``JETSTREAM_URL`` — NATS/JetStream endpoint (`nats://host:port`) used by `workflow run` when present.
 - ``GRID_ENDPOINT`` — Workflow RPC base URL (`https://grid-dev.example`) used by `workflow run` when set; falls back to the in-memory Grid stub when omitted.
-- ``IPFS_GATEWAY`` — TODO (snapshot/artifact publishing slice).
+- ``IPFS_GATEWAY`` — Base URL for the IPFS gateway used by `snapshot capture`; when unset, the in-memory publisher returns deterministic fake CIDs for offline development.
 When ``JETSTREAM_URL`` is omitted the CLI falls back to the in-memory JetStream stub; omitting ``GRID_ENDPOINT`` keeps workflow execution local via the in-memory Grid stub for offline development.
 
 ## Development
