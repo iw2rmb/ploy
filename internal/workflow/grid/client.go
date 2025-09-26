@@ -118,6 +118,18 @@ func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTick
 	if out.Stage.Name != "" {
 		outcome.Stage = unmarshalStage(out.Stage)
 	}
+	if len(out.Artifacts) > 0 {
+		artifacts := make([]runner.Artifact, 0, len(out.Artifacts))
+		for _, art := range out.Artifacts {
+			artifacts = append(artifacts, runner.Artifact{
+				Name:        strings.TrimSpace(art.Name),
+				ArtifactCID: strings.TrimSpace(art.ArtifactCID),
+				Digest:      strings.TrimSpace(art.Digest),
+				MediaType:   strings.TrimSpace(art.MediaType),
+			})
+		}
+		outcome.Artifacts = artifacts
+	}
 	return outcome, nil
 }
 
@@ -143,10 +155,11 @@ type executeRequest struct {
 }
 
 type executeResponse struct {
-	Status    string        `json:"status"`
-	Message   string        `json:"message"`
-	Retryable bool          `json:"retryable"`
-	Stage     stageEnvelope `json:"stage"`
+	Status    string             `json:"status"`
+	Message   string             `json:"message"`
+	Retryable bool               `json:"retryable"`
+	Stage     stageEnvelope      `json:"stage"`
+	Artifacts []artifactEnvelope `json:"artifacts"`
 }
 
 type stageEnvelope struct {
@@ -199,4 +212,11 @@ func unmarshalStage(env stageEnvelope) runner.Stage {
 			Bundles: append([]aster.Metadata(nil), env.Aster.Bundles...),
 		},
 	}
+}
+
+type artifactEnvelope struct {
+	Name        string `json:"name"`
+	ArtifactCID string `json:"artifact_cid"`
+	Digest      string `json:"digest"`
+	MediaType   string `json:"media_type"`
 }

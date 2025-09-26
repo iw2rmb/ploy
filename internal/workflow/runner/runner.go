@@ -45,6 +45,15 @@ type Stage struct {
 	CacheKey     string
 }
 
+// Artifact represents a manifest describing an output produced by a workflow
+// stage and referenced in checkpoints for downstream consumers.
+type Artifact struct {
+	Name        string
+	ArtifactCID string
+	Digest      string
+	MediaType   string
+}
+
 type StageConstraints struct {
 	Manifest manifests.Compilation
 }
@@ -71,6 +80,7 @@ type StageOutcome struct {
 	Status    StageStatus
 	Retryable bool
 	Message   string
+	Artifacts []Artifact
 }
 
 type CacheComposeRequest struct {
@@ -209,7 +219,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 	}()
 
-	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "ticket-claimed", StageStatusCompleted, ""); err != nil {
+	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "ticket-claimed", StageStatusCompleted, "", nil, nil); err != nil {
 		return err
 	}
 
@@ -234,7 +244,8 @@ func Run(ctx context.Context, opts Options) (err error) {
 		}
 		stage.CacheKey = strings.TrimSpace(cacheKey)
 		for attempt := 0; ; attempt++ {
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning, stage.CacheKey); err != nil {
+			runningStage := stage
+			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning, stage.CacheKey, &runningStage, nil); err != nil {
 				return err
 			}
 
@@ -243,9 +254,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 				return execErr
 			}
 
-			if outcome.Stage.Name == "" {
-				outcome.Stage = stage
-			}
+			executedStage := resolvedStage(stage, outcome.Stage)
 
 			status := outcome.Status
 			if status == "" {
@@ -254,16 +263,18 @@ func Run(ctx context.Context, opts Options) (err error) {
 
 			if status == StageStatusFailed {
 				if outcome.Retryable && attempt < maxRetries {
-					if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRetrying, stage.CacheKey); err != nil {
+					stageCopy := executedStage
+					if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRetrying, stage.CacheKey, &stageCopy, nil); err != nil {
 						return err
 					}
 					continue
 				}
 
-				if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusFailed, stage.CacheKey); err != nil {
+				stageCopy := executedStage
+				if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusFailed, stage.CacheKey, &stageCopy, nil); err != nil {
 					return err
 				}
-				_ = publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusFailed, "")
+				_ = publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusFailed, "", nil, nil)
 
 				message := outcome.Message
 				if strings.TrimSpace(message) == "" {
@@ -272,27 +283,36 @@ func Run(ctx context.Context, opts Options) (err error) {
 				return fmt.Errorf("%w: stage %s: %s", ErrStageFailed, stage.Name, message)
 			}
 
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusCompleted, stage.CacheKey); err != nil {
+			stageCopy := executedStage
+			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusCompleted, stage.CacheKey, &stageCopy, outcome.Artifacts); err != nil {
 				return err
 			}
 			break
 		}
 	}
 
-	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted, ""); err != nil {
+	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted, "", nil, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage string, status StageStatus, cacheKey string) error {
+func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage string, status StageStatus, cacheKey string, stageMeta *Stage, artifacts []Artifact) error {
 	checkpoint := contracts.WorkflowCheckpoint{
 		SchemaVersion: contracts.SchemaVersion,
 		TicketID:      ticketID,
 		Stage:         stage,
 		Status:        contracts.CheckpointStatus(status),
 		CacheKey:      cacheKey,
+	}
+	if stageMeta != nil {
+		if meta := buildCheckpointStage(*stageMeta); meta != nil {
+			checkpoint.StageMetadata = meta
+		}
+	}
+	if len(artifacts) > 0 {
+		checkpoint.Artifacts = buildCheckpointArtifacts(artifacts)
 	}
 	if err := checkpoint.Validate(); err != nil {
 		return fmt.Errorf("%w: %v", ErrCheckpointValidationFailed, err)
@@ -380,5 +400,116 @@ func normalizeAsterToggles(values []string) []string {
 		result = append(result, value)
 	}
 	sort.Strings(result)
+	return result
+}
+
+func buildCheckpointStage(stage Stage) *contracts.CheckpointStage {
+	name := strings.TrimSpace(stage.Name)
+	if name == "" {
+		return nil
+	}
+	meta := &contracts.CheckpointStage{
+		Name:         name,
+		Kind:         string(stage.Kind),
+		Lane:         strings.TrimSpace(stage.Lane),
+		Dependencies: copyStringSlice(stage.Dependencies),
+		Manifest: contracts.ManifestReference{
+			Name:    strings.TrimSpace(stage.Constraints.Manifest.Manifest.Name),
+			Version: strings.TrimSpace(stage.Constraints.Manifest.Manifest.Version),
+		},
+		Aster: buildCheckpointStageAster(stage.Aster),
+	}
+	return meta
+}
+
+func buildCheckpointStageAster(stage StageAster) contracts.CheckpointStageAster {
+	result := contracts.CheckpointStageAster{
+		Enabled: stage.Enabled,
+		Toggles: copyStringSlice(stage.Toggles),
+	}
+	if len(stage.Bundles) > 0 {
+		result.Bundles = make([]contracts.CheckpointAsterBundle, 0, len(stage.Bundles))
+		for _, bundle := range stage.Bundles {
+			result.Bundles = append(result.Bundles, contracts.CheckpointAsterBundle{
+				Stage:       strings.TrimSpace(bundle.Stage),
+				Toggle:      strings.TrimSpace(bundle.Toggle),
+				BundleID:    strings.TrimSpace(bundle.BundleID),
+				Digest:      strings.TrimSpace(bundle.Digest),
+				ArtifactCID: strings.TrimSpace(bundle.ArtifactCID),
+				Source:      strings.TrimSpace(bundle.Source),
+			})
+		}
+	}
+	if !result.Enabled && (len(result.Toggles) > 0 || len(result.Bundles) > 0) {
+		result.Enabled = true
+	}
+	return result
+}
+
+func buildCheckpointArtifacts(artifacts []Artifact) []contracts.CheckpointArtifact {
+	if len(artifacts) == 0 {
+		return nil
+	}
+	result := make([]contracts.CheckpointArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		name := strings.TrimSpace(artifact.Name)
+		cid := strings.TrimSpace(artifact.ArtifactCID)
+		digest := strings.TrimSpace(artifact.Digest)
+		mediaType := strings.TrimSpace(artifact.MediaType)
+		if name == "" && cid == "" {
+			continue
+		}
+		result = append(result, contracts.CheckpointArtifact{
+			Name:        name,
+			ArtifactCID: cid,
+			Digest:      digest,
+			MediaType:   mediaType,
+		})
+	}
+	return result
+}
+
+func resolvedStage(base Stage, outcome Stage) Stage {
+	resolved := outcome
+	if strings.TrimSpace(resolved.Name) == "" {
+		return base
+	}
+	if strings.TrimSpace(resolved.Lane) == "" {
+		resolved.Lane = base.Lane
+	}
+	if len(resolved.Dependencies) == 0 {
+		resolved.Dependencies = copyStringSlice(base.Dependencies)
+	}
+	if strings.TrimSpace(resolved.CacheKey) == "" {
+		resolved.CacheKey = base.CacheKey
+	}
+	if resolved.Constraints.Manifest.Manifest.Name == "" && resolved.Constraints.Manifest.Manifest.Version == "" {
+		resolved.Constraints.Manifest = base.Constraints.Manifest
+	}
+	if !resolved.Aster.Enabled && base.Aster.Enabled {
+		resolved.Aster = base.Aster
+	} else {
+		if resolved.Aster.Enabled {
+			if len(resolved.Aster.Toggles) == 0 {
+				resolved.Aster.Toggles = copyStringSlice(base.Aster.Toggles)
+			}
+			if len(resolved.Aster.Bundles) == 0 {
+				resolved.Aster.Bundles = append([]aster.Metadata(nil), base.Aster.Bundles...)
+			}
+		}
+	}
+	return resolved
+}
+
+func copyStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
 	return result
 }

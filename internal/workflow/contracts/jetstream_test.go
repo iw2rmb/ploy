@@ -98,6 +98,16 @@ func TestJetStreamClientPublishCheckpoint(t *testing.T) {
 		Stage:         "mods",
 		Status:        CheckpointStatusRunning,
 		CacheKey:      "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
+		StageMetadata: &CheckpointStage{
+			Name:     "mods",
+			Kind:     "mods",
+			Lane:     "node-wasm",
+			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		},
+		Artifacts: []CheckpointArtifact{{
+			Name:        "mods-plan",
+			ArtifactCID: "cid-mods-plan",
+		}},
 	}
 	if err := client.PublishCheckpoint(context.Background(), checkpoint); err != nil {
 		t.Fatalf("publish checkpoint: %v", err)
@@ -116,6 +126,12 @@ func TestJetStreamClientPublishCheckpoint(t *testing.T) {
 	}
 	if stored.TicketID != checkpoint.TicketID || stored.Stage != checkpoint.Stage {
 		t.Fatalf("stored checkpoint mismatch: %#v", stored)
+	}
+	if stored.StageMetadata == nil || stored.StageMetadata.Lane != "node-wasm" {
+		t.Fatalf("expected stage metadata in stored checkpoint: %#v", stored.StageMetadata)
+	}
+	if len(stored.Artifacts) != 1 || stored.Artifacts[0].ArtifactCID != "cid-mods-plan" {
+		t.Fatalf("expected artifacts in stored checkpoint: %#v", stored.Artifacts)
 	}
 }
 
