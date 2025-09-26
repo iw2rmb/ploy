@@ -1,0 +1,59 @@
+name = "smoke"
+version = "2025-09-26"
+summary = """
+## Purpose
+Baseline manifest for mods smoke runs. Ensures the workflow runner pins caches and fixtures while Grid executes the DAG.
+
+## Notes
+- Blocks outbound internet traffic so the smoke lane stays hermetic.
+- Requires the snapshot toolkit fingerprints for dev Postgres and Redis caches.
+"""
+
+[topology]
+description = "Allow mods API to talk to Postgres + Redis while blocking egress."
+
+[[topology.allow]]
+from = "mods-api"
+to = "postgres"
+
+[[topology.allow]]
+from = "mods-api"
+to = "redis-session"
+
+[[topology.deny]]
+from = "mods-api"
+to = "internet"
+reason = "Smoke environments must remain hermetic."
+
+[fixtures]
+
+[[fixtures.required]]
+name = "postgres"
+reference = "snapshot:dev-db"
+
+[[fixtures.required]]
+name = "redis"
+reference = "snapshot:redis"
+
+[[fixtures.optional]]
+name = "elasticsearch"
+reference = "service:elastic-dev"
+reason = "Only needed when search toggles are enabled."
+
+[lanes]
+
+[[lanes.required]]
+name = "node-wasm"
+reason = "Executes mods stages."
+
+[[lanes.required]]
+name = "go-native"
+reason = "Runs Go builds and tests."
+
+[[lanes.allowed]]
+name = "python-slim"
+reason = "Data transforms for smoke validations."
+
+[aster]
+required = ["plan"]
+optional = ["exec", "lint"]

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 )
 
 var (
@@ -16,6 +17,7 @@ var (
 	ErrEventsClientRequired       = errors.New("events client is required")
 	ErrGridClientRequired         = errors.New("grid client is required")
 	ErrPlannerRequired            = errors.New("planner is required")
+	ErrManifestCompilerRequired   = errors.New("manifest compiler is required")
 	ErrTicketValidationFailed     = errors.New("ticket payload failed validation")
 	ErrCheckpointValidationFailed = errors.New("checkpoint payload failed validation")
 	ErrStageFailed                = errors.New("workflow stage failed")
@@ -35,6 +37,11 @@ type Stage struct {
 	Kind         StageKind
 	Lane         string
 	Dependencies []string
+	Constraints  StageConstraints
+}
+
+type StageConstraints struct {
+	Manifest manifests.Compilation
 }
 
 type StageStatus = contracts.CheckpointStatus
@@ -92,14 +99,19 @@ type EventsClient interface {
 	PublishCheckpoint(ctx context.Context, checkpoint contracts.WorkflowCheckpoint) error
 }
 
+type ManifestCompiler interface {
+	Compile(ctx context.Context, ref contracts.ManifestReference) (manifests.Compilation, error)
+}
+
 type Options struct {
-	Ticket          string
-	Tenant          string
-	Events          EventsClient
-	Grid            GridClient
-	Planner         Planner
-	WorkspaceRoot   string
-	MaxStageRetries int
+	Ticket           string
+	Tenant           string
+	Events           EventsClient
+	Grid             GridClient
+	Planner          Planner
+	WorkspaceRoot    string
+	MaxStageRetries  int
+	ManifestCompiler ManifestCompiler
 }
 
 func Run(ctx context.Context, opts Options) (err error) {
@@ -108,6 +120,9 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}
 	if opts.Grid == nil {
 		return ErrGridClientRequired
+	}
+	if opts.ManifestCompiler == nil {
+		return ErrManifestCompilerRequired
 	}
 
 	planner := opts.Planner
@@ -123,6 +138,11 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}
 	if err := ticket.Validate(); err != nil {
 		return fmt.Errorf("%w: %v", ErrTicketValidationFailed, err)
+	}
+
+	compiledManifest, err := opts.ManifestCompiler.Compile(ctx, ticket.Manifest)
+	if err != nil {
+		return err
 	}
 
 	plan, err := planner.Build(ctx, ticket)
@@ -164,6 +184,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		if strings.TrimSpace(stage.Lane) == "" {
 			return fmt.Errorf("%w: %s", ErrLaneRequired, stage.Name)
 		}
+		stage.Constraints.Manifest = compiledManifest
 		for attempt := 0; ; attempt++ {
 			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning); err != nil {
 				return err

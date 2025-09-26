@@ -11,8 +11,22 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
+
+func defaultManifestCompilation() manifests.Compilation {
+	return manifests.Compilation{
+		Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+		Lanes: manifests.LaneSet{
+			Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}},
+		},
+	}
+}
+
+func newStubCompiler() *recordingCompiler {
+	return &recordingCompiler{compiled: defaultManifestCompilation()}
+}
 
 func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 	planner := runner.NewDefaultPlanner()
@@ -47,7 +61,7 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 }
 
 func TestRunRequiresEventsClient(t *testing.T) {
-	opts := runner.Options{Ticket: "ticket-123", Grid: runner.NewInMemoryGrid()}
+	opts := runner.Options{Ticket: "ticket-123", Grid: runner.NewInMemoryGrid(), ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrEventsClientRequired) {
 		t.Fatalf("expected ErrEventsClientRequired, got %v", err)
@@ -56,20 +70,91 @@ func TestRunRequiresEventsClient(t *testing.T) {
 
 func TestRunRequiresGridClient(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
-	opts := runner.Options{Ticket: "ticket-123", Events: events}
+	opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrGridClientRequired) {
 		t.Fatalf("expected ErrGridClientRequired, got %v", err)
 	}
 }
 
+func TestRunRequiresManifestCompiler(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	opts := runner.Options{
+		Ticket:          "ticket-123",
+		Events:          events,
+		Grid:            runner.NewInMemoryGrid(),
+		Planner:         runner.NewDefaultPlanner(),
+		WorkspaceRoot:   t.TempDir(),
+		MaxStageRetries: 1,
+	}
+	err := runner.Run(context.Background(), opts)
+	if !errors.Is(err, runner.ErrManifestCompilerRequired) {
+		t.Fatalf("expected ErrManifestCompilerRequired, got %v", err)
+	}
+}
+
+func TestRunPropagatesManifestCompilationError(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	compilerErr := errors.New("compile failed")
+	opts := runner.Options{
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             runner.NewInMemoryGrid(),
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: failingCompiler{err: compilerErr},
+	}
+	err := runner.Run(context.Background(), opts)
+	if !errors.Is(err, compilerErr) {
+		t.Fatalf("expected compiler error, got %v", err)
+	}
+}
+
+func TestRunPassesManifestConstraintsToGrid(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	compiler := &recordingCompiler{
+		compiled: manifests.Compilation{
+			Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			Lanes: manifests.LaneSet{
+				Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}},
+			},
+		},
+	}
+	grid := &fakeGrid{}
+	opts := runner.Options{
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: compiler,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(grid.calls) == 0 {
+		t.Fatal("expected at least one grid call")
+	}
+	for _, call := range grid.calls {
+		if call.stage.Constraints.Manifest.Manifest.Name != "smoke" {
+			t.Fatalf("expected manifest on stage, got %+v", call.stage.Constraints.Manifest)
+		}
+	}
+	if compiler.ref.Name != "smoke" || compiler.ref.Version == "" {
+		t.Fatalf("expected manifest reference to be captured, got %+v", compiler.ref)
+	}
+}
+
 func TestRunReturnsClaimTicketError(t *testing.T) {
 	events := &errorEvents{claimErr: errors.New("claim failed")}
 	opts := runner.Options{
-		Ticket:  "ticket-123",
-		Events:  events,
-		Grid:    runner.NewInMemoryGrid(),
-		Planner: runner.NewDefaultPlanner(),
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             runner.NewInMemoryGrid(),
+		Planner:          runner.NewDefaultPlanner(),
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, events.claimErr) {
@@ -87,12 +172,13 @@ func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 		publishErr: errors.New("checkpoint failure"),
 	}
 	opts := runner.Options{
-		Ticket:          "ticket-123",
-		Events:          events,
-		Grid:            runner.NewInMemoryGrid(),
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             runner.NewInMemoryGrid(),
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, events.publishErr) {
@@ -108,13 +194,14 @@ func TestRunErrorsWhenWorkspaceRootInvalid(t *testing.T) {
 	}
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            &fakeGrid{},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   filepath.Join(file, "workspace"),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             &fakeGrid{},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    filepath.Join(file, "workspace"),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if err == nil || !strings.Contains(err.Error(), "create workspace root") {
@@ -132,13 +219,14 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 		},
 	}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: -3,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  -3,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrStageFailed) {
@@ -161,13 +249,14 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            statuslessGrid{},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             statuslessGrid{},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -181,13 +270,14 @@ func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
 func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            noStageGrid{},
-		Planner:         nil,
-		WorkspaceRoot:   "",
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             noStageGrid{},
+		Planner:          nil,
+		WorkspaceRoot:    "",
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -204,12 +294,13 @@ func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
 		failAt: 3,
 	}
 	opts := runner.Options{
-		Ticket:          "ticket-123",
-		Events:          events,
-		Grid:            noStageGrid{},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             noStageGrid{},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, events.err) {
@@ -223,12 +314,13 @@ func TestRunFailsWhenFinalPublishFails(t *testing.T) {
 		failAt: 8,
 	}
 	opts := runner.Options{
-		Ticket:          "ticket-123",
-		Events:          events,
-		Grid:            noStageGrid{},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             noStageGrid{},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, events.err) {
@@ -249,13 +341,14 @@ func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	planner := runner.NewDefaultPlanner()
 	workspaceRoot := t.TempDir()
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         planner,
-		WorkspaceRoot:   workspaceRoot,
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          planner,
+		WorkspaceRoot:    workspaceRoot,
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("run error: %v", err)
@@ -304,13 +397,14 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	planner := runner.NewDefaultPlanner()
 	workspaceRoot := t.TempDir()
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         planner,
-		WorkspaceRoot:   workspaceRoot,
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          planner,
+		WorkspaceRoot:    workspaceRoot,
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("run error: %v", err)
@@ -347,13 +441,14 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 		},
 	}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 0,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrStageFailed) {
@@ -378,13 +473,14 @@ func TestRunFailsWhenPlannerErrors(t *testing.T) {
 	grid := &fakeGrid{}
 	planner := failingPlanner{err: errors.New("planner boom")}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         planner,
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          planner,
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, planner.err) {
@@ -395,13 +491,14 @@ func TestRunFailsWhenPlannerErrors(t *testing.T) {
 func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            &fakeGrid{},
-		Planner:         invalidStagePlanner{},
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             &fakeGrid{},
+		Planner:          invalidStagePlanner{},
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrCheckpointValidationFailed) {
@@ -412,13 +509,14 @@ func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
 func TestRunFailsWhenPlannerOmitsLane(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            &fakeGrid{},
-		Planner:         missingLanePlanner{},
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             &fakeGrid{},
+		Planner:          missingLanePlanner{},
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrLaneRequired) {
@@ -429,13 +527,14 @@ func TestRunFailsWhenPlannerOmitsLane(t *testing.T) {
 func TestRunErrorsWhenTicketValidationFails(t *testing.T) {
 	events := &recordingEvents{tenant: "acme", invalidTicket: true}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            &fakeGrid{},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             &fakeGrid{},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrTicketValidationFailed) {
@@ -452,13 +551,14 @@ func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 		},
 	}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if err == nil {
@@ -482,13 +582,14 @@ func TestRunUsesFallbackFailureMessage(t *testing.T) {
 		},
 	}
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            grid,
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if err == nil {
@@ -503,13 +604,14 @@ func TestRunPropagatesGridError(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	gridErr := errors.New("grid down")
 	opts := runner.Options{
-		Ticket:          "",
-		Tenant:          "acme",
-		Events:          events,
-		Grid:            errorGrid{err: gridErr},
-		Planner:         runner.NewDefaultPlanner(),
-		WorkspaceRoot:   t.TempDir(),
-		MaxStageRetries: 1,
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             errorGrid{err: gridErr},
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
 	}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, gridErr) {
@@ -520,12 +622,12 @@ func TestRunPropagatesGridError(t *testing.T) {
 func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	grid := runner.NewInMemoryGrid()
 	grid.StageOutcomes["build"] = []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "retry-me"}}
-	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "mods", Lane: "node-wasm"}, "/tmp/work"); err != nil {
+	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods", Lane: "node-wasm"}, "/tmp/work"); err != nil {
 		t.Fatalf("unexpected error for default outcome: %v", err)
 	} else if outcome.Status != runner.StageStatusCompleted {
 		t.Fatalf("expected completed outcome, got %+v", outcome)
 	}
-	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "build", Lane: "go-native"}, "/tmp/work")
+	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "build", Lane: "go-native"}, "/tmp/work")
 	if err != nil {
 		t.Fatalf("unexpected error for configured outcome: %v", err)
 	}
@@ -546,7 +648,7 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 
 func TestInMemoryGridRejectsMissingLane(t *testing.T) {
 	grid := runner.NewInMemoryGrid()
-	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "mods"}, "/tmp/work")
+	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods"}, "/tmp/work")
 	if err == nil || !strings.Contains(err.Error(), "lane missing") {
 		t.Fatalf("expected lane missing error, got %v", err)
 	}
@@ -583,6 +685,9 @@ func (e *errorEvents) ClaimTicket(ctx context.Context, ticketID string) (contrac
 	}
 	if e.ticket.Tenant == "" {
 		e.ticket.Tenant = "acme"
+	}
+	if e.ticket.Manifest.Name == "" || e.ticket.Manifest.Version == "" {
+		e.ticket.Manifest = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
 	if strings.TrimSpace(e.ticket.TicketID) == "" {
 		e.ticket.TicketID = "ticket-auto"
@@ -634,6 +739,9 @@ func (c *countingEvents) ClaimTicket(ctx context.Context, ticketID string) (cont
 	if c.ticket.Tenant == "" {
 		c.ticket.Tenant = "acme"
 	}
+	if c.ticket.Manifest.Name == "" || c.ticket.Manifest.Version == "" {
+		c.ticket.Manifest = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
+	}
 	return c.ticket, nil
 }
 
@@ -680,6 +788,7 @@ type recordingEvents struct {
 	tenant         string
 	nextTicket     string
 	invalidTicket  bool
+	manifest       contracts.ManifestReference
 	claimedTickets []string
 	checkpoints    []contracts.WorkflowCheckpoint
 }
@@ -693,10 +802,15 @@ func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (con
 	if r.invalidTicket {
 		return contracts.WorkflowTicket{}, nil
 	}
+	ref := r.manifest
+	if ref.Name == "" && ref.Version == "" {
+		ref = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
+	}
 	return contracts.WorkflowTicket{
 		SchemaVersion: contracts.SchemaVersion,
 		TicketID:      ticketID,
 		Tenant:        r.tenant,
+		Manifest:      ref,
 	}, nil
 }
 
@@ -707,7 +821,7 @@ func (r *recordingEvents) PublishCheckpoint(ctx context.Context, checkpoint cont
 }
 
 type gridCall struct {
-	stage     string
+	stage     runner.Stage
 	workspace string
 }
 
@@ -720,7 +834,7 @@ type fakeGrid struct {
 func (g *fakeGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	_ = ctx
 	_ = ticket
-	g.calls = append(g.calls, gridCall{stage: stage.Name, workspace: workspace})
+	g.calls = append(g.calls, gridCall{stage: stage, workspace: workspace})
 	g.lastWorkspace = workspace
 	queue := g.outcomes[stage.Name]
 	if len(queue) == 0 {
@@ -737,7 +851,7 @@ func (g *fakeGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 func gatherStageAttempts(calls []gridCall, stage string) int {
 	count := 0
 	for _, call := range calls {
-		if call.stage == stage {
+		if call.stage.Name == stage {
 			count++
 		}
 	}
@@ -785,4 +899,25 @@ func withCleanupDeadline(t *testing.T) {
 		defer cancel()
 		<-ctx.Done()
 	})
+}
+
+type failingCompiler struct {
+	err error
+}
+
+func (f failingCompiler) Compile(ctx context.Context, ref contracts.ManifestReference) (manifests.Compilation, error) {
+	_ = ctx
+	_ = ref
+	return manifests.Compilation{}, f.err
+}
+
+type recordingCompiler struct {
+	compiled manifests.Compilation
+	ref      contracts.ManifestReference
+}
+
+func (r *recordingCompiler) Compile(ctx context.Context, ref contracts.ManifestReference) (manifests.Compilation, error) {
+	_ = ctx
+	r.ref = ref
+	return r.compiled, nil
 }
