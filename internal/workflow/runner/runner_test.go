@@ -1566,3 +1566,151 @@ func (s *stubAsterLocator) Locate(ctx context.Context, req aster.Request) (aster
 	}
 	return aster.Metadata{}, aster.ErrBundleNotFound
 }
+
+// TestRunPublishesModsMetadata ensures Mods-specific metadata propagates into
+// published checkpoints and artifact envelopes.
+func TestRunPublishesModsMetadata(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	manifest := defaultManifestCompilation()
+	plan := runner.ExecutionPlan{
+		TicketID: "ticket-123",
+		Stages: []runner.Stage{
+			{
+				Name:        mods.StageNamePlan,
+				Kind:        runner.StageKindModsPlan,
+				Lane:        "node-wasm",
+				Constraints: runner.StageConstraints{Manifest: manifest},
+				Metadata: runner.StageMetadata{Mods: &runner.StageModsMetadata{
+					Plan: &runner.StageModsPlan{
+						SelectedRecipes: []string{"recipe.alpha"},
+						ParallelStages:  []string{mods.StageNameORWApply, mods.StageNameORWGenerate},
+						HumanGate:       true,
+						Summary:         "knowledge base recommends prompting human review",
+					},
+					Recommendations: []runner.StageModsRecommendation{{
+						Source:     "knowledge-base",
+						Message:    "Apply recipe.alpha before llm-exec",
+						Confidence: 1.5,
+					}, {
+						Source:     "knowledge-base",
+						Message:    " ",
+						Confidence: 0.25,
+					}},
+				}},
+			},
+			{
+				Name:         mods.StageNameHuman,
+				Kind:         runner.StageKindModsHuman,
+				Lane:         "go-native",
+				Dependencies: []string{mods.StageNamePlan},
+				Constraints:  runner.StageConstraints{Manifest: manifest},
+				Metadata: runner.StageMetadata{Mods: &runner.StageModsMetadata{
+					Human: &runner.StageModsHuman{
+						Required:  true,
+						Playbooks: []string{"playbook.mods.review"},
+					},
+				}},
+			},
+		},
+	}
+	planner := metadataPlanner{plan: plan}
+	grid := &fakeGrid{
+		outcomes: map[string][]runner.StageOutcome{
+			mods.StageNamePlan: {
+				{Status: runner.StageStatusRunning},
+				{Status: runner.StageStatusCompleted},
+			},
+			mods.StageNameHuman: {
+				{Status: runner.StageStatusCompleted},
+			},
+		},
+	}
+	opts := runner.Options{
+		Ticket:           "ticket-123",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          planner,
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var planRunning, planCompleted, humanCompleted *contracts.WorkflowCheckpoint
+	for i := range events.checkpoints {
+		cp := events.checkpoints[i]
+		if cp.Stage != mods.StageNamePlan && cp.Stage != mods.StageNameHuman {
+			continue
+		}
+		switch cp.Stage {
+		case mods.StageNamePlan:
+			switch cp.Status {
+			case contracts.CheckpointStatusRunning:
+				planRunning = &cp
+			case contracts.CheckpointStatusCompleted:
+				planCompleted = &cp
+			}
+		case mods.StageNameHuman:
+			if cp.Status == contracts.CheckpointStatusCompleted {
+				humanCompleted = &cp
+			}
+		}
+	}
+	if planRunning == nil || planCompleted == nil || humanCompleted == nil {
+		t.Fatalf("expected mods checkpoints recorded, got running=%#v completed=%#v human=%#v", planRunning, planCompleted, humanCompleted)
+	}
+	if planRunning.StageMetadata == nil || planRunning.StageMetadata.Mods == nil {
+		t.Fatalf("expected mods metadata on running checkpoint: %#v", planRunning.StageMetadata)
+	}
+	if planCompleted.StageMetadata == nil || planCompleted.StageMetadata.Mods == nil {
+		t.Fatalf("expected mods metadata on completed checkpoint: %#v", planCompleted.StageMetadata)
+	}
+	planMeta := planCompleted.StageMetadata.Mods
+	if planMeta.Plan == nil {
+		t.Fatalf("expected plan metadata present: %#v", planMeta)
+	}
+	if len(planMeta.Plan.SelectedRecipes) != 1 || planMeta.Plan.SelectedRecipes[0] != "recipe.alpha" {
+		t.Fatalf("unexpected plan recipes: %#v", planMeta.Plan.SelectedRecipes)
+	}
+	if len(planMeta.Plan.ParallelStages) != 2 {
+		t.Fatalf("unexpected plan parallel stages: %#v", planMeta.Plan.ParallelStages)
+	}
+	if !planMeta.Plan.HumanGate {
+		t.Fatalf("expected plan metadata to flag human gate")
+	}
+	if planMeta.Plan.Summary == "" {
+		t.Fatalf("expected plan summary present")
+	}
+	if len(planMeta.Recommendations) != 1 || planMeta.Recommendations[0].Message == "" {
+		t.Fatalf("expected plan recommendations recorded: %#v", planMeta.Recommendations)
+	}
+	if planMeta.Recommendations[0].Confidence != 1 {
+		t.Fatalf("expected recommendation confidence clamped to 1, got %#v", planMeta.Recommendations[0].Confidence)
+	}
+
+	if humanCompleted.StageMetadata.Mods == nil || humanCompleted.StageMetadata.Mods.Human == nil {
+		t.Fatalf("expected human metadata recorded: %#v", humanCompleted.StageMetadata)
+	}
+	humanMeta := humanCompleted.StageMetadata.Mods.Human
+	if !humanMeta.Required {
+		t.Fatalf("expected human stage required")
+	}
+	if len(humanMeta.Playbooks) != 1 || humanMeta.Playbooks[0] != "playbook.mods.review" {
+		t.Fatalf("expected human playbook recorded: %#v", humanMeta.Playbooks)
+	}
+}
+
+// metadataPlanner returns a fixed execution plan with Mods metadata for tests.
+type metadataPlanner struct {
+	plan runner.ExecutionPlan
+}
+
+// Build returns the configured execution plan with Mods metadata.
+func (m metadataPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (runner.ExecutionPlan, error) {
+	_ = ctx
+	_ = ticket
+	return m.plan, nil
+}
