@@ -408,6 +408,57 @@ strategy = "hash"
 	}
 }
 
+func TestBuiltInSnapshotsCapture(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(repoRoot(t), "configs", "snapshots")
+	cases := []struct {
+		name   string
+		engine string
+	}{
+		{name: "dev-db", engine: "postgres"},
+		{name: "commit-db", engine: "postgres"},
+		{name: "commit-cache", engine: "redis"},
+		{name: "mysql-orders", engine: "mysql"},
+		{name: "doc-events", engine: "document"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			artifact := &recordingArtifactPublisher{cid: "cid-" + tc.name}
+			metadata := &recordingMetadataPublisher{}
+			registry, err := LoadDirectory(dir, LoadOptions{
+				ArtifactPublisher: artifact,
+				MetadataPublisher: metadata,
+			})
+			if err != nil {
+				t.Fatalf("load directory: %v", err)
+			}
+
+			plan, err := registry.Plan(ctx, tc.name)
+			if err != nil {
+				t.Fatalf("plan snapshot %s: %v", tc.name, err)
+			}
+			if plan.Engine != tc.engine {
+				t.Fatalf("expected engine %s, got %s", tc.engine, plan.Engine)
+			}
+
+			result, err := registry.Capture(ctx, tc.name, CaptureOptions{Tenant: "acme", TicketID: "ticket-123"})
+			if err != nil {
+				t.Fatalf("capture snapshot %s: %v", tc.name, err)
+			}
+			if result.Metadata.Engine != tc.engine {
+				t.Fatalf("expected metadata engine %s, got %s", tc.engine, result.Metadata.Engine)
+			}
+			if result.ArtifactCID != artifact.cid {
+				t.Fatalf("expected artifact cid %s, got %s", artifact.cid, result.ArtifactCID)
+			}
+			if metadata.calls == 0 {
+				t.Fatalf("expected metadata publisher to be invoked")
+			}
+		})
+	}
+}
+
 func TestValidateSpecRequiresFields(t *testing.T) {
 	if err := validateSpec(Spec{}); err == nil {
 		t.Fatal("expected error for missing name")
@@ -506,4 +557,22 @@ func writeFile(t *testing.T, path, content string) {
 
 func startsWith(value, prefix string) bool {
 	return len(value) >= len(prefix) && value[:len(prefix)] == prefix
+}
+
+func repoRoot(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	for {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not locate go.mod from tests")
+		}
+		dir = parent
+	}
 }

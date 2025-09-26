@@ -1,0 +1,21 @@
+name = "mysql-orders"
+description = "Representative MySQL snapshot for order fulfillment"
+
+[source]
+engine = "mysql"
+dsn = "mysql://grid/orders"
+fixture = "mysql-orders.json"
+
+[[strip]]
+table = "payments"
+columns = ["card_number"]
+
+[[mask]]
+table = "orders"
+column = "customer_email"
+strategy = "hash"
+
+[[synthetic]]
+table = "orders"
+column = "tracking_code"
+strategy = "uuid"

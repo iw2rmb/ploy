@@ -1,0 +1,16 @@
+{
+  "events": [
+    {
+      "id": "evt-1",
+      "payload": "{\"kind\":\"login\"}",
+      "ingested_at": "",
+      "tenant": "acme"
+    },
+    {
+      "id": "evt-2",
+      "payload": "{\"kind\":\"purchase\"}",
+      "ingested_at": "",
+      "tenant": "acme"
+    }
+  ]
+}
