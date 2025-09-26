@@ -30,7 +30,7 @@ func (f runnerInvokerFunc) Run(ctx context.Context, opts runner.Options) error {
 	return f(ctx, opts)
 }
 
-type eventsFactoryFunc func(tenant string) runner.EventsClient
+type eventsFactoryFunc func(tenant string) (runner.EventsClient, error)
 
 type laneRegistry interface {
 	Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error)
@@ -94,10 +94,27 @@ func (f *stageOverrideFlag) Set(value string) error {
 
 var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
-	eventsFactory  eventsFactoryFunc = func(tenant string) runner.EventsClient {
-		return contracts.NewInMemoryBus(tenant)
-	}
+	eventsFactory  eventsFactoryFunc = defaultEventsFactory
 )
+
+func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
+	trimmedTenant := strings.TrimSpace(tenant)
+	if trimmedTenant == "" {
+		return nil, fmt.Errorf("tenant is required for events client")
+	}
+	jetstreamURL := strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
+	if jetstreamURL != "" {
+		client, err := contracts.NewJetStreamClient(contracts.JetStreamOptions{
+			URL:    jetstreamURL,
+			Tenant: trimmedTenant,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return client, nil
+	}
+	return contracts.NewInMemoryBus(trimmedTenant), nil
+}
 
 var (
 	laneRegistryLoader laneRegistryLoaderFunc = func(dir string) (laneRegistry, error) {
@@ -239,7 +256,13 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		ticketValue = ""
 	}
 
-	events := eventsFactory(trimmedTenant)
+	events, err := eventsFactory(trimmedTenant)
+	if err != nil {
+		return fmt.Errorf("configure events client: %w", err)
+	}
+	if closer, ok := events.(interface{ Close() }); ok {
+		defer closer.Close()
+	}
 	grid := runner.NewInMemoryGrid()
 	locator, err := asterLocatorLoader(asterConfigDir)
 	if err != nil {

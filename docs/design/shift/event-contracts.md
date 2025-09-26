@@ -31,15 +31,16 @@ Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate
 
 The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), ensuring the CLI and future Grid integrations consume identical versions. Checkpoints now carry the lane cache key so Grid can coordinate cache hydration and reuse.
 
-## Stubbed JetStream Client
-- `internal/workflow/contracts.InMemoryBus` implements `runner.EventsClient` and records claimed tickets and checkpoints.
-- `cmd/ploy/main.go` wires the stub for workstation runs; real JetStream connectivity lands in `02-workflow-runner-cli`.
-- `GRID_ENDPOINT`, `JETSTREAM_URL`, and `IPFS_GATEWAY` remain unset in this slice. Note them as TODOs for the workflow runner wiring once JetStream integration resumes.
+## JetStream Client
+- `internal/workflow/contracts.JetStreamClient` now implements `runner.EventsClient`, connecting to NATS when ``JETSTREAM_URL`` is provided and falling back to the in-memory bus for offline runs.
+- `cmd/ploy/main.go` selects the real client automatically when the environment variable is set, closing the loop on the original stub pathway.
+- `internal/workflow/contracts.InMemoryBus` remains available for workstation slices that skip live connectivity.
+- `GRID_ENDPOINT` and `IPFS_GATEWAY` remain TODO until the Grid RPC and artifact publishing slices land.
 
 ## Tests
 - Unit tests in `internal/workflow/contracts` validate subject derivation, schema validation, and stub behaviour.
 - Runner tests ensure the CLI claims tickets and publishes an initial `claimed` checkpoint through the stub.
 
 ## Next Steps
-- Replace the stub with a real JetStream client (respecting `JETSTREAM_URL`) and extend checkpoints with cache key payloads.
 - Expand tickets and checkpoints to include DAG metadata and artifact manifests once the lane engine lands.
+- Wire the workflow runner to submit stages to Grid via the Workflow RPC so live runs exercise the real control plane.

@@ -12,7 +12,7 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
-`workflow run` boots in-memory JetStream and Grid stubs, claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. The Grid stub refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Upcoming roadmap slices will swap the stubs for real JetStream connections and Grid RPC calls.
+`workflow run` connects to JetStream when ``JETSTREAM_URL`` is set (falling back to the in-memory stub otherwise), claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. The Grid stub still backs stage execution for this slice and refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
@@ -37,10 +37,10 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 - `1` — error (missing flags, unsupported subcommand, stage failure, or downstream error).
 
 ## Environment
-- ``JETSTREAM_URL`` — TODO (real endpoint wired in Grid integration slice).
-- ``GRID_ENDPOINT`` — TODO (real Workflow RPC target lands with JetStream wiring).
+- ``JETSTREAM_URL`` — NATS/JetStream endpoint (`nats://host:port`) used by `workflow run` when present.
+- ``GRID_ENDPOINT`` — TODO (real Workflow RPC target lands with Grid integration).
 - ``IPFS_GATEWAY`` — TODO (snapshot/artifact publishing slice).
-The current stubs ignore these values; they are documented so workstation environments can surface them once integration resumes.
+When ``JETSTREAM_URL`` is omitted the CLI falls back to the in-memory stub so workstation tests continue to run offline.
 
 ## Development
 - Build via `make build` (outputs to `dist/ploy`).
