@@ -88,31 +88,31 @@ Next steps to implement:
 9. ✅ **COMPLETED (2025-08-21)** **WASM Testing**: Created working sample WASM applications: `apps/wasm-rust-hello/`, `apps/wasm-go-hello/`, `apps/wasm-assemblyscript-hello/`, `apps/wasm-cpp-hello/`. (archived Oct 2025)
 10. ✅ **COMPLETED (2025-08-21)** **Lane G Documentation**: Completed comprehensive WASM implementation guide in `docs/WASM.md` with usage examples, architecture details, and operational procedures. (archived Oct 2025)
 
-**Phase Automated Modification Framework (ARF): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
+**Phase Mods automation program (code modifications): Enterprise Code Transformation** ✅ **PHASES 1-4 COMPLETED**
 
-The Automated Modification Framework (ARF) represents Ploy's enterprise code transformation engine, designed to automatically modify common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
+The Mods automation program (code modifications) represents Ploy's enterprise code transformation engine, designed to automatically modify common code issues, migrate legacy codebases, and apply security fixes across hundreds of repositories using OpenRewrite and LLM-assisted intelligence.
 
-**Implementation Roadmap**: See detailed phase documentation in `roadmap/arf/`:
+**Implementation Roadmap**: The mods automation program is tracked in archived roadmap notes (restore under `roadmap/mods/` during documentation cleanup).
 
-- ✅ **[Phase ARF-1: Foundation & Core Engine](roadmap/arf/phase-arf-1.md)** - **COMPLETED (2025-08-22)** - OpenRewrite integration, sandbox management, recipe catalog, basic transformation engine
-- ✅ **[Phase ARF-2: Self-Healing Loop & Error Recovery](roadmap/arf/phase-arf-2.md)** - **COMPLETED (2025-08-22)** - Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration  
-- ✅ **[Phase ARF-3: LLM Integration & Hybrid Intelligence](roadmap/arf/phase-arf-3.md)** - **COMPLETED (2025-08-23)** - LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
-- ✅ **[Phase ARF-4: Security & Production Hardening](roadmap/arf/phase-arf-4.md)** - **COMPLETED (2025-08-25)** - Complete deployment integration, application testing, Java 11→17 migration pipeline operational with Lane C OSv deployments
+- ✅ Phase Mods-1: Foundation & Core Engine — COMPLETED (2025-08-22) — OpenRewrite integration, sandbox management, recipe catalog, basic transformation engine
+- ✅ Phase Mods-2: Self-Healing Loop & Error Recovery — COMPLETED (2025-08-22) — Circuit breakers, error-driven recipe evolution, parallel processing, multi-repository orchestration
+- ✅ Phase Mods-3: LLM Integration & Hybrid Intelligence — COMPLETED (2025-08-23) — LLM-assisted recipe creation, hybrid transformation pipelines, continuous learning, strategy selection
+- ✅ Phase Mods-4: Security & Production Hardening — COMPLETED (2025-08-25) — Deployment integration, application testing, Java 11→17 migration pipeline operational with Lane C OSv deployments
 
-**Phase ARF-5: Generic Recipe Management System** - **IN PROGRESS** ✅
-Comprehensive transformation of ARF into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
+**Phase Mods-5: Generic Recipe Management System** - IN PROGRESS ✅
+Comprehensive transformation of Mods into a universal code transformation platform enabling user-controlled recipe management, community contributions, and generic transformation engines:
 
-- ✅ **[Phase ARF-5.1: Recipe Data Model & Storage](roadmap/arf/phase-arf-5.1.md)** - ✅ **COMPLETED 2025-08-25** - Recipe data structures, SeaweedFS storage backend, validation framework, and YAML format specification
-- 📋 **[Phase ARF-5.2: CLI Integration & User Interface](roadmap/arf/phase-arf-5.2.md)** - Complete CLI commands for recipe management: upload, update, delete, list, search, run, compose with benchmark integration
-- 📋 **[Phase ARF-5.3: Generic Recipe Execution Engine](roadmap/arf/phase-arf-5.3.md)** - Plugin-based execution framework replacing mock transformations with real OpenRewrite, shell scripts, and AST transformations
-- 📋 **[Phase ARF-5.4: Recipe Discovery & Management Features](roadmap/arf/phase-arf-5.4.md)** - Recipe marketplace, intelligent discovery, dependency management, quality assurance, and community features
+- ✅ Phase Mods-5.1: Recipe Data Model & Storage — COMPLETED 2025-08-25 — Recipe data structures, SeaweedFS storage backend, validation framework, and YAML format specification
+- 📋 Phase Mods-5.2: CLI Integration & User Interface — Complete CLI commands for recipe management: upload, update, delete, list, search, run, compose with benchmark integration
+- 📋 Phase Mods-5.3: Generic Recipe Execution Engine — Plugin-based execution framework replacing mock transformations with real OpenRewrite, shell scripts, and AST transformations
+- 📋 Phase Mods-5.4: Recipe Discovery & Management Features — Recipe marketplace, intelligent discovery, dependency management, quality assurance, and community features
 
 **Future Phases**:
-- **Phase ARF-6: Enterprise Recipe Governance** - Recipe approval workflows, governance policies, and enterprise compliance frameworks
-- **Phase ARF-7: Advanced Analytics & Intelligence** - Usage analytics, trend analysis, predictive recipe recommendations, and transformation impact assessment
-- **Phase ARF-8: Multi-Cloud Recipe Distribution** - Distributed recipe registries, cross-platform synchronization, and federated recipe ecosystems
+- **Phase Mods-6: Enterprise Recipe Governance** - Recipe approval workflows, governance policies, and enterprise compliance frameworks
+- **Phase Mods-7: Advanced Analytics & Intelligence** - Usage analytics, trend analysis, predictive recipe recommendations, and transformation impact assessment
+- **Phase Mods-8: Multi-Cloud Recipe Distribution** - Distributed recipe registries, cross-platform synchronization, and federated recipe ecosystems
 
-**✅ ARF Implementation Status (Phases 1-4)**:
+**✅ Mods Implementation Status (Phases 1-4)**:
 - ✅ **Foundation Complete**: OpenRewrite integration with 2,800+ Java transformation recipes
 - ✅ **Self-Healing Loop**: Circuit breaker patterns, error-driven recipe evolution, parallel processing
 - ✅ **LLM Intelligence**: Multi-provider LLM integration with hybrid transformation pipelines
@@ -122,10 +122,10 @@ Comprehensive transformation of ARF into a universal code transformation platfor
 - ✅ **Multi-Repository Orchestration**: Dependency-aware transformation coordination
 - ✅ **High Availability**: Distributed processing with Consul leader election
 - ⏸️ Pattern Learning: vector similarity (SQL-backed) planned; disabled currently
-- ✅ **Comprehensive API**: Complete `/v1/arf/*` endpoints and `ploy arf` CLI integration
+- ✅ **Comprehensive API**: Complete `/v1/mods/*` endpoints and `ploy mods` CLI integration
 - ✅ **Production Testing**: 28/28 test suite passing (100% success rate)
 
-**ARF Success Metrics & Future Targets**:
+**Mods Success Metrics & Future Targets**:
 - 50-80% time reduction in code migrations (baseline: manual migration time)
 - 95% success rates for well-defined transformations
 - Support for hundreds of repositories per transformation campaign
