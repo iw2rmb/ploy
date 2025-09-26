@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-26] Documentation Cleanup
+- Refreshed `README.md` to highlight the CLI-first/Grid model, enumerate all completed SHIFT slices, and link directly to the design doc.
+- Updated the documentation matrix (`docs/DOCS.md`, `docs/LANES.md`, `docs/MANIFESTS.md`, `docs/SNAPSHOTS.md`) to emphasise JetStream/Grid workflows and point contributors at the relevant guides.
+- Added `documentation_cleanup_test.go` to guard the roadmap status and README alignment for this slice.
+
+
 ## [2025-09-26] Aster Hook Integration
 - Added `internal/workflow/aster` with a filesystem-backed locator that discovers per-stage bundle metadata from `configs/aster/` and surfaces provenance data for Grid submissions.
 - Extended the workflow runner to require an Aster locator, attach sorted toggle metadata to every stage, and honour per-stage disablement while keeping cache keys deterministic.

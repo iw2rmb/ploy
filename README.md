@@ -56,14 +56,18 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    Unit tests assert that only the workflow CLI remains and that the event contract schema stays consistent.
 
 ## Roadmap Alignment
-The active roadmap lives under `roadmap/shift/`. Completed items:
-- [x] `00-legacy-teardown` — repository scoped to CLI-only workflow runner stub.
-- [x] `01-event-contracts` — subject map + schema definitions with a stubbed JetStream client.
+The active roadmap lives under `roadmap/shift/`. Completed slices:
+- [x] `00-legacy-teardown` — repository scoped to the stateless CLI stub.
+- [x] `01-event-contracts` — subject map + schema definitions with a JetStream stub.
 - [x] `02-workflow-runner-cli` — CLI reconstructs the default DAG, streams checkpoints, and exercises the Grid stub.
 - [x] `03-lane-engine` — lane specs + cache key composer + `ploy lanes describe` inspection command.
+- [x] `04-snapshot-toolkit` — snapshot commands, rule engine, and metadata publishing via JetStream/IPFS stubs.
+- [x] `05-integration-manifests` — manifest compiler + Grid lane enforcement.
+- [x] `06-commit-environments` — commit-scoped environment materialisation with dry-run/execute modes.
+- [x] `07-aster-hook` — Aster bundle discovery, cache toggle plumbing, and CLI flags.
+- [x] `08-documentation-cleanup` — doc set refreshed to highlight the CLI-first/Grid model.
 
-Upcoming items:
-- `07-aster-hook` — wire AST-pruned bundles into cache keys and Grid submissions.
+Next up once JetStream wiring resumes: swap the in-memory stubs for real endpoints and exercise the workflow runner against Grid via the Dev API (tracked outside the workstation slice).
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
 

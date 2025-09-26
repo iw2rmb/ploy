@@ -7,6 +7,7 @@ Describe how the snapshot toolkit transforms database fixtures during the SHIFT 
 - `ploy snapshot plan` and `ploy snapshot capture` are available locally and operate against fixtures defined in `configs/snapshots/*.toml`.
 - Strip, mask, and synthetic rules execute via the in-memory rule engine; metadata flows to the JetStream/IPFS stubs until real services are wired in.
 - Container-backed replays are deferred to the JetStream integration slice; captures currently rely on deterministic JSON fixtures.
+- Nomad snapshot tooling is retired; IPFS/JetStream publishing described here replaces SeaweedFS pipelines.
 
 ## Usage / Commands
 - `ploy snapshot plan --snapshot <snapshot-name>` — Summarises strip/mask/synthetic rules, tables touched, and highlights before a capture runs.
@@ -45,5 +46,7 @@ Describe how the snapshot toolkit transforms database fixtures during the SHIFT 
 
 ## Related Docs
 - `docs/design/shift/README.md` — Overall SHIFT architecture.
+- `docs/DOCS.md` — documentation matrix and editing conventions.
 - `README.md` — High-level CLI overview (snapshot commands included).
+- `roadmap/shift/08-documentation-cleanup.md` — slice documenting the doc refresh.
 - `cmd/ploy/README.md` — CLI usage details and environment placeholders.
