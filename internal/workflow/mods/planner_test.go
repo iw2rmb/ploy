@@ -3,7 +3,9 @@ package mods_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
@@ -154,6 +156,68 @@ func TestPlannerFallsBackWhenAdvisorErrors(t *testing.T) {
 	if planStage.Metadata.Mods != nil {
 		t.Fatalf("expected no mods metadata on failure, got %#v", planStage.Metadata.Mods)
 	}
+}
+
+func TestPlannerExposesExecutionHints(t *testing.T) {
+	options := mods.Options{}
+	setModsOptionsHints(t, &options, 90*time.Second, 3)
+	planner := mods.NewPlanner(options)
+
+	stages, err := planner.Plan(context.Background(), mods.PlanInput{
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-hints", Tenant: "acme"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error planning mods stages: %v", err)
+	}
+
+	planStage := findStage(t, stages, mods.StageNamePlan)
+	if planStage.Metadata.Mods == nil {
+		t.Fatalf("expected mods metadata present on plan stage")
+	}
+	if planStage.Metadata.Mods.Plan == nil {
+		t.Fatalf("expected plan metadata present on plan stage")
+	}
+	planMeta := *planStage.Metadata.Mods.Plan
+	if len(planMeta.ParallelStages) == 0 {
+		t.Fatalf("expected parallel stages recorded in plan metadata")
+	}
+	planValue := reflect.ValueOf(planMeta)
+	planTimeoutField := planValue.FieldByName("PlanTimeout")
+	if !planTimeoutField.IsValid() {
+		t.Fatalf("plan metadata missing PlanTimeout field: %#v", planMeta)
+	}
+	if planTimeoutField.String() != "1m30s" {
+		t.Fatalf("expected plan timeout 1m30s, got %q", planTimeoutField.String())
+	}
+	maxParallelField := planValue.FieldByName("MaxParallel")
+	if !maxParallelField.IsValid() {
+		t.Fatalf("plan metadata missing MaxParallel field: %#v", planMeta)
+	}
+	if int(maxParallelField.Int()) != 3 {
+		t.Fatalf("expected max parallel 3, got %d", maxParallelField.Int())
+	}
+}
+
+func setModsOptionsHints(t *testing.T, opts *mods.Options, planTimeout time.Duration, maxParallel int) {
+	t.Helper()
+	val := reflect.ValueOf(opts).Elem()
+	planTimeoutField := val.FieldByName("PlanTimeout")
+	if !planTimeoutField.IsValid() {
+		t.Fatalf("mods.Options missing PlanTimeout field: %#v", opts)
+	}
+	if !planTimeoutField.CanSet() {
+		t.Fatalf("mods.Options PlanTimeout not settable")
+	}
+	planTimeoutField.Set(reflect.ValueOf(planTimeout))
+
+	maxParallelField := val.FieldByName("MaxParallel")
+	if !maxParallelField.IsValid() {
+		t.Fatalf("mods.Options missing MaxParallel field: %#v", opts)
+	}
+	if !maxParallelField.CanSet() {
+		t.Fatalf("mods.Options MaxParallel not settable")
+	}
+	maxParallelField.SetInt(int64(maxParallel))
 }
 
 // findStage locates a stage by name inside the Mods planner output during tests.

@@ -3,6 +3,7 @@ package mods
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -56,6 +57,8 @@ type StageModsPlan struct {
 	ParallelStages  []string
 	HumanGate       bool
 	Summary         string
+	PlanTimeout     string
+	MaxParallel     int
 }
 
 // StageModsHuman outlines expectations for the human-in-the-loop checkpoint.
@@ -118,6 +121,8 @@ type Options struct {
 	LLMExecLane     string
 	HumanLane       string
 	Advisor         Advisor
+	PlanTimeout     time.Duration
+	MaxParallel     int
 }
 
 // PlanInput carries ticket context for planner evaluation.
@@ -147,6 +152,7 @@ func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
 	}
 
 	p.applyAdvisor(ctx, plan, in.Ticket)
+	p.applyPlannerHints(plan)
 
 	for i := range plan {
 		plan[i].Lane = strings.TrimSpace(plan[i].Lane)
@@ -170,6 +176,12 @@ func applyDefaults(opts Options) Options {
 	}
 	if strings.TrimSpace(result.HumanLane) == "" {
 		result.HumanLane = defaultHumanLane
+	}
+	if result.PlanTimeout < 0 {
+		result.PlanTimeout = 0
+	}
+	if result.MaxParallel < 0 {
+		result.MaxParallel = 0
 	}
 	return result
 }
@@ -207,6 +219,51 @@ func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contra
 			humanStage.Metadata.Mods = nil
 		}
 	}
+}
+
+func (p Planner) applyPlannerHints(stages []Stage) {
+	planStage := stageByName(stages, StageNamePlan)
+	if planStage == nil {
+		return
+	}
+	timeout := p.opts.PlanTimeout
+	if timeout < 0 {
+		timeout = 0
+	}
+	maxParallel := p.opts.MaxParallel
+	if maxParallel < 0 {
+		maxParallel = 0
+	}
+	if timeout <= 0 && maxParallel <= 0 {
+		return
+	}
+	modsMeta := ensureModsMetadata(planStage)
+	if modsMeta.Plan == nil {
+		modsMeta.Plan = &StageModsPlan{}
+	}
+	if timeout > 0 {
+		modsMeta.Plan.PlanTimeout = formatPlanTimeout(timeout)
+	}
+	if maxParallel > 0 {
+		modsMeta.Plan.MaxParallel = maxParallel
+	}
+	if len(modsMeta.Plan.ParallelStages) == 0 {
+		modsMeta.Plan.ParallelStages = []string{StageNameORWApply, StageNameORWGenerate}
+	}
+}
+
+func formatPlanTimeout(timeout time.Duration) string {
+	if timeout <= 0 {
+		return ""
+	}
+	if timeout%time.Millisecond == 0 {
+		return timeout.String()
+	}
+	trimmed := timeout.Truncate(time.Millisecond)
+	if trimmed <= 0 {
+		trimmed = time.Millisecond
+	}
+	return trimmed.String()
 }
 
 // stageByName returns the pointer to the stage matching the provided name.

@@ -5,7 +5,7 @@ Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoin
 ## Status
 - [x] Planner skeleton (roadmap/mods/01-planner-skeleton.md) — Mods DAG emitted by default planner (2025-09-26).
 - [x] Knowledge Base feedback loop (roadmap/mods/02-knowledge-base-feedback.md) — Mods planner now records knowledge base advice inside `stage_metadata.mods` (2025-09-26).
-- [ ] CLI surface and Grid wiring (upcoming).
+- [x] CLI surface and Grid wiring (roadmap/mods/03-cli-grid-wiring.md) — `ploy workflow run` exposes planner hints and pushes concurrency metadata into Grid/JetStream (2025-09-26).
 
 
 ## Scope
@@ -24,6 +24,7 @@ Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoin
 - `llm-exec` consumes the plan plus OpenRewrite diffs, executing iterative fixes through Grid jobs. Failures trigger Knowledge Base lookups and optionally spawn `human-in-the-loop` review tickets.
 - `human-in-the-loop` is a manual gate that surfaces curated instructions and diff previews to operators. Completion toggles a checkpoint acknowledged via JetStream; timeouts escalate back to `llm-exec`.
 - Mods checkpoints embed advisor output inside `stage_metadata.mods.plan`, `stage_metadata.mods.recommendations`, and `stage_metadata.mods.human` so Grid tooling can recover recipe choices, human expectations, and confidence values from checkpoints.
+- Planner configuration publishes execution hints (`plan_timeout`, `max_parallel`) alongside the Mods plan metadata so Grid can tune runner behaviour without code changes.
 - Healing retries reuse the legacy approach: unsuccessful builds or diff validation trigger another planning cycle unless the Knowledge Base signals no viable remediation.
 
 ## Implementation Notes

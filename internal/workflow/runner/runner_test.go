@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,41 @@ const modsPlanStage = mods.StageNamePlan
 
 func newStubCompiler() *recordingCompiler {
 	return &recordingCompiler{compiled: defaultManifestCompilation()}
+}
+
+func setRunnerModsOptions(t *testing.T, opts *runner.Options, planTimeout time.Duration, maxParallel int) {
+	t.Helper()
+	value := reflect.ValueOf(opts).Elem()
+	modsField := value.FieldByName("Mods")
+	if !modsField.IsValid() {
+		t.Fatalf("runner.Options missing Mods field: %#v", opts)
+	}
+	if modsField.Kind() != reflect.Struct {
+		t.Fatalf("runner.Options Mods field is not a struct: %s", modsField.Kind())
+	}
+	planTimeoutField := modsField.FieldByName("PlanTimeout")
+	if !planTimeoutField.IsValid() {
+		t.Fatalf("runner.ModsOptions missing PlanTimeout: %#v", modsField.Interface())
+	}
+	if !planTimeoutField.CanSet() {
+		t.Fatalf("runner.ModsOptions PlanTimeout not settable")
+	}
+	if planTimeoutField.Type() != reflect.TypeOf(time.Duration(0)) {
+		t.Fatalf("runner.ModsOptions PlanTimeout has unexpected type: %s", planTimeoutField.Type())
+	}
+	planTimeoutField.Set(reflect.ValueOf(planTimeout))
+
+	maxParallelField := modsField.FieldByName("MaxParallel")
+	if !maxParallelField.IsValid() {
+		t.Fatalf("runner.ModsOptions missing MaxParallel: %#v", modsField.Interface())
+	}
+	if !maxParallelField.CanSet() {
+		t.Fatalf("runner.ModsOptions MaxParallel not settable")
+	}
+	if maxParallelField.Kind() != reflect.Int {
+		t.Fatalf("runner.ModsOptions MaxParallel has unexpected kind: %s", maxParallelField.Kind())
+	}
+	maxParallelField.SetInt(int64(maxParallel))
 }
 
 func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
@@ -1700,6 +1736,70 @@ func TestRunPublishesModsMetadata(t *testing.T) {
 	}
 	if len(humanMeta.Playbooks) != 1 || humanMeta.Playbooks[0] != "playbook.mods.review" {
 		t.Fatalf("expected human playbook recorded: %#v", humanMeta.Playbooks)
+	}
+}
+
+func TestRunPublishesModsPlannerHints(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-hints", tenant: "acme"}
+	grid := &fakeGrid{}
+	opts := runner.Options{
+		Ticket:           "ticket-hints",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+	}
+	setRunnerModsOptions(t, &opts, 75*time.Second, 4)
+
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var planCompleted *contracts.WorkflowCheckpoint
+	for i := range events.checkpoints {
+		cp := events.checkpoints[i]
+		if cp.Stage == mods.StageNamePlan && cp.Status == contracts.CheckpointStatusCompleted {
+			planCompleted = &cp
+			break
+		}
+	}
+	if planCompleted == nil {
+		t.Fatalf("expected completed plan checkpoint, got %#v", events.checkpoints)
+	}
+	if planCompleted.StageMetadata == nil || planCompleted.StageMetadata.Mods == nil {
+		t.Fatalf("expected mods metadata on plan checkpoint: %#v", planCompleted.StageMetadata)
+	}
+	if planCompleted.StageMetadata.Mods.Plan == nil {
+		t.Fatalf("expected mods plan metadata present: %#v", planCompleted.StageMetadata.Mods)
+	}
+	planValue := reflect.ValueOf(*planCompleted.StageMetadata.Mods.Plan)
+	planTimeoutField := planValue.FieldByName("PlanTimeout")
+	if !planTimeoutField.IsValid() {
+		t.Fatalf("plan metadata missing PlanTimeout field: %#v", planCompleted.StageMetadata.Mods.Plan)
+	}
+	if planTimeoutField.String() != "1m15s" {
+		t.Fatalf("expected plan timeout 1m15s, got %q", planTimeoutField.String())
+	}
+	maxParallelField := planValue.FieldByName("MaxParallel")
+	if !maxParallelField.IsValid() {
+		t.Fatalf("plan metadata missing MaxParallel field: %#v", planCompleted.StageMetadata.Mods.Plan)
+	}
+	if int(maxParallelField.Int()) != 4 {
+		t.Fatalf("expected max parallel 4, got %d", maxParallelField.Int())
+	}
+
+	planInvocation := findStageCall(grid.calls, mods.StageNamePlan)
+	if planInvocation.stage.Metadata.Mods == nil || planInvocation.stage.Metadata.Mods.Plan == nil {
+		t.Fatalf("expected mods plan metadata on grid invocation: %#v", planInvocation.stage.Metadata)
+	}
+	invokedPlan := planInvocation.stage.Metadata.Mods.Plan
+	if invokedPlan.PlanTimeout != "1m15s" {
+		t.Fatalf("expected grid invocation plan timeout 1m15s, got %q", invokedPlan.PlanTimeout)
+	}
+	if invokedPlan.MaxParallel != 4 {
+		t.Fatalf("expected grid invocation max parallel 4, got %d", invokedPlan.MaxParallel)
 	}
 }
 
