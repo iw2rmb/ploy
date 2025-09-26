@@ -1,5 +1,5 @@
 # Lane Engine Redesign
-- [ ] Pending
+- [x] Done (2025-09-26)
 
 ## Why / What For
 Recast lanes as build profiles optimised for Grid runtimes while letting Ploy compute deterministic cache keys.
@@ -13,6 +13,8 @@ Recast lanes as build profiles optimised for Grid runtimes while letting Ploy co
 - All legacy Nomad lane metadata removed.
 - CLI prints accurate lane descriptions and cache previews.
 - Grid stub validates that submitted jobs carry expected lane metadata.
+
+Status: Lane specs now live under `configs/lanes/*.toml`, `internal/workflow/lanes` loads and validates them, cache keys incorporate commit/snapshot/manifest/Aster toggles, and `ploy lanes describe` exposes the inspection view with previews for the stubbed Grid submissions.
 
 ## Tests
 - Unit tests for cache key math and lane parsing.

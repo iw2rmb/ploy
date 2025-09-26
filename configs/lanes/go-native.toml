@@ -1,0 +1,8 @@
+name = "go-native"
+description = "Go builds targeting native Grid runners with race-enabled tests"
+runtime_family = "go-native"
+cache_namespace = "go-native"
+
+[commands]
+build = ["go", "build", "./..."]
+test = ["go", "test", "-race", "./..."]

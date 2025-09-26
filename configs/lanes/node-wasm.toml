@@ -1,0 +1,9 @@
+name = "node-wasm"
+description = "Node.js mods executed inside the WASM runtime with pnpm caches"
+runtime_family = "wasm-node"
+cache_namespace = "node-wasm"
+
+[commands]
+setup = ["pnpm", "install"]
+build = ["pnpm", "run", "build"]
+test = ["pnpm", "run", "test"]

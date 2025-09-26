@@ -28,10 +28,14 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 		t.Fatalf("expected 3 stages, got %d", len(plan.Stages))
 	}
 	expectOrder := []string{"mods", "build", "test"}
+	expectLanes := []string{"node-wasm", "go-native", "go-native"}
 	for i, name := range expectOrder {
 		stage := plan.Stages[i]
 		if stage.Name != name {
 			t.Fatalf("unexpected stage at %d: %s", i, stage.Name)
+		}
+		if stage.Lane != expectLanes[i] {
+			t.Fatalf("unexpected lane for %s: %s", stage.Name, stage.Lane)
 		}
 	}
 	if deps := plan.Stages[1].Dependencies; len(deps) != 1 || deps[0] != "mods" {
@@ -405,6 +409,23 @@ func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
 	}
 }
 
+func TestRunFailsWhenPlannerOmitsLane(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	opts := runner.Options{
+		Ticket:          "",
+		Tenant:          "acme",
+		Events:          events,
+		Grid:            &fakeGrid{},
+		Planner:         missingLanePlanner{},
+		WorkspaceRoot:   t.TempDir(),
+		MaxStageRetries: 1,
+	}
+	err := runner.Run(context.Background(), opts)
+	if !errors.Is(err, runner.ErrLaneRequired) {
+		t.Fatalf("expected ErrLaneRequired, got %v", err)
+	}
+}
+
 func TestRunErrorsWhenTicketValidationFails(t *testing.T) {
 	events := &recordingEvents{tenant: "acme", invalidTicket: true}
 	opts := runner.Options{
@@ -499,12 +520,12 @@ func TestRunPropagatesGridError(t *testing.T) {
 func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	grid := runner.NewInMemoryGrid()
 	grid.StageOutcomes["build"] = []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "retry-me"}}
-	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "mods"}, "/tmp/work"); err != nil {
+	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "mods", Lane: "node-wasm"}, "/tmp/work"); err != nil {
 		t.Fatalf("unexpected error for default outcome: %v", err)
 	} else if outcome.Status != runner.StageStatusCompleted {
 		t.Fatalf("expected completed outcome, got %+v", outcome)
 	}
-	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "build"}, "/tmp/work")
+	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "build", Lane: "go-native"}, "/tmp/work")
 	if err != nil {
 		t.Fatalf("unexpected error for configured outcome: %v", err)
 	}
@@ -517,6 +538,17 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	}
 	if invocations[0].Stage.Name != "mods" || invocations[1].Stage.Name != "build" {
 		t.Fatalf("unexpected invocation order: %+v", invocations)
+	}
+	if invocations[0].Stage.Lane != "node-wasm" || invocations[1].Stage.Lane != "go-native" {
+		t.Fatalf("unexpected lanes recorded: %+v", invocations)
+	}
+}
+
+func TestInMemoryGridRejectsMissingLane(t *testing.T) {
+	grid := runner.NewInMemoryGrid()
+	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1"}, runner.Stage{Name: "mods"}, "/tmp/work")
+	if err == nil || !strings.Contains(err.Error(), "lane missing") {
+		t.Fatalf("expected lane missing error, got %v", err)
 	}
 }
 
@@ -729,7 +761,19 @@ func (invalidStagePlanner) Build(ctx context.Context, ticket contracts.WorkflowT
 	return runner.ExecutionPlan{
 		TicketID: ticket.TicketID,
 		Stages: []runner.Stage{
-			{Name: "", Kind: runner.StageKindMods},
+			{Name: "", Kind: runner.StageKindMods, Lane: "node-wasm"},
+		},
+	}, nil
+}
+
+type missingLanePlanner struct{}
+
+func (missingLanePlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (runner.ExecutionPlan, error) {
+	_ = ctx
+	return runner.ExecutionPlan{
+		TicketID: ticket.TicketID,
+		Stages: []runner.Stage{
+			{Name: "mods", Kind: runner.StageKindMods, Lane: ""},
 		},
 	}, nil
 }

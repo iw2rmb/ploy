@@ -2,6 +2,8 @@ package runner
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -27,6 +29,10 @@ func (g *InMemoryGrid) ExecuteStage(ctx context.Context, ticket contracts.Workfl
 	_ = ctx
 	g.mu.Lock()
 	defer g.mu.Unlock()
+
+	if strings.TrimSpace(stage.Lane) == "" {
+		return StageOutcome{}, fmt.Errorf("lane missing for stage %s", stage.Name)
+	}
 
 	g.invocations = append(g.invocations, StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace})
 

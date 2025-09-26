@@ -71,7 +71,6 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - Versioning strategy for integration manifests when multiple teams share the same app but diverge on topology requirements.
 
 ## Next Steps
-- Draft detailed event schemas and publish alongside CLI PoC (see `docs/design/shift/event-contracts.md`).
-- Spike CLI skeleton with JetStream consumer + Grid RPC client.
+- Harden lane-spec documentation (`docs/LANES.md`) and keep CLI examples (`ploy lanes describe`) in sync with TOML schema updates.
 - Validate snapshot tooling against representative databases (Postgres, MySQL, document store).
-- Update lane documentation and remove Nomad references across `docs/LANES.md`, `docs/TESTING.md`, and mods guides.
+- Draft integration manifest schema ahead of the workflow runner wiring slice.

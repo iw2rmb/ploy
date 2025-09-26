@@ -19,6 +19,7 @@ var (
 	ErrTicketValidationFailed     = errors.New("ticket payload failed validation")
 	ErrCheckpointValidationFailed = errors.New("checkpoint payload failed validation")
 	ErrStageFailed                = errors.New("workflow stage failed")
+	ErrLaneRequired               = errors.New("lane is required")
 )
 
 type StageKind string
@@ -32,6 +33,7 @@ const (
 type Stage struct {
 	Name         string
 	Kind         StageKind
+	Lane         string
 	Dependencies []string
 }
 
@@ -73,9 +75,9 @@ func (DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket
 	plan := ExecutionPlan{
 		TicketID: ticket.TicketID,
 		Stages: []Stage{
-			{Name: "mods", Kind: StageKindMods},
-			{Name: "build", Kind: StageKindBuild, Dependencies: []string{"mods"}},
-			{Name: "test", Kind: StageKindTest, Dependencies: []string{"build"}},
+			{Name: "mods", Kind: StageKindMods, Lane: "node-wasm"},
+			{Name: "build", Kind: StageKindBuild, Lane: "go-native", Dependencies: []string{"mods"}},
+			{Name: "test", Kind: StageKindTest, Lane: "go-native", Dependencies: []string{"build"}},
 		},
 	}
 	return plan, nil
@@ -159,6 +161,9 @@ func Run(ctx context.Context, opts Options) (err error) {
 	}
 
 	for _, stage := range plan.Stages {
+		if strings.TrimSpace(stage.Lane) == "" {
+			return fmt.Errorf("%w: %s", ErrLaneRequired, stage.Name)
+		}
 		for attempt := 0; ; attempt++ {
 			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning); err != nil {
 				return err

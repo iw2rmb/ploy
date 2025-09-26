@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -140,5 +141,69 @@ func TestPrintHelpers(t *testing.T) {
 		if !strings.Contains(output, fragment) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}
+	}
+}
+
+type fakeLaneRegistry struct {
+	description lanes.Description
+	err         error
+}
+
+func (f *fakeLaneRegistry) Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error) {
+	if f.err != nil {
+		return lanes.Description{}, f.err
+	}
+	f.description.Parameters = opts
+	return f.description, nil
+}
+
+func TestHandleLanesDescribePrintsDetails(t *testing.T) {
+	buf := &bytes.Buffer{}
+	prevLoader := laneRegistryLoader
+	prevDir := laneConfigDir
+	defer func() {
+		laneRegistryLoader = prevLoader
+		laneConfigDir = prevDir
+	}()
+
+	desc := lanes.Description{
+		Lane: lanes.Spec{
+			Name:           "node-wasm",
+			Description:    "Node lane",
+			RuntimeFamily:  "wasm-node",
+			CacheNamespace: "node",
+			Commands: lanes.Commands{
+				Build: []string{"npm", "ci"},
+				Test:  []string{"npm", "test"},
+			},
+		},
+		CacheKey: "node/node-wasm@commit=abc@...",
+	}
+
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		return &fakeLaneRegistry{description: desc}, nil
+	}
+	laneConfigDir = "ignored"
+
+	err := handleLanes([]string{"describe", "--lane", "node-wasm", "--commit", "abc"}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	output := buf.String()
+	for _, fragment := range []string{"node-wasm", "wasm-node", "node", "node/node-wasm@commit=abc"} {
+		if !strings.Contains(output, fragment) {
+			t.Fatalf("expected output to contain %q, got %q", fragment, output)
+		}
+	}
+}
+
+func TestHandleLanesRequiresSubcommand(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleLanes(nil, buf)
+	if err == nil {
+		t.Fatal("expected error when lanes subcommand missing")
+	}
+	if !strings.Contains(buf.String(), "Usage: ploy lanes") {
+		t.Fatalf("expected usage output, got %q", buf.String())
 	}
 }

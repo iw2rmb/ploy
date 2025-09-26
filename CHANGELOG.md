@@ -1,5 +1,12 @@
 # Changelog
 
+## [2025-09-26] Lane Engine & Describe CLI
+- Added `internal/workflow/lanes` with TOML loader, cache-key composer, validation, and unit tests covering required fields and deterministic outputs.
+- Introduced `configs/lanes/node-wasm.toml` and `configs/lanes/go-native.toml` as the first Grid-ready lane profiles.
+- Extended `cmd/ploy` with `lanes describe`, golden-style CLI tests, and richer top-level usage guidance.
+- Propagated lane metadata through the workflow runner and in-memory Grid stub; stages now error when lane assignments are missing.
+- Documented the lane system in `README.md`, `cmd/ploy/README.md`, `docs/LANES.md`, and marked roadmap slice `03-lane-engine` complete.
+
 ## [2025-09-26] Workflow Runner CLI Stub
 - Expanded `internal/workflow/runner` with a default DAG planner, stage execution loop, retry handling, temporary workspace management, and error propagation for Grid interactions.
 - Added an in-memory Grid client, stage invocation tracking, and extensive unit tests lifting runner package coverage to 94.5%.
