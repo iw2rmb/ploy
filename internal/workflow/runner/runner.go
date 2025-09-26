@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -71,6 +72,8 @@ type StageModsPlan struct {
 	ParallelStages  []string
 	HumanGate       bool
 	Summary         string
+	PlanTimeout     string
+	MaxParallel     int
 }
 
 // StageModsHuman captures expectations for human checkpoints.
@@ -142,14 +145,23 @@ type Planner interface {
 	Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error)
 }
 
-type DefaultPlanner struct{}
+type DefaultPlanner struct {
+	mods ModsOptions
+}
 
 func NewDefaultPlanner() Planner {
 	return DefaultPlanner{}
 }
 
-func (DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error) {
-	modPlanner := mods.NewPlanner(mods.Options{})
+func NewDefaultPlannerWithMods(opts ModsOptions) Planner {
+	return DefaultPlanner{mods: opts}
+}
+
+func (p DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error) {
+	modPlanner := mods.NewPlanner(mods.Options{
+		PlanTimeout: p.mods.PlanTimeout,
+		MaxParallel: p.mods.MaxParallel,
+	})
 	modStages, err := modPlanner.Plan(ctx, mods.PlanInput{Ticket: ticket})
 	if err != nil {
 		return ExecutionPlan{}, err
@@ -207,6 +219,12 @@ type Options struct {
 	ManifestCompiler ManifestCompiler
 	Aster            AsterOptions
 	CacheComposer    CacheComposer
+	Mods             ModsOptions
+}
+
+type ModsOptions struct {
+	PlanTimeout time.Duration
+	MaxParallel int
 }
 
 type AsterOptions struct {
@@ -233,7 +251,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 
 	planner := opts.Planner
 	if planner == nil {
-		planner = NewDefaultPlanner()
+		planner = NewDefaultPlannerWithMods(opts.Mods)
 	}
 
 	trimmedTicket := strings.TrimSpace(opts.Ticket)
@@ -508,6 +526,8 @@ func convertModsMetadata(src *mods.StageModsMetadata) *StageModsMetadata {
 			ParallelStages:  copyStringSlice(src.Plan.ParallelStages),
 			HumanGate:       src.Plan.HumanGate,
 			Summary:         strings.TrimSpace(src.Plan.Summary),
+			PlanTimeout:     strings.TrimSpace(src.Plan.PlanTimeout),
+			MaxParallel:     src.Plan.MaxParallel,
 		}
 	}
 	if src.Human != nil {
@@ -582,6 +602,8 @@ func buildCheckpointModsMetadata(meta *StageModsMetadata) *contracts.ModsStageMe
 			ParallelStages:  copyStringSlice(meta.Plan.ParallelStages),
 			HumanGate:       meta.Plan.HumanGate,
 			Summary:         strings.TrimSpace(meta.Plan.Summary),
+			PlanTimeout:     strings.TrimSpace(meta.Plan.PlanTimeout),
+			MaxParallel:     meta.Plan.MaxParallel,
 		}
 	}
 	if meta.Human != nil {

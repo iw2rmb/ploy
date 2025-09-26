@@ -5,14 +5,14 @@
 ## Usage
 ```
 ploy lanes describe --lane <lane-name> [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] [--aster <toggle,...>]
-ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--aster <toggle,...>] [--aster-step <stage=toggle,...|stage=off>]
+ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--aster <toggle,...>] [--aster-step <stage=toggle,...|stage=off>]
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>
 ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
-`workflow run` connects to JetStream when ``JETSTREAM_URL`` is set (falling back to the in-memory stub otherwise), claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. The Grid stub still backs stage execution for this slice and refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
+`workflow run` connects to JetStream when ``JETSTREAM_URL`` is set (falling back to the in-memory stub otherwise), claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid can respect concurrency/timebox controls when the real workflow client is enabled. The Grid stub still backs stage execution for this slice and refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
@@ -31,6 +31,8 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 - `--manifest` — Override manifest name/version in `<name>@<version>` form (`environment materialize`).
 - `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `workflow run`, `environment materialize`).
 - `--aster-step` — Stage-specific overrides for Aster behaviour when running workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional toggles or `stage=off` to disable Aster for that stage.
+- `--mods-plan-timeout` — Duration string passed to the Mods planner so Grid can timebox plan evaluation (`workflow run`).
+- `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the planner (`workflow run`).
 
 ## Exit Codes
 - `0` — success (ticket claimed, stages completed, workspace cleaned).
