@@ -4,7 +4,7 @@
 Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoints run as parallel stages that align with Grid-driven workflow orchestration. This slice reintroduces the legacy Mods runner capabilities recovered from commit `3b11d7e8` (builder log enrichment, healing flow) while embracing the current stateless CLI and JetStream contracts. The planner must schedule the canonical sequence of `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, and `human-in-the-loop` steps with concurrency awareness and explicit Grid stage metadata.
 ## Status
 - [x] Planner skeleton (roadmap/mods/01-planner-skeleton.md) — Mods DAG emitted by default planner (2025-09-26).
-- [ ] Knowledge Base feedback loop (upcoming).
+- [x] Knowledge Base feedback loop (roadmap/mods/02-knowledge-base-feedback.md) — Mods planner now records knowledge base advice inside `stage_metadata.mods` (2025-09-26).
 - [ ] CLI surface and Grid wiring (upcoming).
 
 
@@ -23,6 +23,7 @@ Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoin
 - `orw-apply` and `orw-gen` run as sibling stages. They depend on the `llm-plan` output and execute OpenRewrite transformations inside Grid jobs using the configured lane. Each stage publishes artifact manifests (diff bundles) to `ploy.artifact.<ticket>`.
 - `llm-exec` consumes the plan plus OpenRewrite diffs, executing iterative fixes through Grid jobs. Failures trigger Knowledge Base lookups and optionally spawn `human-in-the-loop` review tickets.
 - `human-in-the-loop` is a manual gate that surfaces curated instructions and diff previews to operators. Completion toggles a checkpoint acknowledged via JetStream; timeouts escalate back to `llm-exec`.
+- Mods checkpoints embed advisor output inside `stage_metadata.mods.plan`, `stage_metadata.mods.recommendations`, and `stage_metadata.mods.human` so Grid tooling can recover recipe choices, human expectations, and confidence values from checkpoints.
 - Healing retries reuse the legacy approach: unsuccessful builds or diff validation trigger another planning cycle unless the Knowledge Base signals no viable remediation.
 
 ## Implementation Notes

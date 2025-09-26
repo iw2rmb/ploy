@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Mods Knowledge Base Metadata
+- Extended the Mods planner with a knowledge base advisor that records recipe selections, concurrency hints, and human expectations inside `stage_metadata.mods` for plan and human stages.
+- Updated workflow contracts and the runner to serialize Mods plan/human/recommendation metadata in checkpoints and artifact envelopes, exercising the new schema in unit tests.
+- Recorded completion of `roadmap/mods/02-knowledge-base-feedback.md` and refreshed `docs/design/mods/README.md` / `docs/design/README.md` to capture the knowledge base feedback milestone (Roadmap 19).
+
 ## [2025-09-26] Mods Planner Skeleton
 - Added `internal/workflow/mods` with a planner that emits `mods-plan`, `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, and `mods-human` stages wired with repository lane defaults.
 - Updated the default workflow planner to delegate Mods staging, propagate new stage kinds, and adjust unit tests/checkpoint expectations across the runner suite.

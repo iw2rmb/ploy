@@ -49,7 +49,41 @@ type Stage struct {
 	Dependencies []string
 	Constraints  StageConstraints
 	Aster        StageAster
+	Metadata     StageMetadata
 	CacheKey     string
+}
+
+// StageMetadata captures stage-specific metadata for checkpoints.
+type StageMetadata struct {
+	Mods *StageModsMetadata
+}
+
+// StageModsMetadata carries Mods planner metadata for checkpoints.
+type StageModsMetadata struct {
+	Plan            *StageModsPlan
+	Human           *StageModsHuman
+	Recommendations []StageModsRecommendation
+}
+
+// StageModsPlan summarises planner output exposed to Grid consumers.
+type StageModsPlan struct {
+	SelectedRecipes []string
+	ParallelStages  []string
+	HumanGate       bool
+	Summary         string
+}
+
+// StageModsHuman captures expectations for human checkpoints.
+type StageModsHuman struct {
+	Required  bool
+	Playbooks []string
+}
+
+// StageModsRecommendation records a single Mods recommendation entry.
+type StageModsRecommendation struct {
+	Source     string
+	Message    string
+	Confidence float64
 }
 
 // Artifact represents a manifest describing an output produced by a workflow
@@ -127,6 +161,7 @@ func (DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket
 			Kind:         StageKind(stage.Kind),
 			Lane:         stage.Lane,
 			Dependencies: copyStringSlice(stage.Dependencies),
+			Metadata:     convertStageMetadata(stage.Metadata),
 		})
 	}
 	stages = append(stages, Stage{
@@ -452,6 +487,67 @@ func normalizeAsterToggles(values []string) []string {
 	return result
 }
 
+// convertStageMetadata maps Mods planner metadata onto runner stage metadata.
+func convertStageMetadata(meta mods.StageMetadata) StageMetadata {
+	result := StageMetadata{}
+	if converted := convertModsMetadata(meta.Mods); converted != nil {
+		result.Mods = converted
+	}
+	return result
+}
+
+// convertModsMetadata clones Mods metadata from the planner onto runner stages.
+func convertModsMetadata(src *mods.StageModsMetadata) *StageModsMetadata {
+	if src == nil {
+		return nil
+	}
+	dst := &StageModsMetadata{}
+	if src.Plan != nil {
+		dst.Plan = &StageModsPlan{
+			SelectedRecipes: copyStringSlice(src.Plan.SelectedRecipes),
+			ParallelStages:  copyStringSlice(src.Plan.ParallelStages),
+			HumanGate:       src.Plan.HumanGate,
+			Summary:         strings.TrimSpace(src.Plan.Summary),
+		}
+	}
+	if src.Human != nil {
+		dst.Human = &StageModsHuman{
+			Required:  src.Human.Required,
+			Playbooks: copyStringSlice(src.Human.Playbooks),
+		}
+	}
+	if len(src.Recommendations) > 0 {
+		dst.Recommendations = make([]StageModsRecommendation, 0, len(src.Recommendations))
+		for _, rec := range src.Recommendations {
+			source := strings.TrimSpace(rec.Source)
+			message := strings.TrimSpace(rec.Message)
+			if message == "" {
+				continue
+			}
+			dst.Recommendations = append(dst.Recommendations, StageModsRecommendation{
+				Source:     source,
+				Message:    message,
+				Confidence: clampConfidence(rec.Confidence),
+			})
+		}
+	}
+	if dst.Plan == nil && dst.Human == nil && len(dst.Recommendations) == 0 {
+		return nil
+	}
+	return dst
+}
+
+// clampConfidence constrains confidence scores to the [0,1] range.
+func clampConfidence(value float64) float64 {
+	if value < 0 {
+		return 0
+	}
+	if value > 1 {
+		return 1
+	}
+	return value
+}
+
 func buildCheckpointStage(stage Stage) *contracts.CheckpointStage {
 	name := strings.TrimSpace(stage.Name)
 	if name == "" {
@@ -468,7 +564,51 @@ func buildCheckpointStage(stage Stage) *contracts.CheckpointStage {
 		},
 		Aster: buildCheckpointStageAster(stage.Aster),
 	}
+	if modsMeta := buildCheckpointModsMetadata(stage.Metadata.Mods); modsMeta != nil {
+		meta.Mods = modsMeta
+	}
 	return meta
+}
+
+// buildCheckpointModsMetadata converts stage Mods metadata into contract metadata.
+func buildCheckpointModsMetadata(meta *StageModsMetadata) *contracts.ModsStageMetadata {
+	if meta == nil {
+		return nil
+	}
+	result := &contracts.ModsStageMetadata{}
+	if meta.Plan != nil {
+		result.Plan = &contracts.ModsPlanMetadata{
+			SelectedRecipes: copyStringSlice(meta.Plan.SelectedRecipes),
+			ParallelStages:  copyStringSlice(meta.Plan.ParallelStages),
+			HumanGate:       meta.Plan.HumanGate,
+			Summary:         strings.TrimSpace(meta.Plan.Summary),
+		}
+	}
+	if meta.Human != nil {
+		result.Human = &contracts.ModsHumanMetadata{
+			Required:  meta.Human.Required,
+			Playbooks: copyStringSlice(meta.Human.Playbooks),
+		}
+	}
+	if len(meta.Recommendations) > 0 {
+		result.Recommendations = make([]contracts.ModsRecommendation, 0, len(meta.Recommendations))
+		for _, rec := range meta.Recommendations {
+			message := strings.TrimSpace(rec.Message)
+			if message == "" {
+				continue
+			}
+			source := strings.TrimSpace(rec.Source)
+			result.Recommendations = append(result.Recommendations, contracts.ModsRecommendation{
+				Source:     source,
+				Message:    message,
+				Confidence: clampConfidence(rec.Confidence),
+			})
+		}
+	}
+	if result.Plan == nil && result.Human == nil && len(result.Recommendations) == 0 {
+		return nil
+	}
+	return result
 }
 
 func buildCheckpointStageAster(stage StageAster) contracts.CheckpointStageAster {
