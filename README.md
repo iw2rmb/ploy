@@ -9,6 +9,7 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 - ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
 - ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
 - ✅ Integration manifest compiler validates TOML manifests under `configs/manifests/`, attaches compiled payloads to workflow stages, and enforces lane allowlists in the Grid stub.
+- ✅ Commit-scoped environment command (`ploy environment materialize`) assembles manifest fixtures, validates required snapshots, and hydrates lane caches via in-memory stubs.
 
 ## Getting Started
 1. **Clone & build**
@@ -42,7 +43,13 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    ```
    Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, emits a fake IPFS CID, and publishes metadata to the JetStream stub.
 
-6. **Tests**
+6. **Dry-run a commit-scoped environment**
+   ```bash
+   ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
+   ```
+   Dry-run mode compiles the `commit-app` manifest, verifies required snapshots (`commit-db`, `commit-cache`), and previews cache keys for each required lane without mutating state.
+
+7. **Tests**
    ```bash
    make test
    ```
@@ -56,7 +63,6 @@ The active roadmap lives under `roadmap/shift/`. Completed items:
 - [x] `03-lane-engine` — lane specs + cache key composer + `ploy lanes describe` inspection command.
 
 Upcoming items:
-- `06-commit-environments` — hydrate caches/snapshots/manifests for commit-scoped runs.
 - `07-aster-hook` — wire AST-pruned bundles into cache keys and Grid submissions.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
