@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Mods Terminology Guard
+- Replaced remaining ARF references with mods terminology across roadmap and recipe documentation.
+- Added `terminology_guard_test.go` to enforce the naming convention and block regressions.
+- Expanded `docs/RECIPES.md` with a detailed explanation of `configs/recipes/kotlin-gradle.toml`.
+
 ## [2025-09-26] Recipe Pack Registry
 - Added `internal/recipes/packs` with a TOML loader that exposes pluggable recipe pack lists and language-aware lookups.
 - Published default specs (`configs/recipes/java-default.toml`, `configs/recipes/kotlin-gradle.toml`) to seed Java and Kotlin/Gradle catalog coverage.

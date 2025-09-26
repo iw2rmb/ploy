@@ -241,7 +241,7 @@ curl https://api.dev.ployman.app/v1/mods/{id}/logs
 ## Conclusions
 
 ### ✅ Expected Functionality
-1. **ARF Transformation Pipeline**: End-to-end flow from API to Nomad to storage
+1. **Mods Transformation Pipeline**: End-to-end flow from API to Nomad to storage
 2. **OpenRewrite Integration**: Recipes execute and produce code changes
 3. **Status Tracking**: Monitor transformation progress in real-time
 4. **Report Generation**: Markdown reports available via `/report` endpoint
