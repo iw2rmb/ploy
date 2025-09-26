@@ -490,6 +490,38 @@ func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 	}
 }
 
+func TestRunPropagatesPublishArtifactError(t *testing.T) {
+	events := &errorEvents{
+		ticket: contracts.WorkflowTicket{
+			SchemaVersion: contracts.SchemaVersion,
+			TicketID:      "ticket-123",
+			Tenant:        "acme",
+		},
+		artifactErr: errors.New("artifact failure"),
+	}
+	grid := runner.NewInMemoryGrid()
+	grid.StageOutcomes["mods"] = []runner.StageOutcome{{
+		Status: runner.StageStatusCompleted,
+		Artifacts: []runner.Artifact{{
+			Name:        "mods-plan",
+			ArtifactCID: "cid-mods-plan",
+		}},
+	}}
+	opts := runner.Options{
+		Ticket:           "ticket-123",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+	}
+	err := runner.Run(context.Background(), opts)
+	if !errors.Is(err, events.artifactErr) {
+		t.Fatalf("expected artifact publish error, got %v", err)
+	}
+}
+
 func TestRunErrorsWhenWorkspaceRootInvalid(t *testing.T) {
 	temp := t.TempDir()
 	file := filepath.Join(temp, "lock")
@@ -686,6 +718,23 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	artifact := modsCompleted.Artifacts[0]
 	if artifact.ArtifactCID != "cid-mods-plan" || artifact.Digest != "sha256:modsplan" {
 		t.Fatalf("unexpected artifact manifest: %#v", artifact)
+	}
+
+	if len(events.artifacts) != 1 {
+		t.Fatalf("expected single artifact envelope, got %d", len(events.artifacts))
+	}
+	envelope := events.artifacts[0]
+	if envelope.TicketID != "ticket-123" {
+		t.Fatalf("unexpected artifact ticket id: %#v", envelope)
+	}
+	if envelope.Stage != "mods" {
+		t.Fatalf("unexpected artifact stage: %#v", envelope)
+	}
+	if envelope.Artifact.ArtifactCID != "cid-mods-plan" {
+		t.Fatalf("expected artifact CID to mirror checkpoint, got %#v", envelope.Artifact)
+	}
+	if envelope.StageMetadata == nil || envelope.StageMetadata.Lane != "node-wasm" {
+		t.Fatalf("expected artifact envelope to include stage metadata: %#v", envelope.StageMetadata)
 	}
 
 	var workflowCheckpoint *contracts.WorkflowCheckpoint
@@ -1117,9 +1166,10 @@ func (r *recordingCacheComposer) Compose(ctx context.Context, req runner.CacheCo
 }
 
 type errorEvents struct {
-	ticket     contracts.WorkflowTicket
-	claimErr   error
-	publishErr error
+	ticket      contracts.WorkflowTicket
+	claimErr    error
+	publishErr  error
+	artifactErr error
 }
 
 func (e *errorEvents) ClaimTicket(ctx context.Context, ticketID string) (contracts.WorkflowTicket, error) {
@@ -1149,6 +1199,14 @@ func (e *errorEvents) PublishCheckpoint(ctx context.Context, checkpoint contract
 	_ = ctx
 	if e.publishErr != nil {
 		return e.publishErr
+	}
+	return nil
+}
+
+func (e *errorEvents) PublishArtifact(ctx context.Context, artifact contracts.WorkflowArtifact) error {
+	_ = ctx
+	if e.artifactErr != nil {
+		return e.artifactErr
 	}
 	return nil
 }
@@ -1207,6 +1265,11 @@ func (c *countingEvents) PublishCheckpoint(ctx context.Context, checkpoint contr
 	return nil
 }
 
+func (c *countingEvents) PublishArtifact(ctx context.Context, artifact contracts.WorkflowArtifact) error {
+	_ = ctx
+	return nil
+}
+
 type stageStatusEntry struct {
 	stage  string
 	status runner.StageStatus
@@ -1241,6 +1304,7 @@ type recordingEvents struct {
 	manifest       contracts.ManifestReference
 	claimedTickets []string
 	checkpoints    []contracts.WorkflowCheckpoint
+	artifacts      []contracts.WorkflowArtifact
 }
 
 func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (contracts.WorkflowTicket, error) {
@@ -1267,6 +1331,12 @@ func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (con
 func (r *recordingEvents) PublishCheckpoint(ctx context.Context, checkpoint contracts.WorkflowCheckpoint) error {
 	_ = ctx
 	r.checkpoints = append(r.checkpoints, checkpoint)
+	return nil
+}
+
+func (r *recordingEvents) PublishArtifact(ctx context.Context, artifact contracts.WorkflowArtifact) error {
+	_ = ctx
+	r.artifacts = append(r.artifacts, artifact)
 	return nil
 }
 

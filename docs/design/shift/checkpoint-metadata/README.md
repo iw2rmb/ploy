@@ -30,4 +30,4 @@ Carry full DAG context and artifact manifests inside workflow checkpoints so Gri
 ## Rollout & Follow-ups
 - Update `docs/design/shift/event-contracts.md` to mark the checkpoint metadata follow-up complete and describe the enriched schema.
 - Add roadmap entry `roadmap/shift/17-checkpoint-metadata.md` and mark it done when this slice ships.
-- Future slice: mirror stage artifacts to the `ploy.artifact.<ticket>` subject once build artifact uploads move off the workstation stub.
+- ✅ Completed 2025-09-26: Mirror stage artifacts to the `ploy.artifact.<ticket>` subject once build artifact uploads move off the workstation stub.

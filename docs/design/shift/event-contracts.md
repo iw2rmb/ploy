@@ -56,6 +56,28 @@ Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate
     ]
   }
   ```
+- **WorkflowArtifact** — stage artifact envelope mirrored to `ploy.artifact.<ticket>` whenever a stage completes with artifact manifests.
+  ```json
+  {
+    "schema_version": "2025-09-26.1",
+    "ticket_id": "ticket-123",
+    "stage": "mods",
+    "cache_key": "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
+    "stage_metadata": {
+      "name": "mods",
+      "kind": "mods",
+      "lane": "node-wasm",
+      "manifest": {"name": "smoke", "version": "2025-09-26"},
+      "aster": {"enabled": true, "toggles": ["plan"]}
+    },
+    "artifact": {
+      "name": "mods-plan",
+      "artifact_cid": "cid-mods-plan",
+      "digest": "sha256:modsplan",
+      "media_type": "application/tar+zst"
+    }
+  }
+  ```
 
 The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), ensuring the CLI and future Grid integrations consume identical versions. Checkpoints now carry lane cache keys, stage metadata, and optional artifact manifests so Grid can coordinate cache reuse and artifact hydration.
 
@@ -72,3 +94,4 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 ## Next Steps
 - ✅ Completed 2025-09-26: Expand checkpoints with stage metadata and artifact manifests (see `docs/design/shift/checkpoint-metadata/README.md`).
 - ✅ Completed 2025-09-26: Wire the workflow runner to submit stages to Grid via the Workflow RPC so live runs exercise the real control plane.
+- ✅ Completed 2025-09-26: Mirror workflow stage artifact envelopes to `ploy.artifact.<ticket>` via the new event contract.

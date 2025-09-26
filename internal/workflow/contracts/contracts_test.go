@@ -103,6 +103,39 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	}
 }
 
+func TestWorkflowArtifactValidate(t *testing.T) {
+	empty := WorkflowArtifact{}
+	if err := empty.Validate(); err == nil {
+		t.Fatal("expected validation error for empty artifact envelope")
+	}
+
+	envelope := WorkflowArtifact{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-123",
+		Stage:         "mods",
+		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
+		StageMetadata: &CheckpointStage{
+			Name:     "mods",
+			Kind:     "mods",
+			Lane:     "node-wasm",
+			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		},
+		Artifact: CheckpointArtifact{
+			Name:        "mods-plan",
+			ArtifactCID: "cid-mods-plan",
+			Digest:      "sha256:modsplan",
+			MediaType:   "application/tar+zst",
+		},
+	}
+	if err := envelope.Validate(); err != nil {
+		t.Fatalf("expected valid artifact envelope, got %v", err)
+	}
+
+	if subject := envelope.Subject(); subject != "ploy.artifact.ticket-123" {
+		t.Fatalf("unexpected artifact subject: %s", subject)
+	}
+}
+
 func TestInMemoryBusRecordsMessages(t *testing.T) {
 	bus := NewInMemoryBus("acme")
 	ticket, err := bus.ClaimTicket(context.Background(), "ticket-123")
@@ -130,6 +163,22 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 	}
 	if len(bus.Checkpoints) != 1 {
 		t.Fatalf("expected checkpoint to be recorded")
+	}
+
+	artifact := WorkflowArtifact{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-123",
+		Stage:         "mods",
+		Artifact: CheckpointArtifact{
+			Name:        "mods-plan",
+			ArtifactCID: "cid-mods-plan",
+		},
+	}
+	if err := bus.PublishArtifact(context.Background(), artifact); err != nil {
+		t.Fatalf("publish artifact error: %v", err)
+	}
+	if len(bus.Artifacts) != 1 {
+		t.Fatalf("expected artifact envelope to be recorded")
 	}
 }
 

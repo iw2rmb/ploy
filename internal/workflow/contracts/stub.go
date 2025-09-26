@@ -10,6 +10,7 @@ type InMemoryBus struct {
 	Tenant         string
 	ClaimedTickets []string
 	Checkpoints    []WorkflowCheckpoint
+	Artifacts      []WorkflowArtifact
 	tickets        []string
 	Manifest       ManifestReference
 }
@@ -49,5 +50,14 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 func (b *InMemoryBus) PublishCheckpoint(ctx context.Context, checkpoint WorkflowCheckpoint) error {
 	_ = ctx
 	b.Checkpoints = append(b.Checkpoints, checkpoint)
+	return nil
+}
+
+func (b *InMemoryBus) PublishArtifact(ctx context.Context, artifact WorkflowArtifact) error {
+	_ = ctx
+	if err := artifact.Validate(); err != nil {
+		return err
+	}
+	b.Artifacts = append(b.Artifacts, artifact)
 	return nil
 }

@@ -148,6 +148,33 @@ func (c *JetStreamClient) PublishCheckpoint(ctx context.Context, checkpoint Work
 	return nil
 }
 
+// PublishArtifact writes a workflow artifact envelope to JetStream.
+func (c *JetStreamClient) PublishArtifact(ctx context.Context, artifact WorkflowArtifact) error {
+	if err := artifact.Validate(); err != nil {
+		return fmt.Errorf("invalid artifact: %w", err)
+	}
+
+	payload, err := json.Marshal(artifact)
+	if err != nil {
+		return fmt.Errorf("encode artifact: %w", err)
+	}
+
+	subject := strings.TrimSpace(artifact.Subject())
+	if subject == "" {
+		return fmt.Errorf("artifact subject is empty")
+	}
+
+	publishCtx := ctx
+	if publishCtx == nil {
+		publishCtx = context.Background()
+	}
+
+	if _, err := c.js.Publish(subject, payload, nats.Context(publishCtx)); err != nil {
+		return fmt.Errorf("publish artifact: %w", err)
+	}
+	return nil
+}
+
 func (c *JetStreamClient) ensureTicketSubscription() (*nats.Subscription, error) {
 	c.mu.Lock()
 	if c.ticketSub != nil {

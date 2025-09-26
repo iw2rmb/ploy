@@ -22,6 +22,7 @@ var (
 	ErrManifestCompilerRequired   = errors.New("manifest compiler is required")
 	ErrTicketValidationFailed     = errors.New("ticket payload failed validation")
 	ErrCheckpointValidationFailed = errors.New("checkpoint payload failed validation")
+	ErrArtifactValidationFailed   = errors.New("artifact envelope failed validation")
 	ErrStageFailed                = errors.New("workflow stage failed")
 	ErrLaneRequired               = errors.New("lane is required")
 	ErrAsterLocatorRequired       = errors.New("aster locator is required")
@@ -127,6 +128,7 @@ type GridClient interface {
 type EventsClient interface {
 	ClaimTicket(ctx context.Context, ticketID string) (contracts.WorkflowTicket, error)
 	PublishCheckpoint(ctx context.Context, checkpoint contracts.WorkflowCheckpoint) error
+	PublishArtifact(ctx context.Context, artifact contracts.WorkflowArtifact) error
 }
 
 type ManifestCompiler interface {
@@ -317,7 +319,28 @@ func publishCheckpoint(ctx context.Context, events EventsClient, ticketID, stage
 	if err := checkpoint.Validate(); err != nil {
 		return fmt.Errorf("%w: %v", ErrCheckpointValidationFailed, err)
 	}
-	return events.PublishCheckpoint(ctx, checkpoint)
+	if err := events.PublishCheckpoint(ctx, checkpoint); err != nil {
+		return err
+	}
+	if status != StageStatusCompleted {
+		return nil
+	}
+	if checkpoint.StageMetadata == nil {
+		return nil
+	}
+	if len(checkpoint.Artifacts) == 0 {
+		return nil
+	}
+	envelopes := buildWorkflowArtifacts(ticketID, stage, cacheKey, checkpoint.StageMetadata, checkpoint.Artifacts)
+	for _, envelope := range envelopes {
+		if err := envelope.Validate(); err != nil {
+			return fmt.Errorf("%w: %v", ErrArtifactValidationFailed, err)
+		}
+		if err := events.PublishArtifact(ctx, envelope); err != nil {
+			return fmt.Errorf("publish artifact envelope: %w", err)
+		}
+	}
+	return nil
 }
 
 type defaultCacheComposer struct{}
@@ -465,6 +488,26 @@ func buildCheckpointArtifacts(artifacts []Artifact) []contracts.CheckpointArtifa
 			Digest:      digest,
 			MediaType:   mediaType,
 		})
+	}
+	return result
+}
+
+func buildWorkflowArtifacts(ticketID, stage, cacheKey string, stageMeta *contracts.CheckpointStage, artifacts []contracts.CheckpointArtifact) []contracts.WorkflowArtifact {
+	if stageMeta == nil || len(artifacts) == 0 {
+		return nil
+	}
+	result := make([]contracts.WorkflowArtifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		metaCopy := *stageMeta
+		envelope := contracts.WorkflowArtifact{
+			SchemaVersion: contracts.SchemaVersion,
+			TicketID:      ticketID,
+			Stage:         stage,
+			CacheKey:      cacheKey,
+			StageMetadata: &metaCopy,
+			Artifact:      artifact,
+		}
+		result = append(result, envelope)
 	}
 	return result
 }
