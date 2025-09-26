@@ -617,6 +617,96 @@ func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
 	}
 }
 
+func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	compiler := &recordingCompiler{
+		compiled: manifests.Compilation{
+			Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			Lanes: manifests.LaneSet{
+				Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}},
+			},
+		},
+	}
+	grid := &fakeGrid{
+		outcomes: map[string][]runner.StageOutcome{
+			"mods": {{
+				Status:    runner.StageStatusCompleted,
+				Artifacts: []runner.Artifact{{Name: "mods-plan", ArtifactCID: "cid-mods-plan", Digest: "sha256:modsplan", MediaType: "application/tar+zst"}},
+			}},
+		},
+	}
+	opts := runner.Options{
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: compiler,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var modsRunning, modsCompleted *contracts.WorkflowCheckpoint
+	for i := range events.checkpoints {
+		cp := events.checkpoints[i]
+		if cp.Stage != "mods" {
+			continue
+		}
+		switch cp.Status {
+		case contracts.CheckpointStatusRunning:
+			modsRunning = &cp
+		case contracts.CheckpointStatusCompleted:
+			modsCompleted = &cp
+		}
+	}
+	if modsRunning == nil || modsRunning.StageMetadata == nil {
+		t.Fatalf("expected running checkpoint with stage metadata: %#v", modsRunning)
+	}
+	if modsRunning.StageMetadata.Lane != "node-wasm" {
+		t.Fatalf("unexpected lane on running checkpoint: %#v", modsRunning.StageMetadata)
+	}
+	if len(modsRunning.Artifacts) > 0 {
+		t.Fatalf("expected no artifacts on running checkpoint: %#v", modsRunning.Artifacts)
+	}
+	if modsCompleted == nil {
+		t.Fatal("expected completed mods checkpoint")
+	}
+	if modsCompleted.StageMetadata == nil {
+		t.Fatalf("expected stage metadata on completed checkpoint: %#v", modsCompleted)
+	}
+	if modsCompleted.StageMetadata.Manifest.Version != "2025-09-26" {
+		t.Fatalf("unexpected manifest on completed checkpoint: %#v", modsCompleted.StageMetadata.Manifest)
+	}
+	if len(modsCompleted.Artifacts) != 1 {
+		t.Fatalf("expected single artifact on completed checkpoint: %#v", modsCompleted.Artifacts)
+	}
+	artifact := modsCompleted.Artifacts[0]
+	if artifact.ArtifactCID != "cid-mods-plan" || artifact.Digest != "sha256:modsplan" {
+		t.Fatalf("unexpected artifact manifest: %#v", artifact)
+	}
+
+	var workflowCheckpoint *contracts.WorkflowCheckpoint
+	for i := range events.checkpoints {
+		cp := events.checkpoints[i]
+		if cp.Stage == "workflow" && cp.Status == contracts.CheckpointStatusCompleted {
+			workflowCheckpoint = &cp
+			break
+		}
+	}
+	if workflowCheckpoint == nil {
+		t.Fatal("expected workflow completion checkpoint")
+	}
+	if workflowCheckpoint.StageMetadata != nil {
+		t.Fatalf("expected workflow checkpoint to omit stage metadata: %#v", workflowCheckpoint.StageMetadata)
+	}
+	if len(workflowCheckpoint.Artifacts) != 0 {
+		t.Fatalf("expected workflow checkpoint to omit artifacts: %#v", workflowCheckpoint.Artifacts)
+	}
+}
+
 func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	opts := runner.Options{

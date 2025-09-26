@@ -90,6 +90,12 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 			"status":    "completed",
 			"message":   "ok",
 			"retryable": false,
+			"artifacts": []map[string]any{{
+				"name":         "mods-plan",
+				"artifact_cid": "cid-mods-plan",
+				"digest":       "sha256:modsplan",
+				"media_type":   "application/tar+zst",
+			}},
 		})
 	}))
 	defer server.Close()
@@ -111,6 +117,13 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	}
 	if outcome.Retryable {
 		t.Fatal("expected non-retryable")
+	}
+	if len(outcome.Artifacts) != 1 {
+		t.Fatalf("expected artifact manifest, got %#v", outcome.Artifacts)
+	}
+	artifact := outcome.Artifacts[0]
+	if artifact.ArtifactCID != "cid-mods-plan" || artifact.Digest != "sha256:modsplan" {
+		t.Fatalf("unexpected artifact manifest: %#v", artifact)
 	}
 
 	if captured.SchemaVersion != contracts.SchemaVersion {

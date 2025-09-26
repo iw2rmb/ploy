@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const SchemaVersion = "2025-09-26"
+const SchemaVersion = "2025-09-26.1"
 
 type SubjectSet struct {
 	TicketInbox      string
@@ -61,6 +61,102 @@ func (m ManifestReference) Validate() error {
 	return nil
 }
 
+// CheckpointStage captures DAG metadata for a workflow stage recorded in a
+// checkpoint. It mirrors the planner output so consumers can reconstruct
+// dependencies and lane assignments without inspecting the CLI runtime state.
+type CheckpointStage struct {
+	Name         string               `json:"name"`
+	Kind         string               `json:"kind"`
+	Lane         string               `json:"lane"`
+	Dependencies []string             `json:"dependencies,omitempty"`
+	Manifest     ManifestReference    `json:"manifest"`
+	Aster        CheckpointStageAster `json:"aster"`
+}
+
+// Validate ensures the stage metadata includes the required identifiers.
+func (s CheckpointStage) Validate() error {
+	if strings.TrimSpace(s.Name) == "" {
+		return fmt.Errorf("stage name is required")
+	}
+	if strings.TrimSpace(s.Kind) == "" {
+		return fmt.Errorf("stage kind is required")
+	}
+	if strings.TrimSpace(s.Lane) == "" {
+		return fmt.Errorf("stage lane is required")
+	}
+	for i, dep := range s.Dependencies {
+		if strings.TrimSpace(dep) == "" {
+			return fmt.Errorf("dependency %d is empty", i)
+		}
+	}
+	if err := s.Manifest.Validate(); err != nil {
+		return fmt.Errorf("manifest invalid: %w", err)
+	}
+	if err := s.Aster.Validate(); err != nil {
+		return fmt.Errorf("aster metadata invalid: %w", err)
+	}
+	return nil
+}
+
+// CheckpointStageAster describes the active Aster toggles and bundle metadata
+// for a checkpointed stage.
+type CheckpointStageAster struct {
+	Enabled bool                    `json:"enabled"`
+	Toggles []string                `json:"toggles,omitempty"`
+	Bundles []CheckpointAsterBundle `json:"bundles,omitempty"`
+}
+
+// Validate ensures bundle metadata is well-formed.
+func (a CheckpointStageAster) Validate() error {
+	for i, bundle := range a.Bundles {
+		if err := bundle.Validate(); err != nil {
+			return fmt.Errorf("bundle %d invalid: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// CheckpointAsterBundle carries bundle provenance for a single
+// stage/toggle pair.
+type CheckpointAsterBundle struct {
+	Stage       string `json:"stage"`
+	Toggle      string `json:"toggle"`
+	BundleID    string `json:"bundle_id"`
+	Digest      string `json:"digest,omitempty"`
+	ArtifactCID string `json:"artifact_cid,omitempty"`
+	Source      string `json:"source,omitempty"`
+}
+
+// Validate ensures the bundle metadata lists the identifying fields.
+func (b CheckpointAsterBundle) Validate() error {
+	if strings.TrimSpace(b.Stage) == "" {
+		return fmt.Errorf("bundle stage is required")
+	}
+	if strings.TrimSpace(b.Toggle) == "" {
+		return fmt.Errorf("bundle toggle is required")
+	}
+	if strings.TrimSpace(b.BundleID) == "" {
+		return fmt.Errorf("bundle_id is required")
+	}
+	return nil
+}
+
+// CheckpointArtifact records an artifact manifest emitted by a workflow stage.
+type CheckpointArtifact struct {
+	Name        string `json:"name"`
+	ArtifactCID string `json:"artifact_cid,omitempty"`
+	Digest      string `json:"digest,omitempty"`
+	MediaType   string `json:"media_type,omitempty"`
+}
+
+// Validate ensures the artifact manifest has at least a display name.
+func (a CheckpointArtifact) Validate() error {
+	if strings.TrimSpace(a.Name) == "" {
+		return fmt.Errorf("artifact name is required")
+	}
+	return nil
+}
+
 type CheckpointStatus string
 
 const (
@@ -73,11 +169,13 @@ const (
 )
 
 type WorkflowCheckpoint struct {
-	SchemaVersion string           `json:"schema_version"`
-	TicketID      string           `json:"ticket_id"`
-	Stage         string           `json:"stage"`
-	Status        CheckpointStatus `json:"status"`
-	CacheKey      string           `json:"cache_key,omitempty"`
+	SchemaVersion string               `json:"schema_version"`
+	TicketID      string               `json:"ticket_id"`
+	Stage         string               `json:"stage"`
+	Status        CheckpointStatus     `json:"status"`
+	CacheKey      string               `json:"cache_key,omitempty"`
+	StageMetadata *CheckpointStage     `json:"stage_metadata,omitempty"`
+	Artifacts     []CheckpointArtifact `json:"artifacts,omitempty"`
 }
 
 func (c WorkflowCheckpoint) Validate() error {
@@ -92,6 +190,24 @@ func (c WorkflowCheckpoint) Validate() error {
 	}
 	if c.Status == "" {
 		return fmt.Errorf("status is required")
+	}
+	if c.StageMetadata != nil {
+		if err := c.StageMetadata.Validate(); err != nil {
+			return fmt.Errorf("stage metadata invalid: %w", err)
+		}
+		if c.Stage != "" && strings.TrimSpace(c.StageMetadata.Name) != strings.TrimSpace(c.Stage) {
+			return fmt.Errorf("stage metadata name mismatch")
+		}
+	}
+	if len(c.Artifacts) > 0 {
+		if c.StageMetadata == nil {
+			return fmt.Errorf("artifacts require stage metadata")
+		}
+		for i, artifact := range c.Artifacts {
+			if err := artifact.Validate(); err != nil {
+				return fmt.Errorf("artifact %d invalid: %w", i, err)
+			}
+		}
 	}
 	return nil
 }

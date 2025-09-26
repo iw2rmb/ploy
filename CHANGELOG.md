@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Workflow Checkpoint Metadata
+- Bumped the workflow event schema to `2025-09-26.1` and enriched checkpoints with `stage_metadata` and `artifacts` blocks so Grid consumers can inspect lane assignments, dependencies, and produced manifests directly from JetStream.
+- Updated the workflow runner to attach stage metadata for every status transition and to include artifact manifests returned from Grid stage outcomes.
+- Extended the Grid Workflow client and contract tests to round-trip artifact payloads, refreshed `docs/design/shift/event-contracts.md`, and marked roadmap slice `17-checkpoint-metadata` complete.
+
 ## [2025-09-26] Snapshot Metadata Streams
 - Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when ``JETSTREAM_URL`` is configured, retaining the in-memory stub for offline runs.
 - Updated the CLI snapshot registry loader to wire the JetStream metadata publisher automatically and extended `ploy snapshot capture` tests to verify live JetStream behaviour alongside the existing IPFS gateway coverage.

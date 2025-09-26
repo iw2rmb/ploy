@@ -51,6 +51,31 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 		TicketID:      "ticket-123",
 		Stage:         "mods",
 		Status:        CheckpointStatusPending,
+		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
+		StageMetadata: &CheckpointStage{
+			Name:         "mods",
+			Kind:         "mods",
+			Lane:         "node-wasm",
+			Dependencies: []string{},
+			Manifest:     ManifestReference{Name: "smoke", Version: "2025-09-26"},
+			Aster: CheckpointStageAster{
+				Enabled: true,
+				Toggles: []string{"plan"},
+				Bundles: []CheckpointAsterBundle{{
+					Stage:       "mods",
+					Toggle:      "plan",
+					BundleID:    "mods-plan",
+					Digest:      "sha256:modsplan",
+					ArtifactCID: "cid-mods-plan",
+				}},
+			},
+		},
+		Artifacts: []CheckpointArtifact{{
+			Name:        "mods-plan-bundle",
+			ArtifactCID: "cid-mods-plan",
+			Digest:      "sha256:modsplan",
+			MediaType:   "application/tar+zst",
+		}},
 	}
 	if err := cp.Validate(); err != nil {
 		t.Fatalf("expected valid checkpoint, got %v", err)
@@ -62,6 +87,16 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	}
 	if !strings.Contains(string(payload), SchemaVersion) {
 		t.Fatalf("expected payload to contain schema version %q: %s", SchemaVersion, string(payload))
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if _, ok := decoded["stage_metadata"].(map[string]any); !ok {
+		t.Fatalf("expected stage metadata in payload: %v", decoded)
+	}
+	if artifacts, ok := decoded["artifacts"].([]any); !ok || len(artifacts) == 0 {
+		t.Fatalf("expected artifacts in payload: %v", decoded)
 	}
 	if cp.Subject() != "ploy.workflow.ticket-123.checkpoints" {
 		t.Fatalf("unexpected subject: %s", cp.Subject())
