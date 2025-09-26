@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] IPFS Artifact Publishing
+- Added `internal/workflow/snapshots.NewIPFSGatewayPublisher` to stream snapshot payloads to IPFS gateways via `/api/v0/add`, returning the gateway-provided CID while keeping the in-memory stub fallback for offline runs.
+- Updated `ploy snapshot capture` to honour ``IPFS_GATEWAY`` during registry loading, surfacing the returned CID in CLI output and metadata structures.
+- Expanded snapshot and CLI test suites with gateway-backed scenarios; refreshed documentation (`docs/design/shift/ipfs-artifacts.md`, `docs/SNAPSHOTS.md`, `cmd/ploy/README.md`, `README.md`) and recorded roadmap slice `15-ipfs-artifact-publishing` as complete.
+
 ## [2025-09-26] Grid Workflow Client
 - Added `internal/workflow/grid` with an HTTP Workflow RPC client that submits stage executions to Grid and records invocation metadata for CLI summaries.
 - Updated `ploy workflow run` to honour ``GRID_ENDPOINT``, wiring real Grid dispatch when configured and keeping the in-memory stub for offline development.

@@ -139,7 +139,16 @@ var (
 	laneConfigDir = "configs/lanes"
 
 	snapshotRegistryLoader snapshotRegistryLoaderFunc = func(dir string) (snapshotRegistry, error) {
-		return snapshots.LoadDirectory(dir, snapshots.LoadOptions{})
+		opts := snapshots.LoadOptions{}
+		gateway := strings.TrimSpace(os.Getenv("IPFS_GATEWAY"))
+		if gateway != "" {
+			publisher, err := snapshots.NewIPFSGatewayPublisher(gateway, snapshots.IPFSGatewayOptions{Pin: true})
+			if err != nil {
+				return nil, err
+			}
+			opts.ArtifactPublisher = publisher
+		}
+		return snapshots.LoadDirectory(dir, opts)
 	}
 	snapshotConfigDir = "configs/snapshots"
 

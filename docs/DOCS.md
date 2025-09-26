@@ -14,6 +14,7 @@ The SHIFT reboot simplifies the documentation surface so every contributor can f
 - `docs/schemas/integration_manifest.schema.json` — JSON schema backing integration manifests (also exposed via `ploy manifest schema`).
 - `docs/RECIPES.md` — recipe pack registry layout, default pack lists, and future Kotlin/Gradle extensibility.
 - `docs/SNAPSHOTS.md` — snapshot planning/capture behaviour and IPFS/JetStream publishing notes.
+- `docs/design/shift/ipfs-artifacts.md` — design record for the IPFS gateway publishing slice and follow-ups.
 - `cmd/ploy/README.md` — command-level flag reference and environment placeholders.
 - `roadmap/shift/08-documentation-cleanup.md` — status log for this documentation slice, including verification expectations.
 
