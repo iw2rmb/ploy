@@ -2,6 +2,11 @@
 
 ## Purpose
 Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoints run as parallel stages that align with Grid-driven workflow orchestration. This slice reintroduces the legacy Mods runner capabilities recovered from commit `3b11d7e8` (builder log enrichment, healing flow) while embracing the current stateless CLI and JetStream contracts. The planner must schedule the canonical sequence of `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, and `human-in-the-loop` steps with concurrency awareness and explicit Grid stage metadata.
+## Status
+- [x] Planner skeleton (roadmap/mods/01-planner-skeleton.md) — Mods DAG emitted by default planner (2025-09-26).
+- [ ] Knowledge Base feedback loop (upcoming).
+- [ ] CLI surface and Grid wiring (upcoming).
+
 
 ## Scope
 - Applies to a new `internal/workflow/mods` package housing planner, executor stubs, and Grid integration shims.

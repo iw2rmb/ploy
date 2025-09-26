@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Mods Planner Skeleton
+- Added `internal/workflow/mods` with a planner that emits `mods-plan`, `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, and `mods-human` stages wired with repository lane defaults.
+- Updated the default workflow planner to delegate Mods staging, propagate new stage kinds, and adjust unit tests/checkpoint expectations across the runner suite.
+- Recorded completion of `roadmap/mods/01-planner-skeleton.md` and refreshed `docs/design/mods/README.md` to capture the planner skeleton milestone.
+
 ## [2025-09-26] Stage Artifact Streams
 - Added `contracts.WorkflowArtifact` and JetStream/in-memory events client support so workflow stage artifacts mirror onto `ploy.artifact.<ticket>` alongside checkpoints.
 - Updated the workflow runner to emit artifact envelopes for completed stages, propagate publication failures, and surface envelopes in unit tests for cache hydrator consumers.

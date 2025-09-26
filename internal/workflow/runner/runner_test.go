@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -21,9 +22,12 @@ func defaultManifestCompilation() manifests.Compilation {
 		Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
 		Lanes: manifests.LaneSet{
 			Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}},
+			Allowed:  []manifests.Lane{{Name: "gpu-ml"}},
 		},
 	}
 }
+
+const modsPlanStage = mods.StageNamePlan
 
 func newStubCompiler() *recordingCompiler {
 	return &recordingCompiler{compiled: defaultManifestCompilation()}
@@ -39,11 +43,20 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 	if plan.TicketID != ticket.TicketID {
 		t.Fatalf("plan ticket mismatch: %s", plan.TicketID)
 	}
-	if len(plan.Stages) != 3 {
-		t.Fatalf("expected 3 stages, got %d", len(plan.Stages))
+	if len(plan.Stages) != 8 {
+		t.Fatalf("expected 8 stages, got %d", len(plan.Stages))
 	}
-	expectOrder := []string{"mods", "build", "test"}
-	expectLanes := []string{"node-wasm", "go-native", "go-native"}
+	expectOrder := []string{
+		mods.StageNamePlan,
+		mods.StageNameORWApply,
+		mods.StageNameORWGenerate,
+		mods.StageNameLLMPlan,
+		mods.StageNameLLMExec,
+		mods.StageNameHuman,
+		"build",
+		"test",
+	}
+	expectLanes := []string{"node-wasm", "node-wasm", "node-wasm", "gpu-ml", "gpu-ml", "go-native", "go-native", "go-native"}
 	for i, name := range expectOrder {
 		stage := plan.Stages[i]
 		if stage.Name != name {
@@ -53,11 +66,29 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 			t.Fatalf("unexpected lane for %s: %s", stage.Name, stage.Lane)
 		}
 	}
-	if deps := plan.Stages[1].Dependencies; len(deps) != 1 || deps[0] != "mods" {
-		t.Fatalf("build dependencies mismatch: %v", deps)
+	depMap := map[string][]string{
+		mods.StageNamePlan:        nil,
+		mods.StageNameORWApply:    {mods.StageNamePlan},
+		mods.StageNameORWGenerate: {mods.StageNamePlan},
+		mods.StageNameLLMPlan:     {mods.StageNamePlan},
+		mods.StageNameLLMExec:     {mods.StageNameORWApply, mods.StageNameORWGenerate, mods.StageNameLLMPlan},
+		mods.StageNameHuman:       {mods.StageNameLLMExec},
+		"build":                   {mods.StageNameHuman},
+		"test":                    {"build"},
 	}
-	if deps := plan.Stages[2].Dependencies; len(deps) != 1 || deps[0] != "build" {
-		t.Fatalf("test dependencies mismatch: %v", deps)
+	for _, stage := range plan.Stages {
+		expectedDeps, ok := depMap[stage.Name]
+		if !ok {
+			t.Fatalf("unexpected stage in plan: %s", stage.Name)
+		}
+		if len(stage.Dependencies) != len(expectedDeps) {
+			t.Fatalf("dependency mismatch for %s: got %v want %v", stage.Name, stage.Dependencies, expectedDeps)
+		}
+		for i, dep := range expectedDeps {
+			if stage.Dependencies[i] != dep {
+				t.Fatalf("dependency %d for %s: got %s want %s", i, stage.Name, stage.Dependencies[i], dep)
+			}
+		}
 	}
 }
 
@@ -155,7 +186,7 @@ func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
 			Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
 			Lanes: manifests.LaneSet{
 				Required: []manifests.Lane{{Name: "node-wasm"}},
-				Allowed:  []manifests.Lane{{Name: "go-native"}},
+				Allowed:  []manifests.Lane{{Name: "go-native"}, {Name: "gpu-ml"}},
 			},
 		},
 	}
@@ -187,9 +218,14 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 	}
 	locator := &stubAsterLocator{
 		bundles: map[string]aster.Metadata{
-			"mods/plan":  {Stage: "mods", Toggle: "plan", BundleID: "mods-plan", Digest: "sha256:modsplan", ArtifactCID: "cid-mods-plan", Source: "build/aster/mods-plan.tar.zst"},
-			"build/plan": {Stage: "build", Toggle: "plan", BundleID: "build-plan", Digest: "sha256:buildplan", ArtifactCID: "cid-build-plan", Source: "build/aster/build-plan.tar.zst"},
-			"test/plan":  {Stage: "test", Toggle: "plan", BundleID: "test-plan", Digest: "sha256:testplan", ArtifactCID: "cid-test-plan", Source: "build/aster/test-plan.tar.zst"},
+			modsPlanStage + "/plan":             {Stage: modsPlanStage, Toggle: "plan", BundleID: "mods-plan", Digest: "sha256:modsplan", ArtifactCID: "cid-mods-plan", Source: "build/aster/mods-plan.tar.zst"},
+			mods.StageNameORWApply + "/plan":    {Stage: mods.StageNameORWApply, Toggle: "plan", BundleID: "orw-apply-plan"},
+			mods.StageNameORWGenerate + "/plan": {Stage: mods.StageNameORWGenerate, Toggle: "plan", BundleID: "orw-gen-plan"},
+			mods.StageNameLLMPlan + "/plan":     {Stage: mods.StageNameLLMPlan, Toggle: "plan", BundleID: "llm-plan-plan"},
+			mods.StageNameLLMExec + "/plan":     {Stage: mods.StageNameLLMExec, Toggle: "plan", BundleID: "llm-exec-plan"},
+			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
+			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan", Digest: "sha256:buildplan", ArtifactCID: "cid-build-plan", Source: "build/aster/build-plan.tar.zst"},
+			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan", Digest: "sha256:testplan", ArtifactCID: "cid-test-plan", Source: "build/aster/test-plan.tar.zst"},
 		},
 	}
 	grid := &fakeGrid{}
@@ -212,7 +248,7 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 		t.Fatal("expected grid invocations")
 	}
 
-	mods := findStageCall(grid.calls, "mods")
+	mods := findStageCall(grid.calls, modsPlanStage)
 	if !mods.stage.Aster.Enabled {
 		t.Fatal("expected mods stage to enable Aster")
 	}
@@ -253,8 +289,13 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 	}
 	locator := &stubAsterLocator{
 		bundles: map[string]aster.Metadata{
-			"mods/plan": {Stage: "mods", Toggle: "plan", BundleID: "mods-plan"},
-			"test/plan": {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
+			modsPlanStage + "/plan":             {Stage: modsPlanStage, Toggle: "plan", BundleID: "mods-plan"},
+			mods.StageNameORWApply + "/plan":    {Stage: mods.StageNameORWApply, Toggle: "plan", BundleID: "orw-apply-plan"},
+			mods.StageNameORWGenerate + "/plan": {Stage: mods.StageNameORWGenerate, Toggle: "plan", BundleID: "orw-gen-plan"},
+			mods.StageNameLLMPlan + "/plan":     {Stage: mods.StageNameLLMPlan, Toggle: "plan", BundleID: "llm-plan-plan"},
+			mods.StageNameLLMExec + "/plan":     {Stage: mods.StageNameLLMExec, Toggle: "plan", BundleID: "llm-exec-plan"},
+			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
+			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
 	grid := &fakeGrid{}
@@ -277,7 +318,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	mods := findStageCall(grid.calls, "mods")
+	mods := findStageCall(grid.calls, modsPlanStage)
 	if !mods.stage.Aster.Enabled {
 		t.Fatal("expected mods stage to enable Aster")
 	}
@@ -339,13 +380,23 @@ func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
 	}
 	locator := &stubAsterLocator{
 		bundles: map[string]aster.Metadata{
-			"mods/plan":  {Stage: "mods", Toggle: "plan", BundleID: "mods-plan"},
-			"mods/exec":  {Stage: "mods", Toggle: "exec", BundleID: "mods-exec"},
-			"mods/lint":  {Stage: "mods", Toggle: "lint", BundleID: "mods-lint"},
-			"build/plan": {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
-			"build/exec": {Stage: "build", Toggle: "exec", BundleID: "build-exec"},
-			"test/plan":  {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
-			"test/exec":  {Stage: "test", Toggle: "exec", BundleID: "test-exec"},
+			modsPlanStage + "/plan":             {Stage: modsPlanStage, Toggle: "plan", BundleID: "mods-plan"},
+			modsPlanStage + "/exec":             {Stage: modsPlanStage, Toggle: "exec", BundleID: "mods-exec"},
+			modsPlanStage + "/lint":             {Stage: modsPlanStage, Toggle: "lint", BundleID: "mods-lint"},
+			mods.StageNameORWApply + "/plan":    {Stage: mods.StageNameORWApply, Toggle: "plan", BundleID: "orw-apply-plan"},
+			mods.StageNameORWApply + "/exec":    {Stage: mods.StageNameORWApply, Toggle: "exec", BundleID: "orw-apply-exec"},
+			mods.StageNameORWGenerate + "/plan": {Stage: mods.StageNameORWGenerate, Toggle: "plan", BundleID: "orw-gen-plan"},
+			mods.StageNameORWGenerate + "/exec": {Stage: mods.StageNameORWGenerate, Toggle: "exec", BundleID: "orw-gen-exec"},
+			mods.StageNameLLMPlan + "/plan":     {Stage: mods.StageNameLLMPlan, Toggle: "plan", BundleID: "llm-plan-plan"},
+			mods.StageNameLLMPlan + "/exec":     {Stage: mods.StageNameLLMPlan, Toggle: "exec", BundleID: "llm-plan-exec"},
+			mods.StageNameLLMExec + "/plan":     {Stage: mods.StageNameLLMExec, Toggle: "plan", BundleID: "llm-exec-plan"},
+			mods.StageNameLLMExec + "/exec":     {Stage: mods.StageNameLLMExec, Toggle: "exec", BundleID: "llm-exec-exec"},
+			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
+			mods.StageNameHuman + "/exec":       {Stage: mods.StageNameHuman, Toggle: "exec", BundleID: "mods-human-exec"},
+			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
+			"build/exec":                        {Stage: "build", Toggle: "exec", BundleID: "build-exec"},
+			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
+			"test/exec":                         {Stage: "test", Toggle: "exec", BundleID: "test-exec"},
 		},
 	}
 	grid := &fakeGrid{}
@@ -361,14 +412,14 @@ func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
 			Locator:           locator,
 			AdditionalToggles: []string{"EXEC", "plan"},
 			StageOverrides: map[string]runner.AsterStageOverride{
-				"mods": {ExtraToggles: []string{"Lint", "plan"}},
+				modsPlanStage: {ExtraToggles: []string{"Lint", "plan"}},
 			},
 		},
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	mods := findStageCall(grid.calls, "mods")
+	mods := findStageCall(grid.calls, modsPlanStage)
 	if len(mods.stage.Aster.Toggles) != 3 {
 		t.Fatalf("expected merged toggles, got %+v", mods.stage.Aster.Toggles)
 	}
@@ -394,9 +445,14 @@ func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
 	}
 	locator := &stubAsterLocator{
 		bundles: map[string]aster.Metadata{
-			"mods/plan":  {BundleID: "mods-plan"},
-			"build/plan": {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
-			"test/plan":  {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
+			modsPlanStage + "/plan":             {BundleID: "mods-plan"},
+			mods.StageNameORWApply + "/plan":    {BundleID: "orw-apply-plan"},
+			mods.StageNameORWGenerate + "/plan": {BundleID: "orw-gen-plan"},
+			mods.StageNameLLMPlan + "/plan":     {BundleID: "llm-plan-plan"},
+			mods.StageNameLLMExec + "/plan":     {BundleID: "llm-exec-plan"},
+			mods.StageNameHuman + "/plan":       {BundleID: "mods-human-plan"},
+			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
+			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
 	grid := &fakeGrid{}
@@ -413,8 +469,8 @@ func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	mods := findStageCall(grid.calls, "mods")
-	if mods.stage.Aster.Bundles[0].Stage != "mods" {
+	mods := findStageCall(grid.calls, modsPlanStage)
+	if mods.stage.Aster.Bundles[0].Stage != modsPlanStage {
 		t.Fatalf("expected stage fallback, got %+v", mods.stage.Aster.Bundles[0])
 	}
 	if mods.stage.Aster.Bundles[0].Toggle != "plan" {
@@ -500,7 +556,7 @@ func TestRunPropagatesPublishArtifactError(t *testing.T) {
 		artifactErr: errors.New("artifact failure"),
 	}
 	grid := runner.NewInMemoryGrid()
-	grid.StageOutcomes["mods"] = []runner.StageOutcome{{
+	grid.StageOutcomes[modsPlanStage] = []runner.StageOutcome{{
 		Status: runner.StageStatusCompleted,
 		Artifacts: []runner.Artifact{{
 			Name:        "mods-plan",
@@ -550,8 +606,8 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods":  {{Status: runner.StageStatusCompleted}},
-			"build": {{Status: runner.StageStatusFailed, Retryable: true, Message: "no more"}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
+			"build":       {{Status: runner.StageStatusFailed, Retryable: true, Message: "no more"}},
 		},
 	}
 	opts := runner.Options{
@@ -571,8 +627,18 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	sequence := extractStageStatuses(events.checkpoints)
 	expected := []stageStatusEntry{
 		{stage: "ticket-claimed", status: runner.StageStatusCompleted},
-		{stage: "mods", status: runner.StageStatusRunning},
-		{stage: "mods", status: runner.StageStatusCompleted},
+		{stage: modsPlanStage, status: runner.StageStatusRunning},
+		{stage: modsPlanStage, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameHuman, status: runner.StageStatusRunning},
+		{stage: mods.StageNameHuman, status: runner.StageStatusCompleted},
 		{stage: "build", status: runner.StageStatusRunning},
 		{stage: "build", status: runner.StageStatusFailed},
 		{stage: "workflow", status: runner.StageStatusFailed},
@@ -624,10 +690,10 @@ func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
 	if len(composer.calls) == 0 {
 		t.Fatal("expected cache composer to be invoked")
 	}
-	stageChecks := map[string]int{"mods": 0, "build": 0, "test": 0}
+	stageChecks := map[string]int{modsPlanStage: 0, "build": 0, "test": 0}
 	for _, checkpoint := range events.checkpoints {
 		switch checkpoint.Stage {
-		case "mods", "build", "test":
+		case modsPlanStage, "build", "test":
 			if checkpoint.CacheKey == "" {
 				t.Fatalf("expected cache key for stage %s", checkpoint.Stage)
 			}
@@ -661,7 +727,7 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods": {{
+			modsPlanStage: {{
 				Status:    runner.StageStatusCompleted,
 				Artifacts: []runner.Artifact{{Name: "mods-plan", ArtifactCID: "cid-mods-plan", Digest: "sha256:modsplan", MediaType: "application/tar+zst"}},
 			}},
@@ -684,7 +750,7 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	var modsRunning, modsCompleted *contracts.WorkflowCheckpoint
 	for i := range events.checkpoints {
 		cp := events.checkpoints[i]
-		if cp.Stage != "mods" {
+		if cp.Stage != modsPlanStage {
 			continue
 		}
 		switch cp.Status {
@@ -727,7 +793,7 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	if envelope.TicketID != "ticket-123" {
 		t.Fatalf("unexpected artifact ticket id: %#v", envelope)
 	}
-	if envelope.Stage != "mods" {
+	if envelope.Stage != modsPlanStage {
 		t.Fatalf("unexpected artifact stage: %#v", envelope)
 	}
 	if envelope.Artifact.ArtifactCID != "cid-mods-plan" {
@@ -772,8 +838,15 @@ func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	sequence := extractStageStatuses(events.checkpoints)
-	if len(sequence) != 8 {
-		t.Fatalf("expected 8 checkpoints, got %d", len(sequence))
+	if len(sequence) != 18 {
+		t.Fatalf("expected 18 checkpoints, got %d", len(sequence))
+	}
+	if sequence[1].stage != modsPlanStage || sequence[1].status != runner.StageStatusRunning {
+		t.Fatalf("expected first stage checkpoint to be %s running, got %+v", modsPlanStage, sequence[1])
+	}
+	last := sequence[len(sequence)-1]
+	if last.stage != "workflow" || last.status != runner.StageStatusCompleted {
+		t.Fatalf("expected workflow completion, got %+v", last)
 	}
 }
 
@@ -822,9 +895,9 @@ func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods":  {{Status: runner.StageStatusCompleted}},
-			"build": {{Status: runner.StageStatusCompleted}},
-			"test":  {{Status: runner.StageStatusCompleted}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
+			"build":       {{Status: runner.StageStatusCompleted}},
+			"test":        {{Status: runner.StageStatusCompleted}},
 		},
 	}
 	planner := runner.NewDefaultPlanner()
@@ -848,8 +921,18 @@ func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	sequence := extractStageStatuses(events.checkpoints)
 	expected := []stageStatusEntry{
 		{stage: "ticket-claimed", status: runner.StageStatusCompleted},
-		{stage: "mods", status: runner.StageStatusRunning},
-		{stage: "mods", status: runner.StageStatusCompleted},
+		{stage: modsPlanStage, status: runner.StageStatusRunning},
+		{stage: modsPlanStage, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameHuman, status: runner.StageStatusRunning},
+		{stage: mods.StageNameHuman, status: runner.StageStatusCompleted},
 		{stage: "build", status: runner.StageStatusRunning},
 		{stage: "build", status: runner.StageStatusCompleted},
 		{stage: "test", status: runner.StageStatusRunning},
@@ -875,7 +958,7 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods": {{Status: runner.StageStatusCompleted}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
 			"build": {
 				{Status: runner.StageStatusFailed, Retryable: true, Message: "grid transient"},
 				{Status: runner.StageStatusCompleted},
@@ -905,8 +988,18 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	sequence := extractStageStatuses(events.checkpoints)
 	expected := []stageStatusEntry{
 		{stage: "ticket-claimed", status: runner.StageStatusCompleted},
-		{stage: "mods", status: runner.StageStatusRunning},
-		{stage: "mods", status: runner.StageStatusCompleted},
+		{stage: modsPlanStage, status: runner.StageStatusRunning},
+		{stage: modsPlanStage, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameHuman, status: runner.StageStatusRunning},
+		{stage: mods.StageNameHuman, status: runner.StageStatusCompleted},
 		{stage: "build", status: runner.StageStatusRunning},
 		{stage: "build", status: runner.StageStatusRetrying},
 		{stage: "build", status: runner.StageStatusRunning},
@@ -925,8 +1018,8 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods":  {{Status: runner.StageStatusCompleted}},
-			"build": {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
+			"build":       {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},
 		},
 	}
 	opts := runner.Options{
@@ -946,8 +1039,18 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 	sequence := extractStageStatuses(events.checkpoints)
 	expected := []stageStatusEntry{
 		{stage: "ticket-claimed", status: runner.StageStatusCompleted},
-		{stage: "mods", status: runner.StageStatusRunning},
-		{stage: "mods", status: runner.StageStatusCompleted},
+		{stage: modsPlanStage, status: runner.StageStatusRunning},
+		{stage: modsPlanStage, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWApply, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusRunning},
+		{stage: mods.StageNameORWGenerate, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMPlan, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusRunning},
+		{stage: mods.StageNameLLMExec, status: runner.StageStatusCompleted},
+		{stage: mods.StageNameHuman, status: runner.StageStatusRunning},
+		{stage: mods.StageNameHuman, status: runner.StageStatusCompleted},
 		{stage: "build", status: runner.StageStatusRunning},
 		{stage: "build", status: runner.StageStatusFailed},
 		{stage: "workflow", status: runner.StageStatusFailed},
@@ -1035,8 +1138,8 @@ func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods":  {{Status: runner.StageStatusCompleted}},
-			"build": {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
+			"build":       {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
 		},
 	}
 	opts := runner.Options{
@@ -1066,8 +1169,8 @@ func TestRunUsesFallbackFailureMessage(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			"mods":  {{Status: runner.StageStatusCompleted}},
-			"build": {{Status: runner.StageStatusFailed, Retryable: false}},
+			modsPlanStage: {{Status: runner.StageStatusCompleted}},
+			"build":       {{Status: runner.StageStatusFailed, Retryable: false}},
 		},
 	}
 	opts := runner.Options{
@@ -1111,7 +1214,7 @@ func TestRunPropagatesGridError(t *testing.T) {
 func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	grid := runner.NewInMemoryGrid()
 	grid.StageOutcomes["build"] = []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "retry-me"}}
-	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods", Lane: "node-wasm"}, "/tmp/work"); err != nil {
+	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: modsPlanStage, Lane: "node-wasm"}, "/tmp/work"); err != nil {
 		t.Fatalf("unexpected error for default outcome: %v", err)
 	} else if outcome.Status != runner.StageStatusCompleted {
 		t.Fatalf("expected completed outcome, got %+v", outcome)
@@ -1127,7 +1230,7 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	if len(invocations) != 2 {
 		t.Fatalf("expected two invocations, got %d", len(invocations))
 	}
-	if invocations[0].Stage.Name != "mods" || invocations[1].Stage.Name != "build" {
+	if invocations[0].Stage.Name != modsPlanStage || invocations[1].Stage.Name != "build" {
 		t.Fatalf("unexpected invocation order: %+v", invocations)
 	}
 	if invocations[0].Stage.Lane != "node-wasm" || invocations[1].Stage.Lane != "go-native" {
@@ -1137,7 +1240,7 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 
 func TestInMemoryGridRejectsMissingLane(t *testing.T) {
 	grid := runner.NewInMemoryGrid()
-	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods"}, "/tmp/work")
+	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: modsPlanStage}, "/tmp/work")
 	if err == nil || !strings.Contains(err.Error(), "lane missing") {
 		t.Fatalf("expected lane missing error, got %v", err)
 	}
@@ -1404,7 +1507,7 @@ func (invalidStagePlanner) Build(ctx context.Context, ticket contracts.WorkflowT
 	return runner.ExecutionPlan{
 		TicketID: ticket.TicketID,
 		Stages: []runner.Stage{
-			{Name: "", Kind: runner.StageKindMods, Lane: "node-wasm"},
+			{Name: "", Kind: runner.StageKindModsPlan, Lane: "node-wasm"},
 		},
 	}, nil
 }
@@ -1416,7 +1519,7 @@ func (missingLanePlanner) Build(ctx context.Context, ticket contracts.WorkflowTi
 	return runner.ExecutionPlan{
 		TicketID: ticket.TicketID,
 		Stages: []runner.Stage{
-			{Name: "mods", Kind: runner.StageKindMods, Lane: ""},
+			{Name: modsPlanStage, Kind: runner.StageKindModsPlan, Lane: ""},
 		},
 	}, nil
 }
