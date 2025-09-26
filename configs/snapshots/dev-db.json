@@ -1,0 +1,25 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "email": "alice@example.com",
+      "ssn": "123-45-6789",
+      "token": "",
+      "created_at": "2025-09-25T10:00:00Z"
+    },
+    {
+      "id": "2",
+      "email": "bob@example.com",
+      "ssn": "987-65-4321",
+      "token": "",
+      "created_at": "2025-09-25T10:05:00Z"
+    }
+  ],
+  "orders": [
+    {
+      "id": "o-1",
+      "user_id": "1",
+      "total": "120.00"
+    }
+  ]
+}

@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 type runnerInvoker interface {
@@ -32,6 +35,13 @@ type laneRegistry interface {
 
 type laneRegistryLoaderFunc func(dir string) (laneRegistry, error)
 
+type snapshotRegistry interface {
+	Plan(ctx context.Context, name string) (snapshots.PlanReport, error)
+	Capture(ctx context.Context, name string, opts snapshots.CaptureOptions) (snapshots.CaptureResult, error)
+}
+
+type snapshotRegistryLoaderFunc func(dir string) (snapshotRegistry, error)
+
 var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
 	eventsFactory  eventsFactoryFunc = func(tenant string) runner.EventsClient {
@@ -44,6 +54,11 @@ var (
 		return lanes.LoadDirectory(dir)
 	}
 	laneConfigDir = "configs/lanes"
+
+	snapshotRegistryLoader snapshotRegistryLoaderFunc = func(dir string) (snapshotRegistry, error) {
+		return snapshots.LoadDirectory(dir, snapshots.LoadOptions{})
+	}
+	snapshotConfigDir = "configs/snapshots"
 )
 
 func main() {
@@ -64,6 +79,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleWorkflow(args[1:], stderr)
 	case "lanes":
 		return handleLanes(args[1:], stderr)
+	case "snapshot":
+		return handleSnapshot(args[1:], stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -132,6 +149,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "\nCommands:")
 	_, _ = fmt.Fprintln(w, "  workflow  Manage workflow execution entries")
 	_, _ = fmt.Fprintln(w, "  lanes     Inspect lane definitions and cache previews")
+	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
 }
 
 func printWorkflowUsage(w io.Writer) {
@@ -249,5 +267,162 @@ func printLaneDescription(w io.Writer, desc lanes.Description) {
 	}
 	if len(inputs) > 0 {
 		_, _ = fmt.Fprintf(w, "Inputs: %s\n", strings.Join(inputs, "; "))
+	}
+}
+
+func handleSnapshot(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printSnapshotUsage(stderr)
+		return errors.New("snapshot subcommand required")
+	}
+
+	switch args[0] {
+	case "plan":
+		return handleSnapshotPlan(args[1:], stderr)
+	case "capture":
+		return handleSnapshotCapture(args[1:], stderr)
+	default:
+		printSnapshotUsage(stderr)
+		return fmt.Errorf("unknown snapshot subcommand %q", args[0])
+	}
+}
+
+func printSnapshotUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy snapshot <command>")
+	_, _ = fmt.Fprintln(w, "\nCommands:")
+	_, _ = fmt.Fprintln(w, "  plan     Preview strip/mask/synthetic rules for a snapshot")
+	_, _ = fmt.Fprintln(w, "  capture  Execute snapshot capture and publish metadata")
+}
+
+func handleSnapshotPlan(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("snapshot plan", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	snapshotName := fs.String("snapshot", "", "snapshot identifier to plan")
+	if err := fs.Parse(args); err != nil {
+		printSnapshotPlanUsage(stderr)
+		return err
+	}
+
+	if strings.TrimSpace(*snapshotName) == "" {
+		printSnapshotPlanUsage(stderr)
+		return errors.New("snapshot is required")
+	}
+
+	reg, err := snapshotRegistryLoader(snapshotConfigDir)
+	if err != nil {
+		return err
+	}
+
+	report, err := reg.Plan(context.Background(), strings.TrimSpace(*snapshotName))
+	if err != nil {
+		return err
+	}
+
+	printSnapshotPlan(stderr, report)
+	return nil
+}
+
+func printSnapshotPlanUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy snapshot plan --snapshot <snapshot-name>")
+}
+
+func printSnapshotPlan(w io.Writer, report snapshots.PlanReport) {
+	_, _ = fmt.Fprintf(w, "Snapshot: %s\n", report.SnapshotName)
+	if report.Description != "" {
+		_, _ = fmt.Fprintf(w, "Description: %s\n", report.Description)
+	}
+	_, _ = fmt.Fprintf(w, "Engine: %s\n", report.Engine)
+	if report.FixturePath != "" {
+		_, _ = fmt.Fprintf(w, "Fixture: %s\n", report.FixturePath)
+	}
+	_, _ = fmt.Fprintf(w, "Strip Rules: %d\n", report.Stripping.Total)
+	_, _ = fmt.Fprintf(w, "Mask Rules: %d\n", report.Masking.Total)
+	_, _ = fmt.Fprintf(w, "Synthetic Rules: %d\n", report.Synthetic.Total)
+	if len(report.Highlights) > 0 {
+		_, _ = fmt.Fprintln(w, "Highlights:")
+		for _, highlight := range report.Highlights {
+			_, _ = fmt.Fprintf(w, "  - %s\n", highlight)
+		}
+	}
+}
+
+func handleSnapshotCapture(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("snapshot capture", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	snapshotName := fs.String("snapshot", "", "snapshot identifier to capture")
+	tenant := fs.String("tenant", "", "tenant slug for metadata publishing")
+	ticket := fs.String("ticket", "", "ticket identifier associated with capture")
+	if err := fs.Parse(args); err != nil {
+		printSnapshotCaptureUsage(stderr)
+		return err
+	}
+
+	trimmedSnapshot := strings.TrimSpace(*snapshotName)
+	if trimmedSnapshot == "" {
+		printSnapshotCaptureUsage(stderr)
+		return errors.New("snapshot is required")
+	}
+	trimmedTenant := strings.TrimSpace(*tenant)
+	if trimmedTenant == "" {
+		printSnapshotCaptureUsage(stderr)
+		return errors.New("tenant is required")
+	}
+	trimmedTicket := strings.TrimSpace(*ticket)
+	if trimmedTicket == "" {
+		printSnapshotCaptureUsage(stderr)
+		return errors.New("ticket is required")
+	}
+
+	reg, err := snapshotRegistryLoader(snapshotConfigDir)
+	if err != nil {
+		return err
+	}
+
+	result, err := reg.Capture(context.Background(), trimmedSnapshot, snapshots.CaptureOptions{
+		Tenant:   trimmedTenant,
+		TicketID: trimmedTicket,
+	})
+	if err != nil {
+		return err
+	}
+
+	printSnapshotCapture(stderr, result)
+	return nil
+}
+
+func printSnapshotCaptureUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>")
+}
+
+func printSnapshotCapture(w io.Writer, result snapshots.CaptureResult) {
+	_, _ = fmt.Fprintf(w, "Snapshot: %s\n", result.Metadata.SnapshotName)
+	_, _ = fmt.Fprintf(w, "Artifact CID: %s\n", result.ArtifactCID)
+	_, _ = fmt.Fprintf(w, "Fingerprint: %s\n", result.Fingerprint)
+	_, _ = fmt.Fprintf(w, "Captured At: %s\n", result.Metadata.CapturedAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, "Rule Totals: strip=%d mask=%d synthetic=%d\n", result.Metadata.RuleCounts.Strip, result.Metadata.RuleCounts.Mask, result.Metadata.RuleCounts.Synthetic)
+	if len(result.Diff.StrippedColumns) > 0 {
+		_, _ = fmt.Fprintln(w, "Stripped Columns:")
+		printColumnSet(w, result.Diff.StrippedColumns)
+	}
+	if len(result.Diff.MaskedColumns) > 0 {
+		_, _ = fmt.Fprintln(w, "Masked Columns:")
+		printColumnSet(w, result.Diff.MaskedColumns)
+	}
+	if len(result.Diff.SyntheticColumns) > 0 {
+		_, _ = fmt.Fprintln(w, "Synthetic Columns:")
+		printColumnSet(w, result.Diff.SyntheticColumns)
+	}
+}
+
+func printColumnSet(w io.Writer, values map[string][]string) {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		cols := append([]string(nil), values[key]...)
+		sort.Strings(cols)
+		_, _ = fmt.Fprintf(w, "  %s: %s\n", key, strings.Join(cols, ", "))
 	}
 }

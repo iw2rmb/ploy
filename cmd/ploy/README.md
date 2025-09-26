@@ -6,16 +6,23 @@
 ```
 ploy lanes describe --lane <lane-name> [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] [--aster <toggle,...>]
 ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]
+ploy snapshot plan --snapshot <snapshot-name>
+ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
 `workflow run` boots in-memory JetStream and Grid stubs, claims a ticket (auto-generating one if `--ticket auto`), publishes checkpoints for every stage transition, executes mods/build/test against a temporary workspace, and cleans up before exit. Upcoming roadmap slices will swap the stubs for real JetStream connections and Grid RPC calls.
 
+`snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
+
+`snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, publishes artifact metadata to the JetStream stub, and returns the fake IPFS CID assigned by the in-memory publisher.
+
 ## Flags
 - `--lane` — Lane identifier defined under `configs/lanes/*.toml` (required for `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key preview inputs consumed by the lane engine.
-- `--tenant` — Tenant slug used to resolve subject namespaces. Required for `workflow run`.
-- `--ticket` — JetStream ticket identifier to claim (`workflow run`). Defaults to `auto`, which selects or generates the next ticket on the tenant stub.
+- `--tenant` — Tenant slug used to resolve subject namespaces. Required for `workflow run` and `snapshot capture`.
+- `--ticket` — JetStream ticket identifier to claim (`workflow run`) or metadata tag for snapshot captures. Defaults to `auto` for workflows; required for snapshot captures.
+- `--snapshot` — Snapshot identifier defined under `configs/snapshots/*.toml` (required for `snapshot plan` and `snapshot capture`).
 
 ## Exit Codes
 - `0` — success (ticket claimed, stages completed, workspace cleaned).
