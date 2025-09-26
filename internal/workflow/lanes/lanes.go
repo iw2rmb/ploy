@@ -98,6 +98,9 @@ func validateSpec(spec Spec) error {
 	if strings.TrimSpace(spec.Name) == "" {
 		return errors.New("name is required")
 	}
+	if strings.TrimSpace(spec.Description) == "" {
+		return errors.New("description is required")
+	}
 	if strings.TrimSpace(spec.RuntimeFamily) == "" {
 		return errors.New("runtime_family is required")
 	}
