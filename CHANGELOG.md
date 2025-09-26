@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-26] Integration Manifest Compiler
+- Introduced `internal/workflow/manifests` with TOML schema validation, JSON compilation helpers, and unit tests covering happy/failure paths.
+- Extended the workflow runner to require manifest compilation, attach compiled payloads to every stage, and let the in-memory Grid stub enforce lane allowlists.
+- Updated `ploy workflow run` to load manifests from `configs/manifests/`, surface actionable validation errors, and documented the schema in `docs/MANIFESTS.md` alongside new sample manifests (`smoke`, `commit-app`).
+- Added CLI tests asserting manifest loader wiring and error propagation; roadmap slice `05-integration-manifests` is now complete.
+
 ## [2025-09-26] Snapshot Toolkit CLI
 - Added `internal/workflow/snapshots` with TOML spec loader, rule engine (strip/mask/synthetic), deterministic fingerprinting, and metadata publishing hooks backed by in-memory IPFS/JetStream stubs.
 - Introduced `ploy snapshot plan` and `ploy snapshot capture` commands, plus CLI tests covering usage, summary output, and capture reporting.

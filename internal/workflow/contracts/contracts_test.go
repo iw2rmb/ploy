@@ -29,7 +29,12 @@ func TestWorkflowTicketValidate(t *testing.T) {
 		t.Fatal("expected validation error for empty ticket")
 	}
 
-	valid := WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: "ticket-123", Tenant: "acme"}
+	valid := WorkflowTicket{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-123",
+		Tenant:        "acme",
+		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
+	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("expected valid ticket, got %v", err)
 	}
@@ -75,6 +80,9 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 	if len(bus.ClaimedTickets) != 1 {
 		t.Fatalf("expected claimed ticket to be recorded")
 	}
+	if ticket.Manifest.Name == "" || ticket.Manifest.Version == "" {
+		t.Fatalf("expected manifest reference to be set, got %+v", ticket.Manifest)
+	}
 
 	checkpoint := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
@@ -116,5 +124,8 @@ func TestInMemoryBusAutoTicketFallback(t *testing.T) {
 	}
 	if len(bus.ClaimedTickets) != 2 {
 		t.Fatalf("expected two claimed tickets, got %v", bus.ClaimedTickets)
+	}
+	if second.Manifest.Name == "" || second.Manifest.Version == "" {
+		t.Fatalf("expected auto manifest assignment, got %+v", second.Manifest)
 	}
 }

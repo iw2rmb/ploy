@@ -11,6 +11,7 @@ type InMemoryBus struct {
 	ClaimedTickets []string
 	Checkpoints    []WorkflowCheckpoint
 	tickets        []string
+	Manifest       ManifestReference
 }
 
 func NewInMemoryBus(tenant string) *InMemoryBus {
@@ -33,10 +34,15 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 		}
 	}
 	b.ClaimedTickets = append(b.ClaimedTickets, trimmed)
+	manifest := b.Manifest
+	if manifest.Name == "" || manifest.Version == "" {
+		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}
+	}
 	return WorkflowTicket{
 		SchemaVersion: SchemaVersion,
 		TicketID:      trimmed,
 		Tenant:        b.Tenant,
+		Manifest:      manifest,
 	}, nil
 }
 

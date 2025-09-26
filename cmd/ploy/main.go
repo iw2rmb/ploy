@@ -13,6 +13,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
@@ -42,6 +43,8 @@ type snapshotRegistry interface {
 
 type snapshotRegistryLoaderFunc func(dir string) (snapshotRegistry, error)
 
+type manifestCompilerLoaderFunc func(dir string) (runner.ManifestCompiler, error)
+
 var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
 	eventsFactory  eventsFactoryFunc = func(tenant string) runner.EventsClient {
@@ -59,7 +62,32 @@ var (
 		return snapshots.LoadDirectory(dir, snapshots.LoadOptions{})
 	}
 	snapshotConfigDir = "configs/snapshots"
+
+	manifestRegistryLoader manifestCompilerLoaderFunc = func(dir string) (runner.ManifestCompiler, error) {
+		registry, err := manifests.LoadDirectory(dir)
+		if err != nil {
+			return nil, err
+		}
+		return registryCompiler{registry: registry}, nil
+	}
+	manifestConfigDir = "configs/manifests"
 )
+
+type registryCompiler struct {
+	registry *manifests.Registry
+}
+
+func (r registryCompiler) Compile(ctx context.Context, ref contracts.ManifestReference) (manifests.Compilation, error) {
+	_ = ctx
+	if r.registry == nil {
+		return manifests.Compilation{}, fmt.Errorf("compile manifest: registry missing")
+	}
+	comp, err := r.registry.Compile(manifests.CompileOptions{Name: ref.Name, Version: ref.Version})
+	if err != nil {
+		return manifests.Compilation{}, err
+	}
+	return comp, nil
+}
 
 func main() {
 	if err := execute(os.Args[1:], os.Stderr); err != nil {
@@ -118,6 +146,11 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		return errors.New("tenant required")
 	}
 
+	compiler, err := manifestRegistryLoader(manifestConfigDir)
+	if err != nil {
+		return fmt.Errorf("load manifests: %w", err)
+	}
+
 	ticketValue := strings.TrimSpace(*ticket)
 	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
 		ticketValue = ""
@@ -126,14 +159,15 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	events := eventsFactory(trimmedTenant)
 	grid := runner.NewInMemoryGrid()
 	opts := runner.Options{
-		Ticket:          ticketValue,
-		Tenant:          trimmedTenant,
-		Events:          events,
-		Grid:            grid,
-		Planner:         runner.NewDefaultPlanner(),
-		MaxStageRetries: 1,
+		Ticket:           ticketValue,
+		Tenant:           trimmedTenant,
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		MaxStageRetries:  1,
+		ManifestCompiler: compiler,
 	}
-	err := runnerExecutor.Run(context.Background(), opts)
+	err = runnerExecutor.Run(context.Background(), opts)
 	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
 		printWorkflowRunUsage(stderr)
 	}

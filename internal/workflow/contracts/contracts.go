@@ -1,6 +1,9 @@
 package contracts
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const SchemaVersion = "2025-09-25"
 
@@ -21,9 +24,10 @@ func SubjectsForTenant(tenant, ticketID string) SubjectSet {
 }
 
 type WorkflowTicket struct {
-	SchemaVersion string `json:"schema_version"`
-	TicketID      string `json:"ticket_id"`
-	Tenant        string `json:"tenant"`
+	SchemaVersion string            `json:"schema_version"`
+	TicketID      string            `json:"ticket_id"`
+	Tenant        string            `json:"tenant"`
+	Manifest      ManifestReference `json:"manifest"`
 }
 
 func (t WorkflowTicket) Validate() error {
@@ -35,6 +39,24 @@ func (t WorkflowTicket) Validate() error {
 	}
 	if t.Tenant == "" {
 		return fmt.Errorf("tenant is required")
+	}
+	if err := t.Manifest.Validate(); err != nil {
+		return fmt.Errorf("manifest invalid: %w", err)
+	}
+	return nil
+}
+
+type ManifestReference struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+func (m ManifestReference) Validate() error {
+	if strings.TrimSpace(m.Name) == "" {
+		return fmt.Errorf("name is required")
+	}
+	if strings.TrimSpace(m.Version) == "" {
+		return fmt.Errorf("version is required")
 	}
 	return nil
 }

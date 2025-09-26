@@ -1,0 +1,63 @@
+name = "commit-app"
+version = "2025-09-26"
+summary = """
+## Purpose
+Materialise commit-scoped environments for Go + Node services. The manifest captures topology, fixtures, and lanes Grid must honour when launching build/test jobs per commit.
+
+## Notes
+- Uses the snapshot toolkit fingerprints for masked production-like datasets.
+- Allows optional GPU-enabled lanes when Aster toggles request ML workloads.
+"""
+
+[topology]
+description = "Permit app services to reach backing stores and internal caches."
+
+[[topology.allow]]
+from = "app-worker"
+to = "postgres-primary"
+
+[[topology.allow]]
+from = "app-worker"
+to = "redis-cache"
+
+[[topology.allow]]
+from = "app-worker"
+to = "minio-artifacts"
+
+[[topology.deny]]
+from = "app-worker"
+to = "internet"
+reason = "Commit environments block outbound egress by default."
+
+[fixtures]
+
+[[fixtures.required]]
+name = "postgres"
+reference = "snapshot:commit-db"
+
+[[fixtures.required]]
+name = "redis"
+reference = "snapshot:commit-cache"
+
+[[fixtures.optional]]
+name = "minio"
+reference = "service:minio-dev"
+reason = "Enabled when artifact diffing is requested."
+
+[lanes]
+
+[[lanes.required]]
+name = "go-native"
+reason = "Build + test Go workloads."
+
+[[lanes.required]]
+name = "node-wasm"
+reason = "Run mods-based front-end flows."
+
+[[lanes.allowed]]
+name = "gpu-ml"
+reason = "Provision ML workloads when Aster toggles demand it."
+
+[aster]
+required = ["plan"]
+optional = ["ml", "lint"]

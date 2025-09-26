@@ -8,7 +8,7 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 - ✅ Event contract scaffolding in place: the CLI claims a ticket and publishes checkpoints via the JetStream stub.
 - ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
 - ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
-- 🚧 Next roadmap slices validate integration manifests and materialised environments once JetStream/Grid wiring lands.
+- ✅ Integration manifest compiler validates TOML manifests under `configs/manifests/`, attaches compiled payloads to workflow stages, and enforces lane allowlists in the Grid stub.
 
 ## Getting Started
 1. **Clone & build**
@@ -56,8 +56,8 @@ The active roadmap lives under `roadmap/shift/`. Completed items:
 - [x] `03-lane-engine` — lane specs + cache key composer + `ploy lanes describe` inspection command.
 
 Upcoming items:
-- `05-integration-manifests` — manifests, commit-scoped environments, and Aster hook integration.
-- `05-integration-manifests` onward — manifests, commit-scoped environments, and Aster hook integration.
+- `06-commit-environments` — hydrate caches/snapshots/manifests for commit-scoped runs.
+- `07-aster-hook` — wire AST-pruned bundles into cache keys and Grid submissions.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
 
