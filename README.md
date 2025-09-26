@@ -69,8 +69,9 @@ The active roadmap lives under `roadmap/shift/`. Completed slices:
 - [x] `08-documentation-cleanup` — doc set refreshed to highlight the CLI-first/Grid model.
 - [x] `09-cache-coordination` — workflow checkpoints carry lane cache keys for Grid reuse.
 - [x] `10-jetstream-client` — workflow runs connect to live JetStream when available and keep the stub fallback for offline slices.
+- [x] `14-grid-workflow-client` — workflow stages now execute through the Grid Workflow RPC when `GRID_ENDPOINT` is set, falling back to the in-memory stub offline.
 
-Next up: replace the Grid stub with the real Workflow RPC client and exercise the runner against the Dev API once GRID integration resumes.
+Next up: wire the snapshot/IPFS publishing path (`IPFS_GATEWAY`) so captured artifacts travel through the same stateless workflow pipeline.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
 

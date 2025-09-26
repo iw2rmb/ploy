@@ -38,9 +38,9 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 
 ## Environment
 - ``JETSTREAM_URL`` — NATS/JetStream endpoint (`nats://host:port`) used by `workflow run` when present.
-- ``GRID_ENDPOINT`` — TODO (real Workflow RPC target lands with Grid integration).
+- ``GRID_ENDPOINT`` — Workflow RPC base URL (`https://grid-dev.example`) used by `workflow run` when set; falls back to the in-memory Grid stub when omitted.
 - ``IPFS_GATEWAY`` — TODO (snapshot/artifact publishing slice).
-When ``JETSTREAM_URL`` is omitted the CLI falls back to the in-memory stub so workstation tests continue to run offline.
+When ``JETSTREAM_URL`` is omitted the CLI falls back to the in-memory JetStream stub; omitting ``GRID_ENDPOINT`` keeps workflow execution local via the in-memory Grid stub for offline development.
 
 ## Development
 - Build via `make build` (outputs to `dist/ploy`).
