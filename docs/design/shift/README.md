@@ -39,7 +39,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
    - `grid.status.<ticket>` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
 2. **Workflow Runner CLI**
    - Single binary invoked by operators or Grid when work appears; default command `ploy workflow run --ticket auto`.
-   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC.
+   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback).
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 3. **Lane Engine**
    - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache namespaces, and build/test commands.
@@ -67,7 +67,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - Target coverage ≥60% overall, ≥90% on critical path packages (workflow runner, snapshot toolkit, manifest parser).
 
 ## Open Questions
-- Precise schema for Grid Workflow RPC (await detailed spec from Grid team).
+- Finalise the Grid Workflow RPC schema once the upstream spec lands (current client uses a provisional JSON envelope).
 - IPFS gateway availability for developers without direct cluster access.
 - Versioning strategy for integration manifests when multiple teams share the same app but diverge on topology requirements.
 
@@ -75,3 +75,4 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - ✅ Completed 2025-09-26: Harden lane-spec documentation (`docs/LANES.md`) and keep CLI examples (`ploy lanes describe`) in sync with TOML schema updates.
 - ✅ Completed 2025-09-26: Validate snapshot tooling against representative databases (Postgres, MySQL, document store).
 - ✅ Completed 2025-09-26: Draft integration manifest schema ahead of the workflow runner wiring slice.
+- ☐ Implement IPFS artifact publishing once the gateway (`IPFS_GATEWAY`) is provisioned for workstation slices.

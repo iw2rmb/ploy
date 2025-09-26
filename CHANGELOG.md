@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Grid Workflow Client
+- Added `internal/workflow/grid` with an HTTP Workflow RPC client that submits stage executions to Grid and records invocation metadata for CLI summaries.
+- Updated `ploy workflow run` to honour ``GRID_ENDPOINT``, wiring real Grid dispatch when configured and keeping the in-memory stub for offline development.
+- Expanded CLI and client test suites to cover Grid configuration failures, request encoding, and response handling; recorded the roadmap slice as complete.
+
 ## [2025-09-26] Integration Manifest Schema
 - Published `docs/schemas/integration_manifest.schema.json` capturing required manifest fields and constraints for topology, fixtures, lanes, and Aster toggles.
 - Added `ploy manifest schema` to surface the schema for downstream tooling and validation flows.

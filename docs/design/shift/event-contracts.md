@@ -35,7 +35,7 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 - `internal/workflow/contracts.JetStreamClient` now implements `runner.EventsClient`, connecting to NATS when ``JETSTREAM_URL`` is provided and falling back to the in-memory bus for offline runs.
 - `cmd/ploy/main.go` selects the real client automatically when the environment variable is set, closing the loop on the original stub pathway.
 - `internal/workflow/contracts.InMemoryBus` remains available for workstation slices that skip live connectivity.
-- `GRID_ENDPOINT` and `IPFS_GATEWAY` remain TODO until the Grid RPC and artifact publishing slices land.
+- `internal/workflow/grid.Client` now provides the Workflow RPC implementation toggled by ``GRID_ENDPOINT``; `internal/workflow/contracts.InMemoryBus` and the Grid stub remain for offline slices while `IPFS_GATEWAY` is still TODO until artifact publishing lands.
 
 ## Tests
 - Unit tests in `internal/workflow/contracts` validate subject derivation, schema validation, and stub behaviour.
@@ -43,4 +43,4 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 
 ## Next Steps
 - Expand tickets and checkpoints to include DAG metadata and artifact manifests once the lane engine lands.
-- Wire the workflow runner to submit stages to Grid via the Workflow RPC so live runs exercise the real control plane.
+- ✅ Completed 2025-09-26: Wire the workflow runner to submit stages to Grid via the Workflow RPC so live runs exercise the real control plane.

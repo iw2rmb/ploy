@@ -14,6 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
+	"github.com/iw2rmb/ploy/internal/workflow/grid"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
@@ -31,6 +32,8 @@ func (f runnerInvokerFunc) Run(ctx context.Context, opts runner.Options) error {
 }
 
 type eventsFactoryFunc func(tenant string) (runner.EventsClient, error)
+
+type gridFactoryFunc func() (runner.GridClient, error)
 
 type laneRegistry interface {
 	Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error)
@@ -95,6 +98,7 @@ func (f *stageOverrideFlag) Set(value string) error {
 var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
 	eventsFactory  eventsFactoryFunc = defaultEventsFactory
+	gridFactory    gridFactoryFunc   = defaultGridFactory
 )
 
 func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
@@ -114,6 +118,18 @@ func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
 		return client, nil
 	}
 	return contracts.NewInMemoryBus(trimmedTenant), nil
+}
+
+func defaultGridFactory() (runner.GridClient, error) {
+	endpoint := strings.TrimSpace(os.Getenv("GRID_ENDPOINT"))
+	if endpoint == "" {
+		return runner.NewInMemoryGrid(), nil
+	}
+	client, err := grid.NewClient(grid.Options{Endpoint: endpoint})
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 var (
@@ -267,7 +283,10 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	if closer, ok := events.(interface{ Close() }); ok {
 		defer closer.Close()
 	}
-	grid := runner.NewInMemoryGrid()
+	gridClient, err := gridFactory()
+	if err != nil {
+		return fmt.Errorf("configure grid client: %w", err)
+	}
 	locator, err := asterLocatorLoader(asterConfigDir)
 	if err != nil {
 		return fmt.Errorf("load Aster bundles: %w", err)
@@ -276,7 +295,7 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		Ticket:           ticketValue,
 		Tenant:           trimmedTenant,
 		Events:           events,
-		Grid:             grid,
+		Grid:             gridClient,
 		Planner:          runner.NewDefaultPlanner(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
@@ -294,7 +313,7 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if reporter, ok := interface{}(grid).(interface {
+	if reporter, ok := interface{}(gridClient).(interface {
 		Invocations() []runner.StageInvocation
 	}); ok {
 		printAsterSummary(stderr, reporter.Invocations())
