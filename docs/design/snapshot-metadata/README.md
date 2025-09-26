@@ -1,7 +1,7 @@
 # Snapshot Metadata Streams (SHIFT Roadmap 16)
 
 ## Purpose
-Publish snapshot capture metadata to JetStream so Grid can ingest fingerprint, CID, and rule counts without relying on the CLI stdout. This slice closes the TODO called out in `docs/design/shift/ipfs-artifacts.md` and aligns with the SHIFT contract that `ploy snapshot capture` pushes metadata to JetStream alongside artifact uploads.
+Publish snapshot capture metadata to JetStream so Grid can ingest fingerprint, CID, and rule counts without relying on the CLI stdout. This slice closes the TODO called out in `docs/design/ipfs-artifacts/README.md` and aligns with the SHIFT contract that `ploy snapshot capture` pushes metadata to JetStream alongside artifact uploads.
 
 ## Scope
 - Applies to the snapshot toolkit (`internal/workflow/snapshots`) and the CLI wiring in `cmd/ploy`.
@@ -26,6 +26,6 @@ Publish snapshot capture metadata to JetStream so Grid can ingest fingerprint, C
 - Repository-wide `go test -cover ./...` to keep ≥60% overall coverage and ≥90% in the snapshot package.
 
 ## Rollout
-- Document the new requirement in `docs/design/shift/ipfs-artifacts.md` and `docs/SNAPSHOTS.md`.
+- Document the new requirement in `docs/design/ipfs-artifacts/README.md` and `docs/SNAPSHOTS.md`.
 - Update `CHANGELOG.md` with the 2025-09-26 entry describing JetStream snapshot metadata streaming.
 - Follow the RED → GREEN → REFACTOR cadence; integration/Grid verification resumes once workstation JetStream wiring stabilises.

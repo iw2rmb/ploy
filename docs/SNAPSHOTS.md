@@ -48,7 +48,7 @@ Describe how the snapshot toolkit transforms database fixtures during the SHIFT 
 Representative fixtures now cover the three primary engines we target locally: Postgres (`dev-db`, `commit-db`), MySQL (`mysql-orders`), and a document store (`doc-events`). Each ships with TOML specs and JSON fixtures under `configs/snapshots/` so `ploy snapshot plan|capture` can exercise real-world rule combinations whether publishing to a live IPFS gateway or the deterministic stub.
 
 ## Related Docs
-- `docs/design/shift/README.md` — Overall SHIFT architecture.
+- `docs/design/overview/README.md` — Overall feature architecture.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `README.md` — High-level CLI overview (snapshot commands included).
 - `roadmap/shift/08-documentation-cleanup.md` — slice documenting the doc refresh.

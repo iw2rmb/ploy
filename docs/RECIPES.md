@@ -27,6 +27,6 @@ Describe how the OpenRewrite recipe pack catalog is configured during the workst
 - Demonstrates how additional language combinations can be introduced without touching code; drop a new TOML file and the loader will pick it up automatically.
 
 ## Related Docs
-- `docs/design/shift/README.md` — overall SHIFT design and roadmap context.
+- `docs/design/overview/README.md` — overall feature design and roadmap context.
 - `roadmap/recipes.md` — roadmap slice tracking OpenRewrite recipe UX progress.
 - `README.md` — repository status overview, including the recipe pack registry milestone.

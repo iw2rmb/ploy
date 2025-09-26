@@ -1,7 +1,7 @@
 # Workflow Checkpoint Metadata (SHIFT Roadmap 17)
 
 ## Purpose
-Carry full DAG context and artifact manifests inside workflow checkpoints so Grid operators and downstream tooling can introspect stage lane assignments, dependencies, and produced artifacts without scraping CLI output. This closes the follow-up item from `docs/design/shift/event-contracts.md` to enrich checkpoint payloads now that the lane engine and artifact publishers exist.
+Carry full DAG context and artifact manifests inside workflow checkpoints so Grid operators and downstream tooling can introspect stage lane assignments, dependencies, and produced artifacts without scraping CLI output. This closes the follow-up item from `docs/design/event-contracts/README.md` to enrich checkpoint payloads now that the lane engine and artifact publishers exist.
 
 ## Scope
 - Applies to the workflow runner (`internal/workflow/runner`), contracts (`internal/workflow/contracts`), and Grid client (`internal/workflow/grid`).
@@ -28,6 +28,6 @@ Carry full DAG context and artifact manifests inside workflow checkpoints so Gri
 - Repository-wide `go test -cover ./...` to maintain ≥60% coverage overall and ≥90% in the runner package.
 
 ## Rollout & Follow-ups
-- Update `docs/design/shift/event-contracts.md` to mark the checkpoint metadata follow-up complete and describe the enriched schema.
+- Update `docs/design/event-contracts/README.md` to mark the checkpoint metadata follow-up complete and describe the enriched schema.
 - Add roadmap entry `roadmap/shift/17-checkpoint-metadata.md` and mark it done when this slice ships.
 - ✅ Completed 2025-09-26: Mirror stage artifacts to the `ploy.artifact.<ticket>` subject once build artifact uploads move off the workstation stub.

@@ -1,7 +1,7 @@
 # Stage Artifact Streams (SHIFT Roadmap 18)
 
 ## Purpose
-Mirror workflow stage artifact manifests onto the `ploy.artifact.<ticket>` JetStream subject so cache hydrators and downstream tooling can react without scraping checkpoints. This closes the follow-up listed in `docs/design/shift/checkpoint-metadata/README.md` and aligns the workflow runner with the snapshot metadata stream introduced earlier.
+Mirror workflow stage artifact manifests onto the `ploy.artifact.<ticket>` JetStream subject so cache hydrators and downstream tooling can react without scraping checkpoints. This closes the follow-up listed in `docs/design/checkpoint-metadata/README.md` and aligns the workflow runner with the snapshot metadata stream introduced earlier.
 
 ## Scope
 - Applies to the workflow runner (`internal/workflow/runner`) and events client implementations under `internal/workflow/contracts`.
@@ -27,6 +27,6 @@ Mirror workflow stage artifact manifests onto the `ploy.artifact.<ticket>` JetSt
 - Repository-wide `go test -cover ./...` to maintain ≥60% overall and ≥90% coverage on workflow runner packages.
 
 ## Rollout & Follow-ups
-- Update `docs/design/shift/checkpoint-metadata/README.md` to mark the artifact stream follow-up complete.
+- Update `docs/design/checkpoint-metadata/README.md` to mark the artifact stream follow-up complete.
 - Record status in `roadmap/shift/18-stage-artifact-streams.md` once the slice lands.
 - Future slice: attach artifact payload hashing/size metadata when Grid begins returning those fields.

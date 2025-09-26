@@ -92,6 +92,6 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 - Runner tests ensure the CLI claims tickets and publishes an initial `claimed` checkpoint through the stub.
 
 ## Next Steps
-- ✅ Completed 2025-09-26: Expand checkpoints with stage metadata and artifact manifests (see `docs/design/shift/checkpoint-metadata/README.md`).
+- ✅ Completed 2025-09-26: Expand checkpoints with stage metadata and artifact manifests (see `docs/design/checkpoint-metadata/README.md`).
 - ✅ Completed 2025-09-26: Wire the workflow runner to submit stages to Grid via the Workflow RPC so live runs exercise the real control plane.
 - ✅ Completed 2025-09-26: Mirror workflow stage artifact envelopes to `ploy.artifact.<ticket>` via the new event contract.

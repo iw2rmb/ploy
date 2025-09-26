@@ -13,7 +13,7 @@ Give downstream consumers immediate access to workflow stage artifact manifests 
 - Stage completions with artifacts publish envelopes to `ploy.artifact.<ticket>` (JetStream) or the in-memory bus; stages without artifacts produce no envelopes.
 - Artifact envelopes carry schema version, ticket ID, stage metadata, cache key, and manifest details consistent with checkpoints.
 - Workflow-level checkpoints remain unchanged and do not duplicate artifact lists.
-- Documentation (`docs/design/shift/checkpoint-metadata/README.md`, `docs/design/shift/stage-artifacts/README.md`) reflects the behaviour and roadmap entry is marked complete.
+- Documentation (`docs/design/checkpoint-metadata/README.md`, `docs/design/stage-artifacts/README.md`) reflects the behaviour and roadmap entry is marked complete.
 
 Status: Stage completions now emit JSON artifact envelopes to JetStream (or the in-memory stub) alongside checkpoints, satisfying the cache hydrator requirements without altering workflow-level checkpoints.
 
