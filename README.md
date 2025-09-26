@@ -7,7 +7,8 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
 - ✅ Legacy binaries, Nomad orchestration code, and SeaweedFS adapters removed.
 - ✅ Event contract scaffolding in place: the CLI claims a ticket and publishes checkpoints via the JetStream stub.
 - ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
-- 🚧 Next roadmap slices wire JetStream/Grid for real, ship the snapshot toolkit, and validate integration manifests.
+- ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
+- 🚧 Next roadmap slices validate integration manifests and materialised environments once JetStream/Grid wiring lands.
 
 ## Getting Started
 1. **Clone & build**
@@ -29,7 +30,19 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    ```
    The command hydrates the event contract stub, claims the ticket, and publishes a `claimed` checkpoint locally.
 
-4. **Tests**
+4. **Preview snapshot rules**
+   ```bash
+   ./dist/ploy snapshot plan --snapshot dev-db
+   ```
+   The plan command loads `configs/snapshots/dev-db.toml`, summarises strip/mask/synthetic rules, and highlights which tables/columns are affected before a capture runs.
+
+5. **Capture a snapshot (stub)**
+   ```bash
+   ./dist/ploy snapshot capture --snapshot dev-db --tenant acme --ticket SNAPSHOT-1
+   ```
+   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, emits a fake IPFS CID, and publishes metadata to the JetStream stub.
+
+6. **Tests**
    ```bash
    make test
    ```
@@ -43,10 +56,16 @@ The active roadmap lives under `roadmap/shift/`. Completed items:
 - [x] `03-lane-engine` — lane specs + cache key composer + `ploy lanes describe` inspection command.
 
 Upcoming items:
-- `04-snapshot-toolkit` — capture, diff, and publish database snapshots to JetStream/IPFS.
+- `05-integration-manifests` — manifests, commit-scoped environments, and Aster hook integration.
 - `05-integration-manifests` onward — manifests, commit-scoped environments, and Aster hook integration.
 
 See `docs/design/shift/README.md` for the full design intent and sequencing.
+
+## Environment Placeholders
+Workstation builds still rely on in-memory stubs; the real services land once JetStream/Grid wiring resumes. Keep the following environment variables handy (currently marked TODO until integration testing moves off the workstation):
+- ``JETSTREAM_URL`` — JetStream endpoint used by the workflow runner and snapshot publisher.
+- ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid.
+- ``IPFS_GATEWAY`` — Gateway for retrieving snapshot artifacts published by `ploy snapshot capture`.
 
 ## Contributing
 - Follow the instructions in `AGENTS.md` (TDD cadence, coverage expectations, VPS workflows).
