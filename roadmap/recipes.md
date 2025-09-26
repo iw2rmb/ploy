@@ -26,9 +26,9 @@ Server indexes OpenRewrite packs and serves a searchable catalog.
 - [x] Parse `META-INF/rewrite/*.yml` from jars and build in-memory catalog
 - [x] Persist catalog snapshot to SeaweedFS (e.g., `artifacts/openrewrite/catalog.json`) for fast bootstrap
 - [x] Add REST endpoints:
-  - [x] `GET /v1/arf/recipes?query=&pack=&version=&limit=` – list/search
-  - [x] `GET /v1/arf/recipes/:id` – details
-  - [x] `POST /v1/arf/recipes/refresh` – refresh index (admin)
+  - [x] `GET /v1/mods/recipes?query=&pack=&version=&limit=` – list/search
+  - [x] `GET /v1/mods/recipes/:id` – details
+  - [x] `POST /v1/mods/recipes/refresh` – refresh index (admin)
 - [x] TDD (RED/GREEN):
   - [x] Unit tests for indexer (pack fetch, YAML parse, catalog build)
   - [x] Handler tests for list/search/detail/refresh endpoints
@@ -40,8 +40,8 @@ Notes:
 
 Expose recipe discovery to users via Ploy CLI.
 
-- [x] `ploy arf recipes list` – list recipes (tabular/text/json)
-- [x] `ploy arf recipes search <query>` – search by id/name/description
+- [x] `ploy mods recipes list` – list recipes (tabular/text/json)
+- [x] `ploy mods recipes search <query>` – search by id/name/description
 - [x] Flags: `--pack`, `--version`, `--limit`, `--format`
 - [x] TDD: CLI unit/integration tests (mock server)
 
@@ -92,7 +92,7 @@ Validate recipe names passed to transforms.
 - [x] Verified: Transflow workflows produce code changes (RemoveUnusedImports on all repos)
 
 Verified in repo:
-- Catalog/indexer code and tests present under `api/arf/recipes_*.go` with snapshot persistence via `StorageService`.
+- Catalog/indexer code and tests present under `api/mods/recipes_*.go` with snapshot persistence via `StorageService`.
 - Endpoints covered in tests; main server wires registry-based routes today; catalog routes will be wired after platform pack config is ready.
 
 ---
@@ -111,6 +111,6 @@ Verified in repo:
 ## Immediate Next Steps
 
 - [x] Wire internal recipes handlers into main API router; configure default packs via platform config (future enhancement)
-- [x] CLI `ploy arf recipes list/search` (consumes server catalog endpoints)
+- [x] CLI `ploy mods recipes list/search` (consumes server catalog endpoints)
 - [x] Integrate catalog validation into Transflow planning/execution with suggestions on invalid recipe IDs
 - [x] Docs: add `docs/recipes.md` walkthrough; update CLI help and examples
