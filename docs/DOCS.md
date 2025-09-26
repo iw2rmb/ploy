@@ -4,7 +4,7 @@ The feature reboot simplifies the documentation surface so every contributor can
 
 ## Core Documents
 - `AGENTS.md` — operational rules for contributors (TDD cadence, local vs. VPS responsibilities, deployment protocol once reintroduced).
-- `docs/design/README.md` — design index spanning the feature slices. Each roadmap entry links to its detailed spec under `docs/design/shift/`.
+- `docs/design/README.md` — design index spanning the feature slices. Each roadmap entry links to its detailed spec under `docs/design/`.
 - Roadmap files under `roadmap/shift/` — task-by-task status with **Why / Required Changes / Definition of Done / Tests** sections.
 
 ## Documentation Matrix
@@ -15,8 +15,8 @@ The feature reboot simplifies the documentation surface so every contributor can
 - `docs/schemas/integration_manifest.schema.json` — JSON schema backing integration manifests (also exposed via `ploy manifest schema`).
 - `docs/RECIPES.md` — recipe pack registry layout, default pack lists, and future Kotlin/Gradle extensibility.
 - `docs/SNAPSHOTS.md` — snapshot planning/capture behaviour and IPFS/JetStream publishing notes.
-- `docs/design/shift/ipfs-artifacts.md` — design record for the IPFS gateway publishing slice and follow-ups.
-- `docs/design/shift/checkpoint-metadata/README.md` — checkpoint enrichment design covering stage metadata and artifact manifests in workflow events.
+- `docs/design/ipfs-artifacts/README.md` — design record for the IPFS gateway publishing slice and follow-ups.
+- `docs/design/checkpoint-metadata/README.md` — checkpoint enrichment design covering stage metadata and artifact manifests in workflow events.
 - `cmd/ploy/README.md` — command-level flag reference and environment placeholders.
 - `roadmap/shift/08-documentation-cleanup.md` — status log for this documentation slice, including verification expectations.
 

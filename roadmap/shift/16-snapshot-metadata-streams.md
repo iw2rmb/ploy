@@ -7,7 +7,7 @@ Complete the snapshot toolkit’s contract by sending capture metadata to JetStr
 ## Required Changes
 - Implement a JetStream-backed metadata publisher with schema-versioned envelopes for snapshot captures.
 - Wire the CLI snapshot registry loader to select the JetStream publisher whenever ``JETSTREAM_URL`` is configured.
-- Update docs (`docs/design/shift/ipfs-artifacts.md`, `docs/SNAPSHOTS.md`) and changelog entries to reflect the new behaviour and environment requirement.
+- Update docs (`docs/design/ipfs-artifacts/README.md`, `docs/SNAPSHOTS.md`) and changelog entries to reflect the new behaviour and environment requirement.
 
 ## Definition of Done
 - `ploy snapshot capture` publishes metadata to `ploy.artifact.<ticket>` when ``JETSTREAM_URL`` is set, and surfaces errors when publishing fails.

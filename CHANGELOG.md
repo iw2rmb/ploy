@@ -3,22 +3,22 @@
 ## [2025-09-26] Stage Artifact Streams
 - Added `contracts.WorkflowArtifact` and JetStream/in-memory events client support so workflow stage artifacts mirror onto `ploy.artifact.<ticket>` alongside checkpoints.
 - Updated the workflow runner to emit artifact envelopes for completed stages, propagate publication failures, and surface envelopes in unit tests for cache hydrator consumers.
-- Documented the slice in `docs/design/shift/stage-artifacts/README.md`, marked the checkpoint metadata follow-up complete, and recorded roadmap entry `18-stage-artifact-streams` as shipped.
+- Documented the slice in `docs/design/stage-artifacts/README.md`, marked the checkpoint metadata follow-up complete, and recorded roadmap entry `18-stage-artifact-streams` as shipped.
 
 ## [2025-09-26] Workflow Checkpoint Metadata
 - Bumped the workflow event schema to `2025-09-26.1` and enriched checkpoints with `stage_metadata` and `artifacts` blocks so Grid consumers can inspect lane assignments, dependencies, and produced manifests directly from JetStream.
 - Updated the workflow runner to attach stage metadata for every status transition and to include artifact manifests returned from Grid stage outcomes.
-- Extended the Grid Workflow client and contract tests to round-trip artifact payloads, refreshed `docs/design/shift/event-contracts.md`, and marked roadmap slice `17-checkpoint-metadata` complete.
+- Extended the Grid Workflow client and contract tests to round-trip artifact payloads, refreshed `docs/design/event-contracts/README.md`, and marked roadmap slice `17-checkpoint-metadata` complete.
 
 ## [2025-09-26] Snapshot Metadata Streams
 - Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when ``JETSTREAM_URL`` is configured, retaining the in-memory stub for offline runs.
 - Updated the CLI snapshot registry loader to wire the JetStream metadata publisher automatically and extended `ploy snapshot capture` tests to verify live JetStream behaviour alongside the existing IPFS gateway coverage.
-- Refreshed documentation (`docs/SNAPSHOTS.md`, `docs/design/shift/ipfs-artifacts.md`, `docs/design/shift/README.md`) and recorded roadmap slice `16-snapshot-metadata-streams` as complete with CHANGELOG entry dated 2025-09-26.
+- Refreshed documentation (`docs/SNAPSHOTS.md`, `docs/design/ipfs-artifacts/README.md`, `docs/design/overview/README.md`) and recorded roadmap slice `16-snapshot-metadata-streams` as complete with CHANGELOG entry dated 2025-09-26.
 
 ## [2025-09-26] IPFS Artifact Publishing
 - Added `internal/workflow/snapshots.NewIPFSGatewayPublisher` to stream snapshot payloads to IPFS gateways via `/api/v0/add`, returning the gateway-provided CID while keeping the in-memory stub fallback for offline runs.
 - Updated `ploy snapshot capture` to honour ``IPFS_GATEWAY`` during registry loading, surfacing the returned CID in CLI output and metadata structures.
-- Expanded snapshot and CLI test suites with gateway-backed scenarios; refreshed documentation (`docs/design/shift/ipfs-artifacts.md`, `docs/SNAPSHOTS.md`, `cmd/ploy/README.md`, `README.md`) and recorded roadmap slice `15-ipfs-artifact-publishing` as complete.
+- Expanded snapshot and CLI test suites with gateway-backed scenarios; refreshed documentation (`docs/design/ipfs-artifacts/README.md`, `docs/SNAPSHOTS.md`, `cmd/ploy/README.md`, `README.md`) and recorded roadmap slice `15-ipfs-artifact-publishing` as complete.
 
 ## [2025-09-26] Grid Workflow Client
 - Added `internal/workflow/grid` with an HTTP Workflow RPC client that submits stage executions to Grid and records invocation metadata for CLI summaries.
@@ -28,7 +28,7 @@
 ## [2025-09-26] Integration Manifest Schema
 - Published `docs/schemas/integration_manifest.schema.json` capturing required manifest fields and constraints for topology, fixtures, lanes, and Aster toggles.
 - Added `ploy manifest schema` to surface the schema for downstream tooling and validation flows.
-- Updated documentation (`docs/MANIFESTS.md`, `docs/design/shift/README.md`, `docs/DOCS.md`) and recorded roadmap slice `13-integration-manifest-schema` as complete.
+- Updated documentation (`docs/MANIFESTS.md`, `docs/design/overview/README.md`, `docs/DOCS.md`) and recorded roadmap slice `13-integration-manifest-schema` as complete.
 
 ## [2025-09-26] Snapshot Catalog Validation
 - Added MySQL (`mysql-orders`) and document-store (`doc-events`) fixtures alongside the existing Postgres snapshots so `ploy snapshot plan|capture` exercises all representative engines locally.
@@ -67,7 +67,7 @@
 - Extended the workflow runner to require an Aster locator, attach sorted toggle metadata to every stage, and honour per-stage disablement while keeping cache keys deterministic.
 - Introduced `--aster` and `--aster-step` flags on `ploy workflow run`, along with post-run bundle summaries so operators can verify toggles before Grid wiring lands.
 - Expanded CLI and runner test suites to cover bundle detection, metadata propagation, per-stage overrides, and regression behaviour when Aster is disabled.
-- Documented the workflow in `cmd/ploy/README.md`, `docs/MANIFESTS.md`, and `docs/design/shift/README.md`; roadmap slice `07-aster-hook` marked complete.
+- Documented the workflow in `cmd/ploy/README.md`, `docs/MANIFESTS.md`, and `docs/design/overview/README.md`; roadmap slice `07-aster-hook` marked complete.
 
 ## [2025-09-26] Commit-Scoped Environments
 - Added `internal/workflow/environments` service with TDD coverage for dry-run planning, execution hydration, and snapshot gap reporting.
@@ -105,7 +105,7 @@
 - Added `internal/workflow/contracts` with schema version `2025-09-25`, subject helpers, and validation logic for workflow tickets and checkpoints.
 - Wired `internal/workflow/runner` to claim tickets, validate payloads, and publish an initial `claimed` checkpoint through a JetStream stub.
 - Updated the CLI to require `--tenant`, bootstrap the in-memory bus, and reflect the new behaviour in usage docs.
-- Documented the subject map and example payloads in `docs/design/shift/event-contracts.md`; roadmap slice `01-event-contracts` now marked complete.
+- Documented the subject map and example payloads in `docs/design/event-contracts/README.md`; roadmap slice `01-event-contracts` now marked complete.
 
 ## [2025-09-25] Legacy Teardown
 - Removed all legacy API, Nomad, Consul, SeaweedFS, and deployment scaffolding.

@@ -47,7 +47,7 @@ Document the TOML-based lane descriptors consumed by the SHIFT lane engine and t
 - Unit tests cover loader validation, cache-key composition, CLI output, and runner/grid lane enforcement (≥90% coverage on critical packages).
 
 ## Related Docs
-- `docs/design/shift/README.md` — architectural context for lanes within the SHIFT roadmap.
+- `docs/design/overview/README.md` — architectural context for lanes within the feature roadmap.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `roadmap/shift/03-lane-engine.md` — scope, definition of done, and verification expectations.
 - `roadmap/shift/08-documentation-cleanup.md` — roadmap slice tracking doc alignment work.
