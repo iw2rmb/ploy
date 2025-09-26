@@ -11,6 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -58,7 +59,7 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 		Name:         "build",
 		Kind:         runner.StageKindBuild,
 		Lane:         "go-native",
-		Dependencies: []string{"mods"},
+		Dependencies: []string{mods.StageNameHuman},
 		CacheKey:     "go-native/cache@manifest=2025-09-26@aster=plan",
 		Constraints:  runner.StageConstraints{Manifest: manifest},
 		Aster: runner.StageAster{
@@ -183,7 +184,7 @@ func TestClientExecuteStageHandlesServerError(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods", Kind: runner.StageKindMods, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}}}}, "/tmp")
+	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: mods.StageNamePlan, Kind: runner.StageKindModsPlan, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}}}}, "/tmp")
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -204,7 +205,7 @@ func TestClientExecuteStageHandlesInvalidJSON(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: "mods", Kind: runner.StageKindMods, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}}}}, "/tmp")
+	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: mods.StageNamePlan, Kind: runner.StageKindModsPlan, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}}}}, "/tmp")
 	if err == nil {
 		t.Fatal("expected error for invalid json")
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/mods"
 )
 
 var (
@@ -31,9 +32,14 @@ var (
 type StageKind string
 
 const (
-	StageKindMods  StageKind = "mods"
-	StageKindBuild StageKind = "build"
-	StageKindTest  StageKind = "test"
+	StageKindModsPlan        StageKind = StageKind(mods.StageKindPlan)
+	StageKindModsORWApply    StageKind = StageKind(mods.StageKindORWApply)
+	StageKindModsORWGenerate StageKind = StageKind(mods.StageKindORWGenerate)
+	StageKindModsLLMPlan     StageKind = StageKind(mods.StageKindLLMPlan)
+	StageKindModsLLMExec     StageKind = StageKind(mods.StageKindLLMExec)
+	StageKindModsHuman       StageKind = StageKind(mods.StageKindHuman)
+	StageKindBuild           StageKind = "build"
+	StageKindTest            StageKind = "test"
 )
 
 type Stage struct {
@@ -109,14 +115,34 @@ func NewDefaultPlanner() Planner {
 }
 
 func (DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error) {
-	_ = ctx
+	modPlanner := mods.NewPlanner(mods.Options{})
+	modStages, err := modPlanner.Plan(ctx, mods.PlanInput{Ticket: ticket})
+	if err != nil {
+		return ExecutionPlan{}, err
+	}
+	stages := make([]Stage, 0, len(modStages)+2)
+	for _, stage := range modStages {
+		stages = append(stages, Stage{
+			Name:         stage.Name,
+			Kind:         StageKind(stage.Kind),
+			Lane:         stage.Lane,
+			Dependencies: copyStringSlice(stage.Dependencies),
+		})
+	}
+	stages = append(stages, Stage{
+		Name:         "build",
+		Kind:         StageKindBuild,
+		Lane:         "go-native",
+		Dependencies: []string{mods.StageNameHuman},
+	}, Stage{
+		Name:         "test",
+		Kind:         StageKindTest,
+		Lane:         "go-native",
+		Dependencies: []string{"build"},
+	})
 	plan := ExecutionPlan{
 		TicketID: ticket.TicketID,
-		Stages: []Stage{
-			{Name: "mods", Kind: StageKindMods, Lane: "node-wasm"},
-			{Name: "build", Kind: StageKindBuild, Lane: "go-native", Dependencies: []string{"mods"}},
-			{Name: "test", Kind: StageKindTest, Lane: "go-native", Dependencies: []string{"build"}},
-		},
+		Stages:   stages,
 	}
 	return plan, nil
 }

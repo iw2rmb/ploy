@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+const modsStage = "mods-plan"
+
 func TestSubjectsForTenant(t *testing.T) {
 	subjects := SubjectsForTenant("acme", "ticket-123")
 	if subjects.TicketInbox != "grid.webhook.acme" {
@@ -49,12 +51,12 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	cp := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
 		TicketID:      "ticket-123",
-		Stage:         "mods",
+		Stage:         modsStage,
 		Status:        CheckpointStatusPending,
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
-			Name:         "mods",
-			Kind:         "mods",
+			Name:         modsStage,
+			Kind:         modsStage,
 			Lane:         "node-wasm",
 			Dependencies: []string{},
 			Manifest:     ManifestReference{Name: "smoke", Version: "2025-09-26"},
@@ -62,7 +64,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 				Enabled: true,
 				Toggles: []string{"plan"},
 				Bundles: []CheckpointAsterBundle{{
-					Stage:       "mods",
+					Stage:       modsStage,
 					Toggle:      "plan",
 					BundleID:    "mods-plan",
 					Digest:      "sha256:modsplan",
@@ -112,11 +114,11 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 	envelope := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
 		TicketID:      "ticket-123",
-		Stage:         "mods",
+		Stage:         modsStage,
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
-			Name:     "mods",
-			Kind:     "mods",
+			Name:     modsStage,
+			Kind:     modsStage,
 			Lane:     "node-wasm",
 			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		},
@@ -168,7 +170,7 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 	artifact := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
 		TicketID:      "ticket-123",
-		Stage:         "mods",
+		Stage:         modsStage,
 		Artifact: CheckpointArtifact{
 			Name:        "mods-plan",
 			ArtifactCID: "cid-mods-plan",
