@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Stage Artifact Streams
+- Added `contracts.WorkflowArtifact` and JetStream/in-memory events client support so workflow stage artifacts mirror onto `ploy.artifact.<ticket>` alongside checkpoints.
+- Updated the workflow runner to emit artifact envelopes for completed stages, propagate publication failures, and surface envelopes in unit tests for cache hydrator consumers.
+- Documented the slice in `docs/design/shift/stage-artifacts/README.md`, marked the checkpoint metadata follow-up complete, and recorded roadmap entry `18-stage-artifact-streams` as shipped.
+
 ## [2025-09-26] Workflow Checkpoint Metadata
 - Bumped the workflow event schema to `2025-09-26.1` and enriched checkpoints with `stage_metadata` and `artifacts` blocks so Grid consumers can inspect lane assignments, dependencies, and produced manifests directly from JetStream.
 - Updated the workflow runner to attach stage metadata for every status transition and to include artifact manifests returned from Grid stage outcomes.

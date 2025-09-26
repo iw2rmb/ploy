@@ -135,6 +135,75 @@ func TestJetStreamClientPublishCheckpoint(t *testing.T) {
 	}
 }
 
+func TestJetStreamClientPublishArtifact(t *testing.T) {
+	srv := runJetStreamServer(t)
+	defer srv.Shutdown()
+
+	conn, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatalf("connect nats: %v", err)
+	}
+	defer func() { _ = conn.Drain() }()
+
+	js, err := conn.JetStream()
+	if err != nil {
+		t.Fatalf("jetstream context: %v", err)
+	}
+
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:     "PLOY_ARTIFACT",
+		Subjects: []string{"ploy.artifact.*"},
+	}); err != nil {
+		t.Fatalf("add artifact stream: %v", err)
+	}
+
+	client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL(), Tenant: "acme"})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	defer client.Close()
+
+	envelope := WorkflowArtifact{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-123",
+		Stage:         "mods",
+		CacheKey:      "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
+		StageMetadata: &CheckpointStage{
+			Name:     "mods",
+			Kind:     "mods",
+			Lane:     "node-wasm",
+			Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		},
+		Artifact: CheckpointArtifact{
+			Name:        "mods-plan",
+			ArtifactCID: "cid-mods-plan",
+			Digest:      "sha256:modsplan",
+			MediaType:   "application/tar+zst",
+		},
+	}
+	if err := client.PublishArtifact(context.Background(), envelope); err != nil {
+		t.Fatalf("publish artifact: %v", err)
+	}
+
+	msg, err := js.GetMsg("PLOY_ARTIFACT", 1)
+	if err != nil {
+		t.Fatalf("get artifact msg: %v", err)
+	}
+	if msg.Subject != envelope.Subject() {
+		t.Fatalf("unexpected artifact subject %s", msg.Subject)
+	}
+	var stored WorkflowArtifact
+	if err := json.Unmarshal(msg.Data, &stored); err != nil {
+		t.Fatalf("unmarshal artifact: %v", err)
+	}
+	if stored.TicketID != envelope.TicketID || stored.Stage != envelope.Stage {
+		t.Fatalf("artifact mismatch: %#v", stored)
+	}
+	if stored.Artifact.ArtifactCID != "cid-mods-plan" {
+		t.Fatalf("expected artifact CID, got %#v", stored.Artifact)
+	}
+}
+
 func runJetStreamServer(t *testing.T) *server.Server {
 	t.Helper()
 
