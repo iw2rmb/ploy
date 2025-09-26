@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Snapshot Metadata Streams
+- Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when ``JETSTREAM_URL`` is configured, retaining the in-memory stub for offline runs.
+- Updated the CLI snapshot registry loader to wire the JetStream metadata publisher automatically and extended `ploy snapshot capture` tests to verify live JetStream behaviour alongside the existing IPFS gateway coverage.
+- Refreshed documentation (`docs/SNAPSHOTS.md`, `docs/design/shift/ipfs-artifacts.md`, `docs/design/shift/README.md`) and recorded roadmap slice `16-snapshot-metadata-streams` as complete with CHANGELOG entry dated 2025-09-26.
+
 ## [2025-09-26] IPFS Artifact Publishing
 - Added `internal/workflow/snapshots.NewIPFSGatewayPublisher` to stream snapshot payloads to IPFS gateways via `/api/v0/add`, returning the gateway-provided CID while keeping the in-memory stub fallback for offline runs.
 - Updated `ploy snapshot capture` to honour ``IPFS_GATEWAY`` during registry loading, surfacing the returned CID in CLI output and metadata structures.

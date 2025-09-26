@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -22,6 +24,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
+	server "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 )
 
 type recordingRunner struct {
@@ -926,6 +930,94 @@ fixture = "dev-db.json"
 	}
 }
 
+func TestHandleSnapshotCapturePublishesMetadataToJetStream(t *testing.T) {
+	buf := &bytes.Buffer{}
+
+	srv := runJetStreamServer(t)
+	t.Cleanup(func() { srv.Shutdown() })
+
+	conn, err := nats.Connect(srv.ClientURL())
+	if err != nil {
+		t.Fatalf("connect nats: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Drain() })
+
+	js, err := conn.JetStream()
+	if err != nil {
+		t.Fatalf("jetstream context: %v", err)
+	}
+	if _, err := js.AddStream(&nats.StreamConfig{
+		Name:     "PLOY_ARTIFACT",
+		Subjects: []string{"ploy.artifact.*"},
+	}); err != nil {
+		t.Fatalf("add artifact stream: %v", err)
+	}
+
+	dir := t.TempDir()
+	fixturePath := filepath.Join(dir, "dev-db.json")
+	fixture := `{"users":[{"id":"1","email":"alice@example.com"}]}`
+	if err := os.WriteFile(fixturePath, []byte(fixture), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	specContent := `name = "dev-db"
+description = "Development database"
+[source]
+engine = "postgres"
+dsn = "postgres://dev"
+fixture = "dev-db.json"
+`
+	specPath := filepath.Join(dir, "dev-db.toml")
+	if err := os.WriteFile(specPath, []byte(specContent), 0o600); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	prevDir := snapshotConfigDir
+	snapshotConfigDir = dir
+	t.Cleanup(func() { snapshotConfigDir = prevDir })
+
+	t.Setenv("JETSTREAM_URL", srv.ClientURL())
+
+	err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-77"}, buf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	msg, err := js.GetMsg("PLOY_ARTIFACT", 1)
+	if err != nil {
+		t.Fatalf("get metadata msg: %v", err)
+	}
+	if msg.Subject != "ploy.artifact.ticket-77" {
+		t.Fatalf("unexpected metadata subject: %s", msg.Subject)
+	}
+
+	var envelope struct {
+		SchemaVersion string `json:"schema_version"`
+		SnapshotName  string `json:"snapshot_name"`
+		ArtifactCID   string `json:"artifact_cid"`
+		Tenant        string `json:"tenant"`
+		TicketID      string `json:"ticket_id"`
+		CapturedAt    string `json:"captured_at"`
+	}
+	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
+		t.Fatalf("decode metadata envelope: %v", err)
+	}
+	if envelope.SchemaVersion != contracts.SchemaVersion {
+		t.Fatalf("unexpected schema version: %s", envelope.SchemaVersion)
+	}
+	if envelope.SnapshotName != "dev-db" {
+		t.Fatalf("snapshot mismatch: %s", envelope.SnapshotName)
+	}
+	if envelope.Tenant != "acme" || envelope.TicketID != "ticket-77" {
+		t.Fatalf("tenant/ticket mismatch: %s/%s", envelope.Tenant, envelope.TicketID)
+	}
+	if envelope.ArtifactCID == "" {
+		t.Fatalf("expected artifact cid in envelope")
+	}
+	if envelope.CapturedAt == "" {
+		t.Fatalf("expected captured_at in envelope")
+	}
+}
+
 func TestHandleSnapshotRequiresSubcommand(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleSnapshot(nil, buf)
@@ -935,4 +1027,28 @@ func TestHandleSnapshotRequiresSubcommand(t *testing.T) {
 	if !strings.Contains(buf.String(), "Usage: ploy snapshot") {
 		t.Fatalf("expected snapshot usage, got %q", buf.String())
 	}
+}
+
+func runJetStreamServer(t *testing.T) *server.Server {
+	t.Helper()
+
+	opts := &server.Options{
+		JetStream: true,
+		Host:      "127.0.0.1",
+		Port:      -1,
+		StoreDir:  t.TempDir(),
+	}
+
+	srv, err := server.NewServer(opts)
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	go srv.Start()
+
+	if !srv.ReadyForConnections(5 * time.Second) {
+		t.Fatalf("nats server not ready")
+	}
+
+	return srv
 }

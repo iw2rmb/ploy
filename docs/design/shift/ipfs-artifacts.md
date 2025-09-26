@@ -6,7 +6,7 @@ Provide a workstation-ready pathway for snapshot captures to upload artifacts to
 ## Scope
 - Applies to the snapshot toolkit (`ploy snapshot capture`) and any other feature that reuses the snapshot registry's `ArtifactPublisher` hook.
 - Targets workstation environments; VPS/Grid slices will reuse the same publisher once JetStream wiring resumes.
-- Metadata publishing remains a TODO until the JetStream streams are provisioned for snapshots.
+- Metadata now publishes to JetStream (`ploy.artifact.<ticket>`) whenever ``JETSTREAM_URL`` is configured; offline runs continue to rely on the in-memory stub.
 
 ## Behaviour
 - When ``IPFS_GATEWAY`` is set, the CLI loads the snapshot registry with an IPFS gateway publisher. Artifacts are streamed to `<gateway>/api/v0/add?pin=true` using multipart uploads, and the returned CID is surfaced to the operator.
@@ -17,8 +17,8 @@ Provide a workstation-ready pathway for snapshot captures to upload artifacts to
 ## Implementation Notes
 - `internal/workflow/snapshots.NewIPFSGatewayPublisher` constructs a reusable publisher with a 15s HTTP timeout and optional pinning.
 - The publisher tolerates newline-delimited JSON responses from the IPFS gateway and extracts the first non-empty `Hash`/`Cid` field.
-- `cmd/ploy/main.go` now inspects ``IPFS_GATEWAY`` inside the default snapshot registry loader and injects the gateway-backed publisher when present.
-- Existing metadata publishing remains a no-op; the JetStream metadata publisher will replace it in a later slice once streams are available.
+- `cmd/ploy/main.go` inspects both ``IPFS_GATEWAY`` and ``JETSTREAM_URL`` when constructing the snapshot registry, injecting the gateway-backed artifact publisher and the JetStream metadata publisher when available.
+- `internal/workflow/snapshots.NewJetStreamMetadataPublisher` dials JetStream, encodes schema-versioned envelopes, and publishes metadata to `ploy.artifact.<ticket>`.
 
 ## Tests
 - `internal/workflow/snapshots/registry_test.go` exercises the gateway publisher against an `httptest` server, validating multipart payloads, `pin=true` query wiring, CID parsing, and non-200 handling.
@@ -26,6 +26,6 @@ Provide a workstation-ready pathway for snapshot captures to upload artifacts to
 - Repository-wide `go test -cover ./...` continues to enforce the ≥60% coverage bar with `internal/workflow/snapshots` staying above 90%.
 
 ## Follow-ups
-- Replace the no-op metadata publisher with a JetStream-backed implementation once snapshot streams are available.
+- ✅ Completed 2025-09-26: Replace the no-op metadata publisher with a JetStream-backed implementation once snapshot streams are available.
 - Share the IPFS publisher with the workflow runner once build artifacts begin flowing through the same pipeline.
 - Document gateway authentication expectations if a bonded IPFS endpoint requires tokens.
