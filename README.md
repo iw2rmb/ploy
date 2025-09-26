@@ -1,16 +1,56 @@
-# Ploy — Stateless Workflow Runner (SHIFT)
+# Ploy — Stateless Workflow Runner
 
-Ploy is being reinvented as an on-demand workflow brain that consumes Grid events, resolves workflow DAGs, and exits once follow-up jobs are handed back to Grid. This repository now focuses exclusively on that CLI experience; all legacy API, Nomad, Consul, and SeaweedFS components have been removed as part of the SHIFT initiative.
+Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves workflow DAGs, submits work back to Grid, and exits. The repository now focuses entirely on that CLI-driven experience; the feature slices below replaced the legacy API, Nomad, Consul, and SeaweedFS footprint.
 
-## Current Status
-- ✅ Repository reduced to CLI-only entrypoint (`ploy workflow run`).
-- ✅ Legacy binaries, Nomad orchestration code, and SeaweedFS adapters removed.
-- ✅ Event contract slice now supports live JetStream connections when ``JETSTREAM_URL`` is set (falling back to the in-memory stub).
-- ✅ Lane engine exposes deterministic specs under `configs/lanes/*.toml` plus `ploy lanes describe` for cache previews.
-- ✅ Snapshot toolkit slice ships `ploy snapshot plan` / `ploy snapshot capture`, applies strip/mask/synthetic rules locally, and publishes metadata to the in-memory JetStream/IPFS stubs.
-- ✅ Integration manifest compiler validates TOML manifests under `configs/manifests/`, attaches compiled payloads to workflow stages, and enforces lane allowlists in the Grid stub.
-- ✅ Recipe pack registry loads pluggable pack list specs from `configs/recipes/` for the OpenRewrite catalog, paving the way for Kotlin/Gradle support.
-- ✅ Commit-scoped environment command (`ploy environment materialize`) assembles manifest fixtures, validates required snapshots, and hydrates lane caches via in-memory stubs.
+## Operating Model
+- Grid owns the control surface (webhooks, scheduling, cache promotion, node pools) and persists hot signals in JetStream plus cold artifacts in IPFS.
+- Ploy consumes those streams, assembles the mods/workflow DAG, and submits follow-up jobs back to Grid via the workflow RPC client.
+- Every checkpoint, artifact pointer, and decision is written to JetStream/IPFS so runs stay stateless and retries never depend on long-lived services.
+
+## Feature Highlights
+- [x] Legacy teardown — repository scoped to the CLI-only stub and guardrail tests (Roadmap 00).
+- [x] Event contracts — JetStream subject map, schema enforcement, and in-memory stubs for offline work (Roadmap 01).
+- [x] Workflow runner CLI — reconstructs DAGs, streams checkpoints, and exits cleanly after dispatching jobs (Roadmap 02).
+- [x] Lane engine — deterministic lane specs under `configs/lanes/*.toml` with `ploy lanes describe` previews (Roadmap 03).
+- [x] Snapshot toolkit — `ploy snapshot plan` / `ploy snapshot capture` with strip/mask/synthetic rules baked in (Roadmap 04).
+- [x] Integration manifests — manifest compiler enforcing topology, fixtures, and lane allowlists (Roadmap 05).
+- [x] Commit environments — `ploy environment materialize` assembles `<sha>-<app>` builds with cache hydration (Roadmap 06).
+- [x] Aster hook — exposes AST-pruned bundles and workflow toggles inside stage metadata (Roadmap 07).
+- [x] Documentation refresh — doc set aligned around the CLI-first model and GRID hand-off (Roadmap 08).
+- [x] Cache coordination — checkpoints carry lane cache keys for Grid reuse (Roadmap 09).
+- [x] JetStream workflow client — live NATS connectivity with stub fallback toggled by ``JETSTREAM_URL`` (Roadmap 10).
+- [x] Lane documentation hardening — schema enforcement and lane reference updates (Roadmap 11).
+- [x] Snapshot validation — cross-engine verification with coverage guardrails (Roadmap 12).
+- [x] Integration manifest schema — JSON schema + CLI validation hook for manifests (Roadmap 13).
+- [x] Grid workflow client — workflow stages submit through the Grid RPC when ``GRID_ENDPOINT`` is set (Roadmap 14).
+- [x] IPFS artifact publishing — snapshot captures stream artifacts through ``IPFS_GATEWAY`` when available (Roadmap 15).
+- [x] Snapshot metadata streams — capture fingerprints and rule counts published to JetStream (Roadmap 16).
+- [x] Checkpoint enrichment — stage metadata and artifact manifests embedded in workflow checkpoints (Roadmap 17).
+- [x] Stage artifact streams — dedicated JetStream envelopes for stage artifacts to feed cache hydrators (Roadmap 18).
+
+Full design records live in `docs/design/README.md`.
+
+## Removed Components
+- Nomad/Consul/Traefik templates, wrappers, and deployment logic (`internal/orchestration`, embedded HCL, Ansible playbooks).
+- Long-running API/service binaries, routing assumptions, and controller ingress paths.
+- SeaweedFS-specific artifact plumbing now replaced by IPFS publishers.
+- Legacy lane descriptors tied to Nomad job specs and system job scripts.
+- Obsolete docs or runbooks referencing the retired controller deployment path.
+
+## Data & Storage Expectations
+- JetStream carries events, run metadata, cache coordination signals, and artifact manifests.
+- IPFS (or compatible object storage) stores build outputs, DB snapshot archives, diff reports, and audit logs.
+- Workspace metadata (hash IDs, eviction policies, ownership) ensures Grid can claim/release caches without bespoke scripting.
+
+## Testing & Tooling Focus
+- Unit and CLI tests exercise the JetStream/Grid stubs locally; integration work against live Grid resumes once JetStream wiring completes.
+- Cadence and coverage thresholds stay governed by `AGENTS.md`.
+- Workspace commands (`make build`, `make test`) remain workstation-first; no VPS/Grid state is required for the slices above.
+
+## Success Criteria
+- Mods workflows complete end-to-end through Grid with faster build/test cycles than the legacy Nomad runs.
+- Developers request deterministic `<sha>-<app>` environments with lane caches, manifests, and snapshots applied automatically.
+- No permanent services are required; when the CLI is idle, Grid continues queuing work for the next invocation.
 
 ## Getting Started
 1. **Clone & build**
@@ -19,76 +59,48 @@ Ploy is being reinvented as an on-demand workflow brain that consumes Grid event
    cd ploy
    make build
    ```
-
 2. **Inspect lane metadata**
    ```bash
    ./dist/ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db --manifest smoke --aster plan,exec
    ```
    The command parses `configs/lanes/go-native.toml`, previews the composed cache key, and lists the build/test commands bound to that lane.
-
 3. **Run the workflow CLI**
    ```bash
    JETSTREAM_URL=nats://127.0.0.1:4222 ./dist/ploy workflow run --tenant acme --ticket auto
    ```
    With ``JETSTREAM_URL`` set the CLI connects to JetStream, claims the next ticket, and publishes checkpoints on the real stream. When omitted it boots the in-memory stub for offline development.
-
 4. **Preview snapshot rules**
    ```bash
    ./dist/ploy snapshot plan --snapshot dev-db
    ```
    The plan command loads `configs/snapshots/dev-db.toml`, summarises strip/mask/synthetic rules, and highlights which tables/columns are affected before a capture runs.
-
 5. **Capture a snapshot (stub)**
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme --ticket SNAPSHOT-1
    ```
    Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the configured IPFS gateway (or the in-memory stub when unset), and publishes metadata through the current stub path.
-
 6. **Dry-run a commit-scoped environment**
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
    ```
    Dry-run mode compiles the `commit-app` manifest, verifies required snapshots (`commit-db`, `commit-cache`), and previews cache keys for each required lane without mutating state.
-
 7. **Tests**
    ```bash
    make test
    ```
    Unit tests assert that only the workflow CLI remains and that the event contract schema stays consistent.
 
-## Roadmap Alignment
-The active roadmap lives under `roadmap/shift/`. Completed slices:
-- [x] `00-legacy-teardown` — repository scoped to the stateless CLI stub.
-- [x] `01-event-contracts` — subject map + schema definitions with a JetStream stub.
-- [x] `02-workflow-runner-cli` — CLI reconstructs the default DAG, streams checkpoints, and exercises the Grid stub.
-- [x] `03-lane-engine` — lane specs + cache key composer + `ploy lanes describe` inspection command.
-- [x] `04-snapshot-toolkit` — snapshot commands, rule engine, and metadata publishing via JetStream/IPFS stubs.
-- [x] `05-integration-manifests` — manifest compiler + Grid lane enforcement.
-- [x] `06-commit-environments` — commit-scoped environment materialisation with dry-run/execute modes.
-- [x] `07-aster-hook` — Aster bundle discovery, cache toggle plumbing, and CLI flags.
-- [x] `08-documentation-cleanup` — doc set refreshed to highlight the CLI-first/Grid model.
-- [x] `09-cache-coordination` — workflow checkpoints carry lane cache keys for Grid reuse.
-- [x] `10-jetstream-client` — workflow runs connect to live JetStream when available and keep the stub fallback for offline slices.
-- [x] `11-lane-doc-hardening` — lane schema enforcement and documentation refresh.
-- [x] `12-snapshot-validation` — snapshot fixtures validated across engines.
-- [x] `13-integration-manifest-schema` — JSON schema + CLI hook for manifests.
-- [x] `14-grid-workflow-client` — workflow stages now execute through the Grid Workflow RPC when `GRID_ENDPOINT` is set, falling back to the in-memory stub offline.
-- [x] `15-ipfs-artifact-publishing` — snapshot captures stream artifacts to IPFS when `IPFS_GATEWAY` is present, retaining the stub fallback offline.
-
-Next up: replace the snapshot metadata stub with a JetStream-backed publisher once snapshot streams are provisioned.
-
-See `docs/design/shift/README.md` for the full design intent and sequencing.
+## Feature Roadmap
+Per-feature write-ups live under `roadmap/shift/` (directory name retained for historical context). Status checkboxes in this README mirror those roadmap entries, and deeper design context is collected in `docs/design/README.md`.
 
 ## Environment Placeholders
-Workstation builds still rely on the in-memory Grid stub; JetStream is now live-optional. Keep the following environment variables handy:
+Workstation builds still rely on the in-memory Grid stub; JetStream is optional. Keep the following environment variables handy:
 - ``JETSTREAM_URL`` — JetStream endpoint used by the workflow runner and snapshot publisher (optional; falls back to stub).
 - ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid.
 - ``IPFS_GATEWAY`` — Gateway for retrieving snapshot artifacts published by `ploy snapshot capture`.
 
 ## Contributing
-- Follow the instructions in `AGENTS.md` (TDD cadence, coverage expectations, VPS workflows).
-- Keep documentation aligned with `docs/DOCS.md`.
-- Each roadmap slice should land with RED → GREEN → REFACTOR (unit tests locally, integration tests via Grid once implemented).
+Follow the contributor workflow in `AGENTS.md` and keep docs aligned with `docs/DOCS.md`.
 
 ## License
 The project inherits its existing license terms; consult `LICENSE` if/when it is reintroduced in a future slice.
