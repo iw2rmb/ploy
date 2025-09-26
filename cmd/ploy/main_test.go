@@ -10,6 +10,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
@@ -24,17 +25,45 @@ func (r *recordingRunner) Run(ctx context.Context, opts runner.Options) error {
 	return r.err
 }
 
+func defaultManifestPayload() manifests.Compilation {
+	return manifests.Compilation{
+		Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+		Lanes:    manifests.LaneSet{Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}}},
+	}
+}
+
+type stubManifestCompiler struct {
+	compiled manifests.Compilation
+	err      error
+	ref      contracts.ManifestReference
+}
+
+func (s *stubManifestCompiler) Compile(ctx context.Context, ref contracts.ManifestReference) (manifests.Compilation, error) {
+	_ = ctx
+	s.ref = ref
+	return s.compiled, s.err
+}
+
 func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
 	}()
 
 	runnerExecutor = fakeRunner
 	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	stubCompiler := &stubManifestCompiler{compiled: defaultManifestPayload()}
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return stubCompiler, nil
+	}
+	manifestConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err != nil {
@@ -46,23 +75,60 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	if fakeRunner.opts.Tenant != "acme" {
 		t.Fatalf("unexpected tenant: %s", fakeRunner.opts.Tenant)
 	}
+	compiler := fakeRunner.opts.ManifestCompiler
+	if compiler == nil {
+		t.Fatal("expected manifest compiler to be set")
+	}
+	if compiler != stubCompiler {
+		t.Fatalf("expected stub compiler, got %T", compiler)
+	}
 }
 
 func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	fakeRunner := &recordingRunner{err: errors.New("boom")}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
 	}()
 
 	runnerExecutor = fakeRunner
 	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
+	}
+	manifestConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if !errors.Is(err, fakeRunner.err) {
 		t.Fatalf("expected runner error, got %v", err)
+	}
+}
+
+func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
+	prevLoader := manifestRegistryLoader
+	prevDir := manifestConfigDir
+	defer func() {
+		manifestRegistryLoader = prevLoader
+		manifestConfigDir = prevDir
+	}()
+
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return nil, errors.New("manifest load failed")
+	}
+	manifestConfigDir = "ignored"
+
+	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	if err == nil {
+		t.Fatal("expected manifest loader error")
+	}
+	if !strings.Contains(err.Error(), "manifest") {
+		t.Fatalf("expected manifest error context, got %v", err)
 	}
 }
 
@@ -81,13 +147,21 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
 	}()
 
 	runnerExecutor = fakeRunner
 	eventsFactory = func(tenant string) runner.EventsClient { return contracts.NewInMemoryBus(tenant) }
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
+	}
+	manifestConfigDir = "ignored"
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
 	if err != nil {
