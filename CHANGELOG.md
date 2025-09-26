@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-26] Recipe Pack Registry
+- Added `internal/recipes/packs` with a TOML loader that exposes pluggable recipe pack lists and language-aware lookups.
+- Published default specs (`configs/recipes/java-default.toml`, `configs/recipes/kotlin-gradle.toml`) to seed Java and Kotlin/Gradle catalog coverage.
+- Documented the registry in `docs/RECIPES.md`, updated the README, and marked the roadmap item complete.
+
 ## [2025-09-26] Documentation Cleanup
 - Refreshed `README.md` to highlight the CLI-first/Grid model, enumerate all completed SHIFT slices, and link directly to the design doc.
 - Updated the documentation matrix (`docs/DOCS.md`, `docs/LANES.md`, `docs/MANIFESTS.md`, `docs/SNAPSHOTS.md`) to emphasise JetStream/Grid workflows and point contributors at the relevant guides.

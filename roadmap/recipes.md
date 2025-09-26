@@ -59,7 +59,7 @@ Validate recipe names passed to transforms.
 - [x] CLI: Suggest closest matches on invalid recipe
 - [x] CLI: `--version` flag to filter recipes by pack version  
 - [x] CLI: `--pack` flag to filter recipes by pack
-- [ ] Server: Pluggable pack lists; support additional languages (Kotlin/Gradle) later
+- [x] Server: Pluggable pack lists; support additional languages (Kotlin/Gradle) later — configurable TOML specs live under `configs/recipes/`, loaded by `internal/recipes/packs`.
 
 ## Phase 5 — Observability & Docs (DONE)
 

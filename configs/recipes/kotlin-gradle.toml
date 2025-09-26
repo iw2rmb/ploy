@@ -1,0 +1,12 @@
+name = "kotlin-gradle"
+description = "Kotlin + Gradle recipe packs for JVM polyglot projects"
+languages = ["kotlin", "gradle"]
+
+[[packs]]
+id = "rewrite-kotlin"
+version = "7.40.0"
+
+[[packs]]
+id = "rewrite-gradle"
+version = "7.40.0"
+optional = true
