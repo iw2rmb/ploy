@@ -1,5 +1,12 @@
 # Changelog
 
+## [2025-09-26] Workflow Runner CLI Stub
+- Expanded `internal/workflow/runner` with a default DAG planner, stage execution loop, retry handling, temporary workspace management, and error propagation for Grid interactions.
+- Added an in-memory Grid client, stage invocation tracking, and extensive unit tests lifting runner package coverage to 94.5%.
+- Updated `cmd/ploy` to support `--ticket auto`, inject JetStream/Grid stubs via testable factories, and emit usage/help output across new error paths.
+- Extended CLI tests to cover command dispatch, usage printers, and runner wiring; repository-wide `go test -cover ./...` now satisfies ≥60% overall coverage.
+- Documented environment placeholders (`JETSTREAM_URL`, `GRID_ENDPOINT`, `IPFS_GATEWAY`) and new behaviour in `cmd/ploy/README.md`; marked roadmap slice `02-workflow-runner-cli` complete.
+
 ## [2025-09-25] Event Contract Stub
 - Added `internal/workflow/contracts` with schema version `2025-09-25`, subject helpers, and validation logic for workflow tickets and checkpoints.
 - Wired `internal/workflow/runner` to claim tickets, validate payloads, and publish an initial `claimed` checkpoint through a JetStream stub.

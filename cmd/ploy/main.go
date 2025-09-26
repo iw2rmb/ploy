@@ -13,6 +13,25 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
+type runnerInvoker interface {
+	Run(ctx context.Context, opts runner.Options) error
+}
+
+type runnerInvokerFunc func(context.Context, runner.Options) error
+
+func (f runnerInvokerFunc) Run(ctx context.Context, opts runner.Options) error {
+	return f(ctx, opts)
+}
+
+type eventsFactoryFunc func(tenant string) runner.EventsClient
+
+var (
+	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
+	eventsFactory  eventsFactoryFunc = func(tenant string) runner.EventsClient {
+		return contracts.NewInMemoryBus(tenant)
+	}
+)
+
 func main() {
 	if err := execute(os.Args[1:], os.Stderr); err != nil {
 		reportError(err, os.Stderr)
@@ -53,24 +72,36 @@ func handleWorkflow(args []string, stderr io.Writer) error {
 func handleWorkflowRun(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("workflow run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	ticket := fs.String("ticket", "", "ticket identifier to consume")
+	ticket := fs.String("ticket", "auto", "ticket identifier to consume or 'auto'")
 	tenant := fs.String("tenant", "", "tenant slug for subject mapping")
 	if err := fs.Parse(args); err != nil {
 		printWorkflowRunUsage(stderr)
 		return err
 	}
 
-	trimmedTicket := strings.TrimSpace(*ticket)
 	trimmedTenant := strings.TrimSpace(*tenant)
 	if trimmedTenant == "" {
 		printWorkflowRunUsage(stderr)
 		return errors.New("tenant required")
 	}
 
-	bus := contracts.NewInMemoryBus(trimmedTenant)
-	opts := runner.Options{Ticket: trimmedTicket, Events: bus}
-	err := runner.Run(context.Background(), opts)
-	if errors.Is(err, runner.ErrTicketRequired) || errors.Is(err, runner.ErrEventsClientRequired) {
+	ticketValue := strings.TrimSpace(*ticket)
+	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
+		ticketValue = ""
+	}
+
+	events := eventsFactory(trimmedTenant)
+	grid := runner.NewInMemoryGrid()
+	opts := runner.Options{
+		Ticket:          ticketValue,
+		Tenant:          trimmedTenant,
+		Events:          events,
+		Grid:            grid,
+		Planner:         runner.NewDefaultPlanner(),
+		MaxStageRetries: 1,
+	}
+	err := runnerExecutor.Run(context.Background(), opts)
+	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
 		printWorkflowRunUsage(stderr)
 	}
 	return err
@@ -81,7 +112,7 @@ func reportError(err error, stderr io.Writer) {
 }
 
 func printUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run [--tenant <tenant>] --ticket <ticket-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]")
 }
 
 func printWorkflowUsage(w io.Writer) {
@@ -91,5 +122,5 @@ func printWorkflowUsage(w io.Writer) {
 }
 
 func printWorkflowRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> --ticket <ticket-id>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto]")
 }

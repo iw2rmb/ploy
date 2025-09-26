@@ -42,8 +42,12 @@ func (t WorkflowTicket) Validate() error {
 type CheckpointStatus string
 
 const (
-	CheckpointStatusPending CheckpointStatus = "pending"
-	CheckpointStatusClaimed CheckpointStatus = "claimed"
+	CheckpointStatusPending   CheckpointStatus = "pending"
+	CheckpointStatusClaimed   CheckpointStatus = "claimed"
+	CheckpointStatusRunning   CheckpointStatus = "running"
+	CheckpointStatusRetrying  CheckpointStatus = "retrying"
+	CheckpointStatusCompleted CheckpointStatus = "completed"
+	CheckpointStatusFailed    CheckpointStatus = "failed"
 )
 
 type WorkflowCheckpoint struct {
