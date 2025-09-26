@@ -1,0 +1,37 @@
+# Lane Specifications
+
+## Purpose
+Document the TOML-based lane descriptors consumed by the SHIFT lane engine and the `ploy lanes describe` inspection workflow.
+
+## Current Status
+- Lane specs live under `configs/lanes/*.toml` with `name`, `runtime_family`, `cache_namespace`, and `commands` blocks.
+- `ploy lanes describe` loads the specs, validates required fields, and prints runtime metadata plus a cache-key preview.
+- The workflow runner assigns `node-wasm` to the `mods` stage and `go-native` to `build`/`test`, ensuring Grid submissions carry explicit lane metadata.
+
+## Usage / Commands
+- Inspect the default Go lane:
+  ```bash
+  ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db --manifest smoke --aster plan,exec
+  ```
+- Add a new lane by dropping a TOML file into `configs/lanes/`. Required fields:
+  ```toml
+  name = "python-slim"
+  description = "Python tests on slim Grid runtime"
+  runtime_family = "python-slim"
+  cache_namespace = "python-slim"
+
+  [commands]
+  build = ["pip", "install", "-r", "requirements.txt"]
+  test = ["pytest", "-q"]
+  ```
+
+## Development Notes
+- Keep cache namespaces unique; collisions trigger loader errors.
+- `commands.setup` is optional and only printed when present.
+- Cache-key previews collapse empty inputs to `none` and sort Aster toggles alphabetically (`exec+plan`).
+- Unit tests cover loader validation, cache-key composition, CLI output, and runner/grid lane enforcement (≥90% coverage on critical packages).
+
+## Related Docs
+- `docs/design/shift/README.md` — architectural context for lanes within the SHIFT roadmap.
+- `roadmap/shift/03-lane-engine.md` — scope, definition of done, and verification expectations.
+- `cmd/ploy/README.md` — CLI flag reference for `lanes describe` and `workflow run`.
