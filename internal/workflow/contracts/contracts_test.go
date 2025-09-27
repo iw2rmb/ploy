@@ -14,7 +14,7 @@ const (
 
 func TestSubjectsForTenant(t *testing.T) {
 	subjects := SubjectsForTenant("acme", "ticket-123")
-	if subjects.TicketInbox != "grid.webhook.acme" {
+	if subjects.TicketInbox != "webhook.acme.ploy.workflow-ticket" {
 		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
 	}
 	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
@@ -23,8 +23,40 @@ func TestSubjectsForTenant(t *testing.T) {
 	if subjects.ArtifactStream != "ploy.artifact.ticket-123" {
 		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
 	}
-	if subjects.StatusStream != "grid.status.ticket-123" {
+	if subjects.StatusStream != "jobs.ticket-123.events" {
 		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
+	}
+}
+
+func TestSubjectsForTenantTrimsInputs(t *testing.T) {
+	subjects := SubjectsForTenant(" acme ", "  ticket-123  ")
+	if subjects.TicketInbox != "webhook.acme.ploy.workflow-ticket" {
+		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
+	}
+	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
+		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
+	}
+	if subjects.ArtifactStream != "ploy.artifact.ticket-123" {
+		t.Fatalf("ArtifactStream mismatch: %s", subjects.ArtifactStream)
+	}
+	if subjects.StatusStream != "jobs.ticket-123.events" {
+		t.Fatalf("StatusStream mismatch: %s", subjects.StatusStream)
+	}
+}
+
+func TestSubjectsForTenantEmptyTicket(t *testing.T) {
+	subjects := SubjectsForTenant("acme", "")
+	if subjects.TicketInbox != "webhook.acme.ploy.workflow-ticket" {
+		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
+	}
+	if subjects.CheckpointStream != "" {
+		t.Fatalf("expected empty checkpoint stream, got %s", subjects.CheckpointStream)
+	}
+	if subjects.ArtifactStream != "" {
+		t.Fatalf("expected empty artifact stream, got %s", subjects.ArtifactStream)
+	}
+	if subjects.StatusStream != "" {
+		t.Fatalf("expected empty status stream, got %s", subjects.StatusStream)
 	}
 }
 

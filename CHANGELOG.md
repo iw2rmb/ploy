@@ -1,5 +1,26 @@
 # Changelog
 
+## [2025-10-01] Workflow RPC Helper Adoption
+- Added a helper-backed Workflow RPC client that injects bearer tokens, retries transient HTTP failures, and surfaces typed HTTP errors to gate retry logic under `internal/workflow/grid/workflowrpc` and `internal/workflow/grid`.
+- Introduced helper unit tests (auth headers, retry backoff, context cancellation) and updated Grid client tests to validate helper factory wiring for bearer/retry configuration.
+- Marked roadmap slice `workflow-rpc-alignment/04-helper-adoption` complete and refreshed the Workflow RPC alignment design, design index, and overview to document helper adoption.
+
+# [2025-09-30] JetStream Subject Alignment
+- Updated `internal/workflow/contracts` with shared subject constants so ticket claims flow through `webhook.<tenant>.ploy.workflow-ticket` and status polling follows `jobs.<run_id>.events`, including whitespace safeguards for derived subjects.
+- Refreshed JetStream client tests to cover the new webhook stream wildcard and trimmed subject handling, keeping workstation coverage deterministic.
+- Documented the migration across the Workflow RPC alignment design, overview reference, Mods design, and roadmap slice `workflow-rpc-alignment/03-subject-alignment` (now marked complete).
+
+## [2025-09-28] Workflow JobSpec Composition
+- Extended lane specs under `configs/lanes/*.toml` with validated `job` blocks covering image, command, environment, resources, and optional priority defaults.
+- Introduced `runner.LaneJobComposer` plus CLI wiring so workstation runs compose `workflowrpc.JobSpec` payloads from lane metadata while the Grid client stamps lane/cache/manifest metadata for scheduler scoring.
+- Updated documentation (`docs/LANES.md`, `docs/design/workflow-rpc-alignment/README.md`, `cmd/ploy/README.md`) and marked roadmap slice `workflow-rpc-alignment/02-runner-job-spec` complete alongside expanded unit coverage.
+
+## [2025-09-28] Workflow RPC SDK Wrapper
+- Added `internal/workflow/grid/workflowrpc`, a workstation-safe shim around the Grid Workflow RPC SDK with unit tests covering request marshalling, response handling, and error propagation.
+- Replaced the bespoke HTTP client in `internal/workflow/grid` with the SDK-backed wrapper, keeping invocation tracking intact and enabling CLI integration when ``GRID_ENDPOINT`` is configured.
+- Updated `cmd/ploy/README.md`, the Workflow RPC alignment design, and the roadmap entry to reflect the SDK wiring milestone; marked roadmap slice `workflow-rpc-alignment/01-grid-sdk-client` complete.
+- Adjusted a knowledge base filesystem test to skip when running as root so workstation test runs remain deterministic.
+
 ## [2025-09-27] Build Gate Stage Planning & Metadata
 - Added `build-gate` and `static-checks` stages to the default workflow planner with new runner stage kinds, updating CLI Aster overrides and planner/runner tests to reflect the build gate sequence.
 - Introduced `internal/workflow/buildgate` for metadata sanitisation and extended workflow checkpoints/contracts with `build_gate` metadata (schema version `2025-09-27.1`).

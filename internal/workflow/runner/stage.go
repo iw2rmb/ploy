@@ -30,6 +30,7 @@ type Stage struct {
 	Aster        StageAster
 	Metadata     StageMetadata
 	CacheKey     string
+	Job          StageJobSpec
 }
 
 // StageMetadata captures stage-specific metadata for checkpoints.
@@ -99,6 +100,23 @@ type Artifact struct {
 	ArtifactCID string
 	Digest      string
 	MediaType   string
+}
+
+// StageJobSpec captures job execution configuration attached to a stage.
+type StageJobSpec struct {
+	Image     string
+	Command   []string
+	Env       map[string]string
+	Resources StageJobResources
+	Metadata  map[string]string
+}
+
+// StageJobResources expresses resource hints for Grid scheduling.
+type StageJobResources struct {
+	CPU    string
+	Memory string
+	Disk   string
+	GPU    string
 }
 
 type StageConstraints struct {

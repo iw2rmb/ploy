@@ -72,6 +72,9 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	if fakeRunner.opts.CacheComposer == nil {
 		t.Fatal("expected cache composer to be configured")
 	}
+	if fakeRunner.opts.JobComposer == nil {
+		t.Fatal("expected job composer to be configured")
+	}
 }
 
 func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {

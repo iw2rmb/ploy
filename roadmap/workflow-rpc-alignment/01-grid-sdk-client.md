@@ -1,5 +1,10 @@
 # Grid SDK Client Replacement
-- [ ] Pending
+- [x] Completed 2025-09-28
+
+## Status
+- Wrapped the Workflow RPC endpoint behind `internal/workflow/grid/workflowrpc` with an injectable factory so the runner can consume the SDK surface while tests supply fakes.
+- `internal/workflow/grid.Client` now constructs the SDK client when `GRID_ENDPOINT` is set, preserves invocation tracking, and converts runner stages to/from the SDK envelopes.
+- Added unit tests for both the SDK wrapper and the runner integration, covering happy-path submissions, error propagation, and workstation skips for root-only permission checks.
 
 ## Why / What For
 Adopt the official Grid Workflow RPC SDK in `internal/workflow/grid` so Ploy submits workflow runs through `/v1/workflows/rpc/runs` instead of the deprecated `/workflow/stages` endpoint.

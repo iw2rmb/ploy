@@ -36,7 +36,35 @@ func resolvedStage(base Stage, outcome Stage) Stage {
 			}
 		}
 	}
+	resolved.Job = mergeStageJob(base.Job, resolved.Job)
 	return resolved
+}
+
+func mergeStageJob(base, override StageJobSpec) StageJobSpec {
+	merged := override
+	if strings.TrimSpace(merged.Image) == "" {
+		merged.Image = base.Image
+	}
+	if len(merged.Command) == 0 && len(base.Command) > 0 {
+		merged.Command = append([]string(nil), base.Command...)
+	}
+	if len(merged.Env) == 0 && len(base.Env) > 0 {
+		merged.Env = copyStringMap(base.Env)
+	}
+	if strings.TrimSpace(merged.Resources.CPU) == "" {
+		merged.Resources.CPU = base.Resources.CPU
+	}
+	if strings.TrimSpace(merged.Resources.Memory) == "" {
+		merged.Resources.Memory = base.Resources.Memory
+	}
+	if strings.TrimSpace(merged.Resources.Disk) == "" {
+		merged.Resources.Disk = base.Resources.Disk
+	}
+	if strings.TrimSpace(merged.Resources.GPU) == "" {
+		merged.Resources.GPU = base.Resources.GPU
+	}
+	merged.Metadata = mergeStringMaps(base.Metadata, merged.Metadata)
+	return merged
 }
 
 // copyStringSlice duplicates a slice while trimming whitespace and omitting blanks.
@@ -49,6 +77,43 @@ func copyStringSlice(values []string) []string {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			result = append(result, trimmed)
 		}
+	}
+	return result
+}
+
+func copyStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		if trimmedKey := strings.TrimSpace(key); trimmedKey != "" {
+			dst[trimmedKey] = strings.TrimSpace(value)
+		}
+	}
+	if len(dst) == 0 {
+		return nil
+	}
+	return dst
+}
+
+func mergeStringMaps(base, override map[string]string) map[string]string {
+	if len(base) == 0 {
+		return copyStringMap(override)
+	}
+	result := copyStringMap(base)
+	if result == nil {
+		result = make(map[string]string)
+	}
+	for key, value := range override {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		result[trimmedKey] = strings.TrimSpace(value)
+	}
+	if len(result) == 0 {
+		return nil
 	}
 	return result
 }
