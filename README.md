@@ -93,6 +93,12 @@ Full design records live in `docs/design/README.md`.
    ```
    Unit tests assert that only the workflow CLI remains and that the event contract schema stays consistent.
 
+8. **Manage knowledge base incidents**
+   ```bash
+   ./dist/ploy knowledge-base ingest --from ./fixtures/knowledge-base/new-incidents.json
+   ```
+   The ingest command merges incident fixtures into `configs/knowledge-base/catalog.json`, skipping duplicate IDs while keeping workstation runs deterministic.
+
 ## Feature Roadmap
 Per-feature write-ups live under `roadmap/shift/` (directory name retained for historical context). Status checkboxes in this README mirror those roadmap entries, and deeper design context is collected in `docs/design/README.md`.
 

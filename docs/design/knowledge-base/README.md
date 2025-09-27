@@ -2,6 +2,7 @@
 
 ## Status
 - [x] [roadmap/knowledge-base/01-classifier-foundation.md](../../roadmap/knowledge-base/01-classifier-foundation.md) — Knowledge base classifier foundation delivered 2025-09-27 with Mods planner wiring.
+- [x] [roadmap/knowledge-base/02-cli-ingest.md](../../roadmap/knowledge-base/02-cli-ingest.md) — CLI ingest workflow shipped 2025-09-27 with catalog merge + CLI coverage.
 
 ## Purpose
 Deliver a repository-aware knowledge base that classifies build and planner errors with fuzzy matching, then feeds prescriptive fixes into the Mods workflow—especially the `llm-plan` and `llm-exec` stages. The feature reduces repetitive human triage by retrieving historical solutions and generating tailored remediation prompts for LLM agents.
