@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-10-05] Build Gate Sandbox Runner
+- Added `internal/workflow/buildgate.SandboxRunner` to wrap deterministic sandbox builds with structured outcomes (duration, cache hits, failure metadata) and introduced focused unit tests for success, failure, and timeout scenarios.
+- Updated knowledge base catalog tests to skip permission checks when running as root so `go test ./...` stays portable across environments.
+- Recorded roadmap/design updates for the sandbox runner milestone (`roadmap/build-gate/02-sandbox-runner.md`, `docs/design/build-gate/README.md`, `roadmap/shift/21-build-gate-reboot.md`).
+
 ## [2025-09-27] Build Gate Stage Planning & Metadata
 - Added `build-gate` and `static-checks` stages to the default workflow planner with new runner stage kinds, updating CLI Aster overrides and planner/runner tests to reflect the build gate sequence.
 - Introduced `internal/workflow/buildgate` for metadata sanitisation and extended workflow checkpoints/contracts with `build_gate` metadata (schema version `2025-09-27.1`).
