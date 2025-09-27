@@ -179,6 +179,12 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 				Message:  "unused result",
 			}},
 		}},
+		LogFindings: []BuildGateLogFinding{{
+			Code:     "kb.git.auth",
+			Severity: "error",
+			Message:  "Authenticate Git fetch credentials for remote repository access.",
+			Evidence: "fatal: unable to access 'https://example.com/repo'",
+		}},
 	}
 	stage := CheckpointStage{
 		Name:      buildGateStage,
@@ -206,6 +212,18 @@ func TestBuildGateMetadataValidateRejectsEmptyFailureMessage(t *testing.T) {
 	}
 	if err := meta.Validate(); err == nil {
 		t.Fatal("expected validation error for missing failure message")
+	}
+}
+
+func TestBuildGateMetadataValidateRejectsInvalidLogFinding(t *testing.T) {
+	meta := BuildGateStageMetadata{
+		LogFindings: []BuildGateLogFinding{{
+			Code:    "kb.git.auth",
+			Message: "missing severity",
+		}},
+	}
+	if err := meta.Validate(); err == nil {
+		t.Fatal("expected validation error for log finding without severity")
 	}
 }
 

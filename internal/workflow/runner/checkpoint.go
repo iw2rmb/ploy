@@ -177,6 +177,17 @@ func buildCheckpointBuildGateMetadata(meta *StageBuildGateMetadata) *contracts.B
 			raw.StaticChecks = append(raw.StaticChecks, report)
 		}
 	}
+	if len(meta.LogFindings) > 0 {
+		raw.LogFindings = make([]buildgate.LogFinding, 0, len(meta.LogFindings))
+		for _, finding := range meta.LogFindings {
+			raw.LogFindings = append(raw.LogFindings, buildgate.LogFinding{
+				Code:     finding.Code,
+				Severity: finding.Severity,
+				Message:  finding.Message,
+				Evidence: finding.Evidence,
+			})
+		}
+	}
 	sanitized := buildgate.Sanitize(raw)
 	if sanitized.LogDigest == "" && len(sanitized.StaticChecks) == 0 {
 		return nil
@@ -204,6 +215,17 @@ func buildCheckpointBuildGateMetadata(meta *StageBuildGateMetadata) *contracts.B
 				}
 			}
 			result.StaticChecks = append(result.StaticChecks, report)
+		}
+	}
+	if len(sanitized.LogFindings) > 0 {
+		result.LogFindings = make([]contracts.BuildGateLogFinding, 0, len(sanitized.LogFindings))
+		for _, finding := range sanitized.LogFindings {
+			result.LogFindings = append(result.LogFindings, contracts.BuildGateLogFinding{
+				Code:     finding.Code,
+				Severity: finding.Severity,
+				Message:  finding.Message,
+				Evidence: finding.Evidence,
+			})
 		}
 	}
 	return result

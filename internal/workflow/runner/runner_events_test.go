@@ -261,6 +261,14 @@ func TestRunPublishesBuildGateMetadata(t *testing.T) {
 					},
 				},
 			},
+			LogFindings: []runner.StageLogFinding{
+				{
+					Code:     " kb.git.auth ",
+					Severity: "ERROR",
+					Message:  " Authenticate Git fetch credentials for remote repository access. ",
+					Evidence: " fatal: unable to access 'https://example.com/repo' ",
+				},
+			},
 		},
 	}
 	grid := &fakeGrid{
@@ -348,6 +356,22 @@ func TestRunPublishesBuildGateMetadata(t *testing.T) {
 	}
 	if failure.Message != "unused import" {
 		t.Fatalf("expected trimmed message, got %q", failure.Message)
+	}
+	if len(meta.LogFindings) != 1 {
+		t.Fatalf("expected single log finding, got %d", len(meta.LogFindings))
+	}
+	finding := meta.LogFindings[0]
+	if finding.Code != "kb.git.auth" {
+		t.Fatalf("expected trimmed code, got %q", finding.Code)
+	}
+	if finding.Severity != "error" {
+		t.Fatalf("expected severity lower-cased error, got %q", finding.Severity)
+	}
+	if finding.Message != "Authenticate Git fetch credentials for remote repository access." {
+		t.Fatalf("unexpected message: %q", finding.Message)
+	}
+	if finding.Evidence != "fatal: unable to access 'https://example.com/repo'" {
+		t.Fatalf("unexpected evidence: %q", finding.Evidence)
 	}
 }
 

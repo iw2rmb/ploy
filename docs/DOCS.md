@@ -10,6 +10,7 @@ The feature reboot simplifies the documentation surface so every contributor can
 ## Documentation Matrix
 - `README.md` — overview of the CLI-first Grid integration, plus quickstarts for the workflow runner, snapshot toolkit, and environment materialisation.
 - `docs/design/README.md` — index pointing to every design record with status checkboxes.
+- `docs/design/shift/README.md` — SHIFT roadmap alignment summary linking roadmap slices to their design records and current status.
 - `docs/LANES.md` — lane spec format, cache-key guidance, and Grid runtime expectations.
 - `docs/MANIFESTS.md` — manifest schema, validation flow, and how payloads travel to Grid topology enforcement.
 - `docs/schemas/integration_manifest.schema.json` — JSON schema backing integration manifests (also exposed via `ploy manifest schema`).

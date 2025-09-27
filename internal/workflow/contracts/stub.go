@@ -61,3 +61,13 @@ func (b *InMemoryBus) PublishArtifact(ctx context.Context, artifact WorkflowArti
 	b.Artifacts = append(b.Artifacts, artifact)
 	return nil
 }
+
+// RecordedCheckpoints returns a copy of the checkpoints published to the in-memory bus.
+func (b *InMemoryBus) RecordedCheckpoints() []WorkflowCheckpoint {
+	if b == nil {
+		return nil
+	}
+	dup := make([]WorkflowCheckpoint, len(b.Checkpoints))
+	copy(dup, b.Checkpoints)
+	return dup
+}
