@@ -1,5 +1,11 @@
 # Changelog
 
+## [2025-09-27] Knowledge Base Classifier Foundation
+- Introduced `internal/workflow/knowledgebase` with trigram TF-IDF and Levenshtein scoring, providing a catalog-backed advisor that feeds Mods planner recipes, human gates, and recommendations.
+- Wired `ploy workflow run` to load `configs/knowledge-base/catalog.json` when present, enabling the workstation CLI to surface knowledge base guidance without changing behaviour when the catalog is absent.
+- Added high-coverage unit tests for the classifier, planner integration, and scoring utilities, ensuring `internal/workflow/knowledgebase` stays above the 90% coverage target while `go test -cover ./...` remains ≥60% overall.
+- Updated roadmap entry `roadmap/knowledge-base/01-classifier-foundation.md` and design docs to reflect the completed Roadmap 20 classifier slice.
+
 ## [2025-09-26] Mods Planner CLI Controls
 - Added `--mods-plan-timeout` and `--mods-max-parallel` flags to `ploy workflow run`, forwarding planner tuning options into the runner so operators can timebox plan evaluation and cap concurrent Mods stages.
 - Updated the default planner to push the new options into Mods stage metadata, publish concurrency hints in checkpoints/artifact envelopes, and include the hints when dispatching stages to the Grid client.

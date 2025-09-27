@@ -1,5 +1,8 @@
 # Knowledge Base Guided Remediation (Roadmap 20)
 
+## Status
+- [x] [roadmap/knowledge-base/01-classifier-foundation.md](../../roadmap/knowledge-base/01-classifier-foundation.md) — Knowledge base classifier foundation delivered 2025-09-27 with Mods planner wiring.
+
 ## Purpose
 Deliver a repository-aware knowledge base that classifies build and planner errors with fuzzy matching, then feeds prescriptive fixes into the Mods workflow—especially the `llm-plan` and `llm-exec` stages. The feature reduces repetitive human triage by retrieving historical solutions and generating tailored remediation prompts for LLM agents.
 
@@ -21,6 +24,7 @@ Deliver a repository-aware knowledge base that classifies build and planner erro
 - Encapsulate recommendation payloads in a schema versioned struct (`knowledgebase.Recommendation`) that includes recipe IDs, textual guidance, and optional artifact CID references.
 - Add instrumentation hooks so classification events emit `knowledgebase.match` checkpoints for observability.
 - Surface CLI commands for ingesting historical incidents (pulling from prior Grid runs) and for evaluating classifier quality (`ploy knowledge-base evaluate --fixture ./fixtures/*.json`).
+- Provide a workstation catalog at `configs/knowledge-base/catalog.json`, automatically loaded by `ploy workflow run` when present.
 
 ## Tests
 - Unit tests covering tokenizer, similarity scoring, ranking, and threshold logic with curated fixture corpora.

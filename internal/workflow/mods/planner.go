@@ -82,7 +82,8 @@ type Advisor interface {
 
 // AdviceRequest wraps the workflow ticket passed to the advisor.
 type AdviceRequest struct {
-	Ticket contracts.WorkflowTicket
+	Ticket  contracts.WorkflowTicket
+	Signals AdviceSignals
 }
 
 // Advice aggregates planner hints, human expectations, and recommendations.
@@ -90,6 +91,12 @@ type Advice struct {
 	Plan            AdvicePlan
 	Human           AdviceHuman
 	Recommendations []AdviceRecommendation
+}
+
+// AdviceSignals captures contextual signals gathered for classification.
+type AdviceSignals struct {
+	Errors   []string
+	Manifest contracts.ManifestReference
 }
 
 // AdvicePlan represents the Mods planner advice returned by the knowledge base.
@@ -127,7 +134,8 @@ type Options struct {
 
 // PlanInput carries ticket context for planner evaluation.
 type PlanInput struct {
-	Ticket contracts.WorkflowTicket
+	Ticket  contracts.WorkflowTicket
+	Signals AdviceSignals
 }
 
 // Planner constructs Mods workflow stages.
@@ -151,7 +159,7 @@ func (p Planner) Plan(ctx context.Context, in PlanInput) ([]Stage, error) {
 		{Name: StageNameHuman, Kind: StageKindHuman, Lane: p.opts.HumanLane, Dependencies: []string{StageNameLLMExec}},
 	}
 
-	p.applyAdvisor(ctx, plan, in.Ticket)
+	p.applyAdvisor(ctx, plan, in.Ticket, in.Signals)
 	p.applyPlannerHints(plan)
 
 	for i := range plan {
@@ -187,12 +195,12 @@ func applyDefaults(opts Options) Options {
 }
 
 // applyAdvisor enriches the Mods stages with advisor metadata when available.
-func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contracts.WorkflowTicket) {
+func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contracts.WorkflowTicket, signals AdviceSignals) {
 	advisor := p.opts.Advisor
 	if advisor == nil {
 		return
 	}
-	advice, err := advisor.Advise(ctx, AdviceRequest{Ticket: ticket})
+	advice, err := advisor.Advise(ctx, AdviceRequest{Ticket: ticket, Signals: signals})
 	if err != nil {
 		return
 	}
