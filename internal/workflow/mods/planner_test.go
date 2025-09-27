@@ -3,11 +3,14 @@ package mods_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 )
 
@@ -195,6 +198,70 @@ func TestPlannerExposesExecutionHints(t *testing.T) {
 	}
 	if int(maxParallelField.Int()) != 3 {
 		t.Fatalf("expected max parallel 3, got %d", maxParallelField.Int())
+	}
+}
+
+func TestPlannerIntegratesKnowledgeBaseAdvisor(t *testing.T) {
+	dir := t.TempDir()
+	fixture := `{
+		"schema_version": "2025-09-27.1",
+		"incidents": [
+			{
+				"id": "lint-failure",
+				"errors": ["lint failed", "npm ERR! lint script"],
+				"recipes": ["recipe.npm.lint"],
+				"summary": "Run npm run lint with fixes",
+				"human_gate": true,
+				"playbooks": ["mods.npm.lint"],
+				"recommendations": [
+					{"source": "knowledge-base", "message": "Run npm run lint -- --fix", "confidence": 0.9}
+				]
+			}
+		]
+	}`
+	path := filepath.Join(dir, "catalog.json")
+	if err := os.WriteFile(path, []byte(fixture), 0o600); err != nil {
+		t.Fatalf("write catalog fixture: %v", err)
+	}
+	catalog, err := knowledgebase.LoadCatalogFile(path)
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{Catalog: catalog})
+	if err != nil {
+		t.Fatalf("new advisor: %v", err)
+	}
+	planner := mods.NewPlanner(mods.Options{Advisor: advisor})
+
+	ticket := contracts.WorkflowTicket{
+		SchemaVersion: contracts.SchemaVersion,
+		TicketID:      "KB-1",
+		Tenant:        "acme",
+		Manifest:      contracts.ManifestReference{Name: "repo", Version: "1.0.0"},
+	}
+	stages, err := planner.Plan(context.Background(), mods.PlanInput{
+		Ticket:  ticket,
+		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
+	})
+	if err != nil {
+		t.Fatalf("plan with knowledge base: %v", err)
+	}
+	planStage := findStage(t, stages, mods.StageNamePlan)
+	if planStage.Metadata.Mods == nil || planStage.Metadata.Mods.Plan == nil {
+		t.Fatalf("expected plan metadata present: %#v", planStage.Metadata)
+	}
+	if len(planStage.Metadata.Mods.Plan.SelectedRecipes) == 0 || planStage.Metadata.Mods.Plan.SelectedRecipes[0] != "recipe.npm.lint" {
+		t.Fatalf("expected lint recipe recorded, got %#v", planStage.Metadata.Mods.Plan.SelectedRecipes)
+	}
+	if !planStage.Metadata.Mods.Plan.HumanGate {
+		t.Fatalf("expected plan metadata to capture human gate")
+	}
+	humanStage := findStage(t, stages, mods.StageNameHuman)
+	if humanStage.Metadata.Mods == nil || humanStage.Metadata.Mods.Human == nil {
+		t.Fatalf("expected human metadata present on human stage")
+	}
+	if len(humanStage.Metadata.Mods.Human.Playbooks) == 0 || humanStage.Metadata.Mods.Human.Playbooks[0] != "mods.npm.lint" {
+		t.Fatalf("expected human playbook from knowledge base, got %#v", humanStage.Metadata.Mods.Human.Playbooks)
 	}
 }
 
