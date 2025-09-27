@@ -14,7 +14,7 @@ Reintroduce the workstation-friendly build gate with Grid integration, static an
 - Workflow checkpoints expose structured build gate metadata consumed by downstream tooling.
 - CLI and docs document build gate behaviour and configuration, with tests meeting coverage targets.
 
-Status: Stage planning, metadata sanitisation, and contract wiring landed on 2025-09-27 (see `roadmap/build-gate/01-stage-planning-and-metadata.md`). Sandbox runner, adapter registry, and log retrieval remain pending.
+Status: Stage planning, metadata sanitisation, and contract wiring landed on 2025-09-27 (see `roadmap/build-gate/01-stage-planning-and-metadata.md`). Sandbox runner shipped on 2025-10-05 (see `roadmap/build-gate/02-sandbox-runner.md`), while the adapter registry and log retrieval tasks remain pending.
 
 ## Tests
 - Refer to individual tasks under `roadmap/build-gate/` for milestone-specific tests.
