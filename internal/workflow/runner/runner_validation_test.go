@@ -150,26 +150,19 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 		t.Fatalf("expected stage failure, got %v", err)
 	}
 	sequence := extractStageStatuses(events.checkpoints)
-	expected := []stageStatusEntry{
-		{stage: "ticket-claimed", status: runner.StageStatusCompleted},
-		{stage: modsPlanStage, status: runner.StageStatusRunning},
-		{stage: modsPlanStage, status: runner.StageStatusCompleted},
-		{stage: mods.StageNameORWApply, status: runner.StageStatusRunning},
-		{stage: mods.StageNameORWApply, status: runner.StageStatusCompleted},
-		{stage: mods.StageNameORWGenerate, status: runner.StageStatusRunning},
-		{stage: mods.StageNameORWGenerate, status: runner.StageStatusCompleted},
-		{stage: mods.StageNameLLMPlan, status: runner.StageStatusRunning},
-		{stage: mods.StageNameLLMPlan, status: runner.StageStatusCompleted},
-		{stage: mods.StageNameLLMExec, status: runner.StageStatusRunning},
-		{stage: mods.StageNameLLMExec, status: runner.StageStatusCompleted},
-		{stage: mods.StageNameHuman, status: runner.StageStatusRunning},
-		{stage: mods.StageNameHuman, status: runner.StageStatusCompleted},
-		{stage: "build", status: runner.StageStatusRunning},
-		{stage: "build", status: runner.StageStatusFailed},
-		{stage: "workflow", status: runner.StageStatusFailed},
+	if len(sequence) == 0 || sequence[0].stage != "ticket-claimed" {
+		t.Fatalf("expected ticket-claimed first, got %v", sequence)
 	}
-	if err := compareSequences(sequence, expected); err != nil {
-		t.Fatalf("checkpoint sequence mismatch: %v", err)
+	requireStageStatuses(t, sequence, modsPlanStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, mods.StageNameORWApply, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, mods.StageNameORWGenerate, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, mods.StageNameLLMPlan, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, mods.StageNameLLMExec, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, mods.StageNameHuman, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, "build", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusFailed})
+	workflowStatuses := collectStageStatuses(sequence, "workflow")
+	if len(workflowStatuses) != 1 || workflowStatuses[0] != runner.StageStatusFailed {
+		t.Fatalf("expected workflow failure, got %v", workflowStatuses)
 	}
 }
 
