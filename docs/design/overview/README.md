@@ -18,6 +18,12 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - Commit-scoped environments (`<sha>-<app>`) resolve deterministically from caches, manifests, and snapshots—no service stays resident.
 - Aster hook surfaces AST-pruned code bundles as first-class cache strata and toggles per workflow step.
 
+## Responsibilities Split (2025-09-27)
+- Ploy orchestrates workflow planning, lane metadata, and job spec creation (`image`, `command`, `env`, `resources` mandatory) using the Grid Workflow RPC helper/SDK. Lanes define the caching keys and toggle accelerator hints, but Ploy stops at submission.
+- Grid owns job execution, incremental/partial compilation, cache servers, and accelerator enforcement (see `../grid/docs/design/runtime-accelerators/README.md`). The execution plane determines when to reuse cached artifacts or warm workspaces based on metadata supplied by Ploy.
+- Accelerator/tooling investments (e.g., WASM lanes, GraalVM incremental Java) stay in Grid, while Ploy merely forwards the required hints and bucket identifiers.
+- When new language-specific accelerators emerge, update Ploy lane metadata and roadmap slices while Grid expands its runtime adapters and cache layers; both repos must cross-reference the relevant design docs.
+
 ## Non-Goals
 - No backups to Nomad, Consul, Traefik, or SeaweedFS.
 - No compatibility layer for the legacy API or deployment flows.
@@ -36,13 +42,13 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
    - `grid.webhook.<tenant>` (Grid-owned) delivers tickets that Ploy claims via pull consumer.
   - `ploy.workflow.<ticket>.checkpoints` stores DAG reconstructions, lane assignments, cache keys, stage metadata, artifact manifests, and retry markers. Each checkpoint now carries the computed lane cache key and stage context so Grid can reason about cache reuse and artifact availability without introspecting stage payloads.
    - `ploy.artifact.<ticket>` publishes IPFS hashes for build outputs, DB snapshot bundles, and diff reports.
-   - `grid.status.<ticket>` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
+   - `jobs.<run_id>.events` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
 2. **Workflow Runner CLI**
    - Single binary invoked by operators or Grid when work appears; default command `ploy workflow run --ticket auto`.
-   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback).
+   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback and upgraded to the helper once Roadmap 22 completes).
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 3. **Lane Engine**
-   - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache namespaces, and build/test commands.
+   - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache namespaces, build/test commands, and the job spec schema (`image`, `command`, `env`, `resources`).
    - Cache keys incorporate lane, commit SHA, Aster toggle, snapshot fingerprint, and manifest version.
    - Expose `ploy lanes describe <lane>` for developers to inspect runtime assumptions.
 4. **Snapshot Toolkit**
@@ -70,6 +76,12 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 - Finalise the Grid Workflow RPC schema once the upstream spec lands (current client uses a provisional JSON envelope).
 - IPFS gateway availability for developers without direct cluster access.
 - Versioning strategy for integration manifests when multiple teams share the same app but diverge on topology requirements.
+
+## References
+- Grid Workflow RPC design (`../grid/docs/design/workflow-rpc/README.md`).
+- Grid Workflow RPC helper guide (`../grid/sdk/workflowrpc/README.md`).
+- Grid Runtime Accelerators design (`../grid/docs/design/runtime-accelerators/README.md`).
+- Ploy Workflow RPC Alignment design (`../workflow-rpc-alignment/README.md`).
 
 ## Next Steps
 - ✅ Completed 2025-09-26: Harden lane-spec documentation (`docs/LANES.md`) and keep CLI examples (`ploy lanes describe`) in sync with TOML schema updates.

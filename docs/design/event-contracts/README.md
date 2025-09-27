@@ -4,13 +4,13 @@
 Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate statelessly while Grid remains the control surface owner. This slice introduces workstation-only stubs so tickets can be claimed and checkpoints emitted without live JetStream wiring.
 
 ## Subject Map
-- `grid.webhook.<tenant>` — Grid-owned inbox where tickets are queued for consumption.
+- `webhook.<tenant>.<source>.<event>` — Grid-owned inbox where tickets and workflow intents are emitted per provider/event.
 - `ploy.workflow.<ticket>.checkpoints` — Ploy-published stream containing DAG checkpoints, cache signals, and retry markers.
 - `ploy.artifact.<ticket>` — Ploy-published stream of IPFS hashes for build outputs, snapshot bundles, and diff reports.
-- `grid.status.<ticket>` — Grid-owned stream reporting job lifecycle events that Ploy tails before exit.
+- `jobs.<run_id>.events` — Grid-owned stream reporting workflow lifecycle events that Ploy tails before exit.
 
 ## Message Schemas
-- **WorkflowTicket** — minimal claim payload pulled from `grid.webhook.<tenant>`.
+- **WorkflowTicket** — minimal claim payload pulled from `webhook.<tenant>.<source>.<event>`.
   ```json
   {
     "schema_version": "2025-09-26.1",
@@ -85,11 +85,19 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 - `internal/workflow/contracts.JetStreamClient` now implements `runner.EventsClient`, connecting to NATS when ``JETSTREAM_URL`` is provided and falling back to the in-memory bus for offline runs.
 - `cmd/ploy/main.go` selects the real client automatically when the environment variable is set, closing the loop on the original stub pathway.
 - `internal/workflow/contracts.InMemoryBus` remains available for workstation slices that skip live connectivity.
-- `internal/workflow/grid.Client` now provides the Workflow RPC implementation toggled by ``GRID_ENDPOINT``; `internal/workflow/contracts.InMemoryBus` and the Grid stub remain for offline slices while `IPFS_GATEWAY` is still TODO until artifact publishing lands.
+- `internal/workflow/grid.Client` will migrate to the Workflow RPC SDK (see `docs/design/workflow-rpc-alignment/README.md`); until Roadmap 22 lands it continues to use the legacy stage stub for workstation slices.
 
 ## Tests
 - Unit tests in `internal/workflow/contracts` validate subject derivation, schema validation, and stub behaviour.
 - Runner tests ensure the CLI claims tickets and publishes an initial `claimed` checkpoint through the stub.
+
+## References
+- Grid Webhook Gateway design (`../grid/docs/design/webhook-gateway/README.md`) defines webhook subject publishing.
+- Grid Jobs service event stream design (`../grid/docs/design/jobs/README.md`) details `jobs.<run_id>.events` emission.
+
+## Verification (2025-09-27)
+- Verified webhook subjects are published as `webhook.<tenant>.<source>.<event>` in `../grid/internal/webhook/gateway.go`.
+- Verified job lifecycle events emit on `jobs.<run_id>.events` within `../grid/internal/jobs/publisher_jetstream.go`.
 
 ## Next Steps
 - ✅ Completed 2025-09-26: Expand checkpoints with stage metadata and artifact manifests (see `docs/design/checkpoint-metadata/README.md`).
