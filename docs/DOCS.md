@@ -17,6 +17,7 @@ The feature reboot simplifies the documentation surface so every contributor can
 - `docs/SNAPSHOTS.md` — snapshot planning/capture behaviour and IPFS/JetStream publishing notes.
 - `docs/design/ipfs-artifacts/README.md` — design record for the IPFS gateway publishing slice and follow-ups.
 - `docs/design/checkpoint-metadata/README.md` — checkpoint enrichment design covering stage metadata and artifact manifests in workflow events.
+- `configs/knowledge-base/README.md` — catalog format and CLI ingest guidance for workstation incidents.
 - `cmd/ploy/README.md` — command-level flag reference and environment placeholders.
 - `roadmap/shift/08-documentation-cleanup.md` — status log for this documentation slice, including verification expectations.
 
