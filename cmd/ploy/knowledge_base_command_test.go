@@ -114,6 +114,93 @@ func TestHandleKnowledgeBaseIngestDetectsDuplicate(t *testing.T) {
 	}
 }
 
+func TestHandleKnowledgeBaseEvaluateReportsAccuracy(t *testing.T) {
+	dir := t.TempDir()
+	prevCatalog := knowledgeBaseCatalogPath
+	knowledgeBaseCatalogPath = filepath.Join(dir, "catalog.json")
+	t.Cleanup(func() { knowledgeBaseCatalogPath = prevCatalog })
+
+	writeJSON(t, knowledgeBaseCatalogPath, map[string]any{
+		"schema_version": "2025-09-27.1",
+		"incidents": []map[string]any{
+			{
+				"id":         "lint-failure",
+				"errors":     []string{"npm ERR! lint script failed"},
+				"recipes":    []string{"recipe.npm.lint"},
+				"summary":    "Run npm run lint",
+				"human_gate": true,
+			},
+		},
+	})
+
+	fixturePath := filepath.Join(dir, "evaluate.json")
+	writeJSON(t, fixturePath, map[string]any{
+		"schema_version": "2025-09-27.1",
+		"samples": []map[string]any{
+			{
+				"name":     "lint-sample",
+				"errors":   []string{"npm ERR! lint script failed"},
+				"expected": "lint-failure",
+			},
+			{
+				"name":     "unknown",
+				"errors":   []string{"completely unknown error"},
+				"expected": "lint-failure",
+			},
+		},
+	})
+
+	stderr := &bytes.Buffer{}
+	if err := handleKnowledgeBase([]string{"evaluate", "--fixture", fixturePath}, stderr); err != nil {
+		t.Fatalf("expected evaluate to succeed, got %v (stderr: %s)", err, stderr.String())
+	}
+	output := stderr.String()
+	if !strings.Contains(output, "lint-sample: expected lint-failure, matched lint-failure (score") || !strings.Contains(output, "[PASS]") {
+		t.Fatalf("expected lint sample result in output, got %q", output)
+	}
+	if !strings.Contains(output, "unknown: expected lint-failure, no match [MISS]") {
+		t.Fatalf("expected unknown sample miss in output, got %q", output)
+	}
+	if !strings.Contains(output, "Summary: matches=1 misses=1 accuracy=50.00%") {
+		t.Fatalf("expected summary metrics in output, got %q", output)
+	}
+}
+
+func TestHandleKnowledgeBaseEvaluateMissingFixture(t *testing.T) {
+	stderr := &bytes.Buffer{}
+	err := handleKnowledgeBase([]string{"evaluate", "--fixture", ""}, stderr)
+	if err == nil {
+		t.Fatalf("expected evaluate to fail when fixture missing")
+	}
+	if !strings.Contains(stderr.String(), "Usage: ploy knowledge-base evaluate") {
+		t.Fatalf("expected evaluate usage in stderr, got %q", stderr.String())
+	}
+}
+
+func TestHandleKnowledgeBaseEvaluateMissingCatalog(t *testing.T) {
+	dir := t.TempDir()
+	prevCatalog := knowledgeBaseCatalogPath
+	knowledgeBaseCatalogPath = filepath.Join(dir, "missing.json")
+	t.Cleanup(func() { knowledgeBaseCatalogPath = prevCatalog })
+
+	fixturePath := filepath.Join(dir, "evaluate.json")
+	writeJSON(t, fixturePath, map[string]any{
+		"schema_version": "2025-09-27.1",
+		"samples": []map[string]any{
+			{"name": "noop", "errors": []string{"err"}, "expected": "lint-failure"},
+		},
+	})
+
+	stderr := &bytes.Buffer{}
+	err := handleKnowledgeBase([]string{"evaluate", "--fixture", fixturePath}, stderr)
+	if err == nil {
+		t.Fatalf("expected evaluate to fail when catalog missing")
+	}
+	if !strings.Contains(stderr.String(), "Usage: ploy knowledge-base evaluate") {
+		t.Fatalf("expected evaluate usage when catalog missing, got %q", stderr.String())
+	}
+}
+
 func TestHandleKnowledgeBaseUsage(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleKnowledgeBase(nil, buf)
