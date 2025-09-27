@@ -4,11 +4,11 @@
 Document the TOML-based lane descriptors consumed by the SHIFT lane engine and the `ploy lanes describe` inspection workflow.
 
 ## Current Status
-- Lane specs live under `configs/lanes/*.toml` with `name`, `description`, `runtime_family`, `cache_namespace`, and `commands` blocks.
-- Required fields: `description`, `runtime_family`, `cache_namespace`, `commands.build`, and `commands.test`.
-- Optional fields: `commands.setup` runs before build/test when present.
-- `ploy lanes describe` loads the specs, validates required fields, and prints runtime metadata plus a cache-key preview.
-- The workflow runner assigns `node-wasm` to the `mods` stage and `go-native` to `build`/`test`, ensuring Grid submissions carry explicit lane metadata.
+- Lane specs live under `configs/lanes/*.toml` with `name`, `description`, `runtime_family`, `cache_namespace`, `commands`, and `job` blocks.
+- Required fields: `description`, `runtime_family`, `cache_namespace`, `commands.build`, `commands.test`, `job.image`, `job.command`, `job.env`, `job.resources.cpu`, and `job.resources.memory`.
+- Optional fields: `commands.setup` runs before build/test when present; `job.priority`, `job.resources.disk`, and `job.resources.gpu` provide scheduling hints when available.
+- `ploy lanes describe` loads the specs, validates required fields, prints runtime metadata plus a cache-key preview, and now surfaces job defaults (image, command, env, resources).
+- The workflow runner assigns `node-wasm` to the `mods` stage and `go-native` to `build`/`test`, ensuring Grid submissions carry explicit lane metadata and JobSpec payloads.
 
 ## Usage / Commands
 - Inspect the default Go lane:
@@ -36,6 +36,17 @@ Document the TOML-based lane descriptors consumed by the SHIFT lane engine and t
   [commands]
   build = ["pip", "install", "-r", "requirements.txt"]
   test = ["pytest", "-q"]
+
+  [job]
+  image = "registry.dev/ploy/python-slim:latest"
+  command = ["pytest", "-q"]
+
+    [job.env]
+    PYTHONUNBUFFERED = "1"
+
+    [job.resources]
+    cpu = "2000m"
+    memory = "4Gi"
   ```
 
 ## Development Notes

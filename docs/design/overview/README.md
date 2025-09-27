@@ -39,13 +39,13 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
 
 ## Architecture Outline
 1. **JetStream Subjects**
-   - `grid.webhook.<tenant>` (Grid-owned) delivers tickets that Ploy claims via pull consumer.
+  - `webhook.<tenant>.ploy.workflow-ticket` (Grid-owned) delivers tickets that Ploy claims via pull consumer.
   - `ploy.workflow.<ticket>.checkpoints` stores DAG reconstructions, lane assignments, cache keys, stage metadata, artifact manifests, and retry markers. Each checkpoint now carries the computed lane cache key and stage context so Grid can reason about cache reuse and artifact availability without introspecting stage payloads.
    - `ploy.artifact.<ticket>` publishes IPFS hashes for build outputs, DB snapshot bundles, and diff reports.
    - `jobs.<run_id>.events` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
 2. **Workflow Runner CLI**
    - Single binary invoked by operators or Grid when work appears; default command `ploy workflow run --ticket auto`.
-   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback and upgraded to the helper once Roadmap 22 completes).
+   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC helper (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback when unset).
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 3. **Lane Engine**
    - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache namespaces, build/test commands, and the job spec schema (`image`, `command`, `env`, `resources`).

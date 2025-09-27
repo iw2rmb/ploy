@@ -7,3 +7,16 @@ cache_namespace = "node-wasm"
 setup = ["pnpm", "install"]
 build = ["pnpm", "run", "build"]
 test = ["pnpm", "run", "test"]
+
+[job]
+image = "registry.dev/ploy/node-wasm:latest"
+command = ["pnpm", "run", "test"]
+priority = "standard"
+
+  [job.env]
+  NODE_ENV = "test"
+  PNPM_HOME = "/workspace/.pnpm"
+
+  [job.resources]
+  cpu = "2500m"
+  memory = "6Gi"

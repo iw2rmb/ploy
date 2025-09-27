@@ -31,6 +31,70 @@ func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
 	}
 }
 
+type recordingJobComposer struct {
+	job   runner.StageJobSpec
+	calls []runner.JobComposeRequest
+}
+
+func (c *recordingJobComposer) Compose(ctx context.Context, req runner.JobComposeRequest) (runner.StageJobSpec, error) {
+	_ = ctx
+	c.calls = append(c.calls, req)
+	return c.job, nil
+}
+
+func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	grid := &fakeGrid{outcomes: map[string][]runner.StageOutcome{
+		modsPlanStage:  {{Status: runner.StageStatusCompleted}},
+		buildGateStage: {{Status: runner.StageStatusCompleted}},
+	}}
+	composer := &recordingJobComposer{job: runner.StageJobSpec{
+		Image:   "registry.dev/build:latest",
+		Command: []string{"/bin/build"},
+		Env:     map[string]string{"GOFLAGS": "-mod=vendor"},
+		Resources: runner.StageJobResources{
+			CPU:    "4000m",
+			Memory: "8Gi",
+		},
+	}}
+	opts := runner.Options{
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+		JobComposer:      composer,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("run error: %v", err)
+	}
+	if len(grid.calls) == 0 {
+		t.Fatalf("expected grid calls")
+	}
+	for _, call := range grid.calls {
+		if call.stage.Job.Image != composer.job.Image {
+			t.Fatalf("expected job image propagated, got %s", call.stage.Job.Image)
+		}
+		if call.stage.Job.Resources.CPU != composer.job.Resources.CPU {
+			t.Fatalf("expected job resources propagated, got %#v", call.stage.Job.Resources)
+		}
+		if call.stage.Job.Env["GOFLAGS"] != "-mod=vendor" {
+			t.Fatalf("expected job env propagated, got %#v", call.stage.Job.Env)
+		}
+	}
+	if len(composer.calls) == 0 {
+		t.Fatalf("expected composer invocations")
+	}
+	for _, req := range composer.calls {
+		if strings.TrimSpace(req.Stage.Lane) == "" {
+			t.Fatalf("expected stage lane in composer request: %#v", req.Stage)
+		}
+	}
+}
+
 func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{

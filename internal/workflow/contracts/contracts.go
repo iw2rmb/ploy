@@ -8,6 +8,15 @@ import (
 
 const SchemaVersion = "2025-09-27.1"
 
+const (
+	webhookSubjectFormat       = "webhook.%s.%s.%s"
+	webhookSourcePloyWorkflow  = "ploy"
+	webhookEventWorkflowTicket = "workflow-ticket"
+	checkpointStreamFormat     = "ploy.workflow.%s.checkpoints"
+	artifactStreamFormat       = "ploy.artifact.%s"
+	statusStreamFormat         = "jobs.%s.events"
+)
+
 type SubjectSet struct {
 	TicketInbox      string
 	CheckpointStream string
@@ -16,11 +25,32 @@ type SubjectSet struct {
 }
 
 func SubjectsForTenant(tenant, ticketID string) SubjectSet {
+	trimmedTenant := strings.TrimSpace(tenant)
+	ticketInbox := ""
+	if trimmedTenant != "" {
+		ticketInbox = fmt.Sprintf(
+			webhookSubjectFormat,
+			trimmedTenant,
+			webhookSourcePloyWorkflow,
+			webhookEventWorkflowTicket,
+		)
+	}
+
+	trimmedTicket := strings.TrimSpace(ticketID)
+	checkpointStream := ""
+	artifactStream := ""
+	statusStream := ""
+	if trimmedTicket != "" {
+		checkpointStream = fmt.Sprintf(checkpointStreamFormat, trimmedTicket)
+		artifactStream = fmt.Sprintf(artifactStreamFormat, trimmedTicket)
+		statusStream = fmt.Sprintf(statusStreamFormat, trimmedTicket)
+	}
+
 	return SubjectSet{
-		TicketInbox:      fmt.Sprintf("grid.webhook.%s", tenant),
-		CheckpointStream: fmt.Sprintf("ploy.workflow.%s.checkpoints", ticketID),
-		ArtifactStream:   fmt.Sprintf("ploy.artifact.%s", ticketID),
-		StatusStream:     fmt.Sprintf("grid.status.%s", ticketID),
+		TicketInbox:      ticketInbox,
+		CheckpointStream: checkpointStream,
+		ArtifactStream:   artifactStream,
+		StatusStream:     statusStream,
 	}
 }
 
@@ -384,7 +414,11 @@ func (c WorkflowCheckpoint) Validate() error {
 }
 
 func (c WorkflowCheckpoint) Subject() string {
-	return fmt.Sprintf("ploy.workflow.%s.checkpoints", c.TicketID)
+	ticket := strings.TrimSpace(c.TicketID)
+	if ticket == "" {
+		return ""
+	}
+	return fmt.Sprintf(checkpointStreamFormat, ticket)
 }
 
 // WorkflowArtifact represents an artifact envelope published to the artifact
@@ -425,5 +459,9 @@ func (a WorkflowArtifact) Validate() error {
 
 // Subject returns the JetStream subject for the artifact envelope.
 func (a WorkflowArtifact) Subject() string {
-	return fmt.Sprintf("ploy.artifact.%s", a.TicketID)
+	ticket := strings.TrimSpace(a.TicketID)
+	if ticket == "" {
+		return ""
+	}
+	return fmt.Sprintf(artifactStreamFormat, ticket)
 }
