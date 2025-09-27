@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
+	"github.com/iw2rmb/ploy/internal/workflow/mods"
 )
 
 // handleKnowledgeBase routes knowledge-base subcommands.
@@ -22,6 +25,8 @@ func handleKnowledgeBase(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "ingest":
 		return handleKnowledgeBaseIngest(args[1:], stderr)
+	case "evaluate":
+		return handleKnowledgeBaseEvaluate(args[1:], stderr)
 	default:
 		printKnowledgeBaseUsage(stderr)
 		return fmt.Errorf("unknown knowledge-base subcommand %q", args[0])
@@ -80,12 +85,132 @@ func handleKnowledgeBaseIngest(args []string, stderr io.Writer) error {
 	return nil
 }
 
+// handleKnowledgeBaseEvaluate runs the evaluation command to score classifier accuracy.
+func handleKnowledgeBaseEvaluate(args []string, stderr io.Writer) error {
+	flagSet := flag.NewFlagSet("knowledge-base evaluate", flag.ContinueOnError)
+	flagSet.SetOutput(io.Discard)
+	fixture := flagSet.String("fixture", "", "path to evaluation fixture (JSON)")
+	if err := flagSet.Parse(args); err != nil {
+		printKnowledgeBaseEvaluateUsage(stderr)
+		return err
+	}
+
+	fixturePath := strings.TrimSpace(*fixture)
+	if fixturePath == "" {
+		printKnowledgeBaseEvaluateUsage(stderr)
+		return fmt.Errorf("fixture path required")
+	}
+
+	catalog, err := knowledgebase.LoadCatalogFile(knowledgeBaseCatalogPath)
+	if err != nil {
+		printKnowledgeBaseEvaluateUsage(stderr)
+		return fmt.Errorf("load catalog: %w", err)
+	}
+
+	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{Catalog: catalog, ScoreFloor: 0.5})
+	if err != nil {
+		printKnowledgeBaseEvaluateUsage(stderr)
+		return fmt.Errorf("build advisor: %w", err)
+	}
+
+	fixtureData, err := loadKnowledgeBaseEvaluateFixture(fixturePath)
+	if err != nil {
+		printKnowledgeBaseEvaluateUsage(stderr)
+		return err
+	}
+
+	matches := 0
+	misses := 0
+	for idx, sample := range fixtureData.Samples {
+		name := strings.TrimSpace(sample.Name)
+		if name == "" {
+			name = fmt.Sprintf("sample-%d", idx+1)
+		}
+		expected := strings.TrimSpace(sample.Expected)
+		if expected == "" {
+			printKnowledgeBaseEvaluateUsage(stderr)
+			return fmt.Errorf("sample %s missing expected incident id", name)
+		}
+		errorsList := normalizeEvaluateErrors(sample.Errors)
+		if len(errorsList) == 0 {
+			printKnowledgeBaseEvaluateUsage(stderr)
+			return fmt.Errorf("sample %s requires at least one error expression", name)
+		}
+		match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: errorsList}})
+		if err != nil {
+			printKnowledgeBaseEvaluateUsage(stderr)
+			return fmt.Errorf("evaluate sample %s: %w", name, err)
+		}
+		if !ok {
+			_, _ = fmt.Fprintf(stderr, "%s: expected %s, no match [MISS]\n", name, expected)
+			misses++
+			continue
+		}
+		if match.IncidentID == expected {
+			_, _ = fmt.Fprintf(stderr, "%s: expected %s, matched %s (score %.2f) [PASS]\n", name, expected, match.IncidentID, match.Score)
+			matches++
+		} else {
+			_, _ = fmt.Fprintf(stderr, "%s: expected %s, matched %s (score %.2f) [MISS]\n", name, expected, match.IncidentID, match.Score)
+			misses++
+		}
+	}
+
+	total := len(fixtureData.Samples)
+	accuracy := 0.0
+	if total > 0 {
+		accuracy = float64(matches) / float64(total) * 100
+	}
+	_, _ = fmt.Fprintf(stderr, "Summary: matches=%d misses=%d accuracy=%.2f%%\n", matches, misses, accuracy)
+	return nil
+}
+
 func printKnowledgeBaseUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy knowledge-base <command>")
 	_, _ = fmt.Fprintln(w, "\nCommands:")
 	_, _ = fmt.Fprintln(w, "  ingest    Append incidents to the knowledge base catalog")
+	_, _ = fmt.Fprintln(w, "  evaluate  Evaluate knowledge base classifier accuracy")
 }
 
 func printKnowledgeBaseIngestUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy knowledge-base ingest --from <fixture.json>")
+}
+
+// printKnowledgeBaseEvaluateUsage emits usage details for the evaluate subcommand.
+func printKnowledgeBaseEvaluateUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy knowledge-base evaluate --fixture <fixture.json>")
+}
+
+// loadKnowledgeBaseEvaluateFixture decodes the evaluation fixture from disk.
+func loadKnowledgeBaseEvaluateFixture(path string) (knowledgeBaseEvaluateFixture, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return knowledgeBaseEvaluateFixture{}, fmt.Errorf("load fixture: %w", err)
+	}
+	var fx knowledgeBaseEvaluateFixture
+	if err := json.Unmarshal(data, &fx); err != nil {
+		return knowledgeBaseEvaluateFixture{}, fmt.Errorf("decode fixture: %w", err)
+	}
+	return fx, nil
+}
+
+// normalizeEvaluateErrors trims whitespace and filters empty errors from samples.
+func normalizeEvaluateErrors(values []string) []string {
+	trimmed := make([]string, 0, len(values))
+	for _, value := range values {
+		if entry := strings.TrimSpace(value); entry != "" {
+			trimmed = append(trimmed, entry)
+		}
+	}
+	return trimmed
+}
+
+type knowledgeBaseEvaluateFixture struct {
+	SchemaVersion string                        `json:"schema_version"`
+	Samples       []knowledgeBaseEvaluateSample `json:"samples"`
+}
+
+type knowledgeBaseEvaluateSample struct {
+	Name     string   `json:"name"`
+	Errors   []string `json:"errors"`
+	Expected string   `json:"expected"`
 }

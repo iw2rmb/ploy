@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -34,6 +33,13 @@ type incidentVector struct {
 	text     string
 }
 
+// MatchResult captures the top incident match discovered during evaluation.
+type MatchResult struct {
+	IncidentID string
+	Score      float64
+	Advice     mods.Advice
+}
+
 // NewAdvisor constructs an advisor from the provided options.
 func NewAdvisor(opts Options) (Advisor, error) {
 	if err := opts.Validate(); err != nil {
@@ -61,38 +67,55 @@ func NewAdvisor(opts Options) (Advisor, error) {
 
 // Advise returns Mods planner recommendations for the supplied context.
 func (a Advisor) Advise(ctx context.Context, req mods.AdviceRequest) (mods.Advice, error) {
-	if len(a.incidentVectors) == 0 {
+	incident, score, ok := a.bestMatch(req)
+	if !ok {
 		return mods.Advice{}, nil
 	}
-	signals := req.Signals
-	queryText := aggregateSignals(signals)
-	queryVector := buildTFIDFVector(queryText, a.idf)
-	queryLength := vectorLength(queryVector)
-	scores := make([]scoredIncident, 0, len(a.incidentVectors))
-	for _, candidate := range a.incidentVectors {
-		cosine := cosineSimilarity(queryVector, candidate.vector, queryLength, candidate.length)
-		lev := levenshteinSimilarity(queryText, candidate.text)
-		score := 0.7*cosine + 0.3*lev
-		if score >= a.scoreFloor {
-			scores = append(scores, scoredIncident{incident: candidate.incident, score: score})
-		}
-	}
-	if len(scores) == 0 {
-		return mods.Advice{}, nil
-	}
-	sort.SliceStable(scores, func(i, j int) bool {
-		if scores[i].score == scores[j].score {
-			return scores[i].incident.ID < scores[j].incident.ID
-		}
-		return scores[i].score > scores[j].score
-	})
-	top := scores[0]
-	return incidentToAdvice(top.incident, top.score, a.maxRecommendations), nil
+	return incidentToAdvice(incident, score, a.maxRecommendations), nil
 }
 
 type scoredIncident struct {
 	incident Incident
 	score    float64
+}
+
+// Match returns the top incident match including score and advice payloads.
+func (a Advisor) Match(ctx context.Context, req mods.AdviceRequest) (MatchResult, bool, error) {
+	incident, score, ok := a.bestMatch(req)
+	if !ok {
+		return MatchResult{}, false, nil
+	}
+	advice := incidentToAdvice(incident, score, a.maxRecommendations)
+	return MatchResult{IncidentID: incident.ID, Score: score, Advice: advice}, true, nil
+}
+
+// bestMatch returns the highest scoring incident that clears the advisor score floor.
+func (a Advisor) bestMatch(req mods.AdviceRequest) (Incident, float64, bool) {
+	if len(a.incidentVectors) == 0 {
+		return Incident{}, 0, false
+	}
+	signals := req.Signals
+	queryText := aggregateSignals(signals)
+	queryVector := buildTFIDFVector(queryText, a.idf)
+	queryLength := vectorLength(queryVector)
+	var best scoredIncident
+	hasBest := false
+	for _, candidate := range a.incidentVectors {
+		cosine := cosineSimilarity(queryVector, candidate.vector, queryLength, candidate.length)
+		lev := levenshteinSimilarity(queryText, candidate.text)
+		score := 0.7*cosine + 0.3*lev
+		if score < a.scoreFloor {
+			continue
+		}
+		if !hasBest || score > best.score || (score == best.score && candidate.incident.ID < best.incident.ID) {
+			best = scoredIncident{incident: candidate.incident, score: score}
+			hasBest = true
+		}
+	}
+	if !hasBest {
+		return Incident{}, 0, false
+	}
+	return best.incident, best.score, true
 }
 
 // precompute builds TF-IDF vectors for catalog incidents ahead of scoring.
