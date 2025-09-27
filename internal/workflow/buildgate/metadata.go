@@ -6,6 +6,7 @@ import "strings"
 type Metadata struct {
 	LogDigest    string
 	StaticChecks []StaticCheckReport
+	LogFindings  []LogFinding
 }
 
 // StaticCheckReport summarises a static analysis tool invocation.
@@ -64,6 +65,21 @@ func Sanitize(meta Metadata) Metadata {
 			continue
 		}
 		result.StaticChecks = append(result.StaticChecks, sanitized)
+	}
+	for _, finding := range meta.LogFindings {
+		code := strings.TrimSpace(finding.Code)
+		message := strings.TrimSpace(finding.Message)
+		evidence := strings.TrimSpace(finding.Evidence)
+		severity := normalizeSeverity(strings.TrimSpace(finding.Severity))
+		if code == "" && message == "" && evidence == "" {
+			continue
+		}
+		result.LogFindings = append(result.LogFindings, LogFinding{
+			Code:     code,
+			Severity: severity,
+			Message:  message,
+			Evidence: evidence,
+		})
 	}
 	return result
 }

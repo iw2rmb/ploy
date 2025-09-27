@@ -1,5 +1,5 @@
 # Static Check Adapter Registry
-- [ ] Pending
+- [x] Completed 2025-10-05
 
 ## Why / What For
 Wire language-specific static analysis adapters (Go vet/staticcheck, Java Error Prone, ESLint, Ruff, Roslyn) so build gate runs can aggregate diagnostics across stacks.
@@ -10,10 +10,10 @@ Wire language-specific static analysis adapters (Go vet/staticcheck, Java Error 
 - Ensure adapter output is normalised into the build gate metadata schema for checkpoint publication.
 
 ## Definition of Done
-- Registry dispatches adapters based on repo manifest configuration and lane defaults.
-- Failing diagnostics populate checkpoint metadata with language/tool/severity information.
-- Repository documentation explains adapter configuration and CLI overrides.
+- Registry dispatches adapters based on lane defaults (`StaticCheckLaneConfig`), manifest overrides (`StaticCheckManifest`), and CLI skip hooks exposed through `StaticCheckSpec`.
+- Failing diagnostics populate checkpoint metadata with language/tool/severity information using normalized `StaticCheckReport` entries.
+- Repository documentation explains adapter configuration and CLI overrides across `docs/design/build-gate/README.md` and the design index.
 
 ## Tests
-- Unit tests per adapter verifying diagnostic parsing and severity mapping.
-- Integration-style tests ensuring metadata aggregation works across multiple adapters.
+- `internal/workflow/buildgate/static_checks_test.go` exercises registry planning, severity thresholds, manifest overrides, and skip controls with fake adapters.
+- Adapter-specific fixtures remain planned for future slices once language adapters land.

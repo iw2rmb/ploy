@@ -8,10 +8,13 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Parse build outputs into structured metadata consumed by Knowledge Base and Mods healing flows.
 - Keep lane definitions aligned with the Workflow RPC job spec schema (`image`, `command`, `env`, `resources`).
 
-## Current Status (2025-10-05)
+## Current Status (2025-09-27)
 - Stage scheduling and checkpoint metadata wiring landed via `roadmap/build-gate/01-stage-planning-and-metadata.md`.
 - Sandbox runner landed via `roadmap/build-gate/02-sandbox-runner.md`, providing structured duration/cache metadata and timeout handling for workstation tests.
-- Static check adapter registry and log retrieval tasks remain pending (see roadmap files 03-04).
+- Static check adapter registry shipped under `internal/workflow/buildgate/static_checks.go` (see `roadmap/build-gate/03-static-check-registry.md`), wiring lane defaults, manifest overrides, and skip hooks into `StaticCheckRegistry`.
+- Go vet adapter exposed through `internal/workflow/buildgate.NewGoVetAdapter` (see `roadmap/build-gate/05-go-vet-adapter.md`), parsing workstation/Grid diagnostics into `StaticCheckFailure` entries with manifest-configurable package and tag options.
+- Log retrieval and Grid artifact ingestion shipped via `internal/workflow/buildgate.LogRetriever` and `LogIngestor` (see `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`), normalising Knowledge Base findings and surfacing digests in build gate metadata.
+- Build gate runner orchestrates sandbox execution, static checks, and log ingestion through `internal/workflow/buildgate.Runner` (see `roadmap/build-gate/06-build-gate-runner.md`), emitting sanitised metadata for checkpoint publication.
 
 - Establish `internal/workflow/buildgate` hosting sandbox compilation, static check orchestration, and log parsing utilities.
 - Align build execution with Grid workflow stages (`build-gate`, `static-checks`) triggered from Mods and general workflow runs.
@@ -25,16 +28,32 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 ## Behaviour
 - `build-gate` stage runs inside Grid using the lane-specified container image. The stage compiles the repository, executes tests flagged by the plan, and archives `builder.log` as a structured artifact envelope.
 - Immediately after compilation, the runner invokes language-specific static check adapters. Failures produce structured error reports (JSON with rule ID, file, line, message) attached to checkpoint metadata.
-- Log parsing examines `builder.log` for known error signatures (compiler errors, dependency resolution issues) and emits normalized error codes for Knowledge Base matching.
+- Log parsing examines `builder.log` for known error signatures (compiler errors, dependency resolution issues) and emits normalized error codes for Knowledge Base matching using the default log parser patterns.
 - Successful runs propagate build version metadata and artifact digests back to the workflow checkpoint. Failures trigger healing retries or escalate to `human-in-the-loop` depending on Mods planner guidance.
+
+### Static Check Registry
+- `StaticCheckRegistry` indexes adapters by language/tool metadata while retaining default severity thresholds so workstation and Grid runs stay aligned.
+- Lane defaults enable adapters per language via `StaticCheckLaneConfig`, defining baseline failure thresholds (`SeverityError`, `SeverityWarning`, `SeverityInfo`).
+- Repo manifests override defaults using `StaticCheckManifest.Languages[<lang>]`, toggling adapters on/off, adjusting thresholds, or forwarding adapter options. CLI overrides populate `StaticCheckSpec.SkipLanguages` for per-run skips.
+- Registry execution emits normalized `StaticCheckReport` entries consumed by metadata sanitisation and checkpoint publication.
+
+### Go Vet Adapter
+- `buildgate.NewGoVetAdapter` wraps `go vet`, mapping aliases such as `go` and `golang` onto the canonical registry key while keeping defaults portable across workstation and Grid lanes.
+- `StaticCheckRequest.Options["packages"]` defaults to `./...` but supports whitespace/comma separated overrides for repos that need to restrict analysis to select modules.
+- Optional `StaticCheckRequest.Options["tags"]` forwards build tags so `go vet` runs match the manifest-defined test matrix without diverging from lane defaults.
+- Parsed diagnostics populate `StaticCheckFailure` rows tagged with the `govet` rule identifier, normalized severity (`error`), and cleaned file/position metadata for checkpoint publication.
 
 ## Implementation Notes
 - `buildgate.SandboxRunner` wraps the deterministic sandbox build logic and exposes structured results (duration, cache hit, failure reason/detail) for workstation tests. The runner keeps RED-phase tests deterministic while production builds continue to execute inside Grid stages.
 - Implement a `StaticCheckRegistry` mapping languages to adapters. Each adapter runs inside the same Grid job to minimise cold starts and reads configuration from repo manifests (e.g., `.errorprone`, `.eslintrc`).
-- Adapt log enrichment to pull artifacts from Grid: upon failure, inspect `jobs.<run_id>.events` for the stage, find the artifact CID, and retrieve logs via IPFS using the Workflow RPC helper utilities. Provide fallbacks to JetStream attachments in workstation mode.
+- Lane defaults (`StaticCheckLaneConfig`) provide baseline enablement and severity thresholds, while manifest overrides (`StaticCheckManifest`) and CLI flags (`--build-gate-skip=<lang>`) merge through `StaticCheckSpec` before adapters execute.
+- Go vet adapter normalises `go`/`golang` aliases and honours manifest or CLI overrides for `packages` (default `./...`) and `tags` so repos can focus the analysis scope without editing lane defaults.
+- Adapt log enrichment to pull artifacts from Grid: upon failure, inspect `jobs.<run_id>.events` for the stage, find the artifact CID, and retrieve logs via Grid (`LogSourceGrid`) with an IPFS fallback (`LogSourceIPFS`). Provide fallbacks to JetStream attachments in workstation mode via the retriever abstraction.
+- Log ingestion passes retrieved content to the default parser, mapping canonical Knowledge Base codes (e.g., Git auth failures, Go module conflicts, linker resolution issues, disk pressure) onto `Metadata.LogFindings` for checkpoint publication.
 - Emit checkpoint metadata fields (`build_gate.static_checks`, `build_gate.log_digest`) so downstream tooling (Knowledge Base, telemetry) can reason about results.
 - Provide CLI options to toggle static checks per language and to set failure thresholds (`--build-gate-fail-on-warning`, `--build-gate-skip=golang`).
 - Ensure compatibility with Mods planner by exposing a `buildgate.Run(ctx, spec)` API returning structured outcomes consumed by healing logic.
+- `buildgate.Runner` wraps the sandbox runner, static check registry, and log ingestor, applying metadata sanitisation and preferring ingested log digests/findings when available.
 
 ## Clarifications (2025-09-27)
 - “Sandbox” in this document refers to the deterministic workstation harness used for RED-phase unit tests. Live build and static-check execution stays on Grid; there is no additional sandbox infrastructure or per-build VM beyond the Grid runtime adapters.
@@ -52,7 +71,9 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 
 ## Tests
 - Unit tests for sandbox runner covering timeout handling, cache reuse, and structured result mapping, using fake Grid adapters in the workstation stub.
-- Adapter-specific tests verifying each static check tool surfaces expected diagnostics for failing fixtures (Java error-prone sample, Go vet fixture, ESLint error, etc.).
+- Static check registry unit tests exercising lane/manifest reconciliation, skip overrides, and severity thresholds with fake adapters (`internal/workflow/buildgate/static_checks_test.go`).
+- Adapter-specific tests begin with the Go vet adapter coverage under `internal/workflow/buildgate/go_vet_adapter_test.go`, with language-specific fixtures for Java/Error Prone, ESLint, Ruff, and Roslyn tracked as follow-ups.
+- Log ingestion tests covering artifact fallback precedence, truncation limits, parser pattern coverage, and metadata sanitisation via `internal/workflow/buildgate/log_retriever_test.go`, `log_parser_test.go`, `log_ingestion_test.go`, and updated metadata sanitiser coverage.
 - Log parser tests feeding historical logs (retrieved from legacy commits) to confirm normalization of compiler errors into Knowledge Base-ready codes.
 - Workflow runner tests ensuring Grid artifact retrieval works in both stub and live JetStream modes.
 - Maintain ≥90% coverage across `internal/workflow/buildgate` and associated adapters.

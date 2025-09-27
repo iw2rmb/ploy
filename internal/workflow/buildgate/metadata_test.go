@@ -21,6 +21,10 @@ func TestMetadataSanitizeTrimsAndFilters(t *testing.T) {
 				Passed:   true,
 			},
 		},
+		LogFindings: []LogFinding{
+			{Code: "  KB.GIT.AUTH  ", Severity: "WARNING", Message: "  Check auth  ", Evidence: "  fatal error  "},
+			{},
+		},
 	}
 
 	sanitized := Sanitize(meta)
@@ -62,6 +66,23 @@ func TestMetadataSanitizeTrimsAndFilters(t *testing.T) {
 	}
 	if failure.Message != "unused import" {
 		t.Fatalf("expected trimmed message, got %q", failure.Message)
+	}
+
+	if len(sanitized.LogFindings) != 1 {
+		t.Fatalf("expected single log finding, got %d", len(sanitized.LogFindings))
+	}
+	finding := sanitized.LogFindings[0]
+	if finding.Code != "KB.GIT.AUTH" {
+		t.Fatalf("expected trimmed finding code, got %q", finding.Code)
+	}
+	if finding.Severity != "warning" {
+		t.Fatalf("expected normalized finding severity, got %q", finding.Severity)
+	}
+	if finding.Message != "Check auth" {
+		t.Fatalf("expected trimmed message, got %q", finding.Message)
+	}
+	if finding.Evidence != "fatal error" {
+		t.Fatalf("expected trimmed evidence, got %q", finding.Evidence)
 	}
 }
 
