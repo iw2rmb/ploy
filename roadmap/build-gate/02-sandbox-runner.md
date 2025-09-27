@@ -2,7 +2,7 @@
 - [ ] Pending
 
 ## Why / What For
-Port the deterministic sandbox build flow into `internal/workflow/buildgate` so workstation runs can execute builds and capture structured results without Grid dependencies.
+ Port the deterministic sandbox build flow into `internal/workflow/buildgate` so workstation runs can execute builds and capture structured results without Grid dependencies. The sandbox runner exists for RED-phase tests only; Grid remains the default execution path for real builds.
 
 ## Required Changes
 - Implement `buildgate.SandboxRunner` wrapping the existing sandbox build logic with structured outputs.
@@ -17,3 +17,7 @@ Port the deterministic sandbox build flow into `internal/workflow/buildgate` so 
 ## Tests
 - New unit tests for `buildgate.SandboxRunner` covering cache reuse, timeouts, and error propagation.
 - `go test -cover ./...` stays above repository thresholds.
+
+## References
+- Build Gate design (`docs/design/build-gate/README.md`).
+- Grid Workflow RPC helper guide for workstation fallback expectations (`../grid/sdk/workflowrpc/README.md`).

@@ -4,6 +4,10 @@
 Reintroduce the Mods build gate with modern Grid integration, static analysis, and intelligent log parsing. We recover behaviour from commit `3b11d7e8`—which emitted builder logs, sandbox builds, and healing retries—while migrating execution to Grid stages and expanding language-specific static checks (e.g., Google Error Prone for Java). The reboot ensures every Mods plan validates code quality before changes exit the workstation.
 
 ## Scope
+- Execute build and static analysis stages on Grid via Workflow RPC jobs while retaining a deterministic workstation sandbox for RED-phase testing.
+- Parse build outputs into structured metadata consumed by Knowledge Base and Mods healing flows.
+- Keep lane definitions aligned with the Workflow RPC job spec schema (`image`, `command`, `env`, `resources`).
+
 ## Current Status (2025-09-27)
 - Stage scheduling and checkpoint metadata wiring landed via `roadmap/build-gate/01-stage-planning-and-metadata.md`.
 - Sandbox runner, adapter registry, and log retrieval tasks remain pending (see roadmap files 02-04).
@@ -24,12 +28,26 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Successful runs propagate build version metadata and artifact digests back to the workflow checkpoint. Failures trigger healing retries or escalate to `human-in-the-loop` depending on Mods planner guidance.
 
 ## Implementation Notes
-- Create `buildgate.SandboxRunner` to wrap the existing sandbox build logic and expose structured results. It should reuse deterministic caching and keep compatibility with prior unit tests.
+- Create `buildgate.SandboxRunner` to wrap the existing sandbox build logic and expose structured results. This runner is a workstation test harness that keeps RED-phase tests deterministic; production runs continue to execute inside Grid stages.
 - Implement a `StaticCheckRegistry` mapping languages to adapters. Each adapter runs inside the same Grid job to minimise cold starts and reads configuration from repo manifests (e.g., `.errorprone`, `.eslintrc`).
-- Adapt log enrichment to pull artifacts from Grid: upon failure, query `grid.status.<ticket>` for the stage, find the artifact CID, and retrieve logs via IPFS. Provide fallbacks to JetStream attachments in workstation mode.
+- Adapt log enrichment to pull artifacts from Grid: upon failure, inspect `jobs.<run_id>.events` for the stage, find the artifact CID, and retrieve logs via IPFS using the Workflow RPC helper utilities. Provide fallbacks to JetStream attachments in workstation mode.
 - Emit checkpoint metadata fields (`build_gate.static_checks`, `build_gate.log_digest`) so downstream tooling (Knowledge Base, telemetry) can reason about results.
 - Provide CLI options to toggle static checks per language and to set failure thresholds (`--build-gate-fail-on-warning`, `--build-gate-skip=golang`).
 - Ensure compatibility with Mods planner by exposing a `buildgate.Run(ctx, spec)` API returning structured outcomes consumed by healing logic.
+
+## Clarifications (2025-09-27)
+- “Sandbox” in this document refers to the deterministic workstation harness used for RED-phase unit tests. Live build and static-check execution stays on Grid; there is no additional sandbox infrastructure or per-build VM beyond the Grid runtime adapters.
+- Build jobs must populate the Workflow RPC job spec schema (`image`, `command`, `env`, `resources`) before dispatch so Grid accelerators and cache reuse function correctly.
+
+## References
+- Grid Workflow RPC design for build stage submission (`../grid/docs/design/workflow-rpc/README.md`).
+- Grid Workflow RPC helper guide for streaming/log retrieval utilities (`../grid/sdk/workflowrpc/README.md`).
+- Grid log streaming design covering artifact publication (`../grid/docs/design/log-streaming/README.md`).
+- Ploy Workflow RPC alignment design for job payload requirements (`../workflow-rpc-alignment/README.md`).
+
+## Verification (2025-09-27)
+- Confirmed `jobs.<run_id>.events` are emitted with artifact metadata in `../grid/internal/jobs/publisher_jetstream.go`.
+- Verified current Ploy build gate metadata sanitisation in `internal/workflow/buildgate/metadata.go` aligns with the documented schema.
 
 ## Tests
 - Unit tests for sandbox runner covering timeout handling, cache reuse, and structured result mapping, using fake Grid adapters in the workstation stub.
