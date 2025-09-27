@@ -8,9 +8,10 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Parse build outputs into structured metadata consumed by Knowledge Base and Mods healing flows.
 - Keep lane definitions aligned with the Workflow RPC job spec schema (`image`, `command`, `env`, `resources`).
 
-## Current Status (2025-09-27)
+## Current Status (2025-10-05)
 - Stage scheduling and checkpoint metadata wiring landed via `roadmap/build-gate/01-stage-planning-and-metadata.md`.
-- Sandbox runner, adapter registry, and log retrieval tasks remain pending (see roadmap files 02-04).
+- Sandbox runner landed via `roadmap/build-gate/02-sandbox-runner.md`, providing structured duration/cache metadata and timeout handling for workstation tests.
+- Static check adapter registry and log retrieval tasks remain pending (see roadmap files 03-04).
 
 - Establish `internal/workflow/buildgate` hosting sandbox compilation, static check orchestration, and log parsing utilities.
 - Align build execution with Grid workflow stages (`build-gate`, `static-checks`) triggered from Mods and general workflow runs.
@@ -28,7 +29,7 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Successful runs propagate build version metadata and artifact digests back to the workflow checkpoint. Failures trigger healing retries or escalate to `human-in-the-loop` depending on Mods planner guidance.
 
 ## Implementation Notes
-- Create `buildgate.SandboxRunner` to wrap the existing sandbox build logic and expose structured results. This runner is a workstation test harness that keeps RED-phase tests deterministic; production runs continue to execute inside Grid stages.
+- `buildgate.SandboxRunner` wraps the deterministic sandbox build logic and exposes structured results (duration, cache hit, failure reason/detail) for workstation tests. The runner keeps RED-phase tests deterministic while production builds continue to execute inside Grid stages.
 - Implement a `StaticCheckRegistry` mapping languages to adapters. Each adapter runs inside the same Grid job to minimise cold starts and reads configuration from repo manifests (e.g., `.errorprone`, `.eslintrc`).
 - Adapt log enrichment to pull artifacts from Grid: upon failure, inspect `jobs.<run_id>.events` for the stage, find the artifact CID, and retrieve logs via IPFS using the Workflow RPC helper utilities. Provide fallbacks to JetStream attachments in workstation mode.
 - Emit checkpoint metadata fields (`build_gate.static_checks`, `build_gate.log_digest`) so downstream tooling (Knowledge Base, telemetry) can reason about results.

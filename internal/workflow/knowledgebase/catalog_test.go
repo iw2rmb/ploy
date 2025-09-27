@@ -81,6 +81,9 @@ func TestSaveCatalogFileFailsWhenDirectoryNotWritable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("chmod semantics differ on Windows")
 	}
+	if os.Geteuid() == 0 {
+		t.Skip("permission checks require non-root user")
+	}
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0o500); err != nil {
 		t.Skipf("unable to adjust permissions: %v", err)
