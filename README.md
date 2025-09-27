@@ -7,6 +7,12 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - Ploy consumes those streams, assembles the mods/workflow DAG, and submits follow-up jobs back to Grid via the workflow RPC client.
 - Every checkpoint, artifact pointer, and decision is written to JetStream/IPFS so runs stay stateless and retries never depend on long-lived services.
 
+### Related Grid References
+- Workflow RPC contract and SDK expectations live in the Grid repository (`../grid/docs/design/workflow-rpc/README.md`).
+- Webhook intake behaviour is defined in Grid's Webhook Gateway design (`../grid/docs/design/webhook-gateway/README.md`).
+- Scheduler queue, quotas, and cache hints derive from the Grid Scheduler Core design (`../grid/docs/design/scheduler-core/README.md`).
+- Workflow RPC helper usage, builders, and streaming retries are documented in `../grid/sdk/workflowrpc/README.md` and drive configuration parity with Grid.
+
 ## Feature Highlights
 - [x] Legacy teardown — repository scoped to the CLI-only stub and guardrail tests (Roadmap 00).
 - [x] Event contracts — JetStream subject map, schema enforcement, and in-memory stubs for offline work (Roadmap 01).
@@ -30,6 +36,7 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI ingest/evaluate workflows, and seeds `llm-plan` with suggestions (Roadmap 20, see `docs/design/knowledge-base/README.md`).
 - [ ] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`); stage planning & metadata wiring landed 2025-09-27 with sandbox/log work pending.
+- [ ] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement, and subject alignment (Roadmap 22, see `docs/design/workflow-rpc-alignment/README.md`).
 
 Full design records live in `docs/design/README.md`.
 

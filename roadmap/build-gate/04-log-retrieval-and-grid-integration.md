@@ -18,3 +18,8 @@ Fetch build logs from Grid artifact streams (or IPFS fallback) and classify erro
 - Unit tests for log parser fixtures covering compiler, dependency, and infrastructure errors.
 - Grid stub tests verifying artifact retrieval paths populate metadata.
 - `go test -cover ./...` maintains coverage thresholds.
+
+## References
+- Build Gate design (`docs/design/build-gate/README.md`).
+- Grid log streaming design (`../grid/docs/design/log-streaming/README.md`).
+- Grid Workflow RPC helper guide (`../grid/sdk/workflowrpc/README.md`).

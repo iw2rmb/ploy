@@ -1,0 +1,24 @@
+# Adopt Grid Workflow RPC Helper
+- [ ] Pending
+
+## Why / What For
+Once Grid ships the `sdk/workflowrpc/helper` layer, Ploy should migrate its workflow client construction to use the helper APIs for request building, configuration, and streaming retries.
+
+## Required Changes
+- Replace direct `sdk/workflowrpc/go` usage with helper builders for `SubmitRequest` and streaming.
+- Update configuration paths to leverage helper environment/token providers.
+- Adjust tests to cover helper-based wiring and maintain existing coverage thresholds.
+
+## Definition of Done
+- Workflow runner and CLI use helper constructors, reducing bespoke client wiring.
+- Tests validate retryable stream handling and job spec composition via the helper.
+- Documentation updated to note helper adoption and any required environment variables.
+
+## Tests
+- Runner integration test exercising helper-based submission and stream handling.
+- Unit tests verifying helper configuration errors are surfaced correctly.
+
+## References
+- Ploy Workflow RPC Alignment design (`docs/design/workflow-rpc-alignment/README.md`).
+- Grid Workflow RPC helper guide (`../grid/sdk/workflowrpc/README.md`).
+- Grid Workflow RPC helper roadmap (`../grid/roadmap/workflow-rpc/04-sdk-helper-layer.md`).
