@@ -9,6 +9,8 @@ ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--mods
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>
 ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
+ploy knowledge-base ingest --from <fixture.json>
+ploy knowledge-base evaluate --fixture <samples.json>
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
@@ -19,6 +21,8 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 `snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, uploads the payload to the configured IPFS gateway (falling back to the deterministic in-memory publisher when ``IPFS_GATEWAY`` is unset), publishes metadata to the current stub, and prints the returned CID.
 
 `environment materialize` evaluates the integration manifest for a given app/commit pair, validates required snapshots, optionally captures them (execution mode), composes deterministic cache keys for each required lane, and hydrates those caches through an in-memory hydrator. Dry-run mode avoids snapshot capture/hydration and surfaces any gaps before Grid integration lands.
+
+`knowledge-base ingest` merges incident fixtures into the workstation catalog under `configs/knowledge-base/catalog.json`, enforcing duplicate safeguards and preserving schema version ordering. `knowledge-base evaluate` loads curated samples, runs them through the advisor with a conservative score floor, and prints per-sample match results plus aggregate accuracy so operators can gauge classifier drift without leaving the workstation.
 
 ## Flags
 - `--lane` — Lane identifier defined under `configs/lanes/*.toml` (required for `lanes describe`).

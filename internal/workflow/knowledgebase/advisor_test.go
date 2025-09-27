@@ -134,6 +134,79 @@ func TestAdvisorGracefullyHandlesEmptyCatalog(t *testing.T) {
 	}
 }
 
+func TestAdvisorMatchReturnsIncidentIDAndScore(t *testing.T) {
+	dir := t.TempDir()
+	catalogPath := filepath.Join(dir, "catalog.json")
+	if err := os.WriteFile(catalogPath, []byte(`{
+		"schema_version": "2025-09-27.1",
+		"incidents": [
+			{
+				"id": "lint-failure",
+				"errors": ["npm ERR! lint script failed"],
+				"recipes": ["recipe.npm.lint"],
+				"summary": "Run npm run lint",
+				"human_gate": true,
+				"playbooks": ["mods.npm.lint"],
+				"recommendations": [
+					{"source": "knowledge-base", "message": "Run npm run lint -- --fix", "confidence": 0.7}
+				]
+			}
+		]
+	}`), 0o600); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
+	catalog, err := knowledgebase.LoadCatalogFile(catalogPath)
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{Catalog: catalog})
+	if err != nil {
+		t.Fatalf("new advisor: %v", err)
+	}
+	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{
+		Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123", Tenant: "acme"},
+		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
+	})
+	if err != nil {
+		t.Fatalf("match: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected match to be found")
+	}
+	if match.IncidentID != "lint-failure" {
+		t.Fatalf("expected incident lint-failure, got %q", match.IncidentID)
+	}
+	if match.Score <= 0 {
+		t.Fatalf("expected positive score, got %f", match.Score)
+	}
+	if match.Advice.Plan.SelectedRecipes == nil || match.Advice.Plan.SelectedRecipes[0] != "recipe.npm.lint" {
+		t.Fatalf("expected plan advice to include npm lint recipe, got %#v", match.Advice.Plan.SelectedRecipes)
+	}
+	if !match.Advice.Human.Required {
+		t.Fatalf("expected human gate to remain true in advice")
+	}
+}
+
+func TestAdvisorMatchHandlesNoMatch(t *testing.T) {
+	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{})
+	if err != nil {
+		t.Fatalf("new advisor: %v", err)
+	}
+	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: []string{"completely unknown error"}}})
+	if err != nil {
+		t.Fatalf("match empty catalog: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected no match, got %+v", match)
+	}
+	if match.IncidentID != "" {
+		t.Fatalf("expected empty incident id when no match, got %q", match.IncidentID)
+	}
+	if match.Score != 0 {
+		t.Fatalf("expected zero score when no match, got %f", match.Score)
+	}
+}
+
 func TestAdvisorHonoursScoreFloor(t *testing.T) {
 	dir := t.TempDir()
 	catalogPath := filepath.Join(dir, "catalog.json")

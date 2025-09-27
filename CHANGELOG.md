@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-27] Knowledge Base CLI Evaluation
+- Added `knowledgebase.Match` helper returning incident IDs and similarity scores so tooling can inspect advisor output without changing Mods planner wiring.
+- Introduced `ploy knowledge-base evaluate --fixture <samples.json>` with score-floor filtering, PASS/MISS labelling, and aggregate accuracy metrics for workstation validation.
+- Documented the evaluation workflow across `docs/design/knowledge-base/README.md`, `cmd/ploy/README.md`, `configs/knowledge-base/README.md`, and marked roadmap task `roadmap/knowledge-base/03-cli-evaluate.md` complete.
+
 ## [2025-09-27] Knowledge Base CLI Ingest
 - Added `ploy knowledge-base ingest` to append incident fixtures into `configs/knowledge-base/catalog.json`, rejecting duplicate IDs and summarising ingested incidents for operators.
 - Extended `internal/workflow/knowledgebase` with merge/save helpers (atomic writes + duplicate safeguards) and comprehensive unit tests, keeping package coverage at 90.3%.

@@ -13,4 +13,4 @@ The workstation knowledge base catalog powers the Mods advisor by default when r
   - `playbooks`: optional human playbooks to surface.
   - `recommendations`: list of `{source, message, confidence, recipes, artifact_cid}` entries.
 
-Leave the file absent when no catalog is available; the CLI falls back to the previous Mods behaviour automatically. Use `ploy knowledge-base ingest --from <fixture.json>` to append new incidents without editing the file by hand.
+Leave the file absent when no catalog is available; the CLI falls back to the previous Mods behaviour automatically. Use `ploy knowledge-base ingest --from <fixture.json>` to append new incidents without editing the file by hand, and `ploy knowledge-base evaluate --fixture <samples.json>` to sanity-check classifier accuracy against curated incidents.
