@@ -35,8 +35,8 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - [x] Stage artifact streams — dedicated JetStream envelopes for stage artifacts to feed cache hydrators (Roadmap 18).
 - [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI ingest/evaluate workflows, and seeds `llm-plan` with suggestions (Roadmap 20, see `docs/design/knowledge-base/README.md`).
-- [ ] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`); stage planning & metadata wiring landed 2025-09-27 with sandbox/log work pending.
-- [ ] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement, and subject alignment (Roadmap 22, see `docs/design/workflow-rpc-alignment/README.md`).
+- [ ] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`); sandbox runner, static check registry, log ingestion, and metadata sanitisation shipped, with CLI knowledge base surfacing still pending.
+- [x] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement, and subject alignment (Roadmap 22, see `docs/design/workflow-rpc-alignment/README.md`); SDK client, helper retries, subject realignment, and lane-driven job composition landed 2025-10-01.
 
 Full design records live in `docs/design/README.md`.
 
