@@ -31,7 +31,7 @@ Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoin
 ## Implementation Notes
 - Introduce `mods.Planner` that loads roadmap recipes, Knowledge Base hints, and repo metadata (lanes, manifests) to build a DAG spec. Planner outputs map to workflow stages consumed by the existing runner planner.
 - Define stage kinds (`mods-plan`, `orw-apply`, `orw-gen`, `llm-plan`, `llm-exec`, `mods-human`) in `internal/workflow/contracts` so checkpoints carry consistent metadata.
-- Rehydrate builder log enrichment from commit `3b11d7e8` by adapting to Grid status streams: stage failures request `grid.status.<ticket>` event transcripts and artifact CIDs rather than hitting the retired controller HTTP API.
+- Rehydrate builder log enrichment from commit `3b11d7e8` by adapting to Grid status streams: stage failures request `jobs.<run_id>.events` transcripts and artifact CIDs rather than hitting the retired controller HTTP API.
 - Extend the workflow runner to fan out `orw-*` stages concurrently when the plan marks them parallelizable. Use Grid workflow dependencies to express concurrency instead of bespoke goroutines.
 - Persist Mods plan summaries and diff bundles to IPFS via existing artifact publishers, referencing returned CIDs in checkpoints for Knowledge Base lookups.
 - Provide CLI flags (`--mods-plan-timeout`, `--mods-max-parallel`) surfaced through `ploy workflow run` for operator control.

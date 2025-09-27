@@ -110,6 +110,7 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
 		CacheComposer:    laneCacheComposer{lanes: laneReg},
+		JobComposer:      runner.LaneJobComposer{Lanes: laneReg},
 		Mods:             modsOptions,
 		Aster: runner.AsterOptions{
 			Locator:           locator,

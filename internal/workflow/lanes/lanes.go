@@ -28,6 +28,22 @@ type Spec struct {
 	RuntimeFamily  string   `toml:"runtime_family"`
 	CacheNamespace string   `toml:"cache_namespace"`
 	Commands       Commands `toml:"commands"`
+	Job            JobSpec  `toml:"job"`
+}
+
+type JobSpec struct {
+	Image     string            `toml:"image"`
+	Command   []string          `toml:"command"`
+	Env       map[string]string `toml:"env"`
+	Resources JobResources      `toml:"resources"`
+	Priority  string            `toml:"priority"`
+}
+
+type JobResources struct {
+	CPU    string `toml:"cpu"`
+	Memory string `toml:"memory"`
+	Disk   string `toml:"disk"`
+	GPU    string `toml:"gpu"`
 }
 
 type Registry struct {
@@ -112,6 +128,21 @@ func validateSpec(spec Spec) error {
 	}
 	if len(spec.Commands.Test) == 0 {
 		return errors.New("commands.test is required")
+	}
+	if strings.TrimSpace(spec.Job.Image) == "" {
+		return errors.New("job.image is required")
+	}
+	if len(spec.Job.Command) == 0 {
+		return errors.New("job.command is required")
+	}
+	if spec.Job.Env == nil {
+		return errors.New("job.env is required")
+	}
+	if strings.TrimSpace(spec.Job.Resources.CPU) == "" {
+		return errors.New("job.resources.cpu is required")
+	}
+	if strings.TrimSpace(spec.Job.Resources.Memory) == "" {
+		return errors.New("job.resources.memory is required")
 	}
 	return nil
 }

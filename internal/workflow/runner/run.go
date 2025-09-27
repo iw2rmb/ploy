@@ -33,11 +33,19 @@ type stageExecutor struct {
 	maxRetries  int
 	publishMu   *sync.Mutex
 	failureOnce *sync.Once
+	jobComposer JobComposer
 }
 
 func (e *stageExecutor) runStage(ctx context.Context, stage Stage) (Stage, error) {
 	attempt := 0
 	for {
+		if e.jobComposer != nil {
+			jobSpec, err := e.jobComposer.Compose(ctx, JobComposeRequest{Stage: stage, Ticket: e.ticket})
+			if err != nil {
+				return Stage{}, err
+			}
+			stage.Job = jobSpec
+		}
 		if err := e.publishStage(ctx, stage, StageStatusRunning, nil); err != nil {
 			return Stage{}, err
 		}
@@ -256,6 +264,7 @@ func Run(ctx context.Context, opts Options) (err error) {
 		maxRetries:  maxRetries,
 		publishMu:   &publishMu,
 		failureOnce: &failureOnce,
+		jobComposer: opts.JobComposer,
 	}
 	scheduled := make(map[string]bool, len(stageNodes))
 	startStages := func(nodes []*stageNode) {

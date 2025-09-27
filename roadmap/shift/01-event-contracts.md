@@ -5,7 +5,7 @@
 Define the JetStream subjects, message schemas, and retention policies that let Ploy stay stateless while Grid retains control-surface ownership.
 
 ## Required Changes
-- Publish subject map (`grid.webhook.<tenant>`, `ploy.workflow.<ticket>.checkpoints`, etc.) with schema docs.
+- Publish subject map (`webhook.<tenant>.ploy.workflow-ticket`, `ploy.workflow.<ticket>.checkpoints`, etc.) with schema docs.
 - Build protobuf/JSON schema packages for workflow checkpoints, cache key announcements, and artifact manifests.
 - Implement migration notes for tearing out Nomad topic consumers and wiring CLI stubs into JetStream.
 

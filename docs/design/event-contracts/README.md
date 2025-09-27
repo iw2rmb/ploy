@@ -4,7 +4,7 @@
 Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate statelessly while Grid remains the control surface owner. This slice introduces workstation-only stubs so tickets can be claimed and checkpoints emitted without live JetStream wiring.
 
 ## Subject Map
-- `webhook.<tenant>.<source>.<event>` — Grid-owned inbox where tickets and workflow intents are emitted per provider/event.
+- `webhook.<tenant>.<source>.<event>` — Grid-owned inbox where tickets and workflow intents are emitted per provider/event. Ploy uses `source=ploy` and `event=workflow-ticket` for Workflow RPC submissions (`webhook.<tenant>.ploy.workflow-ticket`).
 - `ploy.workflow.<ticket>.checkpoints` — Ploy-published stream containing DAG checkpoints, cache signals, and retry markers.
 - `ploy.artifact.<ticket>` — Ploy-published stream of IPFS hashes for build outputs, snapshot bundles, and diff reports.
 - `jobs.<run_id>.events` — Grid-owned stream reporting workflow lifecycle events that Ploy tails before exit.

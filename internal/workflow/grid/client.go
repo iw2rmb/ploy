@@ -1,11 +1,8 @@
 package grid
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,26 +10,35 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc"
+	rpcHelper "github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc/helper"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-const stagePath = "/workflow/stages"
-
 // Options configures the Grid Workflow RPC client.
 type Options struct {
-	Endpoint   string
-	HTTPClient *http.Client
+	Endpoint      string
+	HTTPClient    *http.Client
+	BearerToken   string
+	Retries       int
+	HelperFactory workflowRPCHelperFactory
+}
+
+type workflowRPCHelperFactory func(rpcHelper.Options) (workflowRPCClient, error)
+
+type workflowRPCClient interface {
+	Submit(ctx context.Context, req workflowrpc.SubmitRequest) (workflowrpc.SubmitResponse, error)
 }
 
 // Client implements runner.GridClient by dispatching workflow stages to Grid's Workflow RPC.
 type Client struct {
-	endpoint   *url.URL
-	httpClient *http.Client
+	rpc workflowRPCClient
 
 	mu          sync.Mutex
 	invocations []runner.StageInvocation
 }
+
+const defaultJobPriority = "standard"
 
 // NewClient constructs a Grid Workflow RPC client.
 func NewClient(opts Options) (*Client, error) {
@@ -40,7 +46,6 @@ func NewClient(opts Options) (*Client, error) {
 	if endpoint == "" {
 		return nil, fmt.Errorf("grid endpoint is required")
 	}
-
 	parsed, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("parse grid endpoint: %w", err)
@@ -49,78 +54,51 @@ func NewClient(opts Options) (*Client, error) {
 		return nil, fmt.Errorf("grid endpoint must include scheme and host")
 	}
 
-	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+	factory := opts.HelperFactory
+	if factory == nil {
+		factory = func(helperOpts rpcHelper.Options) (workflowRPCClient, error) {
+			return rpcHelper.New(helperOpts)
+		}
 	}
 
-	return &Client{endpoint: parsed, httpClient: httpClient}, nil
+	rpcClient, err := factory(rpcHelper.Options{Endpoint: endpoint, HTTPClient: opts.HTTPClient, BearerToken: opts.BearerToken, Retries: opts.Retries})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Client{rpc: rpcClient}, nil
 }
 
 // ExecuteStage submits the stage execution request to Grid and returns the resulting outcome.
 func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	c.recordInvocation(ticket, stage, workspace)
 
-	stagePayload := marshalStage(stage)
-	payload := executeRequest{
+	req := workflowrpc.SubmitRequest{
 		SchemaVersion: contracts.SchemaVersion,
 		Ticket:        ticket,
-		Stage:         stagePayload,
+		Stage:         marshalStage(stage),
 	}
 
-	data, err := json.Marshal(payload)
+	resp, err := c.rpc.Submit(ctx, req)
 	if err != nil {
-		return runner.StageOutcome{}, fmt.Errorf("encode grid request: %w", err)
-	}
-
-	endpoint := c.endpoint.ResolveReference(&url.URL{Path: stagePath})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(data))
-	if err != nil {
-		return runner.StageOutcome{}, fmt.Errorf("create grid request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return runner.StageOutcome{}, fmt.Errorf("invoke grid endpoint: %w", err)
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return runner.StageOutcome{}, fmt.Errorf("read grid response: %w", err)
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		snippet := strings.TrimSpace(string(body))
-		if len(snippet) > 200 {
-			snippet = snippet[:200]
-		}
-		return runner.StageOutcome{}, fmt.Errorf("grid returned status %d: %s", resp.StatusCode, snippet)
-	}
-
-	var out executeResponse
-	if err := json.Unmarshal(body, &out); err != nil {
-		return runner.StageOutcome{}, fmt.Errorf("decode grid response: %w", err)
+		return runner.StageOutcome{}, err
 	}
 
 	outcome := runner.StageOutcome{
 		Stage:     stage,
-		Status:    runner.StageStatus(out.Status),
-		Retryable: out.Retryable,
-		Message:   out.Message,
+		Status:    runner.StageStatus(resp.Status),
+		Retryable: resp.Retryable,
+		Message:   resp.Message,
 	}
 	if outcome.Status == "" {
 		outcome.Status = runner.StageStatusCompleted
 	}
-	if out.Stage.Name != "" {
-		outcome.Stage = unmarshalStage(out.Stage)
+	if resp.Stage.Name != "" {
+		outcome.Stage = unmarshalStage(resp.Stage)
 	}
-	if len(out.Artifacts) > 0 {
-		artifacts := make([]runner.Artifact, 0, len(out.Artifacts))
-		for _, art := range out.Artifacts {
+	if len(resp.Artifacts) > 0 {
+		artifacts := make([]runner.Artifact, 0, len(resp.Artifacts))
+		for _, art := range resp.Artifacts {
 			artifacts = append(artifacts, runner.Artifact{
 				Name:        strings.TrimSpace(art.Name),
 				ArtifactCID: strings.TrimSpace(art.ArtifactCID),
@@ -148,57 +126,26 @@ func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.
 	c.invocations = append(c.invocations, runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace})
 }
 
-type executeRequest struct {
-	SchemaVersion string                   `json:"schema_version"`
-	Ticket        contracts.WorkflowTicket `json:"ticket"`
-	Stage         stageEnvelope            `json:"stage"`
-}
-
-type executeResponse struct {
-	Status    string             `json:"status"`
-	Message   string             `json:"message"`
-	Retryable bool               `json:"retryable"`
-	Stage     stageEnvelope      `json:"stage"`
-	Artifacts []artifactEnvelope `json:"artifacts"`
-}
-
-type stageEnvelope struct {
-	Name         string              `json:"name"`
-	Kind         string              `json:"kind"`
-	Lane         string              `json:"lane"`
-	Dependencies []string            `json:"dependencies,omitempty"`
-	CacheKey     string              `json:"cache_key,omitempty"`
-	Constraints  constraintsEnvelope `json:"constraints"`
-	Aster        asterEnvelope       `json:"aster"`
-}
-
-type constraintsEnvelope struct {
-	Manifest manifests.Compilation `json:"manifest"`
-}
-
-type asterEnvelope struct {
-	Enabled bool             `json:"enabled"`
-	Toggles []string         `json:"toggles"`
-	Bundles []aster.Metadata `json:"bundles"`
-}
-
-func marshalStage(stage runner.Stage) stageEnvelope {
-	return stageEnvelope{
+func marshalStage(stage runner.Stage) workflowrpc.Stage {
+	return workflowrpc.Stage{
 		Name:         stage.Name,
 		Kind:         string(stage.Kind),
 		Lane:         stage.Lane,
 		Dependencies: append([]string(nil), stage.Dependencies...),
 		CacheKey:     stage.CacheKey,
-		Constraints:  constraintsEnvelope{Manifest: stage.Constraints.Manifest},
-		Aster: asterEnvelope{
+		Constraints: workflowrpc.Constraints{
+			Manifest: stage.Constraints.Manifest,
+		},
+		Aster: workflowrpc.Aster{
 			Enabled: stage.Aster.Enabled,
 			Toggles: append([]string(nil), stage.Aster.Toggles...),
 			Bundles: append([]aster.Metadata(nil), stage.Aster.Bundles...),
 		},
+		Job: marshalJob(stage),
 	}
 }
 
-func unmarshalStage(env stageEnvelope) runner.Stage {
+func unmarshalStage(env workflowrpc.Stage) runner.Stage {
 	return runner.Stage{
 		Name:         env.Name,
 		Kind:         runner.StageKind(env.Kind),
@@ -211,12 +158,73 @@ func unmarshalStage(env stageEnvelope) runner.Stage {
 			Toggles: append([]string(nil), env.Aster.Toggles...),
 			Bundles: append([]aster.Metadata(nil), env.Aster.Bundles...),
 		},
+		Job: unmarshalJob(env.Job),
 	}
 }
 
-type artifactEnvelope struct {
-	Name        string `json:"name"`
-	ArtifactCID string `json:"artifact_cid"`
-	Digest      string `json:"digest"`
-	MediaType   string `json:"media_type"`
+func marshalJob(stage runner.Stage) workflowrpc.JobSpec {
+	metadata := copyStringMap(stage.Job.Metadata)
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+	if stage.Lane != "" {
+		metadata["lane"] = stage.Lane
+	}
+	if stage.CacheKey != "" {
+		metadata["cache_key"] = stage.CacheKey
+	}
+	if _, ok := metadata["priority"]; !ok || strings.TrimSpace(metadata["priority"]) == "" {
+		metadata["priority"] = defaultJobPriority
+	}
+	manifest := stage.Constraints.Manifest.Manifest
+	if manifest.Name != "" {
+		metadata["manifest_name"] = manifest.Name
+	}
+	if manifest.Version != "" {
+		metadata["manifest_version"] = manifest.Version
+	}
+
+	return workflowrpc.JobSpec{
+		Image:   stage.Job.Image,
+		Command: append([]string(nil), stage.Job.Command...),
+		Env:     copyStringMap(stage.Job.Env),
+		Resources: workflowrpc.Resources{
+			CPU:    stage.Job.Resources.CPU,
+			Memory: stage.Job.Resources.Memory,
+			Disk:   stage.Job.Resources.Disk,
+			GPU:    stage.Job.Resources.GPU,
+		},
+		Metadata: metadata,
+	}
+}
+
+func unmarshalJob(spec workflowrpc.JobSpec) runner.StageJobSpec {
+	return runner.StageJobSpec{
+		Image:   spec.Image,
+		Command: append([]string(nil), spec.Command...),
+		Env:     copyStringMap(spec.Env),
+		Resources: runner.StageJobResources{
+			CPU:    spec.Resources.CPU,
+			Memory: spec.Resources.Memory,
+			Disk:   spec.Resources.Disk,
+			GPU:    spec.Resources.GPU,
+		},
+		Metadata: copyStringMap(spec.Metadata),
+	}
+}
+
+func copyStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		if trimmedKey := strings.TrimSpace(key); trimmedKey != "" {
+			dst[trimmedKey] = strings.TrimSpace(value)
+		}
+	}
+	if len(dst) == 0 {
+		return nil
+	}
+	return dst
 }

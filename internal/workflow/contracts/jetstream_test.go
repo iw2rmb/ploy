@@ -27,7 +27,7 @@ func TestJetStreamClientClaimTicket(t *testing.T) {
 
 	if _, err := js.AddStream(&nats.StreamConfig{
 		Name:     "GRID_WEBHOOK",
-		Subjects: []string{"grid.webhook.*"},
+		Subjects: []string{"webhook.*.ploy.workflow-ticket"},
 	}); err != nil {
 		t.Fatalf("add webhook stream: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestJetStreamClientClaimTicket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal ticket: %v", err)
 	}
-	if _, err := js.Publish("grid.webhook.acme", payload); err != nil {
+	if _, err := js.Publish("webhook.acme.ploy.workflow-ticket", payload); err != nil {
 		t.Fatalf("publish ticket: %v", err)
 	}
 

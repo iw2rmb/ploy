@@ -26,6 +26,16 @@ func TestHandleLanesDescribePrintsDetails(t *testing.T) {
 				Build: []string{"npm", "ci"},
 				Test:  []string{"npm", "test"},
 			},
+			Job: lanes.JobSpec{
+				Image:   "registry.dev/node:20",
+				Command: []string{"npm", "test"},
+				Env:     map[string]string{"NODE_ENV": "test"},
+				Resources: lanes.JobResources{
+					CPU:    "2000m",
+					Memory: "4Gi",
+				},
+				Priority: "standard",
+			},
 		},
 		CacheKey: "node/node-wasm@commit=abc@...",
 	}
@@ -40,7 +50,7 @@ func TestHandleLanesDescribePrintsDetails(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	output := buf.String()
-	for _, fragment := range []string{"node-wasm", "wasm-node", "node", "node/node-wasm@commit=abc"} {
+	for _, fragment := range []string{"node-wasm", "wasm-node", "node", "registry.dev/node:20", "Job Env", "Job Resources", "node/node-wasm@commit=abc"} {
 		if !strings.Contains(output, fragment) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}

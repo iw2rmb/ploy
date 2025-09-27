@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"strings"
+
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
@@ -69,5 +71,20 @@ func (f *fakeLaneRegistry) Describe(name string, opts lanes.DescribeOptions) (la
 		return lanes.Description{}, f.err
 	}
 	f.description.Parameters = opts
+	if strings.TrimSpace(f.description.Lane.Job.Image) == "" {
+		if f.description.Lane.Job.Env == nil {
+			f.description.Lane.Job.Env = map[string]string{}
+		}
+		if len(f.description.Lane.Job.Command) == 0 {
+			f.description.Lane.Job.Command = []string{"/bin/true"}
+		}
+		if f.description.Lane.Job.Resources.CPU == "" {
+			f.description.Lane.Job.Resources.CPU = "1000m"
+		}
+		if f.description.Lane.Job.Resources.Memory == "" {
+			f.description.Lane.Job.Resources.Memory = "1Gi"
+		}
+		f.description.Lane.Job.Image = "registry.dev/default:latest"
+	}
 	return f.description, nil
 }

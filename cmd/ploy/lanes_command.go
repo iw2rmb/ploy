@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/lanes"
@@ -88,6 +89,44 @@ func printLaneDescription(w io.Writer, desc lanes.Description) {
 	}
 	_, _ = fmt.Fprintf(w, "Build Command: %s\n", strings.Join(desc.Lane.Commands.Build, " "))
 	_, _ = fmt.Fprintf(w, "Test Command: %s\n", strings.Join(desc.Lane.Commands.Test, " "))
+	if desc.Lane.Job.Image != "" {
+		_, _ = fmt.Fprintf(w, "Job Image: %s\n", desc.Lane.Job.Image)
+	}
+	if len(desc.Lane.Job.Command) > 0 {
+		_, _ = fmt.Fprintf(w, "Job Command: %s\n", strings.Join(desc.Lane.Job.Command, " "))
+	}
+	if len(desc.Lane.Job.Env) > 0 {
+		keys := make([]string, 0, len(desc.Lane.Job.Env))
+		for key := range desc.Lane.Job.Env {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		pairs := make([]string, len(keys))
+		for i, key := range keys {
+			pairs[i] = fmt.Sprintf("%s=%s", key, desc.Lane.Job.Env[key])
+		}
+		_, _ = fmt.Fprintf(w, "Job Env: %s\n", strings.Join(pairs, "; "))
+	}
+	resources := desc.Lane.Job.Resources
+	if resources.CPU != "" || resources.Memory != "" || resources.Disk != "" || resources.GPU != "" {
+		parts := []string{}
+		if resources.CPU != "" {
+			parts = append(parts, fmt.Sprintf("cpu=%s", resources.CPU))
+		}
+		if resources.Memory != "" {
+			parts = append(parts, fmt.Sprintf("memory=%s", resources.Memory))
+		}
+		if resources.Disk != "" {
+			parts = append(parts, fmt.Sprintf("disk=%s", resources.Disk))
+		}
+		if resources.GPU != "" {
+			parts = append(parts, fmt.Sprintf("gpu=%s", resources.GPU))
+		}
+		_, _ = fmt.Fprintf(w, "Job Resources: %s\n", strings.Join(parts, "; "))
+	}
+	if trimmed := strings.TrimSpace(desc.Lane.Job.Priority); trimmed != "" {
+		_, _ = fmt.Fprintf(w, "Job Priority: %s\n", trimmed)
+	}
 	_, _ = fmt.Fprintf(w, "Cache Key Preview: %s\n", desc.CacheKey)
 
 	inputs := []string{}
