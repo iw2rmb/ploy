@@ -43,6 +43,7 @@ type StageMetadata struct {
 type StageBuildGateMetadata struct {
 	LogDigest    string
 	StaticChecks []StageStaticCheck
+	LogFindings  []StageLogFinding
 }
 
 // StageStaticCheck describes one static analysis tool invocation.
@@ -61,6 +62,14 @@ type StageStaticCheckFailure struct {
 	Column   int
 	Severity string
 	Message  string
+}
+
+// StageLogFinding captures a normalized log finding generated during build ingestion.
+type StageLogFinding struct {
+	Code     string
+	Severity string
+	Message  string
+	Evidence string
 }
 
 // StageModsMetadata carries Mods planner metadata for checkpoints.
