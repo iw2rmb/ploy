@@ -35,8 +35,8 @@ func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			modsPlanStage: {{Status: runner.StageStatusCompleted}},
-			"build":       {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
+			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
+			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
 		},
 	}
 	opts := runner.Options{
@@ -66,8 +66,8 @@ func TestRunUsesFallbackFailureMessage(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			modsPlanStage: {{Status: runner.StageStatusCompleted}},
-			"build":       {{Status: runner.StageStatusFailed, Retryable: false}},
+			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
+			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false}},
 		},
 	}
 	opts := runner.Options{
@@ -114,7 +114,7 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: {{Status: runner.StageStatusCompleted}},
-			"build": {
+			buildGateStage: {
 				{Status: runner.StageStatusFailed, Retryable: true, Message: "grid transient"},
 				{Status: runner.StageStatusCompleted},
 			},
@@ -136,7 +136,7 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("run error: %v", err)
 	}
-	b := gatherStageAttempts(grid.calls, "build")
+	b := gatherStageAttempts(grid.calls, buildGateStage)
 	if b != 2 {
 		t.Fatalf("expected build stage to retry once, got %d attempts", b)
 	}
@@ -150,7 +150,8 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	requireStageStatuses(t, sequence, mods.StageNameLLMPlan, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameLLMExec, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameHuman, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
-	requireStageStatuses(t, sequence, "build", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusRetrying, runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, buildGateStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusRetrying, runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, staticChecksStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, "test", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	workflowStatuses := collectStageStatuses(sequence, "workflow")
 	if len(workflowStatuses) != 1 || workflowStatuses[0] != runner.StageStatusCompleted {
@@ -163,8 +164,8 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			modsPlanStage: {{Status: runner.StageStatusCompleted}},
-			"build":       {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},
+			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
+			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},
 		},
 	}
 	opts := runner.Options{
@@ -191,7 +192,7 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 	requireStageStatuses(t, sequence, mods.StageNameLLMPlan, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameLLMExec, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameHuman, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
-	requireStageStatuses(t, sequence, "build", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusFailed})
+	requireStageStatuses(t, sequence, buildGateStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusFailed})
 	workflowStatuses := collectStageStatuses(sequence, "workflow")
 	if len(workflowStatuses) != 1 || workflowStatuses[0] != runner.StageStatusFailed {
 		t.Fatalf("expected workflow failure, got %v", workflowStatuses)

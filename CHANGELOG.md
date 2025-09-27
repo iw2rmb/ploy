@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-27] Build Gate Stage Planning & Metadata
+- Added `build-gate` and `static-checks` stages to the default workflow planner with new runner stage kinds, updating CLI Aster overrides and planner/runner tests to reflect the build gate sequence.
+- Introduced `internal/workflow/buildgate` for metadata sanitisation and extended workflow checkpoints/contracts with `build_gate` metadata (schema version `2025-09-27.1`).
+- Recorded roadmap progress under `roadmap/build-gate/01-stage-planning-and-metadata.md` and `roadmap/shift/21-build-gate-reboot.md`, refreshing design docs and the root README to note the milestone.
+
 ## [2025-09-27] Mods Runner Parallel Execution
 - Reworked the workflow runner to schedule Mods stages according to dependency readiness, launching `orw-apply`, `orw-gen`, and `llm-plan` in parallel while holding `llm-exec`/`mods-human` until prerequisites complete.
 - Added concurrency-focused unit tests (including retry coverage) plus helper stubs so the runner package stays at ≥90% coverage even under `go test -cover ./...`.

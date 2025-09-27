@@ -458,7 +458,7 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 	laneConfigDir = "ignored"
 
 	buf := &bytes.Buffer{}
-	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build=lint", "--aster-step", "test=off"}
+	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build-gate=lint", "--aster-step", "test=off"}
 	if err := handleWorkflowRun(args, buf); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -470,7 +470,7 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 	if len(opts.AdditionalToggles) != 1 || opts.AdditionalToggles[0] != "exec" {
 		t.Fatalf("unexpected additional toggles: %+v", opts.AdditionalToggles)
 	}
-	buildOverride, ok := opts.StageOverrides["build"]
+	buildOverride, ok := opts.StageOverrides["build-gate"]
 	if !ok {
 		t.Fatalf("expected build override to exist")
 	}

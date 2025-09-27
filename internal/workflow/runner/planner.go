@@ -17,6 +17,11 @@ type Planner interface {
 	Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error)
 }
 
+const (
+	buildGateStageName    = "build-gate"
+	staticChecksStageName = "static-checks"
+)
+
 type DefaultPlanner struct {
 	mods ModsOptions
 }
@@ -49,7 +54,7 @@ func (p DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTick
 	if err != nil {
 		return ExecutionPlan{}, err
 	}
-	stages := make([]Stage, 0, len(modStages)+2)
+	stages := make([]Stage, 0, len(modStages)+3)
 	for _, stage := range modStages {
 		stages = append(stages, Stage{
 			Name:         stage.Name,
@@ -59,17 +64,26 @@ func (p DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTick
 			Metadata:     convertStageMetadata(stage.Metadata),
 		})
 	}
-	stages = append(stages, Stage{
-		Name:         "build",
-		Kind:         StageKindBuild,
-		Lane:         "go-native",
-		Dependencies: []string{mods.StageNameHuman},
-	}, Stage{
-		Name:         "test",
-		Kind:         StageKindTest,
-		Lane:         "go-native",
-		Dependencies: []string{"build"},
-	})
+	stages = append(stages,
+		Stage{
+			Name:         buildGateStageName,
+			Kind:         StageKindBuildGate,
+			Lane:         "go-native",
+			Dependencies: []string{mods.StageNameHuman},
+		},
+		Stage{
+			Name:         staticChecksStageName,
+			Kind:         StageKindStaticChecks,
+			Lane:         "go-native",
+			Dependencies: []string{buildGateStageName},
+		},
+		Stage{
+			Name:         "test",
+			Kind:         StageKindTest,
+			Lane:         "go-native",
+			Dependencies: []string{staticChecksStageName},
+		},
+	)
 	plan := ExecutionPlan{
 		TicketID: ticket.TicketID,
 		Stages:   stages,

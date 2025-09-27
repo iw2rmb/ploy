@@ -106,10 +106,10 @@ func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
 	if len(composer.calls) == 0 {
 		t.Fatal("expected cache composer to be invoked")
 	}
-	stageChecks := map[string]int{modsPlanStage: 0, "build": 0, "test": 0}
+	stageChecks := map[string]int{modsPlanStage: 0, buildGateStage: 0, staticChecksStage: 0, "test": 0}
 	for _, checkpoint := range events.checkpoints {
 		switch checkpoint.Stage {
-		case modsPlanStage, "build", "test":
+		case modsPlanStage, buildGateStage, staticChecksStage, "test":
 			if checkpoint.CacheKey == "" {
 				t.Fatalf("expected cache key for stage %s", checkpoint.Stage)
 			}
@@ -238,6 +238,119 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunPublishesBuildGateMetadata(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+	compiler := newStubCompiler()
+	buildGateMetadata := runner.StageMetadata{
+		BuildGate: &runner.StageBuildGateMetadata{
+			LogDigest: "  bafy-build-log  ",
+			StaticChecks: []runner.StageStaticCheck{
+				{
+					Language: " Go ",
+					Tool:     " go vet ",
+					Passed:   false,
+					Failures: []runner.StageStaticCheckFailure{
+						{
+							RuleID:   " GOVET001 ",
+							File:     " ./main.go ",
+							Line:     -5,
+							Column:   3,
+							Severity: "ERROR",
+							Message:  " unused import ",
+						},
+					},
+				},
+			},
+		},
+	}
+	grid := &fakeGrid{
+		outcomes: map[string][]runner.StageOutcome{
+			modsPlanStage: []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
+			buildGateStage: []runner.StageOutcome{
+				{
+					Status: runner.StageStatusCompleted,
+					Stage: runner.Stage{
+						Name:     buildGateStage,
+						Kind:     runner.StageKindBuildGate,
+						Lane:     "go-native",
+						Metadata: buildGateMetadata,
+					},
+				},
+			},
+			staticChecksStage: []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
+			"test":            []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
+		},
+	}
+	opts := runner.Options{
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: compiler,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var buildGateCheckpoint *contracts.WorkflowCheckpoint
+	for i := range events.checkpoints {
+		cp := events.checkpoints[i]
+		if cp.Stage != buildGateStage || cp.Status != contracts.CheckpointStatusCompleted {
+			continue
+		}
+		buildGateCheckpoint = &cp
+		break
+	}
+	if buildGateCheckpoint == nil {
+		t.Fatal("expected build gate checkpoint to be published")
+	}
+	if buildGateCheckpoint.StageMetadata == nil || buildGateCheckpoint.StageMetadata.BuildGate == nil {
+		t.Fatalf("expected build gate metadata on checkpoint: %#v", buildGateCheckpoint.StageMetadata)
+	}
+	meta := buildGateCheckpoint.StageMetadata.BuildGate
+	if meta.LogDigest != "bafy-build-log" {
+		t.Fatalf("expected trimmed digest, got %q", meta.LogDigest)
+	}
+	if len(meta.StaticChecks) != 1 {
+		t.Fatalf("expected single static check metadata, got %d", len(meta.StaticChecks))
+	}
+	report := meta.StaticChecks[0]
+	if report.Language != "Go" {
+		t.Fatalf("expected trimmed language, got %q", report.Language)
+	}
+	if report.Tool != "go vet" {
+		t.Fatalf("expected trimmed tool, got %q", report.Tool)
+	}
+	if report.Passed {
+		t.Fatal("expected static check report to remain failed")
+	}
+	if len(report.Failures) != 1 {
+		t.Fatalf("expected single failure, got %d", len(report.Failures))
+	}
+	failure := report.Failures[0]
+	if failure.RuleID != "GOVET001" {
+		t.Fatalf("expected trimmed rule id, got %q", failure.RuleID)
+	}
+	if failure.File != "./main.go" {
+		t.Fatalf("expected trimmed file, got %q", failure.File)
+	}
+	if failure.Line != 0 {
+		t.Fatalf("expected clamped line 0, got %d", failure.Line)
+	}
+	if failure.Column != 3 {
+		t.Fatalf("expected column to remain 3, got %d", failure.Column)
+	}
+	if failure.Severity != "error" {
+		t.Fatalf("expected severity lower-cased error, got %q", failure.Severity)
+	}
+	if failure.Message != "unused import" {
+		t.Fatalf("expected trimmed message, got %q", failure.Message)
+	}
+}
+
 func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
 	events := &countingEvents{
 		ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Tenant: "acme"},
@@ -283,9 +396,9 @@ func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
-			modsPlanStage: {{Status: runner.StageStatusCompleted}},
-			"build":       {{Status: runner.StageStatusCompleted}},
-			"test":        {{Status: runner.StageStatusCompleted}},
+			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
+			buildGateStage: {{Status: runner.StageStatusCompleted}},
+			"test":         {{Status: runner.StageStatusCompleted}},
 		},
 	}
 	planner := runner.NewDefaultPlanner()
@@ -316,7 +429,8 @@ func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	requireStageStatuses(t, sequence, mods.StageNameLLMPlan, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameLLMExec, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, mods.StageNameHuman, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
-	requireStageStatuses(t, sequence, "build", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, buildGateStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
+	requireStageStatuses(t, sequence, staticChecksStage, []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	requireStageStatuses(t, sequence, "test", []runner.StageStatus{runner.StageStatusRunning, runner.StageStatusCompleted})
 	workflowStatuses := collectStageStatuses(sequence, "workflow")
 	if len(workflowStatuses) != 1 || workflowStatuses[0] != runner.StageStatusCompleted {

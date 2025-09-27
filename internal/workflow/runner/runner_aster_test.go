@@ -30,7 +30,8 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 			mods.StageNameLLMPlan + "/plan":     {Stage: mods.StageNameLLMPlan, Toggle: "plan", BundleID: "llm-plan-plan"},
 			mods.StageNameLLMExec + "/plan":     {Stage: mods.StageNameLLMExec, Toggle: "plan", BundleID: "llm-exec-plan"},
 			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
-			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan", Digest: "sha256:buildplan", ArtifactCID: "cid-build-plan", Source: "build/aster/build-plan.tar.zst"},
+			buildGateStage + "/plan":            {Stage: buildGateStage, Toggle: "plan", BundleID: "build-plan", Digest: "sha256:buildplan", ArtifactCID: "cid-build-plan", Source: "build/aster/build-plan.tar.zst"},
+			staticChecksStage + "/plan":         {Stage: staticChecksStage, Toggle: "plan", BundleID: "static-checks-plan", Digest: "sha256:staticplan", ArtifactCID: "cid-static-plan", Source: "build/aster/static-plan.tar.zst"},
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan", Digest: "sha256:testplan", ArtifactCID: "cid-test-plan", Source: "build/aster/test-plan.tar.zst"},
 		},
 	}
@@ -65,7 +66,7 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 		t.Fatalf("unexpected mods bundle metadata: %+v", mods.stage.Aster.Bundles)
 	}
 
-	build := findStageCall(grid.calls, "build")
+	build := findStageCall(grid.calls, buildGateStage)
 	if !build.stage.Aster.Enabled {
 		t.Fatal("expected build stage to enable Aster")
 	}
@@ -101,6 +102,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 			mods.StageNameLLMPlan + "/plan":     {Stage: mods.StageNameLLMPlan, Toggle: "plan", BundleID: "llm-plan-plan"},
 			mods.StageNameLLMExec + "/plan":     {Stage: mods.StageNameLLMExec, Toggle: "plan", BundleID: "llm-exec-plan"},
 			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
+			staticChecksStage + "/plan":         {Stage: staticChecksStage, Toggle: "plan", BundleID: "static-checks-plan"},
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
@@ -116,7 +118,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 		Aster: runner.AsterOptions{
 			Locator: locator,
 			StageOverrides: map[string]runner.AsterStageOverride{
-				"build": {Disable: true},
+				buildGateStage: {Disable: true},
 			},
 		},
 	}
@@ -132,7 +134,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 		t.Fatalf("unexpected mods bundles: %+v", mods.stage.Aster.Bundles)
 	}
 
-	build := findStageCall(grid.calls, "build")
+	build := findStageCall(grid.calls, buildGateStage)
 	if build.stage.Aster.Enabled {
 		t.Fatalf("expected build stage to disable Aster, got %+v", build.stage.Aster)
 	}
@@ -205,8 +207,10 @@ func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
 			mods.StageNameLLMExec + "/exec":     {Stage: mods.StageNameLLMExec, Toggle: "exec", BundleID: "llm-exec-exec"},
 			mods.StageNameHuman + "/plan":       {Stage: mods.StageNameHuman, Toggle: "plan", BundleID: "mods-human-plan"},
 			mods.StageNameHuman + "/exec":       {Stage: mods.StageNameHuman, Toggle: "exec", BundleID: "mods-human-exec"},
-			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
-			"build/exec":                        {Stage: "build", Toggle: "exec", BundleID: "build-exec"},
+			buildGateStage + "/plan":            {Stage: buildGateStage, Toggle: "plan", BundleID: "build-plan"},
+			buildGateStage + "/exec":            {Stage: buildGateStage, Toggle: "exec", BundleID: "build-exec"},
+			staticChecksStage + "/plan":         {Stage: staticChecksStage, Toggle: "plan", BundleID: "static-checks-plan"},
+			staticChecksStage + "/exec":         {Stage: staticChecksStage, Toggle: "exec", BundleID: "static-checks-exec"},
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 			"test/exec":                         {Stage: "test", Toggle: "exec", BundleID: "test-exec"},
 		},
@@ -263,7 +267,8 @@ func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
 			mods.StageNameLLMPlan + "/plan":     {BundleID: "llm-plan-plan"},
 			mods.StageNameLLMExec + "/plan":     {BundleID: "llm-exec-plan"},
 			mods.StageNameHuman + "/plan":       {BundleID: "mods-human-plan"},
-			"build/plan":                        {Stage: "build", Toggle: "plan", BundleID: "build-plan"},
+			buildGateStage + "/plan":            {Stage: buildGateStage, Toggle: "plan", BundleID: "build-plan"},
+			staticChecksStage + "/plan":         {Stage: staticChecksStage, Toggle: "plan", BundleID: "static-checks-plan"},
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}

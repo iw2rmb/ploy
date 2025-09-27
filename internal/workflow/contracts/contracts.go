@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const SchemaVersion = "2025-09-26.1"
+const SchemaVersion = "2025-09-27.1"
 
 type SubjectSet struct {
 	TicketInbox      string
@@ -66,13 +66,14 @@ func (m ManifestReference) Validate() error {
 // checkpoint. It mirrors the planner output so consumers can reconstruct
 // dependencies and lane assignments without inspecting the CLI runtime state.
 type CheckpointStage struct {
-	Name         string               `json:"name"`
-	Kind         string               `json:"kind"`
-	Lane         string               `json:"lane"`
-	Dependencies []string             `json:"dependencies,omitempty"`
-	Manifest     ManifestReference    `json:"manifest"`
-	Aster        CheckpointStageAster `json:"aster"`
-	Mods         *ModsStageMetadata   `json:"mods,omitempty"`
+	Name         string                  `json:"name"`
+	Kind         string                  `json:"kind"`
+	Lane         string                  `json:"lane"`
+	Dependencies []string                `json:"dependencies,omitempty"`
+	Manifest     ManifestReference       `json:"manifest"`
+	Aster        CheckpointStageAster    `json:"aster"`
+	BuildGate    *BuildGateStageMetadata `json:"build_gate,omitempty"`
+	Mods         *ModsStageMetadata      `json:"mods,omitempty"`
 }
 
 // Validate ensures the stage metadata includes the required identifiers.
@@ -97,6 +98,11 @@ func (s CheckpointStage) Validate() error {
 	if err := s.Aster.Validate(); err != nil {
 		return fmt.Errorf("aster metadata invalid: %w", err)
 	}
+	if s.BuildGate != nil {
+		if err := s.BuildGate.Validate(); err != nil {
+			return fmt.Errorf("build gate metadata invalid: %w", err)
+		}
+	}
 	if s.Mods != nil {
 		if err := s.Mods.Validate(); err != nil {
 			return fmt.Errorf("mods metadata invalid: %w", err)
@@ -119,6 +125,70 @@ func (a CheckpointStageAster) Validate() error {
 		if err := bundle.Validate(); err != nil {
 			return fmt.Errorf("bundle %d invalid: %w", i, err)
 		}
+	}
+	return nil
+}
+
+// BuildGateStageMetadata captures build gate metadata published with checkpoints.
+type BuildGateStageMetadata struct {
+	LogDigest    string                       `json:"log_digest,omitempty"`
+	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
+}
+
+// Validate ensures build gate metadata entries are well formed.
+func (m BuildGateStageMetadata) Validate() error {
+	for i, check := range m.StaticChecks {
+		if err := check.Validate(); err != nil {
+			return fmt.Errorf("static check %d invalid: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// BuildGateStaticCheckReport summarises an individual static analysis invocation.
+type BuildGateStaticCheckReport struct {
+	Language string                        `json:"language,omitempty"`
+	Tool     string                        `json:"tool"`
+	Passed   bool                          `json:"passed"`
+	Failures []BuildGateStaticCheckFailure `json:"failures,omitempty"`
+}
+
+// Validate ensures the static check report is well formed.
+func (r BuildGateStaticCheckReport) Validate() error {
+	if strings.TrimSpace(r.Tool) == "" {
+		return fmt.Errorf("tool is required")
+	}
+	for i, failure := range r.Failures {
+		if err := failure.Validate(); err != nil {
+			return fmt.Errorf("failure %d invalid: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// BuildGateStaticCheckFailure captures a single diagnostic from a static check tool.
+type BuildGateStaticCheckFailure struct {
+	RuleID   string `json:"rule_id,omitempty"`
+	File     string `json:"file,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	Column   int    `json:"column,omitempty"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+}
+
+// Validate ensures static check failure entries include required details.
+func (f BuildGateStaticCheckFailure) Validate() error {
+	if strings.TrimSpace(f.Message) == "" {
+		return fmt.Errorf("message is required")
+	}
+	if strings.TrimSpace(f.Severity) == "" {
+		return fmt.Errorf("severity is required")
+	}
+	if f.Line < 0 {
+		return fmt.Errorf("line cannot be negative")
+	}
+	if f.Column < 0 {
+		return fmt.Errorf("column cannot be negative")
 	}
 	return nil
 }

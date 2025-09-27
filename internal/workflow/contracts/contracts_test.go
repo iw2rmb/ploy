@@ -7,7 +7,10 @@ import (
 	"testing"
 )
 
-const modsStage = "mods-plan"
+const (
+	modsStage      = "mods-plan"
+	buildGateStage = "build-gate"
+)
 
 func TestSubjectsForTenant(t *testing.T) {
 	subjects := SubjectsForTenant("acme", "ticket-123")
@@ -125,6 +128,52 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 	}
 	if cp.Subject() != "ploy.workflow.ticket-123.checkpoints" {
 		t.Fatalf("unexpected subject: %s", cp.Subject())
+	}
+}
+
+func TestBuildGateMetadataValidate(t *testing.T) {
+	meta := BuildGateStageMetadata{
+		LogDigest: "bafy-build",
+		StaticChecks: []BuildGateStaticCheckReport{{
+			Language: "go",
+			Tool:     "go vet",
+			Passed:   false,
+			Failures: []BuildGateStaticCheckFailure{{
+				RuleID:   "GOVET001",
+				File:     "internal/pkg/main.go",
+				Line:     12,
+				Column:   4,
+				Severity: "warning",
+				Message:  "unused result",
+			}},
+		}},
+	}
+	stage := CheckpointStage{
+		Name:      buildGateStage,
+		Kind:      buildGateStage,
+		Lane:      "go-native",
+		Manifest:  ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		BuildGate: &meta,
+	}
+	if err := stage.Validate(); err != nil {
+		t.Fatalf("expected valid build gate metadata, got %v", err)
+	}
+}
+
+func TestBuildGateMetadataValidateRejectsEmptyFailureMessage(t *testing.T) {
+	meta := BuildGateStageMetadata{
+		StaticChecks: []BuildGateStaticCheckReport{{
+			Language: "go",
+			Tool:     "go vet",
+			Failures: []BuildGateStaticCheckFailure{{
+				RuleID:   "GOVET001",
+				File:     "main.go",
+				Severity: "error",
+			}},
+		}},
+	}
+	if err := meta.Validate(); err == nil {
+		t.Fatal("expected validation error for missing failure message")
 	}
 }
 

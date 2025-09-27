@@ -10,4 +10,4 @@ Status checkboxes mirror the corresponding entries under `roadmap/shift/`.
 - [x] [stage-artifacts/README.md](stage-artifacts/README.md) — Mirrors stage artifact envelopes onto JetStream for cache hydrators (Roadmap 18).
 - [x] [mods/README.md](mods/README.md) — Parallel Mods workflow planner covering orw/LLM/human stages (Roadmap 19); runner parallel execution landed 2025-09-27 after planner, knowledge base, and CLI/Grid wiring milestones.
 - [x] [knowledge-base/README.md](knowledge-base/README.md) — Fuzzy error classification feeding Mods/LLM remediation (Roadmap 20); classifier foundation, CLI ingest, and CLI evaluation slices completed 2025-09-27.
-- [ ] [build-gate/README.md](build-gate/README.md) — Grid-aligned build gate with static checks and log parsing (Roadmap 21).
+- [ ] [build-gate/README.md](build-gate/README.md) — Grid-aligned build gate with static checks and log parsing (Roadmap 21); stage planning/metadata landed 2025-09-27 with sandbox/log work pending.
