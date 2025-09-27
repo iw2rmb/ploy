@@ -20,8 +20,8 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 	if plan.TicketID != ticket.TicketID {
 		t.Fatalf("plan ticket mismatch: %s", plan.TicketID)
 	}
-	if len(plan.Stages) != 8 {
-		t.Fatalf("expected 8 stages, got %d", len(plan.Stages))
+	if len(plan.Stages) != 9 {
+		t.Fatalf("expected 9 stages, got %d", len(plan.Stages))
 	}
 	expectOrder := []string{
 		mods.StageNamePlan,
@@ -30,10 +30,11 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 		mods.StageNameLLMPlan,
 		mods.StageNameLLMExec,
 		mods.StageNameHuman,
-		"build",
+		buildGateStage,
+		staticChecksStage,
 		"test",
 	}
-	expectLanes := []string{"node-wasm", "node-wasm", "node-wasm", "gpu-ml", "gpu-ml", "go-native", "go-native", "go-native"}
+	expectLanes := []string{"node-wasm", "node-wasm", "node-wasm", "gpu-ml", "gpu-ml", "go-native", "go-native", "go-native", "go-native"}
 	for i, name := range expectOrder {
 		stage := plan.Stages[i]
 		if stage.Name != name {
@@ -50,8 +51,9 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 		mods.StageNameLLMPlan:     {mods.StageNamePlan},
 		mods.StageNameLLMExec:     {mods.StageNameORWApply, mods.StageNameORWGenerate, mods.StageNameLLMPlan},
 		mods.StageNameHuman:       {mods.StageNameLLMExec},
-		"build":                   {mods.StageNameHuman},
-		"test":                    {"build"},
+		buildGateStage:            {mods.StageNameHuman},
+		staticChecksStage:         {buildGateStage},
+		"test":                    {staticChecksStage},
 	}
 	for _, stage := range plan.Stages {
 		expectedDeps, ok := depMap[stage.Name]
@@ -85,8 +87,8 @@ func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	sequence := extractStageStatuses(events.checkpoints)
-	if len(sequence) != 18 {
-		t.Fatalf("expected 18 checkpoints, got %d", len(sequence))
+	if len(sequence) != 20 {
+		t.Fatalf("expected 20 checkpoints, got %d", len(sequence))
 	}
 	if sequence[1].stage != modsPlanStage || sequence[1].status != runner.StageStatusRunning {
 		t.Fatalf("expected first stage checkpoint to be %s running, got %+v", modsPlanStage, sequence[1])

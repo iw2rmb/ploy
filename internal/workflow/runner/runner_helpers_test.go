@@ -17,7 +17,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-const modsPlanStage = mods.StageNamePlan
+const (
+	modsPlanStage     = mods.StageNamePlan
+	buildGateStage    = "build-gate"
+	staticChecksStage = "static-checks"
+)
 
 func defaultManifestCompilation() manifests.Compilation {
 	return manifests.Compilation{

@@ -16,7 +16,8 @@ const (
 	StageKindModsLLMPlan     StageKind = StageKind(mods.StageKindLLMPlan)
 	StageKindModsLLMExec     StageKind = StageKind(mods.StageKindLLMExec)
 	StageKindModsHuman       StageKind = StageKind(mods.StageKindHuman)
-	StageKindBuild           StageKind = "build"
+	StageKindBuildGate       StageKind = "build-gate"
+	StageKindStaticChecks    StageKind = "static-checks"
 	StageKindTest            StageKind = "test"
 )
 
@@ -33,7 +34,32 @@ type Stage struct {
 
 // StageMetadata captures stage-specific metadata for checkpoints.
 type StageMetadata struct {
-	Mods *StageModsMetadata
+	Mods      *StageModsMetadata
+	BuildGate *StageBuildGateMetadata
+}
+
+// StageBuildGateMetadata records build gate metadata attached to checkpoints.
+type StageBuildGateMetadata struct {
+	LogDigest    string
+	StaticChecks []StageStaticCheck
+}
+
+// StageStaticCheck describes one static analysis tool invocation.
+type StageStaticCheck struct {
+	Language string
+	Tool     string
+	Passed   bool
+	Failures []StageStaticCheckFailure
+}
+
+// StageStaticCheckFailure captures a single diagnostic from a static check.
+type StageStaticCheckFailure struct {
+	RuleID   string
+	File     string
+	Line     int
+	Column   int
+	Severity string
+	Message  string
 }
 
 // StageModsMetadata carries Mods planner metadata for checkpoints.

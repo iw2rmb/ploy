@@ -4,6 +4,10 @@
 Reintroduce the Mods build gate with modern Grid integration, static analysis, and intelligent log parsing. We recover behaviour from commit `3b11d7e8`—which emitted builder logs, sandbox builds, and healing retries—while migrating execution to Grid stages and expanding language-specific static checks (e.g., Google Error Prone for Java). The reboot ensures every Mods plan validates code quality before changes exit the workstation.
 
 ## Scope
+## Current Status (2025-09-27)
+- Stage scheduling and checkpoint metadata wiring landed via `roadmap/build-gate/01-stage-planning-and-metadata.md`.
+- Sandbox runner, adapter registry, and log retrieval tasks remain pending (see roadmap files 02-04).
+
 - Establish `internal/workflow/buildgate` hosting sandbox compilation, static check orchestration, and log parsing utilities.
 - Align build execution with Grid workflow stages (`build-gate`, `static-checks`) triggered from Mods and general workflow runs.
 - Integrate with the Knowledge Base slice for error classification and remediation suggestions when builds fail.
