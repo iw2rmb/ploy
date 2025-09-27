@@ -15,6 +15,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
+const buildGateStageName = "build-gate"
+
 type requestPayload struct {
 	SchemaVersion string                   `json:"schema_version"`
 	Ticket        contracts.WorkflowTicket `json:"ticket"`
@@ -56,8 +58,8 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	}
 
 	stage := runner.Stage{
-		Name:         "build",
-		Kind:         runner.StageKindBuild,
+		Name:         buildGateStageName,
+		Kind:         runner.StageKindBuildGate,
 		Lane:         "go-native",
 		Dependencies: []string{mods.StageNameHuman},
 		CacheKey:     "go-native/cache@manifest=2025-09-26@aster=plan",
@@ -65,7 +67,7 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 		Aster: runner.StageAster{
 			Enabled: true,
 			Toggles: []string{"plan"},
-			Bundles: []aster.Metadata{{BundleID: "bundle-1", Stage: "build", Toggle: "plan", ArtifactCID: "bafy123", Digest: "sha256:abc"}},
+			Bundles: []aster.Metadata{{BundleID: "bundle-1", Stage: buildGateStageName, Toggle: "plan", ArtifactCID: "bafy123", Digest: "sha256:abc"}},
 		},
 	}
 

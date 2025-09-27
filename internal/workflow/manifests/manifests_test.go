@@ -174,7 +174,7 @@ reference = "y"
 [lanes]
 [[lanes.required]]
 name = "go-native"
-reason = "build"
+reason = "build-gate"
 [aster]
 required = []
 optional = []

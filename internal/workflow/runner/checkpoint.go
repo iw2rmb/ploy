@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -71,6 +72,9 @@ func buildCheckpointStage(stage Stage) *contracts.CheckpointStage {
 	}
 	if modsMeta := buildCheckpointModsMetadata(stage.Metadata.Mods); modsMeta != nil {
 		meta.Mods = modsMeta
+	}
+	if buildGateMeta := buildCheckpointBuildGateMetadata(stage.Metadata.BuildGate); buildGateMeta != nil {
+		meta.BuildGate = buildGateMeta
 	}
 	return meta
 }
@@ -139,6 +143,68 @@ func buildCheckpointModsMetadata(meta *StageModsMetadata) *contracts.ModsStageMe
 	}
 	if result.Plan == nil && result.Human == nil && len(result.Recommendations) == 0 {
 		return nil
+	}
+	return result
+}
+
+// buildCheckpointBuildGateMetadata converts build gate metadata into contract form.
+func buildCheckpointBuildGateMetadata(meta *StageBuildGateMetadata) *contracts.BuildGateStageMetadata {
+	if meta == nil {
+		return nil
+	}
+	raw := buildgate.Metadata{LogDigest: meta.LogDigest}
+	if len(meta.StaticChecks) > 0 {
+		raw.StaticChecks = make([]buildgate.StaticCheckReport, 0, len(meta.StaticChecks))
+		for _, check := range meta.StaticChecks {
+			report := buildgate.StaticCheckReport{
+				Language: check.Language,
+				Tool:     check.Tool,
+				Passed:   check.Passed,
+			}
+			if len(check.Failures) > 0 {
+				report.Failures = make([]buildgate.StaticCheckFailure, 0, len(check.Failures))
+				for _, failure := range check.Failures {
+					report.Failures = append(report.Failures, buildgate.StaticCheckFailure{
+						RuleID:   failure.RuleID,
+						File:     failure.File,
+						Line:     failure.Line,
+						Column:   failure.Column,
+						Severity: failure.Severity,
+						Message:  failure.Message,
+					})
+				}
+			}
+			raw.StaticChecks = append(raw.StaticChecks, report)
+		}
+	}
+	sanitized := buildgate.Sanitize(raw)
+	if sanitized.LogDigest == "" && len(sanitized.StaticChecks) == 0 {
+		return nil
+	}
+	result := &contracts.BuildGateStageMetadata{LogDigest: sanitized.LogDigest}
+	if len(sanitized.StaticChecks) > 0 {
+		result.StaticChecks = make([]contracts.BuildGateStaticCheckReport, 0, len(sanitized.StaticChecks))
+		for _, check := range sanitized.StaticChecks {
+			report := contracts.BuildGateStaticCheckReport{
+				Language: check.Language,
+				Tool:     check.Tool,
+				Passed:   check.Passed,
+			}
+			if len(check.Failures) > 0 {
+				report.Failures = make([]contracts.BuildGateStaticCheckFailure, 0, len(check.Failures))
+				for _, failure := range check.Failures {
+					report.Failures = append(report.Failures, contracts.BuildGateStaticCheckFailure{
+						RuleID:   failure.RuleID,
+						File:     failure.File,
+						Line:     failure.Line,
+						Column:   failure.Column,
+						Severity: failure.Severity,
+						Message:  failure.Message,
+					})
+				}
+			}
+			result.StaticChecks = append(result.StaticChecks, report)
+		}
 	}
 	return result
 }
