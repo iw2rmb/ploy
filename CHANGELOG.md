@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-27] Knowledge Base CLI Ingest
+- Added `ploy knowledge-base ingest` to append incident fixtures into `configs/knowledge-base/catalog.json`, rejecting duplicate IDs and summarising ingested incidents for operators.
+- Extended `internal/workflow/knowledgebase` with merge/save helpers (atomic writes + duplicate safeguards) and comprehensive unit tests, keeping package coverage at 90.3%.
+- Documented the workstation catalog workflow across `README.md`, `docs/DOCS.md`, `configs/knowledge-base/README.md`, and marked roadmap task `roadmap/knowledge-base/02-cli-ingest.md` complete.
+
 ## [2025-09-27] Knowledge Base Classifier Foundation
 - Introduced `internal/workflow/knowledgebase` with trigram TF-IDF and Levenshtein scoring, providing a catalog-backed advisor that feeds Mods planner recipes, human gates, and recommendations.
 - Wired `ploy workflow run` to load `configs/knowledge-base/catalog.json` when present, enabling the workstation CLI to surface knowledge base guidance without changing behaviour when the catalog is absent.

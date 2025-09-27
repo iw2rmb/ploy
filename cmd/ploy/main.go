@@ -33,6 +33,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleEnvironment(args[1:], stderr)
 	case "manifest":
 		return handleManifest(args[1:], stderr)
+	case "knowledge-base":
+		return handleKnowledgeBase(args[1:], stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -53,4 +55,5 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
 	_, _ = fmt.Fprintln(w, "  environment  Materialize commit-scoped environments")
 	_, _ = fmt.Fprintln(w, "  manifest  Inspect integration manifest assets")
+	_, _ = fmt.Fprintln(w, "  knowledge-base  Manage knowledge base incidents")
 }
