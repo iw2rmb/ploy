@@ -8,13 +8,14 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Parse build outputs into structured metadata consumed by Knowledge Base and Mods healing flows.
 - Keep lane definitions aligned with the Workflow RPC job spec schema (`image`, `command`, `env`, `resources`).
 
-## Current Status (2025-09-27)
+## Current Status (2025-10-07)
 - Stage scheduling and checkpoint metadata wiring landed via `roadmap/build-gate/01-stage-planning-and-metadata.md`.
 - Sandbox runner landed via `roadmap/build-gate/02-sandbox-runner.md`, providing structured duration/cache metadata and timeout handling for workstation tests.
 - Static check adapter registry shipped under `internal/workflow/buildgate/static_checks.go` (see `roadmap/build-gate/03-static-check-registry.md`), wiring lane defaults, manifest overrides, and skip hooks into `StaticCheckRegistry`.
 - Go vet adapter exposed through `internal/workflow/buildgate.NewGoVetAdapter` (see `roadmap/build-gate/05-go-vet-adapter.md`), parsing workstation/Grid diagnostics into `StaticCheckFailure` entries with manifest-configurable package and tag options.
 - Log retrieval and Grid artifact ingestion shipped via `internal/workflow/buildgate.LogRetriever` and `LogIngestor` (see `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`), normalising Knowledge Base findings and surfacing digests in build gate metadata.
 - Build gate runner orchestrates sandbox execution, static checks, and log ingestion through `internal/workflow/buildgate.Runner` (see `roadmap/build-gate/06-build-gate-runner.md`), emitting sanitised metadata for checkpoint publication.
+- CLI build gate summary surfaces static checks and knowledge base guidance after workflow execution (see `roadmap/build-gate/07-cli-summary.md`).
 
 - Establish `internal/workflow/buildgate` hosting sandbox compilation, static check orchestration, and log parsing utilities.
 - Align build execution with Grid workflow stages (`build-gate`, `static-checks`) triggered from Mods and general workflow runs.
@@ -49,7 +50,7 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Lane defaults (`StaticCheckLaneConfig`) provide baseline enablement and severity thresholds, while manifest overrides (`StaticCheckManifest`) and CLI flags (`--build-gate-skip=<lang>`) merge through `StaticCheckSpec` before adapters execute.
 - Go vet adapter normalises `go`/`golang` aliases and honours manifest or CLI overrides for `packages` (default `./...`) and `tags` so repos can focus the analysis scope without editing lane defaults.
 - Adapt log enrichment to pull artifacts from Grid: upon failure, inspect `jobs.<run_id>.events` for the stage, find the artifact CID, and retrieve logs via Grid (`LogSourceGrid`) with an IPFS fallback (`LogSourceIPFS`). Provide fallbacks to JetStream attachments in workstation mode via the retriever abstraction.
-- Log ingestion passes retrieved content to the default parser, mapping canonical Knowledge Base codes (e.g., Git auth failures, Go module conflicts, linker resolution issues, disk pressure) onto `Metadata.LogFindings` for checkpoint publication.
+- Log ingestion passes retrieved content to the default parser, mapping canonical Knowledge Base codes (e.g., Git auth failures, Go module conflicts, linker resolution issues, disk pressure) onto `Metadata.LogFindings` for checkpoint publication and CLI summaries.
 - Emit checkpoint metadata fields (`build_gate.static_checks`, `build_gate.log_digest`) so downstream tooling (Knowledge Base, telemetry) can reason about results.
 - Provide CLI options to toggle static checks per language and to set failure thresholds (`--build-gate-fail-on-warning`, `--build-gate-skip=golang`).
 - Ensure compatibility with Mods planner by exposing a `buildgate.Run(ctx, spec)` API returning structured outcomes consumed by healing logic.
@@ -81,4 +82,4 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 ## Rollout & Follow-ups
 - Add roadmap entries under `roadmap/build-gate/` covering sandbox port, static check adapters, log parser, and Grid integration.
 - Coordinate with Grid maintainers (see `../grid/README.md`) to provision dedicated lanes for static analysis binaries and to expose artifact envelopes required for log retrieval.
-- Future slice: surface build gate results in the CLI summary with actionable remediation links from the Knowledge Base.
+- Monitor feedback from CLI summaries to prioritise future adapters (Error Prone, ESLint, Ruff, Roslyn) once workstation coverage expands.

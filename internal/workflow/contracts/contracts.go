@@ -163,6 +163,7 @@ func (a CheckpointStageAster) Validate() error {
 type BuildGateStageMetadata struct {
 	LogDigest    string                       `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
+	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
 }
 
 // Validate ensures build gate metadata entries are well formed.
@@ -170,6 +171,11 @@ func (m BuildGateStageMetadata) Validate() error {
 	for i, check := range m.StaticChecks {
 		if err := check.Validate(); err != nil {
 			return fmt.Errorf("static check %d invalid: %w", i, err)
+		}
+	}
+	for i, finding := range m.LogFindings {
+		if err := finding.Validate(); err != nil {
+			return fmt.Errorf("log finding %d invalid: %w", i, err)
 		}
 	}
 	return nil
@@ -219,6 +225,25 @@ func (f BuildGateStaticCheckFailure) Validate() error {
 	}
 	if f.Column < 0 {
 		return fmt.Errorf("column cannot be negative")
+	}
+	return nil
+}
+
+// BuildGateLogFinding records a normalized build log finding tied to a knowledge base incident.
+type BuildGateLogFinding struct {
+	Code     string `json:"code,omitempty"`
+	Severity string `json:"severity"`
+	Message  string `json:"message"`
+	Evidence string `json:"evidence,omitempty"`
+}
+
+// Validate ensures log finding entries include required guidance details.
+func (f BuildGateLogFinding) Validate() error {
+	if strings.TrimSpace(f.Message) == "" {
+		return fmt.Errorf("message is required")
+	}
+	if strings.TrimSpace(f.Severity) == "" {
+		return fmt.Errorf("severity is required")
 	}
 	return nil
 }

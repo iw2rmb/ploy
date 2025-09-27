@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-10-07] Build Gate CLI Summary
+- Surfaced build gate results in `ploy workflow run` by printing static check outcomes, failing diagnostics, knowledge base findings, and log digests sourced from checkpoint metadata.
+- Added log finding support to workflow contracts and runner checkpoint conversion so Knowledge Base codes propagate into CLI summaries and downstream consumers.
+- Documented the milestone in `docs/design/build-gate/README.md`, the new SHIFT design index, and roadmap slice `roadmap/build-gate/07-cli-summary.md`, marking `roadmap/shift/21-build-gate-reboot.md` as complete.
+
 ## [2025-09-27] Build Gate Log Retrieval & Parsing
 - Added `internal/workflow/buildgate.LogRetriever` and `LogIngestor` to download Grid build logs with IPFS fallbacks, clamp payload size, compute deterministic SHA-256 digests, and parse Knowledge Base findings into checkpoint metadata.
 - Introduced a default log parser and metadata sanitisation updates that normalise Git authentication, Go module conflict, linker, and disk pressure findings for downstream remediation flows.
