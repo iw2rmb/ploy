@@ -1,5 +1,20 @@
 # Changelog
 
+## [2025-09-27] Build Gate Log Retrieval & Parsing
+- Added `internal/workflow/buildgate.LogRetriever` and `LogIngestor` to download Grid build logs with IPFS fallbacks, clamp payload size, compute deterministic SHA-256 digests, and parse Knowledge Base findings into checkpoint metadata.
+- Introduced a default log parser and metadata sanitisation updates that normalise Git authentication, Go module conflict, linker, and disk pressure findings for downstream remediation flows.
+- Documented the milestone across the build gate design record, roadmap slice `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`, the SHIFT tracker, and the design index so roadmap status stays aligned.
+
+## [2025-09-27] Build Gate Go Vet Adapter
+- Added `internal/workflow/buildgate.NewGoVetAdapter` to run `go vet` with manifest-configurable package scopes and build tag overrides, returning `StaticCheckFailure` entries tagged with the `govet` rule identifier.
+- Normalised static check language aliases so lane defaults, manifest overrides, and CLI skip flags can use `go` or `golang` interchangeably when dispatching adapters.
+- Documented the adapter milestone across the build gate design record and roadmap slices, and introduced dedicated unit tests covering command option propagation and diagnostic parsing.
+
+## [2025-09-27] Build Gate Runner Orchestration
+- Added `internal/workflow/buildgate.Runner` to orchestrate sandbox builds, static check execution, and log ingestion while returning sanitised build gate metadata for checkpoint publication.
+- Introduced `internal/workflow/buildgate/runner_test.go` with unit tests covering dependency validation and aggregated metadata to keep the package above the 90% coverage target.
+- Documented the runner milestone across `docs/design/build-gate/README.md`, the design index, `roadmap/shift/21-build-gate-reboot.md`, and the new roadmap slice `roadmap/build-gate/06-build-gate-runner.md`.
+
 ## [2025-10-01] Workflow RPC Helper Adoption
 - Added a helper-backed Workflow RPC client that injects bearer tokens, retries transient HTTP failures, and surfaces typed HTTP errors to gate retry logic under `internal/workflow/grid/workflowrpc` and `internal/workflow/grid`.
 - Introduced helper unit tests (auth headers, retry backoff, context cancellation) and updated Grid client tests to validate helper factory wiring for bearer/retry configuration.
@@ -25,6 +40,11 @@
 - Added `internal/workflow/buildgate.SandboxRunner` to wrap deterministic sandbox builds with structured outcomes (duration, cache hits, failure metadata) and introduced focused unit tests for success, failure, and timeout scenarios.
 - Updated knowledge base catalog tests to skip permission checks when running as root so `go test ./...` stays portable across environments.
 - Recorded roadmap/design updates for the sandbox runner milestone (`roadmap/build-gate/02-sandbox-runner.md`, `docs/design/build-gate/README.md`, `roadmap/shift/21-build-gate-reboot.md`).
+
+## [2025-10-05] Build Gate Static Check Registry
+- Added `internal/workflow/buildgate.StaticCheckRegistry` with lane default, manifest override, and skip handling so build gate stages can coordinate language-specific adapters with deterministic severity thresholds.
+- Introduced `internal/workflow/buildgate/static_checks_test.go` covering severity evaluation, manifest disablement, and skip overrides with fake adapters to keep package coverage ≥90%.
+- Documented the registry in `docs/design/build-gate/README.md`, marked roadmap slice `roadmap/build-gate/03-static-check-registry.md` complete, and updated `roadmap/shift/21-build-gate-reboot.md` plus the design index to reflect the milestone.
 
 ## [2025-09-27] Build Gate Stage Planning & Metadata
 - Added `build-gate` and `static-checks` stages to the default workflow planner with new runner stage kinds, updating CLI Aster overrides and planner/runner tests to reflect the build gate sequence.
