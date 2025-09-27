@@ -6,8 +6,104 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
+
+type stageNode struct {
+	Stage      Stage
+	Remaining  int
+	Dependents []string
+}
+
+type stageResult struct {
+	node     *stageNode
+	executed Stage
+	err      error
+}
+
+type stageExecutor struct {
+	events      EventsClient
+	grid        GridClient
+	ticket      contracts.WorkflowTicket
+	workspace   string
+	maxRetries  int
+	publishMu   *sync.Mutex
+	failureOnce *sync.Once
+}
+
+func (e *stageExecutor) runStage(ctx context.Context, stage Stage) (Stage, error) {
+	attempt := 0
+	for {
+		if err := e.publishStage(ctx, stage, StageStatusRunning, nil); err != nil {
+			return Stage{}, err
+		}
+		outcome, execErr := e.grid.ExecuteStage(ctx, e.ticket, stage, e.workspace)
+		if execErr != nil {
+			if ctx.Err() != nil {
+				return Stage{}, ctx.Err()
+			}
+			return Stage{}, execErr
+		}
+
+		executedStage := resolvedStage(stage, outcome.Stage)
+		executedStage.CacheKey = stage.CacheKey
+
+		status := outcome.Status
+		if status == "" {
+			status = StageStatusCompleted
+		}
+
+		if status == StageStatusFailed {
+			if outcome.Retryable && attempt < e.maxRetries {
+				stage = executedStage
+				if err := e.publishStage(ctx, stage, StageStatusRetrying, nil); err != nil {
+					return Stage{}, err
+				}
+				attempt++
+				continue
+			}
+			if err := e.publishStage(ctx, executedStage, StageStatusFailed, nil); err != nil {
+				return Stage{}, err
+			}
+			e.failureOnce.Do(func() {
+				_ = e.publishWorkflowFailure(ctx)
+			})
+			message := strings.TrimSpace(outcome.Message)
+			if message == "" {
+				message = "stage failed"
+			}
+			return Stage{}, fmt.Errorf("%w: stage %s: %s", ErrStageFailed, stage.Name, message)
+		}
+
+		if err := e.publishStage(ctx, executedStage, StageStatusCompleted, outcome.Artifacts); err != nil {
+			return Stage{}, err
+		}
+		return executedStage, nil
+	}
+}
+
+func (e *stageExecutor) publishStage(ctx context.Context, stage Stage, status StageStatus, artifacts []Artifact) error {
+	stageCopy := stage
+	e.publishMu.Lock()
+	defer e.publishMu.Unlock()
+	return publishCheckpoint(ctx, e.events, e.ticket.TicketID, stage.Name, status, stage.CacheKey, &stageCopy, artifacts)
+}
+
+func (e *stageExecutor) publishWorkflowFailure(ctx context.Context) error {
+	e.publishMu.Lock()
+	defer e.publishMu.Unlock()
+	return publishCheckpoint(ctx, e.events, e.ticket.TicketID, "workflow", StageStatusFailed, "", nil, nil)
+}
+
+func (e *stageExecutor) publishWorkflowCompletion(ctx context.Context) error {
+	e.publishMu.Lock()
+	defer e.publishMu.Unlock()
+	return publishCheckpoint(ctx, e.events, e.ticket.TicketID, "workflow", StageStatusCompleted, "", nil, nil)
+}
 
 // Run executes the workflow pipeline for the claimed ticket end-to-end.
 func Run(ctx context.Context, opts Options) (err error) {
@@ -81,7 +177,27 @@ func Run(ctx context.Context, opts Options) (err error) {
 		maxRetries = 0
 	}
 
-	for _, stage := range plan.Stages {
+	if len(plan.Stages) == 0 {
+		if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted, "", nil, nil); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	stageOrder := make(map[string]int, len(plan.Stages))
+	stageNodes := make(map[string]*stageNode, len(plan.Stages))
+	orderedNodes := make([]*stageNode, 0, len(plan.Stages))
+	for idx, rawStage := range plan.Stages {
+		stage := rawStage
+		stage.Name = strings.TrimSpace(stage.Name)
+		if stage.Name == "" {
+			return fmt.Errorf("%w: stage name is required", ErrCheckpointValidationFailed)
+		}
+		if _, exists := stageNodes[stage.Name]; exists {
+			return fmt.Errorf("%w: duplicate stage %s in plan", ErrCheckpointValidationFailed, stage.Name)
+		}
+		stageOrder[stage.Name] = idx
+		stage.Dependencies = copyStringSlice(stage.Dependencies)
 		if strings.TrimSpace(stage.Lane) == "" {
 			return fmt.Errorf("%w: %s", ErrLaneRequired, stage.Name)
 		}
@@ -96,55 +212,119 @@ func Run(ctx context.Context, opts Options) (err error) {
 			return fmt.Errorf("compose cache key for stage %s: %w", stage.Name, err)
 		}
 		stage.CacheKey = strings.TrimSpace(cacheKey)
-		for attempt := 0; ; attempt++ {
-			runningStage := stage
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRunning, stage.CacheKey, &runningStage, nil); err != nil {
-				return err
+		node := &stageNode{Stage: stage, Remaining: len(stage.Dependencies)}
+		stageNodes[stage.Name] = node
+		orderedNodes = append(orderedNodes, node)
+	}
+	for _, node := range stageNodes {
+		for _, dep := range node.Stage.Dependencies {
+			depNode, ok := stageNodes[dep]
+			if !ok {
+				return fmt.Errorf("%w: stage %s depends on unknown stage %s", ErrCheckpointValidationFailed, node.Stage.Name, dep)
 			}
+			depNode.Dependents = append(depNode.Dependents, node.Stage.Name)
+		}
+	}
 
-			outcome, execErr := opts.Grid.ExecuteStage(ctx, ticket, stage, workspace)
-			if execErr != nil {
-				return execErr
+	initialReady := make([]*stageNode, 0, len(orderedNodes))
+	for _, node := range orderedNodes {
+		if node.Remaining == 0 {
+			initialReady = append(initialReady, node)
+		}
+	}
+	if len(orderedNodes) > 0 && len(initialReady) == 0 {
+		return fmt.Errorf("%w: workflow plan has no root stages", ErrCheckpointValidationFailed)
+	}
+
+	stageCtx, cancelStages := context.WithCancel(ctx)
+	defer cancelStages()
+
+	var (
+		wg          sync.WaitGroup
+		active      int
+		completed   int
+		runErr      error
+		publishMu   sync.Mutex
+		failureOnce sync.Once
+	)
+	resultCh := make(chan stageResult, len(orderedNodes))
+	executor := stageExecutor{
+		events:      opts.Events,
+		grid:        opts.Grid,
+		ticket:      ticket,
+		workspace:   workspace,
+		maxRetries:  maxRetries,
+		publishMu:   &publishMu,
+		failureOnce: &failureOnce,
+	}
+	scheduled := make(map[string]bool, len(stageNodes))
+	startStages := func(nodes []*stageNode) {
+		if runErr != nil || len(nodes) == 0 {
+			return
+		}
+		sort.Slice(nodes, func(i, j int) bool {
+			return stageOrder[nodes[i].Stage.Name] < stageOrder[nodes[j].Stage.Name]
+		})
+		for _, node := range nodes {
+			if scheduled[node.Stage.Name] {
+				continue
 			}
+			scheduled[node.Stage.Name] = true
+			active++
+			wg.Add(1)
+			go func(n *stageNode) {
+				defer wg.Done()
+				executed, err := executor.runStage(stageCtx, n.Stage)
+				resultCh <- stageResult{node: n, executed: executed, err: err}
+			}(node)
+		}
+	}
 
-			executedStage := resolvedStage(stage, outcome.Stage)
+	startStages(initialReady)
 
-			status := outcome.Status
-			if status == "" {
-				status = StageStatusCompleted
+	totalStages := len(orderedNodes)
+	for completed < totalStages {
+		res := <-resultCh
+		if res.err != nil {
+			if runErr == nil {
+				runErr = res.err
+				cancelStages()
 			}
-
-			if status == StageStatusFailed {
-				if outcome.Retryable && attempt < maxRetries {
-					stageCopy := executedStage
-					if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusRetrying, stage.CacheKey, &stageCopy, nil); err != nil {
-						return err
-					}
-					continue
+		} else {
+			completed++
+			res.node.Stage = res.executed
+			newlyReady := make([]*stageNode, 0, len(res.node.Dependents))
+			for _, depName := range res.node.Dependents {
+				depNode := stageNodes[depName]
+				depNode.Remaining--
+				if depNode.Remaining == 0 {
+					newlyReady = append(newlyReady, depNode)
 				}
-
-				stageCopy := executedStage
-				if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusFailed, stage.CacheKey, &stageCopy, nil); err != nil {
-					return err
-				}
-				_ = publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusFailed, "", nil, nil)
-
-				message := outcome.Message
-				if strings.TrimSpace(message) == "" {
-					message = "stage failed"
-				}
-				return fmt.Errorf("%w: stage %s: %s", ErrStageFailed, stage.Name, message)
 			}
-
-			stageCopy := executedStage
-			if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, stage.Name, StageStatusCompleted, stage.CacheKey, &stageCopy, outcome.Artifacts); err != nil {
-				return err
+			startStages(newlyReady)
+		}
+		active--
+		if active == 0 {
+			if runErr != nil {
+				break
 			}
+			if completed == totalStages {
+				break
+			}
+			runErr = fmt.Errorf("%w: workflow plan has unresolved stage dependencies", ErrCheckpointValidationFailed)
 			break
 		}
 	}
 
-	if err := publishCheckpoint(ctx, opts.Events, ticket.TicketID, "workflow", StageStatusCompleted, "", nil, nil); err != nil {
+	wg.Wait()
+	if runErr != nil {
+		return runErr
+	}
+	if completed != totalStages {
+		return fmt.Errorf("%w: workflow plan incomplete", ErrCheckpointValidationFailed)
+	}
+
+	if err := executor.publishWorkflowCompletion(ctx); err != nil {
 		return err
 	}
 

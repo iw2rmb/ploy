@@ -6,6 +6,7 @@ Reboot the Mods workflow so planning, OpenRewrite execution, and human checkpoin
 - [x] Planner skeleton (roadmap/mods/01-planner-skeleton.md) — Mods DAG emitted by default planner (2025-09-26).
 - [x] Knowledge Base feedback loop (roadmap/mods/02-knowledge-base-feedback.md) — Mods planner now records knowledge base advice inside `stage_metadata.mods` (2025-09-26).
 - [x] CLI surface and Grid wiring (roadmap/mods/03-cli-grid-wiring.md) — `ploy workflow run` exposes planner hints and pushes concurrency metadata into Grid/JetStream (2025-09-26).
+- [x] Runner parallel execution (roadmap/mods/04-runner-parallel-execution.md) — Workflow runner executes Mods stages according to planner parallelism hints with dependency-aware scheduling (2025-09-27).
 
 
 ## Scope

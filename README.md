@@ -27,7 +27,7 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - [x] Snapshot metadata streams — capture fingerprints and rule counts published to JetStream (Roadmap 16).
 - [x] Checkpoint enrichment — stage metadata and artifact manifests embedded in workflow checkpoints (Roadmap 17).
 - [x] Stage artifact streams — dedicated JetStream envelopes for stage artifacts to feed cache hydrators (Roadmap 18).
-- [ ] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware parallelism (Roadmap 19, see `docs/design/mods/README.md`).
+- [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI ingest/evaluate workflows, and seeds `llm-plan` with suggestions (Roadmap 20, see `docs/design/knowledge-base/README.md`).
 - [ ] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`).
 

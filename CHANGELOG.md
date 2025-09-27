@@ -1,5 +1,10 @@
 # Changelog
 
+## [2025-09-27] Mods Runner Parallel Execution
+- Reworked the workflow runner to schedule Mods stages according to dependency readiness, launching `orw-apply`, `orw-gen`, and `llm-plan` in parallel while holding `llm-exec`/`mods-human` until prerequisites complete.
+- Added concurrency-focused unit tests (including retry coverage) plus helper stubs so the runner package stays at ≥90% coverage even under `go test -cover ./...`.
+- Marked `roadmap/mods/04-runner-parallel-execution.md` and `roadmap/shift/19-mods-parallel-planner.md` complete, updating `docs/design/mods/README.md`, `docs/design/README.md`, and the root `README.md` to reflect the finished Roadmap 19 slice.
+
 ## [2025-09-27] Knowledge Base CLI Evaluation
 - Added `knowledgebase.Match` helper returning incident IDs and similarity scores so tooling can inspect advisor output without changing Mods planner wiring.
 - Introduced `ploy knowledge-base evaluate --fixture <samples.json>` with score-floor filtering, PASS/MISS labelling, and aggregate accuracy metrics for workstation validation.

@@ -208,3 +208,122 @@ func TestRunPublishesModsPlannerHints(t *testing.T) {
 		t.Fatalf("expected grid invocation max parallel 4, got %d", invokedPlan.MaxParallel)
 	}
 }
+
+func TestRunExecutesParallelModsStages(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-parallel", tenant: "acme"}
+	grid := newParallelRecordingGrid()
+	grid.addGate(mods.StageNameORWApply)
+	grid.addGate(mods.StageNameORWGenerate)
+	defer func() {
+		grid.allow(mods.StageNameORWApply)
+		grid.allow(mods.StageNameORWGenerate)
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	opts := runner.Options{
+		Ticket:           "ticket-parallel",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- runner.Run(ctx, opts)
+	}()
+
+	if !grid.waitForStart(mods.StageNameORWApply, time.Second) {
+		t.Fatalf("expected orw-apply to start")
+	}
+	if !grid.waitForStart(mods.StageNameORWGenerate, time.Second) {
+		t.Fatalf("expected orw-gen to start while orw-apply running")
+	}
+
+	grid.allow(mods.StageNameORWApply)
+	grid.allow(mods.StageNameORWGenerate)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("runner did not finish")
+	}
+}
+
+func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-parallel-retry", tenant: "acme"}
+	grid := newParallelRecordingGrid()
+	grid.setOutcomes(mods.StageNameORWApply, []runner.StageOutcome{
+		{Status: runner.StageStatusFailed, Retryable: true, Message: "planner detected failure"},
+		{Status: runner.StageStatusCompleted},
+	})
+	grid.setOutcomes(mods.StageNameORWGenerate, []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
+
+	opts := runner.Options{
+		Ticket:           "ticket-parallel-retry",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlanner(),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  1,
+		ManifestCompiler: newStubCompiler(),
+	}
+
+	if err := runner.Run(context.Background(), opts); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	calls := grid.callsSnapshot()
+	if attempts := gatherStageAttempts(calls, mods.StageNameORWApply); attempts != 2 {
+		t.Fatalf("expected two attempts for orw-apply, got %d", attempts)
+	}
+	llmExecIndex := findStageIndex(calls, mods.StageNameLLMExec)
+	if llmExecIndex == -1 {
+		t.Fatalf("expected llm-exec call recorded")
+	}
+	lastApplyIndex := findLastStageIndex(calls, mods.StageNameORWApply)
+	if lastApplyIndex == -1 {
+		t.Fatalf("expected orw-apply call recorded")
+	}
+	if llmExecIndex < lastApplyIndex {
+		t.Fatalf("llm-exec invoked before final orw-apply completion: calls=%#v", calls)
+	}
+
+	sawRetry := false
+	for _, cp := range events.checkpoints {
+		if cp.Stage == mods.StageNameORWApply && cp.Status == contracts.CheckpointStatusRetrying {
+			sawRetry = true
+			break
+		}
+	}
+	if !sawRetry {
+		t.Fatalf("expected retry checkpoint for orw-apply")
+	}
+}
+
+func findStageIndex(calls []gridCall, stage string) int {
+	for i, call := range calls {
+		if call.stage.Name == stage {
+			return i
+		}
+	}
+	return -1
+}
+
+func findLastStageIndex(calls []gridCall, stage string) int {
+	for i := len(calls) - 1; i >= 0; i-- {
+		if calls[i].stage.Name == stage {
+			return i
+		}
+	}
+	return -1
+}
