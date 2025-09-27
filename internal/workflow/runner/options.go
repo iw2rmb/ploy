@@ -14,6 +14,7 @@ type Options struct {
 	ManifestCompiler ManifestCompiler
 	Aster            AsterOptions
 	CacheComposer    CacheComposer
+	JobComposer      JobComposer
 	Mods             ModsOptions
 }
 

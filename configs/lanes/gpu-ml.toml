@@ -7,3 +7,17 @@ cache_namespace = "gpu-ml"
 setup = ["pip", "install", "-r", "requirements.txt"]
 build = ["python", "-m", "build_model"]
 test = ["pytest", "tests/ml"]
+
+[job]
+image = "registry.dev/ploy/gpu-ml:latest"
+command = ["python", "-m", "train_pipeline"]
+priority = "gpu"
+
+  [job.env]
+  CUDA_VISIBLE_DEVICES = "0"
+  PYTHONUNBUFFERED = "1"
+
+  [job.resources]
+  cpu = "6000m"
+  memory = "16Gi"
+  gpu = "1"
