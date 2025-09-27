@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -221,6 +222,29 @@ func compareSequences(actual, expected []stageStatusEntry) error {
 	return nil
 }
 
+func collectStageStatuses(sequence []stageStatusEntry, stage string) []runner.StageStatus {
+	statuses := make([]runner.StageStatus, 0, len(sequence))
+	for _, entry := range sequence {
+		if entry.stage == stage {
+			statuses = append(statuses, entry.status)
+		}
+	}
+	return statuses
+}
+
+func requireStageStatuses(t *testing.T, sequence []stageStatusEntry, stage string, expected []runner.StageStatus) {
+	t.Helper()
+	statuses := collectStageStatuses(sequence, stage)
+	if len(statuses) != len(expected) {
+		t.Fatalf("stage %s statuses length mismatch: got %d want %d", stage, len(statuses), len(expected))
+	}
+	for i, status := range statuses {
+		if status != expected[i] {
+			t.Fatalf("stage %s status %d mismatch: got %s want %s", stage, i, status, expected[i])
+		}
+	}
+}
+
 type recordingEvents struct {
 	tenant         string
 	nextTicket     string
@@ -229,10 +253,13 @@ type recordingEvents struct {
 	claimedTickets []string
 	checkpoints    []contracts.WorkflowCheckpoint
 	artifacts      []contracts.WorkflowArtifact
+	mu             sync.Mutex
 }
 
 func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (contracts.WorkflowTicket, error) {
 	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if ticketID == "" {
 		ticketID = r.nextTicket
 	}
@@ -254,12 +281,16 @@ func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (con
 
 func (r *recordingEvents) PublishCheckpoint(ctx context.Context, checkpoint contracts.WorkflowCheckpoint) error {
 	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.checkpoints = append(r.checkpoints, checkpoint)
 	return nil
 }
 
 func (r *recordingEvents) PublishArtifact(ctx context.Context, artifact contracts.WorkflowArtifact) error {
 	_ = ctx
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.artifacts = append(r.artifacts, artifact)
 	return nil
 }
@@ -270,6 +301,7 @@ type gridCall struct {
 }
 
 type fakeGrid struct {
+	mu            sync.Mutex
 	outcomes      map[string][]runner.StageOutcome
 	calls         []gridCall
 	lastWorkspace string
@@ -278,16 +310,21 @@ type fakeGrid struct {
 func (g *fakeGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	_ = ctx
 	_ = ticket
+	g.mu.Lock()
 	g.calls = append(g.calls, gridCall{stage: stage, workspace: workspace})
 	g.lastWorkspace = workspace
 	queue := g.outcomes[stage.Name]
-	if len(queue) == 0 {
-		return runner.StageOutcome{Stage: stage, Status: runner.StageStatusCompleted}, nil
+	var outcome runner.StageOutcome
+	if len(queue) > 0 {
+		outcome = queue[0]
+		g.outcomes[stage.Name] = queue[1:]
 	}
-	outcome := queue[0]
-	g.outcomes[stage.Name] = queue[1:]
+	g.mu.Unlock()
 	if outcome.Stage.Name == "" {
 		outcome.Stage = stage
+	}
+	if outcome.Status == "" {
+		outcome.Status = runner.StageStatusCompleted
 	}
 	return outcome, nil
 }
@@ -396,4 +433,114 @@ func (m metadataPlanner) Build(ctx context.Context, ticket contracts.WorkflowTic
 	_ = ctx
 	_ = ticket
 	return m.plan, nil
+}
+
+type stageGate struct {
+	ch   chan struct{}
+	once sync.Once
+}
+
+type parallelRecordingGrid struct {
+	mu       sync.Mutex
+	outcomes map[string][]runner.StageOutcome
+	gates    map[string]*stageGate
+	startCh  chan string
+	calls    []gridCall
+}
+
+func newParallelRecordingGrid() *parallelRecordingGrid {
+	return &parallelRecordingGrid{
+		outcomes: make(map[string][]runner.StageOutcome),
+		gates:    make(map[string]*stageGate),
+		startCh:  make(chan string, 64),
+	}
+}
+
+func (g *parallelRecordingGrid) setOutcomes(stage string, outcomes []runner.StageOutcome) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	clone := make([]runner.StageOutcome, len(outcomes))
+	copy(clone, outcomes)
+	g.outcomes[stage] = clone
+}
+
+func (g *parallelRecordingGrid) addGate(stage string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if _, ok := g.gates[stage]; ok {
+		return
+	}
+	g.gates[stage] = &stageGate{ch: make(chan struct{})}
+}
+
+func (g *parallelRecordingGrid) allow(stage string) {
+	g.mu.Lock()
+	gate := g.gates[stage]
+	g.mu.Unlock()
+	if gate == nil {
+		return
+	}
+	gate.once.Do(func() {
+		close(gate.ch)
+	})
+}
+
+func (g *parallelRecordingGrid) waitForStart(stage string, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case name := <-g.startCh:
+			if name == stage {
+				return true
+			}
+		case <-deadline:
+			return false
+		}
+	}
+}
+
+func (g *parallelRecordingGrid) callsSnapshot() []gridCall {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	clone := make([]gridCall, len(g.calls))
+	copy(clone, g.calls)
+	return clone
+}
+
+func (g *parallelRecordingGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
+	_ = ticket
+	g.mu.Lock()
+	g.calls = append(g.calls, gridCall{stage: stage, workspace: workspace})
+	gate := g.gates[stage.Name]
+	g.mu.Unlock()
+
+	select {
+	case g.startCh <- stage.Name:
+	case <-ctx.Done():
+		return runner.StageOutcome{}, ctx.Err()
+	}
+
+	if gate != nil {
+		select {
+		case <-gate.ch:
+		case <-ctx.Done():
+			return runner.StageOutcome{}, ctx.Err()
+		}
+	}
+
+	var outcome runner.StageOutcome
+	g.mu.Lock()
+	if queue := g.outcomes[stage.Name]; len(queue) > 0 {
+		outcome = queue[0]
+		g.outcomes[stage.Name] = queue[1:]
+	}
+	g.mu.Unlock()
+
+	if outcome.Stage.Name == "" {
+		outcome.Stage = stage
+	}
+	if outcome.Status == "" {
+		outcome.Status = runner.StageStatusCompleted
+	}
+	return outcome, nil
 }
