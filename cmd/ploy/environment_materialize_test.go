@@ -48,6 +48,7 @@ func TestHandleEnvironmentMaterializeRequiresApp(t *testing.T) {
 }
 
 func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
+	t.Setenv("PLOY_ASTER_ENABLE", "1")
 	prevFactory := environmentServiceFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
@@ -106,6 +107,9 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	if !recorder.request.DryRun {
 		t.Fatal("expected dry-run request")
 	}
+	if !recorder.request.AsterEnabled {
+		t.Fatal("expected aster to be enabled when flag is set")
+	}
 	if len(recorder.request.AsterToggles) != 1 || recorder.request.AsterToggles[0] != "lint" {
 		t.Fatalf("unexpected aster toggles: %v", recorder.request.AsterToggles)
 	}
@@ -115,6 +119,48 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 		if !strings.Contains(output, fragment) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}
+	}
+}
+
+func TestHandleEnvironmentMaterializeIgnoresAsterWhenFlagDisabled(t *testing.T) {
+	prevFactory := environmentServiceFactory
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
+	prevSnapshotLoader := snapshotRegistryLoader
+	prevSnapshotDir := snapshotConfigDir
+	defer func() {
+		environmentServiceFactory = prevFactory
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
+		snapshotRegistryLoader = prevSnapshotLoader
+		snapshotConfigDir = prevSnapshotDir
+	}()
+
+	recorder := &recordingEnvironmentService{}
+	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
+		return recorder, nil
+	}
+	laneRegistryLoader = func(dir string) (laneRegistry, error) { return nil, nil }
+	laneConfigDir = "ignored"
+	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
+	snapshotConfigDir = "ignored"
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return &stubManifestCompiler{compiled: manifests.Compilation{Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"}}}, nil
+	}
+	manifestConfigDir = "ignored"
+
+	if err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--tenant", "acme", "--aster", "lint"}, io.Discard); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if recorder.request.AsterEnabled {
+		t.Fatal("expected aster to be disabled without feature flag")
+	}
+	if len(recorder.request.AsterToggles) != 0 {
+		t.Fatalf("expected no aster toggles when flag disabled, got %v", recorder.request.AsterToggles)
 	}
 }
 

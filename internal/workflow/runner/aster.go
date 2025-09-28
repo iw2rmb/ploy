@@ -12,6 +12,10 @@ import (
 
 // resolveStageAster builds the Aster metadata for a stage based on manifest toggles and overrides.
 func resolveStageAster(ctx context.Context, stage Stage, manifest manifests.Compilation, opts AsterOptions) (StageAster, error) {
+	if !opts.Enabled {
+		return StageAster{}, nil
+	}
+
 	stageKey := strings.ToLower(strings.TrimSpace(stage.Name))
 	override := opts.StageOverrides
 	if override == nil {

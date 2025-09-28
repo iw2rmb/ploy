@@ -57,11 +57,16 @@ func handleLanesDescribe(args []string, stderr io.Writer) error {
 		return err
 	}
 
+	asterToggles := []string(nil)
+	if asterEnabled() {
+		asterToggles = splitToggles(*aster)
+	}
+
 	desc, err := reg.Describe(trimmedLane, lanes.DescribeOptions{
 		CommitSHA:           strings.TrimSpace(*commit),
 		SnapshotFingerprint: strings.TrimSpace(*snapshot),
 		ManifestVersion:     strings.TrimSpace(*manifest),
-		AsterToggles:        splitToggles(*aster),
+		AsterToggles:        asterToggles,
 	})
 	if err != nil {
 		return err

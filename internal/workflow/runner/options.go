@@ -20,6 +20,7 @@ type Options struct {
 
 // AsterOptions configures Aster bundle lookup for stage execution.
 type AsterOptions struct {
+	Enabled           bool
 	Locator           aster.Locator
 	AdditionalToggles []string
 	StageOverrides    map[string]AsterStageOverride

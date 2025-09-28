@@ -53,7 +53,7 @@ Document the TOML-based lane descriptors consumed by the SHIFT lane engine and t
 - Keep cache namespaces unique; collisions trigger loader errors.
 - Loader rejects specs without a description, runtime family, cache namespace, build command, or test command.
 - `commands.setup` is optional and only printed when present.
-- Cache-key previews collapse empty inputs to `none` and sort Aster toggles alphabetically (`exec+plan`).
+- Cache-key previews collapse empty inputs to `none` and sort Aster toggles alphabetically (`exec+plan`) when ``PLOY_ASTER_ENABLE`` is set; otherwise the preview omits Aster inputs entirely.
 - Nomad-era lane descriptors were removed; TOML specs here are the single source of truth for Grid submissions.
 - Unit tests cover loader validation, cache-key composition, CLI output, and runner/grid lane enforcement (≥90% coverage on critical packages).
 
