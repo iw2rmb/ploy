@@ -14,6 +14,7 @@ import (
 )
 
 func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
+	t.Setenv("GRID_ENDPOINT", "")
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -74,6 +75,7 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 }
 
 func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
+	t.Setenv("GRID_ENDPOINT", "")
 	fakeRunner := &recordingRunner{err: errors.New("boom")}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -114,6 +116,7 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 }
 
 func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
+	t.Setenv("GRID_ENDPOINT", "")
 	prevLoader := manifestRegistryLoader
 	prevDir := manifestConfigDir
 	prevLaneLoader := laneRegistryLoader
@@ -155,6 +158,7 @@ func TestHandleWorkflowRunRequiresTenant(t *testing.T) {
 }
 
 func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
+	t.Setenv("GRID_ENDPOINT", "")
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory

@@ -63,6 +63,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
    - Supports dry-run to show resources that would be touched.
 7. **Aster Hook**
    - Discover Aster-generated AST-pruned bundles per workflow step.
+   - Gate the behaviour behind ``PLOY_ASTER_ENABLE`` so unfinished bundle work can stay dark; when the flag is unset cache keys and stage metadata omit Aster toggles and bundles.
    - Emit metadata into cache keys and attach bundle pointers to job submissions so Grid can select appropriate runtime accelerators.
    - Allow operators to toggle bundles per stage via CLI flags and surface bundle provenance after each workflow run.
 

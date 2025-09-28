@@ -9,7 +9,7 @@ Carry full DAG context and artifact manifests inside workflow checkpoints so Gri
 - Extends the existing checkpoint schema (no new subjects) by embedding stage and artifact metadata alongside status transitions.
 
 ## Behaviour
-- Every checkpoint published for a stage includes a `stage_metadata` block describing the stage name, kind, lane, dependencies, manifest reference, and active Aster toggles/bundles.
+- Every checkpoint published for a stage includes a `stage_metadata` block describing the stage name, kind, lane, dependencies, manifest reference, and (when ``PLOY_ASTER_ENABLE`` is set) the active Aster toggles/bundles.
 - Stage-completed checkpoints include an `artifacts` list derived from Grid stage outcomes so cache hydrators can react to produced bundles immediately. Retry/pending checkpoints omit artifacts.
 - Cache keys remain present for stages, and workflow-level checkpoints continue to render without stage metadata blocks.
 - Clients consuming the event stream can rely on the schema version bump to detect the richer payloads.

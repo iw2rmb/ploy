@@ -126,12 +126,13 @@ func TestServiceDryRunPlansResources(t *testing.T) {
 	})
 
 	result, err := svc.Materialize(context.Background(), Request{
-		CommitSHA:   "deadbeef",
-		App:         "commit-app",
-		Tenant:      "acme",
-		DryRun:      true,
-		Manifest:    manifest,
-		ManifestRef: contracts.ManifestReference{Name: "commit-app", Version: "2025-09-26"},
+		CommitSHA:    "deadbeef",
+		App:          "commit-app",
+		Tenant:       "acme",
+		DryRun:       true,
+		Manifest:     manifest,
+		ManifestRef:  contracts.ManifestReference{Name: "commit-app", Version: "2025-09-26"},
+		AsterEnabled: true,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -220,6 +221,7 @@ func TestServiceMaterializeHydratesResources(t *testing.T) {
 		DryRun:       false,
 		Manifest:     manifest,
 		ManifestRef:  contracts.ManifestReference{Name: "commit-app", Version: "2025-09-26"},
+		AsterEnabled: true,
 		AsterToggles: []string{"ml"},
 	})
 	if err != nil {

@@ -13,6 +13,7 @@ import (
 )
 
 func TestHandleWorkflowRunConfiguresModsFlags(t *testing.T) {
+	t.Setenv("GRID_ENDPOINT", "")
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
