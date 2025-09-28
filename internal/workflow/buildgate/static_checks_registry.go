@@ -8,13 +8,6 @@ import (
 	"strings"
 )
 
-var (
-	// ErrStaticCheckRegistryNil indicates the registry has not been configured.
-	ErrStaticCheckRegistryNil = errors.New("buildgate: static check registry not configured")
-	// ErrStaticCheckAdapterNotFound is returned when a static check adapter is missing.
-	ErrStaticCheckAdapterNotFound = errors.New("buildgate: static check adapter not found")
-)
-
 type StaticCheckRegistry struct {
 	entries map[string]staticCheckAdapterEntry
 }
@@ -27,65 +20,6 @@ type staticCheckAdapterEntry struct {
 // NewStaticCheckRegistry constructs an empty static check registry.
 func NewStaticCheckRegistry() *StaticCheckRegistry {
 	return &StaticCheckRegistry{entries: make(map[string]staticCheckAdapterEntry)}
-}
-
-// StaticCheckAdapter executes language specific static analysis tooling.
-type StaticCheckAdapter interface {
-	Metadata() StaticCheckAdapterMetadata
-	Run(ctx context.Context, req StaticCheckRequest) (StaticCheckResult, error)
-}
-
-// StaticCheckAdapterMetadata describes the adapter configuration exposed to the registry.
-type StaticCheckAdapterMetadata struct {
-	Language        string
-	Tool            string
-	DefaultSeverity SeverityLevel
-}
-
-// SeverityLevel expresses a diagnostic severity threshold.
-type SeverityLevel string
-
-const (
-	SeverityInfo    SeverityLevel = "info"
-	SeverityWarning SeverityLevel = "warning"
-	SeverityError   SeverityLevel = "error"
-)
-
-// StaticCheckLaneConfig configures lane defaults for a language.
-type StaticCheckLaneConfig struct {
-	Enabled        bool
-	FailOnSeverity SeverityLevel
-	Options        map[string]string
-}
-
-// StaticCheckManifest captures manifest overrides for static checks.
-type StaticCheckManifest struct {
-	Languages map[string]StaticCheckManifestLanguage
-}
-
-// StaticCheckManifestLanguage describes per-language manifest configuration.
-type StaticCheckManifestLanguage struct {
-	Enabled        *bool
-	FailOnSeverity string
-	Options        map[string]string
-}
-
-// StaticCheckSpec describes a registry execution request.
-type StaticCheckSpec struct {
-	LaneDefaults  map[string]StaticCheckLaneConfig
-	Manifest      StaticCheckManifest
-	SkipLanguages []string
-}
-
-// StaticCheckRequest supplies adapter execution context.
-type StaticCheckRequest struct {
-	FailOnSeverity SeverityLevel
-	Options        map[string]string
-}
-
-// StaticCheckResult captures adapter execution results.
-type StaticCheckResult struct {
-	Failures []StaticCheckFailure
 }
 
 // Register installs an adapter for the provided language.
@@ -182,11 +116,7 @@ func (r *StaticCheckRegistry) Execute(ctx context.Context, spec StaticCheckSpec)
 				invocation.options[strings.TrimSpace(k)] = v
 			}
 		}
-		if !exists {
-			invocations[normalized] = invocation
-		} else {
-			invocations[normalized] = invocation
-		}
+		invocations[normalized] = invocation
 	}
 
 	skip := make(map[string]struct{})
@@ -259,109 +189,4 @@ type staticCheckInvocation struct {
 	enabled bool
 	failOn  SeverityLevel
 	options map[string]string
-}
-
-func sanitizeAdapterMetadata(meta StaticCheckAdapterMetadata) (StaticCheckAdapterMetadata, error) {
-	language := normalizeLanguage(meta.Language)
-	if language == "" {
-		return StaticCheckAdapterMetadata{}, errors.New("language is required")
-	}
-	tool := strings.TrimSpace(meta.Tool)
-	if tool == "" {
-		return StaticCheckAdapterMetadata{}, errors.New("tool is required")
-	}
-	severity := meta.DefaultSeverity
-	if severity == "" {
-		severity = SeverityError
-	}
-	normalizedSeverity, err := normalizeSeverityLevel(severity)
-	if err != nil {
-		return StaticCheckAdapterMetadata{}, err
-	}
-	return StaticCheckAdapterMetadata{
-		Language:        language,
-		Tool:            tool,
-		DefaultSeverity: normalizedSeverity,
-	}, nil
-}
-
-func normalizeSeverityLevel(level SeverityLevel) (SeverityLevel, error) {
-	switch level {
-	case "":
-		return "", nil
-	case SeverityError, SeverityWarning, SeverityInfo:
-		return level, nil
-	default:
-		return "", fmt.Errorf("invalid severity level %q", string(level))
-	}
-}
-
-func parseSeverityLevel(value string) (SeverityLevel, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "", errors.New("severity is required")
-	}
-	switch strings.ToLower(trimmed) {
-	case string(SeverityError):
-		return SeverityError, nil
-	case string(SeverityWarning):
-		return SeverityWarning, nil
-	case string(SeverityInfo):
-		return SeverityInfo, nil
-	default:
-		return "", fmt.Errorf("invalid severity level %q", trimmed)
-	}
-}
-
-func normalizeLanguage(language string) string {
-	normalized := strings.ToLower(strings.TrimSpace(language))
-	switch normalized {
-	case "":
-		return ""
-	case "go", "golang":
-		return "golang"
-	case "js", "node", "nodejs", "javascript":
-		return "javascript"
-	case "ts", "typescript":
-		return "typescript"
-	case "py", "python":
-		return "python"
-	case "c#", "csharp":
-		return "csharp"
-	default:
-		return normalized
-	}
-}
-
-func copyOptions(src map[string]string) map[string]string {
-	if len(src) == 0 {
-		return nil
-	}
-	dst := make(map[string]string, len(src))
-	for k, v := range src {
-		dst[strings.TrimSpace(k)] = v
-	}
-	return dst
-}
-
-func clampNonNegative(value int) int {
-	if value < 0 {
-		return 0
-	}
-	return value
-}
-
-func severityGreaterOrEqual(severity SeverityLevel, threshold SeverityLevel) bool {
-	return severityRank(severity) >= severityRank(threshold)
-}
-
-func severityRank(level SeverityLevel) int {
-	switch level {
-	case SeverityInfo:
-		return 0
-	case SeverityWarning:
-		return 1
-	default:
-		return 2
-	}
 }
