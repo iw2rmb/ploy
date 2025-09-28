@@ -14,11 +14,11 @@ ploy knowledge-base evaluate --fixture <samples.json>
 ```
 `lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, surfaced job defaults (image, command, env, resources), and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
-`workflow run` connects to JetStream when ``JETSTREAM_URL`` is set (falling back to the in-memory stub otherwise), claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid can respect concurrency/timebox controls. When ``GRID_ENDPOINT`` is configured the CLI now instantiates the Workflow RPC SDK client; omitting it preserves the in-memory Grid stub, which still refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
+`workflow run` claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. When ``GRID_ENDPOINT`` targets a Grid cluster running v2025.11.0 or newer the CLI queries ``/v1/cluster/info`` to discover JetStream and IPFS endpoints before connecting; Grid-less runs fall back to the in-memory stubs. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid can respect concurrency/timebox controls. When ``GRID_ENDPOINT`` is omitted the in-memory Grid stub remains active and still refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
-`snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, uploads the payload to the configured IPFS gateway (falling back to the deterministic in-memory publisher when ``IPFS_GATEWAY`` is unset), publishes metadata to the current stub, and prints the returned CID.
+`snapshot capture` loads the fixture referenced in the spec, applies strip/mask/synthetic rules, produces a deterministic fingerprint, uploads the payload to the IPFS gateway discovered from Grid (falling back to the deterministic in-memory publisher when neither discovery nor ``IPFS_GATEWAY`` are available), publishes metadata to the current stub, and prints the returned CID.
 
 `environment materialize` evaluates the integration manifest for a given app/commit pair, validates required snapshots, optionally captures them (execution mode), composes deterministic cache keys for each required lane, and hydrates those caches through an in-memory hydrator. Dry-run mode avoids snapshot capture/hydration and surfaces any gaps before Grid integration lands.
 
@@ -43,10 +43,10 @@ ploy knowledge-base evaluate --fixture <samples.json>
 - `1` — error (missing flags, unsupported subcommand, stage failure, or downstream error).
 
 ## Environment
-- ``JETSTREAM_URL`` — NATS/JetStream endpoint (`nats://host:port`) used by `workflow run` when present.
-- ``GRID_ENDPOINT`` — Workflow RPC base URL (`https://grid-dev.example`) used by `workflow run` when set; falls back to the in-memory Grid stub when omitted.
-- ``IPFS_GATEWAY`` — Base URL for the IPFS gateway used by `snapshot capture`; when unset, the in-memory publisher returns deterministic fake CIDs for offline development.
-When ``JETSTREAM_URL`` is omitted the CLI falls back to the in-memory JetStream stub; omitting ``GRID_ENDPOINT`` keeps workflow execution local via the in-memory Grid stub for offline development.
+- ``GRID_ENDPOINT`` — Workflow RPC base URL (`https://grid-dev.example`) used by `workflow run`; it also enables discovery via ``/v1/cluster/info`` for JetStream and IPFS configuration.
+- ``JETSTREAM_URL`` — Legacy override for JetStream when discovery is unavailable or when targeting older Grid releases.
+- ``IPFS_GATEWAY`` — Legacy override for the IPFS gateway when discovery is unavailable.
+When ``GRID_ENDPOINT`` is omitted the CLI falls back to the in-memory Grid and JetStream stubs for offline development.
 
 ## Development
 - Build via `make build` (outputs to `dist/ploy`).
