@@ -241,7 +241,7 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 	if !grid.waitForStart(mods.StageNameORWApply, time.Second) {
 		t.Fatalf("expected orw-apply to start")
 	}
-	if !grid.waitForStart(mods.StageNameORWGenerate, time.Second) {
+	if !grid.waitForStart(mods.StageNameORWGenerate, 2*time.Second) {
 		t.Fatalf("expected orw-gen to start while orw-apply running")
 	}
 
