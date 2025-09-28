@@ -45,7 +45,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
    - `jobs.<run_id>.events` (Grid-owned) streams job lifecycle events that the CLI consumes before exit.
 2. **Workflow Runner CLI**
    - Single binary invoked by operators or Grid when work appears; default command `ploy workflow run --ticket auto`.
-   - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC helper (HTTP client toggled via ``GRID_ENDPOINT`` with an in-memory fallback when unset).
+  - Uses NATS JS durable consumers, reconstructs DAG from mod definitions + integration manifests, emits Grid job specs through the Workflow RPC helper (HTTP client keyed off ``GRID_ENDPOINT``). JetStream and IPFS endpoints are discovered automatically via ``/v1/cluster/info`` when ``GRID_ENDPOINT`` is set, with legacy environment fallbacks retained for older Grid releases.
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 3. **Lane Engine**
    - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache namespaces, build/test commands, and the job spec schema (`image`, `command`, `env`, `resources`).
@@ -53,7 +53,7 @@ Reboot Ploy as an on-demand workflow brain that evaluates mods DAGs, emits Grid 
    - Expose `ploy lanes describe <lane>` for developers to inspect runtime assumptions.
 4. **Snapshot Toolkit**
    - `ploy snapshot plan` to preview strip/mask/synthetic rules.
-   - `ploy snapshot capture` produces IPFS artifacts and posts metadata to JetStream.
+  - `ploy snapshot capture` produces IPFS artifacts and posts metadata to JetStream, relying on discovery data when available.
    - Replays snapshots locally using lightweight containers matching Grid runtime images.
 5. **Integration Manifest Processing**
    - Validate schema (TOML + embedded Markdown) before a run; fail fast if topology or fixtures are inconsistent.

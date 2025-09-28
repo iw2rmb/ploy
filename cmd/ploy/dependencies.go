@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -85,10 +89,22 @@ var (
 	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
 	eventsFactory  eventsFactoryFunc = defaultEventsFactory
 	gridFactory    gridFactoryFunc   = defaultGridFactory
+
+	newJetStreamClient = contracts.NewJetStreamClient
 )
 
 var (
 	knowledgeBaseAdvisorLoader knowledgeBaseAdvisorLoaderFunc = defaultKnowledgeBaseAdvisorLoader
+)
+
+type integrationConfig struct {
+	JetStreamURL string
+	IPFSGateway  string
+}
+
+var (
+	discoveryCache     = newClusterInfoCache()
+	fetchClusterInfoFn = fetchClusterInfo
 )
 
 // defaultEventsFactory builds an events client, preferring JetStream when configured.
@@ -97,9 +113,10 @@ func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
 	if trimmedTenant == "" {
 		return nil, fmt.Errorf("tenant is required for events client")
 	}
-	jetstreamURL := strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
+	cfg, _ := resolveIntegrationConfig(context.Background())
+	jetstreamURL := strings.TrimSpace(cfg.JetStreamURL)
 	if jetstreamURL != "" {
-		client, err := contracts.NewJetStreamClient(contracts.JetStreamOptions{
+		client, err := newJetStreamClient(contracts.JetStreamOptions{
 			URL:    jetstreamURL,
 			Tenant: trimmedTenant,
 		})
@@ -132,7 +149,8 @@ var (
 
 	snapshotRegistryLoader snapshotRegistryLoaderFunc = func(dir string) (snapshotRegistry, error) {
 		opts := snapshots.LoadOptions{}
-		gateway := strings.TrimSpace(os.Getenv("IPFS_GATEWAY"))
+		cfg, _ := resolveIntegrationConfig(context.Background())
+		gateway := strings.TrimSpace(cfg.IPFSGateway)
 		if gateway != "" {
 			publisher, err := snapshots.NewIPFSGatewayPublisher(gateway, snapshots.IPFSGatewayOptions{Pin: true})
 			if err != nil {
@@ -140,7 +158,7 @@ var (
 			}
 			opts.ArtifactPublisher = publisher
 		}
-		jetstreamURL := strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
+		jetstreamURL := strings.TrimSpace(cfg.JetStreamURL)
 		if jetstreamURL != "" {
 			metadataPublisher, err := snapshots.NewJetStreamMetadataPublisher(jetstreamURL, snapshots.JetStreamMetadataOptions{})
 			if err != nil {
@@ -204,6 +222,145 @@ func defaultKnowledgeBaseAdvisorLoader(path string) (mods.Advisor, error) {
 		return nil, err
 	}
 	return advisor, nil
+}
+
+func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
+	endpoint := strings.TrimSpace(os.Getenv("GRID_ENDPOINT"))
+	if endpoint == "" {
+		return integrationConfig{
+			JetStreamURL: strings.TrimSpace(os.Getenv("JETSTREAM_URL")),
+			IPFSGateway:  strings.TrimSpace(os.Getenv("IPFS_GATEWAY")),
+		}, nil
+	}
+
+	info, err := loadClusterInfo(ctx, endpoint)
+	if err != nil {
+		return integrationConfig{
+			JetStreamURL: strings.TrimSpace(os.Getenv("JETSTREAM_URL")),
+			IPFSGateway:  strings.TrimSpace(os.Getenv("IPFS_GATEWAY")),
+		}, err
+	}
+
+	cfg := integrationConfig{
+		JetStreamURL: strings.TrimSpace(info.JetStreamURL),
+		IPFSGateway:  strings.TrimSpace(info.IPFSGateway),
+	}
+
+	if cfg.JetStreamURL == "" {
+		cfg.JetStreamURL = strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
+	}
+	if cfg.IPFSGateway == "" {
+		cfg.IPFSGateway = strings.TrimSpace(os.Getenv("IPFS_GATEWAY"))
+	}
+
+	return cfg, nil
+}
+
+type clusterInfo struct {
+	JetStreamURL string
+	IPFSGateway  string
+}
+
+type clusterInfoCache struct {
+	mu      sync.Mutex
+	entries map[string]clusterInfo
+}
+
+func newClusterInfoCache() *clusterInfoCache {
+	return &clusterInfoCache{entries: make(map[string]clusterInfo)}
+}
+
+func (c *clusterInfoCache) get(endpoint string) (clusterInfo, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	info, ok := c.entries[endpoint]
+	return info, ok
+}
+
+func (c *clusterInfoCache) set(endpoint string, info clusterInfo) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[endpoint] = info
+}
+
+func loadClusterInfo(ctx context.Context, endpoint string) (clusterInfo, error) {
+	if info, ok := discoveryCache.get(endpoint); ok {
+		return info, nil
+	}
+
+	info, err := fetchClusterInfoWithRetry(ctx, endpoint)
+	if err != nil {
+		return clusterInfo{}, err
+	}
+
+	discoveryCache.set(endpoint, info)
+	return info, nil
+}
+
+func fetchClusterInfoWithRetry(ctx context.Context, endpoint string) (clusterInfo, error) {
+	const attempts = 3
+	baseBackoff := 100 * time.Millisecond
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		info, err := fetchClusterInfoFn(ctx, endpoint)
+		if err == nil {
+			return info, nil
+		}
+		lastErr = err
+		select {
+		case <-ctx.Done():
+			return clusterInfo{}, ctx.Err()
+		default:
+		}
+		if i < attempts-1 {
+			time.Sleep(time.Duration(i+1) * baseBackoff)
+		}
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("cluster discovery failed")
+	}
+	return clusterInfo{}, lastErr
+}
+
+func fetchClusterInfo(ctx context.Context, endpoint string) (clusterInfo, error) {
+	trimmed := strings.TrimSpace(endpoint)
+	if trimmed == "" {
+		return clusterInfo{}, fmt.Errorf("grid endpoint required for discovery")
+	}
+
+	discoveryURL := fmt.Sprintf("%s/v1/cluster/info", strings.TrimRight(trimmed, "/"))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoveryURL, nil)
+	if err != nil {
+		return clusterInfo{}, fmt.Errorf("create discovery request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return clusterInfo{}, fmt.Errorf("fetch discovery info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return clusterInfo{}, fmt.Errorf("discovery request failed: %s", resp.Status)
+	}
+
+	var payload struct {
+		JetStream struct {
+			URL string `json:"url"`
+		} `json:"jetstream"`
+		IPFS struct {
+			Gateway string `json:"gateway"`
+		} `json:"ipfs"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return clusterInfo{}, fmt.Errorf("decode discovery response: %w", err)
+	}
+
+	return clusterInfo{
+		JetStreamURL: strings.TrimSpace(payload.JetStream.URL),
+		IPFSGateway:  strings.TrimSpace(payload.IPFS.Gateway),
+	}, nil
 }
 
 type registryCompiler struct {

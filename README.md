@@ -24,7 +24,7 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - [x] Aster hook — exposes AST-pruned bundles and workflow toggles inside stage metadata (Roadmap 07).
 - [x] Documentation refresh — doc set aligned around the CLI-first model and GRID hand-off (Roadmap 08).
 - [x] Cache coordination — checkpoints carry lane cache keys for Grid reuse (Roadmap 09).
-- [x] JetStream workflow client — live NATS connectivity with stub fallback toggled by ``JETSTREAM_URL`` (Roadmap 10).
+- [x] JetStream workflow client — live NATS connectivity with configuration discovered from Grid's cluster info endpoint (Roadmap 10).
 - [x] Lane documentation hardening — schema enforcement and lane reference updates (Roadmap 11).
 - [x] Snapshot validation — cross-engine verification with coverage guardrails (Roadmap 12).
 - [x] Integration manifest schema — JSON schema + CLI validation hook for manifests (Roadmap 13).
@@ -76,9 +76,9 @@ Full design records live in `docs/design/README.md`.
    The command parses `configs/lanes/go-native.toml`, previews the composed cache key, and lists the build/test commands bound to that lane.
 3. **Run the workflow CLI**
    ```bash
-   JETSTREAM_URL=nats://127.0.0.1:4222 ./dist/ploy workflow run --tenant acme --ticket auto
+   GRID_ENDPOINT=https://grid-dev.example ./dist/ploy workflow run --tenant acme --ticket auto
    ```
-   With ``JETSTREAM_URL`` set the CLI connects to JetStream, claims the next ticket, and publishes checkpoints on the real stream. When omitted it boots the in-memory stub for offline development.
+   Ploy reads ``/v1/cluster/info`` from Grid (v2025.11.0 or newer) to discover JetStream and IPFS endpoints before connecting. Older Grid releases can still drive the CLI by exporting ``JETSTREAM_URL`` (and optionally ``IPFS_GATEWAY``), or you can omit both for the in-memory stubs.
 4. **Preview snapshot rules**
    ```bash
    ./dist/ploy snapshot plan --snapshot dev-db
@@ -88,7 +88,7 @@ Full design records live in `docs/design/README.md`.
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme --ticket SNAPSHOT-1
    ```
-   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the configured IPFS gateway (or the in-memory stub when unset), and publishes metadata through the current stub path.
+   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the IPFS gateway discovered from Grid (or the in-memory stub when discovery and ``IPFS_GATEWAY`` are both unavailable), and publishes metadata through the current stub path.
 6. **Dry-run a commit-scoped environment**
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
@@ -110,10 +110,10 @@ Full design records live in `docs/design/README.md`.
 Per-feature write-ups live under `roadmap/shift/` (directory name retained for historical context). Status checkboxes in this README mirror those roadmap entries, and deeper design context is collected in `docs/design/README.md`.
 
 ## Environment Placeholders
-Workstation builds still rely on the in-memory Grid stub; JetStream is optional. Keep the following environment variables handy:
-- ``JETSTREAM_URL`` — JetStream endpoint used by the workflow runner and snapshot publisher (optional; falls back to stub).
-- ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid.
-- ``IPFS_GATEWAY`` — Gateway for retrieving snapshot artifacts published by `ploy snapshot capture`.
+Workstation builds still rely on the in-memory Grid stub; JetStream connectivity and IPFS publishing are now auto-configured from Grid when available. Keep the following environment variables handy:
+- ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid and to query the discovery endpoint.
+- ``JETSTREAM_URL`` — Legacy override for the JetStream endpoint when discovery is unavailable.
+- ``IPFS_GATEWAY`` — Legacy override for retrieving snapshot artifacts when discovery is unavailable.
 
 ## Contributing
 Follow the contributor workflow in `AGENTS.md` and keep docs aligned with `docs/DOCS.md`.
