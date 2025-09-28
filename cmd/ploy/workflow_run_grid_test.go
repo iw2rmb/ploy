@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"io"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"fmt"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -68,6 +71,8 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	prevAsterDir := asterConfigDir
 	prevLaneLoader := laneRegistryLoader
 	prevLaneDir := laneConfigDir
+	prevDiscovery := fetchClusterInfoFn
+	resetDiscoveryState()
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -77,6 +82,7 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 		asterConfigDir = prevAsterDir
 		laneRegistryLoader = prevLaneLoader
 		laneConfigDir = prevLaneDir
+		fetchClusterInfoFn = prevDiscovery
 	}()
 
 	runnerExecutor = fakeRunner
@@ -91,6 +97,9 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
 	}
 	laneConfigDir = "ignored"
+	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
+		return clusterInfo{}, nil
+	}
 	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
@@ -111,6 +120,8 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 	prevAsterDir := asterConfigDir
 	prevLaneLoader := laneRegistryLoader
 	prevLaneDir := laneConfigDir
+	prevDiscovery := fetchClusterInfoFn
+	resetDiscoveryState()
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -120,6 +131,7 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 		asterConfigDir = prevAsterDir
 		laneRegistryLoader = prevLaneLoader
 		laneConfigDir = prevLaneDir
+		fetchClusterInfoFn = prevDiscovery
 	}()
 
 	runnerExecutor = &recordingRunner{}
@@ -134,6 +146,9 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
 	}
 	laneConfigDir = "ignored"
+	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
+		return clusterInfo{}, fmt.Errorf("invalid endpoint")
+	}
 	t.Setenv("GRID_ENDPOINT", "://invalid")
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
