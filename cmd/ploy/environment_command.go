@@ -119,6 +119,12 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		return err
 	}
 
+	asterActive := asterEnabled()
+	asterToggles := []string(nil)
+	if asterActive {
+		asterToggles = splitToggles(*aster)
+	}
+
 	result, err := service.Materialize(context.Background(), environments.Request{
 		CommitSHA:    commit,
 		App:          trimmedApp,
@@ -126,7 +132,8 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		DryRun:       *dryRun,
 		Manifest:     compiled,
 		ManifestRef:  contracts.ManifestReference{Name: compiled.Manifest.Name, Version: compiled.Manifest.Version},
-		AsterToggles: splitToggles(*aster),
+		AsterEnabled: asterActive,
+		AsterToggles: asterToggles,
 	})
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ Mirror workflow stage artifact manifests onto the `ploy.artifact.<ticket>` JetSt
 
 ## Behaviour
 - When a stage finishes with artifact manifests, the runner publishes a checkpoint **and** individual artifact envelopes to `ploy.artifact.<ticket>`.
-- Each artifact envelope carries the schema version, ticket ID, stage name, optional cache key, stage metadata (lane, dependencies, manifest, Aster), and a single artifact manifest (name/CID/digest/media type).
+- Each artifact envelope carries the schema version, ticket ID, stage name, optional cache key, stage metadata (lane, dependencies, manifest, and—when ``PLOY_ASTER_ENABLE`` is set—Aster), and a single artifact manifest (name/CID/digest/media type).
 - Offline slices (no `JETSTREAM_URL`) persist envelopes in-memory for assertions; live JetStream runs publish JSON messages for consumers.
 - Workflow-level checkpoints remain unchanged; artifact envelopes are only emitted for stage-level completions with artifacts.
 

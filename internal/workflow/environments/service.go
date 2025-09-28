@@ -59,6 +59,7 @@ type Request struct {
 	DryRun       bool
 	Manifest     manifests.Compilation
 	ManifestRef  contracts.ManifestReference
+	AsterEnabled bool
 	AsterToggles []string
 }
 
@@ -147,7 +148,10 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		snapshotsStatus = append(snapshotsStatus, status)
 	}
 
-	toggles := mergeAsterToggles(req.Manifest, req.AsterToggles)
+	var toggles []string
+	if req.AsterEnabled {
+		toggles = mergeAsterToggles(req.Manifest, req.AsterToggles)
+	}
 	snapshotFingerprint := summarizeSnapshotFingerprint(snapshotsStatus)
 	manifestVersion := manifestMeta.Version
 

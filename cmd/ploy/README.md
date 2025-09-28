@@ -12,9 +12,9 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-r
 ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
 ```
-`lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, surfaced job defaults (image, command, env, resources), and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
+`lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the runtime family, build/test commands, surfaced job defaults (image, command, env, resources), and shows a deterministic cache-key preview that incorporates commit/snapshot/manifest/Aster toggles. Aster inputs are only included when ``PLOY_ASTER_ENABLE`` is set so the unfinished bundle integration can stay hidden behind a feature flag. The preview mirrors what the workflow runner supplies to Grid when dispatching stages.
 
-`workflow run` claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. When ``GRID_ENDPOINT`` targets a Grid cluster running v2025.11.0 or newer the CLI queries ``/v1/cluster/info`` to discover JetStream and IPFS endpoints before connecting; Grid-less runs fall back to the in-memory stubs. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid can respect concurrency/timebox controls. When ``GRID_ENDPOINT`` is omitted the in-memory Grid stub remains active and still refuses stages whose lanes are not declared in the manifest. Aster bundle provenance is surfaced after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
+`workflow run` claims a ticket (auto-generating one if `--ticket auto`), compiles the referenced integration manifest from `configs/manifests/`, publishes checkpoints for every stage transition (now including lane cache keys), executes mods/build/test against a temporary workspace, and cleans up before exit. When ``GRID_ENDPOINT`` targets a Grid cluster running v2025.11.0 or newer the CLI queries ``/v1/cluster/info`` to discover JetStream and IPFS endpoints before connecting; Grid-less runs fall back to the in-memory stubs. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid can respect concurrency/timebox controls. When ``GRID_ENDPOINT`` is omitted the in-memory Grid stub remains active and still refuses stages whose lanes are not declared in the manifest. When ``PLOY_ASTER_ENABLE`` is set the CLI resolves Aster bundle provenance after a successful run so developers can confirm which toggles/bundles were attached to each stage. Explicit ticket IDs remain a stub-only workflow until Grid integration lands.
 
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting strip/mask/synthetic rules and surfacing per-table highlights before a capture runs.
 
@@ -33,8 +33,8 @@ ploy knowledge-base evaluate --fixture <samples.json>
 - `--app` — Application identifier resolved to an integration manifest (required for `environment materialize`).
 - `--dry-run` — Skip snapshot capture and cache hydration while still reporting required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form (`environment materialize`).
-- `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `workflow run`, `environment materialize`).
-- `--aster-step` — Stage-specific overrides for Aster behaviour when running workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional toggles or `stage=off` to disable Aster for that stage.
+- `--aster` — Optional toggles to append to manifest-required Aster switches (`lanes describe`, `workflow run`, `environment materialize`). The flag is ignored unless ``PLOY_ASTER_ENABLE`` is set.
+- `--aster-step` — Stage-specific overrides for Aster behaviour when running workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional toggles or `stage=off` to disable Aster for that stage. Overrides are ignored unless ``PLOY_ASTER_ENABLE`` is set.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner so Grid can timebox plan evaluation (`workflow run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the planner (`workflow run`).
 
@@ -46,6 +46,7 @@ ploy knowledge-base evaluate --fixture <samples.json>
 - ``GRID_ENDPOINT`` — Workflow RPC base URL (`https://grid-dev.example`) used by `workflow run`; it also enables discovery via ``/v1/cluster/info`` for JetStream and IPFS configuration.
 - ``JETSTREAM_URL`` — Legacy override for JetStream when discovery is unavailable or when targeting older Grid releases.
 - ``IPFS_GATEWAY`` — Legacy override for the IPFS gateway when discovery is unavailable.
+- ``PLOY_ASTER_ENABLE`` — Opt-in switch for the experimental Aster integration. When unset the CLI skips bundle lookups and omits Aster toggles from cache keys, manifests, and summaries.
 When ``GRID_ENDPOINT`` is omitted the CLI falls back to the in-memory Grid and JetStream stubs for offline development.
 
 ## Development

@@ -75,9 +75,18 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("configure grid client: %w", err)
 	}
-	locator, err := asterLocatorLoader(asterConfigDir)
-	if err != nil {
-		return fmt.Errorf("load Aster bundles: %w", err)
+	var asterOpts runner.AsterOptions
+	if asterEnabled() {
+		locator, err := asterLocatorLoader(asterConfigDir)
+		if err != nil {
+			return fmt.Errorf("load Aster bundles: %w", err)
+		}
+		asterOpts = runner.AsterOptions{
+			Enabled:           true,
+			Locator:           locator,
+			AdditionalToggles: splitToggles(*asterGlobal),
+			StageOverrides:    overrides,
+		}
 	}
 	modsOptions := runner.ModsOptions{PlanTimeout: *modsPlanTimeout, MaxParallel: *modsMaxParallel}
 	advisor, err := knowledgeBaseAdvisorLoader(knowledgeBaseCatalogPath)
@@ -96,11 +105,7 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 		CacheComposer:    laneCacheComposer{lanes: laneReg},
 		JobComposer:      runner.LaneJobComposer{Lanes: laneReg},
 		Mods:             modsOptions,
-		Aster: runner.AsterOptions{
-			Locator:           locator,
-			AdditionalToggles: splitToggles(*asterGlobal),
-			StageOverrides:    overrides,
-		},
+		Aster:            asterOpts,
 	}
 	err = runnerExecutor.Run(context.Background(), opts)
 	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
@@ -114,10 +119,12 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	}); ok {
 		printBuildGateSummary(stderr, recorder.RecordedCheckpoints())
 	}
-	if reporter, ok := interface{}(gridClient).(interface {
-		Invocations() []runner.StageInvocation
-	}); ok {
-		printAsterSummary(stderr, reporter.Invocations())
+	if asterOpts.Enabled {
+		if reporter, ok := interface{}(gridClient).(interface {
+			Invocations() []runner.StageInvocation
+		}); ok {
+			printAsterSummary(stderr, reporter.Invocations())
+		}
 	}
 	return nil
 }

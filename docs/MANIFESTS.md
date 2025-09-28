@@ -1,7 +1,7 @@
 # Integration Manifests
 
 ## Purpose
-Describe topology, fixtures, lane requirements, and Aster toggles that every workflow run must honour when it dispatches jobs to Grid. Manifests keep the workflow runner stateless while ensuring commit- and workflow-scoped environments stay within approved boundaries.
+Describe topology, fixtures, lane requirements, and (when ``PLOY_ASTER_ENABLE`` is set) Aster toggles that every workflow run must honour when it dispatches jobs to Grid. Manifests keep the workflow runner stateless while ensuring commit- and workflow-scoped environments stay within approved boundaries.
 
 ## Current Status
 - CLI loads manifests from `configs/manifests/` and refuses to run when a ticket references an unknown or mismatched version.
@@ -9,7 +9,7 @@ Describe topology, fixtures, lane requirements, and Aster toggles that every wor
 - Grid enforcement is stubbed locally: the in-memory Grid rejects stages that target lanes not declared in the manifest. JetStream/Grid wiring will replace the stub once `GRID_ENDPOINT` integration resumes.
 
 ## Usage / Commands
-- `ploy workflow run --tenant <tenant>` automatically loads the referenced manifest and surfaces actionable errors when validation fails. Combine `--aster` with `--aster-step <stage=toggle|stage=off>` to enable or disable Aster toggles on a per-stage basis while keeping manifests canonical.
+- `ploy workflow run --tenant <tenant>` automatically loads the referenced manifest and surfaces actionable errors when validation fails. When ``PLOY_ASTER_ENABLE`` is set you can combine `--aster` with `--aster-step <stage=toggle|stage=off>` to enable or disable Aster toggles on a per-stage basis while keeping manifests canonical.
 - Manifests compile to JSON payloads that the workflow runner attaches to each stage before dispatching to Grid.
 - Use TOML files under `configs/manifests/` to add or update manifests. Run `go test ./internal/workflow/manifests` to exercise schema validation helpers.
 - `ploy manifest schema` prints the machine-readable schema located at `docs/schemas/integration_manifest.schema.json` so other tools can validate manifests without embedding Ploy's loader.

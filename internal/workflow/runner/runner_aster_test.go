@@ -45,6 +45,7 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
 		Aster: runner.AsterOptions{
+			Enabled: true,
 			Locator: locator,
 		},
 	}
@@ -116,6 +117,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
 		Aster: runner.AsterOptions{
+			Enabled: true,
 			Locator: locator,
 			StageOverrides: map[string]runner.AsterStageOverride{
 				buildGateStage: {Disable: true},
@@ -171,6 +173,7 @@ func TestRunRequiresAsterLocatorWhenManifestRequiresToggles(t *testing.T) {
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
+		Aster:            runner.AsterOptions{Enabled: true},
 	}
 	err := runner.Run(context.Background(), opts)
 	if err == nil {
@@ -225,6 +228,7 @@ func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
 		Aster: runner.AsterOptions{
+			Enabled:           true,
 			Locator:           locator,
 			AdditionalToggles: []string{"EXEC", "plan"},
 			StageOverrides: map[string]runner.AsterStageOverride{
@@ -281,7 +285,7 @@ func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
-		Aster:            runner.AsterOptions{Locator: locator},
+		Aster:            runner.AsterOptions{Enabled: true, Locator: locator},
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -313,7 +317,7 @@ func TestRunPropagatesAsterLocatorError(t *testing.T) {
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
 		ManifestCompiler: compiler,
-		Aster:            runner.AsterOptions{Locator: &stubAsterLocator{}},
+		Aster:            runner.AsterOptions{Enabled: true, Locator: &stubAsterLocator{}},
 	}
 	err := runner.Run(context.Background(), opts)
 	if err == nil {
