@@ -86,7 +86,15 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	}()
 
 	runnerExecutor = fakeRunner
-	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
+	var observedConfig integrationConfig
+	eventsFactory = func(tenant string) (runner.EventsClient, error) {
+		cfg, err := resolveIntegrationConfig(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		observedConfig = cfg
+		return contracts.NewInMemoryBus(tenant), nil
+	}
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
@@ -98,7 +106,13 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{}, nil
+		return clusterInfo{
+			APIEndpoint:   "https://grid.dev",
+			JetStreamURLs: []string{"nats://grid.dev:4222", "nats://grid.dev:5222"},
+			IPFSGateway:   "https://ipfs.grid.dev",
+			Features:      map[string]string{"workspace_api": "enabled"},
+			Version:       "2025.9.29",
+		}, nil
 	}
 	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
@@ -108,6 +122,21 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	}
 	if _, ok := fakeRunner.opts.Grid.(*grid.Client); !ok {
 		t.Fatalf("expected grid client, got %T", fakeRunner.opts.Grid)
+	}
+	if observedConfig.JetStreamURL != "nats://grid.dev:4222" {
+		t.Fatalf("unexpected primary jetstream url: %q", observedConfig.JetStreamURL)
+	}
+	if len(observedConfig.JetStreamURLs) != 2 {
+		t.Fatalf("unexpected jetstream routes: %+v", observedConfig.JetStreamURLs)
+	}
+	if observedConfig.APIEndpoint != "https://grid.dev" {
+		t.Fatalf("unexpected api endpoint: %q", observedConfig.APIEndpoint)
+	}
+	if observedConfig.Version != "2025.9.29" {
+		t.Fatalf("unexpected version: %q", observedConfig.Version)
+	}
+	if !observedConfig.FeatureEnabled("workspace_api") {
+		t.Fatal("expected workspace_api feature to be enabled")
 	}
 }
 
@@ -165,16 +194,22 @@ func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLaneDir := laneConfigDir
 	prevAsterDir := asterConfigDir
+	prevDiscovery := fetchClusterInfoFn
 	defer func() {
 		eventsFactory = prevFactory
 		manifestConfigDir = prevManifestDir
 		laneConfigDir = prevLaneDir
 		asterConfigDir = prevAsterDir
+		fetchClusterInfoFn = prevDiscovery
+		resetDiscoveryState()
 	}()
 
 	eventsFactory = defaultEventsFactory
-
-	t.Setenv("JETSTREAM_URL", "nats://127.0.0.1:1")
+	resetDiscoveryState()
+	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
+		return clusterInfo{JetStreamURLs: []string{"nats://127.0.0.1:1"}}, nil
+	}
+	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
 	_, file, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))

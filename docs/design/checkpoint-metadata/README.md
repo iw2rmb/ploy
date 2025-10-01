@@ -5,7 +5,7 @@ Carry full DAG context and artifact manifests inside workflow checkpoints so Gri
 
 ## Scope
 - Applies to the workflow runner (`internal/workflow/runner`), contracts (`internal/workflow/contracts`), and Grid client (`internal/workflow/grid`).
-- Workstation-only slice: events still publish through JetStream when ``JETSTREAM_URL`` is available, but validation focuses on the in-memory bus and unit tests.
+- Workstation-only slice: events still publish through JetStream when discovery returns routes, but validation focuses on the in-memory bus and unit tests.
 - Extends the existing checkpoint schema (no new subjects) by embedding stage and artifact metadata alongside status transitions.
 
 ## Behaviour

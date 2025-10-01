@@ -6,13 +6,13 @@ Move the workflow runner off the in-memory event stub so tickets and checkpoints
 
 ## Required Changes
 - Implement a JetStream-backed `runner.EventsClient` that claims tickets from `webhook.<tenant>.ploy.workflow-ticket` and publishes checkpoints to `ploy.workflow.<ticket>.checkpoints`.
-- Teach the CLI to instantiate the JetStream client when `JETSTREAM_URL` is set and fall back to the in-memory bus for offline slices.
+- Teach the CLI to instantiate the JetStream client when discovery returns routes and fall back to the in-memory bus for offline slices.
 - Bubble configuration errors (invalid URLs, missing streams) so operators see actionable failures instead of silent stub usage.
 
 ## Definition of Done
-- `ploy workflow run` connects to JetStream and fails fast when the endpoint is unreachable; removing `JETSTREAM_URL` restores the stub behaviour.
+- `ploy workflow run` connects to JetStream and fails fast when the endpoint is unreachable; discovery omissions restore the stub behaviour.
 - Checkpoints published through the CLI land on JetStream streams with the existing cache-key payloads.
-- Documentation reflects the new behaviour and directs users toward the `JETSTREAM_URL` toggle.
+- Documentation reflects the new behaviour and documents the discovery workflow.
 
 ## Tests
 - Unit tests for the JetStream client cover ticket claims and checkpoint publishing against an in-process NATS server.

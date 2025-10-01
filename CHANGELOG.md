@@ -5,6 +5,30 @@
 - Added log finding support to workflow contracts and runner checkpoint conversion so Knowledge Base codes propagate into CLI summaries and downstream consumers.
 - Documented the milestone in `docs/design/build-gate/README.md`, the new SHIFT design index, and roadmap slice `roadmap/build-gate/07-cli-summary.md`, marking `roadmap/shift/21-build-gate-reboot.md` as complete.
 
+## [2025-09-29] Grid Discovery Alignment
+- Updated `cmd/ploy/dependencies.go` to parse the full `/v1/cluster/info` payload (API endpoint, JetStream route list, IPFS gateway, feature map, version) with strict decoding, caching, and helper accessors.
+- Extended discovery and workflow tests (`cmd/ploy/dependencies_discovery_test.go`, `cmd/ploy/workflow_run_grid_test.go`) to cover multi-route handling, feature checks, caching, and fallback semantics; verified via `go test ./cmd/ploy`.
+- Documented the milestone in `docs/design/discovery-alignment/README.md`, refreshed README guidance, and marked roadmap slices `roadmap/discovery-alignment/01-cluster-info-parser.md`–`03-workflow-grid-alignment.md` complete.
+
+## [2025-09-29] Build Gate Error Prone Adapter
+- Added `internal/workflow/buildgate.NewErrorProneAdapter` to execute Java Error Prone with manifest-configurable targets, classpaths, and flags while parsing diagnostics into `StaticCheckFailure` entries backed by `internal/workflow/buildgate/error_prone_adapter_test.go`.
+- Wired CLI workflow summaries to display Error Prone findings alongside existing Go output via `cmd/ploy/workflow_run_output_test.go` and normalised static check language aliases by mapping `javac` to `java`.
+- Deflaked `TestRunExecutesParallelModsStages` by extending the stage start wait window to accommodate concurrent scheduling under heavier load.
+- Updated documentation and roadmap artifacts: `docs/design/build-gate/error-prone/README.md`, `docs/design/build-gate/README.md`, `docs/design/README.md`, `docs/design/shift/README.md`, `roadmap/build-gate/08-error-prone-adapter.md`, and `roadmap/shift/21-build-gate-reboot.md` to record the adapter milestone and verification.
+- Verification: `go test ./...` on 2025-09-29.
+
+## [2025-09-29] Build Gate ESLint Adapter
+- Added `internal/workflow/buildgate.NewESLintAdapter` to execute ESLint with manifest-configurable targets, config files, and rule severity overrides while converting diagnostics into `StaticCheckFailure` entries (`internal/workflow/buildgate/eslint_adapter.go`).
+- Extended unit coverage with `internal/workflow/buildgate/eslint_adapter_test.go` and `static_checks_helpers_test.go`, and refreshed CLI fixtures in `cmd/ploy/workflow_run_output_test.go` to surface ESLint failures in build gate summaries.
+- Updated documentation and roadmap artifacts: `docs/design/build-gate/eslint/README.md`, `docs/design/build-gate/README.md`, `docs/design/README.md`, `docs/design/shift/README.md`, and `roadmap/build-gate/09-eslint-adapter.md` to mark the JavaScript adapter milestone complete.
+- Verification: `go test ./internal/workflow/buildgate -count=1`, `go test ./internal/workflow/runner -count=1`, and `go test ./...` on 2025-09-29 after stabilising `TestRunExecutesParallelModsStages` timeouts.
+
+## [2025-09-29] Discovery-Only Environment Wiring
+- Removed legacy JetStream and IPFS environment fallbacks from `cmd/ploy/dependencies.go`, relying exclusively on Grid discovery for JetStream routes and IPFS gateways.
+- Updated CLI tests (`cmd/ploy/dependencies_discovery_test.go`, `cmd/ploy/snapshot_test.go`, `cmd/ploy/workflow_run_grid_test.go`) to exercise discovery-driven configuration and sanitized defaults.
+- Refreshed documentation (`docs/envs/README.md`, `README.md`, `cmd/ploy/README.md`, `docs/SNAPSHOTS.md`, `docs/design/{event-contracts,checkpoint-metadata,ipfs-artifacts,snapshot-metadata,stage-artifacts,overview}/README.md`, `docs/design/README.md`) and aligned roadmap entries with the discovery-only behaviour.
+- Verification: `go test ./...` on 2025-09-29.
+
 ## [2025-09-27] Build Gate Log Retrieval & Parsing
 - Added `internal/workflow/buildgate.LogRetriever` and `LogIngestor` to download Grid build logs with IPFS fallbacks, clamp payload size, compute deterministic SHA-256 digests, and parse Knowledge Base findings into checkpoint metadata.
 - Introduced a default log parser and metadata sanitisation updates that normalise Git authentication, Go module conflict, linker, and disk pressure findings for downstream remediation flows.
@@ -29,6 +53,11 @@
 - Updated `internal/workflow/contracts` with shared subject constants so ticket claims flow through `webhook.<tenant>.ploy.workflow-ticket` and status polling follows `jobs.<run_id>.events`, including whitespace safeguards for derived subjects.
 - Refreshed JetStream client tests to cover the new webhook stream wildcard and trimmed subject handling, keeping workstation coverage deterministic.
 - Documented the migration across the Workflow RPC alignment design, overview reference, Mods design, and roadmap slice `workflow-rpc-alignment/03-subject-alignment` (now marked complete).
+
+## [2025-09-29] Integration Manifest v2 Schema
+- Enforced v2 manifests across the loader by requiring `manifest_version = "v2"`, adding services/edges/exposures validation, deterministic ordering, and exported helpers (`LoadFile`, `EncodeCompilationToTOML`) for single-file workflows.
+- Introduced `ploy manifest validate [--rewrite=v2]` to validate or rewrite manifests in place, preserving file permissions and mirroring Grid topology fixtures.
+- Migrated shipped manifests (`configs/manifests/commit-app.toml`, `configs/manifests/smoke.toml`), refreshed `docs/MANIFESTS.md`, updated the v2 design record, and marked roadmap slice `roadmap/integration-manifests/01-schema-upgrade.md` complete.
 
 ## [2025-09-28] Workflow JobSpec Composition
 - Extended lane specs under `configs/lanes/*.toml` with validated `job` blocks covering image, command, environment, resources, and optional priority defaults.
@@ -103,13 +132,13 @@
 - Extended the Grid Workflow client and contract tests to round-trip artifact payloads, refreshed `docs/design/event-contracts/README.md`, and marked roadmap slice `17-checkpoint-metadata` complete.
 
 ## [2025-09-26] Snapshot Metadata Streams
-- Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when ``JETSTREAM_URL`` is configured, retaining the in-memory stub for offline runs.
-- Updated the CLI snapshot registry loader to wire the JetStream metadata publisher automatically and extended `ploy snapshot capture` tests to verify live JetStream behaviour alongside the existing IPFS gateway coverage.
+- Added `internal/workflow/snapshots.NewJetStreamMetadataPublisher` to emit schema-versioned snapshot metadata envelopes to `ploy.artifact.<ticket>` when discovery returns JetStream routes, retaining the in-memory stub for offline runs.
+- Updated the CLI snapshot registry loader to wire the JetStream metadata publisher automatically and extended `ploy snapshot capture` tests to verify live JetStream behaviour alongside the IPFS gateway coverage.
 - Refreshed documentation (`docs/SNAPSHOTS.md`, `docs/design/ipfs-artifacts/README.md`, `docs/design/overview/README.md`) and recorded roadmap slice `16-snapshot-metadata-streams` as complete with CHANGELOG entry dated 2025-09-26.
 
 ## [2025-09-26] IPFS Artifact Publishing
 - Added `internal/workflow/snapshots.NewIPFSGatewayPublisher` to stream snapshot payloads to IPFS gateways via `/api/v0/add`, returning the gateway-provided CID while keeping the in-memory stub fallback for offline runs.
-- Updated `ploy snapshot capture` to honour ``IPFS_GATEWAY`` during registry loading, surfacing the returned CID in CLI output and metadata structures.
+- Updated `ploy snapshot capture` to honour discovery-provided gateways during registry loading, surfacing the returned CID in CLI output and metadata structures.
 - Expanded snapshot and CLI test suites with gateway-backed scenarios; refreshed documentation (`docs/design/ipfs-artifacts/README.md`, `docs/SNAPSHOTS.md`, `cmd/ploy/README.md`, `README.md`) and recorded roadmap slice `15-ipfs-artifact-publishing` as complete.
 
 ## [2025-09-26] Grid Workflow Client
@@ -129,7 +158,7 @@
 
 ## [2025-09-26] JetStream Client Wiring
 - Introduced `internal/workflow/contracts.JetStreamClient` to consume real tickets from `grid.webhook.<tenant>` and publish checkpoints to `ploy.workflow.<ticket>.checkpoints`.
-- Updated `ploy workflow run` to honour ``JETSTREAM_URL`` by dialing JetStream (falling back to the in-memory stub when unset) and surfacing connection failures to the caller.
+- Updated `ploy workflow run` to honour discovery-provided JetStream routes by dialing JetStream (falling back to the in-memory stub when routes are missing) and surfacing connection failures to the caller.
 - Added unit tests that exercise the client against an in-process JetStream server plus CLI coverage for misconfiguration errors.
 - Refreshed documentation and roadmap entries to describe the live JetStream behaviour and new configuration toggle.
 
@@ -191,7 +220,7 @@
 - Added an in-memory Grid client, stage invocation tracking, and extensive unit tests lifting runner package coverage to 94.5%.
 - Updated `cmd/ploy` to support `--ticket auto`, inject JetStream/Grid stubs via testable factories, and emit usage/help output across new error paths.
 - Extended CLI tests to cover command dispatch, usage printers, and runner wiring; repository-wide `go test -cover ./...` now satisfies ≥60% overall coverage.
-- Documented environment placeholders (`JETSTREAM_URL`, `GRID_ENDPOINT`, `IPFS_GATEWAY`) and new behaviour in `cmd/ploy/README.md`; marked roadmap slice `02-workflow-runner-cli` complete.
+- Documented discovery-driven configuration (`GRID_ENDPOINT`) and new behaviour in `cmd/ploy/README.md`; marked roadmap slice `02-workflow-runner-cli` complete.
 
 ## [2025-09-25] Event Contract Stub
 - Added `internal/workflow/contracts` with schema version `2025-09-25`, subject helpers, and validation logic for workflow tickets and checkpoints.

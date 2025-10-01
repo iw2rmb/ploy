@@ -28,7 +28,8 @@ func TestClientSubmitSuccess(t *testing.T) {
 	}
 
 	manifest := manifests.Compilation{
-		Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
+		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
+		ManifestVersion: "v2",
 	}
 
 	stage := Stage{

@@ -29,14 +29,14 @@ Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves 
 - [x] Snapshot validation — cross-engine verification with coverage guardrails (Roadmap 12).
 - [x] Integration manifest schema — JSON schema + CLI validation hook for manifests (Roadmap 13).
 - [x] Grid workflow client — workflow stages submit through the Grid RPC when ``GRID_ENDPOINT`` is set (Roadmap 14).
-- [x] IPFS artifact publishing — snapshot captures stream artifacts through ``IPFS_GATEWAY`` when available (Roadmap 15).
+- [x] IPFS artifact publishing — snapshot captures stream artifacts through the Grid-discovered IPFS gateway (Roadmap 15).
 - [x] Snapshot metadata streams — capture fingerprints and rule counts published to JetStream (Roadmap 16).
 - [x] Checkpoint enrichment — stage metadata and artifact manifests embedded in workflow checkpoints (Roadmap 17).
 - [x] Stage artifact streams — dedicated JetStream envelopes for stage artifacts to feed cache hydrators (Roadmap 18).
 - [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI ingest/evaluate workflows, and seeds `llm-plan` with suggestions (Roadmap 20, see `docs/design/knowledge-base/README.md`).
-- [ ] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`); sandbox runner, static check registry, log ingestion, and metadata sanitisation shipped, with CLI knowledge base surfacing still pending.
-- [x] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement, and subject alignment (Roadmap 22, see `docs/design/workflow-rpc-alignment/README.md`); SDK client, helper retries, subject realignment, and lane-driven job composition landed 2025-10-01.
+- [x] Build gate reboot — Grid-integrated static checks and log parsing across languages (Roadmap 21, see `docs/design/build-gate/README.md`); sandbox runner, static check registry, log ingestion, metadata sanitisation, CLI knowledge base surfacing, and Java Error Prone coverage shipped (verified 2025-09-29 via `cmd/ploy/workflow_summaries.go` and `internal/workflow/buildgate/error_prone_adapter.go`).
+- [x] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement, and subject alignment (Roadmap 22, see `docs/design/workflow-rpc-alignment/README.md`); SDK client, helper retries, subject realignment, and lane-driven job composition shipped (verified 2025-09-29 via `internal/workflow/grid/workflowrpc/helper/helper.go`).
 
 Full design records live in `docs/design/README.md`.
 
@@ -78,7 +78,7 @@ Full design records live in `docs/design/README.md`.
    ```bash
    GRID_ENDPOINT=https://grid-dev.example ./dist/ploy workflow run --tenant acme --ticket auto
    ```
-   Ploy reads ``/v1/cluster/info`` from Grid (v2025.11.0 or newer) to discover JetStream and IPFS endpoints before connecting. Older Grid releases can still drive the CLI by exporting ``JETSTREAM_URL`` (and optionally ``IPFS_GATEWAY``), or you can omit both for the in-memory stubs.
+   Ploy reads ``/v1/cluster/info`` from Grid to discover the API endpoint, JetStream route list, IPFS gateway, feature map, and Grid version before connecting. Omitting ``GRID_ENDPOINT`` keeps the CLI on the in-memory Grid and JetStream stubs.
 4. **Preview snapshot rules**
    ```bash
    ./dist/ploy snapshot plan --snapshot dev-db
@@ -88,7 +88,7 @@ Full design records live in `docs/design/README.md`.
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme --ticket SNAPSHOT-1
    ```
-   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the IPFS gateway discovered from Grid (or the in-memory stub when discovery and ``IPFS_GATEWAY`` are both unavailable), and publishes metadata through the current stub path.
+   Capture applies the configured rules against `configs/snapshots/dev-db.json`, hashes the result, uploads the payload to the IPFS gateway reported by discovery (or the in-memory stub when discovery omits one), and publishes metadata through the current stub path.
 6. **Dry-run a commit-scoped environment**
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
@@ -109,11 +109,10 @@ Full design records live in `docs/design/README.md`.
 ## Feature Roadmap
 Per-feature write-ups live under `roadmap/shift/` (directory name retained for historical context). Status checkboxes in this README mirror those roadmap entries, and deeper design context is collected in `docs/design/README.md`.
 
-## Environment Placeholders
-Workstation builds still rely on the in-memory Grid stub; JetStream connectivity and IPFS publishing are now auto-configured from Grid when available. Keep the following environment variables handy:
+## Environment Variables
+Workstation builds rely on discovery to surface remote dependencies. The CLI inspects the following environment variables:
 - ``GRID_ENDPOINT`` — Workflow RPC host used to submit jobs back to Grid and to query the discovery endpoint.
-- ``JETSTREAM_URL`` — Legacy override for the JetStream endpoint when discovery is unavailable.
-- ``IPFS_GATEWAY`` — Legacy override for retrieving snapshot artifacts when discovery is unavailable.
+- ``PLOY_ASTER_ENABLE`` — Opt-in switch for the experimental Aster bundle integration.
 
 ## Contributing
 Follow the contributor workflow in `AGENTS.md` and keep docs aligned with `docs/DOCS.md`.

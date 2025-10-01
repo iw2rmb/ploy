@@ -95,7 +95,8 @@ func (r *recordingHydrator) HydrateCache(ctx context.Context, lane string, cache
 
 func TestServiceDryRunPlansResources(t *testing.T) {
 	manifest := manifests.Compilation{
-		Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		ManifestVersion: "v2",
 		Fixtures: manifests.FixtureSet{
 			Required: []manifests.Fixture{
 				{Name: "postgres", Reference: "snapshot:commit-db"},
@@ -182,7 +183,8 @@ func TestServiceDryRunPlansResources(t *testing.T) {
 
 func TestServiceMaterializeHydratesResources(t *testing.T) {
 	manifest := manifests.Compilation{
-		Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		ManifestVersion: "v2",
 		Fixtures: manifests.FixtureSet{
 			Required: []manifests.Fixture{
 				{Name: "postgres", Reference: "snapshot:commit-db"},
@@ -264,7 +266,8 @@ func TestServiceMaterializeHydratesResources(t *testing.T) {
 
 func TestServiceMaterializeFailsWhenSnapshotMissing(t *testing.T) {
 	manifest := manifests.Compilation{
-		Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+		ManifestVersion: "v2",
 		Fixtures: manifests.FixtureSet{
 			Required: []manifests.Fixture{{Name: "postgres", Reference: "snapshot:missing"}},
 		},

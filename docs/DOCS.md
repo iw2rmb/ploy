@@ -28,7 +28,7 @@ The feature reboot simplifies the documentation surface so every contributor can
 
 ## Style Guidelines
 - Prefer short, action-oriented bullet lists over dense prose.
-- Use placeholders for environment values (``JETSTREAM_URL``, ``GRID_ENDPOINT``) instead of past platform-specific hosts.
+- Use placeholders for environment values (``GRID_ENDPOINT``) instead of past platform-specific hosts.
 - Highlight the RED → GREEN → REFACTOR cadence whenever tests or workflows are described.
 - Cross-link roadmap tasks and design docs rather than duplicating requirements.
 

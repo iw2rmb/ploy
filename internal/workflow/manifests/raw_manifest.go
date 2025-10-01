@@ -7,13 +7,17 @@ import (
 )
 
 type rawManifest struct {
-	Name     string      `toml:"name"`
-	Version  string      `toml:"version"`
-	Summary  string      `toml:"summary"`
-	Topology rawTopology `toml:"topology"`
-	Fixtures rawFixtures `toml:"fixtures"`
-	Lanes    rawLanes    `toml:"lanes"`
-	Aster    rawAster    `toml:"aster"`
+	ManifestVersion string        `toml:"manifest_version"`
+	Name            string        `toml:"name"`
+	Version         string        `toml:"version"`
+	Summary         string        `toml:"summary"`
+	Topology        rawTopology   `toml:"topology"`
+	Fixtures        rawFixtures   `toml:"fixtures"`
+	Lanes           rawLanes      `toml:"lanes"`
+	Aster           rawAster      `toml:"aster"`
+	Services        []rawService  `toml:"services"`
+	Edges           []rawEdge     `toml:"edges"`
+	Exposures       []rawExposure `toml:"exposures"`
 }
 
 type rawTopology struct {
@@ -54,7 +58,53 @@ type rawAster struct {
 	Optional []string `toml:"optional"`
 }
 
+type rawService struct {
+	Name     string                  `toml:"name"`
+	Kind     string                  `toml:"kind"`
+	Optional bool                    `toml:"optional"`
+	Identity rawServiceIdentity      `toml:"identity"`
+	Ports    []rawServicePort        `toml:"ports"`
+	Requires []rawServiceRequirement `toml:"requires"`
+}
+
+type rawServiceIdentity struct {
+	DNS string `toml:"dns"`
+}
+
+type rawServicePort struct {
+	Name     string `toml:"name"`
+	Port     int    `toml:"port"`
+	Protocol string `toml:"protocol"`
+}
+
+type rawServiceRequirement struct {
+	Target string `toml:"target"`
+	Edge   string `toml:"edge"`
+}
+
+type rawEdge struct {
+	Source    string   `toml:"source"`
+	Target    string   `toml:"target"`
+	Ports     []string `toml:"ports"`
+	Protocols []string `toml:"protocols"`
+}
+
+type rawExposure struct {
+	Service string `toml:"service"`
+	Port    string `toml:"port"`
+	Mode    string `toml:"mode"`
+}
+
+// validateRawManifest ensures the manifest captures the required topology contracts.
 func validateRawManifest(m rawManifest) error {
+	manifestVersion := strings.TrimSpace(m.ManifestVersion)
+	if manifestVersion == "" {
+		return errors.New("manifest_version must be set to v2")
+	}
+	if manifestVersion != "v2" {
+		return fmt.Errorf("manifest_version must be v2 (got %s)", manifestVersion)
+	}
+
 	name := strings.TrimSpace(m.Name)
 	if name == "" {
 		return errors.New("name is required")
@@ -124,6 +174,126 @@ func validateRawManifest(m rawManifest) error {
 	for i, lane := range m.Lanes.Allowed {
 		if strings.TrimSpace(lane.Name) == "" {
 			return fmt.Errorf("lanes.allowed[%d].name is required", i)
+		}
+	}
+
+	if len(m.Services) == 0 {
+		return errors.New("services requires at least one entry")
+	}
+	servicePorts := make(map[string]map[string]struct{}, len(m.Services))
+	for i, service := range m.Services {
+		serviceName := strings.TrimSpace(service.Name)
+		if serviceName == "" {
+			return fmt.Errorf("services[%d].name is required", i)
+		}
+		if _, exists := servicePorts[serviceName]; exists {
+			return fmt.Errorf("services[%d].name duplicates an existing service", i)
+		}
+		if strings.TrimSpace(service.Kind) == "" {
+			return fmt.Errorf("services[%d].kind is required", i)
+		}
+		if strings.TrimSpace(service.Identity.DNS) == "" {
+			return fmt.Errorf("services[%d].identity.dns is required", i)
+		}
+		if len(service.Ports) == 0 {
+			return fmt.Errorf("services[%d].ports requires at least one entry", i)
+		}
+		ports := make(map[string]struct{}, len(service.Ports))
+		for j, port := range service.Ports {
+			name := strings.TrimSpace(port.Name)
+			if name == "" {
+				return fmt.Errorf("services[%d].ports[%d].name is required", i, j)
+			}
+			if _, exists := ports[name]; exists {
+				return fmt.Errorf("services[%d].ports[%d].name duplicates port %q", i, j, name)
+			}
+			if port.Port <= 0 {
+				return fmt.Errorf("services[%d].ports[%d].port must be positive", i, j)
+			}
+			if strings.TrimSpace(port.Protocol) == "" {
+				return fmt.Errorf("services[%d].ports[%d].protocol is required", i, j)
+			}
+			ports[name] = struct{}{}
+		}
+		servicePorts[serviceName] = ports
+		for j, req := range service.Requires {
+			if strings.TrimSpace(req.Target) == "" {
+				return fmt.Errorf("services[%d].requires[%d].target is required", i, j)
+			}
+			if strings.TrimSpace(req.Edge) == "" {
+				return fmt.Errorf("services[%d].requires[%d].edge is required", i, j)
+			}
+		}
+	}
+
+	if len(m.Edges) == 0 {
+		return errors.New("edges requires at least one entry")
+	}
+	for i, edge := range m.Edges {
+		source := strings.TrimSpace(edge.Source)
+		if source == "" {
+			return fmt.Errorf("edges[%d].source is required", i)
+		}
+		if _, ok := servicePorts[source]; !ok {
+			return fmt.Errorf("edges[%d].source %q missing from services", i, source)
+		}
+		target := strings.TrimSpace(edge.Target)
+		if target == "" {
+			return fmt.Errorf("edges[%d].target is required", i)
+		}
+		ports, ok := servicePorts[target]
+		if !ok {
+			return fmt.Errorf("edges[%d].target %q missing from services", i, target)
+		}
+		if len(edge.Ports) == 0 {
+			return fmt.Errorf("edges[%d].ports requires at least one entry", i)
+		}
+		for j, port := range edge.Ports {
+			trimmed := strings.TrimSpace(port)
+			if trimmed == "" {
+				return fmt.Errorf("edges[%d].ports[%d] is required", i, j)
+			}
+			if _, exists := ports[trimmed]; !exists {
+				return fmt.Errorf("edges[%d].ports[%d] references unknown target port %q", i, j, trimmed)
+			}
+		}
+		if len(edge.Protocols) == 0 {
+			return fmt.Errorf("edges[%d].protocols requires at least one entry", i)
+		}
+		for j, protocol := range edge.Protocols {
+			if strings.TrimSpace(protocol) == "" {
+				return fmt.Errorf("edges[%d].protocols[%d] is required", i, j)
+			}
+		}
+	}
+
+	allowedExposureModes := map[string]struct{}{
+		"public":  {},
+		"cluster": {},
+		"local":   {},
+	}
+	for i, exposure := range m.Exposures {
+		service := strings.TrimSpace(exposure.Service)
+		if service == "" {
+			return fmt.Errorf("exposures[%d].service is required", i)
+		}
+		ports, ok := servicePorts[service]
+		if !ok {
+			return fmt.Errorf("exposures[%d].service %q missing from services", i, service)
+		}
+		port := strings.TrimSpace(exposure.Port)
+		if port == "" {
+			return fmt.Errorf("exposures[%d].port is required", i)
+		}
+		if _, exists := ports[port]; !exists {
+			return fmt.Errorf("exposures[%d].port %q missing from service %q", i, port, service)
+		}
+		mode := strings.TrimSpace(exposure.Mode)
+		if mode == "" {
+			return fmt.Errorf("exposures[%d].mode is required", i)
+		}
+		if _, allowed := allowedExposureModes[mode]; !allowed {
+			return fmt.Errorf("exposures[%d].mode %q is not supported", i, mode)
 		}
 	}
 

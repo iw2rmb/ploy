@@ -13,6 +13,7 @@ import (
 func TestRegistryCompileProvidesNormalizedPayload(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `
+manifest_version = "v2"
 name = "smoke"
 version = "2025-09-26"
 summary = """
@@ -35,6 +36,47 @@ to = "redis"
 from = "mods-api"
 to = "internet"
 reason = "Block egress"
+
+[[services]]
+name = "mods-postgres"
+kind = "postgres"
+[services.identity]
+dns = "mods-postgres.svc.local"
+[[services.ports]]
+name = "psql"
+port = 5432
+protocol = "tcp"
+
+[[services]]
+name = "mods-api"
+kind = "http"
+[services.identity]
+dns = "mods-api.svc.local"
+[[services.ports]]
+name = "metrics"
+port = 9100
+protocol = "tcp"
+[[services.ports]]
+name = "http"
+port = 8080
+protocol = "tcp"
+[[services.requires]]
+target = "mods-postgres"
+edge = "api->postgres"
+[[services.requires]]
+target = "mods-redis"
+edge = "api->redis"
+
+[[services]]
+name = "mods-redis"
+kind = "redis"
+optional = true
+[services.identity]
+dns = "mods-redis.svc.local"
+[[services.ports]]
+name = "tcp"
+port = 6379
+protocol = "tcp"
 
 [fixtures]
 
@@ -68,6 +110,28 @@ reason = "data tooling"
 [aster]
 required = ["plan"]
 optional = ["exec", "lint"]
+
+[[edges]]
+source = "mods-api"
+target = "mods-redis"
+ports = ["tcp"]
+protocols = ["tcp"]
+
+[[edges]]
+source = "mods-api"
+target = "mods-postgres"
+ports = ["psql"]
+protocols = ["tcp"]
+
+[[exposures]]
+service = "mods-api"
+port = "http"
+mode = "public"
+
+[[exposures]]
+service = "mods-api"
+port = "metrics"
+mode = "cluster"
 `
 
 	path := filepath.Join(dir, "smoke.toml")
@@ -139,6 +203,33 @@ optional = ["exec", "lint"]
 	if manifestJSON["name"] != "smoke" {
 		t.Fatalf("expected manifest name in json, got %+v", manifestJSON)
 	}
+	if decoded["manifest_version"] != "v2" {
+		t.Fatalf("expected manifest_version v2, got %+v", decoded["manifest_version"])
+	}
+	services, ok := decoded["services"].([]any)
+	if !ok || len(services) != 3 {
+		t.Fatalf("expected 3 services, got %+v", decoded["services"])
+	}
+	firstService, _ := services[0].(map[string]any)
+	if firstService["name"] != "mods-api" {
+		t.Fatalf("expected services sorted by name, got %+v", services)
+	}
+	edges, ok := decoded["edges"].([]any)
+	if !ok || len(edges) != 2 {
+		t.Fatalf("expected edges array, got %+v", decoded["edges"])
+	}
+	firstEdge, _ := edges[0].(map[string]any)
+	if firstEdge["target"] != "mods-postgres" {
+		t.Fatalf("expected edges sorted by target, got %+v", edges)
+	}
+	exposures, ok := decoded["exposures"].([]any)
+	if !ok || len(exposures) != 2 {
+		t.Fatalf("expected exposures array, got %+v", decoded["exposures"])
+	}
+	firstExposure, _ := exposures[0].(map[string]any)
+	if firstExposure["mode"] != "cluster" {
+		t.Fatalf("expected exposures sorted to surface cluster first, got %+v", exposures)
+	}
 }
 
 func TestRegistryCompileRejectsInvalidManifest(t *testing.T) {
@@ -152,14 +243,15 @@ func TestRegistryCompileRejectsInvalidManifest(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing name")
 	}
-	if !strings.Contains(err.Error(), "name is required") {
-		t.Fatalf("expected actionable error, got %v", err)
+	if !strings.Contains(err.Error(), "manifest_version") {
+		t.Fatalf("expected manifest_version validation error, got %v", err)
 	}
 }
 
 func TestRegistryCompileValidatesVersionMatch(t *testing.T) {
 	dir := t.TempDir()
 	manifest := `
+manifest_version = "v2"
 name = "smoke"
 version = "2025-09-26"
 summary = "ok"
@@ -167,6 +259,27 @@ summary = "ok"
 [[topology.allow]]
 from = "a"
 to = "b"
+
+[[services]]
+name = "svc-a"
+kind = "http"
+[services.identity]
+dns = "svc-a.local"
+[[services.ports]]
+name = "http"
+port = 8080
+protocol = "tcp"
+
+[[edges]]
+source = "svc-a"
+target = "svc-a"
+ports = ["http"]
+protocols = ["tcp"]
+
+[[exposures]]
+service = "svc-a"
+port = "http"
+mode = "cluster"
 [fixtures]
 [[fixtures.required]]
 name = "x"
@@ -194,5 +307,119 @@ optional = []
 	}
 	if !strings.Contains(err.Error(), "version mismatch") {
 		t.Fatalf("expected version mismatch error, got %v", err)
+	}
+}
+
+func TestRegistryCompileRejectsManifestWithoutServices(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `
+manifest_version = "v2"
+name = "smoke"
+version = "2025-09-26"
+summary = "ok"
+[topology]
+[[topology.allow]]
+from = "a"
+to = "b"
+[fixtures]
+[[fixtures.required]]
+name = "x"
+reference = "y"
+[lanes]
+[[lanes.required]]
+name = "go-native"
+reason = "build-gate"
+`
+	if err := os.WriteFile(filepath.Join(dir, "smoke.toml"), []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	_, err := manifests.LoadDirectory(dir)
+	if err == nil {
+		t.Fatal("expected error when services block missing")
+	}
+	if !strings.Contains(err.Error(), "services") {
+		t.Fatalf("expected services validation error, got %v", err)
+	}
+}
+
+func TestEncodeCompilationToTOMLProducesDeterministicOutput(t *testing.T) {
+	dir := t.TempDir()
+	manifest := `
+manifest_version = "v2"
+name = "smoke"
+version = "2025-09-26"
+summary = "ok"
+
+[topology]
+description = "Standard mods topology"
+[[topology.allow]]
+from = "mods-api"
+to = "mods-postgres"
+
+[[services]]
+name = "mods-postgres"
+kind = "postgres"
+[services.identity]
+dns = "mods-postgres.svc.local"
+[[services.ports]]
+name = "psql"
+port = 5432
+protocol = "tcp"
+
+[[services]]
+name = "mods-api"
+kind = "http"
+[services.identity]
+dns = "mods-api.svc.local"
+[[services.ports]]
+name = "http"
+port = 8080
+protocol = "tcp"
+[[services.requires]]
+target = "mods-postgres"
+edge = "api->postgres"
+
+[fixtures]
+[[fixtures.required]]
+name = "postgres"
+reference = "snapshot:dev-db"
+
+[lanes]
+[[lanes.required]]
+name = "go-native"
+reason = "baseline"
+
+[aster]
+required = ["plan"]
+optional = []
+
+[[edges]]
+source = "mods-api"
+target = "mods-postgres"
+ports = ["psql"]
+protocols = ["tcp"]
+`
+
+	path := filepath.Join(dir, "smoke.toml")
+	if err := os.WriteFile(path, []byte(manifest), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	compiled, err := manifests.LoadFile(path)
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+
+	encoded, err := manifests.EncodeCompilationToTOML(compiled)
+	if err != nil {
+		t.Fatalf("encode manifest: %v", err)
+	}
+	output := string(encoded)
+	if !strings.Contains(output, "manifest_version = 'v2'") {
+		t.Fatalf("expected manifest_version in encoded output, got %q", output)
+	}
+	if strings.Count(output, "[[services]]") != 2 {
+		t.Fatalf("expected two services in encoded output, got %q", output)
 	}
 }

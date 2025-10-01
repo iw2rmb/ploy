@@ -65,6 +65,8 @@ func normalizeLanguage(language string) string {
 		return ""
 	case "go", "golang":
 		return "golang"
+	case "java", "javac":
+		return "java"
 	case "js", "node", "nodejs", "javascript":
 		return "javascript"
 	case "ts", "typescript":

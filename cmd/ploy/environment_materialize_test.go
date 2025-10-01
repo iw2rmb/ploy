@@ -87,8 +87,9 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: manifests.Compilation{
-			Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
-			Fixtures: manifests.FixtureSet{Required: []manifests.Fixture{{Name: "postgres", Reference: "snapshot:commit-db"}}},
+			Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+			ManifestVersion: "v2",
+			Fixtures:        manifests.FixtureSet{Required: []manifests.Fixture{{Name: "postgres", Reference: "snapshot:commit-db"}}},
 		}}, nil
 	}
 	manifestConfigDir = "ignored"
@@ -149,7 +150,7 @@ func TestHandleEnvironmentMaterializeIgnoresAsterWhenFlagDisabled(t *testing.T) 
 	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
 	snapshotConfigDir = "ignored"
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return &stubManifestCompiler{compiled: manifests.Compilation{Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"}}}, nil
+		return &stubManifestCompiler{compiled: manifests.Compilation{Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"}, ManifestVersion: "v2"}}, nil
 	}
 	manifestConfigDir = "ignored"
 
@@ -189,7 +190,8 @@ func TestHandleEnvironmentMaterializePropagatesError(t *testing.T) {
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: manifests.Compilation{
-			Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+			Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
+			ManifestVersion: "v2",
 		}}, nil
 	}
 	manifestConfigDir = "ignored"

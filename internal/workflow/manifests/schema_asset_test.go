@@ -37,12 +37,15 @@ func TestSchemaAssetIsWellFormed(t *testing.T) {
 	}
 
 	want := map[string]struct{}{
-		"name":     {},
-		"version":  {},
-		"summary":  {},
-		"topology": {},
-		"fixtures": {},
-		"lanes":    {},
+		"manifest_version": {},
+		"name":             {},
+		"version":          {},
+		"summary":          {},
+		"topology":         {},
+		"fixtures":         {},
+		"lanes":            {},
+		"services":         {},
+		"edges":            {},
 	}
 
 	for _, item := range required {
@@ -58,6 +61,15 @@ func TestSchemaAssetIsWellFormed(t *testing.T) {
 	properties, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatalf("schema properties field missing")
+	}
+	if _, ok := properties["services"].(map[string]any); !ok {
+		t.Fatalf("services property missing: %v", properties["services"])
+	}
+	if _, ok := properties["edges"].(map[string]any); !ok {
+		t.Fatalf("edges property missing: %v", properties["edges"])
+	}
+	if _, ok := properties["exposures"].(map[string]any); !ok {
+		t.Fatalf("exposures property missing: %v", properties["exposures"])
 	}
 	fixtures, ok := properties["fixtures"].(map[string]any)
 	if !ok {
