@@ -32,6 +32,32 @@ func TestHandleWorkflowRunPrintsBuildGateSummary(t *testing.T) {
 						Message:  "unused import",
 					}},
 				},
+				{
+					Language: "javascript",
+					Tool:     "ESLint",
+					Passed:   false,
+					Failures: []contracts.BuildGateStaticCheckFailure{{
+						RuleID:   "no-console",
+						File:     "src/app.js",
+						Line:     10,
+						Column:   5,
+						Severity: "error",
+						Message:  "Unexpected console.log",
+					}},
+				},
+				{
+					Language: "java",
+					Tool:     "Error Prone",
+					Passed:   false,
+					Failures: []contracts.BuildGateStaticCheckFailure{{
+						RuleID:   "DeadException",
+						File:     "src/Main.java",
+						Line:     12,
+						Column:   0,
+						Severity: "warning",
+						Message:  "Exception created but not thrown",
+					}},
+				},
 			},
 			LogFindings: []contracts.BuildGateLogFinding{
 				{
@@ -107,8 +133,20 @@ func TestHandleWorkflowRunPrintsBuildGateSummary(t *testing.T) {
 	if !strings.Contains(output, "- go vet (go): FAILED (1 issue)") {
 		t.Fatalf("expected static check summary, got %q", output)
 	}
+	if !strings.Contains(output, "- ESLint (javascript): FAILED (1 issue)") {
+		t.Fatalf("expected eslint summary, got %q", output)
+	}
+	if !strings.Contains(output, "- Error Prone (java): FAILED (1 issue)") {
+		t.Fatalf("expected error prone summary, got %q", output)
+	}
 	if !strings.Contains(output, "unused import") {
 		t.Fatalf("expected failure message in output, got %q", output)
+	}
+	if !strings.Contains(output, "Unexpected console.log") {
+		t.Fatalf("expected eslint message in output, got %q", output)
+	}
+	if !strings.Contains(output, "Exception created but not thrown") {
+		t.Fatalf("expected error prone message in output, got %q", output)
 	}
 	if !strings.Contains(output, "kb.git.auth") {
 		t.Fatalf("expected knowledge base code in output, got %q", output)

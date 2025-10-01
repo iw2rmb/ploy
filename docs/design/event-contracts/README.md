@@ -82,8 +82,8 @@ Capture the JetStream subject map and JSON schemas that let the Ploy CLI operate
 The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), ensuring the CLI and future Grid integrations consume identical versions. Checkpoints now carry lane cache keys, stage metadata, and optional artifact manifests so Grid can coordinate cache reuse and artifact hydration.
 
 ## JetStream Client
-- `internal/workflow/contracts.JetStreamClient` now implements `runner.EventsClient`, connecting to NATS when ``JETSTREAM_URL`` is provided and falling back to the in-memory bus for offline runs.
-- `cmd/ploy/main.go` selects the real client automatically when the environment variable is set, closing the loop on the original stub pathway.
+- `internal/workflow/contracts.JetStreamClient` now implements `runner.EventsClient`, connecting to NATS when discovery returns JetStream routes and falling back to the in-memory bus for offline runs.
+- `cmd/ploy/main.go` selects the real client automatically when discovery exposes routes, closing the loop on the original stub pathway.
 - `internal/workflow/contracts.InMemoryBus` remains available for workstation slices that skip live connectivity.
 - `internal/workflow/grid.Client` will migrate to the Workflow RPC SDK (see `docs/design/workflow-rpc-alignment/README.md`); until Roadmap 22 lands it continues to use the legacy stage stub for workstation slices.
 
@@ -98,6 +98,7 @@ The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.), en
 ## Verification (2025-09-27)
 - Verified webhook subjects are published as `webhook.<tenant>.<source>.<event>` in `../grid/internal/webhook/gateway.go`.
 - Verified job lifecycle events emit on `jobs.<run_id>.events` within `../grid/internal/jobs/publisher_jetstream.go`.
+- 2025-09-29: Confirmed discovery-backed JetStream selection via `cmd/ploy/dependencies.go` and `cmd/ploy/workflow_run_grid_test.go`.
 
 ## Next Steps
 - ✅ Completed 2025-09-26: Expand checkpoints with stage metadata and artifact manifests (see `docs/design/checkpoint-metadata/README.md`).

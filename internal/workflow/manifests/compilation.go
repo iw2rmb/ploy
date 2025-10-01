@@ -6,12 +6,17 @@ import (
 	"strings"
 )
 
+// Compilation represents the normalized manifest payload consumed by Grid.
 type Compilation struct {
-	Manifest Metadata   `json:"manifest"`
-	Topology Topology   `json:"topology"`
-	Fixtures FixtureSet `json:"fixtures"`
-	Lanes    LaneSet    `json:"lanes"`
-	Aster    AsterSet   `json:"aster"`
+	Manifest        Metadata   `json:"manifest"`
+	ManifestVersion string     `json:"manifest_version"`
+	Topology        Topology   `json:"topology"`
+	Services        []Service  `json:"services"`
+	Edges           []Edge     `json:"edges"`
+	Exposures       []Exposure `json:"exposures"`
+	Fixtures        FixtureSet `json:"fixtures"`
+	Lanes           LaneSet    `json:"lanes"`
+	Aster           AsterSet   `json:"aster"`
 }
 
 type Metadata struct {
@@ -58,6 +63,50 @@ type AsterSet struct {
 	Optional []string `json:"optional"`
 }
 
+// Service describes a workload participating in the manifest topology.
+type Service struct {
+	Name     string               `json:"name"`
+	Kind     string               `json:"kind"`
+	Optional bool                 `json:"optional,omitempty"`
+	Identity ServiceIdentity      `json:"identity"`
+	Ports    []ServicePort        `json:"ports"`
+	Requires []ServiceRequirement `json:"requires,omitempty"`
+}
+
+// ServiceIdentity contains per-service addressing metadata.
+type ServiceIdentity struct {
+	DNS string `json:"dns"`
+}
+
+// ServicePort captures an exposed network port for a service.
+type ServicePort struct {
+	Name     string `json:"name"`
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
+}
+
+// ServiceRequirement documents dependencies required by the service.
+type ServiceRequirement struct {
+	Target string `json:"target"`
+	Edge   string `json:"edge"`
+}
+
+// Edge codifies connectivity expectations between services.
+type Edge struct {
+	Source    string   `json:"source"`
+	Target    string   `json:"target"`
+	Ports     []string `json:"ports"`
+	Protocols []string `json:"protocols"`
+}
+
+// Exposure captures public or internal exposure intents for a service port.
+type Exposure struct {
+	Service string `json:"service"`
+	Port    string `json:"port"`
+	Mode    string `json:"mode"`
+}
+
+// compile constructs the normalized compilation payload for the manifest.
 func compile(raw rawManifest) Compilation {
 	summary := strings.TrimSpace(raw.Summary)
 	topology := Topology{
@@ -120,19 +169,29 @@ func compile(raw rawManifest) Compilation {
 		Optional: normalizeToggles(raw.Aster.Optional),
 	}
 
+	manifestVersion := strings.TrimSpace(raw.ManifestVersion)
+	if manifestVersion == "" {
+		manifestVersion = "v2"
+	}
+
 	return Compilation{
 		Manifest: Metadata{
 			Name:    strings.TrimSpace(raw.Name),
 			Version: strings.TrimSpace(raw.Version),
 			Summary: summary,
 		},
-		Topology: topology,
-		Fixtures: fixtures,
-		Lanes:    lanes,
-		Aster:    aster,
+		ManifestVersion: manifestVersion,
+		Topology:        topology,
+		Services:        normalizeServices(raw.Services),
+		Edges:           normalizeEdges(raw.Edges),
+		Exposures:       normalizeExposures(raw.Exposures),
+		Fixtures:        fixtures,
+		Lanes:           lanes,
+		Aster:           aster,
 	}
 }
 
+// normalizeToggles deduplicates and sorts toggle names for deterministic JSON.
 func normalizeToggles(values []string) []string {
 	if len(values) == 0 {
 		return nil
@@ -154,6 +213,124 @@ func normalizeToggles(values []string) []string {
 	return result
 }
 
+// JSON marshals the compilation payload for downstream consumers.
 func (c Compilation) JSON() ([]byte, error) {
 	return json.Marshal(c)
+}
+
+// normalizeServices trims, sorts, and deduplicates service metadata.
+func normalizeServices(rawServices []rawService) []Service {
+	if len(rawServices) == 0 {
+		return nil
+	}
+	services := make([]Service, 0, len(rawServices))
+	for _, svc := range rawServices {
+		ports := make([]ServicePort, 0, len(svc.Ports))
+		for _, port := range svc.Ports {
+			ports = append(ports, ServicePort{
+				Name:     strings.TrimSpace(port.Name),
+				Port:     port.Port,
+				Protocol: strings.TrimSpace(port.Protocol),
+			})
+		}
+		sort.Slice(ports, func(i, j int) bool {
+			return ports[i].Name < ports[j].Name
+		})
+		requires := make([]ServiceRequirement, 0, len(svc.Requires))
+		for _, req := range svc.Requires {
+			requires = append(requires, ServiceRequirement{
+				Target: strings.TrimSpace(req.Target),
+				Edge:   strings.TrimSpace(req.Edge),
+			})
+		}
+		if len(requires) > 0 {
+			sort.Slice(requires, func(i, j int) bool {
+				return requires[i].Target < requires[j].Target
+			})
+		} else {
+			requires = nil
+		}
+		services = append(services, Service{
+			Name:     strings.TrimSpace(svc.Name),
+			Kind:     strings.TrimSpace(svc.Kind),
+			Optional: svc.Optional,
+			Identity: ServiceIdentity{DNS: strings.TrimSpace(svc.Identity.DNS)},
+			Ports:    ports,
+			Requires: requires,
+		})
+	}
+	sort.Slice(services, func(i, j int) bool {
+		return services[i].Name < services[j].Name
+	})
+	return services
+}
+
+// normalizeEdges sorts edges and their fields for deterministic payloads.
+func normalizeEdges(rawEdges []rawEdge) []Edge {
+	if len(rawEdges) == 0 {
+		return nil
+	}
+	edges := make([]Edge, 0, len(rawEdges))
+	for _, edge := range rawEdges {
+		edges = append(edges, Edge{
+			Source:    strings.TrimSpace(edge.Source),
+			Target:    strings.TrimSpace(edge.Target),
+			Ports:     normalizeStringSet(edge.Ports),
+			Protocols: normalizeStringSet(edge.Protocols),
+		})
+	}
+	sort.Slice(edges, func(i, j int) bool {
+		if edges[i].Source == edges[j].Source {
+			return edges[i].Target < edges[j].Target
+		}
+		return edges[i].Source < edges[j].Source
+	})
+	return edges
+}
+
+// normalizeExposures orders exposures to keep manifest parity stable.
+func normalizeExposures(rawExposures []rawExposure) []Exposure {
+	if len(rawExposures) == 0 {
+		return nil
+	}
+	exposures := make([]Exposure, 0, len(rawExposures))
+	for _, exposure := range rawExposures {
+		exposures = append(exposures, Exposure{
+			Service: strings.TrimSpace(exposure.Service),
+			Port:    strings.TrimSpace(exposure.Port),
+			Mode:    strings.TrimSpace(exposure.Mode),
+		})
+	}
+	sort.Slice(exposures, func(i, j int) bool {
+		if exposures[i].Service == exposures[j].Service {
+			if exposures[i].Mode == exposures[j].Mode {
+				return exposures[i].Port < exposures[j].Port
+			}
+			return exposures[i].Mode < exposures[j].Mode
+		}
+		return exposures[i].Service < exposures[j].Service
+	})
+	return exposures
+}
+
+// normalizeStringSet trims, deduplicates, and sorts a slice of strings.
+func normalizeStringSet(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			set[trimmed] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(set))
+	for value := range set {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
 }

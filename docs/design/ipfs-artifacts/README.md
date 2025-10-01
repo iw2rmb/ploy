@@ -6,18 +6,18 @@ Provide a workstation-ready pathway for snapshot captures to upload artifacts to
 ## Scope
 - Applies to the snapshot toolkit (`ploy snapshot capture`) and any other feature that reuses the snapshot registry's `ArtifactPublisher` hook.
 - Targets workstation environments; VPS/Grid slices will reuse the same publisher once JetStream wiring resumes.
-- Metadata now publishes to JetStream (`ploy.artifact.<ticket>`) whenever ``JETSTREAM_URL`` is configured; offline runs continue to rely on the in-memory stub.
+- Metadata now publishes to JetStream (`ploy.artifact.<ticket>`) whenever discovery returns routes; offline runs continue to rely on the in-memory stub.
 
 ## Behaviour
-- When ``IPFS_GATEWAY`` is set, the CLI loads the snapshot registry with an IPFS gateway publisher. Artifacts are streamed to `<gateway>/api/v0/add?pin=true` using multipart uploads, and the returned CID is surfaced to the operator.
-- Without ``IPFS_GATEWAY``, the registry falls back to the deterministic in-memory publisher so existing tests and offline workflows remain unaffected.
+- When discovery reports an IPFS gateway, the CLI loads the snapshot registry with an IPFS publisher. Artifacts are streamed to `<gateway>/api/v0/add?pin=true` using multipart uploads, and the returned CID is surfaced to the operator.
+- When discovery omits an IPFS gateway, the registry falls back to the deterministic in-memory publisher so existing tests and offline workflows remain unaffected.
 - Errors bubble up with the HTTP status code and any response snippet to help diagnose misconfigured gateways.
 - Returned CIDs are forwarded to metadata payloads and printed in the CLI summary alongside fingerprints and diff summaries.
 
 ## Implementation Notes
 - `internal/workflow/snapshots.NewIPFSGatewayPublisher` constructs a reusable publisher with a 15s HTTP timeout and optional pinning.
 - The publisher tolerates newline-delimited JSON responses from the IPFS gateway and extracts the first non-empty `Hash`/`Cid` field.
-- `cmd/ploy/main.go` inspects both ``IPFS_GATEWAY`` and ``JETSTREAM_URL`` when constructing the snapshot registry, injecting the gateway-backed artifact publisher and the JetStream metadata publisher when available.
+- `cmd/ploy/main.go` consumes discovery output when constructing the snapshot registry, injecting the gateway-backed artifact publisher and the JetStream metadata publisher when discovery returns them.
 - `internal/workflow/snapshots.NewJetStreamMetadataPublisher` dials JetStream, encodes schema-versioned envelopes, and publishes metadata to `ploy.artifact.<ticket>`.
 
 ## Tests

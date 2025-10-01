@@ -158,7 +158,16 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	defer func() { snapshotConfigDir = prevDir }()
 
-	t.Setenv("IPFS_GATEWAY", server.URL)
+	prevFetch := fetchClusterInfoFn
+	resetDiscoveryState()
+	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
+		return clusterInfo{IPFSGateway: server.URL}, nil
+	}
+	t.Cleanup(func() {
+		fetchClusterInfoFn = prevFetch
+		resetDiscoveryState()
+	})
+	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
 	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-42"}, buf)
 	if err != nil {
@@ -218,7 +227,16 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	t.Cleanup(func() { snapshotConfigDir = prevDir })
 
-	t.Setenv("JETSTREAM_URL", srv.ClientURL())
+	prevFetch := fetchClusterInfoFn
+	resetDiscoveryState()
+	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
+		return clusterInfo{JetStreamURLs: []string{srv.ClientURL()}}, nil
+	}
+	t.Cleanup(func() {
+		fetchClusterInfoFn = prevFetch
+		resetDiscoveryState()
+	})
+	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
 	err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-77"}, buf)
 	if err != nil {

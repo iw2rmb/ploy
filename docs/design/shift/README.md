@@ -19,9 +19,10 @@ Document the workstation-first reboot (SHIFT) so roadmap slices, design records,
 - `CHANGELOG.md` entries call out SHIFT milestones with dates so workstation users can trace feature availability without scanning the entire roadmap tree.
 
 ## Next Steps
-- Expand static analysis adapter coverage (Error Prone, ESLint, Ruff, Roslyn) alongside build gate CLI summaries to capture multi-language stacks.
+- Continue expanding static analysis adapter coverage (Ruff, Roslyn) alongside build gate CLI summaries; the ESLint slice completed on 2025-09-29 (`../build-gate/eslint/README.md`, `../../../roadmap/build-gate/09-eslint-adapter.md`).
 - Resume Grid/VPS integration once JetStream wiring for Workflow RPC helper retries lands (tracked outside the workstation-only scope).
 - Continue documenting emerging slices (e.g., deploy seams, snapshot hardening) by adding roadmap entries and updating this index as milestones complete.
+- Integration Manifest v2 schema shipped 2025-09-29, delivering service/edge metadata and CLI rewrites ahead of Grid topology enforcement (see `docs/design/integration-manifests/README.md`).
 
 ## References
 - Roadmap tracker (`../../roadmap/shift/`).

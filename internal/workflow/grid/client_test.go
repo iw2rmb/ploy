@@ -41,9 +41,10 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	}
 
 	manifest := manifests.Compilation{
-		Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
-		Lanes:    manifests.LaneSet{Required: []manifests.Lane{{Name: "go-native"}}},
-		Aster:    manifests.AsterSet{Required: []string{"plan"}},
+		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
+		ManifestVersion: "v2",
+		Lanes:           manifests.LaneSet{Required: []manifests.Lane{{Name: "go-native"}}},
+		Aster:           manifests.AsterSet{Required: []string{"plan"}},
 	}
 
 	stage := runner.Stage{
@@ -214,7 +215,7 @@ func TestClientExecuteStagePropagatesRPCError(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: mods.StageNamePlan, Kind: runner.StageKindModsPlan, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}}}}, "/tmp")
+	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: mods.StageNamePlan, Kind: runner.StageKindModsPlan, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}, ManifestVersion: "v2"}}}, "/tmp")
 	if err == nil {
 		t.Fatal("expected error")
 	}

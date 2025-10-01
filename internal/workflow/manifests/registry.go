@@ -23,6 +23,7 @@ type rawEntry struct {
 	path     string
 }
 
+// LoadDirectory ingests manifest definitions from the provided directory.
 func LoadDirectory(dir string) (*Registry, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -67,6 +68,7 @@ func LoadDirectory(dir string) (*Registry, error) {
 	return registry, nil
 }
 
+// Compile materialises a normalized compilation for the requested manifest.
 func (r *Registry) Compile(opts CompileOptions) (Compilation, error) {
 	if r == nil {
 		return Compilation{}, fmt.Errorf("%w: registry missing", errRegistryUnavailable)

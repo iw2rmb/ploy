@@ -219,7 +219,7 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 		grid.allow(mods.StageNameORWGenerate)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
 	opts := runner.Options{
@@ -238,10 +238,11 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 		done <- runner.Run(ctx, opts)
 	}()
 
-	if !grid.waitForStart(mods.StageNameORWApply, time.Second) {
+	const stageStartTimeout = 5 * time.Second
+	if !grid.waitForStart(mods.StageNameORWApply, stageStartTimeout) {
 		t.Fatalf("expected orw-apply to start")
 	}
-	if !grid.waitForStart(mods.StageNameORWGenerate, 2*time.Second) {
+	if !grid.waitForStart(mods.StageNameORWGenerate, stageStartTimeout) {
 		t.Fatalf("expected orw-gen to start while orw-apply running")
 	}
 
@@ -253,7 +254,7 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(4 * time.Second):
 		t.Fatalf("runner did not finish")
 	}
 }

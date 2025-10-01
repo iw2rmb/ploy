@@ -52,6 +52,8 @@ test-template/
 .gocache_go/
 .gocache/
 .gopath/.gocache/
+.gomodcache
+.gopath
 
 tests/tmp/
 /tests/e2e/mods/logs/

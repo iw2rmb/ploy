@@ -68,7 +68,8 @@ func TestRunPassesManifestConstraintsToGrid(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
-			Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			ManifestVersion: "v2",
 			Lanes: manifests.LaneSet{
 				Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}},
 			},
@@ -104,7 +105,8 @@ func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
 	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
-			Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
+			ManifestVersion: "v2",
 			Lanes: manifests.LaneSet{
 				Required: []manifests.Lane{{Name: "node-wasm"}},
 				Allowed:  []manifests.Lane{{Name: "go-native"}, {Name: "gpu-ml"}},

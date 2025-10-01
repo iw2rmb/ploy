@@ -13,6 +13,8 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 - Sandbox runner landed via `roadmap/build-gate/02-sandbox-runner.md`, providing structured duration/cache metadata and timeout handling for workstation tests.
 - Static check adapter registry shipped under `internal/workflow/buildgate/static_checks.go` (see `roadmap/build-gate/03-static-check-registry.md`), wiring lane defaults, manifest overrides, and skip hooks into `StaticCheckRegistry`.
 - Go vet adapter exposed through `internal/workflow/buildgate.NewGoVetAdapter` (see `roadmap/build-gate/05-go-vet-adapter.md`), parsing workstation/Grid diagnostics into `StaticCheckFailure` entries with manifest-configurable package and tag options.
+- Error Prone adapter wired via `internal/workflow/buildgate.NewErrorProneAdapter` (see `roadmap/build-gate/08-error-prone-adapter.md`), enabling Java diagnostics with manifest-configurable targets/classpaths and CLI summary coverage (shipped 2025-09-29).
+- ESLint adapter wired via `internal/workflow/buildgate.NewESLintAdapter` (see `roadmap/build-gate/09-eslint-adapter.md`), enabling JavaScript diagnostics with manifest-configurable targets/config/rule overrides and CLI summary coverage (shipped 2025-09-29).
 - Log retrieval and Grid artifact ingestion shipped via `internal/workflow/buildgate.LogRetriever` and `LogIngestor` (see `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`), normalising Knowledge Base findings and surfacing digests in build gate metadata.
 - Build gate runner orchestrates sandbox execution, static checks, and log ingestion through `internal/workflow/buildgate.Runner` (see `roadmap/build-gate/06-build-gate-runner.md`), emitting sanitised metadata for checkpoint publication.
 - CLI build gate summary surfaces static checks and knowledge base guidance after workflow execution (see `roadmap/build-gate/07-cli-summary.md`).
@@ -73,7 +75,7 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 ## Tests
 - Unit tests for sandbox runner covering timeout handling, cache reuse, and structured result mapping, using fake Grid adapters in the workstation stub.
 - Static check registry unit tests exercising lane/manifest reconciliation, skip overrides, and severity thresholds with fake adapters (`internal/workflow/buildgate/static_checks_test.go`).
-- Adapter-specific tests begin with the Go vet adapter coverage under `internal/workflow/buildgate/go_vet_adapter_test.go`, with language-specific fixtures for Java/Error Prone, ESLint, Ruff, and Roslyn tracked as follow-ups.
+- Adapter-specific tests now cover Go (`internal/workflow/buildgate/go_vet_adapter_test.go`), Java Error Prone (`internal/workflow/buildgate/error_prone_adapter_test.go`), and JavaScript ESLint (`internal/workflow/buildgate/eslint_adapter_test.go`); Ruff and Roslyn fixtures remain follow-ups.
 - Log ingestion tests covering artifact fallback precedence, truncation limits, parser pattern coverage, and metadata sanitisation via `internal/workflow/buildgate/log_retriever_test.go`, `log_parser_test.go`, `log_ingestion_test.go`, and updated metadata sanitiser coverage.
 - Log parser tests feeding historical logs (retrieved from legacy commits) to confirm normalization of compiler errors into Knowledge Base-ready codes.
 - Workflow runner tests ensuring Grid artifact retrieval works in both stub and live JetStream modes.
@@ -82,4 +84,4 @@ Reintroduce the Mods build gate with modern Grid integration, static analysis, a
 ## Rollout & Follow-ups
 - Add roadmap entries under `roadmap/build-gate/` covering sandbox port, static check adapters, log parser, and Grid integration.
 - Coordinate with Grid maintainers (see `../grid/README.md`) to provision dedicated lanes for static analysis binaries and to expose artifact envelopes required for log retrieval.
-- Monitor feedback from CLI summaries to prioritise future adapters (Error Prone, ESLint, Ruff, Roslyn) once workstation coverage expands.
+- ESLint adapter slice (`docs/design/build-gate/eslint/README.md`, `roadmap/build-gate/09-eslint-adapter.md`) is now complete; continue prioritising Ruff and Roslyn adapters once workstation coverage expands.

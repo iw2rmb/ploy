@@ -5,7 +5,7 @@ Follow the global workflow rules in `~/.codex/AGENTS.md`. Repository-specific ad
 ## Before You Start
 - Commit to the RED → GREEN → REFACTOR cadence for the upcoming change.
 - Plan local unit tests and coverage checks before touching code or docs.
-- Verify required environment variables (`GRID_ENDPOINT`, `JETSTREAM_URL`, `IPFS_GATEWAY`) are discoverable or called out as TODOs for future slices.
+- Verify required environment variables (see `docs/envs/README.md`) are discoverable or called out as TODOs for future slices.
 - Confirm you understand the workstation-only scope for the current roadmap slice (VPS/Grid integration resumes once JetStream wiring lands).
 - Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with documentation conventions.
 
@@ -49,6 +49,9 @@ Follow the global workflow rules in `~/.codex/AGENTS.md`. Repository-specific ad
 - Root README describes the CLI-first model; update it whenever behaviour changes.
 - Roadmap updates must mark the relevant checklist item (`roadmap/shift/<nn>-*.md`).
 - When recording new behaviour in `CHANGELOG.md`, include the roadmap slice reference and a concrete YYYY-MM-DD date.
+
+## Environment Variables
+- Keep the canonical list of required variables in `docs/envs/README.md` and update that file whenever values change or new toggles are introduced.
 
 ## Delivery Checklist
 1. RED: add failing unit tests capturing the target behaviour.

@@ -28,6 +28,9 @@ func TestExecuteManifestSchemaPrintsJSON(t *testing.T) {
 	if !strings.Contains(output, "integration_manifest.schema.json") {
 		t.Fatalf("expected schema output to reference schema file, got %q", output)
 	}
+	if !strings.Contains(output, "\"manifest_version\"") {
+		t.Fatalf("expected schema output to include manifest_version, got %q", output)
+	}
 }
 
 func TestExecuteRequiresCommand(t *testing.T) {

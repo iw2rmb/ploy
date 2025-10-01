@@ -6,12 +6,12 @@ Bridge the snapshot toolkit to real artifact storage by uploading captured datas
 
 ## Required Changes
 - Build an IPFS gateway-backed `ArtifactPublisher` that streams payloads to `/api/v0/add` and returns the gateway-provided CID.
-- Teach the CLI snapshot registry loader to inject the gateway publisher when ``IPFS_GATEWAY`` is configured, retaining the in-memory fallback for offline runs.
+- Teach the CLI snapshot registry loader to inject the gateway publisher when discovery reports an IPFS gateway, retaining the in-memory fallback for offline runs.
 - Surface the returned CID in CLI output and metadata structures so downstream systems can reuse snapshot artifacts.
 
 ## Definition of Done
-- `ploy snapshot capture` uploads artifacts to the configured IPFS gateway and reports the returned CID.
-- Removing ``IPFS_GATEWAY`` restores deterministic in-memory behaviour without code changes.
+- `ploy snapshot capture` uploads artifacts to the discovery-provided IPFS gateway and reports the returned CID.
+- When discovery omits a gateway the deterministic in-memory behaviour remains unchanged.
 - Design docs and README note the new capability and no longer list IPFS publishing as a TODO.
 
 ## Tests

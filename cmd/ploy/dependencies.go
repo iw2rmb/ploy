@@ -98,8 +98,24 @@ var (
 )
 
 type integrationConfig struct {
-	JetStreamURL string
-	IPFSGateway  string
+	APIEndpoint   string
+	JetStreamURL  string
+	JetStreamURLs []string
+	IPFSGateway   string
+	Features      map[string]string
+	Version       string
+}
+
+// FeatureEnabled reports whether the named discovery feature is marked as enabled.
+func (cfg integrationConfig) FeatureEnabled(name string) bool {
+	if len(cfg.Features) == 0 {
+		return false
+	}
+	value, ok := cfg.Features[name]
+	if !ok {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(value), "enabled")
 }
 
 var (
@@ -226,39 +242,54 @@ func defaultKnowledgeBaseAdvisorLoader(path string) (mods.Advisor, error) {
 
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
 	endpoint := strings.TrimSpace(os.Getenv("GRID_ENDPOINT"))
+
 	if endpoint == "" {
-		return integrationConfig{
-			JetStreamURL: strings.TrimSpace(os.Getenv("JETSTREAM_URL")),
-			IPFSGateway:  strings.TrimSpace(os.Getenv("IPFS_GATEWAY")),
-		}, nil
+		return integrationConfig{Features: map[string]string{}}, nil
 	}
 
 	info, err := loadClusterInfo(ctx, endpoint)
 	if err != nil {
-		return integrationConfig{
-			JetStreamURL: strings.TrimSpace(os.Getenv("JETSTREAM_URL")),
-			IPFSGateway:  strings.TrimSpace(os.Getenv("IPFS_GATEWAY")),
-		}, err
+		fallback := integrationConfig{
+			APIEndpoint: sanitizeAPIEndpoint(endpoint),
+			Features:    map[string]string{},
+		}
+		return fallback, err
 	}
 
 	cfg := integrationConfig{
-		JetStreamURL: strings.TrimSpace(info.JetStreamURL),
-		IPFSGateway:  strings.TrimSpace(info.IPFSGateway),
+		APIEndpoint:   firstNonEmpty(info.APIEndpoint, sanitizeAPIEndpoint(endpoint)),
+		JetStreamURLs: append([]string(nil), info.JetStreamURLs...),
+		IPFSGateway:   strings.TrimSpace(info.IPFSGateway),
+		Features:      copyFeaturesMap(info.Features),
+		Version:       strings.TrimSpace(info.Version),
 	}
 
-	if cfg.JetStreamURL == "" {
-		cfg.JetStreamURL = strings.TrimSpace(os.Getenv("JETSTREAM_URL"))
-	}
-	if cfg.IPFSGateway == "" {
-		cfg.IPFSGateway = strings.TrimSpace(os.Getenv("IPFS_GATEWAY"))
+	cfg.JetStreamURL = firstJetStreamRoute(cfg.JetStreamURLs)
+
+	if cfg.Features == nil {
+		cfg.Features = map[string]string{}
 	}
 
 	return cfg, nil
 }
 
 type clusterInfo struct {
-	JetStreamURL string
-	IPFSGateway  string
+	APIEndpoint   string
+	JetStreamURLs []string
+	IPFSGateway   string
+	Features      map[string]string
+	Version       string
+}
+
+func (c clusterInfo) clone() clusterInfo {
+	clone := clusterInfo{
+		APIEndpoint: strings.TrimSpace(c.APIEndpoint),
+		IPFSGateway: strings.TrimSpace(c.IPFSGateway),
+		Features:    copyFeaturesMap(c.Features),
+		Version:     strings.TrimSpace(c.Version),
+	}
+	clone.JetStreamURLs = normalizeJetStreamRoutes(c.JetStreamURLs)
+	return clone
 }
 
 type clusterInfoCache struct {
@@ -274,13 +305,16 @@ func (c *clusterInfoCache) get(endpoint string) (clusterInfo, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	info, ok := c.entries[endpoint]
-	return info, ok
+	if !ok {
+		return clusterInfo{}, false
+	}
+	return info.clone(), true
 }
 
 func (c *clusterInfoCache) set(endpoint string, info clusterInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries[endpoint] = info
+	c.entries[endpoint] = info.clone()
 }
 
 func loadClusterInfo(ctx context.Context, endpoint string) (clusterInfo, error) {
@@ -322,7 +356,8 @@ func fetchClusterInfoWithRetry(ctx context.Context, endpoint string) (clusterInf
 	return clusterInfo{}, lastErr
 }
 
-func fetchClusterInfo(ctx context.Context, endpoint string) (clusterInfo, error) {
+// fetchClusterInfo retrieves cluster discovery data from the provided endpoint.
+func fetchClusterInfo(ctx context.Context, endpoint string) (info clusterInfo, err error) {
 	trimmed := strings.TrimSpace(endpoint)
 	if trimmed == "" {
 		return clusterInfo{}, fmt.Errorf("grid endpoint required for discovery")
@@ -338,29 +373,97 @@ func fetchClusterInfo(ctx context.Context, endpoint string) (clusterInfo, error)
 	if err != nil {
 		return clusterInfo{}, fmt.Errorf("fetch discovery info: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("close discovery response body: %w", cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return clusterInfo{}, fmt.Errorf("discovery request failed: %s", resp.Status)
 	}
 
 	var payload struct {
-		JetStream struct {
-			URL string `json:"url"`
-		} `json:"jetstream"`
-		IPFS struct {
-			Gateway string `json:"gateway"`
-		} `json:"ipfs"`
+		APIEndpoint   string            `json:"api_endpoint"`
+		JetStreamURLs []string          `json:"jetstream_urls"`
+		IPFSGateway   string            `json:"ipfs_gateway"`
+		Features      map[string]string `json:"features"`
+		Version       string            `json:"version"`
 	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	decoder := json.NewDecoder(resp.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&payload); err != nil {
 		return clusterInfo{}, fmt.Errorf("decode discovery response: %w", err)
 	}
 
 	return clusterInfo{
-		JetStreamURL: strings.TrimSpace(payload.JetStream.URL),
-		IPFSGateway:  strings.TrimSpace(payload.IPFS.Gateway),
+		APIEndpoint:   strings.TrimSpace(payload.APIEndpoint),
+		JetStreamURLs: normalizeJetStreamRoutes(payload.JetStreamURLs),
+		IPFSGateway:   strings.TrimSpace(payload.IPFSGateway),
+		Features:      copyFeaturesMap(payload.Features),
+		Version:       strings.TrimSpace(payload.Version),
 	}, nil
+}
+
+func normalizeJetStreamRoutes(routes []string) []string {
+	if len(routes) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(routes))
+	for _, route := range routes {
+		trimmed := strings.TrimSpace(route)
+		if trimmed == "" {
+			continue
+		}
+		normalized = append(normalized, trimmed)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func firstJetStreamRoute(routes []string) string {
+	for _, route := range routes {
+		trimmed := strings.TrimSpace(route)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func copyFeaturesMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return map[string]string{}
+	}
+	dst := make(map[string]string, len(src))
+	for key, value := range src {
+		trimmedKey := strings.TrimSpace(key)
+		if trimmedKey == "" {
+			continue
+		}
+		dst[trimmedKey] = strings.TrimSpace(value)
+	}
+	if len(dst) == 0 {
+		return map[string]string{}
+	}
+	return dst
+}
+
+func sanitizeAPIEndpoint(value string) string {
+	trimmed := strings.TrimSpace(value)
+	return strings.TrimRight(trimmed, "/")
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 type registryCompiler struct {
