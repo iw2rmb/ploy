@@ -71,9 +71,10 @@ func TestPrintHelpers(t *testing.T) {
 	printUsage(buf)
 	printWorkflowUsage(buf)
 	printWorkflowRunUsage(buf)
+	printWorkflowCancelUsage(buf)
 	reportError(errors.New("boom"), buf)
 	output := buf.String()
-	for _, fragment := range []string{"Usage: ploy workflow run", "Usage: ploy workflow", "error: boom"} {
+	for _, fragment := range []string{"Usage: ploy workflow run", "Usage: ploy workflow cancel", "Usage: ploy workflow", "error: boom"} {
 		if !strings.Contains(output, fragment) {
 			t.Fatalf("expected output to contain %q, got %q", fragment, output)
 		}

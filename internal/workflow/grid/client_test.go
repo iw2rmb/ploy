@@ -211,6 +211,9 @@ type fakeWorkflowClient struct {
 	metadataReqs []workflowsdk.MetadataRequest
 	metadataResp workflowsdk.MetadataResponse
 	metadataErr  error
+	cancelReqs   []workflowsdk.CancelRequest
+	cancelResp   workflowsdk.CancelResponse
+	cancelErr    error
 }
 
 func newFakeWorkflowClient(t *testing.T) *fakeWorkflowClient {
@@ -238,6 +241,15 @@ func (f *fakeWorkflowClient) Metadata(ctx context.Context, req workflowsdk.Metad
 		return workflowsdk.MetadataResponse{}, f.metadataErr
 	}
 	return f.metadataResp, nil
+}
+
+func (f *fakeWorkflowClient) Cancel(ctx context.Context, req workflowsdk.CancelRequest) (workflowsdk.CancelResponse, error) {
+	_ = ctx
+	f.cancelReqs = append(f.cancelReqs, req)
+	if f.cancelErr != nil {
+		return workflowsdk.CancelResponse{}, f.cancelErr
+	}
+	return f.cancelResp, nil
 }
 
 func (f *fakeWorkflowClient) Client() *workflowsdk.Client {

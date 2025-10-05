@@ -17,6 +17,10 @@ additional configuration.
 - `GRID_ENDPOINT` — Points the CLI at the Grid Workflow RPC. Discovery
   configures JetStream routes and the IPFS gateway automatically. Current
   default: `unset` (the CLI uses the in-memory Grid stub).
+- `GRID_WORKFLOW_SDK_STATE_DIR` — Overrides the Workflow RPC SDK state
+  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`, which
+  Ploy now sets up automatically so manifest caches and CA bundles persist
+  across CLI runs.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
 

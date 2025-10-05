@@ -41,6 +41,12 @@ single contract.
   streams, with contract tests covering trimmed inputs and empty identifiers.
 - Helper adoption completed: the Grid client now constructs helper-backed
   submitters that inject bearer auth and retry transient Workflow RPC failures.
+- **2025-10-05** — Workflow cancellation and archive surfacing landed: the Grid
+  client wires `Cancel` through the SDK, `StageOutcome` captures run IDs plus
+  keep-forever archive metadata, summaries print the resulting export IDs, and
+  the CLI exposes `workflow cancel`. The SDK state directory now defaults to
+  `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid` so manifest/CA caches survive
+  restarts while still respecting `GRID_WORKFLOW_SDK_STATE_DIR` when provided.
 
 ## Background
 
@@ -63,10 +69,15 @@ requires:
    - `internal/workflow/grid.Client` composes the official SDK client, builds
      submit payloads with helper builders, and streams run status until a
      terminal event (with metadata fallback on reconnect).
+   - The client now issues cancellations via the SDK and records archive export
+     metadata from terminal runs so downstream summaries can surface
+     keep-forever exports alongside stage results.
    - Lane/manifest metadata is injected into `JobSpec.Metadata` (lane, cache
      key, manifest, priority) so Grid scoring remains deterministic.
    - In-memory workflow clients remain for tests; helper-backed clients are
-     selected when `GRID_ENDPOINT` is set.
+     selected when `GRID_ENDPOINT` is set. When connected, Ploy ensures the
+     Workflow SDK state dir exists (defaulting under `~/.config/ploy/grid`) so
+     manifest and CA caches persist between invocations.
 
 2. **Job Payload Construction**
    - Lane definitions (`configs/lanes/*.toml`) retain optional `image`,

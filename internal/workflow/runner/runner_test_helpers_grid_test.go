@@ -26,6 +26,12 @@ func (g errorGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 	return runner.StageOutcome{}, g.err
 }
 
+func (g errorGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
+}
+
 type recordingCacheComposer struct {
 	calls []runner.CacheComposeRequest
 }
@@ -45,6 +51,12 @@ func (statuslessGrid) ExecuteStage(ctx context.Context, ticket contracts.Workflo
 	return runner.StageOutcome{Stage: stage}, nil
 }
 
+func (statuslessGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
+}
+
 type noStageGrid struct{}
 
 func (noStageGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
@@ -52,6 +64,12 @@ func (noStageGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 	_ = ticket
 	_ = workspace
 	return runner.StageOutcome{Status: runner.StageStatusCompleted}, nil
+}
+
+func (noStageGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
 }
 
 type gridCall struct {
@@ -86,6 +104,12 @@ func (g *fakeGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 		outcome.Status = runner.StageStatusCompleted
 	}
 	return outcome, nil
+}
+
+func (g *fakeGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
 }
 
 func gatherStageAttempts(calls []gridCall, stage string) int {
@@ -200,18 +224,20 @@ type stageGate struct {
 }
 
 type parallelRecordingGrid struct {
-	mu       sync.Mutex
-	outcomes map[string][]runner.StageOutcome
-	gates    map[string]*stageGate
-	startCh  chan string
-	calls    []gridCall
+	mu            sync.Mutex
+	outcomes      map[string][]runner.StageOutcome
+	gates         map[string]*stageGate
+	startCh       chan string
+	calls         []gridCall
+	pendingStarts map[string]int
 }
 
 func newParallelRecordingGrid() *parallelRecordingGrid {
 	return &parallelRecordingGrid{
-		outcomes: make(map[string][]runner.StageOutcome),
-		gates:    make(map[string]*stageGate),
-		startCh:  make(chan string, 64),
+		outcomes:      make(map[string][]runner.StageOutcome),
+		gates:         make(map[string]*stageGate),
+		startCh:       make(chan string, 64),
+		pendingStarts: make(map[string]int),
 	}
 }
 
@@ -247,11 +273,21 @@ func (g *parallelRecordingGrid) allow(stage string) {
 func (g *parallelRecordingGrid) waitForStart(stage string, timeout time.Duration) bool {
 	deadline := time.After(timeout)
 	for {
+		g.mu.Lock()
+		if count := g.pendingStarts[stage]; count > 0 {
+			g.pendingStarts[stage] = count - 1
+			g.mu.Unlock()
+			return true
+		}
+		g.mu.Unlock()
 		select {
 		case name := <-g.startCh:
 			if name == stage {
 				return true
 			}
+			g.mu.Lock()
+			g.pendingStarts[name]++
+			g.mu.Unlock()
 		case <-deadline:
 			return false
 		}
@@ -302,4 +338,10 @@ func (g *parallelRecordingGrid) ExecuteStage(ctx context.Context, ticket contrac
 		outcome.Status = runner.StageStatusCompleted
 	}
 	return outcome, nil
+}
+
+func (g *parallelRecordingGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
 }

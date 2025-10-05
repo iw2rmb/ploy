@@ -5,6 +5,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
@@ -159,5 +160,61 @@ func printAsterSummary(w io.Writer, invocations []runner.StageInvocation) {
 			}
 		}
 		_, _ = fmt.Fprintf(w, "  %s: %s (toggles: %s)\n", name, strings.Join(bundleSummaries, ", "), strings.Join(stage.Aster.Toggles, ", "))
+	}
+}
+
+// printArchiveSummary surfaces archive export metadata captured during stage execution.
+func printArchiveSummary(w io.Writer, invocations []runner.StageInvocation) {
+	if len(invocations) == 0 {
+		return
+	}
+	type archiveEntry struct {
+		stage   string
+		runID   string
+		archive *runner.StageArchive
+	}
+	entries := make([]archiveEntry, 0)
+	for _, invocation := range invocations {
+		if invocation.Archive == nil {
+			continue
+		}
+		entries = append(entries, archiveEntry{
+			stage:   invocation.Stage.Name,
+			runID:   strings.TrimSpace(invocation.RunID),
+			archive: invocation.Archive,
+		})
+	}
+	if len(entries) == 0 {
+		return
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].stage == entries[j].stage {
+			return entries[i].runID < entries[j].runID
+		}
+		return entries[i].stage < entries[j].stage
+	})
+	_, _ = fmt.Fprintln(w, "Archive Requests:")
+	for _, entry := range entries {
+		queued := ""
+		if !entry.archive.QueuedAt.IsZero() {
+			queued = entry.archive.QueuedAt.UTC().Format(time.RFC3339)
+		}
+		stageName := strings.TrimSpace(entry.stage)
+		if stageName == "" {
+			stageName = "unknown-stage"
+		}
+		runLabel := entry.runID
+		if runLabel == "" {
+			runLabel = "(unknown)"
+		}
+		class := entry.archive.Class
+		if class == "" {
+			class = "unspecified"
+		}
+		if queued != "" {
+			_, _ = fmt.Fprintf(w, "  %s: run=%s id=%s class=%s queued=%s\n", stageName, runLabel, entry.archive.ID, class, queued)
+		} else {
+			_, _ = fmt.Fprintf(w, "  %s: run=%s id=%s class=%s\n", stageName, runLabel, entry.archive.ID, class)
+		}
 	}
 }
