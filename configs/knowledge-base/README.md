@@ -1,8 +1,11 @@
 # Knowledge Base Catalog
 
-The workstation knowledge base catalog powers the Mods advisor by default when running `ploy workflow run`. Populate `catalog.json` in this directory with the JSON format described in `docs/design/knowledge-base/README.md`.
+The workstation knowledge base catalog powers the Mods advisor by default when
+running `ploy workflow run`. Populate `catalog.json` in this directory with the
+JSON format described in `docs/design/knowledge-base/README.md`.
 
 ## Format
+
 - `schema_version`: version string (e.g., `2025-09-27.1`).
 - `incidents`: array of incidents containing:
   - `id`: unique identifier.
@@ -11,6 +14,12 @@ The workstation knowledge base catalog powers the Mods advisor by default when r
   - `summary`: short planner summary.
   - `human_gate`: whether the Mods plan should force a human review stage.
   - `playbooks`: optional human playbooks to surface.
-  - `recommendations`: list of `{source, message, confidence, recipes, artifact_cid}` entries.
+  - `recommendations`: list of
+    `{source, message, confidence, recipes, artifact_cid}` entries.
 
-Leave the file absent when no catalog is available; the CLI falls back to the previous Mods behaviour automatically. Use `ploy knowledge-base ingest --from <fixture.json>` to append new incidents without editing the file by hand, and `ploy knowledge-base evaluate --fixture <samples.json>` to sanity-check classifier accuracy against curated incidents.
+Leave the file absent when no catalog is available; the CLI falls back to the
+previous Mods behaviour automatically. Use
+`ploy knowledge-base ingest --from <fixture.json>` to append new incidents
+without editing the file by hand, and
+`ploy knowledge-base evaluate --fixture <samples.json>` to sanity-check
+classifier accuracy against curated incidents.

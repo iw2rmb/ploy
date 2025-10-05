@@ -10,6 +10,10 @@ build: ## Build the Ploy CLI
 fmt: ## Format Go source files
 	gofmt -w $(shell find . -name '*.go' -not -path './dist/*')
 
+.PHONY: lint-md
+lint-md: ## Lint Markdown documentation with markdownlint
+	npx --yes markdownlint --config .markdownlint.yaml $(shell git ls-files '*.md')
+
 .PHONY: test
 test: ## Run all unit tests with coverage output
 	go test -cover ./...
@@ -23,5 +27,6 @@ help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build  # Build the CLI"
 	@echo "  make fmt    # Run gofmt over Go source"
+	@echo "  make lint-md # Run markdownlint over tracked Markdown files"
 	@echo "  make test   # Run go test ./... with coverage"
 	@echo "  make clean  # Remove build artifacts"
