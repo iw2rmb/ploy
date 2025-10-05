@@ -8,9 +8,12 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	helper "github.com/iw2rmb/grid/sdk/workflowrpc/helper"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -67,6 +70,8 @@ type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 type laneCacheComposer struct {
 	lanes laneRegistry
 }
+
+const workflowSDKStateEnv = "GRID_WORKFLOW_SDK_STATE_DIR"
 
 // Compose produces cache keys by delegating to the configured lane registry.
 func (c laneCacheComposer) Compose(ctx context.Context, req runner.CacheComposeRequest) (string, error) {
@@ -150,7 +155,17 @@ func defaultGridFactory() (runner.GridClient, error) {
 	if endpoint == "" {
 		return runner.NewInMemoryGrid(), nil
 	}
-	client, err := grid.NewClient(grid.Options{Endpoint: endpoint})
+	stateDir, err := ensureWorkflowSDKStateDir()
+	if err != nil {
+		return nil, err
+	}
+
+	options := grid.Options{
+		Endpoint:           endpoint,
+		StreamOptions:      gridStreamOptions(),
+		CursorStoreFactory: grid.NewCursorStoreFactory(stateDir),
+	}
+	client, err := grid.NewClient(options)
 	if err != nil {
 		return nil, err
 	}
@@ -238,6 +253,36 @@ func defaultKnowledgeBaseAdvisorLoader(path string) (mods.Advisor, error) {
 		return nil, err
 	}
 	return advisor, nil
+}
+
+func ensureWorkflowSDKStateDir() (string, error) {
+	if existing := strings.TrimSpace(os.Getenv(workflowSDKStateEnv)); existing != "" {
+		if err := os.MkdirAll(existing, 0o755); err != nil {
+			return "", fmt.Errorf("prepare workflow sdk state dir: %w", err)
+		}
+		return existing, nil
+	}
+
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve config dir: %w", err)
+	}
+	stateDir := filepath.Join(configDir, "ploy", "grid")
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return "", fmt.Errorf("prepare workflow sdk state dir: %w", err)
+	}
+	if err := os.Setenv(workflowSDKStateEnv, stateDir); err != nil {
+		return "", fmt.Errorf("set %s: %w", workflowSDKStateEnv, err)
+	}
+	return stateDir, nil
+}
+
+func gridStreamOptions() helper.StreamOptions {
+	return helper.StreamOptions{
+		HeartbeatInterval: 20 * time.Second,
+		MinBackoff:        200 * time.Millisecond,
+		MaxBackoff:        5 * time.Second,
+	}
 }
 
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {

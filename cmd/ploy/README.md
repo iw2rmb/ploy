@@ -48,6 +48,13 @@ bundle provenance after a successful run so developers can confirm which
 toggles/bundles were attached to each stage. Explicit ticket IDs remain a
 stub-only workflow until Grid integration lands.
 
+`workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
+requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance; in-memory
+stubs respond with a friendly reminder instead of attempting a cancellation.
+Ploy records the cancellation reason (when supplied) and echoes the run status
+so operators can quickly confirm whether the request was accepted or the run
+was already terminal.
+
 `snapshot plan` inspects TOML specs under `configs/snapshots/`, counting
 strip/mask/synthetic rules and surfacing per-table highlights before a capture
 runs.
@@ -112,9 +119,12 @@ classifier drift without leaving the workstation.
 ## Environment
 
 - `GRID_ENDPOINT` — Workflow RPC base URL (`https://grid-dev.example`) used by
-  `workflow run`; it also enables discovery via `/v1/cluster/info` for API
-  endpoint, JetStream routes, IPFS gateway, feature map, and version
-  configuration.
+  `workflow run` and `workflow cancel`; it also enables discovery via
+  `/v1/cluster/info` for API endpoint, JetStream routes, IPFS gateway, feature
+  map, and version configuration.
+- `GRID_WORKFLOW_SDK_STATE_DIR` — Optional override for the Workflow RPC SDK
+  cache location. Ploy now defaults this to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`
+  so manifests and CA bundles persist across CLI restarts.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
   keys, manifests, and summaries. When `GRID_ENDPOINT` is omitted the CLI falls

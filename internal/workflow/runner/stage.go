@@ -1,6 +1,8 @@
 package runner
 
 import (
+	"time"
+
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
@@ -151,8 +153,17 @@ const (
 
 type StageOutcome struct {
 	Stage     Stage
+	RunID     string
 	Status    StageStatus
 	Retryable bool
 	Message   string
 	Artifacts []Artifact
+	Archive   *StageArchive
+}
+
+// StageArchive records archive export metadata captured after a completed stage.
+type StageArchive struct {
+	ID       string
+	Class    string
+	QueuedAt time.Time
 }

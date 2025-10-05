@@ -119,12 +119,14 @@ func handleWorkflowRun(args []string, stderr io.Writer) error {
 	}); ok {
 		printBuildGateSummary(stderr, recorder.RecordedCheckpoints())
 	}
-	if asterOpts.Enabled {
-		if reporter, ok := interface{}(gridClient).(interface {
-			Invocations() []runner.StageInvocation
-		}); ok {
-			printAsterSummary(stderr, reporter.Invocations())
+	if reporter, ok := interface{}(gridClient).(interface {
+		Invocations() []runner.StageInvocation
+	}); ok {
+		invocations := reporter.Invocations()
+		if asterOpts.Enabled {
+			printAsterSummary(stderr, invocations)
 		}
+		printArchiveSummary(stderr, invocations)
 	}
 	return nil
 }

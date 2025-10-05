@@ -10,6 +10,7 @@ import (
 // GridClient executes individual workflow stages on Grid.
 type GridClient interface {
 	ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage Stage, workspace string) (StageOutcome, error)
+	CancelWorkflow(ctx context.Context, req CancelRequest) (CancelResult, error)
 }
 
 // EventsClient brokers ticket claims, checkpoints, and artifact publication.

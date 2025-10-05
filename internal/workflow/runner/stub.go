@@ -14,6 +14,8 @@ type StageInvocation struct {
 	TicketID  string
 	Stage     Stage
 	Workspace string
+	RunID     string
+	Archive   *StageArchive
 }
 
 type InMemoryGrid struct {
@@ -68,6 +70,12 @@ func (g *InMemoryGrid) Invocations() []StageInvocation {
 	dst := make([]StageInvocation, len(g.invocations))
 	copy(dst, g.invocations)
 	return dst
+}
+
+func (g *InMemoryGrid) CancelWorkflow(ctx context.Context, req CancelRequest) (CancelResult, error) {
+	_ = ctx
+	_ = req
+	return CancelResult{}, ErrGridCancellationUnsupported
 }
 
 func allowedLaneSet(set manifests.LaneSet) map[string]struct{} {
