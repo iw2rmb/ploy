@@ -2,43 +2,55 @@ package grid
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 
+	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
+	helper "github.com/iw2rmb/grid/sdk/workflowrpc/helper"
+
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc"
-	rpcHelper "github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc/helper"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 // Options configures the Grid Workflow RPC client.
 type Options struct {
-	Endpoint      string
-	HTTPClient    *http.Client
-	BearerToken   string
-	Retries       int
-	HelperFactory workflowRPCHelperFactory
+	Endpoint         string
+	HTTPClient       *http.Client
+	BearerToken      string
+	WorkflowResolver WorkflowResolver
+	StreamOptions    helper.StreamOptions
+	StreamFunc       streamFunc
+	HelperFactory    workflowClientFactory
 }
 
-type workflowRPCHelperFactory func(rpcHelper.Options) (workflowRPCClient, error)
+// WorkflowResolver resolves the workflow identifier associated with a ticket and stage.
+type WorkflowResolver func(contracts.WorkflowTicket, runner.Stage) string
 
-type workflowRPCClient interface {
-	Submit(ctx context.Context, req workflowrpc.SubmitRequest) (workflowrpc.SubmitResponse, error)
+type workflowClientFactory func(helper.Config) (workflowClient, error)
+
+type workflowClient interface {
+	Submit(ctx context.Context, req workflowsdk.SubmitRequest) (workflowsdk.SubmitResponse, error)
+	Metadata(ctx context.Context, req workflowsdk.MetadataRequest) (workflowsdk.MetadataResponse, error)
+	Client() *workflowsdk.Client
 }
+
+type streamFunc func(context.Context, *workflowsdk.Client, workflowsdk.StreamRequest, func(workflowsdk.StatusEvent) error, helper.StreamOptions) error
 
 // Client implements runner.GridClient by dispatching workflow stages to Grid's Workflow RPC.
 type Client struct {
-	rpc workflowRPCClient
+	rpc             workflowClient
+	stream          streamFunc
+	streamOpts      helper.StreamOptions
+	resolveWorkflow WorkflowResolver
 
 	mu          sync.Mutex
 	invocations []runner.StageInvocation
 }
-
-const defaultJobPriority = "standard"
 
 // NewClient constructs a Grid Workflow RPC client.
 func NewClient(opts Options) (*Client, error) {
@@ -56,57 +68,75 @@ func NewClient(opts Options) (*Client, error) {
 
 	factory := opts.HelperFactory
 	if factory == nil {
-		factory = func(helperOpts rpcHelper.Options) (workflowRPCClient, error) {
-			return rpcHelper.New(helperOpts)
-		}
+		factory = defaultWorkflowClientFactory
 	}
 
-	rpcClient, err := factory(rpcHelper.Options{Endpoint: endpoint, HTTPClient: opts.HTTPClient, BearerToken: opts.BearerToken, Retries: opts.Retries})
+	cfgOpts := []helper.ConfigOption{helper.WithEndpoint(endpoint)}
+	if opts.HTTPClient != nil {
+		cfgOpts = append(cfgOpts, helper.WithHTTPClient(opts.HTTPClient))
+	}
+	if token := strings.TrimSpace(opts.BearerToken); token != "" {
+		cfgOpts = append(cfgOpts, helper.WithTokenProvider(helper.StaticTokenProvider(token)))
+	}
+
+	cfg := helper.NewConfig(cfgOpts...)
+	rpcClient, err := factory(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Client{rpc: rpcClient}, nil
+	streamFn := opts.StreamFunc
+	if streamFn == nil {
+		streamFn = helper.StreamStatusWithRetry
+	}
+
+	resolver := opts.WorkflowResolver
+	if resolver == nil {
+		resolver = defaultWorkflowResolver
+	}
+
+	return &Client{
+		rpc:             rpcClient,
+		stream:          streamFn,
+		streamOpts:      opts.StreamOptions,
+		resolveWorkflow: resolver,
+	}, nil
 }
 
 // ExecuteStage submits the stage execution request to Grid and returns the resulting outcome.
 func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	c.recordInvocation(ticket, stage, workspace)
-
-	req := workflowrpc.SubmitRequest{
-		SchemaVersion: contracts.SchemaVersion,
-		Ticket:        ticket,
-		Stage:         marshalStage(stage),
+	if err := ctx.Err(); err != nil {
+		return runner.StageOutcome{}, err
 	}
 
-	resp, err := c.rpc.Submit(ctx, req)
+	workflowID := strings.TrimSpace(c.resolveWorkflow(ticket, stage))
+	if workflowID == "" {
+		workflowID = strings.TrimSpace(ticket.TicketID)
+	}
+
+	submitReq, err := buildSubmitRequest(ticket, stage, workflowID)
+	if err != nil {
+		return runner.StageOutcome{}, err
+	}
+
+	resp, err := c.rpc.Submit(ctx, submitReq)
+	if err != nil {
+		return runner.StageOutcome{}, err
+	}
+
+	finalStatus, finalMessage, err := c.awaitTerminalStatus(ctx, resp.RunID, ticket.Tenant, workflowID)
 	if err != nil {
 		return runner.StageOutcome{}, err
 	}
 
 	outcome := runner.StageOutcome{
-		Stage:     stage,
-		Status:    runner.StageStatus(resp.Status),
-		Retryable: resp.Retryable,
-		Message:   resp.Message,
+		Stage:   stage,
+		Status:  mapRunStatus(finalStatus),
+		Message: finalMessage,
 	}
-	if outcome.Status == "" {
-		outcome.Status = runner.StageStatusCompleted
-	}
-	if resp.Stage.Name != "" {
-		outcome.Stage = unmarshalStage(resp.Stage)
-	}
-	if len(resp.Artifacts) > 0 {
-		artifacts := make([]runner.Artifact, 0, len(resp.Artifacts))
-		for _, art := range resp.Artifacts {
-			artifacts = append(artifacts, runner.Artifact{
-				Name:        strings.TrimSpace(art.Name),
-				ArtifactCID: strings.TrimSpace(art.ArtifactCID),
-				Digest:      strings.TrimSpace(art.Digest),
-				MediaType:   strings.TrimSpace(art.MediaType),
-			})
-		}
-		outcome.Artifacts = artifacts
+	if outcome.Status == runner.StageStatusFailed {
+		outcome.Retryable = false
 	}
 	return outcome, nil
 }
@@ -126,105 +156,210 @@ func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.
 	c.invocations = append(c.invocations, runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace})
 }
 
-func marshalStage(stage runner.Stage) workflowrpc.Stage {
-	return workflowrpc.Stage{
-		Name:         stage.Name,
-		Kind:         string(stage.Kind),
-		Lane:         stage.Lane,
-		Dependencies: append([]string(nil), stage.Dependencies...),
-		CacheKey:     stage.CacheKey,
-		Constraints: workflowrpc.Constraints{
-			Manifest: stage.Constraints.Manifest,
-		},
-		Aster: workflowrpc.Aster{
-			Enabled: stage.Aster.Enabled,
-			Toggles: append([]string(nil), stage.Aster.Toggles...),
-			Bundles: append([]aster.Metadata(nil), stage.Aster.Bundles...),
-		},
-		Job: marshalJob(stage),
+func defaultWorkflowClientFactory(cfg helper.Config) (workflowClient, error) {
+	client, err := cfg.Client(context.Background())
+	if err != nil {
+		return nil, err
 	}
+	return &helperWorkflowClient{client: client}, nil
 }
 
-func unmarshalStage(env workflowrpc.Stage) runner.Stage {
-	return runner.Stage{
-		Name:         env.Name,
-		Kind:         runner.StageKind(env.Kind),
-		Lane:         env.Lane,
-		Dependencies: append([]string(nil), env.Dependencies...),
-		CacheKey:     env.CacheKey,
-		Constraints:  runner.StageConstraints{Manifest: env.Constraints.Manifest},
-		Aster: runner.StageAster{
-			Enabled: env.Aster.Enabled,
-			Toggles: append([]string(nil), env.Aster.Toggles...),
-			Bundles: append([]aster.Metadata(nil), env.Aster.Bundles...),
-		},
-		Job: unmarshalJob(env.Job),
+func defaultWorkflowResolver(ticket contracts.WorkflowTicket, stage runner.Stage) string {
+	if name := strings.TrimSpace(ticket.Manifest.Name); name != "" {
+		return name
 	}
+	return strings.TrimSpace(ticket.TicketID)
 }
 
-func marshalJob(stage runner.Stage) workflowrpc.JobSpec {
-	metadata := copyStringMap(stage.Job.Metadata)
-	if metadata == nil {
-		metadata = make(map[string]string)
-	}
-	if stage.Lane != "" {
-		metadata["lane"] = stage.Lane
-	}
-	if stage.CacheKey != "" {
-		metadata["cache_key"] = stage.CacheKey
-	}
-	if _, ok := metadata["priority"]; !ok || strings.TrimSpace(metadata["priority"]) == "" {
-		metadata["priority"] = defaultJobPriority
-	}
-	manifest := stage.Constraints.Manifest.Manifest
-	if manifest.Name != "" {
-		metadata["manifest_name"] = manifest.Name
-	}
-	if manifest.Version != "" {
-		metadata["manifest_version"] = manifest.Version
-	}
-
-	return workflowrpc.JobSpec{
-		Image:   stage.Job.Image,
-		Command: append([]string(nil), stage.Job.Command...),
-		Env:     copyStringMap(stage.Job.Env),
-		Resources: workflowrpc.Resources{
-			CPU:    stage.Job.Resources.CPU,
-			Memory: stage.Job.Resources.Memory,
-			Disk:   stage.Job.Resources.Disk,
-			GPU:    stage.Job.Resources.GPU,
-		},
-		Metadata: metadata,
-	}
+type helperWorkflowClient struct {
+	client *workflowsdk.Client
 }
 
-func unmarshalJob(spec workflowrpc.JobSpec) runner.StageJobSpec {
-	return runner.StageJobSpec{
-		Image:   spec.Image,
-		Command: append([]string(nil), spec.Command...),
-		Env:     copyStringMap(spec.Env),
-		Resources: runner.StageJobResources{
-			CPU:    spec.Resources.CPU,
-			Memory: spec.Resources.Memory,
-			Disk:   spec.Resources.Disk,
-			GPU:    spec.Resources.GPU,
-		},
-		Metadata: copyStringMap(spec.Metadata),
-	}
+func (h *helperWorkflowClient) Submit(ctx context.Context, req workflowsdk.SubmitRequest) (workflowsdk.SubmitResponse, error) {
+	return h.client.Submit(ctx, req)
 }
 
-func copyStringMap(src map[string]string) map[string]string {
-	if len(src) == 0 {
+func (h *helperWorkflowClient) Metadata(ctx context.Context, req workflowsdk.MetadataRequest) (workflowsdk.MetadataResponse, error) {
+	return h.client.Metadata(ctx, req)
+}
+
+func (h *helperWorkflowClient) Client() *workflowsdk.Client {
+	return h.client
+}
+
+func (c *Client) awaitTerminalStatus(ctx context.Context, runID, tenant, workflowID string) (workflowsdk.RunStatus, string, error) {
+	streamReq := workflowsdk.StreamRequest{
+		Tenant:     strings.TrimSpace(tenant),
+		WorkflowID: strings.TrimSpace(workflowID),
+		RunID:      strings.TrimSpace(runID),
+	}
+	if streamReq.RunID == "" {
+		return "", "", fmt.Errorf("workflow run id is required")
+	}
+
+	var finalStatus workflowsdk.RunStatus
+	var finalMessage string
+
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	streamErr := c.stream(streamCtx, c.rpc.Client(), streamReq, func(evt workflowsdk.StatusEvent) error {
+		if evt.RunID == "" {
+			return nil
+		}
+		if message := strings.TrimSpace(evt.Message); message != "" {
+			finalMessage = message
+		}
+		if isTerminalStatus(evt.Status) {
+			finalStatus = evt.Status
+			cancel()
+		}
 		return nil
-	}
-	dst := make(map[string]string, len(src))
-	for key, value := range src {
-		if trimmedKey := strings.TrimSpace(key); trimmedKey != "" {
-			dst[trimmedKey] = strings.TrimSpace(value)
+	}, c.streamOpts)
+
+	if streamErr != nil {
+		if ctx.Err() != nil {
+			return "", "", ctx.Err()
+		}
+		if errors.Is(streamErr, context.Canceled) && finalStatus != "" {
+			streamErr = nil
 		}
 	}
-	if len(dst) == 0 {
+
+	if finalStatus == "" {
+		meta, err := c.rpc.Metadata(ctx, workflowsdk.MetadataRequest{Tenant: tenant, WorkflowID: workflowID, RunID: runID})
+		if err != nil {
+			if streamErr != nil {
+				return "", "", streamErr
+			}
+			return "", "", err
+		}
+		finalStatus = meta.Run.Status
+		if finalMessage == "" && meta.Run.Result != nil {
+			if msg, ok := meta.Run.Result["reason"].(string); ok {
+				finalMessage = strings.TrimSpace(msg)
+			}
+		}
+	}
+
+	if finalStatus == "" {
+		if streamErr != nil {
+			return "", "", streamErr
+		}
+		finalStatus = workflowsdk.RunStatusSucceeded
+	}
+
+	return finalStatus, finalMessage, nil
+}
+
+func buildSubmitRequest(ticket contracts.WorkflowTicket, stage runner.Stage, workflowID string) (workflowsdk.SubmitRequest, error) {
+	builder := helper.NewSubmitBuilder().
+		Tenant(strings.TrimSpace(ticket.Tenant)).
+		Workflow(strings.TrimSpace(workflowID)).
+		Correlation(strings.TrimSpace(ticket.TicketID)).
+		Idempotency(idempotencyKey(ticket, stage)).
+		Label("stage", stage.Name).
+		Label("lane", stage.Lane).
+		Label("ticket_id", ticket.TicketID)
+
+	manifest := stage.Constraints.Manifest.Manifest
+	if manifest.Name != "" {
+		builder.Label("manifest_name", manifest.Name)
+	}
+	if manifest.Version != "" {
+		builder.Label("manifest_version", manifest.Version)
+	}
+
+	builder.Job(func(job *helper.JobBuilder) {
+		if strings.TrimSpace(stage.Job.Image) != "" {
+			job.Image(stage.Job.Image)
+		}
+		if len(stage.Job.Command) > 0 {
+			job.Command(stage.Job.Command...)
+		}
+		for key, value := range stage.Job.Env {
+			job.Env(key, value)
+		}
+		for key, value := range copyStringMap(stage.Job.Metadata) {
+			job.Metadata(key, value)
+		}
+		if _, ok := stage.Job.Metadata["priority"]; !ok || strings.TrimSpace(stage.Job.Metadata["priority"]) == "" {
+			job.Metadata("priority", "standard")
+		}
+		if stage.Lane != "" {
+			job.Metadata("lane", stage.Lane)
+		}
+		if stage.CacheKey != "" {
+			job.Metadata("cache_key", stage.CacheKey)
+		}
+		if manifest.Name != "" {
+			job.Metadata("manifest_name", manifest.Name)
+		}
+		if manifest.Version != "" {
+			job.Metadata("manifest_version", manifest.Version)
+		}
+		if stage.Job.Resources.CPU != "" {
+			job.Metadata("resources.cpu", stage.Job.Resources.CPU)
+		}
+		if stage.Job.Resources.Memory != "" {
+			job.Metadata("resources.memory", stage.Job.Resources.Memory)
+		}
+		if stage.Job.Resources.Disk != "" {
+			job.Metadata("resources.disk", stage.Job.Resources.Disk)
+		}
+		if stage.Job.Resources.GPU != "" {
+			job.Metadata("resources.gpu", stage.Job.Resources.GPU)
+		}
+		if len(stage.Aster.Toggles) > 0 {
+			job.Metadata("aster.toggles", append([]string(nil), stage.Aster.Toggles...))
+		}
+		if len(stage.Aster.Bundles) > 0 {
+			job.Metadata("aster.bundles", append([]aster.Metadata(nil), stage.Aster.Bundles...))
+		}
+	})
+
+	return builder.Build()
+}
+
+func idempotencyKey(ticket contracts.WorkflowTicket, stage runner.Stage) string {
+	base := strings.TrimSpace(ticket.TicketID)
+	if base == "" {
+		base = strings.TrimSpace(ticket.Manifest.Name)
+	}
+	stageName := strings.TrimSpace(stage.Name)
+	if stageName == "" {
+		stageName = "stage"
+	}
+	return fmt.Sprintf("%s:%s", base, stageName)
+}
+
+func mapRunStatus(status workflowsdk.RunStatus) runner.StageStatus {
+	switch status {
+	case workflowsdk.RunStatusSucceeded:
+		return runner.StageStatusCompleted
+	case workflowsdk.RunStatusFailed, workflowsdk.RunStatusCanceled:
+		return runner.StageStatusFailed
+	default:
+		return runner.StageStatusRunning
+	}
+}
+
+func isTerminalStatus(status workflowsdk.RunStatus) bool {
+	switch status {
+	case workflowsdk.RunStatusSucceeded, workflowsdk.RunStatusFailed, workflowsdk.RunStatusCanceled:
+		return true
+	default:
+		return false
+	}
+}
+
+func copyStringMap(in map[string]string) map[string]string {
+	if len(in) == 0 {
 		return nil
 	}
-	return dst
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }

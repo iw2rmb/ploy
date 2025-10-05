@@ -6,31 +6,17 @@ import (
 	"reflect"
 	"testing"
 
+	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
+	helper "github.com/iw2rmb/grid/sdk/workflowrpc/helper"
+
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc"
-	rpcHelper "github.com/iw2rmb/ploy/internal/workflow/grid/workflowrpc/helper"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 const buildGateStageName = "build-gate"
-
-type fakeWorkflowRPC struct {
-	requests []workflowrpc.SubmitRequest
-	resp     workflowrpc.SubmitResponse
-	err      error
-}
-
-func (f *fakeWorkflowRPC) Submit(ctx context.Context, req workflowrpc.SubmitRequest) (workflowrpc.SubmitResponse, error) {
-	_ = ctx
-	f.requests = append(f.requests, req)
-	if f.err != nil {
-		return workflowrpc.SubmitResponse{}, f.err
-	}
-	return f.resp, nil
-}
 
 func TestClientExecuteStageSuccess(t *testing.T) {
 	ticket := contracts.WorkflowTicket{
@@ -72,36 +58,29 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 		},
 	}
 
-	fake := &fakeWorkflowRPC{
-		resp: workflowrpc.SubmitResponse{
-			Status:    string(runner.StageStatusCompleted),
-			Message:   "ok",
-			Retryable: false,
-			Artifacts: []workflowrpc.Artifact{{
-				Name:        "mods-plan",
-				ArtifactCID: "cid-mods-plan",
-				Digest:      "sha256:modsplan",
-				MediaType:   "application/tar+zst",
-			}},
+	fake := newFakeWorkflowClient(t)
+	fake.submitResp = workflowsdk.SubmitResponse{
+		RunID:         "run-123",
+		WorkflowID:    "smoke",
+		CorrelationID: "ticket-123",
+		Accepted:      true,
+		Status:        workflowsdk.RunStatusQueued,
+	}
+
+	stream := &fakeStreamer{
+		events: []workflowsdk.StatusEvent{
+			{RunID: "run-123", Status: workflowsdk.RunStatusDispatch},
+			{RunID: "run-123", Status: workflowsdk.RunStatusRunning},
+			{RunID: "run-123", Status: workflowsdk.RunStatusSucceeded, Message: "ok"},
 		},
 	}
 
 	client, err := NewClient(Options{
-		Endpoint:    "https://grid.dev",
-		BearerToken: "token-123",
-		Retries:     5,
-		HelperFactory: func(opts rpcHelper.Options) (workflowRPCClient, error) {
-			if got, want := opts.Endpoint, "https://grid.dev"; got != want {
-				t.Fatalf("unexpected endpoint: got %s, want %s", got, want)
-			}
-			if got, want := opts.BearerToken, "token-123"; got != want {
-				t.Fatalf("unexpected bearer token: got %q, want %q", got, want)
-			}
-			if got, want := opts.Retries, 5; got != want {
-				t.Fatalf("unexpected retries: got %d, want %d", got, want)
-			}
+		Endpoint: "https://grid.dev",
+		HelperFactory: func(cfg helper.Config) (workflowClient, error) {
 			return fake, nil
 		},
+		StreamFunc: stream.Stream,
 	})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
@@ -121,74 +100,41 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	if outcome.Retryable {
 		t.Fatal("expected non-retryable")
 	}
-	if len(outcome.Artifacts) != 1 {
-		t.Fatalf("expected artifact manifest, got %#v", outcome.Artifacts)
-	}
-	artifact := outcome.Artifacts[0]
-	if artifact.ArtifactCID != "cid-mods-plan" || artifact.Digest != "sha256:modsplan" {
-		t.Fatalf("unexpected artifact manifest: %#v", artifact)
+	if len(outcome.Artifacts) != 0 {
+		t.Fatalf("expected no artifacts, got %#v", outcome.Artifacts)
 	}
 
-	if len(fake.requests) != 1 {
-		t.Fatalf("expected 1 submit request, got %d", len(fake.requests))
+	if len(fake.submits) != 1 {
+		t.Fatalf("expected 1 submit request, got %d", len(fake.submits))
 	}
-	req := fake.requests[0]
-	if req.SchemaVersion != contracts.SchemaVersion {
-		t.Fatalf("unexpected schema version: %s", req.SchemaVersion)
+	req := fake.submits[0]
+	if req.Tenant != "acme" {
+		t.Fatalf("tenant mismatch: %s", req.Tenant)
 	}
-	if req.Ticket.TicketID != ticket.TicketID {
-		t.Fatalf("ticket mismatch: %s", req.Ticket.TicketID)
+	if req.WorkflowID != "smoke" {
+		t.Fatalf("workflow id mismatch: %s", req.WorkflowID)
 	}
-	if req.Stage.Name != stage.Name {
-		t.Fatalf("stage name mismatch: %s", req.Stage.Name)
+	if req.RunMetadata.CorrelationID != "ticket-123" {
+		t.Fatalf("unexpected correlation id: %s", req.RunMetadata.CorrelationID)
 	}
-	if req.Stage.Kind != string(stage.Kind) {
-		t.Fatalf("stage kind mismatch: %s", req.Stage.Kind)
+	if req.Job.Image != stage.Job.Image {
+		t.Fatalf("job image mismatch: %s", req.Job.Image)
 	}
-	if req.Stage.Lane != stage.Lane {
-		t.Fatalf("lane mismatch: %s", req.Stage.Lane)
+	if !reflect.DeepEqual(req.Job.Command, stage.Job.Command) {
+		t.Fatalf("job command mismatch: %#v", req.Job.Command)
 	}
-	if req.Stage.CacheKey != stage.CacheKey {
-		t.Fatalf("cache key mismatch: %s", req.Stage.CacheKey)
-	}
-	if req.Stage.Aster.Enabled != stage.Aster.Enabled {
-		t.Fatalf("aster enabled mismatch: %v", req.Stage.Aster.Enabled)
-	}
-	if len(req.Stage.Aster.Bundles) != len(stage.Aster.Bundles) {
-		t.Fatalf("expected %d bundles, got %d", len(stage.Aster.Bundles), len(req.Stage.Aster.Bundles))
-	}
-	if req.Stage.Constraints.Manifest.Manifest.Name != manifest.Manifest.Name {
-		t.Fatalf("manifest name mismatch: %s", req.Stage.Constraints.Manifest.Manifest.Name)
-	}
-	if req.Stage.Job.Image != stage.Job.Image {
-		t.Fatalf("job image mismatch: %s", req.Stage.Job.Image)
-	}
-	if !reflect.DeepEqual(req.Stage.Job.Command, stage.Job.Command) {
-		t.Fatalf("job command mismatch: %#v", req.Stage.Job.Command)
-	}
-	if got := req.Stage.Job.Env["GOFLAGS"]; got != "-mod=vendor" {
+	if got := req.Job.Env["GOFLAGS"]; got != "-mod=vendor" {
 		t.Fatalf("job env mismatch: %s", got)
 	}
-	if req.Stage.Job.Resources.CPU != stage.Job.Resources.CPU {
-		t.Fatalf("job cpu mismatch: %s", req.Stage.Job.Resources.CPU)
+	if lane, ok := req.Job.Metadata["lane"]; !ok || lane != stage.Lane {
+		t.Fatalf("expected lane metadata, got %#v", req.Job.Metadata)
 	}
-	if req.Stage.Job.Resources.Memory != stage.Job.Resources.Memory {
-		t.Fatalf("job memory mismatch: %s", req.Stage.Job.Resources.Memory)
+
+	if stream.calls != 1 {
+		t.Fatalf("expected stream to be invoked once, got %d", stream.calls)
 	}
-	if req.Stage.Job.Metadata["lane"] != stage.Lane {
-		t.Fatalf("job metadata missing lane: %#v", req.Stage.Job.Metadata)
-	}
-	if req.Stage.Job.Metadata["cache_key"] != stage.CacheKey {
-		t.Fatalf("job metadata missing cache key: %#v", req.Stage.Job.Metadata)
-	}
-	if req.Stage.Job.Metadata["priority"] != "standard" {
-		t.Fatalf("job metadata missing priority: %#v", req.Stage.Job.Metadata)
-	}
-	if req.Stage.Job.Metadata["manifest_name"] != manifest.Manifest.Name {
-		t.Fatalf("job metadata missing manifest name: %#v", req.Stage.Job.Metadata)
-	}
-	if req.Stage.Job.Metadata["manifest_version"] != manifest.Manifest.Version {
-		t.Fatalf("job metadata missing manifest version: %#v", req.Stage.Job.Metadata)
+	if stream.lastReq.RunID != "run-123" {
+		t.Fatalf("unexpected stream run id: %s", stream.lastReq.RunID)
 	}
 
 	invocations := client.Invocations()
@@ -198,16 +144,15 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	if invocations[0].TicketID != ticket.TicketID {
 		t.Fatalf("invocation ticket mismatch: %s", invocations[0].TicketID)
 	}
-	if invocations[0].Stage.Name != stage.Name {
-		t.Fatalf("invocation stage mismatch: %s", invocations[0].Stage.Name)
-	}
 }
 
-func TestClientExecuteStagePropagatesRPCError(t *testing.T) {
-	fake := &fakeWorkflowRPC{err: errors.New("submit failed")}
+func TestClientExecuteStagePropagatesSubmitError(t *testing.T) {
+	fake := newFakeWorkflowClient(t)
+	fake.submitErr = errors.New("submit failed")
+
 	client, err := NewClient(Options{
 		Endpoint: "https://grid.dev",
-		HelperFactory: func(opts rpcHelper.Options) (workflowRPCClient, error) {
+		HelperFactory: func(cfg helper.Config) (workflowClient, error) {
 			return fake, nil
 		},
 	})
@@ -215,23 +160,29 @@ func TestClientExecuteStagePropagatesRPCError(t *testing.T) {
 		t.Fatalf("new client: %v", err)
 	}
 
-	_, err = client.ExecuteStage(context.Background(), contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: mods.StageNamePlan, Kind: runner.StageKindModsPlan, Lane: "node-wasm", Constraints: runner.StageConstraints{Manifest: manifests.Compilation{Manifest: manifests.Metadata{Name: "smoke", Version: "2025-09-26"}, ManifestVersion: "v2"}}}, "/tmp")
+	_, err = client.ExecuteStage(
+		context.Background(),
+		contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}},
+		runner.Stage{
+			Name: mods.StageNamePlan,
+			Kind: runner.StageKindModsPlan,
+			Job:  runner.StageJobSpec{Image: "alpine"},
+		},
+		"/tmp",
+	)
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !errors.Is(err, fake.err) {
+	if !errors.Is(err, fake.submitErr) {
 		t.Fatalf("expected submit error to propagate, got %v", err)
 	}
 }
 
 func TestNewClientValidatesEndpoint(t *testing.T) {
-	_, err := NewClient(Options{})
-	if err == nil {
+	if _, err := NewClient(Options{}); err == nil {
 		t.Fatal("expected error for empty endpoint")
 	}
-
-	_, err = NewClient(Options{Endpoint: "://invalid"})
-	if err == nil {
+	if _, err := NewClient(Options{Endpoint: "://invalid"}); err == nil {
 		t.Fatal("expected error for invalid endpoint")
 	}
 }
@@ -240,7 +191,7 @@ func TestNewClientPropagatesFactoryError(t *testing.T) {
 	boom := errors.New("factory boom")
 	_, err := NewClient(Options{
 		Endpoint: "https://grid.dev",
-		HelperFactory: func(opts rpcHelper.Options) (workflowRPCClient, error) {
+		HelperFactory: func(helper.Config) (workflowClient, error) {
 			return nil, boom
 		},
 	})
@@ -250,4 +201,63 @@ func TestNewClientPropagatesFactoryError(t *testing.T) {
 	if !errors.Is(err, boom) {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+type fakeWorkflowClient struct {
+	client       *workflowsdk.Client
+	submits      []workflowsdk.SubmitRequest
+	submitResp   workflowsdk.SubmitResponse
+	submitErr    error
+	metadataReqs []workflowsdk.MetadataRequest
+	metadataResp workflowsdk.MetadataResponse
+	metadataErr  error
+}
+
+func newFakeWorkflowClient(t *testing.T) *fakeWorkflowClient {
+	t.Helper()
+	client, err := workflowsdk.NewClient("https://grid.dev")
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	return &fakeWorkflowClient{client: client}
+}
+
+func (f *fakeWorkflowClient) Submit(ctx context.Context, req workflowsdk.SubmitRequest) (workflowsdk.SubmitResponse, error) {
+	_ = ctx
+	f.submits = append(f.submits, req)
+	if f.submitErr != nil {
+		return workflowsdk.SubmitResponse{}, f.submitErr
+	}
+	return f.submitResp, nil
+}
+
+func (f *fakeWorkflowClient) Metadata(ctx context.Context, req workflowsdk.MetadataRequest) (workflowsdk.MetadataResponse, error) {
+	_ = ctx
+	f.metadataReqs = append(f.metadataReqs, req)
+	if f.metadataErr != nil {
+		return workflowsdk.MetadataResponse{}, f.metadataErr
+	}
+	return f.metadataResp, nil
+}
+
+func (f *fakeWorkflowClient) Client() *workflowsdk.Client {
+	return f.client
+}
+
+type fakeStreamer struct {
+	calls   int
+	lastReq workflowsdk.StreamRequest
+	events  []workflowsdk.StatusEvent
+}
+
+func (s *fakeStreamer) Stream(ctx context.Context, _ *workflowsdk.Client, req workflowsdk.StreamRequest, handler func(workflowsdk.StatusEvent) error, opts helper.StreamOptions) error {
+	_ = opts
+	s.calls++
+	s.lastReq = req
+	for _, evt := range s.events {
+		if err := handler(evt); err != nil {
+			return err
+		}
+	}
+	return context.Canceled
 }
