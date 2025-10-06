@@ -62,7 +62,7 @@ the snapshot metadata stream introduced earlier.
 
 - Update `docs/design/checkpoint-metadata/README.md` to mark the artifact stream
   follow-up complete.
-- Record status in `roadmap/shift/18-stage-artifact-streams.md` once the slice
+- Record status in `docs/tasks/shift/18-stage-artifact-streams.md` once the slice
   lands.
 - Future slice: attach artifact payload hashing/size metadata when Grid begins
   returning those fields.

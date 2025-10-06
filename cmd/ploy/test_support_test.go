@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"strings"
+	"testing"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -26,7 +27,7 @@ func defaultManifestPayload() manifests.Compilation {
 	return manifests.Compilation{
 		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
 		ManifestVersion: "v2",
-		Lanes:           manifests.LaneSet{Required: []manifests.Lane{{Name: "node-wasm"}, {Name: "go-native"}}},
+		Lanes:           manifests.LaneSet{Required: []manifests.Lane{{Name: "mods-plan"}, {Name: "mods-java"}, {Name: "mods-llm"}, {Name: "mods-human"}, {Name: "go-native"}}},
 	}
 }
 
@@ -88,4 +89,24 @@ func (f *fakeLaneRegistry) Describe(name string, opts lanes.DescribeOptions) (la
 		f.description.Lane.Job.Image = "registry.dev/default:latest"
 	}
 	return f.description, nil
+}
+
+type stubWorkspacePreparer struct {
+	calls []runner.WorkspacePrepareRequest
+	err   error
+}
+
+func (s *stubWorkspacePreparer) Prepare(ctx context.Context, req runner.WorkspacePrepareRequest) error {
+	s.calls = append(s.calls, req)
+	return s.err
+}
+
+func withStubWorkspacePreparer(t *testing.T) *stubWorkspacePreparer {
+	prev := workspacePreparerFactory
+	stub := &stubWorkspacePreparer{}
+	workspacePreparerFactory = func() (runner.WorkspacePreparer, error) { return stub, nil }
+	if t != nil {
+		t.Cleanup(func() { workspacePreparerFactory = prev })
+	}
+	return stub
 }

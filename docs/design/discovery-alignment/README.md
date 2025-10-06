@@ -8,13 +8,13 @@ endpoint, feature gates, version) without relying on stale assumptions.
 
 ## Status (2025-09-29)
 
-- [x] [roadmap/discovery-alignment/01-cluster-info-parser.md](../../../roadmap/discovery-alignment/01-cluster-info-parser.md)
+- [x] [docs/tasks/discovery-alignment/01-cluster-info-parser.md](../../../docs/tasks/discovery-alignment/01-cluster-info-parser.md)
       — Discovery parser consumes the full schema and honours multi-URL
       JetStream responses.
-- [x] [roadmap/discovery-alignment/02-discovery-config-tests.md](../../../roadmap/discovery-alignment/02-discovery-config-tests.md)
+- [x] [docs/tasks/discovery-alignment/02-discovery-config-tests.md](../../../docs/tasks/discovery-alignment/02-discovery-config-tests.md)
       — Configuration tests cover new fields, feature gates, and cache
       behaviour.
-- [x] [roadmap/discovery-alignment/03-workflow-grid-alignment.md](../../../roadmap/discovery-alignment/03-workflow-grid-alignment.md)
+- [x] [docs/tasks/discovery-alignment/03-workflow-grid-alignment.md](../../../docs/tasks/discovery-alignment/03-workflow-grid-alignment.md)
       — Workflow runner Grid tests align with the expanded discovery
       integration.
 

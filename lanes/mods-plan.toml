@@ -1,0 +1,21 @@
+name = "mods-plan"
+description = "Mods planner stage running workspace analysis and recipe selection"
+runtime_family = "mods"
+cache_namespace = "mods-plan"
+
+[commands]
+setup = ["npm", "install"]
+build = ["mods-plan", "--prepare"]
+test = ["mods-plan", "--verify"]
+
+[job]
+image = "registry.dev/ploy/mods-plan:latest"
+command = ["mods-plan", "--run"]
+priority = "standard"
+
+  [job.env]
+  MODS_PLAN_CACHE = "/workspace/cache"
+
+  [job.resources]
+  cpu = "2000m"
+  memory = "4Gi"

@@ -75,6 +75,27 @@ func TestWorkflowTicketValidate(t *testing.T) {
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("expected valid ticket, got %v", err)
 	}
+
+	withRepo := WorkflowTicket{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-456",
+		Tenant:        "acme",
+		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		Repo: RepoMaterialization{
+			URL:       "https://gitlab.com/iw2rmb/sample.git",
+			BaseRef:   "main",
+			TargetRef: "mods/shift-grid",
+		},
+	}
+	if err := withRepo.Validate(); err != nil {
+		t.Fatalf("expected ticket with repo to validate, got %v", err)
+	}
+
+	badRepo := valid
+	badRepo.Repo = RepoMaterialization{URL: "https://example.com/repo.git"}
+	if err := badRepo.Validate(); err == nil {
+		t.Fatal("expected repo validation error when target ref missing")
+	}
 }
 
 func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {

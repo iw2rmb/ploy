@@ -13,17 +13,21 @@ explicit Grid stage metadata.
 
 ## Status
 
-- [x] Planner skeleton (roadmap/mods/01-planner-skeleton.md) — Mods DAG emitted
+- [x] Planner skeleton (docs/tasks/mods/01-planner-skeleton.md) — Mods DAG emitted
       by default planner (2025-09-26).
-- [x] Knowledge Base feedback loop (roadmap/mods/02-knowledge-base-feedback.md)
+- [x] Knowledge Base feedback loop (docs/tasks/mods/02-knowledge-base-feedback.md)
       — Mods planner now records knowledge base advice inside
       `stage_metadata.mods` (2025-09-26).
-- [x] CLI surface and Grid wiring (roadmap/mods/03-cli-grid-wiring.md) —
+- [x] CLI surface and Grid wiring (docs/tasks/mods/03-cli-grid-wiring.md) —
       `ploy workflow run` exposes planner hints and pushes concurrency metadata
       into Grid/JetStream (2025-09-26).
-- [x] Runner parallel execution (roadmap/mods/04-runner-parallel-execution.md) —
+- [x] Runner parallel execution (docs/tasks/mods/04-runner-parallel-execution.md) —
       Workflow runner executes Mods stages according to planner parallelism
       hints with dependency-aware scheduling (2025-09-27).
+- [x] Mods Grid restoration (docs/design/mods-grid-restoration/README.md) —
+      Steps 1–4 completed 2025-10-05 (repo materialisation, Mods lanes, healing
+      retries). SHIFT migration of lanes tracked via
+      `docs/tasks/mods-grid/05-refactor.md`.
 
 ## Scope
 
@@ -44,7 +48,7 @@ explicit Grid stage metadata.
   We will port the planning heuristics, healing retry structure, and logging
   semantics into the new workflow package while replacing controller calls with
   Grid workflow submissions.
-- Existing roadmap docs (`roadmap/orw-test.md`, `roadmap/recipes.md`) capture
+- Existing roadmap docs (`docs/tasks/orw-test.md`, `docs/tasks/recipes.md`) capture
   OpenRewrite recipe usage; these become inputs for the new planner API.
 
 ## Behaviour
@@ -111,7 +115,7 @@ explicit Grid stage metadata.
 
 ## Rollout & Follow-ups
 
-- Add roadmap entries under `roadmap/mods/` capturing planner implementation,
+- Add roadmap entries under `docs/tasks/mods/` capturing planner implementation,
   Grid wiring, Knowledge Base integration, and CLI surface work.
 - Coordinate with the Build Gate reboot (`docs/design/build-gate/README.md`) to
   ensure post-plan builds reuse shared log parsing and static analysis outputs.

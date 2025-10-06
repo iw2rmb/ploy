@@ -1,5 +1,60 @@
 # Changelog
 
+## [2025-10-07] Mods Catalog Alignment
+
+- `docs/design/mods-grid-restoration/README.md`: Reframed follow-up work around a
+  dedicated Mods lane repository and Grid catalog registration; re-reviewed
+  `go test ./internal/workflow/runner -run TestRunSchedulesHealingPlanAfterBuildGateFailure -count=1`,
+  `go test ./cmd/ploy -run TestHandleWorkflowRunConfiguresModsFlags -count=1`, and
+  `go test -tags e2e ./tests/e2e -count=1` (latest run 2025-10-05) to confirm
+  behaviour remains unchanged.
+- `docs/design/shift/README.md`: Updated SHIFT roadmap alignment to track the
+  Mods catalog namespace hand-off to Grid and call out coordination requirements
+  (desk review with Mods design + Grid plan on 2025-10-07).
+- `docs/design/README.md`: Refreshed index entries for SHIFT/Mods designs to
+  highlight the Grid catalog follow-up and new verification timestamp.
+- Noted the `/lanes/<namespace>.tar.gz` publication path in the Mods/Grid
+  designs so workstation docs match the updated Grid endpoint.
+
+## [2025-10-05] Mods Grid Restoration (Steps 1–4)
+
+- `ploy mod run` now materialises repositories via `WorkflowTicket.Repo`,
+  cloning into a temporary workspace and honouring optional workspace hints
+  before Mods stages execute.
+- Mods-specific lanes (`lanes/mods-*.toml`) feed the job composer so
+  OpenRewrite, LLM, and human stages dispatch with correct container images and
+  resources; build-gate failures trigger healing retries that append `#healN`
+  branches using knowledge base signals.
+- Documentation refreshed: `cmd/ploy/README.md`,
+  `docs/design/mods-grid-restoration/README.md`, `docs/design/mods/README.md`,
+  `docs/design/event-contracts/README.md`, and `docs/design/shift/README.md`
+  now describe repo materialisation, stage metadata, and healing behaviour.
+- Introduced `lanes/` catalog (mirrored to SHIFT) with a
+  `go run ./tools/lanesvalidate` helper and `make lanes-validate` target; CLI now
+  reads from this catalog by default.
+- Restored Mods E2E harness under `tests/e2e` so workstation runs validate
+  simple, self-healing, and parallel scenarios against the in-memory Grid stub.
+- Verification:
+  `go test ./internal/workflow/runner -run TestRunSchedulesHealingPlanAfterBuildGateFailure -count=1`,
+  `go test ./cmd/ploy -run TestHandleWorkflowRunConfiguresModsFlags -count=1`,
+  `go test -tags e2e ./tests/e2e -count=1`.
+
+## [2025-10-05] Workflow RPC Cancellation & Archive Summaries
+
+- Added `workflow cancel` to the CLI, wiring Workflow RPC cancellation through
+  the Grid SDK helper and surfacing whether the request was accepted or the run
+  had already finished.
+- Persisted Workflow RPC trust state under
+  `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid` (override via
+  `GRID_WORKFLOW_SDK_STATE_DIR`) so manifests and CA bundles survive successive
+  runs without re-bootstrap.
+- Enriched `StageOutcome` with run IDs and archive export metadata so CLI
+  summaries highlight keep-forever runs once Grid queues archive requests.
+- Updated `docs/design/workflow-rpc-alignment/README.md`,
+  `docs/design/README.md`, `docs/envs/README.md`, and `cmd/ploy/README.md` to
+  document cancellation flows, archive surfacing, and the SDK state directory.
+- Verification: `go test ./...` on 2025-10-05.
+
 ## [2025-10-07] Build Gate CLI Summary
 
 - Surfaced build gate results in `ploy workflow run` by printing static check
@@ -9,8 +64,8 @@
   conversion so Knowledge Base codes propagate into CLI summaries and downstream
   consumers.
 - Documented the milestone in `docs/design/build-gate/README.md`, the new SHIFT
-  design index, and roadmap slice `roadmap/build-gate/07-cli-summary.md`,
-  marking `roadmap/shift/21-build-gate-reboot.md` as complete.
+  design index, and roadmap slice `docs/tasks/build-gate/07-cli-summary.md`,
+  marking `docs/tasks/shift/21-build-gate-reboot.md` as complete.
 
 ## [2025-09-29] Grid Discovery Alignment
 
@@ -23,7 +78,7 @@
   checks, caching, and fallback semantics; verified via `go test ./cmd/ploy`.
 - Documented the milestone in `docs/design/discovery-alignment/README.md`,
   refreshed README guidance, and marked roadmap slices
-  `roadmap/discovery-alignment/01-cluster-info-parser.md`–`03-workflow-grid-alignment.md`
+  `docs/tasks/discovery-alignment/01-cluster-info-parser.md`–`03-workflow-grid-alignment.md`
   complete.
 
 ## [2025-09-29] Build Gate Error Prone Adapter
@@ -40,8 +95,8 @@
 - Updated documentation and roadmap artifacts:
   `docs/design/build-gate/error-prone/README.md`,
   `docs/design/build-gate/README.md`, `docs/design/README.md`,
-  `docs/design/shift/README.md`, `roadmap/build-gate/08-error-prone-adapter.md`,
-  and `roadmap/shift/21-build-gate-reboot.md` to record the adapter milestone
+  `docs/design/shift/README.md`, `docs/tasks/build-gate/08-error-prone-adapter.md`,
+  and `docs/tasks/shift/21-build-gate-reboot.md` to record the adapter milestone
   and verification.
 - Verification: `go test ./...` on 2025-09-29.
 
@@ -59,7 +114,7 @@
 - Updated documentation and roadmap artifacts:
   `docs/design/build-gate/eslint/README.md`, `docs/design/build-gate/README.md`,
   `docs/design/README.md`, `docs/design/shift/README.md`, and
-  `roadmap/build-gate/09-eslint-adapter.md` to mark the JavaScript adapter
+  `docs/tasks/build-gate/09-eslint-adapter.md` to mark the JavaScript adapter
   milestone complete.
 - Verification: `go test ./internal/workflow/buildgate -count=1`,
   `go test ./internal/workflow/runner -count=1`, and `go test ./...` on
@@ -89,7 +144,7 @@
   normalise Git authentication, Go module conflict, linker, and disk pressure
   findings for downstream remediation flows.
 - Documented the milestone across the build gate design record, roadmap slice
-  `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`, the SHIFT
+  `docs/tasks/build-gate/04-log-retrieval-and-grid-integration.md`, the SHIFT
   tracker, and the design index so roadmap status stays aligned.
 
 ## [2025-09-27] Build Gate Go Vet Adapter
@@ -113,8 +168,8 @@
   covering dependency validation and aggregated metadata to keep the package
   above the 90% coverage target.
 - Documented the runner milestone across `docs/design/build-gate/README.md`, the
-  design index, `roadmap/shift/21-build-gate-reboot.md`, and the new roadmap
-  slice `roadmap/build-gate/06-build-gate-runner.md`.
+  design index, `docs/tasks/shift/21-build-gate-reboot.md`, and the new roadmap
+  slice `docs/tasks/build-gate/06-build-gate-runner.md`.
 
 ## [2025-10-01] Workflow RPC Helper Adoption
 
@@ -154,7 +209,7 @@
 - Migrated shipped manifests (`configs/manifests/commit-app.toml`,
   `configs/manifests/smoke.toml`), refreshed `docs/MANIFESTS.md`, updated the v2
   design record, and marked roadmap slice
-  `roadmap/integration-manifests/01-schema-upgrade.md` complete.
+  `docs/tasks/integration-manifests/01-schema-upgrade.md` complete.
 
 ## [2025-09-28] Workflow JobSpec Composition
 
@@ -191,9 +246,9 @@
   scenarios.
 - Updated knowledge base catalog tests to skip permission checks when running as
   root so `go test ./...` stays portable across environments.
-- Recorded roadmap/design updates for the sandbox runner milestone
-  (`roadmap/build-gate/02-sandbox-runner.md`,
-  `docs/design/build-gate/README.md`, `roadmap/shift/21-build-gate-reboot.md`).
+- Recorded docs/tasks/design updates for the sandbox runner milestone
+  (`docs/tasks/build-gate/02-sandbox-runner.md`,
+  `docs/design/build-gate/README.md`, `docs/tasks/shift/21-build-gate-reboot.md`).
 
 ## [2025-10-05] Build Gate Static Check Registry
 
@@ -204,8 +259,8 @@
   severity evaluation, manifest disablement, and skip overrides with fake
   adapters to keep package coverage ≥90%.
 - Documented the registry in `docs/design/build-gate/README.md`, marked roadmap
-  slice `roadmap/build-gate/03-static-check-registry.md` complete, and updated
-  `roadmap/shift/21-build-gate-reboot.md` plus the design index to reflect the
+  slice `docs/tasks/build-gate/03-static-check-registry.md` complete, and updated
+  `docs/tasks/shift/21-build-gate-reboot.md` plus the design index to reflect the
   milestone.
 
 ## [2025-09-27] Build Gate Stage Planning & Metadata
@@ -217,8 +272,8 @@
   extended workflow checkpoints/contracts with `build_gate` metadata (schema
   version `2025-09-27.1`).
 - Recorded roadmap progress under
-  `roadmap/build-gate/01-stage-planning-and-metadata.md` and
-  `roadmap/shift/21-build-gate-reboot.md`, refreshing design docs and the root
+  `docs/tasks/build-gate/01-stage-planning-and-metadata.md` and
+  `docs/tasks/shift/21-build-gate-reboot.md`, refreshing design docs and the root
   README to note the milestone.
 
 ## [2025-09-27] Mods Runner Parallel Execution
@@ -229,8 +284,8 @@
 - Added concurrency-focused unit tests (including retry coverage) plus helper
   stubs so the runner package stays at ≥90% coverage even under
   `go test -cover ./...`.
-- Marked `roadmap/mods/04-runner-parallel-execution.md` and
-  `roadmap/shift/19-mods-parallel-planner.md` complete, updating
+- Marked `docs/tasks/mods/04-runner-parallel-execution.md` and
+  `docs/tasks/shift/19-mods-parallel-planner.md` complete, updating
   `docs/design/mods/README.md`, `docs/design/README.md`, and the root
   `README.md` to reflect the finished Roadmap 19 slice.
 
@@ -245,7 +300,7 @@
 - Documented the evaluation workflow across
   `docs/design/knowledge-base/README.md`, `cmd/ploy/README.md`,
   `configs/knowledge-base/README.md`, and marked roadmap task
-  `roadmap/knowledge-base/03-cli-evaluate.md` complete.
+  `docs/tasks/knowledge-base/03-cli-evaluate.md` complete.
 
 ## [2025-09-27] Knowledge Base CLI Ingest
 
@@ -257,7 +312,7 @@
   coverage at 90.3%.
 - Documented the workstation catalog workflow across `README.md`,
   `docs/DOCS.md`, `configs/knowledge-base/README.md`, and marked roadmap task
-  `roadmap/knowledge-base/02-cli-ingest.md` complete.
+  `docs/tasks/knowledge-base/02-cli-ingest.md` complete.
 
 ## [2025-09-27] Knowledge Base Classifier Foundation
 
@@ -270,7 +325,7 @@
 - Added high-coverage unit tests for the classifier, planner integration, and
   scoring utilities, ensuring `internal/workflow/knowledgebase` stays above the
   90% coverage target while `go test -cover ./...` remains ≥60% overall.
-- Updated roadmap entry `roadmap/knowledge-base/01-classifier-foundation.md` and
+- Updated roadmap entry `docs/tasks/knowledge-base/01-classifier-foundation.md` and
   design docs to reflect the completed Roadmap 20 classifier slice.
 
 ## [2025-09-26] Mods Planner CLI Controls
@@ -282,7 +337,7 @@
   publish concurrency hints in checkpoints/artifact envelopes, and include the
   hints when dispatching stages to the Grid client.
 - Documented the flags across CLI docs, marked
-  `roadmap/mods/03-cli-grid-wiring.md` complete, and refreshed the Mods design
+  `docs/tasks/mods/03-cli-grid-wiring.md` complete, and refreshed the Mods design
   record to note the CLI/Grid wiring milestone.
 
 ## [2025-09-26] Mods Knowledge Base Metadata
@@ -293,7 +348,7 @@
 - Updated workflow contracts and the runner to serialize Mods
   plan/human/recommendation metadata in checkpoints and artifact envelopes,
   exercising the new schema in unit tests.
-- Recorded completion of `roadmap/mods/02-knowledge-base-feedback.md` and
+- Recorded completion of `docs/tasks/mods/02-knowledge-base-feedback.md` and
   refreshed `docs/design/mods/README.md` / `docs/design/README.md` to capture
   the knowledge base feedback milestone (Roadmap 19).
 
@@ -305,7 +360,7 @@
 - Updated the default workflow planner to delegate Mods staging, propagate new
   stage kinds, and adjust unit tests/checkpoint expectations across the runner
   suite.
-- Recorded completion of `roadmap/mods/01-planner-skeleton.md` and refreshed
+- Recorded completion of `docs/tasks/mods/01-planner-skeleton.md` and refreshed
   `docs/design/mods/README.md` to capture the planner skeleton milestone.
 
 ## [2025-09-26] Stage Artifact Streams

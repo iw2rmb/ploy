@@ -33,7 +33,8 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       stubs for offline work (Roadmap 01).
 - [x] Workflow runner CLI — reconstructs DAGs, streams checkpoints, and exits
       cleanly after dispatching jobs (Roadmap 02).
-- [x] Lane engine — deterministic lane specs under `configs/lanes/*.toml` with
+- [x] Lane engine — deterministic lane specs under `lanes/*.toml` (mirrored into
+      SHIFT) with
       `ploy lanes describe` previews (Roadmap 03).
 - [x] Snapshot toolkit — `ploy snapshot plan` / `ploy snapshot capture` with
       strip/mask/synthetic rules baked in (Roadmap 04).
@@ -137,7 +138,7 @@ Full design records live in `docs/design/README.md`.
      --manifest smoke --aster plan,exec
    ```
 
-   The command parses `configs/lanes/go-native.toml`, previews the composed
+   The command parses `lanes/go-native.toml`, previews the composed
    cache key, and lists the build/test commands bound to that lane.
 
 3. **Run the workflow CLI**
@@ -205,7 +206,7 @@ Full design records live in `docs/design/README.md`.
 
 ## Feature Roadmap
 
-Per-feature write-ups live under `roadmap/shift/` (directory name retained for
+Per-feature write-ups live under `docs/tasks/shift/` (directory name retained for
 historical context). Status checkboxes in this README mirror those roadmap
 entries, and deeper design context is collected in `docs/design/README.md`.
 

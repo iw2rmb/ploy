@@ -22,11 +22,23 @@ single contract.
 - Refresh CLI and documentation to reference the RPC endpoints
   (`/v1/workflows/rpc/runs*`) instead of the legacy stage API.
 
-## Current Status (2025-10-01)
+## Current Status
 
-- SDK + helper adoption complete: `internal/workflow/grid.Client` now submits
-  `workflowsdk.SubmitRequest` payloads via the official Grid helper and streams
-  run state with `helper.StreamStatusWithRetry` while workstation tests inject
+### 2025-10-05
+
+- Workflow cancellation flows end-to-end via the SDK `Cancel` call, the CLI
+  exposes `workflow cancel`, and `StageOutcome` now records run IDs plus
+  keep-forever archive metadata for CLI summaries.
+- The Workflow RPC SDK state directory defaults to
+  `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`, with
+  `GRID_WORKFLOW_SDK_STATE_DIR` still honoured for overrides, ensuring manifest
+  and CA caches persist across CLI runs.
+
+### 2025-10-01
+
+- SDK + helper adoption complete: `internal/workflow/grid.Client` submits
+  `workflowsdk.SubmitRequest` payloads via the official helper and streams run
+  state with `helper.StreamStatusWithRetry` while workstation tests inject
   fakes.
 - JobSpec composition is wired end-to-end: lane definitions declare job
   defaults, the runner composes `workflowsdk.JobSpec` payloads via the injected
@@ -39,14 +51,8 @@ single contract.
   `internal/workflow/contracts.SubjectsForTenant` now derives
   `webhook.<tenant>.ploy.workflow-ticket` inboxes and `jobs.<run_id>.events`
   streams, with contract tests covering trimmed inputs and empty identifiers.
-- Helper adoption completed: the Grid client now constructs helper-backed
+- Helper adoption completed: the Grid client constructs helper-backed
   submitters that inject bearer auth and retry transient Workflow RPC failures.
-- **2025-10-05** — Workflow cancellation and archive surfacing landed: the Grid
-  client wires `Cancel` through the SDK, `StageOutcome` captures run IDs plus
-  keep-forever archive metadata, summaries print the resulting export IDs, and
-  the CLI exposes `workflow cancel`. The SDK state directory now defaults to
-  `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid` so manifest/CA caches survive
-  restarts while still respecting `GRID_WORKFLOW_SDK_STATE_DIR` when provided.
 
 ## Background
 
@@ -63,47 +69,49 @@ requires:
   (`webhook.<tenant>.<source>.<event>`, `jobs.<run_id>.events`) across tickets,
   checkpoints, and log retrieval.
 
-## Behaviour & Architecture
+## Client Integration
 
-1. **Client Abstraction**
-   - `internal/workflow/grid.Client` composes the official SDK client, builds
-     submit payloads with helper builders, and streams run status until a
-     terminal event (with metadata fallback on reconnect).
-   - The client now issues cancellations via the SDK and records archive export
-     metadata from terminal runs so downstream summaries can surface
-     keep-forever exports alongside stage results.
-   - Lane/manifest metadata is injected into `JobSpec.Metadata` (lane, cache
-     key, manifest, priority) so Grid scoring remains deterministic.
-   - In-memory workflow clients remain for tests; helper-backed clients are
-     selected when `GRID_ENDPOINT` is set. When connected, Ploy ensures the
-     Workflow SDK state dir exists (defaulting under `~/.config/ploy/grid`) so
-     manifest and CA caches persist between invocations.
+- `internal/workflow/grid.Client` composes the official SDK client, builds
+  submit payloads with helper builders, and streams run status until a terminal
+  event (with metadata fallback on reconnect).
+- Cancellation flows reuse the SDK helper, and terminal metadata now feeds
+  archive export details (ID, class, queued timestamp) back into the CLI.
+- In-memory workflow clients remain for tests; helper-backed clients are
+  selected when `GRID_ENDPOINT` is set. When connected, Ploy ensures the
+  Workflow SDK state dir exists (defaulting under `~/.config/ploy/grid`) so
+  manifest and CA caches persist between invocations.
 
-2. **Job Payload Construction**
-   - Lane definitions (`configs/lanes/*.toml`) retain optional `image`,
-     `command`, `env`, and resource hints.
-   - Runner assembles `JobSpec` using lane defaults plus manifest/Aster
-     overrides and records textual resource hints in metadata so Grid can score
-     workloads even when numeric limits are unspecified.
-   - Cache keys continue to publish via checkpoints for downstream cache
-     coordination.
+## Runner Data Composition
 
-3. **Event & Subject Alignment**
-   - `internal/workflow/contracts` exposes constants for webhook inbox
-     (`webhook.<tenant>.ploy.workflow-ticket`) and status stream
-     (`jobs.<run_id>.events`).
-   - Runner consumes status events via the RPC stream (`jobs.<run_id>.events`)
-     instead of polling legacy `grid.status.<ticket>`.
-   - Build-gate log retrieval uses the new event subjects to locate artifacts
-     via job CIDs.
+- Lane definitions (`lanes/*.toml`) retain optional `image`, `command`,
+  `env`, and resource hints.
+- The runner assembles `workflowsdk.JobSpec` using lane defaults plus
+  manifest/Aster overrides and records textual resource hints in metadata so
+  Grid can score workloads even when numeric limits are unspecified.
+- Cache keys continue to publish via checkpoints for downstream cache
+  coordination.
 
-4. **CLI & Docs**
-   - CLI help references Workflow RPC endpoints, helper configuration flows, and
-     credential expectations.
-   - The workflow runner selects helper-backed clients when `GRID_ENDPOINT` is
-     configured, attaching bearer tokens and retry policy via the helper.
-   - Design index and roadmap entries stay in sync with the milestone status and
-     link to Grid helper documentation for downstream adopters.
+## Events & Subject Alignment
+
+- `internal/workflow/contracts` exposes constants for webhook inbox
+  (`webhook.<tenant>.ploy.workflow-ticket`) and status stream
+  (`jobs.<run_id>.events`).
+- Runner consumes status events via the RPC stream (`jobs.<run_id>.events`)
+  instead of polling legacy `grid.status.<ticket>`.
+- Build-gate log retrieval uses the new event subjects to locate artifacts via
+  job CIDs, and archive exports now surface alongside stage summaries.
+
+## CLI Surface
+
+- `workflow run` claims tickets, streams Workflow RPC status, and prints stage
+  summaries enriched with archive export identifiers when Grid queues
+  keep-forever runs.
+- `workflow cancel` requires `GRID_ENDPOINT`, calls the Workflow RPC cancel
+  endpoint, records the run status, and surfaces whether the cancellation was
+  new or the run was already terminal.
+- CLI help references Workflow RPC endpoints, helper configuration flows, and
+  credential expectations; documentation and roadmap entries link back to this
+  design so downstream consumers stay in sync.
 
 ## Job Spec Schema (2025-10-01)
 
@@ -183,7 +191,7 @@ so Grid scoring and diagnostics stay informative.
 - Grid Workflow RPC design (`../grid/docs/design/workflow-rpc/README.md`).
 - Grid Workflow RPC SDK implementation (`../grid/sdk/workflowrpc/go/client.go`).
 - Grid Workflow RPC helper roadmap
-  (`../grid/roadmap/workflow-rpc/04-sdk-helper-layer.md`).
+  (`../grid/docs/tasks/workflow-rpc/04-sdk-helper-layer.md`).
 - Grid Workflow RPC helper usage guide (`../grid/sdk/workflowrpc/README.md`).
 
 ## Verification
@@ -218,10 +226,10 @@ so Grid scoring and diagnostics stay informative.
 
 ## Roadmap Tasks
 
-- [x] `roadmap/workflow-rpc-alignment/01-grid-sdk-client.md`
-- [x] `roadmap/workflow-rpc-alignment/02-runner-job-spec.md`
-- [x] `roadmap/workflow-rpc-alignment/03-subject-alignment.md`
-- [x] `roadmap/workflow-rpc-alignment/04-helper-adoption.md`
+- [x] `docs/tasks/workflow-rpc-alignment/01-grid-sdk-client.md`
+- [x] `docs/tasks/workflow-rpc-alignment/02-runner-job-spec.md`
+- [x] `docs/tasks/workflow-rpc-alignment/03-subject-alignment.md`
+- [x] `docs/tasks/workflow-rpc-alignment/04-helper-adoption.md`
 
 ## Completion Criteria
 

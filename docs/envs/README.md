@@ -24,6 +24,17 @@ additional configuration.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
 
+## E2E Harness
+
+- `PLOY_E2E_TENANT` — Tenant slug consumed by the Mods E2E harness when running
+  `ploy workflow run` against Grid.
+- `PLOY_E2E_TICKET_PREFIX` — Optional ticket ID prefix for Mods E2E runs
+  (default `e2e`).
+- `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
+  E2E scenarios in place of the default Java sample repo.
+- `PLOY_E2E_GITLAB_TOKEN` — Optional GitLab PAT so the E2E harness can clean up
+  branches after creating merge requests.
+
 ## Grid (service)
 
 - No environment variables are managed inside this repository slice; Grid

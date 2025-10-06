@@ -29,7 +29,13 @@ live JetStream wiring.
   {
     "schema_version": "2025-09-26.1",
     "ticket_id": "ticket-123",
-    "tenant": "acme"
+    "tenant": "acme",
+    "repo": {
+      "url": "https://gitlab.com/acme/repo.git",
+      "base_ref": "main",
+      "target_ref": "mods/workflow-123",
+      "workspace_hint": "mods/java"
+    }
   }
   ```
 
@@ -40,15 +46,32 @@ live JetStream wiring.
   {
     "schema_version": "2025-09-26.1",
     "ticket_id": "ticket-123",
-    "stage": "mods",
+    "stage": "mods-plan#heal1",
     "status": "running",
     "cache_key": "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
     "stage_metadata": {
-      "name": "mods",
-      "kind": "mods",
-      "lane": "node-wasm",
+      "name": "mods-plan#heal1",
+      "kind": "mods-plan",
+      "lane": "mods-plan",
       "manifest": { "name": "smoke", "version": "2025-09-26" },
       "dependencies": [],
+      "mods": {
+        "plan": {
+          "selected_recipes": ["org.openrewrite.java.UpgradeJavaVersion"],
+          "parallel_stages": ["orw-apply", "orw-gen"],
+          "human_gate": true,
+          "summary": "Retry OpenRewrite with KB suggestions",
+          "plan_timeout": "2m30s",
+          "max_parallel": 2
+        },
+        "recommendations": [
+          { "source": "knowledge-base", "message": "Apply rewrite recipe for JDK17", "confidence": 0.82 }
+        ],
+        "human": {
+          "required": true,
+          "playbooks": ["playbooks/mods/manual-check.md"]
+        }
+      },
       "aster": {
         "enabled": true,
         "toggles": ["plan"],
@@ -81,13 +104,26 @@ live JetStream wiring.
   {
     "schema_version": "2025-09-26.1",
     "ticket_id": "ticket-123",
-    "stage": "mods",
+    "stage": "mods-plan#heal1",
     "cache_key": "node-wasm/node-wasm@manifest=2025-09-26@aster=plan",
     "stage_metadata": {
-      "name": "mods",
-      "kind": "mods",
-      "lane": "node-wasm",
+      "name": "mods-plan#heal1",
+      "kind": "mods-plan",
+      "lane": "mods-plan",
       "manifest": { "name": "smoke", "version": "2025-09-26" },
+      "mods": {
+        "plan": {
+          "selected_recipes": ["org.openrewrite.java.UpgradeJavaVersion"],
+          "parallel_stages": ["orw-apply", "orw-gen"],
+          "human_gate": true,
+          "summary": "Retry OpenRewrite with KB suggestions",
+          "plan_timeout": "2m30s",
+          "max_parallel": 2
+        },
+        "recommendations": [
+          { "source": "knowledge-base", "message": "Apply rewrite recipe for JDK17", "confidence": 0.82 }
+        ]
+      },
       "aster": { "enabled": true, "toggles": ["plan"] }
     },
     "artifact": {
@@ -98,6 +134,10 @@ live JetStream wiring.
     }
   }
   ```
+
+`stage_metadata.mods` mirrors planner output for both initial and healing
+branches, while the `#healN` suffix on stage names lets consumers correlate
+follow-up attempts with their parent build gate failures.
 
 The constants live in `internal/workflow/contracts` (`SchemaVersion` et al.),
 ensuring the CLI and future Grid integrations consume identical versions.

@@ -13,6 +13,7 @@ import (
 func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 	t.Setenv("PLOY_ASTER_ENABLE", "1")
 	t.Setenv("GRID_ENDPOINT", "")
+	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory

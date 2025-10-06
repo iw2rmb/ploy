@@ -13,6 +13,7 @@ type InMemoryBus struct {
 	Artifacts      []WorkflowArtifact
 	tickets        []string
 	Manifest       ManifestReference
+	Repo           RepoMaterialization
 }
 
 func NewInMemoryBus(tenant string) *InMemoryBus {
@@ -44,6 +45,7 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 		TicketID:      trimmed,
 		Tenant:        b.Tenant,
 		Manifest:      manifest,
+		Repo:          b.Repo,
 	}, nil
 }
 

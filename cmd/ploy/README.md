@@ -15,6 +15,11 @@ ploy workflow run --tenant <tenant> \
   [--ticket <ticket-id>|--ticket auto] [--mods-plan-timeout <duration>] \
   [--mods-max-parallel <n>] [--aster <toggle,...>] \
   [--aster-step <stage=toggle,...|stage=off>]
+ploy mod run --tenant <tenant> \
+  [--ticket <ticket-id>|--ticket auto] \
+  [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
+   --repo-workspace-hint <dir>] \
+  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> \
   --ticket <ticket-id>
@@ -24,7 +29,7 @@ ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
 ```
 
-`lanes describe` inspects TOML lane specs under `configs/lanes/`, displays the
+`lanes describe` inspects TOML lane specs under `lanes/`, displays the
 runtime family, build/test commands, surfaced job defaults (image, command, env,
 resources), and shows a deterministic cache-key preview that incorporates
 commit/snapshot/manifest/Aster toggles. Aster inputs are only included when
@@ -32,21 +37,29 @@ commit/snapshot/manifest/Aster toggles. Aster inputs are only included when
 behind a feature flag. The preview mirrors what the workflow runner supplies to
 Grid when dispatching stages.
 
-`workflow run` claims a ticket (auto-generating one if `--ticket auto`),
+`mod run` claims a ticket (auto-generating one if `--ticket auto`),
+materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
-publishes checkpoints for every stage transition (now including lane cache
-keys), executes mods/build/test against a temporary workspace, and cleans up
-before exit. When `GRID_ENDPOINT` targets a Grid cluster running v2025.11.0 or
-newer the CLI queries `/v1/cluster/info` to discover the API endpoint, JetStream
+publishes checkpoints for every stage transition (including lane cache keys),
+executes mods/build/test against a temporary workspace, and cleans up before
+exit. When `GRID_ENDPOINT` targets a Grid cluster running v2025.11.0 or newer
+the CLI queries `/v1/cluster/info` to discover the API endpoint, JetStream
 route list, IPFS gateway, feature map, and Grid version before connecting;
 Grid-less runs fall back to the in-memory stubs. Mods planner hints
 (`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid
-can respect concurrency/timebox controls. When `GRID_ENDPOINT` is omitted the
-in-memory Grid stub remains active and still refuses stages whose lanes are not
-declared in the manifest. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster
-bundle provenance after a successful run so developers can confirm which
+can respect concurrency/timebox controls. When build-gate fails with a
+retryable outcome the runner collects the failure metadata, re-plans a healing
+branch using the Mods planner, and appends `#healN` stages before continuing to
+static checks and tests. When `GRID_ENDPOINT` is omitted the in-memory Grid stub
+remains active and still refuses stages whose lanes are not declared in the
+manifest. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle
+provenance after a successful run so developers can confirm which
 toggles/bundles were attached to each stage. Explicit ticket IDs remain a
 stub-only workflow until Grid integration lands.
+
+`workflow run` remains available for generic workflow execution; it mirrors the
+Mods defaults but omits repo materialisation unless the new `--repo-*` flags are
+provided.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
 requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance; in-memory
@@ -80,7 +93,7 @@ classifier drift without leaving the workstation.
 
 ## Flags
 
-- `--lane` — Lane identifier defined under `configs/lanes/*.toml` (required for
+- `--lane` — Lane identifier defined under `lanes/*.toml`.
   `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
@@ -105,10 +118,16 @@ classifier drift without leaving the workstation.
   workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional
   toggles or `stage=off` to disable Aster for that stage. Overrides are ignored
   unless `PLOY_ASTER_ENABLE` is set.
+- `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
+  — Repository materialisation inputs consumed by `mod run` (also available to
+  `workflow run`). When `--repo-url` is provided, `--repo-target-ref` is
+  required; `--repo-base-ref` defaults to the repository's default branch. The
+  workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods
+  stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner so Grid can
-  timebox plan evaluation (`workflow run`).
+  timebox plan evaluation (`mod run` / `workflow run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
-  planner (`workflow run`).
+  planner (`mod run` / `workflow run`).
 
 ## Exit Codes
 

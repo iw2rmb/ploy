@@ -25,6 +25,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
+	lanescatalog "github.com/iw2rmb/ploy/lanes"
 )
 
 type runnerInvoker interface {
@@ -67,6 +68,8 @@ type environmentFactoryFunc func(l laneRegistry, s snapshotRegistry) (environmen
 
 type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 
+type workspacePreparerFactoryFunc func() (runner.WorkspacePreparer, error)
+
 type laneCacheComposer struct {
 	lanes laneRegistry
 }
@@ -91,9 +94,10 @@ func (c laneCacheComposer) Compose(ctx context.Context, req runner.CacheComposeR
 }
 
 var (
-	runnerExecutor runnerInvoker     = runnerInvokerFunc(runner.Run)
-	eventsFactory  eventsFactoryFunc = defaultEventsFactory
-	gridFactory    gridFactoryFunc   = defaultGridFactory
+	runnerExecutor           runnerInvoker                = runnerInvokerFunc(runner.Run)
+	eventsFactory            eventsFactoryFunc            = defaultEventsFactory
+	gridFactory              gridFactoryFunc              = defaultGridFactory
+	workspacePreparerFactory workspacePreparerFactoryFunc = defaultWorkspacePreparerFactory
 
 	newJetStreamClient = contracts.NewJetStreamClient
 )
@@ -172,11 +176,89 @@ func defaultGridFactory() (runner.GridClient, error) {
 	return client, nil
 }
 
-var (
-	laneRegistryLoader laneRegistryLoaderFunc = func(dir string) (laneRegistry, error) {
-		return lanes.LoadDirectory(dir)
+func resolveLaneDirectories(dir string) []string {
+	trimmed := strings.TrimSpace(dir)
+	if trimmed == "" || strings.EqualFold(trimmed, "auto") {
+		return []string{"lanes"}
 	}
-	laneConfigDir = "configs/lanes"
+	return []string{trimmed}
+}
+
+func loadEmbeddedLaneRegistry() (laneRegistry, error) {
+	embeddedLaneOnce.Do(func() {
+		tempDir, err := os.MkdirTemp("", "ploy-lanes-")
+		if err != nil {
+			embeddedLaneErr = err
+			return
+		}
+		if err := copyEmbeddedLaneCatalog(tempDir); err != nil {
+			embeddedLaneErr = err
+			return
+		}
+		embeddedLaneRegistry, embeddedLaneErr = lanes.LoadDirectory(tempDir)
+	})
+	return embeddedLaneRegistry, embeddedLaneErr
+}
+
+func copyEmbeddedLaneCatalog(dest string) error {
+	return fs.WalkDir(lanescatalog.Catalog, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".toml") {
+			return nil
+		}
+		data, err := lanescatalog.Catalog.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dest, filepath.Base(path))
+		return os.WriteFile(target, data, 0o644)
+	})
+}
+
+var (
+	embeddedLaneOnce     sync.Once
+	embeddedLaneRegistry laneRegistry
+	embeddedLaneErr      error
+
+	laneRegistryLoader laneRegistryLoaderFunc = func(dir string) (laneRegistry, error) {
+		trimmed := strings.TrimSpace(dir)
+		defaultSearch := trimmed == "" || strings.EqualFold(trimmed, "auto")
+		candidates := resolveLaneDirectories(dir)
+		var firstErr error
+		for _, candidate := range candidates {
+			registry, err := lanes.LoadDirectory(candidate)
+			if err == nil {
+				return registry, nil
+			}
+			if errors.Is(err, os.ErrNotExist) || errors.Is(err, fs.ErrNotExist) {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			return nil, err
+		}
+		if defaultSearch {
+			registry, err := loadEmbeddedLaneRegistry()
+			if err == nil {
+				return registry, nil
+			}
+			if firstErr != nil {
+				return nil, fmt.Errorf("load lanes from disk: %v; embedded catalog error: %w", firstErr, err)
+			}
+			return nil, err
+		}
+		if firstErr != nil {
+			return nil, firstErr
+		}
+		return nil, fmt.Errorf("no lane directories found (searched %v)", candidates)
+	}
+	laneConfigDir = ""
 
 	snapshotRegistryLoader snapshotRegistryLoaderFunc = func(dir string) (snapshotRegistry, error) {
 		opts := snapshots.LoadOptions{}

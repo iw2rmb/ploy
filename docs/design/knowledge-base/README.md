@@ -2,13 +2,13 @@
 
 ## Status
 
-- [x] [roadmap/knowledge-base/01-classifier-foundation.md](../../roadmap/knowledge-base/01-classifier-foundation.md)
+- [x] [docs/tasks/knowledge-base/01-classifier-foundation.md](../../docs/tasks/knowledge-base/01-classifier-foundation.md)
       — Knowledge base classifier foundation delivered 2025-09-27 with Mods
       planner wiring.
-- [x] [roadmap/knowledge-base/02-cli-ingest.md](../../roadmap/knowledge-base/02-cli-ingest.md)
+- [x] [docs/tasks/knowledge-base/02-cli-ingest.md](../../docs/tasks/knowledge-base/02-cli-ingest.md)
       — CLI ingest workflow shipped 2025-09-27 with catalog merge + CLI
       coverage.
-- [x] [roadmap/knowledge-base/03-cli-evaluate.md](../../roadmap/knowledge-base/03-cli-evaluate.md)
+- [x] [docs/tasks/knowledge-base/03-cli-evaluate.md](../../docs/tasks/knowledge-base/03-cli-evaluate.md)
       — CLI evaluation command shipped 2025-09-27 with advisor match helpers and
       accuracy reporting.
 

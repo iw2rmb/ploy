@@ -78,7 +78,7 @@ addendum:
 - Root README describes the CLI-first model; update it whenever behaviour
   changes.
 - Roadmap updates must mark the relevant checklist item
-  (`roadmap/shift/<nn>-*.md`).
+  (`docs/tasks/shift/<nn>-*.md`).
 - When recording new behaviour in `CHANGELOG.md`, include the roadmap slice
   reference and a concrete YYYY-MM-DD date.
 
@@ -92,7 +92,7 @@ addendum:
 1. RED: add failing unit tests capturing the target behaviour.
 2. GREEN: implement the minimal code to satisfy tests.
 3. go test -cover ./...
-4. Update documentation, the design index, and the relevant roadmap entry.
+4. Update documentation, the design index, and the relevant task entry under `docs/tasks/`.
 5. (Once Grid integration lands) perform REFACTOR verification against the Dev
    API.
 6. Commit with a clear message and ensure branch is ready for PR.

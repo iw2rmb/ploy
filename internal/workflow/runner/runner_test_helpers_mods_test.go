@@ -48,4 +48,17 @@ func setRunnerModsOptions(t *testing.T, opts *runner.Options, planTimeout time.D
 		t.Fatalf("runner.ModsOptions MaxParallel has unexpected kind: %s", maxParallelField.Kind())
 	}
 	maxParallelField.SetInt(int64(maxParallel))
+
+	for field, value := range map[string]string{
+		"PlanLane":        "mods-plan",
+		"OpenRewriteLane": "mods-java",
+		"LLMPlanLane":     "mods-llm",
+		"LLMExecLane":     "mods-llm",
+		"HumanLane":       "mods-human",
+	} {
+		laneField := modsField.FieldByName(field)
+		if laneField.IsValid() && laneField.CanSet() && laneField.Kind() == reflect.String {
+			laneField.SetString(value)
+		}
+	}
 }
