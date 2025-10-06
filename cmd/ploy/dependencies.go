@@ -246,7 +246,7 @@ var (
 
 		candidates := resolveLaneDirectories("")
 		if len(candidates) == 0 {
-			return nil, fmt.Errorf("lane catalog path not configured; set %s or run ploy grid connect", lanesCatalogEnv)
+			return nil, fmt.Errorf("lane catalog path not configured; set %s or configure GRID_* environment variables", lanesCatalogEnv)
 		}
 
 		var missing []string
@@ -262,7 +262,7 @@ var (
 			return nil, err
 		}
 
-		return nil, fmt.Errorf("no lane definitions found (searched %v); set %s or run ploy grid connect", missing, lanesCatalogEnv)
+		return nil, fmt.Errorf("no lane definitions found (searched %v); set %s or configure GRID_* environment variables", missing, lanesCatalogEnv)
 	}
 	laneConfigDir = ""
 

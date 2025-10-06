@@ -1,6 +1,6 @@
 # shift-mods-grid-05 — Mods Lane Consolidation (REFRACTOR)
 
-- **Status**: [x] Planned · [ ] In Progress · [ ] Done
+- **Status**: [ ] Planned · [x] In Progress · [ ] Done
 - **Design**: [../design/mods-grid-restoration/README.md](../../design/mods-grid-restoration/README.md)
 - **Blocked by**: `shift-mods-grid-04`
 - **Unblocks**: SHIFT lane migration design (TBD)
@@ -23,6 +23,10 @@
 
 ## Notes
 
-- Replace `tests/e2e/mods_scenarios_test.go`'s in-memory Grid harness with real
-  Grid smoke once SHIFT lanes publish.
-- Placeholder for follow-up; flesh out scope after GREEN delivery.
+- Verified SHIFT lane catalog via `PLOY_LANES_DIR=$PLOY_LANES_DIR go run
+  ./cmd/ploy lanes describe --lane mods-plan --manifest 2025-09-26`.
+- `tests/e2e/mods_scenarios_test.go` now builds the CLI and, when `GRID_ENDPOINT`
+  and `PLOY_LANES_DIR` are configured, runs `ploy mod run` against Grid via
+  `TestModsScenariosLiveGrid`; additional scenarios can be enabled through
+  `PLOY_E2E_LIVE_SCENARIOS`.
+- Placeholder for additional follow-up once SHIFT lane publication completes.
