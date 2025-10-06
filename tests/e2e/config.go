@@ -57,3 +57,16 @@ func (c Config) TicketID(scenarioID string) string {
 	}
 	return fmt.Sprintf("%s-%s", prefix, trimmed)
 }
+
+// TargetRef returns a unique git branch name for the provided scenario.
+func (c Config) TargetRef(scenarioID string) string {
+	trimmed := strings.TrimSpace(scenarioID)
+	if trimmed == "" {
+		trimmed = "scenario"
+	}
+	prefix := strings.TrimSpace(c.TicketPrefix)
+	if prefix == "" {
+		prefix = "e2e"
+	}
+	return fmt.Sprintf("%s-%s", prefix, trimmed)
+}

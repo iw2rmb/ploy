@@ -17,6 +17,10 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Planner metadata reflects parallel healing; SHIFT follow-up covers real Grid
   reconciliation.
+- `TestModsScenariosLiveGrid` — When `GRID_ENDPOINT`,
+  `GRID_API_KEY`, and `PLOY_LANES_DIR` are configured, runs the same scenario
+  against the live Grid Workflow RPC by shelling out to `ploy mod run`.
+  Additional scenarios can be toggled via `PLOY_E2E_LIVE_SCENARIOS`.
 
 Each scenario is defined in code (`scenarios.go`) with links back to the legacy
 GitLab fixtures. The workstation harness now runs green against the in-memory
@@ -34,6 +38,8 @@ Set the following variables before invoking the suite:
 - `PLOY_E2E_TICKET_PREFIX` — Optional prefix for ad-hoc ticket IDs (default `e2e`)
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repo URL override for scenarios
 - `PLOY_E2E_GITLAB_TOKEN` — Optional PAT for GitLab cleanup (branch deletion)
+- `PLOY_E2E_LIVE_SCENARIOS` — Comma-separated scenario IDs to execute against
+  live Grid (defaults to `simple-openrewrite`).
 
 When any mandatory variable is missing, the tests skip with a helpful message.
 

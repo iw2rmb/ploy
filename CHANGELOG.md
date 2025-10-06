@@ -12,6 +12,10 @@
 - Added optional `GRID_API_KEY`/`GRID_ID` handling alongside the existing
   `GRID_ENDPOINT`, wiring bearer tokens into the Grid helper and discovery calls
   while updating tests and env listings.
+- Extended Mods live Grid smoke to accept `PLOY_E2E_LIVE_SCENARIOS`, allowing
+  `TestModsScenariosLiveGrid` to run multiple scenarios via `go test -tags e2e
+  ./tests/e2e`; documented the knob in `docs/envs/README.md` and the refactor
+  task notes after verifying `ploy lanes describe` against the SHIFT catalog.
 
 ## [2025-10-07] Mods Catalog Alignment
 

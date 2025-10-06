@@ -42,6 +42,8 @@ additional configuration.
   E2E scenarios in place of the default Java sample repo.
 - `PLOY_E2E_GITLAB_TOKEN` — Optional GitLab PAT so the E2E harness can clean up
   branches after creating merge requests.
+- `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
+  live Grid smoke test should execute (defaults to `simple-openrewrite`).
 
 ## Grid (service)
 
