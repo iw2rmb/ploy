@@ -11,6 +11,8 @@ import (
 // Config captures runtime knobs required to execute the Grid-based Mods E2E scenarios.
 type Config struct {
 	GridEndpoint string
+	GridAPIKey   string
+	GridID       string
 	Tenant       string
 	TicketPrefix string
 	RepoOverride string
@@ -22,6 +24,8 @@ type Config struct {
 func LoadConfig() Config {
 	cfg := Config{
 		GridEndpoint: strings.TrimSpace(os.Getenv("GRID_ENDPOINT")),
+		GridAPIKey:   strings.TrimSpace(os.Getenv("GRID_API_KEY")),
+		GridID:       strings.TrimSpace(os.Getenv("GRID_ID")),
 		Tenant:       strings.TrimSpace(os.Getenv("PLOY_E2E_TENANT")),
 		TicketPrefix: strings.TrimSpace(os.Getenv("PLOY_E2E_TICKET_PREFIX")),
 		RepoOverride: strings.TrimSpace(os.Getenv("PLOY_E2E_REPO_OVERRIDE")),

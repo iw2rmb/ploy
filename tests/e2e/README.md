@@ -27,6 +27,9 @@ Grid stub, while remaining integration gaps for SHIFT are tracked per scenario.
 Set the following variables before invoking the suite:
 
 - `GRID_ENDPOINT` — Grid Workflow RPC endpoint (e.g. `https://grid.dev`)
+- `GRID_API_KEY` — Optional bearer token forwarded to discovery/RPC calls.
+- `GRID_ID` — Optional identifier for multi-grid setups (used for cache
+  scoping only).
 - `PLOY_E2E_TENANT` — Tenant slug to claim tickets under
 - `PLOY_E2E_TICKET_PREFIX` — Optional prefix for ad-hoc ticket IDs (default `e2e`)
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repo URL override for scenarios
