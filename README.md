@@ -33,8 +33,9 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       stubs for offline work (Roadmap 01).
 - [x] Workflow runner CLI — reconstructs DAGs, streams checkpoints, and exits
       cleanly after dispatching jobs (Roadmap 02).
-- [x] Lane engine — deterministic lane specs under `lanes/*.toml` (mirrored into
-      SHIFT) with
+- [x] Lane engine — deterministic lane specs published via the
+      [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+      repository (mirrored into SHIFT) with
       `ploy lanes describe` previews (Roadmap 03).
 - [x] Snapshot toolkit — `ploy snapshot plan` / `ploy snapshot capture` with
       strip/mask/synthetic rules baked in (Roadmap 04).
@@ -131,20 +132,33 @@ Full design records live in `docs/design/README.md`.
    make build
    ```
 
-2. **Inspect lane metadata**
+2. **Clone the lane catalog (one-time)**
+
+   ```bash
+   cd ..
+   git clone https://github.com/iw2rmb/ploy-lanes-catalog
+   cd ploy
+   ```
+
+   Set `PLOY_LANES_DIR` to the checkout location (or place the checkout adjacent
+   to the repo as shown) so the CLI can resolve lane definitions.
+
+3. **Inspect lane metadata**
 
    ```bash
    ./dist/ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db \
      --manifest smoke --aster plan,exec
    ```
 
-   The command parses `lanes/go-native.toml`, previews the composed
-   cache key, and lists the build/test commands bound to that lane.
+   The command loads `go-native.toml` from the configured catalogue, previews the
+   composed cache key, and lists the build/test commands bound to that lane.
 
-3. **Run the workflow CLI**
+4. **Run the workflow CLI**
 
    ```bash
    GRID_ENDPOINT=https://grid-dev.example \
+     GRID_API_KEY=ghp_example \
+     GRID_ID=dev-grid \
      ./dist/ploy workflow run --tenant acme --ticket auto
    ```
 
@@ -153,7 +167,7 @@ Full design records live in `docs/design/README.md`.
    connecting. Omitting `GRID_ENDPOINT` keeps the CLI on the in-memory Grid and
    JetStream stubs.
 
-4. **Preview snapshot rules**
+5. **Preview snapshot rules**
 
    ```bash
    ./dist/ploy snapshot plan --snapshot dev-db
@@ -163,7 +177,7 @@ Full design records live in `docs/design/README.md`.
    strip/mask/synthetic rules, and highlights which tables/columns are affected
    before a capture runs.
 
-5. **Capture a snapshot (stub)**
+6. **Capture a snapshot (stub)**
 
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme \
@@ -175,7 +189,7 @@ Full design records live in `docs/design/README.md`.
    discovery (or the in-memory stub when discovery omits one), and publishes
    metadata through the current stub path.
 
-6. **Dry-run a commit-scoped environment**
+7. **Dry-run a commit-scoped environment**
 
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
@@ -185,7 +199,7 @@ Full design records live in `docs/design/README.md`.
    (`commit-db`, `commit-cache`), and previews cache keys for each required lane
    without mutating state.
 
-7. **Tests**
+8. **Tests**
 
    ```bash
    make test
@@ -194,7 +208,7 @@ Full design records live in `docs/design/README.md`.
    Unit tests assert that only the workflow CLI remains and that the event
    contract schema stays consistent.
 
-8. **Manage knowledge base incidents**
+9. **Manage knowledge base incidents**
 
    ```bash
    ./dist/ploy knowledge-base ingest --from ./fixtures/knowledge-base/new-incidents.json
@@ -215,8 +229,12 @@ entries, and deeper design context is collected in `docs/design/README.md`.
 Workstation builds rely on discovery to surface remote dependencies. The CLI
 inspects the following environment variables:
 
-- `GRID_ENDPOINT` — Workflow RPC host used to submit jobs back to Grid and to
+- `GRID_ENDPOINT` — Workflow RPC host used to submit jobs back to Grid and
   query the discovery endpoint.
+- `GRID_API_KEY` — Optional bearer token forwarded to Grid discovery and
+  Workflow RPC requests.
+- `GRID_ID` — Optional identifier scoping Grid state directories and
+  emitted discovery headers.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration.
 

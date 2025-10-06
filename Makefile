@@ -16,7 +16,7 @@ lint-md: ## Lint Markdown documentation with markdownlint
 
 .PHONY: lanes-validate
 lanes-validate: ## Validate lane catalog with SHIFT loaders
-	go run ./tools/lanesvalidate
+	PLOY_LANES_DIR=$${PLOY_LANES_DIR:-../ploy-lanes-catalog} go run ./tools/lanesvalidate
 
 .PHONY: test
 test: ## Run all unit tests with coverage output

@@ -232,7 +232,7 @@ func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 	manifestConfigDir = filepath.Join(repoRoot, "configs", "manifests")
-	laneConfigDir = filepath.Join(repoRoot, "lanes")
+	laneConfigDir = filepath.Join(repoRoot, "..", "ploy-lanes-catalog")
 	asterConfigDir = filepath.Join(repoRoot, "configs", "aster")
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)

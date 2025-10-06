@@ -17,10 +17,18 @@ additional configuration.
 - `GRID_ENDPOINT` — Points the CLI at the Grid Workflow RPC. Discovery
   configures JetStream routes and the IPFS gateway automatically. Current
   default: `unset` (the CLI uses the in-memory Grid stub).
+- `GRID_API_KEY` — Optional bearer token supplied to the Grid helper and
+  discovery requests via the `Authorization` header.
+- `GRID_ID` — Optional identifier used to scope SDK state directories and
+  discovery headers when connecting to multiple Grid installations.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Overrides the Workflow RPC SDK state
   directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`, which
   Ploy now sets up automatically so manifest caches and CA bundles persist
   across CLI runs.
+- `PLOY_LANES_DIR` — Explicit path to the lane catalog directory. When unset,
+  Ploy searches `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/lanes`, `$HOME/.ploy/lanes`,
+  and the adjacent `../ploy-lanes-catalog` checkout (for development). Set this
+  before running the CLI to avoid missing lane definitions.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
 

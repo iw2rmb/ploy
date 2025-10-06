@@ -74,7 +74,9 @@ the legacy API.
   IPFS-compatible publishers/readers owned by the snapshot toolkit.
 - **Legacy lane metadata** – Purge Nomad-specific lane descriptors, templates
   under `configs/lanes/nomad*`, and build/test scripts that rely on system jobs.
-  Workstation lanes now live under `lanes/*.toml` and are mirrored into SHIFT.
+  Workstation lanes now live in the public
+  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+  repository and are mirrored into SHIFT.
 - **Build-gate service integrations** – Remove API-specific webhooks, Cron jobs,
   and background workers; ensure SBOM/vuln/static analysis hooks operate as
   Grid-submitted jobs only.
@@ -101,15 +103,17 @@ the legacy API.
    - Single binary invoked by operators or Grid when work appears; default
      command `ploy workflow run --ticket auto`.
    - Uses NATS JS durable consumers, reconstructs DAG from mod definitions +
-     integration manifests, emits Grid job specs through the Workflow RPC
-     helper (HTTP client keyed off `GRID_ENDPOINT`). JetStream and IPFS
-     endpoints are discovered automatically via `/v1/cluster/info` when
-     `GRID_ENDPOINT` is set, with legacy environment fallbacks retained for
+    integration manifests, emits Grid job specs through the Workflow RPC
+    helper (HTTP client keyed off `GRID_ENDPOINT`). JetStream and IPFS
+    endpoints are discovered automatically via `/v1/cluster/info` when
+    `GRID_ENDPOINT` is set, with legacy environment fallbacks retained for
      older Grid releases.
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 
 3. **Lane Engine**
-   - Lanes defined in `lanes/*.toml` referencing runtime families, cache namespaces, build/test
+   - Lanes defined in the
+     [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+     repository referencing runtime families, cache namespaces, build/test
      commands, and the job spec schema (`image`, `command`, `env`, `resources`).
    - Cache keys incorporate lane, commit SHA, Aster toggle, snapshot
      fingerprint, and manifest version.

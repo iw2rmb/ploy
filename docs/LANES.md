@@ -7,7 +7,9 @@ the `ploy lanes describe` inspection workflow.
 
 ## Current Status
 
-- Lane specs live under `lanes/*.toml` (mirrored into SHIFT). Required fields are
+- Lane specs live in the public catalogue repository
+  [`iw2rmb/ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+  (mirrored into SHIFT). Required fields are
   `runtime_family`, `cache_namespace`, `commands`, and `job` blocks.
 - Required fields: `description`, `runtime_family`, `cache_namespace`,
   `commands.build`, `commands.test`, `job.image`, `job.command`, `job.env`,
@@ -44,8 +46,9 @@ the `ploy lanes describe` inspection workflow.
   Inputs: commit=deadbeef; snapshot=dev-db; manifest=smoke; aster=plan,exec
   ```
 
-- Add a new lane by dropping a TOML file into `lanes/` (validate with
-  `make lanes-validate`). Required fields:
+- Add a new lane by editing the catalogue repository (clone
+  `github.com/iw2rmb/ploy-lanes-catalog` locally and run `make lanes-validate`)
+  and submitting a PR. Required fields:
 
   ```toml
   name = "python-slim"

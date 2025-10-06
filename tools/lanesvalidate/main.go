@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	shift "github.com/iw2rmb/shift/pkg/shift"
 )
@@ -13,8 +14,15 @@ import (
 // main validates lane TOML definitions using the SHIFT loader and reports the result.
 func main() {
 	var dir string
-	flag.StringVar(&dir, "dir", "lanes", "directory containing lane TOML files")
+	flag.StringVar(&dir, "dir", "", "directory containing lane TOML files (defaults to $PLOY_LANES_DIR or current directory)")
 	flag.Parse()
+
+	if strings.TrimSpace(dir) == "" {
+		dir = os.Getenv("PLOY_LANES_DIR")
+		if strings.TrimSpace(dir) == "" {
+			dir = "."
+		}
+	}
 
 	abs, err := filepath.Abs(dir)
 	if err != nil {

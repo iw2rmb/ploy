@@ -25,7 +25,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
-	lanescatalog "github.com/iw2rmb/ploy/lanes"
 )
 
 type runnerInvoker interface {
@@ -74,7 +73,13 @@ type laneCacheComposer struct {
 	lanes laneRegistry
 }
 
-const workflowSDKStateEnv = "GRID_WORKFLOW_SDK_STATE_DIR"
+const (
+	workflowSDKStateEnv = "GRID_WORKFLOW_SDK_STATE_DIR"
+	lanesCatalogEnv     = "PLOY_LANES_DIR"
+	gridEndpointEnv     = "GRID_ENDPOINT"
+	gridAPIKeyEnv       = "GRID_API_KEY"
+	gridIDEnv           = "GRID_ID"
+)
 
 // Compose produces cache keys by delegating to the configured lane registry.
 func (c laneCacheComposer) Compose(ctx context.Context, req runner.CacheComposeRequest) (string, error) {
@@ -155,7 +160,7 @@ func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
 
 // defaultGridFactory returns either an in-memory grid client or the configured endpoint client.
 func defaultGridFactory() (runner.GridClient, error) {
-	endpoint := strings.TrimSpace(os.Getenv("GRID_ENDPOINT"))
+	endpoint := strings.TrimSpace(os.Getenv(gridEndpointEnv))
 	if endpoint == "" {
 		return runner.NewInMemoryGrid(), nil
 	}
@@ -169,6 +174,9 @@ func defaultGridFactory() (runner.GridClient, error) {
 		StreamOptions:      gridStreamOptions(),
 		CursorStoreFactory: grid.NewCursorStoreFactory(stateDir),
 	}
+	if token := strings.TrimSpace(os.Getenv(gridAPIKeyEnv)); token != "" {
+		options.BearerToken = token
+	}
 	client, err := grid.NewClient(options)
 	if err != nil {
 		return nil, err
@@ -178,85 +186,83 @@ func defaultGridFactory() (runner.GridClient, error) {
 
 func resolveLaneDirectories(dir string) []string {
 	trimmed := strings.TrimSpace(dir)
-	if trimmed == "" || strings.EqualFold(trimmed, "auto") {
-		return []string{"lanes"}
+	if trimmed != "" && !strings.EqualFold(trimmed, "auto") {
+		return []string{trimmed}
 	}
-	return []string{trimmed}
-}
 
-func loadEmbeddedLaneRegistry() (laneRegistry, error) {
-	embeddedLaneOnce.Do(func() {
-		tempDir, err := os.MkdirTemp("", "ploy-lanes-")
-		if err != nil {
-			embeddedLaneErr = err
+	seen := map[string]struct{}{}
+	var candidates []string
+
+	add := func(path string) {
+		clean := strings.TrimSpace(path)
+		if clean == "" {
 			return
 		}
-		if err := copyEmbeddedLaneCatalog(tempDir); err != nil {
-			embeddedLaneErr = err
+		abs := filepath.Clean(clean)
+		if _, exists := seen[abs]; exists {
 			return
 		}
-		embeddedLaneRegistry, embeddedLaneErr = lanes.LoadDirectory(tempDir)
-	})
-	return embeddedLaneRegistry, embeddedLaneErr
-}
+		seen[abs] = struct{}{}
+		candidates = append(candidates, abs)
+	}
 
-func copyEmbeddedLaneCatalog(dest string) error {
-	return fs.WalkDir(lanescatalog.Catalog, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, part := range filepath.SplitList(os.Getenv(lanesCatalogEnv)) {
+		add(part)
+	}
+
+	gridID := sanitizePathComponent(os.Getenv(gridIDEnv))
+
+	if configDir, err := os.UserConfigDir(); err == nil {
+		base := filepath.Join(configDir, "ploy", "lanes")
+		add(base)
+		if gridID != "" {
+			add(filepath.Join(base, gridID))
 		}
-		if d.IsDir() {
-			return nil
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		base := filepath.Join(homeDir, ".ploy", "lanes")
+		add(base)
+		if gridID != "" {
+			add(filepath.Join(base, gridID))
 		}
-		if !strings.HasSuffix(path, ".toml") {
-			return nil
-		}
-		data, err := lanescatalog.Catalog.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dest, filepath.Base(path))
-		return os.WriteFile(target, data, 0o644)
-	})
+	}
+	if wd, err := os.Getwd(); err == nil {
+		add(filepath.Join(wd, "..", "ploy-lanes-catalog"))
+	}
+	if exePath, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exePath)
+		add(filepath.Join(exeDir, "..", "ploy-lanes-catalog"))
+	}
+
+	return candidates
 }
 
 var (
-	embeddedLaneOnce     sync.Once
-	embeddedLaneRegistry laneRegistry
-	embeddedLaneErr      error
-
 	laneRegistryLoader laneRegistryLoaderFunc = func(dir string) (laneRegistry, error) {
 		trimmed := strings.TrimSpace(dir)
-		defaultSearch := trimmed == "" || strings.EqualFold(trimmed, "auto")
-		candidates := resolveLaneDirectories(dir)
-		var firstErr error
+		if trimmed != "" && !strings.EqualFold(trimmed, "auto") {
+			return lanes.LoadDirectory(trimmed)
+		}
+
+		candidates := resolveLaneDirectories("")
+		if len(candidates) == 0 {
+			return nil, fmt.Errorf("lane catalog path not configured; set %s or run ploy grid connect", lanesCatalogEnv)
+		}
+
+		var missing []string
 		for _, candidate := range candidates {
 			registry, err := lanes.LoadDirectory(candidate)
 			if err == nil {
 				return registry, nil
 			}
 			if errors.Is(err, os.ErrNotExist) || errors.Is(err, fs.ErrNotExist) {
-				if firstErr == nil {
-					firstErr = err
-				}
+				missing = append(missing, candidate)
 				continue
 			}
 			return nil, err
 		}
-		if defaultSearch {
-			registry, err := loadEmbeddedLaneRegistry()
-			if err == nil {
-				return registry, nil
-			}
-			if firstErr != nil {
-				return nil, fmt.Errorf("load lanes from disk: %v; embedded catalog error: %w", firstErr, err)
-			}
-			return nil, err
-		}
-		if firstErr != nil {
-			return nil, firstErr
-		}
-		return nil, fmt.Errorf("no lane directories found (searched %v)", candidates)
+
+		return nil, fmt.Errorf("no lane definitions found (searched %v); set %s or run ploy grid connect", missing, lanesCatalogEnv)
 	}
 	laneConfigDir = ""
 
@@ -350,6 +356,9 @@ func ensureWorkflowSDKStateDir() (string, error) {
 		return "", fmt.Errorf("resolve config dir: %w", err)
 	}
 	stateDir := filepath.Join(configDir, "ploy", "grid")
+	if gridID := sanitizePathComponent(os.Getenv(gridIDEnv)); gridID != "" {
+		stateDir = filepath.Join(stateDir, gridID)
+	}
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return "", fmt.Errorf("prepare workflow sdk state dir: %w", err)
 	}
@@ -368,7 +377,7 @@ func gridStreamOptions() helper.StreamOptions {
 }
 
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
-	endpoint := strings.TrimSpace(os.Getenv("GRID_ENDPOINT"))
+	endpoint := strings.TrimSpace(os.Getenv(gridEndpointEnv))
 
 	if endpoint == "" {
 		return integrationConfig{Features: map[string]string{}}, nil
@@ -487,13 +496,19 @@ func fetchClusterInfoWithRetry(ctx context.Context, endpoint string) (clusterInf
 func fetchClusterInfo(ctx context.Context, endpoint string) (info clusterInfo, err error) {
 	trimmed := strings.TrimSpace(endpoint)
 	if trimmed == "" {
-		return clusterInfo{}, fmt.Errorf("grid endpoint required for discovery")
+		return clusterInfo{}, fmt.Errorf("grid endpoint required for discovery; set %s", gridEndpointEnv)
 	}
 
 	discoveryURL := fmt.Sprintf("%s/v1/cluster/info", strings.TrimRight(trimmed, "/"))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, discoveryURL, nil)
 	if err != nil {
 		return clusterInfo{}, fmt.Errorf("create discovery request: %w", err)
+	}
+	if token := strings.TrimSpace(os.Getenv(gridAPIKeyEnv)); token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	}
+	if gridID := strings.TrimSpace(os.Getenv(gridIDEnv)); gridID != "" {
+		req.Header.Set("X-Ploy-Grid-ID", gridID)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -581,6 +596,25 @@ func copyFeaturesMap(src map[string]string) map[string]string {
 func sanitizeAPIEndpoint(value string) string {
 	trimmed := strings.TrimSpace(value)
 	return strings.TrimRight(trimmed, "/")
+}
+
+func sanitizePathComponent(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+	builder := strings.Builder{}
+	for _, r := range trimmed {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+			builder.WriteRune(r)
+		default:
+			builder.WriteRune('-')
+		}
+	}
+	component := builder.String()
+	component = strings.Trim(component, "-_")
+	return component
 }
 
 func firstNonEmpty(values ...string) string {

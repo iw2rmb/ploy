@@ -1,5 +1,18 @@
 # Changelog
 
+## [2025-10-08] Lane Catalog Externalised
+
+- Published [`iw2rmb/ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+  and removed embedded lane definitions from this repository; the CLI now loads
+  lanes from `$PLOY_LANES_DIR` (falling back to XDG paths or an adjacent
+  checkout).
+- Updated CLI docs, environment references, and design tasks to point at the new
+  catalogue; added `PLOY_LANES_DIR` to the documented environment variables and
+  refreshed the lane validator default.
+- Added optional `GRID_API_KEY`/`GRID_ID` handling alongside the existing
+  `GRID_ENDPOINT`, wiring bearer tokens into the Grid helper and discovery calls
+  while updating tests and env listings.
+
 ## [2025-10-07] Mods Catalog Alignment
 
 - `docs/design/mods-grid-restoration/README.md`: Reframed follow-up work around a

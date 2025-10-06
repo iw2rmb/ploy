@@ -29,7 +29,8 @@ ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
 ```
 
-`lanes describe` inspects TOML lane specs under `lanes/`, displays the
+`lanes describe` inspects TOML lane specs sourced from
+`$PLOY_LANES_DIR` (or the inferred catalogue checkout), displays the
 runtime family, build/test commands, surfaced job defaults (image, command, env,
 resources), and shows a deterministic cache-key preview that incorporates
 commit/snapshot/manifest/Aster toggles. Aster inputs are only included when
@@ -52,7 +53,8 @@ retryable outcome the runner collects the failure metadata, re-plans a healing
 branch using the Mods planner, and appends `#healN` stages before continuing to
 static checks and tests. When `GRID_ENDPOINT` is omitted the in-memory Grid stub
 remains active and still refuses stages whose lanes are not declared in the
-manifest. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle
+manifest. Provide `GRID_API_KEY` when authentication against the Workflow
+RPC helper is required. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle
 provenance after a successful run so developers can confirm which
 toggles/bundles were attached to each stage. Explicit ticket IDs remain a
 stub-only workflow until Grid integration lands.
@@ -62,8 +64,9 @@ Mods defaults but omits repo materialisation unless the new `--repo-*` flags are
 provided.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
-requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance; in-memory
-stubs respond with a friendly reminder instead of attempting a cancellation.
+requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance;
+in-memory stubs respond with a friendly reminder instead of attempting a
+cancellation.
 Ploy records the cancellation reason (when supplied) and echoes the run status
 so operators can quickly confirm whether the request was accepted or the run
 was already terminal.
@@ -93,7 +96,9 @@ classifier drift without leaving the workstation.
 
 ## Flags
 
-- `--lane` — Lane identifier defined under `lanes/*.toml`.
+- `--lane` — Lane identifier defined in the
+  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+  repository.
   `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
@@ -137,10 +142,14 @@ classifier drift without leaving the workstation.
 
 ## Environment
 
-- `GRID_ENDPOINT` — Workflow RPC base URL (`https://grid-dev.example`) used by
-  `workflow run` and `workflow cancel`; it also enables discovery via
+- `GRID_ENDPOINT` — Workflow RPC base URL (`https://grid-dev.example`)
+  used by `workflow run` and `workflow cancel`; it also enables discovery via
   `/v1/cluster/info` for API endpoint, JetStream routes, IPFS gateway, feature
   map, and version configuration.
+- `GRID_API_KEY` — Optional bearer token forwarded to Grid discovery and
+  Workflow RPC calls.
+- `GRID_ID` — Optional identifier scoping on-disk SDK caches and discovery
+  headers when working with multiple Grid installations.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Optional override for the Workflow RPC SDK
   cache location. Ploy now defaults this to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`
   so manifests and CA bundles persist across CLI restarts.

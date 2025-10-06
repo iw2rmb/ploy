@@ -11,7 +11,9 @@
 
 ## Definition of Done
 
-- Mods-specific lanes moved into SHIFT repository with matching import hooks in Ploy.
+- Mods-specific lanes moved into the public
+  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
+  repository with matching import hooks in Ploy.
 - Documentation updated to reference SHIFT as the source of truth.
 
 ## Test Plan
@@ -21,5 +23,6 @@
 
 ## Notes
 
-- Replace `tests/e2e/mods_scenarios_test.go`'s in-memory Grid harness with real Grid smoke once SHIFT lanes publish.
+- Replace `tests/e2e/mods_scenarios_test.go`'s in-memory Grid harness with real
+  Grid smoke once SHIFT lanes publish.
 - Placeholder for follow-up; flesh out scope after GREEN delivery.

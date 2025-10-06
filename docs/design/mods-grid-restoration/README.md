@@ -82,8 +82,10 @@ Steps 1–4):
 - The CLI provisions a `gitWorkspacePreparer` that clones repositories into
   `workspace/` before Mods stages execute, honouring optional workspace hints for
   language-specific layouts.
-- Mods lane specs (`lanes/mods-plan.toml`, `mods-java.toml`, `mods-llm.toml`,
-  `mods-human.toml`) feed the job composer so Grid runs boot the correct
+- Mods lane specs (published in
+  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog) as
+  `mods-plan.toml`, `mods-java.toml`, `mods-llm.toml`, `mods-human.toml`) feed
+  the job composer so Grid runs boot the correct
   containers instead of fallback lanes.
 - Build-gate failures dispatch through `handleHealing`, which extracts
   knowledge-base findings from checkpoint metadata, replans Mods stages once,
@@ -107,8 +109,10 @@ Steps 1–4):
 - Workspace: a `gitWorkspacePreparer` clones the repo into `<run>/workspace/`,
   checks out the target ref, and scaffolds optional hints that lane scripts
   expect. Runs without repo metadata skip cloning entirely.
-- Lanes & job specs: Mods-specific TOML lanes (`lanes/mods-plan.toml`,
-  `mods-java.toml`, `mods-llm.toml`, `mods-human.toml`) flow through the job
+- Lanes & job specs: Mods-specific TOML lanes (see
+  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog) —
+  `mods-plan.toml`, `mods-java.toml`, `mods-llm.toml`, `mods-human.toml`) flow
+  through the job
   composer so staged Mods work pulls the correct container images and commands.
 - Healing: `handleHealing` inspects build-gate outcomes, converts
   static-check/log findings into `mods.AdviceSignals`, and invokes the planner
