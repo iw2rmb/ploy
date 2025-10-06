@@ -66,11 +66,22 @@ func TestHandleWorkflowRequiresSubcommand(t *testing.T) {
 	}
 }
 
+func TestHandleModRequiresSubcommand(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := handleMod(nil, buf)
+	if err == nil {
+		t.Fatal("expected error for missing mod subcommand")
+	}
+	if !strings.Contains(buf.String(), "Usage: ploy mod") {
+		t.Fatalf("expected mod usage, got %q", buf.String())
+	}
+}
+
 func TestPrintHelpers(t *testing.T) {
 	buf := &bytes.Buffer{}
 	printUsage(buf)
 	printWorkflowUsage(buf)
-	printWorkflowRunUsage(buf)
+	printRunUsage(buf, "workflow run")
 	printWorkflowCancelUsage(buf)
 	reportError(errors.New("boom"), buf)
 	output := buf.String()

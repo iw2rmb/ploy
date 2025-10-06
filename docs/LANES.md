@@ -7,7 +7,7 @@ the `ploy lanes describe` inspection workflow.
 
 ## Current Status
 
-- Lane specs live under `configs/lanes/*.toml` with `name`, `description`,
+- Lane specs live under `lanes/*.toml` (mirrored into SHIFT). Required fields are
   `runtime_family`, `cache_namespace`, `commands`, and `job` blocks.
 - Required fields: `description`, `runtime_family`, `cache_namespace`,
   `commands.build`, `commands.test`, `job.image`, `job.command`, `job.env`,
@@ -44,7 +44,8 @@ the `ploy lanes describe` inspection workflow.
   Inputs: commit=deadbeef; snapshot=dev-db; manifest=smoke; aster=plan,exec
   ```
 
-- Add a new lane by dropping a TOML file into `configs/lanes/`. Required fields:
+- Add a new lane by dropping a TOML file into `lanes/` (validate with
+  `make lanes-validate`). Required fields:
 
   ```toml
   name = "python-slim"
@@ -87,9 +88,9 @@ the `ploy lanes describe` inspection workflow.
 - `docs/design/overview/README.md` — architectural context for lanes within the
   feature roadmap.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
-- `roadmap/shift/03-lane-engine.md` — scope, definition of done, and
+- `docs/tasks/shift/03-lane-engine.md` — scope, definition of done, and
   verification expectations.
-- `roadmap/shift/08-documentation-cleanup.md` — roadmap slice tracking doc
+- `docs/tasks/shift/08-documentation-cleanup.md` — roadmap slice tracking doc
   alignment work.
 - `cmd/ploy/README.md` — CLI flag reference for `lanes describe` and
   `workflow run`.

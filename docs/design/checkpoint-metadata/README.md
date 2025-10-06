@@ -62,7 +62,7 @@ checkpoint payloads now that the lane engine and artifact publishers exist.
 
 - Update `docs/design/event-contracts/README.md` to mark the checkpoint metadata
   follow-up complete and describe the enriched schema.
-- Add roadmap entry `roadmap/shift/17-checkpoint-metadata.md` and mark it done
+- Add roadmap entry `docs/tasks/shift/17-checkpoint-metadata.md` and mark it done
   when this slice ships.
 - ✅ Completed 2025-09-26: Mirror stage artifacts to the
   `ploy.artifact.<ticket>` subject once build artifact uploads move off the

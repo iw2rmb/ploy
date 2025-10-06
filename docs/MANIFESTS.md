@@ -84,7 +84,7 @@ workflow-scoped environments stay within approved boundaries.
 - `docs/design/overview/README.md` — overarching feature design.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `docs/SNAPSHOTS.md` — snapshot toolkit referenced by manifest fixtures.
-- `roadmap/shift/05-integration-manifests.md` — roadmap slice covering this
+- `docs/tasks/shift/05-integration-manifests.md` — roadmap slice covering this
   work.
-- `roadmap/shift/08-documentation-cleanup.md` — documentation alignment status
+- `docs/tasks/shift/08-documentation-cleanup.md` — documentation alignment status
   and verification notes.

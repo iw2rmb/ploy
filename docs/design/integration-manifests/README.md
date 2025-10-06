@@ -9,7 +9,7 @@ enforcing manifests.
 
 ## Status (2025-09-29)
 
-- [x] [roadmap/integration-manifests/01-schema-upgrade.md](../../../roadmap/integration-manifests/01-schema-upgrade.md)
+- [x] [docs/tasks/integration-manifests/01-schema-upgrade.md](../../../docs/tasks/integration-manifests/01-schema-upgrade.md)
       — Schema, compiler, CLI tooling, manifests, and docs verified for the v2
       contract.
 
@@ -132,4 +132,4 @@ ships and Ploy loses validation coverage for production-style policies.
   compliance.
 - 2025-09-29 — Confirmed design/docs alignment across `docs/MANIFESTS.md`, this
   design record, and roadmap entry
-  `roadmap/integration-manifests/01-schema-upgrade.md`.
+  `docs/tasks/integration-manifests/01-schema-upgrade.md`.

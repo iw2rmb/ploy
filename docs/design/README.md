@@ -1,6 +1,6 @@
 # Design Documents
 
-Status checkboxes mirror the corresponding entries under `roadmap/shift/`.
+Status checkboxes mirror the corresponding entries under `docs/tasks/shift/`.
 
 - [x] [overview/README.md](overview/README.md) — Blueprint for the CLI-first
       architecture and Grid hand-off model (evergreen reference).
@@ -20,18 +20,20 @@ Status checkboxes mirror the corresponding entries under `roadmap/shift/`.
 - [x] [stage-artifacts/README.md](stage-artifacts/README.md) — Mirrors stage
       artifact envelopes onto JetStream for cache hydrators (Roadmap 18; updated
       2025-09-29 for discovery-driven JetStream selection).
-- [x] [mods/README.md](mods/README.md) — Parallel Mods workflow planner covering
-      orw/LLM/human stages (Roadmap 19); runner parallel execution landed
-      2025-09-27 after planner, knowledge base, and CLI/Grid wiring milestones.
+- [ ] [mods/README.md](mods/README.md) — Parallel Mods workflow planner covering
+      orw/LLM/human stages (task set shifting to `docs/tasks/mods/`); planner
+      skeleton and knowledge base feedback landed 2025-09-27, but Grid job
+      specs and healing feedback are pending `shift-mods-grid` restoration.
 - [x] [knowledge-base/README.md](knowledge-base/README.md) — Fuzzy error
       classification feeding Mods/LLM remediation (Roadmap 20); classifier
       foundation, CLI ingest, and CLI evaluation slices completed 2025-09-27.
 - [x] [integration-manifests/README.md](integration-manifests/README.md) — V2
       manifest schema, deterministic compiler, and CLI rewrite tooling landed
       2025-09-29.
-- [x] [shift/README.md](shift/README.md) — SHIFT roadmap overview aligning
-      workstation-first slices (legacy teardown through build gate reboot) with
-      completed design milestones.
+- [ ] [shift/README.md](shift/README.md) — SHIFT roadmap overview aligning
+      workstation-first slices; reopen pending Mods/Grid parity captured in
+      `docs/tasks/shift/21-build-gate-reboot.md` follow-ups (updated 2025-10-07 to
+      track Grid catalog registration).
 - [x] [build-gate/README.md](build-gate/README.md) — Grid-aligned build gate
       with static checks, clarified sandbox scope, log streaming via Workflow
       RPC helper, and CLI summaries (Roadmap 21); stage planning/metadata landed
@@ -54,6 +56,11 @@ Status checkboxes mirror the corresponding entries under `roadmap/shift/`.
       workflows honour feature availability (Roadmap TBD).
 - [x] [workflow-rpc-alignment/README.md](workflow-rpc-alignment/README.md) —
       Aligns Ploy with Grid Workflow RPC/helper, locking the job spec schema
-      (`image`, `command`, `env`, `resources`) and subject alignment (Roadmap
-      22); SDK wrapper, job spec composition, subject realignment, and helper
-      adoption (auth + retries) landed by 2025-10-01.
+      (`image`, `command`, `env`, `resources`), subject alignment, SDK
+      cancellation flows, archive surfacing, and CLI state-dir defaults (Roadmap
+      22); latest update 2025-10-05.
+- [x] [mods-grid-restoration/README.md](mods-grid-restoration/README.md) —
+      Steps 1–4 landed 2025-10-05: repo materialisation, Mods lanes/job specs,
+      and build-gate healing retries now ship via `ploy mod run`. Updated
+      2025-10-07 to call out the dedicated Mods catalog repository + Grid
+      registration follow-up (`docs/tasks/mods-grid/05-refactor.md`).

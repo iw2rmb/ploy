@@ -21,36 +21,36 @@ quality before changes exit the workstation.
 ## Current Status (2025-10-07)
 
 - Stage scheduling and checkpoint metadata wiring landed via
-  `roadmap/build-gate/01-stage-planning-and-metadata.md`.
-- Sandbox runner landed via `roadmap/build-gate/02-sandbox-runner.md`, providing
+  `docs/tasks/build-gate/01-stage-planning-and-metadata.md`.
+- Sandbox runner landed via `docs/tasks/build-gate/02-sandbox-runner.md`, providing
   structured duration/cache metadata and timeout handling for workstation tests.
 - Static check adapter registry shipped under
   `internal/workflow/buildgate/static_checks.go` (see
-  `roadmap/build-gate/03-static-check-registry.md`), wiring lane defaults,
+  `docs/tasks/build-gate/03-static-check-registry.md`), wiring lane defaults,
   manifest overrides, and skip hooks into `StaticCheckRegistry`.
 - Go vet adapter exposed through `internal/workflow/buildgate.NewGoVetAdapter`
-  (see `roadmap/build-gate/05-go-vet-adapter.md`), parsing workstation/Grid
+  (see `docs/tasks/build-gate/05-go-vet-adapter.md`), parsing workstation/Grid
   diagnostics into `StaticCheckFailure` entries with manifest-configurable
   package and tag options.
 - Error Prone adapter wired via
   `internal/workflow/buildgate.NewErrorProneAdapter` (see
-  `roadmap/build-gate/08-error-prone-adapter.md`), enabling Java diagnostics
+  `docs/tasks/build-gate/08-error-prone-adapter.md`), enabling Java diagnostics
   with manifest-configurable targets/classpaths and CLI summary coverage
   (shipped 2025-09-29).
 - ESLint adapter wired via `internal/workflow/buildgate.NewESLintAdapter` (see
-  `roadmap/build-gate/09-eslint-adapter.md`), enabling JavaScript diagnostics
+  `docs/tasks/build-gate/09-eslint-adapter.md`), enabling JavaScript diagnostics
   with manifest-configurable targets/config/rule overrides and CLI summary
   coverage (shipped 2025-09-29).
 - Log retrieval and Grid artifact ingestion shipped via
   `internal/workflow/buildgate.LogRetriever` and `LogIngestor` (see
-  `roadmap/build-gate/04-log-retrieval-and-grid-integration.md`), normalising
+  `docs/tasks/build-gate/04-log-retrieval-and-grid-integration.md`), normalising
   Knowledge Base findings and surfacing digests in build gate metadata.
 - Build gate runner orchestrates sandbox execution, static checks, and log
   ingestion through `internal/workflow/buildgate.Runner` (see
-  `roadmap/build-gate/06-build-gate-runner.md`), emitting sanitised metadata for
+  `docs/tasks/build-gate/06-build-gate-runner.md`), emitting sanitised metadata for
   checkpoint publication.
 - CLI build gate summary surfaces static checks and knowledge base guidance
-  after workflow execution (see `roadmap/build-gate/07-cli-summary.md`).
+  after workflow execution (see `docs/tasks/build-gate/07-cli-summary.md`).
 
 - Establish `internal/workflow/buildgate` hosting sandbox compilation, static
   check orchestration, and log parsing utilities.
@@ -210,11 +210,11 @@ quality before changes exit the workstation.
 
 ## Rollout & Follow-ups
 
-- Add roadmap entries under `roadmap/build-gate/` covering sandbox port, static
+- Add roadmap entries under `docs/tasks/build-gate/` covering sandbox port, static
   check adapters, log parser, and Grid integration.
 - Coordinate with Grid maintainers (see `../grid/README.md`) to provision
   dedicated lanes for static analysis binaries and to expose artifact envelopes
   required for log retrieval.
 - ESLint adapter slice (`docs/design/build-gate/eslint/README.md`,
-  `roadmap/build-gate/09-eslint-adapter.md`) is now complete; continue
+  `docs/tasks/build-gate/09-eslint-adapter.md`) is now complete; continue
   prioritising Ruff and Roslyn adapters once workstation coverage expands.

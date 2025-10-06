@@ -1,0 +1,20 @@
+name = "mods-human"
+description = "Mods human-in-the-loop review lane that captures manual sign-off"
+runtime_family = "go-native"
+cache_namespace = "mods-human"
+
+[commands]
+build = ["mods-human", "--prepare"]
+test = ["mods-human", "--validate"]
+
+[job]
+image = "registry.dev/ploy/mods-human:latest"
+command = ["mods-human", "--gate"]
+priority = "standard"
+
+  [job.env]
+  MODS_HUMAN_QUEUE = "review"
+
+  [job.resources]
+  cpu = "1000m"
+  memory = "2Gi"

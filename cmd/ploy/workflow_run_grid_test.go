@@ -18,6 +18,7 @@ import (
 )
 
 func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
+	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -47,7 +48,12 @@ func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
 	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
+		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
+		desc.Lane.Job.Command = []string{"mods-plan"}
+		desc.Lane.Job.Env = map[string]string{}
+		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
+		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
 	t.Setenv("GRID_ENDPOINT", "")
@@ -62,6 +68,7 @@ func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
 }
 
 func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
+	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -102,7 +109,12 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
 	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
+		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
+		desc.Lane.Job.Command = []string{"mods-plan"}
+		desc.Lane.Job.Env = map[string]string{}
+		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
+		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
 	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
@@ -141,6 +153,7 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 }
 
 func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
+	withStubWorkspacePreparer(t)
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
@@ -172,7 +185,12 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
 	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
+		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
+		desc.Lane.Job.Command = []string{"mods-plan"}
+		desc.Lane.Job.Env = map[string]string{}
+		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
+		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
 	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
@@ -214,7 +232,7 @@ func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
 	_, file, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 	manifestConfigDir = filepath.Join(repoRoot, "configs", "manifests")
-	laneConfigDir = filepath.Join(repoRoot, "configs", "lanes")
+	laneConfigDir = filepath.Join(repoRoot, "lanes")
 	asterConfigDir = filepath.Join(repoRoot, "configs", "aster")
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)

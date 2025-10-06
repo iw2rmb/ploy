@@ -33,8 +33,8 @@ func printWorkflowUsage(w io.Writer) {
 }
 
 // printWorkflowRunUsage outputs the accepted workflow run flags.
-func printWorkflowRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]")
+func printRunUsage(w io.Writer, command string) {
+	_, _ = fmt.Fprintf(w, "Usage: ploy %s --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]\n", command)
 }
 
 // printWorkflowCancelUsage documents the workflow cancellation flags.

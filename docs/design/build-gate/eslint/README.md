@@ -16,7 +16,7 @@ ESLint during CI.
 
 - `../README.md` tracks the static check roadmap and still lists ESLint, Ruff,
   and Roslyn adapters as open follow-ups now that Error Prone shipped.
-- `../../../../roadmap/build-gate/03-static-check-registry.md` defines the
+- `../../../../docs/tasks/build-gate/03-static-check-registry.md` defines the
   adapter registry contract and lane/manifest reconciliation flow used by
   existing adapters.
 - `../../../../internal/workflow/buildgate/static_checks_registry.go` and
@@ -88,14 +88,14 @@ ESLint during CI.
 - **CLI summary**: Update fixture to include a failing ESLint report so summary
   output enumerates it alongside other adapters.
 - **Docs/Roadmap**: Record scope/deliverables in roadmap task
-  `../../../../roadmap/build-gate/09-eslint-adapter.md`, update design index,
+  `../../../../docs/tasks/build-gate/09-eslint-adapter.md`, update design index,
   and refresh build gate design follow-ups.
 
 ## Dependencies
 
 - `../README.md`
-- `../../../../roadmap/build-gate/09-eslint-adapter.md`
-- `../../../../roadmap/build-gate/03-static-check-registry.md`
+- `../../../../docs/tasks/build-gate/09-eslint-adapter.md`
+- `../../../../docs/tasks/build-gate/03-static-check-registry.md`
 - `../../../../internal/workflow/buildgate/static_checks_registry.go`
 - `../../../../internal/workflow/buildgate/static_checks_types.go`
 - `../../../../cmd/ploy/workflow_run_output_test.go`
@@ -131,7 +131,7 @@ ESLint during CI.
 
 - `internal/workflow/buildgate/eslint_adapter.go` and accompanying tests.
 - Updated CLI fixtures and any registry alias tests.
-- Roadmap task `../../../../roadmap/build-gate/09-eslint-adapter.md` describing
+- Roadmap task `../../../../docs/tasks/build-gate/09-eslint-adapter.md` describing
   scope, DOD, and verification.
 - Documentation updates: this design record, design index entry, build gate
   design follow-ups, SHIFT design next steps, and changelog entry with

@@ -106,6 +106,25 @@ func (g *fakeGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTi
 	return outcome, nil
 }
 
+func (g *fakeGrid) setOutcomes(stage string, outcomes []runner.StageOutcome) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.outcomes == nil {
+		g.outcomes = make(map[string][]runner.StageOutcome)
+	}
+	dup := make([]runner.StageOutcome, len(outcomes))
+	copy(dup, outcomes)
+	g.outcomes[stage] = dup
+}
+
+func (g *fakeGrid) callsSnapshot() []gridCall {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	dup := make([]gridCall, len(g.calls))
+	copy(dup, g.calls)
+	return dup
+}
+
 func (g *fakeGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req

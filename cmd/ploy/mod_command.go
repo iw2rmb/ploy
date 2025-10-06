@@ -1,0 +1,33 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+	"io"
+)
+
+// handleMod routes Mods subcommands to their implementations.
+func handleMod(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printModUsage(stderr)
+		return errors.New("mod subcommand required")
+	}
+
+	switch args[0] {
+	case "run":
+		return handleModRun(args[1:], stderr)
+	default:
+		printModUsage(stderr)
+		return fmt.Errorf("unknown mod subcommand %q", args[0])
+	}
+}
+
+func printModUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod <command>")
+	_, _ = fmt.Fprintln(w, "\nCommands:")
+	_, _ = fmt.Fprintln(w, "  run    Execute a Mods workflow run against Grid")
+}
+
+func printModRunUsage(w io.Writer) {
+	printRunUsage(w, "mod run")
+}

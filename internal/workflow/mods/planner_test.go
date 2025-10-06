@@ -285,6 +285,19 @@ func setModsOptionsHints(t *testing.T, opts *mods.Options, planTimeout time.Dura
 		t.Fatalf("mods.Options MaxParallel not settable")
 	}
 	maxParallelField.SetInt(int64(maxParallel))
+
+	for field, value := range map[string]string{
+		"PlanLane":        "mods-plan",
+		"OpenRewriteLane": "mods-java",
+		"LLMPlanLane":     "mods-llm",
+		"LLMExecLane":     "mods-llm",
+		"HumanLane":       "mods-human",
+	} {
+		laneField := val.FieldByName(field)
+		if laneField.IsValid() && laneField.CanSet() && laneField.Kind() == reflect.String {
+			laneField.SetString(value)
+		}
+	}
 }
 
 // findStage locates a stage by name inside the Mods planner output during tests.

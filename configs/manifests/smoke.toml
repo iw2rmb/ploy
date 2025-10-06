@@ -85,8 +85,20 @@ reason = "Only when search stack enabled"
 [lanes]
 
 [[lanes.required]]
-name = "node-wasm"
-reason = "mods DAG"
+name = "mods-plan"
+reason = "mods planning"
+
+[[lanes.required]]
+name = "mods-java"
+reason = "mods OpenRewrite execution"
+
+[[lanes.required]]
+name = "mods-llm"
+reason = "mods LLM planning/execution"
+
+[[lanes.required]]
+name = "mods-human"
+reason = "mods human-in-the-loop review"
 
 [[lanes.required]]
 name = "go-native"

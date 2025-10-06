@@ -1,0 +1,22 @@
+name = "mods-java"
+description = "Mods OpenRewrite execution lane for Maven/Gradle projects"
+runtime_family = "java-mods"
+cache_namespace = "mods-java"
+
+[commands]
+setup = ["mvn", "-q", "dependency:go-offline"]
+build = ["mvn", "-q", "verify"]
+test = ["mvn", "-q", "test"]
+
+[job]
+image = "registry.dev/ploy/mods-openrewrite:latest"
+command = ["mods-orw", "--apply"]
+priority = "standard"
+
+  [job.env]
+  MAVEN_OPTS = "-Dmaven.repo.local=/workspace/.m2"
+  OPENREWRITE_ACTIVE_RECIPES = ""
+
+  [job.resources]
+  cpu = "4000m"
+  memory = "8Gi"

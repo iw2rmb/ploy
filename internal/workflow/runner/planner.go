@@ -28,9 +28,14 @@ type DefaultPlanner struct {
 
 // ModsOptions configures the Mods planner invoked by the workflow runner.
 type ModsOptions struct {
-	PlanTimeout time.Duration
-	MaxParallel int
-	Advisor     mods.Advisor
+	PlanTimeout     time.Duration
+	MaxParallel     int
+	Advisor         mods.Advisor
+	PlanLane        string
+	OpenRewriteLane string
+	LLMPlanLane     string
+	LLMExecLane     string
+	HumanLane       string
 }
 
 // NewDefaultPlanner constructs a planner that uses default Mods settings.
@@ -46,9 +51,14 @@ func NewDefaultPlannerWithMods(opts ModsOptions) Planner {
 // Build generates the execution plan using the Mods planner output plus build/test stages.
 func (p DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTicket) (ExecutionPlan, error) {
 	modPlanner := mods.NewPlanner(mods.Options{
-		PlanTimeout: p.mods.PlanTimeout,
-		MaxParallel: p.mods.MaxParallel,
-		Advisor:     p.mods.Advisor,
+		PlanLane:        p.mods.PlanLane,
+		OpenRewriteLane: p.mods.OpenRewriteLane,
+		LLMPlanLane:     p.mods.LLMPlanLane,
+		LLMExecLane:     p.mods.LLMExecLane,
+		HumanLane:       p.mods.HumanLane,
+		PlanTimeout:     p.mods.PlanTimeout,
+		MaxParallel:     p.mods.MaxParallel,
+		Advisor:         p.mods.Advisor,
 	})
 	modStages, err := modPlanner.Plan(ctx, mods.PlanInput{Ticket: ticket})
 	if err != nil {

@@ -43,9 +43,15 @@ func TestHandleWorkflowRunConfiguresModsFlags(t *testing.T) {
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
 	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
+		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods"}, CacheKey: "stub-cache"}
+		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
+		desc.Lane.Job.Command = []string{"mods-plan"}
+		desc.Lane.Job.Env = map[string]string{}
+		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
+		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
+	withStubWorkspacePreparer(t)
 
 	err := handleWorkflowRun([]string{"--tenant", "acme", "--mods-plan-timeout", "2m30s", "--mods-max-parallel", "5"}, io.Discard)
 	if err != nil {

@@ -36,7 +36,7 @@ catalog service returns.
   multiple defaults to prevent ambiguous catalog bootstraps.
 - Individual pack entries can be marked `optional = true` to signal non-blocking
   downloads once the server wiring resumes.
-- Loader errors wrap `ErrInvalidSpec` to make roadmap/test assertions
+- Loader errors wrap `ErrInvalidSpec` to make docs/tasks/test assertions
   straightforward.
 
 ## Example: `configs/recipes/kotlin-gradle.toml`
@@ -55,6 +55,6 @@ catalog service returns.
 ## Related Docs
 
 - `docs/design/overview/README.md` — overall feature design and roadmap context.
-- `roadmap/recipes.md` — roadmap slice tracking OpenRewrite recipe UX progress.
+- `docs/tasks/recipes.md` — roadmap slice tracking OpenRewrite recipe UX progress.
 - `README.md` — repository status overview, including the recipe pack registry
   milestone.

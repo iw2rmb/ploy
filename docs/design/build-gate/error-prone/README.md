@@ -16,7 +16,7 @@ repositories.
 
 - `docs/design/build-gate/README.md` established the multi-language adapter
   strategy but only the Go adapter has shipped so far.
-- `roadmap/build-gate/03-static-check-registry.md` calls out Java Error Prone as
+- `docs/tasks/build-gate/03-static-check-registry.md` calls out Java Error Prone as
   a follow-up adapter to populate the registry.
 - `cmd/ploy/workflow_run_output_test.go` and corresponding knowledge base wiring
   already expect multi-tool output.
@@ -119,5 +119,5 @@ repositories.
 - Documentation updates: this design doc (marked complete), build gate design
   status, design index, roadmap task, README feature highlight verification
   note, and changelog entry with date and verification details.
-- Roadmap task `roadmap/build-gate/08-error-prone-adapter.md` recording scope,
+- Roadmap task `docs/tasks/build-gate/08-error-prone-adapter.md` recording scope,
   DOD, and verification commands.

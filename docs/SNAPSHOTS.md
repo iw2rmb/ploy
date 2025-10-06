@@ -84,6 +84,6 @@ stub.
 - `docs/design/overview/README.md` — Overall feature architecture.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `README.md` — High-level CLI overview (snapshot commands included).
-- `roadmap/shift/08-documentation-cleanup.md` — slice documenting the doc
+- `docs/tasks/shift/08-documentation-cleanup.md` — slice documenting the doc
   refresh.
 - `cmd/ploy/README.md` — CLI usage details and environment placeholders.

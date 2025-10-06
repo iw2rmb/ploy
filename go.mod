@@ -4,10 +4,13 @@ go 1.25
 
 require (
 	github.com/iw2rmb/grid v0.0.0
+	github.com/iw2rmb/shift v0.0.0
 	github.com/nats-io/nats-server/v2 v2.12.0
 	github.com/nats-io/nats.go v1.46.0
 	github.com/pelletier/go-toml/v2 v2.2.2
 )
+
+replace github.com/iw2rmb/shift => ../SHIFT
 
 require (
 	github.com/antithesishq/antithesis-sdk-go v0.4.3-default-no-op // indirect
@@ -32,6 +35,7 @@ require (
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/iw2rmb/grid => ../grid

@@ -388,7 +388,7 @@ issues:
       linters:
         - errcheck
         - staticcheck
-    - path: ^roadmap/
+    - path: ^docs/tasks/
       linters:
         - errcheck
         - staticcheck
@@ -437,7 +437,7 @@ issues:
       linters:
         - errcheck
         - staticcheck
-    - path: ^roadmap/
+    - path: ^docs/tasks/
       linters:
         - errcheck
         - staticcheck

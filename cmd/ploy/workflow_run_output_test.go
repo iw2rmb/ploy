@@ -14,6 +14,7 @@ import (
 
 func TestHandleWorkflowRunPrintsBuildGateSummary(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
+	withStubWorkspacePreparer(t)
 	buf := &bytes.Buffer{}
 	fakeRunner := runnerInvokerFunc(func(ctx context.Context, opts runner.Options) error {
 		meta := contracts.BuildGateStageMetadata{

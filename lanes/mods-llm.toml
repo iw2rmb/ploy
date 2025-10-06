@@ -1,0 +1,23 @@
+name = "mods-llm"
+description = "Mods LLM planning/execution lane leveraging GPU-enabled runners"
+runtime_family = "gpu-ml"
+cache_namespace = "mods-llm"
+
+[commands]
+setup = ["pip", "install", "-r", "requirements.txt"]
+build = ["mods-llm", "--prepare"]
+test = ["mods-llm", "--validate"]
+
+[job]
+image = "registry.dev/ploy/mods-llm:latest"
+command = ["mods-llm", "--execute"]
+priority = "gpu"
+
+  [job.env]
+  OPENAI_API_TYPE = ""
+  MODS_LLM_CACHE = "/workspace/cache"
+
+  [job.resources]
+  cpu = "6000m"
+  memory = "16Gi"
+  gpu = "1"

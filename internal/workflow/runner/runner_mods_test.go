@@ -78,7 +78,12 @@ func TestRunPublishesModsMetadata(t *testing.T) {
 		ManifestCompiler: newStubCompiler(),
 	}
 	if err := runner.Run(context.Background(), opts); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		calls := grid.callsSnapshot()
+		names := make([]string, len(calls))
+		for i := range calls {
+			names[i] = calls[i].stage.Name
+		}
+		t.Fatalf("unexpected error: %v (stages=%v)", err, names)
 	}
 
 	var planRunning, planCompleted, humanCompleted *contracts.WorkflowCheckpoint
@@ -280,9 +285,13 @@ func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
 	}
 
 	if err := runner.Run(context.Background(), opts); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		calls := grid.callsSnapshot()
+		names := make([]string, len(calls))
+		for i := range calls {
+			names[i] = calls[i].stage.Name
+		}
+		t.Fatalf("unexpected error: %v (stages=%v)", err, names)
 	}
-
 	calls := grid.callsSnapshot()
 	if attempts := gatherStageAttempts(calls, mods.StageNameORWApply); attempts != 2 {
 		t.Fatalf("expected two attempts for orw-apply, got %d", attempts)
@@ -308,6 +317,55 @@ func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
 	}
 	if !sawRetry {
 		t.Fatalf("expected retry checkpoint for orw-apply")
+	}
+}
+
+func TestRunSchedulesHealingPlanAfterBuildGateFailure(t *testing.T) {
+	events := &recordingEvents{nextTicket: "ticket-buildgate-heal", tenant: "acme"}
+	grid := &fakeGrid{}
+	grid.setOutcomes(buildGateStage, []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "compile failed"}})
+	grid.setOutcomes(buildGateStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
+	grid.setOutcomes(staticChecksStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
+	grid.setOutcomes("test#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
+
+	modsOpts := runner.ModsOptions{
+		PlanTimeout:     30 * time.Second,
+		MaxParallel:     2,
+		PlanLane:        "mods-plan",
+		OpenRewriteLane: "mods-java",
+		LLMPlanLane:     "mods-llm",
+		LLMExecLane:     "mods-llm",
+		HumanLane:       "mods-human",
+	}
+	opts := runner.Options{
+		Ticket:           "",
+		Tenant:           "acme",
+		Events:           events,
+		Grid:             grid,
+		Planner:          runner.NewDefaultPlannerWithMods(modsOpts),
+		WorkspaceRoot:    t.TempDir(),
+		MaxStageRetries:  0,
+		ManifestCompiler: newStubCompiler(),
+		Mods:             modsOpts,
+	}
+	if err := runner.Run(context.Background(), opts); err != nil {
+		calls := grid.callsSnapshot()
+		names := make([]string, len(calls))
+		for i := range calls {
+			names[i] = calls[i].stage.Name
+		}
+		t.Fatalf("unexpected error: %v (stages=%v)", err, names)
+	}
+
+	calls := grid.callsSnapshot()
+	if findStageIndex(calls, buildGateStage) == -1 {
+		t.Fatalf("expected initial build-gate invocation recorded: %#v", calls)
+	}
+	if findStageIndex(calls, buildGateStage+"#heal1") == -1 {
+		t.Fatalf("expected healing build-gate invocation recorded: %#v", calls)
+	}
+	if findStageIndex(calls, mods.StageNamePlan+"#heal1") == -1 {
+		t.Fatalf("expected healing mods-plan recorded: %#v", calls)
 	}
 }
 

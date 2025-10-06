@@ -74,6 +74,7 @@ the legacy API.
   IPFS-compatible publishers/readers owned by the snapshot toolkit.
 - **Legacy lane metadata** – Purge Nomad-specific lane descriptors, templates
   under `configs/lanes/nomad*`, and build/test scripts that rely on system jobs.
+  Workstation lanes now live under `lanes/*.toml` and are mirrored into SHIFT.
 - **Build-gate service integrations** – Remove API-specific webhooks, Cron jobs,
   and background workers; ensure SBOM/vuln/static analysis hooks operate as
   Grid-submitted jobs only.
@@ -108,9 +109,8 @@ the legacy API.
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 
 3. **Lane Engine**
-   - Lanes defined in `configs/lanes/*.toml` referencing runtime families, cache
-     namespaces, build/test commands, and the job spec schema (`image`,
-     `command`, `env`, `resources`).
+   - Lanes defined in `lanes/*.toml` referencing runtime families, cache namespaces, build/test
+     commands, and the job spec schema (`image`, `command`, `env`, `resources`).
    - Cache keys incorporate lane, commit SHA, Aster toggle, snapshot
      fingerprint, and manifest version.
    - Expose `ploy lanes describe <lane>` for developers to inspect runtime
