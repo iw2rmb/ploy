@@ -57,8 +57,8 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       (Roadmap 12).
 - [x] Integration manifest schema — JSON schema + CLI validation hook for
       manifests (Roadmap 13).
-- [x] Grid workflow client — workflow stages submit through the Grid RPC when
-      `GRID_ENDPOINT` is set (Roadmap 14).
+- [x] Grid workflow client — workflow stages submit through the shared grid
+      client when `GRID_ID`/`GRID_API_KEY` are provided (Roadmap 14).
 - [x] IPFS artifact publishing — snapshot captures stream artifacts through the
       Grid-discovered IPFS gateway (Roadmap 15).
 - [x] Snapshot metadata streams — capture fingerprints and rule counts published
@@ -156,16 +156,16 @@ Full design records live in `docs/design/README.md`.
 4. **Run the Mods CLI**
 
    ```bash
-   GRID_ENDPOINT=https://grid-dev.example \
+   GRID_ID=dev-grid \
      GRID_API_KEY=ghp_example \
-     GRID_ID=dev-grid \
      ./dist/ploy mod run --tenant acme --ticket auto
    ```
 
-   Ploy reads `/v1/cluster/info` from Grid to discover the API endpoint,
-   JetStream route list, IPFS gateway, feature map, and Grid version before
-   connecting. Omitting `GRID_ENDPOINT` keeps the CLI on the in-memory Grid and
-   JetStream stubs.
+   The CLI instantiates the shared grid client, authenticates with gridbeacon,
+   and fetches discovery metadata (API endpoint, JetStream routes, IPFS gateway,
+   feature map, version) before connecting. Omitting either `GRID_ID` or
+   `GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs, and
+   setting the deprecated `GRID_ENDPOINT` variable now fails fast with guidance.
 
 5. **Preview snapshot rules**
 
@@ -229,12 +229,16 @@ entries, and deeper design context is collected in `docs/design/README.md`.
 Workstation builds rely on discovery to surface remote dependencies. The CLI
 inspects the following environment variables:
 
-- `GRID_ENDPOINT` — Workflow RPC host used to submit jobs back to Grid and
-  query the discovery endpoint.
-- `GRID_API_KEY` — Optional bearer token forwarded to Grid discovery and
-  Workflow RPC requests.
-- `GRID_ID` — Optional identifier scoping Grid state directories and
-  emitted discovery headers.
+- `GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
+  scope its state directory.
+- `GRID_API_KEY` — Required grid-scoped API key forwarded to gridbeacon,
+  discovery, and workflow RPC requests.
+- `GRID_CLIENT_BEACON_URL` — Optional beacon base URL override (defaults to
+  `https://beacon.getgrid.dev`).
+- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
+  directory (defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`).
+- `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set, it
+  also controls the grid client state directory.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration.
 

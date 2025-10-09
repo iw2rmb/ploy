@@ -5,6 +5,9 @@ import (
 	"strings"
 	"testing"
 
+	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
+	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
+
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
@@ -109,4 +112,51 @@ func withStubWorkspacePreparer(t *testing.T) *stubWorkspacePreparer {
 		t.Cleanup(func() { workspacePreparerFactory = prev })
 	}
 	return stub
+}
+
+type stubGridClient struct {
+	status        gridclient.Status
+	workflow      *workflowsdk.Client
+	workflowError error
+	calls         int
+}
+
+func newStubGridClient(status gridclient.Status) *stubGridClient {
+	return &stubGridClient{
+		status:   status,
+		workflow: &workflowsdk.Client{},
+	}
+}
+
+func (s *stubGridClient) Status() gridclient.Status {
+	return s.status
+}
+
+func (s *stubGridClient) WorkflowClient(context.Context) (*workflowsdk.Client, error) {
+	s.calls++
+	if s.workflowError != nil {
+		return nil, s.workflowError
+	}
+	if s.workflow != nil {
+		return s.workflow, nil
+	}
+	return &workflowsdk.Client{}, nil
+}
+
+func withGridClientStub(t *testing.T, stub gridClientAPI) {
+	if t != nil {
+		t.Helper()
+	}
+
+	prevNew := newGridClient
+	resetGridClientState()
+	newGridClient = func(context.Context, gridclient.Config) (gridClientAPI, error) {
+		return stub, nil
+	}
+	if t != nil {
+		t.Cleanup(func() {
+			newGridClient = prevNew
+			resetGridClientState()
+		})
+	}
 }

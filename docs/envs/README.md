@@ -14,23 +14,27 @@ additional configuration.
 
 ## gridctl (CLI)
 
-- `GRID_ENDPOINT` — Points the CLI at the Grid Workflow RPC. Discovery
-  configures JetStream routes and the IPFS gateway automatically. Current
-  default: `unset` (the CLI uses the in-memory Grid stub).
-- `GRID_API_KEY` — Optional bearer token supplied to the Grid helper and
-  discovery requests via the `Authorization` header.
-- `GRID_ID` — Optional identifier used to scope SDK state directories and
-  discovery headers when connecting to multiple Grid installations.
-- `GRID_WORKFLOW_SDK_STATE_DIR` — Overrides the Workflow RPC SDK state
-  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`, which
-  Ploy now sets up automatically so manifest caches and CA bundles persist
-  across CLI runs.
+- `GRID_ID` — Required grid identifier used to scope client state on disk and
+  construct the discovery/beacon requests. The CLI fails fast when unset.
+- `GRID_API_KEY` — Required grid-scoped API key presented to gridbeacon,
+  discovery, and control-plane requests; the CLI rejects runs when missing.
+- `GRID_CLIENT_BEACON_URL` — Optional override for the gridbeacon base URL.
+  Defaults to the production beacon (`https://beacon.getgrid.dev`).
+- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
+  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`
+  so discovery caches, manifests, and trust bundles persist per grid.
+- `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy override retained for compatibility.
+  When set it controls the workflow SDK cache path and is reused as the grid
+  client state directory.
 - `PLOY_LANES_DIR` — Explicit path to the lane catalog directory. When unset,
   Ploy searches `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/lanes`, `$HOME/.ploy/lanes`,
   and the adjacent `../ploy-lanes-catalog` checkout (for development). Set this
   before running the CLI to avoid missing lane definitions.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
+
+`GRID_ENDPOINT` is no longer recognised; exporting it causes the CLI to abort
+with guidance to supply `GRID_ID` and `GRID_API_KEY`.
 
 ## E2E Harness
 
@@ -48,7 +52,8 @@ additional configuration.
 ## Grid (service)
 
 - No environment variables are managed inside this repository slice; Grid
-  settings are discovered dynamically from the configured `GRID_ENDPOINT`.
+  settings are discovered dynamically via `sdk/gridclient/go` using the inputs
+  above (grid ID + API key).
 
 ## gapi
 

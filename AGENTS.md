@@ -70,8 +70,9 @@ addendum:
   `01-event-contracts` and `02-workflow-runner-cli`.
 - Until then, avoid stubbing external calls beyond interfaces defined inside
   `internal/workflow`.
-- When Grid integration arrives, run integration tests from the workstation
-  using the Dev API (`GRID_ENDPOINT`), keeping the CLI stateless.
+- When Grid integration requires live endpoints, run integration tests from the
+  workstation using the shared grid client (`GRID_ID`, `GRID_API_KEY`, optional
+  `GRID_CLIENT_BEACON_URL`), keeping the CLI stateless.
 
 ## Documentation Discipline
 

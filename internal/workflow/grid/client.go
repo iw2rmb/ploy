@@ -17,14 +17,15 @@ import (
 
 // Options configures the Grid Workflow RPC client.
 type Options struct {
-	Endpoint           string
-	HTTPClient         *http.Client
-	BearerToken        string
-	WorkflowResolver   WorkflowResolver
-	StreamOptions      helper.StreamOptions
-	StreamFunc         streamFunc
-	HelperFactory      workflowClientFactory
-	CursorStoreFactory CursorStoreFactory
+	Endpoint              string
+	HTTPClient            *http.Client
+	BearerToken           string
+	WorkflowResolver      WorkflowResolver
+	WorkflowClientFactory func(context.Context) (*workflowsdk.Client, error)
+	StreamOptions         helper.StreamOptions
+	StreamFunc            streamFunc
+	HelperFactory         workflowClientFactory
+	CursorStoreFactory    CursorStoreFactory
 }
 
 // WorkflowResolver resolves the workflow identifier associated with a ticket and stage.
@@ -59,22 +60,40 @@ type Client struct {
 func NewClient(opts Options) (*Client, error) {
 	endpoint := strings.TrimSpace(opts.Endpoint)
 	if endpoint == "" {
-		return nil, fmt.Errorf("grid endpoint is required")
-	}
-	parsed, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("parse grid endpoint: %w", err)
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return nil, fmt.Errorf("grid endpoint must include scheme and host")
+		if opts.WorkflowClientFactory == nil {
+			return nil, fmt.Errorf("grid endpoint is required")
+		}
+	} else {
+		parsed, err := url.Parse(endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("parse grid endpoint: %w", err)
+		}
+		if parsed.Scheme == "" || parsed.Host == "" {
+			return nil, fmt.Errorf("grid endpoint must include scheme and host")
+		}
 	}
 
 	factory := opts.HelperFactory
-	if factory == nil {
+	switch {
+	case opts.WorkflowClientFactory != nil:
+		factory = func(helper.Config) (workflowClient, error) {
+			client, err := opts.WorkflowClientFactory(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			if client == nil {
+				return nil, fmt.Errorf("workflow client factory returned nil client")
+			}
+			return &helperWorkflowClient{client: client}, nil
+		}
+	case factory == nil:
 		factory = defaultWorkflowClientFactory
 	}
 
-	cfgOpts := []helper.ConfigOption{helper.WithEndpoint(endpoint)}
+	cfgOpts := []helper.ConfigOption{}
+	if endpoint != "" {
+		cfgOpts = append(cfgOpts, helper.WithEndpoint(endpoint))
+	}
 	if opts.HTTPClient != nil {
 		cfgOpts = append(cfgOpts, helper.WithHTTPClient(opts.HTTPClient))
 	}

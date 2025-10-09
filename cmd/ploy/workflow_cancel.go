@@ -46,7 +46,7 @@ func handleWorkflowCancel(args []string, stderr io.Writer) error {
 		Reason:     strings.TrimSpace(*reason),
 	})
 	if errors.Is(err, runner.ErrGridCancellationUnsupported) {
-		return fmt.Errorf("workflow cancellation requires a Grid endpoint; set %s and retry", gridEndpointEnv)
+		return fmt.Errorf("workflow cancellation requires Grid credentials; set %s and %s and retry", gridIDEnv, gridAPIKeyEnv)
 	}
 	if err != nil {
 		return err

@@ -43,26 +43,27 @@ materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
-exit. When `GRID_ENDPOINT` targets a Grid cluster running v2025.11.0 or newer
-the CLI queries `/v1/cluster/info` to discover the API endpoint, JetStream
-route list, IPFS gateway, feature map, and Grid version before connecting;
-Grid-less runs fall back to the in-memory stubs. Mods planner hints
-(`--mods-plan-timeout`, `--mods-max-parallel`) flow into stage metadata so Grid
-can respect concurrency/timebox controls. When build-gate fails with a
-retryable outcome the runner collects the failure metadata, re-plans a healing
-branch using the Mods planner, and appends `#healN` stages before continuing to
-static checks and tests. When `GRID_ENDPOINT` is omitted the in-memory Grid stub
-remains active and still refuses stages whose lanes are not declared in the
-manifest. Provide `GRID_API_KEY` when authentication against the Workflow
-RPC helper is required. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle
-provenance after a successful run so developers can confirm which
-toggles/bundles were attached to each stage. Explicit ticket IDs remain a
-stub-only workflow until Grid integration lands.
+exit. When `GRID_ID` and `GRID_API_KEY` are supplied the CLI initialises the
+shared grid client, authenticates with gridbeacon, and reads discovery metadata
+(API endpoint, JetStream routes, IPFS gateway, feature map, version) before
+dispatching stages; without credentials the CLI remains on the in-memory Grid
+and JetStream stubs, and exporting the deprecated `GRID_ENDPOINT` now fails fast
+with guidance. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
+flow into stage metadata so Grid can respect concurrency/timebox controls. When
+build-gate fails with a retryable outcome the runner collects the failure
+metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
+stages before continuing to static checks and tests. Provide
+`GRID_CLIENT_BEACON_URL` when the beacon origin differs from the default. Both
+credentials must be present; supplying only one results in an error. When
+`PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
+successful run so developers can confirm which toggles/bundles were attached to
+each stage. Explicit ticket IDs remain a stub-only workflow until Grid
+integration lands.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
-requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance;
-in-memory stubs respond with a friendly reminder instead of attempting a
-cancellation.
+requires `GRID_ID` and `GRID_API_KEY` so the CLI can reach a real Grid
+instance; in-memory stubs respond with a friendly reminder instead of attempting
+an unsupported cancellation.
 Ploy records the cancellation reason (when supplied) and echoes the run status
 so operators can quickly confirm whether the request was accepted or the run
 was already terminal.
@@ -137,20 +138,19 @@ classifier drift without leaving the workstation.
 
 ## Environment
 
-- `GRID_ENDPOINT` — Workflow RPC base URL (`https://grid-dev.example`)
-  used by `mod run` and `workflow cancel`; it also enables discovery via
-  `/v1/cluster/info` for API endpoint, JetStream routes, IPFS gateway, feature
-  map, and version configuration.
-- `GRID_API_KEY` — Optional bearer token forwarded to Grid discovery and
-  Workflow RPC calls.
-- `GRID_ID` — Optional identifier scoping on-disk SDK caches and discovery
-  headers when working with multiple Grid installations.
-- `GRID_WORKFLOW_SDK_STATE_DIR` — Optional override for the Workflow RPC SDK
-  cache location. Ploy now defaults this to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid`
-  so manifests and CA bundles persist across CLI restarts.
+- `GRID_ID` — Required grid identifier so the CLI can initialise the shared
+  grid client and scope its state directory per grid.
+- `GRID_API_KEY` — Required grid-scoped API key forwarded to beacon/discovery
+  and workflow RPC calls.
+- `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
+  by default).
+- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
+  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`.
+- `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set it
+  also dictates the grid client state directory.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
-  keys, manifests, and summaries. When `GRID_ENDPOINT` is omitted the CLI falls
+  keys, manifests, and summaries. Without `GRID_ID`/`GRID_API_KEY` the CLI falls
   back to the in-memory Grid and JetStream stubs for offline development.
 
 ## Development

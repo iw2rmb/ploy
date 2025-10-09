@@ -104,11 +104,11 @@ the legacy API.
    - Single binary invoked by operators or Grid when work appears; default
      command `ploy mod run --ticket auto`.
    - Uses NATS JS durable consumers, reconstructs DAG from mod definitions +
-     integration manifests, emits Grid job specs through the Workflow RPC
-     helper (HTTP client keyed off `GRID_ENDPOINT`). JetStream and IPFS
-     endpoints are discovered automatically via `/v1/cluster/info` when
-     `GRID_ENDPOINT` is set, with legacy environment fallbacks retained for
-     older Grid releases.
+     integration manifests, emits Grid job specs through the shared grid client
+     (workflow helper keyed off `GRID_ID`/`GRID_API_KEY`). JetStream and IPFS
+     endpoints are discovered automatically via beacon + discovery; credentials
+     are required for live runs, with the in-memory stubs remaining available
+     when credentials are absent.
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 
 3. **Lane Engine**

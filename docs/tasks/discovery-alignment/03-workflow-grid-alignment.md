@@ -5,7 +5,7 @@
 ## Why / What For
 
 `handleModRun` relies on discovery to configure JetStream and snapshots
-when `GRID_ENDPOINT` is set. The tests currently stub discovery with minimal
+when grid credentials are supplied. The tests currently stub discovery with minimal
 payloads, so they do not cover feature gates or the richer schema. Updating the
 tests guarantees the workflow runner continues to operate when Grid exposes
 additional discovery data or disables integrations via feature flags.
