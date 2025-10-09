@@ -13,7 +13,10 @@ import (
 )
 
 func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	buf := &bytes.Buffer{}
 	fakeRunner := runnerInvokerFunc(func(ctx context.Context, opts runner.Options) error {

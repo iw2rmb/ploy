@@ -17,9 +17,10 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Planner metadata reflects parallel healing; SHIFT follow-up covers real Grid
   reconciliation.
-- `TestModsScenariosLiveGrid` — When `GRID_ENDPOINT`,
-  `GRID_API_KEY`, and `PLOY_LANES_DIR` are configured, runs the same scenario
-  against the live Grid Workflow RPC by shelling out to `ploy mod run`.
+- `TestModsScenariosLiveGrid` — When `GRID_ID`, `GRID_API_KEY`, and
+  `PLOY_LANES_DIR` are configured (plus optional `GRID_CLIENT_BEACON_URL`),
+  runs the same scenario against the live Grid Workflow RPC by shelling out to
+  `ploy mod run`.
   Additional scenarios can be toggled via `PLOY_E2E_LIVE_SCENARIOS`.
 
 Each scenario is defined in code (`scenarios.go`) with links back to the legacy
@@ -30,10 +31,11 @@ Grid stub, while remaining integration gaps for SHIFT are tracked per scenario.
 
 Set the following variables before invoking the suite:
 
-- `GRID_ENDPOINT` — Grid Workflow RPC endpoint (e.g. `https://grid.dev`)
-- `GRID_API_KEY` — Optional bearer token forwarded to discovery/RPC calls.
-- `GRID_ID` — Optional identifier for multi-grid setups (used for cache
-  scoping only).
+- `GRID_ID` — Grid identifier required to bootstrap discovery.
+- `GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
+- `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
+  by default).
+- `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.
 - `PLOY_E2E_TENANT` — Tenant slug to claim tickets under
 - `PLOY_E2E_TICKET_PREFIX` — Optional prefix for ad-hoc ticket IDs (default `e2e`)
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repo URL override for scenarios

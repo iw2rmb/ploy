@@ -31,7 +31,7 @@ func TestHandleWorkflowCancelRequiresGridEndpoint(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected cancellation unsupported error")
 	}
-	if !strings.Contains(err.Error(), "Grid endpoint") {
+	if !strings.Contains(err.Error(), gridIDEnv) || !strings.Contains(err.Error(), gridAPIKeyEnv) {
 		t.Fatalf("expected unsupported message, got %v", err)
 	}
 }

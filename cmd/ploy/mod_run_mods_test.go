@@ -13,7 +13,10 @@ import (
 )
 
 func TestHandleModRunConfiguresModsFlags(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory

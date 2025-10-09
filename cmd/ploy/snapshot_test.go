@@ -4,10 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
-	server "github.com/nats-io/nats-server/v2/server"
-	"github.com/nats-io/nats.go"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +13,13 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	discovery "github.com/iw2rmb/grid/sdk/discovery/go"
+	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
+	server "github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 )
 
 type fakeSnapshotRegistry struct {
@@ -107,6 +110,7 @@ func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
 
 func TestHandleSnapshotCaptureUsesIPFSGatewayWhenConfigured(t *testing.T) {
 	buf := &bytes.Buffer{}
+	t.Setenv(gridEndpointEnv, "")
 	serverCalled := int32(0)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&serverCalled, 1)
@@ -158,16 +162,22 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	defer func() { snapshotConfigDir = prevDir }()
 
-	prevFetch := fetchClusterInfoFn
-	resetDiscoveryState()
-	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{IPFSGateway: server.URL}, nil
-	}
-	t.Cleanup(func() {
-		fetchClusterInfoFn = prevFetch
-		resetDiscoveryState()
-	})
-	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+	withGridClientStub(t, newStubGridClient(gridclient.Status{
+		Beacon: gridclient.BeaconStatus{
+			APIEndpoint:      "https://api.grid.dev",
+			WorkflowEndpoint: "https://workflow.grid.dev",
+		},
+		Discovery: discovery.ClusterInfo{
+			APIEndpoint:   "https://api.grid.dev",
+			IPFSGateway:   server.URL,
+			JetStreamURLs: nil,
+			Features:      map[string]string{},
+			Version:       "2025.9.29",
+		},
+	}))
 
 	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-42"}, buf)
 	if err != nil {
@@ -184,6 +194,7 @@ fixture = "dev-db.json"
 
 func TestHandleSnapshotCapturePublishesMetadataToJetStream(t *testing.T) {
 	buf := &bytes.Buffer{}
+	t.Setenv(gridEndpointEnv, "")
 
 	srv := runJetStreamServer(t)
 	t.Cleanup(func() { srv.Shutdown() })
@@ -227,16 +238,22 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	t.Cleanup(func() { snapshotConfigDir = prevDir })
 
-	prevFetch := fetchClusterInfoFn
-	resetDiscoveryState()
-	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{JetStreamURLs: []string{srv.ClientURL()}}, nil
-	}
-	t.Cleanup(func() {
-		fetchClusterInfoFn = prevFetch
-		resetDiscoveryState()
-	})
-	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+	withGridClientStub(t, newStubGridClient(gridclient.Status{
+		Beacon: gridclient.BeaconStatus{
+			APIEndpoint:      "https://api.grid.dev",
+			WorkflowEndpoint: "https://workflow.grid.dev",
+		},
+		Discovery: discovery.ClusterInfo{
+			APIEndpoint:   "https://api.grid.dev",
+			JetStreamURLs: []string{srv.ClientURL()},
+			IPFSGateway:   "",
+			Features:      map[string]string{},
+			Version:       "2025.9.29",
+		},
+	}))
 
 	err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-77"}, buf)
 	if err != nil {

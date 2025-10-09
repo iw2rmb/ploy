@@ -8,7 +8,7 @@
   `github.com/iw2rmb/grid/sdk/workflowrpc/go`, with an injectable factory so
   tests can supply fakes.
 - The client preserves invocation tracking, constructs helper-backed SDK
-  instances when `GRID_ENDPOINT` is set, and converts runner stages into
+  instances when grid credentials (`GRID_ID`, `GRID_API_KEY`) are set, and converts runner stages into
   `workflowsdk.SubmitRequest` payloads.
 - Unit tests cover payload construction, streaming terminal events, and error
   propagation without relying on the removed `internal/workflow/grid/workflowrpc`
@@ -36,14 +36,14 @@ submits workflow runs through `/v1/workflows/rpc/runs` instead of the deprecated
   types and handles submission/cancellation/streaming via the SDK.
 - Tests cover success, non-2xx responses, and stream handling errors.
 - CLI wiring and dependency factories instantiate the SDK client when
-  `GRID_ENDPOINT` is provided.
+  grid credentials are provided.
 - Wrapper exports hooks so Roadmap 04 can swap in the helper once it lands
   without refactoring call sites.
 
 ## Tests
 
 - Unit tests for the wrapper verifying request payloads and error translation.
-- CLI tests ensuring `GRID_ENDPOINT` triggers SDK-based execution with
+- CLI tests ensuring grid credentials trigger SDK-based execution with
   invocation tracking preserved.
 
 ## References

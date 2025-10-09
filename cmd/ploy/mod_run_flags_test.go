@@ -14,7 +14,10 @@ import (
 )
 
 func TestHandleModRunSupportsAutoTicket(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -76,7 +79,10 @@ func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 }
 
 func TestHandleModRunPropagatesRunnerError(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{err: errors.New("boom")}
 	prevRunner := runnerExecutor
@@ -118,7 +124,10 @@ func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 }
 
 func TestHandleModRunPropagatesManifestLoaderError(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	prevLoader := manifestRegistryLoader
 	prevDir := manifestConfigDir
@@ -161,7 +170,10 @@ func TestHandleModRunRequiresTenant(t *testing.T) {
 }
 
 func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor

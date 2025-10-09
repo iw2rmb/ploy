@@ -5,14 +5,14 @@
 ## Why / What For
 
 Replace the in-memory Grid stub with the real Workflow RPC client so workstation
-runs can target the Dev Grid when `GRID_ENDPOINT` is available while still
+runs can target the Dev Grid when grid credentials (`GRID_ID`, `GRID_API_KEY`) are available while still
 supporting offline slices.
 
 ## Required Changes
 
 - Implement an HTTP client (`internal/workflow/grid`) that encodes stage
   requests, dispatches them to Grid, and captures outcomes.
-- Teach `ploy mod run` to instantiate the real client when `GRID_ENDPOINT`
+- Teach `ploy mod run` to instantiate the real client when grid credentials
   is set and preserve the stub fallback otherwise.
 - Record invocation metadata so the CLI can continue printing Aster bundle
   summaries regardless of the backing Grid implementation.
@@ -21,7 +21,7 @@ supporting offline slices.
 
 ## Definition of Done
 
-- Workflow stages execute through the Grid Workflow RPC when `GRID_ENDPOINT` is
+- Workflow stages execute through the Grid Workflow RPC when grid credentials are
   configured; removing the variable restores the in-memory stub.
 - CLI surface errors when Grid configuration fails and continues to print Aster
   summaries using invocation metadata.

@@ -77,7 +77,8 @@ requires:
 - Cancellation flows reuse the SDK helper, and terminal metadata now feeds
   archive export details (ID, class, queued timestamp) back into the CLI.
 - In-memory workflow clients remain for tests; helper-backed clients are
-  selected when `GRID_ENDPOINT` is set. When connected, Ploy ensures the
+  selected when grid credentials (`GRID_ID`, `GRID_API_KEY`) are set. When
+  connected, Ploy ensures the
   Workflow SDK state dir exists (defaulting under `~/.config/ploy/grid`) so
   manifest and CA caches persist between invocations.
 
@@ -107,7 +108,7 @@ requires:
 - `mod run` claims tickets, streams Workflow RPC status, and prints stage
   summaries enriched with archive export identifiers when Grid queues
   keep-forever runs.
-- `workflow cancel` requires `GRID_ENDPOINT`, calls the Workflow RPC cancel
+- `workflow cancel` requires `GRID_ID` and `GRID_API_KEY`, calls the Workflow RPC cancel
   endpoint, records the run status, and surfaces whether the cancellation was
   new or the run was already terminal.
 - CLI help references Workflow RPC endpoints, helper configuration flows, and

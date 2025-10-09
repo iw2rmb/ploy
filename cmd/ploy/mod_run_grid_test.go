@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"fmt"
+	discovery "github.com/iw2rmb/grid/sdk/discovery/go"
+	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -17,7 +19,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
+func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
+	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -28,6 +31,7 @@ func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	prevAsterDir := asterConfigDir
 	prevLaneLoader := laneRegistryLoader
 	prevLaneDir := laneConfigDir
+	prevStateDir := t.TempDir()
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -38,6 +42,10 @@ func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
 		laneRegistryLoader = prevLaneLoader
 		laneConfigDir = prevLaneDir
 	}()
+
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, prevStateDir)
 
 	runnerExecutor = fakeRunner
 	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
@@ -56,7 +64,6 @@ func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
 		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
-	t.Setenv("GRID_ENDPOINT", "")
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err != nil {
@@ -67,7 +74,8 @@ func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	}
 }
 
-func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
+func TestHandleModRunUsesSharedGridClient(t *testing.T) {
+	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -78,8 +86,6 @@ func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 	prevAsterDir := asterConfigDir
 	prevLaneLoader := laneRegistryLoader
 	prevLaneDir := laneConfigDir
-	prevDiscovery := fetchClusterInfoFn
-	resetDiscoveryState()
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -89,8 +95,26 @@ func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 		asterConfigDir = prevAsterDir
 		laneRegistryLoader = prevLaneLoader
 		laneConfigDir = prevLaneDir
-		fetchClusterInfoFn = prevDiscovery
 	}()
+
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+
+	status := gridclient.Status{
+		Beacon: gridclient.BeaconStatus{
+			APIEndpoint:      "https://api.grid.dev",
+			WorkflowEndpoint: "https://workflow.grid.dev",
+		},
+		Discovery: discovery.ClusterInfo{
+			APIEndpoint:   "https://api.grid.dev",
+			JetStreamURLs: []string{"nats://grid.dev:4222", "nats://grid.dev:5222"},
+			IPFSGateway:   "https://ipfs.grid.dev",
+			Features:      map[string]string{"workspace_api": "enabled"},
+			Version:       "2025.9.29",
+		},
+	}
+	withGridClientStub(t, newStubGridClient(status))
 
 	runnerExecutor = fakeRunner
 	var observedConfig integrationConfig
@@ -117,16 +141,6 @@ func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
-	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{
-			APIEndpoint:   "https://grid.dev",
-			JetStreamURLs: []string{"nats://grid.dev:4222", "nats://grid.dev:5222"},
-			IPFSGateway:   "https://ipfs.grid.dev",
-			Features:      map[string]string{"workspace_api": "enabled"},
-			Version:       "2025.9.29",
-		}, nil
-	}
-	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err != nil {
@@ -141,7 +155,7 @@ func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 	if len(observedConfig.JetStreamURLs) != 2 {
 		t.Fatalf("unexpected jetstream routes: %+v", observedConfig.JetStreamURLs)
 	}
-	if observedConfig.APIEndpoint != "https://grid.dev" {
+	if observedConfig.APIEndpoint != "https://api.grid.dev" {
 		t.Fatalf("unexpected api endpoint: %q", observedConfig.APIEndpoint)
 	}
 	if observedConfig.Version != "2025.9.29" {
@@ -152,29 +166,38 @@ func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 	}
 }
 
-func TestHandleModRunFailsForInvalidGridEndpoint(t *testing.T) {
+func TestHandleModRunFailsWhenGridClientUnavailable(t *testing.T) {
+	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
-	prevLocatorLoader := asterLocatorLoader
-	prevAsterDir := asterConfigDir
 	prevLaneLoader := laneRegistryLoader
 	prevLaneDir := laneConfigDir
-	prevDiscovery := fetchClusterInfoFn
-	resetDiscoveryState()
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
-		asterLocatorLoader = prevLocatorLoader
-		asterConfigDir = prevAsterDir
 		laneRegistryLoader = prevLaneLoader
 		laneConfigDir = prevLaneDir
-		fetchClusterInfoFn = prevDiscovery
 	}()
+
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+
+	sentinel := fmt.Errorf("gridclient: boom")
+	prevNew := newGridClient
+	resetGridClientState()
+	newGridClient = func(context.Context, gridclient.Config) (gridClientAPI, error) {
+		return nil, sentinel
+	}
+	t.Cleanup(func() {
+		newGridClient = prevNew
+		resetGridClientState()
+	})
 
 	runnerExecutor = &recordingRunner{}
 	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
@@ -182,8 +205,6 @@ func TestHandleModRunFailsForInvalidGridEndpoint(t *testing.T) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
 	manifestConfigDir = "ignored"
-	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
-	asterConfigDir = "ignored"
 	laneRegistryLoader = func(dir string) (laneRegistry, error) {
 		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
 		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
@@ -193,41 +214,90 @@ func TestHandleModRunFailsForInvalidGridEndpoint(t *testing.T) {
 		return &fakeLaneRegistry{description: desc}, nil
 	}
 	laneConfigDir = "ignored"
-	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{}, fmt.Errorf("invalid endpoint")
+
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), sentinel.Error()) {
+		t.Fatalf("expected error %v, got %v", sentinel, err)
 	}
-	t.Setenv("GRID_ENDPOINT", "://invalid")
+}
+
+func TestHandleModRunRejectsDeprecatedEndpoint(t *testing.T) {
+	withStubWorkspacePreparer(t)
+	prevRunner := runnerExecutor
+	prevManifestLoader := manifestRegistryLoader
+	prevManifestDir := manifestConfigDir
+	prevLaneLoader := laneRegistryLoader
+	prevLaneDir := laneConfigDir
+	defer func() {
+		runnerExecutor = prevRunner
+		manifestRegistryLoader = prevManifestLoader
+		manifestConfigDir = prevManifestDir
+		laneRegistryLoader = prevLaneLoader
+		laneConfigDir = prevLaneDir
+	}()
+
+	t.Setenv(gridEndpointEnv, "https://legacy.dev")
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+
+	runnerExecutor = &recordingRunner{}
+	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
+	}
+	manifestConfigDir = "ignored"
+	laneRegistryLoader = func(dir string) (laneRegistry, error) {
+		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
+		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
+		desc.Lane.Job.Command = []string{"mods-plan"}
+		desc.Lane.Job.Env = map[string]string{}
+		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
+		return &fakeLaneRegistry{description: desc}, nil
+	}
+	laneConfigDir = "ignored"
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err == nil {
-		t.Fatal("expected error for invalid grid endpoint")
+		t.Fatal("expected error when GRID_ENDPOINT is set")
 	}
-	if !strings.Contains(strings.ToLower(err.Error()), "grid") {
-		t.Fatalf("expected grid error context, got %v", err)
+	if !strings.Contains(err.Error(), gridEndpointEnv) {
+		t.Fatalf("expected mention of %s, got %v", gridEndpointEnv, err)
 	}
 }
 
 func TestHandleModRunFailsWhenJetStreamURLInvalid(t *testing.T) {
+	t.Setenv(gridEndpointEnv, "")
 	prevFactory := eventsFactory
 	prevManifestDir := manifestConfigDir
 	prevLaneDir := laneConfigDir
 	prevAsterDir := asterConfigDir
-	prevDiscovery := fetchClusterInfoFn
 	defer func() {
 		eventsFactory = prevFactory
 		manifestConfigDir = prevManifestDir
 		laneConfigDir = prevLaneDir
 		asterConfigDir = prevAsterDir
-		fetchClusterInfoFn = prevDiscovery
-		resetDiscoveryState()
 	}()
 
-	eventsFactory = defaultEventsFactory
-	resetDiscoveryState()
-	fetchClusterInfoFn = func(ctx context.Context, endpoint string) (clusterInfo, error) {
-		return clusterInfo{JetStreamURLs: []string{"nats://127.0.0.1:1"}}, nil
+	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridClientStateEnv, t.TempDir())
+
+	status := gridclient.Status{
+		Beacon: gridclient.BeaconStatus{
+			APIEndpoint:      "https://api.grid.dev",
+			WorkflowEndpoint: "https://workflow.grid.dev",
+		},
+		Discovery: discovery.ClusterInfo{
+			APIEndpoint:   "https://api.grid.dev",
+			JetStreamURLs: []string{"nats://127.0.0.1:1"},
+			IPFSGateway:   "",
+			Features:      map[string]string{},
+			Version:       "2025.9.29",
+		},
 	}
-	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
+	withGridClientStub(t, newStubGridClient(status))
+
+	eventsFactory = defaultEventsFactory
 
 	_, file, _, _ := runtime.Caller(0)
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))

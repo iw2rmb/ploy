@@ -18,7 +18,7 @@ workflow-scoped environments stay within approved boundaries.
   supplied, keeping TOML output deterministic for review.
 - Grid enforcement is stubbed locally: the in-memory Grid rejects stages that
   target lanes not declared in the manifest. JetStream/Grid wiring will replace
-  the stub once `GRID_ENDPOINT` integration resumes.
+  the stub as the shared grid client rolls out across environments.
 
 ## Usage / Commands
 

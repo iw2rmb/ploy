@@ -1,5 +1,21 @@
 # Changelog
 
+## [2025-10-11] Grid Client Adoption
+
+- Switched the Ploy CLI to use the shared `sdk/gridclient/go` library, removed
+  `GRID_ENDPOINT` handling, and enforced `{GRID_ID, GRID_API_KEY}` credentials
+  for live runs while retaining in-memory fallbacks (cmd/ploy/dependencies*.go,
+  internal/workflow/grid/client.go).
+- Updated unit tests and the Mods/snapshot harnesses to stub the shared client
+  and reset legacy environment variables; refreshed the e2e configuration to
+  propagate the new inputs (cmd/ploy/*_test.go, tests/e2e/config.go,
+  tests/e2e/mods_scenarios_test.go).
+- Refreshed CLI/docs/environment references to document the new client flow
+  and the `GRID_ENDPOINT` deprecation (README.md, cmd/ploy/README.md,
+  docs/envs/README.md, docs/design/workflow-rpc-alignment/README.md,
+  docs/tasks/grid-client/04-ploy-adoption.md).
+- Verified via `go test ./...` on 2025-10-11.
+
 ## [2025-10-09] Mods CLI Rename
 
 - Retired the `ploy workflow run` command in favour of `ploy mod run`, updating

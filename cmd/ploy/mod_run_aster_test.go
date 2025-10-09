@@ -12,7 +12,10 @@ import (
 
 func TestHandleModRunParsesAsterFlags(t *testing.T) {
 	t.Setenv("PLOY_ASTER_ENABLE", "1")
-	t.Setenv("GRID_ENDPOINT", "")
+	t.Setenv(gridEndpointEnv, "")
+	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor

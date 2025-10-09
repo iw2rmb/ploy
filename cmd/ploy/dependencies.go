@@ -65,6 +65,8 @@ const (
 	gridEndpointEnv     = "GRID_ENDPOINT"
 	gridAPIKeyEnv       = "GRID_API_KEY"
 	gridIDEnv           = "GRID_ID"
+	gridClientBeaconEnv = "GRID_CLIENT_BEACON_URL"
+	gridClientStateEnv  = "GRID_CLIENT_STATE_DIR"
 )
 
 var (
