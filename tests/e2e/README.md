@@ -9,14 +9,15 @@ go test -tags e2e ./tests/e2e -v
 
 ## Current Scenarios
 
-- `simple-openrewrite` — Java 11→17 OpenRewrite sample upgrade. ✅ Passes on
-  workstation harness (`go test -tags e2e`) using the Grid stub and Mods lanes.
+- `simple-openrewrite` — Java 11→17 OpenRewrite sample upgrade. ✅ Runs against
+  live Grid through the workstation harness (`go test -tags e2e`) when the Grid
+  credentials are present.
 - `buildgate-self-heal` — OpenRewrite plus healing after the build gate fails.
-  ✅ Healing branch validated via in-memory Grid stub; real Grid smoke deferred
-  to SHIFT lanes.
+  ✅ Exercises the live Grid path; expect retries and healing branches to run
+  against the real infrastructure.
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
-  ✅ Planner metadata reflects parallel healing; SHIFT follow-up covers real Grid
-  reconciliation.
+  ✅ Drives the live Grid client; parallel reconciliation depends on the staged
+  roadmap work landing upstream.
 - `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, and
   `PLOY_LANES_DIR` are configured (plus optional `GRID_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
@@ -24,8 +25,9 @@ go test -tags e2e ./tests/e2e -v
   Additional scenarios can be toggled via `PLOY_E2E_LIVE_SCENARIOS`.
 
 Each scenario is defined in code (`scenarios.go`) with links back to the legacy
-GitLab fixtures. The workstation harness now runs green against the in-memory
-Grid stub, while remaining integration gaps for SHIFT are tracked per scenario.
+GitLab fixtures. The workstation harness now always drives the live Grid client,
+so any missing behaviour must be implemented upstream rather than simulated with
+stubs.
 
 ## Environment Requirements
 
@@ -45,7 +47,8 @@ Set the following variables before invoking the suite:
 - `PLOY_E2E_LIVE_SCENARIOS` — Comma-separated scenario IDs to execute against
   live Grid (defaults to `simple-openrewrite`).
 
-When any mandatory variable is missing, the tests skip with a helpful message.
+When mandatory variables are missing or the credentials are invalid, the live
+Grid-backed tests fail fast so misconfiguration is surfaced immediately.
 
 ## How This Diff Relates to Legacy Mods E2E
 

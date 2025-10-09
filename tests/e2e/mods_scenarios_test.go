@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 func TestModsScenarioSimpleOpenRewrite(t *testing.T) {
@@ -98,20 +97,6 @@ func TestModsScenarioBuildGateSelfHeal(t *testing.T) {
 				Confidence: 0.84,
 			}},
 		},
-		GridOutcomes: map[string][]runner.StageOutcome{
-			"build-gate": {
-				{
-					Status:    runner.StageStatusFailed,
-					Retryable: true,
-					Message:   "compile failed: missing symbol",
-				},
-				{
-					Status:    runner.StageStatusFailed,
-					Retryable: true,
-					Message:   "compile failed: missing symbol",
-				},
-			},
-		},
 	})
 
 	if err := harness.run(); err != nil {
@@ -174,20 +159,6 @@ func TestModsScenarioParallelHealingOptions(t *testing.T) {
 			Human: mods.AdviceHuman{
 				Required:  true,
 				Playbooks: []string{"playbooks/mods/parallel-review.md"},
-			},
-		},
-		GridOutcomes: map[string][]runner.StageOutcome{
-			"build-gate": {
-				{
-					Status:    runner.StageStatusFailed,
-					Retryable: true,
-					Message:   "tests failed: multiple regressions",
-				},
-				{
-					Status:    runner.StageStatusFailed,
-					Retryable: true,
-					Message:   "tests failed: multiple regressions",
-				},
 			},
 		},
 		PlanTimeout:     2*time.Minute + 30*time.Second,

@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,6 @@ import (
 
 type scenarioOptions struct {
 	Advice          mods.Advice
-	GridOutcomes    map[string][]runner.StageOutcome
 	PlanTimeout     time.Duration
 	ModsMaxParallel int
 	WorkspaceHint   string
@@ -29,7 +29,8 @@ type scenarioHarness struct {
 	options   scenarioOptions
 	tenant    string
 	ticket    string
-	grid      *runner.InMemoryGrid
+	grid      runner.GridClient
+	recorder  *capturingGrid
 	bus       *contracts.InMemoryBus
 	workspace *recordingWorkspacePreparer
 	advisor   *recordingAdvisor
@@ -82,12 +83,21 @@ func newScenarioHarness(t *testing.T, scenario Scenario, opts scenarioOptions) *
 		harness.options.WorkspaceHint = "mods/java"
 	}
 
-	harness.grid = runner.NewInMemoryGrid()
-	if len(harness.options.GridOutcomes) > 0 {
-		for name, outcomes := range harness.options.GridOutcomes {
-			harness.grid.StageOutcomes[name] = append([]runner.StageOutcome(nil), outcomes...)
-		}
+	cfg := LoadConfig()
+	if cfg.SkipReason != "" {
+		t.Fatalf("live grid config missing: %s", cfg.SkipReason)
 	}
+	client, stateDir, err := liveGridClient(cfg)
+	if err != nil {
+		t.Fatalf("create live grid client: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(stateDir)
+	})
+
+	recorder := newCapturingGrid(client)
+	harness.grid = recorder
+	harness.recorder = recorder
 
 	repo := contracts.RepoMaterialization{
 		URL:           strings.TrimSpace(scenario.RepoURL),
@@ -144,7 +154,10 @@ func (h *scenarioHarness) run() error {
 }
 
 func (h *scenarioHarness) stageNames() []string {
-	invocations := h.grid.Invocations()
+	if h.recorder == nil {
+		return nil
+	}
+	invocations := h.recorder.Invocations()
 	names := make([]string, len(invocations))
 	for i, inv := range invocations {
 		names[i] = inv.Stage.Name
@@ -153,7 +166,10 @@ func (h *scenarioHarness) stageNames() []string {
 }
 
 func (h *scenarioHarness) stageByName(name string) (runner.Stage, bool) {
-	invocations := h.grid.Invocations()
+	if h.recorder == nil {
+		return runner.Stage{}, false
+	}
+	invocations := h.recorder.Invocations()
 	for _, inv := range invocations {
 		if inv.Stage.Name == name {
 			return inv.Stage, true
