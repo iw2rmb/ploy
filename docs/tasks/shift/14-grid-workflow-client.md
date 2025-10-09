@@ -5,7 +5,7 @@
 ## Why / What For
 
 Replace the in-memory Grid stub with the real Workflow RPC client so workstation
-runs can target the Dev Grid when grid credentials (`PLOY_GRID_ID`, `PLOY_GRID_API_KEY`) are available while still
+runs can target the Dev Grid when grid credentials (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`) are available while still
 supporting offline slices.
 
 ## Required Changes

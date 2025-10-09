@@ -53,7 +53,7 @@ in mind when editing `AGENTS.md` or adding new docs.
 ## Style Guidelines
 
 - Prefer short, action-oriented bullet lists over dense prose.
-- Use placeholders for environment values (`PLOY_GRID_ID`, `PLOY_GRID_API_KEY`) instead of past
+- Use placeholders for environment values (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`) instead of past
   platform-specific hosts.
 - Highlight the RED → GREEN → REFACTOR cadence whenever tests or workflows are
   described.

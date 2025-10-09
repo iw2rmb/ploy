@@ -58,7 +58,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
 - [x] Integration manifest schema — JSON schema + CLI validation hook for
       manifests (Roadmap 13).
 - [x] Grid workflow client — workflow stages submit through the shared grid
-      client when `PLOY_GRID_ID`/`PLOY_GRID_API_KEY` are provided (Roadmap 14).
+      client when `PLOY_GRID_ID`/`GRID_BEACON_API_KEY` are provided (Roadmap 14).
 - [x] IPFS artifact publishing — snapshot captures stream artifacts through the
       Grid-discovered IPFS gateway (Roadmap 15).
 - [x] Snapshot metadata streams — capture fingerprints and rule counts published
@@ -157,14 +157,14 @@ Full design records live in `docs/design/README.md`.
 
    ```bash
    PLOY_GRID_ID=dev-grid \
-     PLOY_GRID_API_KEY=ghp_example \
+     GRID_BEACON_API_KEY=ghp_example \
      ./dist/ploy mod run --tenant acme --ticket auto
    ```
 
    The CLI instantiates the shared grid client, authenticates with gridbeacon,
    and fetches discovery metadata (API endpoint, JetStream routes, IPFS gateway,
    feature map, version) before connecting. Omitting either `PLOY_GRID_ID` or
-   `PLOY_GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs.
+   `GRID_BEACON_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs.
 
 5. **Preview snapshot rules**
 
@@ -230,8 +230,8 @@ inspects the following environment variables:
 
 - `PLOY_GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
   scope its state directory.
-- `PLOY_GRID_API_KEY` — Required grid-scoped API key forwarded to gridbeacon,
-  discovery, and workflow RPC requests.
+- `GRID_BEACON_API_KEY` — Required beacon API key forwarded to gridbeacon when
+  fetching discovery metadata and workflow credentials.
 - `GRID_BEACON_URL` — Optional beacon base URL override (defaults to
   `https://beacon.getgrid.dev`).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state

@@ -26,7 +26,7 @@
 - Verified SHIFT lane catalog via `PLOY_LANES_DIR=$PLOY_LANES_DIR go run
   ./cmd/ploy lanes describe --lane mods-plan --manifest 2025-09-26`.
 - `tests/e2e/mods_scenarios_test.go` now builds the CLI and, when `PLOY_GRID_ID`,
-  `PLOY_GRID_API_KEY`, and `PLOY_LANES_DIR` are configured, runs `ploy mod run` against Grid via
+  `GRID_BEACON_API_KEY`, and `PLOY_LANES_DIR` are configured, runs `ploy mod run` against Grid via
   `TestModsScenariosLiveGrid`; additional scenarios can be enabled through
   `PLOY_E2E_LIVE_SCENARIOS`.
 - Placeholder for additional follow-up once SHIFT lane publication completes.

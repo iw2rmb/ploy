@@ -8,7 +8,7 @@
   `github.com/iw2rmb/grid/sdk/workflowrpc/go`, with an injectable factory so
   tests can supply fakes.
 - The client preserves invocation tracking, constructs helper-backed SDK
-  instances when grid credentials (`PLOY_GRID_ID`, `PLOY_GRID_API_KEY`) are set, and converts runner stages into
+  instances when grid credentials (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`) are set, and converts runner stages into
   `workflowsdk.SubmitRequest` payloads.
 - Unit tests cover payload construction, streaming terminal events, and error
   propagation without relying on the removed `internal/workflow/grid/workflowrpc`

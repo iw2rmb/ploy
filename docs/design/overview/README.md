@@ -105,7 +105,7 @@ the legacy API.
      command `ploy mod run --ticket auto`.
    - Uses NATS JS durable consumers, reconstructs DAG from mod definitions +
      integration manifests, emits Grid job specs through the shared grid client
-     (workflow helper keyed off `PLOY_GRID_ID`/`PLOY_GRID_API_KEY`). JetStream and IPFS
+     (workflow helper keyed off `PLOY_GRID_ID`/`GRID_BEACON_API_KEY`). JetStream and IPFS
      endpoints are discovered automatically via beacon + discovery; credentials
      are required for live runs, with the in-memory stubs remaining available
      when credentials are absent.
