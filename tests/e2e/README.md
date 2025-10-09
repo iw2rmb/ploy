@@ -31,6 +31,8 @@ Grid stub, while remaining integration gaps for SHIFT are tracked per scenario.
 
 Set the following variables before invoking the suite:
 
+- Remember to source `~/.zshenv` (or otherwise export them into your shell) so
+  the CLI picks up the expected environment.
 - `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
 - `PLOY_GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
