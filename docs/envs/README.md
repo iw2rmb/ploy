@@ -14,9 +14,9 @@ additional configuration.
 
 ## gridctl (CLI)
 
-- `GRID_ID` — Required grid identifier used to scope client state on disk and
+- `PLOY_GRID_ID` — Required grid identifier used to scope client state on disk and
   construct the discovery/beacon requests. The CLI fails fast when unset.
-- `GRID_API_KEY` — Required grid-scoped API key presented to gridbeacon,
+- `PLOY_GRID_API_KEY` — Required grid-scoped API key presented to gridbeacon,
   discovery, and control-plane requests; the CLI rejects runs when missing.
 - `GRID_CLIENT_BEACON_URL` — Optional override for the gridbeacon base URL.
   Defaults to the production beacon (`https://beacon.getgrid.dev`).
@@ -34,7 +34,7 @@ additional configuration.
   integration. Current default: `unset` (Aster toggles stay disabled).
 
 `GRID_ENDPOINT` is no longer recognised; exporting it causes the CLI to abort
-with guidance to supply `GRID_ID` and `GRID_API_KEY`.
+with guidance to supply `PLOY_GRID_ID` and `PLOY_GRID_API_KEY`.
 
 ## E2E Harness
 

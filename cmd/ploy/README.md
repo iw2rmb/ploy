@@ -43,7 +43,7 @@ materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
-exit. When `GRID_ID` and `GRID_API_KEY` are supplied the CLI initialises the
+exit. When `PLOY_GRID_ID` and `PLOY_GRID_API_KEY` are supplied the CLI initialises the
 shared grid client, authenticates with gridbeacon, and reads discovery metadata
 (API endpoint, JetStream routes, IPFS gateway, feature map, version) before
 dispatching stages; without credentials the CLI remains on the in-memory Grid
@@ -61,7 +61,7 @@ each stage. Explicit ticket IDs remain a stub-only workflow until Grid
 integration lands.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
-requires `GRID_ID` and `GRID_API_KEY` so the CLI can reach a real Grid
+requires `PLOY_GRID_ID` and `PLOY_GRID_API_KEY` so the CLI can reach a real Grid
 instance; in-memory stubs respond with a friendly reminder instead of attempting
 an unsupported cancellation.
 Ploy records the cancellation reason (when supplied) and echoes the run status
@@ -138,9 +138,9 @@ classifier drift without leaving the workstation.
 
 ## Environment
 
-- `GRID_ID` — Required grid identifier so the CLI can initialise the shared
+- `PLOY_GRID_ID` — Required grid identifier so the CLI can initialise the shared
   grid client and scope its state directory per grid.
-- `GRID_API_KEY` — Required grid-scoped API key forwarded to beacon/discovery
+- `PLOY_GRID_API_KEY` — Required grid-scoped API key forwarded to beacon/discovery
   and workflow RPC calls.
 - `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
@@ -150,7 +150,7 @@ classifier drift without leaving the workstation.
   also dictates the grid client state directory.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
-  keys, manifests, and summaries. Without `GRID_ID`/`GRID_API_KEY` the CLI falls
+  keys, manifests, and summaries. Without `PLOY_GRID_ID`/`PLOY_GRID_API_KEY` the CLI falls
   back to the in-memory Grid and JetStream stubs for offline development.
 
 ## Development

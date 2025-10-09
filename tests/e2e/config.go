@@ -23,8 +23,8 @@ type Config struct {
 // LoadConfig inspects the environment and prepares the E2E configuration.
 func LoadConfig() Config {
 	cfg := Config{
-		GridID:       strings.TrimSpace(os.Getenv("GRID_ID")),
-		GridAPIKey:   strings.TrimSpace(os.Getenv("GRID_API_KEY")),
+		GridID:       strings.TrimSpace(os.Getenv("PLOY_GRID_ID")),
+		GridAPIKey:   strings.TrimSpace(os.Getenv("PLOY_GRID_API_KEY")),
 		BeaconURL:    strings.TrimSpace(os.Getenv("GRID_CLIENT_BEACON_URL")),
 		Tenant:       strings.TrimSpace(os.Getenv("PLOY_E2E_TENANT")),
 		TicketPrefix: strings.TrimSpace(os.Getenv("PLOY_E2E_TICKET_PREFIX")),
@@ -35,11 +35,11 @@ func LoadConfig() Config {
 		cfg.TicketPrefix = "e2e"
 	}
 	if cfg.GridID == "" {
-		cfg.SkipReason = "GRID_ID is not set; grid client requires a grid identifier"
+		cfg.SkipReason = "PLOY_GRID_ID is not set; grid client requires a grid identifier"
 		return cfg
 	}
 	if cfg.GridAPIKey == "" {
-		cfg.SkipReason = "GRID_API_KEY is not set; grid client requires a grid API key"
+		cfg.SkipReason = "PLOY_GRID_API_KEY is not set; grid client requires a grid API key"
 		return cfg
 	}
 	if cfg.Tenant == "" {

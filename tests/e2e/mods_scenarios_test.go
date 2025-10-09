@@ -345,8 +345,8 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	cmd.Dir = rootDir
 
 	envVars := map[string]string{
-		"GRID_API_KEY":           cfg.GridAPIKey,
-		"GRID_ID":                cfg.GridID,
+		"PLOY_GRID_API_KEY":      cfg.GridAPIKey,
+		"PLOY_GRID_ID":           cfg.GridID,
 		"PLOY_E2E_TENANT":        cfg.Tenant,
 		"PLOY_E2E_TICKET_PREFIX": cfg.TicketPrefix,
 		"PLOY_E2E_REPO_OVERRIDE": cfg.RepoOverride,
