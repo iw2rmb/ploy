@@ -17,7 +17,7 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Planner metadata reflects parallel healing; SHIFT follow-up covers real Grid
   reconciliation.
-- `TestModsScenariosLiveGrid` — When `GRID_ID`, `GRID_API_KEY`, and
+- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, and
   `PLOY_LANES_DIR` are configured (plus optional `GRID_CLIENT_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
   `ploy mod run`.
@@ -31,8 +31,8 @@ Grid stub, while remaining integration gaps for SHIFT are tracked per scenario.
 
 Set the following variables before invoking the suite:
 
-- `GRID_ID` — Grid identifier required to bootstrap discovery.
-- `GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
+- `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
+- `PLOY_GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
 - `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.

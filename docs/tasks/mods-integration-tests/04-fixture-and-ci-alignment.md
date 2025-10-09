@@ -28,7 +28,7 @@ fail due to missing repositories or credentials.
 ## Current Status
 
 - Fixture seeding script uploads SeaweedFS payloads and validates Git remotes
-  using `PLOY_GITLAB_PAT`.
+  using `PLOY_E2E_GITLAB_TOKEN`.
 - GitHub Actions job `mods-integration-harness` seeds fixtures and invokes
   `make mods-integration-vps` when VPS secrets are present.
 - Docs note workstation and VPS preparation steps.
@@ -37,7 +37,7 @@ fail due to missing repositories or credentials.
 
 - Added SeaweedFS seeding script (`scripts/mods-seed-fixtures.sh`) that uploads
   fixture payloads from `tests/mods-fixtures` and validates Git remotes using
-  `PLOY_GITLAB_PAT`.
+  `PLOY_E2E_GITLAB_TOKEN`.
 - Curated fixture inputs in `tests/mods-fixtures/` for mod-99, mod-gitlab-test,
   and self-healing scenarios.
 - Wired GitHub Actions job `mods-integration-harness` to seed fixtures and

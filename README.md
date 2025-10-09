@@ -58,7 +58,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
 - [x] Integration manifest schema — JSON schema + CLI validation hook for
       manifests (Roadmap 13).
 - [x] Grid workflow client — workflow stages submit through the shared grid
-      client when `GRID_ID`/`GRID_API_KEY` are provided (Roadmap 14).
+      client when `PLOY_GRID_ID`/`PLOY_GRID_API_KEY` are provided (Roadmap 14).
 - [x] IPFS artifact publishing — snapshot captures stream artifacts through the
       Grid-discovered IPFS gateway (Roadmap 15).
 - [x] Snapshot metadata streams — capture fingerprints and rule counts published
@@ -156,15 +156,15 @@ Full design records live in `docs/design/README.md`.
 4. **Run the Mods CLI**
 
    ```bash
-   GRID_ID=dev-grid \
-     GRID_API_KEY=ghp_example \
+   PLOY_GRID_ID=dev-grid \
+     PLOY_GRID_API_KEY=ghp_example \
      ./dist/ploy mod run --tenant acme --ticket auto
    ```
 
    The CLI instantiates the shared grid client, authenticates with gridbeacon,
    and fetches discovery metadata (API endpoint, JetStream routes, IPFS gateway,
-   feature map, version) before connecting. Omitting either `GRID_ID` or
-   `GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs, and
+   feature map, version) before connecting. Omitting either `PLOY_GRID_ID` or
+   `PLOY_GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs, and
    setting the deprecated `GRID_ENDPOINT` variable now fails fast with guidance.
 
 5. **Preview snapshot rules**
@@ -229,9 +229,9 @@ entries, and deeper design context is collected in `docs/design/README.md`.
 Workstation builds rely on discovery to surface remote dependencies. The CLI
 inspects the following environment variables:
 
-- `GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
+- `PLOY_GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
   scope its state directory.
-- `GRID_API_KEY` — Required grid-scoped API key forwarded to gridbeacon,
+- `PLOY_GRID_API_KEY` — Required grid-scoped API key forwarded to gridbeacon,
   discovery, and workflow RPC requests.
 - `GRID_CLIENT_BEACON_URL` — Optional beacon base URL override (defaults to
   `https://beacon.getgrid.dev`).
