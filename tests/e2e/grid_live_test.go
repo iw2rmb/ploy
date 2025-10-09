@@ -70,9 +70,9 @@ func (g *capturingGrid) Invocations() []runner.StageInvocation {
 // liveGridClient constructs a runner.GridClient backed by the real Grid Workflow RPC.
 func liveGridClient(cfg Config) (runner.GridClient, string, error) {
 	gridID := strings.TrimSpace(cfg.GridID)
-	apiKey := strings.TrimSpace(cfg.GridAPIKey)
-	if gridID == "" || apiKey == "" {
-		return nil, "", fmt.Errorf("grid id and api key are required")
+	beaconKey := strings.TrimSpace(cfg.BeaconAPIKey)
+	if gridID == "" || beaconKey == "" {
+		return nil, "", fmt.Errorf("grid id and beacon api key are required")
 	}
 
 	stateDir, err := os.MkdirTemp("", "ploy-grid-client-")
@@ -82,7 +82,7 @@ func liveGridClient(cfg Config) (runner.GridClient, string, error) {
 
 	clientCfg := gridclient.Config{
 		GridID:   gridID,
-		APIKey:   apiKey,
+		APIKey:   beaconKey,
 		StateDir: stateDir,
 	}
 	if beacon := strings.TrimSpace(cfg.BeaconURL); beacon != "" {
@@ -100,10 +100,11 @@ func liveGridClient(cfg Config) (runner.GridClient, string, error) {
 		return nil, "", fmt.Errorf("configure grid client: workflow endpoint unavailable from beacon metadata")
 	}
 
+	streamOpts := helper.StreamOptions{HeartbeatInterval: 20 * time.Second, MinBackoff: 200 * time.Millisecond, MaxBackoff: 5 * time.Second}
 	cursorFactory := grid.NewCursorStoreFactory(stateDir)
 	options := grid.Options{
 		Endpoint:           endpoint,
-		StreamOptions:      helper.StreamOptions{HeartbeatInterval: 20 * time.Second, MinBackoff: 200 * time.Millisecond, MaxBackoff: 5 * time.Second},
+		StreamOptions:      streamOpts,
 		CursorStoreFactory: cursorFactory,
 		WorkflowClientFactory: func(ctx context.Context) (*workflowsdk.Client, error) {
 			return baseClient.WorkflowClient(ctx)

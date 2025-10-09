@@ -313,7 +313,7 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	cmd.Dir = rootDir
 
 	envVars := map[string]string{
-		"GRID_API_KEY":           cfg.GridAPIKey,
+		"GRID_BEACON_API_KEY":    cfg.BeaconAPIKey,
 		"GRID_ID":                cfg.GridID,
 		"PLOY_E2E_TENANT":        cfg.Tenant,
 		"PLOY_E2E_TICKET_PREFIX": cfg.TicketPrefix,

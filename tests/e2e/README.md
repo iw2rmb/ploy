@@ -18,7 +18,7 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Drives the live Grid client; parallel reconciliation depends on the staged
   roadmap work landing upstream.
-- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, and
+- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `GRID_BEACON_API_KEY`, and
   `PLOY_LANES_DIR` are configured (plus optional `GRID_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
   `ploy mod run`.
@@ -36,7 +36,8 @@ Set the following variables before invoking the suite:
 - Remember to source `~/.zshenv` (or otherwise export them into your shell) so
   the CLI picks up the expected environment.
 - `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
-- `PLOY_GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
+- `GRID_BEACON_API_KEY` — Beacon service API key used to bootstrap discovery and workflow credentials.
+- `GRID_BEACON_API_KEY` — Beacon service API key used to resolve workflow endpoints.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.

@@ -71,7 +71,7 @@ addendum:
 - Until then, avoid stubbing external calls beyond interfaces defined inside
   `internal/workflow`.
 - When Grid integration requires live endpoints, run integration tests from the
-  workstation using the shared grid client (`PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, optional
+  workstation using the shared grid client (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`, optional
   `GRID_BEACON_URL`), keeping the CLI stateless.
 
 ## Documentation Discipline

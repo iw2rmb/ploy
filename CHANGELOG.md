@@ -17,7 +17,7 @@
 ## [2025-10-11] Grid Client Adoption
 
 - Switched the Ploy CLI to use the shared `sdk/gridclient/go` library, removed
-  the legacy endpoint override handling, and enforced `{PLOY_GRID_ID, PLOY_GRID_API_KEY}` credentials
+  the legacy endpoint override handling, and enforced `{PLOY_GRID_ID, GRID_BEACON_API_KEY}` credentials
   for live runs while retaining in-memory fallbacks (cmd/ploy/dependencies*.go,
   internal/workflow/grid/client.go).
 - Updated unit tests and the Mods/snapshot harnesses to stub the shared client
@@ -49,7 +49,7 @@
 - Updated CLI docs, environment references, and design tasks to point at the new
   catalogue; added `PLOY_LANES_DIR` to the documented environment variables and
   refreshed the lane validator default.
-- Added optional `PLOY_GRID_API_KEY`/`PLOY_GRID_ID` handling alongside the existing
+- Added optional `GRID_BEACON_API_KEY`/`PLOY_GRID_ID` handling alongside the existing
   endpoint override, wiring bearer tokens into the Grid helper and discovery calls
   while updating tests and env listings.
 - Extended Mods live Grid smoke to accept `PLOY_E2E_LIVE_SCENARIOS`, allowing
