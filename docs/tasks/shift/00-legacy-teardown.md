@@ -21,7 +21,7 @@ depend solely on Grid contracts.
 ## Definition of Done
 
 - Repository builds without any Nomad/Consul/Traefik/SeaweedFS references.
-- CLI `ploy workflow run` (stub) is the only supported entrypoint, and CI fails
+- CLI `ploy mod run` (stub at the time) is the only supported entrypoint, and CI fails
   if legacy binaries reappear.
 - Documentation reflects the CLI + Grid architecture exclusively.
 

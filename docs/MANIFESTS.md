@@ -3,7 +3,7 @@
 ## Purpose
 
 Describe topology, fixtures, lane requirements, and (when `PLOY_ASTER_ENABLE` is
-set) Aster toggles that every workflow run must honour when it dispatches jobs
+set) Aster toggles that every Mods run must honour when it dispatches jobs
 to Grid. Manifests keep the workflow runner stateless while ensuring commit- and
 workflow-scoped environments stay within approved boundaries.
 
@@ -22,7 +22,7 @@ workflow-scoped environments stay within approved boundaries.
 
 ## Usage / Commands
 
-- `ploy workflow run --tenant <tenant>` automatically loads the referenced
+- `ploy mod run --tenant <tenant>` automatically loads the referenced
   manifest and surfaces actionable errors when validation fails. When
   `PLOY_ASTER_ENABLE` is set you can combine `--aster` with
   `--aster-step <stage=toggle|stage=off>` to enable or disable Aster toggles on
@@ -53,7 +53,7 @@ workflow-scoped environments stay within approved boundaries.
   field is optional but required when a service must be reachable outside the
   topology graph.
 - `fixtures.required` and `lanes.required` demand at least one entry, ensuring
-  workflow runs always enumerate baseline fixtures/lanes.
+  Mods runs always enumerate baseline fixtures/lanes.
 - `aster.required`/`aster.optional` accept unique toggle names so cache keys
   remain deterministic.
 

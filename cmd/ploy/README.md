@@ -11,15 +11,15 @@ removed during the SHIFT legacy teardown.
 ploy lanes describe --lane <lane-name> \
   [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] \
   [--aster <toggle,...>]
-ploy workflow run --tenant <tenant> \
-  [--ticket <ticket-id>|--ticket auto] [--mods-plan-timeout <duration>] \
-  [--mods-max-parallel <n>] [--aster <toggle,...>] \
-  [--aster-step <stage=toggle,...|stage=off>]
 ploy mod run --tenant <tenant> \
   [--ticket <ticket-id>|--ticket auto] \
   [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
    --repo-workspace-hint <dir>] \
-  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]
+  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] \
+  [--aster <toggle,...>] \
+  [--aster-step <stage=toggle,...|stage=off>]
+ploy workflow cancel --tenant <tenant> --run-id <run-id> \
+  [--workflow <workflow-id>] [--reason <text>]
 ploy snapshot plan --snapshot <snapshot-name>
 ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> \
   --ticket <ticket-id>
@@ -58,10 +58,6 @@ RPC helper is required. When `PLOY_ASTER_ENABLE` is set the CLI resolves Aster b
 provenance after a successful run so developers can confirm which
 toggles/bundles were attached to each stage. Explicit ticket IDs remain a
 stub-only workflow until Grid integration lands.
-
-`workflow run` remains available for generic workflow execution; it mirrors the
-Mods defaults but omits repo materialisation unless the new `--repo-*` flags are
-provided.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
 requires `GRID_ENDPOINT` so the CLI can reach a real Grid instance;
@@ -103,9 +99,9 @@ classifier drift without leaving the workstation.
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
 - `--tenant` — Tenant slug used to resolve subject namespaces. Required for
-  `workflow run`, `snapshot capture`, and execution-mode
+  `mod run`, `workflow cancel`, `snapshot capture`, and execution-mode
   `environment materialize`.
-- `--ticket` — JetStream ticket identifier to claim (`workflow run`) or metadata
+- `--ticket` — JetStream ticket identifier to claim (`mod run`) or metadata
   tag for snapshot captures. Defaults to `auto` for workflows; required for
   snapshot captures.
 - `--snapshot` — Snapshot identifier defined under `configs/snapshots/*.toml`
@@ -117,22 +113,21 @@ classifier drift without leaving the workstation.
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).
 - `--aster` — Optional toggles to append to manifest-required Aster switches
-  (`lanes describe`, `workflow run`, `environment materialize`). The flag is
+  (`lanes describe`, `mod run`, `environment materialize`). The flag is
   ignored unless `PLOY_ASTER_ENABLE` is set.
 - `--aster-step` — Stage-specific overrides for Aster behaviour when running
-  workflows (`workflow run`). Use `stage=toggle1,toggle2` to enable additional
+  workflows (`mod run`). Use `stage=toggle1,toggle2` to enable additional
   toggles or `stage=off` to disable Aster for that stage. Overrides are ignored
   unless `PLOY_ASTER_ENABLE` is set.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
-  — Repository materialisation inputs consumed by `mod run` (also available to
-  `workflow run`). When `--repo-url` is provided, `--repo-target-ref` is
+  — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-target-ref` is
   required; `--repo-base-ref` defaults to the repository's default branch. The
   workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods
   stages execute.
 - `--mods-plan-timeout` — Duration string passed to the Mods planner so Grid can
-  timebox plan evaluation (`mod run` / `workflow run`).
+  timebox plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
-  planner (`mod run` / `workflow run`).
+  planner (`mod run`).
 
 ## Exit Codes
 
@@ -143,7 +138,7 @@ classifier drift without leaving the workstation.
 ## Environment
 
 - `GRID_ENDPOINT` — Workflow RPC base URL (`https://grid-dev.example`)
-  used by `workflow run` and `workflow cancel`; it also enables discovery via
+  used by `mod run` and `workflow cancel`; it also enables discovery via
   `/v1/cluster/info` for API endpoint, JetStream routes, IPFS gateway, feature
   map, and version configuration.
 - `GRID_API_KEY` — Optional bearer token forwarded to Grid discovery and

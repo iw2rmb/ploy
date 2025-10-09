@@ -4,7 +4,7 @@
 
 ## Why / What For
 
-`handleWorkflowRun` relies on discovery to configure JetStream and snapshots
+`handleModRun` relies on discovery to configure JetStream and snapshots
 when `GRID_ENDPOINT` is set. The tests currently stub discovery with minimal
 payloads, so they do not cover feature gates or the richer schema. Updating the
 tests guarantees the workflow runner continues to operate when Grid exposes
@@ -12,7 +12,7 @@ additional discovery data or disables integrations via feature flags.
 
 ## Required Changes
 
-- Adjust `cmd/ploy/workflow_run_grid_test.go` fixtures to provide full discovery
+- Adjust `cmd/ploy/mod_run_grid_test.go` fixtures to provide full discovery
   payloads matching Grid's contract.
 - Add assertions that the workflow runner respects discovery-derived
   configuration while tolerating disabled features (e.g., missing snapshot
@@ -31,8 +31,8 @@ additional discovery data or disables integrations via feature flags.
 
 ## Tests to Perform
 
-- `go test ./cmd/ploy -run TestHandleWorkflowRunUsesGridEndpointClient`.
-- `go test ./cmd/ploy -run TestHandleWorkflowRunFailsForInvalidGridEndpoint`.
+- `go test ./cmd/ploy -run TestHandleModRunUsesGridEndpointClient`.
+- `go test ./cmd/ploy -run TestHandleModRunFailsForInvalidGridEndpoint`.
 - Additional tests if needed for feature-gated paths.
 
 ## Status Log

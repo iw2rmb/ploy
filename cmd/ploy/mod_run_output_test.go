@@ -12,7 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleWorkflowRunPrintsBuildGateSummary(t *testing.T) {
+func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
 	buf := &bytes.Buffer{}
@@ -123,7 +123,7 @@ func TestHandleWorkflowRunPrintsBuildGateSummary(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 
-	if err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, buf); err != nil {
+	if err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, buf); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

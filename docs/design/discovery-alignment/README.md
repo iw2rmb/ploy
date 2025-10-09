@@ -94,7 +94,7 @@ confirmed the mismatch.
 
 - Unit tests in `cmd/ploy/dependencies_discovery_test.go` covering success,
   sanitized-default, disabled-feature scenarios, and caching.
-- CLI workflow tests in `cmd/ploy/workflow_run_grid_test.go` confirm Grid runs
+- CLI workflow tests in `cmd/ploy/mod_run_grid_test.go` confirm Grid runs
   bootstrap correctly with discovery present/absent.
 - `go test ./cmd/ploy` remains the primary verification command; additional
   targeted packages unchanged.
@@ -118,4 +118,4 @@ confirmed the mismatch.
 - 2025-09-29 — `go test ./cmd/ploy` after implementation, confirming new
   parser + feature map plumbing against `cmd/ploy/dependencies.go`,
   `cmd/ploy/dependencies_discovery_test.go`, and
-  `cmd/ploy/workflow_run_grid_test.go`; results captured in roadmap status logs.
+  `cmd/ploy/mod_run_grid_test.go`; results captured in roadmap status logs.

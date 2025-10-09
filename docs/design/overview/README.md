@@ -18,7 +18,7 @@ the legacy API.
 
 ## Goals
 
-- Stateless CLI (`ploy workflow run`) that retrieves one ticket, reconstructs
+- Stateless CLI (`ploy mod run`) that retrieves one ticket, reconstructs
   the DAG (mods, build gate, lanes), publishes jobs to Grid, and exits fast.
 - JetStream contracts capture every decision, artifact pointer, retry
   checkpoint, and cache coordination signal.
@@ -100,13 +100,14 @@ the legacy API.
      CLI consumes before exit.
 
 2. **Workflow Runner CLI**
+
    - Single binary invoked by operators or Grid when work appears; default
-     command `ploy workflow run --ticket auto`.
+     command `ploy mod run --ticket auto`.
    - Uses NATS JS durable consumers, reconstructs DAG from mod definitions +
-    integration manifests, emits Grid job specs through the Workflow RPC
-    helper (HTTP client keyed off `GRID_ENDPOINT`). JetStream and IPFS
-    endpoints are discovered automatically via `/v1/cluster/info` when
-    `GRID_ENDPOINT` is set, with legacy environment fallbacks retained for
+     integration manifests, emits Grid job specs through the Workflow RPC
+     helper (HTTP client keyed off `GRID_ENDPOINT`). JetStream and IPFS
+     endpoints are discovered automatically via `/v1/cluster/info` when
+     `GRID_ENDPOINT` is set, with legacy environment fallbacks retained for
      older Grid releases.
    - Persists minimal local state (ephemeral temp dirs) and wipes them post-run.
 
@@ -139,6 +140,7 @@ the legacy API.
    - Supports dry-run to show resources that would be touched.
 
 7. **Aster Hook**
+
    - Discover Aster-generated AST-pruned bundles per workflow step.
    - Gate the behaviour behind `PLOY_ASTER_ENABLE` so unfinished bundle work can
      stay dark; when the flag is unset cache keys and stage metadata omit Aster
@@ -146,7 +148,7 @@ the legacy API.
    - Emit metadata into cache keys and attach bundle pointers to job submissions
      so Grid can select appropriate runtime accelerators.
    - Allow operators to toggle bundles per stage via CLI flags and surface
-     bundle provenance after each workflow run.
+     bundle provenance after each Mods run.
 
 ## Testing Strategy
 

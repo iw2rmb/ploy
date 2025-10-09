@@ -12,18 +12,13 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-// handleWorkflowRun executes the workflow run command flow.
-func handleWorkflowRun(args []string, stderr io.Writer) error {
-	return executeWorkflowRun("workflow run", args, stderr)
-}
-
 // handleModRun executes the Mods-specific run command.
 func handleModRun(args []string, stderr io.Writer) error {
-	return executeWorkflowRun("mod run", args, stderr)
+	return executeModRun(args, stderr)
 }
 
-func executeWorkflowRun(command string, args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet(command, flag.ContinueOnError)
+func executeModRun(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	ticket := fs.String("ticket", "auto", "ticket identifier to consume or 'auto'")
 	tenant := fs.String("tenant", "", "tenant slug for subject mapping")
@@ -37,28 +32,28 @@ func executeWorkflowRun(command string, args []string, stderr io.Writer) error {
 	modsPlanTimeout := fs.Duration("mods-plan-timeout", 0, "planner timeout for Mods plan evaluation (e.g. 2m30s)")
 	modsMaxParallel := fs.Int("mods-max-parallel", 0, "maximum Mods stages to run in parallel")
 	if err := fs.Parse(args); err != nil {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return err
 	}
 
 	if *modsPlanTimeout < 0 {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return fmt.Errorf("mods plan timeout must be non-negative")
 	}
 	if *modsMaxParallel < 0 {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return fmt.Errorf("mods max parallel must be non-negative")
 	}
 
 	trimmedTenant := strings.TrimSpace(*tenant)
 	if trimmedTenant == "" {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return errors.New("tenant required")
 	}
 
 	overrides, err := parseStageOverrides(stageOverrides.values)
 	if err != nil {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return err
 	}
 
@@ -84,7 +79,7 @@ func executeWorkflowRun(command string, args []string, stderr io.Writer) error {
 		WorkspaceHint: strings.TrimSpace(*repoWorkspace),
 	}
 	if repoSpec.URL != "" && repoSpec.TargetRef == "" {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 		return fmt.Errorf("repo target ref required when repo url is set")
 	}
 
@@ -146,7 +141,7 @@ func executeWorkflowRun(command string, args []string, stderr io.Writer) error {
 	}
 	err = runnerExecutor.Run(context.Background(), opts)
 	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
-		printRunUsage(stderr, command)
+		printModRunUsage(stderr)
 	}
 	if err != nil {
 		return err
@@ -166,4 +161,8 @@ func executeWorkflowRun(command string, args []string, stderr io.Writer) error {
 		printArchiveSummary(stderr, invocations)
 	}
 	return nil
+}
+
+func printModRunUsage(w io.Writer) {
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]")
 }

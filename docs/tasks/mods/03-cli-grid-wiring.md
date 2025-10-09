@@ -12,7 +12,7 @@ respecting workstation-only execution.
 
 ## Required Changes
 
-- Add CLI flags on `ploy workflow run` for Mods planner tuning (plan timeout,
+- Add CLI flags on `ploy mod run` for Mods planner tuning (plan timeout,
   max parallel stages) and plumb them to the runner options.
 - Extend the workflow runner planner configuration so Mods stages honour the
   CLI-provided options when constructing the DAG.
@@ -23,7 +23,7 @@ respecting workstation-only execution.
 
 ## Definition of Done
 
-- `ploy workflow run` accepts `--mods-plan-timeout` (duration string) and
+- `ploy mod run` accepts `--mods-plan-timeout` (duration string) and
   `--mods-max-parallel` (integer) flags, validating input and passing values to
   the workflow runner.
 - Runner planner configuration forwards Mods options into `mods.NewPlanner` and

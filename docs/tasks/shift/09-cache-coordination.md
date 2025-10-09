@@ -28,6 +28,6 @@ cache reuse decisions without introspecting stage payloads.
 
 - Runner unit tests assert checkpoints include cache keys for mods/build/test
   stages.
-- CLI tests ensure the cache composer is injected when invoking `workflow run`.
+- CLI tests ensure the cache composer is injected when invoking `mod run`.
 - Repository-wide `go test -cover ./...` remains ≥60% overall with runner
   coverage above 90%.

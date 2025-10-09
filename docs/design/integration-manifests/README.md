@@ -93,7 +93,7 @@ ships and Ploy loses validation coverage for production-style policies.
   and JSON output parity against Grid fixtures.
 - CLI tests for `ploy manifest schema` and migration commands ensuring help text
   and rewrites stay in sync.
-- Integration tests simulating `ploy workflow run` manifest loading in both stub
+- Integration tests simulating `ploy mod run` manifest loading in both stub
   and Grid endpoint modes.
 - RED → GREEN → REFACTOR cadence: add failing schema/migration tests, implement
   minimal parsing updates, then refactor once parity with Grid fixtures is

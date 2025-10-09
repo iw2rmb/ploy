@@ -52,7 +52,7 @@ receive actionable feedback during workstation runs.
 - Registry coverage ensuring manifest overrides/skip lists interact correctly
   with the new adapter.
 - CLI summary test cases rendering Error Prone failures in
-  `cmd/ploy/workflow_run_output_test.go`.
+  `cmd/ploy/mod_run_output_test.go`.
 - `go test ./...` verification recorded in the changelog and roadmap once GREEN.
 
 ## References

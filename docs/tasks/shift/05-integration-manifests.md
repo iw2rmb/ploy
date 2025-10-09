@@ -5,7 +5,7 @@
 ## Why / What For
 
 Ensure topology, fixtures, and lane requirements are declared once and enforced
-across every workflow run.
+across every Mods run.
 
 ## Required Changes
 
@@ -18,7 +18,7 @@ across every workflow run.
 
 - Manifest loader resides in `internal/workflow/manifests`, applying schema
   validation and Aster toggle normalisation.
-- `runner.Options` now requires a manifest compiler; `ploy workflow run` loads
+- `runner.Options` now requires a manifest compiler; `ploy mod run` loads
   configs under `configs/manifests/` and fails fast on invalid inputs.
 - The in-memory Grid stub enforces lane allowlists, and docs + samples (`smoke`,
   `commit-app`) explain authoring flows in `docs/MANIFESTS.md`.

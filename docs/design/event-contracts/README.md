@@ -180,7 +180,7 @@ manifests so Grid can coordinate cache reuse and artifact hydration.
 - Verified job lifecycle events emit on `jobs.<run_id>.events` within
   `../grid/internal/jobs/publisher_jetstream.go`.
 - 2025-09-29: Confirmed discovery-backed JetStream selection via
-  `cmd/ploy/dependencies.go` and `cmd/ploy/workflow_run_grid_test.go`.
+  `cmd/ploy/dependencies.go` and `cmd/ploy/mod_run_grid_test.go`.
 
 ## Next Steps
 
