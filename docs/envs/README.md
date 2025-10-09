@@ -35,7 +35,7 @@ additional configuration.
 ## E2E Harness
 
 - `PLOY_E2E_TENANT` — Tenant slug consumed by the Mods E2E harness when running
-  `ploy workflow run` against Grid.
+  `ploy mod run` against Grid.
 - `PLOY_E2E_TICKET_PREFIX` — Optional ticket ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods

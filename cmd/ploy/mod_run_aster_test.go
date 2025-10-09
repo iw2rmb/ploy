@@ -10,7 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
+func TestHandleModRunParsesAsterFlags(t *testing.T) {
 	t.Setenv("PLOY_ASTER_ENABLE", "1")
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
@@ -53,7 +53,7 @@ func TestHandleWorkflowRunParsesAsterFlags(t *testing.T) {
 
 	buf := &bytes.Buffer{}
 	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build-gate=lint", "--aster-step", "test=off"}
-	if err := handleWorkflowRun(args, buf); err != nil {
+	if err := handleModRun(args, buf); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

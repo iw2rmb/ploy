@@ -13,7 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
+func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
@@ -50,7 +50,7 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestHandleWorkflowRunSupportsAutoTicket(t *testing.T) {
 	}
 }
 
-func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
+func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{err: errors.New("boom")}
@@ -111,13 +111,13 @@ func TestHandleWorkflowRunPropagatesRunnerError(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if !errors.Is(err, fakeRunner.err) {
 		t.Fatalf("expected runner error, got %v", err)
 	}
 }
 
-func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
+func TestHandleModRunPropagatesManifestLoaderError(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
 	prevLoader := manifestRegistryLoader
@@ -140,7 +140,7 @@ func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err == nil {
 		t.Fatal("expected manifest loader error")
 	}
@@ -149,18 +149,18 @@ func TestHandleWorkflowRunPropagatesManifestLoaderError(t *testing.T) {
 	}
 }
 
-func TestHandleWorkflowRunRequiresTenant(t *testing.T) {
+func TestHandleModRunRequiresTenant(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := handleWorkflowRun([]string{"--ticket", "auto"}, buf)
+	err := handleModRun([]string{"--ticket", "auto"}, buf)
 	if err == nil {
 		t.Fatal("expected error for missing tenant")
 	}
-	if !strings.Contains(buf.String(), "Usage: ploy workflow run") {
+	if !strings.Contains(buf.String(), "Usage: ploy mod run") {
 		t.Fatalf("expected usage output, got %q", buf.String())
 	}
 }
 
-func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
+func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
@@ -196,7 +196,7 @@ func TestHandleWorkflowRunTrimsExplicitTicket(t *testing.T) {
 	}
 	laneConfigDir = "ignored"
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -104,7 +104,7 @@ requires:
 
 ## CLI Surface
 
-- `workflow run` claims tickets, streams Workflow RPC status, and prints stage
+- `mod run` claims tickets, streams Workflow RPC status, and prints stage
   summaries enriched with archive export identifiers when Grid queues
   keep-forever runs.
 - `workflow cancel` requires `GRID_ENDPOINT`, calls the Workflow RPC cancel

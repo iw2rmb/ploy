@@ -20,7 +20,7 @@ the event contract slice and prepares the CLI for the upcoming Grid RPC wiring.
 
 ## Definition of Done
 
-- `ploy workflow run` connects to JetStream and fails fast when the endpoint is
+- `ploy mod run` connects to JetStream and fails fast when the endpoint is
   unreachable; discovery omissions restore the stub behaviour.
 - Checkpoints published through the CLI land on JetStream streams with the
   existing cache-key payloads.

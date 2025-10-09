@@ -1,5 +1,15 @@
 # Changelog
 
+## [2025-10-09] Mods CLI Rename
+
+- Retired the `ploy workflow run` command in favour of `ploy mod run`, updating
+  CLI helpers, tests, and usage text to reflect the Mods-specific entrypoint.
+- Routed the `workflow` top-level command exclusively to cancellation flows and
+  refreshed CLI usage output to match.
+- Updated documentation, design records, and environment references to the new
+  command name; recorded the rename across tasks and roadmap notes for future
+  slices.
+
 ## [2025-10-08] Lane Catalog Externalised
 
 - Published [`iw2rmb/ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
@@ -22,7 +32,7 @@
 - `docs/design/mods-grid-restoration/README.md`: Reframed follow-up work around a
   dedicated Mods lane repository and Grid catalog registration; re-reviewed
   `go test ./internal/workflow/runner -run TestRunSchedulesHealingPlanAfterBuildGateFailure -count=1`,
-  `go test ./cmd/ploy -run TestHandleWorkflowRunConfiguresModsFlags -count=1`, and
+  `go test ./cmd/ploy -run TestHandleModRunConfiguresModsFlags -count=1`, and
   `go test -tags e2e ./tests/e2e -count=1` (latest run 2025-10-05) to confirm
   behaviour remains unchanged.
 - `docs/design/shift/README.md`: Updated SHIFT roadmap alignment to track the
@@ -53,7 +63,7 @@
   simple, self-healing, and parallel scenarios against the in-memory Grid stub.
 - Verification:
   `go test ./internal/workflow/runner -run TestRunSchedulesHealingPlanAfterBuildGateFailure -count=1`,
-  `go test ./cmd/ploy -run TestHandleWorkflowRunConfiguresModsFlags -count=1`,
+  `go test ./cmd/ploy -run TestHandleModRunConfiguresModsFlags -count=1`,
   `go test -tags e2e ./tests/e2e -count=1`.
 
 ## [2025-10-05] Workflow RPC Cancellation & Archive Summaries
@@ -74,7 +84,7 @@
 
 ## [2025-10-07] Build Gate CLI Summary
 
-- Surfaced build gate results in `ploy workflow run` by printing static check
+- Surfaced build gate results in `ploy mod run` by printing static check
   outcomes, failing diagnostics, knowledge base findings, and log digests
   sourced from checkpoint metadata.
 - Added log finding support to workflow contracts and runner checkpoint
@@ -91,7 +101,7 @@
   version) with strict decoding, caching, and helper accessors.
 - Extended discovery and workflow tests
   (`cmd/ploy/dependencies_discovery_test.go`,
-  `cmd/ploy/workflow_run_grid_test.go`) to cover multi-route handling, feature
+  `cmd/ploy/mod_run_grid_test.go`) to cover multi-route handling, feature
   checks, caching, and fallback semantics; verified via `go test ./cmd/ploy`.
 - Documented the milestone in `docs/design/discovery-alignment/README.md`,
   refreshed README guidance, and marked roadmap slices
@@ -105,7 +115,7 @@
   diagnostics into `StaticCheckFailure` entries backed by
   `internal/workflow/buildgate/error_prone_adapter_test.go`.
 - Wired CLI workflow summaries to display Error Prone findings alongside
-  existing Go output via `cmd/ploy/workflow_run_output_test.go` and normalised
+  existing Go output via `cmd/ploy/mod_run_output_test.go` and normalised
   static check language aliases by mapping `javac` to `java`.
 - Deflaked `TestRunExecutesParallelModsStages` by extending the stage start wait
   window to accommodate concurrent scheduling under heavier load.
@@ -126,7 +136,7 @@
 - Extended unit coverage with
   `internal/workflow/buildgate/eslint_adapter_test.go` and
   `static_checks_helpers_test.go`, and refreshed CLI fixtures in
-  `cmd/ploy/workflow_run_output_test.go` to surface ESLint failures in build
+  `cmd/ploy/mod_run_output_test.go` to surface ESLint failures in build
   gate summaries.
 - Updated documentation and roadmap artifacts:
   `docs/design/build-gate/eslint/README.md`, `docs/design/build-gate/README.md`,
@@ -143,7 +153,7 @@
   `cmd/ploy/dependencies.go`, relying exclusively on Grid discovery for
   JetStream routes and IPFS gateways.
 - Updated CLI tests (`cmd/ploy/dependencies_discovery_test.go`,
-  `cmd/ploy/snapshot_test.go`, `cmd/ploy/workflow_run_grid_test.go`) to exercise
+  `cmd/ploy/snapshot_test.go`, `cmd/ploy/mod_run_grid_test.go`) to exercise
   discovery-driven configuration and sanitized defaults.
 - Refreshed documentation (`docs/envs/README.md`, `README.md`,
   `cmd/ploy/README.md`, `docs/SNAPSHOTS.md`,
@@ -336,7 +346,7 @@
 - Introduced `internal/workflow/knowledgebase` with trigram TF-IDF and
   Levenshtein scoring, providing a catalog-backed advisor that feeds Mods
   planner recipes, human gates, and recommendations.
-- Wired `ploy workflow run` to load `configs/knowledge-base/catalog.json` when
+- Wired `ploy mod run` to load `configs/knowledge-base/catalog.json` when
   present, enabling the workstation CLI to surface knowledge base guidance
   without changing behaviour when the catalog is absent.
 - Added high-coverage unit tests for the classifier, planner integration, and
@@ -348,7 +358,7 @@
 ## [2025-09-26] Mods Planner CLI Controls
 
 - Added `--mods-plan-timeout` and `--mods-max-parallel` flags to
-  `ploy workflow run`, forwarding planner tuning options into the runner so
+  `ploy mod run`, forwarding planner tuning options into the runner so
   operators can timebox plan evaluation and cap concurrent Mods stages.
 - Updated the default planner to push the new options into Mods stage metadata,
   publish concurrency hints in checkpoints/artifact envelopes, and include the
@@ -436,7 +446,7 @@
 
 - Added `internal/workflow/grid` with an HTTP Workflow RPC client that submits
   stage executions to Grid and records invocation metadata for CLI summaries.
-- Updated `ploy workflow run` to honour `GRID_ENDPOINT`, wiring real Grid
+- Updated `ploy mod run` to honour `GRID_ENDPOINT`, wiring real Grid
   dispatch when configured and keeping the in-memory stub for offline
   development.
 - Expanded CLI and client test suites to cover Grid configuration failures,
@@ -469,7 +479,7 @@
 - Introduced `internal/workflow/contracts.JetStreamClient` to consume real
   tickets from `grid.webhook.<tenant>` and publish checkpoints to
   `ploy.workflow.<ticket>.checkpoints`.
-- Updated `ploy workflow run` to honour discovery-provided JetStream routes by
+- Updated `ploy mod run` to honour discovery-provided JetStream routes by
   dialing JetStream (falling back to the in-memory stub when routes are missing)
   and surfacing connection failures to the caller.
 - Added unit tests that exercise the client against an in-process JetStream
@@ -523,7 +533,7 @@
 - Extended the workflow runner to require an Aster locator, attach sorted toggle
   metadata to every stage, and honour per-stage disablement while keeping cache
   keys deterministic.
-- Introduced `--aster` and `--aster-step` flags on `ploy workflow run`, along
+- Introduced `--aster` and `--aster-step` flags on `ploy mod run`, along
   with post-run bundle summaries so operators can verify toggles before Grid
   wiring lands.
 - Expanded CLI and runner test suites to cover bundle detection, metadata
@@ -551,7 +561,7 @@
 - Extended the workflow runner to require manifest compilation, attach compiled
   payloads to every stage, and let the in-memory Grid stub enforce lane
   allowlists.
-- Updated `ploy workflow run` to load manifests from `configs/manifests/`,
+- Updated `ploy mod run` to load manifests from `configs/manifests/`,
   surface actionable validation errors, and documented the schema in
   `docs/MANIFESTS.md` alongside new sample manifests (`smoke`, `commit-app`).
 - Added CLI tests asserting manifest loader wiring and error propagation;
@@ -614,7 +624,7 @@
 ## [2025-09-25] Legacy Teardown
 
 - Removed all legacy API, Nomad, Consul, SeaweedFS, and deployment scaffolding.
-- Replaced the repo with a CLI-only stub (`ploy workflow run`) that validates
+- Replaced the repo with a CLI-only stub (`ploy mod run`, formerly `ploy workflow run`) that validates
   ticket input and returns `ErrNotImplemented`.
 - Added guardrail tests that fail if legacy binaries or imports reappear.
 - Simplified the build system (`Makefile`) to focus on the workflow CLI.

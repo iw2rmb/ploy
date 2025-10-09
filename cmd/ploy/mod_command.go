@@ -25,9 +25,5 @@ func handleMod(args []string, stderr io.Writer) error {
 func printModUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mod <command>")
 	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  run    Execute a Mods workflow run against Grid")
-}
-
-func printModRunUsage(w io.Writer) {
-	printRunUsage(w, "mod run")
+	_, _ = fmt.Fprintln(w, "  run    Execute a Mods run against Grid")
 }

@@ -12,7 +12,7 @@ supporting offline slices.
 
 - Implement an HTTP client (`internal/workflow/grid`) that encodes stage
   requests, dispatches them to Grid, and captures outcomes.
-- Teach `ploy workflow run` to instantiate the real client when `GRID_ENDPOINT`
+- Teach `ploy mod run` to instantiate the real client when `GRID_ENDPOINT`
   is set and preserve the stub fallback otherwise.
 - Record invocation metadata so the CLI can continue printing Aster bundle
   summaries regardless of the backing Grid implementation.

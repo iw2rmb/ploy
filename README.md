@@ -76,7 +76,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       languages (Roadmap 21, see `docs/design/build-gate/README.md`); sandbox
       runner, static check registry, log ingestion, metadata sanitisation, CLI
       knowledge base surfacing, and Java Error Prone coverage shipped (verified
-      2025-09-29 via `cmd/ploy/workflow_summaries.go` and
+      2025-09-29 via `cmd/ploy/mod_summaries.go` and
       `internal/workflow/buildgate/error_prone_adapter.go`).
 - [x] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement,
       and subject alignment (Roadmap 22, see
@@ -153,13 +153,13 @@ Full design records live in `docs/design/README.md`.
    The command loads `go-native.toml` from the configured catalogue, previews the
    composed cache key, and lists the build/test commands bound to that lane.
 
-4. **Run the workflow CLI**
+4. **Run the Mods CLI**
 
    ```bash
    GRID_ENDPOINT=https://grid-dev.example \
      GRID_API_KEY=ghp_example \
      GRID_ID=dev-grid \
-     ./dist/ploy workflow run --tenant acme --ticket auto
+     ./dist/ploy mod run --tenant acme --ticket auto
    ```
 
    Ploy reads `/v1/cluster/info` from Grid to discover the API endpoint,

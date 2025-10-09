@@ -19,7 +19,7 @@ explicit Grid stage metadata.
       — Mods planner now records knowledge base advice inside
       `stage_metadata.mods` (2025-09-26).
 - [x] CLI surface and Grid wiring (docs/tasks/mods/03-cli-grid-wiring.md) —
-      `ploy workflow run` exposes planner hints and pushes concurrency metadata
+      `ploy mod run` exposes planner hints and pushes concurrency metadata
       into Grid/JetStream (2025-09-26).
 - [x] Runner parallel execution (docs/tasks/mods/04-runner-parallel-execution.md) —
       Workflow runner executes Mods stages according to planner parallelism
@@ -34,7 +34,7 @@ explicit Grid stage metadata.
 - Applies to a new `internal/workflow/mods` package housing planner, executor
   stubs, and Grid integration shims.
 - Updates workflow stage construction so Mods contributes multiple parallel
-  stages to the root DAG emitted by `ploy workflow run`.
+  stages to the root DAG emitted by `ploy mod run`.
 - Extends event contracts with Mods-specific stage metadata (step kind, recipe
   IDs, planning status) without altering global schema fields.
 - Coordinates with the Knowledge Base slice
@@ -96,7 +96,7 @@ explicit Grid stage metadata.
   publishers, referencing returned CIDs in checkpoints for Knowledge Base
   lookups.
 - Provide CLI flags (`--mods-plan-timeout`, `--mods-max-parallel`) surfaced
-  through `ploy workflow run` for operator control.
+  through `ploy mod run` for operator control.
 
 ## Tests
 

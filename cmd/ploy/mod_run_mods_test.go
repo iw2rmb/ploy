@@ -12,7 +12,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleWorkflowRunConfiguresModsFlags(t *testing.T) {
+func TestHandleModRunConfiguresModsFlags(t *testing.T) {
 	t.Setenv("GRID_ENDPOINT", "")
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -53,7 +53,7 @@ func TestHandleWorkflowRunConfiguresModsFlags(t *testing.T) {
 	laneConfigDir = "ignored"
 	withStubWorkspacePreparer(t)
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--mods-plan-timeout", "2m30s", "--mods-max-parallel", "5"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--mods-plan-timeout", "2m30s", "--mods-max-parallel", "5"}, io.Discard)
 	if err != nil {
 		t.Fatalf("expected Mods flags accepted, got error: %v", err)
 	}

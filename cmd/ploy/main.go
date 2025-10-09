@@ -52,8 +52,8 @@ func reportError(err error, stderr io.Writer) {
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy <command>")
 	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  workflow  Manage workflow execution entries")
-	_, _ = fmt.Fprintln(w, "  mod       Execute Mods-specific workflows")
+	_, _ = fmt.Fprintln(w, "  workflow  Manage workflow cancellations")
+	_, _ = fmt.Fprintln(w, "  mod       Execute Mods runs")
 	_, _ = fmt.Fprintln(w, "  lanes     Inspect lane definitions and cache previews")
 	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
 	_, _ = fmt.Fprintln(w, "  environment  Materialize commit-scoped environments")

@@ -19,7 +19,7 @@ reflects repository history.
   selections, human gate expectations, and recommendation payloads backed by the
   catalog.
 - Wire the new advisor through the workflow runner Mods options so
-  `ploy workflow run` uses the classifier when fixtures are available, while
+  `ploy mod run` uses the classifier when fixtures are available, while
   keeping behaviour unchanged when no catalog is configured.
 - Document the catalog format and task status across
   `docs/design/knowledge-base/README.md`, `docs/design/README.md`, and

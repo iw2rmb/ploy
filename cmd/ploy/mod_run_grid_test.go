@@ -17,7 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
+func TestHandleModRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -58,7 +58,7 @@ func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	laneConfigDir = "ignored"
 	t.Setenv("GRID_ENDPOINT", "")
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestHandleWorkflowRunUsesInMemoryGridWhenUnset(t *testing.T) {
 	}
 }
 
-func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
+func TestHandleModRunUsesGridEndpointClient(t *testing.T) {
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -128,7 +128,7 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	}
 	t.Setenv("GRID_ENDPOINT", "https://grid.dev")
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestHandleWorkflowRunUsesGridEndpointClient(t *testing.T) {
 	}
 }
 
-func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
+func TestHandleModRunFailsForInvalidGridEndpoint(t *testing.T) {
 	withStubWorkspacePreparer(t)
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -198,7 +198,7 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 	}
 	t.Setenv("GRID_ENDPOINT", "://invalid")
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err == nil {
 		t.Fatal("expected error for invalid grid endpoint")
 	}
@@ -207,7 +207,7 @@ func TestHandleWorkflowRunFailsForInvalidGridEndpoint(t *testing.T) {
 	}
 }
 
-func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
+func TestHandleModRunFailsWhenJetStreamURLInvalid(t *testing.T) {
 	prevFactory := eventsFactory
 	prevManifestDir := manifestConfigDir
 	prevLaneDir := laneConfigDir
@@ -235,7 +235,7 @@ func TestHandleWorkflowRunFailsWhenJetStreamURLInvalid(t *testing.T) {
 	laneConfigDir = filepath.Join(repoRoot, "..", "ploy-lanes-catalog")
 	asterConfigDir = filepath.Join(repoRoot, "configs", "aster")
 
-	err := handleWorkflowRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
+	err := handleModRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err == nil {
 		t.Fatal("expected error when JetStream connection fails")
 	}

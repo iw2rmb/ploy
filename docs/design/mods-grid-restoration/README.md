@@ -15,7 +15,7 @@
 - **Last Verification**: 2025-10-07 — Re-reviewed tests and noted upcoming Grid
   catalog registration as follow-up work:
   - `go test ./internal/workflow/runner -run TestRunSchedulesHealingPlanAfterBuildGateFailure -count=1`
-  - `go test ./cmd/ploy -run TestHandleWorkflowRunConfiguresModsFlags -count=1`
+  - `go test ./cmd/ploy -run TestHandleModRunConfiguresModsFlags -count=1`
   - `go test -tags e2e ./tests/e2e -count=1`
 - **Upstream Dependencies**:
   - `../workflow-rpc-alignment/README.md`
@@ -105,7 +105,7 @@ Steps 1–4):
 - CLI: `ploy mod run` now shells repository inputs (`--repo-url`, `--repo-base-ref`,
   `--repo-target-ref`, `--repo-workspace-hint`) into `contracts.WorkflowTicket.Repo`
   and decorates the events client so claimed tickets inherit workstation
-  overrides (`cmd/ploy/workflow_run.go`, `cmd/ploy/workspace_preparer.go`).
+  overrides (`cmd/ploy/mod_run.go`, `cmd/ploy/workspace_preparer.go`).
 - Workspace: a `gitWorkspacePreparer` clones the repo into `<run>/workspace/`,
   checks out the target ref, and scaffolds optional hints that lane scripts
   expect. Runs without repo metadata skip cloning entirely.
@@ -197,7 +197,7 @@ Steps 1–4):
   (`TestRunSchedulesHealingPlanAfterBuildGateFailure`) and ensures branch stages
   enqueue with suffixed names; planner and metadata conversion tests cover
   recipe propagation.
-- CLI: `cmd/ploy/workflow_run_mods_test.go` asserts repo flags populate tickets,
+- CLI: `cmd/ploy/mod_run_mods_test.go` asserts repo flags populate tickets,
   workspace preparer execution, and Mods lane wiring.
 - Integration: `cmd/ploy/test_support_test.go` keeps the in-memory Grid stub
   verifying job specs; additional workspace error cases are covered via stubbed

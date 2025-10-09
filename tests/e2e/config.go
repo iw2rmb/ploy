@@ -39,7 +39,7 @@ func LoadConfig() Config {
 		return cfg
 	}
 	if cfg.Tenant == "" {
-		cfg.SkipReason = "PLOY_E2E_TENANT is not set; workflow run requires a tenant"
+		cfg.SkipReason = "PLOY_E2E_TENANT is not set; mod run requires a tenant"
 		return cfg
 	}
 	return cfg

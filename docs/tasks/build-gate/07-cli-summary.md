@@ -12,7 +12,7 @@ checkpoints or Grid logs.
 
 - Expose build gate log findings and static check metadata through workflow
   checkpoints.
-- Render build gate summaries after `ploy workflow run` completes, including
+- Render build gate summaries after `ploy mod run` completes, including
   actionable knowledge base findings and log digests.
 - Expand documentation and roadmap records to capture the new CLI behaviour.
 
@@ -20,7 +20,7 @@ checkpoints or Grid logs.
 
 - Build gate metadata published with checkpoints includes log findings alongside
   static check reports.
-- `ploy workflow run` prints a build gate summary showing static check status,
+- `ploy mod run` prints a build gate summary showing static check status,
   failing diagnostics, knowledge base findings, and the associated log digest
   when available.
 - Documentation and the SHIFT tracker record the milestone with cross references
@@ -38,7 +38,7 @@ checkpoints or Grid logs.
 
 ## Tests
 
-- `cmd/ploy/workflow_run_test.go` covers the CLI summary output with
+- `cmd/ploy/mod_run_output_test.go` covers the CLI summary output with
   representative static check and knowledge base findings.
 - `internal/workflow/runner/runner_events_test.go` verifies build gate metadata
   sanitation for log findings.

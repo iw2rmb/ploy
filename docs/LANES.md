@@ -96,4 +96,4 @@ the `ploy lanes describe` inspection workflow.
 - `docs/tasks/shift/08-documentation-cleanup.md` — roadmap slice tracking doc
   alignment work.
 - `cmd/ploy/README.md` — CLI flag reference for `lanes describe` and
-  `workflow run`.
+  `mod run`.

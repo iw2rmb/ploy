@@ -4,8 +4,8 @@
 
 ## Why / What For
 
-Deliver `ploy workflow run` as the radical replacement for the legacy
-controller, executing one ticket end-to-end and exiting.
+Deliver `ploy mod run` (formerly `ploy workflow run`) as the radical replacement
+for the legacy controller, executing one ticket end-to-end and exiting.
 
 ## Required Changes
 

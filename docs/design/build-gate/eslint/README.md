@@ -22,7 +22,7 @@ ESLint during CI.
 - `../../../../internal/workflow/buildgate/static_checks_registry.go` and
   `static_checks_types.go` provide the registry implementation and option
   plumbing we must plug into.
-- `../../../../cmd/ploy/workflow_run_output_test.go` exercises the CLI build
+- `../../../../cmd/ploy/mod_run_output_test.go` exercises the CLI build
   gate summary; it currently covers Go vet and Error Prone findings but lacks
   ESLint fixtures.
 - Repositories describe ESLint expectations via manifest language entries
@@ -98,7 +98,7 @@ ESLint during CI.
 - `../../../../docs/tasks/build-gate/03-static-check-registry.md`
 - `../../../../internal/workflow/buildgate/static_checks_registry.go`
 - `../../../../internal/workflow/buildgate/static_checks_types.go`
-- `../../../../cmd/ploy/workflow_run_output_test.go`
+- `../../../../cmd/ploy/mod_run_output_test.go`
 
 ## Risks & Mitigations
 

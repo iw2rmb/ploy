@@ -66,7 +66,7 @@ tailored remediation prompts for LLM agents.
   (`ploy knowledge-base evaluate --fixture ./fixtures/*.json`) with a
   conservative score floor to flag low-confidence matches.
 - Provide a workstation catalog at `configs/knowledge-base/catalog.json`,
-  automatically loaded by `ploy workflow run` when present.
+  automatically loaded by `ploy mod run` when present.
 
 ## Tests
 

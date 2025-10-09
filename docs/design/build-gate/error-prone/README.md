@@ -18,7 +18,7 @@ repositories.
   strategy but only the Go adapter has shipped so far.
 - `docs/tasks/build-gate/03-static-check-registry.md` calls out Java Error Prone as
   a follow-up adapter to populate the registry.
-- `cmd/ploy/workflow_run_output_test.go` and corresponding knowledge base wiring
+- `cmd/ploy/mod_run_output_test.go` and corresponding knowledge base wiring
   already expect multi-tool output.
 - `internal/workflow/buildgate/static_checks_registry.go` normalises adapter
   results, so a dedicated Error Prone adapter can plug in without further
@@ -82,7 +82,7 @@ repositories.
   integration point.
 - `internal/workflow/buildgate/static_checks_types.go` — shared adapter
   interfaces and severity constants.
-- `cmd/ploy/workflow_run_output_test.go` — CLI summary expectations that must
+- `cmd/ploy/mod_run_output_test.go` — CLI summary expectations that must
   now include Java diagnostics.
 - Upstream Error Prone tooling documentation
   (`https://errorprone.info/docs/installation`) referenced for flag behaviour.
