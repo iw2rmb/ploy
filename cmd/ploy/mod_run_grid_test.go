@@ -20,7 +20,6 @@ import (
 )
 
 func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -75,7 +74,6 @@ func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
 }
 
 func TestHandleModRunUsesSharedGridClient(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
@@ -167,7 +165,6 @@ func TestHandleModRunUsesSharedGridClient(t *testing.T) {
 }
 
 func TestHandleModRunFailsWhenGridClientUnavailable(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	withStubWorkspacePreparer(t)
 	prevRunner := runnerExecutor
 	prevBusFactory := eventsFactory
@@ -221,52 +218,7 @@ func TestHandleModRunFailsWhenGridClientUnavailable(t *testing.T) {
 	}
 }
 
-func TestHandleModRunRejectsDeprecatedEndpoint(t *testing.T) {
-	withStubWorkspacePreparer(t)
-	prevRunner := runnerExecutor
-	prevManifestLoader := manifestRegistryLoader
-	prevManifestDir := manifestConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
-	defer func() {
-		runnerExecutor = prevRunner
-		manifestRegistryLoader = prevManifestLoader
-		manifestConfigDir = prevManifestDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
-	}()
-
-	t.Setenv(gridEndpointEnv, "https://legacy.dev")
-	t.Setenv(gridIDEnv, "grid-dev")
-	t.Setenv(gridAPIKeyEnv, "secret")
-	t.Setenv(gridClientStateEnv, t.TempDir())
-
-	runnerExecutor = &recordingRunner{}
-	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
-	}
-	manifestConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods-plan"}, CacheKey: "stub-cache"}
-		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
-		desc.Lane.Job.Command = []string{"mods-plan"}
-		desc.Lane.Job.Env = map[string]string{}
-		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
-		return &fakeLaneRegistry{description: desc}, nil
-	}
-	laneConfigDir = "ignored"
-
-	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
-	if err == nil {
-		t.Fatal("expected error when GRID_ENDPOINT is set")
-	}
-	if !strings.Contains(err.Error(), gridEndpointEnv) {
-		t.Fatalf("expected mention of %s, got %v", gridEndpointEnv, err)
-	}
-}
-
 func TestHandleModRunFailsWhenJetStreamURLInvalid(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	prevFactory := eventsFactory
 	prevManifestDir := manifestConfigDir
 	prevLaneDir := laneConfigDir

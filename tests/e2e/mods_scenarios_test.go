@@ -333,10 +333,7 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 		"--repo-workspace-hint", workspaceHint,
 	}
 
-	rootDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("determine repo root: %w", err)
-	}
+	rootDir := projectRootDir(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
@@ -345,14 +342,14 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	cmd.Dir = rootDir
 
 	envVars := map[string]string{
-		"PLOY_GRID_API_KEY":      cfg.GridAPIKey,
-		"PLOY_GRID_ID":           cfg.GridID,
+		"GRID_API_KEY":           cfg.GridAPIKey,
+		"GRID_ID":                cfg.GridID,
 		"PLOY_E2E_TENANT":        cfg.Tenant,
 		"PLOY_E2E_TICKET_PREFIX": cfg.TicketPrefix,
 		"PLOY_E2E_REPO_OVERRIDE": cfg.RepoOverride,
 	}
 	if cfg.BeaconURL != "" {
-		envVars["GRID_CLIENT_BEACON_URL"] = cfg.BeaconURL
+		envVars["GRID_BEACON_URL"] = cfg.BeaconURL
 	}
 	cmd.Env = ensureEnv(os.Environ(), envVars)
 
@@ -390,7 +387,16 @@ func projectRootDir(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("resolve project root: %v", err)
 	}
-	return root
+	for {
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			return root
+		}
+		parent := filepath.Dir(root)
+		if parent == root {
+			t.Fatalf("unable to locate repository root starting from %s", root)
+		}
+		root = parent
+	}
 }
 
 // ensureEnv merges override variables into the base environment without mutating the input slice.

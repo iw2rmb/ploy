@@ -14,7 +14,6 @@ import (
 )
 
 func TestHandleModRunSupportsAutoTicket(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
@@ -79,7 +78,6 @@ func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 }
 
 func TestHandleModRunPropagatesRunnerError(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
@@ -124,7 +122,6 @@ func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 }
 
 func TestHandleModRunPropagatesManifestLoaderError(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
@@ -170,7 +167,6 @@ func TestHandleModRunRequiresTenant(t *testing.T) {
 }
 
 func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())

@@ -13,7 +13,6 @@ import (
 )
 
 func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())

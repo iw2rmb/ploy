@@ -25,7 +25,7 @@ func LoadConfig() Config {
 	cfg := Config{
 		GridID:       strings.TrimSpace(os.Getenv("PLOY_GRID_ID")),
 		GridAPIKey:   strings.TrimSpace(os.Getenv("PLOY_GRID_API_KEY")),
-		BeaconURL:    strings.TrimSpace(os.Getenv("GRID_CLIENT_BEACON_URL")),
+		BeaconURL:    strings.TrimSpace(os.Getenv("GRID_BEACON_URL")),
 		Tenant:       strings.TrimSpace(os.Getenv("PLOY_E2E_TENANT")),
 		TicketPrefix: strings.TrimSpace(os.Getenv("PLOY_E2E_TICKET_PREFIX")),
 		RepoOverride: strings.TrimSpace(os.Getenv("PLOY_E2E_REPO_OVERRIDE")),

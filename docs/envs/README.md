@@ -18,7 +18,7 @@ additional configuration.
   construct the discovery/beacon requests. The CLI fails fast when unset.
 - `PLOY_GRID_API_KEY` — Required grid-scoped API key presented to gridbeacon,
   discovery, and control-plane requests; the CLI rejects runs when missing.
-- `GRID_CLIENT_BEACON_URL` — Optional override for the gridbeacon base URL.
+- `GRID_BEACON_URL` — Optional override for the gridbeacon base URL.
   Defaults to the production beacon (`https://beacon.getgrid.dev`).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
   directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`
@@ -32,9 +32,6 @@ additional configuration.
   before running the CLI to avoid missing lane definitions.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
-
-`GRID_ENDPOINT` is no longer recognised; exporting it causes the CLI to abort
-with guidance to supply `PLOY_GRID_ID` and `PLOY_GRID_API_KEY`.
 
 ## E2E Harness
 

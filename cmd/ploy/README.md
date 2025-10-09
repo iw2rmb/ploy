@@ -47,13 +47,12 @@ exit. When `PLOY_GRID_ID` and `PLOY_GRID_API_KEY` are supplied the CLI initialis
 shared grid client, authenticates with gridbeacon, and reads discovery metadata
 (API endpoint, JetStream routes, IPFS gateway, feature map, version) before
 dispatching stages; without credentials the CLI remains on the in-memory Grid
-and JetStream stubs, and exporting the deprecated `GRID_ENDPOINT` now fails fast
-with guidance. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
+and JetStream stubs. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
 flow into stage metadata so Grid can respect concurrency/timebox controls. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests. Provide
-`GRID_CLIENT_BEACON_URL` when the beacon origin differs from the default. Both
+`GRID_BEACON_URL` when the beacon origin differs from the default. Both
 credentials must be present; supplying only one results in an error. When
 `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
 successful run so developers can confirm which toggles/bundles were attached to
@@ -142,7 +141,7 @@ classifier drift without leaving the workstation.
   grid client and scope its state directory per grid.
 - `PLOY_GRID_API_KEY` — Required grid-scoped API key forwarded to beacon/discovery
   and workflow RPC calls.
-- `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
+- `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
   directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`.

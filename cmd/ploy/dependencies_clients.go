@@ -91,10 +91,6 @@ func defaultGridFactory() (runner.GridClient, error) {
 
 // acquireGridClient instantiates or returns the shared grid client instance.
 func acquireGridClient(ctx context.Context) (gridClientAPI, error) {
-	if value := strings.TrimSpace(os.Getenv(gridEndpointEnv)); value != "" {
-		return nil, fmt.Errorf("%s is no longer supported; remove it and set %s and %s instead", gridEndpointEnv, gridIDEnv, gridAPIKeyEnv)
-	}
-
 	gridID := strings.TrimSpace(os.Getenv(gridIDEnv))
 	apiKey := strings.TrimSpace(os.Getenv(gridAPIKeyEnv))
 

@@ -110,7 +110,6 @@ func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
 
 func TestHandleSnapshotCaptureUsesIPFSGatewayWhenConfigured(t *testing.T) {
 	buf := &bytes.Buffer{}
-	t.Setenv(gridEndpointEnv, "")
 	serverCalled := int32(0)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&serverCalled, 1)
@@ -194,7 +193,6 @@ fixture = "dev-db.json"
 
 func TestHandleSnapshotCapturePublishesMetadataToJetStream(t *testing.T) {
 	buf := &bytes.Buffer{}
-	t.Setenv(gridEndpointEnv, "")
 
 	srv := runJetStreamServer(t)
 	t.Cleanup(func() { srv.Shutdown() })
