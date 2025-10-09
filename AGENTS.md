@@ -72,7 +72,7 @@ addendum:
   `internal/workflow`.
 - When Grid integration requires live endpoints, run integration tests from the
   workstation using the shared grid client (`PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, optional
-  `GRID_CLIENT_BEACON_URL`), keeping the CLI stateless.
+  `GRID_BEACON_URL`), keeping the CLI stateless.
 
 ## Documentation Discipline
 

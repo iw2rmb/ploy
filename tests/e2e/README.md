@@ -18,7 +18,7 @@ go test -tags e2e ./tests/e2e -v
   ✅ Planner metadata reflects parallel healing; SHIFT follow-up covers real Grid
   reconciliation.
 - `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `PLOY_GRID_API_KEY`, and
-  `PLOY_LANES_DIR` are configured (plus optional `GRID_CLIENT_BEACON_URL`),
+  `PLOY_LANES_DIR` are configured (plus optional `GRID_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
   `ploy mod run`.
   Additional scenarios can be toggled via `PLOY_E2E_LIVE_SCENARIOS`.
@@ -33,7 +33,7 @@ Set the following variables before invoking the suite:
 
 - `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
 - `PLOY_GRID_API_KEY` — Grid-scoped API key required for beacon/discovery requests.
-- `GRID_CLIENT_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
+- `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.
 - `PLOY_E2E_TENANT` — Tenant slug to claim tickets under

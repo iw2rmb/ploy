@@ -1,9 +1,23 @@
 # Changelog
 
+## [2025-10-09] Discovery Env Cleanup
+
+- Retired the legacy discovery override variable so the CLI now reads the beacon
+  host exclusively from `GRID_BEACON_URL` and no longer filters inherited shell
+  environments (cmd/ploy/dependencies.go, cmd/ploy/dependencies_clients.go,
+  tests/e2e/mods_scenarios_test.go).
+- Removed helper utilities and tests that referenced the retired toggle to keep
+  the harness focused on the supported configuration (cmd/ploy/mod_run_grid_test.go,
+  cmd/ploy/dependencies_discovery_test.go, cmd/ploy/test_support_test.go).
+- Updated developer documentation to call out `GRID_BEACON_URL` for overrides
+  and refreshed agent guidance to match (README.md, cmd/ploy/README.md,
+  docs/envs/README.md, tests/e2e/README.md, AGENTS.md, tests/e2e/config.go).
+- Verified via `go test ./...` on 2025-10-09. Refs shift-mods-grid-05.
+
 ## [2025-10-11] Grid Client Adoption
 
 - Switched the Ploy CLI to use the shared `sdk/gridclient/go` library, removed
-  `GRID_ENDPOINT` handling, and enforced `{PLOY_GRID_ID, PLOY_GRID_API_KEY}` credentials
+  the legacy endpoint override handling, and enforced `{PLOY_GRID_ID, PLOY_GRID_API_KEY}` credentials
   for live runs while retaining in-memory fallbacks (cmd/ploy/dependencies*.go,
   internal/workflow/grid/client.go).
 - Updated unit tests and the Mods/snapshot harnesses to stub the shared client
@@ -11,7 +25,7 @@
   propagate the new inputs (cmd/ploy/*_test.go, tests/e2e/config.go,
   tests/e2e/mods_scenarios_test.go).
 - Refreshed CLI/docs/environment references to document the new client flow
-  and the `GRID_ENDPOINT` deprecation (README.md, cmd/ploy/README.md,
+  and the endpoint override removal (README.md, cmd/ploy/README.md,
   docs/envs/README.md, docs/design/workflow-rpc-alignment/README.md,
   docs/tasks/grid-client/04-ploy-adoption.md).
 - Verified via `go test ./...` on 2025-10-11.
@@ -36,7 +50,7 @@
   catalogue; added `PLOY_LANES_DIR` to the documented environment variables and
   refreshed the lane validator default.
 - Added optional `PLOY_GRID_API_KEY`/`PLOY_GRID_ID` handling alongside the existing
-  `GRID_ENDPOINT`, wiring bearer tokens into the Grid helper and discovery calls
+  endpoint override, wiring bearer tokens into the Grid helper and discovery calls
   while updating tests and env listings.
 - Extended Mods live Grid smoke to accept `PLOY_E2E_LIVE_SCENARIOS`, allowing
   `TestModsScenariosLiveGrid` to run multiple scenarios via `go test -tags e2e
@@ -274,7 +288,7 @@
   handling, and error propagation.
 - Replaced the bespoke HTTP client in `internal/workflow/grid` with the
   SDK-backed wrapper, keeping invocation tracking intact and enabling CLI
-  integration when `GRID_ENDPOINT` is configured.
+  integration when the endpoint override is configured.
 - Updated `cmd/ploy/README.md`, the Workflow RPC alignment design, and the
   roadmap entry to reflect the SDK wiring milestone; marked roadmap slice
   `workflow-rpc-alignment/01-grid-sdk-client` complete.
@@ -462,7 +476,7 @@
 
 - Added `internal/workflow/grid` with an HTTP Workflow RPC client that submits
   stage executions to Grid and records invocation metadata for CLI summaries.
-- Updated `ploy mod run` to honour `GRID_ENDPOINT`, wiring real Grid
+- Updated `ploy mod run` to honour the endpoint override, wiring real Grid
   dispatch when configured and keeping the in-memory stub for offline
   development.
 - Expanded CLI and client test suites to cover Grid configuration failures,
@@ -621,7 +635,7 @@
 - Extended CLI tests to cover command dispatch, usage printers, and runner
   wiring; repository-wide `go test -cover ./...` now satisfies ≥60% overall
   coverage.
-- Documented discovery-driven configuration (`GRID_ENDPOINT`) and new behaviour
+- Documented discovery-driven configuration and new behaviour
   in `cmd/ploy/README.md`; marked roadmap slice `02-workflow-runner-cli`
   complete.
 

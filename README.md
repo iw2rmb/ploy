@@ -164,8 +164,7 @@ Full design records live in `docs/design/README.md`.
    The CLI instantiates the shared grid client, authenticates with gridbeacon,
    and fetches discovery metadata (API endpoint, JetStream routes, IPFS gateway,
    feature map, version) before connecting. Omitting either `PLOY_GRID_ID` or
-   `PLOY_GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs, and
-   setting the deprecated `GRID_ENDPOINT` variable now fails fast with guidance.
+   `PLOY_GRID_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs.
 
 5. **Preview snapshot rules**
 
@@ -233,7 +232,7 @@ inspects the following environment variables:
   scope its state directory.
 - `PLOY_GRID_API_KEY` — Required grid-scoped API key forwarded to gridbeacon,
   discovery, and workflow RPC requests.
-- `GRID_CLIENT_BEACON_URL` — Optional beacon base URL override (defaults to
+- `GRID_BEACON_URL` — Optional beacon base URL override (defaults to
   `https://beacon.getgrid.dev`).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
   directory (defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`).

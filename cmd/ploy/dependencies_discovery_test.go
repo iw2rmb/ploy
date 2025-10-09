@@ -10,7 +10,6 @@ import (
 )
 
 func TestResolveIntegrationConfigFromGridClient(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
@@ -62,7 +61,6 @@ func TestResolveIntegrationConfigFromGridClient(t *testing.T) {
 }
 
 func TestResolveIntegrationConfigDisabledWithoutCredentials(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
 	cfg, err := resolveIntegrationConfig(context.Background())
@@ -78,7 +76,6 @@ func TestResolveIntegrationConfigDisabledWithoutCredentials(t *testing.T) {
 }
 
 func TestResolveIntegrationConfigPropagatesErrors(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "")
 	t.Setenv(gridIDEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
@@ -97,20 +94,5 @@ func TestResolveIntegrationConfigPropagatesErrors(t *testing.T) {
 	_, err := resolveIntegrationConfig(context.Background())
 	if err == nil || !strings.Contains(err.Error(), errSentinel.Error()) {
 		t.Fatalf("expected error %v, got %v", errSentinel, err)
-	}
-}
-
-func TestResolveIntegrationConfigRejectsDeprecatedEndpoint(t *testing.T) {
-	t.Setenv(gridEndpointEnv, "https://legacy.example")
-	t.Setenv(gridIDEnv, "grid-dev")
-	t.Setenv(gridAPIKeyEnv, "secret")
-	t.Setenv(gridClientStateEnv, t.TempDir())
-
-	_, err := resolveIntegrationConfig(context.Background())
-	if err == nil {
-		t.Fatal("expected error when GRID_ENDPOINT is set")
-	}
-	if !strings.Contains(err.Error(), gridEndpointEnv) {
-		t.Fatalf("expected mention of %s, got %v", gridEndpointEnv, err)
 	}
 }

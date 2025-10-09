@@ -62,10 +62,9 @@ type laneCacheComposer struct {
 const (
 	workflowSDKStateEnv = "GRID_WORKFLOW_SDK_STATE_DIR"
 	lanesCatalogEnv     = "PLOY_LANES_DIR"
-	gridEndpointEnv     = "GRID_ENDPOINT"
 	gridAPIKeyEnv       = "PLOY_GRID_API_KEY"
 	gridIDEnv           = "PLOY_GRID_ID"
-	gridClientBeaconEnv = "GRID_CLIENT_BEACON_URL"
+	gridClientBeaconEnv = "GRID_BEACON_URL"
 	gridClientStateEnv  = "GRID_CLIENT_STATE_DIR"
 )
 
