@@ -72,7 +72,9 @@ addendum:
   `internal/workflow`.
 - When Grid integration requires live endpoints, run integration tests from the
   workstation using the shared grid client (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`, optional
-  `GRID_BEACON_URL`), keeping the CLI stateless.
+  `GRID_BEACON_URL`), keeping the CLI stateless. If the grid client reports the
+  grid is missing, run `gridctl grid client backfill --grid-id <grid>` so beacon
+  exposes the `manifestHost` and CA metadata expected by the SDK.
 
 ## Documentation Discipline
 
