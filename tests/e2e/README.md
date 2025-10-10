@@ -36,8 +36,8 @@ Set the following variables before invoking the suite:
 - Remember to source `~/.zshenv` (or otherwise export them into your shell) so
   the CLI picks up the expected environment.
 - `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
-- `GRID_BEACON_API_KEY` — Beacon service API key used to bootstrap discovery and workflow credentials.
-- `GRID_BEACON_API_KEY` — Beacon service API key used to resolve workflow endpoints.
+- `GRID_BEACON_API_KEY` — Beacon service API key used to bootstrap discovery, trust
+  material, and workflow credentials.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.
@@ -49,7 +49,10 @@ Set the following variables before invoking the suite:
   live Grid (defaults to `simple-openrewrite`).
 
 When mandatory variables are missing or the credentials are invalid, the live
-Grid-backed tests fail fast so misconfiguration is surfaced immediately.
+Grid-backed tests fail fast so misconfiguration is surfaced immediately. If
+beacon replies without control-plane metadata and the grid client reports
+`gridclient: grid not found`, run `gridctl grid client backfill --grid-id $PLOY_GRID_ID`
+to publish the required `manifestHost` and CA bundle before rerunning the suite.
 
 ## How This Diff Relates to Legacy Mods E2E
 

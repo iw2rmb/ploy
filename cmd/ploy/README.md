@@ -140,7 +140,9 @@ classifier drift without leaving the workstation.
 - `PLOY_GRID_ID` — Required grid identifier so the CLI can initialise the shared
   grid client and scope its state directory per grid.
 - `GRID_BEACON_API_KEY` — Required beacon API key forwarded to beacon/discovery
-  and workflow RPC calls.
+  and workflow RPC calls. Ensure the grid has been backfilled via
+  `gridctl grid client backfill --grid-id <grid>` so beacon exposes the
+  `manifestHost` and CA bundle needed by the shared client.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state

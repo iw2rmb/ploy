@@ -231,7 +231,10 @@ inspects the following environment variables:
 - `PLOY_GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
   scope its state directory.
 - `GRID_BEACON_API_KEY` — Required beacon API key forwarded to gridbeacon when
-  fetching discovery metadata and workflow credentials.
+  fetching discovery metadata and workflow credentials. Existing grids must have
+  their metadata backfilled via `gridctl grid client backfill --grid-id $PLOY_GRID_ID`
+  so beacon exposes the `manifestHost` and CA bundle required by the shared grid
+  client.
 - `GRID_BEACON_URL` — Optional beacon base URL override (defaults to
   `https://beacon.getgrid.dev`).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state

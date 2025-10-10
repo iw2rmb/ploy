@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -91,7 +92,14 @@ func liveGridClient(cfg Config) (runner.GridClient, string, error) {
 
 	baseClient, err := gridclient.New(context.Background(), clientCfg)
 	if err != nil {
-		return nil, "", err
+		switch {
+		case errors.Is(err, gridclient.ErrGridNotFound):
+			return nil, "", fmt.Errorf("%w: beacon has no control-plane metadata for grid %q; run `gridctl grid client backfill --grid-id %s` and retry", err, gridID, gridID)
+		case errors.Is(err, gridclient.ErrUnauthorized):
+			return nil, "", fmt.Errorf("%w: verify GRID_BEACON_API_KEY is scoped to grid %q", err, gridID)
+		default:
+			return nil, "", err
+		}
 	}
 
 	status := baseClient.Status()

@@ -17,7 +17,10 @@ additional configuration.
 - `PLOY_GRID_ID` — Required grid identifier used to scope client state on disk and
   construct the discovery/beacon requests. The CLI fails fast when unset.
 - `GRID_BEACON_API_KEY` — Required beacon-scoped API key presented to gridbeacon
-  when bootstrapping discovery, trust material, and workflow credentials.
+  when bootstrapping discovery, trust material, and workflow credentials. For
+  pre-existing grids, run `gridctl grid client backfill --grid-id <grid>` after
+  adopting the new client so beacon publishes the `manifestHost` and CA bundle
+  expected by the SDK.
 - `GRID_BEACON_URL` — Optional override for the gridbeacon base URL.
   Defaults to the production beacon (`https://beacon.getgrid.dev`).
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
