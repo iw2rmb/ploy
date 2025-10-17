@@ -1,12 +1,12 @@
 # Mods Grid Restoration Design Spec
 
-- **Identifier**: `shift-mods-grid`
+- **Identifier**: `mods-grid`
 - **Status**: [x] Draft · [x] In progress · [ ] Completed — last updated 2025-10-07
 - **Linked Tasks**:
-  - [x] `shift-mods-grid-01` – `docs/tasks/mods-grid/01-red.md`
-  - [x] `shift-mods-grid-02` – `docs/tasks/mods-grid/02-green.md`
-  - [x] `shift-mods-grid-03` – `docs/tasks/mods-grid/03-red.md`
-  - [x] `shift-mods-grid-04` – `docs/tasks/mods-grid/04-green.md`
+  - [x] `mods-grid-01` – `docs/tasks/mods-grid/01-red.md`
+  - [x] `mods-grid-02` – `docs/tasks/mods-grid/02-green.md`
+  - [x] `mods-grid-03` – `docs/tasks/mods-grid/03-red.md`
+  - [x] `mods-grid-04` – `docs/tasks/mods-grid/04-green.md`
 - **Blocked by**:
   - None (follow-ups tracked below)
 - **Unblocks**:
@@ -33,10 +33,10 @@ build-gate feedback loop that drives LLM/human remediation.
 
 | Track | Ready When | Owner | Notes |
 | --- | --- | --- | --- |
-| Repo materialisation RED (`shift-mods-grid-01`) | Design approved | Mods squad | Produces RED tests + E2E guardrails |
-| Materialisation GREEN (`shift-mods-grid-02`) | RED tests merged | Mods squad | Enables simple OpenRewrite scenario |
-| Healing RED (`shift-mods-grid-03`) | Simple scenario reaches build gate | Mods squad | Adds retry + branching tests |
-| Healing GREEN (`shift-mods-grid-04`) | RED failures in place | Mods + Build Gate | Implements planner/runner feedback |
+| Repo materialisation RED (`mods-grid-01`) | Design approved | Mods squad | Produces RED tests + E2E guardrails |
+| Materialisation GREEN (`mods-grid-02`) | RED tests merged | Mods squad | Enables simple OpenRewrite scenario |
+| Healing RED (`mods-grid-03`) | Simple scenario reaches build gate | Mods squad | Adds retry + branching tests |
+| Healing GREEN (`mods-grid-04`) | RED failures in place | Mods + Build Gate | Implements planner/runner feedback |
 
 ## Shared Components & Unblocking Candidates
 
@@ -50,7 +50,7 @@ build-gate feedback loop that drives LLM/human remediation.
 
 Legacy Mods E2E suites were removed in commit `da348c89`, leaving the CLI with a
 planner that emitted Mods stages but no way to run them on Grid. The
-`shift-mods-grid` slice set out to close the following gaps (now addressed by
+`mods-grid` slice set out to close the following gaps (now addressed by
 Steps 1–4):
 
 - Workflow tickets lacked repo/branch metadata, preventing runner-side materialisation.
@@ -223,7 +223,7 @@ Steps 1–4):
 ## Follow-Up Work (2025-10-07)
 
 - [ ] Planned –
-  [shift-mods-grid-05 Grid Catalog Registration](../../tasks/mods-grid/05-refactor.md)
+  [mods-grid-05 Grid Catalog Registration](../../tasks/mods-grid/05-refactor.md)
   *(placeholder to be created once GREEN completes)*
 - [ ] Planned – Publish Mods catalog repository and update consumers to
   reference the Grid namespace.

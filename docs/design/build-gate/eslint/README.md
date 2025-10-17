@@ -134,5 +134,5 @@ ESLint during CI.
 - Roadmap task `../../../../docs/tasks/build-gate/09-eslint-adapter.md` describing
   scope, DOD, and verification.
 - Documentation updates: this design record, design index entry, build gate
-  design follow-ups, SHIFT design next steps, and changelog entry with
+  design follow-ups, workstation roadmap next steps, and changelog entry with
   date/verification details.

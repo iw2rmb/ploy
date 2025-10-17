@@ -23,8 +23,8 @@ checkpoints or Grid logs.
 - `ploy mod run` prints a build gate summary showing static check status,
   failing diagnostics, knowledge base findings, and the associated log digest
   when available.
-- Documentation and the SHIFT tracker record the milestone with cross references
-  to the design record.
+- Documentation and the workstation roadmap tracker record the milestone with
+  cross references to the design record.
 
 ## Implementation Notes
 
@@ -48,4 +48,4 @@ checkpoints or Grid logs.
 ## References
 
 - Build gate design (`docs/design/build-gate/README.md`).
-- SHIFT roadmap slice (`docs/tasks/shift/21-build-gate-reboot.md`).
+- Workstation roadmap slice (`docs/tasks/roadmap/21-build-gate-reboot.md`).

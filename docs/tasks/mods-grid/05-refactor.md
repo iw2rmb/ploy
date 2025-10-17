@@ -1,9 +1,9 @@
-# shift-mods-grid-05 — Mods Lane Consolidation (REFRACTOR)
+# mods-grid-05 — Mods Lane Consolidation (REFRACTOR)
 
 - **Status**: [ ] Planned · [x] In Progress · [ ] Done
 - **Design**: [../design/mods-grid-restoration/README.md](../../design/mods-grid-restoration/README.md)
-- **Blocked by**: `shift-mods-grid-04`
-- **Unblocks**: SHIFT lane migration design (TBD)
+- **Blocked by**: `mods-grid-04`
+- **Unblocks**: Lane catalog publication design (TBD)
 
 ## Definition of Ready
 
@@ -12,8 +12,8 @@
 ## Definition of Done
 
 - Mods-specific lanes bundled under `configs/lanes` with matching import hooks
-  in Ploy and mirrored into SHIFT when published.
-- Documentation updated to reference SHIFT as the source of truth.
+  in Ploy and mirrored into the published lane catalog when released.
+- Documentation updated to reference the external lane catalog as the source of truth.
 
 ## Test Plan
 
@@ -27,4 +27,4 @@
   and `GRID_BEACON_API_KEY` are configured, runs `ploy mod run` against Grid via
   `TestModsScenariosLiveGrid`; additional scenarios can be enabled through
   `PLOY_E2E_LIVE_SCENARIOS`.
-- Placeholder for additional follow-up once SHIFT lane publication completes.
+- Placeholder for additional follow-up once lane publication completes.

@@ -23,7 +23,7 @@ output.
   description.
 - `docs/LANES.md` documents field requirements and shows accurate CLI output for
   `go-native`.
-- Roadmap entry recorded for the SHIFT slice so future tasks build on the
+- Roadmap entry recorded for the workstation slice so future tasks build on the
   hardened schema.
 
 ## Tests

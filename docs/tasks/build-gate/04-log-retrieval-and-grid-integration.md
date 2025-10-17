@@ -37,7 +37,7 @@ workstation and Grid modes.
   results, ensuring downstream consumers receive trimmed codes, evidence, and
   severity values.
 - Documentation now cross-references the retriever/ingestor components and
-  records the milestone in the build gate design index and SHIFT tracker.
+  records the milestone in the build gate design index and workstation roadmap tracker.
 
 ## Tests
 

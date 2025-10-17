@@ -70,8 +70,8 @@ ships and Ploy loses validation coverage for production-style policies.
 - [`../../MANIFESTS.md`](../../MANIFESTS.md) — User-facing manifest guidance.
 - [`../../../configs/manifests/commit-app.toml`](../../../configs/manifests/commit-app.toml)
   — Existing manifest requiring migration.
-- [`../../shift/README.md`](../../shift/README.md) — SHIFT roadmap status
-  tracker.
+- [`../../workstation-roadmap/README.md`](../../workstation-roadmap/README.md) —
+  Workstation roadmap status tracker.
 - [`../../workflow-rpc-alignment/README.md`](../../workflow-rpc-alignment/README.md)
   — Ensures job submissions keep referencing manifest payloads.
 - [`../../../../grid/testdata/topology/sample-gate.toml`](../../../../grid/testdata/topology/sample-gate.toml)

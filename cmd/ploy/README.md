@@ -3,7 +3,7 @@
 `ploy` is now a single-purpose CLI that claims workflow tickets from Grid,
 reconstructs the default mods→build→test DAG, and dispatches stages to the
 in-memory Grid stub. Legacy subcommands (apps, env, mods, security, etc.) were
-removed during the SHIFT legacy teardown.
+removed during the workstation legacy teardown.
 
 ## Usage
 

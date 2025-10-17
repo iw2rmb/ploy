@@ -33,7 +33,7 @@ build gates, and pave the way for eliminating duplicate deployment code.
 
 ## Current Status
 
-- Deploy seams landed before the SHIFT reboot; CLI handlers rely on injected
+- Deploy seams landed before the workstation reboot; CLI handlers rely on injected
   dependencies with backwards-compatible defaults.
 - Tests use fakes to avoid on-disk tarball creation and network calls.
 

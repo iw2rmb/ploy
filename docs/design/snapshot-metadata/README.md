@@ -1,11 +1,11 @@
-# Snapshot Metadata Streams (SHIFT Roadmap 16)
+# Snapshot Metadata Streams (Roadmap 16)
 
 ## Purpose
 
 Publish snapshot capture metadata to JetStream so Grid can ingest fingerprint,
 CID, and rule counts without relying on the CLI stdout. This slice closes the
 TODO called out in `docs/design/ipfs-artifacts/README.md` and aligns with the
-SHIFT contract that `ploy snapshot capture` pushes metadata to JetStream
+roadmap contract that `ploy snapshot capture` pushes metadata to JetStream
 alongside artifact uploads.
 
 ## Scope

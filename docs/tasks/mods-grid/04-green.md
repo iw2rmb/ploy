@@ -1,9 +1,9 @@
-# shift-mods-grid-04 — Mods Healing Branching (GREEN)
+# mods-grid-04 — Mods Healing Branching (GREEN)
 
 - **Status**: [ ] Planned · [ ] In Progress · [x] Done
 - **Design**: [../design/mods-grid-restoration/README.md](../../design/mods-grid-restoration/README.md)
-- **Blocked by**: `shift-mods-grid-03`
-- **Unblocks**: `shift-mods-grid-05`
+- **Blocked by**: `mods-grid-03`
+- **Unblocks**: `mods-grid-05`
 
 ## Definition of Ready
 

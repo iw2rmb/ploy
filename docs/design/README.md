@@ -1,6 +1,6 @@
 # Design Documents
 
-Status checkboxes mirror the corresponding entries under `docs/tasks/shift/`.
+Status checkboxes mirror the corresponding entries under `docs/tasks/roadmap/`.
 
 - [x] [overview/README.md](overview/README.md) — Blueprint for the CLI-first
       architecture and Grid hand-off model (evergreen reference).
@@ -23,17 +23,18 @@ Status checkboxes mirror the corresponding entries under `docs/tasks/shift/`.
 - [ ] [mods/README.md](mods/README.md) — Parallel Mods workflow planner covering
       orw/LLM/human stages (task set shifting to `docs/tasks/mods/`); planner
       skeleton and knowledge base feedback landed 2025-09-27, but Grid job
-      specs and healing feedback are pending `shift-mods-grid` restoration.
+      specs and healing feedback are pending `mods-grid` restoration.
 - [x] [knowledge-base/README.md](knowledge-base/README.md) — Fuzzy error
       classification feeding Mods/LLM remediation (Roadmap 20); classifier
       foundation, CLI ingest, and CLI evaluation slices completed 2025-09-27.
 - [x] [integration-manifests/README.md](integration-manifests/README.md) — V2
       manifest schema, deterministic compiler, and CLI rewrite tooling landed
       2025-09-29.
-- [ ] [shift/README.md](shift/README.md) — SHIFT roadmap overview aligning
-      workstation-first slices; reopen pending Mods/Grid parity captured in
-      `docs/tasks/shift/21-build-gate-reboot.md` follow-ups (updated 2025-10-07 to
-      track Grid catalog registration).
+- [ ] [workstation-roadmap/README.md](workstation-roadmap/README.md) —
+      Workstation roadmap overview aligning workstation-first slices; reopen
+      pending Mods/Grid parity captured in
+      `docs/tasks/roadmap/21-build-gate-reboot.md` follow-ups (updated 2025-10-07
+      to track Grid catalog registration).
 - [x] [build-gate/README.md](build-gate/README.md) — Grid-aligned build gate
       with static checks, clarified sandbox scope, log streaming via Workflow
       RPC helper, and CLI summaries (Roadmap 21); stage planning/metadata landed

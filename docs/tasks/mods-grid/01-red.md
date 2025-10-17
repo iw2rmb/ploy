@@ -1,9 +1,9 @@
-# shift-mods-grid-01 — Mods Grid Materialisation (RED)
+# mods-grid-01 — Mods Grid Materialisation (RED)
 
 - **Status**: [ ] Planned · [ ] In Progress · [x] Done
 - **Design**: [../design/mods-grid-restoration/README.md](../../design/mods-grid-restoration/README.md)
 - **Blocked by**: None
-- **Unblocks**: `shift-mods-grid-02`
+- **Unblocks**: `mods-grid-02`
 
 ## Definition of Ready
 

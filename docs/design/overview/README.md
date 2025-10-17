@@ -1,4 +1,4 @@
-# Ploy Shift Design
+# Ploy Workflow Design
 
 ## Purpose
 
@@ -8,9 +8,8 @@ the legacy API.
 
 ## Context
 
-- Source plan: `SHIFT.md` in this repo plus `../grid/SHIFT.md` for Grid’s
-  responsibilities (no deep-dive doc exists at
-  `../grid/docs/design/shift/SHIFT.md`).
+- Source plan: `docs/design/workstation-roadmap/README.md` in this repo plus
+  complementary Grid design records covering workflow, discovery, and schedulers.
 - Ploy must stay workstation-first: run via CLI, hydrate state from
   JetStream/IPFS, and leave the execution/control plane to Grid.
 - We explicitly drop Nomad/Consul/Traefik scaffolding, SeaweedFS-specific flows,
@@ -59,7 +58,8 @@ the legacy API.
 
 - No backups to Nomad, Consul, Traefik, or SeaweedFS.
 - No compatibility layer for the legacy API or deployment flows.
-- No bespoke Grid shims—rely on the contract described in `../grid/SHIFT.md`.
+- No bespoke Grid shims—rely on the contract described in the Grid workflow
+  design references.
 
 ## Legacy Decommission Plan
 
@@ -75,7 +75,7 @@ the legacy API.
 - **Legacy lane metadata** – Purge Nomad-specific lane descriptors, templates
   under `configs/lanes/nomad*`, and build/test scripts that rely on system jobs.
   Workstation lanes now live under `configs/lanes` in this repository and are
-  mirrored into SHIFT.
+  mirrored into the published lane catalog.
 - **Build-gate service integrations** – Remove API-specific webhooks, Cron jobs,
   and background workers; ensure SBOM/vuln/static analysis hooks operate as
   Grid-submitted jobs only.
@@ -113,8 +113,8 @@ the legacy API.
 3. **Lane Engine**
    - Lanes defined in `configs/lanes` referencing runtime families, cache
      namespaces, build/test commands, and the job spec schema (`image`,
-     `command`, `env`, `resources`). The catalogue is mirrored into SHIFT when
-     required.
+  `command`, `env`, `resources`). The catalogue is mirrored into the shared lane
+  registry when required.
    - Cache keys incorporate lane, commit SHA, Aster toggle, snapshot
      fingerprint, and manifest version.
    - Expose `ploy lanes describe <lane>` for developers to inspect runtime

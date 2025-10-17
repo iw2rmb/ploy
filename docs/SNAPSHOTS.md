@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Describe how the snapshot toolkit transforms database fixtures during the SHIFT
+Describe how the snapshot toolkit transforms database fixtures during the workstation
 reboot, keeping captures deterministic while supporting real IPFS publishing
 when a gateway is available.
 
@@ -84,6 +84,6 @@ stub.
 - `docs/design/overview/README.md` — Overall feature architecture.
 - `docs/DOCS.md` — documentation matrix and editing conventions.
 - `README.md` — High-level CLI overview (snapshot commands included).
-- `docs/tasks/shift/08-documentation-cleanup.md` — slice documenting the doc
+- `docs/tasks/roadmap/08-documentation-cleanup.md` — slice documenting the doc
   refresh.
 - `cmd/ploy/README.md` — CLI usage details and environment placeholders.
