@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -24,17 +25,18 @@ type scenarioOptions struct {
 }
 
 type scenarioHarness struct {
-	t         *testing.T
-	scenario  Scenario
-	options   scenarioOptions
-	tenant    string
-	ticket    string
-	grid      runner.GridClient
-	recorder  *capturingGrid
-	bus       *contracts.InMemoryBus
-	workspace *recordingWorkspacePreparer
-	advisor   *recordingAdvisor
-	compiler  staticManifestCompiler
+	t           *testing.T
+	scenario    Scenario
+	options     scenarioOptions
+	tenant      string
+	ticket      string
+	grid        runner.GridClient
+	recorder    *capturingGrid
+	bus         *contracts.InMemoryBus
+	workspace   *recordingWorkspacePreparer
+	advisor     *recordingAdvisor
+	jobComposer runner.JobComposer
+	compiler    staticManifestCompiler
 }
 
 type staticManifestCompiler struct {
@@ -123,6 +125,8 @@ func newScenarioHarness(t *testing.T, scenario Scenario, opts scenarioOptions) *
 
 	harness.advisor = &recordingAdvisor{advice: normalizeAdvice(opts.Advice)}
 
+	harness.jobComposer = runner.NewStaticJobComposer()
+
 	return harness
 }
 
@@ -146,6 +150,7 @@ func (h *scenarioHarness) run() error {
 		Planner:           runner.NewDefaultPlannerWithMods(modsOpts),
 		MaxStageRetries:   1,
 		ManifestCompiler:  h.compiler,
+		JobComposer:       h.jobComposer,
 		WorkspacePreparer: h.workspace,
 		Mods:              modsOpts,
 	}
@@ -192,7 +197,9 @@ func newModsCompilation() manifests.Compilation {
 		{Name: "mods-java"},
 		{Name: "mods-llm"},
 		{Name: "mods-human"},
-		{Name: "go-native"},
+		{Name: "build-gate"},
+		{Name: "static-checks"},
+		{Name: "test"},
 	}
 	return manifests.Compilation{
 		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},

@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
@@ -28,11 +26,9 @@ type eventsFactoryFunc func(tenant string) (runner.EventsClient, error)
 
 type gridFactoryFunc func() (runner.GridClient, error)
 
-type laneRegistry interface {
-	Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error)
-}
+type jobComposerFactoryFunc func() runner.JobComposer
 
-type laneRegistryLoaderFunc func(dir string) (laneRegistry, error)
+type cacheComposerFactoryFunc func() runner.CacheComposer
 
 type knowledgeBaseAdvisorLoaderFunc func(path string) (mods.Advisor, error)
 
@@ -49,19 +45,14 @@ type environmentService interface {
 	Materialize(ctx context.Context, req environments.Request) (environments.Result, error)
 }
 
-type environmentFactoryFunc func(l laneRegistry, s snapshotRegistry) (environmentService, error)
+type environmentFactoryFunc func(s snapshotRegistry) (environmentService, error)
 
 type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 
 type workspacePreparerFactoryFunc func() (runner.WorkspacePreparer, error)
 
-type laneCacheComposer struct {
-	lanes laneRegistry
-}
-
 const (
 	workflowSDKStateEnv = "GRID_WORKFLOW_SDK_STATE_DIR"
-	lanesCatalogEnv     = "PLOY_LANES_DIR"
 	gridAPIKeyEnv       = "GRID_BEACON_API_KEY"
 	gridIDEnv           = "PLOY_GRID_ID"
 	gridClientBeaconEnv = "GRID_BEACON_URL"
@@ -73,6 +64,8 @@ var (
 	eventsFactory            eventsFactoryFunc            = defaultEventsFactory
 	gridFactory              gridFactoryFunc              = defaultGridFactory
 	workspacePreparerFactory workspacePreparerFactoryFunc = defaultWorkspacePreparerFactory
+	jobComposerFactory       jobComposerFactoryFunc       = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory     cacheComposerFactoryFunc     = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	newJetStreamClient = contracts.NewJetStreamClient
 )
@@ -80,20 +73,3 @@ var (
 var (
 	knowledgeBaseAdvisorLoader knowledgeBaseAdvisorLoaderFunc = defaultKnowledgeBaseAdvisorLoader
 )
-
-// Compose produces cache keys by delegating to the configured lane registry.
-func (c laneCacheComposer) Compose(ctx context.Context, req runner.CacheComposeRequest) (string, error) {
-	_ = ctx
-	if c.lanes == nil {
-		return "", fmt.Errorf("lane registry unavailable")
-	}
-	manifestVersion := req.Stage.Constraints.Manifest.Manifest.Version
-	desc, err := c.lanes.Describe(req.Stage.Lane, lanes.DescribeOptions{
-		ManifestVersion: manifestVersion,
-		AsterToggles:    req.Stage.Aster.Toggles,
-	})
-	if err != nil {
-		return "", err
-	}
-	return desc.CacheKey, nil
-}

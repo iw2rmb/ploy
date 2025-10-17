@@ -16,6 +16,7 @@ type StageInvocation struct {
 	Workspace string
 	RunID     string
 	Archive   *StageArchive
+	Evidence  *StageEvidence
 }
 
 type InMemoryGrid struct {
@@ -47,6 +48,7 @@ func (g *InMemoryGrid) ExecuteStage(ctx context.Context, ticket contracts.Workfl
 	}
 
 	g.invocations = append(g.invocations, StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace})
+	idx := len(g.invocations) - 1
 
 	outcomes := g.StageOutcomes[stage.Name]
 	if len(outcomes) == 0 {
@@ -60,6 +62,11 @@ func (g *InMemoryGrid) ExecuteStage(ctx context.Context, ticket contracts.Workfl
 	}
 	if outcome.Status == "" {
 		outcome.Status = StageStatusCompleted
+	}
+	if idx >= 0 && idx < len(g.invocations) {
+		g.invocations[idx].RunID = outcome.RunID
+		g.invocations[idx].Archive = outcome.Archive
+		g.invocations[idx].Evidence = outcome.Evidence
 	}
 	return outcome, nil
 }

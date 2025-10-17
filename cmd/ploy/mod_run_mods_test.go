@@ -8,7 +8,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -23,8 +22,8 @@ func TestHandleModRunConfiguresModsFlags(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -32,8 +31,8 @@ func TestHandleModRunConfiguresModsFlags(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	runnerExecutor = fakeRunner
@@ -44,15 +43,8 @@ func TestHandleModRunConfiguresModsFlags(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		desc := lanes.Description{Lane: lanes.Spec{Name: "mods-plan", CacheNamespace: "mods"}, CacheKey: "stub-cache"}
-		desc.Lane.Job.Image = "registry.dev/ploy/mods-plan:latest"
-		desc.Lane.Job.Command = []string{"mods-plan"}
-		desc.Lane.Job.Env = map[string]string{}
-		desc.Lane.Job.Resources = lanes.JobResources{CPU: "1000m", Memory: "1Gi"}
-		return &fakeLaneRegistry{description: desc}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 	withStubWorkspacePreparer(t)
 
 	err := handleModRun([]string{"--tenant", "acme", "--mods-plan-timeout", "2m30s", "--mods-max-parallel", "5"}, io.Discard)

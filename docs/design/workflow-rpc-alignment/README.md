@@ -84,9 +84,8 @@ requires:
 
 ## Runner Data Composition
 
-- Lane definitions (sourced from
-  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)) retain
-  optional `image`, `command`, `env`, and resource hints.
+- Lane definitions (sourced from `configs/lanes`) retain optional `image`,
+  `command`, `env`, and resource hints.
 - The runner assembles `workflowsdk.JobSpec` using lane defaults plus
   manifest/Aster overrides and records textual resource hints in metadata so
   Grid can score workloads even when numeric limits are unspecified.

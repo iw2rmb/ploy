@@ -12,6 +12,7 @@ import (
 type Config struct {
 	GridID       string
 	BeaconAPIKey string
+	GridAPIKey   string
 	BeaconURL    string
 	Tenant       string
 	TicketPrefix string
@@ -25,6 +26,7 @@ func LoadConfig() Config {
 	cfg := Config{
 		GridID:       strings.TrimSpace(os.Getenv("PLOY_GRID_ID")),
 		BeaconAPIKey: strings.TrimSpace(os.Getenv("GRID_BEACON_API_KEY")),
+		GridAPIKey:   strings.TrimSpace(os.Getenv("PLOY_GRID_API_KEY")),
 		BeaconURL:    strings.TrimSpace(os.Getenv("GRID_BEACON_URL")),
 		Tenant:       strings.TrimSpace(os.Getenv("PLOY_E2E_TENANT")),
 		TicketPrefix: strings.TrimSpace(os.Getenv("PLOY_E2E_TICKET_PREFIX")),
@@ -40,6 +42,10 @@ func LoadConfig() Config {
 	}
 	if cfg.BeaconAPIKey == "" {
 		cfg.SkipReason = "GRID_BEACON_API_KEY is not set; grid client requires a beacon API key"
+		return cfg
+	}
+	if cfg.GridAPIKey == "" {
+		cfg.SkipReason = "PLOY_GRID_API_KEY is not set; grid client requires a workflow API token"
 		return cfg
 	}
 	if cfg.Tenant == "" {

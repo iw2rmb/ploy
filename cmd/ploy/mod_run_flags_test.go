@@ -9,7 +9,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -18,39 +17,37 @@ func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
+
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
-	prevBusFactory := eventsFactory
+	prevEventsFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
-		eventsFactory = prevBusFactory
+		eventsFactory = prevEventsFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	runnerExecutor = fakeRunner
 	eventsFactory = func(tenant string) (runner.EventsClient, error) { return contracts.NewInMemoryBus(tenant), nil }
-	stubCompiler := &stubManifestCompiler{compiled: defaultManifestPayload()}
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return stubCompiler, nil
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "auto"}, io.Discard)
 	if err != nil {
@@ -62,18 +59,11 @@ func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 	if fakeRunner.opts.Tenant != "acme" {
 		t.Fatalf("unexpected tenant: %s", fakeRunner.opts.Tenant)
 	}
-	compiler := fakeRunner.opts.ManifestCompiler
-	if compiler == nil {
-		t.Fatal("expected manifest compiler to be set")
-	}
-	if compiler != stubCompiler {
-		t.Fatalf("expected stub compiler, got %T", compiler)
+	if fakeRunner.opts.JobComposer == nil {
+		t.Fatal("expected job composer to be configured")
 	}
 	if fakeRunner.opts.CacheComposer == nil {
 		t.Fatal("expected cache composer to be configured")
-	}
-	if fakeRunner.opts.JobComposer == nil {
-		t.Fatal("expected job composer to be configured")
 	}
 }
 
@@ -82,24 +72,25 @@ func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
+
 	fakeRunner := &recordingRunner{err: errors.New("boom")}
 	prevRunner := runnerExecutor
-	prevBusFactory := eventsFactory
+	prevEventsFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
-		eventsFactory = prevBusFactory
+		eventsFactory = prevEventsFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	runnerExecutor = fakeRunner
@@ -110,10 +101,8 @@ func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if !errors.Is(err, fakeRunner.err) {
@@ -126,25 +115,18 @@ func TestHandleModRunPropagatesManifestLoaderError(t *testing.T) {
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
+
 	prevLoader := manifestRegistryLoader
 	prevDir := manifestConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
 	defer func() {
 		manifestRegistryLoader = prevLoader
 		manifestConfigDir = prevDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
 	}()
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return nil, errors.New("manifest load failed")
 	}
 	manifestConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard)
 	if err == nil {
@@ -171,24 +153,25 @@ func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
 	t.Setenv(gridAPIKeyEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
+
 	fakeRunner := &recordingRunner{}
 	prevRunner := runnerExecutor
-	prevBusFactory := eventsFactory
+	prevEventsFactory := eventsFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
-		eventsFactory = prevBusFactory
+		eventsFactory = prevEventsFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	runnerExecutor = fakeRunner
@@ -199,10 +182,8 @@ func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	err := handleModRun([]string{"--tenant", "acme", "--ticket", "  ticket-456  "}, io.Discard)
 	if err != nil {

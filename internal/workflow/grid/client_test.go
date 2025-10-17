@@ -29,16 +29,16 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	manifest := manifests.Compilation{
 		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
 		ManifestVersion: "v2",
-		Lanes:           manifests.LaneSet{Required: []manifests.Lane{{Name: "go-native"}}},
+		Lanes:           manifests.LaneSet{Required: []manifests.Lane{{Name: "build-gate"}}},
 		Aster:           manifests.AsterSet{Required: []string{"plan"}},
 	}
 
 	stage := runner.Stage{
 		Name:         buildGateStageName,
 		Kind:         runner.StageKindBuildGate,
-		Lane:         "go-native",
+		Lane:         "build-gate",
 		Dependencies: []string{mods.StageNameHuman},
-		CacheKey:     "go-native/cache@manifest=2025-09-26@aster=plan",
+		CacheKey:     "build-gate/build-gate@manifest=2025-09-26@aster=plan",
 		Constraints:  runner.StageConstraints{Manifest: manifest},
 		Aster: runner.StageAster{
 			Enabled: true,
@@ -55,6 +55,7 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 				CPU:    "4000m",
 				Memory: "8Gi",
 			},
+			Runtime: "docker",
 		},
 	}
 
@@ -128,6 +129,9 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	}
 	if lane, ok := req.Job.Metadata["lane"]; !ok || lane != stage.Lane {
 		t.Fatalf("expected lane metadata, got %#v", req.Job.Metadata)
+	}
+	if req.Job.Runtime != stage.Job.Runtime {
+		t.Fatalf("expected runtime %s, got %s", stage.Job.Runtime, req.Job.Runtime)
 	}
 
 	if stream.calls != 1 {

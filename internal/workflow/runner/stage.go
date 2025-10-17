@@ -120,6 +120,7 @@ type StageJobSpec struct {
 	Env       map[string]string
 	Resources StageJobResources
 	Metadata  map[string]string
+	Runtime   string
 }
 
 // StageJobResources expresses resource hints for Grid scheduling.
@@ -159,6 +160,7 @@ type StageOutcome struct {
 	Message   string
 	Artifacts []Artifact
 	Archive   *StageArchive
+	Evidence  *StageEvidence
 }
 
 // StageArchive records archive export metadata captured after a completed stage.
@@ -166,4 +168,24 @@ type StageArchive struct {
 	ID       string
 	Class    string
 	QueuedAt time.Time
+}
+
+// StageEvidence captures execution evidence returned by Grid after a workflow stage runs.
+type StageEvidence struct {
+	JobState string
+	ExitCode *int
+	LogTail  string
+	Events   []StageEvidenceEvent
+	Metadata map[string]string
+	Result   map[string]any
+	Source   string
+}
+
+// StageEvidenceEvent records a single workflow status transition during stage execution.
+type StageEvidenceEvent struct {
+	Type     string
+	State    string
+	ExitCode *int
+	Reason   string
+	Time     time.Time
 }

@@ -20,7 +20,7 @@ func TestPlannerBuildsModsStageGraph(t *testing.T) {
 		OpenRewriteLane: "node-wasm",
 		LLMPlanLane:     "gpu-ml",
 		LLMExecLane:     "gpu-ml",
-		HumanLane:       "go-native",
+		HumanLane:       "mods-human",
 	})
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
 		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Tenant: "acme"},
@@ -42,7 +42,7 @@ func TestPlannerBuildsModsStageGraph(t *testing.T) {
 		{mods.StageNameORWGenerate, mods.StageNameORWGenerate, "node-wasm", []string{mods.StageNamePlan}},
 		{mods.StageNameLLMPlan, mods.StageNameLLMPlan, "gpu-ml", []string{mods.StageNamePlan}},
 		{mods.StageNameLLMExec, mods.StageNameLLMExec, "gpu-ml", []string{mods.StageNameORWApply, mods.StageNameORWGenerate, mods.StageNameLLMPlan}},
-		{mods.StageNameHuman, mods.StageNameHuman, "go-native", []string{mods.StageNameLLMExec}},
+		{mods.StageNameHuman, mods.StageNameHuman, "mods-human", []string{mods.StageNameLLMExec}},
 	}
 	for i, exp := range expect {
 		stage := stages[i]

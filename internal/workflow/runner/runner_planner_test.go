@@ -34,7 +34,7 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 		staticChecksStage,
 		"test",
 	}
-	expectLanes := []string{"node-wasm", "node-wasm", "node-wasm", "gpu-ml", "gpu-ml", "go-native", "go-native", "go-native", "go-native"}
+	expectLanes := []string{"node-wasm", "node-wasm", "node-wasm", "gpu-ml", "gpu-ml", "mods-human", "build-gate", "static-checks", "test"}
 	for i, name := range expectOrder {
 		stage := plan.Stages[i]
 		if stage.Name != name {

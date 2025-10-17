@@ -35,6 +35,8 @@ addendum:
   packages.
 - **Cycle**: RED (write failing tests) → GREEN (minimal code) → REFACTOR
   (exercise Grid once available).
+- For Codex execution details on the Mods Grid E2E harness, consult
+  `tests/e2e/README.md`.
 
 ### Go Tooling (MANDATORY)
 

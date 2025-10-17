@@ -101,8 +101,16 @@ name = "mods-human"
 reason = "mods human-in-the-loop review"
 
 [[lanes.required]]
-name = "go-native"
-reason = "build/test baseline"
+name = "build-gate"
+reason = "build gate"
+
+[[lanes.required]]
+name = "static-checks"
+reason = "static analysis"
+
+[[lanes.required]]
+name = "test"
+reason = "test baseline"
 
 [[lanes.allowed]]
 name = "python-slim"

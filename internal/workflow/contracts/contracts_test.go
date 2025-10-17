@@ -210,7 +210,7 @@ func TestBuildGateMetadataValidate(t *testing.T) {
 	stage := CheckpointStage{
 		Name:      buildGateStage,
 		Kind:      buildGateStage,
-		Lane:      "go-native",
+		Lane:      "build-gate",
 		Manifest:  ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		BuildGate: &meta,
 	}

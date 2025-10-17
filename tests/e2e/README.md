@@ -18,8 +18,8 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Drives the live Grid client; parallel reconciliation depends on the staged
   roadmap work landing upstream.
-- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID`, `GRID_BEACON_API_KEY`, and
-  `PLOY_LANES_DIR` are configured (plus optional `GRID_BEACON_URL`),
+- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID` and `GRID_BEACON_API_KEY`
+  are configured (plus optional `GRID_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
   `ploy mod run`.
   Additional scenarios can be toggled via `PLOY_E2E_LIVE_SCENARIOS`.
@@ -33,6 +33,14 @@ stubs.
 
 Set the following variables before invoking the suite:
 
+- **Codex CLI note:** when asking Codex to execute these tests, wrap the command
+  so it sources your environment in the same shell session, for example:
+
+  ```bash
+  zsh -lc 'source ~/.zshenv && go test -tags e2e ./tests/e2e -v'
+  ```
+
+  Replace the `-run` filter or add inline exports as needed.
 - Remember to source `~/.zshenv` (or otherwise export them into your shell) so
   the CLI picks up the expected environment.
 - `PLOY_GRID_ID` — Grid identifier required to bootstrap discovery.
@@ -40,7 +48,6 @@ Set the following variables before invoking the suite:
   material, and workflow credentials.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
-- `PLOY_LANES_DIR` — Lane catalogue checkout used by the CLI when planning runs.
 - `PLOY_E2E_TENANT` — Tenant slug to claim tickets under
 - `PLOY_E2E_TICKET_PREFIX` — Optional prefix for ad-hoc ticket IDs (default `e2e`)
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repo URL override for scenarios

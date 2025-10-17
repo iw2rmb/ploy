@@ -9,10 +9,8 @@ compute deterministic cache keys.
 
 ## Required Changes
 
-- Define new lane spec format (published in
-  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog) and
-  mirrored into SHIFT) with runtime families,
-  cache namespaces, and commands.
+- Define new lane spec format (bundled under `configs/lanes` and mirrored into
+  SHIFT) with runtime families, cache namespaces, and commands.
 - Implement cache key composer incorporating lane, commit, snapshot, manifest,
   and Aster toggles.
 - Expose inspection command `ploy lanes describe` with rich output.
@@ -25,9 +23,7 @@ compute deterministic cache keys.
 
 ## Current Status (2025-09-26)
 
-- Lane specs live in
-  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog) with
-  validation handled by `internal/workflow/lanes`.
+- Lane specs live under `configs/lanes` with validation handled by
   `internal/workflow/lanes`.
 - Cache keys incorporate commit, snapshot, manifest, and Aster toggles.
 - `ploy lanes describe` exposes lane metadata and cache previews against the

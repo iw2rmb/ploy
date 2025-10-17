@@ -8,7 +8,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -96,8 +95,8 @@ func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevEvents
@@ -105,8 +104,8 @@ func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	bus := contracts.NewInMemoryBus("acme")
@@ -120,10 +119,8 @@ func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 	manifestConfigDir = "ignored"
 	asterLocatorLoader = func(dir string) (aster.Locator, error) { return &recordingLocator{dir: dir}, nil }
 	asterConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "go-native", CacheNamespace: "go-native"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	if err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, buf); err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"strings"
+	"net/http"
 	"testing"
 
 	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
@@ -11,7 +11,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
@@ -66,34 +65,6 @@ func (r *recordingEnvironmentService) Materialize(ctx context.Context, req envir
 	return r.result, r.err
 }
 
-type fakeLaneRegistry struct {
-	description lanes.Description
-	err         error
-}
-
-func (f *fakeLaneRegistry) Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error) {
-	if f.err != nil {
-		return lanes.Description{}, f.err
-	}
-	f.description.Parameters = opts
-	if strings.TrimSpace(f.description.Lane.Job.Image) == "" {
-		if f.description.Lane.Job.Env == nil {
-			f.description.Lane.Job.Env = map[string]string{}
-		}
-		if len(f.description.Lane.Job.Command) == 0 {
-			f.description.Lane.Job.Command = []string{"/bin/true"}
-		}
-		if f.description.Lane.Job.Resources.CPU == "" {
-			f.description.Lane.Job.Resources.CPU = "1000m"
-		}
-		if f.description.Lane.Job.Resources.Memory == "" {
-			f.description.Lane.Job.Resources.Memory = "1Gi"
-		}
-		f.description.Lane.Job.Image = "registry.dev/default:latest"
-	}
-	return f.description, nil
-}
-
 type stubWorkspacePreparer struct {
 	calls []runner.WorkspacePrepareRequest
 	err   error
@@ -141,6 +112,10 @@ func (s *stubGridClient) WorkflowClient(context.Context) (*workflowsdk.Client, e
 		return s.workflow, nil
 	}
 	return &workflowsdk.Client{}, nil
+}
+
+func (s *stubGridClient) HTTPClient(context.Context) (*http.Client, error) {
+	return &http.Client{}, nil
 }
 
 func withGridClientStub(t *testing.T, stub gridClientAPI) {

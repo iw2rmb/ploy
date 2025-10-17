@@ -15,8 +15,8 @@ lint-md: ## Lint Markdown documentation with markdownlint
 	npx --yes markdownlint --config .markdownlint.yaml $(shell git ls-files '*.md')
 
 .PHONY: lanes-validate
-lanes-validate: ## Validate lane catalog with SHIFT loaders
-	PLOY_LANES_DIR=$${PLOY_LANES_DIR:-../ploy-lanes-catalog} go run ./tools/lanesvalidate
+lanes-validate: ## Validate bundled lane catalog
+	go run ./tools/lanesvalidate --dir configs/lanes
 
 .PHONY: test
 test: ## Run all unit tests with coverage output

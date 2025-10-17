@@ -102,8 +102,16 @@ reason = "Enabled when artifact diffing is requested."
 [lanes]
 
 [[lanes.required]]
-name = "go-native"
-reason = "Build + test Go workloads."
+name = "build-gate"
+reason = "Build gate validation for Go workloads."
+
+[[lanes.required]]
+name = "static-checks"
+reason = "Static analysis for Go workloads."
+
+[[lanes.required]]
+name = "test"
+reason = "Test execution for Go workloads."
 
 [[lanes.required]]
 name = "node-wasm"

@@ -29,10 +29,6 @@ additional configuration.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy override retained for compatibility.
   When set it controls the workflow SDK cache path and is reused as the grid
   client state directory.
-- `PLOY_LANES_DIR` — Explicit path to the lane catalog directory. When unset,
-  Ploy searches `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/lanes`, `$HOME/.ploy/lanes`,
-  and the adjacent `../ploy-lanes-catalog` checkout (for development). Set this
-  before running the CLI to avoid missing lane definitions.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
 

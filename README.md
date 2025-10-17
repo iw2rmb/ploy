@@ -33,9 +33,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       stubs for offline work (Roadmap 01).
 - [x] Workflow runner CLI — reconstructs DAGs, streams checkpoints, and exits
       cleanly after dispatching jobs (Roadmap 02).
-- [x] Lane engine — deterministic lane specs published via the
-      [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
-      repository (mirrored into SHIFT) with
+- [x] Lane engine — deterministic lane specs bundled under `configs/lanes` with
       `ploy lanes describe` previews (Roadmap 03).
 - [x] Snapshot toolkit — `ploy snapshot plan` / `ploy snapshot capture` with
       strip/mask/synthetic rules baked in (Roadmap 04).
@@ -132,28 +130,17 @@ Full design records live in `docs/design/README.md`.
    make build
    ```
 
-2. **Clone the lane catalog (one-time)**
-
-   ```bash
-   cd ..
-   git clone https://github.com/iw2rmb/ploy-lanes-catalog
-   cd ploy
-   ```
-
-   Set `PLOY_LANES_DIR` to the checkout location (or place the checkout adjacent
-   to the repo as shown) so the CLI can resolve lane definitions.
-
-3. **Inspect lane metadata**
+2. **Inspect lane metadata**
 
    ```bash
    ./dist/ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db \
      --manifest smoke --aster plan,exec
    ```
 
-   The command loads `go-native.toml` from the configured catalogue, previews the
+   The command loads `go-native.toml` from the bundled catalogue, previews the
    composed cache key, and lists the build/test commands bound to that lane.
 
-4. **Run the Mods CLI**
+3. **Run the Mods CLI**
 
    ```bash
    PLOY_GRID_ID=dev-grid \
@@ -166,7 +153,7 @@ Full design records live in `docs/design/README.md`.
    feature map, version) before connecting. Omitting either `PLOY_GRID_ID` or
    `GRID_BEACON_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs.
 
-5. **Preview snapshot rules**
+4. **Preview snapshot rules**
 
    ```bash
    ./dist/ploy snapshot plan --snapshot dev-db
@@ -176,7 +163,7 @@ Full design records live in `docs/design/README.md`.
    strip/mask/synthetic rules, and highlights which tables/columns are affected
    before a capture runs.
 
-6. **Capture a snapshot (stub)**
+5. **Capture a snapshot (stub)**
 
    ```bash
    ./dist/ploy snapshot capture --snapshot dev-db --tenant acme \
@@ -188,7 +175,7 @@ Full design records live in `docs/design/README.md`.
    discovery (or the in-memory stub when discovery omits one), and publishes
    metadata through the current stub path.
 
-7. **Dry-run a commit-scoped environment**
+6. **Dry-run a commit-scoped environment**
 
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
@@ -198,7 +185,7 @@ Full design records live in `docs/design/README.md`.
    (`commit-db`, `commit-cache`), and previews cache keys for each required lane
    without mutating state.
 
-8. **Tests**
+7. **Tests**
 
    ```bash
    make test
@@ -207,7 +194,7 @@ Full design records live in `docs/design/README.md`.
    Unit tests assert that only the workflow CLI remains and that the event
    contract schema stays consistent.
 
-9. **Manage knowledge base incidents**
+8. **Manage knowledge base incidents**
 
    ```bash
    ./dist/ploy knowledge-base ingest --from ./fixtures/knowledge-base/new-incidents.json

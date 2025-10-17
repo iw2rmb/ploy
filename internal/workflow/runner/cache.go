@@ -38,3 +38,9 @@ func (defaultCacheComposer) Compose(ctx context.Context, req CacheComposeRequest
 	}
 	return fmt.Sprintf("%s/%s@manifest=%s@aster=%s", lane, lane, manifest, toggles), nil
 }
+
+// NewDefaultCacheComposer returns the cache composer that mirrors the historical
+// lane-based cache key format used by workstation runs.
+func NewDefaultCacheComposer() CacheComposer {
+	return defaultCacheComposer{}
+}
