@@ -63,6 +63,9 @@ func mergeStageJob(base, override StageJobSpec) StageJobSpec {
 	if strings.TrimSpace(merged.Resources.GPU) == "" {
 		merged.Resources.GPU = base.Resources.GPU
 	}
+	if strings.TrimSpace(merged.Runtime) == "" {
+		merged.Runtime = base.Runtime
+	}
 	merged.Metadata = mergeStringMaps(base.Metadata, merged.Metadata)
 	return merged
 }

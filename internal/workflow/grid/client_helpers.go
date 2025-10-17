@@ -77,6 +77,9 @@ func buildSubmitRequest(ticket contracts.WorkflowTicket, stage runner.Stage, wor
 		if len(stage.Aster.Bundles) > 0 {
 			job.Metadata("aster.bundles", append([]aster.Metadata(nil), stage.Aster.Bundles...))
 		}
+		if runtime := strings.TrimSpace(stage.Job.Runtime); runtime != "" {
+			job.Runtime(runtime)
+		}
 	})
 
 	return builder.Build()

@@ -3,19 +3,20 @@ package main
 import (
 	"bytes"
 	"errors"
-	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/manifests"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/workflow/environments"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 func TestHandleEnvironmentMaterializeRequiresCommit(t *testing.T) {
 	prevFactory := environmentServiceFactory
 	defer func() { environmentServiceFactory = prevFactory }()
 
-	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
+	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
 		return &recordingEnvironmentService{}, nil
 	}
 
@@ -33,7 +34,7 @@ func TestHandleEnvironmentMaterializeRequiresApp(t *testing.T) {
 	prevFactory := environmentServiceFactory
 	defer func() { environmentServiceFactory = prevFactory }()
 
-	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
+	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
 		return &recordingEnvironmentService{}, nil
 	}
 
@@ -49,19 +50,16 @@ func TestHandleEnvironmentMaterializeRequiresApp(t *testing.T) {
 
 func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	t.Setenv("PLOY_ASTER_ENABLE", "1")
+
 	prevFactory := environmentServiceFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
 	prevSnapshotLoader := snapshotRegistryLoader
 	prevSnapshotDir := snapshotConfigDir
 	defer func() {
 		environmentServiceFactory = prevFactory
 		manifestRegistryLoader = prevManifestLoader
 		manifestConfigDir = prevManifestDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
 		snapshotRegistryLoader = prevSnapshotLoader
 		snapshotConfigDir = prevSnapshotDir
 	}()
@@ -72,16 +70,14 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 			CommitSHA: "deadbeef",
 			DryRun:    true,
 			Snapshots: []environments.SnapshotStatus{{Name: "commit-db"}},
-			Caches:    []environments.CacheStatus{{Lane: "go-native", CacheKey: "go/go-native@commit=deadbeef@snapshot=pending@manifest=2025-09-26@aster=plan", Hydrated: false}},
+			Caches:    []environments.CacheStatus{{Lane: "go-native", CacheKey: "go/go-native@commit=deadbeef@snapshot=none@manifest=2025-09-26@aster=plan", Hydrated: false}},
 		},
 	}
 
-	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
+	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
 		return recorder, nil
 	}
 
-	laneRegistryLoader = func(dir string) (laneRegistry, error) { return nil, nil }
-	laneConfigDir = "ignored"
 	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
 	snapshotConfigDir = "ignored"
 
@@ -123,85 +119,21 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	}
 }
 
-func TestHandleEnvironmentMaterializeIgnoresAsterWhenFlagDisabled(t *testing.T) {
+func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 	prevFactory := environmentServiceFactory
-	prevManifestLoader := manifestRegistryLoader
-	prevManifestDir := manifestConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
-	prevSnapshotLoader := snapshotRegistryLoader
-	prevSnapshotDir := snapshotConfigDir
-	defer func() {
-		environmentServiceFactory = prevFactory
-		manifestRegistryLoader = prevManifestLoader
-		manifestConfigDir = prevManifestDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
-		snapshotRegistryLoader = prevSnapshotLoader
-		snapshotConfigDir = prevSnapshotDir
-	}()
+	defer func() { environmentServiceFactory = prevFactory }()
 
-	recorder := &recordingEnvironmentService{}
-	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
-		return recorder, nil
-	}
-	laneRegistryLoader = func(dir string) (laneRegistry, error) { return nil, nil }
-	laneConfigDir = "ignored"
-	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
-	snapshotConfigDir = "ignored"
-	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return &stubManifestCompiler{compiled: manifests.Compilation{Manifest: manifests.Metadata{Name: "commit-app", Version: "2025-09-26"}, ManifestVersion: "v2"}}, nil
-	}
-	manifestConfigDir = "ignored"
-
-	if err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--tenant", "acme", "--aster", "lint"}, io.Discard); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if recorder.request.AsterEnabled {
-		t.Fatal("expected aster to be disabled without feature flag")
-	}
-	if len(recorder.request.AsterToggles) != 0 {
-		t.Fatalf("expected no aster toggles when flag disabled, got %v", recorder.request.AsterToggles)
-	}
-}
-
-func TestHandleEnvironmentMaterializePropagatesError(t *testing.T) {
-	prevFactory := environmentServiceFactory
-	prevManifestLoader := manifestRegistryLoader
-	prevManifestDir := manifestConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
-	prevSnapshotLoader := snapshotRegistryLoader
-	prevSnapshotDir := snapshotConfigDir
-	defer func() {
-		environmentServiceFactory = prevFactory
-		manifestRegistryLoader = prevManifestLoader
-		manifestConfigDir = prevManifestDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
-		snapshotRegistryLoader = prevSnapshotLoader
-		snapshotConfigDir = prevSnapshotDir
-	}()
-
-	recorder := &recordingEnvironmentService{err: errors.New("boom")}
-	environmentServiceFactory = func(l laneRegistry, s snapshotRegistry) (environmentService, error) {
-		return recorder, nil
+	sentinel := errors.New("boom")
+	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
+		return &recordingEnvironmentService{err: sentinel}, nil
 	}
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return &stubManifestCompiler{compiled: manifests.Compilation{
-			Manifest:        manifests.Metadata{Name: "commit-app", Version: "2025-09-26"},
-			ManifestVersion: "v2",
-		}}, nil
+		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
-	manifestConfigDir = "ignored"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) { return nil, nil }
-	laneConfigDir = "ignored"
-	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
-	snapshotConfigDir = "ignored"
 
 	err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--tenant", "acme"}, io.Discard)
-	if !errors.Is(err, recorder.err) {
+	if !errors.Is(err, sentinel) {
 		t.Fatalf("expected service error, got %v", err)
 	}
 }

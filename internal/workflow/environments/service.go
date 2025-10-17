@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
@@ -20,10 +20,6 @@ type Hydrator interface {
 	HydrateCache(ctx context.Context, lane string, cacheKey string) error
 }
 
-type laneDescriber interface {
-	Describe(name string, opts lanes.DescribeOptions) (lanes.Description, error)
-}
-
 type snapshotPlanner interface {
 	Plan(ctx context.Context, name string) (snapshots.PlanReport, error)
 	Capture(ctx context.Context, name string, opts snapshots.CaptureOptions) (snapshots.CaptureResult, error)
@@ -31,13 +27,11 @@ type snapshotPlanner interface {
 
 // ServiceOptions configures Service dependencies.
 type ServiceOptions struct {
-	Lanes     laneDescriber
 	Snapshots snapshotPlanner
 	Hydrator  Hydrator
 }
 
 type Service struct {
-	lanes     laneDescriber
 	snapshots snapshotPlanner
 	hydrator  Hydrator
 }
@@ -45,7 +39,6 @@ type Service struct {
 // NewService wires the environment materialization service.
 func NewService(opts ServiceOptions) Service {
 	return Service{
-		lanes:     opts.Lanes,
 		snapshots: opts.Snapshots,
 		hydrator:  opts.Hydrator,
 	}
@@ -168,19 +161,16 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		}
 		seenLanes[trimmedLane] = struct{}{}
 
-		desc, err := s.lanes.Describe(trimmedLane, lanes.DescribeOptions{
-			CommitSHA:           trimmedCommit,
-			SnapshotFingerprint: snapshotFingerprint,
-			ManifestVersion:     manifestVersion,
-			AsterToggles:        toggles,
-		})
+		cacheNamespace, err := runner.CacheNamespaceForLane(trimmedLane)
 		if err != nil {
-			return Result{}, fmt.Errorf("describe lane %s: %w", trimmedLane, err)
+			return Result{}, fmt.Errorf("resolve cache namespace for lane %s: %w", trimmedLane, err)
 		}
 
-		status := CacheStatus{Lane: trimmedLane, CacheKey: desc.CacheKey, Hydrated: !req.DryRun}
+		cacheKey := composeCacheKey(cacheNamespace, trimmedLane, trimmedCommit, snapshotFingerprint, manifestVersion, toggles)
+
+		status := CacheStatus{Lane: trimmedLane, CacheKey: cacheKey, Hydrated: !req.DryRun}
 		if !req.DryRun {
-			if err := s.hydrator.HydrateCache(ctx, trimmedLane, desc.CacheKey); err != nil {
+			if err := s.hydrator.HydrateCache(ctx, trimmedLane, cacheKey); err != nil {
 				return Result{}, fmt.Errorf("hydrate lane %s: %w", trimmedLane, err)
 			}
 		}
@@ -201,9 +191,6 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 }
 
 func (s Service) validate() error {
-	if s.lanes == nil {
-		return errors.New("lane registry is required")
-	}
 	if s.snapshots == nil {
 		return errors.New("snapshot registry is required")
 	}
@@ -286,6 +273,51 @@ func summarizeSnapshotFingerprint(snapshots []SnapshotStatus) string {
 	}
 	sort.Strings(values)
 	return strings.Join(values, "+")
+}
+
+func composeCacheKey(namespace, lane, commit, snapshot, manifest string, toggles []string) string {
+	ns := strings.TrimSpace(namespace)
+	if ns == "" {
+		ns = strings.TrimSpace(lane)
+	}
+	laneName := strings.TrimSpace(lane)
+	if laneName == "" {
+		laneName = ns
+	}
+	toggleComponent := formatToggleComponent(toggles)
+	return fmt.Sprintf("%s/%s@commit=%s@snapshot=%s@manifest=%s@aster=%s",
+		ns,
+		laneName,
+		sanitizeCacheComponent(commit),
+		sanitizeCacheComponent(snapshot),
+		sanitizeCacheComponent(manifest),
+		toggleComponent,
+	)
+}
+
+func sanitizeCacheComponent(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "none"
+	}
+	return trimmed
+}
+
+func formatToggleComponent(values []string) string {
+	if len(values) == 0 {
+		return "none"
+	}
+	clean := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			clean = append(clean, trimmed)
+		}
+	}
+	if len(clean) == 0 {
+		return "none"
+	}
+	sort.Strings(clean)
+	return strings.Join(clean, "+")
 }
 
 func ticketIdentifier(app, commit string) string {

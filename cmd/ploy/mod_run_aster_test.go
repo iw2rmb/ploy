@@ -6,7 +6,6 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/lanes"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -23,8 +22,8 @@ func TestHandleModRunParsesAsterFlags(t *testing.T) {
 	prevManifestDir := manifestConfigDir
 	prevLocatorLoader := asterLocatorLoader
 	prevAsterDir := asterConfigDir
-	prevLaneLoader := laneRegistryLoader
-	prevLaneDir := laneConfigDir
+	prevJobComposerFactory := jobComposerFactory
+	prevCacheComposerFactory := cacheComposerFactory
 	defer func() {
 		runnerExecutor = prevRunner
 		eventsFactory = prevBusFactory
@@ -32,8 +31,8 @@ func TestHandleModRunParsesAsterFlags(t *testing.T) {
 		manifestConfigDir = prevManifestDir
 		asterLocatorLoader = prevLocatorLoader
 		asterConfigDir = prevAsterDir
-		laneRegistryLoader = prevLaneLoader
-		laneConfigDir = prevLaneDir
+		jobComposerFactory = prevJobComposerFactory
+		cacheComposerFactory = prevCacheComposerFactory
 	}()
 
 	runnerExecutor = fakeRunner
@@ -48,10 +47,8 @@ func TestHandleModRunParsesAsterFlags(t *testing.T) {
 		return locator, nil
 	}
 	asterConfigDir = "configs/aster"
-	laneRegistryLoader = func(dir string) (laneRegistry, error) {
-		return &fakeLaneRegistry{description: lanes.Description{Lane: lanes.Spec{Name: "node-wasm", CacheNamespace: "node-wasm"}, CacheKey: "stub-cache"}}, nil
-	}
-	laneConfigDir = "ignored"
+	jobComposerFactory = func() runner.JobComposer { return runner.NewStaticJobComposer() }
+	cacheComposerFactory = func() runner.CacheComposer { return runner.NewDefaultCacheComposer() }
 
 	buf := &bytes.Buffer{}
 	args := []string{"--tenant", "acme", "--aster", "exec", "--aster-step", "build-gate=lint", "--aster-step", "test=off"}

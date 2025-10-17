@@ -17,7 +17,7 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	} else if outcome.Status != runner.StageStatusCompleted {
 		t.Fatalf("expected completed outcome, got %+v", outcome)
 	}
-	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: buildGateStage, Lane: "go-native"}, "/tmp/work")
+	outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: buildGateStage, Lane: "build-gate"}, "/tmp/work")
 	if err != nil {
 		t.Fatalf("unexpected error for configured outcome: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestInMemoryGridRecordsInvocations(t *testing.T) {
 	if invocations[0].Stage.Name != modsPlanStage || invocations[1].Stage.Name != buildGateStage {
 		t.Fatalf("unexpected invocation order: %+v", invocations)
 	}
-	if invocations[0].Stage.Lane != "node-wasm" || invocations[1].Stage.Lane != "go-native" {
+	if invocations[0].Stage.Lane != "node-wasm" || invocations[1].Stage.Lane != "build-gate" {
 		t.Fatalf("unexpected lanes recorded: %+v", invocations)
 	}
 }

@@ -26,6 +26,9 @@ type Options struct {
 	StreamFunc            streamFunc
 	HelperFactory         workflowClientFactory
 	CursorStoreFactory    CursorStoreFactory
+	ControlPlaneHTTP      func(context.Context) (*http.Client, error)
+	ControlPlaneStatus    func() ControlPlaneStatus
+	LogTailLines          int
 }
 
 // WorkflowResolver resolves the workflow identifier associated with a ticket and stage.
@@ -44,6 +47,11 @@ type streamFunc func(context.Context, *workflowsdk.Client, workflowsdk.StreamReq
 
 type CursorStoreFactory func(tenant, workflowID, runID string) (helper.CursorStore, error)
 
+// ControlPlaneStatus summarises the Grid control-plane endpoints exposed by the grid client.
+type ControlPlaneStatus struct {
+	APIEndpoint string
+}
+
 // Client implements runner.GridClient by dispatching workflow stages to Grid's Workflow RPC.
 type Client struct {
 	rpc             workflowClient
@@ -51,6 +59,9 @@ type Client struct {
 	streamOpts      helper.StreamOptions
 	resolveWorkflow WorkflowResolver
 	cursorFactory   CursorStoreFactory
+	controlHTTP     func(context.Context) (*http.Client, error)
+	controlStatus   func() ControlPlaneStatus
+	logTail         int
 
 	mu          sync.Mutex
 	invocations []runner.StageInvocation
@@ -124,12 +135,20 @@ func NewClient(opts Options) (*Client, error) {
 		}
 	}
 
+	logTail := opts.LogTailLines
+	if logTail <= 0 {
+		logTail = 200
+	}
+
 	return &Client{
 		rpc:             rpcClient,
 		stream:          streamFn,
 		streamOpts:      opts.StreamOptions,
 		resolveWorkflow: resolver,
 		cursorFactory:   cursorFactory,
+		controlHTTP:     opts.ControlPlaneHTTP,
+		controlStatus:   opts.ControlPlaneStatus,
+		logTail:         logTail,
 	}, nil
 }
 
@@ -159,18 +178,20 @@ func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTick
 	if err != nil {
 		return runner.StageOutcome{}, err
 	}
+	evidence := c.collectEvidence(ctx, runID, term)
 
 	outcome := runner.StageOutcome{
-		Stage:   stage,
-		RunID:   runID,
-		Status:  mapRunStatus(term.status),
-		Message: term.message,
-		Archive: stageArchiveFromTerminal(term),
+		Stage:    stage,
+		RunID:    runID,
+		Status:   mapRunStatus(term.status),
+		Message:  term.message,
+		Archive:  stageArchiveFromTerminal(term),
+		Evidence: evidence,
 	}
 	if outcome.Status == runner.StageStatusFailed {
 		outcome.Retryable = false
 	}
-	c.recordInvocation(ticket, outcome.Stage, workspace, runID, outcome.Archive)
+	c.recordInvocation(ticket, outcome.Stage, workspace, runID, outcome.Archive, evidence)
 	return outcome, nil
 }
 
@@ -209,10 +230,10 @@ func (c *Client) Invocations() []runner.StageInvocation {
 	return dup
 }
 
-func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.Stage, workspace, runID string, archive *runner.StageArchive) {
+func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.Stage, workspace, runID string, archive *runner.StageArchive, evidence *runner.StageEvidence) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.invocations = append(c.invocations, runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace, RunID: runID, Archive: archive})
+	c.invocations = append(c.invocations, runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace, RunID: runID, Archive: archive, Evidence: evidence})
 }
 
 func defaultWorkflowClientFactory(cfg helper.Config) (workflowClient, error) {

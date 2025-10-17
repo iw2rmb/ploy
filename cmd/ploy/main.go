@@ -27,8 +27,6 @@ func execute(args []string, stderr io.Writer) error {
 		return handleWorkflow(args[1:], stderr)
 	case "mod":
 		return handleMod(args[1:], stderr)
-	case "lanes":
-		return handleLanes(args[1:], stderr)
 	case "snapshot":
 		return handleSnapshot(args[1:], stderr)
 	case "environment":
@@ -54,7 +52,6 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "\nCommands:")
 	_, _ = fmt.Fprintln(w, "  workflow  Manage workflow cancellations")
 	_, _ = fmt.Fprintln(w, "  mod       Execute Mods runs")
-	_, _ = fmt.Fprintln(w, "  lanes     Inspect lane definitions and cache previews")
 	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
 	_, _ = fmt.Fprintln(w, "  environment  Materialize commit-scoped environments")
 	_, _ = fmt.Fprintln(w, "  manifest  Inspect integration manifest assets")

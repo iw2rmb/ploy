@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 func TestModsScenarioSimpleOpenRewrite(t *testing.T) {
@@ -35,6 +36,23 @@ func TestModsScenarioSimpleOpenRewrite(t *testing.T) {
 	})
 
 	if err := harness.run(); err != nil {
+		for _, invocation := range harness.recorder.Invocations() {
+			runtime := strings.TrimSpace(invocation.Stage.Job.Runtime)
+			if runtime == "" {
+				runtime = "(unset)"
+			}
+			if invocation.Evidence != nil {
+				exit := "(nil)"
+				if invocation.Evidence.ExitCode != nil {
+					exit = fmt.Sprintf("%d", *invocation.Evidence.ExitCode)
+				}
+				t.Logf("stage=%s lane=%s runtime=%s run=%s state=%s exit=%s source=%s",
+					invocation.Stage.Name, invocation.Stage.Lane, runtime, invocation.RunID,
+					invocation.Evidence.JobState, exit, invocation.Evidence.Source)
+			} else {
+				t.Logf("stage=%s lane=%s runtime=%s run=%s (no evidence)", invocation.Stage.Name, invocation.Stage.Lane, runtime, invocation.RunID)
+			}
+		}
 		t.Fatalf("mods scenario simple-openrewrite failed: %v", err)
 	}
 
@@ -74,6 +92,34 @@ func TestModsScenarioSimpleOpenRewrite(t *testing.T) {
 	}
 	if len(calls[0].Signals.Errors) != 0 {
 		t.Fatalf("expected no healing signals, got %#v", calls[0].Signals.Errors)
+	}
+
+	var planInvocation *runner.StageInvocation
+	for _, invocation := range harness.recorder.Invocations() {
+		if invocation.Stage.Name == mods.StageNamePlan {
+			plan := invocation
+			planInvocation = &plan
+			break
+		}
+	}
+	if planInvocation == nil {
+		t.Fatalf("mods-plan invocation missing from recorder")
+	}
+	if planInvocation.Evidence == nil {
+		t.Fatalf("expected mods-plan evidence to be collected")
+	}
+	evidence := planInvocation.Evidence
+	if strings.TrimSpace(evidence.JobState) == "" {
+		t.Fatalf("expected job state to be recorded, got %#v", evidence.JobState)
+	}
+	if evidence.ExitCode == nil || *evidence.ExitCode != 0 {
+		t.Fatalf("expected exit code 0, got %#v", evidence.ExitCode)
+	}
+	if strings.TrimSpace(evidence.LogTail) == "" {
+		t.Fatalf("expected log tail to be captured, got %q", evidence.LogTail)
+	}
+	if len(evidence.Events) == 0 {
+		t.Fatalf("expected workflow events to be captured, got %#v", evidence.Events)
 	}
 }
 

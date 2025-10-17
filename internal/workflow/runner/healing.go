@@ -137,13 +137,13 @@ func appendHealingPlan(ctx context.Context, ticket contracts.WorkflowTicket, com
 		return nil
 	}
 
-	if err := appendLinearStage(buildGateStageName+suffix, StageKindBuildGate, "go-native", []string{mods.StageNameHuman + suffix}); err != nil {
+	if err := appendLinearStage(buildGateStageName+suffix, StageKindBuildGate, "build-gate", []string{mods.StageNameHuman + suffix}); err != nil {
 		return nil, 0, err
 	}
-	if err := appendLinearStage(staticChecksStageName+suffix, StageKindStaticChecks, "go-native", []string{buildGateStageName + suffix}); err != nil {
+	if err := appendLinearStage(staticChecksStageName+suffix, StageKindStaticChecks, "static-checks", []string{buildGateStageName + suffix}); err != nil {
 		return nil, 0, err
 	}
-	if err := appendLinearStage("test"+suffix, StageKindTest, "go-native", []string{staticChecksStageName + suffix}); err != nil {
+	if err := appendLinearStage("test"+suffix, StageKindTest, "test", []string{staticChecksStageName + suffix}); err != nil {
 		return nil, 0, err
 	}
 

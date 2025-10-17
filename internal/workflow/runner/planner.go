@@ -78,19 +78,19 @@ func (p DefaultPlanner) Build(ctx context.Context, ticket contracts.WorkflowTick
 		Stage{
 			Name:         buildGateStageName,
 			Kind:         StageKindBuildGate,
-			Lane:         "go-native",
+			Lane:         "build-gate",
 			Dependencies: []string{mods.StageNameHuman},
 		},
 		Stage{
 			Name:         staticChecksStageName,
 			Kind:         StageKindStaticChecks,
-			Lane:         "go-native",
+			Lane:         "static-checks",
 			Dependencies: []string{buildGateStageName},
 		},
 		Stage{
 			Name:         "test",
 			Kind:         StageKindTest,
-			Lane:         "go-native",
+			Lane:         "test",
 			Dependencies: []string{staticChecksStageName},
 		},
 	)

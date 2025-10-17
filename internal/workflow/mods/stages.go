@@ -19,7 +19,7 @@ const (
 	defaultOpenRewriteLane = "node-wasm"
 	defaultLLMPlanLane     = "gpu-ml"
 	defaultLLMExecLane     = "gpu-ml"
-	defaultHumanLane       = "go-native"
+	defaultHumanLane       = "mods-human"
 )
 
 // Stage models a Mods workflow stage produced by the planner.

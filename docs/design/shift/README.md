@@ -49,11 +49,10 @@ planner, and documentation converge on the CLI-first contract.
   retries lands (tracked outside the workstation-only scope).
 - Continue documenting emerging slices (e.g., deploy seams, snapshot hardening)
   by adding roadmap entries and updating this index as milestones complete.
-- Coordinate with Grid on the Mods catalog repository + namespace so
-  workstation lanes stay in sync with the control plane once registration
-  tooling lands. Lane specs now live in
-  [`github.com/iw2rmb/ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
-  while Grid publishes `/lanes/<namespace>.tar.gz`).
+- Coordinate with Grid on the Mods catalog namespace so workstation lanes stay
+  in sync with the control plane once registration tooling lands. Lane specs now
+  live under `configs/lanes` (mirrored into SHIFT when published) while Grid
+  publishes `/lanes/<namespace>.tar.gz`).
 - Integration Manifest v2 schema shipped 2025-09-29, delivering service/edge
   metadata and CLI rewrites ahead of Grid topology enforcement (see
   `docs/design/integration-manifests/README.md`).

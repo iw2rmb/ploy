@@ -29,10 +29,9 @@ ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
 ```
 
-`lanes describe` inspects TOML lane specs sourced from
-`$PLOY_LANES_DIR` (or the inferred catalogue checkout), displays the
-runtime family, build/test commands, surfaced job defaults (image, command, env,
-resources), and shows a deterministic cache-key preview that incorporates
+`lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
+displays the runtime family, build/test commands, surfaced job defaults (image,
+command, env, resources), and shows a deterministic cache-key preview that incorporates
 commit/snapshot/manifest/Aster toggles. Aster inputs are only included when
 `PLOY_ASTER_ENABLE` is set so the unfinished bundle integration can stay hidden
 behind a feature flag. The preview mirrors what the workflow runner supplies to
@@ -92,9 +91,7 @@ classifier drift without leaving the workstation.
 
 ## Flags
 
-- `--lane` — Lane identifier defined in the
-  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
-  repository.
+- `--lane` — Lane identifier defined under `configs/lanes` (used by
   `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.

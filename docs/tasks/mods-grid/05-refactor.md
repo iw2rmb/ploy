@@ -11,9 +11,8 @@
 
 ## Definition of Done
 
-- Mods-specific lanes moved into the public
-  [`ploy-lanes-catalog`](https://github.com/iw2rmb/ploy-lanes-catalog)
-  repository with matching import hooks in Ploy.
+- Mods-specific lanes bundled under `configs/lanes` with matching import hooks
+  in Ploy and mirrored into SHIFT when published.
 - Documentation updated to reference SHIFT as the source of truth.
 
 ## Test Plan
@@ -23,10 +22,9 @@
 
 ## Notes
 
-- Verified SHIFT lane catalog via `PLOY_LANES_DIR=$PLOY_LANES_DIR go run
-  ./cmd/ploy lanes describe --lane mods-plan --manifest 2025-09-26`.
-- `tests/e2e/mods_scenarios_test.go` now builds the CLI and, when `PLOY_GRID_ID`,
-  `GRID_BEACON_API_KEY`, and `PLOY_LANES_DIR` are configured, runs `ploy mod run` against Grid via
+- Verified bundled lane catalog via `go run ./cmd/ploy lanes describe --lane mods-plan --manifest 2025-09-26`.
+- `tests/e2e/mods_scenarios_test.go` now builds the CLI and, when `PLOY_GRID_ID`
+  and `GRID_BEACON_API_KEY` are configured, runs `ploy mod run` against Grid via
   `TestModsScenariosLiveGrid`; additional scenarios can be enabled through
   `PLOY_E2E_LIVE_SCENARIOS`.
 - Placeholder for additional follow-up once SHIFT lane publication completes.

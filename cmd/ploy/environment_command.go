@@ -95,10 +95,6 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	laneReg, err := laneRegistryLoader(laneConfigDir)
-	if err != nil {
-		return err
-	}
 	snapshotReg, err := snapshotRegistryLoader(snapshotConfigDir)
 	if err != nil {
 		return err
@@ -114,7 +110,7 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	service, err := environmentServiceFactory(laneReg, snapshotReg)
+	service, err := environmentServiceFactory(snapshotReg)
 	if err != nil {
 		return err
 	}

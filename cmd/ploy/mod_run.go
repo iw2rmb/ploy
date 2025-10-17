@@ -62,11 +62,6 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("load manifests: %w", err)
 	}
 
-	laneReg, err := laneRegistryLoader(laneConfigDir)
-	if err != nil {
-		return fmt.Errorf("load lanes: %w", err)
-	}
-
 	ticketValue := strings.TrimSpace(*ticket)
 	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
 		ticketValue = ""
@@ -125,6 +120,8 @@ func executeModRun(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("configure workspace preparer: %w", err)
 	}
+	cacheComposer := cacheComposerFactory()
+	jobComposer := jobComposerFactory()
 	opts := runner.Options{
 		Ticket:            ticketValue,
 		Tenant:            trimmedTenant,
@@ -133,8 +130,8 @@ func executeModRun(args []string, stderr io.Writer) error {
 		Planner:           runner.NewDefaultPlannerWithMods(modsOptions),
 		MaxStageRetries:   1,
 		ManifestCompiler:  compiler,
-		CacheComposer:     laneCacheComposer{lanes: laneReg},
-		JobComposer:       runner.LaneJobComposer{Lanes: laneReg},
+		CacheComposer:     cacheComposer,
+		JobComposer:       jobComposer,
 		Mods:              modsOptions,
 		Aster:             asterOpts,
 		WorkspacePreparer: workspacePrep,

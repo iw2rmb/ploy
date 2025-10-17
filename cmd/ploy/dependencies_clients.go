@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,6 +24,7 @@ import (
 type gridClientAPI interface {
 	Status() gridclient.Status
 	WorkflowClient(context.Context) (*workflowsdk.Client, error)
+	HTTPClient(context.Context) (*http.Client, error)
 }
 
 var (
@@ -80,9 +82,17 @@ func defaultGridFactory() (runner.GridClient, error) {
 	}
 
 	options := grid.Options{
-		Endpoint:              endpoint,
-		StreamOptions:         gridStreamOptions(),
-		CursorStoreFactory:    grid.NewCursorStoreFactory(gridClientStatePath),
+		Endpoint:           endpoint,
+		StreamOptions:      gridStreamOptions(),
+		CursorStoreFactory: grid.NewCursorStoreFactory(gridClientStatePath),
+		ControlPlaneHTTP: func(ctx context.Context) (*http.Client, error) {
+			return client.HTTPClient(ctx)
+		},
+		ControlPlaneStatus: func() grid.ControlPlaneStatus {
+			status := client.Status()
+			return grid.ControlPlaneStatus{APIEndpoint: strings.TrimSpace(status.Beacon.APIEndpoint)}
+		},
+		LogTailLines:          500,
 		WorkflowClientFactory: func(ctx context.Context) (*workflowsdk.Client, error) { return client.WorkflowClient(ctx) },
 	}
 

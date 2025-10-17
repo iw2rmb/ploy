@@ -56,6 +56,7 @@ func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
 			CPU:    "4000m",
 			Memory: "8Gi",
 		},
+		Runtime: "docker",
 	}}
 	opts := runner.Options{
 		Ticket:           "",
