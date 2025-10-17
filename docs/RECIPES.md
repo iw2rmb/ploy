@@ -3,7 +3,7 @@
 ## Purpose
 
 Describe how the OpenRewrite recipe pack catalog is configured during the
-workstation-only SHIFT slices. Pack lists are stored as TOML specs so new
+workstation-only roadmap slices. Pack lists are stored as TOML specs so new
 languages (Kotlin/Gradle) can be added without code changes once the mods
 catalog service returns.
 

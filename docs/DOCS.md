@@ -10,7 +10,7 @@ in mind when editing `AGENTS.md` or adding new docs.
   responsibilities, deployment protocol once reintroduced).
 - `docs/design/README.md` — design index spanning the feature slices. Each
   task entry links to its detailed spec under `docs/design/`.
-- Task files under `docs/tasks/shift/` — task-by-task status with **Why /
+- Task files under `docs/tasks/roadmap/` — task-by-task status with **Why /
   Required Changes / Definition of Done / Tests** sections.
 
 ## Documentation Matrix
@@ -19,8 +19,8 @@ in mind when editing `AGENTS.md` or adding new docs.
   the workflow runner, snapshot toolkit, and environment materialisation.
 - `docs/design/README.md` — index pointing to every design record with status
   checkboxes.
-- `docs/design/shift/README.md` — SHIFT alignment summary linking task slices
-  to their design records and current status.
+- `docs/design/workstation-roadmap/README.md` — workstation roadmap alignment
+  summary linking task slices to their design records and current status.
 - `docs/LANES.md` — lane spec format, cache-key guidance, and Grid runtime
   expectations.
 - `docs/MANIFESTS.md` — manifest schema, validation flow, and how payloads
@@ -39,7 +39,7 @@ in mind when editing `AGENTS.md` or adding new docs.
   for workstation incidents.
 - `cmd/ploy/README.md` — command-level flag reference and environment
   placeholders.
-- `docs/tasks/shift/08-documentation-cleanup.md` — status log for this
+- `docs/tasks/roadmap/08-documentation-cleanup.md` — status log for this
   documentation slice, including verification expectations.
 
 ## README Expectations
@@ -62,7 +62,7 @@ in mind when editing `AGENTS.md` or adding new docs.
 ## When Adding Docs
 
 1. Confirm the topic is part of the active feature roadmap (see
-   `docs/tasks/shift/`).
+   `docs/tasks/roadmap/`).
 2. Reference the relevant roadmap task and design subsection.
 3. Note where unit vs. integration work happens (workstation vs. Grid/VPS).
 4. Run `make lint-md` to keep Markdown formatting consistent, then `go test

@@ -10,7 +10,7 @@ compute deterministic cache keys.
 ## Required Changes
 
 - Define new lane spec format (bundled under `configs/lanes` and mirrored into
-  SHIFT) with runtime families, cache namespaces, and commands.
+  the shared lane catalog) with runtime families, cache namespaces, and commands.
 - Implement cache key composer incorporating lane, commit, snapshot, manifest,
   and Aster toggles.
 - Expose inspection command `ploy lanes describe` with rich output.

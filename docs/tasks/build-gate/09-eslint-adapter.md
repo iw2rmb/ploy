@@ -29,7 +29,7 @@ repositories get consistent feedback alongside Go vet and Error Prone findings.
 - CLI summary renders ESLint failures alongside other static checks with
   accurate issue counts and severities.
 - Documentation (`docs/design/build-gate/eslint/README.md`, design index, build
-  gate design, SHIFT design) updated with status/verification.
+  gate design, workstation roadmap design) updated with status/verification.
 - `go test ./...` passes with new adapter tests, and verification details
   recorded in changelog and roadmap log.
 

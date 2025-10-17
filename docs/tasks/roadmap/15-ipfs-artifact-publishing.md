@@ -6,7 +6,7 @@
 
 Bridge the snapshot toolkit to real artifact storage by uploading captured
 datasets to IPFS when a workstation gateway is available, fulfilling the
-remaining item on the SHIFT design doc Next Steps.
+remaining item on the roadmap design Next Steps.
 
 ## Required Changes
 

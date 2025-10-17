@@ -26,7 +26,7 @@ explicit Grid stage metadata.
       hints with dependency-aware scheduling (2025-09-27).
 - [x] Mods Grid restoration (docs/design/mods-grid-restoration/README.md) —
       Steps 1–4 completed 2025-10-05 (repo materialisation, Mods lanes, healing
-      retries). SHIFT migration of lanes tracked via
+      retries). Lane catalog migration tracked via
       `docs/tasks/mods-grid/05-refactor.md`.
 
 ## Scope

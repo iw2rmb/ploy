@@ -12,7 +12,7 @@
 - Updated developer documentation to call out `GRID_BEACON_URL` for overrides
   and refreshed agent guidance to match (README.md, cmd/ploy/README.md,
   docs/envs/README.md, tests/e2e/README.md, AGENTS.md, tests/e2e/config.go).
-- Verified via `go test ./...` on 2025-10-09. Refs shift-mods-grid-05.
+- Verified via `go test ./...` on 2025-10-09. Refs mods-grid-05.
 
 ## [2025-10-11] Grid Client Adoption
 
@@ -55,7 +55,7 @@
 - Extended Mods live Grid smoke to accept `PLOY_E2E_LIVE_SCENARIOS`, allowing
   `TestModsScenariosLiveGrid` to run multiple scenarios via `go test -tags e2e
   ./tests/e2e`; documented the knob in `docs/envs/README.md` and the refactor
-  task notes after verifying `ploy lanes describe` against the SHIFT catalog.
+  task notes after verifying `ploy lanes describe` against the published lane catalog.
 
 ## [2025-10-07] Mods Catalog Alignment
 
@@ -65,11 +65,12 @@
   `go test ./cmd/ploy -run TestHandleModRunConfiguresModsFlags -count=1`, and
   `go test -tags e2e ./tests/e2e -count=1` (latest run 2025-10-05) to confirm
   behaviour remains unchanged.
-- `docs/design/shift/README.md`: Updated SHIFT roadmap alignment to track the
-  Mods catalog namespace hand-off to Grid and call out coordination requirements
-  (desk review with Mods design + Grid plan on 2025-10-07).
-- `docs/design/README.md`: Refreshed index entries for SHIFT/Mods designs to
-  highlight the Grid catalog follow-up and new verification timestamp.
+- `docs/design/workstation-roadmap/README.md`: Updated the workstation roadmap
+  alignment to track the Mods catalog namespace hand-off to Grid and call out
+  coordination requirements (desk review with Mods design + Grid plan on
+  2025-10-07).
+- `docs/design/README.md`: Refreshed index entries for workstation roadmap/Mods
+  designs to highlight the Grid catalog follow-up and new verification timestamp.
 - Noted the `/lanes/<namespace>.tar.gz` publication path in the Mods/Grid
   designs so workstation docs match the updated Grid endpoint.
 
@@ -84,9 +85,9 @@
   branches using knowledge base signals.
 - Documentation refreshed: `cmd/ploy/README.md`,
   `docs/design/mods-grid-restoration/README.md`, `docs/design/mods/README.md`,
-  `docs/design/event-contracts/README.md`, and `docs/design/shift/README.md`
+  `docs/design/event-contracts/README.md`, and `docs/design/workstation-roadmap/README.md`
   now describe repo materialisation, stage metadata, and healing behaviour.
-- Introduced `lanes/` catalog (mirrored to SHIFT) with a
+- Introduced `lanes/` catalog (mirrored to the shared registry) with a
   `go run ./tools/lanesvalidate` helper and `make lanes-validate` target; CLI now
   reads from this catalog by default.
 - Restored Mods E2E harness under `tests/e2e` so workstation runs validate
@@ -120,9 +121,10 @@
 - Added log finding support to workflow contracts and runner checkpoint
   conversion so Knowledge Base codes propagate into CLI summaries and downstream
   consumers.
-- Documented the milestone in `docs/design/build-gate/README.md`, the new SHIFT
-  design index, and roadmap slice `docs/tasks/build-gate/07-cli-summary.md`,
-  marking `docs/tasks/shift/21-build-gate-reboot.md` as complete.
+- Documented the milestone in `docs/design/build-gate/README.md`, the updated
+  workstation roadmap design index, and roadmap slice
+  `docs/tasks/build-gate/07-cli-summary.md`, marking
+  `docs/tasks/roadmap/21-build-gate-reboot.md` as complete.
 
 ## [2025-09-29] Grid Discovery Alignment
 
@@ -152,8 +154,9 @@
 - Updated documentation and roadmap artifacts:
   `docs/design/build-gate/error-prone/README.md`,
   `docs/design/build-gate/README.md`, `docs/design/README.md`,
-  `docs/design/shift/README.md`, `docs/tasks/build-gate/08-error-prone-adapter.md`,
-  and `docs/tasks/shift/21-build-gate-reboot.md` to record the adapter milestone
+  `docs/design/workstation-roadmap/README.md`,
+  `docs/tasks/build-gate/08-error-prone-adapter.md`, and
+  `docs/tasks/roadmap/21-build-gate-reboot.md` to record the adapter milestone
   and verification.
 - Verification: `go test ./...` on 2025-09-29.
 
@@ -170,7 +173,7 @@
   gate summaries.
 - Updated documentation and roadmap artifacts:
   `docs/design/build-gate/eslint/README.md`, `docs/design/build-gate/README.md`,
-  `docs/design/README.md`, `docs/design/shift/README.md`, and
+  `docs/design/README.md`, `docs/design/workstation-roadmap/README.md`, and
   `docs/tasks/build-gate/09-eslint-adapter.md` to mark the JavaScript adapter
   milestone complete.
 - Verification: `go test ./internal/workflow/buildgate -count=1`,
@@ -201,8 +204,8 @@
   normalise Git authentication, Go module conflict, linker, and disk pressure
   findings for downstream remediation flows.
 - Documented the milestone across the build gate design record, roadmap slice
-  `docs/tasks/build-gate/04-log-retrieval-and-grid-integration.md`, the SHIFT
-  tracker, and the design index so roadmap status stays aligned.
+  `docs/tasks/build-gate/04-log-retrieval-and-grid-integration.md`, the
+  workstation roadmap tracker, and the design index so roadmap status stays aligned.
 
 ## [2025-09-27] Build Gate Go Vet Adapter
 
@@ -225,7 +228,7 @@
   covering dependency validation and aggregated metadata to keep the package
   above the 90% coverage target.
 - Documented the runner milestone across `docs/design/build-gate/README.md`, the
-  design index, `docs/tasks/shift/21-build-gate-reboot.md`, and the new roadmap
+  design index, `docs/tasks/roadmap/21-build-gate-reboot.md`, and the new roadmap
   slice `docs/tasks/build-gate/06-build-gate-runner.md`.
 
 ## [2025-10-01] Workflow RPC Helper Adoption
@@ -305,7 +308,7 @@
   root so `go test ./...` stays portable across environments.
 - Recorded docs/tasks/design updates for the sandbox runner milestone
   (`docs/tasks/build-gate/02-sandbox-runner.md`,
-  `docs/design/build-gate/README.md`, `docs/tasks/shift/21-build-gate-reboot.md`).
+  `docs/design/build-gate/README.md`, `docs/tasks/roadmap/21-build-gate-reboot.md`).
 
 ## [2025-10-05] Build Gate Static Check Registry
 
@@ -317,8 +320,8 @@
   adapters to keep package coverage ≥90%.
 - Documented the registry in `docs/design/build-gate/README.md`, marked roadmap
   slice `docs/tasks/build-gate/03-static-check-registry.md` complete, and updated
-  `docs/tasks/shift/21-build-gate-reboot.md` plus the design index to reflect the
-  milestone.
+  `docs/tasks/roadmap/21-build-gate-reboot.md` plus the design index to reflect
+  the milestone.
 
 ## [2025-09-27] Build Gate Stage Planning & Metadata
 
@@ -330,7 +333,7 @@
   version `2025-09-27.1`).
 - Recorded roadmap progress under
   `docs/tasks/build-gate/01-stage-planning-and-metadata.md` and
-  `docs/tasks/shift/21-build-gate-reboot.md`, refreshing design docs and the root
+  `docs/tasks/roadmap/21-build-gate-reboot.md`, refreshing design docs and the root
   README to note the milestone.
 
 ## [2025-09-27] Mods Runner Parallel Execution
@@ -342,7 +345,7 @@
   stubs so the runner package stays at ≥90% coverage even under
   `go test -cover ./...`.
 - Marked `docs/tasks/mods/04-runner-parallel-execution.md` and
-  `docs/tasks/shift/19-mods-parallel-planner.md` complete, updating
+  `docs/tasks/roadmap/19-mods-parallel-planner.md` complete, updating
   `docs/design/mods/README.md`, `docs/design/README.md`, and the root
   `README.md` to reflect the finished Roadmap 19 slice.
 
@@ -501,8 +504,8 @@
   exercises all representative engines locally.
 - Implemented the `last4` masking strategy and wired regression coverage that
   loads the in-repo catalog and executes captures with stub publishers.
-- Updated snapshot documentation and the SHIFT roadmap to record the validation
-  slice ahead of JetStream/Grid wiring.
+- Updated snapshot documentation and the workstation roadmap to record the
+  validation slice ahead of JetStream/Grid wiring.
 
 ## [2025-09-26] JetStream Client Wiring
 
@@ -548,7 +551,7 @@
 ## [2025-09-26] Documentation Cleanup
 
 - Refreshed `README.md` to highlight the CLI-first/Grid model, enumerate all
-  completed SHIFT slices, and link directly to the design doc.
+  completed workstation roadmap slices, and link directly to the design doc.
 - Updated the documentation matrix (`docs/DOCS.md`, `docs/LANES.md`,
   `docs/MANIFESTS.md`, `docs/SNAPSHOTS.md`) to emphasise JetStream/Grid
   workflows and point contributors at the relevant guides.

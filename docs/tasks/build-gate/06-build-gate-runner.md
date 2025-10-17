@@ -28,7 +28,7 @@ build gate outcomes and metadata.
   static check reports and log findings aligned with checkpoint schema
   expectations.
 - Documentation references the runner milestone across the build gate design
-  record, design index, and SHIFT tracker.
+  record, design index, and workstation roadmap tracker.
 
 ## Tests
 

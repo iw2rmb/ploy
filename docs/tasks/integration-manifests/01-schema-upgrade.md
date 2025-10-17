@@ -54,4 +54,4 @@ planning aligned with the execution plane and unblocks integration testing.
 - Design: `docs/design/integration-manifests/README.md`.
 - Grid fixtures: `../../../grid/testdata/topology/README.md` and related
   samples.
-- SHIFT tracker: `docs/design/shift/README.md`.
+- Workstation roadmap tracker: `docs/design/workstation-roadmap/README.md`.

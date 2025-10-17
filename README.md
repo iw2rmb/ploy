@@ -206,8 +206,7 @@ Full design records live in `docs/design/README.md`.
 
 ## Feature Roadmap
 
-Per-feature write-ups live under `docs/tasks/shift/` (directory name retained for
-historical context). Status checkboxes in this README mirror those roadmap
+Per-feature write-ups live under `docs/tasks/roadmap/`. Status checkboxes in this README mirror those roadmap
 entries, and deeper design context is collected in `docs/design/README.md`.
 
 ## Environment Variables

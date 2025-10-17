@@ -1,13 +1,13 @@
-# shift-mods-grid-02 — Mods Grid Materialisation (GREEN)
+# mods-grid-02 — Mods Grid Materialisation (GREEN)
 
 - **Status**: [ ] Planned · [ ] In Progress · [x] Done
 - **Design**: [../design/mods-grid-restoration/README.md](../../design/mods-grid-restoration/README.md)
-- **Blocked by**: `shift-mods-grid-01`
-- **Unblocks**: `shift-mods-grid-03`
+- **Blocked by**: `mods-grid-01`
+- **Unblocks**: `mods-grid-03`
 
 ## Definition of Ready
 
-- RED tests from `shift-mods-grid-01` are failing and committed.
+- RED tests from `mods-grid-01` are failing and committed.
 - Repository access secrets made available locally.
 
 ## Definition of Done
@@ -26,4 +26,4 @@
 
 ## Notes
 
-- Ensure job spec composition reuses lane registry defaults without duplicating SHIFT assets yet.
+- Ensure job spec composition reuses lane registry defaults without duplicating lane catalog assets yet.

@@ -28,7 +28,7 @@ for hermetic runs and real clients when the harness provides them.
 
 ## Current Status
 
-- Dependency seams landed prior to the SHIFT reboot; Mods tests rely on injected
+- Dependency seams landed prior to the workstation reboot; Mods tests rely on injected
   uploaders and builders with in-memory fallbacks.
 - Future slices reference this baseline for workstation-only Mods testing.
 

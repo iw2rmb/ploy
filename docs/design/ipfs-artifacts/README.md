@@ -5,7 +5,7 @@
 Provide a workstation-ready pathway for snapshot captures to upload artifacts to
 IPFS when a gateway is available, while preserving the existing in-memory stub
 for offline slices. This closes the remaining gap between the snapshot toolkit
-and the Grid/VPS integration plan called out in `SHIFT.md`.
+and the Grid/VPS integration plan called out in the workstation roadmap index.
 
 ## Scope
 

@@ -83,7 +83,7 @@ addendum:
 - Root README describes the CLI-first model; update it whenever behaviour
   changes.
 - Roadmap updates must mark the relevant checklist item
-  (`docs/tasks/shift/<nn>-*.md`).
+  (`docs/tasks/roadmap/<nn>-*.md`).
 - When recording new behaviour in `CHANGELOG.md`, include the roadmap slice
   reference and a concrete YYYY-MM-DD date.
 
