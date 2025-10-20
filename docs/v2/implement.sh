@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+ #!/bin/zsh
 #
 # Orchestrates a full Ploy v2 implementation cycle using the Codex CLI in
 # non-interactive mode. The script follows four phases:
@@ -14,16 +14,17 @@
 
 set -euo pipefail
 
-: "${CODEX_BIN:=codex}"
-: "${GIT_BIN:=git}"
+export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+hash -r
+
+CODEX_BIN=${CODEX_BIN:-$(command -v codex 2>/dev/null || echo codex)}
+GIT_BIN=${GIT_BIN:-$(command -v git 2>/dev/null || echo git)}
 
 function run_codex() {
   local prompt="$1"
-  print -r -- "$prompt" | "$CODEX_BIN" \
-    exec \
+  "$CODEX_BIN" exec \
     --dangerously-bypass-approvals-and-sandbox \
-    --search \
-    --prompt -
+    --search "$prompt"
 }
 
 function generate_design_docs() {
