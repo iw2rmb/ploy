@@ -7,15 +7,6 @@ repos:
         language: system
         pass_filenames: false
         files: \.go$
-
-  - repo: local
-    hooks:
-      - id: markdownlint
-        name: markdownlint
-        entry: npx --yes markdownlint --config .markdownlint.yaml
-        language: system
-        types_or: [markdown]
-
   # Use official golangci-lint pre-commit hook pinned to v2
   - repo: https://github.com/golangci/golangci-lint
     rev: v2.4.0
