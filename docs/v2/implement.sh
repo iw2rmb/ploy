@@ -34,8 +34,7 @@ function plan_overall_steps() {
   run_codex "$(cat <<'EOF'
 Consult and comply with ~/.codex/AGENTS.md.
 Create or update docs/v2/implementation-plan.md with a concise, dependency-aware series of independent steps for the Ploy v2 migration workflow executed by docs/v2/implement.sh.
-Structure the plan as a Markdown checklist where every item is runnable as its own Codex session (design creation, task planning, implementation, verification).
-Explicitly note that each run of the script should complete at most one checklist item before exiting.
+Structure the plan as a Markdown checklist where every item triggers a fresh Codex session, while the script continues through the sequence in the same invocation (design creation, task planning, implementation, verification).
 Call out prerequisites (environment variables from docs/envs/README.md) and cross-reference relevant design docs and specs.
 No other actions are required in this session.
 EOF
@@ -43,8 +42,9 @@ EOF
   return 0
 }
 
-function generate_design_doc() {
+function generate_design_docs() {
   local entry slug path description
+  local status=1
   for entry in "${DESIGN_SPECS[@]}"; do
     IFS='::' read -r slug path description <<<"$entry"
     if [[ -s "$path" ]]; then
@@ -60,9 +60,9 @@ Document assumptions, open questions, acceptance criteria. Keep Markdown lint co
 Use web search to gather latest library versions, best practices, relevant snippets.
 EOF
 )"
-    return 0
+    status=0
   done
-  return 1
+  return $status
 }
 
 function ensure_task_readme_header() {
@@ -98,6 +98,7 @@ function read_tasks() {
 function build_task_queue() {
   ensure_task_readme_header
   local entry design prefix summary
+  local status=1
   for entry in "${DESIGN_TASK_MAPPINGS[@]}"; do
     IFS='::' read -r design prefix summary <<<"$entry"
     if [[ ! -s "$design" ]]; then
@@ -126,22 +127,20 @@ EOF
       printf '%s\n' "$queue_entries"
       printf '\n'
     } >>docs/tasks/README.md
-    return 0
+    status=0
   done
-  return 1
+  return $status
 }
 
-function implement_next_task() {
+function implement_tasks() {
   local task path abs feature_spec
-  task=$(read_tasks | head -n1 || true)
-  if [[ -z "${task// }" ]]; then
-    return 1
-  fi
-  path=${task%% — *}
-  abs="docs/tasks/${path}"
-  feature_spec="docs/features/${path%/*}/README.md"
-  printf 'Implementing task %s\n' "$path"
-  run_codex "$(cat <<EOF
+  local status=1
+  while task=$(read_tasks | head -n1); [[ -n "${task// }" ]]; do
+    path=${task%% — *}
+    abs="docs/tasks/${path}"
+    feature_spec="docs/features/${path%/*}/README.md"
+    printf 'Implementing task %s\n' "$path"
+    run_codex "$(cat <<EOF
 Adhere to ~/.codex/AGENTS.md.
 Implement the task ${abs} (new Ploy v2 behaviour—no legacy Grid compatibility).
 Requirements:
@@ -155,8 +154,10 @@ Requirements:
 Use web search for latest libraries, best practices, snippets.
 EOF
 )"
-  run_codex "Perform a quick status: git status --short"
-  return 0
+    run_codex "Perform a quick status: git status --short"
+    status=0
+  done
+  return $status
 }
 
 function final_verification() {
@@ -180,27 +181,30 @@ EOF
 }
 
 function main() {
+  local did_work=1
   if plan_overall_steps; then
-    printf 'Plan generated. Re-run docs/v2/implement.sh for the next step.\n'
-    exit 0
+    printf 'Plan generated.\n'
+    did_work=0
   fi
-  if generate_design_doc; then
-    printf 'Design document generated. Re-run docs/v2/implement.sh for the next step.\n'
-    exit 0
+  if generate_design_docs; then
+    printf 'Design documents generated.\n'
+    did_work=0
   fi
   if build_task_queue; then
-    printf 'Task queue updated. Re-run docs/v2/implement.sh for the next step.\n'
-    exit 0
+    printf 'Task queue updated.\n'
+    did_work=0
   fi
-  if implement_next_task; then
-    printf 'Task implementation executed. Re-run docs/v2/implement.sh for the next step.\n'
-    exit 0
+  if implement_tasks; then
+    printf 'Task implementation steps executed.\n'
+    did_work=0
   fi
   if final_verification; then
     printf 'Final verification executed. Workflow complete.\n'
-    exit 0
+    did_work=0
   fi
-  printf 'No pending steps detected. Nothing to do.\n'
+  if [[ $did_work -ne 0 ]]; then
+    printf 'No pending steps detected. Nothing to do.\n'
+  fi
 }
 
 main "$@"
