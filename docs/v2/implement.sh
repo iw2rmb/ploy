@@ -20,10 +20,10 @@ set -euo pipefail
 function run_codex() {
   local prompt="$1"
   print -r -- "$prompt" | "$CODEX_BIN" \
-    --non-interactive \
+    exec \
     --dangerously-bypass-approvals-and-sandbox \
     --search \
-    --enable-web-search
+    --prompt -
 }
 
 function generate_design_docs() {
