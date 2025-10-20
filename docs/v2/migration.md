@@ -17,6 +17,8 @@ previous workflow stack entirely.
 1. **Repository hygiene**
    - Remove or archive Grid-specific adapters, feature flags, and environment variables.
    - Annotate remaining cross-repo references (grid SDK imports, JetStream helpers) for later deletion.
+   - Review the reuse candidates listed in [docs/v2/reuse.md](reuse.md) and plan how to port them
+     into the v2 architecture.
 2. **Docs alignment**
    - Keep `docs/v2/*` in sync with ongoing changes; treat these documents as the contract.
 
@@ -34,6 +36,7 @@ previous workflow stack entirely.
 1. **Job outcome schema**
    - Implement etcd storage layout `mods/<ticket>/jobs/<job-id>` (status, node, timestamps).
    - Add artifact reference fields (diff CID, build gate report CID, log digest).
+   - Follow the key contracts described in [docs/v2/etcd.md](etcd.md).
 2. **Workspace hydration & diff publishing**
    - Teach `ploynode` to hydrate containers with the original repo plus cumulative diffs before each
      job launches (shared volume mount).
@@ -43,6 +46,7 @@ previous workflow stack entirely.
      outcomes.
 3. **SSE log streaming**
    - Implement `/v2/jobs/{id}/logs/stream` and `/node/v2/jobs/{id}/logs/stream`.
+   - Ensure log payloads follow the pattern in [docs/v2/logs.md](logs.md).
 
 ## Phase 3 — CLI & API Surface
 
@@ -58,7 +62,9 @@ previous workflow stack entirely.
 
 1. **Workflow runner**
    - Replace Grid client wiring with the new runtime adapter.
-   - Ensure stage execution stores job metadata + artifact CIDs after every step.
+   - Ensure stage execution stores job metadata + artifact CIDs after every step (see
+     [docs/v2/job.md](job.md) and [docs/v2/queue.md](queue.md)).
+
 2. **SHIFT integration**
    - Keep existing build gate packages but adapt output to IPFS & job metadata.
    - Update failure handling to emit JSON report CIDs.
@@ -71,16 +77,21 @@ previous workflow stack entirely.
 2. **Ops commands**
    - Implement `ploy beacon rotate-ca`, `ploy beacon sync`, `ploy node logs`.
    - Surface `ploy status` using the new endpoints.
+   - Wire `ploy gc` and the automated controller as documented in [docs/v2/gc.md](gc.md).
 
 ## Phase 6 — Cleanup & Validation
 
 1. **Remove legacy code paths**
    - Delete Grid RPC clients, JetStream helpers, and unused env vars once v2 paths are green.
 2. **Testing**
-   - Add integration tests covering job submission, diff publishing, build gate failure loops, CLI end-to-end flows.
+   - Add integration tests covering job submission, diff publishing, build gate failure loops, CLI
+     end-to-end flows.
+   - Use the VPS lab environment ([docs/v2/vps-lab.md](vps-lab.md)) for multi-node tests and follow
+     the testing guidance in [docs/v2/testing.md](testing.md) (timeouts, coverage expectations).
    - Update CI to run only the new pipelines.
+
 3. **Documentation pass**
-   - Verify `docs/v2` remains accurate, and update root README when v2 becomes default.
+   - Verify `docs/v2` remains accurate, and update the root README when v2 becomes default.
 
 ## Tracking & Delivery
 
