@@ -91,3 +91,4 @@ For IPFS-specific topology and replication details, refer to [docs/v2/ipfs.md](i
 - [docs/v2/etcd.md](etcd.md) — etcd keyspace layout and contracts.
 - [docs/v2/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
 - [docs/v2/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.
+- [docs/v2/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy v2.
