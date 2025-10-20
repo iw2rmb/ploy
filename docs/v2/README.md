@@ -89,3 +89,5 @@ For IPFS-specific topology and replication details, refer to [docs/v2/ipfs.md](i
 - [docs/v2/logs.md](logs.md) — Log streaming and archival strategy (metadata in etcd, payloads in IPFS).
 - [docs/v2/queue.md](queue.md) — etcd-backed queue, capacity tracking, and scheduling behaviour.
 - [docs/v2/etcd.md](etcd.md) — etcd keyspace layout and contracts.
+- [docs/v2/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
+- [docs/v2/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.

@@ -9,10 +9,6 @@ addendum:
 - Plan local unit tests and coverage checks before touching code or docs.
 - Verify required environment variables (see `docs/envs/README.md`) are
   discoverable or called out as TODOs for future slices.
-- Confirm you understand the workstation-only scope for the current roadmap
-  slice (VPS/Grid integration resumes once JetStream wiring lands).
-- Skim `docs/DOCS.md` so AGENTS.md and scoped READMEs stay aligned with
- documentation conventions.
 
 ## Documentation
 
@@ -38,16 +34,6 @@ addendum:
 - For Codex execution details on the Mods Grid E2E harness, consult
   `tests/e2e/README.md`.
 
-### Go Tooling (MANDATORY)
-
-- Prefer the MCP tools shipped with `mcp-golang` for common tasks:
-  - `mcp_golang__format_source` (or `run_playbook` → `format-lint-test`) for
-    formatting.
-  - `mcp_golang__lint_package` for static analysis.
-  - `mcp_golang__test_with_coverage` for running unit tests (fallback:
-    `go test -cover ./...`).
-- Run `go mod tidy` after removing or adding dependencies.
-
 ### CLI Build & Smoke Checks
 
 - `make build` places the CLI in `dist/ploy`.
@@ -66,38 +52,7 @@ addendum:
 - If you enable pre-commit hooks, keep them focused on `gofmt`, `go test`,
   static analysis for the workflow runner, and Markdown linting (`markdownlint`).
 
-## Grid Integration (Future REFACTOR)
-
-- JetStream consumers and Grid RPC clients will be introduced in roadmap items
-  `01-event-contracts` and `02-workflow-runner-cli`.
-- Until then, avoid stubbing external calls beyond interfaces defined inside
-  `internal/workflow`.
-- When Grid integration requires live endpoints, run integration tests from the
-  workstation using the shared grid client (`PLOY_GRID_ID`, `GRID_BEACON_API_KEY`, optional
-  `GRID_BEACON_URL`), keeping the CLI stateless. If the grid client reports the
-  grid is missing, run `gridctl grid client backfill --grid-id <grid>` so beacon
-  exposes the `manifestHost` and CA metadata expected by the SDK.
-
-## Documentation Discipline
-
-- Root README describes the CLI-first model; update it whenever behaviour
-  changes.
-- Roadmap updates must mark the relevant checklist item
-  (`docs/tasks/roadmap/<nn>-*.md`).
-- When recording new behaviour in `CHANGELOG.md`, include the roadmap slice
-  reference and a concrete YYYY-MM-DD date.
-
 ## Environment Variables
 
 - Keep the canonical list of required variables in `docs/envs/README.md` and
   update that file whenever values change or new toggles are introduced.
-
-## Delivery Checklist
-
-1. RED: add failing unit tests capturing the target behaviour.
-2. GREEN: implement the minimal code to satisfy tests.
-3. go test -cover ./...
-4. Update documentation, the design index, and the relevant task entry under `docs/tasks/`.
-5. (Once Grid integration lands) perform REFACTOR verification against the Dev
-   API.
-6. Commit with a clear message and ensure branch is ready for PR.
