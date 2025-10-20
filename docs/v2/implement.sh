@@ -5,6 +5,11 @@ export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/usr/bin:/bin:/usr/sbin:
 hash -r
 CODEX_BIN=${CODEX_BIN:-$(command -v codex 2>/dev/null || echo codex)}
 GIT_BIN=${GIT_BIN:-$(command -v git 2>/dev/null || echo git)}
+MKDIR_BIN=${MKDIR_BIN:-$(command -v mkdir 2>/dev/null || echo mkdir)}
+CAT_BIN=${CAT_BIN:-$(command -v cat 2>/dev/null || echo cat)}
+SED_BIN=${SED_BIN:-$(command -v sed 2>/dev/null || echo sed)}
+HEAD_BIN=${HEAD_BIN:-$(command -v head 2>/dev/null || echo head)}
+RG_BIN=${RG_BIN:-$(command -v rg 2>/dev/null || echo rg)}
 
 PLAN_DOC="docs/v2/implementation-plan.md"
 FINAL_VERIFICATION_MARKER="docs/v2/.final-verification-done"
@@ -31,26 +36,25 @@ function plan_overall_steps() {
     return 1
   fi
   printf 'Planning execution steps in %s\n' "$PLAN_DOC"
-  run_codex "$(cat <<'EOF'
-Consult and comply with ~/.codex/AGENTS.md.
+  local prompt
+  prompt=$("$CAT_BIN" <<'EOF'
+Consult and comply with /Users/vk/@iw2rmb/docs/AGENTS.md.
 Create or update docs/v2/implementation-plan.md with a concise, dependency-aware series of independent steps for the Ploy v2 migration workflow executed by docs/v2/implement.sh.
 Structure the plan as a Markdown checklist where every item triggers a fresh Codex session, while the script continues through the sequence in the same invocation (design creation, task planning, implementation, verification).
 Call out prerequisites (environment variables from docs/envs/README.md) and cross-reference relevant design docs and specs.
 No other actions are required in this session.
 EOF
-)"
+)
+  run_codex "$prompt"
   return 0
 }
 
 function generate_design_docs() {
-  local entry slug path description
+  local entry
   local retval=1
   for entry in "${DESIGN_SPECS[@]}"; do
-    local fields
-    fields=("${(@s/::/)entry}")
-    slug="${fields[1]:-}"
-    path="${fields[2]:-}"
-    description="${fields[3]:-}"
+    local prompt slug path description
+    IFS='::' read -r slug path description <<<"$entry"
     if [[ -z "$path" || -z "$description" ]]; then
       printf 'Design spec entry malformed: %s\n' "$entry" >&2
       continue
@@ -59,15 +63,16 @@ function generate_design_docs() {
       continue
     fi
     printf 'Generating design document %s\n' "$path"
-    command mkdir -p "${path:h}"
-    run_codex "$(cat <<EOF
-Consult and comply with ~/.codex/AGENTS.md.
+    "$MKDIR_BIN" -p "${path:h}"
+    prompt=$("$CAT_BIN" <<EOF
+Consult and comply with /Users/vk/@iw2rmb/docs/AGENTS.md.
 Create or update ${path} covering: ${description}.
 State explicitly that Ploy v2 does not need to maintain backward compatibility with legacy Grid behaviour; reuse existing Grid code only when helpful.
 Document assumptions, open questions, acceptance criteria. Keep Markdown lint compliant.
 Use web search to gather latest library versions, best practices, relevant snippets.
 EOF
-)"
+)
+    run_codex "$prompt"
     retval=0
   done
   return $retval
@@ -76,7 +81,7 @@ EOF
 function ensure_task_readme_header() {
   local readme="docs/tasks/README.md"
   if [[ ! -f "$readme" ]]; then
-    cat <<'EOF' >"$readme"
+    "$CAT_BIN" <<'EOF' >"$readme"
 # Dependency-Ordered Task Queue
 
 Always re-open this file immediately before editing; do not rely on a cached copy or stale editor buffer.
@@ -91,8 +96,8 @@ Always re-open this file immediately before editing; do not rely on a cached cop
 EOF
     return
   fi
-  if ! rg -q '^## Queue' "$readme"; then
-    cat <<'EOF' >>"$readme"
+  if ! "$RG_BIN" -q '^## Queue' "$readme"; then
+    "$CAT_BIN" <<'EOF' >>"$readme"
 
 ## Queue
 EOF
@@ -100,7 +105,7 @@ EOF
 }
 
 function read_tasks() {
-  rg '^\- \[ \] ' docs/tasks/README.md 2>/dev/null | sed 's/^\- \[ \] //' || true
+  "$RG_BIN" '^\- \[ \] ' docs/tasks/README.md 2>/dev/null | "$SED_BIN" 's/^\- \[ \] //' || true
 }
 
 function build_task_queue() {
@@ -108,11 +113,8 @@ function build_task_queue() {
   local entry design prefix summary
   local retval=1
   for entry in "${DESIGN_TASK_MAPPINGS[@]}"; do
-    local fields
-    fields=("${(@s/::/)entry}")
-    design="${fields[1]:-}"
-    prefix="${fields[2]:-}"
-    summary="${fields[3]:-}"
+    local prompt queue_entries
+    IFS='::' read -r design prefix summary <<<"$entry"
     if [[ -z "$design" || -z "$prefix" || -z "$summary" ]]; then
       printf 'Task mapping entry malformed: %s\n' "$entry" >&2
       continue
@@ -120,20 +122,20 @@ function build_task_queue() {
     if [[ ! -s "$design" ]]; then
       continue
     fi
-    if rg -q -F "- [ ] ${prefix}/" docs/tasks/README.md 2>/dev/null || \
-       rg -q -F "\`${prefix}" docs/tasks/README.md 2>/dev/null; then
+    if "$RG_BIN" -q -F "- [ ] ${prefix}/" docs/tasks/README.md 2>/dev/null || \
+       "$RG_BIN" -q -F "\`${prefix}" docs/tasks/README.md 2>/dev/null; then
       continue
     fi
     printf 'Planning task queue entries for %s\n' "$design"
-    local queue_entries
-    queue_entries=$(run_codex "$(cat <<EOF
-Follow ~/.codex/AGENTS.md.
+    prompt=$("$CAT_BIN" <<EOF
+Follow /Users/vk/@iw2rmb/docs/AGENTS.md.
 Read ${design} and break it into concise tasks (name, scope, acceptance criteria) under ${prefix}.
 Output them as Markdown bullet points with the format '- [ ] path/to/task.md — summary', referencing docs/v2/testing.md for expectations.
 Explicitly state "No legacy Grid compatibility required" in each summary if the design suggests reuse.
 Use web search for best practices while planning tasks. Respond ONLY with the bullet list.
 EOF
-)")
+)
+    queue_entries=$(run_codex "$prompt")
     if [[ -z "${queue_entries// }" ]]; then
       printf 'Codex did not return task entries for %s; aborting.\n' "$design" >&2
       exit 1
@@ -151,13 +153,14 @@ EOF
 function implement_tasks() {
   local task path abs feature_spec
   local retval=1
-  while task=$(read_tasks | head -n1); [[ -n "${task// }" ]]; do
+  while task=$(read_tasks | "$HEAD_BIN" -n1); [[ -n "${task// }" ]]; do
     path=${task%% — *}
     abs="docs/tasks/${path}"
     feature_spec="docs/features/${path%/*}/README.md"
     printf 'Implementing task %s\n' "$path"
-    run_codex "$(cat <<EOF
-Adhere to ~/.codex/AGENTS.md.
+    local prompt
+    prompt=$("$CAT_BIN" <<EOF
+Adhere to /Users/vk/@iw2rmb/docs/AGENTS.md.
 Implement the task ${abs} (new Ploy v2 behaviour—no legacy Grid compatibility).
 Requirements:
 1. Update code to satisfy the task spec and relevant design doc.
@@ -169,7 +172,8 @@ Requirements:
 7. Remove ${abs} and drop the entry from docs/tasks/README.md.
 Use web search for latest libraries, best practices, snippets.
 EOF
-)"
+)
+    run_codex "$prompt"
     run_codex "Perform a quick status: git status --short"
     retval=0
   done
@@ -184,14 +188,16 @@ function final_verification() {
     return 1
   fi
   printf 'Running final verification via Codex\n'
-  run_codex "$(cat <<'EOF'
-Perform final verification (/.codex/AGENTS.md):
+  local prompt
+  prompt=$("$CAT_BIN" <<'EOF'
+Perform final verification (/Users/vk/@iw2rmb/docs/AGENTS.md):
 - Ensure docs/envs/README.md, docs/api/OpenAPI.yaml are updated.
 - Run make lint-md and go test ./...
 - Summarise the completed migration; note that no backward compatibility is required.
 - Use web search to ensure nothing is outdated.
 EOF
-)"
+)
+  run_codex "$prompt"
   touch "$FINAL_VERIFICATION_MARKER"
   return 0
 }
