@@ -24,7 +24,7 @@ function run_codex() {
   local prompt="$1"
   "$CODEX_BIN" exec \
     --dangerously-bypass-approvals-and-sandbox \
-    --search "$prompt"
+    "${prompt}" --search
 }
 
 function generate_design_docs() {
