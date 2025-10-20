@@ -156,6 +156,10 @@ so Grid scoring and diagnostics stay informative.
 
 ## Implementation Notes
 
+- **2025-10-07** — Introduced a pluggable runtime adapter registry so the CLI
+  selects Grid (default) or future orchestrators (`k8s`, `nomad`, `openshift`)
+  via `PLOY_RUNTIME_ADAPTER`. The Grid adapter now encapsulates client wiring
+  behind the registry for reuse.
 - **2025-10-01** — Adopted the helper-backed Workflow RPC submitter and streaming
   loop: `internal/workflow/grid/client.go` now builds `workflowsdk.SubmitRequest`
   payloads, streams status via `helper.StreamStatusWithRetry`, falls back to run

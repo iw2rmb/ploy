@@ -12,7 +12,9 @@ import (
 func TestHandleModRunParsesAsterFlags(t *testing.T) {
 	t.Setenv("PLOY_ASTER_ENABLE", "1")
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	fakeRunner := &recordingRunner{}

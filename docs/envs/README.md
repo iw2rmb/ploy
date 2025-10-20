@@ -29,6 +29,9 @@ additional configuration.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy override retained for compatibility.
   When set it controls the workflow SDK cache path and is reused as the grid
   client state directory.
+- `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
+  `grid`. Future adapters (`k8s`, `nomad`, `openshift`) will plug in here; the
+  CLI fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
 

@@ -38,7 +38,9 @@ func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
 	}()
 
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 
 	runnerExecutor = fakeRunner
@@ -84,7 +86,9 @@ func TestHandleModRunUsesSharedGridClient(t *testing.T) {
 	}()
 
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 
 	status := gridclient.Status{
@@ -123,7 +127,9 @@ func TestHandleModRunUsesSharedGridClient(t *testing.T) {
 
 func TestHandleModRunSurfacingGridErrors(t *testing.T) {
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 
@@ -140,7 +146,9 @@ func TestHandleModRunSurfacingGridErrors(t *testing.T) {
 
 func TestHandleModRunPopulatesConfigFromDiscovery(t *testing.T) {
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 

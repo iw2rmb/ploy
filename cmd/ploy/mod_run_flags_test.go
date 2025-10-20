@@ -14,7 +14,9 @@ import (
 
 func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 
@@ -69,7 +71,9 @@ func TestHandleModRunSupportsAutoTicket(t *testing.T) {
 
 func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 
@@ -112,7 +116,9 @@ func TestHandleModRunPropagatesRunnerError(t *testing.T) {
 
 func TestHandleModRunPropagatesManifestLoaderError(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 
@@ -150,7 +156,9 @@ func TestHandleModRunRequiresTenant(t *testing.T) {
 
 func TestHandleModRunTrimsExplicitTicket(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 

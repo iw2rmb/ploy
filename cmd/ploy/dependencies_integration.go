@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
 type integrationConfig struct {
@@ -28,6 +31,25 @@ func (cfg integrationConfig) FeatureEnabled(name string) bool {
 }
 
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
+	selection := strings.TrimSpace(os.Getenv(runtimeAdapterEnv))
+	if selection == "" {
+		selection = "grid"
+	}
+	if runtimeRegistry != nil {
+		_, meta, err := runtimeRegistry.Resolve(selection)
+		if errors.Is(err, runtime.ErrAdapterNotFound) {
+			return integrationConfig{Features: map[string]string{}}, nil
+		}
+		if err != nil {
+			return integrationConfig{}, err
+		}
+		if meta.Name != "grid" {
+			return integrationConfig{Features: map[string]string{}}, nil
+		}
+	} else if !strings.EqualFold(selection, "grid") {
+		return integrationConfig{Features: map[string]string{}}, nil
+	}
+
 	client, err := acquireGridClient(ctx)
 	if errors.Is(err, errGridClientDisabled) {
 		return integrationConfig{Features: map[string]string{}}, nil
