@@ -44,14 +44,22 @@ EOF
 
 function generate_design_docs() {
   local entry slug path description
-  local status=1
+  local retval=1
   for entry in "${DESIGN_SPECS[@]}"; do
-    IFS='::' read -r slug path description <<<"$entry"
+    local fields
+    fields=("${(@s/::/)entry}")
+    slug="${fields[1]:-}"
+    path="${fields[2]:-}"
+    description="${fields[3]:-}"
+    if [[ -z "$path" || -z "$description" ]]; then
+      printf 'Design spec entry malformed: %s\n' "$entry" >&2
+      continue
+    fi
     if [[ -s "$path" ]]; then
       continue
     fi
     printf 'Generating design document %s\n' "$path"
-    mkdir -p "$(dirname "$path")"
+    command mkdir -p "${path:h}"
     run_codex "$(cat <<EOF
 Consult and comply with ~/.codex/AGENTS.md.
 Create or update ${path} covering: ${description}.
@@ -60,9 +68,9 @@ Document assumptions, open questions, acceptance criteria. Keep Markdown lint co
 Use web search to gather latest library versions, best practices, relevant snippets.
 EOF
 )"
-    status=0
+    retval=0
   done
-  return $status
+  return $retval
 }
 
 function ensure_task_readme_header() {
@@ -98,9 +106,17 @@ function read_tasks() {
 function build_task_queue() {
   ensure_task_readme_header
   local entry design prefix summary
-  local status=1
+  local retval=1
   for entry in "${DESIGN_TASK_MAPPINGS[@]}"; do
-    IFS='::' read -r design prefix summary <<<"$entry"
+    local fields
+    fields=("${(@s/::/)entry}")
+    design="${fields[1]:-}"
+    prefix="${fields[2]:-}"
+    summary="${fields[3]:-}"
+    if [[ -z "$design" || -z "$prefix" || -z "$summary" ]]; then
+      printf 'Task mapping entry malformed: %s\n' "$entry" >&2
+      continue
+    fi
     if [[ ! -s "$design" ]]; then
       continue
     fi
@@ -127,14 +143,14 @@ EOF
       printf '%s\n' "$queue_entries"
       printf '\n'
     } >>docs/tasks/README.md
-    status=0
+    retval=0
   done
-  return $status
+  return $retval
 }
 
 function implement_tasks() {
   local task path abs feature_spec
-  local status=1
+  local retval=1
   while task=$(read_tasks | head -n1); [[ -n "${task// }" ]]; do
     path=${task%% — *}
     abs="docs/tasks/${path}"
@@ -155,9 +171,9 @@ Use web search for latest libraries, best practices, snippets.
 EOF
 )"
     run_codex "Perform a quick status: git status --short"
-    status=0
+    retval=0
   done
-  return $status
+  return $retval
 }
 
 function final_verification() {
