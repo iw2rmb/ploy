@@ -146,6 +146,9 @@ classifier drift without leaving the workstation.
   directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set it
   also dictates the grid client state directory.
+- `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
+  `grid`; upcoming adapters (`k8s`, `nomad`, `openshift`) will register here and
+  unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
   keys, manifests, and summaries. Without `PLOY_GRID_ID`/`GRID_BEACON_API_KEY` the CLI falls

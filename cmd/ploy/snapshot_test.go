@@ -162,7 +162,9 @@ fixture = "dev-db.json"
 	defer func() { snapshotConfigDir = prevDir }()
 
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withGridClientStub(t, newStubGridClient(gridclient.Status{
 		Beacon: gridclient.BeaconStatus{
@@ -237,7 +239,9 @@ fixture = "dev-db.json"
 	t.Cleanup(func() { snapshotConfigDir = prevDir })
 
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withGridClientStub(t, newStubGridClient(gridclient.Status{
 		Beacon: gridclient.BeaconStatus{

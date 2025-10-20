@@ -121,12 +121,20 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 
 func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 	prevFactory := environmentServiceFactory
+	prevSnapshotLoader := snapshotRegistryLoader
+	prevSnapshotDir := snapshotConfigDir
 	defer func() { environmentServiceFactory = prevFactory }()
+	defer func() {
+		snapshotRegistryLoader = prevSnapshotLoader
+		snapshotConfigDir = prevSnapshotDir
+	}()
 
 	sentinel := errors.New("boom")
 	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
 		return &recordingEnvironmentService{err: sentinel}, nil
 	}
+	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return &fakeSnapshotRegistry{}, nil }
+	snapshotConfigDir = "ignored"
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil

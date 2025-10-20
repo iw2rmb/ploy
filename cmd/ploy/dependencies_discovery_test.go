@@ -11,7 +11,9 @@ import (
 
 func TestResolveIntegrationConfigFromGridClient(t *testing.T) {
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withGridClientStub(t, newStubGridClient(gridclient.Status{
 		Beacon: gridclient.BeaconStatus{
@@ -62,7 +64,9 @@ func TestResolveIntegrationConfigFromGridClient(t *testing.T) {
 
 func TestResolveIntegrationConfigDisabledWithoutCredentials(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	cfg, err := resolveIntegrationConfig(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -77,7 +81,9 @@ func TestResolveIntegrationConfigDisabledWithoutCredentials(t *testing.T) {
 
 func TestResolveIntegrationConfigPropagatesErrors(t *testing.T) {
 	t.Setenv(gridIDEnv, "grid-dev")
+	t.Setenv(gridIDFallbackEnv, "grid-dev")
 	t.Setenv(gridAPIKeyEnv, "secret")
+	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 
 	errSentinel := context.DeadlineExceeded

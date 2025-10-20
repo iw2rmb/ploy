@@ -13,7 +13,9 @@ import (
 
 func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 	t.Setenv(gridIDEnv, "")
+	t.Setenv(gridIDFallbackEnv, "")
 	t.Setenv(gridAPIKeyEnv, "")
+	t.Setenv(gridAPIKeyFallbackEnv, "")
 	t.Setenv(gridClientStateEnv, t.TempDir())
 	withStubWorkspacePreparer(t)
 	buf := &bytes.Buffer{}
