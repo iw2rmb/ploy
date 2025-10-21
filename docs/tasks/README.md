@@ -10,4 +10,13 @@ Always re-open this file immediately before editing; do not rely on a cached cop
 
 ## Queue
 
-- [x] `relative/task/path.md`
+- [ ] `docs/tasks/roadmap/01-control-plane-and-job-scheduling.md`
+- [ ] `docs/tasks/roadmap/02-mod-step-runtime.md`
+- [ ] `docs/tasks/roadmap/03-ipfs-artifact-store.md`
+- [ ] `docs/tasks/roadmap/04-gitlab-integration.md`
+- [ ] `docs/tasks/roadmap/05-cli-surface-refresh.md`
+- [ ] `docs/tasks/roadmap/06-api-surfaces.md`
+- [ ] `docs/tasks/roadmap/07-job-observability.md`
+- [ ] `docs/tasks/roadmap/08-deployment-bootstrap.md`
+- [ ] `docs/tasks/roadmap/09-garbage-collection.md`
+- [ ] `docs/tasks/roadmap/10-testing-and-quality.md`
