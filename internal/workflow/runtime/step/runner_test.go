@@ -198,7 +198,7 @@ type fakeArtifactPublisher struct {
 }
 
 func (f *fakeArtifactPublisher) Publish(ctx context.Context, req ArtifactRequest) (PublishedArtifact, error) {
-	artifact := PublishedArtifact{CID: "bafydiff", Kind: req.Kind}
+	artifact := PublishedArtifact{CID: "bafydiff", Kind: req.Kind, Digest: "sha256:fixture"}
 	f.published = append(f.published, artifact)
 	return artifact, nil
 }

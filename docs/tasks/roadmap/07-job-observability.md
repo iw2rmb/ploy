@@ -12,12 +12,12 @@
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 12
 
-| Functional process                       | E | X | R | W | CFP |
-|------------------------------------------|---|---|---|---|-----|
-| Log streaming & SSE endpoints            | 2 | 1 | 1 | 1 | 5   |
-| Log archival & retention policies        | 1 | 1 | 1 | 1 | 4   |
-| Metrics/tracing instrumentation & CLI UX | 1 | 1 | 1 | 0 | 3   |
-| **TOTAL**                                | 4 | 3 | 3 | 2 | 12  |
+| Functional process                       | E   | X   | R   | W   | CFP |
+| ---------------------------------------- | --- | --- | --- | --- | --- |
+| Log streaming & SSE endpoints            | 2   | 1   | 1   | 1   | 5   |
+| Log archival & retention policies        | 1   | 1   | 1   | 1   | 4   |
+| Metrics/tracing instrumentation & CLI UX | 1   | 1   | 1   | 0   | 3   |
+| **TOTAL**                                | 4   | 3   | 3   | 2   | 12  |
 
 - Assumptions / notes: CFP assumes IPFS artifact publisher available for
   archival and observability stack (Prometheus + Grafana) already provisioned.
@@ -85,4 +85,5 @@
 
 - **Notes**
   - Evaluate streaming compression and tail window limits for long-lived steps.
-  - Consider integrating structured log parsing for SHIFT findings as part of the same pipeline.
+  - Consider integrating structured log parsing for SHIFT findings as part of
+    the same pipeline.

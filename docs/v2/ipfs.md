@@ -1,52 +1,47 @@
-# IPFS Integration
+# IPFS Cluster Integration
 
-Ploy v2 treats IPFS Cluster as the primary artifact store for snapshots, diffs, build gate reports,
-and logs. Every `ploynode` runs a local IPFS daemon and joins the cluster so artifacts remain
-available regardless of which node produced them.
+Ploy v2 replaces the workstation filesystem artifact cache with an IPFS Cluster
+backed store. Every step execution publishes diff bundles, log archives, and
+auxiliary assets directly to the cluster so any node can hydrate artifacts by
+CID.
 
-## Topology
+## Artifact Pipeline
 
-- **Per-node daemon** — Each worker (including the beacon node) runs an IPFS daemon and IPFS Cluster
-  service. Nodes join the cluster using shared credentials distributed during bootstrap.
-- **etcd coordination** — Cluster peer information (peer IDs, multiaddrs) is stored in etcd under
-  `ipfs/peers/*` so new nodes can discover existing members.
-- **Replication factor** — Set the desired pin replication count (default 2) in the cluster config.
-  This ensures that new artifacts are pinned on multiple nodes.
+1. The step runtime captures diff tarballs from the writable workspace mount
+   and streams them to the cluster via the embedded client in
+   `internal/workflow/artifacts`.
+2. Log buffers are uploaded using the same pathway. Both uploads compute a
+   SHA-256 digest before transmission so the resulting CID and digest can be
+   recorded in workflow checkpoints.
+3. Replication factors default to the workstation configuration:
+   - `PLOY_IPFS_CLUSTER_REPL_MIN`
+   - `PLOY_IPFS_CLUSTER_REPL_MAX`
+   Operators can override these values per upload via CLI flags when testing.
+4. Additional metadata (artifact name, kind) is stored with each pin to aid
+   debugging and operational tooling.
 
-## Data Paths
+## CLI Commands
 
-- **Runtime nodes** — Upload artifacts (diffs, build gate reports, logs) directly to their local
-  IPFS Cluster API, minimising control-plane bandwidth. Only the resulting CID and metadata are
-  written to etcd.
-- **Workstation/CLI** — When operators need to upload artifacts manually, the control plane exposes
-  `POST /v2/artifacts/upload`, which proxies the payload into IPFS Cluster. This keeps credentials
-  centralised while still producing the same CID workflow.
+The CLI routes artifact management commands to the cluster client:
 
-## Bootstrapping
+- `ploy artifact push [--name <name>] [--kind <kind>] <path>` uploads an
+  artifact and prints the CID, digest, size, and replication settings.
+- `ploy artifact pull <cid> [--output <path>]` downloads and optionally writes
+  the artifact to disk, reporting the digest for verification.
+- `ploy artifact status <cid>` reports peer pin states and replication
+  thresholds to help operators detect skew.
+- `ploy artifact rm <cid>` initiates an unpin request when an artifact is no
+  longer required.
 
-1. During `ploy deploy bootstrap`, the CLI installs the IPFS Cluster daemon on the beacon host and
-   generates cluster secrets.
-2. `ploy node add` downloads those secrets, installs the daemon, and joins the cluster automatically.
-3. Each node reports its IPFS peer ID and status back to etcd so the control plane can monitor health.
+## Operational Guidance
 
-## Pinning and Garbage Collection
-
-- `ploynode` pins all new artifact CIDs (diff bundles, build gate reports) once they are uploaded.
-- The cluster enforces the replication factor; nodes receiving pins publish status back to etcd.
-- Garbage collection is coordinated by the control plane:
-  - Artifacts marked for deletion are unpinned via the IPFS Cluster REST API.
-  - Nodes run `ipfs repo gc` on a schedule once unpin operations complete.
-- Operators can trigger clean-up using `ploy artifact gc`, which invokes the same unpin/GC workflow.
-
-## Failure Handling
-
-- Because artifacts replicate across multiple nodes, a single node loss does not impact availability.
-- When a node rejoins, it syncs pins using IPFS Cluster’s consensus (RAFT by default).
-- If quorum is lost, run the cluster recovery procedure documented in `docs/v2/devops.md`.
-
-## References
-
-- `docs/v2/devops.md` — Deployment instructions covering IPFS Cluster installation on beacon and
-  worker nodes.
-- `docs/v2/job.md` — Describes how job outcomes upload artifacts to IPFS and record the resulting CIDs.
-- `docs/design/ipfs-artifacts/README.md` — Background design notes on IPFS usage within Ploy.
+- Ensure `PLOY_IPFS_CLUSTER_API` points at an IPFS Cluster peer reachable from
+  the workstation. Authentication can be provided via
+  `PLOY_IPFS_CLUSTER_TOKEN` (bearer) or
+  `PLOY_IPFS_CLUSTER_USERNAME`/`PLOY_IPFS_CLUSTER_PASSWORD` (basic auth).
+- The `tests/integration/artifacts` suite exercises the client behaviour against
+  a mocked cluster API. Extend this coverage as real cluster endpoints become
+  available.
+- When diagnosing replication issues, start with `ploy artifact status` to see
+  which peers report lagging pins. Combine with cluster daemon logs to isolate
+  connectivity or disk pressure problems.

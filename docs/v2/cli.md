@@ -16,12 +16,12 @@ running Mods locally, managing artifacts, and administering a lightweight Ploy n
 
 ## Artifact Management
 
-- `ploy artifact push <path>` — Upload a repository snapshot, diff bundle, or OCI image to the configured
-  IPFS Cluster, returning the CID.
-- `ploy artifact pull <cid> [--output <path>]` — Download an artifact by CID for local inspection or reruns.
-- `ploy artifact list [--repo <name>]` — Enumerate artifacts known to the cluster, optionally scoped to a
-  repository.
-- `ploy artifact gc` — Trigger garbage collection policies (unpin unused CIDs, compact metadata) across participating nodes.
+- `ploy artifact push [--name <name>] [--kind <kind>] <path>` — Upload a diff, log bundle, or other artifact to the
+  configured IPFS Cluster, returning the CID and SHA-256 digest.
+- `ploy artifact pull <cid> [--output <path>]` — Download an artifact by CID for local inspection or reruns, verifying
+  the digest locally.
+- `ploy artifact status <cid>` — Inspect replication factors and per-peer pin health for a stored artifact.
+- `ploy artifact rm <cid>` — Unpin an artifact from the cluster when cleaning up expired or superseded payloads.
 
 ## Node Administration
 

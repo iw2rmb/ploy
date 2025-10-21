@@ -21,18 +21,20 @@ are hydrated, executed, and staged for follow-on tasks.
 
 ## Diff Capture
 
-- After container exit the runtime archives the writable mount into a deterministic tarball. The
-  tarball path is returned to the runner and staged under the artifact cache using a content-hash CID.
-- Future slices publish the staged tarball to IPFS Cluster; until then the CID references the cached
-  file on disk so downstream tasks can inspect results locally.
+- After container exit the runtime archives the writable mount into a deterministic tarball and
+  streams the payload to the configured IPFS Cluster client. The returned CID is recorded on the
+  step result so downstream tasks can hydrate the diff from any node.
+- Log bundles are captured in-memory and pushed through the same publisher, ensuring both diff and
+  log artifacts share replication and verification behaviour.
 
-## Artifact Staging
+## Artifact Publishing
 
-- The filesystem artifact publisher writes diff tarballs and log buffers under the artifact root with
-  per-kind subdirectories (`diffs/`, `logs/`). Each file name is derived from the SHA-256 hash
-  prefixed with `ipfs:`.
-- Manifests and job outcomes store these CIDs so the dedicated artifact-store task
-  (`docs/tasks/roadmap/03a-mod-runtime-artifacts.md`) can promote them to IPFS Cluster.
+- The IPFS Cluster publisher computes a SHA-256 digest for every artifact before upload and stores
+  the digest alongside the CID. Workflow checkpoints now reference both values so the CLI can verify
+  downloads.
+- Replication factors default to the workstation configuration (`PLOY_IPFS_CLUSTER_REPL_MIN` /
+  `PLOY_IPFS_CLUSTER_REPL_MAX`) but can be overridden per upload. Operators can use `ploy artifact
+  status` to inspect peer health and `ploy artifact rm` to unpin stale artifacts when debugging.
 
 ## SHIFT Enforcement
 

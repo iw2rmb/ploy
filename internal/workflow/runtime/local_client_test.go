@@ -28,12 +28,14 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 		result: step.Result{
 			ExitCode: 1,
 			DiffArtifact: step.PublishedArtifact{
-				CID:  "bafy-diff",
-				Kind: step.ArtifactKindDiff,
+				CID:    "bafy-diff",
+				Kind:   step.ArtifactKindDiff,
+				Digest: "sha256:d00d",
 			},
 			LogArtifact: step.PublishedArtifact{
-				CID:  "bafy-logs",
-				Kind: step.ArtifactKindLogs,
+				CID:    "bafy-logs",
+				Kind:   step.ArtifactKindLogs,
+				Digest: "sha256:beef",
 			},
 			ShiftReport: step.ShiftResult{
 				Passed:  false,

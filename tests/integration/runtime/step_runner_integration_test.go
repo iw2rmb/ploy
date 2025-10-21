@@ -160,7 +160,7 @@ type integrationArtifactPublisher struct {
 }
 
 func (i *integrationArtifactPublisher) Publish(ctx context.Context, req step.ArtifactRequest) (step.PublishedArtifact, error) {
-	artifact := step.PublishedArtifact{CID: string(req.Kind) + "-cid", Kind: req.Kind}
+	artifact := step.PublishedArtifact{CID: string(req.Kind) + "-cid", Kind: req.Kind, Digest: "sha256:" + string(req.Kind)}
 	if req.Kind == step.ArtifactKindDiff {
 		content, err := os.ReadFile(req.Path)
 		if err != nil {
