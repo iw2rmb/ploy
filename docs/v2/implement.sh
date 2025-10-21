@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Directory layout helpers
 SCRIPT_DIR="${0:A:h}"
-REPO_ROOT="${SCRIPT_DIR:A:h}"
-TASK_DIR="${REPO_ROOT}/tasks/roadmap"
+REPO_ROOT="${SCRIPT_DIR:h:h}"
+TASK_DIR="${REPO_ROOT}/docs/tasks/roadmap"
 
 if (( $# == 0 )); then
   print -u2 "usage: ${0##*/} task-file [task-file ...]"
@@ -14,8 +14,9 @@ fi
 
 CODEX_BIN="${CODEX_BIN:-codex}"
 CODEX_ARGS=(
-  "--non-interactive"
+  exec
   "--dangerously-bypass-approvals-and-sandbox"
+  "--cd" "$REPO_ROOT"
 )
 
 for task in "$@"; do
@@ -31,5 +32,6 @@ for task in "$@"; do
   fi
 
   print "Implementing task: ${candidate}"
-  "$CODEX_BIN" "${CODEX_ARGS[@]}" implement --task-file "$candidate"
+  prompt=$'Implement the following task as described:\n\n'"$(<"$candidate")"$'\n'
+  "$CODEX_BIN" "${CODEX_ARGS[@]}" - <<< "$prompt"
 done
