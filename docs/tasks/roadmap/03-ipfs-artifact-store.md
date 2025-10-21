@@ -77,12 +77,13 @@
   - Needs access to IPFS Cluster endpoints and credentials distributed via
     beacon.
   - VPS lab access is required to run `scripts/ipfs/bootstrap_lab_cluster.sh`
-    before integration or E2E suites execute.
+    against the hosts enumerated in `docs/v2/vps-lab.md` before integration or
+    E2E suites execute.
 
 - **Verification Steps**
-  - `scripts/ipfs/bootstrap_lab_cluster.sh` – provision VPS lab IPFS Cluster
-    prior to executing integration suites; tear down once verification
-    completes.
+  - `scripts/ipfs/bootstrap_lab_cluster.sh` – provision the VPS lab IPFS Cluster
+    via SSH (`--ssh-host` defaults to Node A in `docs/v2/vps-lab.md`) prior to
+    executing integration suites; tear down once verification completes.
   - `go test ./internal/workflow/artifacts/...`
   - `go test -tags integration ./tests/integration/artifacts/...`
   - `make lint-md`
@@ -94,9 +95,10 @@
     operational guidance.
 
 - **Next Steps**
-  1. Run `scripts/ipfs/bootstrap_lab_cluster.sh up` on the VPS lab host to
-     provision the disposable IPFS Cluster prior to integration/E2E execution,
-     and tear it down with `down --destroy-data` when finished.
+  1. Run `scripts/ipfs/bootstrap_lab_cluster.sh up --ssh-host root@45.9.42.212`
+     (or the appropriate lab host from `docs/v2/vps-lab.md`) to provision the
+     disposable IPFS Cluster via SSH; the script will install Docker/compose if
+     required. Tear it down with `down --destroy-data` when finished.
   2. Configure `PLOY_IPFS_CLUSTER_API` (plus optional token/basic auth) before
      invoking the CLI or step runtime to exercise the live cluster.
   3. Run `go test -tags integration ./tests/integration/artifacts/...` against

@@ -70,6 +70,13 @@ func buildCheckpointStage(stage Stage) *contracts.CheckpointStage {
 		},
 		Aster: buildCheckpointStageAster(stage.Aster),
 	}
+	if stage.StepManifest != nil {
+		retained := stage.StepManifest.Retention.RetainContainer
+		ttl := strings.TrimSpace(stage.StepManifest.Retention.TTL)
+		if retained || ttl != "" {
+			meta.Retention = &contracts.CheckpointRetention{Retained: retained, TTL: ttl}
+		}
+	}
 	if modsMeta := buildCheckpointModsMetadata(stage.Metadata.Mods); modsMeta != nil {
 		meta.Mods = modsMeta
 	}

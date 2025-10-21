@@ -82,7 +82,12 @@ func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 				Kind:      "build-gate",
 				Lane:      "go-native",
 				Manifest:  contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"},
+				Retention: &contracts.CheckpointRetention{Retained: true, TTL: "24h"},
 				BuildGate: &meta,
+			},
+			Artifacts: []contracts.CheckpointArtifact{
+				{Name: "diff", ArtifactCID: "bafy-diff", Digest: "sha256:d00d"},
+				{Name: "logs", ArtifactCID: "bafy-logs", Digest: "sha256:beef"},
 			},
 		}
 		if err := opts.Events.PublishCheckpoint(ctx, checkpoint); err != nil {
@@ -158,5 +163,17 @@ func TestHandleModRunPrintsBuildGateSummary(t *testing.T) {
 	}
 	if !strings.Contains(output, "Log Digest: bafy-build-log") {
 		t.Fatalf("expected log digest in output, got %q", output)
+	}
+	if !strings.Contains(output, "Stage Artifacts:") {
+		t.Fatalf("expected stage artifact summary, got %q", output)
+	}
+	if !strings.Contains(output, "  build-gate (retained ttl=24h):") {
+		t.Fatalf("expected retention summary for build-gate, got %q", output)
+	}
+	if !strings.Contains(output, "    - diff: bafy-diff (sha256:d00d)") {
+		t.Fatalf("expected diff artifact summary, got %q", output)
+	}
+	if !strings.Contains(output, "    - logs: bafy-logs (sha256:beef)") {
+		t.Fatalf("expected log artifact summary, got %q", output)
 	}
 }

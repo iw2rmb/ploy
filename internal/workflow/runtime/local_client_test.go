@@ -109,3 +109,86 @@ func containsArtifact(artifacts []runner.Artifact, name, cid string) bool {
 	}
 	return false
 }
+
+func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
+	manifest := contracts.StepManifest{
+		ID:    "mods-apply",
+		Name:  "Mods Apply",
+		Image: "ghcr.io/ploy/mods-apply:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "baseline", MountPath: "/mnt/baseline", Mode: contracts.StepInputModeReadOnly, SnapshotCID: "bafy-1"},
+			{Name: "overlay", MountPath: "/mnt/overlay", Mode: contracts.StepInputModeReadWrite, DiffCID: "bafy-2"},
+		},
+		Retention: contracts.StepRetentionSpec{RetainContainer: true, TTL: "36h"},
+	}
+	stepRunner := &recordingStepRunner{
+		result: step.Result{
+			ContainerID: "container-789",
+			ExitCode:    0,
+			DiffArtifact: step.PublishedArtifact{
+				CID:    "bafy-diff-apply",
+				Kind:   step.ArtifactKindDiff,
+				Digest: "sha256:feed",
+			},
+			LogArtifact: step.PublishedArtifact{
+				CID:    "bafy-logs-apply",
+				Kind:   step.ArtifactKindLogs,
+				Digest: "sha256:babe",
+			},
+			ShiftReport: step.ShiftResult{
+				Passed: true,
+			},
+			Retained:     true,
+			RetentionTTL: "36h",
+		},
+	}
+	client, err := NewLocalStepClient(LocalStepClientOptions{Runner: stepRunner})
+	if err != nil {
+		t.Fatalf("NewLocalStepClient() error: %v", err)
+	}
+	stage := runner.Stage{
+		Name:         "mods-apply",
+		Kind:         runner.StageKindModsORWApply,
+		Lane:         "mods-orw",
+		StepManifest: &manifest,
+	}
+	ticket := contracts.WorkflowTicket{TicketID: "ticket-456", Tenant: "acme"}
+
+	outcome, err := client.ExecuteStage(context.Background(), ticket, stage, "/tmp/workspace")
+	if err != nil {
+		t.Fatalf("ExecuteStage() unexpected error: %v", err)
+	}
+	if outcome.Status != runner.StageStatusCompleted {
+		t.Fatalf("expected completed outcome, got %s", outcome.Status)
+	}
+
+	invocations := client.Invocations()
+	if len(invocations) != 1 {
+		t.Fatalf("expected single invocation, got %d", len(invocations))
+	}
+	inv := invocations[0]
+	if inv.Stage.Name != stage.Name {
+		t.Fatalf("expected invocation stage %q, got %q", stage.Name, inv.Stage.Name)
+	}
+	if inv.RunID != stepRunner.result.ContainerID {
+		t.Fatalf("expected run id %q, got %q", stepRunner.result.ContainerID, inv.RunID)
+	}
+	if len(inv.Artifacts) != 2 {
+		t.Fatalf("expected artifacts recorded, got %d", len(inv.Artifacts))
+	}
+	if !containsArtifact(inv.Artifacts, "diff", "bafy-diff-apply") {
+		t.Fatalf("expected diff artifact recorded, got %+v", inv.Artifacts)
+	}
+	if !containsArtifact(inv.Artifacts, "logs", "bafy-logs-apply") {
+		t.Fatalf("expected log artifact recorded, got %+v", inv.Artifacts)
+	}
+	if inv.Evidence == nil {
+		t.Fatalf("expected evidence recorded")
+	}
+	if inv.Evidence.Metadata["retained"] != "true" {
+		t.Fatalf("expected retention metadata, got %+v", inv.Evidence.Metadata)
+	}
+	if inv.Evidence.Metadata["retention_ttl"] != "36h" {
+		t.Fatalf("expected retention ttl metadata, got %+v", inv.Evidence.Metadata)
+	}
+}

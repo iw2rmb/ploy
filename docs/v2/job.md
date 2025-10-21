@@ -51,13 +51,16 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 ## Outputs & Artifacts
 
 - Diff-producing steps (e.g., ORW apply) package changes as deterministic tarballs generated from the
-  writable workspace mount. The tarball is staged locally (hashed to produce a CID) and recorded in
-  the job outcome stored in etcd. Subsequent tasks publish the staged artifacts to IPFS Cluster.
-- Ploy nodes compute diffs after each step by comparing the hydrated workspace against the baseline
-  tree. The resulting tarball is retained alongside the log bundle so the artifact publisher can push
-  them to IPFS Cluster once the dedicated artifact store slice lands.
+  writable workspace mount and upload them directly to the local IPFS Cluster via the node publisher.
+  The resulting CID and SHA-256 digest are recorded in the job outcome and surfaced in workflow
+  checkpoints so operators can retrieve the bundle with `ploy artifact pull` immediately.
+- Log bundles follow the same path: the runtime streams container stdout/stderr into an IPFS Cluster
+  object and stores the CID, digest, and retention metadata alongside the diff artifact. The CLI now
+  prints a **Stage Artifacts** summary highlighting each stage’s diff/log CIDs plus the configured
+  retention TTL (`retain_container`), mirroring what is stored in etcd.
 - Build gate runs emit structured JSON reports (errors, static check findings) into IPFS. The job
-  metadata links the report CID alongside the log digest, status, and failure reason.
+  metadata links the report CID alongside the log digest, status, and failure reason so downstream
+  tooling can verify results without replaying the step.
 - Job metadata lives under `mods/<ticket>/jobs/<job-id>` in etcd, providing a compact index so the
   control plane and CLI can resolve artifacts without downloading full payloads until needed.
 

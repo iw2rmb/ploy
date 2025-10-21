@@ -146,7 +146,9 @@ func executeModRun(args []string, stderr io.Writer) error {
 	if recorder, ok := events.(interface {
 		RecordedCheckpoints() []contracts.WorkflowCheckpoint
 	}); ok {
-		printBuildGateSummary(stderr, recorder.RecordedCheckpoints())
+		checkpoints := recorder.RecordedCheckpoints()
+		printBuildGateSummary(stderr, checkpoints)
+		printArtifactSummary(stderr, checkpoints)
 	}
 	if reporter, ok := interface{}(gridClient).(interface {
 		Invocations() []runner.StageInvocation

@@ -12,6 +12,11 @@ consists of three nodes:
 Guidelines:
 
 - Use these hosts for integration/E2E testing.
+- Bootstrap the IPFS Cluster lab by running
+  `scripts/ipfs/bootstrap_lab_cluster.sh up --ssh-host root@45.9.42.212` (or the desired host) from
+  your workstation; the script copies compose assets, installs Docker/compose on the VPS if missing,
+  and executes Docker remotely via SSH.
 - Keep SSH keys restricted to the lab team and rotate credentials regularly.
 - Clean up temporary artifacts after test runs (IPFS pins, etcd keys, Docker containers) to avoid
-  state drift between test cycles.
+  state drift between test cycles. Tear down the cluster with
+  `scripts/ipfs/bootstrap_lab_cluster.sh down --destroy-data`.

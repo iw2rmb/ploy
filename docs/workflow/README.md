@@ -35,6 +35,9 @@ are hydrated, executed, and staged for follow-on tasks.
 - Replication factors default to the workstation configuration (`PLOY_IPFS_CLUSTER_REPL_MIN` /
   `PLOY_IPFS_CLUSTER_REPL_MAX`) but can be overridden per upload. Operators can use `ploy artifact
   status` to inspect peer health and `ploy artifact rm` to unpin stale artifacts when debugging.
+- Stage checkpoints now include diff/log artifacts plus retention metadata (`retain_container` and
+  TTL). The CLI surfaces this in the **Stage Artifacts** summary so operators can pull bundles or
+  plan inspections without querying Grid.
 
 ## SHIFT Enforcement
 

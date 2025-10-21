@@ -10,9 +10,12 @@ Always re-open this file immediately before editing; do not rely on a cached cop
 
 ## Queue
 
-- [ ] `docs/tasks/roadmap/03-ipfs-artifact-store.md`
-- [ ] `docs/tasks/roadmap/03a-mod-runtime-artifacts.md`
-- [ ] `docs/tasks/roadmap/04-gitlab-integration.md`
+- [x] `docs/tasks/roadmap/04-gitlab-integration.md`
+- [ ] `docs/tasks/roadmap/05a-cli-command-tree-refresh.md`
+- [ ] `docs/tasks/roadmap/05b-cli-node-lifecycle-config.md`
+- [ ] `docs/tasks/roadmap/05c-cli-mods-artifacts.md`
+- [ ] `docs/tasks/roadmap/05d-cli-streaming-observability.md`
+- [ ] `docs/tasks/roadmap/05e-cli-operator-enablement.md`
 - [ ] `docs/tasks/roadmap/05-cli-surface-refresh.md`
 - [ ] `docs/tasks/roadmap/06-api-surfaces.md`
 - [ ] `docs/tasks/roadmap/07-job-observability.md`
