@@ -43,7 +43,7 @@
 
 - **Tests To Add / Fix**
   - `make test` and targeted coverage reports for CLI packages, capturing results.
-  - `make lint-md` across updated docs.
+  - Documentation formatting checks across updated docs.
   - Optional smoke: `dist/ploy` walkthrough following operator runbook.
 
 - **Dependencies & Blockers**
@@ -52,7 +52,7 @@
 
 - **Verification Steps**
   - Capture coverage output (`go test -cover ./cmd/ploy/...`) and record in `CHANGELOG.md`.
-  - Run `make lint-md` and document conformance.
+  - Validate documentation formatting against `.markdownlint.yaml` and document conformance.
   - Review docs with operator stakeholders for sign-off.
 
 - **Changelog / Docs Impact**

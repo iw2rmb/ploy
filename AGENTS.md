@@ -17,8 +17,8 @@ addendum:
    where applicable.
 2. When documentation conventions change, reflect them across `docs/DOCS.md`,
    the design index, and related README files so repo guidance stays consistent.
-3. Run `make lint-md` before submitting doc updates to enforce the Markdown
-   formatting conventions codified in `.markdownlint.yaml`.
+3. Validate Markdown formatting against `.markdownlint.yaml` before submitting
+   doc updates.
 
 ## Local Development
 

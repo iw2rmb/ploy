@@ -23,8 +23,8 @@
 
 - Developers can execute the full test suite locally with deterministic results
   and clear failure guidance.
-- CI pipelines enforce coverage, linting (including `make lint-md`), and
-  long-running test timeouts.
+- CI pipelines enforce coverage, Markdown linting, and long-running test
+  timeouts.
 - Contribution docs reference the updated test strategy and workflows for new
   slices.
 
