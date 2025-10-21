@@ -5,6 +5,10 @@ set -euo pipefail
 source ~/.zshenv 2>/dev/null || true
 source ~/.zshrc 2>/dev/null || true
 
+log() {
+  print -ru2 -- "[ploy-v2] $*"
+}
+
 SCRIPT_PATH=${(%):-%x}
 SCRIPT_DIR=$(cd "$(dirname "$SCRIPT_PATH")" && pwd)
 REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
@@ -32,6 +36,11 @@ for spec_file in "$SPEC_DIR"/*.md; do
   FEATURE_SPEC_MAP[$feature_slug]="$spec_rel"
 done
 
+if (( ${#FEATURES[@]} == 0 )); then
+  log "No specs discovered in ${SPEC_DIR}; nothing to process."
+  exit 0
+fi
+
 mkdir -p "$DESIGN_DIR" "$TASKS_DIR"
 
 # run_codex re-sources the zsh environment and streams a prompt into codex exec.
@@ -42,17 +51,25 @@ run_codex() {
   print -r -- "$prompt" > "$tmpfile"
   source ~/.zshenv 2>/dev/null || true
   source ~/.zshrc 2>/dev/null || true
-  codex --dangerously-bypass-approvals-and-sandbox --search exec --cd "$REPO_ROOT" - < "$tmpfile"
-  rm -f "$tmpfile"
+  log "codex exec starting with prompt file ${tmpfile}"
+  if codex --dangerously-bypass-approvals-and-sandbox --search exec --cd "$REPO_ROOT" - < "$tmpfile"; then
+    rm -f "$tmpfile"
+    log "codex exec completed successfully"
+  else
+    log "codex exec failed; preserving prompt at ${tmpfile}"
+    return 1
+  fi
 }
 
 # generate_design_docs asks Codex to transform each v2 spec into a design doc.
 generate_design_docs() {
+  log "Starting design generation for ${#FEATURES[@]} features"
   for feature in "${FEATURES[@]}"; do
     spec_rel=${FEATURE_SPEC_MAP[$feature]}
     design_dir_rel="docs/design/${feature}"
     design_doc_rel="${design_dir_rel}/README.md"
     mkdir -p "$REPO_ROOT/$design_dir_rel"
+    log "Generating design doc ${design_doc_rel} from ${spec_rel}"
     prompt=$(cat <<EOF
 You are Codex operating inside the Ploy repository. Follow /Users/vk/@iw2rmb/docs/AGENTS.md and docs/AGENTS guidance verbatim.
 
@@ -78,10 +95,12 @@ EOF
 
 # generate_task_specs decomposes each design into task specs and refreshes the queue.
 generate_task_specs() {
+  log "Deriving task specs for ${#FEATURES[@]} features"
   for feature in "${FEATURES[@]}"; do
     design_doc_rel="docs/design/${feature}/README.md"
     tasks_dir_rel="docs/tasks/${feature}"
     mkdir -p "$REPO_ROOT/$tasks_dir_rel"
+    log "Producing task specs in ${tasks_dir_rel} from ${design_doc_rel}"
     prompt=$(cat <<EOF
 You already produced ${design_doc_rel}; now derive actionable tasks for ${INITIATIVE_PREFIX}.
 
@@ -124,7 +143,9 @@ next_task_in_queue() {
 
 # implement_tasks runs Codex on each queued task until the backlog is empty.
 implement_tasks() {
+  log "Beginning task implementation loop"
   while next_task=$(next_task_in_queue); do
+    log "Implementing task ${next_task}"
     prompt=$(cat <<EOF
 Implement the next planned task while obeying /Users/vk/@iw2rmb/docs/AGENTS.md workflows.
 
@@ -143,8 +164,11 @@ EOF
 )
     run_codex "$prompt"
   done
+  log "Task queue empty; implementation loop finished"
 }
 
+log "Ploy v2 automation script starting"
 generate_design_docs
 generate_task_specs
 implement_tasks
+log "Ploy v2 automation script completed"
