@@ -13,6 +13,7 @@ SPEC_DIR="$REPO_ROOT/docs/v2"
 DESIGN_DIR="$REPO_ROOT/docs/design"
 TASKS_DIR="$REPO_ROOT/docs/tasks"
 TASK_QUEUE="$TASKS_DIR/README.md"
+TASK_QUEUE_REL="docs/tasks/README.md"
 INITIATIVE_PREFIX="ploy-v2"
 
 typeset -a FEATURES=()
@@ -87,7 +88,7 @@ You already produced ${design_doc_rel}; now derive actionable tasks for ${INITIA
 Inputs:
 - Design source: ${design_doc_rel}
 - Tasks directory: ${tasks_dir_rel}
-- Queue index: ${TASK_QUEUE}
+- Queue index: ${TASK_QUEUE_REL}
 - Templates: /Users/vk/@iw2rmb/docs/templates/tasks/README.md and /Users/vk/@iw2rmb/docs/templates/tasks/INDEX.md
 - COSMIC checklist: /Users/vk/@iw2rmb/docs/COSMIC.md
 
@@ -130,11 +131,11 @@ Implement the next planned task while obeying /Users/vk/@iw2rmb/docs/AGENTS.md w
 Active task: ${next_task}
 
 Execution checklist:
-1. Immediately re-open docs/tasks/README.md and mark ${next_task} as reserved (- [x]) before editing.
+1. Immediately re-open ${TASK_QUEUE_REL} and mark ${next_task} as reserved (- [x]) before editing.
 2. Follow the RED ➜ GREEN ➜ REFACTOR cadence spelled out in the task spec; write failing tests first.
 3. Implement code, docs, and configuration updates demanded by ${next_task}, keeping design/task dependencies mirrored.
 4. Run required local validation (make test, go test ./..., make build, make lint-md when docs change) and record evidence in CHANGELOG.md.
-5. Update docs/design/README.md, the owning design doc, and docs/tasks/README.md to reflect completion; remove the queue entry when done.
+5. Update docs/design/README.md, the owning design doc, and ${TASK_QUEUE_REL} to reflect completion; remove the queue entry when done.
 6. Commit with message referencing the task identifier (e.g. "feat: ${INITIATIVE_PREFIX} ${next_task}") and ensure the workspace is clean.
 
 Do not start another task until this one is complete and committed.
