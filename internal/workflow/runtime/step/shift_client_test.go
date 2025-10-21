@@ -70,7 +70,7 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 		Shift: &contracts.StepShiftSpec{Enabled: true, Profile: "default"},
 	}
 
-	logArtifact := PublishedArtifact{CID: "bafy-logs", Kind: ArtifactKindLogs}
+	logArtifact := PublishedArtifact{CID: "bafy-logs", Kind: ArtifactKindLogs, Digest: "sha256:fixture"}
 	result, err := client.Validate(context.Background(), ShiftRequest{
 		Manifest:    manifest,
 		Workspace:   Workspace{WorkingDir: "/tmp/workspace"},

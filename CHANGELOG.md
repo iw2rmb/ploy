@@ -1,5 +1,19 @@
 # Changelog
 
+## [2025-10-21] IPFS Cluster Artifact Store
+
+- Replaced the filesystem artifact publisher with an IPFS Cluster-backed client
+  (`internal/workflow/artifacts`) that streams diff/log payloads, records
+  SHA-256 digests, and honours replication overrides. The local runtime now
+  injects this publisher by default.
+- Added CLI artifact commands (`ploy artifact push|pull|status|rm`) backed by
+  the same cluster client, including digest reporting and download
+  verification (`cmd/ploy/artifact_command.go`, new unit coverage).
+- Documented cluster configuration knobs, updated the workflow overview, and
+  tracked operational guidance in `docs/v2/ipfs.md`.
+- Verification (2025-10-21):
+  - `go test ./...`
+
 ## [2025-10-21] Local Step Runtime Wiring
 
 - Defaulted the CLI to the `local-step` runtime adapter and registered a Docker

@@ -111,6 +111,7 @@ func convertPublishedArtifacts(result step.Result) []runner.Artifact {
 		artifacts = append(artifacts, runner.Artifact{
 			Name:        string(step.ArtifactKindDiff),
 			ArtifactCID: strings.TrimSpace(result.DiffArtifact.CID),
+			Digest:      strings.TrimSpace(result.DiffArtifact.Digest),
 			MediaType:   "application/vnd.ploy.diff+tar",
 		})
 	}
@@ -118,6 +119,7 @@ func convertPublishedArtifacts(result step.Result) []runner.Artifact {
 		artifacts = append(artifacts, runner.Artifact{
 			Name:        string(step.ArtifactKindLogs),
 			ArtifactCID: strings.TrimSpace(result.LogArtifact.CID),
+			Digest:      strings.TrimSpace(result.LogArtifact.Digest),
 			MediaType:   "text/plain",
 		})
 	}

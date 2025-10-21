@@ -304,8 +304,9 @@ const (
 
 // PublishedArtifact references a stored artifact.
 type PublishedArtifact struct {
-	CID  string
-	Kind ArtifactKind
+	CID    string
+	Kind   ArtifactKind
+	Digest string
 }
 
 // LogCollector retrieves container logs when a custom pathway exists.

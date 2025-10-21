@@ -68,7 +68,9 @@ func (p *FilesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactR
 		return PublishedArtifact{}, err
 	}
 
-	cid := fmt.Sprintf("ipfs:%x", sum.Sum(nil))
+	hash := sum.Sum(nil)
+	cid := fmt.Sprintf("ipfs:%x", hash)
+	digest := fmt.Sprintf("sha256:%x", hash)
 	finalPath := filepath.Join(p.root, string(req.Kind), cid)
 	if err := os.MkdirAll(filepath.Dir(finalPath), 0o755); err != nil {
 		return PublishedArtifact{}, fmt.Errorf("step: prepare artifact directory: %w", err)
@@ -78,8 +80,9 @@ func (p *FilesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactR
 	}
 
 	return PublishedArtifact{
-		CID:  cid,
-		Kind: req.Kind,
+		CID:    cid,
+		Kind:   req.Kind,
+		Digest: digest,
 	}, nil
 }
 

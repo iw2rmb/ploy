@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
@@ -53,7 +54,13 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 		return nil, err
 	}
 	diffGenerator := step.NewFilesystemDiffGenerator(step.FilesystemDiffGeneratorOptions{})
-	artifactPublisher, err := step.NewFilesystemArtifactPublisher(step.FilesystemArtifactPublisherOptions{})
+	client, err := artifactClientFactory()
+	if err != nil {
+		return nil, err
+	}
+	publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
+		Client: client,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +77,7 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 		Containers: containerRuntime,
 		Diffs:      diffGenerator,
 		SHIFT:      shiftClient,
-		Artifacts:  artifactPublisher,
+		Artifacts:  publisher,
 	}, nil
 }
 

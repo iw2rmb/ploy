@@ -34,6 +34,20 @@ additional configuration.
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
+- `PLOY_IPFS_CLUSTER_API` — Base URL for the IPFS Cluster REST API used by the
+  step runtime and CLI artifact commands. Required when artifact publishing is
+  enabled.
+- `PLOY_IPFS_CLUSTER_TOKEN` — Optional bearer token passed to the cluster when
+  authenticating artifact requests.
+- `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Optional
+  basic-auth credentials used when a bearer token is not available. Username
+  and password must be provided together.
+- `PLOY_IPFS_CLUSTER_REPL_MIN` — Optional override for the minimum replication
+  factor applied to artifact pins. Defaults to the cluster-defined value when
+  unset or zero.
+- `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
+  factor applied to artifact pins. Defaults to the cluster-defined value when
+  unset or zero.
 - `PLOY_ETCD_ENDPOINTS` — Comma-separated etcd endpoints used by the control-plane scheduler
   (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled.
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
