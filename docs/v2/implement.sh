@@ -1,174 +1,206 @@
 #!/bin/zsh
 
 set -euo pipefail
+setopt null_glob
 
-source ~/.zshenv 2>/dev/null || true
-source ~/.zshrc 2>/dev/null || true
+[[ -r ~/.zshenv ]] && source ~/.zshenv
+[[ -r ~/.zshrc ]] && source ~/.zshrc
 
-log() {
-  print -ru2 -- "[ploy-v2] $*"
+function log_info() {
+  print -r -- "[ploy-v2] $*"
 }
 
-SCRIPT_PATH=${(%):-%x}
-SCRIPT_DIR=$(cd "$(dirname "$SCRIPT_PATH")" && pwd)
-REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
+function abort() {
+  log_info "ERROR: $*"
+  exit 1
+}
 
-SPEC_DIR="$REPO_ROOT/docs/v2"
-DESIGN_DIR="$REPO_ROOT/docs/design"
-TASKS_DIR="$REPO_ROOT/docs/tasks"
-TASK_QUEUE="$TASKS_DIR/README.md"
-TASK_QUEUE_REL="docs/tasks/README.md"
-INITIATIVE_PREFIX="ploy-v2"
+function ensure_cmd() {
+  local cmd="$1"
+  command -v "$cmd" >/dev/null 2>&1 || abort "Required command '${cmd}' not found in PATH."
+}
 
-typeset -a FEATURES=()
-typeset -A FEATURE_SPEC_MAP
-
-for spec_file in "$SPEC_DIR"/*.md; do
-  [[ -f "$spec_file" ]] || continue
-  base_name=${spec_file:t:r}
-  if [[ "$base_name" == "README" ]]; then
-    feature_slug="overview"
-  else
-    feature_slug=${base_name:l}
-  fi
-  spec_rel=${spec_file#$REPO_ROOT/}
-  FEATURES+=("$feature_slug")
-  FEATURE_SPEC_MAP[$feature_slug]="$spec_rel"
-done
-
-if (( ${#FEATURES[@]} == 0 )); then
-  log "No specs discovered in ${SPEC_DIR}; nothing to process."
-  exit 0
+SCRIPT_PATH="$0"
+if [[ "$SCRIPT_PATH" != /* ]]; then
+  SCRIPT_PATH="$(pwd)/$SCRIPT_PATH"
 fi
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-mkdir -p "$DESIGN_DIR" "$TASKS_DIR"
+DOCS_V2_DIR="$REPO_ROOT/docs/v2"
+DOCS_DESIGN_DIR_DEFAULT="$REPO_ROOT/docs/design"
+DOCS_DESIGN_DIR_ALT="$REPO_ROOT/docs/desing"
+if [[ -d "$DOCS_DESIGN_DIR_ALT" && ! -d "$DOCS_DESIGN_DIR_DEFAULT" ]]; then
+  DOCS_DESIGN_DIR="$DOCS_DESIGN_DIR_ALT"
+  log_info "Using docs/desing directory for design outputs."
+else
+  DOCS_DESIGN_DIR="$DOCS_DESIGN_DIR_DEFAULT"
+fi
+DOCS_TASKS_DIR="$REPO_ROOT/docs/tasks"
+DOCS_TASKS_BACKLOG_DIR="$DOCS_TASKS_DIR/v2"
+TASK_QUEUE_PATH="$DOCS_TASKS_DIR/README.md"
+DESIGN_SENTINEL="$DOCS_DESIGN_DIR/.ploy_v2_design_generated"
 
-# run_codex re-sources the zsh environment and streams a prompt into codex exec.
-run_codex() {
-  local prompt="$1"
-  local tmpfile
-  tmpfile=$(mktemp)
-  print -r -- "$prompt" > "$tmpfile"
-  source ~/.zshenv 2>/dev/null || true
-  source ~/.zshrc 2>/dev/null || true
-  log "codex exec starting with prompt file ${tmpfile}"
-  if codex --dangerously-bypass-approvals-and-sandbox --search exec --cd "$REPO_ROOT" - < "$tmpfile"; then
-    rm -f "$tmpfile"
-    log "codex exec completed successfully"
-  else
-    log "codex exec failed; preserving prompt at ${tmpfile}"
-    return 1
+ensure_cmd codex
+ensure_cmd git
+
+mkdir -p "$DOCS_DESIGN_DIR" "$DOCS_TASKS_DIR" "$DOCS_TASKS_BACKLOG_DIR"
+
+function run_codex() {
+  local label="$1"
+  shift
+  log_info "$label"
+  codex exec --include-plan-tool -C "$REPO_ROOT" - "$@"
+}
+
+function generate_design_docs() {
+  if [[ -f "$DESIGN_SENTINEL" ]]; then
+    log_info "Design sentinel present; skipping initial design synthesis."
+    return
   fi
-}
 
-# generate_design_docs asks Codex to transform each v2 spec into a design doc.
-generate_design_docs() {
-  log "Starting design generation for ${#FEATURES[@]} features"
-  for feature in "${FEATURES[@]}"; do
-    spec_rel=${FEATURE_SPEC_MAP[$feature]}
-    design_dir_rel="docs/design/${feature}"
-    design_doc_rel="${design_dir_rel}/README.md"
-    mkdir -p "$REPO_ROOT/$design_dir_rel"
-    log "Generating design doc ${design_doc_rel} from ${spec_rel}"
-    prompt=$(cat <<EOF
-You are Codex operating inside the Ploy repository. Follow /Users/vk/@iw2rmb/docs/AGENTS.md and docs/AGENTS guidance verbatim.
+  log_info "First run detected; generating design documents from specs."
 
-Objective: Convert the v2 spec at ${spec_rel} into a design document stored at ${design_doc_rel}.
+  local spec_path
+  for spec_path in "$DOCS_V2_DIR"/*.md; do
+    [[ -f "$spec_path" ]] || continue
 
-Constraints:
-- Use /Users/vk/@iw2rmb/docs/templates/design/README.md as the scaffold.
-- Use identifier prefix ${INITIATIVE_PREFIX}-${feature}-<sequence> and mirror Blocked by/Unblocks links across artefacts.
-- Reference ${spec_rel} explicitly in the Dependencies, Evidence, and Verification sections.
-- Update docs/design/README.md index, maintaining status checkboxes and dependency mirrors.
-- Capture COSMIC sizing guidance and environment variable impacts; reflect findings in docs/envs/README.md or note TODOs.
-- Record documentation verification details in CHANGELOG.md as required by /Users/vk/@iw2rmb/docs/AGENTS.md.
-
-Deliverables:
-1. Completed design doc written to ${design_doc_rel}.
-2. Updated docs/design/README.md, docs/envs/README.md (if new env vars surface), and CHANGELOG.md.
-3. Any supporting files or links needed to keep design and specs consistent.
-EOF
-)
-    run_codex "$prompt"
-  done
-}
-
-# generate_task_specs decomposes each design into task specs and refreshes the queue.
-generate_task_specs() {
-  log "Deriving task specs for ${#FEATURES[@]} features"
-  for feature in "${FEATURES[@]}"; do
-    design_doc_rel="docs/design/${feature}/README.md"
-    tasks_dir_rel="docs/tasks/${feature}"
-    mkdir -p "$REPO_ROOT/$tasks_dir_rel"
-    log "Producing task specs in ${tasks_dir_rel} from ${design_doc_rel}"
-    prompt=$(cat <<EOF
-You already produced ${design_doc_rel}; now derive actionable tasks for ${INITIATIVE_PREFIX}.
-
-Inputs:
-- Design source: ${design_doc_rel}
-- Tasks directory: ${tasks_dir_rel}
-- Queue index: ${TASK_QUEUE_REL}
-- Templates: /Users/vk/@iw2rmb/docs/templates/tasks/README.md and /Users/vk/@iw2rmb/docs/templates/tasks/INDEX.md
-- COSMIC checklist: /Users/vk/@iw2rmb/docs/COSMIC.md
-
-Requirements:
-1. Create task specs under ${tasks_dir_rel} using filenames ${INITIATIVE_PREFIX}-${feature}-<sequence>-<stage>.md.
-2. Ensure each task lists Blocked by/Unblocks links that mirror the design doc and other tasks.
-3. Size each task with COSMIC CFPs and split anything above 4 CFP into smaller units.
-4. Refresh docs/tasks/README.md using the index template so unblocked work appears first; mark newly generated tasks as unclaimed (- [ ]).
-5. Update design doc dependency tables to reference the new tasks.
-6. Append verification notes to CHANGELOG.md covering the planning work.
-
-Output: Task specs ready for implementation and a dependency-sorted docs/tasks/README.md queue.
-EOF
-)
-    run_codex "$prompt"
-  done
-}
-
-# next_task_in_queue returns the first unclaimed task path from the queue.
-next_task_in_queue() {
-  [[ -f "$TASK_QUEUE" ]] || return 1
-  local line
-  while IFS= read -r line; do
-    if [[ "$line" == "- [ ] "* ]]; then
-      local candidate=${line#- [ ] \`}
-      candidate=${candidate%\`}
-      print -r -- "$candidate"
-      return 0
+    local spec_rel="${spec_path#$REPO_ROOT/}"
+    local base_name="${spec_path:t:r}"
+    local component_name
+    if [[ "$base_name" == "README" ]]; then
+      component_name="overview"
+    else
+      component_name="$base_name"
     fi
-  done < "$TASK_QUEUE"
-  return 1
-}
 
-# implement_tasks runs Codex on each queued task until the backlog is empty.
-implement_tasks() {
-  log "Beginning task implementation loop"
-  while next_task=$(next_task_in_queue); do
-    log "Implementing task ${next_task}"
-    prompt=$(cat <<EOF
-Implement the next planned task while obeying /Users/vk/@iw2rmb/docs/AGENTS.md workflows.
+    local design_dir="$DOCS_DESIGN_DIR/$component_name"
+    local design_md="$design_dir/README.md"
+    mkdir -p "$design_dir"
 
-Active task: ${next_task}
+    if [[ -s "$design_md" ]]; then
+      log_info "Design doc ${design_md#$REPO_ROOT/} already exists; skipping generation."
+      continue
+    fi
 
-Execution checklist:
-1. Immediately re-open ${TASK_QUEUE_REL} and mark ${next_task} as reserved (- [x]) before editing.
-2. Follow the RED ➜ GREEN ➜ REFACTOR cadence spelled out in the task spec; write failing tests first.
-3. Implement code, docs, and configuration updates demanded by ${next_task}, keeping design/task dependencies mirrored.
-4. Run required local validation (make test, go test ./..., make build, make lint-md when docs change) and record evidence in CHANGELOG.md.
-5. Update docs/design/README.md, the owning design doc, and ${TASK_QUEUE_REL} to reflect completion; remove the queue entry when done.
-6. Commit with message referencing the task identifier (e.g. "feat: ${INITIATIVE_PREFIX} ${next_task}") and ensure the workspace is clean.
-
-Do not start another task until this one is complete and committed.
+    local design_rel="${design_md#$REPO_ROOT/}"
+    run_codex "Generating design doc ${design_rel}" <<EOF
+Follow the workflow guidance in docs/AGENTS.md. Fully review the specification at ${spec_rel}. Create a comprehensive design document at ${design_rel} that translates the spec into architecture decisions, workflows, data models, external integrations, invariants, risk mitigation, rollout plan, and testing strategy. Keep the narrative actionable for future implementation slices, reference related specs, and list open questions plus follow-up tasks. Make no code changes; only author ${design_rel} (adding any supporting assets beneath ${design_rel:h} if absolutely required).
 EOF
-)
-    run_codex "$prompt"
   done
-  log "Task queue empty; implementation loop finished"
+
+  touch "$DESIGN_SENTINEL"
+  log_info "Design generation step complete."
 }
 
-log "Ploy v2 automation script starting"
+function queue_tasks_from_design() {
+  if [[ ! -d "$DOCS_DESIGN_DIR" ]]; then
+    log_info "Design directory ${DOCS_DESIGN_DIR#$REPO_ROOT/} not found; skipping task planning."
+    return
+  fi
+
+  log_info "Refreshing task backlogs from design documents."
+
+  find "$DOCS_DESIGN_DIR" -type f -name '*.md' -print0 | sort -z | while IFS= read -r -d '' design_md; do
+    local design_rel="${design_md#$REPO_ROOT/}"
+    local relative_from_design="${design_md#$DOCS_DESIGN_DIR/}"
+    local task_stub="${relative_from_design%.md}"
+    if [[ "$task_stub" == */README ]]; then
+      task_stub="${task_stub%/README}"
+    fi
+    if [[ -z "$task_stub" ]]; then
+      task_stub="index"
+    fi
+
+    local tasks_md="$DOCS_TASKS_BACKLOG_DIR/$task_stub.md"
+    local tasks_rel="${tasks_md#$REPO_ROOT/}"
+    mkdir -p "$(dirname "$tasks_md")"
+
+    run_codex "Planning tasks for ${design_rel}" <<EOF
+Adhere to docs/AGENTS.md. Review the design narrative at ${design_rel} and ensure the implementation backlog at ${tasks_rel} exists and is current. Structure the Markdown with clear sections and checklists that respect the RED -> GREEN -> REFACTOR cadence, list prerequisite migrations/tooling, call out required tests (unit, CLI, integration mocks), and document doc updates or env vars from docs/envs/README.md. Preserve completed work, update or prune obsolete tasks, and keep outstanding items unchecked.
+
+Once ${tasks_rel} is synchronised, update docs/tasks/README.md so the queue contains a single "- [ ] \`${tasks_rel}\`" entry (no duplicates, no in-progress markers unless you are actively executing the slice). Do not implement code or run tests; limit changes to backlog curation and queue bookkeeping.
+EOF
+  done
+}
+
+function remove_task_from_queue() {
+  local task_rel="$1"
+  [[ -f "$TASK_QUEUE_PATH" ]] || return
+  python3 - "$task_rel" <<PYTHON
+import pathlib, re, sys
+
+queue_path = pathlib.Path(r"$TASK_QUEUE_PATH")
+task = sys.argv[1]
+
+lines = queue_path.read_text().splitlines()
+pattern = re.compile(rf"^- \[[ xX]\] `{re.escape(task)}`$")
+filtered = [line for line in lines if not pattern.match(line.strip())]
+
+if filtered:
+    queue_path.write_text("\n".join(filtered) + "\n")
+else:
+    queue_path.write_text("")
+PYTHON
+}
+
+function open_tasks_from_queue() {
+  [[ -f "$TASK_QUEUE_PATH" ]] || return
+  awk '/^- \[ \] `/{gsub(/^- \[ \] `/, "", $0); gsub(/`$/, "", $0); print}' "$TASK_QUEUE_PATH"
+}
+
+function implement_open_tasks() {
+  if [[ ! -f "$TASK_QUEUE_PATH" ]]; then
+    log_info "Queue file ${TASK_QUEUE_PATH#$REPO_ROOT/} missing; skipping implementation."
+    return
+  fi
+
+  log_info "Processing queued implementation slices."
+
+  while true; do
+    local -a pending_tasks
+    IFS=$'\n' pending_tasks=($(open_tasks_from_queue || true))
+    IFS=$' \t\n'
+
+    if (( ${#pending_tasks[@]} == 0 )); then
+      log_info "No pending tasks remain in docs/tasks/README.md."
+      break
+    fi
+
+    local task_rel
+    for task_rel in "${pending_tasks[@]}"; do
+      [[ -n "$task_rel" ]] || continue
+
+      if ! grep -Fq "- [ ] \`$task_rel\`" "$TASK_QUEUE_PATH"; then
+        continue
+      fi
+
+      local task_md="$REPO_ROOT/$task_rel"
+      if [[ ! -f "$task_md" ]]; then
+        log_info "Task file ${task_rel} not found; removing stale queue entry."
+        remove_task_from_queue "$task_rel"
+        continue
+      fi
+
+      local component_name="${task_rel##*/}"
+      component_name="${component_name%.md}"
+      local commit_message="Implement ${component_name} tasks (Ploy v2)"
+
+      run_codex "Implementing ${task_rel}" <<EOF
+Obey docs/AGENTS.md. Fully implement every unchecked item in ${task_rel}. While working, mark the corresponding entry in docs/tasks/README.md as in-progress, follow the RED -> GREEN -> REFACTOR cadence, keep docs updated (including docs/envs/README.md when env vars shift), maintain >=60% overall test coverage and >=90% on critical workflow runner packages, and run relevant local tests (e.g. make test) before committing.
+
+Once the plan in ${task_rel} is satisfied, mark all tasks complete, remove the queue entry for \`${task_rel}\`, and create a single git commit with message "${commit_message}" summarising the slice. The commit must include documentation updates and regenerated artifacts as required. Do not leave the repository dirty or the queue in an indeterminate state.
+EOF
+
+      if grep -Fq "\`${task_rel}\`" "$TASK_QUEUE_PATH"; then
+        abort "Implementation for ${task_rel} left the queue entry in place; resolve manually."
+      fi
+    done
+  done
+}
+
 generate_design_docs
-generate_task_specs
-implement_tasks
-log "Ploy v2 automation script completed"
+queue_tasks_from_design
+implement_open_tasks
+
+log_info "Ploy v2 automation flow completed."
