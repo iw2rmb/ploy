@@ -90,6 +90,29 @@ func TestRunnerBuildsContainerSpec(t *testing.T) {
 	if len(artifacts.published) == 0 {
 		t.Fatalf("expected artifacts to be published")
 	}
+	if len(artifacts.requests) != 2 {
+		t.Fatalf("expected diff and log publication requests, got %d", len(artifacts.requests))
+	}
+	diffReq := artifacts.requests[0]
+	if diffReq.Kind != ArtifactKindDiff {
+		t.Fatalf("expected diff artifact kind, got %s", diffReq.Kind)
+	}
+	if strings.TrimSpace(diffReq.Path) != diffs.result.Path {
+		t.Fatalf("expected diff artifact path %q, got %q", diffs.result.Path, diffReq.Path)
+	}
+	if len(diffReq.Buffer) != 0 {
+		t.Fatalf("expected diff artifact to use file payload, got buffer")
+	}
+	logReq := artifacts.requests[1]
+	if logReq.Kind != ArtifactKindLogs {
+		t.Fatalf("expected log artifact kind, got %s", logReq.Kind)
+	}
+	if len(logReq.Buffer) == 0 {
+		t.Fatalf("expected log artifact to include payload buffer")
+	}
+	if logReq.Path != "" {
+		t.Fatalf("expected log artifact to omit file path, got %q", logReq.Path)
+	}
 }
 
 func TestRunnerShiftFailureBlocksPipeline(t *testing.T) {
@@ -138,6 +161,9 @@ func TestRunnerShiftFailureBlocksPipeline(t *testing.T) {
 	}
 	if artifacts.published[0].Kind != ArtifactKindDiff {
 		t.Fatalf("expected diff artifact to publish")
+	}
+	if len(artifacts.requests) != 2 {
+		t.Fatalf("expected diff and log requests recorded, got %d", len(artifacts.requests))
 	}
 }
 
@@ -195,11 +221,13 @@ func (f *fakeShiftClient) Validate(ctx context.Context, req ShiftRequest) (Shift
 
 type fakeArtifactPublisher struct {
 	published []PublishedArtifact
+	requests  []ArtifactRequest
 }
 
 func (f *fakeArtifactPublisher) Publish(ctx context.Context, req ArtifactRequest) (PublishedArtifact, error) {
 	artifact := PublishedArtifact{CID: "bafydiff", Kind: req.Kind, Digest: "sha256:fixture"}
 	f.published = append(f.published, artifact)
+	f.requests = append(f.requests, req)
 	return artifact, nil
 }
 

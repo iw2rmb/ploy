@@ -2,49 +2,53 @@ package main
 
 import (
 	"bytes"
-	"errors"
+	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
 
-func TestExecuteManifestSchemaPrintsJSON(t *testing.T) {
-	prevPath := manifestSchemaPath
-	_, file, _, _ := runtime.Caller(0)
-	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
-	manifestSchemaPath = filepath.Join(repoRoot, "docs", "schemas", "integration_manifest.schema.json")
-	defer func() { manifestSchemaPath = prevPath }()
-
+func TestExecuteHelpMatchesGolden(t *testing.T) {
+	t.Helper()
 	buf := &bytes.Buffer{}
-	err := execute([]string{"manifest", "schema"}, buf)
+	err := execute([]string{"help"}, buf)
 	if err != nil {
-		t.Fatalf("expected schema command to succeed, got %v", err)
+		t.Fatalf("execute help: %v", err)
 	}
-	output := buf.String()
-	if !strings.Contains(output, "\"title\"") {
-		t.Fatalf("expected schema output to contain title field, got %q", output)
+	expect := loadGolden(t, "help.txt")
+	if diff := diffStrings(expect, buf.String()); diff != "" {
+		t.Fatalf("help output mismatch:\n%s", diff)
 	}
-	if !strings.Contains(output, "integration_manifest.schema.json") {
-		t.Fatalf("expected schema output to reference schema file, got %q", output)
-	}
-	if !strings.Contains(output, "\"manifest_version\"") {
-		t.Fatalf("expected schema output to include manifest_version, got %q", output)
+	if strings.Contains(buf.String(), "Grid") {
+		t.Fatalf("help output should not reference Grid: %q", buf.String())
 	}
 }
 
-func TestExecuteRequiresCommand(t *testing.T) {
+func TestExecuteHelpForModMatchesGolden(t *testing.T) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	err := execute([]string{"help", "mod"}, buf)
+	if err != nil {
+		t.Fatalf("execute help mod: %v", err)
+	}
+	expect := loadGolden(t, "help_mod.txt")
+	if diff := diffStrings(expect, buf.String()); diff != "" {
+		t.Fatalf("help mod output mismatch:\n%s", diff)
+	}
+}
+
+func TestExecuteRequiresCommandPrintsHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute(nil, buf)
 	if err == nil {
-		t.Fatal("expected error when no command provided")
+		t.Fatal("expected error when no arguments provided")
 	}
-	if buf.Len() == 0 {
-		t.Fatal("expected usage output")
+	if !strings.Contains(buf.String(), "Ploy CLI v2") {
+		t.Fatalf("expected usage output, got %q", buf.String())
 	}
 }
 
-func TestExecuteUnknownCommand(t *testing.T) {
+func TestExecuteUnknownCommandSuggestsHelp(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := execute([]string{"unknown"}, buf)
 	if err == nil {
@@ -53,41 +57,24 @@ func TestExecuteUnknownCommand(t *testing.T) {
 	if !strings.Contains(err.Error(), "unknown command") {
 		t.Fatalf("expected unknown command error, got %v", err)
 	}
-}
-
-func TestHandleWorkflowRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleWorkflow(nil, buf)
-	if err == nil {
-		t.Fatal("expected error for missing subcommand")
-	}
-	if !strings.Contains(buf.String(), "Usage: ploy workflow") {
-		t.Fatalf("expected workflow usage, got %q", buf.String())
+	if !strings.Contains(buf.String(), "help") {
+		t.Fatalf("expected help hint in usage output, got %q", buf.String())
 	}
 }
 
-func TestHandleModRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleMod(nil, buf)
-	if err == nil {
-		t.Fatal("expected error for missing mod subcommand")
+func loadGolden(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join("testdata", name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read golden %s: %v", name, err)
 	}
-	if !strings.Contains(buf.String(), "Usage: ploy mod") {
-		t.Fatalf("expected mod usage, got %q", buf.String())
-	}
+	return string(data)
 }
 
-func TestPrintHelpers(t *testing.T) {
-	buf := &bytes.Buffer{}
-	printUsage(buf)
-	printWorkflowUsage(buf)
-	printModRunUsage(buf)
-	printWorkflowCancelUsage(buf)
-	reportError(errors.New("boom"), buf)
-	output := buf.String()
-	for _, fragment := range []string{"Usage: ploy mod run", "Usage: ploy workflow cancel", "Usage: ploy workflow", "error: boom"} {
-		if !strings.Contains(output, fragment) {
-			t.Fatalf("expected output to contain %q, got %q", fragment, output)
-		}
+func diffStrings(expect, actual string) string {
+	if expect == actual {
+		return ""
 	}
+	return "expected:\n" + expect + "\nactual:\n" + actual
 }

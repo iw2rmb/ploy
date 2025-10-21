@@ -163,6 +163,88 @@ func printAsterSummary(w io.Writer, invocations []runner.StageInvocation) {
 	}
 }
 
+// printArtifactSummary surfaces per-stage artifact references captured in checkpoints.
+func printArtifactSummary(w io.Writer, checkpoints []contracts.WorkflowCheckpoint) {
+	if len(checkpoints) == 0 {
+		return
+	}
+	type stageArtifacts struct {
+		order     int
+		artifacts []contracts.CheckpointArtifact
+		retention *contracts.CheckpointRetention
+	}
+	stages := make(map[string]*stageArtifacts)
+	order := 0
+	for _, checkpoint := range checkpoints {
+		if checkpoint.Status != contracts.CheckpointStatusCompleted {
+			continue
+		}
+		if checkpoint.StageMetadata == nil {
+			continue
+		}
+		if len(checkpoint.Artifacts) == 0 {
+			continue
+		}
+		name := strings.TrimSpace(checkpoint.StageMetadata.Name)
+		if name == "" {
+			name = strings.TrimSpace(checkpoint.Stage)
+		}
+		if name == "" {
+			continue
+		}
+		entry, ok := stages[name]
+		if !ok {
+			entry = &stageArtifacts{order: order}
+			order++
+			stages[name] = entry
+		}
+		entry.retention = checkpoint.StageMetadata.Retention
+		entry.artifacts = make([]contracts.CheckpointArtifact, len(checkpoint.Artifacts))
+		copy(entry.artifacts, checkpoint.Artifacts)
+	}
+	if len(stages) == 0 {
+		return
+	}
+	names := make([]string, 0, len(stages))
+	for name := range stages {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool {
+		return stages[names[i]].order < stages[names[j]].order
+	})
+	_, _ = fmt.Fprintln(w, "Stage Artifacts:")
+	for _, name := range names {
+		entry := stages[name]
+		line := fmt.Sprintf("  %s", name)
+		if entry.retention != nil {
+			ttl := strings.TrimSpace(entry.retention.TTL)
+			switch {
+			case entry.retention.Retained && ttl != "":
+				line += fmt.Sprintf(" (retained ttl=%s)", ttl)
+			case entry.retention.Retained:
+				line += " (retained)"
+			case ttl != "":
+				line += fmt.Sprintf(" (ttl=%s)", ttl)
+			}
+		}
+		line += ":"
+		_, _ = fmt.Fprintln(w, line)
+		for _, artifact := range entry.artifacts {
+			artifactName := strings.TrimSpace(artifact.Name)
+			if artifactName == "" {
+				artifactName = "artifact"
+			}
+			cid := strings.TrimSpace(artifact.ArtifactCID)
+			line := fmt.Sprintf("    - %s: %s", artifactName, cid)
+			digest := strings.TrimSpace(artifact.Digest)
+			if digest != "" {
+				line += fmt.Sprintf(" (%s)", digest)
+			}
+			_, _ = fmt.Fprintln(w, line)
+		}
+	}
+}
+
 // printArchiveSummary surfaces archive export metadata captured during stage execution.
 func printArchiveSummary(w io.Writer, invocations []runner.StageInvocation) {
 	if len(invocations) == 0 {

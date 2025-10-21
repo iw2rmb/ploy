@@ -23,12 +23,18 @@ func execute(args []string, stderr io.Writer) error {
 	}
 
 	switch args[0] {
+	case "help":
+		return handleHelp(args[1:], stderr)
 	case "workflow":
 		return handleWorkflow(args[1:], stderr)
 	case "mod":
 		return handleMod(args[1:], stderr)
 	case "artifact":
 		return handleArtifact(args[1:], stderr)
+	case "config":
+		return handleConfig(args[1:], stderr)
+	case "cluster":
+		return handleCluster(args[1:], stderr)
 	case "snapshot":
 		return handleSnapshot(args[1:], stderr)
 	case "environment":
@@ -50,13 +56,69 @@ func reportError(err error, stderr io.Writer) {
 
 // printUsage lists the available top-level commands.
 func printUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  workflow  Manage workflow cancellations")
-	_, _ = fmt.Fprintln(w, "  mod       Execute Mods runs")
-	_, _ = fmt.Fprintln(w, "  artifact  Manage artifact uploads and downloads")
-	_, _ = fmt.Fprintln(w, "  snapshot  Plan and capture database snapshots")
-	_, _ = fmt.Fprintln(w, "  environment  Materialize commit-scoped environments")
-	_, _ = fmt.Fprintln(w, "  manifest  Inspect integration manifest assets")
-	_, _ = fmt.Fprintln(w, "  knowledge-base  Manage knowledge base incidents")
+	lines := []string{
+		"Ploy CLI v2",
+		"",
+		"Usage:",
+		"  ploy <command> [<args>]",
+		"",
+		"Core Commands:",
+		"  mod         Plan and run Mods workflows",
+		"  artifact    Manage IPFS Cluster artifacts",
+		"  node        Administer Ploy nodes and lifecycle",
+		"  deploy      Bootstrap or upgrade clusters",
+		"  cluster     Manage local cluster descriptors",
+		"  beacon      Control beacon discovery operations",
+		"  config      Inspect or update cluster configuration",
+		"  logs        Stream job and node logs",
+		"  status      Summarize cluster health",
+		"  doctor      Run workstation diagnostics",
+		"",
+		"Use 'ploy help <command>' for detailed command help.",
+	}
+	for _, line := range lines {
+		_, _ = fmt.Fprintln(w, line)
+	}
+}
+
+func handleHelp(args []string, stderr io.Writer) error {
+	if len(args) == 0 {
+		printUsage(stderr)
+		return nil
+	}
+	switch args[0] {
+	case "mod":
+		printModUsage(stderr)
+		return nil
+	case "artifact":
+		printArtifactUsage(stderr)
+		return nil
+	case "node":
+		printNodeUsage(stderr)
+		return nil
+	case "deploy":
+		printDeployUsage(stderr)
+		return nil
+	case "cluster":
+		printClusterUsage(stderr)
+		return nil
+	case "beacon":
+		printBeaconUsage(stderr)
+		return nil
+	case "config":
+		printConfigUsage(stderr)
+		return nil
+	case "logs":
+		printLogsUsage(stderr)
+		return nil
+	case "status":
+		printStatusUsage(stderr)
+		return nil
+	case "doctor":
+		printDoctorUsage(stderr)
+		return nil
+	default:
+		printUsage(stderr)
+		return fmt.Errorf("unknown help topic %q", args[0])
+	}
 }

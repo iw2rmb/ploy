@@ -191,7 +191,7 @@ func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTick
 	if outcome.Status == runner.StageStatusFailed {
 		outcome.Retryable = false
 	}
-	c.recordInvocation(ticket, outcome.Stage, workspace, runID, outcome.Archive, evidence)
+	c.recordInvocation(ticket, outcome.Stage, workspace, runID, outcome.Archive, evidence, outcome.Artifacts)
 	return outcome, nil
 }
 
@@ -230,10 +230,23 @@ func (c *Client) Invocations() []runner.StageInvocation {
 	return dup
 }
 
-func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.Stage, workspace, runID string, archive *runner.StageArchive, evidence *runner.StageEvidence) {
+func (c *Client) recordInvocation(ticket contracts.WorkflowTicket, stage runner.Stage, workspace, runID string, archive *runner.StageArchive, evidence *runner.StageEvidence, artifacts []runner.Artifact) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.invocations = append(c.invocations, runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace, RunID: runID, Archive: archive, Evidence: evidence})
+	invocation := runner.StageInvocation{TicketID: ticket.TicketID, Stage: stage, Workspace: workspace, RunID: runID, Archive: archive, Evidence: evidence}
+	if len(artifacts) > 0 {
+		invocation.Artifacts = cloneArtifacts(artifacts)
+	}
+	c.invocations = append(c.invocations, invocation)
+}
+
+func cloneArtifacts(src []runner.Artifact) []runner.Artifact {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]runner.Artifact, len(src))
+	copy(dst, src)
+	return dst
 }
 
 func defaultWorkflowClientFactory(cfg helper.Config) (workflowClient, error) {

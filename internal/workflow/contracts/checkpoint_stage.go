@@ -15,6 +15,7 @@ type CheckpointStage struct {
 	Dependencies []string                `json:"dependencies,omitempty"`
 	Manifest     ManifestReference       `json:"manifest"`
 	Aster        CheckpointStageAster    `json:"aster"`
+	Retention    *CheckpointRetention    `json:"retention,omitempty"`
 	BuildGate    *BuildGateStageMetadata `json:"build_gate,omitempty"`
 	Mods         *ModsStageMetadata      `json:"mods,omitempty"`
 }
@@ -41,6 +42,11 @@ func (s CheckpointStage) Validate() error {
 	if err := s.Aster.Validate(); err != nil {
 		return fmt.Errorf("aster metadata invalid: %w", err)
 	}
+	if s.Retention != nil {
+		if err := s.Retention.Validate(); err != nil {
+			return fmt.Errorf("retention metadata invalid: %w", err)
+		}
+	}
 	if s.BuildGate != nil {
 		if err := s.BuildGate.Validate(); err != nil {
 			return fmt.Errorf("build gate metadata invalid: %w", err)
@@ -51,6 +57,17 @@ func (s CheckpointStage) Validate() error {
 			return fmt.Errorf("mods metadata invalid: %w", err)
 		}
 	}
+	return nil
+}
+
+// CheckpointRetention captures retention expectations for a stage.
+type CheckpointRetention struct {
+	Retained bool   `json:"retained"`
+	TTL      string `json:"ttl,omitempty"`
+}
+
+// Validate ensures retention metadata is well-formed.
+func (r CheckpointRetention) Validate() error {
 	return nil
 }
 

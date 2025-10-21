@@ -1,7 +1,7 @@
 # roadmap-mod-step-runtime-03 – Node Artifact Publishing Integration
 
 - **Identifier**: `roadmap-mod-step-runtime-03`
-- [ ] **Status**: Not started
+- [x] **Status**: Completed (2025-10-21)
 - **Blocked by**:
   - `docs/tasks/roadmap/02-mod-step-runtime.md`
   - `docs/tasks/roadmap/03-ipfs-artifact-store.md`
@@ -68,12 +68,15 @@
     `docs/tasks/roadmap/03-ipfs-artifact-store.md`.
   - Depends on local runtime execution path from
     `docs/tasks/roadmap/02-mod-step-runtime.md`.
-  - Requires access to the VPS lab IPFS Cluster provisioned by
-    `scripts/ipfs/bootstrap_lab_cluster.sh` before integration suites execute.
+  - Requires access to the VPS lab IPFS Cluster provisioned via
+    `scripts/ipfs/bootstrap_lab_cluster.sh` (targeting hosts from
+    `docs/v2/vps-lab.md`) before integration suites execute; the script ensures
+    Docker/compose are present on the lab hosts.
 
 - **Verification Steps**
-  - `scripts/ipfs/bootstrap_lab_cluster.sh` – provision VPS lab IPFS Cluster
-    prior to running integration suites; tear down after verification.
+  - `scripts/ipfs/bootstrap_lab_cluster.sh` – provision the VPS lab IPFS
+    Cluster over SSH before running integration suites; tear down after
+    verification.
   - `go test ./internal/workflow/runtime/...`
   - `go test -tags integration ./tests/integration/runtime/...`
   - `go test ./cmd/ploy -run TestModRun*`
@@ -89,3 +92,4 @@
   - Coordinate with `roadmap-ipfs-artifact-store-03` to align retention policies
     and GC expectations.
   - Revisit SHIFT static check surfacing once IPFS-backed reports are available.
+  - Completion recorded 2025-10-21 with verification in `CHANGELOG.md` (go test ./..., make lint-md).

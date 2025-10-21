@@ -1,5 +1,30 @@
 # Changelog
 
+## [2025-10-21] CLI Surface Refresh Decomposition
+
+- Documented the CLI surface refresh roadmap as five focused slices
+  (`docs/tasks/roadmap/05a-cli-command-tree-refresh.md` through
+  `docs/tasks/roadmap/05e-cli-operator-enablement.md`) with COSMIC sizing,
+  dependencies, and verification guidance.
+- Updated the task queue (`docs/tasks/README.md`) to reflect the new slices and
+  maintain dependency ordering for roadmap execution.
+- Verification (2025-10-21):
+  - `make lint-md`
+
+## [2025-10-21] Mods Step Runtime Artifact Publishing
+
+- Local step executions now persist diff/log artifact CIDs plus retention metadata on stage
+  outcomes and record the invocations for CLI summaries (`internal/workflow/runtime/local_client.go`,
+  `internal/workflow/runner/stub.go`, `internal/workflow/grid/client.go`).
+- Workflow checkpoints embed retention details so the CLI can print a **Stage Artifacts** summary
+  with CIDs, digests, and TTLs; `cmd/ploy/mod_run.go` and `cmd/ploy/mod_summaries.go` render the
+  new output with updated golden coverage.
+- Documentation refreshed to describe immediate artifact availability and CLI inspection flows
+  (`docs/v2/job.md`, `docs/v2/mod.md`, `docs/workflow/README.md`).
+- Verification (2025-10-21):
+  - `go test ./...`
+  - `make lint-md`
+
 ## [2025-10-21] IPFS Cluster Artifact Store
 
 - Replaced the filesystem artifact publisher with an IPFS Cluster-backed client

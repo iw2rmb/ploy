@@ -53,9 +53,9 @@ ploy mod run \
   - Repository state (original tree + any healing diffs).
   - Snapshot artifacts (CIDs) for deterministic checkout.
   - Recipe configuration describing the Java 11 → Java 17 migration.
-- The step generates new diffs (e.g., pom updates, code fixes), uploads the bundle to IPFS Cluster
-  through the node’s local cluster client, and records the diff CID in the job metadata stored in
-  etcd.
+- The step generates new diffs (e.g., pom updates, code fixes), uploads the bundle and execution log
+  to IPFS Cluster through the node’s local cluster client, and records the diff/log CIDs plus digests
+  in the job metadata stored in etcd.
 
 ## 5. Post-Apply Build Gate
 
@@ -64,26 +64,27 @@ ploy mod run \
   - The node re-enters the healing loop (`llm-plan`) to suggest follow-up steps (e.g., dependency
     bumps, code tweaks), applying each recommended fix and re-running the build gate.
 - On success:
-  - The node records the Mod stage as complete, persists the final diff tarball, and stages a
-    structured build gate report (JSON) for publication. Both CIDs are attached to the job outcome
-    so the artifact store can push them to IPFS Cluster once replication is available.
+  - The node records the Mod stage as complete, uploads the final diff tarball and build gate report
+    JSON to IPFS Cluster, and attaches all resulting CIDs/digests to the job outcome. Replicated
+    artifacts are immediately available to the CLI and follow-on stages.
 
 ## 6. Completion & Output
 
 - The control plane updates the Mod ticket with:
-  - Final diff CID (ready for MR creation or manual review).
+  - Final diff and log CIDs (ready for MR creation or manual review).
   - Build gate report CID and static analysis summaries.
   - Execution metadata (timings, node, container images) captured in the job record.
 - Optional post-processing can push the branch/MR back to GitLab using the stored API key.
-- The CLI prints a success summary and provides commands to inspect diffs
-  (`ploy artifact pull <cid>`) or open the generated merge request.
+- The CLI prints a success summary, including a **Stage Artifacts** section listing diff/log CIDs and
+  retention TTLs. Operators can immediately inspect outputs with `ploy artifact pull <cid>` or open
+  the generated merge request.
 
 ## Key Behaviours Highlighted
 
 - **GitLab Integration** — Credentials live in etcd, enabling secure repo cloning and MR operations
   without manual token management on nodes.
-- **Artifact Reuse** — Snapshots hydrate locally from cached tarballs and staged diffs flow into the
-  upcoming IPFS artifact store, avoiding redundant clones when repeating Mods.
+- **Artifact Reuse** — Snapshots hydrate locally from cached tarballs and each step’s diff/log bundle
+  is replicated to IPFS Cluster in real time, avoiding redundant clones when repeating Mods.
 - **Build Gate Enforcement** — Each step runs the SHIFT sandbox automatically; static checks are
   re-enabled once the artifact publisher exposes the detailed reports.
 - **Deterministic Replay** — Each step reconstructs repository state from the original HEAD plus

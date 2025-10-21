@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -26,7 +27,9 @@ type LocalStepClientOptions struct {
 
 // LocalStepClient executes workflow stages by invoking the node-local step runner.
 type LocalStepClient struct {
-	runner StepExecutor
+	runner      StepExecutor
+	mu          sync.Mutex
+	invocations []runner.StageInvocation
 }
 
 // NewLocalStepClient constructs a node-local workflow runtime client.
@@ -73,6 +76,7 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 				outcome.Message = strings.TrimSpace(execErr.Error())
 			}
 			outcome.Evidence = buildStageEvidence(result, outcome.Status)
+			c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
 			return outcome, nil
 		}
 		return runner.StageOutcome{}, execErr
@@ -83,6 +87,7 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 		outcome.Retryable = false
 		outcome.Message = strings.TrimSpace(result.ShiftReport.Message)
 		outcome.Evidence = buildStageEvidence(result, outcome.Status)
+		c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
 		return outcome, nil
 	}
 
@@ -91,10 +96,12 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 		outcome.Retryable = false
 		outcome.Message = fmt.Sprintf("container exited with status %d", result.ExitCode)
 		outcome.Evidence = buildStageEvidence(result, outcome.Status)
+		c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
 		return outcome, nil
 	}
 
 	outcome.Evidence = buildStageEvidence(result, outcome.Status)
+	c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
 	return outcome, nil
 }
 
@@ -103,6 +110,41 @@ func (c *LocalStepClient) CancelWorkflow(ctx context.Context, req runner.CancelR
 	_ = ctx
 	_ = req
 	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
+}
+
+// Invocations returns a snapshot of recorded stage invocations executed via the local client.
+func (c *LocalStepClient) Invocations() []runner.StageInvocation {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	dup := make([]runner.StageInvocation, len(c.invocations))
+	copy(dup, c.invocations)
+	return dup
+}
+
+func (c *LocalStepClient) recordInvocation(ticket contracts.WorkflowTicket, stage runner.Stage, workspace string, outcome runner.StageOutcome) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	invocation := runner.StageInvocation{
+		TicketID:  strings.TrimSpace(ticket.TicketID),
+		Stage:     outcome.Stage,
+		Workspace: strings.TrimSpace(workspace),
+		RunID:     strings.TrimSpace(outcome.RunID),
+		Archive:   outcome.Archive,
+		Evidence:  outcome.Evidence,
+	}
+	if len(outcome.Artifacts) > 0 {
+		invocation.Artifacts = cloneArtifacts(outcome.Artifacts)
+	}
+	c.invocations = append(c.invocations, invocation)
+}
+
+func cloneArtifacts(src []runner.Artifact) []runner.Artifact {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]runner.Artifact, len(src))
+	copy(dst, src)
+	return dst
 }
 
 func convertPublishedArtifacts(result step.Result) []runner.Artifact {

@@ -17,6 +17,7 @@ type StageInvocation struct {
 	RunID     string
 	Archive   *StageArchive
 	Evidence  *StageEvidence
+	Artifacts []Artifact
 }
 
 type InMemoryGrid struct {
@@ -67,6 +68,9 @@ func (g *InMemoryGrid) ExecuteStage(ctx context.Context, ticket contracts.Workfl
 		g.invocations[idx].RunID = outcome.RunID
 		g.invocations[idx].Archive = outcome.Archive
 		g.invocations[idx].Evidence = outcome.Evidence
+		if len(outcome.Artifacts) > 0 {
+			g.invocations[idx].Artifacts = cloneArtifacts(outcome.Artifacts)
+		}
 	}
 	return outcome, nil
 }
@@ -76,6 +80,15 @@ func (g *InMemoryGrid) Invocations() []StageInvocation {
 	defer g.mu.Unlock()
 	dst := make([]StageInvocation, len(g.invocations))
 	copy(dst, g.invocations)
+	return dst
+}
+
+func cloneArtifacts(src []Artifact) []Artifact {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make([]Artifact, len(src))
+	copy(dst, src)
 	return dst
 }
 
