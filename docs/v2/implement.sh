@@ -50,7 +50,7 @@ function run_codex() {
   local label="$1"
   shift
   log_info "$label"
-  codex exec --include-plan-tool -C "$REPO_ROOT" - "$@"
+  codex exec --dangerously-bypass-approvals-and-sandbox --include-plan-tool -C "$REPO_ROOT" - "$@"
 }
 
 function generate_design_docs() {
