@@ -42,7 +42,7 @@ run_codex() {
   print -r -- "$prompt" > "$tmpfile"
   source ~/.zshenv 2>/dev/null || true
   source ~/.zshrc 2>/dev/null || true
-  codex exec --dangerously-bypass-approvals-and-sandbox --search --cd "$REPO_ROOT" - < "$tmpfile"
+  codex --dangerously-bypass-approvals-and-sandbox --search exec --cd "$REPO_ROOT" - < "$tmpfile"
   rm -f "$tmpfile"
 }
 
