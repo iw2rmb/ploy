@@ -76,7 +76,7 @@
   - `go test ./internal/workflow/runtime/step -run TestLogs*`
   - `go test ./internal/controlplane/httpapi -run TestLogs*`
   - `go test ./cmd/ploy -run TestLogs*`
-  - `make lint-md`
+  - Validate documentation updates against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Document SSE endpoints, retention policies, and CLI inspection flows in

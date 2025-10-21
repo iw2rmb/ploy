@@ -10,7 +10,10 @@ Always re-open this file immediately before editing; do not rely on a cached cop
 
 ## Queue
 
-- [x] `docs/tasks/roadmap/04-gitlab-integration.md`
+- [ ] `docs/tasks/roadmap/04a-gitlab-node-bootstrap.md`
+- [ ] `docs/tasks/roadmap/04b-gitlab-workflow-client.md`
+- [ ] `docs/tasks/roadmap/04c-gitlab-credential-ops.md`
+- [ ] `docs/tasks/roadmap/04d-gitlab-docs-and-tests.md`
 - [ ] `docs/tasks/roadmap/05a-cli-command-tree-refresh.md`
 - [ ] `docs/tasks/roadmap/05b-cli-node-lifecycle-config.md`
 - [ ] `docs/tasks/roadmap/05c-cli-mods-artifacts.md`

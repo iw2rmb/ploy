@@ -65,9 +65,9 @@ in mind when editing `AGENTS.md` or adding new docs.
    `docs/tasks/roadmap/`).
 2. Reference the relevant roadmap task and design subsection.
 3. Note where unit vs. integration work happens (workstation vs. Grid/VPS).
-4. Run `make lint-md` to keep Markdown formatting consistent, then `go test
-   ./...` (or the appropriate doc linter) to ensure helper tests such as
-   `legacy_dependencies_test.go` still pass.
+4. Validate Markdown formatting against `.markdownlint.yaml`, then run
+   `go test ./...` (or the appropriate doc linter) to ensure helper tests such
+   as `legacy_dependencies_test.go` still pass.
 
 Keeping the doc set small and focused prevents regressions toward the
 Nomad-based architecture we just retired.

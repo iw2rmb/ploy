@@ -49,7 +49,15 @@ additional configuration.
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
 - `PLOY_ETCD_ENDPOINTS` — Comma-separated etcd endpoints used by the control-plane scheduler
-  (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled.
+  (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled and for
+  storing GitLab credentials via `ploy config gitlab`.
+- `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
+  connecting to endpoints listed above.
+- `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.
+- `PLOY_ETCD_TLS_CERT` / `PLOY_ETCD_TLS_KEY` — Optional client certificate pair presented to etcd
+  when mutual TLS is required. Both values must be provided together.
+- `PLOY_ETCD_TLS_SKIP_VERIFY` — When set to `true`, disables server certificate verification. Use
+  only for local development.
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
   until the CLI flips to the new scheduler by default.
 

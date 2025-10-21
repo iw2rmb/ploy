@@ -80,7 +80,7 @@
   - `go test ./internal/workflow/runtime/...`
   - `go test -tags integration ./tests/integration/runtime/...`
   - `go test ./cmd/ploy -run TestModRun*`
-  - `make lint-md`
+  - Validate documentation formatting against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Append dated entry describing artifact publisher integration, verification
@@ -92,4 +92,5 @@
   - Coordinate with `roadmap-ipfs-artifact-store-03` to align retention policies
     and GC expectations.
   - Revisit SHIFT static check surfacing once IPFS-backed reports are available.
-  - Completion recorded 2025-10-21 with verification in `CHANGELOG.md` (go test ./..., make lint-md).
+  - Completion recorded 2025-10-21 with verification in `CHANGELOG.md`
+    (`go test ./...`, documentation formatting validation).

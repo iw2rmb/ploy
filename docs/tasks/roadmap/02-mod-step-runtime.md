@@ -98,7 +98,7 @@
   - `go test ./internal/workflow/contracts/... ./internal/workflow/runtime/...`
   - `go test -tags integration ./tests/integration/runtime/...`
   - `go test ./cmd/ploy -run TestModRun*`
-  - `make lint-md`
+  - Validate documentation updates against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
 - Append dated entry describing runtime pipeline implementation, tests executed,

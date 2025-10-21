@@ -52,7 +52,7 @@
 - **Verification Steps**
   - `go test ./cmd/ploy -run TestCluster*`
   - `make build && dist/ploy cluster bootstrap --help` to validate UX.
-  - `make lint-md` for updated docs.
+  - Validate updated documentation against `.markdownlint.yaml`.
 
 - **Changelog / Docs Impact**
   - Record new lifecycle commands and verification evidence in `CHANGELOG.md`.

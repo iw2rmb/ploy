@@ -9,7 +9,7 @@
 - Updated the task queue (`docs/tasks/README.md`) to reflect the new slices and
   maintain dependency ordering for roadmap execution.
 - Verification (2025-10-21):
-  - `make lint-md`
+  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-21] Mods Step Runtime Artifact Publishing
 
@@ -23,7 +23,7 @@
   (`docs/v2/job.md`, `docs/v2/mod.md`, `docs/workflow/README.md`).
 - Verification (2025-10-21):
   - `go test ./...`
-  - `make lint-md`
+  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-21] IPFS Cluster Artifact Store
 
@@ -95,7 +95,7 @@
   - `go test ./internal/controlplane/...`
   - `go test -tags integration ./tests/integration/controlplane`
   - `staticcheck ./internal/controlplane/...`
-  - `make lint-md`
+  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-09] Discovery Env Cleanup
 

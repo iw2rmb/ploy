@@ -53,7 +53,7 @@
 - **Verification Steps**
   - `go test ./cmd/ploy -run TestLogs*`
   - Mock SSE harness demonstrating reconnect/resume behaviour.
-  - `make lint-md` for doc updates.
+  - Validate documentation updates against `.markdownlint.yaml`.
 
 - **Changelog / Docs Impact**
   - Document streaming additions, verification date, and evidence in `CHANGELOG.md`.

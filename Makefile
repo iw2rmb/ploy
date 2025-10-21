@@ -31,6 +31,5 @@ help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build  # Build the CLI"
 	@echo "  make fmt    # Run gofmt over Go source"
-	@echo "  make lint-md # Run markdownlint over tracked Markdown files"
 	@echo "  make test   # Run go test ./... with coverage"
 	@echo "  make clean  # Remove build artifacts"

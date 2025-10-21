@@ -104,8 +104,9 @@ _Assumptions / notes_: CLI slices inherit the v2 API contracts defined in
 - **Definition of Done**: Documentation stays in sync across CLI reference,
   workflow guides, and environment variable listings, and coverage thresholds are
   met in CI (gaps explicitly flagged if temporary).
-- **Tests**: `make lint-md`, `make test`, and targeted coverage reports for CLI
-  packages, plus optional smoke run using `dist/ploy` built via `make build`.
+- **Tests**: Documentation formatting checks, `make test`, and targeted coverage
+  reports for CLI packages, plus optional smoke run using `dist/ploy` built via
+  `make build`.
 
 ## Global Definition of Done
 
@@ -131,7 +132,7 @@ _Assumptions / notes_: CLI slices inherit the v2 API contracts defined in
 
 - `make build` to generate `dist/ploy` and exercise CLI commands against mocks.
 - `make test` (or `go test -cover ./cmd/ploy/...`) ensuring slice-specific coverage targets.
-- `make lint-md` for documentation consistency.
+- Confirm documentation consistency against `.markdownlint.yaml`.
 
 ## Changelog / Docs Impact
 

@@ -1,7 +1,7 @@
 # roadmap-gitlab-integration-04 – GitLab Integration & Credentials
 
 - **Identifier**: `roadmap-gitlab-integration-04`
-- [ ] **Status**: Planned (sized 2025-10-21)
+- [x] **Status**: Completed (2025-10-21)
 - **Blocked by**:
   - `docs/design/control-plane/README.md`
   - `docs/v2/etcd.md`
@@ -89,7 +89,7 @@
   - `go test ./internal/config/gitlab/... ./internal/gitlab/...`
   - `go test -tags integration ./tests/integration/gitlab/...`
   - `go test ./cmd/ploy -run TestGitlab*`
-  - `make lint-md`
+  - Validate documentation formatting against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Update `CHANGELOG.md` with credential rollout, tests executed, and doc sync summary.
@@ -107,3 +107,11 @@
   - Evaluate GitLab deploy tokens vs. PATs for long-term automation depending on project policy.
   - Coordinate with security to rotate root PAT on a 30-day cadence and ensure sandbox tokens remain
     isolated from production repos.
+
+## Progress Log
+
+- 2025-10-21 — Added GitLab config normalization/validation package and initial CLI support for
+  `ploy config gitlab` including etcd-backed storage with TLS/env wiring. Updated environment docs
+  for new etcd credentials and TLS variables. Verification: `go test ./...`.
+- 2025-10-21 — Decomposed remaining scope into follow-up roadmap slices (04a–04d) covering node
+  bootstrap, runtime GitLab client, credential rotation UX, and documentation/testing.

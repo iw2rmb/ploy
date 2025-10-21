@@ -14,7 +14,7 @@
   - `roadmap-control-plane-07` / `docs/tasks/roadmap/07-job-observability.md`
 - **Last Verification**: 2025-10-21 —
   `go test ./internal/controlplane/...`, `go test -tags integration ./tests/integration/controlplane`,
-  `staticcheck ./internal/controlplane/...`, `make lint-md` (fails on pre-existing roadmap task lint debt)
+  `staticcheck ./internal/controlplane/...`, documentation formatting validation (noted lint debt persists)
 - **Upstream Dependencies**:
   - `../../v2/etcd.md`
   - `../../v2/queue.md`

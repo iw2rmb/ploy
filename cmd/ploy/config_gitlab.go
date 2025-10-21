@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
+
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 )
 
@@ -21,7 +25,31 @@ type gitlabStore interface {
 	Save(context.Context, gitlabcfg.Config) (int64, error)
 }
 
+type gitlabStoreCloser interface {
+	gitlabStore
+	Close() error
+}
+
+const (
+	etcdEndpointsEnv     = "PLOY_ETCD_ENDPOINTS"
+	etcdUsernameEnv      = "PLOY_ETCD_USERNAME"
+	etcdPasswordEnv      = "PLOY_ETCD_PASSWORD"
+	etcdCAEnv            = "PLOY_ETCD_TLS_CA"
+	etcdCertEnv          = "PLOY_ETCD_TLS_CERT"
+	etcdKeyEnv           = "PLOY_ETCD_TLS_KEY"
+	etcdSkipVerifyEnv    = "PLOY_ETCD_TLS_SKIP_VERIFY"
+	defaultGitlabTimeout = 10 * time.Second
+)
+
 var gitlabConfigStoreFactory = func(ctx context.Context) (gitlabStore, error) {
+	endpoints := etcdEndpointsFromEnv()
+	if len(endpoints) > 0 {
+		client, err := newEtcdClient(ctx, endpoints)
+		if err != nil {
+			return nil, err
+		}
+		return &etcdGitlabStore{Store: gitlabcfg.NewStore(gitlabcfg.NewEtcdKV(client)), client: client}, nil
+	}
 	path, err := gitlabConfigFile()
 	if err != nil {
 		return nil, err
@@ -63,11 +91,14 @@ func handleConfigGitlab(args []string, stderr io.Writer) error {
 }
 
 func runGitlabShow(stderr io.Writer) error {
-	store, err := gitlabConfigStoreFactory(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
+	defer cancel()
+	store, err := gitlabConfigStoreFactory(ctx)
 	if err != nil {
 		return err
 	}
-	cfg, revision, err := store.Load(context.Background())
+	defer closeGitlabStore(store)
+	cfg, revision, err := store.Load(ctx)
 	if err != nil {
 		return err
 	}
@@ -117,11 +148,14 @@ func runGitlabSet(args []string, stderr io.Writer) error {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return fmt.Errorf("decode config: %w", err)
 	}
-	store, err := gitlabConfigStoreFactory(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
+	defer cancel()
+	store, err := gitlabConfigStoreFactory(ctx)
 	if err != nil {
 		return err
 	}
-	revision, err := store.Save(context.Background(), cfg)
+	defer closeGitlabStore(store)
+	revision, err := store.Save(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -220,4 +254,93 @@ func gitlabConfigFile() (string, error) {
 		return "", fmt.Errorf("resolve config dir: %w", err)
 	}
 	return filepath.Join(dir, "ploy", "gitlab", "config.json"), nil
+}
+
+func closeGitlabStore(store gitlabStore) {
+	if closer, ok := store.(gitlabStoreCloser); ok {
+		_ = closer.Close()
+	}
+}
+
+type etcdGitlabStore struct {
+	*gitlabcfg.Store
+	client *clientv3.Client
+}
+
+func (s *etcdGitlabStore) Close() error {
+	return s.client.Close()
+}
+
+func etcdEndpointsFromEnv() []string {
+	raw := strings.TrimSpace(os.Getenv(etcdEndpointsEnv))
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	endpoints := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			endpoints = append(endpoints, trimmed)
+		}
+	}
+	return endpoints
+}
+
+func newEtcdClient(ctx context.Context, endpoints []string) (*clientv3.Client, error) {
+	cfg := clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 5 * time.Second,
+		Context:     ctx,
+	}
+	user := strings.TrimSpace(os.Getenv(etcdUsernameEnv))
+	if user != "" {
+		cfg.Username = user
+		cfg.Password = os.Getenv(etcdPasswordEnv)
+	}
+	tlsCfg, err := buildEtcdTLSConfig()
+	if err != nil {
+		return nil, err
+	}
+	if tlsCfg != nil {
+		cfg.TLS = tlsCfg
+	}
+	client, err := clientv3.New(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect etcd: %w", err)
+	}
+	return client, nil
+}
+
+func buildEtcdTLSConfig() (*tls.Config, error) {
+	caPath := strings.TrimSpace(os.Getenv(etcdCAEnv))
+	certPath := strings.TrimSpace(os.Getenv(etcdCertEnv))
+	keyPath := strings.TrimSpace(os.Getenv(etcdKeyEnv))
+	skipVerify := strings.EqualFold(strings.TrimSpace(os.Getenv(etcdSkipVerifyEnv)), "true")
+	if caPath == "" && certPath == "" && keyPath == "" && !skipVerify {
+		return nil, nil
+	}
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: skipVerify}
+	if caPath != "" {
+		caData, err := os.ReadFile(caPath)
+		if err != nil {
+			return nil, fmt.Errorf("read etcd CA: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if ok := pool.AppendCertsFromPEM(caData); !ok {
+			return nil, errors.New("parse etcd CA bundle")
+		}
+		tlsCfg.RootCAs = pool
+	}
+	if certPath != "" || keyPath != "" {
+		if certPath == "" || keyPath == "" {
+			return nil, errors.New("both etcd TLS cert and key required")
+		}
+		cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+		if err != nil {
+			return nil, fmt.Errorf("load etcd client cert: %w", err)
+		}
+		tlsCfg.Certificates = []tls.Certificate{cert}
+	}
+	return tlsCfg, nil
 }
