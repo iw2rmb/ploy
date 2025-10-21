@@ -1,89 +1,149 @@
-#!/usr/bin/env zsh
+#!/bin/zsh
 
 set -euo pipefail
 
-script_dir="${0:A:h}"
-repo_root="$(git -C "$script_dir" rev-parse --show-toplevel)"
-cd "$repo_root"
+source ~/.zshenv 2>/dev/null || true
+source ~/.zshrc 2>/dev/null || true
 
-if codex exec --help | grep -q -- '--search'; then
-  codex_has_search=1
-else
-  codex_has_search=0
-  echo "Warning: codex exec does not support --search; continuing without scoped search." >&2
-fi
+SCRIPT_PATH=${(%):-%x}
+SCRIPT_DIR=$(cd "$(dirname "$SCRIPT_PATH")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/../.." && pwd)
 
-run_codex() {
-  local search_scope="$1"
-  local prompt_payload="$2"
+SPEC_DIR="$REPO_ROOT/docs/v2"
+DESIGN_DIR="$REPO_ROOT/docs/design"
+TASKS_DIR="$REPO_ROOT/docs/tasks"
+TASK_QUEUE="$TASKS_DIR/README.md"
+INITIATIVE_PREFIX="ploy-v2"
 
-  if (( codex_has_search )); then
-    print -r -- "$prompt_payload" | codex exec --dangerously-bypass-approvals-and-sandbox --search "$search_scope"
+typeset -a FEATURES=()
+typeset -A FEATURE_SPEC_MAP
+
+for spec_file in "$SPEC_DIR"/*.md; do
+  [[ -f "$spec_file" ]] || continue
+  base_name=${spec_file:t:r}
+  if [[ "$base_name" == "README" ]]; then
+    feature_slug="overview"
   else
-    print -r -- "$prompt_payload" | codex exec --dangerously-bypass-approvals-and-sandbox
+    feature_slug=${base_name:l}
   fi
+  spec_rel=${spec_file#$REPO_ROOT/}
+  FEATURES+=("$feature_slug")
+  FEATURE_SPEC_MAP[$feature_slug]="$spec_rel"
+done
+
+mkdir -p "$DESIGN_DIR" "$TASKS_DIR"
+
+# run_codex re-sources the zsh environment and streams a prompt into codex exec.
+run_codex() {
+  local prompt="$1"
+  local tmpfile
+  tmpfile=$(mktemp)
+  print -r -- "$prompt" > "$tmpfile"
+  source ~/.zshenv 2>/dev/null || true
+  source ~/.zshrc 2>/dev/null || true
+  codex exec --dangerously-bypass-approvals-and-sandbox --search --cd "$REPO_ROOT" - < "$tmpfile"
+  rm -f "$tmpfile"
 }
 
-typeset -a design_docs
-design_docs=(${(@f)$(find docs/v2 -maxdepth 1 -type f -name '*.md' | sort)})
+# generate_design_docs asks Codex to transform each v2 spec into a design doc.
+generate_design_docs() {
+  for feature in "${FEATURES[@]}"; do
+    spec_rel=${FEATURE_SPEC_MAP[$feature]}
+    design_dir_rel="docs/design/${feature}"
+    design_doc_rel="${design_dir_rel}/README.md"
+    mkdir -p "$REPO_ROOT/$design_dir_rel"
+    prompt=$(cat <<EOF
+You are Codex operating inside the Ploy repository. Follow /Users/vk/@iw2rmb/docs/AGENTS.md and docs/AGENTS guidance verbatim.
 
-if (( ${#design_docs[@]} == 0 )); then
-  echo "No design docs found in docs/v2; aborting." >&2
-  exit 1
-fi
+Objective: Convert the v2 spec at ${spec_rel} into a design document stored at ${design_doc_rel}.
 
-design_doc_list=""
-for doc in "${design_docs[@]}"; do
-  design_doc_list+="- ${doc}"$'\n'
-done
+Constraints:
+- Use /Users/vk/@iw2rmb/docs/templates/design/README.md as the scaffold.
+- Use identifier prefix ${INITIATIVE_PREFIX}-${feature}-<sequence> and mirror Blocked by/Unblocks links across artefacts.
+- Reference ${spec_rel} explicitly in the Dependencies, Evidence, and Verification sections.
+- Update docs/design/README.md index, maintaining status checkboxes and dependency mirrors.
+- Capture COSMIC sizing guidance and environment variable impacts; reflect findings in docs/envs/README.md or note TODOs.
+- Record documentation verification details in CHANGELOG.md as required by /Users/vk/@iw2rmb/docs/AGENTS.md.
 
-design_prompt=$(cat <<EOF
-You are the lead architect for the docs/v2 program. Generate the full scope of design documentation required for the docs/v2 implementation. Review every existing file under docs/v2, add any missing design artifacts, and ensure each document is complete, internally consistent, and cross-referenced. Where new documents are needed, create them under docs/v2 following existing formatting conventions.
-
-Current docs inventory:
-${design_doc_list}
-
-Deliver updated and newly created design docs directly in the repository.
+Deliverables:
+1. Completed design doc written to ${design_doc_rel}.
+2. Updated docs/design/README.md, docs/envs/README.md (if new env vars surface), and CHANGELOG.md.
+3. Any supporting files or links needed to keep design and specs consistent.
 EOF
 )
+    run_codex "$prompt"
+  done
+}
 
-run_codex "docs/v2 docs/tasks" "$design_prompt"
+# generate_task_specs decomposes each design into task specs and refreshes the queue.
+generate_task_specs() {
+  for feature in "${FEATURES[@]}"; do
+    design_doc_rel="docs/design/${feature}/README.md"
+    tasks_dir_rel="docs/tasks/${feature}"
+    mkdir -p "$REPO_ROOT/$tasks_dir_rel"
+    prompt=$(cat <<EOF
+You already produced ${design_doc_rel}; now derive actionable tasks for ${INITIATIVE_PREFIX}.
 
-design_docs=(${(@f)$(find docs/v2 -maxdepth 1 -type f -name '*.md' | sort)})
+Inputs:
+- Design source: ${design_doc_rel}
+- Tasks directory: ${tasks_dir_rel}
+- Queue index: ${TASK_QUEUE}
+- Templates: /Users/vk/@iw2rmb/docs/templates/tasks/README.md and /Users/vk/@iw2rmb/docs/templates/tasks/INDEX.md
+- COSMIC checklist: /Users/vk/@iw2rmb/docs/COSMIC.md
 
-for doc in "${design_docs[@]}"; do
-  doc_name="${doc:t}"
-  doc_slug="${doc_name%.md}"
-  task_file="docs/tasks/${doc_slug}.md"
+Requirements:
+1. Create task specs under ${tasks_dir_rel} using filenames ${INITIATIVE_PREFIX}-${feature}-<sequence>-<stage>.md.
+2. Ensure each task lists Blocked by/Unblocks links that mirror the design doc and other tasks.
+3. Size each task with COSMIC CFPs and split anything above 4 CFP into smaller units.
+4. Refresh docs/tasks/README.md using the index template so unblocked work appears first; mark newly generated tasks as unclaimed (- [ ]).
+5. Update design doc dependency tables to reference the new tasks.
+6. Append verification notes to CHANGELOG.md covering the planning work.
 
-  task_prompt=$(cat <<EOF
-Derive the implementation task plan for ${doc}. Produce a sequenced checklist of actionable tasks with acceptance criteria and owner notes, then write the plan to ${task_file}. Each checklist item should map to a concrete deliverable that moves the docs/v2 implementation forward.
-EOF
-  )
-
-  run_codex "${doc} docs/tasks" "$task_prompt"
-done
-
-queue_prompt=$(cat <<'EOF'
-Update docs/tasks/README.md to reflect the current task queue generated for the docs/v2 rollout. Preserve the legend, add each docs/tasks/*.md file in dependency order as unchecked items, and remove any stale entries.
+Output: Task specs ready for implementation and a dependency-sorted docs/tasks/README.md queue.
 EOF
 )
+    run_codex "$prompt"
+  done
+}
 
-run_codex "docs/tasks" "$queue_prompt"
+# next_task_in_queue returns the first unclaimed task path from the queue.
+next_task_in_queue() {
+  [[ -f "$TASK_QUEUE" ]] || return 1
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" == "- [ ] "* ]]; then
+      local candidate=${line#- [ ] \`}
+      candidate=${candidate%\`}
+      print -r -- "$candidate"
+      return 0
+    fi
+  done < "$TASK_QUEUE"
+  return 1
+}
 
-typeset -a task_files
-task_files=(${(@f)$(find docs/tasks -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | sort)})
+# implement_tasks runs Codex on each queued task until the backlog is empty.
+implement_tasks() {
+  while next_task=$(next_task_in_queue); do
+    prompt=$(cat <<EOF
+Implement the next planned task while obeying /Users/vk/@iw2rmb/docs/AGENTS.md workflows.
 
-if (( ${#task_files[@]} == 0 )); then
-  echo "No task files found under docs/tasks; skipping implementation phase." >&2
-  exit 0
-fi
+Active task: ${next_task}
 
-for task in "${task_files[@]}"; do
-  impl_prompt=$(cat <<EOF
-Implement the work described in ${task}. Complete the checklist items, update code, tests, and docs as required, run the necessary validations, and then create a focused git commit referencing ${task}. Provide a brief implementation report in the command output.
+Execution checklist:
+1. Immediately re-open docs/tasks/README.md and mark ${next_task} as reserved (- [x]) before editing.
+2. Follow the RED ➜ GREEN ➜ REFACTOR cadence spelled out in the task spec; write failing tests first.
+3. Implement code, docs, and configuration updates demanded by ${next_task}, keeping design/task dependencies mirrored.
+4. Run required local validation (make test, go test ./..., make build, make lint-md when docs change) and record evidence in CHANGELOG.md.
+5. Update docs/design/README.md, the owning design doc, and docs/tasks/README.md to reflect completion; remove the queue entry when done.
+6. Commit with message referencing the task identifier (e.g. "feat: ${INITIATIVE_PREFIX} ${next_task}") and ensure the workspace is clean.
+
+Do not start another task until this one is complete and committed.
 EOF
-  )
+)
+    run_codex "$prompt"
+  done
+}
 
-  run_codex "${task} docs/v2 internal pkg cmd" "$impl_prompt"
-done
+generate_design_docs
+generate_task_specs
+implement_tasks
