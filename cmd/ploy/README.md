@@ -147,7 +147,7 @@ classifier drift without leaving the workstation.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set it
   also dictates the grid client state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `grid`; upcoming adapters (`k8s`, `nomad`, `openshift`) will register here and
+  `local-step`; other adapters (`grid`, `k8s`, `nomad`) register here and
   unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache

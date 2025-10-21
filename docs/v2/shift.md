@@ -23,5 +23,12 @@ module. Key changes:
   asserting the expected outputs.
 - Remove any test harnesses that spun up fake Grid APIs or JetStream fixtures.
 
+## Current Status (2025-10)
+
+- The Ploy node runtime invokes the SHIFT sandbox after every step and surfaces the resulting
+  diagnostics in job metadata.
+- Static-check adapters remain disabled until artifact publishing lands in `roadmap-mod-step-runtime-03`;
+  once available, the SHIFT client will attach the structured reports to the staged artifacts.
+
 By simplifying SHIFT this way, Ploy v2 can reuse the build gate logic via module imports without any
 legacy Grid wiring.

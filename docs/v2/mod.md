@@ -64,8 +64,9 @@ ploy mod run \
   - The node re-enters the healing loop (`llm-plan`) to suggest follow-up steps (e.g., dependency
     bumps, code tweaks), applying each recommended fix and re-running the build gate.
 - On success:
-  - The node records the Mod stage as complete, persists the final diffs, and publishes a structured
-    build gate report (JSON) to IPFS Cluster with the resulting CID attached to the job outcome.
+  - The node records the Mod stage as complete, persists the final diff tarball, and stages a
+    structured build gate report (JSON) for publication. Both CIDs are attached to the job outcome
+    so the artifact store can push them to IPFS Cluster once replication is available.
 
 ## 6. Completion & Output
 
@@ -81,9 +82,9 @@ ploy mod run \
 
 - **GitLab Integration** — Credentials live in etcd, enabling secure repo cloning and MR operations
   without manual token management on nodes.
-- **Artifact Reuse** — Snapshots and diffs flow through IPFS Cluster, avoiding redundant clones when
-  repeating Mods.
-- **Build Gate Enforcement** — Every major step runs through SHIFT; failures feed into LLM planning
-  for automated healing.
+- **Artifact Reuse** — Snapshots hydrate locally from cached tarballs and staged diffs flow into the
+  upcoming IPFS artifact store, avoiding redundant clones when repeating Mods.
+- **Build Gate Enforcement** — Each step runs the SHIFT sandbox automatically; static checks are
+  re-enabled once the artifact publisher exposes the detailed reports.
 - **Deterministic Replay** — Each step reconstructs repository state from the original HEAD plus
   ordered diffs, ensuring consistent outcomes across nodes.

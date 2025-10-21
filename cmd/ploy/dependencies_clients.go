@@ -69,7 +69,7 @@ func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
 func defaultGridFactory() (runner.GridClient, error) {
 	selection := strings.TrimSpace(os.Getenv(runtimeAdapterEnv))
 	if selection == "" {
-		selection = "grid"
+		selection = "local-step"
 	}
 	if runtimeRegistry == nil {
 		return nil, fmt.Errorf("configure runtime adapters: registry unavailable")
@@ -80,7 +80,7 @@ func defaultGridFactory() (runner.GridClient, error) {
 	}
 	client, err := adapter.Connect(context.Background())
 	if errors.Is(err, runtime.ErrAdapterDisabled) {
-		return runner.NewInMemoryGrid(), nil
+		return nil, err
 	}
 	if err != nil {
 		return nil, err
@@ -266,6 +266,9 @@ func (gridRuntimeAdapter) Connect(ctx context.Context) (runner.GridClient, error
 func init() {
 	if runtimeRegistry == nil {
 		runtimeRegistry = runtime.NewRegistry()
+	}
+	if err := runtimeRegistry.Register(newLocalRuntimeAdapter()); err != nil {
+		panic(err)
 	}
 	if err := runtimeRegistry.Register(newGridRuntimeAdapter()); err != nil {
 		panic(err)

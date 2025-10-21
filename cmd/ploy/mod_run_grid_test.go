@@ -12,9 +12,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/aster"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
-func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
+func TestHandleModRunUsesLocalRuntimeByDefault(t *testing.T) {
 	withStubWorkspacePreparer(t)
 
 	fakeRunner := &recordingRunner{}
@@ -57,8 +58,8 @@ func TestHandleModRunUsesInMemoryGridWhenCredentialsMissing(t *testing.T) {
 	if err := handleModRun([]string{"--tenant", "acme", "--ticket", "ticket-123"}, io.Discard); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, ok := fakeRunner.opts.Grid.(*runner.InMemoryGrid); !ok {
-		t.Fatalf("expected in-memory grid client, got %T", fakeRunner.opts.Grid)
+	if _, ok := fakeRunner.opts.Grid.(*runtime.LocalStepClient); !ok {
+		t.Fatalf("expected local step client, got %T", fakeRunner.opts.Grid)
 	}
 }
 
@@ -90,6 +91,7 @@ func TestHandleModRunUsesSharedGridClient(t *testing.T) {
 	t.Setenv(gridAPIKeyEnv, "secret")
 	t.Setenv(gridAPIKeyFallbackEnv, "secret")
 	t.Setenv(gridClientStateEnv, t.TempDir())
+	t.Setenv(runtimeAdapterEnv, "grid")
 
 	status := gridclient.Status{
 		Beacon: gridclient.BeaconStatus{

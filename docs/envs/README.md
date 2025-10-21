@@ -30,10 +30,14 @@ additional configuration.
   When set it controls the workflow SDK cache path and is reused as the grid
   client state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `grid`. Future adapters (`k8s`, `nomad`, `openshift`) will plug in here; the
-  CLI fails fast when an unknown adapter name is provided.
+  `local-step`. Other adapters (`grid`, `k8s`, `nomad`) plug in here; the CLI
+  fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
+- `PLOY_ETCD_ENDPOINTS` — Comma-separated etcd endpoints used by the control-plane scheduler
+  (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled.
+- `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
+  until the CLI flips to the new scheduler by default.
 
 ## E2E Harness
 

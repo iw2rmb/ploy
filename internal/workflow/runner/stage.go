@@ -33,6 +33,7 @@ type Stage struct {
 	Metadata     StageMetadata
 	CacheKey     string
 	Job          StageJobSpec
+	StepManifest *contracts.StepManifest
 }
 
 // StageMetadata captures stage-specific metadata for checkpoints.

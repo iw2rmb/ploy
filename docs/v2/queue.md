@@ -9,88 +9,69 @@ behaviour.
 - Waiting jobs live under `queue/<kind>/<priority>/<job-id>`.
   - `<kind>` is `mods` or `buildgate`.
   - `<priority>` can be `default`, `high`, etc. (lexicographic order determines pull order).
-  - The value stores the job payload including resource requirements and metadata.
+  - The value stores the job payload including ticket, step ID, retry counters, and metadata used
+    for scheduling.
 - Example payload:
 
   ```json
   {
+    "job_id": "job-8a9f",
     "ticket": "mod-123",
     "step_id": "apply-1",
-    "cpu": 1000,          // milliCPU
-    "mem": 512,           // MiB
-    "retry": 0,
+    "priority": "default",
+    "retry_attempt": 0,
+    "max_attempts": 2,
     "enqueued_at": "2025-10-08T12:34:56Z"
   }
   ```
 
 Jobs may override defaults via CLI flags:
 
-- `--cpu` (milliCPU) and `--mem` (MiB) control resource requirements (defaults: 1000m CPU, 512 MiB).
-- `--retry` sets the maximum additional attempts (default 0).
+- `--priority` moves the job into a different priority bucket.
+- `--retry` sets the maximum additional attempts (default 0, meaning a single execution).
 
-## Capacity Reporting
+## Claim Flow
 
-- Every `ploynode` publishes free capacity to etcd every 15 seconds under
-  `nodes/<node-id>/capacity`:
+Workers poll the queue continuously:
 
-  ```json
-  {
-    "cpu_free": 6000,
-    "mem_free": 8192,
-    "heartbeat": "2025-10-08T12:35:00Z",
-    "revision": 42
-  }
-  ```
-
-- Nodes update the record immediately after claiming or finishing a job so the queue reflects the
-  latest capacity.
-
-## Pulling Work
-
-Every minute a node wakes up and:
-
-1. Reads a slice of queue keys (`queue/mods/*`, `queue/buildgate/*`) ordered by priority+
-   submission time.
-2. For each entry, checks if its `cpu`/`mem` fit within the node’s published `cpu_free`/`mem_free`.
-3. If a match is found, the node issues an etcd transaction:
-   - Compare the queue key version to ensure it still exists.
-   - Compare the node capacity revision to ensure no other claim changed it.
+1. Fetch the oldest entry within the relevant prefix (`queue/mods/*`, `queue/buildgate/*`).
+2. Load the job record to confirm it is still `queued` and capture the current modification revision.
+3. Grant a lease (`leases/jobs/<job-id>`) with TTL (default 120s) and build an optimistic
+   transaction:
+   - Compare the queue key revision to ensure no other worker removed it.
+   - Compare the job record revision to ensure the job is still `queued`.
    - Delete the queue key.
-   - Create/Update the job record under `mods/<ticket>/jobs/<job-id>` (state = `claimed`,
-     `claimed_by = node-id`).
-   - Update `nodes/<node-id>/capacity` with the reduced `cpu_free`/`mem_free`.
-4. If no job fits, the node leaves the queue untouched and retries after the sleep interval.
+   - Update the job record with state `running`, `claimed_by`, `claimed_at`, and `lease_id`.
+   - Persist the lease key with the granted lease so etcd expires it if the worker disappears.
+4. If the transaction fails, revoke the lease and retry the next queue entry.
 
-Because each claim is wrapped in a transaction, jobs are claimed once even when multiple nodes race
-to pull work.
+Because the queue deletion, job mutation, and lease creation occur in a single transaction, only one
+worker can claim a job even under heavy contention.
 
 ## Execution & Completion
 
 - After claiming a job, the node hydrates the workspace, runs the container, and updates the job
   record with status, timestamps, and artifact CIDs (see `docs/v2/job.md`).
-- When the job finishes, the node restores its free capacity and writes a completion event.
+- When the job finishes, the worker calls the control-plane completion API which transitions the job
+  to `succeeded`, `failed`, or `inspection_ready`, clears the lease, and writes a GC marker.
 
 ## Retry Behaviour
 
-- If a job fails and should be retried, the control plane re-enqueues it with `retry` decremented and
-  a new queue key (e.g., `queue/mods/default/mod-123/apply-1/retry-2`).
-- Jobs store `enqueued_at` timestamps so operators can identify starvation or long waits, but there
-  is no hard time limit enforced.
+- When a job fails and `retry_attempt < max_attempts`, the scheduler re-enqueues it with the attempt
+  counter incremented, preserving `priority` and metadata.
+- Jobs store `enqueued_at` timestamps so operators can identify starvation or long waits.
 
 ## Node Failure & Failover
 
-- Since the queue entry is removed only after the job is claimed, jobs that never reach `state:
-  running` remain queued.
-- If a node crashes mid-job, heartbeat monitoring (every 15s capacity updates) detects the stale
-  node. The control plane can mark the job as failed and re-enqueue it according to the `retry`
-  policy.
-- Capacity updates ensure other nodes see the crash (capacity entry stops updating) and avoid
-  routing new work to unresponsive nodes.
+- The lease watcher monitors `leases/jobs/`. When a lease expires (worker crash or missing
+  heartbeat), the scheduler transitions the job back to `queued` and re-creates the queue entry.
+- If the retry budget is exhausted the job transitions to `failed` with reason `lease_expired` so
+  operators can inspect before GC removes the record.
 
 ## Summary
 
-- etcd stores both queue items and node capacity, enabling atomic claim operations.
-- Nodes poll the queue periodically and only grab work that fits current resources.
-- Retries are controlled by job metadata; no separate leader election is required.
-- Operators can inspect queue entries and timestamps through etcd or future CLI tooling to monitor
-  backlogs.
+- etcd stores queue items, job records, and lease keys so all coordination lives in one system.
+- Optimistic transactions guarantee single-claim semantics without leader election.
+- Automatic lease expiry handles crashed workers and keeps the queue populated with retryable jobs.
+- Operators can inspect queue entries, job records, and lease keys directly in etcd or via the
+  control-plane HTTP API.
