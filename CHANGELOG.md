@@ -1,5 +1,63 @@
 # Changelog
 
+## [2025-10-21] Local Step Runtime Wiring
+
+- Defaulted the CLI to the `local-step` runtime adapter and registered a Docker
+  backed `runtime/step` container implementation plus filesystem workspace
+  hydration, diff tarball generation, and artifact staging modules used by the
+  local step client.
+- Updated Mods documentation to describe local execution and staged artifacts
+  (`docs/workflow/README.md`, `docs/v2/README.md`, `docs/v2/job.md`,
+  `docs/v2/mod.md`, `docs/v2/shift.md`) and captured the follow-on artifact
+  publisher work in `docs/tasks/roadmap/03a-mod-runtime-artifacts.md`.
+- Closed out roadmap task `docs/tasks/roadmap/02-mod-step-runtime.md`, marking it
+  completed and logging verification steps; refreshed README/env references for
+  the new runtime default.
+- Verification (2025-10-21):
+  - `go test ./internal/workflow/runtime/...`
+  - `go test ./cmd/...`
+  - `go test ./...`
+  - `npx markdownlint --config .markdownlint.yaml README.md docs/envs/README.md \\
+    cmd/ploy/README.md docs/workflow/README.md docs/v2/README.md docs/v2/job.md \\
+    docs/v2/mod.md docs/v2/shift.md docs/tasks/roadmap/02-mod-step-runtime.md \\
+    docs/tasks/README.md docs/tasks/roadmap/03a-mod-runtime-artifacts.md`
+
+## [2025-10-21] Mods Step Runtime Foundations
+
+- Introduced a node-local runtime client (`internal/workflow/runtime/local_client.go`) that adapts
+  `internal/workflow/runtime/step.Runner` to the workflow runner interface, along with a build
+  gate-backed `ShiftClient` (`internal/workflow/runtime/step/shift_client.go`) emitting sanitized
+  diagnostics.
+- Extended step manifest requests with workspace context, surfaced build gate metadata on stage
+  checkpoints, and added unit coverage for SHIFT failure propagation and local runtime outcomes
+  (`internal/workflow/runtime/local_client_test.go`,
+  `internal/workflow/runtime/step/shift_client_test.go`).
+- Task `docs/tasks/roadmap/02-mod-step-runtime.md` now tracks this foundation and enumerates the
+  follow-up wiring required to retire the Grid adapter.
+- Verification (2025-10-21):
+  - `go test ./internal/workflow/runtime/...`
+  - `go test ./internal/workflow/runtime/step/...`
+  - `go test ./...`
+
+## [2025-10-21] Control Plane Scheduler
+
+- Added `internal/controlplane/scheduler` with etcd-backed job submission, claim, heartbeat, and
+  completion flows using optimistic transactions and lease watchers.
+- Introduced an HTTP surface in `internal/controlplane/httpapi` with lifecycle tests and embedded
+  etcd fixtures.
+- Created integration suite under `tests/integration/controlplane` exercising multi-worker claims
+  and lease expiry requeues; refreshed unit tests for heartbeat renewal and TTL enforcement.
+- Documented scheduler behaviour across `docs/v2/etcd.md`, `docs/v2/queue.md`, `docs/v2/job.md`,
+  and added the `docs/runbooks/control-plane/job-recovery.md` operational guide alongside updated
+  environment variable references.
+- Updated `docs/design/control-plane/README.md` and roadmap task metadata to reflect completion of
+  `roadmap-control-plane-01` with verification evidence.
+- Verification (2025-10-21):
+  - `go test ./internal/controlplane/...`
+  - `go test -tags integration ./tests/integration/controlplane`
+  - `staticcheck ./internal/controlplane/...`
+  - `make lint-md`
+
 ## [2025-10-09] Discovery Env Cleanup
 
 - Retired the legacy discovery override variable so the CLI now reads the beacon

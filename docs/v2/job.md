@@ -5,8 +5,9 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## Job Types
 
-- **Mod step jobs** — Run the units defined in a Mod plan (plan, apply, healing actions). These jobs
-  are associated with a Mod ticket and appear both under `/v2/mods/{ticket}` and `/v2/jobs/{id}`.
+- **Mod step jobs** — Run the units defined in a Mod plan (plan, apply, healing actions). Each job
+  executes a single step manifest locally on the worker node and appears both under
+  `/v2/mods/{ticket}` and `/v2/jobs/{id}`.
 - **Build gate jobs** — Execute the SHIFT build gate (sandbox + static checks). They share the same
   schema but are flagged with `type: buildgate` in the metadata.
 - Additional auxiliary jobs (e.g., log ingestion) can reuse the same pattern if future roadmap items
@@ -14,20 +15,24 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## Lifecycle
 
-1. **Submission** — The control plane creates a job record in etcd, capturing image, command,
-   environment variables, mounts, and metadata (ticket, step ID, requester).
-2. **Execution** — The workflow runner materialises the inputs (repo snapshots, cumulative diffs,
-   secrets) through the job service, mounts the hydrated workspace into the container, and launches
-   it via the Docker runtime adapter.
-3. **Monitoring** — Runtime state (queued, running, succeeded, failed, timed out) and resource usage
-   are persisted back to etcd. Log metadata (CID, digest, tail snippet) is recorded while the full
-   log payload lives in IPFS (see [docs/v2/logs.md](logs.md)).
+1. **Submission** — The control plane persists a job record in etcd with state `queued`, priority,
+   retry budget, and metadata, then inserts a queue entry under `queue/<kind>/<priority>/<job-id>`.
+2. **Execution** — Worker nodes claim jobs through the scheduler HTTP API. Successful claims update
+   the job to `running`, stamp `claimed_by`, attach an etcd lease, and delete the queue entry. The
+   node hydrates the workspace (snapshot + cumulative diffs) and runs the step manifest inside a
+   retained Docker container.
+3. **Monitoring** — Runtime state transitions (`queued`, `running`, `succeeded`, `failed`,
+   `inspection_ready`) plus timestamps, artifacts, and error metadata are persisted back to etcd.
+   Lease heartbeats update the expiry timestamp. Log metadata (CID, digest, tail snippet) is
+   recorded while the full payload lives in IPFS (see [docs/v2/logs.md](logs.md)).
 4. **Retention** — Job records, stdout/stderr, and structured metadata are retained according to
-   policy (default seven days) for audit and debugging.
+   policy (default seven days) for audit and debugging. Terminal jobs also gain a GC marker under
+   `gc/jobs/<job-id>` with an expiry timestamp for the retention controller.
 
 ## Container Handling
 
-- Containers are launched with `auto-remove` disabled so logs and exit metadata can be collected.
+- Containers are launched with `auto-remove` disabled so logs and exit metadata can be collected,
+  matching the local runtime defaults.
   Once log bundles are archived to IPFS and metadata is persisted, `ploynode` explicitly removes the
   container to avoid disk bloat.
 - Nodes periodically clean up terminated containers once logs are archived and retention windows
@@ -45,12 +50,12 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## Outputs & Artifacts
 
-- Diff-producing steps (e.g., ORW apply) upload a tarball or patch bundle to IPFS Cluster using the
-  node’s local cluster client, keyed by the job ID. The returned CID, size, and checksum are
-  persisted in the job outcome stored in etcd.
+- Diff-producing steps (e.g., ORW apply) package changes as deterministic tarballs generated from the
+  writable workspace mount. The tarball is staged locally (hashed to produce a CID) and recorded in
+  the job outcome stored in etcd. Subsequent tasks publish the staged artifacts to IPFS Cluster.
 - Ploy nodes compute diffs after each step by comparing the hydrated workspace against the baseline
-  tree. The resulting bundle is uploaded to IPFS Cluster, keyed by the job ID, and recorded in etcd
-  with CID, size, and checksum.
+  tree. The resulting tarball is retained alongside the log bundle so the artifact publisher can push
+  them to IPFS Cluster once the dedicated artifact store slice lands.
 - Build gate runs emit structured JSON reports (errors, static check findings) into IPFS. The job
   metadata links the report CID alongside the log digest, status, and failure reason.
 - Job metadata lives under `mods/<ticket>/jobs/<job-id>` in etcd, providing a compact index so the
@@ -58,20 +63,22 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## Failure Semantics
 
-- Failures capture exit code, reason, and the tail of stdout/stderr.
-- Build gate failures trigger healing workflows (e.g., `llm-plan`), while Mods mark the offending
-  step for operator review.
-- Retries create new job records linked to the original ticket for traceability.
-- Operator-driven resumes (via `ploy mod resume`) are distinct: they rehydrate the Mod from stored
-  artifacts and enqueue fresh jobs only when administrators explicitly request it. Automated retries
-  respect the per-job `retry` budget.
+- Failures capture exit code, reason, and the tail of stdout/stderr. Scheduler-induced failures
+  (lease expiry, heartbeat timeout) set `error.reason = lease_expired` and honour the retry budget.
+- Build gate failures continue to trigger healing workflows (e.g., `llm-plan`), while Mods mark the
+  offending step for operator review.
+- Retries increment `retry_attempt` on the same job record and re-enqueue the job when budget
+  remains. Once exhausted, the job transitions to `failed` and a GC marker is written.
+- Operator-driven resumes (via `ploy mod resume`) rehydrate the Mod from stored artifacts and
+  enqueue fresh jobs only when administrators explicitly request it.
 
 ## CLI & API Touchpoints
 
-- `ploy status` and `ploy mod inspect` surface job history for each step, with links to log streams
-  and IPFS CIDs.
+- `POST /v2/jobs` submits work, `POST /v2/jobs/claim` lets workers compete for steps,
+  `POST /v2/jobs/{id}/heartbeat` renews leases, and `POST /v2/jobs/{id}/complete` records terminal
+  states.
+- `GET /v2/jobs/{id}` and `GET /v2/jobs?ticket=` back the CLI (`ploy status`, `ploy mod inspect`)
+  with complete lifecycle snapshots including lease metadata.
 - `ploy logs job <job-id>` tails logs via SSE and fetches archived bundles from IPFS when complete.
-- API consumers can query `GET /v2/jobs/{id}` for status snapshots and `GET /v2/jobs/{id}/logs` for
-  archived output.
 - Responses include the executing node ID so operators can reach the exact worker for further
   diagnostics (`ploy node logs` or node API).

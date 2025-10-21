@@ -61,6 +61,35 @@ func TestDefaultGridFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
 	}
 }
 
+func TestDefaultGridFactoryDefaultsToLocalStep(t *testing.T) {
+	prevRegistry := runtimeRegistry
+	t.Cleanup(func() { runtimeRegistry = prevRegistry })
+	runtimeRegistry = runtime.NewRegistry()
+
+	adapter := &fakeRuntimeAdapter{
+		meta: runtime.AdapterMetadata{
+			Name:    "local-step",
+			Aliases: []string{"local"},
+		},
+		grid: runner.NewInMemoryGrid(),
+	}
+	if err := runtimeRegistry.Register(adapter); err != nil {
+		t.Fatalf("register adapter: %v", err)
+	}
+
+	t.Setenv(runtimeAdapterEnv, "")
+	client, err := defaultGridFactory()
+	if err != nil {
+		t.Fatalf("defaultGridFactory: %v", err)
+	}
+	if adapter.connectCalled != 1 {
+		t.Fatalf("expected local-step adapter used, calls=%d", adapter.connectCalled)
+	}
+	if client != adapter.grid {
+		t.Fatalf("expected local-step grid client to be returned")
+	}
+}
+
 func TestDefaultGridFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
 	prevRegistry := runtimeRegistry
 	t.Cleanup(func() { runtimeRegistry = prevRegistry })

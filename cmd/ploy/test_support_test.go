@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"os"
 	"testing"
 
 	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
@@ -13,6 +14,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 type recordingRunner struct {
@@ -134,4 +137,27 @@ func withGridClientStub(t *testing.T, stub gridClientAPI) {
 			resetGridClientState()
 		})
 	}
+}
+
+func withStepExecutorStub(t *testing.T, executor runtime.StepExecutor, err error) {
+	prevFactory := stepExecutorFactory
+	stepExecutorFactory = func() (runtime.StepExecutor, error) {
+		return executor, err
+	}
+	if t != nil {
+		t.Cleanup(func() { stepExecutorFactory = prevFactory })
+	}
+}
+
+type noopStepExecutor struct{}
+
+func (noopStepExecutor) Run(ctx context.Context, req step.Request) (step.Result, error) {
+	_ = ctx
+	return step.Result{}, nil
+}
+
+func TestMain(m *testing.M) {
+	withStepExecutorStub(nil, noopStepExecutor{}, nil)
+	code := m.Run()
+	os.Exit(code)
 }

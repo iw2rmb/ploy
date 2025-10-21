@@ -9,8 +9,9 @@ while keeping the CLI experience familiar.
 
 - Mods remain the primary unit of work: each Mod starts from a repository, expands into a plan,
   and executes a sequence of typed steps (plan, LLM, rewrite generation, rewrite apply, validation).
-- Every step runs inside an OCI image, receives repository plus cumulative diffs as inputs,
-  produces a diff, and passes through the SHIFT build gate before continuing.
+- Every step runs inside an OCI image, receives repository plus cumulative diffs as inputs, executes
+  via the node-local Docker runtime, produces a diff tarball, and passes through the SHIFT sandbox
+  before continuing.
 - The control plane may assign independent steps to different nodes when a Mod’s dependency graph
   allows for concurrency. Each step is claimed once via the job records in etcd, so no additional
   leader election or distributed locks are required.
@@ -23,6 +24,9 @@ while keeping the CLI experience familiar.
   and bootstrapping a cluster.
 - **Ploy Nodes** — Worker daemons hosting Docker, SHIFT, IPFS Cluster client, and etcd connectivity.
   They execute Mod steps, persist job state, and stream logs back to the CLI.
+- **Control Plane Service** — Exposes `/v2/jobs` APIs for submission, worker claims, heartbeats,
+  status queries, and completion. Wraps the etcd-backed scheduler and enforces optimistic
+  concurrency with leases.
 - **Ploy Node (beacon mode)** — A standard node operating in discovery mode: serves DNS bootstrap,
   distributes API endpoints and trust bundles, and still participates in job execution when capacity
   allows.

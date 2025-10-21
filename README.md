@@ -228,7 +228,7 @@ inspects the following environment variables:
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set, it
   also controls the grid client state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `grid`; future adapters (`k8s`, `nomad`, `openshift`) will plug in here. The
+  `local-step`; future adapters (`grid`, `k8s`, `nomad`) will plug in here. The
   CLI fails fast when an unknown adapter is requested.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration.

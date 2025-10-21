@@ -109,7 +109,14 @@ func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
 			ManifestVersion: "v2",
 			Lanes: manifests.LaneSet{
 				Required: []manifests.Lane{{Name: "node-wasm"}},
-				Allowed:  []manifests.Lane{{Name: "go-native"}, {Name: "gpu-ml"}},
+				Allowed: []manifests.Lane{
+					{Name: "go-native"},
+					{Name: "gpu-ml"},
+					{Name: "mods-human"},
+					{Name: "build-gate"},
+					{Name: "static-checks"},
+					{Name: "test"},
+				},
 			},
 		},
 	}

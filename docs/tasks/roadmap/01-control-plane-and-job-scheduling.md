@@ -1,21 +1,74 @@
-# Control Plane & Job Scheduling
+# roadmap-control-plane-01 – Control Plane & Job Scheduling
 
-## Why
-- Consolidate Mods coordination into a workstation-first control plane that no longer relies on Grid services.
-- Ensure each Mod step is scheduled once, supports concurrency, and persists state within etcd as the single source of truth (per `docs/v2/README.md`).
+- **Identifier**: `roadmap-control-plane-01`
+- [x] **Status**: Completed (2025-10-21)
+- **Blocked by**:
+  - `docs/design/control-plane/README.md`
+- **Unblocks**:
+  - `docs/tasks/roadmap/02-mod-step-runtime.md`
+  - `docs/tasks/roadmap/07-job-observability.md`
+- **Planned Complexity (COSMIC)**
+  - Sized on: 2025-10-21 · Planned CFP: 13
 
-## Required Changes
-- Design an etcd keyspace that captures node membership, Mods metadata, and job lifecycle events without Grid fallbacks.
-- Implement optimistic concurrency and lease-based TTLs for job claims so only one node executes a step at a time, following current etcd scheduling best practices.citeturn1search9
-- Define durable job status records (queued, running, succeeded, failed, inspection-ready) with retention windows and garbage collection hooks.
-- Remove all Grid-specific leader election or dependency code paths from the scheduler packages.
+| Functional process        | E | X | R | W | CFP |
+|---------------------------|---|---|---|---|-----|
+| Job submission API        | 2 | 1 | 1 | 1 | 5   |
+| Job claim/lease workflow  | 2 | 1 | 1 | 1 | 5   |
+| Status query/reporting    | 1 | 0 | 1 | 0 | 2   |
+| Runbook/GC hooks          | 0 | 1 | 0 | 0 | 1   |
+| **TOTAL**                 | 5 | 3 | 3 | 2 | 13  |
 
-## Definition of Done
-- Control-plane service exposes APIs for job submission, status query, and worker claims backed solely by the new etcd layout.
-- Nodes acquire and release work through documented leases with automatic expiry when a worker disappears.
-- Operational runbooks document how to recover stuck jobs by manipulating the new keyspace rather than Grid tools.
+_Assumptions_: CFP counts treat each API path as one functional process; GC hooks limited to
+metadata wiring for this slice.
 
-## Tests
-- Unit tests covering optimistic locking, lease renewal, and failure recovery paths on the scheduler.
-- Integration tests that spin up ephemeral etcd instances and multiple worker processes to validate single-claim behaviour and retry semantics.
-- Coverage reports confirm ≥90% coverage on scheduler packages, in line with the repo standards.
+- **Why**
+  - Remove Grid dependency for Mods scheduling by introducing an etcd-backed control plane per
+    `docs/design/control-plane/README.md`.
+
+- **How / Approach**
+  - Build scheduler + queue service using etcd transactions and leases.
+  - Expose HTTP API endpoints for submission, claim, status, completion.
+  - Provide retention and runbook tooling via explicit key prefixes.
+  - Remove Grid leader-election references from runtime adapter registry.
+
+- **Changes Needed**
+  - `internal/controlplane/scheduler/*` – job service, optimistic txn logic, lease watchers.
+  - `internal/controlplane/httpapi/*` – HTTP handlers for submission/claim/status.
+  - `tests/integration/controlplane/*` – embedded etcd integration coverage.
+  - `docs/design/control-plane/README.md` – keep design synced as implementation lands.
+  - `docs/runbooks/control-plane/job-recovery.md` – operational recovery steps.
+  - `docs/envs/README.md`, `docs/v2/README.md`, `docs/v2/queue.md`, `docs/v2/job.md` – align
+    documentation with new scheduler behaviour.
+  - `CHANGELOG.md` – record verification evidence and doc updates.
+
+- **Definition of Done**
+  - Control-plane service processes job submission, claim, status, completion purely via etcd
+    keyspace described in design.
+  - Single-claim guarantee enforced through transactions and leases.
+  - Job status records persist through completion with retention + GC hooks.
+  - Runbook documents stuck-job recovery using etcd keys (no Grid tools).
+  - Scheduler packages free from Grid leader-election dependencies.
+
+- **Tests To Add / Fix**
+  - Unit: `internal/controlplane/scheduler/*_test.go` covering optimistic locking, lease renewal,
+    retries, GC filters.
+  - Integration: `tests/integration/controlplane/scheduler_test.go` spinning up embedded etcd with
+    competing workers.
+  - CLI smoke (follow-up once CLI integrates) – pending future slice.
+
+- **Dependencies & Blockers**
+  - Requires go.etcd.io/etcd/client/v3 module.
+  - Coordination with future runtime slice for container execution.
+
+- **Verification Steps**
+  - 2025-10-21 — `go test ./internal/controlplane/... -cover`
+  - 2025-10-21 — `go test -tags integration ./tests/integration/controlplane -cover`
+  - 2025-10-21 — `staticcheck ./internal/controlplane/...`
+  - 2025-10-21 — `make lint-md`
+
+- **Changelog / Docs Impact**
+  - Append dated entry summarising scheduler, docs, and verification commands.
+  - Reference runbook creation and design verification.
+
+- **Notes**
+  - Capture etcd endpoints via env vars for local + CI usage (`PLOY_ETCD_ENDPOINTS` planned).
