@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -104,6 +105,8 @@ type Signer struct {
 	defaultTTL time.Duration
 	maxTTL     time.Duration
 	now        func() time.Time
+	revoker    TokenRevoker
+	audit      AuditRecorder
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -112,6 +115,9 @@ type Signer struct {
 	watchersMu sync.RWMutex
 	watchers   map[int64]chan RotationEvent
 	watcherSeq atomic.Int64
+
+	issuedMu sync.Mutex
+	issued   map[string]map[string]issuedToken
 }
 
 // SignerOption customises signer configuration.
@@ -122,6 +128,8 @@ type signerConfig struct {
 	defaultTTL time.Duration
 	maxTTL     time.Duration
 	now        func() time.Time
+	revoker    TokenRevoker
+	audit      AuditRecorder
 }
 
 // WithPrefix overrides the etcd prefix used to store secrets.
@@ -158,6 +166,24 @@ func WithNow(now func() time.Time) SignerOption {
 	}
 }
 
+// WithTokenRevoker overrides the GitLab token revoker used during rotations.
+func WithTokenRevoker(revoker TokenRevoker) SignerOption {
+	return func(cfg *signerConfig) {
+		if revoker != nil {
+			cfg.revoker = revoker
+		}
+	}
+}
+
+// WithAuditRecorder overrides the audit recorder used for rotation events.
+func WithAuditRecorder(recorder AuditRecorder) SignerOption {
+	return func(cfg *signerConfig) {
+		if recorder != nil {
+			cfg.audit = recorder
+		}
+	}
+}
+
 // RotationEvent captures a secret rotation observed via etcd.
 type RotationEvent struct {
 	SecretName string
@@ -171,6 +197,73 @@ type RotationSubscription struct {
 
 	closeOnce sync.Once
 	closeFn   func()
+}
+
+// AuditAction enumerates rotation audit activity types.
+type AuditAction string
+
+const (
+	// AuditActionIssued records token issuance to a node.
+	AuditActionIssued AuditAction = "issued"
+	// AuditActionRevoked records successful token revocation.
+	AuditActionRevoked AuditAction = "revoked"
+	// AuditActionRevocationFailed records a revocation failure.
+	AuditActionRevocationFailed AuditAction = "revocation_failed"
+)
+
+// AuditEvent captures rotation audit metadata for observability pipelines.
+type AuditEvent struct {
+	Action     AuditAction
+	SecretName string
+	NodeID     string
+	TokenID    string
+	Timestamp  time.Time
+	ExpiresAt  time.Time
+	Error      string
+}
+
+// AuditRecorder consumes rotation audit events.
+type AuditRecorder interface {
+	Record(event AuditEvent)
+}
+
+// NoopAuditRecorder returns an audit recorder that discards events.
+func NoopAuditRecorder() AuditRecorder { return noopAuditRecorder{} }
+
+type noopAuditRecorder struct{}
+
+func (noopAuditRecorder) Record(AuditEvent) {}
+
+// RevocableToken describes a token subject to GitLab API revocation.
+type RevocableToken struct {
+	ID     string
+	NodeID string
+}
+
+// RevocationFailure tracks a revocation error for a specific token.
+type RevocationFailure struct {
+	Token RevocableToken
+	Err   error
+}
+
+// RevocationReport summarises revocation outcomes.
+type RevocationReport struct {
+	Revoked []RevocableToken
+	Failed  []RevocationFailure
+}
+
+// TokenRevoker revokes GitLab tokens via the GitLab API.
+type TokenRevoker interface {
+	Revoke(ctx context.Context, secret string, tokens []RevocableToken) RevocationReport
+}
+
+// NoopTokenRevoker returns a revoker that performs no operations.
+func NoopTokenRevoker() TokenRevoker { return noopTokenRevoker{} }
+
+type noopTokenRevoker struct{}
+
+func (noopTokenRevoker) Revoke(context.Context, string, []RevocableToken) RevocationReport {
+	return RevocationReport{}
 }
 
 // Close terminates the subscription and releases resources.
@@ -200,6 +293,7 @@ type IssueTokenRequest struct {
 	SecretName string
 	Scopes     []string
 	TTL        time.Duration
+	NodeID     string
 }
 
 // SignedToken captures the issued token and metadata.
@@ -209,6 +303,7 @@ type SignedToken struct {
 	Scopes     []string
 	IssuedAt   time.Time
 	ExpiresAt  time.Time
+	TokenID    string
 }
 
 // NewSigner constructs a GitLab token signer.
@@ -237,6 +332,12 @@ func NewSigner(client *clientv3.Client, cipher Cipher, opts ...SignerOption) (*S
 	if !strings.HasSuffix(cfg.prefix, "/") {
 		cfg.prefix += "/"
 	}
+	if cfg.revoker == nil {
+		cfg.revoker = NoopTokenRevoker()
+	}
+	if cfg.audit == nil {
+		cfg.audit = NoopAuditRecorder()
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &Signer{
@@ -249,6 +350,9 @@ func NewSigner(client *clientv3.Client, cipher Cipher, opts ...SignerOption) (*S
 		ctx:        ctx,
 		cancel:     cancel,
 		watchers:   make(map[int64]chan RotationEvent),
+		revoker:    cfg.revoker,
+		audit:      cfg.audit,
+		issued:     make(map[string]map[string]issuedToken),
 	}
 
 	s.wg.Add(1)
@@ -341,10 +445,12 @@ func (s *Signer) RotateSecret(ctx context.Context, req RotateSecretRequest) (Rot
 	if resp != nil && resp.Header != nil {
 		revision = resp.Header.Revision
 	}
-	return RotateSecretResult{
+	result := RotateSecretResult{
 		Revision:  revision,
 		UpdatedAt: now,
-	}, nil
+	}
+	s.handleRotation(ctx, name)
+	return result, nil
 }
 
 // IssueToken returns a short-lived token scoped to the requested permissions.
@@ -352,6 +458,10 @@ func (s *Signer) IssueToken(ctx context.Context, req IssueTokenRequest) (SignedT
 	name := strings.TrimSpace(req.SecretName)
 	if name == "" {
 		return SignedToken{}, errEmptySecretName
+	}
+	nodeID := strings.TrimSpace(req.NodeID)
+	if nodeID == "" {
+		return SignedToken{}, errors.New("gitlab signer: node_id required for issuance")
 	}
 
 	record, err := s.loadSecret(ctx, name)
@@ -388,13 +498,140 @@ func (s *Signer) IssueToken(ctx context.Context, req IssueTokenRequest) (SignedT
 		return SignedToken{}, err
 	}
 
-	return SignedToken{
+	tokenID, err := generateTokenID()
+	if err != nil {
+		return SignedToken{}, err
+	}
+
+	signed := SignedToken{
 		SecretName: name,
 		Value:      value,
 		Scopes:     requestedScopes,
 		IssuedAt:   issuedAt,
 		ExpiresAt:  expiresAt,
-	}, nil
+		TokenID:    tokenID,
+	}
+	s.recordIssuedToken(name, nodeID, signed)
+
+	return signed, nil
+}
+
+func (s *Signer) recordIssuedToken(secret, nodeID string, token SignedToken) {
+	evt := AuditEvent{
+		Action:     AuditActionIssued,
+		SecretName: secret,
+		NodeID:     nodeID,
+		TokenID:    token.TokenID,
+		Timestamp:  token.IssuedAt,
+		ExpiresAt:  token.ExpiresAt,
+	}
+
+	s.issuedMu.Lock()
+	bySecret := s.ensureIssuedLocked(secret)
+	bySecret[token.TokenID] = issuedToken{
+		tokenID:   token.TokenID,
+		nodeID:    nodeID,
+		issuedAt:  token.IssuedAt,
+		expiresAt: token.ExpiresAt,
+	}
+	s.issuedMu.Unlock()
+
+	s.audit.Record(evt)
+}
+
+func (s *Signer) handleRotation(ctx context.Context, secret string) {
+	tokens := s.popIssuedTokens(secret)
+	if len(tokens) == 0 {
+		return
+	}
+	revoker := s.revoker
+	if revoker == nil {
+		return
+	}
+
+	revocable := make([]RevocableToken, 0, len(tokens))
+	lookup := make(map[string]issuedToken, len(tokens))
+	for _, tok := range tokens {
+		revocable = append(revocable, RevocableToken{ID: tok.tokenID, NodeID: tok.nodeID})
+		lookup[tok.tokenID] = tok
+	}
+
+	report := revoker.Revoke(ctx, secret, revocable)
+	now := s.now().UTC()
+
+	for _, revoked := range report.Revoked {
+		s.audit.Record(AuditEvent{
+			Action:     AuditActionRevoked,
+			SecretName: secret,
+			NodeID:     revoked.NodeID,
+			TokenID:    revoked.ID,
+			Timestamp:  now,
+		})
+		delete(lookup, revoked.ID)
+	}
+
+	if len(report.Failed) == 0 {
+		return
+	}
+
+	var retry []issuedToken
+	for _, failure := range report.Failed {
+		orig, ok := lookup[failure.Token.ID]
+		if ok {
+			retry = append(retry, orig)
+		}
+		errMsg := ""
+		if failure.Err != nil {
+			errMsg = failure.Err.Error()
+		}
+		s.audit.Record(AuditEvent{
+			Action:     AuditActionRevocationFailed,
+			SecretName: secret,
+			NodeID:     failure.Token.NodeID,
+			TokenID:    failure.Token.ID,
+			Timestamp:  now,
+			Error:      errMsg,
+		})
+	}
+	if len(retry) > 0 {
+		s.requeueTokens(secret, retry)
+	}
+}
+
+func (s *Signer) ensureIssuedLocked(secret string) map[string]issuedToken {
+	if s.issued == nil {
+		s.issued = make(map[string]map[string]issuedToken)
+	}
+	bySecret, ok := s.issued[secret]
+	if !ok {
+		bySecret = make(map[string]issuedToken)
+		s.issued[secret] = bySecret
+	}
+	return bySecret
+}
+
+func (s *Signer) popIssuedTokens(secret string) []issuedToken {
+	s.issuedMu.Lock()
+	defer s.issuedMu.Unlock()
+	bySecret, ok := s.issued[secret]
+	if !ok || len(bySecret) == 0 {
+		return nil
+	}
+	result := make([]issuedToken, 0, len(bySecret))
+	for _, tok := range bySecret {
+		result = append(result, tok)
+	}
+	delete(s.issued, secret)
+	return result
+}
+
+func (s *Signer) requeueTokens(secret string, tokens []issuedToken) {
+	s.issuedMu.Lock()
+	defer s.issuedMu.Unlock()
+	bySecret := s.ensureIssuedLocked(secret)
+	for _, tok := range tokens {
+		bySecret[tok.tokenID] = tok
+	}
 }
 
 func (s *Signer) loadSecret(ctx context.Context, name string) (secretRecord, error) {
@@ -477,6 +714,13 @@ type secretRecord struct {
 	UpdatedAt  string   `json:"updated_at"`
 }
 
+type issuedToken struct {
+	tokenID   string
+	nodeID    string
+	issuedAt  time.Time
+	expiresAt time.Time
+}
+
 func (r secretRecord) updatedAt() time.Time {
 	if r.UpdatedAt == "" {
 		return time.Time{}
@@ -539,6 +783,14 @@ func ensureScopesAllowed(allowed, requested []string) error {
 		}
 	}
 	return nil
+}
+
+func generateTokenID() (string, error) {
+	id := make([]byte, 16)
+	if _, err := rand.Read(id); err != nil {
+		return "", fmt.Errorf("gitlab signer: generate token id: %w", err)
+	}
+	return hex.EncodeToString(id), nil
 }
 
 func mintToken(apiKey string, scopes []string, issuedAt, expiresAt time.Time) (string, error) {

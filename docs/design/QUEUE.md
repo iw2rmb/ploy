@@ -1,6 +1,6 @@
 # Design Queue
 
-- [ ] `docs/design/gitlab-rotation-revocation/README.md` — broadcast rotation events and revoke stale tokens.
+- Completed (2025-10-22 15:20 UTC, status: shipped) — gitlab-rotation-revocation archived to `.archive/gitlab-rotation-revocation/`.
 - [ ] `docs/design/gitlab-cli-ops/README.md` — CLI credential setup, signer health, operator flows.
 - [ ] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags.
 - [ ] `docs/design/cli-streaming/README.md` — implement streaming log follow commands over SSE.

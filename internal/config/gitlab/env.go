@@ -11,9 +11,11 @@ import (
 )
 
 const (
-	signerAESKeyEnv     = "PLOY_GITLAB_SIGNER_AES_KEY"
-	signerDefaultTTLEnv = "PLOY_GITLAB_SIGNER_DEFAULT_TTL"
-	signerMaxTTLEnv     = "PLOY_GITLAB_SIGNER_MAX_TTL"
+	signerAESKeyEnv         = "PLOY_GITLAB_SIGNER_AES_KEY"
+	signerDefaultTTLEnv     = "PLOY_GITLAB_SIGNER_DEFAULT_TTL"
+	signerMaxTTLEnv         = "PLOY_GITLAB_SIGNER_MAX_TTL"
+	signerRevokerBaseURLEnv = "PLOY_GITLAB_API_BASE_URL"
+	signerRevokerTokenEnv   = "PLOY_GITLAB_ADMIN_TOKEN"
 )
 
 // NewSignerFromEnv constructs a Signer using environment variables for keys and TTL overrides.
@@ -55,6 +57,11 @@ func signerOptionsFromEnv() ([]SignerOption, error) {
 			return nil, fmt.Errorf("gitlab signer: parse %s: %w", signerMaxTTLEnv, err)
 		}
 		opts = append(opts, WithMaxTTL(ttl))
+	}
+	baseURL := strings.TrimSpace(os.Getenv(signerRevokerBaseURLEnv))
+	adminToken := strings.TrimSpace(os.Getenv(signerRevokerTokenEnv))
+	if baseURL != "" && adminToken != "" {
+		opts = append(opts, WithTokenRevoker(NewHTTPTokenRevoker(baseURL, adminToken, nil)))
 	}
 	return opts, nil
 }

@@ -12,7 +12,7 @@ and is referenced by the node bootstrapper in
 - **Request**: `{ secretName, scopes?, ttl? }`. Nodes typically omit `scopes`
   to request the default set stored alongside the secret.
 - **Response**: `{ token, scopes }` where `token` includes metadata:
-  `secretName`, `value`, `issuedAt`, `expiresAt`, and allowed `scopes`.
+  `secretName`, `tokenId`, `value`, `issuedAt`, `expiresAt`, and allowed `scopes`.
 - **Failure Semantics**: transient issues surface as retriable errors. Nodes are
   expected to retry with exponential or fixed backoff without blocking process
   startup.

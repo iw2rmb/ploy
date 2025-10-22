@@ -94,6 +94,11 @@ additional configuration.
   callers omit a TTL while requesting short-lived GitLab tokens.
 - `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.
   Requests above this threshold are rejected. Defaults to `12h` when unset.
+- `PLOY_GITLAB_API_BASE_URL` — Base URL for GitLab API requests when revoking
+  stale runner tokens during credential rotations.
+- `PLOY_GITLAB_ADMIN_TOKEN` — Admin or automation token presented to GitLab when
+  calling the revocation API. Required for the rotation revocation workflow to
+  disable stale tokens across nodes.
 
 ## Related Docs
 

@@ -70,6 +70,7 @@ type Signer interface {
 type HandshakeRequest struct {
 	SecretName string
 	Scopes     []string
+	NodeID     string
 	TLSConfig  *tls.Config
 }
 
@@ -84,6 +85,7 @@ type TokenRequest struct {
 	SecretName string
 	Scopes     []string
 	TTL        time.Duration
+	NodeID     string
 }
 
 // RotationSubscriptionRequest registers for rotation events.
@@ -115,6 +117,7 @@ func (r *RotationSubscription) Close() {
 type Config struct {
 	SecretName          string
 	Scopes              []string
+	NodeID              string
 	Signer              Signer
 	Cache               *git.CredentialCache
 	Metrics             metrics.GitLabNodeRecorder
@@ -131,6 +134,7 @@ type GitLabBootstrap struct {
 	secret       string
 	scopes       []string
 	requestedTTL time.Duration
+	nodeID       string
 
 	signer Signer
 	cache  *git.CredentialCache
@@ -149,6 +153,10 @@ func NewGitLabBootstrap(cfg Config) (*GitLabBootstrap, error) {
 	secret := strings.TrimSpace(cfg.SecretName)
 	if secret == "" {
 		return nil, errors.New("bootstrap: secret name required")
+	}
+	nodeID := strings.TrimSpace(cfg.NodeID)
+	if nodeID == "" {
+		return nil, errors.New("bootstrap: node id required")
 	}
 	if cfg.Signer == nil {
 		return nil, errors.New("bootstrap: signer client required")
@@ -192,6 +200,7 @@ func NewGitLabBootstrap(cfg Config) (*GitLabBootstrap, error) {
 		secret:       secret,
 		scopes:       sanitizeScopes(cfg.Scopes),
 		requestedTTL: cfg.RequestedTTL,
+		nodeID:       nodeID,
 		signer:       cfg.Signer,
 		cache:        cfg.Cache,
 		log:          logger,
@@ -244,6 +253,7 @@ func (b *GitLabBootstrap) performHandshake(ctx context.Context) (HandshakeRespon
 		resp, err := b.signer.Handshake(ctx, HandshakeRequest{
 			SecretName: b.secret,
 			Scopes:     b.scopes,
+			NodeID:     b.nodeID,
 			TLSConfig:  b.tlsConfig,
 		})
 		if err == nil {
@@ -305,6 +315,7 @@ func (b *GitLabBootstrap) refreshLoop(ctx context.Context, current gitlab.Signed
 				SecretName: b.secret,
 				Scopes:     b.scopes,
 				TTL:        b.requestedTTL,
+				NodeID:     b.nodeID,
 			})
 			if err != nil {
 				b.metrics.RefreshFailure(b.secret, err)
