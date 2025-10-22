@@ -8,21 +8,26 @@ predictable.
 
 - Job stdout/stderr is routed into IPFS Cluster as the job runs. Nodes stream log chunks to both
   the requester (SSE) and a rotating log file.
-- When the job ends, the node finalises the log bundle, pins it in IPFS, and records the resulting
-  CID in the job metadata:
+- When the job ends, the node finalises the log bundle, performs a deduplicated pin with retry
+  backoff, and records the resulting CID, digest, and retention window in the job metadata:
 
 ```json
 {
-  "logs": {
-    "cid": "bafy...",
-    "size": 1048576,
-    "content_type": "text/plain"
+  "bundles": {
+    "logs": {
+      "cid": "bafy...",
+      "digest": "sha256:...",
+      "size": 1048576,
+      "retained": true,
+      "ttl": "24h",
+      "expires_at": "2025-10-23T14:00:00Z"
+    }
   }
 }
 ```
 
-- Only small derived fields (log digest, tail snippet, CID) live in etcd; the raw log content does
-  not.
+- Only small derived fields (log digest, retention TTL, CID) live in etcd; the raw log content does
+  not. Duplicate payloads reuse the existing CID instead of triggering a second pin.
 
 ## Streaming
 
@@ -67,12 +72,15 @@ numeric SSE id to support resumable replay.
 
 - Log bundles follow the same `expires_at` lifecycle as other job artifacts (see
   [docs/v2/gc.md](gc.md)). When a job’s retention window lapses, the GC controller unpins the log
-  CID and removes the reference from etcd.
+  CID and removes the reference from etcd. The scheduler computes `expires_at` when recording the
+  bundle so downstream consumers do not need to re-run TTL math.
 - Operators can override the default retention duration per job or via `ploy gc --older-than`.
 
 ## Operational Notes
 
-- Monitoring: track log upload latency and IPFS pin status to catch slow nodes.
+- Monitoring: track log upload latency and IPFS pin status to catch slow nodes. Prometheus exposes
+  `ploy_ipfs_bundle_pin_total{kind,result}`, `ploy_ipfs_bundle_pin_retry_total{kind}`, and
+  `ploy_ipfs_bundle_pin_duration_seconds{kind}` for alerting on failures or slow pins.
 - Compression: log tarballs can be gzip-compressed before upload to reduce storage costs.
 - Security: ensure logs do not contain secrets; if sensitive data is present, apply redaction before
   archiving or restrict access controls on the log download endpoint.

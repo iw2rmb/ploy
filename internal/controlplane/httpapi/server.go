@@ -232,12 +232,13 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		return
 	}
 	var req struct {
-		Ticket     string              `json:"ticket"`
-		NodeID     string              `json:"node_id"`
-		State      string              `json:"state"`
-		Artifacts  map[string]string   `json:"artifacts"`
-		Error      *scheduler.JobError `json:"error"`
-		Inspection bool                `json:"inspection"`
+		Ticket     string                            `json:"ticket"`
+		NodeID     string                            `json:"node_id"`
+		State      string                            `json:"state"`
+		Artifacts  map[string]string                 `json:"artifacts"`
+		Bundles    map[string]scheduler.BundleRecord `json:"bundles"`
+		Error      *scheduler.JobError               `json:"error"`
+		Inspection bool                              `json:"inspection"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -249,6 +250,7 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		NodeID:     req.NodeID,
 		State:      scheduler.JobState(req.State),
 		Artifacts:  req.Artifacts,
+		Bundles:    req.Bundles,
 		Error:      req.Error,
 		Inspection: req.Inspection,
 	})
@@ -443,23 +445,24 @@ func (s *Server) handleSignerRotations(w http.ResponseWriter, r *http.Request) {
 
 // jobDTO is the API representation for a job.
 type jobDTO struct {
-	ID             string              `json:"id"`
-	Ticket         string              `json:"ticket"`
-	StepID         string              `json:"step_id"`
-	Priority       string              `json:"priority"`
-	State          string              `json:"state"`
-	CreatedAt      string              `json:"created_at"`
-	EnqueuedAt     string              `json:"enqueued_at"`
-	ClaimedAt      string              `json:"claimed_at,omitempty"`
-	CompletedAt    string              `json:"completed_at,omitempty"`
-	LeaseID        int64               `json:"lease_id,omitempty"`
-	LeaseExpiresAt string              `json:"lease_expires_at,omitempty"`
-	ClaimedBy      string              `json:"claimed_by,omitempty"`
-	RetryAttempt   int                 `json:"retry_attempt"`
-	MaxAttempts    int                 `json:"max_attempts"`
-	Metadata       map[string]string   `json:"metadata,omitempty"`
-	Artifacts      map[string]string   `json:"artifacts,omitempty"`
-	Error          *scheduler.JobError `json:"error,omitempty"`
+	ID             string                            `json:"id"`
+	Ticket         string                            `json:"ticket"`
+	StepID         string                            `json:"step_id"`
+	Priority       string                            `json:"priority"`
+	State          string                            `json:"state"`
+	CreatedAt      string                            `json:"created_at"`
+	EnqueuedAt     string                            `json:"enqueued_at"`
+	ClaimedAt      string                            `json:"claimed_at,omitempty"`
+	CompletedAt    string                            `json:"completed_at,omitempty"`
+	LeaseID        int64                             `json:"lease_id,omitempty"`
+	LeaseExpiresAt string                            `json:"lease_expires_at,omitempty"`
+	ClaimedBy      string                            `json:"claimed_by,omitempty"`
+	RetryAttempt   int                               `json:"retry_attempt"`
+	MaxAttempts    int                               `json:"max_attempts"`
+	Metadata       map[string]string                 `json:"metadata,omitempty"`
+	Artifacts      map[string]string                 `json:"artifacts,omitempty"`
+	Bundles        map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+	Error          *scheduler.JobError               `json:"error,omitempty"`
 }
 
 func jobDTOFrom(job *scheduler.Job) jobDTO {
@@ -480,6 +483,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		MaxAttempts:    job.MaxAttempts,
 		Metadata:       copyMap(job.Metadata),
 		Artifacts:      copyMap(job.Artifacts),
+		Bundles:        copyBundles(job.Bundles),
 		Error:          job.Error,
 	}
 }
@@ -498,6 +502,24 @@ func copyMap(src map[string]string) map[string]string {
 	out := make(map[string]string, len(src))
 	for k, v := range src {
 		out[k] = v
+	}
+	return out
+}
+
+func copyBundles(src map[string]scheduler.BundleRecord) map[string]scheduler.BundleRecord {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]scheduler.BundleRecord, len(src))
+	for k, v := range src {
+		out[k] = scheduler.BundleRecord{
+			CID:       v.CID,
+			Digest:    v.Digest,
+			Size:      v.Size,
+			Retained:  v.Retained,
+			TTL:       v.TTL,
+			ExpiresAt: v.ExpiresAt,
+		}
 	}
 	return out
 }

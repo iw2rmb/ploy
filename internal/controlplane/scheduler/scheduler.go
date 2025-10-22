@@ -108,6 +108,7 @@ func (s *Scheduler) SubmitJob(ctx context.Context, spec JobSpec) (*Job, error) {
 		MaxAttempts:    maxAttempts,
 		Metadata:       cloneMap(spec.Metadata),
 		Artifacts:      map[string]string{},
+		Bundles:        map[string]bundleRecord{},
 		LeaseExpiresAt: "",
 	}
 
@@ -295,8 +296,9 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 		return nil, fmt.Errorf("scheduler: job %s owned by %s", req.JobID, record.ClaimedBy)
 	}
 
+	completedAt := s.now().UTC()
 	record.State = req.State
-	record.CompletedAt = encodeTime(s.now().UTC())
+	record.CompletedAt = encodeTime(completedAt)
 	record.LeaseID = 0
 	record.LeaseExpiresAt = ""
 	if req.Artifacts != nil {
@@ -304,6 +306,9 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	}
 	if req.Error != nil {
 		record.Error = req.Error
+	}
+	if len(req.Bundles) > 0 {
+		record.Bundles = normalizeBundleRecords(req.Bundles, completedAt)
 	}
 	if req.Inspection && req.State == JobStateFailed {
 		record.State = JobStateInspectionReady
@@ -319,7 +324,7 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 		JobID:      record.ID,
 		Ticket:     record.Ticket,
 		State:      record.State,
-		ExpiresAt:  encodeTime(s.now().UTC().Add(24 * time.Hour)),
+		ExpiresAt:  encodeTime(completedAt.Add(24 * time.Hour)),
 		FinalState: string(record.State),
 	}
 	gcBytes, err := json.Marshal(gcPayload)
@@ -693,23 +698,24 @@ func normalizePrefix(prefix, fallback string) string {
 }
 
 type jobRecord struct {
-	ID             string            `json:"id"`
-	Ticket         string            `json:"ticket"`
-	StepID         string            `json:"step_id"`
-	Priority       string            `json:"priority"`
-	State          JobState          `json:"state"`
-	CreatedAt      string            `json:"created_at"`
-	EnqueuedAt     string            `json:"enqueued_at"`
-	ClaimedAt      string            `json:"claimed_at,omitempty"`
-	CompletedAt    string            `json:"completed_at,omitempty"`
-	LeaseID        int64             `json:"lease_id,omitempty"`
-	LeaseExpiresAt string            `json:"lease_expires_at,omitempty"`
-	ClaimedBy      string            `json:"claimed_by,omitempty"`
-	RetryAttempt   int               `json:"retry_attempt"`
-	MaxAttempts    int               `json:"max_attempts"`
-	Metadata       map[string]string `json:"metadata,omitempty"`
-	Artifacts      map[string]string `json:"artifacts,omitempty"`
-	Error          *JobError         `json:"error,omitempty"`
+	ID             string                  `json:"id"`
+	Ticket         string                  `json:"ticket"`
+	StepID         string                  `json:"step_id"`
+	Priority       string                  `json:"priority"`
+	State          JobState                `json:"state"`
+	CreatedAt      string                  `json:"created_at"`
+	EnqueuedAt     string                  `json:"enqueued_at"`
+	ClaimedAt      string                  `json:"claimed_at,omitempty"`
+	CompletedAt    string                  `json:"completed_at,omitempty"`
+	LeaseID        int64                   `json:"lease_id,omitempty"`
+	LeaseExpiresAt string                  `json:"lease_expires_at,omitempty"`
+	ClaimedBy      string                  `json:"claimed_by,omitempty"`
+	RetryAttempt   int                     `json:"retry_attempt"`
+	MaxAttempts    int                     `json:"max_attempts"`
+	Metadata       map[string]string       `json:"metadata,omitempty"`
+	Artifacts      map[string]string       `json:"artifacts,omitempty"`
+	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
+	Error          *JobError               `json:"error,omitempty"`
 }
 
 func (r jobRecord) toJob() *Job {
@@ -730,6 +736,7 @@ func (r jobRecord) toJob() *Job {
 		MaxAttempts:    r.MaxAttempts,
 		Metadata:       cloneMap(r.Metadata),
 		Artifacts:      cloneMap(r.Artifacts),
+		Bundles:        exportBundleRecords(r.Bundles),
 		Error:          r.Error,
 	}
 }
@@ -740,6 +747,55 @@ func decodeJobRecord(data []byte) (jobRecord, error) {
 		return jobRecord{}, err
 	}
 	return record, nil
+}
+
+type bundleRecord struct {
+	CID       string `json:"cid,omitempty"`
+	Digest    string `json:"digest,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Retained  bool   `json:"retained,omitempty"`
+	TTL       string `json:"ttl,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+// exportBundleRecords converts stored bundle metadata into public scheduler state.
+func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]BundleRecord, len(src))
+	for name, rec := range src {
+		dst[name] = BundleRecord(rec)
+	}
+	return dst
+}
+
+// normalizeBundleRecords trims bundle fields and computes expiry timestamps.
+func normalizeBundleRecords(src map[string]BundleRecord, completedAt time.Time) map[string]bundleRecord {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]bundleRecord, len(src))
+	for name, rec := range src {
+		cid := strings.TrimSpace(rec.CID)
+		digest := strings.TrimSpace(rec.Digest)
+		ttl := strings.TrimSpace(rec.TTL)
+		expires := strings.TrimSpace(rec.ExpiresAt)
+		if expires == "" && !completedAt.IsZero() && ttl != "" {
+			if duration, err := time.ParseDuration(ttl); err == nil && duration > 0 {
+				expires = completedAt.Add(duration).UTC().Format(time.RFC3339Nano)
+			}
+		}
+		dst[name] = bundleRecord{
+			CID:       cid,
+			Digest:    digest,
+			Size:      rec.Size,
+			Retained:  rec.Retained,
+			TTL:       ttl,
+			ExpiresAt: expires,
+		}
+	}
+	return dst
 }
 
 type queueEntry struct {
