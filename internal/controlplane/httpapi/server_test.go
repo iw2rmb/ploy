@@ -9,12 +9,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 
+	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/httpapi"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 )
@@ -36,7 +38,7 @@ func TestServerJobLifecycle(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched))
+	server := httptest.NewServer(httpapi.New(sched, nil))
 	defer server.Close()
 
 	submit := map[string]any{
@@ -77,6 +79,116 @@ func TestServerJobLifecycle(t *testing.T) {
 	jobs := resp["jobs"].([]any)
 	if len(jobs) != 1 {
 		t.Fatalf("expected one job, got %d", len(jobs))
+	}
+}
+
+func TestServerGitLabSignerEndpoints(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() {
+		_ = client.Close()
+	}()
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() {
+		_ = sched.Close()
+	}()
+
+	key := strings.Repeat("l", 32)
+	cipher, err := gitlab.NewAESCipher([]byte(key))
+	if err != nil {
+		t.Fatalf("new cipher: %v", err)
+	}
+	signer, err := gitlab.NewSigner(client, cipher)
+	if err != nil {
+		t.Fatalf("new signer: %v", err)
+	}
+	defer func() {
+		_ = signer.Close()
+	}()
+
+	server := httptest.NewServer(httpapi.New(sched, signer))
+	defer server.Close()
+
+	rotateResp := putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
+		"secret":  "runner",
+		"api_key": "glpat-first",
+		"scopes":  []string{"api", "read_repository"},
+	})
+	initialRevision := int64(rotateResp["revision"].(float64))
+	if initialRevision == 0 {
+		t.Fatalf("expected initial revision > 0")
+	}
+
+	tokenResp := postJSON(t, server.URL+"/v2/gitlab/signer/tokens", map[string]any{
+		"secret":      "runner",
+		"scopes":      []string{"read_repository"},
+		"ttl_seconds": 300,
+	})
+	if tokenResp["secret"].(string) != "runner" {
+		t.Fatalf("unexpected token secret: %v", tokenResp["secret"])
+	}
+	if tokenResp["token"].(string) == "" {
+		t.Fatalf("expected token value")
+	}
+	if ttl := int64(tokenResp["ttl_seconds"].(float64)); ttl != 300 {
+		t.Fatalf("expected ttl_seconds 300, got %d", ttl)
+	}
+
+	eventCh := make(chan map[string]any, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		url := fmt.Sprintf("%s/v2/gitlab/signer/rotations?timeout=5s&since=%d", server.URL, initialRevision)
+		resp, err := http.Get(url)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		defer func() {
+			_ = resp.Body.Close()
+		}()
+		if resp.StatusCode >= 400 {
+			body, _ := io.ReadAll(resp.Body)
+			errCh <- fmt.Errorf("rotation http %d: %s", resp.StatusCode, string(body))
+			return
+		}
+		if resp.StatusCode == http.StatusNoContent {
+			errCh <- fmt.Errorf("rotation returned no content")
+			return
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			errCh <- fmt.Errorf("decode rotation: %w", err)
+			return
+		}
+		eventCh <- payload
+	}()
+
+	time.Sleep(150 * time.Millisecond)
+	putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
+		"secret":  "runner",
+		"api_key": "glpat-second",
+		"scopes":  []string{"api", "read_repository"},
+	})
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("rotation watcher: %v", err)
+	case evt := <-eventCh:
+		if evt["secret"].(string) != "runner" {
+			t.Fatalf("expected rotation secret runner, got %v", evt["secret"])
+		}
+		if rev := int64(evt["revision"].(float64)); rev <= initialRevision {
+			t.Fatalf("expected revision > %d, got %d", initialRevision, rev)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for rotation event")
 	}
 }
 
@@ -131,14 +243,18 @@ func mustParseURL(raw string) url.URL {
 }
 
 func postJSON(t *testing.T, endpoint string, payload map[string]any) map[string]any {
+	return sendJSON(t, http.MethodPost, endpoint, payload)
+}
+
+func putJSON(t *testing.T, endpoint string, payload map[string]any) map[string]any {
+	return sendJSON(t, http.MethodPut, endpoint, payload)
+}
+
+func getJSON(t *testing.T, endpoint string) map[string]any {
 	t.Helper()
-	body, err := json.Marshal(payload)
+	resp, err := http.Get(endpoint)
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-	resp, err := http.Post(endpoint, "application/json", bytes.NewReader(body))
-	if err != nil {
-		t.Fatalf("post %s: %v", endpoint, err)
+		t.Fatalf("get %s: %v", endpoint, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -154,18 +270,27 @@ func postJSON(t *testing.T, endpoint string, payload map[string]any) map[string]
 	return out
 }
 
-func getJSON(t *testing.T, endpoint string) map[string]any {
+func sendJSON(t *testing.T, method, endpoint string, payload map[string]any) map[string]any {
 	t.Helper()
-	resp, err := http.Get(endpoint)
+	body, err := json.Marshal(payload)
 	if err != nil {
-		t.Fatalf("get %s: %v", endpoint, err)
+		t.Fatalf("marshal payload: %v", err)
+	}
+	req, err := http.NewRequest(method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, endpoint, err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode >= 400 {
 		data, _ := io.ReadAll(resp.Body)
-		t.Fatalf("http %d: %s", resp.StatusCode, string(data))
+		t.Fatalf("%s %s -> http %d: %s", method, endpoint, resp.StatusCode, string(data))
 	}
 	var out map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {

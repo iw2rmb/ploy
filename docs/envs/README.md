@@ -85,6 +85,16 @@ additional configuration.
 - No environment variables are active for gapi within this codebase; record
   future additions here once the API slices land.
 
+## Control Plane
+
+- `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
+  to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
+  16, 24, or 32 bytes to satisfy AES-GCM requirements.
+- `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
+  callers omit a TTL while requesting short-lived GitLab tokens.
+- `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.
+  Requests above this threshold are rejected. Defaults to `12h` when unset.
+
 ## Related Docs
 
 - [docs/design/overview/README.md](../design/overview/README.md)
