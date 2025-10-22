@@ -62,3 +62,5 @@ e2e-logs/
 tests/e2e/deploy/e2e-logs/
 /build/
 /tests/e2e/build-logs/logs
+
+/.archive
