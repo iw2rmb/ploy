@@ -5,6 +5,30 @@ import (
 	"io"
 )
 
+func printModsUsage(w io.Writer) {
+	lines := []string{
+		"Usage: ploy mods <command>",
+		"",
+		"Commands:",
+		"  logs <ticket>    Stream Mods logs via SSE (raw|structured formats, auto-retry)",
+		"",
+		"Use 'ploy mods logs --help' for flag details.",
+	}
+	writeUsageLines(w, lines)
+}
+
+func printJobsUsage(w io.Writer) {
+	lines := []string{
+		"Usage: ploy jobs <command>",
+		"",
+		"Commands:",
+		"  follow <job-id>  Follow job logs via SSE with retry semantics",
+		"",
+		"Use 'ploy jobs follow --help' for flag details.",
+	}
+	writeUsageLines(w, lines)
+}
+
 func printNodeUsage(w io.Writer) {
 	lines := []string{
 		"Usage: ploy node <command>",
@@ -61,17 +85,6 @@ func printConfigUsage(w io.Writer) {
 		"  gitlab <command>  Manage GitLab integration credentials",
 		"  show              Display the effective cluster configuration",
 		"  set               Update a configuration key/value pair",
-	}
-	writeUsageLines(w, lines)
-}
-
-func printLogsUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy logs <command>",
-		"",
-		"Commands:",
-		"  job <job-id>    Stream logs for a specific job via SSE",
-		"  node <node-id>  Stream daemon logs from a node via SSE",
 	}
 	writeUsageLines(w, lines)
 }

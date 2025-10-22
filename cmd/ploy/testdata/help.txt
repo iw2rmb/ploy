@@ -5,13 +5,14 @@ Usage:
 
 Core Commands:
   mod         Plan and run Mods workflows
+  mods        Observe Mods execution (logs, events)
+  jobs        Inspect and follow individual jobs
   artifact    Manage IPFS Cluster artifacts
   node        Administer Ploy nodes and lifecycle
   deploy      Bootstrap or upgrade clusters
   cluster     Manage local cluster descriptors
   beacon      Control beacon discovery operations
   config      Inspect or update cluster configuration
-  logs        Stream job and node logs
   status      Summarize cluster health
   doctor      Run workstation diagnostics
 
