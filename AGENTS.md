@@ -15,8 +15,6 @@ addendum:
 1. Keep documentation synchronized with the codebase. After each change, update
    the affected docs, link or remove orphaned files, and note completion states
    where applicable.
-2. When documentation conventions change, reflect them across `docs/DOCS.md`,
-   the design index, and related README files so repo guidance stays consistent.
 
 ## Local Development
 

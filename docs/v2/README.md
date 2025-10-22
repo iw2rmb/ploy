@@ -1,82 +1,129 @@
 # Ploy v2 Overview
 
-Ploy v2 consolidates Mods execution, build validation, and artifact handling into a single
-workstation-first stack. The goal is to replace the Grid dependency chain with lightweight
-Ploy nodes that coordinate Mods runs, build gates (SHIFT), and artifact storage (IPFS Cluster)
-while keeping the CLI experience familiar.
+Ploy v2 unifies Mods execution, SHIFT validation, and artifact handling into a
+workstation-first stack. Lightweight Ploy nodes coordinate Mods locally, while
+an etcd-backed control plane assigns work, enforces optimistic concurrency, and
+publishes durable artifacts in IPFS Cluster. The CLI remains the primary
+operator surface, providing familiar workflows without requiring the legacy
+Grid stack.
 
-## Core Mods Feature
+## Goals
 
-- Mods remain the primary unit of work: each Mod starts from a repository, expands into a plan,
-  and executes a sequence of typed steps (plan, LLM, rewrite generation, rewrite apply, validation).
-- Every step runs inside an OCI image, receives repository plus cumulative diffs as inputs, executes
-  via the node-local Docker runtime, produces a diff tarball, and passes through the SHIFT sandbox
-  before continuing.
-- The control plane may assign independent steps to different nodes when a Mod’s dependency graph
-  allows for concurrency. Each step is claimed once via the job records in etcd, so no additional
-  leader election or distributed locks are required.
-- Artifacts (diffs, archives, logs) are published to IPFS Cluster so any Ploy node can hydrate the
-  same state deterministically.
+- Deliver workstation-first Mods orchestration without Grid or JetStream.
+- Keep Mods steps deterministic by replaying repository snapshots plus ordered
+  diffs on every node.
+- Streamline artifact publishing so diffs, logs, and SHIFT reports replicate
+  across the cluster through IPFS Cluster.
+- Provide observability from the first release: job logs, retention metadata,
+  and health endpoints behave the same on laptops and shared clusters.
 
-## Components & Responsibilities
+## Non-Goals
 
-- **Ploy CLI** — Operator interface for submitting Mods, managing artifacts, administering nodes,
-  and bootstrapping a cluster.
-- **Ploy Nodes** — Worker daemons hosting Docker, SHIFT, IPFS Cluster client, and etcd connectivity.
-  They execute Mod steps, persist job state, and stream logs back to the CLI.
-- **Control Plane Service** — Exposes `/v2/jobs` APIs for submission, worker claims, heartbeats,
-  status queries, and completion. Wraps the etcd-backed scheduler and enforces optimistic
-  concurrency with leases.
-- **Ploy Node (beacon mode)** — A standard node operating in discovery mode: serves DNS bootstrap,
-  distributes API endpoints and trust bundles, and still participates in job execution when capacity
-  allows.
-- **SHIFT Build Gate** — Runs unit tests and static analysis per step; reused from the existing
-  integration without embedding its CLI.
-- **IPFS Cluster** — Externalized artifact store for repositories, step diffs, logs, and OCI layers.
-  Cluster pinning replaces embedded IPFS nodes.
-- **etcd** — Control-plane backing store for node membership, Mods metadata, job scheduling,
-  and coordination.
-- **GitLab Integration** — GitLab API keys and project metadata live in etcd so nodes can
-  authenticate when cloning repositories or opening merge requests across all Mods.
+- Multi-cluster federation or beacon-to-beacon failover (future work).
+- Hybrid support for the Grid workflow runner; v2 replaces Grid entirely.
+- Rewriting SHIFT itself—Ploy consumes the existing SHIFT build gate APIs.
 
-## Ploy CLI Overview
+## Architecture Summary
 
-The CLI remains the operator’s primary touchpoint for Mods execution, artifact management, and
-cluster administration. Commands cover Mods lifecycle actions, artifact uploads/downloads, node
-maintenance, bootstrap flows, and observability tooling. See [docs/v2/cli.md](cli.md) for the
-complete reference.
+### Mods Lifecycle
 
-## GitLab Integration
+Mods stay the primary unit of work. Each Mod expands into a typed plan and runs
+as an ordered set of jobs (plan, LLM, rewrite generation, rewrite apply,
+validation). Every job executes in an OCI image, sees repository plus
+cumulative diffs, and produces a diff tarball plus logs that move through the
+SHIFT sandbox before the next step.
 
-Ploy v2 treats GitLab as the canonical source and destination for Mods. Operators store a single
-GitLab API key (or key set) in etcd via `ploy config set gitlab.api_key=...`, letting nodes
-authenticate when cloning repositories, creating branches, or publishing merge requests. Credentials
-replicate through the control plane over mutual TLS, so nodes never rely on local static secrets.
+### Cluster Roles
 
-## API Surfaces
+- Control plane schedules jobs, stores job metadata in etcd, and exposes the
+  `/v2/jobs` APIs.
+- Nodes hydrate workspaces, launch containers, run SHIFT, and publish artifacts
+  to IPFS Cluster.
+- Beacon mode distributes discovery data (DNS bootstrap, trust bundles) while
+  still participating in job execution when capacity allows.
+- The CLI submits Mods, manages artifacts, administers nodes, and bootstraps
+  clusters.
 
-Ploy v2 introduces dedicated APIs for the control plane, nodes, and beacon. Refer to
-[docs/v2/api.md](api.md) for route details and security expectations.
+## Component Responsibilities
 
-## Job Execution
+- **Ploy CLI** — Operator interface for Mods submission, artifact management,
+  and node lifecycle. See [docs/v2/cli.md](cli.md).
+- **Control Plane Service** — `/v2/jobs` HTTP APIs for submission, worker
+  claims, heartbeats, status queries, and job completion. Wraps the etcd-backed
+  scheduler with optimistic concurrency.
+- **Ploy Nodes** — Worker daemons hosting Docker, SHIFT, IPFS Cluster client,
+  and etcd connectivity. Execute Mod steps, persist job state, and stream logs
+  back to the CLI.
+- **Ploy Node (beacon mode)** — Discovery node that distributes API endpoints
+  and trust bundles while remaining eligible to execute jobs.
+- **SHIFT Build Gate** — Executes unit tests and static analysis per step;
+  reused from the existing integration without embedding its CLI.
+- **IPFS Cluster** — Artifact store for snapshots, diff bundles, logs, and OCI
+  layers. Cluster pinning replaces embedded IPFS nodes.
+- **etcd** — Backing store for node membership, Mods metadata, queue state, and
+  coordination leases.
+- **GitLab Integration** — Control plane stores GitLab API keys in etcd so
+  nodes can authenticate when cloning repositories or opening merge requests.
 
-Every Mod step and build gate run executes as a durable job. Containers remain available after exit
-for inspection, stdout/stderr are persisted, and logs stream over SSE so operators can tail
-progress. See [docs/v2/job.md](job.md) for the full execution model.
+## Execution Pipeline
 
-## Grid Component Reuse
+1. Operator submits a Mod via the CLI, including target repository, manifest,
+   and optional overrides (e.g., build gate profile, plan heuristics).
+2. Control plane records the job (`mods/<ticket>/jobs/<job-id>`), enqueues the
+   work (`queue/mods/<priority>/<job-id>`), and exposes status over `/v2/jobs`.
+3. A node claims the job through `/v2/jobs/claim`, hydrates the workspace from
+   snapshot and diff CIDs, and launches the specified container with retention
+   enabled for inspection.
+4. On exit, the node captures stdout/stderr, diff tarball, and metadata before
+   invoking SHIFT to run tests and static analysis.
+5. Artifacts (diffs, logs, SHIFT report) publish to IPFS Cluster; the node
+   records resulting CIDs, digests, and retention windows back in etcd.
+6. Control plane updates job state, surfaces observability (SSE log streams,
+   status poll APIs), and triggers GC markers for later retention enforcement.
 
-Ploy v2 deliberately reuses proven Grid components (beacon, job runtime, build gate) to reduce risk
-and keep behaviour aligned. See [docs/v2/reuse.md](reuse.md) for a detailed inventory of recommended
-modules and code paths to port from `../grid`.
+## Data & Artifact Management
 
-## Deploy
+The control plane persists canonical job records and queue entries in etcd,
+using transactions and leases to guarantee single-worker claims. IPFS Cluster
+stores snapshots, diffs, logs, and SHIFT reports so any node can hydrate the
+same state deterministically. Artifact CIDs live alongside job metadata,
+allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 
-Operators can bootstrap a Ploy cluster (beacon mode, etcd, IPFS Cluster, CA generation) and add
-worker nodes with the same workflow. See [docs/v2/devops.md](devops.md) for step-by-step deployment
-and operational guidance, including prerequisites (SSH, Linux builds, user provisioning) and
-post-install checks.
-For IPFS-specific topology and replication details, refer to [docs/v2/ipfs.md](ipfs.md).
+## Interfaces & Access
+
+- CLI command reference — [docs/v2/cli.md](cli.md)
+- Control plane APIs — [docs/v2/api.md](api.md)
+- Job execution model — [docs/v2/job.md](job.md)
+- Mods workflow example — [docs/v2/mod.md](mod.md)
+- IPFS artifact handling — [docs/v2/ipfs.md](ipfs.md)
+- SHIFT integration — [docs/v2/shift.md](shift.md)
+
+## Operations & Observability
+
+- Nodes stream container stdout/stderr over SSE so operators can tail progress
+  live, even on workstation runs.
+- Containers remain available after job completion for inspection; retention
+  policies govern when GC prunes them.
+- Metrics capture queue depth, claim latency, lease expirations, retries, and
+  SHIFT duration. Health endpoints report etcd connectivity and backlog size.
+- Garbage collection controllers respect retention windows defined in
+  [docs/v2/gc.md](gc.md).
+
+## Operational Baseline
+
+| Dependency      | Minimum version (2025-10-22) | Notes |
+|-----------------|------------------------------|-------|
+| etcd cluster    | 3.6.x (recommend 3.6.5)      | Leverages the 3.6 feature set (livez/readyz, downgrade RPC) and security fixes released through September 2025. |
+| IPFS Cluster    | 1.1.4                        | Provides the pin tracker improvements and metrics emitted in May 2025, matching the artifact replication strategy. |
+| Docker Engine   | 28.x                         | Required for the BuildKit and container retention defaults used by the step runner. |
+| Go toolchain    | 1.25                          | Matches the module target (`go 1.25`) and unlocks Go 1.25 runtime improvements relevant to the control plane. |
+
+## Adoption Path
+
+Ploy v2 rolls out sequentially: control plane scheduler, step runtime, artifact
+publisher, CLI refresh, and deployment tooling. Follow
+[`docs/v2/migration.md`](migration.md) for the phase-by-phase plan, the
+dependencies between components, and cleanup guidance for retiring Grid.
 
 ## Further Reading
 
