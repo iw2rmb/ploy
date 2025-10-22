@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	cfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 )
@@ -98,6 +99,108 @@ func TestConfigGitlabSetLoadsFileAndPersists(t *testing.T) {
 	}
 }
 
+func TestConfigGitlabUsageMatchesGolden(t *testing.T) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	err := execute([]string{"config", "gitlab"}, buf)
+	if err == nil {
+		t.Fatal("expected error for missing gitlab subcommand")
+	}
+	expect := loadConfigGolden(t, "config_gitlab_usage.txt")
+	if diff := diffStringsLocal(expect, buf.String()); diff != "" {
+		t.Fatalf("gitlab usage mismatch:\n%s", diff)
+	}
+}
+
+func TestConfigGitlabStatusOutputsSignerSummary(t *testing.T) {
+	t.Helper()
+	originalFactory := gitlabSignerClientFactory
+	t.Cleanup(func() { gitlabSignerClientFactory = originalFactory })
+
+	rotatedAt := time.Date(2025, time.October, 21, 15, 4, 5, 0, time.UTC)
+	stub := &stubGitlabSignerOps{
+		status: gitlabSignerStatus{
+			FeedRevision: 128,
+			Secrets: []gitlabSignerSecretStatus{
+				{
+					Name:      "runner",
+					Revision:  64,
+					Scopes:    []string{"api", "read_repository"},
+					RotatedAt: rotatedAt,
+					Audit: gitlabSignerAudit{
+						LastRotation: rotatedAt,
+						Revocations: []gitlabSignerRevocation{
+							{NodeID: "node-a", TokenID: "tok-1", Timestamp: rotatedAt.Add(2 * time.Minute)},
+						},
+						Failures: []gitlabSignerFailure{
+							{NodeID: "node-b", TokenID: "tok-2", Timestamp: rotatedAt.Add(3 * time.Minute), Error: "gitlab timeout"},
+						},
+					},
+				},
+			},
+		},
+	}
+	gitlabSignerClientFactory = func(context.Context) (gitlabSignerClient, error) {
+		return stub, nil
+	}
+
+	buf := &bytes.Buffer{}
+	if err := execute([]string{"config", "gitlab", "status"}, buf); err != nil {
+		t.Fatalf("execute status: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Secret: runner") {
+		t.Fatalf("expected runner secret in output, got %q", output)
+	}
+	if !strings.Contains(output, "Scopes: api, read_repository") {
+		t.Fatalf("expected scopes in output, got %q", output)
+	}
+	if !strings.Contains(output, "Audit feed revision: 128") {
+		t.Fatalf("expected feed revision in output, got %q", output)
+	}
+	if !strings.Contains(output, "node-b") || !strings.Contains(output, "gitlab timeout") {
+		t.Fatalf("expected failure details in output, got %q", output)
+	}
+	if !stub.closed {
+		t.Fatal("expected signer client to be closed")
+	}
+}
+
+func TestConfigGitlabRotateTriggersSecretUpdate(t *testing.T) {
+	t.Helper()
+	originalFactory := gitlabSignerClientFactory
+	t.Cleanup(func() { gitlabSignerClientFactory = originalFactory })
+
+	stub := &stubGitlabSignerOps{}
+	gitlabSignerClientFactory = func(context.Context) (gitlabSignerClient, error) {
+		return stub, nil
+	}
+
+	buf := &bytes.Buffer{}
+	err := execute([]string{
+		"config", "gitlab", "rotate",
+		"--secret", "runner",
+		"--api-key", "glpat-123",
+		"--scope", "api",
+		"--scope", "read_repository",
+	}, buf)
+	if err != nil {
+		t.Fatalf("execute rotate: %v", err)
+	}
+	if !stub.rotated {
+		t.Fatal("expected rotate to be invoked")
+	}
+	if stub.rotateReq.Secret != "runner" {
+		t.Fatalf("unexpected secret: %+v", stub.rotateReq)
+	}
+	if len(stub.rotateReq.Scopes) != 2 || stub.rotateReq.Scopes[1] != "read_repository" {
+		t.Fatalf("unexpected scopes: %+v", stub.rotateReq)
+	}
+	if !strings.Contains(buf.String(), "GitLab secret runner rotated") {
+		t.Fatalf("expected rotation success message, got %q", buf.String())
+	}
+}
+
 type stubGitlabStore struct {
 	config      cfg.Config
 	revision    int64
@@ -124,4 +227,54 @@ func (s *stubGitlabStore) Save(_ context.Context, config cfg.Config) (int64, err
 	}
 	s.config = config
 	return s.revision, nil
+}
+
+type stubGitlabSignerOps struct {
+	status    gitlabSignerStatus
+	statusErr error
+
+	rotated   bool
+	rotateReq gitlabRotateSecretRequest
+	rotateRes gitlabRotateSecretResult
+	rotateErr error
+
+	closed bool
+}
+
+func (s *stubGitlabSignerOps) Status(context.Context, gitlabSignerStatusRequest) (gitlabSignerStatus, error) {
+	return s.status, s.statusErr
+}
+
+func (s *stubGitlabSignerOps) RotateSecret(_ context.Context, req gitlabRotateSecretRequest) (gitlabRotateSecretResult, error) {
+	s.rotated = true
+	s.rotateReq = req
+	if s.rotateErr != nil {
+		return gitlabRotateSecretResult{}, s.rotateErr
+	}
+	if s.rotateRes.Secret == "" {
+		s.rotateRes.Secret = req.Secret
+	}
+	return s.rotateRes, nil
+}
+
+func (s *stubGitlabSignerOps) Close() error {
+	s.closed = true
+	return nil
+}
+
+func loadConfigGolden(t *testing.T, name string) string {
+	t.Helper()
+	path := filepath.Join("testdata", name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read golden %s: %v", name, err)
+	}
+	return string(data)
+}
+
+func diffStringsLocal(expect, actual string) string {
+	if expect == actual {
+		return ""
+	}
+	return "expected:\n" + expect + "\nactual:\n" + actual
 }
