@@ -13,7 +13,7 @@
 - [`internal/config/gitlab`](../../../internal/config/gitlab) to emit rotation events and track token IDs.
 - [`internal/controlplane/events`](../../../internal/controlplane/events) (or equivalent) for fan-out to nodes.
 - [`internal/node/bootstrap`](../../../internal/node/bootstrap) for rotation signal handling.
-- Upstream docs: [`../gitlab-token-signer/README.md`](../gitlab-token-signer/README.md) and [`../gitlab-cli-ops/README.md`](../gitlab-cli-ops/README.md).
+- Upstream docs: [`../gitlab-token-signer/README.md`](../gitlab-token-signer/README.md) and [`../gitlab-cli-ops/README.md`](../gitlab-cli-ops/README.md). Node refresh flows now live in [`../.archive/gitlab-node-refresh/README.md`](../.archive/gitlab-node-refresh/README.md).
 
 ## COSMIC evaluation
 | Functional process                        | E | X | R | W | CFP |

@@ -6,9 +6,11 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/iw2rmb/grid v0.0.0
+	github.com/jonboulle/clockwork v0.5.0
 	github.com/nats-io/nats-server/v2 v2.12.1
 	github.com/nats-io/nats.go v1.46.1
 	github.com/pelletier/go-toml/v2 v2.2.2
+	github.com/prometheus/client_golang v1.23.0
 	go.etcd.io/etcd/api/v3 v3.6.0
 	go.etcd.io/etcd/client/v3 v3.6.0
 	go.etcd.io/etcd/server/v3 v3.6.0
@@ -48,7 +50,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
-	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/matoous/go-nanoid/v2 v2.1.0 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
@@ -64,7 +65,6 @@ require (
 	github.com/pion/logging v0.2.3 // indirect
 	github.com/pion/transport/v2 v2.2.10 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.23.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
