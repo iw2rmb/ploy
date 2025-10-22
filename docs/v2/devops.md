@@ -75,13 +75,14 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
-   - Run `ploy node add <address> --config node.yaml` (or equivalent) from the workstation.  
-   - The CLI reuses the embedded shell script to install dependencies, configure the node, register it
-     with the beacon/etcd, and launch `ploynode` in worker mode.  
-   - Confirm secrets/certificates delivered (TLS cert under `/etc/ploy/pki/`).
+   - Run `ploy node add --cluster-id <cluster> --worker-id <worker-id> --address <host-or-ip>` and include any metadata labels with `--label key=value`.  
+   - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
+   - The CLI writes worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issues a worker certificate via the deployment CA manager, and records probe outcomes.  
+   - Use `--dry-run` to preview probes and certificate issuance without modifying etcd. Successful runs store the PEM bundle for the worker under the security prefix and surface the certificate version in the CLI output.  
+   - Confirm the worker fetches its materials at `/etc/ploy/pki/` and registers with the beacon services.
 
 3. **Validation**  
-   - `ploy node list` to verify status.  
+   - `etcdctl get /ploy/clusters/<cluster>/registry/workers --prefix --keys-only` to confirm the descriptor exists.  
    - Run a smoke Mod to confirm job submission, log streaming, and artifact uploads.
 
 ## Maintenance

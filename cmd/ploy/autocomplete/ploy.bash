@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy beacon config snapshot environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy node beacon config snapshot environment manifest knowledge-base help" -- "$cur") )
         return 0
     fi
 
@@ -53,6 +53,12 @@ _ploy_completions() {
             return 0
         fi
         ;;
+    "node")
+        if [[ $COMP_CWORD -eq 2 ]]; then
+            COMPREPLY=( $(compgen -W "add" -- "$cur") )
+            return 0
+        fi
+        ;;
     "beacon")
         if [[ $COMP_CWORD -eq 2 ]]; then
             COMPREPLY=( $(compgen -W "rotate-ca" -- "$cur") )
@@ -95,7 +101,7 @@ _ploy_completions() {
         ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy beacon config snapshot environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy node beacon config snapshot environment manifest knowledge-base" -- "$cur") )
             return 0
         fi
         ;;
