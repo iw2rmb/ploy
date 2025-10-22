@@ -30,9 +30,7 @@ func handleEnvironment(args []string, stderr io.Writer) error {
 
 // printEnvironmentUsage prints the environment command overview.
 func printEnvironmentUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy environment <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  materialize  Plan or hydrate a commit-scoped environment")
+	printCommandUsage(w, "environment")
 }
 
 // handleEnvironmentMaterialize materialises an environment plan or execution request.

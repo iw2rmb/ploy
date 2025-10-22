@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/iw2rmb/ploy/internal/clitree"
 )
 
 // main bootstraps the CLI entrypoint.
@@ -20,6 +22,11 @@ func execute(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
 		printUsage(stderr)
 		return errors.New("command required")
+	}
+
+	if msg, ok := clitree.LegacyCommands()[args[0]]; ok {
+		_, _ = fmt.Fprintf(stderr, "Command %q is deprecated. %s\n", args[0], msg)
+		return fmt.Errorf("legacy command %q", args[0])
 	}
 
 	switch args[0] {
@@ -60,30 +67,32 @@ func reportError(err error, stderr io.Writer) {
 
 // printUsage lists the available top-level commands.
 func printUsage(w io.Writer) {
-	lines := []string{
-		"Ploy CLI v2",
-		"",
-		"Usage:",
-		"  ploy <command> [<args>]",
-		"",
-		"Core Commands:",
-		"  mod         Plan and run Mods workflows",
-		"  mods        Observe Mods execution (logs, events)",
-		"  jobs        Inspect and follow individual jobs",
-		"  artifact    Manage IPFS Cluster artifacts",
-		"  node        Administer Ploy nodes and lifecycle",
-		"  deploy      Bootstrap or upgrade clusters",
-		"  cluster     Manage local cluster descriptors",
-		"  beacon      Control beacon discovery operations",
-		"  config      Inspect or update cluster configuration",
-		"  status      Summarize cluster health",
-		"  doctor      Run workstation diagnostics",
-		"",
-		"Use 'ploy help <command>' for detailed command help.",
+	nodes := clitree.Tree()
+	visible := make([]clitree.Node, 0, len(nodes))
+	width := 0
+	for _, node := range nodes {
+		if node.Hidden {
+			continue
+		}
+		visible = append(visible, node)
+		if l := len(node.Name); l > width {
+			width = l
+		}
 	}
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
+	padding := width + 2
+
+	_, _ = fmt.Fprintln(w, "Ploy CLI v2")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Usage:")
+	_, _ = fmt.Fprintln(w, "  ploy <command> [<args>]")
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Core Commands:")
+	for _, node := range visible {
+		desc := node.Description
+		_, _ = fmt.Fprintf(w, "  %-*s %s\n", padding, node.Name, desc)
 	}
+	_, _ = fmt.Fprintln(w, "")
+	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
 }
 
 func handleHelp(args []string, stderr io.Writer) error {
@@ -91,42 +100,17 @@ func handleHelp(args []string, stderr io.Writer) error {
 		printUsage(stderr)
 		return nil
 	}
-	switch args[0] {
-	case "mod":
-		printModUsage(stderr)
+
+	if node, ok := clitree.Lookup(args...); ok {
+		renderNodeUsage(stderr, node, args)
 		return nil
-	case "artifact":
-		printArtifactUsage(stderr)
-		return nil
-	case "node":
-		printNodeUsage(stderr)
-		return nil
-	case "deploy":
-		printDeployUsage(stderr)
-		return nil
-	case "cluster":
-		printClusterUsage(stderr)
-		return nil
-	case "beacon":
-		printBeaconUsage(stderr)
-		return nil
-	case "config":
-		printConfigUsage(stderr)
-		return nil
-	case "mods":
-		printModsUsage(stderr)
-		return nil
-	case "jobs":
-		printJobsUsage(stderr)
-		return nil
-	case "status":
-		printStatusUsage(stderr)
-		return nil
-	case "doctor":
-		printDoctorUsage(stderr)
-		return nil
-	default:
-		printUsage(stderr)
-		return fmt.Errorf("unknown help topic %q", args[0])
 	}
+
+	if node, ok := clitree.Lookup(args[0]); ok {
+		renderNodeUsage(stderr, node, args[:1])
+		return fmt.Errorf("unknown help topic %q", clitree.PathString(args...))
+	}
+
+	printUsage(stderr)
+	return fmt.Errorf("unknown help topic %q", args[0])
 }

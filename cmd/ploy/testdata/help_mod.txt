@@ -1,9 +1,6 @@
 Usage: ploy mod <command>
 
 Commands:
-  plan      Generate a Mods plan locally before submission
-  run       Submit a Mods run to the control plane
-  resume    Resume a paused or interrupted Mods run
-  inspect   Show Mods ticket status and artifacts
+  run   Submit a Mods run to the control plane
 
-Use 'ploy help mod <command>' for command-specific details.
+Use 'ploy mod run --help' for flag details.

@@ -4,7 +4,7 @@
 - [x] GitLab CLI Ops — Completed 2025-10-22T09:22:50Z by Codex (archived).
 - [x] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags. Reserved 2025-10-22T10:55:17Z by Codex.
 - Completed (2025-10-22 11:15 UTC, status: shipped) — cli-streaming archived to `.archive/cli-streaming/`.
-- [ ] `docs/design/cli-help-autocomplete/README.md` — regenerate help text and autocomplete artifacts.
+- Completed (2025-10-22 12:02 UTC, status: shipped) — cli-help-autocomplete archived to `.archive/cli-help-autocomplete/`.
 - [ ] `docs/design/observability-log-streaming/README.md` — stream live job logs via SSE endpoints.
 - [ ] `docs/design/observability-log-bundles/README.md` — persist log bundles to IPFS Cluster with retries.
 - [ ] `docs/design/observability-retention-cli/README.md` — expose retention metadata and CLI surfacing.

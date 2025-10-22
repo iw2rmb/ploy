@@ -23,18 +23,5 @@ func handleMod(args []string, stderr io.Writer) error {
 }
 
 func printModUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy mod <command>",
-		"",
-		"Commands:",
-		"  plan      Generate a Mods plan locally before submission",
-		"  run       Submit a Mods run to the control plane",
-		"  resume    Resume a paused or interrupted Mods run",
-		"  inspect   Show Mods ticket status and artifacts",
-		"",
-		"Use 'ploy help mod <command>' for command-specific details.",
-	}
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
-	}
+	printCommandUsage(w, "mod")
 }

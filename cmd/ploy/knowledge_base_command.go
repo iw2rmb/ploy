@@ -165,10 +165,7 @@ func handleKnowledgeBaseEvaluate(args []string, stderr io.Writer) error {
 }
 
 func printKnowledgeBaseUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy knowledge-base <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  ingest    Append incidents to the knowledge base catalog")
-	_, _ = fmt.Fprintln(w, "  evaluate  Evaluate knowledge base classifier accuracy")
+	printCommandUsage(w, "knowledge-base")
 }
 
 func printKnowledgeBaseIngestUsage(w io.Writer) {
