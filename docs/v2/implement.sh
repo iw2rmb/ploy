@@ -70,11 +70,13 @@ for doc in "$@"; do
   print "Implementing design doc: ${candidate}"
   prompt=$'You are Codex working inside /Users/vk/@iw2rmb/ploy. Follow /Users/vk/@iw2rmb/docs/AGENTS.md and all repository rules exactly.\n\n'
   prompt+=$'Workflow requirements (no exceptions):\n'
+  prompt+=$'- Immediately reserve this design doc by updating docs/design/QUEUE.md so its checkbox reads `- [x]` with your reservation note.\n'
   prompt+=$'- Implement every requirement from the design doc completely; do not leave TODOs, follow-ups, or "next steps"—ship the finished slice.\n'
   prompt+=$'- Keep docs in sync with the code. When the work is done, mark the queue entry finished with status and timestamp, then move the design doc directory to .archive/.\n'
   prompt+=$'- Run all required local checks (at minimum `make test`) and ensure they pass.\n'
   prompt+=$'- Produce a single commit covering your work. Use a descriptive message referencing this design doc.\n'
   prompt+=$'- Never contradict /Users/vk/@iw2rmb/docs/AGENTS.md or the design doc. If something blocks you, resolve it before finishing.\n'
+  prompt+=$'- When finished, remove design doc reference from docs/design/QUEUE.md and move design doc own folder to root .archive folder.\n'
   prompt+=$"\nDesign doc path: ${candidate}\nQueue file: ${QUEUE_FILE}\n\n"
   prompt+=$'Implement the following design doc end-to-end:\n\n'
   prompt+="$(<"$candidate")"
