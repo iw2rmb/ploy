@@ -384,6 +384,7 @@ type PublishedArtifact struct {
 	CID    string
 	Kind   ArtifactKind
 	Digest string
+	Size   int64
 }
 
 // LogCollector retrieves container logs when a custom pathway exists.

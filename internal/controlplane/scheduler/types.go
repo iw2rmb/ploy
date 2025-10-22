@@ -56,6 +56,7 @@ type Job struct {
 	MaxAttempts    int
 	Metadata       map[string]string
 	Artifacts      map[string]string
+	Bundles        map[string]BundleRecord
 	Error          *JobError
 }
 
@@ -87,6 +88,7 @@ type CompleteRequest struct {
 	Artifacts  map[string]string
 	Error      *JobError
 	Inspection bool
+	Bundles    map[string]BundleRecord
 }
 
 // Options configures the scheduler.
@@ -104,3 +106,13 @@ type Options struct {
 
 // ErrNoJobs signals no work was available when claiming.
 var ErrNoJobs = errors.New("scheduler: no jobs available")
+
+// BundleRecord stores retention metadata for an artifact bundle.
+type BundleRecord struct {
+	CID       string `json:"cid,omitempty"`
+	Digest    string `json:"digest,omitempty"`
+	Size      int64  `json:"size,omitempty"`
+	Retained  bool   `json:"retained,omitempty"`
+	TTL       string `json:"ttl,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}

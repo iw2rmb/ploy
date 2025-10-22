@@ -2,10 +2,13 @@ package artifacts
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -63,6 +66,9 @@ func TestClusterPublisherPublishReadsFromPath(t *testing.T) {
 	if result.Digest != "sha256:deadbeef" {
 		t.Fatalf("unexpected digest: %s", result.Digest)
 	}
+	if result.Size != 13 {
+		t.Fatalf("unexpected size: %d", result.Size)
+	}
 	if len(client.requests) != 1 {
 		t.Fatalf("expected single Add invocation, got %d", len(client.requests))
 	}
@@ -110,6 +116,9 @@ func TestClusterPublisherPublishUsesBufferFallback(t *testing.T) {
 	if result.Digest != "sha256:cafebabe" {
 		t.Fatalf("unexpected digest: %s", result.Digest)
 	}
+	if result.Size != 12 {
+		t.Fatalf("unexpected size: %d", result.Size)
+	}
 	if len(client.requests) != 1 {
 		t.Fatalf("expected single Add invocation")
 	}
@@ -142,4 +151,187 @@ func TestClusterPublisherPublishValidatesPayload(t *testing.T) {
 	if !strings.Contains(err.Error(), "artifact payload required") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+func TestClusterPublisherDeduplicatesByDigest(t *testing.T) {
+	client := &fakeAddClient{
+		response: AddResponse{
+			CID:    "bafy-dedupe",
+			Digest: "sha256:dedupe",
+			Name:   "logs-123.txt",
+			Size:   20,
+		},
+	}
+	publisher, err := NewClusterPublisher(ClusterPublisherOptions{
+		Client: client,
+		NameBuilder: func(kind step.ArtifactKind) string {
+			return "logs-123.txt"
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewClusterPublisher: %v", err)
+	}
+
+	payload := []byte("duplicate log payload")
+	first, err := publisher.Publish(context.Background(), step.ArtifactRequest{
+		Kind:   step.ArtifactKindLogs,
+		Buffer: payload,
+	})
+	if err != nil {
+		t.Fatalf("first publish: %v", err)
+	}
+	second, err := publisher.Publish(context.Background(), step.ArtifactRequest{
+		Kind:   step.ArtifactKindLogs,
+		Buffer: payload,
+	})
+	if err != nil {
+		t.Fatalf("second publish: %v", err)
+	}
+	if len(client.requests) != 1 {
+		t.Fatalf("expected single Add call, got %d", len(client.requests))
+	}
+	if second.CID != first.CID {
+		t.Fatalf("expected deduplicated CID, got %s vs %s", second.CID, first.CID)
+	}
+}
+
+func TestClusterPublisherRetriesOnFailure(t *testing.T) {
+	client := &sequenceAddClient{
+		results: []AddResponse{
+			{
+				CID:    "bafy-retry",
+				Digest: "sha256:retry",
+				Name:   "logs.txt",
+				Size:   16,
+			},
+		},
+		errors: []error{
+			fmt.Errorf("transient failure"),
+			nil,
+		},
+	}
+	publisher, err := NewClusterPublisher(ClusterPublisherOptions{
+		Client:     client,
+		MaxRetries: 1,
+		RetryDelay: time.Millisecond,
+		NameBuilder: func(step.ArtifactKind) string {
+			return "logs.txt"
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewClusterPublisher: %v", err)
+	}
+	result, err := publisher.Publish(context.Background(), step.ArtifactRequest{
+		Kind:   step.ArtifactKindLogs,
+		Buffer: []byte("retry payload"),
+	})
+	if err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+	if client.failures != 1 {
+		t.Fatalf("expected single retry, got %d failures", client.failures)
+	}
+	if result.CID != "bafy-retry" {
+		t.Fatalf("unexpected cid: %s", result.CID)
+	}
+}
+
+func TestClusterPublisherEmitsMetrics(t *testing.T) {
+	recorder := &fakeBundleRecorder{}
+	client := &sequenceAddClient{
+		results: []AddResponse{
+			{
+				CID:    "bafy-metric",
+				Digest: "sha256:metric",
+				Name:   "logs.txt",
+				Size:   4,
+			},
+		},
+		errors: []error{
+			fmt.Errorf("pin failed"),
+			nil,
+		},
+	}
+	publisher, err := NewClusterPublisher(ClusterPublisherOptions{
+		Client:     client,
+		Recorder:   recorder,
+		MaxRetries: 1,
+		RetryDelay: time.Millisecond,
+		NameBuilder: func(step.ArtifactKind) string {
+			return "logs.txt"
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewClusterPublisher: %v", err)
+	}
+
+	if _, err := publisher.Publish(context.Background(), step.ArtifactRequest{
+		Kind:   step.ArtifactKindLogs,
+		Buffer: []byte("data"),
+	}); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	if recorder.failures != 1 {
+		t.Fatalf("expected one failure recorded, got %d", recorder.failures)
+	}
+	if recorder.retries != 1 {
+		t.Fatalf("expected one retry recorded, got %d", recorder.retries)
+	}
+	if recorder.successes != 1 {
+		t.Fatalf("expected one success recorded, got %d", recorder.successes)
+	}
+	if recorder.lastKind != string(step.ArtifactKindLogs) {
+		t.Fatalf("unexpected kind recorded: %s", recorder.lastKind)
+	}
+}
+
+type fakeBundleRecorder struct {
+	failures  int
+	retries   int
+	successes int
+	lastKind  string
+}
+
+func (f *fakeBundleRecorder) PinSuccess(kind string, _ time.Duration) {
+	f.successes++
+	f.lastKind = kind
+}
+
+func (f *fakeBundleRecorder) PinFailure(kind string, _ error) {
+	f.failures++
+	f.lastKind = kind
+}
+
+func (f *fakeBundleRecorder) PinRetry(kind string) {
+	f.retries++
+	f.lastKind = kind
+}
+
+type sequenceAddClient struct {
+	mu       sync.Mutex
+	requests []AddRequest
+	results  []AddResponse
+	errors   []error
+	failures int
+}
+
+func (c *sequenceAddClient) Add(ctx context.Context, req AddRequest) (AddResponse, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.requests = append(c.requests, req)
+	if len(c.errors) > 0 {
+		err := c.errors[0]
+		c.errors = c.errors[1:]
+		if err != nil {
+			c.failures++
+			return AddResponse{}, err
+		}
+	}
+	if len(c.results) == 0 {
+		return AddResponse{}, nil
+	}
+	resp := c.results[0]
+	c.results = c.results[1:]
+	return resp, nil
 }

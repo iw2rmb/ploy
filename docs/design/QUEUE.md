@@ -6,7 +6,7 @@
 - Completed (2025-10-22 11:15 UTC, status: shipped) — cli-streaming archived to `.archive/cli-streaming/`.
 - Completed (2025-10-22 12:02 UTC, status: shipped) — cli-help-autocomplete archived to `.archive/cli-help-autocomplete/`.
 - Completed (2025-10-22 12:55 UTC, status: shipped) — observability-log-streaming archived to `.archive/observability-log-streaming/`.
-- [ ] `docs/design/observability-log-bundles/README.md` — persist log bundles to IPFS Cluster with retries.
+- Completed (2025-10-22T16:01:47Z, status: shipped) — observability-log-bundles archived to `.archive/observability-log-bundles/`.
 - [ ] `docs/design/observability-retention-cli/README.md` — expose retention metadata and CLI surfacing.
 - [ ] `docs/design/observability-metrics/README.md` — publish Prometheus metrics and scrape guidance.
 - [ ] `docs/design/deployment-bootstrap-host/README.md` — host dependency bootstrap and readiness checks.

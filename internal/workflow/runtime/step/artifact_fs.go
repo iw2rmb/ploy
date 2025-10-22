@@ -60,7 +60,8 @@ func (p *FilesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactR
 		return PublishedArtifact{}, fmt.Errorf("step: create artifact temp file: %w", err)
 	}
 
-	if _, err := io.Copy(io.MultiWriter(tempFile, sum), payload); err != nil {
+	written, err := io.Copy(io.MultiWriter(tempFile, sum), payload)
+	if err != nil {
 		_ = tempFile.Close()
 		return PublishedArtifact{}, fmt.Errorf("step: write artifact: %w", err)
 	}
@@ -83,6 +84,7 @@ func (p *FilesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactR
 		CID:    cid,
 		Kind:   req.Kind,
 		Digest: digest,
+		Size:   written,
 	}, nil
 }
 
