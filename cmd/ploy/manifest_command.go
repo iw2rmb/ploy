@@ -32,10 +32,7 @@ func handleManifest(args []string, stderr io.Writer) error {
 
 // printManifestUsage prints the manifest command usage information.
 func printManifestUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy manifest <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  schema    Print the integration manifest JSON schema")
-	_, _ = fmt.Fprintln(w, "  validate  Validate manifests and optionally rewrite them to v2")
+	printCommandUsage(w, "manifest")
 }
 
 // handleManifestSchema writes the manifest schema file to the provided writer.

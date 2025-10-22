@@ -3,112 +3,73 @@ package main
 import (
 	"fmt"
 	"io"
+	"strings"
+
+	"github.com/iw2rmb/ploy/internal/clitree"
 )
 
 func printModsUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy mods <command>",
-		"",
-		"Commands:",
-		"  logs <ticket>    Stream Mods logs via SSE (raw|structured formats, auto-retry)",
-		"",
-		"Use 'ploy mods logs --help' for flag details.",
-	}
-	writeUsageLines(w, lines)
+	printCommandUsage(w, "mods")
 }
 
 func printJobsUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy jobs <command>",
-		"",
-		"Commands:",
-		"  follow <job-id>  Follow job logs via SSE with retry semantics",
-		"",
-		"Use 'ploy jobs follow --help' for flag details.",
-	}
-	writeUsageLines(w, lines)
-}
-
-func printNodeUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy node <command>",
-		"",
-		"Commands:",
-		"  add       Register a new node with the cluster beacon",
-		"  remove    Deregister a node after draining workloads",
-		"  list      List registered nodes with health summaries",
-		"  heal      Run automated remediation on a node",
-		"  logs      Stream node daemon logs via SSE",
-	}
-	writeUsageLines(w, lines)
-}
-
-func printDeployUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy deploy <command>",
-		"",
-		"Commands:",
-		"  bootstrap  Bootstrap a new cluster from a configuration file",
-		"  upgrade    Roll out binary or configuration updates to nodes",
-	}
-	writeUsageLines(w, lines)
+	printCommandUsage(w, "jobs")
 }
 
 func printClusterUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy cluster <command>",
-		"",
-		"Commands:",
-		"  connect  Cache beacon metadata and trust bundles locally",
-		"  list     Show locally cached cluster descriptors",
-	}
-	writeUsageLines(w, lines)
-}
-
-func printBeaconUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy beacon <command>",
-		"",
-		"Commands:",
-		"  promote    Promote a node to become the active beacon",
-		"  rotate-ca  Rotate the cluster certificate authority bundle",
-		"  sync       Refresh beacon discovery data and trust material",
-	}
-	writeUsageLines(w, lines)
+	printCommandUsage(w, "cluster")
 }
 
 func printConfigUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy config <command>",
-		"",
-		"Commands:",
-		"  gitlab <command>  Manage GitLab integration credentials",
-		"  show              Display the effective cluster configuration",
-		"  set               Update a configuration key/value pair",
-	}
-	writeUsageLines(w, lines)
+	printCommandUsage(w, "config")
 }
 
-func printStatusUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy status",
-		"",
-		"Summarize control plane health, node status, and Mods activity.",
+func printCommandUsage(w io.Writer, path ...string) {
+	node, ok := clitree.Lookup(path...)
+	if !ok {
+		fallback := fmt.Sprintf("ploy %s", strings.Join(path, " "))
+		_, _ = fmt.Fprintf(w, "Usage: %s\n", fallback)
+		return
 	}
-	writeUsageLines(w, lines)
+	renderNodeUsage(w, node, path)
 }
 
-func printDoctorUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy doctor",
-		"",
-		"Run workstation diagnostics covering Docker, beacon reachability, and trust bundles.",
+func renderNodeUsage(w io.Writer, node clitree.Node, path []string) {
+	usage := strings.TrimSpace(node.Usage)
+	if usage == "" {
+		usage = fmt.Sprintf("ploy %s", strings.Join(path, " "))
+		if len(node.Subcommands) > 0 {
+			usage += " <command>"
+		}
 	}
-	writeUsageLines(w, lines)
-}
+	_, _ = fmt.Fprintf(w, "Usage: %s\n", usage)
 
-func writeUsageLines(w io.Writer, lines []string) {
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
+	if len(node.Subcommands) > 0 {
+		_, _ = fmt.Fprintln(w, "\nCommands:")
+		width := 0
+		for _, child := range node.Subcommands {
+			synopsis := strings.TrimSpace(child.Synopsis)
+			if synopsis == "" {
+				synopsis = child.Name
+			}
+			if l := len(synopsis); l > width {
+				width = l
+			}
+		}
+		padding := width + 2
+		for _, child := range node.Subcommands {
+			synopsis := strings.TrimSpace(child.Synopsis)
+			if synopsis == "" {
+				synopsis = child.Name
+			}
+			desc := strings.TrimSpace(child.Description)
+			_, _ = fmt.Fprintf(w, "  %-*s %s\n", padding, synopsis, desc)
+		}
+	} else if desc := strings.TrimSpace(node.Description); desc != "" {
+		_, _ = fmt.Fprintf(w, "\n%s\n", desc)
+	}
+
+	if note := strings.TrimSpace(node.Note); note != "" {
+		_, _ = fmt.Fprintf(w, "\n%s\n", note)
 	}
 }

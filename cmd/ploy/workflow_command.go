@@ -24,9 +24,7 @@ func handleWorkflow(args []string, stderr io.Writer) error {
 
 // printWorkflowUsage details the workflow command usage information.
 func printWorkflowUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  cancel Cancel an in-flight workflow run")
+	printCommandUsage(w, "workflow")
 }
 
 // printWorkflowCancelUsage documents the workflow cancellation flags.

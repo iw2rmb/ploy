@@ -62,6 +62,22 @@ func TestExecuteUnknownCommandSuggestsHelp(t *testing.T) {
 	}
 }
 
+func TestExecuteLegacyGridCommandShowsDeprecation(t *testing.T) {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	err := execute([]string{"grid"}, buf)
+	if err == nil {
+		t.Fatal("expected error for legacy grid command")
+	}
+	output := buf.String()
+	if !strings.Contains(output, "deprecated") {
+		t.Fatalf("expected deprecation notice, got %q", output)
+	}
+	if !strings.Contains(output, "docs/design/cli-command-tree/README.md") {
+		t.Fatalf("expected pointer to cli-command-tree design doc, got %q", output)
+	}
+}
+
 func loadGolden(t *testing.T, name string) string {
 	t.Helper()
 	path := filepath.Join("testdata", name)

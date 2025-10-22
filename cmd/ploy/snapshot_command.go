@@ -33,10 +33,7 @@ func handleSnapshot(args []string, stderr io.Writer) error {
 
 // printSnapshotUsage lists the available snapshot subcommands.
 func printSnapshotUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy snapshot <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  plan     Preview strip/mask/synthetic rules for a snapshot")
-	_, _ = fmt.Fprintln(w, "  capture  Execute snapshot capture and publish metadata")
+	printCommandUsage(w, "snapshot")
 }
 
 // handleSnapshotPlan renders a snapshot plan preview from the registry.

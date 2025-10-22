@@ -1,8 +1,8 @@
 Usage: ploy config gitlab <command>
 
 Commands:
-  show                Display the current GitLab configuration
-  set --file <path>   Apply a GitLab configuration JSON file
-  validate --file     Validate a GitLab configuration without saving
-  status              Inspect signer health and recent rotation audit entries
-  rotate              Rotate a GitLab secret and trigger node refresh
+  show                     Display the current GitLab configuration
+  set --file <path>        Apply a GitLab configuration JSON file
+  validate --file <path>   Validate a GitLab configuration without saving
+  status                   Inspect signer health and recent rotation audit entries
+  rotate --secret <name>   Rotate a GitLab secret and trigger node refresh

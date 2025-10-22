@@ -60,12 +60,7 @@ func handleArtifact(args []string, stderr io.Writer) error {
 }
 
 func printArtifactUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy artifact <command>")
-	_, _ = fmt.Fprintln(w, "\nCommands:")
-	_, _ = fmt.Fprintln(w, "  push    Upload an artifact to the configured IPFS Cluster")
-	_, _ = fmt.Fprintln(w, "  pull    Download an artifact by CID")
-	_, _ = fmt.Fprintln(w, "  status  Inspect replication state for a CID")
-	_, _ = fmt.Fprintln(w, "  rm      Unpin an artifact from the cluster")
+	printCommandUsage(w, "artifact")
 }
 
 func handleArtifactPush(args []string, stderr io.Writer) error {

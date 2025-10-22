@@ -360,19 +360,7 @@ func runGitlabRotate(args []string, stderr io.Writer) error {
 }
 
 func printConfigGitlabUsage(w io.Writer) {
-	lines := []string{
-		"Usage: ploy config gitlab <command>",
-		"",
-		"Commands:",
-		"  show                Display the current GitLab configuration",
-		"  set --file <path>   Apply a GitLab configuration JSON file",
-		"  validate --file     Validate a GitLab configuration without saving",
-		"  status              Inspect signer health and recent rotation audit entries",
-		"  rotate              Rotate a GitLab secret and trigger node refresh",
-	}
-	for _, line := range lines {
-		_, _ = fmt.Fprintln(w, line)
-	}
+	printCommandUsage(w, "config", "gitlab")
 }
 
 func printGitlabSignerStatus(w io.Writer, status gitlabSignerStatus, limit int) {
