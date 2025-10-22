@@ -26,12 +26,29 @@ predictable.
 
 ## Streaming
 
-- `GET /v2/jobs/{id}/logs/stream` proxies live output directly from the node so operators can tail
-  logs without waiting for IPFS uploads to finish.
-- After completion, `GET /v2/jobs/{id}/logs` fetches from the archived bundle. The API downloads the
-  content from IPFS, optionally truncating based on query parameters (e.g., `?tail=2000`).
-- Node-level logs (`/v2/nodes/{node}/logs/stream`) follow the same pattern: streaming first,
-  archived bundles stored via IPFS.
+- `GET /v2/jobs/{id}/logs/stream` exposes a server-sent events (SSE) stream backed by the in-memory
+  log hub. Calls may provide `Last-Event-ID` to resume from a previously observed frame.
+- Node services expose the same contract at `GET /node/v2/jobs/{id}/logs/stream`, enabling CLI
+  fallbacks when the control plane is unavailable.
+- Streams are bounded (history of 256 frames; per-subscriber buffer of 32). Slow subscribers are
+  dropped and must reconnect with `Last-Event-ID`.
+- After completion, `GET /v2/jobs/{id}/logs` fetches the archived bundle from IPFS, optionally
+  truncated via query parameters (e.g., `?tail=2000`).
+- Node-level logs (`/v2/nodes/{node}/logs/stream`) are intended for direct operator access while
+  investigating node behaviour.
+
+### Event Frames
+
+Streams emit structured JSON payloads per event type:
+
+| Event       | Payload fields                                                                            |
+|-------------|--------------------------------------------------------------------------------------------|
+| `log`       | `timestamp`, `stream`, `line` (newline trimmed).                                           |
+| `retention` | `retained`, `ttl`, `expires_at`, `bundle_cid` (omitted if retention metadata unavailable).  |
+| `done`      | `status` (`completed`, `failed`, `cancelled`).                                             |
+
+The `done` event terminates the stream and signals the CLI to stop reconnecting. Clients track the
+numeric SSE id to support resumable replay.
 
 ### CLI Streaming
 
