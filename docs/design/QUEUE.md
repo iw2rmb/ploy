@@ -1,6 +1,6 @@
 # Design Queue
 
-- [ ] `docs/design/gitlab-node-refresh/README.md` — node bootstrap, token refresh loop, cache purge.
+- [x] `docs/design/.archive/gitlab-node-refresh/README.md` — node bootstrap, token refresh loop, cache purge. (completed 2025-10-22 08:06:45Z)
 - [ ] `docs/design/gitlab-rotation-revocation/README.md` — broadcast rotation events and revoke stale tokens.
 - [ ] `docs/design/gitlab-cli-ops/README.md` — CLI credential setup, signer health, operator flows.
 - [ ] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags.

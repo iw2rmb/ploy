@@ -13,7 +13,7 @@
 - [`cmd/ploy/config`](../../../cmd/ploy/config) for new subcommands and output formatting.
 - [`cmd/ploy/testdata`](../../../cmd/ploy/testdata) to update golden help and signer responses.
 - [`docs/v2/devops.md`](../../v2/devops.md) for operator walkthroughs.
-- Upstream design docs: [`../gitlab-token-signer/README.md`](../gitlab-token-signer/README.md) and [`../gitlab-node-refresh/README.md`](../gitlab-node-refresh/README.md).
+- Upstream design docs: [`../gitlab-token-signer/README.md`](../gitlab-token-signer/README.md) and [`../.archive/gitlab-node-refresh/README.md`](../.archive/gitlab-node-refresh/README.md).
 
 ## COSMIC evaluation
 | Functional process                   | E | X | R | W | CFP |
