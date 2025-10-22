@@ -52,7 +52,6 @@
 
 - **Verification Steps**
   - Capture coverage output (`go test -cover ./cmd/ploy/...`) and record in `CHANGELOG.md`.
-  - Validate documentation formatting against `.markdownlint.yaml` and document conformance.
   - Review docs with operator stakeholders for sign-off.
 
 - **Changelog / Docs Impact**

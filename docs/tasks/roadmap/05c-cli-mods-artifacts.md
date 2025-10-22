@@ -53,7 +53,6 @@
 - **Verification Steps**
   - `go test ./cmd/ploy -run TestMod*`
   - Integration harness invoking `dist/ploy mod run --artifact <...>` against mocks.
-  - Validate documentation updates against `.markdownlint.yaml`.
 
 - **Changelog / Docs Impact**
   - Add mods submission changes, SHIFT gating surfacing, and verification evidence to `CHANGELOG.md`.

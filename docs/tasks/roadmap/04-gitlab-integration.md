@@ -89,7 +89,6 @@
   - `go test ./internal/config/gitlab/... ./internal/gitlab/...`
   - `go test -tags integration ./tests/integration/gitlab/...`
   - `go test ./cmd/ploy -run TestGitlab*`
-  - Validate documentation formatting against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Update `CHANGELOG.md` with credential rollout, tests executed, and doc sync summary.

@@ -8,8 +8,6 @@
   dependencies, and verification guidance.
 - Updated the task queue (`docs/tasks/README.md`) to reflect the new slices and
   maintain dependency ordering for roadmap execution.
-- Verification (2025-10-21):
-  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-21] Mods Step Runtime Artifact Publishing
 
@@ -23,7 +21,6 @@
   (`docs/v2/job.md`, `docs/v2/mod.md`, `docs/workflow/README.md`).
 - Verification (2025-10-21):
   - `go test ./...`
-  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-21] IPFS Cluster Artifact Store
 
@@ -56,10 +53,6 @@
   - `go test ./internal/workflow/runtime/...`
   - `go test ./cmd/...`
   - `go test ./...`
-  - `npx markdownlint --config .markdownlint.yaml README.md docs/envs/README.md \\
-    cmd/ploy/README.md docs/workflow/README.md docs/v2/README.md docs/v2/job.md \\
-    docs/v2/mod.md docs/v2/shift.md docs/tasks/roadmap/02-mod-step-runtime.md \\
-    docs/tasks/README.md docs/tasks/roadmap/03a-mod-runtime-artifacts.md`
 
 ## [2025-10-21] Mods Step Runtime Foundations
 
@@ -95,7 +88,6 @@
   - `go test ./internal/controlplane/...`
   - `go test -tags integration ./tests/integration/controlplane`
   - `staticcheck ./internal/controlplane/...`
-  - Documentation formatting validated against `.markdownlint.yaml`
 
 ## [2025-10-09] Discovery Env Cleanup
 
