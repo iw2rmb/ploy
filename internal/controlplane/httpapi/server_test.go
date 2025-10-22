@@ -85,6 +85,117 @@ func TestServerJobLifecycle(t *testing.T) {
 	}
 }
 
+func TestJobRetention(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() {
+		_ = client.Close()
+	}()
+
+	completedAt := time.Date(2025, 10, 22, 17, 0, 0, 0, time.UTC)
+	sched, err := scheduler.New(client, scheduler.Options{
+		LeaseTTL: 3 * time.Second,
+		Now:      func() time.Time { return completedAt },
+	})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() {
+		_ = sched.Close()
+	}()
+
+	server := httptest.NewServer(httpapi.New(sched, nil, nil))
+	defer server.Close()
+
+	submit := map[string]any{
+		"ticket":       "mod-retention",
+		"step_id":      "logs",
+		"priority":     "default",
+		"max_attempts": 1,
+	}
+	job := postJSON(t, server.URL+"/v2/jobs", submit)
+	jobID := job["id"].(string)
+
+	claim := postJSON(t, server.URL+"/v2/jobs/claim", map[string]any{"node_id": "node-retention"})
+	if claim["status"].(string) != "claimed" {
+		t.Fatalf("claim status: %v", claim)
+	}
+
+	complete := postJSON(t, server.URL+"/v2/jobs/"+jobID+"/complete", map[string]any{
+		"ticket":     "mod-retention",
+		"node_id":    "node-retention",
+		"state":      "failed",
+		"inspection": true,
+		"bundles": map[string]any{
+			"logs": map[string]any{
+				"cid":      "bafy-observed",
+				"digest":   "sha256:bundle",
+				"size":     8192,
+				"retained": true,
+				"ttl":      "96h",
+			},
+		},
+	})
+	if complete["state"].(string) != "inspection_ready" {
+		t.Fatalf("expected inspection_ready state, got %v", complete["state"])
+	}
+
+	getURL := fmt.Sprintf("%s/v2/jobs/%s?ticket=%s", server.URL, jobID, url.QueryEscape("mod-retention"))
+	jobResp := getJSON(t, getURL)
+	retention, ok := jobResp["retention"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected retention block in job response")
+	}
+	wantExpires := completedAt.Add(96 * time.Hour).UTC().Format(time.RFC3339Nano)
+	if retained, _ := retention["retained"].(bool); !retained {
+		t.Fatalf("expected retained flag in job response")
+	}
+	if bundle, _ := retention["bundle"].(string); bundle != "logs" {
+		t.Fatalf("unexpected retention bundle: %v", bundle)
+	}
+	if cid, _ := retention["bundle_cid"].(string); cid != "bafy-observed" {
+		t.Fatalf("unexpected retention cid: %v", cid)
+	}
+	if ttl, _ := retention["ttl"].(string); ttl != "96h" {
+		t.Fatalf("unexpected retention ttl: %v", ttl)
+	}
+	if expires, _ := retention["expires_at"].(string); expires != wantExpires {
+		t.Fatalf("unexpected retention expires_at: %v want %s", expires, wantExpires)
+	}
+	if inspect, _ := retention["inspection"].(bool); !inspect {
+		t.Fatalf("expected inspection hint true")
+	}
+
+	bundles, ok := jobResp["bundles"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected bundles map in job response")
+	}
+	logBundle, ok := bundles["logs"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected logs bundle in response")
+	}
+	if expires, _ := logBundle["expires_at"].(string); expires != wantExpires {
+		t.Fatalf("unexpected bundle expires_at: %v want %s", expires, wantExpires)
+	}
+
+	listURL := fmt.Sprintf("%s/v2/jobs?ticket=%s", server.URL, url.QueryEscape("mod-retention"))
+	listResp := getJSON(t, listURL)
+	items, ok := listResp["jobs"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected job listing")
+	}
+	item := items[0].(map[string]any)
+	retList, ok := item["retention"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected retention in listing entry")
+	}
+	if expires, _ := retList["expires_at"].(string); expires != wantExpires {
+		t.Fatalf("unexpected list retention expires_at: %v want %s", expires, wantExpires)
+	}
+}
+
 func TestServerGitLabSignerEndpoints(t *testing.T) {
 	t.Parallel()
 

@@ -57,6 +57,7 @@ type Job struct {
 	Metadata       map[string]string
 	Artifacts      map[string]string
 	Bundles        map[string]BundleRecord
+	Retention      *JobRetention
 	Error          *JobError
 }
 
@@ -115,4 +116,14 @@ type BundleRecord struct {
 	Retained  bool   `json:"retained,omitempty"`
 	TTL       string `json:"ttl,omitempty"`
 	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+// JobRetention summarises retention metadata per job for audit use.
+type JobRetention struct {
+	Retained   bool   `json:"retained"`
+	TTL        string `json:"ttl,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"`
+	Bundle     string `json:"bundle,omitempty"`
+	BundleCID  string `json:"bundle_cid,omitempty"`
+	Inspection bool   `json:"inspection,omitempty"`
 }

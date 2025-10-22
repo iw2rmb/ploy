@@ -22,6 +22,7 @@ func TestFollowCommandReconnects(t *testing.T) {
 		{
 			events: []testEvent{
 				{event: "log", data: `{"timestamp":"2025-10-22T11:00:01Z","stream":"stdout","line":"second"}`},
+				{event: "retention", data: `{"retained":true,"ttl":"48h","expires_at":"2025-10-24T11:00:01Z","bundle_cid":"bafy-job"}`},
 				{event: "done", data: `{"status":"completed"}`},
 			},
 		},
@@ -53,7 +54,7 @@ func TestFollowCommandReconnects(t *testing.T) {
 		t.Fatalf("run follow command: %v", err)
 	}
 	got := buf.String()
-	want := "2025-10-22T11:00:00Z stdout first\n2025-10-22T11:00:01Z stdout second\n"
+	want := "2025-10-22T11:00:00Z stdout first\n2025-10-22T11:00:01Z stdout second\nRetention: retained ttl=48h expires=2025-10-24T11:00:01Z cid=bafy-job\n"
 	if got != want {
 		t.Fatalf("unexpected output\nwant: %q\ngot:  %q", want, got)
 	}

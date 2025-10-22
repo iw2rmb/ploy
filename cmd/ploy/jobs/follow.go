@@ -60,6 +60,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		return fmt.Errorf("jobs: build endpoint: %w", err)
 	}
 
+	var retention *retentionEvent
 	handler := func(evt stream.Event) error {
 		switch strings.ToLower(evt.Type) {
 		case "", "log":
@@ -71,6 +72,16 @@ func (c FollowCommand) Run(ctx context.Context) error {
 				return fmt.Errorf("jobs: decode log event: %w", err)
 			}
 			printLog(writer, format, payload)
+		case "retention":
+			if len(evt.Data) == 0 {
+				return nil
+			}
+			var hint retentionEvent
+			if err := json.Unmarshal(evt.Data, &hint); err != nil {
+				return fmt.Errorf("jobs: decode retention event: %w", err)
+			}
+			copy := hint
+			retention = &copy
 		case "done", "complete", "completed":
 			return stream.ErrDone
 		default:
@@ -79,13 +90,24 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		return nil
 	}
 
-	return c.Client.Stream(ctx, endpoint, handler)
+	if err := c.Client.Stream(ctx, endpoint, handler); err != nil {
+		return err
+	}
+	printRetentionSummary(writer, retention)
+	return nil
 }
 
 type logEvent struct {
 	Timestamp string `json:"timestamp"`
 	Stream    string `json:"stream"`
 	Line      string `json:"line"`
+}
+
+type retentionEvent struct {
+	Retained bool   `json:"retained"`
+	TTL      string `json:"ttl"`
+	Expires  string `json:"expires_at"`
+	Bundle   string `json:"bundle_cid"`
 }
 
 func printLog(w io.Writer, format Format, evt logEvent) {
@@ -103,5 +125,26 @@ func printLog(w io.Writer, format Format, evt logEvent) {
 			streamName = "stdout"
 		}
 		_, _ = fmt.Fprintf(w, "%s %s %s\n", timestamp, streamName, line)
+	}
+}
+
+func printRetentionSummary(w io.Writer, evt *retentionEvent) {
+	if evt == nil {
+		return
+	}
+	ret := *evt
+	ttl := strings.TrimSpace(ret.TTL)
+	expires := strings.TrimSpace(ret.Expires)
+	bundle := strings.TrimSpace(ret.Bundle)
+
+	switch {
+	case ret.Retained && ttl != "" && expires != "":
+		_, _ = fmt.Fprintf(w, "Retention: retained ttl=%s expires=%s cid=%s\n", ttl, expires, bundle)
+	case ret.Retained && ttl != "":
+		_, _ = fmt.Fprintf(w, "Retention: retained ttl=%s cid=%s\n", ttl, bundle)
+	case ret.Retained:
+		_, _ = fmt.Fprintf(w, "Retention: retained cid=%s\n", bundle)
+	default:
+		_, _ = fmt.Fprintln(w, "Retention: not retained (bundle expires per default policy)")
 	}
 }

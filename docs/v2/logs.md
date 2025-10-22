@@ -22,9 +22,19 @@ predictable.
       "ttl": "24h",
       "expires_at": "2025-10-23T14:00:00Z"
     }
+  },
+  "retention": {
+    "retained": true,
+    "ttl": "24h",
+    "expires_at": "2025-10-23T14:00:00Z",
+    "bundle": "logs",
+    "bundle_cid": "bafy..."
   }
 }
 ```
+
+The top-level `retention` block summarises the active bundle, TTL, and expiry timestamp so the CLI and
+control plane APIs can surface inspection-ready jobs without re-scanning bundle metadata.
 
 - Only small derived fields (log digest, retention TTL, CID) live in etcd; the raw log content does
   not. Duplicate payloads reuse the existing CID instead of triggering a second pin.
@@ -63,6 +73,8 @@ numeric SSE id to support resumable replay.
   (`--max-retries` and `--retry-wait` tune behaviour).
 - `ploy jobs follow <job-id>` tails job logs in real time using `/v2/jobs/{id}/logs/stream`, sharing
   the same formatting and retry semantics so operators can follow a single step through completion.
+  When a retention hint arrives, the CLI prints a `Retention: ...` summary with the bundle CID, TTL,
+  and expiry window after the stream closes.
 - When retention metadata is published on the stream (see
   [`observability-log-bundles`](../design/observability-log-bundles/README.md)), the CLI surfaces
   bundle TTLs, expiry timestamps, and archived CIDs so operators know how long the log bundle will
@@ -73,7 +85,8 @@ numeric SSE id to support resumable replay.
 - Log bundles follow the same `expires_at` lifecycle as other job artifacts (see
   [docs/v2/gc.md](gc.md)). When a job’s retention window lapses, the GC controller unpins the log
   CID and removes the reference from etcd. The scheduler computes `expires_at` when recording the
-  bundle so downstream consumers do not need to re-run TTL math.
+  bundle and publishes an aggregate `retention` summary alongside job records so downstream
+  consumers do not need to re-run TTL math.
 - Operators can override the default retention duration per job or via `ploy gc --older-than`.
 
 ## Operational Notes

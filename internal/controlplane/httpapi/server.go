@@ -462,6 +462,7 @@ type jobDTO struct {
 	Metadata       map[string]string                 `json:"metadata,omitempty"`
 	Artifacts      map[string]string                 `json:"artifacts,omitempty"`
 	Bundles        map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+	Retention      *scheduler.JobRetention           `json:"retention,omitempty"`
 	Error          *scheduler.JobError               `json:"error,omitempty"`
 }
 
@@ -484,6 +485,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		Metadata:       copyMap(job.Metadata),
 		Artifacts:      copyMap(job.Artifacts),
 		Bundles:        copyBundles(job.Bundles),
+		Retention:      copyRetention(job.Retention),
 		Error:          job.Error,
 	}
 }
@@ -522,6 +524,20 @@ func copyBundles(src map[string]scheduler.BundleRecord) map[string]scheduler.Bun
 		}
 	}
 	return out
+}
+
+func copyRetention(src *scheduler.JobRetention) *scheduler.JobRetention {
+	if src == nil {
+		return nil
+	}
+	return &scheduler.JobRetention{
+		Retained:   src.Retained,
+		TTL:        src.TTL,
+		ExpiresAt:  src.ExpiresAt,
+		Bundle:     src.Bundle,
+		BundleCID:  src.BundleCID,
+		Inspection: src.Inspection,
+	}
 }
 
 func decodeJSON(r *http.Request, dst any) error {

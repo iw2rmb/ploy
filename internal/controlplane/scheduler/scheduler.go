@@ -17,6 +17,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const defaultRetentionWindow = 24 * time.Hour
+
 // Scheduler coordinates job submission, claims, and lifecycle management backed by etcd.
 type Scheduler struct {
 	client *clientv3.Client
@@ -313,6 +315,11 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	if req.Inspection && req.State == JobStateFailed {
 		record.State = JobStateInspectionReady
 	}
+	expiry := completedAt.Add(defaultRetentionWindow).UTC()
+	if derived := computeRetentionExpiry(record.Bundles, completedAt); !derived.IsZero() {
+		expiry = derived
+	}
+	record.Retention = deriveRetentionRecord(record.Bundles, expiry, record.State == JobStateInspectionReady)
 
 	jobBytes, err := json.Marshal(record)
 	if err != nil {
@@ -324,7 +331,7 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 		JobID:      record.ID,
 		Ticket:     record.Ticket,
 		State:      record.State,
-		ExpiresAt:  encodeTime(completedAt.Add(24 * time.Hour)),
+		ExpiresAt:  encodeTime(expiry),
 		FinalState: string(record.State),
 	}
 	gcBytes, err := json.Marshal(gcPayload)
@@ -715,6 +722,7 @@ type jobRecord struct {
 	Metadata       map[string]string       `json:"metadata,omitempty"`
 	Artifacts      map[string]string       `json:"artifacts,omitempty"`
 	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
+	Retention      *retentionRecord        `json:"retention,omitempty"`
 	Error          *JobError               `json:"error,omitempty"`
 }
 
@@ -737,6 +745,7 @@ func (r jobRecord) toJob() *Job {
 		Metadata:       cloneMap(r.Metadata),
 		Artifacts:      cloneMap(r.Artifacts),
 		Bundles:        exportBundleRecords(r.Bundles),
+		Retention:      exportRetention(r.Retention),
 		Error:          r.Error,
 	}
 }
@@ -758,6 +767,15 @@ type bundleRecord struct {
 	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
+type retentionRecord struct {
+	Retained   bool   `json:"retained,omitempty"`
+	TTL        string `json:"ttl,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"`
+	Bundle     string `json:"bundle,omitempty"`
+	BundleCID  string `json:"bundle_cid,omitempty"`
+	Inspection bool   `json:"inspection,omitempty"`
+}
+
 // exportBundleRecords converts stored bundle metadata into public scheduler state.
 func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
 	if len(src) == 0 {
@@ -768,6 +786,20 @@ func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
 		dst[name] = BundleRecord(rec)
 	}
 	return dst
+}
+
+func exportRetention(src *retentionRecord) *JobRetention {
+	if src == nil {
+		return nil
+	}
+	return &JobRetention{
+		Retained:   src.Retained,
+		TTL:        src.TTL,
+		ExpiresAt:  src.ExpiresAt,
+		Bundle:     src.Bundle,
+		BundleCID:  src.BundleCID,
+		Inspection: src.Inspection,
+	}
 }
 
 // normalizeBundleRecords trims bundle fields and computes expiry timestamps.
@@ -796,6 +828,85 @@ func normalizeBundleRecords(src map[string]BundleRecord, completedAt time.Time) 
 		}
 	}
 	return dst
+}
+
+func computeRetentionExpiry(bundles map[string]bundleRecord, completedAt time.Time) time.Time {
+	var latest time.Time
+	for _, rec := range bundles {
+		if expires := decodeTime(rec.ExpiresAt); !expires.IsZero() {
+			if expires.After(latest) {
+				latest = expires
+			}
+			continue
+		}
+		ttl := strings.TrimSpace(rec.TTL)
+		if ttl == "" {
+			continue
+		}
+		duration, err := time.ParseDuration(ttl)
+		if err != nil || duration <= 0 {
+			continue
+		}
+		candidate := completedAt.Add(duration).UTC()
+		if candidate.After(latest) {
+			latest = candidate
+		}
+	}
+	return latest
+}
+
+func deriveRetentionRecord(bundles map[string]bundleRecord, expiry time.Time, inspection bool) *retentionRecord {
+	var (
+		found bool
+		name  string
+		rec   bundleRecord
+	)
+	if len(bundles) > 0 {
+		if candidate, ok := bundles["logs"]; ok && (candidate.Retained || strings.TrimSpace(candidate.TTL) != "" || strings.TrimSpace(candidate.ExpiresAt) != "" || strings.TrimSpace(candidate.CID) != "") {
+			found = true
+			name = "logs"
+			rec = candidate
+		} else {
+			for key, candidate := range bundles {
+				if candidate.Retained || strings.TrimSpace(candidate.TTL) != "" || strings.TrimSpace(candidate.ExpiresAt) != "" || strings.TrimSpace(candidate.CID) != "" {
+					found = true
+					name = key
+					rec = candidate
+					break
+				}
+			}
+		}
+	}
+
+	if !found && !inspection {
+		return nil
+	}
+
+	summary := &retentionRecord{
+		Bundle:     name,
+		BundleCID:  strings.TrimSpace(rec.CID),
+		TTL:        strings.TrimSpace(rec.TTL),
+		Retained:   rec.Retained,
+		Inspection: inspection,
+	}
+
+	if expiry.IsZero() {
+		summary.ExpiresAt = ""
+	} else {
+		summary.ExpiresAt = encodeTime(expiry)
+	}
+	if trimmed := strings.TrimSpace(rec.ExpiresAt); trimmed != "" {
+		summary.ExpiresAt = trimmed
+	}
+	if summary.Retained || inspection {
+		summary.Retained = true
+	}
+	if !found {
+		summary.BundleCID = ""
+		summary.TTL = ""
+		summary.Bundle = ""
+	}
+	return summary
 }
 
 type queueEntry struct {
