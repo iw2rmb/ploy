@@ -1,29 +1,36 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 )
 
 // Server exposes the control-plane scheduler over HTTP.
 type Server struct {
 	scheduler *scheduler.Scheduler
+	signer    *gitlab.Signer
 }
 
 // New returns an HTTP handler rooted at /v2.
-func New(s *scheduler.Scheduler) http.Handler {
+func New(s *scheduler.Scheduler, signer *gitlab.Signer) http.Handler {
 	mux := http.NewServeMux()
-	h := &Server{scheduler: s}
+	h := &Server{scheduler: s, signer: signer}
 	mux.HandleFunc("/v2/jobs", h.handleJobs)
 	mux.HandleFunc("/v2/jobs/claim", h.handleClaim)
 	mux.HandleFunc("/v2/jobs/", h.handleJobSubpath)
 	mux.HandleFunc("/v2/health", h.handleHealth)
+	mux.HandleFunc("/v2/gitlab/signer/secrets", h.handleSignerSecrets)
+	mux.HandleFunc("/v2/gitlab/signer/tokens", h.handleSignerTokens)
+	mux.HandleFunc("/v2/gitlab/signer/rotations", h.handleSignerRotations)
 	return mux
 }
 
@@ -40,6 +47,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	switch r.Method {
 	case http.MethodPost:
 		s.handleJobSubmit(w, r)
@@ -51,6 +61,9 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	var req struct {
 		Ticket      string            `json:"ticket"`
 		StepID      string            `json:"step_id"`
@@ -77,6 +90,9 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	ticket := strings.TrimSpace(r.URL.Query().Get("ticket"))
 	if ticket == "" {
 		http.Error(w, "ticket query parameter required", http.StatusBadRequest)
@@ -95,6 +111,9 @@ func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -123,6 +142,9 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	rel := strings.TrimPrefix(r.URL.Path, "/v2/jobs/")
 	parts := strings.Split(strings.Trim(rel, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
@@ -145,6 +167,9 @@ func (s *Server) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleJobGet(w http.ResponseWriter, r *http.Request, jobID string) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -163,6 +188,9 @@ func (s *Server) handleJobGet(w http.ResponseWriter, r *http.Request, jobID stri
 }
 
 func (s *Server) handleJobHeartbeat(w http.ResponseWriter, r *http.Request, jobID string) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -187,6 +215,9 @@ func (s *Server) handleJobHeartbeat(w http.ResponseWriter, r *http.Request, jobI
 }
 
 func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID string) {
+	if !s.ensureScheduler(w) {
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -217,6 +248,150 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		return
 	}
 	writeJSON(w, http.StatusOK, jobDTOFrom(job))
+}
+
+func (s *Server) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {
+	if s.signer == nil {
+		http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Secret string   `json:"secret"`
+		APIKey string   `json:"api_key"`
+		Scopes []string `json:"scopes"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result, err := s.signer.RotateSecret(r.Context(), gitlab.RotateSecretRequest{
+		SecretName: req.Secret,
+		APIKey:     req.APIKey,
+		Scopes:     req.Scopes,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	payload := map[string]any{
+		"secret":     strings.TrimSpace(req.Secret),
+		"revision":   result.Revision,
+		"updated_at": result.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *Server) handleSignerTokens(w http.ResponseWriter, r *http.Request) {
+	if s.signer == nil {
+		http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Secret     string   `json:"secret"`
+		Scopes     []string `json:"scopes"`
+		TTLSeconds int64    `json:"ttl_seconds"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ttl := time.Duration(req.TTLSeconds) * time.Second
+	token, err := s.signer.IssueToken(r.Context(), gitlab.IssueTokenRequest{
+		SecretName: req.Secret,
+		Scopes:     req.Scopes,
+		TTL:        ttl,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	payload := map[string]any{
+		"secret":      token.SecretName,
+		"token":       token.Value,
+		"scopes":      token.Scopes,
+		"issued_at":   token.IssuedAt.UTC().Format(time.RFC3339Nano),
+		"expires_at":  token.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		"ttl_seconds": int64(token.ExpiresAt.Sub(token.IssuedAt).Seconds()),
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *Server) handleSignerRotations(w http.ResponseWriter, r *http.Request) {
+	if s.signer == nil {
+		http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	timeout := 30 * time.Second
+	if raw := strings.TrimSpace(r.URL.Query().Get("timeout")); raw != "" {
+		dur, err := time.ParseDuration(raw)
+		if err != nil {
+			http.Error(w, "invalid timeout duration", http.StatusBadRequest)
+			return
+		}
+		if dur > 0 {
+			timeout = dur
+		} else {
+			timeout = 0
+		}
+	}
+
+	var since int64
+	if raw := strings.TrimSpace(r.URL.Query().Get("since")); raw != "" {
+		revision, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid since revision", http.StatusBadRequest)
+			return
+		}
+		since = revision
+	}
+
+	ctx := r.Context()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	sub := s.signer.SubscribeRotations()
+	defer sub.Close()
+
+	for {
+		select {
+		case <-ctx.Done():
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case evt, ok := <-sub.C:
+			if !ok {
+				http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if evt.Revision <= since {
+				continue
+			}
+			payload := map[string]any{
+				"secret":   evt.SecretName,
+				"revision": evt.Revision,
+			}
+			if !evt.UpdatedAt.IsZero() {
+				payload["updated_at"] = evt.UpdatedAt.UTC().Format(time.RFC3339Nano)
+			}
+			writeJSON(w, http.StatusOK, payload)
+			return
+		}
+	}
 }
 
 // jobDTO is the API representation for a job.
@@ -303,4 +478,12 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 	enc := json.NewEncoder(w)
 	_ = enc.Encode(payload)
+}
+
+func (s *Server) ensureScheduler(w http.ResponseWriter) bool {
+	if s.scheduler == nil {
+		http.Error(w, "scheduler unavailable", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
 }
