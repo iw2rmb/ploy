@@ -37,6 +37,12 @@ var (
 	ErrPKIAlreadyBootstrapped = errors.New("deploy: cluster PKI already bootstrapped")
 	// ErrConcurrentRotation signals the CA changed while processing a rotation.
 	ErrConcurrentRotation = errors.New("deploy: concurrent CA rotation detected")
+	// ErrWorkerExists indicates the worker has already been registered.
+	ErrWorkerExists = errors.New("deploy: worker already registered")
+	// ErrWorkerNotFound indicates the worker is missing from the inventory.
+	ErrWorkerNotFound = errors.New("deploy: worker not registered")
+	// ErrConcurrentWorkerUpdate signals a concurrent modification to the worker inventory.
+	ErrConcurrentWorkerUpdate = errors.New("deploy: concurrent worker update detected")
 )
 
 // CARotationManager manages certificate authority lifecycle for a cluster.
@@ -73,6 +79,7 @@ type CAState struct {
 	WorkerCertificates map[string]LeafCertificate
 	Revoked            []RevokedRecord
 	Revision           int64
+	NodesRevision      int64
 }
 
 // CABundle captures certificate authority metadata and PEM-encoded material.
@@ -406,6 +413,7 @@ func (m *CARotationManager) State(ctx context.Context) (CAState, error) {
 	if err := json.Unmarshal(nodesResp.Kvs[0].Value, &nodes); err != nil {
 		return CAState{}, fmt.Errorf("deploy: decode node inventory: %w", err)
 	}
+	nodesRevision := nodesResp.Kvs[0].ModRevision
 
 	beaconCerts, err := m.loadLeafCertificates(ctx, m.beaconPrefix())
 	if err != nil {
@@ -438,7 +446,118 @@ func (m *CARotationManager) State(ctx context.Context) (CAState, error) {
 		WorkerCertificates: workerCerts,
 		Revoked:            revoked,
 		Revision:           resp.Kvs[0].ModRevision,
+		NodesRevision:      nodesRevision,
 	}, nil
+}
+
+// IssueWorkerCertificate adds the worker to the cluster inventory and issues a leaf certificate.
+func (m *CARotationManager) IssueWorkerCertificate(ctx context.Context, workerID string, now time.Time) (LeafCertificate, error) {
+	id := strings.TrimSpace(workerID)
+	if id == "" {
+		return LeafCertificate{}, errors.New("deploy: worker id required")
+	}
+	state, err := m.State(ctx)
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+	for _, existing := range state.Nodes.Workers {
+		if existing == id {
+			return LeafCertificate{}, ErrWorkerExists
+		}
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	caKey, caCert, err := decodeCABundleMaterials(state.CurrentCA)
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+	cert, err := issueLeafCertificate(id, workerCertificateUse, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, "")
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+
+	updatedWorkers := append([]string(nil), state.Nodes.Workers...)
+	updatedWorkers = append(updatedWorkers, id)
+	sort.Strings(updatedWorkers)
+	nodes := NodeSet{
+		Beacons: append([]string(nil), state.Nodes.Beacons...),
+		Workers: updatedWorkers,
+	}
+	nodesBytes, err := json.Marshal(nodes)
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: encode worker nodes: %w", err)
+	}
+	certBytes, err := json.Marshal(cert)
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: encode worker certificate: %w", err)
+	}
+
+	txn := m.client.Txn(ctx).If(
+		clientv3.Compare(clientv3.ModRevision(m.caCurrentKey()), "=", state.Revision),
+		clientv3.Compare(clientv3.ModRevision(m.nodesKey()), "=", state.NodesRevision),
+		clientv3.Compare(clientv3.CreateRevision(m.workerCertKey(id)), "=", 0),
+	).Then(
+		clientv3.OpPut(m.nodesKey(), string(nodesBytes)),
+		clientv3.OpPut(m.workerCertKey(id), string(certBytes)),
+	)
+	resp, err := txn.Commit()
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: persist worker certificate: %w", err)
+	}
+	if !resp.Succeeded {
+		return LeafCertificate{}, ErrConcurrentWorkerUpdate
+	}
+	return cert, nil
+}
+
+// RemoveWorker removes the worker from the inventory and deletes certificate materials.
+func (m *CARotationManager) RemoveWorker(ctx context.Context, workerID string) error {
+	id := strings.TrimSpace(workerID)
+	if id == "" {
+		return errors.New("deploy: worker id required")
+	}
+	state, err := m.State(ctx)
+	if err != nil {
+		return err
+	}
+	index := -1
+	for i, existing := range state.Nodes.Workers {
+		if existing == id {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return ErrWorkerNotFound
+	}
+	updatedWorkers := append([]string(nil), state.Nodes.Workers...)
+	updatedWorkers = append(updatedWorkers[:index], updatedWorkers[index+1:]...)
+	nodes := NodeSet{
+		Beacons: append([]string(nil), state.Nodes.Beacons...),
+		Workers: updatedWorkers,
+	}
+	nodesBytes, err := json.Marshal(nodes)
+	if err != nil {
+		return fmt.Errorf("deploy: encode worker nodes: %w", err)
+	}
+
+	txn := m.client.Txn(ctx).If(
+		clientv3.Compare(clientv3.ModRevision(m.caCurrentKey()), "=", state.Revision),
+		clientv3.Compare(clientv3.ModRevision(m.nodesKey()), "=", state.NodesRevision),
+		clientv3.Compare(clientv3.CreateRevision(m.workerCertKey(id)), ">", 0),
+	).Then(
+		clientv3.OpPut(m.nodesKey(), string(nodesBytes)),
+		clientv3.OpDelete(m.workerCertKey(id)),
+	)
+	resp, err := txn.Commit()
+	if err != nil {
+		return fmt.Errorf("deploy: remove worker: %w", err)
+	}
+	if !resp.Succeeded {
+		return ErrConcurrentWorkerUpdate
+	}
+	return nil
 }
 
 func (m *CARotationManager) loadLeafCertificates(ctx context.Context, prefix string) (map[string]LeafCertificate, error) {
@@ -487,6 +606,30 @@ func (m *CARotationManager) beaconCertKey(id string) string {
 
 func (m *CARotationManager) workerCertKey(id string) string {
 	return m.workerPrefix() + id
+}
+
+func decodeCABundleMaterials(bundle CABundle) (ed25519.PrivateKey, *x509.Certificate, error) {
+	keyBlock, _ := pem.Decode([]byte(bundle.KeyPEM))
+	if keyBlock == nil {
+		return nil, nil, errors.New("deploy: decode CA private key: missing PEM block")
+	}
+	keyAny, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("deploy: parse CA private key: %w", err)
+	}
+	privateKey, ok := keyAny.(ed25519.PrivateKey)
+	if !ok {
+		return nil, nil, errors.New("deploy: CA private key must be ed25519")
+	}
+	certBlock, _ := pem.Decode([]byte(bundle.CertificatePEM))
+	if certBlock == nil {
+		return nil, nil, errors.New("deploy: decode CA certificate: missing PEM block")
+	}
+	caCert, err := x509.ParseCertificate(certBlock.Bytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("deploy: parse CA certificate: %w", err)
+	}
+	return privateKey, caCert, nil
 }
 
 func normalizeNodeIDs(ids []string) []string {

@@ -11,7 +11,7 @@
 - Completed (2025-10-22T17:31:45Z, status: shipped) — observability-metrics archived to `.archive/observability-metrics/`.
 - Completed (2025-10-22T18:00:07Z, status: shipped) — deployment-bootstrap-host archived to `.archive/deployment-bootstrap-host/`.
 - Completed (2025-10-22T22:50:50Z, status: shipped) — deployment-ca-rotation archived to `.archive/deployment-ca-rotation/`.
-- [ ] `docs/design/deployment-worker-onboarding/README.md` — automate worker join flows and metadata updates.
+- Completed (2025-10-22T23:10:33Z, status: shipped) — deployment-worker-onboarding archived to `.archive/deployment-worker-onboarding/`.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
 - [ ] `docs/design/gc-marker-controller/README.md` — select expired markers and stage deletions.

@@ -126,6 +126,18 @@ var commandTree = []Node{
 		},
 	},
 	{
+		Name:        "node",
+		Description: "Manage worker nodes and onboarding",
+		Usage:       "ploy node <command>",
+		Subcommands: []Node{
+			{
+				Name:        "add",
+				Description: "Onboard a worker node, register metadata, and verify health probes",
+				Usage:       "ploy node add [--cluster-id <id>] [--worker-id <id>] [--address <addr>] [--label key=value] [--health-probe name=url] [--dry-run]",
+			},
+		},
+	},
+	{
 		Name:        "beacon",
 		Description: "Rotate deployment CA material and node certificates",
 		Usage:       "ploy beacon <command>",

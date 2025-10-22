@@ -17,6 +17,7 @@ _ploy() {
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("cluster:Manage local cluster descriptors")
             commands+=("deploy:Bootstrap deployment hosts and verify readiness")
+            commands+=("node:Manage worker nodes and onboarding")
             commands+=("beacon:Rotate deployment CA material and node certificates")
             commands+=("config:Inspect or update cluster configuration")
             commands+=("snapshot:Plan and capture workspace snapshots")
@@ -67,6 +68,11 @@ _ploy() {
                     commands+=("bootstrap:Install dependencies and run host preflight checks")
                     _describe 'deploy command' commands && ret=0
                     ;;
+                'node')
+                    commands=()
+                    commands+=("add:Onboard a worker node, register metadata, and verify health probes")
+                    _describe 'node command' commands && ret=0
+                    ;;
                 'beacon')
                     commands=()
                     commands+=("rotate-ca:Rotate the cluster CA, update beacon/worker certificates, and record revocations")
@@ -109,6 +115,7 @@ _ploy() {
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("cluster:Manage local cluster descriptors")
                     commands+=("deploy:Bootstrap deployment hosts and verify readiness")
+                    commands+=("node:Manage worker nodes and onboarding")
                     commands+=("beacon:Rotate deployment CA material and node certificates")
                     commands+=("config:Inspect or update cluster configuration")
                     commands+=("snapshot:Plan and capture workspace snapshots")

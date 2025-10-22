@@ -58,6 +58,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleDeploy(args[1:], stderr)
 	case "beacon":
 		return handleBeacon(args[1:], stderr)
+	case "node":
+		return handleNode(args[1:], stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
