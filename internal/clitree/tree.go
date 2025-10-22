@@ -114,6 +114,18 @@ var commandTree = []Node{
 		},
 	},
 	{
+		Name:        "deploy",
+		Description: "Bootstrap deployment hosts and verify readiness",
+		Usage:       "ploy deploy <command>",
+		Subcommands: []Node{
+			{
+				Name:        "bootstrap",
+				Description: "Install dependencies and run host preflight checks",
+				Usage:       "ploy deploy bootstrap [--config <path>] [--host <addr>] [--dry-run]",
+			},
+		},
+	},
+	{
 		Name:        "config",
 		Description: "Inspect or update cluster configuration",
 		Usage:       "ploy config <command>",

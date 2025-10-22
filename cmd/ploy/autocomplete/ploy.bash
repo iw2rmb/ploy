@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster config snapshot environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy config snapshot environment manifest knowledge-base help" -- "$cur") )
         return 0
     fi
 
@@ -47,6 +47,12 @@ _ploy_completions() {
             return 0
         fi
         ;;
+    "deploy")
+        if [[ $COMP_CWORD -eq 2 ]]; then
+            COMPREPLY=( $(compgen -W "bootstrap" -- "$cur") )
+            return 0
+        fi
+        ;;
     "config")
         if [[ $COMP_CWORD -eq 2 ]]; then
             COMPREPLY=( $(compgen -W "gitlab" -- "$cur") )
@@ -83,7 +89,7 @@ _ploy_completions() {
         ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster config snapshot environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster deploy config snapshot environment manifest knowledge-base" -- "$cur") )
             return 0
         fi
         ;;

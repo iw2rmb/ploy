@@ -9,7 +9,7 @@
 - Completed (2025-10-22T16:01:47Z, status: shipped) — observability-log-bundles archived to `.archive/observability-log-bundles/`.
 - Completed (2025-10-22T16:37:18Z, status: shipped) — observability-retention-cli archived to `.archive/observability-retention-cli/`.
 - Completed (2025-10-22T17:31:45Z, status: shipped) — observability-metrics archived to `.archive/observability-metrics/`.
-- [ ] `docs/design/deployment-bootstrap-host/README.md` — host dependency bootstrap and readiness checks.
+- Completed (2025-10-22T18:00:07Z, status: shipped) — deployment-bootstrap-host archived to `.archive/deployment-bootstrap-host/`.
 - [ ] `docs/design/deployment-ca-rotation/README.md` — generate and rotate CA and cluster descriptors.
 - [ ] `docs/design/deployment-worker-onboarding/README.md` — automate worker join flows and metadata updates.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.

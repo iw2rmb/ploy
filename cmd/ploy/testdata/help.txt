@@ -10,6 +10,7 @@ Core Commands:
   jobs             Inspect and follow individual jobs
   artifact         Manage IPFS Cluster artifacts
   cluster          Manage local cluster descriptors
+  deploy           Bootstrap deployment hosts and verify readiness
   config           Inspect or update cluster configuration
   snapshot         Plan and capture workspace snapshots
   environment      Materialize integration environments

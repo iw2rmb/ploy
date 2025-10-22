@@ -6,10 +6,10 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 ## Prerequisites
 
 - SSH access to all hosts with sudo privileges.
-- Go 1.25+ installed for building binaries.
-- Docker Engine 28.x on each node.
-- IPFS Cluster daemon 1.1.4 installed (or newer compatible release).
-- etcd 3.6.x binary or package available.
+- Go 1.25.2 installed for building binaries.
+- Docker Engine 28.0.1 (deployed via static binaries).
+- IPFS Cluster service 1.1.4 installed.
+- etcd 3.6.0 binary or package available.
 
 ## Bootstrap Steps (Beacon + Control Plane)
 
@@ -23,12 +23,23 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 3. **Run Bootstrap Script via CLI**  
    - Execute `ploy deploy bootstrap --config bootstrap.yaml` (or similar) from the workstation.  
-   - The command uploads and runs the embedded shell script on the target host, installing
-     dependencies, creating the `ploy` user, and configuring etcd/IPFS/ploynode in beacon mode.  
-   - The same script generates the cluster CA (`ca.pem`, `ca-key.pem`) and places artifacts under
-     `/etc/ploy/pki/`.  
-   - During bootstrap the CLI prompts to install the CA locally and add a resolver entry for `*.ploy`;
-     consent records are stored so operators can review changes.
+   - Use `--dry-run` to preview the embedded script (`docs/v2/implement.sh`) before shipping it over SSH.  
+   - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
+     and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
+     Cluster 1.1.4.  
+   - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
+     refreshed, and logs summarise installed versions.  
+   - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with
+     a sane `daemon.json` default.
+   - Example `bootstrap.yaml`:
+
+     ```yaml
+     host: beacon.example.com
+     user: root
+     identity_file: /home/operator/.ssh/ploy
+     min_disk_gb: 80
+     required_ports: [2379, 2380, 9094, 9095]
+     ```
 
 4. **Capture Cluster Metadata**  
    - The CLI copies the CA bundle to the workstation’s trust store and writes a cluster descriptor

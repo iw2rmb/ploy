@@ -16,6 +16,7 @@ _ploy() {
             commands+=("jobs:Inspect and follow individual jobs")
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("cluster:Manage local cluster descriptors")
+            commands+=("deploy:Bootstrap deployment hosts and verify readiness")
             commands+=("config:Inspect or update cluster configuration")
             commands+=("snapshot:Plan and capture workspace snapshots")
             commands+=("environment:Materialize integration environments")
@@ -60,6 +61,11 @@ _ploy() {
                     commands+=("list:Show locally cached cluster descriptors")
                     _describe 'cluster command' commands && ret=0
                     ;;
+                'deploy')
+                    commands=()
+                    commands+=("bootstrap:Install dependencies and run host preflight checks")
+                    _describe 'deploy command' commands && ret=0
+                    ;;
                 'config')
                     commands=()
                     commands+=("gitlab:Manage GitLab integration credentials")
@@ -96,6 +102,7 @@ _ploy() {
                     commands+=("jobs:Inspect and follow individual jobs")
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("cluster:Manage local cluster descriptors")
+                    commands+=("deploy:Bootstrap deployment hosts and verify readiness")
                     commands+=("config:Inspect or update cluster configuration")
                     commands+=("snapshot:Plan and capture workspace snapshots")
                     commands+=("environment:Materialize integration environments")
