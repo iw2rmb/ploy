@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,6 +51,7 @@ func TestSignerRotateAndIssueToken(t *testing.T) {
 		SecretName: "runner-api",
 		Scopes:     []string{"read_repository"},
 		TTL:        7 * time.Minute,
+		NodeID:     "node-a",
 	})
 	if err != nil {
 		t.Fatalf("IssueToken: %v", err)
@@ -65,6 +68,9 @@ func TestSignerRotateAndIssueToken(t *testing.T) {
 	}
 	if len(token.Scopes) != 1 || token.Scopes[0] != "read_repository" {
 		t.Fatalf("expected scopes [read_repository], got %+v", token.Scopes)
+	}
+	if strings.TrimSpace(token.TokenID) == "" {
+		t.Fatalf("expected token id populated")
 	}
 
 	resp, err := client.Get(ctx, SecretsPrefix+"runner-api")
@@ -164,6 +170,7 @@ func TestSignerIssueTokenValidatesScopes(t *testing.T) {
 		SecretName: "limited",
 		Scopes:     []string{"write_repository"},
 		TTL:        5 * time.Minute,
+		NodeID:     "node-scope",
 	}); err == nil {
 		t.Fatalf("expected IssueToken to reject unknown scopes")
 	}
@@ -205,6 +212,7 @@ func TestNewSignerFromEnv(t *testing.T) {
 
 	token, err := signer.IssueToken(ctx, IssueTokenRequest{
 		SecretName: "env-secret",
+		NodeID:     "node-env",
 	})
 	if err != nil {
 		t.Fatalf("IssueToken default ttl: %v", err)
@@ -219,9 +227,243 @@ func TestNewSignerFromEnv(t *testing.T) {
 	if _, err := signer.IssueToken(ctx, IssueTokenRequest{
 		SecretName: "env-secret",
 		TTL:        2 * time.Hour,
+		NodeID:     "node-env",
 	}); err == nil {
 		t.Fatalf("expected IssueToken to reject ttl above max")
 	}
+}
+
+func TestSignerRotateSecretRevokesTokens(t *testing.T) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	etcd, client := newTestEtcd(t)
+	defer etcd.Close()
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	revoker := newRecordingRevoker(nil)
+	audit := newRecordingAudit()
+
+	cipher := mustNewAESCipher(t, strings.Repeat("t", 32))
+	signer := mustNewSigner(t, client, cipher,
+		WithTokenRevoker(revoker),
+		WithAuditRecorder(audit),
+	)
+	t.Cleanup(func() {
+		_ = signer.Close()
+	})
+
+	if _, err := signer.RotateSecret(ctx, RotateSecretRequest{
+		SecretName: "deploy",
+		APIKey:     "glpat-initial",
+		Scopes:     []string{"api"},
+	}); err != nil {
+		t.Fatalf("RotateSecret initial: %v", err)
+	}
+
+	token, err := signer.IssueToken(ctx, IssueTokenRequest{
+		SecretName: "deploy",
+		Scopes:     []string{"api"},
+		TTL:        3 * time.Minute,
+		NodeID:     "node-1",
+	})
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	if _, err := signer.RotateSecret(ctx, RotateSecretRequest{
+		SecretName: "deploy",
+		APIKey:     "glpat-next",
+		Scopes:     []string{"api"},
+	}); err != nil {
+		t.Fatalf("RotateSecret rotate: %v", err)
+	}
+
+	report := revoker.lastCall()
+	if report == nil {
+		t.Fatalf("expected revoker to be invoked")
+	}
+	if len(report.tokens) != 1 || report.tokens[0].ID != token.TokenID {
+		t.Fatalf("expected revoker to receive token id %q, got %+v", token.TokenID, report.tokens)
+	}
+	if report.secret != "deploy" {
+		t.Fatalf("expected secret deploy, got %s", report.secret)
+	}
+
+	issued := audit.eventsByAction(AuditActionIssued)
+	if len(issued) == 0 {
+		t.Fatalf("expected issued audit event recorded")
+	}
+	revoked := audit.eventsByAction(AuditActionRevoked)
+	if len(revoked) != 1 {
+		t.Fatalf("expected single revoked audit event, got %d", len(revoked))
+	}
+	if revokerFail := audit.eventsByAction(AuditActionRevocationFailed); len(revokerFail) != 0 {
+		t.Fatalf("unexpected revocation failure events: %+v", revokerFail)
+	}
+	if rev := revoked[0]; rev.TokenID != token.TokenID || rev.NodeID != "node-1" {
+		t.Fatalf("unexpected revoked event payload: %+v", rev)
+	}
+}
+
+func TestSignerRotateSecretRecordsRevocationFailures(t *testing.T) {
+	t.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	etcd, client := newTestEtcd(t)
+	defer etcd.Close()
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	cipher := mustNewAESCipher(t, strings.Repeat("u", 32))
+	failErr := errors.New("boom")
+	revoker := newRecordingRevoker(map[string]error{})
+	audit := newRecordingAudit()
+
+	signer := mustNewSigner(t, client, cipher,
+		WithTokenRevoker(revoker),
+		WithAuditRecorder(audit),
+	)
+	t.Cleanup(func() {
+		_ = signer.Close()
+	})
+
+	if _, err := signer.RotateSecret(ctx, RotateSecretRequest{
+		SecretName: "deploy",
+		APIKey:     "glpat-initial",
+		Scopes:     []string{"api"},
+	}); err != nil {
+		t.Fatalf("RotateSecret initial: %v", err)
+	}
+
+	token, err := signer.IssueToken(ctx, IssueTokenRequest{
+		SecretName: "deploy",
+		Scopes:     []string{"api"},
+		TTL:        2 * time.Minute,
+		NodeID:     "node-err",
+	})
+	if err != nil {
+		t.Fatalf("IssueToken: %v", err)
+	}
+
+	revoker.failures[token.TokenID] = failErr
+
+	if _, err := signer.RotateSecret(ctx, RotateSecretRequest{
+		SecretName: "deploy",
+		APIKey:     "glpat-next",
+		Scopes:     []string{"api"},
+	}); err != nil {
+		t.Fatalf("RotateSecret rotate: %v", err)
+	}
+
+	failed := audit.eventsByAction(AuditActionRevocationFailed)
+	if len(failed) != 1 {
+		t.Fatalf("expected revocation failure event, got %d", len(failed))
+	}
+	if failed[0].TokenID != token.TokenID || failed[0].NodeID != "node-err" {
+		t.Fatalf("unexpected failure event payload: %+v", failed[0])
+	}
+	if failed[0].Error == "" || !strings.Contains(failed[0].Error, "boom") {
+		t.Fatalf("expected failure error containing boom, got %q", failed[0].Error)
+	}
+
+	// Clear failure to allow success on next rotation.
+	delete(revoker.failures, token.TokenID)
+
+	if _, err := signer.RotateSecret(ctx, RotateSecretRequest{
+		SecretName: "deploy",
+		APIKey:     "glpat-final",
+		Scopes:     []string{"api"},
+	}); err != nil {
+		t.Fatalf("RotateSecret retry: %v", err)
+	}
+
+	revoked := audit.eventsByAction(AuditActionRevoked)
+	if len(revoked) == 0 {
+		t.Fatalf("expected revoked event after retry")
+	}
+}
+
+type revocationCall struct {
+	secret string
+	tokens []RevocableToken
+}
+
+type recordingRevoker struct {
+	mu       sync.Mutex
+	failures map[string]error
+	calls    []revocationCall
+}
+
+func newRecordingRevoker(failures map[string]error) *recordingRevoker {
+	if failures == nil {
+		failures = make(map[string]error)
+	}
+	return &recordingRevoker{failures: failures}
+}
+
+func (r *recordingRevoker) Revoke(_ context.Context, secret string, tokens []RevocableToken) RevocationReport {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	clone := append([]RevocableToken(nil), tokens...)
+	r.calls = append(r.calls, revocationCall{secret: secret, tokens: clone})
+
+	report := RevocationReport{}
+	for _, tok := range tokens {
+		if err, ok := r.failures[tok.ID]; ok {
+			report.Failed = append(report.Failed, RevocationFailure{
+				Token: tok,
+				Err:   err,
+			})
+			continue
+		}
+		report.Revoked = append(report.Revoked, tok)
+	}
+	return report
+}
+
+func (r *recordingRevoker) lastCall() *revocationCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.calls) == 0 {
+		return nil
+	}
+	call := r.calls[len(r.calls)-1]
+	return &call
+}
+
+type recordingAudit struct {
+	mu     sync.Mutex
+	events []AuditEvent
+}
+
+func newRecordingAudit() *recordingAudit {
+	return &recordingAudit{}
+}
+
+func (r *recordingAudit) Record(event AuditEvent) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, event)
+}
+
+func (r *recordingAudit) eventsByAction(action AuditAction) []AuditEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []AuditEvent
+	for _, evt := range r.events {
+		if evt.Action == action {
+			out = append(out, evt)
+		}
+	}
+	return out
 }
 
 // --- helpers ---

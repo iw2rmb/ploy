@@ -129,12 +129,16 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		"secret":      "runner",
 		"scopes":      []string{"read_repository"},
 		"ttl_seconds": 300,
+		"node_id":     "node-http",
 	})
 	if tokenResp["secret"].(string) != "runner" {
 		t.Fatalf("unexpected token secret: %v", tokenResp["secret"])
 	}
 	if tokenResp["token"].(string) == "" {
 		t.Fatalf("expected token value")
+	}
+	if tokenResp["token_id"].(string) == "" {
+		t.Fatalf("expected token_id in response")
 	}
 	if ttl := int64(tokenResp["ttl_seconds"].(float64)); ttl != 300 {
 		t.Fatalf("expected ttl_seconds 300, got %d", ttl)

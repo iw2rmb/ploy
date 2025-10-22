@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ func TestGitLabRefresh(t *testing.T) {
 
 	cfg := Config{
 		SecretName:          "deploy",
+		NodeID:              "node-bootstrap",
 		Signer:              signer,
 		Cache:               cache,
 		Metrics:             recorder,
@@ -68,6 +70,10 @@ func TestGitLabRefresh(t *testing.T) {
 		t.Fatalf("expected mutual TLS config passed to signer")
 	}
 
+	if signer.lastNode() != "node-bootstrap" {
+		t.Fatalf("expected handshake to include node id, got %q", signer.lastNode())
+	}
+
 	if err := clock.BlockUntilContext(ctx, 1); err != nil {
 		t.Fatalf("block until: %v", err)
 	}
@@ -104,6 +110,12 @@ func TestGitLabRefresh(t *testing.T) {
 		token, ok := cache.Get("deploy")
 		return ok && token.Value == "recovered-token"
 	})
+
+	for _, node := range signer.issuedNodes() {
+		if node != "node-bootstrap" {
+			t.Fatalf("expected refresh calls to include node id node-bootstrap, got %q", node)
+		}
+	}
 
 	signer.emitRotation(gitlab.RotationEvent{
 		SecretName: "deploy",
@@ -143,6 +155,8 @@ type fakeSigner struct {
 	mu              sync.Mutex
 	hCalls          int
 	lastTLSConfig   *tls.Config
+	lastNodeID      string
+	issuedNodeIDs   []string
 	handshake       handshakeResult
 	issueQueue      chan issueResult
 	rotationUpdates chan gitlab.RotationEvent
@@ -177,14 +191,30 @@ func (f *fakeSigner) tlsConfig() *tls.Config {
 	return f.lastTLSConfig
 }
 
+func (f *fakeSigner) lastNode() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.lastNodeID
+}
+
+func (f *fakeSigner) issuedNodes() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.issuedNodeIDs...)
+}
+
 func (f *fakeSigner) Handshake(ctx context.Context, req HandshakeRequest) (HandshakeResponse, error) {
 	f.mu.Lock()
 	f.hCalls++
 	f.lastTLSConfig = req.TLSConfig
+	f.lastNodeID = req.NodeID
 	f.mu.Unlock()
 
 	if req.TLSConfig == nil {
 		return HandshakeResponse{}, errors.New("missing tls config")
+	}
+	if strings.TrimSpace(req.NodeID) == "" {
+		return HandshakeResponse{}, errors.New("missing node id")
 	}
 
 	now := f.clock.Now()
@@ -207,7 +237,13 @@ func (f *fakeSigner) IssueToken(ctx context.Context, req TokenRequest) (gitlab.S
 		if res.err != nil {
 			return gitlab.SignedToken{}, res.err
 		}
+		if strings.TrimSpace(req.NodeID) == "" {
+			return gitlab.SignedToken{}, errors.New("missing node id")
+		}
 		now := f.clock.Now()
+		f.mu.Lock()
+		f.issuedNodeIDs = append(f.issuedNodeIDs, req.NodeID)
+		f.mu.Unlock()
 		return gitlab.SignedToken{
 			SecretName: req.SecretName,
 			Value:      res.value,

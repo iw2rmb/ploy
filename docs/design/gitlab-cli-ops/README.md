@@ -6,7 +6,9 @@
 
 ## What to do
 - Add CLI commands for configuring GitLab credentials, checking signer status, and triggering rotations.
-- Surface audit metadata (last rotation, failing nodes) in CLI output sourced from rotation doc [`../gitlab-rotation-revocation/README.md`](../gitlab-rotation-revocation/README.md).
+- Surface audit metadata (last rotation, failing nodes) in CLI output sourced from rotation doc [`../../../.archive/gitlab-rotation-revocation/README.md`](../../../.archive/gitlab-rotation-revocation/README.md).
+- Consume the rotation audit feed emitted by the control plane to report which
+  nodes revoked credentials or encountered failures.
 - Update operator docs with step-by-step workflows and failure recovery guidance.
 
 ## Where to change
