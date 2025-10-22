@@ -1,6 +1,8 @@
 package step
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -22,8 +25,9 @@ var ErrShiftFailed = errors.New("step: SHIFT validation failed")
 
 // Request captures the data required to execute a step manifest.
 type Request struct {
-	Manifest  contracts.StepManifest
-	Workspace string
+	Manifest    contracts.StepManifest
+	Workspace   string
+	LogStreamID string
 }
 
 // Result summarises a completed step run.
@@ -45,40 +49,63 @@ type Runner struct {
 	SHIFT      ShiftClient
 	Artifacts  ArtifactPublisher
 	Logs       LogCollector
+	Streams    LogStreamPublisher
 }
 
 // Run executes the step manifest and returns the execution result.
 func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 	manifest := req.Manifest
+	streamID := strings.TrimSpace(req.LogStreamID)
+	hasStream := streamID != "" && r.Streams != nil
+	var runErr error
+	defer func() {
+		if !hasStream {
+			return
+		}
+		status := "completed"
+		if runErr != nil {
+			status = "failed"
+		}
+		_ = r.Streams.PublishStatus(ctx, streamID, logstream.Status{Status: status})
+	}()
+
 	if err := manifest.Validate(); err != nil {
-		return Result{}, fmt.Errorf("%w: %v", ErrManifestInvalid, err)
+		runErr = fmt.Errorf("%w: %v", ErrManifestInvalid, err)
+		return Result{}, runErr
 	}
 	if r.Workspace == nil {
-		return Result{}, fmt.Errorf("%w: workspace hydrator missing", ErrWorkspaceUnavailable)
+		runErr = fmt.Errorf("%w: workspace hydrator missing", ErrWorkspaceUnavailable)
+		return Result{}, runErr
 	}
 	workspace, err := r.Workspace.Prepare(ctx, WorkspaceRequest{Manifest: manifest})
 	if err != nil {
-		return Result{}, fmt.Errorf("%w: %v", ErrWorkspaceUnavailable, err)
+		runErr = fmt.Errorf("%w: %v", ErrWorkspaceUnavailable, err)
+		return Result{}, runErr
 	}
 
 	spec, err := buildContainerSpec(manifest, workspace)
 	if err != nil {
-		return Result{}, err
+		runErr = err
+		return Result{}, runErr
 	}
 
 	if r.Containers == nil {
-		return Result{}, errors.New("step: container runtime missing")
+		runErr = errors.New("step: container runtime missing")
+		return Result{}, runErr
 	}
 	handle, err := r.Containers.Create(ctx, spec)
 	if err != nil {
-		return Result{}, fmt.Errorf("step: create container: %w", err)
+		runErr = fmt.Errorf("step: create container: %w", err)
+		return Result{}, runErr
 	}
 	if err := r.Containers.Start(ctx, handle); err != nil {
-		return Result{}, fmt.Errorf("step: start container: %w", err)
+		runErr = fmt.Errorf("step: start container: %w", err)
+		return Result{}, runErr
 	}
 	containerResult, err := r.Containers.Wait(ctx, handle)
 	if err != nil {
-		return Result{}, fmt.Errorf("step: wait container: %w", err)
+		runErr = fmt.Errorf("step: wait container: %w", err)
+		return Result{}, runErr
 	}
 
 	var logBytes []byte
@@ -88,15 +115,21 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		logBytes, err = r.Containers.Logs(ctx, handle)
 	}
 	if err != nil {
-		return Result{}, fmt.Errorf("step: collect logs: %w", err)
+		runErr = fmt.Errorf("step: collect logs: %w", err)
+		return Result{}, runErr
+	}
+	if hasStream && len(logBytes) > 0 {
+		r.publishLogStream(ctx, streamID, logBytes)
 	}
 
 	if r.Diffs == nil {
-		return Result{}, errors.New("step: diff generator missing")
+		runErr = errors.New("step: diff generator missing")
+		return Result{}, runErr
 	}
 	diffResult, err := r.Diffs.Capture(ctx, DiffRequest{Manifest: manifest, Workspace: workspace})
 	if err != nil {
-		return Result{}, fmt.Errorf("step: capture diff: %w", err)
+		runErr = fmt.Errorf("step: capture diff: %w", err)
+		return Result{}, runErr
 	}
 
 	var diffArtifact PublishedArtifact
@@ -104,11 +137,13 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 	if r.Artifacts != nil {
 		diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
 		if err != nil {
-			return Result{}, fmt.Errorf("step: publish diff: %w", err)
+			runErr = fmt.Errorf("step: publish diff: %w", err)
+			return Result{}, runErr
 		}
 		logArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindLogs, Buffer: logBytes})
 		if err != nil {
-			return Result{}, fmt.Errorf("step: publish logs: %w", err)
+			runErr = fmt.Errorf("step: publish logs: %w", err)
+			return Result{}, runErr
 		}
 	}
 
@@ -124,10 +159,11 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		}
 		shiftResult, err = r.SHIFT.Validate(ctx, shiftReq)
 		if err != nil {
-			return Result{}, fmt.Errorf("step: SHIFT validation: %w", err)
+			runErr = fmt.Errorf("step: SHIFT validation: %w", err)
+			return Result{}, runErr
 		}
 		if !shiftResult.Passed {
-			return Result{
+			result := Result{
 				ContainerID:  handle.ID,
 				ExitCode:     containerResult.ExitCode,
 				DiffArtifact: diffArtifact,
@@ -135,11 +171,16 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 				ShiftReport:  shiftResult,
 				Retained:     manifest.Retention.RetainContainer,
 				RetentionTTL: manifest.Retention.TTL,
-			}, fmt.Errorf("%w: %s", ErrShiftFailed, shiftResult.Message)
+			}
+			if hasStream {
+				r.publishRetentionHint(ctx, streamID, result)
+			}
+			runErr = fmt.Errorf("%w: %s", ErrShiftFailed, shiftResult.Message)
+			return result, runErr
 		}
 	}
 
-	return Result{
+	result := Result{
 		ContainerID:  handle.ID,
 		ExitCode:     containerResult.ExitCode,
 		DiffArtifact: diffArtifact,
@@ -147,7 +188,43 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		ShiftReport:  shiftResult,
 		Retained:     manifest.Retention.RetainContainer,
 		RetentionTTL: manifest.Retention.TTL,
-	}, nil
+	}
+	if hasStream {
+		r.publishRetentionHint(ctx, streamID, result)
+	}
+	return result, nil
+}
+
+func (r Runner) publishLogStream(ctx context.Context, streamID string, data []byte) {
+	if r.Streams == nil || strings.TrimSpace(streamID) == "" || len(data) == 0 {
+		return
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimRight(scanner.Text(), "\r\n")
+		if err := r.Streams.PublishLog(ctx, streamID, logstream.LogRecord{
+			Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+			Stream:    "stdout",
+			Line:      line,
+		}); err != nil && !errors.Is(err, logstream.ErrStreamClosed) {
+			break
+		}
+	}
+}
+
+func (r Runner) publishRetentionHint(ctx context.Context, streamID string, result Result) {
+	if r.Streams == nil || strings.TrimSpace(streamID) == "" {
+		return
+	}
+	hint := logstream.RetentionHint{
+		Retained: result.Retained,
+		TTL:      strings.TrimSpace(result.RetentionTTL),
+		Bundle:   strings.TrimSpace(result.LogArtifact.CID),
+		Expires:  "",
+	}
+	if err := r.Streams.PublishRetention(ctx, streamID, hint); err != nil && !errors.Is(err, logstream.ErrStreamClosed) {
+		return
+	}
 }
 
 func buildContainerSpec(manifest contracts.StepManifest, workspace Workspace) (ContainerSpec, error) {
@@ -312,4 +389,11 @@ type PublishedArtifact struct {
 // LogCollector retrieves container logs when a custom pathway exists.
 type LogCollector interface {
 	Collect(ctx context.Context, handle ContainerHandle) ([]byte, error)
+}
+
+// LogStreamPublisher publishes streaming events for live log consumers.
+type LogStreamPublisher interface {
+	PublishLog(ctx context.Context, streamID string, record logstream.LogRecord) error
+	PublishRetention(ctx context.Context, streamID string, hint logstream.RetentionHint) error
+	PublishStatus(ctx context.Context, streamID string, status logstream.Status) error
 }

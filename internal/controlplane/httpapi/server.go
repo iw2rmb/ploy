@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // Server exposes the control-plane scheduler over HTTP.
@@ -20,12 +21,13 @@ type Server struct {
 	scheduler *scheduler.Scheduler
 	signer    *gitlab.Signer
 	rotations *events.RotationHub
+	streams   *logstream.Hub
 }
 
 // New returns an HTTP handler rooted at /v2.
-func New(s *scheduler.Scheduler, signer *gitlab.Signer) http.Handler {
+func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub) http.Handler {
 	mux := http.NewServeMux()
-	h := &Server{scheduler: s, signer: signer}
+	h := &Server{scheduler: s, signer: signer, streams: streams}
 	if signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), signer)
 	}
@@ -166,6 +168,8 @@ func (s *Server) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
 		s.handleJobHeartbeat(w, r, jobID)
 	case "complete":
 		s.handleJobComplete(w, r, jobID)
+	case "logs":
+		s.handleJobLogs(w, r, jobID, parts[2:])
 	default:
 		http.NotFound(w, r)
 	}
@@ -253,6 +257,49 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		return
 	}
 	writeJSON(w, http.StatusOK, jobDTOFrom(job))
+}
+
+func (s *Server) handleJobLogs(w http.ResponseWriter, r *http.Request, jobID string, parts []string) {
+	if len(parts) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	switch parts[0] {
+	case "stream":
+		s.handleJobLogsStream(w, r, jobID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *Server) handleJobLogsStream(w http.ResponseWriter, r *http.Request, jobID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.streams == nil {
+		http.Error(w, "log streaming unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	var sinceID int64
+	if raw := strings.TrimSpace(r.Header.Get("Last-Event-ID")); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+			return
+		}
+		if id > 0 {
+			sinceID = id
+		}
+	}
+
+	if err := logstream.Serve(w, r, s.streams, jobID, sinceID); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
 }
 
 func (s *Server) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {

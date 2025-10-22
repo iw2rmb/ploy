@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -112,6 +113,75 @@ func TestRunnerBuildsContainerSpec(t *testing.T) {
 	}
 	if logReq.Path != "" {
 		t.Fatalf("expected log artifact to omit file path, got %q", logReq.Path)
+	}
+}
+
+func TestRunnerPublishesLogStreamEvents(t *testing.T) {
+	ctx := context.Background()
+	manifest := contracts.StepManifest{
+		ID:    "mods-log-stream",
+		Name:  "Log Stream",
+		Image: "ghcr.io/ploy/runtime/logs:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite, DiffCID: "bafyworkspace"},
+		},
+		Retention: contracts.StepRetentionSpec{
+			RetainContainer: true,
+			TTL:             "48h",
+		},
+	}
+
+	container := &fakeContainerRunner{}
+	workspace := &fakeWorkspaceHydrator{
+		inputs: map[string]string{
+			"workspace": "/tmp/workspace",
+		},
+	}
+	diffs := &fakeDiffGenerator{result: DiffResult{Path: "/tmp/diff"}}
+	shift := &fakeShiftClient{result: ShiftResult{Passed: true}}
+	artifacts := &fakeArtifactPublisher{}
+	logger := &fakeLogCollector{logs: []byte("first line\nsecond line\n")}
+	streams := &fakeLogStreamPublisher{}
+
+	r := Runner{
+		Workspace:  workspace,
+		Containers: container,
+		Diffs:      diffs,
+		SHIFT:      shift,
+		Artifacts:  artifacts,
+		Logs:       logger,
+		Streams:    streams,
+	}
+
+	result, err := r.Run(ctx, Request{
+		Manifest:    manifest,
+		LogStreamID: "job-logs-42",
+	})
+	if err != nil {
+		t.Fatalf("Run() error: %v", err)
+	}
+
+	if len(streams.logEvents) != 2 {
+		t.Fatalf("expected 2 log events, got %d", len(streams.logEvents))
+	}
+	if streams.logEvents[0].Line != "first line" || streams.logEvents[1].Line != "second line" {
+		t.Fatalf("unexpected log lines: %+v", streams.logEvents)
+	}
+	if len(streams.retentionEvents) != 1 {
+		t.Fatalf("expected retention event emitted")
+	}
+	ret := streams.retentionEvents[0]
+	if !ret.Retained || ret.TTL != "48h" {
+		t.Fatalf("unexpected retention payload: %+v", ret)
+	}
+	if len(streams.statusEvents) != 1 {
+		t.Fatalf("expected status event")
+	}
+	if streams.statusEvents[0].Status != "completed" {
+		t.Fatalf("unexpected status: %+v", streams.statusEvents[0])
+	}
+	if result.LogArtifact.CID == "" {
+		t.Fatalf("expected log artifact to persist")
 	}
 }
 
@@ -239,4 +309,29 @@ type fakeLogCollector struct {
 func (f *fakeLogCollector) Collect(ctx context.Context, handle ContainerHandle) ([]byte, error) {
 	f.collected = true
 	return bytes.Clone(f.logs), nil
+}
+
+type fakeLogStreamPublisher struct {
+	streamIDs       []string
+	logEvents       []logstream.LogRecord
+	retentionEvents []logstream.RetentionHint
+	statusEvents    []logstream.Status
+}
+
+func (f *fakeLogStreamPublisher) PublishLog(ctx context.Context, streamID string, record logstream.LogRecord) error {
+	f.streamIDs = append(f.streamIDs, streamID)
+	f.logEvents = append(f.logEvents, record)
+	return nil
+}
+
+func (f *fakeLogStreamPublisher) PublishRetention(ctx context.Context, streamID string, hint logstream.RetentionHint) error {
+	f.streamIDs = append(f.streamIDs, streamID)
+	f.retentionEvents = append(f.retentionEvents, hint)
+	return nil
+}
+
+func (f *fakeLogStreamPublisher) PublishStatus(ctx context.Context, streamID string, status logstream.Status) error {
+	f.streamIDs = append(f.streamIDs, streamID)
+	f.statusEvents = append(f.statusEvents, status)
+	return nil
 }
