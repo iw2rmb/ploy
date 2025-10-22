@@ -50,10 +50,9 @@
 
 - **Verification Steps**
   - Run integration suites and capture results in `CHANGELOG.md`.
-  - Validate doc formatting against `.markdownlint.yaml`.
 
 - **Changelog / Docs Impact**
-  - Update docs and runbooks listed above; ensure formatting adheres to `.markdownlint.yaml`.
+  - Update docs and runbooks listed above.
 
 - **Notes**
   - Coordinate with security team to align incident response docs with corporate policy.

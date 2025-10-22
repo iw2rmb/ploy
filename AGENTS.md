@@ -17,8 +17,6 @@ addendum:
    where applicable.
 2. When documentation conventions change, reflect them across `docs/DOCS.md`,
    the design index, and related README files so repo guidance stays consistent.
-3. Validate Markdown formatting against `.markdownlint.yaml` before submitting
-   doc updates.
 
 ## Local Development
 
@@ -50,7 +48,7 @@ addendum:
 ### Pre-commit Hooks (Optional for now)
 
 - If you enable pre-commit hooks, keep them focused on `gofmt`, `go test`,
-  static analysis for the workflow runner, and Markdown linting (`markdownlint`).
+  static analysis for the workflow runner.
 
 ## Environment Variables
 

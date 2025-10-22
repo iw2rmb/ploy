@@ -57,7 +57,6 @@
 - **Verification Steps**
   - `go test ./cmd/ploy -run TestHelp*`
   - `make build && dist/ploy help` to visually inspect grouping.
-  - Validate updated CLI docs against `.markdownlint.yaml`.
 
 - **Changelog / Docs Impact**
   - Add dated entry to `CHANGELOG.md` summarising command removals and the new help structure.

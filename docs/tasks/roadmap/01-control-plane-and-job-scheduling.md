@@ -68,7 +68,6 @@ hooks limited to metadata wiring for this slice.
   - 2025-10-21 —
     `go test -tags integration ./tests/integration/controlplane -cover`
   - 2025-10-21 — `staticcheck ./internal/controlplane/...`
-  - 2025-10-21 — Documentation formatting validated against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Append dated entry summarising scheduler, docs, and verification commands.

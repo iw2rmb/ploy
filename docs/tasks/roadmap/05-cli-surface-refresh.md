@@ -132,7 +132,6 @@ _Assumptions / notes_: CLI slices inherit the v2 API contracts defined in
 
 - `make build` to generate `dist/ploy` and exercise CLI commands against mocks.
 - `make test` (or `go test -cover ./cmd/ploy/...`) ensuring slice-specific coverage targets.
-- Confirm documentation consistency against `.markdownlint.yaml`.
 
 ## Changelog / Docs Impact
 

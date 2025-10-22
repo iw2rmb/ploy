@@ -86,7 +86,6 @@
     executing integration suites; tear down once verification completes.
   - `go test ./internal/workflow/artifacts/...`
   - `go test -tags integration ./tests/integration/artifacts/...`
-  - Validate documentation formatting against `.markdownlint.yaml`
 
 - **Changelog / Docs Impact**
   - Append dated entry summarising IPFS integration, verification commands, and
