@@ -6,10 +6,10 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 ## Prerequisites
 
 - SSH access to all hosts with sudo privileges.
-- Go 1.22+ installed for building binaries.
-- Docker Engine 24+ on each node.
-- IPFS Cluster daemon package (external) available.
-- etcd binary or package (>=3.5).
+- Go 1.25+ installed for building binaries.
+- Docker Engine 28.x on each node.
+- IPFS Cluster daemon 1.1.4 installed (or newer compatible release).
+- etcd 3.6.x binary or package available.
 
 ## Bootstrap Steps (Beacon + Control Plane)
 
