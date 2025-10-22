@@ -7,7 +7,10 @@
   - `docs/tasks/roadmap/04c-gitlab-credential-ops.md`
 - **Unblocks**:
   - `docs/tasks/roadmap/05e-cli-operator-enablement.md`
-  - `docs/tasks/roadmap/10-testing-and-quality.md`
+  - `docs/tasks/roadmap/10a-local-test-harness.md`
+  - `docs/tasks/roadmap/10b-coverage-enforcement.md`
+  - `docs/tasks/roadmap/10c-mods-timeouts-and-retries.md`
+  - `docs/tasks/roadmap/10d-testing-docs-alignment.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 4
 

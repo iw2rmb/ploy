@@ -4,10 +4,11 @@
 - [ ] **Status**: Planned (2025-10-21)
 - **Blocked by**:
   - `docs/tasks/roadmap/04a-gitlab-node-bootstrap.md`
-  - `docs/tasks/roadmap/04-gitlab-integration.md`
 - **Unblocks**:
   - `docs/tasks/roadmap/05c-cli-mods-artifacts.md`
-  - `docs/tasks/roadmap/07-job-observability.md`
+  - `docs/tasks/roadmap/07a-job-log-streaming.md`
+  - `docs/tasks/roadmap/07b-job-log-archival.md`
+  - `docs/tasks/roadmap/07c-job-observability-instrumentation.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 7
 

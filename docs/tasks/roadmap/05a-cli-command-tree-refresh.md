@@ -8,7 +8,6 @@
   - `docs/tasks/roadmap/04-gitlab-integration.md`
 - **Unblocks**:
   - `docs/tasks/roadmap/05b-cli-node-lifecycle-config.md`
-  - `docs/tasks/roadmap/05-cli-surface-refresh.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 4
 

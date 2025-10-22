@@ -10,7 +10,6 @@
 - **Unblocks**:
   - `docs/tasks/roadmap/05c-cli-mods-artifacts.md`
   - `docs/tasks/roadmap/05e-cli-operator-enablement.md`
-  - `docs/tasks/roadmap/05-cli-surface-refresh.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 4
 

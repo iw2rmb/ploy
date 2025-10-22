@@ -3,11 +3,12 @@
 - **Identifier**: `roadmap-gitlab-node-bootstrap-04a`
 - [ ] **Status**: Planned (2025-10-21)
 - **Blocked by**:
-  - `docs/tasks/roadmap/04-gitlab-integration.md`
   - `docs/design/control-plane/README.md`
 - **Unblocks**:
   - `docs/tasks/roadmap/04b-gitlab-workflow-client.md`
-  - `docs/tasks/roadmap/07-job-observability.md`
+  - `docs/tasks/roadmap/07a-job-log-streaming.md`
+  - `docs/tasks/roadmap/07b-job-log-archival.md`
+  - `docs/tasks/roadmap/07c-job-observability-instrumentation.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 6
 

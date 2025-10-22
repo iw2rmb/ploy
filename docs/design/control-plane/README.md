@@ -11,7 +11,9 @@
 - **Unblocks**:
   - `roadmap-mod-step-runtime` / `docs/design/mod-step-runtime/README.md`
   - `roadmap-control-plane-02` / `docs/tasks/roadmap/02-mod-step-runtime.md`
-  - `roadmap-control-plane-07` / `docs/tasks/roadmap/07-job-observability.md`
+  - `roadmap-job-observability-07a` / `docs/tasks/roadmap/07a-job-log-streaming.md`
+  - `roadmap-job-observability-07b` / `docs/tasks/roadmap/07b-job-log-archival.md`
+  - `roadmap-job-observability-07c` / `docs/tasks/roadmap/07c-job-observability-instrumentation.md`
 - **Last Verification**: 2025-10-21 —
   `go test ./internal/controlplane/...`, `go test -tags integration ./tests/integration/controlplane`,
   `staticcheck ./internal/controlplane/...`, documentation formatting validation (noted lint debt persists)
@@ -45,7 +47,7 @@ storage, and workstation nodes executing containers.
 ## Non-Goals
 
 - Replacing Mods runtime container execution (covered by roadmap-control-plane-02).
-- Implementing observability streams beyond job status metadata (handled by roadmap-control-plane-07).
+- Implementing observability streams beyond job status metadata (handled by roadmap-job-observability-07a/07b/07c).
 - Shipping beacon bootstrapping or multi-cluster federation; scope is single cluster.
 
 ## Current State
@@ -168,7 +170,9 @@ storage, and workstation nodes executing containers.
 ## Follow-Up Work (2025-10-21)
 
 - [ ] Planned – [roadmap-control-plane-02 Mod Step Runtime](../../tasks/roadmap/02-mod-step-runtime.md)
-- [ ] Planned – [roadmap-control-plane-07 Job Observability](../../tasks/roadmap/07-job-observability.md)
+- [ ] Planned – [roadmap-job-observability-07a Job Log Streaming & Tails](../../tasks/roadmap/07a-job-log-streaming.md)
+- [ ] Planned – [roadmap-job-observability-07b Job Log Archival & Retention](../../tasks/roadmap/07b-job-log-archival.md)
+- [ ] Planned – [roadmap-job-observability-07c Job Metrics, Tracing & Dashboards](../../tasks/roadmap/07c-job-observability-instrumentation.md)
 
 Status verification: task entries reviewed on 2025-10-21.
 
