@@ -7,7 +7,7 @@
   - `docs/tasks/roadmap/04a-gitlab-node-bootstrap.md`
 - **Unblocks**:
   - `docs/tasks/roadmap/05-cli-surface-refresh.md`
-  - `docs/tasks/roadmap/08-deployment-bootstrap.md`
+  - `docs/tasks/roadmap/08a-deployment-bootstrap-cli.md`
 - **Planned Complexity (COSMIC)**
   - Sized on: 2025-10-21 · Planned CFP: 5
 

@@ -230,7 +230,11 @@ Ploy nodes replace Grid.
       [roadmap-mod-step-runtime-03 Artifact Publisher Integration](../../tasks/roadmap/03-ipfs-artifact-store.md)
       _(update task spec to include dependency)_
 - [ ] Planned –
-      [roadmap-mod-step-runtime-04 Job Observability Enhancements](../../tasks/roadmap/07-job-observability.md)
+      [roadmap-job-observability-07a Job Log Streaming & Tails](../../tasks/roadmap/07a-job-log-streaming.md)
+- [ ] Planned –
+      [roadmap-job-observability-07b Job Log Archival & Retention](../../tasks/roadmap/07b-job-log-archival.md)
+- [ ] Planned –
+      [roadmap-job-observability-07c Job Metrics, Tracing & Dashboards](../../tasks/roadmap/07c-job-observability-instrumentation.md)
 
 Status verification: task entries reviewed on 2025-10-21.
 
