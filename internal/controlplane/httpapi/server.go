@@ -10,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
@@ -25,7 +28,7 @@ type Server struct {
 }
 
 // New returns an HTTP handler rooted at /v2.
-func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub) http.Handler {
+func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub, gatherer prometheus.Gatherer) http.Handler {
 	mux := http.NewServeMux()
 	h := &Server{scheduler: s, signer: signer, streams: streams}
 	if signer != nil {
@@ -38,6 +41,10 @@ func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub) 
 	mux.HandleFunc("/v2/gitlab/signer/secrets", h.handleSignerSecrets)
 	mux.HandleFunc("/v2/gitlab/signer/tokens", h.handleSignerTokens)
 	mux.HandleFunc("/v2/gitlab/signer/rotations", h.handleSignerRotations)
+	if gatherer == nil {
+		gatherer = prometheus.DefaultGatherer
+	}
+	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	return mux
 }
 
@@ -239,10 +246,25 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		Bundles    map[string]scheduler.BundleRecord `json:"bundles"`
 		Error      *scheduler.JobError               `json:"error"`
 		Inspection bool                              `json:"inspection"`
+		Shift      *struct {
+			Result          string  `json:"result"`
+			DurationSeconds float64 `json:"duration_seconds"`
+		} `json:"shift"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	var shiftMetrics *scheduler.ShiftMetrics
+	if req.Shift != nil {
+		d := time.Duration(req.Shift.DurationSeconds * float64(time.Second))
+		if d < 0 {
+			d = 0
+		}
+		shiftMetrics = &scheduler.ShiftMetrics{
+			Result:   req.Shift.Result,
+			Duration: d,
+		}
 	}
 	job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
 		JobID:      jobID,
@@ -253,6 +275,7 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 		Bundles:    req.Bundles,
 		Error:      req.Error,
 		Inspection: req.Inspection,
+		Shift:      shiftMetrics,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
@@ -462,6 +485,7 @@ type jobDTO struct {
 	Metadata       map[string]string                 `json:"metadata,omitempty"`
 	Artifacts      map[string]string                 `json:"artifacts,omitempty"`
 	Bundles        map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+	Shift          *shiftDTO                         `json:"shift,omitempty"`
 	Retention      *scheduler.JobRetention           `json:"retention,omitempty"`
 	Error          *scheduler.JobError               `json:"error,omitempty"`
 }
@@ -485,6 +509,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		Metadata:       copyMap(job.Metadata),
 		Artifacts:      copyMap(job.Artifacts),
 		Bundles:        copyBundles(job.Bundles),
+		Shift:          copyShift(job.Shift),
 		Retention:      copyRetention(job.Retention),
 		Error:          job.Error,
 	}
@@ -524,6 +549,22 @@ func copyBundles(src map[string]scheduler.BundleRecord) map[string]scheduler.Bun
 		}
 	}
 	return out
+}
+
+type shiftDTO struct {
+	Result          string  `json:"result"`
+	DurationSeconds float64 `json:"duration_seconds"`
+}
+
+func copyShift(src *scheduler.ShiftSummary) *shiftDTO {
+	if src == nil {
+		return nil
+	}
+	dst := &shiftDTO{Result: src.Result}
+	if src.Duration > 0 {
+		dst.DurationSeconds = src.Duration.Seconds()
+	}
+	return dst
 }
 
 func copyRetention(src *scheduler.JobRetention) *scheduler.JobRetention {

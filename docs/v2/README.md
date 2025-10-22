@@ -106,6 +106,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
   policies govern when GC prunes them.
 - Metrics capture queue depth, claim latency, lease expirations, retries, and
   SHIFT duration. Health endpoints report etcd connectivity and backlog size.
+- Prometheus scraping and alerting guidance — [docs/v2/observability.md](observability.md)
 - Garbage collection controllers respect retention windows defined in
   [docs/v2/gc.md](gc.md).
 

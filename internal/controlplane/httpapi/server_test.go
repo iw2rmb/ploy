@@ -18,9 +18,12 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/httpapi"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
@@ -41,7 +44,7 @@ func TestServerJobLifecycle(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, nil, nil))
+	server := httptest.NewServer(httpapi.New(sched, nil, nil, nil))
 	defer server.Close()
 
 	submit := map[string]any{
@@ -106,7 +109,7 @@ func TestJobRetention(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, nil, nil))
+	server := httptest.NewServer(httpapi.New(sched, nil, nil, nil))
 	defer server.Close()
 
 	submit := map[string]any{
@@ -196,6 +199,62 @@ func TestJobRetention(t *testing.T) {
 	}
 }
 
+func TestMetricsEndpointExposesPrometheus(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	reg := prometheus.NewRegistry()
+	recorder, err := metrics.NewSchedulerMetrics(reg)
+	if err != nil {
+		t.Fatalf("new scheduler metrics: %v", err)
+	}
+
+	sched, err := scheduler.New(client, scheduler.Options{
+		LeaseTTL: 3 * time.Second,
+		Metrics:  recorder,
+	})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(httpapi.New(sched, nil, nil, reg))
+	defer server.Close()
+
+	postJSON(t, server.URL+"/v2/jobs", map[string]any{
+		"ticket":       "mod-observe",
+		"step_id":      "build",
+		"priority":     "default",
+		"max_attempts": 1,
+	})
+
+	resp, err := http.Get(server.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("fetch metrics: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read metrics body: %v", err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "ploy_controlplane_queue_depth") {
+		t.Fatalf("expected queue depth metric in scrape output")
+	}
+	if !strings.Contains(text, `priority="default"`) {
+		t.Fatalf("expected queue depth labels recorded")
+	}
+}
+
 func TestServerGitLabSignerEndpoints(t *testing.T) {
 	t.Parallel()
 
@@ -226,7 +285,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		_ = signer.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, signer, nil))
+	server := httptest.NewServer(httpapi.New(sched, signer, nil, nil))
 	defer server.Close()
 
 	rotateResp := putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
@@ -331,7 +390,7 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	jobID := "job-stream-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(sched, nil, streams))
+	server := httptest.NewServer(httpapi.New(sched, nil, streams, nil))
 	defer server.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -468,7 +527,7 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	jobID := "job-resume-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(sched, nil, streams))
+	server := httptest.NewServer(httpapi.New(sched, nil, streams, nil))
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())

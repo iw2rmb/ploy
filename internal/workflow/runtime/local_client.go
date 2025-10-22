@@ -199,6 +199,9 @@ func buildStageEvidence(result step.Result, status runner.StageStatus) *runner.S
 	if strings.TrimSpace(result.RetentionTTL) != "" {
 		evidence.Metadata["retention_ttl"] = strings.TrimSpace(result.RetentionTTL)
 	}
+	if result.ShiftReport.Duration > 0 {
+		evidence.Result["shift"].(map[string]any)["duration_seconds"] = result.ShiftReport.Duration.Seconds()
+	}
 	if len(result.ShiftReport.Report) > 0 {
 		evidence.Result["shift"].(map[string]any)["report"] = string(result.ShiftReport.Report)
 	}

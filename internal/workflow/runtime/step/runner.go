@@ -157,10 +157,15 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 			artifactCopy := logArtifact
 			shiftReq.LogArtifact = &artifactCopy
 		}
+		shiftStart := time.Now()
 		shiftResult, err = r.SHIFT.Validate(ctx, shiftReq)
+		elapsed := time.Since(shiftStart)
 		if err != nil {
 			runErr = fmt.Errorf("step: SHIFT validation: %w", err)
 			return Result{}, runErr
+		}
+		if shiftResult.Duration <= 0 {
+			shiftResult.Duration = elapsed
 		}
 		if !shiftResult.Passed {
 			result := Result{
@@ -352,9 +357,10 @@ type ShiftRequest struct {
 
 // ShiftResult contains SHIFT execution details.
 type ShiftResult struct {
-	Passed  bool
-	Message string
-	Report  []byte
+	Passed   bool
+	Message  string
+	Report   []byte
+	Duration time.Duration
 }
 
 // ArtifactPublisher uploads step artifacts.
