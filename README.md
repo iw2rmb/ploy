@@ -204,11 +204,6 @@ Full design records live in `docs/design/README.md`.
    `configs/knowledge-base/catalog.json`, skipping duplicate IDs while keeping
    workstation runs deterministic.
 
-## Feature Roadmap
-
-Per-feature write-ups live under `docs/tasks/roadmap/`. Status checkboxes in this README mirror those roadmap
-entries, and deeper design context is collected in `docs/design/README.md`.
-
 ## Environment Variables
 
 Workstation builds rely on discovery to surface remote dependencies. The CLI
