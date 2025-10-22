@@ -17,6 +17,7 @@ _ploy() {
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("cluster:Manage local cluster descriptors")
             commands+=("deploy:Bootstrap deployment hosts and verify readiness")
+            commands+=("beacon:Rotate deployment CA material and node certificates")
             commands+=("config:Inspect or update cluster configuration")
             commands+=("snapshot:Plan and capture workspace snapshots")
             commands+=("environment:Materialize integration environments")
@@ -66,6 +67,11 @@ _ploy() {
                     commands+=("bootstrap:Install dependencies and run host preflight checks")
                     _describe 'deploy command' commands && ret=0
                     ;;
+                'beacon')
+                    commands=()
+                    commands+=("rotate-ca:Rotate the cluster CA, update beacon/worker certificates, and record revocations")
+                    _describe 'beacon command' commands && ret=0
+                    ;;
                 'config')
                     commands=()
                     commands+=("gitlab:Manage GitLab integration credentials")
@@ -103,6 +109,7 @@ _ploy() {
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("cluster:Manage local cluster descriptors")
                     commands+=("deploy:Bootstrap deployment hosts and verify readiness")
+                    commands+=("beacon:Rotate deployment CA material and node certificates")
                     commands+=("config:Inspect or update cluster configuration")
                     commands+=("snapshot:Plan and capture workspace snapshots")
                     commands+=("environment:Materialize integration environments")

@@ -11,6 +11,7 @@ Core Commands:
   artifact         Manage IPFS Cluster artifacts
   cluster          Manage local cluster descriptors
   deploy           Bootstrap deployment hosts and verify readiness
+  beacon           Rotate deployment CA material and node certificates
   config           Inspect or update cluster configuration
   snapshot         Plan and capture workspace snapshots
   environment      Materialize integration environments

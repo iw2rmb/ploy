@@ -121,7 +121,19 @@ var commandTree = []Node{
 			{
 				Name:        "bootstrap",
 				Description: "Install dependencies and run host preflight checks",
-				Usage:       "ploy deploy bootstrap [--config <path>] [--host <addr>] [--dry-run]",
+				Usage:       "ploy deploy bootstrap [--address <addr>] [--host <domain>] [--user <name>] [--identity <path>] [--port <n>] [--dry-run]",
+			},
+		},
+	},
+	{
+		Name:        "beacon",
+		Description: "Rotate deployment CA material and node certificates",
+		Usage:       "ploy beacon <command>",
+		Subcommands: []Node{
+			{
+				Name:        "rotate-ca",
+				Description: "Rotate the cluster CA, update beacon/worker certificates, and record revocations",
+				Usage:       "ploy beacon rotate-ca --cluster-id <id> [--dry-run] [--operator <name>] [--reason <text>]",
 			},
 		},
 	},

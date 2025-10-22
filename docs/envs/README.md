@@ -49,8 +49,9 @@ additional configuration.
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
 - `PLOY_ETCD_ENDPOINTS` — Comma-separated etcd endpoints used by the control-plane scheduler
-  (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled and for
-  storing GitLab credentials via `ploy config gitlab`.
+  (e.g., `https://127.0.0.1:2379`). Required when the new scheduler mode is enabled, for
+  storing GitLab credentials via `ploy config gitlab`, and for deployment CA rotation commands
+  (`ploy beacon rotate-ca`).
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   connecting to endpoints listed above.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.

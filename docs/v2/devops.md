@@ -22,30 +22,39 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Configure systemd units for etcd and IPFS Cluster services.
 
 3. **Run Bootstrap Script via CLI**  
-   - Execute `ploy deploy bootstrap --config bootstrap.yaml` (or similar) from the workstation.  
-   - Use `--dry-run` to preview the embedded script (`docs/v2/implement.sh`) before shipping it over SSH.  
+   - Execute `dist/ploy deploy bootstrap --address 45.9.42.212`
+     (swap the address for Node B/C as needed) and tee output to a log for troubleshooting.  
+   - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before shipping it over SSH.  
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  
+   - If `--host` is omitted, the CLI generates a beacon domain in the form `<16 hex chars>.ploy`
+     using go-nanoid; override it explicitly when a fixed hostname is required.  
+   - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`.  
+   - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
    - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
      refreshed, and logs summarise installed versions.  
    - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with
      a sane `daemon.json` default.
-   - Example `bootstrap.yaml`:
+   - Example command with overrides:
 
-     ```yaml
-     host: beacon.example.com
-     user: root
-     identity_file: /home/operator/.ssh/ploy
-     min_disk_gb: 80
-     required_ports: [2379, 2380, 9094, 9095]
+     ```bash
+     dist/ploy deploy bootstrap \
+       --address 45.9.42.212 \
+       --host beacon-lab.ploy \
+       --user root \
+       --identity ~/.ssh/ploy-lab
      ```
 
-4. **Capture Cluster Metadata**  
-   - The CLI copies the CA bundle to the workstation’s trust store and writes a cluster descriptor
-     (beacon address, API key, CA path) under `${XDG_CONFIG_HOME}/ploy/clusters/<id>.json`.
-   - Metadata includes the cluster version tag (retrieved via `GET /v2/version`) so the CLI can detect
-     drift and prompt for refresh.
+4. **Capture Cluster Metadata & PKI**  
+   - On success the CLI invokes the deployment PKI manager, generating the cluster CA plus beacon and
+     worker leaf certificates. Material is stored in etcd under `/ploy/clusters/<cluster>/security/...`
+     with revocation markers and per-node descriptors that the worker onboarding flow consumes.
+   - The trust bundle is published via the control-plane security store so subsequent `ploy cluster
+     connect` calls download the latest CA chain automatically.
+   - The CLI also writes a cluster descriptor (beacon address, API key, CA path) under
+     `${XDG_CONFIG_HOME}/ploy/clusters/<id>.json`, including the cluster version returned by
+     `GET /v2/version` to detect drift.
    - Enables fast reconnection via `ploy cluster connect --beacon-ip <ip> --api-key <key>` when joining
      an existing deployment; version mismatches trigger a metadata refresh.
 
@@ -77,7 +86,9 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 ## Maintenance
 
-- Rotate CA via `ploy beacon rotate-ca` and redeploy certificates to nodes.  
+- Use `ploy beacon rotate-ca --cluster-id <id> --dry-run` to preview CA changes, then rerun without
+  `--dry-run` to rotate the CA, reissue beacon/worker certificates, update the trust bundle, and record
+  revocation metadata in etcd. Worker onboarding reads the refreshed descriptors automatically.  
 - Use `ploy logs job <job-id>` for debugging, and clean up old containers using node operations.  
 - Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.
 - Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer. The command talks to the control plane, writes the encrypted secret, and emits rotation events so workers refresh immediately.  
@@ -87,3 +98,16 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 This operational flow keeps Ploy nodes consistent and ensures the control plane remains
 authoritative via etcd and beacon mode.
+
+## Certificate Lifecycle
+
+- Deployment bootstrap generates the initial cluster CA and issues leaf certificates for the beacon
+  plus any pre-registered workers. The materials live under `/ploy/clusters/<cluster>/security/` in etcd
+  alongside a trust bundle exposed to CLI consumers.
+- Subsequent worker onboarding reuses these descriptors; the onboarding flow in
+  `docs/design/deployment-worker-onboarding/README.md` reads the same paths to provision node keys.
+- Run `ploy beacon rotate-ca --cluster-id <id>` to mint a new CA, publish refreshed leaf certificates,
+  and mark the previous CA version as revoked under `/security/ca/history/<version>`. Use
+  `--dry-run` to stage the rotation before writing to etcd.
+- After rotation, the trust store and local cluster descriptors are updated automatically so tools and
+  operators download the new CA bundle on their next refresh.
