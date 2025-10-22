@@ -69,6 +69,9 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - Rotate CA via `ploy beacon rotate-ca` and redeploy certificates to nodes.  
 - Use `ploy logs job <job-id>` for debugging, and clean up old containers using node operations.  
 - Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.
+- Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer. The command talks to the control plane, writes the encrypted secret, and emits rotation events so workers refresh immediately.  
+- Inspect signer health with `ploy config gitlab status [--secret <name>]`. The output includes audit feed metadata from the rotation revocation pipeline (last rotation, revoked nodes, recent failures) outlined in `.archive/gitlab-rotation-revocation/README.md`.  
+- For unattended rotations, provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` or ensure the active cluster descriptor contains the control plane endpoint and CA bundle so the CLI can authenticate requests.
 
 This operational flow keeps Ploy nodes consistent and ensures the control plane remains
 authoritative via etcd and beacon mode.

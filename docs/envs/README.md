@@ -90,6 +90,9 @@ additional configuration.
 - `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
   to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
   16, 24, or 32 bytes to satisfy AES-GCM requirements.
+- `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL used by
+  `ploy config gitlab` commands when a cluster descriptor or Grid discovery metadata is
+  unavailable.
 - `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
   callers omit a TTL while requesting short-lived GitLab tokens.
 - `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.
