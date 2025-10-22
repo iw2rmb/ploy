@@ -15,9 +15,14 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/google/uuid"
+
+	metricsx "github.com/iw2rmb/ploy/internal/metrics"
 )
 
-const defaultRetentionWindow = 24 * time.Hour
+const (
+	defaultRetentionWindow     = 24 * time.Hour
+	jobRetryReasonLeaseExpired = "lease_expired"
+)
 
 // Scheduler coordinates job submission, claims, and lifecycle management backed by etcd.
 type Scheduler struct {
@@ -34,9 +39,10 @@ type Scheduler struct {
 	now         func() time.Time
 	idGenerator func() string
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	ctx     context.Context
+	cancel  context.CancelFunc
+	metrics metricsx.SchedulerRecorder
+	wg      sync.WaitGroup
 }
 
 // New constructs a scheduler with the provided etcd client and options.
@@ -61,6 +67,7 @@ func New(client *clientv3.Client, opts Options) (*Scheduler, error) {
 		idGenerator:  cfg.idGenerator,
 		ctx:          ctx,
 		cancel:       cancel,
+		metrics:      cfg.metrics,
 	}
 
 	s.wg.Add(1)
@@ -152,6 +159,8 @@ func (s *Scheduler) SubmitJob(ctx context.Context, spec JobSpec) (*Job, error) {
 	if !resp.Succeeded {
 		return nil, fmt.Errorf("scheduler: job already exists for ticket %s step %s", spec.Ticket, spec.StepID)
 	}
+
+	s.metrics.QueueEnqueued(priority)
 
 	return record.toJob(), nil
 }
@@ -321,6 +330,22 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	}
 	record.Retention = deriveRetentionRecord(record.Bundles, expiry, record.State == JobStateInspectionReady)
 
+	shiftDuration := time.Duration(0)
+	shiftResult := ""
+	if req.Shift != nil {
+		shiftDuration = req.Shift.Duration
+		if shiftDuration < 0 {
+			shiftDuration = 0
+		}
+		shiftResult = normalizeShiftResult(req.Shift.Result, record.State)
+		if shiftDuration > 0 || shiftResult != "" {
+			record.Shift = &shiftRecord{
+				Result:          shiftResult,
+				DurationSeconds: shiftDuration.Seconds(),
+			}
+		}
+	}
+
 	jobBytes, err := json.Marshal(record)
 	if err != nil {
 		return nil, fmt.Errorf("scheduler: marshal completion job: %w", err)
@@ -352,6 +377,9 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	}
 	if !txnResp.Succeeded {
 		return nil, fmt.Errorf("scheduler: completion conflict for job %s", req.JobID)
+	}
+	if shiftDuration > 0 {
+		s.metrics.ObserveShiftDuration(record.StepID, shiftResult, shiftDuration)
 	}
 
 	if record.LeaseID != 0 {
@@ -466,11 +494,13 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 	record.LeaseID = 0
 	record.LeaseExpiresAt = ""
 	record.RetryAttempt++
+	record.Shift = nil
 
 	var (
 		queuePut clientv3.Op
 		errMsg   *JobError
 		newState JobState
+		requeued bool
 	)
 
 	if record.RetryAttempt >= record.MaxAttempts {
@@ -498,6 +528,7 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 		}
 		queuePut = clientv3.OpPut(s.queueKey(lease.Priority, record.ID), string(queueBytes))
 		record.EnqueuedAt = queue.EnqueuedAt
+		requeued = true
 	}
 
 	record.State = newState
@@ -521,8 +552,16 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 
 	txn = txn.Then(ops...)
 
-	_, err = txn.Commit()
-	return err
+	respTxn, err := txn.Commit()
+	if err != nil {
+		return err
+	}
+	_ = respTxn
+	if requeued {
+		s.metrics.QueueEnqueued(lease.Priority)
+	}
+	s.metrics.ObserveJobRetry(lease.Priority, jobRetryReasonLeaseExpired)
+	return nil
 }
 
 func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimResult, error) {
@@ -570,7 +609,15 @@ func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimR
 		return nil, fmt.Errorf("scheduler: grant lease: %w", err)
 	}
 
+	enqueueAt := decodeTime(record.EnqueuedAt)
 	now := s.now().UTC()
+	latency := time.Duration(0)
+	if !enqueueAt.IsZero() {
+		latency = now.Sub(enqueueAt)
+		if latency < 0 {
+			latency = 0
+		}
+	}
 	record.State = JobStateRunning
 	record.ClaimedBy = req.NodeID
 	record.ClaimedAt = encodeTime(now)
@@ -612,6 +659,9 @@ func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimR
 		_, _ = s.client.Revoke(ctx, lease.ID)
 		return nil, errRetryClaim
 	}
+
+	s.metrics.QueueDequeued(entry.Priority)
+	s.metrics.ObserveClaimLatency(entry.Priority, latency)
 
 	return &ClaimResult{
 		NodeID:  req.NodeID,
@@ -665,6 +715,7 @@ type compiledOptions struct {
 	clockSkew    time.Duration
 	now          func() time.Time
 	idGenerator  func() string
+	metrics      metricsx.SchedulerRecorder
 }
 
 func compileOptions(opts Options) compiledOptions {
@@ -678,6 +729,7 @@ func compileOptions(opts Options) compiledOptions {
 		clockSkew:    opts.ClockSkewBuffer,
 		now:          opts.Now,
 		idGenerator:  opts.IDGenerator,
+		metrics:      opts.Metrics,
 	}
 
 	if cfg.leaseTTL <= 0 {
@@ -692,6 +744,9 @@ func compileOptions(opts Options) compiledOptions {
 	if cfg.idGenerator == nil {
 		cfg.idGenerator = func() string { return uuid.NewString() }
 	}
+	if cfg.metrics == nil {
+		cfg.metrics = metricsx.NewNoopSchedulerRecorder()
+	}
 
 	return cfg
 }
@@ -702,6 +757,27 @@ func normalizePrefix(prefix, fallback string) string {
 		p = fallback
 	}
 	return p
+}
+
+func normalizeShiftResult(raw string, state JobState) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case "", "unknown":
+		switch state {
+		case JobStateSucceeded:
+			return ShiftResultPassed
+		case JobStateFailed, JobStateInspectionReady:
+			return ShiftResultFailed
+		default:
+			return ""
+		}
+	case "passed", "pass", "success", "succeeded":
+		return ShiftResultPassed
+	case "failed", "fail", "failure":
+		return ShiftResultFailed
+	default:
+		return value
+	}
 }
 
 type jobRecord struct {
@@ -722,6 +798,7 @@ type jobRecord struct {
 	Metadata       map[string]string       `json:"metadata,omitempty"`
 	Artifacts      map[string]string       `json:"artifacts,omitempty"`
 	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
+	Shift          *shiftRecord            `json:"shift,omitempty"`
 	Retention      *retentionRecord        `json:"retention,omitempty"`
 	Error          *JobError               `json:"error,omitempty"`
 }
@@ -745,6 +822,7 @@ func (r jobRecord) toJob() *Job {
 		Metadata:       cloneMap(r.Metadata),
 		Artifacts:      cloneMap(r.Artifacts),
 		Bundles:        exportBundleRecords(r.Bundles),
+		Shift:          exportShiftSummary(r.Shift),
 		Retention:      exportRetention(r.Retention),
 		Error:          r.Error,
 	}
@@ -786,6 +864,17 @@ func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
 		dst[name] = BundleRecord(rec)
 	}
 	return dst
+}
+
+func exportShiftSummary(rec *shiftRecord) *ShiftSummary {
+	if rec == nil {
+		return nil
+	}
+	summary := &ShiftSummary{Result: rec.Result}
+	if rec.DurationSeconds > 0 {
+		summary.Duration = time.Duration(rec.DurationSeconds * float64(time.Second))
+	}
+	return summary
 }
 
 func exportRetention(src *retentionRecord) *JobRetention {
@@ -918,6 +1007,11 @@ type queueEntry struct {
 	MaxAttempts  int               `json:"max_attempts"`
 	EnqueuedAt   string            `json:"enqueued_at"`
 	Metadata     map[string]string `json:"metadata,omitempty"`
+}
+
+type shiftRecord struct {
+	Result          string  `json:"result,omitempty"`
+	DurationSeconds float64 `json:"duration_seconds,omitempty"`
 }
 
 type leaseEntry struct {

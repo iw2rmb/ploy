@@ -5,6 +5,8 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
+	metrics "github.com/iw2rmb/ploy/internal/metrics"
 )
 
 // JobState represents persisted job lifecycle states.
@@ -21,6 +23,12 @@ const (
 	JobStateFailed JobState = "failed"
 	// JobStateInspectionReady indicates the job is preserved for manual inspection.
 	JobStateInspectionReady JobState = "inspection_ready"
+)
+
+// Shift result classifications recorded with job completions.
+const (
+	ShiftResultPassed = "passed"
+	ShiftResultFailed = "failed"
 )
 
 // JobSpec describes a job submission.
@@ -57,8 +65,21 @@ type Job struct {
 	Metadata       map[string]string
 	Artifacts      map[string]string
 	Bundles        map[string]BundleRecord
+	Shift          *ShiftSummary
 	Retention      *JobRetention
 	Error          *JobError
+}
+
+// ShiftSummary stores SHIFT execution metadata persisted with the job.
+type ShiftSummary struct {
+	Result   string
+	Duration time.Duration
+}
+
+// ShiftMetrics captures SHIFT execution details supplied when completing a job.
+type ShiftMetrics struct {
+	Result   string
+	Duration time.Duration
 }
 
 // ClaimRequest scopes a claim attempt.
@@ -87,6 +108,7 @@ type CompleteRequest struct {
 	Ticket     string
 	State      JobState
 	Artifacts  map[string]string
+	Shift      *ShiftMetrics
 	Error      *JobError
 	Inspection bool
 	Bundles    map[string]BundleRecord
@@ -103,6 +125,7 @@ type Options struct {
 	ClockSkewBuffer time.Duration
 	IDGenerator     func() string
 	Now             func() time.Time
+	Metrics         metrics.SchedulerRecorder
 }
 
 // ErrNoJobs signals no work was available when claiming.
