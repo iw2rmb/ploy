@@ -1,6 +1,5 @@
 # Design Queue
 
-- [x] `docs/design/.archive/gitlab-token-signer/README.md` — etcd credential service and short-lived token issuance. (Completed 2025-10-22T07:39:49Z by Codex — status: shipped)
 - [ ] `docs/design/gitlab-node-refresh/README.md` — node bootstrap, token refresh loop, cache purge.
 - [ ] `docs/design/gitlab-rotation-revocation/README.md` — broadcast rotation events and revoke stale tokens.
 - [ ] `docs/design/gitlab-cli-ops/README.md` — CLI credential setup, signer health, operator flows.
