@@ -30,8 +30,21 @@ predictable.
   logs without waiting for IPFS uploads to finish.
 - After completion, `GET /v2/jobs/{id}/logs` fetches from the archived bundle. The API downloads the
   content from IPFS, optionally truncating based on query parameters (e.g., `?tail=2000`).
-- Node-level logs (`ploy node logs`, `/v2/nodes/{node}/logs/stream`) follow the same pattern:
-  streaming first, archived bundles stored via IPFS.
+- Node-level logs (`/v2/nodes/{node}/logs/stream`) follow the same pattern: streaming first,
+  archived bundles stored via IPFS.
+
+### CLI Streaming
+
+- `ploy mods logs <ticket>` establishes an SSE stream against
+  `/v2/mods/{ticket}/logs/stream`. The CLI defaults to a structured view (`timestamp stream line`),
+  supports `--format raw` for verbatim log output, and automatically retries transient disconnects
+  (`--max-retries` and `--retry-wait` tune behaviour).
+- `ploy jobs follow <job-id>` tails job logs in real time using `/v2/jobs/{id}/logs/stream`, sharing
+  the same formatting and retry semantics so operators can follow a single step through completion.
+- When retention metadata is published on the stream (see
+  [`observability-log-bundles`](../design/observability-log-bundles/README.md)), the CLI surfaces
+  bundle TTLs, expiry timestamps, and archived CIDs so operators know how long the log bundle will
+  remain addressable.
 
 ## Retention
 

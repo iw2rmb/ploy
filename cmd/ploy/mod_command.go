@@ -31,7 +31,6 @@ func printModUsage(w io.Writer) {
 		"  run       Submit a Mods run to the control plane",
 		"  resume    Resume a paused or interrupted Mods run",
 		"  inspect   Show Mods ticket status and artifacts",
-		"  logs      Stream Mods logs via SSE",
 		"",
 		"Use 'ploy help mod <command>' for command-specific details.",
 	}

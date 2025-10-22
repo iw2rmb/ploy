@@ -43,6 +43,10 @@ func execute(args []string, stderr io.Writer) error {
 		return handleManifest(args[1:], stderr)
 	case "knowledge-base":
 		return handleKnowledgeBase(args[1:], stderr)
+	case "mods":
+		return handleMods(args[1:], stderr)
+	case "jobs":
+		return handleJobs(args[1:], stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -64,13 +68,14 @@ func printUsage(w io.Writer) {
 		"",
 		"Core Commands:",
 		"  mod         Plan and run Mods workflows",
+		"  mods        Observe Mods execution (logs, events)",
+		"  jobs        Inspect and follow individual jobs",
 		"  artifact    Manage IPFS Cluster artifacts",
 		"  node        Administer Ploy nodes and lifecycle",
 		"  deploy      Bootstrap or upgrade clusters",
 		"  cluster     Manage local cluster descriptors",
 		"  beacon      Control beacon discovery operations",
 		"  config      Inspect or update cluster configuration",
-		"  logs        Stream job and node logs",
 		"  status      Summarize cluster health",
 		"  doctor      Run workstation diagnostics",
 		"",
@@ -108,8 +113,11 @@ func handleHelp(args []string, stderr io.Writer) error {
 	case "config":
 		printConfigUsage(stderr)
 		return nil
-	case "logs":
-		printLogsUsage(stderr)
+	case "mods":
+		printModsUsage(stderr)
+		return nil
+	case "jobs":
+		printJobsUsage(stderr)
 		return nil
 	case "status":
 		printStatusUsage(stderr)

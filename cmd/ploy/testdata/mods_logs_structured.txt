@@ -1,0 +1,3 @@
+2025-10-22T10:00:00Z stdout Step started
+2025-10-22T10:00:01Z stderr warning: slow retry
+Retention: retained ttl=72h expires=2025-10-25T10:00:00Z cid=bafy-ret-bundle

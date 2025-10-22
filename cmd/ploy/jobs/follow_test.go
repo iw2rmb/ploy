@@ -1,0 +1,104 @@
+package jobs
+
+import (
+	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+	"time"
+
+	"github.com/iw2rmb/ploy/cmd/ploy/stream"
+)
+
+func TestFollowCommandReconnects(t *testing.T) {
+	t.Helper()
+	plan := []followPlan{
+		{
+			events:     []testEvent{{event: "log", data: `{"timestamp":"2025-10-22T11:00:00Z","stream":"stdout","line":"first"}`}},
+			closeAfter: true,
+		},
+		{
+			events: []testEvent{
+				{event: "log", data: `{"timestamp":"2025-10-22T11:00:01Z","stream":"stdout","line":"second"}`},
+				{event: "done", data: `{"status":"completed"}`},
+			},
+		},
+	}
+	server := newFollowStreamServer(t, plan)
+	defer server.Close()
+
+	httpClient := server.Client()
+	httpClient.Timeout = 0
+
+	baseURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+
+	buf := &bytes.Buffer{}
+	cmd := FollowCommand{
+		Client: stream.Client{
+			HTTPClient:   httpClient,
+			MaxRetries:   3,
+			RetryBackoff: 5 * time.Millisecond,
+		},
+		BaseURL: baseURL,
+		JobID:   "job-1",
+		Format:  FormatStructured,
+		Output:  buf,
+	}
+	if err := cmd.Run(context.Background()); err != nil {
+		t.Fatalf("run follow command: %v", err)
+	}
+	got := buf.String()
+	want := "2025-10-22T11:00:00Z stdout first\n2025-10-22T11:00:01Z stdout second\n"
+	if got != want {
+		t.Fatalf("unexpected output\nwant: %q\ngot:  %q", want, got)
+	}
+}
+
+type followPlan struct {
+	events     []testEvent
+	closeAfter bool
+}
+
+type testEvent struct {
+	event string
+	data  string
+}
+
+func newFollowStreamServer(t *testing.T, plans []followPlan) *httptest.Server {
+	t.Helper()
+	var idx int
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/jobs/job-1/logs/stream" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		plan := plans[idx]
+		if idx < len(plans)-1 {
+			idx++
+		}
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("response writer missing flusher")
+		}
+		for _, evt := range plan.events {
+			if evt.event != "" {
+				_, _ = w.Write([]byte("event: " + evt.event + "\n"))
+			}
+			if evt.data != "" {
+				_, _ = w.Write([]byte("data: " + evt.data + "\n"))
+			}
+			_, _ = w.Write([]byte("\n"))
+			flusher.Flush()
+		}
+		if plan.closeAfter {
+			return
+		}
+	}
+	return httptest.NewServer(http.HandlerFunc(handler))
+}
