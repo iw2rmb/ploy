@@ -1,6 +1,5 @@
 # Design Queue
 
-- [x] ployd daemon — define the unified node daemon (`ployd`) for bootstrap and worker modes. Completed on 2025-10-23; archived to `.archive/ployd-daemon`.
 - [ ] `docs/design/control-plane-node-onboarding/README.md` — migrate CLI workflows from direct etcd access to control-plane APIs.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
