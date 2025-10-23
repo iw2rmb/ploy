@@ -43,11 +43,6 @@ addendum:
 - Use descriptive names (`workflow_runner_test.go`, `event_contract_test.go`).
 - Avoid catch-all suffixes such as `_more_test.go` or `_extra_test.go`.
 
-### Pre-commit Hooks (Optional for now)
-
-- If you enable pre-commit hooks, keep them focused on `gofmt`, `go test`,
-  static analysis for the workflow runner.
-
 ## Environment Variables
 
 - Keep the canonical list of required variables in `docs/envs/README.md` and
