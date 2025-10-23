@@ -1,8 +1,9 @@
 # Ploy v2 Overview
 
 Ploy v2 unifies Mods execution, SHIFT validation, and artifact handling into a
-workstation-first stack. Lightweight Ploy nodes coordinate Mods locally, while
-an etcd-backed control plane assigns work, enforces optimistic concurrency, and
+workstation-first stack. Lightweight `ployd` nodes coordinate Mods locally,
+while an etcd-backed control plane assigns work, enforces optimistic
+concurrency, and
 publishes durable artifacts in IPFS Cluster. The CLI remains the primary
 operator surface, providing familiar workflows without requiring the legacy
 Grid stack.
@@ -48,14 +49,16 @@ SHIFT sandbox before the next step.
 
 - **Ploy CLI** — Operator interface for Mods submission, artifact management,
   and node lifecycle. See [docs/v2/cli.md](cli.md).
-- **Control Plane Service** — `/v2/jobs` HTTP APIs for submission, worker
-  claims, heartbeats, status queries, and job completion. Wraps the etcd-backed
-  scheduler with optimistic concurrency.
-- **Ploy Nodes** — Worker daemons hosting Docker, SHIFT, IPFS Cluster client,
-  and etcd connectivity. Execute Mod steps, persist job state, and stream logs
-  back to the CLI.
-- **Ploy Node (beacon mode)** — Discovery node that distributes API endpoints
-  and trust bundles while remaining eligible to execute jobs.
+- **Control Plane Service (ployd)** — `/v2/jobs` HTTP APIs for submission,
+  worker claims, heartbeats, status queries, and job completion. The ployd
+  daemon fronts these routes, wrapping the etcd-backed scheduler with
+  optimistic concurrency.
+- **Ploy Nodes (ployd workers)** — `ployd` worker daemons hosting Docker,
+  SHIFT, IPFS Cluster client, and etcd connectivity. Execute Mod steps, persist
+  job state, and stream logs back to the CLI.
+- **Ploy Node (ployd beacon mode)** — `ployd` running in beacon mode acts as
+  the discovery node that distributes API endpoints and trust bundles while
+  remaining eligible to execute jobs.
 - **SHIFT Build Gate** — Executes unit tests and static analysis per step;
   reused from the existing integration without embedding its CLI.
 - **IPFS Cluster** — Artifact store for snapshots, diff bundles, logs, and OCI
