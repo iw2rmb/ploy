@@ -47,9 +47,11 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      ```
 
 4. **Capture Cluster Metadata & PKI**  
-   - On success the CLI invokes the deployment PKI manager, generating the cluster CA plus beacon and
-     worker leaf certificates. Material is stored in etcd under `/ploy/clusters/<cluster>/security/...`
-     with revocation markers and per-node descriptors that the worker onboarding flow consumes.
+   - On success the CLI invokes the deployment PKI manager (see
+     [`docs/design/deployment-pki-bootstrap/README.md`](../design/deployment-pki-bootstrap/README.md)),
+     generating the cluster CA plus beacon and worker leaf certificates. Material is stored in etcd under
+     `/ploy/clusters/<cluster>/security/...` with revocation markers and per-node descriptors that the worker
+     onboarding flow consumes.
    - The trust bundle is published via the control-plane security store so subsequent `ploy cluster
      connect` calls download the latest CA chain automatically.
    - The CLI also writes a cluster descriptor (beacon address, API key, CA path) under
@@ -105,8 +107,9 @@ authoritative via etcd and beacon mode.
 - Deployment bootstrap generates the initial cluster CA and issues leaf certificates for the beacon
   plus any pre-registered workers. The materials live under `/ploy/clusters/<cluster>/security/` in etcd
   alongside a trust bundle exposed to CLI consumers.
-- Subsequent worker onboarding reuses these descriptors; the onboarding flow in
-  `docs/design/deployment-worker-onboarding/README.md` reads the same paths to provision node keys.
+   - Subsequent worker onboarding reuses these descriptors; the onboarding flow in
+     [`.archive/deployment-worker-onboarding/README.md`](../../.archive/deployment-worker-onboarding/README.md)
+     reads the same paths to provision node keys.
 - Run `ploy beacon rotate-ca --cluster-id <id>` to mint a new CA, publish refreshed leaf certificates,
   and mark the previous CA version as revoked under `/security/ca/history/<version>`. Use
   `--dry-run` to stage the rotation before writing to etcd.

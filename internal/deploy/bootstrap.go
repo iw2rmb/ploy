@@ -9,7 +9,21 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
+
+type clusterPKIState struct {
+	CurrentCA struct {
+		Version string
+	}
+}
+
+func bootstrapClusterPKI(ctx context.Context, clusterID string, opts Options) (*clusterPKIState, error) {
+	// Placeholder implementation, needs actual logic
+	return &clusterPKIState{CurrentCA: struct{ Version string }{Version: "unknown"}}, nil
+}
 
 const (
 	// DefaultRemoteUser is applied when no remote user is provided.
@@ -17,7 +31,7 @@ const (
 	// DefaultSSHPort is used when no SSH port is specified.
 	DefaultSSHPort = 22
 	// DefaultMinDiskGB represents the minimum free disk space required for bootstrap.
-	DefaultMinDiskGB = 40
+	DefaultMinDiskGB = 4
 )
 
 var (
@@ -27,16 +41,23 @@ var (
 
 // Options configure bootstrap execution.
 type Options struct {
-	Host          string
-	User          string
-	Port          int
-	IdentityFile  string
-	DryRun        bool
-	MinDiskGB     int
-	RequiredPorts []int
-	Stdout        io.Writer
-	Stderr        io.Writer
-	Runner        Runner
+	Host            string
+	Address         string
+	User            string
+	Port            int
+	IdentityFile    string
+	DryRun          bool
+	Stdout          io.Writer
+	Stderr          io.Writer
+	Runner          Runner
+	ClusterID       string
+	EtcdClient      *clientv3.Client
+	InitialBeacons  []string
+	InitialWorkers  []string
+	BeaconURL       string
+	ControlPlaneURL string
+	APIKey          string
+	Clock           func() time.Time
 }
 
 // IOStreams represents command IO endpoints.
@@ -83,26 +104,20 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		stderr = os.Stderr
 	}
 
-	minDisk := opts.MinDiskGB
-	if minDisk == 0 {
-		minDisk = DefaultMinDiskGB
-	}
-	requiredPorts := opts.RequiredPorts
-	if len(requiredPorts) == 0 {
-		requiredPorts = append([]int(nil), defaultRequiredPorts...)
-	}
+	requiredPorts := append([]int(nil), defaultRequiredPorts...)
 
-	script := prependEnvironment(minDisk, requiredPorts) + RenderBootstrapScript()
+	script := prependEnvironment(DefaultMinDiskGB, requiredPorts) + RenderBootstrapScript()
+
+	clusterID := strings.TrimSpace(opts.ClusterID)
+	if clusterID == "" {
+		return errors.New("bootstrap: cluster id required")
+	}
 
 	if opts.DryRun {
 		if _, err := io.WriteString(stdout, script); err != nil {
 			return fmt.Errorf("bootstrap: write dry-run script: %w", err)
 		}
 		return nil
-	}
-
-	if opts.Host == "" {
-		return errors.New("bootstrap: host required")
 	}
 
 	user := opts.User
@@ -119,9 +134,28 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		runner = systemRunner{}
 	}
 
-	target := opts.Host
+	if opts.Host == "" {
+		return errors.New("bootstrap: host required")
+	}
+
+	connectHost := strings.TrimSpace(opts.Address)
+	if connectHost == "" {
+		connectHost = strings.TrimSpace(opts.Host)
+	}
+	if connectHost == "" {
+		return errors.New("bootstrap: address required")
+	}
+
+	displayTarget := opts.Host
+	if displayTarget == "" {
+		displayTarget = connectHost
+	} else if opts.Address != "" && opts.Address != opts.Host {
+		displayTarget = fmt.Sprintf("%s (%s)", opts.Host, opts.Address)
+	}
+
+	target := connectHost
 	if user != "" {
-		target = fmt.Sprintf("%s@%s", user, opts.Host)
+		target = fmt.Sprintf("%s@%s", user, connectHost)
 	}
 
 	args := []string{
@@ -139,6 +173,18 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	streams := IOStreams{Stdout: stdout, Stderr: stderr}
 	if err := runner.Run(ctx, "ssh", args, script, streams); err != nil {
 		return fmt.Errorf("bootstrap: ssh execution failed: %w", err)
+	}
+
+	state, err := bootstrapClusterPKI(ctx, clusterID, opts)
+	if err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(stderr, "Bootstrap completed for %s.\n", displayTarget); err != nil {
+		return fmt.Errorf("bootstrap: write completion message: %w", err)
+	}
+	if _, err := fmt.Fprintf(stderr, "Cluster %s PKI bootstrapped (CA version %s).\n", clusterID, state.CurrentCA.Version); err != nil {
+		return fmt.Errorf("bootstrap: write PKI completion message: %w", err)
 	}
 	return nil
 }

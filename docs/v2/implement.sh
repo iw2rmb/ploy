@@ -1,373 +1,85 @@
-#!/usr/bin/env bash
+#!/bin/zsh
 set -euo pipefail
 
-# Deployment bootstrap script used by `ploy deploy bootstrap`.
-# The script converges host dependencies to the required versions and
-# performs preflight checks before installing software.
+# Directory layout helpers
+SCRIPT_DIR="${0:A:h}"
+REPO_ROOT="${SCRIPT_DIR:h:h}"
+DESIGN_ROOT="${REPO_ROOT}/docs/design"
+QUEUE_FILE="${REPO_ROOT}/docs/design/QUEUE.md"
 
-ETCD_VERSION="3.6.0"
-IPFS_CLUSTER_VERSION="1.1.4"
-DOCKER_VERSION="28.0.1"
-DOCKER_CHANNEL="28"
-GO_VERSION="1.25.2"
-
-WORKDIR="${PLOY_WORKDIR:-/var/lib/ploy}"
-TMP_ROOT="${WORKDIR}/tmp"
-DOWNLOAD_DIR="${WORKDIR}/downloads"
-BIN_DIR="/usr/local/bin"
-SYSTEMD_DIR="/etc/systemd/system"
-
-log() {
-  printf '[bootstrap] %s\n' "$*" >&2
-}
-
-warn() {
-  printf '[bootstrap][warn] %s\n' "$*" >&2
-}
-
-fail() {
-  printf '[bootstrap][error] %s\n' "$*" >&2
-  exit 1
-}
-
-require_root() {
-  if [[ $(id -u) -ne 0 ]]; then
-    fail "bootstrap requires root privileges"
+if (( $# == 0 )); then
+  if [[ ! -f "$QUEUE_FILE" ]]; then
+    print -u2 "no design doc provided and queue file missing: $QUEUE_FILE"
+    exit 1
   fi
-}
 
-detect_arch() {
-  local machine shell_arch go_arch docker_arch ipfs_arch
-  machine="$(uname -m)"
-  case "$machine" in
-    x86_64|amd64)
-      shell_arch="amd64"
-      go_arch="amd64"
-      docker_arch="x86_64"
-      ipfs_arch="linux-amd64"
-      ;;
-    aarch64|arm64)
-      shell_arch="arm64"
-      go_arch="arm64"
-      docker_arch="aarch64"
-      ipfs_arch="linux-arm64"
-      ;;
-    *)
-      fail "unsupported architecture: $machine"
-      ;;
-  esac
-  ARCH="$shell_arch"
-  GO_ARCH="$go_arch"
-  DOCKER_ARCH="$docker_arch"
-  IPFS_ARCH="$ipfs_arch"
-}
+  default_doc="$(
+    python3 - "$QUEUE_FILE" <<'PY'
+import pathlib
+import sys
 
-check_package_manager() {
-  if command -v apt-get >/dev/null 2>&1; then
-    PKG_MANAGER="apt"
-    PKG_UPDATE_CMD=(apt-get update -y)
-    PKG_INSTALL_CMD=(apt-get install -y)
-    return
+queue_path = pathlib.Path(sys.argv[1])
+for raw_line in queue_path.read_text().splitlines():
+    line = raw_line.strip()
+    if not line.startswith("- [ ] "):
+        continue
+    first = line.find("`")
+    if first == -1:
+        continue
+    second = line.find("`", first + 1)
+    if second == -1:
+        continue
+    print(line[first + 1:second])
+    break
+PY
+  )"
+  if [[ -z "$default_doc" ]]; then
+    print -u2 "no unclaimed design docs found in queue: $QUEUE_FILE"
+    exit 1
   fi
-  if command -v dnf >/dev/null 2>&1; then
-    PKG_MANAGER="dnf"
-    PKG_UPDATE_CMD=(dnf makecache -y)
-    PKG_INSTALL_CMD=(dnf install -y)
-    return
-  fi
-  if command -v yum >/dev/null 2>&1; then
-    PKG_MANAGER="yum"
-    PKG_UPDATE_CMD=(yum makecache -y)
-    PKG_INSTALL_CMD=(yum install -y)
-    return
-  fi
-  fail "no supported package manager (apt, dnf, yum) detected"
-}
 
-install_package_set() {
-  local packages=("$@")
-  if [[ ${#packages[@]} -eq 0 ]]; then
-    return
-  fi
-  case "$PKG_MANAGER" in
-    apt)
-      "${PKG_UPDATE_CMD[@]}"
-      "${PKG_INSTALL_CMD[@]}" "${packages[@]}"
-      ;;
-    dnf|yum)
-      "${PKG_UPDATE_CMD[@]}"
-      "${PKG_INSTALL_CMD[@]}" "${packages[@]}"
-      ;;
-    *)
-      fail "package manager not initialised"
-      ;;
-  esac
-}
+  print "No design doc argument supplied; selecting from queue: ${default_doc}"
+  set -- "$default_doc"
+fi
 
-ensure_prerequisites() {
-  local required_commands=(curl tar gzip sha256sum systemctl ss jq sed awk)
-  local missing=()
-  for cmd in "${required_commands[@]}"; do
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-      missing+=("$cmd")
-    fi
-  done
-  if [[ ${#missing[@]} -gt 0 ]]; then
-    log "installing prerequisite packages: ${missing[*]}"
-    case "$PKG_MANAGER" in
-      apt)
-        install_package_set curl tar gzip coreutils systemd iproute2 iptables jq sed
-        ;;
-      dnf|yum)
-        install_package_set curl tar gzip coreutils systemd iproute iptables jq sed
-        ;;
-      *)
-        fail "cannot install prerequisites without a supported package manager"
-        ;;
-    esac
-  fi
-}
+CODEX_BIN="${CODEX_BIN:-codex}"
+CODEX_ARGS=(
+  exec
+  "--dangerously-bypass-approvals-and-sandbox"
+  "--cd" "$REPO_ROOT"
+)
 
-check_disk_space() {
-  local target path total_kb required_gb available_gb
-  target="${1:-$WORKDIR}"
-  required_gb="${PLOY_MIN_DISK_GB:-40}"
-  if [[ ! -d "$target" ]]; then
-    mkdir -p "$target"
-  fi
-  total_kb="$(df -Pk "$target" | tail -1 | awk '{print $4}')"
-  available_gb=$(( (total_kb + 1023) / 1024 / 1024 ))
-  if (( available_gb < required_gb )); then
-    fail "insufficient disk space at $target: need ${required_gb}GiB, have ${available_gb}GiB"
-  fi
-  log "disk space check passed: ${available_gb}GiB available at $target"
-}
-
-check_required_ports() {
-  local ports raw port
-  raw="${PLOY_REQUIRED_PORTS:-}"
-  if [[ -z "$raw" ]]; then
-    warn "no required ports defined; skipping port availability checks"
-    return
-  fi
-  IFS=' ' read -r -a ports <<<"$raw"
-  for port in "${ports[@]}"; do
-    [[ -z "$port" ]] && continue
-    if ss -tulpn 2>/dev/null | grep -q ":${port} " ; then
-      fail "port ${port} currently in use; cannot continue bootstrap"
-    fi
-    log "port ${port} available"
-  done
-}
-
-prepare_workspace() {
-  mkdir -p "$TMP_ROOT" "$DOWNLOAD_DIR"
-  chmod 0755 "$WORKDIR" "$TMP_ROOT" "$DOWNLOAD_DIR"
-}
-
-with_tmpdir() {
-  local fn="$1"
-  shift
-  local tmpdir
-  tmpdir="$(mktemp -d "${TMP_ROOT}/bootstrap.XXXXXX")"
-  trap 'rm -rf "$tmpdir"' RETURN
-  "$fn" "$tmpdir" "$@"
-  trap - RETURN
-  rm -rf "$tmpdir"
-}
-
-ensure_group() {
-  local name="$1"
-  if ! getent group "$name" >/dev/null 2>&1; then
-    groupadd --system "$name"
-    log "created system group $name"
-  fi
-}
-
-install_etcd() {
-  local current tmp archive url
-  if command -v etcd >/dev/null 2>&1; then
-    current="$(etcd --version | awk '/etcd Version/ {print $3}' | tr -d 'v')"
-    if [[ "$current" == "$ETCD_VERSION" ]] || [[ "$current" == 3.6.* ]]; then
-      log "etcd already at $current; skipping"
-      return
-    fi
-    warn "etcd version $current detected, upgrading to $ETCD_VERSION"
+for doc in "$@"; do
+  if [[ "$doc" == /* ]]; then
+    candidate="$doc"
+  elif [[ "$doc" == docs/design/* ]]; then
+    candidate="${REPO_ROOT}/${doc}"
   else
-    log "etcd not present; installing $ETCD_VERSION"
+    candidate="${DESIGN_ROOT}/${doc}"
   fi
-  archive="etcd-v${ETCD_VERSION}-linux-${ARCH}.tar.gz"
-  url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${archive}"
-  with_tmpdir install_etcd_from_archive "$archive" "$url"
-}
 
-install_etcd_from_archive() {
-  local tmpdir="$1" archive="$2" url="$3"
-  local extracted
-  curl -fsSL "$url" -o "${tmpdir}/${archive}"
-  tar -xzf "${tmpdir}/${archive}" -C "$tmpdir"
-  extracted="${tmpdir}/etcd-v${ETCD_VERSION}-linux-${ARCH}"
-  install -m0755 "${extracted}/etcd" "${BIN_DIR}/etcd"
-  install -m0755 "${extracted}/etcdctl" "${BIN_DIR}/etcdctl"
-  log "installed etcd ${ETCD_VERSION} to ${BIN_DIR}"
-}
-
-install_ipfs_cluster() {
-  local current archive url
-  if command -v ipfs-cluster-service >/dev/null 2>&1; then
-    current="$(ipfs-cluster-service --version 2>/dev/null | awk '{print $3}' | tr -d 'v')"
-    if [[ "$current" == "$IPFS_CLUSTER_VERSION" ]]; then
-      log "IPFS Cluster already at $current; skipping"
-      return
-    fi
-    warn "IPFS Cluster version $current detected, upgrading to $IPFS_CLUSTER_VERSION"
-  else
-    log "IPFS Cluster not present; installing $IPFS_CLUSTER_VERSION"
+  if [[ -d "$candidate" ]]; then
+    candidate="${candidate%/}/README.md"
   fi
-  archive="ipfs-cluster-service_v${IPFS_CLUSTER_VERSION}_${IPFS_ARCH}.tar.gz"
-  url="https://dist.ipfs.tech/ipfs-cluster-service/v${IPFS_CLUSTER_VERSION}/${archive}"
-  with_tmpdir install_ipfs_cluster_from_archive "$archive" "$url"
-}
 
-install_ipfs_cluster_from_archive() {
-  local tmpdir="$1" archive="$2" url="$3"
-  local extracted
-  curl -fsSL "$url" -o "${tmpdir}/${archive}"
-  tar -xzf "${tmpdir}/${archive}" -C "$tmpdir"
-  extracted="${tmpdir}/ipfs-cluster-service"
-  install -m0755 "${extracted}/ipfs-cluster-service" "${BIN_DIR}/ipfs-cluster-service"
-  install -m0755 "${extracted}/ipfs-cluster-ctl" "${BIN_DIR}/ipfs-cluster-ctl"
-  log "installed IPFS Cluster ${IPFS_CLUSTER_VERSION} binaries"
-}
-
-install_go() {
-  local current archive url
-  if command -v go >/dev/null 2>&1; then
-    current="$(go version | awk '{print $3}' | tr -d 'go')"
-    if [[ "$current" == "$GO_VERSION" ]] || [[ "$current" == 1.25.* ]]; then
-      log "Go already at $current; skipping"
-      return
-    fi
-    warn "Go version $current detected, upgrading to $GO_VERSION"
-  else
-    log "Go not present; installing $GO_VERSION"
+  if [[ ! -f "$candidate" ]]; then
+    print -u2 "design doc not found: $candidate"
+    exit 2
   fi
-  archive="go${GO_VERSION}.linux-${GO_ARCH}.tar.gz"
-  url="https://go.dev/dl/${archive}"
-  with_tmpdir install_go_from_archive "$archive" "$url"
-}
 
-install_go_from_archive() {
-  local tmpdir="$1" archive="$2" url="$3"
-  curl -fsSL "$url" -o "${tmpdir}/${archive}"
-  rm -rf /usr/local/go
-  tar -xzf "${tmpdir}/${archive}" -C /usr/local
-  log "installed Go ${GO_VERSION}"
-}
-
-install_docker() {
-  local current archive url extracted
-  if command -v docker >/dev/null 2>&1; then
-    current="$(docker version --format '{{.Server.Version}}' 2>/dev/null || docker --version | awk '{print $3}' | tr -d ',')"
-    if [[ "$current" == "${DOCKER_VERSION}" ]] || [[ "$current" == 28.* ]]; then
-      log "Docker already at $current; ensuring service configuration"
-      configure_docker_service
-      return
-    fi
-    warn "Docker version $current detected, upgrading to ${DOCKER_VERSION}"
-  else
-    log "Docker not present; installing ${DOCKER_VERSION}"
-  fi
-  archive="docker-${DOCKER_VERSION}.tgz"
-  url="https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/${archive}"
-  with_tmpdir install_docker_from_archive "$archive" "$url"
-  configure_docker_service
-}
-
-install_docker_from_archive() {
-  local tmpdir="$1" archive="$2" url="$3"
-  local extracted
-  curl -fsSL "$url" -o "${tmpdir}/${archive}"
-  tar -xzf "${tmpdir}/${archive}" -C "$tmpdir"
-  extracted="${tmpdir}/docker"
-  install -m0755 "${extracted}/docker" "${BIN_DIR}/docker"
-  install -m0755 "${extracted}/dockerd" "${BIN_DIR}/dockerd"
-  install -m0755 "${extracted}/containerd"* "${BIN_DIR}/"
-  install -m0755 "${extracted}/runc" "${BIN_DIR}/runc"
-  install -m0755 "${extracted}/ctr" "${BIN_DIR}/ctr"
-  install -m0755 "${extracted}/docker-proxy" "${BIN_DIR}/docker-proxy"
-  install -m0755 "${extracted}/docker-init" "${BIN_DIR}/docker-init"
-  log "installed Docker ${DOCKER_VERSION} binaries"
-}
-
-configure_docker_service() {
-  ensure_group docker
-  mkdir -p /etc/docker
-  if [[ ! -f /etc/docker/daemon.json ]]; then
-    cat >/etc/docker/daemon.json <<'JSON'
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  },
-  "exec-opts": ["native.cgroupdriver=systemd"],
-  "storage-driver": "overlay2"
-}
-JSON
-    log "wrote /etc/docker/daemon.json"
-  fi
-  cat >"${SYSTEMD_DIR}/docker.service" <<'UNIT'
-[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network-online.target firewalld.service
-Wants=network-online.target
-
-[Service]
-Type=notify
-ExecStart=/usr/local/bin/dockerd --config-file=/etc/docker/daemon.json
-ExecReload=/bin/kill -s HUP $MAINPID
-LimitNOFILE=1048576
-LimitNPROC=1048576
-LimitCORE=infinity
-TasksMax=infinity
-TimeoutStartSec=0
-Delegate=yes
-KillMode=process
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-  systemctl daemon-reload
-  systemctl enable docker
-  systemctl restart docker
-  log "docker service enabled and restarted"
-}
-
-summarise_versions() {
-  log "Bootstrap versions:"
-  command -v etcd >/dev/null 2>&1 && log "  etcd: $(etcd --version | awk '/etcd Version/ {print $3}')"
-  command -v ipfs-cluster-service >/dev/null 2>&1 && log "  ipfs-cluster-service: $(ipfs-cluster-service --version 2>/dev/null | awk '{print $3}')"
-  command -v docker >/dev/null 2>&1 && log "  docker: $(docker version --format '{{.Server.Version}}' 2>/dev/null || docker --version | awk '{print $3}')"
-  command -v go >/dev/null 2>&1 && log "  go: $(go version | awk '{print $3}')"
-}
-
-main() {
-  log "starting deployment bootstrap (script ${PLOY_BOOTSTRAP_VERSION:-unknown})"
-  require_root
-  detect_arch
-  check_package_manager
-  ensure_prerequisites
-  check_disk_space "$WORKDIR"
-  check_required_ports
-  prepare_workspace
-  install_etcd
-  install_ipfs_cluster
-  install_docker
-  install_go
-  summarise_versions
-  log "bootstrap complete"
-}
-
-main "$@"
+  print "Implementing design doc: ${candidate}"
+  prompt=$'You are Codex working inside /Users/vk/@iw2rmb/ploy. Follow /Users/vk/@iw2rmb/docs/AGENTS.md and all repository rules exactly.\n\n'
+  prompt+=$'Workflow requirements (no exceptions):\n'
+  prompt+=$'- Immediately reserve this design doc by updating docs/design/QUEUE.md so its checkbox reads `- [x]` with your reservation note.\n'
+  prompt+=$'- Implement every requirement from the design doc completely; do not leave TODOs, follow-ups, or "next steps"—ship the finished slice.\n'
+  prompt+=$'- Keep docs in sync with the code. When the work is done, mark the queue entry finished with status and timestamp, then move the design doc directory to .archive/.\n'
+  prompt+=$'- Run all required local checks (at minimum `make test`) and ensure they pass.\n'
+  prompt+=$'- Produce a single commit covering your work. Use a descriptive message referencing this design doc.\n'
+  prompt+=$'- Never contradict /Users/vk/@iw2rmb/docs/AGENTS.md or the design doc. If something blocks you, resolve it before finishing.\n'
+  prompt+=$'- When finished, remove design doc reference from docs/design/QUEUE.md and move design doc own folder to root .archive folder.\n'
+  prompt+=$"\nDesign doc path: ${candidate}\nQueue file: ${QUEUE_FILE}\n\n"
+  prompt+=$'Implement the following design doc end-to-end:\n\n'
+  prompt+="$(<"$candidate")"
+  prompt+=$'\n'
+  "$CODEX_BIN" "${CODEX_ARGS[@]}" - <<< "$prompt"
+done
