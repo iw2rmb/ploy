@@ -397,6 +397,71 @@ configure_docker_service() {
   "exec-opts": ["native.cgroupdriver=systemd"],
   "storage-driver": "overlay2"
 }
+
+configure_ployd_service() {
+  if [[ ! -x "${BIN_DIR}/ployd" ]]; then
+    warn "ployd binary not found at ${BIN_DIR}/ployd; skipping daemon installation"
+    return
+  fi
+
+  local config_path="${PLOYD_CONFIG_PATH:-/etc/ploy/ployd.yaml}"
+  mkdir -p "$(dirname "$config_path")"
+  mkdir -p /etc/systemd/system
+
+  if [[ ! -f "$config_path" ]]; then
+    if [[ -z "${PLOY_CONTROL_PLANE_ENDPOINT:-}" ]]; then
+      warn "PLOY_CONTROL_PLANE_ENDPOINT not set; using placeholder control plane endpoint"
+    fi
+    cat >"$config_path" <<YAML
+mode: \\${PLOYD_MODE:-worker}
+http:
+  listen: \\${PLOYD_HTTP_LISTEN:-:8443}
+metrics:
+  listen: \\${PLOYD_METRICS_LISTEN:-:9100}
+control_plane:
+  endpoint: "\\${PLOY_CONTROL_PLANE_ENDPOINT:-https://control.example.com}"
+  ca: "/etc/ploy/pki/control-plane-ca.pem"
+  certificate: "/etc/ploy/pki/node.pem"
+  key: "/etc/ploy/pki/node-key.pem"
+runtime:
+  plugins:
+    - name: local
+      module: builtin
+YAML
+    log "wrote default ployd configuration at $config_path"
+  fi
+
+  cat >"${SYSTEMD_DIR}/ployd.service" <<UNIT
+[Unit]
+Description=ploy node daemon
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${BIN_DIR}/ployd --config $config_path
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable ployd >/dev/null 2>&1 || true
+}
+
+start_ployd_service() {
+  if ! systemctl list-unit-files | grep -q '^ployd.service'; then
+    return
+  fi
+  systemctl restart ployd
+  if ! systemctl is-active --quiet ployd; then
+    warn "ployd service failed to start"
+  else
+    log "ployd service running"
+  fi
+}
 JSON
     log "wrote /etc/docker/daemon.json"
   fi
@@ -456,6 +521,13 @@ summarise_versions() {
   else
     warn "etcd service not active"
   fi
+  if systemctl list-unit-files | grep -q '^ployd.service'; then
+    if systemctl is-active --quiet ployd; then
+      log "  ployd service: active"
+    else
+      warn "ployd service not active"
+    fi
+  fi
 }
 
 main() {
@@ -470,6 +542,8 @@ main() {
   install_etcd
   install_ipfs_cluster
   install_docker
+  configure_ployd_service
+  start_ployd_service
   install_go
   summarise_versions
   log "bootstrap complete"

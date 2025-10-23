@@ -28,7 +28,7 @@ func TestOnlyWorkflowBinaryRemains(t *testing.T) {
 	}
 
 	sort.Strings(dirs)
-	expected := []string{"ploy"}
+	expected := []string{"ploy", "ployd"}
 	if len(dirs) != len(expected) {
 		t.Fatalf("unexpected command directories: got %v, want %v", dirs, expected)
 	}
