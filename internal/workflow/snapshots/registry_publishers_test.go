@@ -159,7 +159,8 @@ func TestIPFSGatewayPublisherUsesBackgroundWhenContextNil(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new IPFS gateway publisher: %v", err)
 	}
-	cid, err := publisher.Publish(nil, []byte("data")) //nolint:staticcheck // exercise nil context branch
+	//lint:ignore SA1012 this path must pass nil to ensure background context fallback
+	cid, err := publisher.Publish(nil, []byte("data"))
 	if err != nil || cid != "bafyctx" {
 		t.Fatalf("expected cid bafyctx, got cid=%s err=%v", cid, err)
 	}
