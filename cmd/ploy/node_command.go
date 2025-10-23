@@ -1,25 +1,41 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
-	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"github.com/iw2rmb/ploy/cmd/ploy/config"
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
 const (
 	defaultWorkerJoinTimeout = 20 * time.Second
 )
+
+type nodeAddRequest struct {
+	ClusterID string                     `json:"cluster_id"`
+	Address   string                     `json:"address"`
+	Labels    map[string]string          `json:"labels,omitempty"`
+	Probes    []deploy.WorkerHealthProbe `json:"probes,omitempty"`
+	DryRun    bool                       `json:"dry_run,omitempty"`
+}
+
+type nodeAddResponse struct {
+	WorkerID    string                       `json:"worker_id"`
+	Certificate deploy.LeafCertificate       `json:"certificate"`
+	DryRun      bool                         `json:"dry_run"`
+	Health      []registry.WorkerProbeResult `json:"health"`
+}
 
 func handleNode(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
@@ -48,7 +64,7 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	fs.Var(&address, "address", "Worker address (host or IP)")
 	fs.Var(&labels, "label", "Apply a label (key=value). May be repeated.")
 	fs.Var(&probes, "health-probe", "Register a health probe in the form name=url. May be repeated.")
-	dryRun := fs.Bool("dry-run", false, "Preview onboarding without writing to etcd")
+	dryRun := fs.Bool("dry-run", false, "Preview onboarding without registering the node")
 
 	if err := fs.Parse(args); err != nil {
 		printNodeAddUsage(stderr)
@@ -74,38 +90,29 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	workerID, err := gonanoid.Generate(defaultWorkerIDAlphabet, defaultWorkerIDLength)
-	if err != nil {
-		return fmt.Errorf("generate worker identifier: %w", err)
-	}
-
-	endpoints := etcdEndpointsFromEnv()
-	if len(endpoints) == 0 {
-		return errors.New("PLOY_ETCD_ENDPOINTS must be set for worker onboarding")
+	payload := nodeAddRequest{
+		ClusterID: desc.ID,
+		Address:   strings.TrimSpace(address.value),
+		Labels:    map[string]string(labels),
+		Probes:    []deploy.WorkerHealthProbe(probes),
+		DryRun:    *dryRun,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultWorkerJoinTimeout)
 	defer cancel()
 
-	client, err := newEtcdClient(ctx, endpoints)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = client.Close()
-	}()
-
-	result, err := runWorkerJoin(ctx, client, desc.ID, workerID, address.value, map[string]string(labels), probes, *dryRun)
+	url := buildAdminURL(payload.Address)
+	result, err := registerNode(ctx, url, payload)
 	if err != nil {
 		return err
 	}
 
 	if result.DryRun {
-		if err := writef(stderr, "[DRY RUN] Worker %s would be added to cluster %s\n", workerID, desc.ID); err != nil {
+		if err := writef(stderr, "[DRY RUN] Worker %s would be added to cluster %s\n", result.WorkerID, desc.ID); err != nil {
 			return err
 		}
 	} else {
-		if err := writef(stderr, "Worker %s joined cluster %s\n", workerID, desc.ID); err != nil {
+		if err := writef(stderr, "Worker %s joined cluster %s\n", result.WorkerID, desc.ID); err != nil {
 			return err
 		}
 		if result.Certificate.Version != "" {
@@ -148,22 +155,60 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func runWorkerJoin(ctx context.Context, client *clientv3.Client, clusterID, workerID, address string, labels map[string]string, probes []deploy.WorkerHealthProbe, dryRun bool) (deploy.WorkerJoinResult, error) {
-	clock := func() time.Time { return time.Now().UTC() }
-	options := deploy.WorkerJoinOptions{
-		ClusterID:    clusterID,
-		WorkerID:     workerID,
-		Address:      address,
-		Labels:       labels,
-		HealthProbes: probes,
-		DryRun:       dryRun,
-		Clock:        clock,
+func buildAdminURL(address string) string {
+	if base := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_ENDPOINT")); base != "" {
+		return strings.TrimRight(base, "/") + "/admin/v1/nodes"
 	}
-	options.HealthChecker = &deploy.HTTPHealthChecker{
-		Client: &http.Client{Timeout: 5 * time.Second},
-		Clock:  clock,
+	scheme := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_SCHEME"))
+	if scheme == "" {
+		scheme = "http"
 	}
-	return deploy.RunWorkerJoin(ctx, client, options)
+	port := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_PORT"))
+	if port == "" {
+		port = "8443"
+	}
+	host := strings.TrimSpace(address)
+	if host == "" {
+		host = "localhost"
+	}
+	if strings.Contains(host, "://") {
+		return strings.TrimRight(host, "/") + "/admin/v1/nodes"
+	}
+	if strings.Count(host, ":") == 1 && !strings.HasSuffix(host, "]") {
+		return fmt.Sprintf("%s://%s/admin/v1/nodes", scheme, host)
+	}
+	return fmt.Sprintf("%s://%s:%s/admin/v1/nodes", scheme, host, port)
+}
+
+func registerNode(ctx context.Context, url string, payload nodeAddRequest) (nodeAddResponse, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nodeAddResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nodeAddResponse{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nodeAddResponse{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		msg, _ := io.ReadAll(resp.Body)
+		if len(msg) == 0 {
+			return nodeAddResponse{}, fmt.Errorf("ployd responded with %s", resp.Status)
+		}
+		return nodeAddResponse{}, fmt.Errorf("ployd: %s", strings.TrimSpace(string(msg)))
+	}
+	var out nodeAddResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nodeAddResponse{}, err
+	}
+	return out, nil
+
 }
 
 type labelMap map[string]string

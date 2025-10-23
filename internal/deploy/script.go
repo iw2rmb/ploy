@@ -8,3 +8,8 @@ import (
 //
 //go:embed assets/bootstrap.sh
 var scriptTemplate string
+
+// ScriptTemplate returns the embedded bootstrap script.
+func ScriptTemplate() string {
+	return scriptTemplate
+}

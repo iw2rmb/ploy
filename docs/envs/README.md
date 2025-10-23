@@ -59,6 +59,19 @@ additional configuration.
   when mutual TLS is required. Both values must be provided together.
 - `PLOY_ETCD_TLS_SKIP_VERIFY` — When set to `true`, disables server certificate verification. Use
   only for local development.
+- `PLOYD_ADMIN_ENDPOINT` — Optional base URL used by `ploy node add` when contacting the ployd
+  admin API. If unset the CLI builds a URL from the worker address, scheme, and port.
+- `PLOYD_ADMIN_SCHEME` — Optional scheme (`http` or `https`) applied when constructing the ployd
+  admin API URL. Defaults to `http`.
+- `PLOYD_ADMIN_PORT` — Optional port used for ployd admin API requests. Defaults to `8443`.
+- `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
+  location (default `/etc/ploy/ployd.yaml`).
+- `PLOYD_MODE` — Overrides the default daemon mode written into the bootstrap configuration. May be
+  `bootstrap`, `worker`, or `beacon`.
+- `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
+  generates the initial configuration.
+- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
+  `:9100`).
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
   until the CLI flips to the new scheduler by default.
 
