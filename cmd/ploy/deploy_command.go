@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
@@ -21,6 +22,8 @@ const (
 	defaultIDAlphabet   = "0123456789abcdef"
 	defaultIDLength     = 16
 )
+
+var deployBootstrapRunner = deploy.RunBootstrap
 
 // handleDeploy routes deploy subcommands.
 func handleDeploy(args []string, stderr io.Writer) error {
@@ -48,6 +51,13 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		identity stringValue
 		portFlag intValue
 		address  stringValue
+		cluster  stringValue
+		control  stringValue
+		beacon   stringValue
+		apiKey   stringValue
+		etcd     stringSliceValue
+		beacons  stringSliceValue
+		workers  stringSliceValue
 	)
 
 	fs.Var(&hostFlag, "host", "SSH hostname or IP address")
@@ -55,6 +65,13 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
 	fs.Var(&portFlag, "port", "SSH port (default: 22)")
 	fs.Var(&address, "address", "Override SSH target address (defaults to host)")
+	fs.Var(&cluster, "cluster-id", "Cluster identifier (required)")
+	fs.Var(&control, "control-plane-url", "Control plane endpoint recorded in the local descriptor")
+	fs.Var(&beacon, "beacon-url", "Beacon URL recorded in the local descriptor (required for execution)")
+	fs.Var(&apiKey, "api-key", "API key stored in the local descriptor (required for execution)")
+	fs.Var(&etcd, "etcd-endpoints", "Comma-separated etcd endpoints (required for execution)")
+	fs.Var(&beacons, "beacon-id", "Initial beacon identifier (repeatable, required for execution)")
+	fs.Var(&workers, "worker-id", "Initial worker identifier (repeatable)")
 	dryRun := fs.Bool("dry-run", false, "Print bootstrap script without executing")
 
 	if err := fs.Parse(args); err != nil {
@@ -65,6 +82,11 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	if fs.NArg() > 0 {
 		printDeployBootstrapUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+
+	if !cluster.set || strings.TrimSpace(cluster.value) == "" {
+		printDeployBootstrapUsage(stderr)
+		return errors.New("cluster-id is required")
 	}
 
 	var opts deploy.Options
@@ -82,6 +104,17 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	}
 	if address.set {
 		opts.Address = strings.TrimSpace(address.value)
+	}
+	opts.ClusterID = strings.TrimSpace(cluster.value)
+	opts.BeaconURL = strings.TrimSpace(beacon.value)
+	opts.ControlPlaneURL = strings.TrimSpace(control.value)
+	opts.APIKey = strings.TrimSpace(apiKey.value)
+	opts.InitialBeacons = beacons.Values()
+	opts.InitialWorkers = workers.Values()
+
+	var etcdEndpoints []string
+	if len(etcd.values) > 0 {
+		etcdEndpoints = etcd.Values()
 	}
 
 	if strings.TrimSpace(opts.Host) == "" {
@@ -103,10 +136,38 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	opts.Stderr = stderr
 
 	if opts.DryRun {
+		opts.EtcdClient = nil
 		_, _ = fmt.Fprintln(stderr, "# ploy deploy bootstrap --dry-run (script preview)")
+	} else {
+		if len(etcdEndpoints) == 0 {
+			printDeployBootstrapUsage(stderr)
+			return errors.New("etcd-endpoints is required")
+		}
+		if opts.BeaconURL == "" {
+			printDeployBootstrapUsage(stderr)
+			return errors.New("beacon-url is required")
+		}
+		if opts.APIKey == "" {
+			printDeployBootstrapUsage(stderr)
+			return errors.New("api-key is required")
+		}
+		if len(opts.InitialBeacons) == 0 {
+			printDeployBootstrapUsage(stderr)
+			return errors.New("at least one beacon-id is required")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		client, err := newEtcdClient(ctx, etcdEndpoints)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			_ = client.Close()
+		}()
+		opts.EtcdClient = client
 	}
 
-	if err := deploy.RunBootstrap(context.Background(), opts); err != nil {
+	if err := deployBootstrapRunner(context.Background(), opts); err != nil {
 		return err
 	}
 
@@ -186,4 +247,26 @@ func expandPath(path string) string {
 		}
 	}
 	return path
+}
+
+type stringSliceValue struct {
+	values []string
+}
+
+func (s *stringSliceValue) Set(value string) error {
+	for _, part := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			s.values = append(s.values, trimmed)
+		}
+	}
+	return nil
+}
+
+func (s *stringSliceValue) String() string {
+	return strings.Join(s.values, ",")
+}
+
+func (s *stringSliceValue) Values() []string {
+	return append([]string(nil), s.values...)
 }

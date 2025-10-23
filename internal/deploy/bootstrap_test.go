@@ -73,12 +73,24 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 		return nil
 	})
 
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	t.Setenv("PLOY_CONFIG_HOME", "")
+
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
 	opts := Options{
-		Host:      "bootstrap.example.com",
-		User:      "ploy",
-		Runner:    runner,
-		Stderr:    io.Discard,
-		ClusterID: "cluster",
+		Host:           "bootstrap.example.com",
+		User:           "ploy",
+		Runner:         runner,
+		Stderr:         io.Discard,
+		ClusterID:      "cluster",
+		BeaconURL:      "https://beacon.example.com",
+		APIKey:         "secret",
+		InitialBeacons: []string{"beacon-bootstrap"},
+		EtcdClient:     client,
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
@@ -104,12 +116,24 @@ func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 		return nil
 	})
 
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	t.Setenv("PLOY_CONFIG_HOME", "")
+
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
 	opts := Options{
-		Host:      "abcd1234abcd1234.ploy",
-		Address:   "45.9.42.212",
-		Runner:    runner,
-		Stderr:    io.Discard,
-		ClusterID: "cluster",
+		Host:           "abcd1234abcd1234.ploy",
+		Address:        "45.9.42.212",
+		Runner:         runner,
+		Stderr:         io.Discard,
+		ClusterID:      "cluster",
+		BeaconURL:      "https://beacon.example.com",
+		APIKey:         "secret",
+		InitialBeacons: []string{"beacon-bootstrap"},
+		EtcdClient:     client,
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
@@ -226,6 +250,15 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	if !strings.Contains(string(caData), "BEGIN CERTIFICATE") {
 		t.Fatalf("expected ca bundle file to contain certificate block")
 	}
+	if desc.Version != state.CurrentCA.Version {
+		t.Fatalf("expected descriptor version %s, got %s", state.CurrentCA.Version, desc.Version)
+	}
+	if desc.LastRefreshed.IsZero() {
+		t.Fatalf("expected descriptor last refreshed timestamp to be set")
+	}
+	if got := strings.TrimSpace(string(caData)); got != strings.TrimSpace(state.CurrentCA.CertificatePEM) {
+		t.Fatalf("expected ca bundle file to match stored certificate")
+	}
 
 	result, err := RunWorkerJoin(ctx, client, WorkerJoinOptions{
 		ClusterID: "cluster-alpha",
@@ -257,10 +290,69 @@ func TestRunBootstrapRequiresEtcdClientWhenNotDryRun(t *testing.T) {
 	opts := Options{
 		Host:      "bootstrap.example.com",
 		ClusterID: "cluster-alpha",
+		BeaconURL: "https://beacon.example.com",
+		APIKey:    "secret",
 		Runner:    RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
 	}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when etcd client not provided")
+	}
+}
+
+func TestRunBootstrapRequiresBeaconIdentifiers(t *testing.T) {
+	ctx := context.Background()
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	opts := Options{
+		Host:       "bootstrap.example.com",
+		ClusterID:  "cluster-alpha",
+		BeaconURL:  "https://beacon.example.com",
+		APIKey:     "secret",
+		EtcdClient: client,
+		Runner:     RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+	}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when no beacon identifiers provided")
+	}
+}
+
+func TestRunBootstrapRequiresBeaconURL(t *testing.T) {
+	ctx := context.Background()
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	opts := Options{
+		Host:           "bootstrap.example.com",
+		ClusterID:      "cluster-alpha",
+		APIKey:         "secret",
+		InitialBeacons: []string{"beacon-main"},
+		EtcdClient:     client,
+		Runner:         RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+	}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when beacon url missing")
+	}
+}
+
+func TestRunBootstrapRequiresAPIKey(t *testing.T) {
+	ctx := context.Background()
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	opts := Options{
+		Host:           "bootstrap.example.com",
+		ClusterID:      "cluster-alpha",
+		BeaconURL:      "https://beacon.example.com",
+		InitialBeacons: []string{"beacon-main"},
+		EtcdClient:     client,
+		Runner:         RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+	}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when api key missing")
 	}
 }
 

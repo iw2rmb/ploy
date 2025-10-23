@@ -22,9 +22,19 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Configure systemd units for etcd and IPFS Cluster services.
 
 3. **Run Bootstrap Script via CLI**  
-   - Execute `dist/ploy deploy bootstrap --address 45.9.42.212`
-     (swap the address for Node B/C as needed) and tee output to a log for troubleshooting.  
-   - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before shipping it over SSH.  
+   - Execute `dist/ploy deploy bootstrap` with the required metadata flags so the CLI can wire trust
+     material immediately after the remote host is prepared. The following flags are mandatory when
+     not using `--dry-run`:
+     - `--cluster-id <id>` — canonical identifier persisted in etcd and local descriptors.
+     - `--etcd-endpoints <http(s)://host:port>[,<...>]` — comma-separated etcd endpoints reachable
+       from the operator workstation.
+     - `--beacon-url <https://beacon.example.com>` — beacon discovery URL recorded in the descriptor.
+     - `--api-key <key>` — API key saved locally for `ploy cluster connect`.
+     - At least one `--beacon-id <beacon-name>` for the bootstrap beacon; repeatable per node.
+     - Optional `--worker-id <worker-name>` entries pre-register worker certificates for the
+       bootstrap host.
+   - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before
+     shipping it over SSH. Dry runs skip etcd connectivity and local descriptor writes.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  
@@ -40,6 +50,12 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
      ```bash
      dist/ploy deploy bootstrap \
+       --cluster-id staging-lab \
+       --beacon-id beacon-main \
+       --worker-id worker-bootstrap \
+       --etcd-endpoints https://127.0.0.1:2379 \
+       --beacon-url https://beacon.staging.example.com \
+       --api-key "$(pass show ploy/staging/api-key)" \
        --address 45.9.42.212 \
        --host beacon-lab.ploy \
        --user root \
@@ -48,17 +64,22 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 4. **Capture Cluster Metadata & PKI**  
    - On success the CLI invokes the deployment PKI manager (see
-     [`docs/design/deployment-pki-bootstrap/README.md`](../design/deployment-pki-bootstrap/README.md)),
+     [`.archive/deployment-pki-bootstrap/README.md`](../../.archive/deployment-pki-bootstrap/README.md)),
      generating the cluster CA plus beacon and worker leaf certificates. Material is stored in etcd under
      `/ploy/clusters/<cluster>/security/...` with revocation markers and per-node descriptors that the worker
      onboarding flow consumes.
    - The trust bundle is published via the control-plane security store so subsequent `ploy cluster
      connect` calls download the latest CA chain automatically.
-   - The CLI also writes a cluster descriptor (beacon address, API key, CA path) under
-     `${XDG_CONFIG_HOME}/ploy/clusters/<id>.json`, including the cluster version returned by
-     `GET /v2/version` to detect drift.
-   - Enables fast reconnection via `ploy cluster connect --beacon-ip <ip> --api-key <key>` when joining
-     an existing deployment; version mismatches trigger a metadata refresh.
+   - The CLI writes the CA bundle to `${XDG_CONFIG_HOME}/ploy/clusters/<id>_ca.pem` and persists a
+     cluster descriptor alongside it (`<id>.json`). The descriptor records the beacon URL, optional
+     control-plane endpoint, API key, CA bundle path, and the active CA version returned by the PKI
+     manager.
+   - With the CA materials present, trust-sensitive commands such as `ploy node add --dry-run` and
+     `ploy beacon rotate-ca --dry-run` succeed immediately after bootstrap, enabling smoke tests
+     against the lab cluster before onboarding additional nodes.
+   - Enables fast reconnection via `ploy cluster connect --cluster-id <id>` or `ploy cluster list`
+     once the descriptor exists; subsequent commands reuse the stored CA bundle and API key. If the CA
+     rotates, the descriptor is refreshed automatically during the rotation workflow.
 
 5. **Configure Ploy CLI**  
    - Install `ploy` binary on operator workstation.  
