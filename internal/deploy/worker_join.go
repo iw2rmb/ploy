@@ -2,6 +2,8 @@ package deploy
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -166,6 +168,12 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 	if err != nil {
 		return WorkerJoinResult{}, err
 	}
+
+	httpClient, err := newWorkerHealthHTTPClient(state.CurrentCA.CertificatePEM)
+	if err != nil {
+		return WorkerJoinResult{}, err
+	}
+
 	for _, existing := range state.Nodes.Workers {
 		if existing == workerID {
 			return WorkerJoinResult{}, registry.ErrWorkerExists
@@ -174,7 +182,17 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 
 	prober := opts.HealthChecker
 	if prober == nil {
-		prober = &HTTPHealthChecker{Clock: clock}
+		prober = &HTTPHealthChecker{
+			Client: httpClient,
+			Clock:  clock,
+		}
+	} else if hc, ok := prober.(*HTTPHealthChecker); ok {
+		if hc.Client == nil {
+			hc.Client = httpClient
+		}
+		if hc.Clock == nil {
+			hc.Clock = clock
+		}
 	}
 
 	if opts.DryRun {
@@ -300,4 +318,46 @@ func cloneLabels(src map[string]string) map[string]string {
 		return nil
 	}
 	return dst
+}
+
+func newWorkerHealthHTTPClient(caCertificatePEM string) (*http.Client, error) {
+	roots, err := x509.SystemCertPool()
+	if err != nil || roots == nil {
+		roots = x509.NewCertPool()
+	}
+	if caCertificatePEM != "" {
+		if ok := roots.AppendCertsFromPEM([]byte(caCertificatePEM)); !ok {
+			return nil, errors.New("deploy: add cluster CA to health check client")
+		}
+	}
+	transport, err := cloneDefaultTransport()
+	if err != nil {
+		return nil, err
+	}
+	tlsCfg := ensureTLSConfig(transport.TLSClientConfig)
+	tlsCfg.RootCAs = roots
+	transport.TLSClientConfig = tlsCfg
+	return &http.Client{
+		Timeout:   5 * time.Second,
+		Transport: transport,
+	}, nil
+}
+
+func cloneDefaultTransport() (*http.Transport, error) {
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return nil, errors.New("deploy: default transport is not *http.Transport")
+	}
+	return base.Clone(), nil
+}
+
+func ensureTLSConfig(cfg *tls.Config) *tls.Config {
+	if cfg == nil {
+		return &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	cloned := cfg.Clone()
+	if cloned.MinVersion == 0 {
+		cloned.MinVersion = tls.VersionTLS12
+	}
+	return cloned
 }

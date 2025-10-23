@@ -61,15 +61,20 @@ func TestRunBootstrapRequiresHost(t *testing.T) {
 
 func TestRunBootstrapInvokesSSH(t *testing.T) {
 	ctx := context.Background()
-	var invoked struct {
+	var sshCall struct {
 		Command string
 		Args    []string
 		Stdin   string
 	}
-	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin string, _ IOStreams) error {
-		invoked.Command = command
-		invoked.Args = append([]string(nil), args...)
-		invoked.Stdin = stdin
+	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin io.Reader, _ IOStreams) error {
+		if command == "ssh" && sshCall.Command == "" {
+			sshCall.Command = command
+			sshCall.Args = append([]string(nil), args...)
+			if stdin != nil {
+				data, _ := io.ReadAll(stdin)
+				sshCall.Stdin = string(data)
+			}
+		}
 		return nil
 	})
 
@@ -88,31 +93,34 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 		Stderr:         io.Discard,
 		ClusterID:      "cluster",
 		BeaconURL:      "https://beacon.example.com",
-		APIKey:         "secret",
 		InitialBeacons: []string{"beacon-bootstrap"},
 		EtcdClient:     client,
+		WorkstationOS:  "darwin",
+		Stdin:          strings.NewReader("n\n"),
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
 
-	if invoked.Command != "ssh" {
-		t.Fatalf("expected ssh command, got %q", invoked.Command)
+	if sshCall.Command != "ssh" {
+		t.Fatalf("expected ssh command, got %q", sshCall.Command)
 	}
-	if len(invoked.Args) == 0 || invoked.Args[len(invoked.Args)-1] != "bash -s --" {
-		t.Fatalf("expected trailing stdin exec argument, got %v", invoked.Args)
+	if len(sshCall.Args) == 0 || sshCall.Args[len(sshCall.Args)-1] != "bash -s --" {
+		t.Fatalf("expected trailing stdin exec argument, got %v", sshCall.Args)
 	}
-	if !strings.Contains(invoked.Stdin, "ETCD_VERSION=\"3.6.") {
-		t.Fatalf("expected stdin script to contain ETCD version, got:\n%s", invoked.Stdin)
+	if !strings.Contains(sshCall.Stdin, "ETCD_VERSION=\"3.6.") {
+		t.Fatalf("expected stdin script to contain ETCD version, got:\n%s", sshCall.Stdin)
 	}
 }
 
 func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 	ctx := context.Background()
 	var captured []string
-	runner := RunnerFunc(func(_ context.Context, _ string, args []string, _ string, _ IOStreams) error {
-		captured = append([]string(nil), args...)
+	runner := RunnerFunc(func(_ context.Context, command string, args []string, _ io.Reader, _ IOStreams) error {
+		if command == "ssh" && len(captured) == 0 {
+			captured = append([]string(nil), args...)
+		}
 		return nil
 	})
 
@@ -131,9 +139,10 @@ func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 		Stderr:         io.Discard,
 		ClusterID:      "cluster",
 		BeaconURL:      "https://beacon.example.com",
-		APIKey:         "secret",
 		InitialBeacons: []string{"beacon-bootstrap"},
 		EtcdClient:     client,
+		WorkstationOS:  "darwin",
+		Stdin:          strings.NewReader("n\n"),
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
@@ -170,18 +179,20 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", cfgDir)
 	t.Setenv("PLOY_CONFIG_HOME", "")
 
-	var invoked bool
-	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin string, _ IOStreams) error {
-		invoked = true
-		if command != "ssh" {
-			t.Fatalf("expected ssh command, got %q", command)
+	type call struct {
+		command string
+		args    []string
+		stdin   string
+	}
+	var calls []call
+	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin io.Reader, _ IOStreams) error {
+		cp := append([]string(nil), args...)
+		var input string
+		if stdin != nil {
+			data, _ := io.ReadAll(stdin)
+			input = string(data)
 		}
-		if len(args) == 0 {
-			t.Fatalf("expected ssh arguments to be populated")
-		}
-		if !strings.Contains(stdin, "PLOY_BOOTSTRAP_VERSION") {
-			t.Fatalf("expected bootstrap script to render into stdin")
-		}
+		calls = append(calls, call{command: command, args: cp, stdin: input})
 		return nil
 	})
 
@@ -196,14 +207,36 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 		InitialWorkers:  []string{"worker-bootstrap"},
 		BeaconURL:       "https://beacon.example.com",
 		ControlPlaneURL: "https://control.example.com",
-		APIKey:          "secret-api-key",
+		WorkstationOS:   "darwin",
+		Stdin:           strings.NewReader("n\n"),
+		ResolverDir:     filepath.Join(cfgDir, "resolver"),
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
-	if !invoked {
+
+	var sshSeen bool
+	var caInstalled bool
+	for _, c := range calls {
+		if c.command == "ssh" {
+			sshSeen = true
+			if len(c.args) == 0 {
+				t.Fatalf("expected ssh arguments to be populated")
+			}
+			if !strings.Contains(c.stdin, "PLOY_BOOTSTRAP_VERSION") {
+				t.Fatalf("expected bootstrap script to render into stdin")
+			}
+		}
+		if c.command == "sudo" && len(c.args) >= 2 && c.args[0] == "security" && c.args[1] == "add-trusted-cert" {
+			caInstalled = true
+		}
+	}
+	if !sshSeen {
 		t.Fatalf("expected bootstrap runner to execute ssh command")
+	}
+	if !caInstalled {
+		t.Fatalf("expected system CA install command to be invoked")
 	}
 
 	manager, err := NewCARotationManager(client, "cluster-alpha")
@@ -234,8 +267,8 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	if desc.BeaconURL != "https://beacon.example.com" {
 		t.Fatalf("expected descriptor beacon url, got %q", desc.BeaconURL)
 	}
-	if desc.APIKey != "secret-api-key" {
-		t.Fatalf("expected descriptor api key, got %q", desc.APIKey)
+	if desc.APIKey == "" {
+		t.Fatalf("expected descriptor api key to be generated")
 	}
 	if desc.ControlPlaneURL != "https://control.example.com" {
 		t.Fatalf("expected descriptor control plane url, got %q", desc.ControlPlaneURL)
@@ -259,6 +292,9 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	if got := strings.TrimSpace(string(caData)); got != strings.TrimSpace(state.CurrentCA.CertificatePEM) {
 		t.Fatalf("expected ca bundle file to match stored certificate")
 	}
+	if !desc.Default {
+		t.Fatalf("expected descriptor to be marked default")
+	}
 
 	result, err := RunWorkerJoin(ctx, client, WorkerJoinOptions{
 		ClusterID: "cluster-alpha",
@@ -274,11 +310,65 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	}
 }
 
+func TestEnsureResolverRecordCreatesEntryOnConsent(t *testing.T) {
+	ctx := context.Background()
+	tempDir := t.TempDir()
+
+	type call struct {
+		command string
+		args    []string
+	}
+	var calls []call
+	runner := RunnerFunc(func(_ context.Context, command string, args []string, _ io.Reader, _ IOStreams) error {
+		calls = append(calls, call{
+			command: command,
+			args:    append([]string(nil), args...),
+		})
+		return nil
+	})
+
+	cfg := configureWorkstationOptions{
+		ClusterID:   "cluster-test",
+		CAPath:      filepath.Join(tempDir, "ca.pem"),
+		BeaconIP:    "198.51.100.7",
+		Runner:      runner,
+		Stdout:      io.Discard,
+		Stderr:      io.Discard,
+		Stdin:       strings.NewReader("y\n"),
+		GOOS:        "darwin",
+		ResolverDir: tempDir,
+	}
+
+	if err := ensureResolverRecord(ctx, cfg); err != nil {
+		t.Fatalf("ensureResolverRecord returned error: %v", err)
+	}
+
+	resolverPath := filepath.Join(tempDir, "ploy")
+	var mkdirSeen, installSeen bool
+	for _, c := range calls {
+		if c.command != "sudo" {
+			continue
+		}
+		if len(c.args) >= 3 && c.args[0] == "mkdir" && c.args[1] == "-p" && c.args[2] == tempDir {
+			mkdirSeen = true
+		}
+		if len(c.args) >= 2 && c.args[0] == "install" && c.args[len(c.args)-1] == resolverPath {
+			installSeen = true
+		}
+	}
+	if !mkdirSeen {
+		t.Fatalf("expected sudo mkdir to be invoked for resolver directory")
+	}
+	if !installSeen {
+		t.Fatalf("expected resolver install command targeting %s", resolverPath)
+	}
+}
+
 func TestRunBootstrapRequiresClusterID(t *testing.T) {
 	ctx := context.Background()
 	opts := Options{
 		Host:   "bootstrap.example.com",
-		Runner: RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+		Runner: RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when cluster id not provided")
@@ -288,11 +378,11 @@ func TestRunBootstrapRequiresClusterID(t *testing.T) {
 func TestRunBootstrapRequiresEtcdClientWhenNotDryRun(t *testing.T) {
 	ctx := context.Background()
 	opts := Options{
-		Host:      "bootstrap.example.com",
-		ClusterID: "cluster-alpha",
-		BeaconURL: "https://beacon.example.com",
-		APIKey:    "secret",
-		Runner:    RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+		Host:           "bootstrap.example.com",
+		ClusterID:      "cluster-alpha",
+		BeaconURL:      "https://beacon.example.com",
+		InitialBeacons: []string{"beacon-main"},
+		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when etcd client not provided")
@@ -309,9 +399,8 @@ func TestRunBootstrapRequiresBeaconIdentifiers(t *testing.T) {
 		Host:       "bootstrap.example.com",
 		ClusterID:  "cluster-alpha",
 		BeaconURL:  "https://beacon.example.com",
-		APIKey:     "secret",
 		EtcdClient: client,
-		Runner:     RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+		Runner:     RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when no beacon identifiers provided")
@@ -327,32 +416,12 @@ func TestRunBootstrapRequiresBeaconURL(t *testing.T) {
 	opts := Options{
 		Host:           "bootstrap.example.com",
 		ClusterID:      "cluster-alpha",
-		APIKey:         "secret",
 		InitialBeacons: []string{"beacon-main"},
 		EtcdClient:     client,
-		Runner:         RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when beacon url missing")
-	}
-}
-
-func TestRunBootstrapRequiresAPIKey(t *testing.T) {
-	ctx := context.Background()
-	etcd, client := newBootstrapTestEtcd(t)
-	defer etcd.Close()
-	defer func() { _ = client.Close() }()
-
-	opts := Options{
-		Host:           "bootstrap.example.com",
-		ClusterID:      "cluster-alpha",
-		BeaconURL:      "https://beacon.example.com",
-		InitialBeacons: []string{"beacon-main"},
-		EtcdClient:     client,
-		Runner:         RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
-	}
-	if err := RunBootstrap(ctx, opts); err == nil {
-		t.Fatalf("expected error when api key missing")
 	}
 }
 

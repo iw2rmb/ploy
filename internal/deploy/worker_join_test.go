@@ -2,7 +2,16 @@ package deploy
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
+	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -221,6 +230,115 @@ func TestWorkerJoin(t *testing.T) {
 			t.Fatalf("expected ErrWorkerNotFound after dry run, got %v", err)
 		}
 	})
+
+	t.Run("https health probes trust cluster CA", func(t *testing.T) {
+		ctx := context.Background()
+		etcd, client := newTestEtcd(t)
+		defer etcd.Close()
+		defer func() {
+			_ = client.Close()
+		}()
+
+		manager := mustNewCARotationManager(t, client, "cluster-delta")
+		now := time.Date(2025, 10, 23, 12, 0, 0, 0, time.UTC)
+		state, err := manager.Bootstrap(ctx, BootstrapOptions{
+			BeaconIDs:   []string{"beacon-main"},
+			RequestedAt: now,
+		})
+		if err != nil {
+			t.Fatalf("bootstrap: %v", err)
+		}
+
+		caKey, caCert, err := decodeCABundleMaterials(state.CurrentCA)
+		if err != nil {
+			t.Fatalf("decode CA bundle: %v", err)
+		}
+
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("listen: %v", err)
+		}
+		t.Cleanup(func() {
+			_ = listener.Close()
+		})
+
+		serverCert := issueServerCertificate(t, caCert, caKey, "127.0.0.1", now)
+		server := &http.Server{
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			}),
+			TLSConfig: &tls.Config{
+				Certificates: []tls.Certificate{serverCert},
+			},
+		}
+		tlsListener := tls.NewListener(listener, server.TLSConfig)
+		errCh := make(chan error, 1)
+		go func() {
+			errCh <- server.Serve(tlsListener)
+		}()
+		t.Cleanup(func() {
+			_ = server.Shutdown(context.Background())
+			// Drain server error channel to avoid leaking goroutines.
+			select {
+			case <-errCh:
+			default:
+			}
+		})
+
+		endpoint := "https://" + listener.Addr().String()
+
+		opt := WorkerJoinOptions{
+			ClusterID: "cluster-delta",
+			WorkerID:  "worker-tls",
+			Address:   "127.0.0.1",
+			HealthProbes: []WorkerHealthProbe{
+				{Name: "tls", Endpoint: endpoint},
+			},
+			Clock: func() time.Time {
+				return now
+			},
+		}
+
+		result, err := RunWorkerJoin(ctx, client, opt)
+		if err != nil {
+			t.Fatalf("RunWorkerJoin returned error: %v", err)
+		}
+		if len(result.Health) != 1 || !result.Health[0].Passed {
+			t.Fatalf("expected health probe to pass, got %+v", result.Health)
+		}
+	})
+
+	t.Run("rejects worker ids already present from bootstrap", func(t *testing.T) {
+		ctx := context.Background()
+		etcd, client := newTestEtcd(t)
+		defer etcd.Close()
+		defer func() {
+			_ = client.Close()
+		}()
+
+		manager := mustNewCARotationManager(t, client, "cluster-epsilon")
+		_, err := manager.Bootstrap(ctx, BootstrapOptions{
+			BeaconIDs: []string{"beacon-main"},
+			WorkerIDs: []string{"bootstrap"},
+		})
+		if err != nil {
+			t.Fatalf("bootstrap: %v", err)
+		}
+
+		opt := WorkerJoinOptions{
+			ClusterID: "cluster-epsilon",
+			WorkerID:  "bootstrap",
+			Address:   "10.0.0.2",
+			HealthProbes: []WorkerHealthProbe{
+				{Name: "ready", Endpoint: "http://bootstrap.local/healthz"},
+			},
+		}
+
+		_, err = RunWorkerJoin(ctx, client, opt)
+		if !errors.Is(err, registry.ErrWorkerExists) {
+			t.Fatalf("expected ErrWorkerExists when reusing bootstrap id, got %v", err)
+		}
+	})
 }
 
 type fakeHealthChecker struct {
@@ -230,4 +348,55 @@ type fakeHealthChecker struct {
 
 func (f fakeHealthChecker) Run(_ context.Context, workerID string, address string, probes []WorkerHealthProbe) ([]registry.WorkerProbeResult, error) {
 	return f.results, f.err
+}
+
+func issueServerCertificate(t *testing.T, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, host string, now time.Time) tls.Certificate {
+	t.Helper()
+
+	serial, err := randomSerial()
+	if err != nil {
+		t.Fatalf("randomSerial: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName: "ploy-health-probe",
+		},
+		NotBefore: now.Add(-1 * time.Minute),
+		NotAfter:  now.Add(defaultLeafValidity),
+		KeyUsage:  x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageServerAuth,
+		},
+	}
+
+	if ip := net.ParseIP(host); ip != nil {
+		template.IPAddresses = []net.IP{ip}
+	} else {
+		template.DNSNames = []string{host}
+	}
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, &priv.PublicKey, caKey)
+	if err != nil {
+		t.Fatalf("create certificate: %v", err)
+	}
+
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		t.Fatalf("marshal key: %v", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		t.Fatalf("build tls key pair: %v", err)
+	}
+	return tlsCert
 }
