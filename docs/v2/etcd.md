@@ -19,8 +19,8 @@ contracts expected under each.
 - **`gc/jobs/<job-id>`** — Garbage-collection markers stamped when jobs enter a terminal state.
 - **`nodes/<node-id>/capacity`** — Node capacity snapshots. See [docs/v2/queue.md](queue.md) for
   polling/updates.
-- **`nodes/<node-id>/status`** — Health info (heartbeat, current version tag). Populated by
-  ploynode heartbeats; used by the control plane.
+- **`nodes/<node-id>/status`** — Health info (heartbeat, current version tag). Populated by `ployd`
+  heartbeats; used by the control plane.
 - **`ipfs/peers/<node-id>`** — IPFS Cluster peer metadata (peer ID, multiaddr, last seen; see
   [docs/v2/ipfs.md](ipfs.md)).
 - **`artifacts/<cid>`** — Optional metadata for artifacts published outside job context. Tracks
@@ -104,7 +104,7 @@ contracts expected under each.
 
 ### Node Capacity (`nodes/<node-id>/capacity`)
 
-- Updated every 15 seconds by `ploynode`.
+- Updated every 15 seconds by `ployd`.
 - Transactional updates are required when claiming jobs to avoid race conditions (see
   [queue.md](queue.md)).
 - Example entry:

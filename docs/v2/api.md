@@ -1,12 +1,15 @@
 # Ploy v2 API Reference
 
 This document catalogs the service endpoints introduced in Ploy v2. Routes are grouped by surface:
-Ploy control-plane APIs, node-local endpoints, artifact/registry interfaces, and the beacon exposure.
+Ploy control-plane APIs, node-local endpoints, artifact/registry interfaces, and the beacon
+exposure. The `ployd` daemon serves both the control-plane and node APIs described below, exposing
+them over mutual TLS behind the beacon DNS entry.
 
 ## Ploy Control Plane
 
 All routes below are served by the control-plane API (fronted by the beacon DNS), protected by
-mutual TLS and token-based authorization.
+mutual TLS and token-based authorization. The cluster's `ployd` control-plane deployment owns this
+surface.
 
 ### Mods
 
@@ -78,7 +81,8 @@ differentiate them.
 
 ## Node API
 
-Each worker node exposes a subset of APIs (mutual TLS, restricted to control-plane callers):
+Each worker node exposes a subset of APIs (mutual TLS, restricted to control-plane callers)
+through its local `ployd` instance:
 
 - `POST /node/v2/jobs` — Accept a step execution request (OCI image, command, environment).
 - `GET /node/v2/jobs/{id}` — Inspect job state (queued, running, succeeded, failed) with timestamps and exit codes.

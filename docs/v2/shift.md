@@ -25,7 +25,7 @@ module. Key changes:
 
 ## Current Status (2025-10)
 
-- The Ploy node runtime invokes the SHIFT sandbox after every step and surfaces the resulting
+- Each `ployd` node runtime invokes the SHIFT sandbox after every step and surfaces the resulting
   diagnostics in job metadata.
 - Static-check adapters remain disabled until artifact publishing lands in `roadmap-mod-step-runtime-03`;
   once available, the SHIFT client will attach the structured reports to the staged artifacts.

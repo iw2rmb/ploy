@@ -1,6 +1,7 @@
 # Deployment & Operations Guide
 
-This guide describes how to bootstrap a Ploy v2 cluster and add additional nodes.
+This guide describes how to bootstrap a Ploy v2 cluster and add additional
+`ployd` nodes.
 It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 ## Prerequisites
@@ -15,11 +16,14 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 1. **Provision Host**  
    - Ensure OS packages are up to date.  
-   - Create `ploy` user with sudo rights and `/var/lib/ploy` workspace.
+   - Create `ploy` user with sudo rights and `/var/lib/ploy` workspace for the
+     `ployd` service runtime.
 
 2. **Install Dependencies**  
-   - Install Docker, etcd, IPFS Cluster daemon.  
-   - Configure systemd units for etcd and IPFS Cluster services.
+   - Install Docker, etcd, and the IPFS Cluster daemon so `ployd` can launch
+     jobs locally.  
+   - Configure systemd units for etcd, IPFS Cluster, and prepare the `ployd`
+     service definition.
 
 3. **Run Bootstrap Script via CLI**  
    - Execute `dist/ploy deploy bootstrap` so the CLI can prepare the host and wire trust material.
@@ -33,7 +37,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      Defaults to `https://<node-id>.<cluster-id>.ploy` so clients resolve through the beacon DNS.
    - The CLI generates and stores a cluster API key locally for later `ploy cluster connect` calls.
    - The bootstrap command automatically registers the generated node as both beacon and worker
-     metadata, exposing it as `<node-id>.<cluster-id>.ploy`.
+     metadata, exposing its `ployd` endpoint as `<node-id>.<cluster-id>.ploy`.
    - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before
      shipping it over SSH. Dry runs skip etcd connectivity and local descriptor writes.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
@@ -105,7 +109,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
    - TLS health probes presenting certificates issued by the deployment CA are trusted automatically during onboarding.  
-   - The CLI writes worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issues a worker certificate via the deployment CA manager, and records probe outcomes.  
+   - The CLI writes worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issues a worker certificate via the deployment CA manager for that node's `ployd`, and records probe outcomes.  
    - Use `--dry-run` to preview probes and certificate issuance without modifying etcd. Successful runs store the PEM bundle for the worker under the security prefix and surface the certificate version in the CLI output.  
    - Confirm the worker fetches its materials at `/etc/ploy/pki/` and registers with the beacon services.
 
@@ -125,7 +129,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/v2/logs.md](logs.md)).  
 - For unattended rotations, provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` or ensure the active cluster descriptor contains the control plane endpoint and CA bundle so the CLI can authenticate requests.
 
-This operational flow keeps Ploy nodes consistent and ensures the control plane remains
+This operational flow keeps `ployd` nodes consistent and ensures the control plane remains
 authoritative via etcd and beacon mode.
 
 ## Certificate Lifecycle

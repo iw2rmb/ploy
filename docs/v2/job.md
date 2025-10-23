@@ -32,9 +32,8 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 ## Container Handling
 
 - Containers are launched with `auto-remove` disabled so logs and exit metadata can be collected,
-  matching the local runtime defaults.
-  Once log bundles are archived to IPFS and metadata is persisted, `ploynode` explicitly removes the
-  container to avoid disk bloat.
+  matching the local runtime defaults. Once log bundles are archived to IPFS and metadata is
+  persisted, the local `ployd` worker explicitly removes the container to avoid disk bloat.
 - Nodes periodically clean up terminated containers once logs are archived and retention windows
   expire.
 - Secrets are injected via temporary volumes or environment variables sourced from etcd; they are

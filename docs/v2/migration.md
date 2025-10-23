@@ -7,7 +7,7 @@ previous workflow stack entirely.
 
 ## Goals
 
-- Replace Grid RPC + JetStream dependencies with native Ploy node APIs, etcd, and IPFS Cluster.
+- Replace Grid RPC + JetStream dependencies with native `ployd` APIs, etcd, and IPFS Cluster.
 - Deliver a unified job model with durable metadata, artifact CIDs, and streamed logs.
 - Reshape the CLI and API surfaces to match the v2 documentation.
 - Provide deployment tooling (bootstrap + node onboarding) using the embedded shell script workflow.
@@ -28,7 +28,7 @@ previous workflow stack entirely.
    - Introduce `internal/workflow/runtime` v2 registry that defaults to the new Ploy adapter.
    - Port minimum viable job service (`internal/jobs` clone) backed by etcd key/value stores.
 2. **Beacon node**
-   - Adapt `gridbeacon` service into a Ploy-focused binary (etcd store, no Cloudflare).
+   - Adapt `gridbeacon` service into a Ploy-focused `ployd` beacon mode (etcd store, no Cloudflare).
    - Expose discovery + DNS endpoints documented in `docs/v2/api.md`.
 
 ## Phase 2 — Job Metadata & Artifacts
@@ -38,7 +38,7 @@ previous workflow stack entirely.
    - Add artifact reference fields (diff CID, build gate report CID, log digest).
    - Follow the key contracts described in [docs/v2/etcd.md](etcd.md).
 2. **Workspace hydration & diff publishing**
-   - Teach `ploynode` to hydrate containers with the original repo plus cumulative diffs before each
+   - Teach `ployd` workers to hydrate containers with the original repo plus cumulative diffs before each
      job launches (shared volume mount).
    - After completion, compute diff bundles on the node, upload them through the IPFS Cluster client
      (replacing JetStream attachments), and record CIDs in etcd.
