@@ -1,8 +1,8 @@
 # Design Queue
 
 - Completed (2025-10-22 15:20 UTC, status: shipped) — gitlab-rotation-revocation archived to `.archive/gitlab-rotation-revocation/`.
-- [x] GitLab CLI Ops — Completed 2025-10-22T09:22:50Z by Codex (archived).
-- [x] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags. Reserved 2025-10-22T10:55:17Z by Codex.
+- [ ] GitLab CLI Ops — Completed 2025-10-22T09:22:50Z by Codex (archived).
+- [ ] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags. Reserved 2025-10-22T10:55:17Z by Codex.
 - Completed (2025-10-22 11:15 UTC, status: shipped) — cli-streaming archived to `.archive/cli-streaming/`.
 - Completed (2025-10-22 12:02 UTC, status: shipped) — cli-help-autocomplete archived to `.archive/cli-help-autocomplete/`.
 - Completed (2025-10-22 12:55 UTC, status: shipped) — observability-log-streaming archived to `.archive/observability-log-streaming/`.
@@ -13,6 +13,7 @@
 - Completed (2025-10-22T22:50:50Z, status: shipped) — deployment-ca-rotation archived to `.archive/deployment-ca-rotation/`.
 - Completed (2025-10-22T23:10:33Z, status: shipped) — deployment-worker-onboarding archived to `.archive/deployment-worker-onboarding/`.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
+- [ ] `docs/design/deployment-pki-bootstrap/README.md` — bootstrap PKI automation and trust material wiring. Reserved 2025-10-23T07:40:12Z by Codex (in progress).
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
 - [ ] `docs/design/gc-marker-controller/README.md` — select expired markers and stage deletions.
 - [ ] `docs/design/gc-artifact-cleanup/README.md` — unpin artifacts, prune containers, retry safeguards.

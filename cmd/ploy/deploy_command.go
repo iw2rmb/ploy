@@ -6,10 +6,20 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
+	gonanoid "github.com/matoous/go-nanoid/v2"
+
 	"github.com/iw2rmb/ploy/internal/deploy"
+)
+
+const (
+	defaultDomainSuffix = ".ploy"
+	defaultIDAlphabet   = "0123456789abcdef"
+	defaultIDLength     = 16
 )
 
 // handleDeploy routes deploy subcommands.
@@ -33,22 +43,18 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		configPath stringValue
-		hostFlag   stringValue
-		userFlag   stringValue
-		identity   stringValue
-		portFlag   intValue
-		minDisk    intValue
-		portList   multiIntValue
+		hostFlag stringValue
+		userFlag stringValue
+		identity stringValue
+		portFlag intValue
+		address  stringValue
 	)
 
-	fs.Var(&configPath, "config", "Path to bootstrap configuration (YAML)")
 	fs.Var(&hostFlag, "host", "SSH hostname or IP address")
 	fs.Var(&userFlag, "user", "SSH username (default: root)")
-	fs.Var(&identity, "identity", "SSH identity file (optional)")
+	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
 	fs.Var(&portFlag, "port", "SSH port (default: 22)")
-	fs.Var(&minDisk, "min-disk", "Minimum free disk in GiB (default aligns with docs)")
-	fs.Var(&portList, "require-port", "Additional port to verify availability (repeatable)")
+	fs.Var(&address, "address", "Override SSH target address (defaults to host)")
 	dryRun := fs.Bool("dry-run", false, "Print bootstrap script without executing")
 
 	if err := fs.Parse(args); err != nil {
@@ -62,14 +68,6 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	}
 
 	var opts deploy.Options
-	if configPath.set {
-		cfg, err := deploy.LoadBootstrapConfig(strings.TrimSpace(configPath.value))
-		if err != nil {
-			return err
-		}
-		opts = cfg.ToOptions()
-	}
-
 	if hostFlag.set {
 		opts.Host = strings.TrimSpace(hostFlag.value)
 	}
@@ -77,26 +75,32 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		opts.User = strings.TrimSpace(userFlag.value)
 	}
 	if identity.set {
-		opts.IdentityFile = strings.TrimSpace(identity.value)
+		opts.IdentityFile = expandPath(strings.TrimSpace(identity.value))
 	}
 	if portFlag.set {
 		opts.Port = portFlag.value
 	}
-	if minDisk.set {
-		opts.MinDiskGB = minDisk.value
+	if address.set {
+		opts.Address = strings.TrimSpace(address.value)
 	}
-	if len(portList.values) > 0 {
-		opts.RequiredPorts = append([]int(nil), portList.values...)
+
+	if strings.TrimSpace(opts.Host) == "" {
+		id, err := gonanoid.Generate(defaultIDAlphabet, defaultIDLength)
+		if err != nil {
+			return fmt.Errorf("generate host identifier: %w", err)
+		}
+		opts.Host = id + defaultDomainSuffix
+	}
+
+	if opts.IdentityFile == "" {
+		opts.IdentityFile = defaultIdentityPath()
+	} else {
+		opts.IdentityFile = expandPath(opts.IdentityFile)
 	}
 
 	opts.DryRun = *dryRun
 	opts.Stdout = stderr
 	opts.Stderr = stderr
-
-	if !opts.DryRun && strings.TrimSpace(opts.Host) == "" {
-		printDeployBootstrapUsage(stderr)
-		return errors.New("host required (use --host or specify in --config)")
-	}
 
 	if opts.DryRun {
 		_, _ = fmt.Fprintln(stderr, "# ploy deploy bootstrap --dry-run (script preview)")
@@ -108,8 +112,6 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 
 	if opts.DryRun {
 		_, _ = fmt.Fprintln(stderr, "# end bootstrap script")
-	} else {
-		_, _ = fmt.Fprintf(stderr, "Bootstrap completed for %s.\n", opts.Host)
 	}
 	return nil
 }
@@ -159,35 +161,29 @@ func (i *intValue) String() string {
 	return strconv.Itoa(i.value)
 }
 
-type multiIntValue struct {
-	values []int
-}
-
-func (m *multiIntValue) Set(value string) error {
-	for _, segment := range strings.Split(value, ",") {
-		segment = strings.TrimSpace(segment)
-		if segment == "" {
-			continue
-		}
-		v, err := strconv.Atoi(segment)
-		if err != nil {
-			return fmt.Errorf("parse port %q: %w", segment, err)
-		}
-		if v <= 0 || v > 65535 {
-			return fmt.Errorf("port %d out of range", v)
-		}
-		m.values = append(m.values, v)
-	}
-	return nil
-}
-
-func (m *multiIntValue) String() string {
-	if len(m.values) == 0 {
+func defaultIdentityPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
 		return ""
 	}
-	parts := make([]string, len(m.values))
-	for i, v := range m.values {
-		parts[i] = strconv.Itoa(v)
+	return filepath.Join(home, ".ssh", "id_rsa")
+}
+
+func expandPath(path string) string {
+	if path == "" {
+		return ""
 	}
-	return strings.Join(parts, ",")
+	if path == "~" {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return home
+		}
+	}
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, strings.TrimPrefix(path, "~/"))
+		}
+	}
+	return path
 }

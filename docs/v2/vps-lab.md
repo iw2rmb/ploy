@@ -12,6 +12,7 @@ consists of three nodes:
 Guidelines:
 
 - Use these hosts for integration/E2E testing.
+- Bootstrap beacon nodes with `dist/ploy deploy bootstrap --address <ip>` and capture output for runbooks.
 - Bootstrap the IPFS Cluster lab by running
   `scripts/ipfs/bootstrap_lab_cluster.sh up --ssh-host root@45.9.42.212` (or the desired host) from
   your workstation; the script copies compose assets, installs Docker/compose on the VPS if missing,

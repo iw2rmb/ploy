@@ -12,7 +12,7 @@
 ## Where to change
 - [`cmd/ploy/deploy`](../../../cmd/ploy/deploy) to invoke bootstrap routines.
 - [`internal/deploy`](../../../internal/deploy) for script templating and execution over SSH.
-- Script assets at [`docs/v2/implement.sh`](../../v2/implement.sh) aligning versions and checks.
+- Script assets at [`internal/deploy/assets/bootstrap.sh`](../../../internal/deploy/assets/bootstrap.sh) aligning versions and checks.
 - Update dependency mentions in [`docs/v2/devops.md`](../../v2/devops.md).
 
 ## COSMIC evaluation

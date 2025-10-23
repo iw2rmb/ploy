@@ -7,7 +7,7 @@
 ## What to do
 - Implement CLI subcommands (`ploy cluster connect`, `ploy node list`, etc.) that wrap deployment automation hooks.
 - Display status, progress, and error summaries pulled from deployment scripts.
-- Cross-link to automation docs: [`../deployment-bootstrap-host/README.md`](../deployment-bootstrap-host/README.md) and [`../deployment-worker-onboarding/README.md`](../deployment-worker-onboarding/README.md).
+- Cross-link to automation docs: [`../deployment-bootstrap-host/README.md`](../deployment-bootstrap-host/README.md) and [`.archive/deployment-worker-onboarding/README.md`](../../../.archive/deployment-worker-onboarding/README.md).
 
 ## Where to change
 - [`cmd/ploy/deploy`](../../../cmd/ploy/deploy) and [`cmd/ploy/node`](../../../cmd/ploy/node) for command implementations.

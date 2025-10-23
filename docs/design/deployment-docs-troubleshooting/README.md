@@ -7,7 +7,7 @@
 ## What to do
 - Document smoke tests covering bootstrap, onboarding, and rotation scenarios.
 - Capture troubleshooting guidance, including common failure signatures and remediation actions.
-- Publish rollback procedures and cross-reference automation docs: [`../deployment-bootstrap-host/README.md`](../deployment-bootstrap-host/README.md), [`../deployment-ca-rotation/README.md`](../deployment-ca-rotation/README.md), [`../deployment-worker-onboarding/README.md`](../deployment-worker-onboarding/README.md).
+- Publish rollback procedures and cross-reference automation docs: [`../deployment-bootstrap-host/README.md`](../deployment-bootstrap-host/README.md), [`../deployment-ca-rotation/README.md`](../deployment-ca-rotation/README.md), [`.archive/deployment-worker-onboarding/README.md`](../../../.archive/deployment-worker-onboarding/README.md).
 
 ## Where to change
 - [`docs/v2/devops.md`](../../v2/devops.md) and related operator guides for detailed procedures.

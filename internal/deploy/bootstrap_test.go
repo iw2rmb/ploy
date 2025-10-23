@@ -3,10 +3,19 @@ package deploy
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/server/v3/embed"
+
+	"github.com/iw2rmb/ploy/cmd/ploy/config"
 )
 
 func TestRenderBootstrapScriptVersions(t *testing.T) {
@@ -30,8 +39,9 @@ func TestRunBootstrapDryRun(t *testing.T) {
 	var buf bytes.Buffer
 	ctx := context.Background()
 	opts := Options{
-		DryRun: true,
-		Stdout: &buf,
+		DryRun:    true,
+		Stdout:    &buf,
+		ClusterID: "cluster",
 	}
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap(dry-run) returned error: %v", err)
@@ -43,7 +53,7 @@ func TestRunBootstrapDryRun(t *testing.T) {
 
 func TestRunBootstrapRequiresHost(t *testing.T) {
 	ctx := context.Background()
-	opts := Options{}
+	opts := Options{ClusterID: "cluster"}
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when host not provided")
 	}
@@ -64,9 +74,11 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 	})
 
 	opts := Options{
-		Host:   "bootstrap.example.com",
-		User:   "ploy",
-		Runner: runner,
+		Host:      "bootstrap.example.com",
+		User:      "ploy",
+		Runner:    runner,
+		Stderr:    io.Discard,
+		ClusterID: "cluster",
 	}
 
 	if err := RunBootstrap(ctx, opts); err != nil {
@@ -84,58 +96,211 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 	}
 }
 
-func TestLoadBootstrapConfig(t *testing.T) {
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "bootstrap.yaml")
-	configData := `
-host: node1.example.com
-user: root
-port: 2222
-identity_file: /home/user/.ssh/id_ed25519
-min_disk_gb: 80
-required_ports: [2379, 2380, 9094]
-`
-	if err := os.WriteFile(configPath, []byte(configData), 0o644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
+func TestRunBootstrapUsesAddressOverride(t *testing.T) {
+	ctx := context.Background()
+	var captured []string
+	runner := RunnerFunc(func(_ context.Context, _ string, args []string, _ string, _ IOStreams) error {
+		captured = append([]string(nil), args...)
+		return nil
+	})
+
+	opts := Options{
+		Host:      "abcd1234abcd1234.ploy",
+		Address:   "45.9.42.212",
+		Runner:    runner,
+		Stderr:    io.Discard,
+		ClusterID: "cluster",
 	}
 
-	cfg, err := LoadBootstrapConfig(configPath)
-	if err != nil {
-		t.Fatalf("LoadBootstrapConfig returned error: %v", err)
+	if err := RunBootstrap(ctx, opts); err != nil {
+		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
-	if cfg.Host != "node1.example.com" {
-		t.Fatalf("expected host node1.example.com, got %q", cfg.Host)
+
+	if len(captured) == 0 {
+		t.Fatalf("expected ssh arguments captured")
 	}
-	if cfg.User != "root" {
-		t.Fatalf("expected user root, got %q", cfg.User)
-	}
-	if cfg.Port != 2222 {
-		t.Fatalf("expected port 2222, got %d", cfg.Port)
-	}
-	if cfg.IdentityFile != "/home/user/.ssh/id_ed25519" {
-		t.Fatalf("expected identity file path, got %q", cfg.IdentityFile)
-	}
-	if cfg.MinDiskGB != 80 {
-		t.Fatalf("expected disk 80 GB, got %d", cfg.MinDiskGB)
-	}
-	wantPorts := []int{2379, 2380, 9094}
-	if len(cfg.RequiredPorts) != len(wantPorts) {
-		t.Fatalf("expected %d ports, got %d", len(wantPorts), len(cfg.RequiredPorts))
-	}
-	for i, port := range wantPorts {
-		if cfg.RequiredPorts[i] != port {
-			t.Fatalf("expected port %d at index %d, got %d", port, i, cfg.RequiredPorts[i])
-		}
+	target := captured[len(captured)-2]
+	if target != "root@45.9.42.212" {
+		t.Fatalf("expected ssh target to use address override, got %q", target)
 	}
 }
 
-func TestDocsBootstrapScriptMatchesEmbedded(t *testing.T) {
+func TestImplementScriptInvokesCodex(t *testing.T) {
 	docPath := filepath.Join("..", "..", "docs", "v2", "implement.sh")
 	data, err := os.ReadFile(docPath)
 	if err != nil {
 		t.Fatalf("failed to read %s: %v", docPath, err)
 	}
-	if got := RenderBootstrapScript(); got != string(data) {
-		t.Fatalf("embedded script diverges from documentation copy")
+	if !strings.Contains(string(data), "CODEX_BIN") {
+		t.Fatalf("expected docs/v2/implement.sh to contain Codex automation wrapper")
 	}
+}
+
+func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
+	ctx := context.Background()
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	t.Setenv("PLOY_CONFIG_HOME", "")
+
+	var invoked bool
+	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin string, _ IOStreams) error {
+		invoked = true
+		if command != "ssh" {
+			t.Fatalf("expected ssh command, got %q", command)
+		}
+		if len(args) == 0 {
+			t.Fatalf("expected ssh arguments to be populated")
+		}
+		if !strings.Contains(stdin, "PLOY_BOOTSTRAP_VERSION") {
+			t.Fatalf("expected bootstrap script to render into stdin")
+		}
+		return nil
+	})
+
+	opts := Options{
+		Host:            "bootstrap.example.com",
+		Address:         "203.0.113.7",
+		Runner:          runner,
+		Stderr:          io.Discard,
+		ClusterID:       "cluster-alpha",
+		EtcdClient:      client,
+		InitialBeacons:  []string{"beacon-main"},
+		InitialWorkers:  []string{"worker-bootstrap"},
+		BeaconURL:       "https://beacon.example.com",
+		ControlPlaneURL: "https://control.example.com",
+		APIKey:          "secret-api-key",
+	}
+
+	if err := RunBootstrap(ctx, opts); err != nil {
+		t.Fatalf("RunBootstrap returned error: %v", err)
+	}
+	if !invoked {
+		t.Fatalf("expected bootstrap runner to execute ssh command")
+	}
+
+	manager, err := NewCARotationManager(client, "cluster-alpha")
+	if err != nil {
+		t.Fatalf("NewCARotationManager: %v", err)
+	}
+	state, err := manager.State(ctx)
+	if err != nil {
+		t.Fatalf("State returned error: %v", err)
+	}
+	if len(state.BeaconCertificates) != 1 {
+		t.Fatalf("expected one beacon certificate, got %d", len(state.BeaconCertificates))
+	}
+	if _, ok := state.BeaconCertificates["beacon-main"]; !ok {
+		t.Fatalf("expected beacon-main certificate to be issued")
+	}
+	if len(state.WorkerCertificates) != 1 {
+		t.Fatalf("expected worker certificate issued, got %d", len(state.WorkerCertificates))
+	}
+	if _, ok := state.WorkerCertificates["worker-bootstrap"]; !ok {
+		t.Fatalf("expected worker-bootstrap certificate to be issued")
+	}
+
+	desc, err := config.LoadDescriptor("cluster-alpha")
+	if err != nil {
+		t.Fatalf("LoadDescriptor returned error: %v", err)
+	}
+	if desc.BeaconURL != "https://beacon.example.com" {
+		t.Fatalf("expected descriptor beacon url, got %q", desc.BeaconURL)
+	}
+	if desc.APIKey != "secret-api-key" {
+		t.Fatalf("expected descriptor api key, got %q", desc.APIKey)
+	}
+	if desc.ControlPlaneURL != "https://control.example.com" {
+		t.Fatalf("expected descriptor control plane url, got %q", desc.ControlPlaneURL)
+	}
+	if desc.CABundlePath == "" {
+		t.Fatalf("expected descriptor to include ca bundle path")
+	}
+	caData, err := os.ReadFile(desc.CABundlePath)
+	if err != nil {
+		t.Fatalf("read ca bundle: %v", err)
+	}
+	if !strings.Contains(string(caData), "BEGIN CERTIFICATE") {
+		t.Fatalf("expected ca bundle file to contain certificate block")
+	}
+
+	result, err := RunWorkerJoin(ctx, client, WorkerJoinOptions{
+		ClusterID: "cluster-alpha",
+		WorkerID:  "worker-dryrun",
+		Address:   "192.0.2.10",
+		DryRun:    true,
+	})
+	if err != nil {
+		t.Fatalf("RunWorkerJoin dry-run returned error: %v", err)
+	}
+	if !result.DryRun {
+		t.Fatalf("expected dry run flag propagated")
+	}
+}
+
+func TestRunBootstrapRequiresClusterID(t *testing.T) {
+	ctx := context.Background()
+	opts := Options{
+		Host:   "bootstrap.example.com",
+		Runner: RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+	}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when cluster id not provided")
+	}
+}
+
+func TestRunBootstrapRequiresEtcdClientWhenNotDryRun(t *testing.T) {
+	ctx := context.Background()
+	opts := Options{
+		Host:      "bootstrap.example.com",
+		ClusterID: "cluster-alpha",
+		Runner:    RunnerFunc(func(context.Context, string, []string, string, IOStreams) error { return nil }),
+	}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when etcd client not provided")
+	}
+}
+
+func newBootstrapTestEtcd(t *testing.T) (*embed.Etcd, *clientv3.Client) {
+	t.Helper()
+	dir := t.TempDir()
+	cfg := embed.NewConfig()
+	cfg.Dir = dir
+	clientURL := mustParseURL("http://127.0.0.1:0")
+	peerURL := mustParseURL("http://127.0.0.1:0")
+	cfg.ListenClientUrls = []url.URL{clientURL}
+	cfg.ListenPeerUrls = []url.URL{peerURL}
+	cfg.AdvertiseClientUrls = []url.URL{clientURL}
+	cfg.AdvertisePeerUrls = []url.URL{peerURL}
+	cfg.Name = "bootstrap"
+	cfg.InitialCluster = fmt.Sprintf("%s=%s", cfg.Name, peerURL.String())
+	cfg.ClusterState = embed.ClusterStateFlagNew
+	cfg.InitialClusterToken = "deploy-bootstrap-test"
+	cfg.LogLevel = "panic"
+	cfg.Logger = "zap"
+	cfg.LogOutputs = []string{fmt.Sprintf("%s/etcd.log", dir)}
+
+	e, err := embed.StartEtcd(cfg)
+	if err != nil {
+		t.Fatalf("start etcd: %v", err)
+	}
+	select {
+	case <-e.Server.ReadyNotify():
+	case <-time.After(10 * time.Second):
+		e.Server.Stop()
+		t.Fatalf("etcd start timeout")
+	}
+
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{e.Clients[0].Addr().String()},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		e.Close()
+		t.Fatalf("client: %v", err)
+	}
+	return e, client
 }
