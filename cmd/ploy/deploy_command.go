@@ -241,25 +241,3 @@ func expandPath(path string) string {
 	}
 	return path
 }
-
-type stringSliceValue struct {
-	values []string
-}
-
-func (s *stringSliceValue) Set(value string) error {
-	for _, part := range strings.Split(value, ",") {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			s.values = append(s.values, trimmed)
-		}
-	}
-	return nil
-}
-
-func (s *stringSliceValue) String() string {
-	return strings.Join(s.values, ",")
-}
-
-func (s *stringSliceValue) Values() []string {
-	return append([]string(nil), s.values...)
-}
