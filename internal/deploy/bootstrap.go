@@ -7,22 +7,19 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
+	"github.com/iw2rmb/ploy/cmd/ploy/config"
 )
 
 type clusterPKIState struct {
-	CurrentCA struct {
-		Version string
-	}
-}
-
-func bootstrapClusterPKI(ctx context.Context, clusterID string, opts Options) (*clusterPKIState, error) {
-	// Placeholder implementation, needs actual logic
-	return &clusterPKIState{CurrentCA: struct{ Version string }{Version: "unknown"}}, nil
+	CurrentCA  CABundle
+	Descriptor config.Descriptor
 }
 
 const (
@@ -112,6 +109,26 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	if clusterID == "" {
 		return errors.New("bootstrap: cluster id required")
 	}
+	opts.ClusterID = clusterID
+
+	opts.BeaconURL = strings.TrimSpace(opts.BeaconURL)
+	opts.ControlPlaneURL = strings.TrimSpace(opts.ControlPlaneURL)
+	opts.APIKey = strings.TrimSpace(opts.APIKey)
+
+	if !opts.DryRun {
+		if opts.EtcdClient == nil {
+			return errors.New("bootstrap: etcd client required")
+		}
+		if opts.BeaconURL == "" {
+			return errors.New("bootstrap: beacon url required")
+		}
+		if opts.APIKey == "" {
+			return errors.New("bootstrap: api key required")
+		}
+		if !hasNonEmpty(opts.InitialBeacons) {
+			return errors.New("bootstrap: at least one beacon id required")
+		}
+	}
 
 	if opts.DryRun {
 		if _, err := io.WriteString(stdout, script); err != nil {
@@ -189,6 +206,81 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	return nil
 }
 
+func bootstrapClusterPKI(ctx context.Context, clusterID string, opts Options) (*clusterPKIState, error) {
+	clusterID = strings.TrimSpace(clusterID)
+	client := opts.EtcdClient
+	if client == nil {
+		return nil, errors.New("bootstrap: etcd client required")
+	}
+	if strings.TrimSpace(opts.BeaconURL) == "" {
+		return nil, errors.New("bootstrap: beacon url required")
+	}
+	if strings.TrimSpace(opts.APIKey) == "" {
+		return nil, errors.New("bootstrap: api key required")
+	}
+	beaconIDs := normalizeNodeIDs(opts.InitialBeacons)
+	if len(beaconIDs) == 0 {
+		return nil, errors.New("bootstrap: at least one beacon id required")
+	}
+	workerIDs := normalizeNodeIDs(opts.InitialWorkers)
+
+	manager, err := NewCARotationManager(client, clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	clock := opts.Clock
+	var requestedAt time.Time
+	if clock != nil {
+		requestedAt = clock().UTC()
+	} else {
+		requestedAt = time.Now().UTC()
+	}
+
+	state, err := manager.Bootstrap(ctx, BootstrapOptions{
+		BeaconIDs:   beaconIDs,
+		WorkerIDs:   workerIDs,
+		RequestedAt: requestedAt,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	caPath, err := config.CABundlePath(clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("bootstrap: resolve ca bundle path: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(caPath), 0o755); err != nil {
+		return nil, fmt.Errorf("bootstrap: create config directory: %w", err)
+	}
+	if err := os.WriteFile(caPath, []byte(state.CurrentCA.CertificatePEM), 0o600); err != nil {
+		return nil, fmt.Errorf("bootstrap: write ca bundle: %w", err)
+	}
+
+	beaconURL := strings.TrimSpace(opts.BeaconURL)
+	controlPlaneURL := strings.TrimSpace(opts.ControlPlaneURL)
+	apiKey := strings.TrimSpace(opts.APIKey)
+
+	descriptor := config.Descriptor{
+		ID:              clusterID,
+		BeaconURL:       beaconURL,
+		ControlPlaneURL: controlPlaneURL,
+		APIKey:          apiKey,
+		CABundlePath:    caPath,
+		TrustBundlePath: caPath,
+		Version:         state.CurrentCA.Version,
+	}
+	saved, err := config.SaveDescriptor(descriptor)
+	if err != nil {
+		return nil, fmt.Errorf("bootstrap: save descriptor: %w", err)
+	}
+
+	return &clusterPKIState{
+		CurrentCA:  state.CurrentCA,
+		Descriptor: saved,
+	}, nil
+}
+
 func prependEnvironment(minDisk int, ports []int) string {
 	portStrings := make([]string, len(ports))
 	for i, port := range ports {
@@ -201,6 +293,15 @@ func prependEnvironment(minDisk int, ports []int) string {
 	builder.WriteString("export PLOY_REQUIRED_PACKAGES=\"ipfs-cluster-service docker etcd go\"\n")
 	builder.WriteString("\n")
 	return builder.String()
+}
+
+func hasNonEmpty(values []string) bool {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // RenderBootstrapScript exposes the embedded script.

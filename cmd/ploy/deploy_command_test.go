@@ -15,8 +15,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
-var deployBootstrapRunner = deploy.Run
-
 func TestHandleDeployBootstrapRequiresClusterID(t *testing.T) {
 	origRunner := deployBootstrapRunner
 	defer func() { deployBootstrapRunner = origRunner }()
@@ -35,9 +33,65 @@ func TestHandleDeployBootstrapRequiresClusterID(t *testing.T) {
 	}
 }
 
+func TestHandleDeployBootstrapRequiresEtcdEndpoints(t *testing.T) {
+	origRunner := deployBootstrapRunner
+	defer func() { deployBootstrapRunner = origRunner }()
+
+	deployBootstrapRunner = func(context.Context, deploy.Options) error {
+		return errors.New("should not be called")
+	}
+
+	err := handleDeployBootstrap([]string{
+		"--cluster-id", "cluster-alpha",
+		"--beacon-url", "https://beacon.example.com",
+		"--api-key", "secret",
+		"--beacon-id", "beacon-main",
+	}, io.Discard)
+	if err == nil {
+		t.Fatalf("expected error when etcd endpoints missing")
+	}
+}
+
+func TestHandleDeployBootstrapRequiresBeaconURL(t *testing.T) {
+	origRunner := deployBootstrapRunner
+	defer func() { deployBootstrapRunner = origRunner }()
+
+	deployBootstrapRunner = func(context.Context, deploy.Options) error {
+		return errors.New("should not be called")
+	}
+
+	err := handleDeployBootstrap([]string{
+		"--cluster-id", "cluster-alpha",
+		"--etcd-endpoints", "http://127.0.0.1:12345",
+		"--api-key", "secret",
+		"--beacon-id", "beacon-main",
+	}, io.Discard)
+	if err == nil {
+		t.Fatalf("expected error when beacon url missing")
+	}
+}
+
+func TestHandleDeployBootstrapRequiresAPIKey(t *testing.T) {
+	origRunner := deployBootstrapRunner
+	defer func() { deployBootstrapRunner = origRunner }()
+
+	deployBootstrapRunner = func(context.Context, deploy.Options) error {
+		return errors.New("should not be called")
+	}
+
+	err := handleDeployBootstrap([]string{
+		"--cluster-id", "cluster-alpha",
+		"--etcd-endpoints", "http://127.0.0.1:12345",
+		"--beacon-url", "https://beacon.example.com",
+		"--beacon-id", "beacon-main",
+	}, io.Discard)
+	if err == nil {
+		t.Fatalf("expected error when api key missing")
+	}
+}
+
 func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
-	etcd, endpoint := startDeployBootstrapTestEtcd(t)
-	defer etcd.Close()
+	_, endpoint := startDeployBootstrapTestEtcd(t)
 
 	origRunner := deployBootstrapRunner
 	defer func() { deployBootstrapRunner = origRunner }()
@@ -83,6 +137,40 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 	}
 	if captured.EtcdClient == nil {
 		t.Fatalf("expected etcd client to be provided")
+	}
+}
+
+func TestHandleDeployBootstrapAggregatesIDs(t *testing.T) {
+	_, endpoint := startDeployBootstrapTestEtcd(t)
+
+	origRunner := deployBootstrapRunner
+	defer func() { deployBootstrapRunner = origRunner }()
+
+	var captured deploy.Options
+	deployBootstrapRunner = func(_ context.Context, opts deploy.Options) error {
+		captured = opts
+		return nil
+	}
+
+	err := handleDeployBootstrap([]string{
+		"--cluster-id", "cluster-gamma",
+		"--etcd-endpoints", endpoint,
+		"--beacon-url", "https://beacon.example.com",
+		"--api-key", "super-secret-key",
+		"--beacon-id", "beacon-main",
+		"--beacon-id", "beacon-secondary",
+		"--worker-id", "worker-bootstrap",
+		"--worker-id", "worker-observer",
+	}, io.Discard)
+	if err != nil {
+		t.Fatalf("handleDeployBootstrap returned error: %v", err)
+	}
+
+	if got, want := captured.InitialBeacons, []string{"beacon-main", "beacon-secondary"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("expected beacon ids %v, got %v", want, got)
+	}
+	if got, want := captured.InitialWorkers, []string{"worker-bootstrap", "worker-observer"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("expected worker ids %v, got %v", want, got)
 	}
 }
 

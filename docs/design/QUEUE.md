@@ -13,7 +13,7 @@
 - Completed (2025-10-22T22:50:50Z, status: shipped) — deployment-ca-rotation archived to `.archive/deployment-ca-rotation/`.
 - Completed (2025-10-22T23:10:33Z, status: shipped) — deployment-worker-onboarding archived to `.archive/deployment-worker-onboarding/`.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
-- [ ] `docs/design/deployment-pki-bootstrap/README.md` — bootstrap PKI automation and trust material wiring. Reserved 2025-10-23T07:40:12Z by Codex (in progress).
+- Completed (2025-10-23T08:01:13Z, status: shipped) — deployment-pki-bootstrap archived to `.archive/deployment-pki-bootstrap/`.
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
 - [ ] `docs/design/gc-marker-controller/README.md` — select expired markers and stage deletions.
 - [ ] `docs/design/gc-artifact-cleanup/README.md` — unpin artifacts, prune containers, retry safeguards.
