@@ -10,8 +10,10 @@ import (
 	"strings"
 	"time"
 
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
+	"github.com/iw2rmb/ploy/cmd/ploy/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
@@ -38,15 +40,11 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		clusterID stringValue
-		workerID  stringValue
-		address   stringValue
+		address stringValue
 	)
 	labels := make(labelMap)
 	probes := make(probeList, 0)
 
-	fs.Var(&clusterID, "cluster-id", "Cluster identifier (required)")
-	fs.Var(&workerID, "worker-id", "Worker identifier (required)")
 	fs.Var(&address, "address", "Worker address (host or IP)")
 	fs.Var(&labels, "label", "Apply a label (key=value). May be repeated.")
 	fs.Var(&probes, "health-probe", "Register a health probe in the form name=url. May be repeated.")
@@ -66,17 +64,19 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 		address.set = true
 	}
 
-	if !clusterID.set || strings.TrimSpace(clusterID.value) == "" {
-		printNodeAddUsage(stderr)
-		return errors.New("cluster-id is required")
-	}
-	if !workerID.set || strings.TrimSpace(workerID.value) == "" {
-		printNodeAddUsage(stderr)
-		return errors.New("worker-id is required")
-	}
 	if !address.set || strings.TrimSpace(address.value) == "" {
 		printNodeAddUsage(stderr)
 		return errors.New("worker address is required")
+	}
+
+	desc, err := resolveActiveClusterDescriptor()
+	if err != nil {
+		return err
+	}
+
+	workerID, err := gonanoid.Generate(defaultWorkerIDAlphabet, defaultWorkerIDLength)
+	if err != nil {
+		return fmt.Errorf("generate worker identifier: %w", err)
 	}
 
 	endpoints := etcdEndpointsFromEnv()
@@ -95,17 +95,17 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 		_ = client.Close()
 	}()
 
-	result, err := runWorkerJoin(ctx, client, clusterID.value, workerID.value, address.value, map[string]string(labels), probes, *dryRun)
+	result, err := runWorkerJoin(ctx, client, desc.ID, workerID, address.value, map[string]string(labels), probes, *dryRun)
 	if err != nil {
 		return err
 	}
 
 	if result.DryRun {
-		if err := writef(stderr, "[DRY RUN] Worker %s would be added to cluster %s\n", workerID.value, clusterID.value); err != nil {
+		if err := writef(stderr, "[DRY RUN] Worker %s would be added to cluster %s\n", workerID, desc.ID); err != nil {
 			return err
 		}
 	} else {
-		if err := writef(stderr, "Worker %s joined cluster %s\n", workerID.value, clusterID.value); err != nil {
+		if err := writef(stderr, "Worker %s joined cluster %s\n", workerID, desc.ID); err != nil {
 			return err
 		}
 		if result.Certificate.Version != "" {
@@ -241,4 +241,23 @@ func printNodeUsage(w io.Writer) {
 
 func printNodeAddUsage(w io.Writer) {
 	printCommandUsage(w, "node", "add")
+}
+
+func resolveActiveClusterDescriptor() (config.Descriptor, error) {
+	descs, err := config.ListDescriptors()
+	if err != nil {
+		return config.Descriptor{}, err
+	}
+	if len(descs) == 0 {
+		return config.Descriptor{}, errors.New("no clusters cached locally; run 'ploy deploy bootstrap' first")
+	}
+	for _, desc := range descs {
+		if desc.Default {
+			return desc, nil
+		}
+	}
+	if len(descs) == 1 {
+		return descs[0], nil
+	}
+	return config.Descriptor{}, errors.New("multiple clusters cached; set a default in ~/.config/ploy/clusters before onboarding nodes")
 }

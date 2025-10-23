@@ -22,42 +22,44 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Configure systemd units for etcd and IPFS Cluster services.
 
 3. **Run Bootstrap Script via CLI**  
-   - Execute `dist/ploy deploy bootstrap` with the required metadata flags so the CLI can wire trust
-     material immediately after the remote host is prepared. The following flags are mandatory when
-     not using `--dry-run`:
-     - `--cluster-id <id>` — canonical identifier persisted in etcd and local descriptors.
-     - `--etcd-endpoints <http(s)://host:port>[,<...>]` — comma-separated etcd endpoints reachable
-       from the operator workstation.
-     - `--beacon-url <https://beacon.example.com>` — beacon discovery URL recorded in the descriptor.
-     - `--api-key <key>` — API key saved locally for `ploy cluster connect`.
-     - At least one `--beacon-id <beacon-name>` for the bootstrap beacon; repeatable per node.
-     - Optional `--worker-id <worker-name>` entries pre-register worker certificates for the
-       bootstrap host.
+   - Execute `dist/ploy deploy bootstrap` so the CLI can prepare the host and wire trust material.
+     The command automatically generates a 16-character lowercase-hex cluster identifier (persisted
+     locally as the default descriptor) and a 4-character node identifier reused for the initial
+     beacon/worker registration.
+   - `--etcd-endpoints <http(s)://host:port>[,<...>]` — optional override for etcd endpoints reachable
+     from the operator workstation. When omitted the CLI assumes `http://<address>:2379` (or the
+     derived host) after bootstrap.
+   - `--beacon-url <https://beacon.example.com>` — optional override for the beacon discovery URL.
+     Defaults to `https://<node-id>.<cluster-id>.ploy` so clients resolve through the beacon DNS.
+   - The CLI generates and stores a cluster API key locally for later `ploy cluster connect` calls.
+   - The bootstrap command automatically registers the generated node as both beacon and worker
+     metadata, exposing it as `<node-id>.<cluster-id>.ploy`.
    - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before
      shipping it over SSH. Dry runs skip etcd connectivity and local descriptor writes.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  
-   - If `--host` is omitted, the CLI generates a beacon domain in the form `<16 hex chars>.ploy`
-     using go-nanoid; override it explicitly when a fixed hostname is required.  
+   - The CLI always uses `<cluster-id>.ploy` so the beacon domain matches the generated identifier; configure DNS separately when a fixed hostname is required.  
+   - After the remote script succeeds, the CLI elevates via `sudo` to install the cluster CA into
+     the workstation trust store. On macOS it also checks `/etc/resolver/ploy`; when the file is
+     missing it prompts to write a resolver entry pointing `*.ploy` lookups to the beacon IP.
+   - Beacon nodes are regular workers operating in beacon mode. The generated node ID is reused for
+     both the beacon and worker records so the beacon DNS can resolve `*.{cluster-id}.ploy` and
+     `<node-id>.<cluster-id>.ploy` entries for the same machine.
    - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`.  
    - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
    - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
      refreshed, and logs summarise installed versions.  
+   - etcd is installed as a systemd service bound to `127.0.0.1:{2379,2380}` so the CLI can finish
+     bootstrap writes without exposing client ports publicly.
    - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with
      a sane `daemon.json` default.
    - Example command with overrides:
 
      ```bash
      dist/ploy deploy bootstrap \
-       --cluster-id staging-lab \
-       --beacon-id beacon-main \
-       --worker-id worker-bootstrap \
-       --etcd-endpoints https://127.0.0.1:2379 \
        --beacon-url https://beacon.staging.example.com \
-       --api-key "$(pass show ploy/staging/api-key)" \
        --address 45.9.42.212 \
-       --host beacon-lab.ploy \
        --user root \
        --identity ~/.ssh/ploy-lab
      ```
@@ -98,8 +100,11 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
-   - Run `ploy node add --cluster-id <cluster> --worker-id <worker-id> --address <host-or-ip>` and include any metadata labels with `--label key=value`.  
+   - Run `ploy node add --address <host-or-ip>` and include any metadata labels with `--label key=value`.  
+   - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
+     and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
+   - TLS health probes presenting certificates issued by the deployment CA are trusted automatically during onboarding.  
    - The CLI writes worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issues a worker certificate via the deployment CA manager, and records probe outcomes.  
    - Use `--dry-run` to preview probes and certificate issuance without modifying etcd. Successful runs store the PEM bundle for the worker under the security prefix and surface the certificate version in the CLI output.  
    - Confirm the worker fetches its materials at `/etc/ploy/pki/` and registers with the beacon services.

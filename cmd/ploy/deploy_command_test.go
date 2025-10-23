@@ -3,96 +3,54 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"testing"
-	"time"
-
-	"go.etcd.io/etcd/server/v3/embed"
 
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
-func TestHandleDeployBootstrapRequiresClusterID(t *testing.T) {
+func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 	origRunner := deployBootstrapRunner
 	defer func() { deployBootstrapRunner = origRunner }()
 
-	deployBootstrapRunner = func(context.Context, deploy.Options) error {
-		return errors.New("should not be called")
+	var captured deploy.Options
+	deployBootstrapRunner = func(_ context.Context, opts deploy.Options) error {
+		captured = opts
+		return nil
 	}
 
 	err := handleDeployBootstrap([]string{
-		"--etcd-endpoints", "http://127.0.0.1:12345",
-		"--beacon-url", "https://beacon.example.com",
-		"--api-key", "secret",
+		"--address", "192.0.2.10",
 	}, io.Discard)
-	if err == nil {
-		t.Fatalf("expected error when cluster-id missing")
+	if err != nil {
+		t.Fatalf("expected cluster id to be generated, got error: %v", err)
 	}
-}
-
-func TestHandleDeployBootstrapRequiresEtcdEndpoints(t *testing.T) {
-	origRunner := deployBootstrapRunner
-	defer func() { deployBootstrapRunner = origRunner }()
-
-	deployBootstrapRunner = func(context.Context, deploy.Options) error {
-		return errors.New("should not be called")
+	if captured.ClusterID == "" {
+		t.Fatalf("expected cluster id to be generated")
 	}
-
-	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-alpha",
-		"--beacon-url", "https://beacon.example.com",
-		"--api-key", "secret",
-		"--beacon-id", "beacon-main",
-	}, io.Discard)
-	if err == nil {
-		t.Fatalf("expected error when etcd endpoints missing")
+	if len(captured.InitialBeacons) != 1 {
+		t.Fatalf("expected one beacon id, got %v", captured.InitialBeacons)
 	}
-}
-
-func TestHandleDeployBootstrapRequiresBeaconURL(t *testing.T) {
-	origRunner := deployBootstrapRunner
-	defer func() { deployBootstrapRunner = origRunner }()
-
-	deployBootstrapRunner = func(context.Context, deploy.Options) error {
-		return errors.New("should not be called")
+	if captured.APIKey == "" {
+		t.Fatalf("expected api key to be generated")
 	}
-
-	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-alpha",
-		"--etcd-endpoints", "http://127.0.0.1:12345",
-		"--api-key", "secret",
-		"--beacon-id", "beacon-main",
-	}, io.Discard)
-	if err == nil {
-		t.Fatalf("expected error when beacon url missing")
+	if len(captured.InitialWorkers) != 1 || captured.InitialWorkers[0] != captured.InitialBeacons[0] {
+		t.Fatalf("expected worker ids to mirror beacon ids, got %v", captured.InitialWorkers)
 	}
-}
-
-func TestHandleDeployBootstrapRequiresAPIKey(t *testing.T) {
-	origRunner := deployBootstrapRunner
-	defer func() { deployBootstrapRunner = origRunner }()
-
-	deployBootstrapRunner = func(context.Context, deploy.Options) error {
-		return errors.New("should not be called")
+	beaconID := captured.InitialBeacons[0]
+	if !isLowerHexWithLen(beaconID, defaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, beaconID)
 	}
-
-	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-alpha",
-		"--etcd-endpoints", "http://127.0.0.1:12345",
-		"--beacon-url", "https://beacon.example.com",
-		"--beacon-id", "beacon-main",
-	}, io.Discard)
-	if err == nil {
-		t.Fatalf("expected error when api key missing")
+	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, defaultDomainSuffix) {
+		t.Fatalf("expected beacon url to reference node domain, got %q", captured.BeaconURL)
+	}
+	if got, want := captured.EtcdEndpoints, []string{"http://192.0.2.10:2379"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("expected etcd endpoint %v, got %v", want, got)
 	}
 }
 
 func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
-	_, endpoint := startDeployBootstrapTestEtcd(t)
-
 	origRunner := deployBootstrapRunner
 	defer func() { deployBootstrapRunner = origRunner }()
 
@@ -104,45 +62,41 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 
 	stderr := &bytes.Buffer{}
 	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-alpha",
-		"--host", "bootstrap.example.com",
-		"--beacon-url", "https://beacon.example.com",
+		"--address", "bootstrap.example.com",
+		"--beacon-url", "https://override.example.com",
 		"--control-plane-url", "https://control.example.com",
-		"--api-key", "super-secret-key",
-		"--etcd-endpoints", endpoint,
-		"--beacon-id", "beacon-main",
-		"--worker-id", "worker-bootstrap",
 	}, stderr)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
 	}
 
-	if captured.ClusterID != "cluster-alpha" {
-		t.Fatalf("expected cluster id cluster-alpha, got %q", captured.ClusterID)
+	if captured.ClusterID == "" {
+		t.Fatalf("expected cluster id to be generated")
 	}
-	if captured.BeaconURL != "https://beacon.example.com" {
+	if captured.BeaconURL != "https://override.example.com" {
 		t.Fatalf("expected beacon url to propagate")
 	}
 	if captured.ControlPlaneURL != "https://control.example.com" {
 		t.Fatalf("expected control plane url to propagate")
 	}
-	if captured.APIKey != "super-secret-key" {
-		t.Fatalf("expected api key to propagate")
+	if got, want := captured.EtcdEndpoints, []string{"http://bootstrap.example.com:2379"}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("expected etcd endpoints %v, got %v", want, got)
 	}
-	if len(captured.InitialBeacons) != 1 || captured.InitialBeacons[0] != "beacon-main" {
-		t.Fatalf("expected beacon ids to propagate, got %v", captured.InitialBeacons)
+	if len(captured.InitialBeacons) != 1 {
+		t.Fatalf("expected exactly one beacon id, got %v", captured.InitialBeacons)
 	}
-	if len(captured.InitialWorkers) != 1 || captured.InitialWorkers[0] != "worker-bootstrap" {
-		t.Fatalf("expected worker ids to propagate, got %v", captured.InitialWorkers)
+	if !isLowerHexWithLen(captured.InitialBeacons[0], defaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, captured.InitialBeacons[0])
 	}
-	if captured.EtcdClient == nil {
-		t.Fatalf("expected etcd client to be provided")
+	if len(captured.InitialWorkers) != 1 || captured.InitialWorkers[0] != captured.InitialBeacons[0] {
+		t.Fatalf("expected worker ids to mirror beacon ids, got %v", captured.InitialWorkers)
+	}
+	if captured.APIKey == "" {
+		t.Fatalf("expected api key to be generated")
 	}
 }
 
-func TestHandleDeployBootstrapAggregatesIDs(t *testing.T) {
-	_, endpoint := startDeployBootstrapTestEtcd(t)
-
+func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 	origRunner := deployBootstrapRunner
 	defer func() { deployBootstrapRunner = origRunner }()
 
@@ -152,25 +106,42 @@ func TestHandleDeployBootstrapAggregatesIDs(t *testing.T) {
 		return nil
 	}
 
-	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-gamma",
-		"--etcd-endpoints", endpoint,
-		"--beacon-url", "https://beacon.example.com",
-		"--api-key", "super-secret-key",
-		"--beacon-id", "beacon-main",
-		"--beacon-id", "beacon-secondary",
-		"--worker-id", "worker-bootstrap",
-		"--worker-id", "worker-observer",
-	}, io.Discard)
+	err := handleDeployBootstrap([]string{}, io.Discard)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
 	}
 
-	if got, want := captured.InitialBeacons, []string{"beacon-main", "beacon-secondary"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("expected beacon ids %v, got %v", want, got)
+	if captured.ClusterID == "" {
+		t.Fatalf("expected cluster id to be generated")
 	}
-	if got, want := captured.InitialWorkers, []string{"worker-bootstrap", "worker-observer"}; len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
-		t.Fatalf("expected worker ids %v, got %v", want, got)
+	if len(captured.ClusterID) != defaultClusterIDLength {
+		t.Fatalf("expected cluster id length %d, got %d", defaultClusterIDLength, len(captured.ClusterID))
+	}
+	if !isLowerHex(captured.ClusterID) {
+		t.Fatalf("expected cluster id to be lowercase hex, got %q", captured.ClusterID)
+	}
+	expectedHost := captured.ClusterID + defaultDomainSuffix
+	if captured.Host != expectedHost {
+		t.Fatalf("expected host %q, got %q", expectedHost, captured.Host)
+	}
+	if len(captured.InitialBeacons) != 1 {
+		t.Fatalf("expected one beacon id, got %v", captured.InitialBeacons)
+	}
+	beaconID := captured.InitialBeacons[0]
+	if !isLowerHexWithLen(beaconID, defaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, beaconID)
+	}
+	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, defaultDomainSuffix) {
+		t.Fatalf("expected beacon url to default to node domain, got %q", captured.BeaconURL)
+	}
+	if got, want := captured.InitialWorkers, captured.InitialBeacons; len(got) != len(want) {
+		t.Fatalf("expected worker ids to mirror beacon ids, got %v want %v", got, want)
+	} else if len(got) > 0 && got[0] != want[0] {
+		t.Fatalf("expected worker ids to mirror beacon ids, got %v want %v", got, want)
+	}
+	expectedEndpoint := fmt.Sprintf("http://%s:2379", expectedHost)
+	if got, want := captured.EtcdEndpoints, []string{expectedEndpoint}; len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("expected etcd endpoints %v, got %v", want, got)
 	}
 }
 
@@ -185,9 +156,6 @@ func TestHandleDeployBootstrapDryRunSkipsEtcd(t *testing.T) {
 	}
 
 	err := handleDeployBootstrap([]string{
-		"--cluster-id", "cluster-beta",
-		"--beacon-url", "https://beacon.example.com",
-		"--api-key", "dry-run-key",
 		"--dry-run",
 	}, io.Discard)
 	if err != nil {
@@ -196,54 +164,26 @@ func TestHandleDeployBootstrapDryRunSkipsEtcd(t *testing.T) {
 	if !captured.DryRun {
 		t.Fatalf("expected dry-run flag propagated")
 	}
-	if captured.EtcdClient != nil {
-		t.Fatalf("expected etcd client to be nil for dry-run")
+	if len(captured.EtcdEndpoints) != 1 {
+		t.Fatalf("expected derived etcd endpoint even for dry run")
 	}
 }
 
-func startDeployBootstrapTestEtcd(t *testing.T) (*embed.Etcd, string) {
-	t.Helper()
-	dir := t.TempDir()
-	cfg := embed.NewConfig()
-	cfg.Dir = dir
-	clientURL := mustParseBootstrapURL("http://127.0.0.1:0")
-	peerURL := mustParseBootstrapURL("http://127.0.0.1:0")
-	cfg.ListenClientUrls = []url.URL{clientURL}
-	cfg.ListenPeerUrls = []url.URL{peerURL}
-	cfg.AdvertiseClientUrls = []url.URL{clientURL}
-	cfg.AdvertisePeerUrls = []url.URL{peerURL}
-	cfg.Name = "deploy-bootstrap-cli"
-	cfg.InitialCluster = fmt.Sprintf("%s=%s", cfg.Name, peerURL.String())
-	cfg.ClusterState = embed.ClusterStateFlagNew
-	cfg.InitialClusterToken = "deploy-cli-bootstrap"
-	cfg.LogLevel = "panic"
-	cfg.Logger = "zap"
-	cfg.LogOutputs = []string{fmt.Sprintf("%s/etcd.log", dir)}
-
-	e, err := embed.StartEtcd(cfg)
-	if err != nil {
-		t.Fatalf("start etcd: %v", err)
+func isLowerHex(value string) bool {
+	if value == "" {
+		return false
 	}
-	select {
-	case <-e.Server.ReadyNotify():
-	case <-time.After(10 * time.Second):
-		e.Server.Stop()
-		t.Fatalf("etcd start timeout")
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+		case r >= 'a' && r <= 'f':
+		default:
+			return false
+		}
 	}
-
-	clientEndpoint := e.Clients[0].Addr().String()
-
-	t.Cleanup(func() {
-		e.Close()
-	})
-
-	return e, clientEndpoint
+	return true
 }
 
-func mustParseBootstrapURL(raw string) url.URL {
-	parsed, err := url.Parse(raw)
-	if err != nil {
-		panic(err)
-	}
-	return *parsed
+func isLowerHexWithLen(value string, length int) bool {
+	return len(value) == length && isLowerHex(value)
 }

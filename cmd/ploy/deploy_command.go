@@ -8,9 +8,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
@@ -18,9 +18,13 @@ import (
 )
 
 const (
-	defaultDomainSuffix = ".ploy"
-	defaultIDAlphabet   = "0123456789abcdef"
-	defaultIDLength     = 16
+	defaultDomainSuffix      = ".ploy"
+	defaultClusterIDAlphabet = "0123456789abcdef"
+	defaultClusterIDLength   = 16
+	defaultWorkerIDAlphabet  = "0123456789abcdef"
+	defaultWorkerIDLength    = 4
+	defaultAPIKeyAlphabet    = "0123456789abcdef"
+	defaultAPIKeyLength      = 64
 )
 
 var deployBootstrapRunner = deploy.RunBootstrap
@@ -46,32 +50,20 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		hostFlag stringValue
 		userFlag stringValue
 		identity stringValue
 		portFlag intValue
 		address  stringValue
-		cluster  stringValue
 		control  stringValue
 		beacon   stringValue
-		apiKey   stringValue
-		etcd     stringSliceValue
-		beacons  stringSliceValue
-		workers  stringSliceValue
 	)
 
-	fs.Var(&hostFlag, "host", "SSH hostname or IP address")
 	fs.Var(&userFlag, "user", "SSH username (default: root)")
 	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
 	fs.Var(&portFlag, "port", "SSH port (default: 22)")
 	fs.Var(&address, "address", "Override SSH target address (defaults to host)")
-	fs.Var(&cluster, "cluster-id", "Cluster identifier (required)")
 	fs.Var(&control, "control-plane-url", "Control plane endpoint recorded in the local descriptor")
-	fs.Var(&beacon, "beacon-url", "Beacon URL recorded in the local descriptor (required for execution)")
-	fs.Var(&apiKey, "api-key", "API key stored in the local descriptor (required for execution)")
-	fs.Var(&etcd, "etcd-endpoints", "Comma-separated etcd endpoints (required for execution)")
-	fs.Var(&beacons, "beacon-id", "Initial beacon identifier (repeatable, required for execution)")
-	fs.Var(&workers, "worker-id", "Initial worker identifier (repeatable)")
+	fs.Var(&beacon, "beacon-url", "Beacon URL recorded in the local descriptor (default: https://<node-id>.<cluster-id>.ploy)")
 	dryRun := fs.Bool("dry-run", false, "Print bootstrap script without executing")
 
 	if err := fs.Parse(args); err != nil {
@@ -84,15 +76,7 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 
-	if !cluster.set || strings.TrimSpace(cluster.value) == "" {
-		printDeployBootstrapUsage(stderr)
-		return errors.New("cluster-id is required")
-	}
-
 	var opts deploy.Options
-	if hostFlag.set {
-		opts.Host = strings.TrimSpace(hostFlag.value)
-	}
 	if userFlag.set {
 		opts.User = strings.TrimSpace(userFlag.value)
 	}
@@ -105,24 +89,45 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	if address.set {
 		opts.Address = strings.TrimSpace(address.value)
 	}
-	opts.ClusterID = strings.TrimSpace(cluster.value)
-	opts.BeaconURL = strings.TrimSpace(beacon.value)
+	clusterID, err := gonanoid.Generate(defaultClusterIDAlphabet, defaultClusterIDLength)
+	if err != nil {
+		return fmt.Errorf("generate cluster identifier: %w", err)
+	}
+	opts.ClusterID = clusterID
+	manualBeaconURL := strings.TrimSpace(beacon.value)
 	opts.ControlPlaneURL = strings.TrimSpace(control.value)
-	opts.APIKey = strings.TrimSpace(apiKey.value)
-	opts.InitialBeacons = beacons.Values()
-	opts.InitialWorkers = workers.Values()
 
-	var etcdEndpoints []string
-	if len(etcd.values) > 0 {
-		etcdEndpoints = etcd.Values()
+	opts.Host = opts.ClusterID + defaultDomainSuffix
+
+	nodeID, err := gonanoid.Generate(defaultWorkerIDAlphabet, defaultWorkerIDLength)
+	if err != nil {
+		return fmt.Errorf("generate node identifier: %w", err)
+	}
+	opts.InitialBeacons = []string{nodeID}
+	opts.InitialWorkers = []string{nodeID}
+
+	if manualBeaconURL != "" {
+		opts.BeaconURL = manualBeaconURL
+	} else {
+		opts.BeaconURL = fmt.Sprintf("https://%s.%s%s", nodeID, opts.ClusterID, defaultDomainSuffix)
 	}
 
-	if strings.TrimSpace(opts.Host) == "" {
-		id, err := gonanoid.Generate(defaultIDAlphabet, defaultIDLength)
-		if err != nil {
-			return fmt.Errorf("generate host identifier: %w", err)
+	apiKey, err := gonanoid.Generate(defaultAPIKeyAlphabet, defaultAPIKeyLength)
+	if err != nil {
+		return fmt.Errorf("generate api key: %w", err)
+	}
+	opts.APIKey = apiKey
+
+	connectHost := strings.TrimSpace(opts.Address)
+	if connectHost == "" {
+		connectHost = strings.TrimSpace(opts.Host)
+	}
+	if connectHost != "" {
+		etcdHost := connectHost
+		if strings.Contains(etcdHost, ":") && !strings.Contains(etcdHost, "]") && !strings.Contains(etcdHost, "[") {
+			etcdHost = "[" + etcdHost + "]"
 		}
-		opts.Host = id + defaultDomainSuffix
+		opts.EtcdEndpoints = []string{fmt.Sprintf("http://%s:2379", etcdHost)}
 	}
 
 	if opts.IdentityFile == "" {
@@ -134,15 +139,13 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	opts.DryRun = *dryRun
 	opts.Stdout = stderr
 	opts.Stderr = stderr
+	opts.Stdin = os.Stdin
+	opts.WorkstationOS = runtime.GOOS
 
 	if opts.DryRun {
 		opts.EtcdClient = nil
 		_, _ = fmt.Fprintln(stderr, "# ploy deploy bootstrap --dry-run (script preview)")
 	} else {
-		if len(etcdEndpoints) == 0 {
-			printDeployBootstrapUsage(stderr)
-			return errors.New("etcd-endpoints is required")
-		}
 		if opts.BeaconURL == "" {
 			printDeployBootstrapUsage(stderr)
 			return errors.New("beacon-url is required")
@@ -155,16 +158,6 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 			printDeployBootstrapUsage(stderr)
 			return errors.New("at least one beacon-id is required")
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		client, err := newEtcdClient(ctx, etcdEndpoints)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = client.Close()
-		}()
-		opts.EtcdClient = client
 	}
 
 	if err := deployBootstrapRunner(context.Background(), opts); err != nil {

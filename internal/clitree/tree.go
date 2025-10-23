@@ -121,7 +121,7 @@ var commandTree = []Node{
 			{
 				Name:        "bootstrap",
 				Description: "Install dependencies and run host preflight checks",
-				Usage:       "ploy deploy bootstrap [--address <addr>] [--host <domain>] [--user <name>] [--identity <path>] [--port <n>] [--dry-run]",
+				Usage:       "ploy deploy bootstrap [--address <addr>] [--user <name>] [--identity <path>] [--port <n>] [--dry-run]",
 			},
 		},
 	},
@@ -133,7 +133,7 @@ var commandTree = []Node{
 			{
 				Name:        "add",
 				Description: "Onboard a worker node, register metadata, and verify health probes",
-				Usage:       "ploy node add [--cluster-id <id>] [--worker-id <id>] [--address <addr>] [--label key=value] [--health-probe name=url] [--dry-run]",
+				Usage:       "ploy node add [--address <addr>] [--label key=value] [--health-probe name=url] [--dry-run]",
 			},
 		},
 	},

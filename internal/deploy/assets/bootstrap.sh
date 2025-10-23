@@ -210,6 +210,8 @@ install_etcd() {
   archive="etcd-v${ETCD_VERSION}-linux-${ARCH}.tar.gz"
   url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${archive}"
   with_tmpdir install_etcd_from_archive "$archive" "$url"
+  configure_etcd_service
+  start_etcd_service
 }
 
 install_etcd_from_archive() {
@@ -339,6 +341,48 @@ install_docker_from_archive() {
   log "installed Docker ${DOCKER_VERSION} binaries"
 }
 
+configure_etcd_service() {
+  local data_dir="/var/lib/etcd"
+  mkdir -p "$data_dir"
+  cat >/etc/systemd/system/etcd.service <<'UNIT'
+[Unit]
+Description=etcd key-value store
+Documentation=https://etcd.io/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/etcd \
+  --name=ploy-bootstrap \
+  --data-dir=/var/lib/etcd \
+  --listen-client-urls=http://127.0.0.1:2379 \
+  --advertise-client-urls=http://127.0.0.1:2379 \
+  --listen-peer-urls=http://127.0.0.1:2380 \
+  --initial-advertise-peer-urls=http://127.0.0.1:2380 \
+  --initial-cluster=ploy-bootstrap=http://127.0.0.1:2380 \
+  --initial-cluster-state=new \
+  --initial-cluster-token=ploy-bootstrap \
+  --max-wals=5
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable etcd >/dev/null 2>&1 || true
+}
+
+start_etcd_service() {
+  systemctl restart etcd
+  if ! systemctl is-active --quiet etcd; then
+    fail "failed to start etcd service"
+  fi
+  log "etcd service running"
+}
+
 configure_docker_service() {
   ensure_group docker
   mkdir -p /etc/docker
@@ -406,6 +450,11 @@ summarise_versions() {
     log "  go: $(go version | awk '{print $3}')"
   else
     warn "go binary not found in PATH"
+  fi
+  if systemctl is-active --quiet etcd; then
+    log "  etcd service: active"
+  else
+    warn "etcd service not active"
   fi
 }
 

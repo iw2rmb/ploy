@@ -1,20 +1,21 @@
 package deploy
 
 import (
-	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/hex"
-	"encoding/json"
-	"encoding/pem"
-	"errors"
-	"fmt"
-	"math/big"
-	"sort"
-	"strings"
-	"time"
+    "context"
+    "crypto/ecdsa"
+    "crypto/elliptic"
+    "crypto/rand"
+    "crypto/x509"
+    "crypto/x509/pkix"
+    "encoding/hex"
+    "encoding/json"
+    "encoding/pem"
+    "errors"
+    "fmt"
+    "math/big"
+    "sort"
+    "strings"
+    "time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -608,7 +609,7 @@ func (m *CARotationManager) workerCertKey(id string) string {
 	return m.workerPrefix() + id
 }
 
-func decodeCABundleMaterials(bundle CABundle) (ed25519.PrivateKey, *x509.Certificate, error) {
+func decodeCABundleMaterials(bundle CABundle) (*ecdsa.PrivateKey, *x509.Certificate, error) {
 	keyBlock, _ := pem.Decode([]byte(bundle.KeyPEM))
 	if keyBlock == nil {
 		return nil, nil, errors.New("deploy: decode CA private key: missing PEM block")
@@ -617,9 +618,9 @@ func decodeCABundleMaterials(bundle CABundle) (ed25519.PrivateKey, *x509.Certifi
 	if err != nil {
 		return nil, nil, fmt.Errorf("deploy: parse CA private key: %w", err)
 	}
-	privateKey, ok := keyAny.(ed25519.PrivateKey)
+	privateKey, ok := keyAny.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, nil, errors.New("deploy: CA private key must be ed25519")
+		return nil, nil, errors.New("deploy: CA private key must be ecdsa")
 	}
 	certBlock, _ := pem.Decode([]byte(bundle.CertificatePEM))
 	if certBlock == nil {
@@ -652,8 +653,8 @@ func normalizeNodeIDs(ids []string) []string {
 	return normalized
 }
 
-func generateCABundle(clusterID string, now time.Time, validity time.Duration) (CABundle, ed25519.PrivateKey, *x509.Certificate, error) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	func generateCABundle(clusterID string, now time.Time, validity time.Duration) (CABundle, *ecdsa.PrivateKey, *x509.Certificate, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return CABundle{}, nil, nil, fmt.Errorf("deploy: generate CA key: %w", err)
 	}
@@ -676,7 +677,7 @@ func generateCABundle(clusterID string, now time.Time, validity time.Duration) (
 		MaxPathLen:            1,
 		MaxPathLenZero:        false,
 	}
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, pub, priv)
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 	if err != nil {
 		return CABundle{}, nil, nil, fmt.Errorf("deploy: create CA certificate: %w", err)
 	}
@@ -698,8 +699,8 @@ func generateCABundle(clusterID string, now time.Time, validity time.Duration) (
 	}, priv, template, nil
 }
 
-func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certificate, caKey ed25519.PrivateKey, now time.Time, validity time.Duration, previousVersion string) (LeafCertificate, error) {
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string) (LeafCertificate, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return LeafCertificate{}, fmt.Errorf("deploy: generate %s key for %s: %w", usage, nodeID, err)
 	}
@@ -722,16 +723,16 @@ func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certif
 			x509.ExtKeyUsageServerAuth,
 		},
 	}
-	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, pub, caKey)
+	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, &priv.PublicKey, caKey)
 	if err != nil {
 		return LeafCertificate{}, fmt.Errorf("deploy: create %s certificate for %s: %w", usage, nodeID, err)
 	}
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
-	keyDER, err := x509.MarshalPKCS8PrivateKey(priv)
+	keyBytes, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
 		return LeafCertificate{}, fmt.Errorf("deploy: marshal %s private key for %s: %w", usage, nodeID, err)
 	}
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 	return LeafCertificate{
 		NodeID:          nodeID,
 		Usage:           usage,

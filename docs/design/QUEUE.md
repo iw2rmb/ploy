@@ -1,19 +1,9 @@
 # Design Queue
 
-- Completed (2025-10-22 15:20 UTC, status: shipped) — gitlab-rotation-revocation archived to `.archive/gitlab-rotation-revocation/`.
-- [ ] GitLab CLI Ops — Completed 2025-10-22T09:22:50Z by Codex (archived).
-- [ ] `docs/design/cli-command-tree/README.md` — reorganise command groups and persistent flags. Reserved 2025-10-22T10:55:17Z by Codex.
-- Completed (2025-10-22 11:15 UTC, status: shipped) — cli-streaming archived to `.archive/cli-streaming/`.
-- Completed (2025-10-22 12:02 UTC, status: shipped) — cli-help-autocomplete archived to `.archive/cli-help-autocomplete/`.
-- Completed (2025-10-22 12:55 UTC, status: shipped) — observability-log-streaming archived to `.archive/observability-log-streaming/`.
-- Completed (2025-10-22T16:01:47Z, status: shipped) — observability-log-bundles archived to `.archive/observability-log-bundles/`.
-- Completed (2025-10-22T16:37:18Z, status: shipped) — observability-retention-cli archived to `.archive/observability-retention-cli/`.
-- Completed (2025-10-22T17:31:45Z, status: shipped) — observability-metrics archived to `.archive/observability-metrics/`.
-- Completed (2025-10-22T18:00:07Z, status: shipped) — deployment-bootstrap-host archived to `.archive/deployment-bootstrap-host/`.
-- Completed (2025-10-22T22:50:50Z, status: shipped) — deployment-ca-rotation archived to `.archive/deployment-ca-rotation/`.
-- Completed (2025-10-22T23:10:33Z, status: shipped) — deployment-worker-onboarding archived to `.archive/deployment-worker-onboarding/`.
+- [ ] `docs/design/ployd-daemon/README.md` — define the unified node daemon (`ployd`) for bootstrap and worker modes.
+- [ ] `docs/design/node-fiber-migration/README.md` — adopt Fiber for worker/bootstrap node HTTP surfaces.
+- [ ] `docs/design/control-plane-node-onboarding/README.md` — migrate CLI workflows from direct etcd access to control-plane APIs.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
-- Completed (2025-10-23T08:01:13Z, status: shipped) — deployment-pki-bootstrap archived to `.archive/deployment-pki-bootstrap/`.
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
 - [ ] `docs/design/gc-marker-controller/README.md` — select expired markers and stage deletions.
 - [ ] `docs/design/gc-artifact-cleanup/README.md` — unpin artifacts, prune containers, retry safeguards.

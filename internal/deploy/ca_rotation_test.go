@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"crypto/x509"
+	"encoding/pem"
+
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 
@@ -37,6 +40,10 @@ func TestCARotation(t *testing.T) {
 	if bootstrapState.CurrentCA.Version == "" {
 		t.Fatalf("expected bootstrap to generate CA version")
 	}
+	wantCASubject := fmt.Sprintf("CN=ploy-%s-root,OU=Control Plane,O=Ploy Deployment", "cluster-alpha")
+	if bootstrapState.CurrentCA.Subject != wantCASubject {
+		t.Fatalf("expected CA subject %q, got %q", wantCASubject, bootstrapState.CurrentCA.Subject)
+	}
 	if !slices.Equal(bootstrapState.Nodes.Beacons, []string{"beacon-main"}) {
 		t.Fatalf("expected beacon inventory to persist, got %v", bootstrapState.Nodes.Beacons)
 	}
@@ -47,8 +54,12 @@ func TestCARotation(t *testing.T) {
 	if beaconCert.ParentVersion != bootstrapState.CurrentCA.Version {
 		t.Fatalf("expected beacon cert parent %s, got %s", bootstrapState.CurrentCA.Version, beaconCert.ParentVersion)
 	}
+	assertLeafSubject(t, beaconCert.CertificatePEM, "beacon-beacon-main", wantCASubject)
 	if len(bootstrapState.WorkerCertificates) != 2 {
 		t.Fatalf("expected worker certificates to be issued, got %d", len(bootstrapState.WorkerCertificates))
+	}
+	for id, cert := range bootstrapState.WorkerCertificates {
+		assertLeafSubject(t, cert.CertificatePEM, "worker-"+id, wantCASubject)
 	}
 
 	store := mustNewTrustStore(t, client, "cluster-alpha")
@@ -198,4 +209,22 @@ func mustParseURL(raw string) url.URL {
 		panic(err)
 	}
 	return *parsed
+}
+
+func assertLeafSubject(t *testing.T, pemData string, wantCN string, wantIssuer string) {
+	t.Helper()
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		t.Fatalf("expected PEM block for certificate")
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse certificate: %v", err)
+	}
+	if cert.Subject.CommonName != wantCN {
+		t.Fatalf("expected certificate CN %q, got %q", wantCN, cert.Subject.CommonName)
+	}
+	if cert.Issuer.String() != wantIssuer {
+		t.Fatalf("expected certificate issuer %q, got %q", wantIssuer, cert.Issuer.String())
+	}
 }
