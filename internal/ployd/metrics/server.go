@@ -26,7 +26,6 @@ type Server struct {
 	listener net.Listener
 	running  bool
 	addr     string
-	ctx      context.Context
 	parent   context.Context
 }
 

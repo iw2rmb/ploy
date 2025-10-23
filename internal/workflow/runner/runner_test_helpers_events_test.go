@@ -3,7 +3,6 @@ package runner_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -110,20 +109,6 @@ func extractStageStatuses(checkpoints []contracts.WorkflowCheckpoint) []stageSta
 		result = append(result, stageStatusEntry{stage: cp.Stage, status: runner.StageStatus(cp.Status)})
 	}
 	return result
-}
-
-func compareSequences(actual, expected []stageStatusEntry) error {
-	if len(actual) != len(expected) {
-		return fmt.Errorf("length mismatch: got %d want %d", len(actual), len(expected))
-	}
-	for i := range actual {
-		a := actual[i]
-		e := expected[i]
-		if a.stage != e.stage || a.status != e.status {
-			return fmt.Errorf("entry %d mismatch: got %s/%s want %s/%s", i, a.stage, a.status, e.stage, e.status)
-		}
-	}
-	return nil
 }
 
 func collectStageStatuses(sequence []stageStatusEntry, stage string) []runner.StageStatus {

@@ -2,7 +2,6 @@ package pki_test
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -44,7 +43,7 @@ func TestManagerTriggersRenewal(t *testing.T) {
 func TestManagerReloadUpdatesConfig(t *testing.T) {
 	manager, err := pki.New(pki.Options{
 		Config: config.PKIConfig{
-			BundleDir: "/etc/ploy/pki",
+			BundleDir:   "/etc/ploy/pki",
 			RenewBefore: 10 * time.Minute,
 		},
 		Rotator: &stubRotator{ch: make(chan struct{}, 1)},
@@ -62,7 +61,6 @@ func TestManagerReloadUpdatesConfig(t *testing.T) {
 }
 
 type stubRotator struct {
-	mu sync.Mutex
 	ch chan struct{}
 }
 
