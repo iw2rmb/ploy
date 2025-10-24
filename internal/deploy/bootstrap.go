@@ -13,17 +13,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/iw2rmb/ploy/cmd/ploy/config"
-	ploydconfig "github.com/iw2rmb/ploy/internal/ployd/config"
 )
 
 type clusterPKIState struct {
@@ -41,12 +37,6 @@ const (
 	remotePloydBinaryPath = "/usr/local/bin/ployd"
 	// defaultControlPlaneEndpointValue is used when no control plane URL is provided.
 	defaultControlPlaneEndpointValue = "https://control.example.com"
-	// defaultAdminSocketPath is used for the temporary bootstrap configuration.
-	defaultAdminSocketPath = "/run/ployd-bootstrap.sock"
-	// defaultHTTPListen is the bootstrap HTTP listener value.
-	defaultHTTPListen = ":8443"
-	// defaultMetricsListen is the bootstrap metrics listener value.
-	defaultMetricsListen = ":9100"
 )
 
 // Options configure bootstrap execution.
@@ -191,106 +181,32 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		displayTarget = fmt.Sprintf("%s (%s)", opts.Host, opts.Address)
 	}
 
-	target := connectHost
-	if user != "" {
-		target = fmt.Sprintf("%s@%s", user, connectHost)
-	}
-
 	ploydBinary := strings.TrimSpace(opts.PloydBinaryPath)
 	if ploydBinary == "" {
 		return errors.New("bootstrap: ployd binary path required")
 	}
-	info, err := os.Stat(ploydBinary)
-	if err != nil {
-		return fmt.Errorf("bootstrap: stat ployd binary: %w", err)
-	}
-	if info.IsDir() {
-		return fmt.Errorf("bootstrap: ployd binary path %q is a directory", ploydBinary)
-	}
-
-	streams := IOStreams{Stdout: stdout, Stderr: stderr}
-
-	binarySuffix, err := randomHexString(8)
-	if err != nil {
-		return fmt.Errorf("bootstrap: generate remote binary suffix: %w", err)
-	}
-	remoteBinaryPath := fmt.Sprintf("/tmp/ployd-%s", binarySuffix)
-
-	configSuffix, err := randomHexString(8)
-	if err != nil {
-		return fmt.Errorf("bootstrap: generate remote config suffix: %w", err)
-	}
-	remoteConfigPath := fmt.Sprintf("/tmp/ployd-bootstrap-%s.yaml", configSuffix)
-
-	sshArgs := buildSSHArgs(opts.IdentityFile, port)
-	scpArgs := buildScpArgs(opts.IdentityFile, port)
-
-	copyBinaryArgs := append(append([]string(nil), scpArgs...), ploydBinary, fmt.Sprintf("%s:%s", target, remoteBinaryPath))
-	if err := runner.Run(ctx, "scp", copyBinaryArgs, nil, streams); err != nil {
-		return fmt.Errorf("bootstrap: copy ployd binary: %w", err)
-	}
-
-	installCmd := fmt.Sprintf("install -m0755 %s %s && rm -f %s", remoteBinaryPath, remotePloydBinaryPath, remoteBinaryPath)
-	installArgs := append(append([]string(nil), sshArgs...), target, installCmd)
-	if err := runner.Run(ctx, "ssh", installArgs, nil, streams); err != nil {
-		return fmt.Errorf("bootstrap: install ployd binary: %w", err)
-	}
-
-	cfgData, err := buildBootstrapConfig(opts)
-	if err != nil {
-		return err
-	}
-	tmpFile, err := os.CreateTemp("", "ployd-bootstrap-*.yaml")
-	if err != nil {
-		return fmt.Errorf("bootstrap: create temp config: %w", err)
-	}
-	tmpPath := tmpFile.Name()
-	if _, err := tmpFile.Write(cfgData); err != nil {
-		_ = tmpFile.Close()
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("bootstrap: write temp config: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("bootstrap: close temp config: %w", err)
-	}
-	defer func() { _ = os.Remove(tmpPath) }()
-
-	copyConfigArgs := append(append([]string(nil), scpArgs...), tmpPath, fmt.Sprintf("%s:%s", target, remoteConfigPath))
-	if err := runner.Run(ctx, "scp", copyConfigArgs, nil, streams); err != nil {
-		return fmt.Errorf("bootstrap: copy bootstrap config: %w", err)
-	}
 
 	envVars := map[string]string{
-		"PLOYD_MODE":                  ploydconfig.ModeBeacon,
-		"PLOYD_HTTP_LISTEN":           ":8443",
-		"PLOYD_METRICS_LISTEN":        ":9100",
 		"PLOY_CONTROL_PLANE_ENDPOINT": defaultControlPlaneEndpoint(opts.ControlPlaneURL),
 	}
-	envKeys := make([]string, 0, len(envVars))
-	for key, value := range envVars {
-		value = strings.TrimSpace(value)
-		if value == "" {
-			continue
-		}
-		envVars[key] = value
-		envKeys = append(envKeys, key)
-	}
-	sort.Strings(envKeys)
 
-	assignments := make([]string, 0, len(envKeys))
-	for _, key := range envKeys {
-		assignments = append(assignments, fmt.Sprintf("%s=%s", key, shellQuote(envVars[key])))
-	}
-
-	remoteCommand := fmt.Sprintf("%s --config %s --mode bootstrap && rm -f %s", shellQuote(remotePloydBinaryPath), shellQuote(remoteConfigPath), shellQuote(remoteConfigPath))
-	if len(assignments) > 0 {
-		remoteCommand = strings.Join(append(assignments, remoteCommand), " ")
+	provisionOpts := ProvisionOptions{
+		Host:            opts.Host,
+		Address:         connectHost,
+		User:            user,
+		Port:            port,
+		IdentityFile:    opts.IdentityFile,
+		PloydBinaryPath: ploydBinary,
+		Runner:          runner,
+		Stdout:          stdout,
+		Stderr:          stderr,
+		Mode:            ProvisionModeBeacon,
+		ScriptEnv:       envVars,
+		ServiceChecks:   []string{"etcd", "ployd"},
 	}
 
-	runArgs := append(append([]string(nil), sshArgs...), target, remoteCommand)
-	if err := runner.Run(ctx, "ssh", runArgs, nil, streams); err != nil {
-		return fmt.Errorf("bootstrap: execute remote ployd: %w", err)
+	if err := ProvisionHost(ctx, provisionOpts); err != nil {
+		return err
 	}
 
 	var stopTunnel func() error
@@ -405,65 +321,12 @@ func randomHexString(length int) (string, error) {
 	return hexStr, nil
 }
 
-func buildBootstrapConfig(opts Options) ([]byte, error) {
-	enabled := true
-	cfg := ploydconfig.Config{
-		Mode: ploydconfig.ModeBootstrap,
-		HTTP: ploydconfig.HTTPConfig{
-			Listen: defaultHTTPListen,
-		},
-		Metrics: ploydconfig.MetricsConfig{
-			Listen: defaultMetricsListen,
-		},
-		Admin: ploydconfig.AdminConfig{
-			Socket: defaultAdminSocketPath,
-		},
-		ControlPlane: ploydconfig.ControlPlaneConfig{
-			Endpoint:    defaultControlPlaneEndpoint(opts.ControlPlaneURL),
-			CAPath:      "/etc/ploy/pki/control-plane-ca.pem",
-			Certificate: "/etc/ploy/pki/node.pem",
-			Key:         "/etc/ploy/pki/node-key.pem",
-		},
-		PKI: ploydconfig.PKIConfig{
-			BundleDir:   "/etc/ploy/pki",
-			Certificate: "/etc/ploy/pki/node.pem",
-			Key:         "/etc/ploy/pki/node-key.pem",
-		},
-		Runtime: ploydconfig.RuntimeConfig{
-			DefaultAdapter: "local",
-			Plugins: []ploydconfig.RuntimePluginConfig{
-				{
-					Name:    "local",
-					Module:  "builtin",
-					Enabled: &enabled,
-					Config:  map[string]any{},
-				},
-			},
-		},
-	}
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("bootstrap: marshal bootstrap config: %w", err)
-	}
-	return data, nil
-}
-
 func defaultControlPlaneEndpoint(value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return defaultControlPlaneEndpointValue
 	}
 	return value
-}
-
-func shellQuote(value string) string {
-	if value == "" {
-		return "''"
-	}
-	if !strings.Contains(value, "'") {
-		return "'" + value + "'"
-	}
-	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
 
 func bootstrapClusterPKI(ctx context.Context, clusterID string, opts Options) (*clusterPKIState, error) {

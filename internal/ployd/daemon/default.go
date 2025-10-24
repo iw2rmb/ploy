@@ -21,7 +21,6 @@ import (
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/ployd/admin"
-	"github.com/iw2rmb/ploy/internal/ployd/bootstrap"
 	"github.com/iw2rmb/ploy/internal/ployd/config"
 	"github.com/iw2rmb/ploy/internal/ployd/controlplane"
 	"github.com/iw2rmb/ploy/internal/ployd/executor"
@@ -33,6 +32,14 @@ import (
 	"github.com/iw2rmb/ploy/internal/ployd/status"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
+
+var defaultEtcdEndpoints = []string{"http://127.0.0.1:2379"}
+
+func localEtcdEndpoints() []string {
+	out := make([]string, len(defaultEtcdEndpoints))
+	copy(out, defaultEtcdEndpoints)
+	return out
+}
 
 // NewDefault constructs a daemon using default component implementations.
 func NewDefault(cfg config.Config) (*Daemon, error) {
@@ -91,8 +98,6 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 
 	taskScheduler := scheduler.New()
 
-	bootstrapRunner := bootstrap.NewRunner(bootstrap.Options{})
-
 	svc, err := New(Options{
 		Config:               cfg,
 		RuntimeRegistry:      registry,
@@ -102,7 +107,6 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		ControlPlane:         controlClient,
 		PKI:                  pkiManager,
 		Scheduler:            taskScheduler,
-		Bootstrap:            bootstrapRunner,
 		ControlPlaneShutdown: controlPlaneShutdown,
 	})
 	if err != nil {
@@ -147,40 +151,15 @@ func ensureFile(path string) error {
 }
 
 func buildAdminService() httpserver.AdminService {
-	endpoints := strings.Split(strings.TrimSpace(os.Getenv("PLOY_ETCD_ENDPOINTS")), ",")
-	var cleaned []string
-	for _, ep := range endpoints {
-		ep = strings.TrimSpace(ep)
-		if ep == "" {
-			continue
-		}
-		cleaned = append(cleaned, ep)
-	}
-	if len(cleaned) == 0 {
-		return nil
-	}
-	return &admin.Service{EtcdEndpoints: cleaned}
+	return &admin.Service{EtcdEndpoints: localEtcdEndpoints()}
 }
 
 func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.Context) error, error) {
 	if streams == nil {
 		return nil, nil, errors.New("control-plane: streams hub required")
 	}
-	endpointsEnv := strings.Split(strings.TrimSpace(os.Getenv("PLOY_ETCD_ENDPOINTS")), ",")
-	var endpoints []string
-	for _, ep := range endpointsEnv {
-		ep = strings.TrimSpace(ep)
-		if ep == "" {
-			continue
-		}
-		endpoints = append(endpoints, ep)
-	}
-	if len(endpoints) == 0 {
-		return nil, nil, nil
-	}
-
 	cfg := clientv3.Config{
-		Endpoints:   endpoints,
+		Endpoints:   localEtcdEndpoints(),
 		DialTimeout: 5 * time.Second,
 	}
 

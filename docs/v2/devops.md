@@ -38,8 +38,8 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - The CLI generates and stores a cluster API key locally for later `ploy cluster connect` calls.
    - The bootstrap command automatically registers the generated node as both beacon and worker
      metadata, exposing its `ployd` endpoint as `<node-id>.<cluster-id>.ploy`.
-  - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and runs `ployd --mode bootstrap` on the remote host, which reuses the embedded shell script to converge dependencies.
-  - On completion `ployd` is enabled and started in beacon mode so the initial node immediately advertises discovery endpoints.
+  - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and then streams the embedded bootstrap shell script over SSH. The script converges dependencies, writes the initial `/etc/ploy/ployd.yaml`, and installs the systemd unit.
+  - Once the script completes, the CLI verifies `etcd` and `ployd` are active via `systemctl` before continuing. `ployd` starts in beacon mode immediately so the node advertises discovery endpoints.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  
@@ -104,12 +104,12 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
-   - Run `ploy node add --address <host-or-ip>` and include any metadata labels with `--label key=value`.  
+  - Run `ploy node add --address <host-or-ip>` and include any metadata labels with `--label key=value`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
    - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
      and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
    - TLS health probes presenting certificates issued by the deployment CA are trusted automatically during onboarding.  
-   - The CLI writes worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issues a worker certificate via the deployment CA manager for that node's `ployd`, and records probe outcomes.  
+  - The CLI first SSHes into the worker, uploads `ployd`, reruns the bootstrap script with `PLOYD_MODE=worker`, and verifies the `ployd` service is active. It then calls the beacon control-plane (`/v2/nodes`) to write worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issue a worker certificate via the deployment CA manager, and record probe outcomes.  
    - Use `--dry-run` to preview probes and certificate issuance without modifying etcd. Successful runs store the PEM bundle for the worker under the security prefix and surface the certificate version in the CLI output.  
    - Confirm the worker fetches its materials at `/etc/ploy/pki/` and registers with the beacon services.
 

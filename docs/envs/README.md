@@ -48,12 +48,8 @@ additional configuration.
 - `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
-- `PLOY_ETCD_ENDPOINTS` — Comma-separated etcd endpoints ployd uses to back the `/v2`
-  control-plane API (jobs, nodes, GitLab signer) (e.g., `https://127.0.0.1:2379`). When set, the
-  daemon serves the REST surface that CLI commands (`ploy node add`, `ploy beacon rotate-ca`,
-  `ploy config gitlab`) target instead of dialing etcd directly.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
-  connecting to endpoints listed above.
+  ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.
 - `PLOY_ETCD_TLS_CERT` / `PLOY_ETCD_TLS_KEY` — Optional client certificate pair presented to etcd
   when mutual TLS is required. Both values must be provided together.
