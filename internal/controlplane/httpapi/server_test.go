@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +23,9 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/httpapi"
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
@@ -44,7 +47,10 @@ func TestServerJobLifecycle(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, nil, nil, nil))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	submit := map[string]any{
@@ -109,7 +115,10 @@ func TestJobRetention(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, nil, nil, nil))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	submit := map[string]any{
@@ -199,6 +208,230 @@ func TestJobRetention(t *testing.T) {
 	}
 }
 
+func TestServerNodesLifecycle(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	manager := mustBootstrapCluster(t, client, "cluster-alpha")
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	status, nodeResp := postJSONStatus(t, server.URL+"/v2/nodes", map[string]any{
+		"cluster_id": "cluster-alpha",
+		"address":    "10.20.1.50",
+		"labels": map[string]any{
+			"role": "build",
+		},
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d", status)
+	}
+
+	workerID, ok := nodeResp["worker_id"].(string)
+	if !ok || strings.TrimSpace(workerID) == "" {
+		t.Fatalf("expected worker_id in response, got %+v", nodeResp["worker_id"])
+	}
+
+	desc, ok := nodeResp["descriptor"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected descriptor map in response")
+	}
+	if address, _ := desc["address"].(string); address != "10.20.1.50" {
+		t.Fatalf("unexpected descriptor address %q", address)
+	}
+	statusMap, ok := desc["status"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected status block in descriptor")
+	}
+	if phase, _ := statusMap["phase"].(string); phase != registry.WorkerPhaseReady {
+		t.Fatalf("expected ready phase, got %q", phase)
+	}
+
+	listStatus, listResp := getJSONStatus(t, fmt.Sprintf("%s/v2/nodes?cluster_id=%s", server.URL, url.QueryEscape("cluster-alpha")))
+	if listStatus != http.StatusOK {
+		t.Fatalf("expected list status 200, got %d", listStatus)
+	}
+	nodes, ok := listResp["nodes"].([]any)
+	if !ok || len(nodes) == 0 {
+		t.Fatalf("expected nodes array in list response")
+	}
+	var entry map[string]any
+	for _, item := range nodes {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if id, _ := m["id"].(string); id == workerID {
+			entry = m
+			break
+		}
+	}
+	if entry == nil {
+		t.Fatalf("worker %s missing from listing", workerID)
+	}
+	if version, _ := entry["certificate_version"].(string); strings.TrimSpace(version) == "" {
+		t.Fatalf("expected certificate version recorded in listing")
+	}
+
+	jobTicket := "mod-node"
+	job, err := sched.SubmitJob(ctx, scheduler.JobSpec{
+		Ticket:      jobTicket,
+		StepID:      "build",
+		Priority:    "default",
+		MaxAttempts: 1,
+	})
+	if err != nil {
+		t.Fatalf("submit job: %v", err)
+	}
+
+	claim, err := sched.ClaimNext(ctx, scheduler.ClaimRequest{NodeID: workerID})
+	if err != nil {
+		t.Fatalf("claim job: %v", err)
+	}
+
+	completed := make(chan struct{})
+	go func() {
+		defer close(completed)
+		time.Sleep(150 * time.Millisecond)
+		_, err := sched.CompleteJob(ctx, scheduler.CompleteRequest{
+			JobID:  claim.Job.ID,
+			NodeID: workerID,
+			Ticket: job.Ticket,
+			State:  scheduler.JobStateSucceeded,
+		})
+		if err != nil {
+			t.Errorf("complete job: %v", err)
+		}
+	}()
+
+	deleteStatus, _ := deleteJSONStatus(t, server.URL+"/v2/nodes", map[string]any{
+		"cluster_id":            "cluster-alpha",
+		"worker_id":             workerID,
+		"confirm":               workerID,
+		"drain_timeout_seconds": 5,
+	})
+	if deleteStatus != http.StatusNoContent {
+		t.Fatalf("expected delete status 204, got %d", deleteStatus)
+	}
+
+	select {
+	case <-completed:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("job completion goroutine did not finish")
+	}
+
+	state, err := manager.State(ctx)
+	if err != nil {
+		t.Fatalf("manager state: %v", err)
+	}
+	for _, id := range state.Nodes.Workers {
+		if id == workerID {
+			t.Fatalf("expected worker removed from CA inventory")
+		}
+	}
+	if _, ok := state.WorkerCertificates[workerID]; ok {
+		t.Fatalf("expected worker certificate removed from CA state")
+	}
+
+	reg, err := registry.NewWorkerRegistry(client, "cluster-alpha")
+	if err != nil {
+		t.Fatalf("new worker registry: %v", err)
+	}
+	if _, err := reg.Get(ctx, workerID); !errors.Is(err, registry.ErrWorkerNotFound) {
+		t.Fatalf("expected registry ErrWorkerNotFound, got %v", err)
+	}
+}
+
+func TestServerBeaconRotateCA(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	manager := mustBootstrapCluster(t, client, "cluster-alpha")
+
+	_, err := deploy.RunWorkerJoin(ctx, client, deploy.WorkerJoinOptions{
+		ClusterID:    "cluster-alpha",
+		WorkerID:     "worker-rotate",
+		Address:      "10.20.2.12",
+		HealthProbes: nil,
+		Clock:        func() time.Time { return time.Date(2025, 10, 22, 12, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatalf("RunWorkerJoin: %v", err)
+	}
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	initial, err := manager.State(ctx)
+	if err != nil {
+		t.Fatalf("initial state: %v", err)
+	}
+
+	status, resp := postJSONStatus(t, server.URL+"/v2/beacon/rotate-ca", map[string]any{
+		"cluster_id": "cluster-alpha",
+		"operator":   "ci-bot",
+		"reason":     "expiry-test",
+	})
+	if status != http.StatusOK {
+		t.Fatalf("expected rotate status 200, got %d", status)
+	}
+
+	oldVersion, _ := resp["old_version"].(string)
+	newVersion, _ := resp["new_version"].(string)
+	if oldVersion != initial.CurrentCA.Version {
+		t.Fatalf("expected old version %s, got %s", initial.CurrentCA.Version, oldVersion)
+	}
+	if oldVersion == "" || newVersion == "" || oldVersion == newVersion {
+		t.Fatalf("expected rotation to change CA version, got old=%q new=%q", oldVersion, newVersion)
+	}
+	if operator, _ := resp["operator"].(string); operator != "ci-bot" {
+		t.Fatalf("expected operator ci-bot, got %q", operator)
+	}
+	if reason, _ := resp["reason"].(string); reason != "expiry-test" {
+		t.Fatalf("expected reason expiry-test, got %q", reason)
+	}
+
+	updated, err := manager.State(ctx)
+	if err != nil {
+		t.Fatalf("updated state: %v", err)
+	}
+	if updated.CurrentCA.Version != newVersion {
+		t.Fatalf("expected state current version %s, got %s", newVersion, updated.CurrentCA.Version)
+	}
+	if _, ok := updated.WorkerCertificates["worker-rotate"]; !ok {
+		t.Fatalf("expected worker certificate reissued for worker-rotate")
+	}
+}
+
 func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	t.Parallel()
 
@@ -221,7 +454,11 @@ func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpapi.New(sched, nil, nil, reg))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Gatherer:  reg,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	postJSON(t, server.URL+"/v2/jobs", map[string]any{
@@ -255,6 +492,110 @@ func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	}
 }
 
+func TestServerGitLabConfig(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	status, _ := getJSONStatus(t, server.URL+"/v2/config/gitlab")
+	if status != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing config, got %d", status)
+	}
+
+	createPayload := map[string]any{
+		"revision": 0,
+		"config": map[string]any{
+			"api_base_url":     "https://gitlab.local/api/v4",
+			"allowed_projects": []any{"acme/ploy"},
+			"default_token":    map[string]any{"name": "default", "value": "glpat-secret", "scopes": []any{"api"}},
+			"deploy_tokens": []any{
+				map[string]any{"name": "deploy", "value": "glpat-deploy", "scopes": []any{"read_repository"}},
+			},
+			"branch_policies": []any{},
+			"rbac":            map[string]any{"readers": []any{"ops"}, "updaters": []any{"ops", "release"}},
+		},
+	}
+
+	putStatus, putResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", createPayload)
+	if putStatus != http.StatusOK {
+		t.Fatalf("expected put status 200, got %d", putStatus)
+	}
+	revision := int64(putResp["revision"].(float64))
+	if revision == 0 {
+		t.Fatalf("expected non-zero revision after create")
+	}
+
+	getStatus, getResp := getJSONStatus(t, server.URL+"/v2/config/gitlab")
+	if getStatus != http.StatusOK {
+		t.Fatalf("expected get status 200, got %d", getStatus)
+	}
+	cfg, ok := getResp["config"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected config object in get response")
+	}
+	defaultToken, _ := cfg["default_token"].(map[string]any)
+	if defaultToken == nil {
+		t.Fatalf("expected default_token in config response")
+	}
+	if value, _ := defaultToken["value"].(string); value != "***redacted***" {
+		t.Fatalf("expected default token to be masked, got %q", value)
+	}
+
+	updatePayload := map[string]any{
+		"revision": revision,
+		"config": map[string]any{
+			"api_base_url":     "https://gitlab.local/api/v4",
+			"allowed_projects": []any{"acme/ploy", "acme/api"},
+			"default_token":    map[string]any{"name": "default", "value": "glpat-secret", "scopes": []any{"api", "read_repository"}},
+			"deploy_tokens": []any{
+				map[string]any{"name": "deploy", "value": "glpat-deploy", "scopes": []any{"read_repository"}},
+			},
+			"branch_policies": []any{
+				map[string]any{"pattern": "main", "protected": true, "require_approvals": 1},
+			},
+			"rbac": map[string]any{
+				"readers":  []any{"ops"},
+				"updaters": []any{"ops", "release"},
+			},
+		},
+	}
+
+	updateStatus, updateResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", updatePayload)
+	if updateStatus != http.StatusOK {
+		t.Fatalf("expected update status 200, got %d", updateStatus)
+	}
+	newRevision := int64(updateResp["revision"].(float64))
+	if newRevision == revision || newRevision == 0 {
+		t.Fatalf("expected new revision different from previous")
+	}
+
+	stalePayload := map[string]any{
+		"revision": revision,
+		"config":   updatePayload["config"],
+	}
+	staleStatus, staleResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", stalePayload)
+	if staleStatus != http.StatusConflict {
+		t.Fatalf("expected conflict status, got %d", staleStatus)
+	}
+	if message, _ := staleResp["error"].(string); !strings.Contains(message, "revision mismatch") {
+		t.Fatalf("expected revision mismatch error, got %q", message)
+	}
+}
+
 func TestServerGitLabSignerEndpoints(t *testing.T) {
 	t.Parallel()
 
@@ -285,7 +626,11 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		_ = signer.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(sched, signer, nil, nil))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Signer:    signer,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	rotateResp := putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
@@ -390,7 +735,11 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	jobID := "job-stream-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(sched, nil, streams, nil))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Streams:   streams,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -527,7 +876,11 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	jobID := "job-resume-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(sched, nil, streams, nil))
+	server := httptest.NewServer(httpapi.New(httpapi.Options{
+		Scheduler: sched,
+		Streams:   streams,
+		Etcd:      client,
+	}))
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -660,6 +1013,24 @@ func readSSEEvent(r *bufio.Reader) (sseEvent, error) {
 	}
 }
 
+func mustBootstrapCluster(t *testing.T, client *clientv3.Client, clusterID string) *deploy.CARotationManager {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	manager, err := deploy.NewCARotationManager(client, clusterID)
+	if err != nil {
+		t.Fatalf("new ca rotation manager: %v", err)
+	}
+	_, err = manager.Bootstrap(ctx, deploy.BootstrapOptions{
+		BeaconIDs: []string{"beacon-main"},
+	})
+	if err != nil && !errors.Is(err, deploy.ErrPKIAlreadyBootstrapped) {
+		t.Fatalf("bootstrap ca: %v", err)
+	}
+	return manager
+}
+
 func startTestEtcd(t *testing.T) (*embed.Etcd, *clientv3.Client) {
 	t.Helper()
 	dir := t.TempDir()
@@ -711,14 +1082,42 @@ func mustParseURL(raw string) url.URL {
 }
 
 func postJSON(t *testing.T, endpoint string, payload map[string]any) map[string]any {
-	return sendJSON(t, http.MethodPost, endpoint, payload)
+	status, out := postJSONStatus(t, endpoint, payload)
+	if status >= 400 {
+		t.Fatalf("post %s -> http %d: %v", endpoint, status, out)
+	}
+	return out
 }
 
 func putJSON(t *testing.T, endpoint string, payload map[string]any) map[string]any {
-	return sendJSON(t, http.MethodPut, endpoint, payload)
+	status, out := putJSONStatus(t, endpoint, payload)
+	if status >= 400 {
+		t.Fatalf("put %s -> http %d: %v", endpoint, status, out)
+	}
+	return out
 }
 
 func getJSON(t *testing.T, endpoint string) map[string]any {
+	status, out := getJSONStatus(t, endpoint)
+	if status >= 400 {
+		t.Fatalf("get %s -> http %d: %v", endpoint, status, out)
+	}
+	return out
+}
+
+func postJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int, map[string]any) {
+	return sendJSONStatus(t, http.MethodPost, endpoint, payload)
+}
+
+func putJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int, map[string]any) {
+	return sendJSONStatus(t, http.MethodPut, endpoint, payload)
+}
+
+func deleteJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int, map[string]any) {
+	return sendJSONStatus(t, http.MethodDelete, endpoint, payload)
+}
+
+func getJSONStatus(t *testing.T, endpoint string) (int, map[string]any) {
 	t.Helper()
 	resp, err := http.Get(endpoint)
 	if err != nil {
@@ -727,18 +1126,19 @@ func getJSON(t *testing.T, endpoint string) map[string]any {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode >= 400 {
-		data, _ := io.ReadAll(resp.Body)
-		t.Fatalf("http %d: %s", resp.StatusCode, string(data))
+	status := resp.StatusCode
+	data, _ := io.ReadAll(resp.Body)
+	if len(data) == 0 {
+		return status, nil
 	}
 	var out map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode response: %v", err)
+	if err := json.Unmarshal(data, &out); err != nil {
+		out = map[string]any{"error": strings.TrimSpace(string(data))}
 	}
-	return out
+	return status, out
 }
 
-func sendJSON(t *testing.T, method, endpoint string, payload map[string]any) map[string]any {
+func sendJSONStatus(t *testing.T, method, endpoint string, payload map[string]any) (int, map[string]any) {
 	t.Helper()
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -756,13 +1156,17 @@ func sendJSON(t *testing.T, method, endpoint string, payload map[string]any) map
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode >= 400 {
-		data, _ := io.ReadAll(resp.Body)
-		t.Fatalf("%s %s -> http %d: %s", method, endpoint, resp.StatusCode, string(data))
+	status := resp.StatusCode
+	data, _ := io.ReadAll(resp.Body)
+	if status == http.StatusNoContent {
+		return status, nil
+	}
+	if len(data) == 0 {
+		return status, nil
 	}
 	var out map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode response: %v", err)
+	if err := json.Unmarshal(data, &out); err != nil {
+		out = map[string]any{"error": strings.TrimSpace(string(data))}
 	}
-	return out
+	return status, out
 }

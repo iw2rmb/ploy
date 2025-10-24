@@ -429,6 +429,33 @@ func (s *Scheduler) ListJobs(ctx context.Context, ticket string) ([]*Job, error)
 	return jobs, nil
 }
 
+// RunningJobsForNode returns all jobs currently running on the provided node.
+func (s *Scheduler) RunningJobsForNode(ctx context.Context, nodeID string) ([]*Job, error) {
+	if strings.TrimSpace(nodeID) == "" {
+		return nil, errors.New("scheduler: node id is required")
+	}
+	prefix := s.jobsPrefix + "/"
+	resp, err := s.client.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("scheduler: list jobs for node: %w", err)
+	}
+	jobs := make([]*Job, 0, resp.Count)
+	for _, kv := range resp.Kvs {
+		record, err := decodeJobRecord(kv.Value)
+		if err != nil {
+			return nil, fmt.Errorf("scheduler: decode job for node listing: %w", err)
+		}
+		if record.State != JobStateRunning {
+			continue
+		}
+		if record.ClaimedBy != nodeID {
+			continue
+		}
+		jobs = append(jobs, record.toJob())
+	}
+	return jobs, nil
+}
+
 // watchLeaseExpiry monitors lease prefix deletions to requeue expired jobs.
 func (s *Scheduler) watchLeaseExpiry() {
 	defer s.wg.Done()
