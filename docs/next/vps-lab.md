@@ -21,3 +21,6 @@ Guidelines:
 - Clean up temporary artifacts after test runs (IPFS pins, etcd keys, Docker containers) to avoid
   state drift between test cycles. Tear down the cluster with
   `scripts/ipfs/bootstrap_lab_cluster.sh down --destroy-data`.
+- Expose the control plane on the lab network so operators can poll `/v1/status` for queue depth and
+  worker readiness, `/v1/config` for configuration audits, and `/v1/beacon/nodes` to verify beacon
+  discovery. Capture the signed responses in incident reports so they can be replayed offline.

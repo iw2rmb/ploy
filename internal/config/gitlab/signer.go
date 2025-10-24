@@ -306,6 +306,15 @@ type SignedToken struct {
 	TokenID    string
 }
 
+// TokenClaims captures validated token metadata.
+type TokenClaims struct {
+	SecretName string
+	TokenID    string
+	Scopes     []string
+	IssuedAt   time.Time
+	ExpiresAt  time.Time
+}
+
 // NewSigner constructs a GitLab token signer.
 func NewSigner(client *clientv3.Client, cipher Cipher, opts ...SignerOption) (*Signer, error) {
 	if client == nil {
@@ -493,12 +502,12 @@ func (s *Signer) IssueToken(ctx context.Context, req IssueTokenRequest) (SignedT
 		return SignedToken{}, err
 	}
 
-	value, err := mintToken(apiKey, requestedScopes, issuedAt, expiresAt)
+	tokenID, err := generateTokenID()
 	if err != nil {
 		return SignedToken{}, err
 	}
 
-	tokenID, err := generateTokenID()
+	value, err := mintToken(apiKey, requestedScopes, issuedAt, expiresAt, tokenID)
 	if err != nil {
 		return SignedToken{}, err
 	}
@@ -537,6 +546,147 @@ func (s *Signer) recordIssuedToken(secret, nodeID string, token SignedToken) {
 	s.issuedMu.Unlock()
 
 	s.audit.Record(evt)
+}
+
+type tokenEnvelope struct {
+	Payload   string `json:"payload"`
+	Signature string `json:"sig"`
+}
+
+type tokenPayload struct {
+	IssuedAt  int64    `json:"iat"`
+	ExpiresAt int64    `json:"exp"`
+	Scopes    []string `json:"scp"`
+	TokenID   string   `json:"tid"`
+}
+
+// ValidateToken verifies the bearer token and returns its claims.
+func (s *Signer) ValidateToken(ctx context.Context, token string) (TokenClaims, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return TokenClaims{}, errors.New("gitlab signer: token required")
+	}
+	if !strings.HasPrefix(token, "gls_") {
+		return TokenClaims{}, errors.New("gitlab signer: malformed token")
+	}
+	rawEnvelope, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(token, "gls_"))
+	if err != nil {
+		return TokenClaims{}, fmt.Errorf("gitlab signer: decode token envelope: %w", err)
+	}
+
+	var envelope tokenEnvelope
+	if err := json.Unmarshal(rawEnvelope, &envelope); err != nil {
+		return TokenClaims{}, fmt.Errorf("gitlab signer: decode token payload: %w", err)
+	}
+	if envelope.Payload == "" || envelope.Signature == "" {
+		return TokenClaims{}, errors.New("gitlab signer: token envelope incomplete")
+	}
+
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(envelope.Payload)
+	if err != nil {
+		return TokenClaims{}, fmt.Errorf("gitlab signer: decode payload body: %w", err)
+	}
+	var payload tokenPayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return TokenClaims{}, fmt.Errorf("gitlab signer: decode payload: %w", err)
+	}
+	if payload.IssuedAt == 0 || payload.ExpiresAt == 0 {
+		return TokenClaims{}, errors.New("gitlab signer: token missing timestamps")
+	}
+	issuedAt := time.Unix(payload.IssuedAt, 0).UTC()
+	expiresAt := time.Unix(payload.ExpiresAt, 0).UTC()
+	if time.Now().UTC().After(expiresAt) {
+		return TokenClaims{}, errors.New("gitlab signer: token expired")
+	}
+
+	signature, err := base64.RawURLEncoding.DecodeString(envelope.Signature)
+	if err != nil {
+		return TokenClaims{}, fmt.Errorf("gitlab signer: decode signature: %w", err)
+	}
+
+	record, err := s.findTokenSecret(ctx, payload.TokenID, payloadJSON, signature)
+	if err != nil {
+		return TokenClaims{}, err
+	}
+
+	scopes := normalizeScopes(payload.Scopes)
+	if err := ensureScopesAllowed(record.Scopes, scopes); err != nil {
+		return TokenClaims{}, err
+	}
+
+	return TokenClaims{
+		SecretName: record.SecretName,
+		TokenID:    strings.TrimSpace(payload.TokenID),
+		Scopes:     scopes,
+		IssuedAt:   issuedAt,
+		ExpiresAt:  expiresAt,
+	}, nil
+}
+
+func (s *Signer) findTokenSecret(ctx context.Context, tokenID string, payloadJSON, signature []byte) (secretRecord, error) {
+	// Attempt to resolve via in-memory cache first.
+	s.issuedMu.Lock()
+	var cachedSecret string
+	for secret, tokens := range s.issued {
+		if _, ok := tokens[tokenID]; ok {
+			cachedSecret = secret
+			break
+		}
+	}
+	s.issuedMu.Unlock()
+
+	if cachedSecret != "" {
+		record, err := s.loadSecret(ctx, cachedSecret)
+		if err == nil {
+			if ok, verifyErr := s.secretMatches(ctx, record, payloadJSON, signature); verifyErr == nil && ok {
+				return record, nil
+			}
+		}
+	}
+
+	secrets, err := s.listSecrets(ctx)
+	if err != nil {
+		return secretRecord{}, err
+	}
+	for _, record := range secrets {
+		match, matchErr := s.secretMatches(ctx, record, payloadJSON, signature)
+		if matchErr != nil {
+			continue
+		}
+		if match {
+			return record, nil
+		}
+	}
+	return secretRecord{}, errors.New("gitlab signer: token not recognized")
+}
+
+func (s *Signer) secretMatches(ctx context.Context, record secretRecord, payloadJSON, signature []byte) (bool, error) {
+	apiKey, err := record.decrypt(ctx, s.cipher)
+	if err != nil {
+		return false, err
+	}
+	mac := hmac.New(sha256.New, []byte(apiKey))
+	mac.Write(payloadJSON)
+	if !hmac.Equal(mac.Sum(nil), signature) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *Signer) listSecrets(ctx context.Context) ([]secretRecord, error) {
+	resp, err := s.client.Get(ctx, s.prefix, clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("gitlab signer: list secrets: %w", err)
+	}
+	records := make([]secretRecord, 0, len(resp.Kvs))
+	for _, kv := range resp.Kvs {
+		record, err := decodeSecretRecord(kv, s.prefix)
+		if err != nil {
+			continue
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
 
 func (s *Signer) handleRotation(ctx context.Context, secret string) {
@@ -793,7 +943,7 @@ func generateTokenID() (string, error) {
 	return hex.EncodeToString(id), nil
 }
 
-func mintToken(apiKey string, scopes []string, issuedAt, expiresAt time.Time) (string, error) {
+func mintToken(apiKey string, scopes []string, issuedAt, expiresAt time.Time, tokenID string) (string, error) {
 	if strings.TrimSpace(apiKey) == "" {
 		return "", errors.New("gitlab signer: api key required for minting token")
 	}
@@ -801,6 +951,9 @@ func mintToken(apiKey string, scopes []string, issuedAt, expiresAt time.Time) (s
 		"iat": issuedAt.Unix(),
 		"exp": expiresAt.Unix(),
 		"scp": scopes,
+	}
+	if trimmed := strings.TrimSpace(tokenID); trimmed != "" {
+		payload["tid"] = trimmed
 	}
 
 	nonce := make([]byte, 24)

@@ -123,6 +123,16 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - Inspect signer health with `ploy config gitlab status [--secret <name>]`. The output includes audit feed metadata from the rotation revocation pipeline (last rotation, revoked nodes, recent failures) outlined in `.archive/gitlab-rotation-revocation/README.md`.  
 - Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/next/logs.md](logs.md)).  
 - For unattended rotations, provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` or ensure the active cluster descriptor contains the control plane endpoint and CA bundle so the CLI can authenticate requests.
+- Use `GET /v1/config?cluster_id=<id>` to audit the active control-plane configuration. Apply updates with
+  `PUT /v1/config` and an `If-Match` header (use `0` for initial creation, the last seen revision for updates,
+  or `*` to override). Every write is recorded by `ploy_config_updates_total` in Prometheus.
+- `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the
+  response is intentionally uncached so dashboards can poll it directly.
+- `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane
+  and is safe to cache client-side for up to a minute.
+- Beacon discovery calls (`GET /v1/beacon/nodes`, `/v1/beacon/config`, `/v1/beacon/ca`) now include
+  signed envelopes. Operators can verify the `signature.value` field with the active CA certificate and
+  promote a standby node by posting to `/v1/beacon/promote` with the `admin` scope.
 
 This operational flow keeps `ployd` nodes consistent and ensures the control plane remains
 authoritative via etcd and beacon mode.
