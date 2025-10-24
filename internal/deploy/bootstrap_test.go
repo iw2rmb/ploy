@@ -14,7 +14,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/server/v3/embed"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/config"
+	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 func tempPloydBinary(t *testing.T) string {

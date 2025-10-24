@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/config"
+	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 func TestHandleClusterRequiresSubcommand(t *testing.T) {

@@ -1,42 +1,21 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 
+	artifactcli "github.com/iw2rmb/ploy/internal/cli/artifact"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
-// artifactService captures the cluster client behaviour required by the CLI.
-type artifactService interface {
-	Add(ctx context.Context, req artifacts.AddRequest) (artifacts.AddResponse, error)
-	Fetch(ctx context.Context, cid string) (artifacts.FetchResult, error)
-	Unpin(ctx context.Context, cid string) error
-	Status(ctx context.Context, cid string) (artifacts.StatusResult, error)
-}
-
-type artifactFactoryFunc func() (artifactService, error)
-
 var (
-	artifactClientFactory artifactFactoryFunc = defaultArtifactClientFactory
-)
-
-const (
-	ipfsClusterURLEnv      = "PLOY_IPFS_CLUSTER_API"
-	ipfsClusterTokenEnv    = "PLOY_IPFS_CLUSTER_TOKEN"
-	ipfsClusterUserEnv     = "PLOY_IPFS_CLUSTER_USERNAME"
-	ipfsClusterPasswordEnv = "PLOY_IPFS_CLUSTER_PASSWORD"
-	ipfsClusterReplMinEnv  = "PLOY_IPFS_CLUSTER_REPL_MIN"
-	ipfsClusterReplMaxEnv  = "PLOY_IPFS_CLUSTER_REPL_MAX"
+	artifactClientFactory artifactcli.ClientFactory = artifactcli.DefaultClientFactory
 )
 
 func handleArtifact(args []string, stderr io.Writer) error {
@@ -81,57 +60,21 @@ func handleArtifactPush(args []string, stderr io.Writer) error {
 		return errors.New("artifact path required")
 	}
 	path := remaining[0]
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("read artifact %s: %w", path, err)
-	}
 
-	client, err := artifactClientFactory()
-	if err != nil {
-		return err
-	}
-
-	kind, err := parseArtifactKind(*kindFlag)
-	if err != nil {
-		return err
-	}
-
-	nameValue := strings.TrimSpace(*name)
-	if nameValue == "" {
-		nameValue = filepath.Base(path)
-	}
-
-	addReq := artifacts.AddRequest{
-		Name:    nameValue,
-		Kind:    kind,
-		Payload: bytes.Clone(data),
-		Local:   *local,
-	}
-	if *replMin > 0 {
-		addReq.ReplicationFactorMin = *replMin
-	}
-	if *replMax > 0 {
-		addReq.ReplicationFactorMax = *replMax
-	}
-
-	result, err := client.Add(context.Background(), addReq)
+	result, err := artifactcli.Push(context.Background(), artifactClientFactory, artifactcli.PushOptions{
+		Path:           path,
+		Name:           *name,
+		Kind:           *kindFlag,
+		Local:          *local,
+		ReplicationMin: *replMin,
+		ReplicationMax: *replMax,
+	})
 	if err != nil {
 		return err
 	}
 
 	printArtifactPushResult(stderr, result)
 	return nil
-}
-
-func parseArtifactKind(value string) (step.ArtifactKind, error) {
-	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "logs":
-		return step.ArtifactKindLogs, nil
-	case "diff":
-		return step.ArtifactKindDiff, nil
-	default:
-		return "", fmt.Errorf("unknown artifact kind %q", value)
-	}
 }
 
 func printArtifactPushUsage(w io.Writer) {
@@ -169,12 +112,7 @@ func handleArtifactPull(args []string, stderr io.Writer) error {
 	}
 	cid := remaining[0]
 
-	client, err := artifactClientFactory()
-	if err != nil {
-		return err
-	}
-
-	result, err := client.Fetch(context.Background(), cid)
+	result, err := artifactcli.Pull(context.Background(), artifactClientFactory, cid)
 	if err != nil {
 		return err
 	}
@@ -206,11 +144,7 @@ func handleArtifactStatus(args []string, stderr io.Writer) error {
 		return errors.New("artifact cid required")
 	}
 	cid := strings.TrimSpace(args[0])
-	client, err := artifactClientFactory()
-	if err != nil {
-		return err
-	}
-	status, err := client.Status(context.Background(), cid)
+	status, err := artifactcli.Status(context.Background(), artifactClientFactory, cid)
 	if err != nil {
 		return err
 	}
@@ -247,11 +181,7 @@ func handleArtifactRemove(args []string, stderr io.Writer) error {
 		return errors.New("artifact cid required")
 	}
 	cid := strings.TrimSpace(args[0])
-	client, err := artifactClientFactory()
-	if err != nil {
-		return err
-	}
-	if err := client.Unpin(context.Background(), cid); err != nil {
+	if err := artifactcli.Remove(context.Background(), artifactClientFactory, cid); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintf(stderr, "Unpinned %s from cluster\n", cid)
@@ -260,35 +190,4 @@ func handleArtifactRemove(args []string, stderr io.Writer) error {
 
 func printArtifactRemoveUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy artifact rm <cid>")
-}
-
-func defaultArtifactClientFactory() (artifactService, error) {
-	baseURL := strings.TrimSpace(os.Getenv(ipfsClusterURLEnv))
-	if baseURL == "" {
-		return nil, errors.New("configure artifact client: PLOY_IPFS_CLUSTER_API required")
-	}
-	opts := artifacts.ClusterClientOptions{
-		BaseURL:              baseURL,
-		AuthToken:            strings.TrimSpace(os.Getenv(ipfsClusterTokenEnv)),
-		BasicAuthUsername:    strings.TrimSpace(os.Getenv(ipfsClusterUserEnv)),
-		BasicAuthPassword:    strings.TrimSpace(os.Getenv(ipfsClusterPasswordEnv)),
-		ReplicationFactorMin: parseOptionalInt(os.Getenv(ipfsClusterReplMinEnv)),
-		ReplicationFactorMax: parseOptionalInt(os.Getenv(ipfsClusterReplMaxEnv)),
-	}
-	client, err := artifacts.NewClusterClient(opts)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
-func parseOptionalInt(value string) int {
-	if strings.TrimSpace(value) == "" {
-		return 0
-	}
-	num, err := strconv.Atoi(strings.TrimSpace(value))
-	if err != nil {
-		return 0
-	}
-	return num
 }

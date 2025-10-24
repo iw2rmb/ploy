@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/jobs"
-	"github.com/iw2rmb/ploy/cmd/ploy/mods"
-	"github.com/iw2rmb/ploy/cmd/ploy/stream"
+	"github.com/iw2rmb/ploy/internal/cli/jobs"
+	"github.com/iw2rmb/ploy/internal/cli/mods"
+	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
 
 func handleMods(args []string, stderr io.Writer) error {

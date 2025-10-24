@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	cfgstore "github.com/iw2rmb/ploy/cmd/ploy/config"
+	cfgstore "github.com/iw2rmb/ploy/internal/cli/config"
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 )
 

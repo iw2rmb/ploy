@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/iw2rmb/ploy/internal/cli/workflow"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
@@ -39,7 +40,8 @@ func handleWorkflowCancel(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("configure grid client: %w", err)
 	}
-	result, err := gridClient.CancelWorkflow(context.Background(), runner.CancelRequest{
+	cmd := workflow.CancelCommand{Client: gridClient}
+	result, err := cmd.Run(context.Background(), workflow.CancelOptions{
 		Tenant:     trimmedTenant,
 		WorkflowID: strings.TrimSpace(*workflowID),
 		RunID:      trimmedRunID,

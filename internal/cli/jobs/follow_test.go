@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/stream"
+	"github.com/iw2rmb/ploy/internal/cli/stream"
 )
 
 func TestFollowCommandReconnects(t *testing.T) {
