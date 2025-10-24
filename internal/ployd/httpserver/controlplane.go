@@ -1,4 +1,4 @@
-package httpapi
+package httpserver
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 )
 
 // Server exposes the control-plane scheduler over HTTP.
-type Server struct {
+type controlPlaneServer struct {
 	scheduler *scheduler.Scheduler
 	signer    *gitlab.Signer
 	rotations *events.RotationHub
@@ -36,24 +36,26 @@ type Server struct {
 }
 
 // Options configure the HTTP server handlers.
-type Options struct {
+type ControlPlaneOptions struct {
 	Scheduler *scheduler.Scheduler
 	Signer    *gitlab.Signer
 	Streams   *logstream.Hub
 	Gatherer  prometheus.Gatherer
 	Etcd      *clientv3.Client
+	Rotations *events.RotationHub
 }
 
 // New returns an HTTP handler rooted at /v2.
-func New(opts Options) http.Handler {
+func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux := http.NewServeMux()
-	h := &Server{
+	h := &controlPlaneServer{
 		scheduler: opts.Scheduler,
 		signer:    opts.Signer,
 		streams:   opts.Streams,
 		etcd:      opts.Etcd,
+		rotations: opts.Rotations,
 	}
-	if opts.Signer != nil {
+	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
 	}
 	mux.HandleFunc("/v2/jobs", h.handleJobs)
@@ -74,7 +76,7 @@ func New(opts Options) http.Handler {
 	return mux
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -86,7 +88,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleNodes(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureEtcd(w) {
 		return
 	}
@@ -102,7 +104,7 @@ func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleBeaconRotateCA(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleBeaconRotateCA(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureEtcd(w) {
 		return
 	}
@@ -163,7 +165,7 @@ func (s *Server) handleBeaconRotateCA(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, payload)
 }
 
-func (s *Server) handleGitLabConfig(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleGitLabConfig(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureEtcd(w) {
 		return
 	}
@@ -177,7 +179,7 @@ func (s *Server) handleGitLabConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
 	var req nodeJoinRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -243,7 +245,7 @@ func (s *Server) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, resp)
 }
 
-func (s *Server) handleNodeList(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleNodeList(w http.ResponseWriter, r *http.Request) {
 	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
 	if clusterID == "" {
 		writeErrorMessage(w, http.StatusBadRequest, "cluster_id query parameter required")
@@ -266,7 +268,7 @@ func (s *Server) handleNodeList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"nodes": nodes})
 }
 
-func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -356,7 +358,7 @@ func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *Server) handleGitLabConfigGet(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleGitLabConfigGet(w http.ResponseWriter, r *http.Request) {
 	store := gitlab.NewStore(gitlab.NewEtcdKV(s.etcd))
 	cfg, revision, err := store.Load(r.Context())
 	if err != nil {
@@ -373,7 +375,7 @@ func (s *Server) handleGitLabConfigGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleGitLabConfigPut(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleGitLabConfigPut(w http.ResponseWriter, r *http.Request) {
 	var req gitlabConfigRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -423,7 +425,7 @@ func (s *Server) handleGitLabConfigPut(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleJobs(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -437,7 +439,7 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -466,7 +468,7 @@ func (s *Server) handleJobSubmit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, jobDTOFrom(job))
 }
 
-func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleJobList(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -487,7 +489,7 @@ func (s *Server) handleJobList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"jobs": items})
 }
 
-func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleClaim(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -518,7 +520,7 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -545,7 +547,7 @@ func (s *Server) handleJobSubpath(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleJobGet(w http.ResponseWriter, r *http.Request, jobID string) {
+func (s *controlPlaneServer) handleJobGet(w http.ResponseWriter, r *http.Request, jobID string) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -566,7 +568,7 @@ func (s *Server) handleJobGet(w http.ResponseWriter, r *http.Request, jobID stri
 	writeJSON(w, http.StatusOK, jobDTOFrom(job))
 }
 
-func (s *Server) handleJobHeartbeat(w http.ResponseWriter, r *http.Request, jobID string) {
+func (s *controlPlaneServer) handleJobHeartbeat(w http.ResponseWriter, r *http.Request, jobID string) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -593,7 +595,7 @@ func (s *Server) handleJobHeartbeat(w http.ResponseWriter, r *http.Request, jobI
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
-func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID string) {
+func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID string) {
 	if !s.ensureScheduler(w) {
 		return
 	}
@@ -647,7 +649,7 @@ func (s *Server) handleJobComplete(w http.ResponseWriter, r *http.Request, jobID
 	writeJSON(w, http.StatusOK, jobDTOFrom(job))
 }
 
-func (s *Server) handleJobLogs(w http.ResponseWriter, r *http.Request, jobID string, parts []string) {
+func (s *controlPlaneServer) handleJobLogs(w http.ResponseWriter, r *http.Request, jobID string, parts []string) {
 	if len(parts) == 0 {
 		http.NotFound(w, r)
 		return
@@ -660,7 +662,7 @@ func (s *Server) handleJobLogs(w http.ResponseWriter, r *http.Request, jobID str
 	}
 }
 
-func (s *Server) handleJobLogsStream(w http.ResponseWriter, r *http.Request, jobID string) {
+func (s *controlPlaneServer) handleJobLogsStream(w http.ResponseWriter, r *http.Request, jobID string) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -690,7 +692,7 @@ func (s *Server) handleJobLogsStream(w http.ResponseWriter, r *http.Request, job
 	}
 }
 
-func (s *Server) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {
 	if s.signer == nil {
 		http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
 		return
@@ -725,7 +727,7 @@ func (s *Server) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, payload)
 }
 
-func (s *Server) handleSignerTokens(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleSignerTokens(w http.ResponseWriter, r *http.Request) {
 	if s.signer == nil {
 		http.Error(w, "gitlab signer unavailable", http.StatusServiceUnavailable)
 		return
@@ -771,7 +773,7 @@ func (s *Server) handleSignerTokens(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, payload)
 }
 
-func (s *Server) handleSignerRotations(w http.ResponseWriter, r *http.Request) {
+func (s *controlPlaneServer) handleSignerRotations(w http.ResponseWriter, r *http.Request) {
 	if s.rotations == nil {
 		http.Error(w, "gitlab rotations unavailable", http.StatusServiceUnavailable)
 		return
@@ -914,7 +916,7 @@ func descriptorDTOFrom(desc registry.WorkerDescriptor) workerDescriptorDTO {
 	return dto
 }
 
-func (s *Server) waitForNodeDrain(ctx context.Context, nodeID string, timeout time.Duration) error {
+func (s *controlPlaneServer) waitForNodeDrain(ctx context.Context, nodeID string, timeout time.Duration) error {
 	if s.scheduler == nil {
 		return errors.New("scheduler unavailable")
 	}
@@ -948,7 +950,7 @@ func (s *Server) waitForNodeDrain(ctx context.Context, nodeID string, timeout ti
 	}
 }
 
-func (s *Server) ensureEtcd(w http.ResponseWriter) bool {
+func (s *controlPlaneServer) ensureEtcd(w http.ResponseWriter) bool {
 	if s.etcd == nil {
 		http.Error(w, "etcd unavailable", http.StatusServiceUnavailable)
 		return false
@@ -1111,7 +1113,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	_ = enc.Encode(payload)
 }
 
-func (s *Server) ensureScheduler(w http.ResponseWriter) bool {
+func (s *controlPlaneServer) ensureScheduler(w http.ResponseWriter) bool {
 	if s.scheduler == nil {
 		http.Error(w, "scheduler unavailable", http.StatusServiceUnavailable)
 		return false

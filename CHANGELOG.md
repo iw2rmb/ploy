@@ -75,7 +75,7 @@
 
 - Added `internal/controlplane/scheduler` with etcd-backed job submission, claim, heartbeat, and
   completion flows using optimistic transactions and lease watchers.
-- Introduced an HTTP surface in `internal/controlplane/httpapi` with lifecycle tests and embedded
+- Introduced an HTTP surface in `internal/ployd/httpserver` with lifecycle tests and embedded
   etcd fixtures.
 - Created integration suite under `tests/integration/controlplane` exercising multi-worker claims
   and lease expiry requeues; refreshed unit tests for heartbeat renewal and TTL enforcement.
