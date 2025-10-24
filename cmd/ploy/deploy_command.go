@@ -7,24 +7,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
-
+	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/deploy"
-)
-
-const (
-	defaultDomainSuffix      = ".ploy"
-	defaultClusterIDAlphabet = "0123456789abcdef"
-	defaultClusterIDLength   = 16
-	defaultWorkerIDAlphabet  = "0123456789abcdef"
-	defaultWorkerIDLength    = 4
-	defaultAPIKeyAlphabet    = "0123456789abcdef"
-	defaultAPIKeyLength      = 64
 )
 
 var deployBootstrapRunner = deploy.RunBootstrap
@@ -75,94 +63,36 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 
-	var opts deploy.Options
+	cfg := deploycli.BootstrapConfig{
+		Stdout:        stderr,
+		Stderr:        stderr,
+		Stdin:         os.Stdin,
+		WorkstationOS: runtime.GOOS,
+	}
 	if userFlag.set {
-		opts.User = strings.TrimSpace(userFlag.value)
+		cfg.User = strings.TrimSpace(userFlag.value)
 	}
 	if identity.set {
-		opts.IdentityFile = expandPath(strings.TrimSpace(identity.value))
+		cfg.IdentityFile = strings.TrimSpace(identity.value)
 	}
 	if address.set {
-		opts.Address = strings.TrimSpace(address.value)
+		cfg.Address = strings.TrimSpace(address.value)
 	}
-	clusterID, err := gonanoid.Generate(defaultClusterIDAlphabet, defaultClusterIDLength)
-	if err != nil {
-		return fmt.Errorf("generate cluster identifier: %w", err)
-	}
-	opts.ClusterID = clusterID
-	manualBeaconURL := strings.TrimSpace(beacon.value)
-	opts.ControlPlaneURL = strings.TrimSpace(control.value)
-
-	opts.Host = opts.ClusterID + defaultDomainSuffix
-
-	nodeID, err := gonanoid.Generate(defaultWorkerIDAlphabet, defaultWorkerIDLength)
-	if err != nil {
-		return fmt.Errorf("generate node identifier: %w", err)
-	}
-	opts.InitialBeacons = []string{nodeID}
-	opts.InitialWorkers = []string{nodeID}
-
-	if manualBeaconURL != "" {
-		opts.BeaconURL = manualBeaconURL
-	} else {
-		opts.BeaconURL = fmt.Sprintf("https://%s.%s%s", nodeID, opts.ClusterID, defaultDomainSuffix)
-	}
-
-	apiKey, err := gonanoid.Generate(defaultAPIKeyAlphabet, defaultAPIKeyLength)
-	if err != nil {
-		return fmt.Errorf("generate api key: %w", err)
-	}
-	opts.APIKey = apiKey
-
-	connectHost := strings.TrimSpace(opts.Address)
-	if connectHost == "" {
-		connectHost = strings.TrimSpace(opts.Host)
-	}
-	if connectHost != "" {
-		etcdHost := connectHost
-		if strings.Contains(etcdHost, ":") && !strings.Contains(etcdHost, "]") && !strings.Contains(etcdHost, "[") {
-			etcdHost = "[" + etcdHost + "]"
-		}
-		opts.EtcdEndpoints = []string{fmt.Sprintf("http://%s:2379", etcdHost)}
-	}
-
-	if opts.IdentityFile == "" {
-		opts.IdentityFile = defaultIdentityPath()
-	} else {
-		opts.IdentityFile = expandPath(opts.IdentityFile)
-	}
-
+	cfg.ControlPlaneURL = strings.TrimSpace(control.value)
+	cfg.BeaconURL = strings.TrimSpace(beacon.value)
 	if ploydBin.set {
-		opts.PloydBinaryPath = expandPath(strings.TrimSpace(ploydBin.value))
-	} else {
-		path, err := defaultPloydBinaryPath()
-		if err != nil {
-			return err
+		cfg.PloydBinaryPath = strings.TrimSpace(ploydBin.value)
+	}
+
+	cmd := deploycli.BootstrapCommand{
+		RunBootstrap: deployBootstrapRunner,
+	}
+	if err := cmd.Run(context.Background(), cfg); err != nil {
+		if errors.Is(err, deploycli.ErrBeaconURLRequired) || errors.Is(err, deploycli.ErrAPIKeyRequired) || errors.Is(err, deploycli.ErrInitialBeaconIDMissing) {
+			printDeployBootstrapUsage(stderr)
 		}
-		opts.PloydBinaryPath = path
-	}
-
-	opts.Stdout = stderr
-	opts.Stderr = stderr
-	opts.Stdin = os.Stdin
-	opts.WorkstationOS = runtime.GOOS
-	if opts.BeaconURL == "" {
-		printDeployBootstrapUsage(stderr)
-		return errors.New("beacon-url is required")
-	}
-	if opts.APIKey == "" {
-		printDeployBootstrapUsage(stderr)
-		return errors.New("api-key is required")
-	}
-	if len(opts.InitialBeacons) == 0 {
-		printDeployBootstrapUsage(stderr)
-		return errors.New("at least one beacon-id is required")
-	}
-
-	if err := deployBootstrapRunner(context.Background(), opts); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -172,31 +102,6 @@ func printDeployUsage(w io.Writer) {
 
 func printDeployBootstrapUsage(w io.Writer) {
 	printCommandUsage(w, "deploy", "bootstrap")
-}
-
-func defaultPloydBinaryPath() (string, error) {
-	execPath, err := os.Executable()
-	if err != nil {
-		return "", fmt.Errorf("locate ploy executable: %w", err)
-	}
-	dir := filepath.Dir(execPath)
-	candidates := []string{
-		filepath.Join(dir, "ployd"),
-	}
-	if runtime.GOOS == "windows" {
-		candidates = append([]string{filepath.Join(dir, "ployd.exe")}, candidates...)
-	}
-	for _, candidate := range candidates {
-		info, err := os.Stat(candidate)
-		if err != nil {
-			continue
-		}
-		if info.IsDir() {
-			continue
-		}
-		return candidate, nil
-	}
-	return "", errors.New("ploy deploy bootstrap: ployd binary not found alongside CLI; provide --ployd-binary")
 }
 
 type stringValue struct {
@@ -234,31 +139,4 @@ func (i *intValue) String() string {
 		return ""
 	}
 	return strconv.Itoa(i.value)
-}
-
-func defaultIdentityPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".ssh", "id_rsa")
-}
-
-func expandPath(path string) string {
-	if path == "" {
-		return ""
-	}
-	if path == "~" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return home
-		}
-	}
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			return filepath.Join(home, strings.TrimPrefix(path, "~/"))
-		}
-	}
-	return path
 }

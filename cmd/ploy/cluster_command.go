@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/config"
+	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 func handleCluster(args []string, w io.Writer) error {

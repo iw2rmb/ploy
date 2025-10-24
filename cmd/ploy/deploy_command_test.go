@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
@@ -53,10 +54,10 @@ func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 		t.Fatalf("expected worker ids to mirror beacon ids, got %v", captured.InitialWorkers)
 	}
 	beaconID := captured.InitialBeacons[0]
-	if !isLowerHexWithLen(beaconID, defaultWorkerIDLength) {
-		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, beaconID)
+	if !isLowerHexWithLen(beaconID, deploycli.DefaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", deploycli.DefaultWorkerIDLength, beaconID)
 	}
-	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, defaultDomainSuffix) {
+	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, deploycli.DefaultDomainSuffix) {
 		t.Fatalf("expected beacon url to reference node domain, got %q", captured.BeaconURL)
 	}
 	if got, want := captured.EtcdEndpoints, []string{"http://192.0.2.10:2379"}; len(got) != len(want) || got[0] != want[0] {
@@ -104,8 +105,8 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 	if len(captured.InitialBeacons) != 1 {
 		t.Fatalf("expected exactly one beacon id, got %v", captured.InitialBeacons)
 	}
-	if !isLowerHexWithLen(captured.InitialBeacons[0], defaultWorkerIDLength) {
-		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, captured.InitialBeacons[0])
+	if !isLowerHexWithLen(captured.InitialBeacons[0], deploycli.DefaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", deploycli.DefaultWorkerIDLength, captured.InitialBeacons[0])
 	}
 	if len(captured.InitialWorkers) != 1 || captured.InitialWorkers[0] != captured.InitialBeacons[0] {
 		t.Fatalf("expected worker ids to mirror beacon ids, got %v", captured.InitialWorkers)
@@ -139,13 +140,13 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 	if captured.ClusterID == "" {
 		t.Fatalf("expected cluster id to be generated")
 	}
-	if len(captured.ClusterID) != defaultClusterIDLength {
-		t.Fatalf("expected cluster id length %d, got %d", defaultClusterIDLength, len(captured.ClusterID))
+	if len(captured.ClusterID) != deploycli.DefaultClusterIDLength {
+		t.Fatalf("expected cluster id length %d, got %d", deploycli.DefaultClusterIDLength, len(captured.ClusterID))
 	}
 	if !isLowerHex(captured.ClusterID) {
 		t.Fatalf("expected cluster id to be lowercase hex, got %q", captured.ClusterID)
 	}
-	expectedHost := captured.ClusterID + defaultDomainSuffix
+	expectedHost := captured.ClusterID + deploycli.DefaultDomainSuffix
 	if captured.Host != expectedHost {
 		t.Fatalf("expected host %q, got %q", expectedHost, captured.Host)
 	}
@@ -153,10 +154,10 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 		t.Fatalf("expected one beacon id, got %v", captured.InitialBeacons)
 	}
 	beaconID := captured.InitialBeacons[0]
-	if !isLowerHexWithLen(beaconID, defaultWorkerIDLength) {
-		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", defaultWorkerIDLength, beaconID)
+	if !isLowerHexWithLen(beaconID, deploycli.DefaultWorkerIDLength) {
+		t.Fatalf("expected beacon id to be lowercase hex length %d, got %q", deploycli.DefaultWorkerIDLength, beaconID)
 	}
-	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, defaultDomainSuffix) {
+	if captured.BeaconURL != fmt.Sprintf("https://%s.%s%s", beaconID, captured.ClusterID, deploycli.DefaultDomainSuffix) {
 		t.Fatalf("expected beacon url to default to node domain, got %q", captured.BeaconURL)
 	}
 	if got, want := captured.InitialWorkers, captured.InitialBeacons; len(got) != len(want) {

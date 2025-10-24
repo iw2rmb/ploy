@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	artifactcli "github.com/iw2rmb/ploy/internal/cli/artifact"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -89,7 +90,7 @@ func TestHandleArtifactPushUploadsFile(t *testing.T) {
 	}
 	prevFactory := artifactClientFactory
 	t.Cleanup(func() { artifactClientFactory = prevFactory })
-	artifactClientFactory = func() (artifactService, error) {
+	artifactClientFactory = func() (artifactcli.Service, error) {
 		return client, nil
 	}
 
@@ -122,7 +123,7 @@ func TestHandleArtifactPushUploadsFile(t *testing.T) {
 func TestHandleArtifactPushPropagatesClientError(t *testing.T) {
 	prevFactory := artifactClientFactory
 	t.Cleanup(func() { artifactClientFactory = prevFactory })
-	artifactClientFactory = func() (artifactService, error) {
+	artifactClientFactory = func() (artifactcli.Service, error) {
 		return nil, errors.New("client init failed")
 	}
 
@@ -145,7 +146,7 @@ func TestHandleArtifactPullWritesOutput(t *testing.T) {
 	}
 	prevFactory := artifactClientFactory
 	t.Cleanup(func() { artifactClientFactory = prevFactory })
-	artifactClientFactory = func() (artifactService, error) {
+	artifactClientFactory = func() (artifactcli.Service, error) {
 		return client, nil
 	}
 

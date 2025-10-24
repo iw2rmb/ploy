@@ -15,7 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/cmd/ploy/config"
+	"github.com/iw2rmb/ploy/internal/cli/config"
+	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
@@ -116,17 +117,17 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 
 	identityPath := strings.TrimSpace(identity.value)
 	if identity.set {
-		identityPath = expandPath(identityPath)
+		identityPath = deploycli.ExpandPath(identityPath)
 	} else {
-		identityPath = defaultIdentityPath()
+		identityPath = deploycli.DefaultIdentityPath()
 	}
 
 	var ploydPath string
 	if !*dryRun {
 		if ploydBin.set {
-			ploydPath = expandPath(strings.TrimSpace(ploydBin.value))
+			ploydPath = deploycli.ExpandPath(strings.TrimSpace(ploydBin.value))
 		} else {
-			ploydPath, err = defaultPloydBinaryPath()
+			ploydPath, err = deploycli.DefaultPloydBinaryPath("")
 			if err != nil {
 				return err
 			}
