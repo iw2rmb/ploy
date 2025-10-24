@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/ployd/config"
-	"github.com/iw2rmb/ploy/internal/ployd/daemon"
+	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/daemon"
 )
 
 func main() {
