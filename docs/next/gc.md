@@ -1,6 +1,6 @@
 # Retention & Garbage Collection
 
-Ploy v2 keeps artifact retention explicit so etcd metadata and IPFS pins stay in sync. This document
+Ploy Next keeps artifact retention explicit so etcd metadata and IPFS pins stay in sync. This document
 describes the lifecycle, cleanup controller, and CLI tooling.
 
 ## Retention Metadata

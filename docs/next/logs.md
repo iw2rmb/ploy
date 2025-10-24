@@ -1,6 +1,6 @@
 # Log Storage & Streaming
 
-Ploy v2 keeps etcd lean by storing only log metadata in the control plane and placing the actual
+Ploy Next keeps etcd lean by storing only log metadata in the control plane and placing the actual
 log payloads in IPFS Cluster. This avoids hitting etcd’s size limits and keeps write throughput
 predictable.
 

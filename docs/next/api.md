@@ -1,6 +1,6 @@
-# Ploy v2 API Reference
+# Ploy Next API Reference
 
-This document catalogs the service endpoints introduced in Ploy v2. Routes are grouped by surface:
+This document catalogs the service endpoints introduced in Ploy Next. Routes are grouped by surface:
 Ploy control-plane APIs, node-local endpoints, artifact/registry interfaces, and the beacon
 exposure. The `ployd` daemon serves both the control-plane and node APIs described below, exposing
 them over mutual TLS behind the beacon DNS entry.

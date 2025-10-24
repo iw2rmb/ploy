@@ -1,6 +1,6 @@
 # VPS Lab Environment
 
-Integration and end-to-end tests for Ploy v2 should target the dedicated VPS lab. The cluster
+Integration and end-to-end tests for Ploy Next should target the dedicated VPS lab. The cluster
 consists of three nodes:
 
 | Node | IP Address | SSH Access |

@@ -1,6 +1,6 @@
 # Testing Expectations
 
-While implementing Ploy v2, every task must ship with comprehensive unit and integration test
+While implementing Ploy Next, every task must ship with comprehensive unit and integration test
 coverage.
 
 - **Unit tests** — Cover control-plane logic, job lifecycle operations, queue transactions, and any

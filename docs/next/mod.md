@@ -1,6 +1,6 @@
 # Mods Workflow Example: Java 11 → Java 17 Upgrade
 
-This walkthrough demonstrates how Ploy v2 orchestrates a multi-step Mod using GitLab as the source
+This walkthrough demonstrates how Ploy Next orchestrates a multi-step Mod using GitLab as the source
 repository. The Mod upgrades a project from Java 11 to Java 17 using OpenRewrite (ORW) recipes.
 
 ## 1. Operator Invokes the Mod

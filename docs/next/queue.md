@@ -1,6 +1,6 @@
 # Work Queue & Scheduling
 
-Ploy v2 uses etcd as the canonical queue and scheduling engine for Mods and build gate jobs. This
+Ploy Next uses etcd as the canonical queue and scheduling engine for Mods and build gate jobs. This
 document describes how jobs enter the queue, how nodes claim work, capacity reporting, and retry
 behaviour.
 
