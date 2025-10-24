@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -22,19 +24,26 @@ const (
 	defaultWorkerJoinTimeout = 20 * time.Second
 )
 
-type nodeAddRequest struct {
-	ClusterID string                     `json:"cluster_id"`
-	Address   string                     `json:"address"`
-	Labels    map[string]string          `json:"labels,omitempty"`
-	Probes    []deploy.WorkerHealthProbe `json:"probes,omitempty"`
-	DryRun    bool                       `json:"dry_run,omitempty"`
+type nodeJoinRequest struct {
+	ClusterID string            `json:"cluster_id"`
+	WorkerID  string            `json:"worker_id,omitempty"`
+	Address   string            `json:"address"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	Probes    []nodeJoinProbe   `json:"probes,omitempty"`
+	DryRun    bool              `json:"dry_run,omitempty"`
 }
 
-type nodeAddResponse struct {
+type nodeJoinProbe struct {
+	Name         string `json:"name"`
+	Endpoint     string `json:"endpoint"`
+	ExpectStatus int    `json:"expect_status"`
+}
+
+type nodeJoinResponse struct {
 	WorkerID    string                       `json:"worker_id"`
 	Certificate deploy.LeafCertificate       `json:"certificate"`
-	DryRun      bool                         `json:"dry_run"`
 	Health      []registry.WorkerProbeResult `json:"health"`
+	DryRun      bool                         `json:"dry_run"`
 }
 
 func handleNode(args []string, stderr io.Writer) error {
@@ -56,7 +65,11 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		address stringValue
+		address  stringValue
+		user     stringValue
+		identity stringValue
+		ploydBin stringValue
+		sshPort  intValue
 	)
 	labels := make(labelMap)
 	probes := make(probeList, 0)
@@ -64,6 +77,10 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	fs.Var(&address, "address", "Worker address (host or IP)")
 	fs.Var(&labels, "label", "Apply a label (key=value). May be repeated.")
 	fs.Var(&probes, "health-probe", "Register a health probe in the form name=url. May be repeated.")
+	fs.Var(&user, "user", "SSH username (default: root)")
+	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
+	fs.Var(&sshPort, "ssh-port", "SSH port (default: 22)")
+	fs.Var(&ploydBin, "ployd-binary", "Path to the ployd binary uploaded during provisioning (default: alongside the CLI)")
 	dryRun := fs.Bool("dry-run", false, "Preview onboarding without registering the node")
 
 	if err := fs.Parse(args); err != nil {
@@ -90,19 +107,80 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	payload := nodeAddRequest{
+	baseURL, err := controlPlaneBaseURL(desc)
+	if err != nil {
+		return err
+	}
+
+	workerAddress := strings.TrimSpace(address.value)
+
+	identityPath := strings.TrimSpace(identity.value)
+	if identity.set {
+		identityPath = expandPath(identityPath)
+	} else {
+		identityPath = defaultIdentityPath()
+	}
+
+	var ploydPath string
+	if !*dryRun {
+		if ploydBin.set {
+			ploydPath = expandPath(strings.TrimSpace(ploydBin.value))
+		} else {
+			ploydPath, err = defaultPloydBinaryPath()
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if !*dryRun {
+		provEnv := map[string]string{
+			"PLOY_CONTROL_PLANE_ENDPOINT": baseURL,
+		}
+		provOpts := deploy.ProvisionOptions{
+			Host:            workerAddress,
+			Address:         workerAddress,
+			User:            strings.TrimSpace(user.value),
+			Port:            sshPort.value,
+			IdentityFile:    identityPath,
+			PloydBinaryPath: ploydPath,
+			Stdout:          stderr,
+			Stderr:          stderr,
+			Mode:            deploy.ProvisionModeWorker,
+			ScriptEnv:       provEnv,
+			ServiceChecks:   []string{"ployd"},
+		}
+		if err := deploy.ProvisionHost(context.Background(), provOpts); err != nil {
+			return err
+		}
+	}
+
+	probesPayload := make([]nodeJoinProbe, 0, len(probes))
+	for _, probe := range probes {
+		probesPayload = append(probesPayload, nodeJoinProbe{
+			Name:         strings.TrimSpace(probe.Name),
+			Endpoint:     strings.TrimSpace(probe.Endpoint),
+			ExpectStatus: probe.ExpectStatus,
+		})
+	}
+
+	request := nodeJoinRequest{
 		ClusterID: desc.ID,
-		Address:   strings.TrimSpace(address.value),
+		Address:   workerAddress,
 		Labels:    map[string]string(labels),
-		Probes:    []deploy.WorkerHealthProbe(probes),
+		Probes:    probesPayload,
 		DryRun:    *dryRun,
+	}
+
+	client, err := newControlPlaneClient(baseURL, desc, defaultWorkerJoinTimeout)
+	if err != nil {
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultWorkerJoinTimeout)
 	defer cancel()
 
-	url := buildAdminURL(payload.Address)
-	result, err := registerNode(ctx, url, payload)
+	result, err := registerWorker(ctx, client, baseURL, request)
 	if err != nil {
 		return err
 	}
@@ -155,60 +233,70 @@ func runNodeAdd(args []string, stderr io.Writer) error {
 	return nil
 }
 
-func buildAdminURL(address string) string {
-	if base := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_ENDPOINT")); base != "" {
-		return strings.TrimRight(base, "/") + "/admin/v1/nodes"
+func controlPlaneBaseURL(desc config.Descriptor) (string, error) {
+	if base := strings.TrimSpace(desc.ControlPlaneURL); base != "" {
+		return strings.TrimRight(base, "/"), nil
 	}
-	scheme := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_SCHEME"))
-	if scheme == "" {
-		scheme = "http"
+	if base := strings.TrimSpace(desc.BeaconURL); base != "" {
+		return strings.TrimRight(base, "/"), nil
 	}
-	port := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_PORT"))
-	if port == "" {
-		port = "8443"
-	}
-	host := strings.TrimSpace(address)
-	if host == "" {
-		host = "localhost"
-	}
-	if strings.Contains(host, "://") {
-		return strings.TrimRight(host, "/") + "/admin/v1/nodes"
-	}
-	if strings.Count(host, ":") == 1 && !strings.HasSuffix(host, "]") {
-		return fmt.Sprintf("%s://%s/admin/v1/nodes", scheme, host)
-	}
-	return fmt.Sprintf("%s://%s:%s/admin/v1/nodes", scheme, host, port)
+	return "", errors.New("control-plane URL missing; rerun 'ploy deploy bootstrap'")
 }
 
-func registerNode(ctx context.Context, url string, payload nodeAddRequest) (nodeAddResponse, error) {
+func newControlPlaneClient(baseURL string, desc config.Descriptor, timeout time.Duration) (*http.Client, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if strings.HasPrefix(baseURL, "https://") {
+		caPath := strings.TrimSpace(desc.CABundlePath)
+		if caPath == "" {
+			return nil, errors.New("cluster CA bundle path missing; rerun 'ploy deploy bootstrap'")
+		}
+		data, err := os.ReadFile(caPath)
+		if err != nil {
+			return nil, fmt.Errorf("read cluster CA bundle: %w", err)
+		}
+		pool := x509.NewCertPool()
+		if ok := pool.AppendCertsFromPEM(data); !ok {
+			return nil, errors.New("cluster CA bundle invalid")
+		}
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs:    pool,
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+	return &http.Client{Timeout: timeout, Transport: transport}, nil
+}
+
+func registerWorker(ctx context.Context, client *http.Client, baseURL string, payload nodeJoinRequest) (nodeJoinResponse, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nodeAddResponse{}, err
+		return nodeJoinResponse{}, err
 	}
+	url := strings.TrimRight(baseURL, "/") + "/v2/nodes"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return nodeAddResponse{}, err
+		return nodeJoinResponse{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nodeAddResponse{}, err
+		return nodeJoinResponse{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
 		msg, _ := io.ReadAll(resp.Body)
 		if len(msg) == 0 {
-			return nodeAddResponse{}, fmt.Errorf("ployd responded with %s", resp.Status)
+			msg = []byte(resp.Status)
 		}
-		return nodeAddResponse{}, fmt.Errorf("ployd: %s", strings.TrimSpace(string(msg)))
+		return nodeJoinResponse{}, fmt.Errorf("worker registration failed: %s", strings.TrimSpace(string(msg)))
 	}
-	var out nodeAddResponse
+	var out nodeJoinResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return nodeAddResponse{}, err
+		return nodeJoinResponse{}, err
+	}
+	if out.WorkerID == "" {
+		out.WorkerID = payload.WorkerID
 	}
 	return out, nil
-
 }
 
 type labelMap map[string]string

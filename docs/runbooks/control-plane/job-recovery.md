@@ -8,7 +8,7 @@ jobs failing to re-queue after retry budget resets.
 
 ## Prerequisites
 
-- `etcdctl` configured with the cluster CA (`export ETCDCTL_ENDPOINTS=$PLOY_ETCD_ENDPOINTS`).
+- `etcdctl` configured with the cluster CA (`export ETCDCTL_ENDPOINTS=http://127.0.0.1:2379`).
 - Access to the control-plane API host(s) or the etcd cluster.
 - Knowledge of the affected Mod ticket (`mod-xxxx`) and job ID when available.
 

@@ -10,16 +10,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
-
-	clientv3 "go.etcd.io/etcd/client/v3"
 
 	cfgstore "github.com/iw2rmb/ploy/cmd/ploy/config"
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
@@ -90,31 +86,16 @@ type gitlabRotateSecretResult struct {
 }
 
 const (
-	etcdEndpointsEnv     = "PLOY_ETCD_ENDPOINTS"
-	etcdUsernameEnv      = "PLOY_ETCD_USERNAME"
-	etcdPasswordEnv      = "PLOY_ETCD_PASSWORD"
-	etcdCAEnv            = "PLOY_ETCD_TLS_CA"
-	etcdCertEnv          = "PLOY_ETCD_TLS_CERT"
-	etcdKeyEnv           = "PLOY_ETCD_TLS_KEY"
-	etcdSkipVerifyEnv    = "PLOY_ETCD_TLS_SKIP_VERIFY"
 	controlPlaneURLEnv   = "PLOY_CONTROL_PLANE_URL"
 	defaultGitlabTimeout = 10 * time.Second
 )
 
 var gitlabConfigStoreFactory = func(ctx context.Context) (gitlabStore, error) {
-	endpoints := etcdEndpointsFromEnv()
-	if len(endpoints) > 0 {
-		client, err := newEtcdClient(ctx, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		return &etcdGitlabStore{Store: gitlabcfg.NewStore(gitlabcfg.NewEtcdKV(client)), client: client}, nil
-	}
-	path, err := gitlabConfigFile()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return gitlabcfg.NewStore(newFileKV(path)), nil
+	return newHTTPGitlabConfigStore(base, httpClient), nil
 }
 
 var gitlabSignerClientFactory = func(ctx context.Context) (gitlabSignerClient, error) {
@@ -652,8 +633,7 @@ func (c *httpGitlabSignerClient) RotateSecret(ctx context.Context, req gitlabRot
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 300 {
-		message, _ := io.ReadAll(resp.Body)
-		return gitlabRotateSecretResult{}, fmt.Errorf("rotate GitLab secret: %s", strings.TrimSpace(string(message)))
+		return gitlabRotateSecretResult{}, fmt.Errorf("rotate GitLab secret: %w", controlPlaneHTTPError(resp))
 	}
 
 	var response struct {
@@ -695,8 +675,7 @@ func (c *httpGitlabSignerClient) Status(ctx context.Context, req gitlabSignerSta
 		return gitlabSignerStatus{}, errors.New("gitlab signer status endpoint unavailable on control plane")
 	}
 	if resp.StatusCode >= 300 {
-		message, _ := io.ReadAll(resp.Body)
-		return gitlabSignerStatus{}, fmt.Errorf("fetch signer status: %s", strings.TrimSpace(string(message)))
+		return gitlabSignerStatus{}, fmt.Errorf("fetch signer status: %w", controlPlaneHTTPError(resp))
 	}
 
 	var payload struct {
@@ -785,55 +764,29 @@ func parseTimestamp(value string) time.Time {
 	return time.Time{}
 }
 
-type fileKV struct {
-	path string
-}
-
-func newFileKV(path string) *fileKV {
-	return &fileKV{path: path}
-}
-
-func (f *fileKV) Get(_ context.Context, _ string) (gitlabcfg.Value, bool, error) {
-	data, err := os.ReadFile(f.path)
+func controlPlaneHTTPError(resp *http.Response) error {
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return gitlabcfg.Value{}, false, nil
+		return fmt.Errorf("control plane responded with %s", resp.Status)
+	}
+	var payload struct {
+		Error   string `json:"error"`
+		Message string `json:"message"`
+	}
+	if len(data) > 0 {
+		if err := json.Unmarshal(data, &payload); err == nil {
+			if msg := strings.TrimSpace(payload.Message); msg != "" {
+				return errors.New(msg)
+			}
+			if msg := strings.TrimSpace(payload.Error); msg != "" {
+				return errors.New(msg)
+			}
 		}
-		return gitlabcfg.Value{}, false, fmt.Errorf("read gitlab config: %w", err)
+		if msg := strings.TrimSpace(string(data)); msg != "" {
+			return errors.New(msg)
+		}
 	}
-	info, err := os.Stat(f.path)
-	if err != nil {
-		return gitlabcfg.Value{}, false, fmt.Errorf("stat gitlab config: %w", err)
-	}
-	return gitlabcfg.Value{Data: string(data), Revision: info.ModTime().UnixNano()}, true, nil
-}
-
-func (f *fileKV) Put(_ context.Context, _ string, value string) (int64, error) {
-	if err := os.MkdirAll(filepath.Dir(f.path), 0o755); err != nil {
-		return 0, fmt.Errorf("create gitlab config directory: %w", err)
-	}
-	if err := os.WriteFile(f.path, []byte(value), 0o600); err != nil {
-		return 0, fmt.Errorf("write gitlab config: %w", err)
-	}
-	info, err := os.Stat(f.path)
-	if err != nil {
-		return 0, fmt.Errorf("stat gitlab config: %w", err)
-	}
-	return info.ModTime().UnixNano(), nil
-}
-
-func gitlabConfigFile() (string, error) {
-	if override := strings.TrimSpace(os.Getenv("PLOY_CONFIG_HOME")); override != "" {
-		return filepath.Join(override, "gitlab", "config.json"), nil
-	}
-	if base := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); base != "" {
-		return filepath.Join(base, "ploy", "gitlab", "config.json"), nil
-	}
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve config dir: %w", err)
-	}
-	return filepath.Join(dir, "ploy", "gitlab", "config.json"), nil
+	return fmt.Errorf("control plane responded with %s", resp.Status)
 }
 
 func closeGitlabStore(store gitlabStore) {
@@ -842,85 +795,89 @@ func closeGitlabStore(store gitlabStore) {
 	}
 }
 
-type etcdGitlabStore struct {
-	*gitlabcfg.Store
-	client *clientv3.Client
+type httpGitlabConfigStore struct {
+	base *url.URL
+	http *http.Client
 }
 
-func (s *etcdGitlabStore) Close() error {
-	return s.client.Close()
+func newHTTPGitlabConfigStore(base *url.URL, httpClient *http.Client) *httpGitlabConfigStore {
+	clone := *base
+	return &httpGitlabConfigStore{base: &clone, http: httpClient}
 }
 
-func etcdEndpointsFromEnv() []string {
-	raw := strings.TrimSpace(os.Getenv(etcdEndpointsEnv))
-	if raw == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	endpoints := make([]string, 0, len(parts))
-	for _, part := range parts {
-		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			endpoints = append(endpoints, trimmed)
-		}
-	}
-	return endpoints
-}
+func (s *httpGitlabConfigStore) Close() error { return nil }
 
-func newEtcdClient(ctx context.Context, endpoints []string) (*clientv3.Client, error) {
-	cfg := clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
-		Context:     ctx,
-	}
-	user := strings.TrimSpace(os.Getenv(etcdUsernameEnv))
-	if user != "" {
-		cfg.Username = user
-		cfg.Password = os.Getenv(etcdPasswordEnv)
-	}
-	tlsCfg, err := buildEtcdTLSConfig()
+func (s *httpGitlabConfigStore) Load(ctx context.Context) (gitlabcfg.Config, int64, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.endpoint("/v2/config/gitlab"), nil)
 	if err != nil {
-		return nil, err
+		return gitlabcfg.Config{}, 0, fmt.Errorf("build gitlab config request: %w", err)
 	}
-	if tlsCfg != nil {
-		cfg.TLS = tlsCfg
-	}
-	client, err := clientv3.New(cfg)
+	resp, err := s.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("connect etcd: %w", err)
+		return gitlabcfg.Config{}, 0, fmt.Errorf("fetch gitlab config: %w", err)
 	}
-	return client, nil
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return gitlabcfg.Config{}, 0, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return gitlabcfg.Config{}, 0, controlPlaneHTTPError(resp)
+	}
+
+	var payload struct {
+		Config   gitlabcfg.Config `json:"config"`
+		Revision int64            `json:"revision"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return gitlabcfg.Config{}, 0, fmt.Errorf("decode gitlab config response: %w", err)
+	}
+	return payload.Config, payload.Revision, nil
 }
 
-func buildEtcdTLSConfig() (*tls.Config, error) {
-	caPath := strings.TrimSpace(os.Getenv(etcdCAEnv))
-	certPath := strings.TrimSpace(os.Getenv(etcdCertEnv))
-	keyPath := strings.TrimSpace(os.Getenv(etcdKeyEnv))
-	skipVerify := strings.EqualFold(strings.TrimSpace(os.Getenv(etcdSkipVerifyEnv)), "true")
-	if caPath == "" && certPath == "" && keyPath == "" && !skipVerify {
-		return nil, nil
+func (s *httpGitlabConfigStore) Save(ctx context.Context, cfg gitlabcfg.Config) (int64, error) {
+	_, revision, err := s.Load(ctx)
+	if err != nil {
+		return 0, err
 	}
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: skipVerify}
-	if caPath != "" {
-		caData, err := os.ReadFile(caPath)
-		if err != nil {
-			return nil, fmt.Errorf("read etcd CA: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if ok := pool.AppendCertsFromPEM(caData); !ok {
-			return nil, errors.New("parse etcd CA bundle")
-		}
-		tlsCfg.RootCAs = pool
+
+	request := map[string]any{
+		"revision": revision,
+		"config":   cfg,
 	}
-	if certPath != "" || keyPath != "" {
-		if certPath == "" || keyPath == "" {
-			return nil, errors.New("both etcd TLS cert and key required")
-		}
-		cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-		if err != nil {
-			return nil, fmt.Errorf("load etcd client cert: %w", err)
-		}
-		tlsCfg.Certificates = []tls.Certificate{cert}
+	body, err := json.Marshal(request)
+	if err != nil {
+		return 0, fmt.Errorf("marshal gitlab config: %w", err)
 	}
-	return tlsCfg, nil
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.endpoint("/v2/config/gitlab"), bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("build gitlab config update request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("update gitlab config: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, controlPlaneHTTPError(resp)
+	}
+
+	var payload struct {
+		Revision int64 `json:"revision"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return 0, fmt.Errorf("decode gitlab config update response: %w", err)
+	}
+	return payload.Revision, nil
+}
+
+func (s *httpGitlabConfigStore) endpoint(path string) string {
+	u := *s.base
+	u.Path = strings.TrimSuffix(u.Path, "/") + path
+	u.RawQuery = ""
+	return u.String()
 }

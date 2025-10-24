@@ -1,15 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
-
-	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
@@ -19,34 +21,94 @@ type carotator interface {
 	Close() error
 }
 
-type managedCARotator struct {
-	manager *deploy.CARotationManager
-	client  *clientv3.Client
+type httpCARotator struct {
+	base      *url.URL
+	http      *http.Client
+	clusterID string
 }
 
-func (m *managedCARotator) Rotate(ctx context.Context, opts deploy.RotateOptions) (deploy.RotateResult, error) {
-	return m.manager.Rotate(ctx, opts)
+func newHTTPCARotator(base *url.URL, client *http.Client, clusterID string) *httpCARotator {
+	clone := *base
+	return &httpCARotator{
+		base:      &clone,
+		http:      client,
+		clusterID: clusterID,
+	}
 }
 
-func (m *managedCARotator) Close() error {
-	return m.client.Close()
+func (r *httpCARotator) Rotate(ctx context.Context, opts deploy.RotateOptions) (deploy.RotateResult, error) {
+	payload := map[string]any{
+		"cluster_id": r.clusterID,
+		"dry_run":    opts.DryRun,
+		"operator":   strings.TrimSpace(opts.Operator),
+		"reason":     strings.TrimSpace(opts.Reason),
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return deploy.RotateResult{}, fmt.Errorf("marshal rotation request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint("/v2/beacon/rotate-ca"), bytes.NewReader(body))
+	if err != nil {
+		return deploy.RotateResult{}, fmt.Errorf("build rotation request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.http.Do(req)
+	if err != nil {
+		return deploy.RotateResult{}, fmt.Errorf("invoke rotation: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return deploy.RotateResult{}, fmt.Errorf("rotate beacon CA: %w", controlPlaneHTTPError(resp))
+	}
+
+	var response struct {
+		DryRun                    bool                     `json:"dry_run"`
+		OldVersion                string                   `json:"old_version"`
+		NewVersion                string                   `json:"new_version"`
+		UpdatedBeaconCertificates []deploy.LeafCertificate `json:"updated_beacon_certificates"`
+		UpdatedWorkerCertificates []deploy.LeafCertificate `json:"updated_worker_certificates"`
+		Revoked                   deploy.RevokedRecord     `json:"revoked"`
+		Operator                  string                   `json:"operator"`
+		Reason                    string                   `json:"reason"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return deploy.RotateResult{}, fmt.Errorf("decode rotation response: %w", err)
+	}
+
+	return deploy.RotateResult{
+		DryRun:                    response.DryRun,
+		OldVersion:                response.OldVersion,
+		NewVersion:                response.NewVersion,
+		UpdatedBeaconCertificates: response.UpdatedBeaconCertificates,
+		UpdatedWorkerCertificates: response.UpdatedWorkerCertificates,
+		Revoked:                   response.Revoked,
+		Operator:                  strings.TrimSpace(response.Operator),
+		Reason:                    strings.TrimSpace(response.Reason),
+	}, nil
+}
+
+func (r *httpCARotator) Close() error { return nil }
+
+func (r *httpCARotator) endpoint(path string) string {
+	u := *r.base
+	u.Path = strings.TrimSuffix(u.Path, "/") + path
+	u.RawQuery = ""
+	return u.String()
 }
 
 var beaconRotationManagerFactory = func(ctx context.Context, clusterID string) (carotator, error) {
-	endpoints := etcdEndpointsFromEnv()
-	if len(endpoints) == 0 {
-		return nil, errors.New("PLOY_ETCD_ENDPOINTS must be set for CA rotation")
-	}
-	client, err := newEtcdClient(ctx, endpoints)
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return nil, err
 	}
-	manager, err := deploy.NewCARotationManager(client, clusterID)
-	if err != nil {
-		_ = client.Close()
-		return nil, err
+	trimmed := strings.TrimSpace(clusterID)
+	if trimmed == "" {
+		return nil, errors.New("cluster id required")
 	}
-	return &managedCARotator{manager: manager, client: client}, nil
+	return newHTTPCARotator(base, httpClient, trimmed), nil
 }
 
 func handleBeacon(args []string, stderr io.Writer) error {

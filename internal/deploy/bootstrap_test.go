@@ -36,16 +36,26 @@ func TestRunBootstrapRequiresHost(t *testing.T) {
 
 func TestRunBootstrapInvokesSSH(t *testing.T) {
 	ctx := context.Background()
-	var calls []struct {
-		command string
-		args    []string
-	}
+	var (
+		calls []struct {
+			command string
+			args    []string
+		}
+		scriptBody string
+	)
 	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin io.Reader, _ IOStreams) error {
 		cp := append([]string(nil), args...)
 		calls = append(calls, struct {
 			command string
 			args    []string
 		}{command: command, args: cp})
+		if command == "ssh" && len(args) >= 3 {
+			last := args[len(args)-3:]
+			if last[0] == "bash" && last[1] == "-s" && last[2] == "--" && stdin != nil {
+				data, _ := io.ReadAll(stdin)
+				scriptBody = string(data)
+			}
+		}
 		return nil
 	})
 
@@ -77,9 +87,10 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 
 	var (
 		copiedBinary bool
-		copiedConfig bool
 		installed    bool
-		executed     bool
+		ranScript    bool
+		checkedEtcd  bool
+		checkedPloyd bool
 	)
 	for _, call := range calls {
 		switch call.command {
@@ -87,9 +98,6 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 			for _, arg := range call.args {
 				if strings.Contains(arg, "/tmp/ployd-") {
 					copiedBinary = true
-				}
-				if strings.Contains(arg, "/tmp/ployd-bootstrap-") {
-					copiedConfig = true
 				}
 			}
 		case "ssh":
@@ -99,9 +107,17 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 			payload := call.args[len(call.args)-1]
 			if strings.Contains(payload, "install -m0755") && strings.Contains(payload, remotePloydBinaryPath) {
 				installed = true
+			} else if len(call.args) >= 3 {
+				last := call.args[len(call.args)-3:]
+				if last[0] == "bash" && last[1] == "-s" && last[2] == "--" {
+					ranScript = true
+				}
 			}
-			if strings.Contains(payload, remotePloydBinaryPath) && strings.Contains(payload, "--mode bootstrap") {
-				executed = true
+			if strings.Contains(payload, "systemctl is-active --quiet 'etcd'") {
+				checkedEtcd = true
+			}
+			if strings.Contains(payload, "systemctl is-active --quiet 'ployd'") {
+				checkedPloyd = true
 			}
 		}
 	}
@@ -109,14 +125,20 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 	if !copiedBinary {
 		t.Fatalf("expected ployd binary to be copied via scp; calls=%v", calls)
 	}
-	if !copiedConfig {
-		t.Fatalf("expected bootstrap config to be copied via scp; calls=%v", calls)
-	}
 	if !installed {
 		t.Fatalf("expected remote install ssh command; calls=%v", calls)
 	}
-	if !executed {
-		t.Fatalf("expected remote ployd bootstrap execution; calls=%v", calls)
+	if !ranScript {
+		t.Fatalf("expected bootstrap script execution; calls=%v", calls)
+	}
+	if !checkedEtcd {
+		t.Fatalf("expected etcd service check; calls=%v", calls)
+	}
+	if !checkedPloyd {
+		t.Fatalf("expected ployd service check; calls=%v", calls)
+	}
+	if !strings.Contains(scriptBody, "export PLOYD_MODE=\"beacon\"") {
+		t.Fatalf("script does not configure beacon mode: %q", scriptBody)
 	}
 }
 
@@ -237,9 +259,10 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 
 	var (
 		binaryCopied  bool
-		configCopied  bool
 		remoteInstall bool
-		remoteExec    bool
+		scriptRan     bool
+		checkedEtcd   bool
+		checkedPloyd  bool
 		caInstalled   bool
 	)
 	for _, c := range calls {
@@ -249,9 +272,6 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 				if strings.Contains(arg, "/tmp/ployd-") {
 					binaryCopied = true
 				}
-				if strings.Contains(arg, "/tmp/ployd-bootstrap-") {
-					configCopied = true
-				}
 			}
 		case "ssh":
 			if len(c.args) == 0 {
@@ -260,9 +280,17 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 			payload := c.args[len(c.args)-1]
 			if strings.Contains(payload, "install -m0755") && strings.Contains(payload, remotePloydBinaryPath) {
 				remoteInstall = true
+			} else if len(c.args) >= 3 {
+				last := c.args[len(c.args)-3:]
+				if last[0] == "bash" && last[1] == "-s" && last[2] == "--" {
+					scriptRan = true
+				}
 			}
-			if strings.Contains(payload, remotePloydBinaryPath) && strings.Contains(payload, "--mode bootstrap") {
-				remoteExec = true
+			if strings.Contains(payload, "systemctl is-active --quiet 'etcd'") {
+				checkedEtcd = true
+			}
+			if strings.Contains(payload, "systemctl is-active --quiet 'ployd'") {
+				checkedPloyd = true
 			}
 		case "sudo":
 			if len(c.args) >= 2 && c.args[0] == "security" && c.args[1] == "add-trusted-cert" {
@@ -273,14 +301,17 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 	if !binaryCopied {
 		t.Fatalf("expected ployd binary copy command; calls=%v", calls)
 	}
-	if !configCopied {
-		t.Fatalf("expected bootstrap config copy command; calls=%v", calls)
-	}
 	if !remoteInstall {
 		t.Fatalf("expected remote install command; calls=%v", calls)
 	}
-	if !remoteExec {
-		t.Fatalf("expected remote ployd execution; calls=%v", calls)
+	if !scriptRan {
+		t.Fatalf("expected bootstrap script execution; calls=%v", calls)
+	}
+	if !checkedEtcd {
+		t.Fatalf("expected etcd service check; calls=%v", calls)
+	}
+	if !checkedPloyd {
+		t.Fatalf("expected ployd service check; calls=%v", calls)
 	}
 	if !caInstalled {
 		t.Fatalf("expected system CA install command to be invoked")
