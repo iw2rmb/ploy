@@ -2,11 +2,18 @@ package httpserver
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,10 +22,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
+	"github.com/iw2rmb/ploy/internal/api/httpserver/security"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
@@ -26,7 +36,53 @@ import (
 	"github.com/iw2rmb/ploy/internal/deploy"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/version"
 )
+
+const (
+	errorCodeArtifactUpload   = "ARTIFACT_UPLOAD_UNIMPLEMENTED"
+	errorCodeArtifactDelete   = "ARTIFACT_DELETE_UNIMPLEMENTED"
+	errorCodeRegistryUpload   = "REGISTRY_UPLOAD_UNIMPLEMENTED"
+	errorCodeRegistryManifest = "REGISTRY_MANIFEST_UNIMPLEMENTED"
+	errorCodeRegistryBlob     = "REGISTRY_BLOB_UNIMPLEMENTED"
+	errorCodeRegistryTags     = "REGISTRY_TAGS_UNIMPLEMENTED"
+)
+
+var (
+	artifactRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_artifact_http_requests_total",
+		Help: "Count of control-plane artifact API requests.",
+	}, []string{"method", "status"})
+	artifactPayloadBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_artifact_payload_bytes_total",
+		Help: "Bytes processed by artifact API payloads.",
+	}, []string{"operation"})
+	registryRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_registry_http_requests_total",
+		Help: "Count of control-plane registry API requests.",
+	}, []string{"resource", "method", "status"})
+	registryPayloadBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_registry_payload_bytes_total",
+		Help: "Bytes processed by registry API payloads.",
+	}, []string{"resource", "operation"})
+	configRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_config_http_requests_total",
+		Help: "Count of control-plane config API requests.",
+	}, []string{"method", "status"})
+	configUpdatesTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_config_updates_total",
+		Help: "Count of persisted configuration updates.",
+	}, []string{"cluster"})
+	beaconRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "ploy_beacon_http_requests_total",
+		Help: "Count of beacon discovery API requests.",
+	}, []string{"resource", "method", "status"})
+)
+
+func init() {
+	prometheus.MustRegister(artifactRequestsTotal, artifactPayloadBytes, registryRequestsTotal, registryPayloadBytes)
+	prometheus.MustRegister(configRequestsTotal, configUpdatesTotal, beaconRequestsTotal)
+}
 
 // Server exposes the control-plane scheduler over HTTP.
 type controlPlaneServer struct {
@@ -36,22 +92,48 @@ type controlPlaneServer struct {
 	streams   *logstream.Hub
 	etcd      *clientv3.Client
 	mods      *controlplanemods.Service
+	auth      *security.Manager
+	gatherer  prometheus.Gatherer
+	cfgStore  *config.Store
 }
 
 // Options configure the HTTP server handlers.
 type ControlPlaneOptions struct {
-	Scheduler *scheduler.Scheduler
-	Signer    *gitlab.Signer
-	Streams   *logstream.Hub
-	Gatherer  prometheus.Gatherer
-	Etcd      *clientv3.Client
-	Rotations *events.RotationHub
-	Mods      *controlplanemods.Service
+	Scheduler    *scheduler.Scheduler
+	Signer       *gitlab.Signer
+	Streams      *logstream.Hub
+	Gatherer     prometheus.Gatherer
+	Etcd         *clientv3.Client
+	Rotations    *events.RotationHub
+	Mods         *controlplanemods.Service
+	Auth         *security.Manager
+	AuthVerifier security.TokenVerifier
 }
 
 // New returns an HTTP handler rooted at /v1.
 func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux := http.NewServeMux()
+
+	var authManager *security.Manager
+	switch {
+	case opts.Auth != nil:
+		authManager = opts.Auth
+	case opts.AuthVerifier != nil:
+		authManager = security.NewManager(opts.AuthVerifier)
+	}
+
+	gatherer := opts.Gatherer
+	if gatherer == nil {
+		gatherer = prometheus.DefaultGatherer
+	}
+
+	var cfgStore *config.Store
+	if opts.Etcd != nil {
+		if store, err := config.NewStore(opts.Etcd); err == nil {
+			cfgStore = store
+		}
+	}
+
 	h := &controlPlaneServer{
 		scheduler: opts.Scheduler,
 		signer:    opts.Signer,
@@ -59,30 +141,57 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		etcd:      opts.Etcd,
 		rotations: opts.Rotations,
 		mods:      opts.Mods,
+		auth:      authManager,
+		gatherer:  gatherer,
+		cfgStore:  cfgStore,
 	}
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
 	}
-	mux.HandleFunc("/v1/jobs", h.handleJobs)
-	mux.HandleFunc("/v1/jobs/claim", h.handleClaim)
-	mux.HandleFunc("/v1/jobs/", h.handleJobSubpath)
-	mux.HandleFunc("/v1/health", h.handleHealth)
-	mux.HandleFunc("/v1/gitlab/signer/secrets", h.handleSignerSecrets)
-	mux.HandleFunc("/v1/gitlab/signer/tokens", h.handleSignerTokens)
-	mux.HandleFunc("/v1/gitlab/signer/rotations", h.handleSignerRotations)
-	mux.HandleFunc("/v1/nodes", h.handleNodes)
-	mux.HandleFunc("/v1/beacon/rotate-ca", h.handleBeaconRotateCA)
-	mux.HandleFunc("/v1/config/gitlab", h.handleGitLabConfig)
+	h.registerRoute(mux, "", "/v1/jobs", h.handleJobs)
+	h.registerRoute(mux, http.MethodPost, "/v1/jobs/claim", h.handleClaim)
+	h.registerRoute(mux, "", "/v1/jobs/", h.handleJobSubpath)
+	h.registerRoute(mux, http.MethodGet, "/v1/health", h.handleHealth)
+	h.registerRoute(mux, http.MethodPut, "/v1/gitlab/signer/secrets", h.handleSignerSecrets, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodPost, "/v1/gitlab/signer/tokens", h.handleSignerTokens, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/gitlab/signer/rotations", h.handleSignerRotations, security.ScopeAdmin)
+	h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
+	h.registerRoute(mux, http.MethodPost, "/v1/beacon/rotate-ca", h.handleBeaconRotateCA, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/beacon/nodes", h.handleBeaconNodes)
+	h.registerRoute(mux, http.MethodGet, "/v1/beacon/ca", h.handleBeaconCA)
+	h.registerRoute(mux, http.MethodGet, "/v1/beacon/config", h.handleBeaconConfig)
+	h.registerRoute(mux, http.MethodPost, "/v1/beacon/promote", h.handleBeaconPromote, security.ScopeAdmin)
+	h.registerRoute(mux, "", "/v1/config/gitlab", h.handleGitLabConfig, security.ScopeAdmin)
+	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/version", h.handleVersion)
 	if h.mods != nil {
-		mux.HandleFunc("/v1/mods/tickets", h.handleModsTickets)
-		mux.HandleFunc("/v1/mods/tickets/", h.handleModsTicketSubpath)
+		h.registerRoute(mux, http.MethodPost, "/v1/mods", h.handleModsSubmit, security.ScopeMods)
+		h.registerRoute(mux, "", "/v1/mods/", h.handleModsSubpath, security.ScopeMods)
+		h.registerRoute(mux, http.MethodPost, "/v1/mods/tickets", h.handleModsTickets, security.ScopeMods)
+		h.registerRoute(mux, "", "/v1/mods/tickets/", h.handleModsTicketSubpath, security.ScopeMods)
 	}
-	gatherer := opts.Gatherer
-	if gatherer == nil {
-		gatherer = prometheus.DefaultGatherer
-	}
+	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, security.ScopeArtifactsWrite)
+	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, security.ScopeArtifactsRead)
+	h.registerRoute(mux, "", "/v1/artifacts/", h.handleArtifactsSubpath)
+	h.registerRoute(mux, "", "/v1/registry/", h.handleRegistry)
 	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	return mux
+}
+
+func (s *controlPlaneServer) registerRoute(mux *http.ServeMux, method, path string, handler http.HandlerFunc, scopes ...string) {
+	var final http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if method != "" && r.Method != method {
+			w.Header().Set("Allow", method)
+			writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		handler(w, r)
+	})
+	if s.auth != nil {
+		final = s.auth.Middleware(scopes...)(final)
+	}
+	mux.Handle(path, final)
 }
 
 func (s *controlPlaneServer) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +204,92 @@ func (s *controlPlaneServer) handleHealth(w http.ResponseWriter, r *http.Request
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *controlPlaneServer) handleStatusSummary(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	status := http.StatusOK
+
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id query parameter required")
+		return
+	}
+
+	queueDepths := s.collectQueueDepths()
+	totalDepth := 0.0
+	priorities := make([]map[string]any, 0, len(queueDepths))
+	for priority, depth := range queueDepths {
+		priorities = append(priorities, map[string]any{
+			"priority": priority,
+			"depth":    depth,
+		})
+		totalDepth += depth
+	}
+	sort.Slice(priorities, func(i, j int) bool {
+		pi := fmt.Sprintf("%v", priorities[i]["priority"])
+		pj := fmt.Sprintf("%v", priorities[j]["priority"])
+		return pi < pj
+	})
+
+	workerStats := map[string]any{
+		"total": 0,
+		"phases": map[string]int{
+			"ready":       0,
+			"registering": 0,
+			"error":       0,
+			"unknown":     0,
+		},
+	}
+
+	reg, err := registry.NewWorkerRegistry(s.etcd, clusterID)
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+	descriptors, err := reg.List(r.Context())
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	phases := workerStats["phases"].(map[string]int)
+	for _, descriptor := range descriptors {
+		phase := strings.TrimSpace(descriptor.Status.Phase)
+		if phase == "" {
+			phase = "unknown"
+		}
+		phases[phase]++
+	}
+	workerStats["total"] = len(descriptors)
+
+	payload := map[string]any{
+		"cluster_id": clusterID,
+		"timestamp":  time.Now().UTC().Format(time.RFC3339Nano),
+		"queue": map[string]any{
+			"total_depth": totalDepth,
+			"priorities":  priorities,
+		},
+		"workers": workerStats,
+	}
+
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, status, payload)
+}
+
+func (s *controlPlaneServer) handleVersion(w http.ResponseWriter, r *http.Request) {
+	payload := map[string]any{
+		"version":  strings.TrimSpace(version.Version),
+		"commit":   strings.TrimSpace(version.Commit),
+		"built_at": strings.TrimSpace(version.BuiltAt),
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, payload)
 }
 
 func (s *controlPlaneServer) handleNodes(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +369,414 @@ func (s *controlPlaneServer) handleBeaconRotateCA(w http.ResponseWriter, r *http
 	writeJSON(w, http.StatusOK, payload)
 }
 
+func (s *controlPlaneServer) handleBeaconNodes(w http.ResponseWriter, r *http.Request) {
+	status := http.StatusOK
+	defer func() {
+		recordBeaconRequest("nodes", http.MethodGet, status)
+	}()
+	if !s.ensureEtcd(w) {
+		return
+	}
+
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id query parameter required")
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		if errors.Is(err, deploy.ErrPKINotBootstrapped) {
+			status = http.StatusNotFound
+			writeErrorMessage(w, status, "cluster security materials not bootstrapped")
+		} else {
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	payload := map[string]any{
+		"cluster_id":     clusterID,
+		"revision":       state.Revision,
+		"nodes_revision": state.NodesRevision,
+		"issued_at":      time.Now().UTC().Format(time.RFC3339Nano),
+		"beacons":        sanitizeLeafCertificates(state.Nodes.Beacons, state.BeaconCertificates),
+		"workers":        sanitizeLeafCertificates(state.Nodes.Workers, state.WorkerCertificates),
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	if err := s.sendSignedJSON(w, status, payload, state.CurrentCA); err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+	}
+}
+
+func (s *controlPlaneServer) handleBeaconCA(w http.ResponseWriter, r *http.Request) {
+	status := http.StatusOK
+	defer func() {
+		recordBeaconRequest("ca", http.MethodGet, status)
+	}()
+	if !s.ensureEtcd(w) {
+		return
+	}
+
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id query parameter required")
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		if errors.Is(err, deploy.ErrPKINotBootstrapped) {
+			status = http.StatusNotFound
+			writeErrorMessage(w, status, "cluster security materials not bootstrapped")
+		} else {
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	payload := map[string]any{
+		"cluster_id":      clusterID,
+		"version":         state.CurrentCA.Version,
+		"serial_number":   state.CurrentCA.SerialNumber,
+		"subject":         state.CurrentCA.Subject,
+		"certificate_pem": state.CurrentCA.CertificatePEM,
+		"issued_at":       state.CurrentCA.IssuedAt.UTC().Format(time.RFC3339Nano),
+		"expires_at":      state.CurrentCA.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		"revoked":         state.Revoked,
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	if err := s.sendSignedJSON(w, status, payload, state.CurrentCA); err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+	}
+}
+
+func (s *controlPlaneServer) handleBeaconConfig(w http.ResponseWriter, r *http.Request) {
+	status := http.StatusOK
+	defer func() {
+		recordBeaconRequest("config", http.MethodGet, status)
+	}()
+	if !s.ensureEtcd(w) {
+		return
+	}
+
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id query parameter required")
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		if errors.Is(err, deploy.ErrPKINotBootstrapped) {
+			status = http.StatusNotFound
+			writeErrorMessage(w, status, "cluster security materials not bootstrapped")
+		} else {
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	store, err := s.configStore()
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	doc, revision, err := store.Load(r.Context(), clusterID)
+	if err != nil && !errors.Is(err, config.ErrNotFound) {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	payload := map[string]any{
+		"cluster_id": clusterID,
+		"issued_at":  time.Now().UTC().Format(time.RFC3339Nano),
+		"revision":   revision,
+		"config":     cloneAnyMap(doc.Data),
+	}
+	if strings.TrimSpace(doc.VersionTag) != "" {
+		payload["version_tag"] = doc.VersionTag
+	}
+	if !doc.UpdatedAt.IsZero() {
+		payload["updated_at"] = doc.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if strings.TrimSpace(doc.UpdatedBy) != "" {
+		payload["updated_by"] = doc.UpdatedBy
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	if err := s.sendSignedJSON(w, status, payload, state.CurrentCA); err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+	}
+}
+
+func (s *controlPlaneServer) handleBeaconPromote(w http.ResponseWriter, r *http.Request) {
+	status := http.StatusOK
+	defer func() {
+		recordBeaconRequest("promote", http.MethodPost, status)
+	}()
+	if !s.ensureEtcd(w) {
+		return
+	}
+
+	var req struct {
+		ClusterID string `json:"cluster_id"`
+		BeaconID  string `json:"beacon_id"`
+		Operator  string `json:"operator"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		status = http.StatusBadRequest
+		writeError(w, status, err)
+		return
+	}
+
+	clusterID := strings.TrimSpace(req.ClusterID)
+	beaconID := strings.TrimSpace(req.BeaconID)
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id is required")
+		return
+	}
+	if beaconID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "beacon_id is required")
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		if errors.Is(err, deploy.ErrPKINotBootstrapped) {
+			status = http.StatusNotFound
+			writeErrorMessage(w, status, "cluster security materials not bootstrapped")
+		} else {
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	record := map[string]any{
+		"cluster_id":  clusterID,
+		"beacon_id":   beaconID,
+		"operator":    strings.TrimSpace(req.Operator),
+		"promoted_at": time.Now().UTC().Format(time.RFC3339Nano),
+		"ca_version":  state.CurrentCA.Version,
+	}
+
+	if err := s.persistBeaconCanonical(r.Context(), clusterID, record); err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	if err := s.sendSignedJSON(w, status, record, state.CurrentCA); err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+	}
+}
+
+func (s *controlPlaneServer) handleClusterConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleConfigGet(w, r)
+	case http.MethodPut:
+		s.handleConfigPut(w, r)
+	default:
+		w.Header().Set("Allow", "GET, PUT")
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *controlPlaneServer) handleConfigGet(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	status := http.StatusOK
+	method := http.MethodGet
+	defer func() {
+		recordConfigRequest(method, status)
+	}()
+
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id query parameter required")
+		return
+	}
+
+	store, err := s.configStore()
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	doc, revision, err := store.Load(r.Context(), clusterID)
+	if err != nil {
+		switch {
+		case errors.Is(err, config.ErrNotFound):
+			status = http.StatusNotFound
+			w.Header().Set("Cache-Control", "no-store")
+			writeErrorMessage(w, status, "configuration not found")
+		default:
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	response := map[string]any{
+		"cluster_id": clusterID,
+		"config":     cloneAnyMap(doc.Data),
+		"revision":   revision,
+	}
+	if strings.TrimSpace(doc.VersionTag) != "" {
+		response["version_tag"] = doc.VersionTag
+	}
+	if !doc.UpdatedAt.IsZero() {
+		response["updated_at"] = doc.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if strings.TrimSpace(doc.UpdatedBy) != "" {
+		response["updated_by"] = doc.UpdatedBy
+	}
+
+	w.Header().Set("ETag", strconv.FormatInt(revision, 10))
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, status, response)
+}
+
+func (s *controlPlaneServer) handleConfigPut(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	status := http.StatusOK
+	method := http.MethodPut
+	defer func() {
+		recordConfigRequest(method, status)
+	}()
+
+	var req struct {
+		ClusterID  string         `json:"cluster_id"`
+		Config     map[string]any `json:"config"`
+		VersionTag string         `json:"version_tag"`
+		UpdatedBy  string         `json:"updated_by"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		status = http.StatusBadRequest
+		writeError(w, status, err)
+		return
+	}
+
+	clusterID := strings.TrimSpace(req.ClusterID)
+	if clusterID == "" {
+		status = http.StatusBadRequest
+		writeErrorMessage(w, status, "cluster_id is required")
+		return
+	}
+
+	rawMatch := strings.TrimSpace(r.Header.Get("If-Match"))
+	if rawMatch == "" {
+		status = http.StatusPreconditionRequired
+		writeErrorMessage(w, status, "If-Match header required")
+		return
+	}
+	expectedRevision, err := parseRevisionHeader(rawMatch)
+	if err != nil {
+		status = http.StatusBadRequest
+		writeError(w, status, err)
+		return
+	}
+
+	store, err := s.configStore()
+	if err != nil {
+		status = http.StatusInternalServerError
+		writeError(w, status, err)
+		return
+	}
+
+	doc := config.Document{
+		Data:       cloneAnyMap(req.Config),
+		VersionTag: strings.TrimSpace(req.VersionTag),
+		UpdatedBy:  strings.TrimSpace(req.UpdatedBy),
+		UpdatedAt:  time.Now().UTC(),
+	}
+
+	saved, revision, err := store.Save(r.Context(), clusterID, expectedRevision, doc)
+	if err != nil {
+		switch {
+		case errors.Is(err, config.ErrConflict):
+			status = http.StatusPreconditionFailed
+			writeErrorMessage(w, status, "revision mismatch")
+		case errors.Is(err, config.ErrNotFound):
+			status = http.StatusNotFound
+			writeErrorMessage(w, status, "configuration not found")
+		default:
+			status = http.StatusInternalServerError
+			writeError(w, status, err)
+		}
+		return
+	}
+
+	response := map[string]any{
+		"cluster_id": clusterID,
+		"config":     cloneAnyMap(saved.Data),
+		"revision":   revision,
+	}
+	if strings.TrimSpace(saved.VersionTag) != "" {
+		response["version_tag"] = saved.VersionTag
+	}
+	if !saved.UpdatedAt.IsZero() {
+		response["updated_at"] = saved.UpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if strings.TrimSpace(saved.UpdatedBy) != "" {
+		response["updated_by"] = saved.UpdatedBy
+	}
+
+	w.Header().Set("ETag", strconv.FormatInt(revision, 10))
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, status, response)
+	configUpdatesTotal.WithLabelValues(clusterID).Inc()
+}
+
 func (s *controlPlaneServer) handleGitLabConfig(w http.ResponseWriter, r *http.Request) {
 	if !s.ensureEtcd(w) {
 		return
@@ -185,6 +788,304 @@ func (s *controlPlaneServer) handleGitLabConfig(w http.ResponseWriter, r *http.R
 		s.handleGitLabConfigPut(w, r)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *controlPlaneServer) handleArtifactsList(w http.ResponseWriter, r *http.Request) {
+	if !s.requireScope(w, r, security.ScopeArtifactsRead) {
+		recordArtifactRequest(r.Method, http.StatusForbidden)
+		return
+	}
+	recordArtifactRequest(r.Method, http.StatusOK)
+	writeJSON(w, http.StatusOK, map[string]any{"artifacts": []any{}})
+}
+
+func (s *controlPlaneServer) handleArtifactsUpload(w http.ResponseWriter, r *http.Request) {
+	if !s.requireScope(w, r, security.ScopeArtifactsWrite) {
+		recordArtifactRequest(r.Method, http.StatusForbidden)
+		return
+	}
+	if r.Body == nil {
+		recordArtifactRequest(r.Method, http.StatusBadRequest)
+		writeErrorMessage(w, http.StatusBadRequest, "request body required")
+		return
+	}
+	defer func() {
+		_ = r.Body.Close()
+	}()
+	bytesCopied, err := io.Copy(io.Discard, r.Body)
+	if err != nil {
+		recordArtifactRequest(r.Method, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("read upload payload: %w", err))
+		return
+	}
+	recordArtifactPayload("upload", bytesCopied)
+	recordArtifactRequest(r.Method, http.StatusNotImplemented)
+	writeErrorWithCode(w, http.StatusNotImplemented, errorCodeArtifactUpload, "artifact upload pending persistence backends")
+}
+
+func (s *controlPlaneServer) handleArtifactsSubpath(w http.ResponseWriter, r *http.Request) {
+	trimmed := strings.TrimPrefix(r.URL.Path, "/v1/artifacts/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		recordArtifactRequest(r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		if !s.requireScope(w, r, security.ScopeArtifactsRead) {
+			recordArtifactRequest(r.Method, http.StatusForbidden)
+			return
+		}
+		recordArtifactRequest(r.Method, http.StatusNotFound)
+		writeErrorMessage(w, http.StatusNotFound, "artifact not found")
+	case http.MethodDelete:
+		if !s.requireScope(w, r, security.ScopeArtifactsWrite) {
+			recordArtifactRequest(r.Method, http.StatusForbidden)
+			return
+		}
+		recordArtifactRequest(r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeArtifactDelete, "artifact delete pending persistence backends")
+	default:
+		recordArtifactRequest(r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, DELETE")
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *controlPlaneServer) handleRegistry(w http.ResponseWriter, r *http.Request) {
+	trimmed := strings.TrimPrefix(r.URL.Path, "/v1/registry/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		recordRegistryRequest("root", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 2 {
+		recordRegistryRequest("root", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	repo := strings.TrimSpace(parts[0])
+	if repo == "" {
+		recordRegistryRequest("root", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	switch parts[1] {
+	case "manifests":
+		s.handleRegistryManifest(w, r, repo, parts[2:])
+	case "blobs":
+		s.handleRegistryBlobs(w, r, repo, parts[2:])
+	case "tags":
+		s.handleRegistryTags(w, r, repo, parts[2:])
+	default:
+		recordRegistryRequest("unknown", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+	}
+}
+
+func (s *controlPlaneServer) handleRegistryManifest(w http.ResponseWriter, r *http.Request, repo string, parts []string) {
+	_ = repo
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		recordRegistryRequest("manifests", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		if !s.requireScope(w, r, security.ScopeRegistryPull) {
+			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
+			return
+		}
+		recordRegistryRequest("manifests", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryManifest, "registry manifest retrieval pending persistence backends")
+	case http.MethodPut:
+		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
+			return
+		}
+		body := r.Body
+		if body == nil {
+			body = http.NoBody
+		}
+		defer func() {
+			_ = body.Close()
+		}()
+		bytesCopied, err := io.Copy(io.Discard, body)
+		if err != nil {
+			recordRegistryRequest("manifests", r.Method, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, fmt.Errorf("read manifest payload: %w", err))
+			return
+		}
+		recordRegistryPayload("manifests", "write", bytesCopied)
+		recordRegistryRequest("manifests", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryManifest, "registry manifest write pending persistence backends")
+	case http.MethodDelete:
+		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
+			return
+		}
+		recordRegistryRequest("manifests", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryManifest, "registry manifest delete pending persistence backends")
+	default:
+		recordRegistryRequest("manifests", r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, PUT, DELETE")
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *controlPlaneServer) handleRegistryBlobs(w http.ResponseWriter, r *http.Request, repo string, parts []string) {
+	_ = repo
+	if len(parts) == 0 {
+		recordRegistryRequest("blobs", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	if parts[0] == "uploads" {
+		if len(parts) == 1 {
+			s.handleRegistryUploadStart(w, r, repo)
+			return
+		}
+		s.handleRegistryUploadSession(w, r, repo, parts[1])
+		return
+	}
+	digest := strings.TrimSpace(parts[0])
+	if digest == "" {
+		recordRegistryRequest("blobs", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	s.handleRegistryBlob(w, r, repo, digest)
+}
+
+func (s *controlPlaneServer) handleRegistryUploadStart(w http.ResponseWriter, r *http.Request, repo string) {
+	_ = repo
+	if r.Method != http.MethodPost {
+		recordRegistryRequest("uploads", r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", http.MethodPost)
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireScope(w, r, security.ScopeRegistryPush) {
+		recordRegistryRequest("uploads", r.Method, http.StatusForbidden)
+		return
+	}
+	recordRegistryRequest("uploads", r.Method, http.StatusNotImplemented)
+	writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryUpload, "registry upload session pending persistence backends")
+}
+
+func (s *controlPlaneServer) handleRegistryUploadSession(w http.ResponseWriter, r *http.Request, repo, sessionID string) {
+	_ = repo
+	_ = sessionID
+	switch r.Method {
+	case http.MethodPatch, http.MethodPut:
+		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+			recordRegistryRequest("uploads", r.Method, http.StatusForbidden)
+			return
+		}
+		body := r.Body
+		if body == nil {
+			body = http.NoBody
+		}
+		defer func() {
+			_ = body.Close()
+		}()
+		bytesCopied, err := io.Copy(io.Discard, body)
+		if err != nil {
+			recordRegistryRequest("uploads", r.Method, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, fmt.Errorf("read upload payload: %w", err))
+			return
+		}
+		operation := strings.ToLower(r.Method)
+		recordRegistryPayload("uploads", operation, bytesCopied)
+		recordRegistryRequest("uploads", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryUpload, "registry upload session pending persistence backends")
+	default:
+		recordRegistryRequest("uploads", r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "PATCH, PUT")
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *controlPlaneServer) handleRegistryBlob(w http.ResponseWriter, r *http.Request, repo, digest string) {
+	_ = repo
+	switch r.Method {
+	case http.MethodGet:
+		if !s.requireScope(w, r, security.ScopeRegistryPull) {
+			recordRegistryRequest("blobs", r.Method, http.StatusForbidden)
+			return
+		}
+		recordRegistryRequest("blobs", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryBlob, "registry blob retrieval pending persistence backends")
+	case http.MethodDelete:
+		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+			recordRegistryRequest("blobs", r.Method, http.StatusForbidden)
+			return
+		}
+		recordRegistryRequest("blobs", r.Method, http.StatusNotImplemented)
+		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryBlob, "registry blob delete pending persistence backends")
+	default:
+		recordRegistryRequest("blobs", r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, DELETE")
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+func (s *controlPlaneServer) handleRegistryTags(w http.ResponseWriter, r *http.Request, repo string, parts []string) {
+	_ = repo
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) != "list" {
+		recordRegistryRequest("tags", r.Method, http.StatusNotFound)
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		recordRegistryRequest("tags", r.Method, http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", http.MethodGet)
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if !s.requireScope(w, r, security.ScopeRegistryPull) {
+		recordRegistryRequest("tags", r.Method, http.StatusForbidden)
+		return
+	}
+	recordRegistryRequest("tags", r.Method, http.StatusNotImplemented)
+	writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryTags, "registry tag listing pending persistence backends")
+}
+
+func (s *controlPlaneServer) handleModsSubpath(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMods(w) {
+		return
+	}
+	trimmed := strings.TrimPrefix(r.URL.Path, "/v1/mods/")
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" {
+		http.NotFound(w, r)
+		return
+	}
+	parts := strings.Split(trimmed, "/")
+	ticketID := strings.TrimSpace(parts[0])
+	if ticketID == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if len(parts) == 1 {
+		s.handleModsTicketStatus(w, r, ticketID)
+		return
+	}
+	switch parts[1] {
+	case "resume":
+		s.handleModsResume(w, r, ticketID)
+	case "cancel":
+		s.handleModsCancel(w, r, ticketID)
+	case "logs":
+		s.handleModsLogs(w, r, ticketID, parts[2:])
+	case "events":
+		s.handleModsEvents(w, r, ticketID)
+	default:
+		http.NotFound(w, r)
 	}
 }
 
@@ -205,6 +1106,7 @@ func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *h
 		return
 	}
 	trimmed := strings.TrimPrefix(r.URL.Path, "/v1/mods/tickets/")
+	trimmed = strings.Trim(trimmed, "/")
 	if trimmed == "" {
 		http.NotFound(w, r)
 		return
@@ -219,12 +1121,15 @@ func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *h
 		s.handleModsTicketStatus(w, r, ticketID)
 		return
 	}
-	action := strings.TrimSpace(parts[1])
-	switch action {
+	switch parts[1] {
 	case "cancel":
 		s.handleModsCancel(w, r, ticketID)
 	case "resume":
 		s.handleModsResume(w, r, ticketID)
+	case "logs":
+		s.handleModsLogs(w, r, ticketID, parts[2:])
+	case "events":
+		s.handleModsEvents(w, r, ticketID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -316,6 +1221,153 @@ func (s *controlPlaneServer) handleModsResume(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, modsapi.TicketStatusResponse{Ticket: toAPITicketSummary(status)})
+}
+
+func (s *controlPlaneServer) handleModsLogs(w http.ResponseWriter, r *http.Request, ticketID string, parts []string) {
+	if len(parts) == 0 {
+		s.handleModsLogsSnapshot(w, r, ticketID)
+		return
+	}
+	if len(parts) == 1 && parts[0] == "stream" {
+		s.handleModsLogsStream(w, r, ticketID)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func (s *controlPlaneServer) handleModsLogsSnapshot(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.streams == nil {
+		http.Error(w, "log streaming unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	events, err := s.snapshotLogStream(r.Context(), modsLogStreamID(ticketID))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	payload := map[string]any{
+		"events": buildLogEventDTOs(events),
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *controlPlaneServer) handleModsLogsStream(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.streams == nil {
+		http.Error(w, "log streaming unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	since, err := parseLastEventID(r)
+	if err != nil {
+		http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+		return
+	}
+	if err := logstream.Serve(w, r, s.streams, modsLogStreamID(ticketID), since); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
+}
+
+func (s *controlPlaneServer) handleModsEvents(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.mods == nil {
+		http.Error(w, "mods service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	since, err := parseLastEventID(r)
+	if err != nil {
+		http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+		return
+	}
+
+	status, rev, err := s.mods.TicketStatusWithRevision(r.Context(), ticketID)
+	if err != nil {
+		code, msg := mapModsError(err)
+		writeErrorMessage(w, code, msg)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	if _, err := io.WriteString(w, ":ok\n\n"); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	if rev > 0 && (since <= 0 || rev > since) {
+		if err := writeSSEJSON(w, rev, "ticket", toAPITicketSummary(status)); err != nil {
+			return
+		}
+		flusher.Flush()
+		since = rev
+	}
+
+	events, err := s.mods.WatchTicket(r.Context(), ticketID, since)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case evt, ok := <-events:
+			if !ok {
+				return
+			}
+			switch evt.Kind {
+			case controlplanemods.EventTicket:
+				if evt.Ticket == nil {
+					continue
+				}
+				if err := writeSSEJSON(w, evt.Revision, "ticket", toAPITicketSummary(evt.Ticket)); err != nil {
+					return
+				}
+				flusher.Flush()
+			case controlplanemods.EventStage:
+				if evt.Stage == nil {
+					continue
+				}
+				payload := modsStageEvent{
+					TicketID: ticketID,
+					Stage:    toAPIStageStatus(evt.Stage),
+				}
+				if err := writeSSEJSON(w, evt.Revision, "stage", payload); err != nil {
+					return
+				}
+				flusher.Flush()
+			}
+		case <-ticker.C:
+			if _, err := io.WriteString(w, ":ping\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
+	}
 }
 
 func (s *controlPlaneServer) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
@@ -681,6 +1733,8 @@ func (s *controlPlaneServer) handleJobSubpath(w http.ResponseWriter, r *http.Req
 		s.handleJobComplete(w, r, jobID)
 	case "logs":
 		s.handleJobLogs(w, r, jobID, parts[2:])
+	case "events":
+		s.handleJobEvents(w, r, jobID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -811,23 +1865,108 @@ func (s *controlPlaneServer) handleJobLogsStream(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var sinceID int64
-	if raw := strings.TrimSpace(r.Header.Get("Last-Event-ID")); raw != "" {
-		id, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
-			return
-		}
-		if id > 0 {
-			sinceID = id
-		}
+	lastID, err := parseLastEventID(r)
+	if err != nil {
+		http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+		return
 	}
-
-	if err := logstream.Serve(w, r, s.streams, jobID, sinceID); err != nil {
+	if err := logstream.Serve(w, r, s.streams, jobID, lastID); err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+	}
+}
+
+func (s *controlPlaneServer) handleJobEvents(w http.ResponseWriter, r *http.Request, jobID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.etcd == nil {
+		http.Error(w, "etcd unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	lastID, err := parseLastEventID(r)
+	if err != nil {
+		http.Error(w, "invalid Last-Event-ID", http.StatusBadRequest)
+		return
+	}
+	ticket, key, rev, err := s.lookupJobKey(r.Context(), jobID)
+	if err != nil {
+		writeErrorMessage(w, http.StatusNotFound, "job not found")
+		return
+	}
+	job, err := s.scheduler.GetJob(r.Context(), ticket, jobID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	if _, err := io.WriteString(w, ":ok\n\n"); err != nil {
+		return
+	}
+	flusher.Flush()
+
+	if rev > 0 && (lastID <= 0 || rev > lastID) {
+		if err := writeSSEJSON(w, rev, "job", jobDTOFrom(job)); err != nil {
+			return
+		}
+		flusher.Flush()
+	}
+
+	watchRev := rev + 1
+	if lastID >= watchRev {
+		watchRev = lastID + 1
+	}
+
+	opts := []clientv3.OpOption{}
+	if watchRev > 0 {
+		opts = append(opts, clientv3.WithRev(watchRev))
+	}
+	watch := s.etcd.Watch(r.Context(), key, opts...)
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case resp, ok := <-watch:
+			if !ok {
+				return
+			}
+			if err := resp.Err(); err != nil {
+				continue
+			}
+			for _, ev := range resp.Events {
+				if ev == nil || ev.Type != clientv3.EventTypePut || ev.Kv == nil {
+					continue
+				}
+				current, err := s.scheduler.GetJob(r.Context(), ticket, jobID)
+				if err != nil {
+					continue
+				}
+				if err := writeSSEJSON(w, ev.Kv.ModRevision, "job", jobDTOFrom(current)); err != nil {
+					return
+				}
+				flusher.Flush()
+			}
+		case <-ticker.C:
+			if _, err := io.WriteString(w, ":ping\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		}
 	}
 }
 
@@ -1105,6 +2244,248 @@ func (s *controlPlaneServer) ensureMods(w http.ResponseWriter) bool {
 	return true
 }
 
+func (s *controlPlaneServer) requireScope(w http.ResponseWriter, r *http.Request, scope string) bool {
+	if s.auth == nil {
+		return true
+	}
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		return true
+	}
+	principal, ok := s.principal(r)
+	if !ok {
+		writeErrorMessage(w, http.StatusForbidden, "principal missing")
+		return false
+	}
+	if !principal.HasScope(scope) {
+		writeErrorMessage(w, http.StatusForbidden, "insufficient scope")
+		return false
+	}
+	return true
+}
+
+func (s *controlPlaneServer) principal(r *http.Request) (security.Principal, bool) {
+	return security.PrincipalFromContext(r.Context())
+}
+
+func (s *controlPlaneServer) configStore() (*config.Store, error) {
+	if s.cfgStore != nil {
+		return s.cfgStore, nil
+	}
+	if s.etcd == nil {
+		return nil, errors.New("config: etcd unavailable")
+	}
+	store, err := config.NewStore(s.etcd)
+	if err != nil {
+		return nil, err
+	}
+	s.cfgStore = store
+	return store, nil
+}
+
+func recordConfigRequest(method string, status int) {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "UNKNOWN"
+	}
+	configRequestsTotal.WithLabelValues(method, strconv.Itoa(status)).Inc()
+}
+
+func recordBeaconRequest(resource, method string, status int) {
+	resource = strings.TrimSpace(resource)
+	if resource == "" {
+		resource = "unknown"
+	}
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "UNKNOWN"
+	}
+	beaconRequestsTotal.WithLabelValues(resource, method, strconv.Itoa(status)).Inc()
+}
+
+func cloneAnyMap(src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func parseRevisionHeader(raw string) (int64, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, errors.New("config: If-Match header required")
+	}
+	if trimmed == "*" {
+		return -1, nil
+	}
+	if strings.HasPrefix(trimmed, "W/") {
+		trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "W/"))
+	}
+	trimmed = strings.Trim(trimmed, `"`)
+	if trimmed == "" {
+		return 0, errors.New("config: invalid If-Match header")
+	}
+	revision, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("config: parse If-Match revision: %w", err)
+	}
+	if revision < 0 {
+		return 0, errors.New("config: revision must be non-negative")
+	}
+	return revision, nil
+}
+
+func (s *controlPlaneServer) collectQueueDepths() map[string]float64 {
+	depths := make(map[string]float64)
+	if s.gatherer == nil {
+		return depths
+	}
+	families, err := s.gatherer.Gather()
+	if err != nil {
+		return depths
+	}
+	for _, fam := range families {
+		if fam == nil || fam.GetName() != "ploy_controlplane_queue_depth" {
+			continue
+		}
+		for _, metric := range fam.GetMetric() {
+			if metric == nil || metric.GetGauge() == nil {
+				continue
+			}
+			priority := labelValue(metric, "priority")
+			if priority == "" {
+				priority = "default"
+			}
+			depths[priority] = metric.GetGauge().GetValue()
+		}
+	}
+	return depths
+}
+
+func labelValue(metric *dto.Metric, name string) string {
+	for _, label := range metric.GetLabel() {
+		if label == nil {
+			continue
+		}
+		if strings.EqualFold(label.GetName(), name) {
+			return label.GetValue()
+		}
+	}
+	return ""
+}
+
+func sanitizeLeafCertificates(ids []string, certificates map[string]deploy.LeafCertificate) []map[string]any {
+	out := make([]map[string]any, 0, len(ids))
+	for _, id := range ids {
+		entry := map[string]any{
+			"node_id": id,
+		}
+		if cert, ok := certificates[id]; ok {
+			entry["usage"] = cert.Usage
+			entry["version"] = cert.Version
+			entry["parent_version"] = cert.ParentVersion
+			entry["serial_number"] = cert.SerialNumber
+			entry["certificate_pem"] = cert.CertificatePEM
+			if !cert.IssuedAt.IsZero() {
+				entry["issued_at"] = cert.IssuedAt.UTC().Format(time.RFC3339Nano)
+			}
+			if !cert.ExpiresAt.IsZero() {
+				entry["expires_at"] = cert.ExpiresAt.UTC().Format(time.RFC3339Nano)
+			}
+		} else {
+			entry["missing"] = true
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+type signedEnvelope struct {
+	Payload   json.RawMessage `json:"payload"`
+	Signature signatureDTO    `json:"signature"`
+}
+
+type signatureDTO struct {
+	Algorithm string `json:"algorithm"`
+	KeyID     string `json:"key_id"`
+	Value     string `json:"value"`
+}
+
+func (s *controlPlaneServer) sendSignedJSON(w http.ResponseWriter, status int, payload any, bundle deploy.CABundle) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("encode signed payload: %w", err)
+	}
+	signature, err := signPayload(bundle, data)
+	if err != nil {
+		return err
+	}
+	env := signedEnvelope{
+		Payload:   data,
+		Signature: signature,
+	}
+	writeJSON(w, status, env)
+	return nil
+}
+
+func signPayload(bundle deploy.CABundle, payload []byte) (signatureDTO, error) {
+	key, err := parsePrivateKey(bundle.KeyPEM)
+	if err != nil {
+		return signatureDTO{}, err
+	}
+	digest := sha256.Sum256(payload)
+	sig, err := ecdsa.SignASN1(rand.Reader, key, digest[:])
+	if err != nil {
+		return signatureDTO{}, fmt.Errorf("sign payload: %w", err)
+	}
+	return signatureDTO{
+		Algorithm: "ES256",
+		KeyID:     strings.TrimSpace(bundle.Version),
+		Value:     base64.StdEncoding.EncodeToString(sig),
+	}, nil
+}
+
+func parsePrivateKey(pemData string) (*ecdsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(pemData))
+	if block == nil {
+		return nil, errors.New("beacon: decode private key")
+	}
+	if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("beacon: parse private key: %w", err)
+	}
+	ecdsaKey, ok := parsed.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("beacon: private key is not ECDSA")
+	}
+	return ecdsaKey, nil
+}
+
+func (s *controlPlaneServer) persistBeaconCanonical(ctx context.Context, clusterID string, record map[string]any) error {
+	if s.etcd == nil {
+		return errors.New("beacon: etcd unavailable")
+	}
+	data, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("beacon: encode canonical record: %w", err)
+	}
+	if _, err := s.etcd.Put(ctx, beaconCanonicalKey(clusterID), string(data)); err != nil {
+		return fmt.Errorf("beacon: persist canonical record: %w", err)
+	}
+	return nil
+}
+
+func beaconCanonicalKey(clusterID string) string {
+	return fmt.Sprintf("/ploy/clusters/%s/beacon/canonical", strings.TrimSpace(clusterID))
+}
+
 func writeError(w http.ResponseWriter, status int, err error) {
 	if err == nil {
 		writeErrorMessage(w, status, http.StatusText(status))
@@ -1132,15 +2513,8 @@ func toAPITicketSummary(status *controlplanemods.TicketStatus) modsapi.TicketSum
 	}
 	stages := make(map[string]modsapi.StageStatus, len(status.Stages))
 	for id, stage := range status.Stages {
-		stages[id] = modsapi.StageStatus{
-			StageID:      stage.StageID,
-			State:        modsapi.StageState(stage.State),
-			Attempts:     stage.Attempts,
-			MaxAttempts:  stage.MaxAttempts,
-			CurrentJobID: stage.CurrentJobID,
-			Artifacts:    cloneStringMap(stage.Artifacts),
-			LastError:    stage.LastError,
-		}
+		stageCopy := stage
+		stages[id] = toAPIStageStatus(&stageCopy)
 	}
 	return modsapi.TicketSummary{
 		TicketID:   status.TicketID,
@@ -1175,11 +2549,40 @@ func cloneStringSlice(src []string) []string {
 	return out
 }
 
+type modsStageEvent struct {
+	TicketID string              `json:"ticket_id"`
+	Stage    modsapi.StageStatus `json:"stage"`
+}
+
+func toAPIStageStatus(stage *controlplanemods.StageStatus) modsapi.StageStatus {
+	if stage == nil {
+		return modsapi.StageStatus{}
+	}
+	return modsapi.StageStatus{
+		StageID:      stage.StageID,
+		State:        modsapi.StageState(stage.State),
+		Attempts:     stage.Attempts,
+		MaxAttempts:  stage.MaxAttempts,
+		CurrentJobID: stage.CurrentJobID,
+		Artifacts:    cloneStringMap(stage.Artifacts),
+		LastError:    stage.LastError,
+	}
+}
+
 func writeErrorMessage(w http.ResponseWriter, status int, message string) {
+	writeErrorWithCode(w, status, "", message)
+}
+
+func writeErrorWithCode(w http.ResponseWriter, status int, code, message string) {
 	if strings.TrimSpace(message) == "" {
 		message = http.StatusText(status)
 	}
-	writeJSON(w, status, map[string]any{"error": message})
+	payload := map[string]any{"error": message}
+	code = strings.TrimSpace(code)
+	if code != "" {
+		payload["error_code"] = code
+	}
+	writeJSON(w, status, payload)
 }
 
 // jobDTO is the API representation for a job.
@@ -1340,6 +2743,141 @@ func copyAnyMap(src map[string]any) map[string]any {
 	return out
 }
 
+func modsLogStreamID(ticketID string) string {
+	return strings.TrimSpace(ticketID)
+}
+
+func (s *controlPlaneServer) snapshotLogStream(ctx context.Context, streamID string) ([]logstream.Event, error) {
+	sub, err := s.streams.Subscribe(ctx, streamID, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer sub.Cancel()
+	events := make([]logstream.Event, 0, 8)
+	for {
+		select {
+		case evt, ok := <-sub.Events:
+			if !ok {
+				return events, nil
+			}
+			events = append(events, evt)
+			if strings.EqualFold(evt.Type, "done") {
+				return events, nil
+			}
+		default:
+			return events, nil
+		}
+	}
+}
+
+func buildLogEventDTOs(events []logstream.Event) []map[string]any {
+	out := make([]map[string]any, 0, len(events))
+	for _, evt := range events {
+		dto := map[string]any{
+			"id":   evt.ID,
+			"type": evt.Type,
+		}
+		if len(evt.Data) > 0 {
+			var payload any
+			if err := json.Unmarshal(evt.Data, &payload); err != nil {
+				dto["data"] = strings.TrimSpace(string(evt.Data))
+			} else {
+				dto["data"] = payload
+			}
+		}
+		out = append(out, dto)
+	}
+	return out
+}
+
+func writeSSEJSON(w io.Writer, id int64, event string, payload any) error {
+	if id > 0 {
+		if _, err := fmt.Fprintf(w, "id: %d\n", id); err != nil {
+			return err
+		}
+	}
+	if event != "" {
+		if _, err := fmt.Fprintf(w, "event: %s\n", event); err != nil {
+			return err
+		}
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if _, err := fmt.Fprintf(w, "data: %s\n", line); err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprint(w, "\n")
+	return err
+}
+
+func parseLastEventID(r *http.Request) (int64, error) {
+	raw := strings.TrimSpace(r.Header.Get("Last-Event-ID"))
+	if raw == "" {
+		return 0, nil
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	if id < 0 {
+		return 0, nil
+	}
+	return id, nil
+}
+
+func (s *controlPlaneServer) lookupJobKey(ctx context.Context, jobID string) (string, string, int64, error) {
+	if s.etcd == nil {
+		return "", "", 0, fmt.Errorf("etcd unavailable")
+	}
+	prefix := s.modsPrefix()
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	resp, err := s.etcd.Get(ctx, prefix, clientv3.WithPrefix(), clientv3.WithKeysOnly())
+	if err != nil {
+		return "", "", 0, err
+	}
+	suffix := "/jobs/" + jobID
+	for _, kv := range resp.Kvs {
+		key := string(kv.Key)
+		if !strings.HasSuffix(key, suffix) {
+			continue
+		}
+		trimmed := strings.TrimPrefix(key, prefix)
+		parts := strings.Split(trimmed, "/")
+		if len(parts) < 3 {
+			continue
+		}
+		ticket := strings.TrimSpace(parts[0])
+		if ticket == "" {
+			continue
+		}
+		detail, err := s.etcd.Get(ctx, key)
+		if err != nil {
+			return "", "", 0, err
+		}
+		if len(detail.Kvs) == 0 {
+			continue
+		}
+		return ticket, key, detail.Kvs[0].ModRevision, nil
+	}
+	return "", "", 0, fmt.Errorf("job %s not found", jobID)
+}
+
+func (s *controlPlaneServer) modsPrefix() string {
+	if s.mods != nil {
+		if prefix := strings.TrimSpace(s.mods.Prefix()); prefix != "" {
+			return prefix
+		}
+	}
+	return "mods/"
+}
+
 func decodeJSON(r *http.Request, dst any) error {
 	defer func() {
 		_ = r.Body.Close()
@@ -1371,4 +2909,50 @@ func (s *controlPlaneServer) ensureScheduler(w http.ResponseWriter) bool {
 		return false
 	}
 	return true
+}
+
+func recordArtifactRequest(method string, status int) {
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "UNKNOWN"
+	}
+	artifactRequestsTotal.WithLabelValues(method, strconv.Itoa(status)).Inc()
+}
+
+func recordArtifactPayload(operation string, bytesCopied int64) {
+	if bytesCopied <= 0 {
+		return
+	}
+	operation = strings.TrimSpace(operation)
+	if operation == "" {
+		operation = "unknown"
+	}
+	artifactPayloadBytes.WithLabelValues(operation).Add(float64(bytesCopied))
+}
+
+func recordRegistryRequest(resource, method string, status int) {
+	resource = strings.TrimSpace(resource)
+	if resource == "" {
+		resource = "unknown"
+	}
+	method = strings.ToUpper(strings.TrimSpace(method))
+	if method == "" {
+		method = "UNKNOWN"
+	}
+	registryRequestsTotal.WithLabelValues(resource, method, strconv.Itoa(status)).Inc()
+}
+
+func recordRegistryPayload(resource, operation string, bytesCopied int64) {
+	if bytesCopied <= 0 {
+		return
+	}
+	resource = strings.TrimSpace(resource)
+	if resource == "" {
+		resource = "unknown"
+	}
+	operation = strings.TrimSpace(operation)
+	if operation == "" {
+		operation = "unknown"
+	}
+	registryPayloadBytes.WithLabelValues(resource, operation).Add(float64(bytesCopied))
 }

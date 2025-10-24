@@ -22,6 +22,53 @@ surface.
 - `GET /v1/mods/{ticket}/logs` — Fetch aggregated logs (per-step and build gate) from archive storage.
 - `GET /v1/mods/{ticket}/logs/stream` — SSE stream of combined Mod logs for real-time tailing.
 
+Example `GET /v1/mods/{ticket}` response:
+
+```json
+{
+  "ticket": {
+    "ticket_id": "mod-1234",
+    "state": "running",
+    "submitter": "ci-bot",
+    "repository": "git@gitlab.com:ploy/example.git",
+    "metadata": {
+      "sha": "3b28cf5"
+    },
+    "created_at": "2025-10-24T10:14:09Z",
+    "updated_at": "2025-10-24T10:15:42Z",
+    "stages": {
+      "plan": {
+        "stage_id": "plan",
+        "state": "queued",
+        "attempts": 1,
+        "max_attempts": 3,
+        "current_job_id": "job-9h2d5",
+        "artifacts": {},
+        "last_error": ""
+      }
+    }
+  }
+}
+```
+
+`GET /v1/mods/{ticket}/logs` returns the buffered SSE history (log, retention, done frames) as JSON:
+
+```json
+{
+  "events": [
+    {
+      "id": 1,
+      "type": "log",
+      "data": {
+        "timestamp": "2025-10-24T10:15:10Z",
+        "stream": "stdout",
+        "line": "starting plan stage"
+      }
+    }
+  ]
+}
+```
+
 ### Artifacts & Snapshotting
 
 - `POST /v1/artifacts/upload` — Stage a repository snapshot or diff bundle; returns the CID published
@@ -33,6 +80,9 @@ surface.
 
 The upload endpoint is primarily for workstation CLI interactions; runtime nodes typically stream
 artifacts directly to IPFS Cluster via their local daemon and only record the resulting CIDs in etcd.
+Artifacts routes require the `artifact.read` and/or `artifact.write` scopes. Until roadmap item 1.4
+lands persistence, uploads and deletions return a structured `501 Not Implemented` payload with
+`error_code` hints, and listings surface an empty collection.
 
 ### OCI Registry
 
@@ -47,6 +97,11 @@ artifacts directly to IPFS Cluster via their local daemon and only record the re
 - `GET /v1/registry/{repo}/blobs/{digest}` — Stream a blob.
 - `DELETE /v1/registry/{repo}/blobs/{digest}` — Remove a blob (subject to reference tracking).
 - `GET /v1/registry/{repo}/tags/list` — List tags for a repository.
+
+Registry endpoints enforce `registry.pull` for read paths and `registry.push` for write/delete
+operations. While the backing registry store is still underway, all write paths and blob/manifest
+reads return `501 Not Implemented` responses carrying `error_code` markers so the CLI can gate on the
+contract.
 
 ### Node Management & Observability
 
@@ -73,11 +128,38 @@ differentiate them.
 ### Configuration & Cluster Metadata
 
 - `GET /v1/config` — Retrieve effective cluster configuration (IPFS endpoints, node selection policies,
-  feature flags, cluster version tag).
-- `PUT /v1/config` — Update configuration values (requires admin scope).
-- `GET /v1/status` — Cluster summary: node health, Mods throughput, build gate pass rate.
+  feature flags, cluster version tag). Responses include the current `revision`, `version_tag`,
+  and timestamps (`updated_at`, `updated_by`). The response is returned with `Cache-Control: no-store`
+  and an `ETag` header whose value matches the etcd revision so callers can cache locally.
+- `PUT /v1/config` — Update configuration values (requires `admin` scope). Callers must supply an
+  `If-Match` header: use `0` to create the document, the last seen revision to update in place, or `*`
+  to force an unconditional write. On success the control plane returns the sanitized document,
+  refreshes the revision/ETag, and increments `ploy_config_updates_total`.
+- `GET /v1/status` — Cluster summary covering queue depth and worker readiness. The payload includes:
+
+  ```json
+  {
+    "cluster_id": "cluster-alpha",
+    "timestamp": "2025-10-24T17:42:13.123456Z",
+    "queue": {
+      "total_depth": 3,
+      "priorities": [
+        {"priority": "default", "depth": 2},
+        {"priority": "urgent", "depth": 1}
+      ]
+    },
+    "workers": {
+      "total": 5,
+      "phases": {"ready": 4, "registering": 1, "error": 0, "unknown": 0}
+    }
+  }
+  ```
+
+  The endpoint always returns `Cache-Control: no-store` so operators poll without stale data.
 - `GET /v1/logs/{component}` — Fetch aggregated logs for control-plane components (scheduler, artifact service).
-- `GET /v1/version` — Return the current cluster version tag used for drift detection and CLI caching.
+- `GET /v1/version` — Return the current build metadata used for drift detection and CLI caching.
+  Responses contain the semantic version, git commit, and build timestamp and are cacheable for one
+  minute (`Cache-Control: public, max-age=60`).
 
 ## Node API
 
@@ -96,17 +178,44 @@ through its local `ployd` instance:
 
 The beacon node (running in beacon mode) exposes DNS-compatible discovery plus a small HTTPS API:
 
-- `GET /v1/beacon/nodes` — Signed list of healthy nodes, advertised addresses, and capabilities.
-- `GET /v1/beacon/ca` — Current cluster CA bundle for clients.
+- `GET /v1/beacon/nodes` — Signed list of healthy nodes, advertised addresses, and capabilities. The
+  control plane responds with a signed envelope:
+
+  ```json
+  {
+    "payload": {
+      "cluster_id": "cluster-alpha",
+      "revision": 42,
+      "nodes_revision": 87,
+      "issued_at": "2025-10-24T17:42:13.123456Z",
+      "beacons": [{"node_id": "beacon-main", "usage": "beacon", "version": "v3", ...}],
+      "workers": [{"node_id": "worker-a1", "usage": "worker", "version": "v7", ...}]
+    },
+    "signature": {
+      "algorithm": "ES256",
+      "key_id": "ca-v5",
+      "value": "BASE64_ECDSA_SIGNATURE"
+    }
+  }
+  ```
+
+  Clients verify the payload using the active CA certificate referenced by `key_id`.
+- `GET /v1/beacon/ca` — Current cluster CA bundle for clients. The response mirrors the signed envelope
+  structure above and includes CA metadata (`version`, `serial_number`, validity range, and revoked
+  history) so CLIs can refresh trust bundles without extra etcd queries.
 - `POST /v1/beacon/rotate-ca` — Initiate CA rotation (admin only); returns new bundle metadata.
 - `GET /v1/beacon/config` — Discovery endpoints (etcd cluster addresses, IPFS Cluster peers,
-  registry endpoints).
-- `POST /v1/beacon/promote` — Record the canonical beacon node (used during failover).
+  registry endpoints) packaged in the same signed envelope format. Consumers can rely on the `revision`
+  field to detect config changes without re-polling `/v1/config`.
+- `POST /v1/beacon/promote` — Record the canonical beacon node (used during failover). Requires the
+  `admin` scope and returns the signed promotion record (`beacon_id`, `operator`, `promoted_at`,
+  and CA version). The canonical record is stored at `/ploy/clusters/<cluster>/beacon/canonical`.
 
 ## Authentication & Security
 
 - All APIs require mutual TLS certificates issued by the cluster CA.
-- Control-plane routes additionally accept bearer tokens (JWT) minted during node registration or CLI login.
+- Control-plane routes additionally accept bearer tokens minted by the GitLab signer. Tokens embed the issuing secret identifier (`sid`) and token id (`tid`) so the control plane can validate them without scanning every secret.
+- Administrative operations (GitLab signer management, beacon rotation, configuration updates) require bearer tokens that include the `admin` scope.
 - Beacon responses are signed with the beacon key so clients can verify node lists and configuration payloads.
 
 ## Eventing & Streaming
@@ -114,6 +223,23 @@ The beacon node (running in beacon mode) exposes DNS-compatible discovery plus a
 - Job and Mod updates stream over server-sent events (`GET /v1/mods/{ticket}/events`) for CLI consumption.
 - Artifact pin/unpin notifications publish to etcd watch paths (`/ploy/pins/**`), replacing the
   JetStream event bus.
+
+Mod event streams emit:
+
+```text
+event: ticket
+data: {"ticket_id":"mod-1234","state":"running",...}
+
+event: stage
+data: {"ticket_id":"mod-1234","stage":{"stage_id":"plan","state":"queued","attempts":1,...}}
+```
+
+Job event streams (`GET /v1/jobs/{id}/events`) emit the canonical job DTO on every update:
+
+```text
+event: job
+data: {"id":"job-9h2d5","ticket":"mod-1234","state":"succeeded",...}
+```
 
 This layout keeps Ploy APIs modular while mirroring the familiar registry and Mods flows, allowing
 gradual upgrades from Grid-based deployments.

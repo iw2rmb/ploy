@@ -4,7 +4,7 @@
 
 - [x] 1.1 Align the etcd layout with `docs/next/etcd.md`: extend `internal/controlplane/scheduler` to persist `expires_at`, retention bundles, lease metadata, and node capacity snapshots; add watchers for `leases/jobs`, `gc/jobs`, and node status prefixes; document the schema contract in the package tests.
 - [x] 1.2 Build a Mods orchestrator in the control plane: create a service that persists Mod tickets under `mods/<ticket>` (status, stage graph, artifact references) and translates submissions into scheduler jobs; wire optimistic concurrency so nodes cannot double-claim stages.
-- [ ] 1.3 Expand the HTTP surface in `internal/api/httpserver/controlplane.go` to match `docs/next/api.md`: add `/v1/mods` (submit, resume, cancel, status, events, logs), `/v1/artifacts` CRUD, `/v1/jobs/{id}/events`, `/v1/config`, `/v1/status`, `/v1/version`, `/v1/beacon/*`, `/v1/registry/*`, and ensure every route enforces mutual TLS/token auth once the security middleware lands.
+- [x] 1.3 Expand the HTTP surface in `internal/api/httpserver/controlplane.go` to match `docs/next/api.md`: add `/v1/mods` (submit, resume, cancel, status, events, logs), `/v1/artifacts` CRUD, `/v1/jobs/{id}/events`, `/v1/config`, `/v1/status`, `/v1/version`, `/v1/beacon/*`, `/v1/registry/*`, and ensure every route enforces mutual TLS/token auth once the security middleware lands.
 - [ ] 1.4 Introduce artifact/registry backends behind the new endpoints: reuse `internal/workflow/artifacts` for IPFS Cluster pins, implement OCI manifest/blob storage (etcd metadata + IPFS payload), and surface pin status for CLI queries.
 - [ ] 1.5 Harden configuration discovery: update `internal/api/config` and `cmd/ploy/config_gitlab.go` to merge cluster descriptors, beacon discovery, and local overrides; ensure CA bundle rotation flows propagate to control-plane clients.
 
@@ -19,7 +19,7 @@
 ## 3. CLI & Operator Workflow
 
 - [ ] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on Grid clients and event stubs.
-- [ ] 3.2 Add CLI commands for control-plane parity: `ploy mods resume`, `ploy mods cancel`, `ploy mods inspect`, `ploy mods artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
+- [ ] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
 - [ ] 3.3 Update cluster and node administration flows: ensure `ploy deploy bootstrap`, `ploy node add`, `ploy node rm`, and GitLab signer commands hit the new endpoints, use the refreshed descriptor format, and surface beacon CA rotation data.
 - [ ] 3.4 Refresh configuration/environment handling: purge Grid-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
 - [ ] 3.5 Remove the legacy workflow runner path: delete `internal/workflow/grid`, the local `runner.Run` invocation path, and associated tests once the control-plane submission round-trips are covered.
