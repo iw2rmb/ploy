@@ -10,6 +10,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/ployd/admin"
+	"github.com/iw2rmb/ploy/internal/ployd/bootstrap"
 	"github.com/iw2rmb/ploy/internal/ployd/config"
 	"github.com/iw2rmb/ploy/internal/ployd/controlplane"
 	"github.com/iw2rmb/ploy/internal/ployd/executor"
@@ -73,6 +74,8 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 
 	taskScheduler := scheduler.New()
 
+	bootstrapRunner := bootstrap.NewRunner(bootstrap.Options{})
+
 	svc, err := New(Options{
 		Config:          cfg,
 		RuntimeRegistry: registry,
@@ -82,7 +85,7 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		ControlPlane:    controlClient,
 		PKI:             pkiManager,
 		Scheduler:       taskScheduler,
-		Bootstrap:       noopBootstrap{},
+		Bootstrap:       bootstrapRunner,
 	})
 	if err != nil {
 		return nil, err
@@ -124,10 +127,6 @@ func ensureFile(path string) error {
 	}
 	return nil
 }
-
-type noopBootstrap struct{}
-
-func (noopBootstrap) Run(context.Context, config.Config) error { return nil }
 
 func buildAdminService() httpserver.AdminService {
 	endpoints := strings.Split(strings.TrimSpace(os.Getenv("PLOY_ETCD_ENDPOINTS")), ",")

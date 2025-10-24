@@ -38,8 +38,8 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - The CLI generates and stores a cluster API key locally for later `ploy cluster connect` calls.
    - The bootstrap command automatically registers the generated node as both beacon and worker
      metadata, exposing its `ployd` endpoint as `<node-id>.<cluster-id>.ploy`.
-   - Use `--dry-run` to preview the embedded script (`internal/deploy/assets/bootstrap.sh`) before
-     shipping it over SSH. Dry runs skip etcd connectivity and local descriptor writes.
+  - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and runs `ployd --mode bootstrap` on the remote host, which reuses the embedded shell script to converge dependencies.
+  - On completion `ployd` is enabled and started in beacon mode so the initial node immediately advertises discovery endpoints.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  

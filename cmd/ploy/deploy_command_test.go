@@ -5,10 +5,22 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
+
+func ploydFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ployd")
+	if err := os.WriteFile(path, []byte("binary"), 0o755); err != nil {
+		t.Fatalf("write temp ployd binary: %v", err)
+	}
+	return path
+}
 
 func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 	origRunner := deployBootstrapRunner
@@ -20,8 +32,10 @@ func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 		return nil
 	}
 
+	ploydPath := ploydFixture(t)
 	err := handleDeployBootstrap([]string{
 		"--address", "192.0.2.10",
+		"--ployd-binary", ploydPath,
 	}, io.Discard)
 	if err != nil {
 		t.Fatalf("expected cluster id to be generated, got error: %v", err)
@@ -48,6 +62,9 @@ func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 	if got, want := captured.EtcdEndpoints, []string{"http://192.0.2.10:2379"}; len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("expected etcd endpoint %v, got %v", want, got)
 	}
+	if captured.PloydBinaryPath != ploydPath {
+		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
+	}
 }
 
 func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
@@ -61,10 +78,12 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 	}
 
 	stderr := &bytes.Buffer{}
+	ploydPath := ploydFixture(t)
 	err := handleDeployBootstrap([]string{
 		"--address", "bootstrap.example.com",
 		"--beacon-url", "https://override.example.com",
 		"--control-plane-url", "https://control.example.com",
+		"--ployd-binary", ploydPath,
 	}, stderr)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
@@ -94,6 +113,9 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 	if captured.APIKey == "" {
 		t.Fatalf("expected api key to be generated")
 	}
+	if captured.PloydBinaryPath != ploydPath {
+		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
+	}
 }
 
 func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
@@ -106,7 +128,10 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 		return nil
 	}
 
-	err := handleDeployBootstrap([]string{}, io.Discard)
+	ploydPath := ploydFixture(t)
+	err := handleDeployBootstrap([]string{
+		"--ployd-binary", ploydPath,
+	}, io.Discard)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
 	}
@@ -143,32 +168,10 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 	if got, want := captured.EtcdEndpoints, []string{expectedEndpoint}; len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("expected etcd endpoints %v, got %v", want, got)
 	}
-}
-
-func TestHandleDeployBootstrapDryRunSkipsEtcd(t *testing.T) {
-	origRunner := deployBootstrapRunner
-	defer func() { deployBootstrapRunner = origRunner }()
-
-	var captured deploy.Options
-	deployBootstrapRunner = func(_ context.Context, opts deploy.Options) error {
-		captured = opts
-		return nil
-	}
-
-	err := handleDeployBootstrap([]string{
-		"--dry-run",
-	}, io.Discard)
-	if err != nil {
-		t.Fatalf("handleDeployBootstrap(dry-run) returned error: %v", err)
-	}
-	if !captured.DryRun {
-		t.Fatalf("expected dry-run flag propagated")
-	}
-	if len(captured.EtcdEndpoints) != 1 {
-		t.Fatalf("expected derived etcd endpoint even for dry run")
+	if captured.PloydBinaryPath != ploydPath {
+		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
 	}
 }
-
 func isLowerHex(value string) bool {
 	if value == "" {
 		return false

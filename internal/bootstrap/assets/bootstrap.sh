@@ -413,13 +413,13 @@ configure_ployd_service() {
       warn "PLOY_CONTROL_PLANE_ENDPOINT not set; using placeholder control plane endpoint"
     fi
     cat >"$config_path" <<YAML
-mode: \\${PLOYD_MODE:-worker}
+mode: ${PLOYD_MODE:-beacon}
 http:
-  listen: \\${PLOYD_HTTP_LISTEN:-:8443}
+  listen: "${PLOYD_HTTP_LISTEN:-:8443}"
 metrics:
-  listen: \\${PLOYD_METRICS_LISTEN:-:9100}
+  listen: "${PLOYD_METRICS_LISTEN:-:9100}"
 control_plane:
-  endpoint: "\\${PLOY_CONTROL_PLANE_ENDPOINT:-https://control.example.com}"
+  endpoint: "${PLOY_CONTROL_PLANE_ENDPOINT:-https://control.example.com}"
   ca: "/etc/ploy/pki/control-plane-ca.pem"
   certificate: "/etc/ploy/pki/node.pem"
   key: "/etc/ploy/pki/node-key.pem"
