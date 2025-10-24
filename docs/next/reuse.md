@@ -1,6 +1,6 @@
-# Reusing Grid Components in Ploy v2
+# Reusing Grid Components in Ploy Next
 
-Ploy v2 benefits from selectively porting mature modules from the Grid repository. This document
+Ploy Next benefits from selectively porting mature modules from the Grid repository. This document
 highlights the primary candidates, why they are useful, and where to find them.
 
 ## Beacon & Discovery
@@ -54,5 +54,5 @@ highlights the primary candidates, why they are useful, and where to find them.
 4. **Validate with tests** — Reuse Grid’s unit/integration tests as a starting point, adjusting for
    Ploy’s environment.
 
-Reusing these components accelerates Ploy v2 without sacrificing stability, while still allowing the
+Reusing these components accelerates Ploy Next without sacrificing stability, while still allowing the
 system to move away from Grid’s infrastructure assumptions.

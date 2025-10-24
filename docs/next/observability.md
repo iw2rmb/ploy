@@ -1,6 +1,6 @@
 # Observability
 
-Ploy v2 publishes Prometheus metrics directly from the control plane. Operators can
+Ploy Next publishes Prometheus metrics directly from the control plane. Operators can
 scrape the `/metrics` endpoint on every control-plane instance and wire alerts using
 these collectors.
 

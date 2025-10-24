@@ -1,6 +1,6 @@
 # Deployment & Operations Guide
 
-This guide describes how to bootstrap a Ploy v2 cluster and add additional
+This guide describes how to bootstrap a Ploy Next cluster and add additional
 `ployd` nodes.
 It assumes Linux hosts (VPS or bare metal) with SSH access.
 
@@ -30,11 +30,6 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      The command automatically generates a 16-character lowercase-hex cluster identifier (persisted
      locally as the default descriptor) and a 4-character node identifier reused for the initial
      beacon/worker registration.
-   - `--etcd-endpoints <http(s)://host:port>[,<...>]` — optional override for etcd endpoints reachable
-     from the operator workstation. When omitted the CLI assumes `http://<address>:2379` (or the
-     derived host) after bootstrap.
-   - `--beacon-url <https://beacon.example.com>` — optional override for the beacon discovery URL.
-     Defaults to `https://<node-id>.<cluster-id>.ploy` so clients resolve through the beacon DNS.
    - The CLI generates and stores a cluster API key locally for later `ploy cluster connect` calls.
    - The bootstrap command automatically registers the generated node as both beacon and worker
      metadata, exposing its `ployd` endpoint as `<node-id>.<cluster-id>.ploy`.
@@ -104,7 +99,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
-  - Run `ploy node add --address <host-or-ip>` and include any metadata labels with `--label key=value`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
+  - Run `ploy node add --address <host-or-ip>`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
    - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
      and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  

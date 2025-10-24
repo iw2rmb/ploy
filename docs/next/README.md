@@ -1,6 +1,6 @@
-# Ploy v2 Overview
+# Ploy Next Overview
 
-Ploy v2 unifies Mods execution, SHIFT validation, and artifact handling into a
+Ploy Next unifies Mods execution, SHIFT validation, and artifact handling into a
 workstation-first stack. Lightweight `ployd` nodes coordinate Mods locally,
 while an etcd-backed control plane assigns work, enforces optimistic
 concurrency, and
@@ -124,7 +124,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 
 ## Adoption Path
 
-Ploy v2 rolls out sequentially: control plane scheduler, step runtime, artifact
+Ploy Next rolls out sequentially: control plane scheduler, step runtime, artifact
 publisher, CLI refresh, and deployment tooling. Follow
 [`docs/next/migration.md`](migration.md) for the phase-by-phase plan, the
 dependencies between components, and cleanup guidance for retiring Grid.
@@ -136,9 +136,8 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
 - [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.
-- [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy v2.
+- [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy Next.
 - [docs/next/devops.md](devops.md) — Deployment, bootstrap, and node operations playbook.
-- [docs/next/migration.md](migration.md) — Development roadmap for landing Ploy v2 features (no backward compatibility).
 - [docs/next/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
 - [docs/next/gc.md](gc.md) — Retention and garbage collection workflow (controller + `ploy gc`).
 - [docs/next/logs.md](logs.md) — Log streaming and archival strategy (metadata in etcd, payloads in IPFS).
@@ -146,4 +145,4 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/etcd.md](etcd.md) — etcd keyspace layout and contracts.
 - [docs/next/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
 - [docs/next/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.
-- [docs/next/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy v2.
+- [docs/next/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy Next.

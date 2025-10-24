@@ -1,12 +1,12 @@
 # SHIFT Build Gate Simplification
 
-Ploy v2 drops Grid dependencies, so the SHIFT repository must operate as a standalone build gate
+Ploy Next drops Grid dependencies, so the SHIFT repository must operate as a standalone build gate
 module. Key changes:
 
 ## Remove Grid Integrations
 
 - Delete Grid RPC clients, JetStream consumers, and queue listeners. SHIFT no longer receives jobs
-  via Grid; Ploy v2 dispatches build-gate jobs directly.
+  via Grid; Ploy Next dispatches build-gate jobs directly.
 - Remove Grid-specific environment variables (`GRID_*`, JetStream URLs) from configuration structs
   and docs.
 
@@ -30,5 +30,5 @@ module. Key changes:
 - Static-check adapters remain disabled until artifact publishing lands in `roadmap-mod-step-runtime-03`;
   once available, the SHIFT client will attach the structured reports to the staged artifacts.
 
-By simplifying SHIFT this way, Ploy v2 can reuse the build gate logic via module imports without any
+By simplifying SHIFT this way, Ploy Next can reuse the build gate logic via module imports without any
 legacy Grid wiring.

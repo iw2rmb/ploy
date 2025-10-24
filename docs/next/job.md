@@ -1,6 +1,6 @@
 # Job Execution Model
 
-Ploy v2 executes every step—Mods, build gate stages, auxiliary tooling—through a consistent job
+Ploy Next executes every step—Mods, build gate stages, auxiliary tooling—through a consistent job
 abstraction. This mirrors the Grid runtime semantics so workstation workflows remain predictable.
 
 ## Job Types

@@ -1,6 +1,6 @@
 # IPFS Cluster Integration
 
-Ploy v2 replaces the workstation filesystem artifact cache with an IPFS Cluster
+Ploy Next replaces the workstation filesystem artifact cache with an IPFS Cluster
 backed store. Every step execution publishes diff bundles, log archives, and
 auxiliary assets directly to the cluster so any node can hydrate artifacts by
 CID.

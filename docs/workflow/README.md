@@ -1,6 +1,6 @@
 # Workflow Runtime Overview
 
-Ploy v2 executes Mods locally on each workstation node. This document summarises how step manifests
+Ploy Next executes Mods locally on each workstation node. This document summarises how step manifests
 are hydrated, executed, and staged for follow-on tasks.
 
 ## Runtime Selection

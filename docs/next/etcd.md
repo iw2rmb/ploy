@@ -1,6 +1,6 @@
 # etcd Data Model
 
-Ploy v2 uses etcd as the authoritative control-plane store for queueing, job state, node capacity,
+Ploy Next uses etcd as the authoritative control-plane store for queueing, job state, node capacity,
 configuration, and IPFS metadata. This document provides an overview of the key prefixes and the
 contracts expected under each.
 
