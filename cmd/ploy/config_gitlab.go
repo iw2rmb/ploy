@@ -19,6 +19,7 @@ import (
 
 	cfgstore "github.com/iw2rmb/ploy/internal/cli/config"
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
 )
 
 type gitlabStore interface {
@@ -541,8 +542,15 @@ func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error
 		parsed.Scheme = "https"
 	}
 
+	if err := tunnel.EnsureFallbackNode(parsed); err != nil {
+		return nil, nil, err
+	}
+
 	httpClient, err := newControlPlaneHTTPClient(parsed, descriptor)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := tunnel.AttachHTTP(httpClient); err != nil {
 		return nil, nil, err
 	}
 	return parsed, httpClient, nil

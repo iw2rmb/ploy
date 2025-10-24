@@ -195,6 +195,105 @@ ensure_group() {
   fi
 }
 
+ensure_system_user() {
+  local name="$1"
+  if id "$name" >/dev/null 2>&1; then
+    return
+  fi
+  useradd --system --create-home --shell /bin/bash "$name"
+  log "created system user $name"
+}
+
+ensure_sshd() {
+  if ! command -v sshd >/dev/null 2>&1; then
+    log "sshd not present; installing openssh-server"
+    case "$PKG_MANAGER" in
+      apt)
+        install_package_set openssh-server
+        ;;
+      dnf|yum)
+        install_package_set openssh-server
+        ;;
+      *)
+        warn "unknown package manager; skipping sshd installation"
+        ;;
+    esac
+  fi
+  if ! command -v ssh >/dev/null 2>&1; then
+    case "$PKG_MANAGER" in
+      apt)
+        install_package_set openssh-client
+        ;;
+      dnf|yum)
+        install_package_set openssh-clients
+        ;;
+      *)
+        warn "unknown package manager; skipping ssh client installation"
+        ;;
+    esac
+  fi
+}
+
+configure_sshd() {
+  local admin_b64="${PLOY_SSH_ADMIN_KEYS_B64:-}"
+  local user_b64="${PLOY_SSH_USER_KEYS_B64:-}"
+  local sshd_dir="/etc/ssh"
+  local dropin_dir="${sshd_dir}/sshd_config.d"
+
+  mkdir -p "$dropin_dir"
+  cat >"${dropin_dir}/ploy.conf" <<'CONF'
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+KbdInteractiveAuthentication no
+UsePAM yes
+PermitRootLogin prohibit-password
+AllowUsers ploy-admin ploy-user
+Match User ploy-admin
+  AuthorizedKeysFile /etc/ploy/ssh/admin_authorized_keys
+Match User ploy-user
+  AuthorizedKeysFile /etc/ploy/ssh/user_authorized_keys
+LogLevel VERBOSE
+AllowTcpForwarding yes
+AllowAgentForwarding yes
+GatewayPorts no
+X11Forwarding no
+ClientAliveInterval 300
+ClientAliveCountMax 2
+CONF
+
+  mkdir -p /etc/ploy/ssh
+  chmod 0700 /etc/ploy/ssh
+
+  if [[ -n "$admin_b64" ]]; then
+    echo "$admin_b64" | base64 --decode >/etc/ploy/ssh/admin_authorized_keys
+    chmod 0600 /etc/ploy/ssh/admin_authorized_keys
+    chown root:root /etc/ploy/ssh/admin_authorized_keys
+  else
+    warn "PLOY_SSH_ADMIN_KEYS_B64 not provided; admin SSH access disabled"
+    : >/etc/ploy/ssh/admin_authorized_keys
+    chmod 0600 /etc/ploy/ssh/admin_authorized_keys
+  fi
+
+  if [[ -n "$user_b64" ]]; then
+    echo "$user_b64" | base64 --decode >/etc/ploy/ssh/user_authorized_keys
+    chmod 0600 /etc/ploy/ssh/user_authorized_keys
+    chown root:root /etc/ploy/ssh/user_authorized_keys
+  else
+    warn "PLOY_SSH_USER_KEYS_B64 not provided; user SSH access disabled"
+    : >/etc/ploy/ssh/user_authorized_keys
+    chmod 0600 /etc/ploy/ssh/user_authorized_keys
+  fi
+
+  if systemctl list-unit-files | grep -q '^ssh\.service'; then
+    systemctl enable ssh >/dev/null 2>&1 || true
+    systemctl restart ssh >/dev/null 2>&1 || true
+  fi
+  if systemctl list-unit-files | grep -q '^sshd\.service'; then
+    systemctl enable sshd >/dev/null 2>&1 || true
+    systemctl restart sshd >/dev/null 2>&1 || true
+  fi
+}
+
 install_etcd() {
   local current tmp archive url
   if command -v etcd >/dev/null 2>&1; then
@@ -415,9 +514,9 @@ configure_ployd_service() {
     cat >"$config_path" <<YAML
 mode: ${PLOYD_MODE:-beacon}
 http:
-  listen: "${PLOYD_HTTP_LISTEN:-:8443}"
+  listen: "${PLOYD_HTTP_LISTEN:-127.0.0.1:8443}"
 metrics:
-  listen: "${PLOYD_METRICS_LISTEN:-:9100}"
+  listen: "${PLOYD_METRICS_LISTEN:-127.0.0.1:9100}"
 control_plane:
   endpoint: "${PLOY_CONTROL_PLANE_ENDPOINT:-https://control.example.com}"
   ca: "/etc/ploy/pki/control-plane-ca.pem"
@@ -536,6 +635,10 @@ main() {
   detect_arch
   check_package_manager
   ensure_prerequisites
+  ensure_sshd
+  ensure_system_user "ploy-admin"
+  ensure_system_user "ploy-user"
+  configure_sshd
   check_disk_space "$WORKDIR"
   check_required_ports
   prepare_workspace

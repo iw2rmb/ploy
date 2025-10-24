@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
+	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
@@ -245,8 +247,19 @@ func controlPlaneBaseURL(desc config.Descriptor) (string, error) {
 }
 
 func newControlPlaneClient(baseURL string, desc config.Descriptor, timeout time.Duration) (*http.Client, error) {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse control plane url: %w", err)
+	}
+	if parsed.Scheme == "" {
+		parsed.Scheme = "https"
+	}
+	if err := tunnel.EnsureFallbackNode(parsed); err != nil {
+		return nil, err
+	}
+
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	if strings.HasPrefix(baseURL, "https://") {
+	if strings.EqualFold(parsed.Scheme, "https") {
 		caPath := strings.TrimSpace(desc.CABundlePath)
 		if caPath == "" {
 			return nil, errors.New("cluster CA bundle path missing; rerun 'ploy deploy bootstrap'")
@@ -264,7 +277,11 @@ func newControlPlaneClient(baseURL string, desc config.Descriptor, timeout time.
 			MinVersion: tls.VersionTLS12,
 		}
 	}
-	return &http.Client{Timeout: timeout, Transport: transport}, nil
+	client := &http.Client{Timeout: timeout, Transport: transport}
+	if err := tunnel.AttachHTTP(client); err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func registerWorker(ctx context.Context, client *http.Client, baseURL string, payload nodeJoinRequest) (nodeJoinResponse, error) {

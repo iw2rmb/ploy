@@ -26,24 +26,28 @@ const (
 )
 
 var (
-	ErrBeaconURLRequired      = errors.New("beacon-url is required")
-	ErrAPIKeyRequired         = errors.New("api-key is required")
-	ErrInitialBeaconIDMissing = errors.New("at least one beacon-id is required")
-	errMissingRunner          = errors.New("deploy: bootstrap runner required")
+	ErrBeaconURLRequired           = errors.New("beacon-url is required")
+	ErrAPIKeyRequired              = errors.New("api-key is required")
+	ErrInitialBeaconIDMissing      = errors.New("at least one beacon-id is required")
+	ErrAdminAuthorizedKeysRequired = errors.New("admin-authorized-keys is required")
+	ErrUserAuthorizedKeysRequired  = errors.New("user-authorized-keys is required")
+	errMissingRunner               = errors.New("deploy: bootstrap runner required")
 )
 
 // BootstrapConfig encapsulates the adjustable inputs for bootstrap provisioning.
 type BootstrapConfig struct {
-	User            string
-	IdentityFile    string
-	Address         string
-	ControlPlaneURL string
-	BeaconURL       string
-	PloydBinaryPath string
-	Stdout          io.Writer
-	Stderr          io.Writer
-	Stdin           io.Reader
-	WorkstationOS   string
+	User                    string
+	IdentityFile            string
+	Address                 string
+	ControlPlaneURL         string
+	BeaconURL               string
+	PloydBinaryPath         string
+	Stdout                  io.Writer
+	Stderr                  io.Writer
+	Stdin                   io.Reader
+	WorkstationOS           string
+	AdminAuthorizedKeysPath string
+	UserAuthorizedKeysPath  string
 }
 
 // BootstrapCommand prepares deploy.Options and invokes the deployment runner.
@@ -162,6 +166,26 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		opts.PloydBinaryPath = path
 	}
 
+	adminPath := strings.TrimSpace(cfg.AdminAuthorizedKeysPath)
+	if adminPath == "" {
+		return ErrAdminAuthorizedKeysRequired
+	}
+	adminKeys, err := readAuthorizedKeysFile(ExpandPath(adminPath))
+	if err != nil {
+		return fmt.Errorf("load admin authorized keys: %w", err)
+	}
+	opts.AdminAuthorizedKeys = adminKeys
+
+	userPath := strings.TrimSpace(cfg.UserAuthorizedKeysPath)
+	if userPath == "" {
+		return ErrUserAuthorizedKeysRequired
+	}
+	userKeys, err := readAuthorizedKeysFile(ExpandPath(userPath))
+	if err != nil {
+		return fmt.Errorf("load user authorized keys: %w", err)
+	}
+	opts.UserAuthorizedKeys = userKeys
+
 	opts.Stdout = cfg.Stdout
 	if opts.Stdout == nil {
 		opts.Stdout = os.Stdout
@@ -189,6 +213,27 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		ctx = context.Background()
 	}
 	return runner(ctx, opts)
+}
+
+// readAuthorizedKeysFile loads authorized keys from the provided path, skipping blanks and comments.
+func readAuthorizedKeysFile(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read authorized keys %s: %w", path, err)
+	}
+	lines := strings.Split(string(data), "\n")
+	keys := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		keys = append(keys, trimmed)
+	}
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("authorized keys file %s has no keys", path)
+	}
+	return keys, nil
 }
 
 // ExpandPath resolves a leading tilde to the user home directory.

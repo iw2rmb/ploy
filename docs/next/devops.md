@@ -49,6 +49,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
    - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
      refreshed, and logs summarise installed versions.  
+   - Provide `--admin-authorized-keys` and `--user-authorized-keys` pointing at files that contain newline-separated public keys for each role. Blank files are rejected.
    - etcd is installed as a systemd service bound to `127.0.0.1:{2379,2380}` so the CLI can finish
      bootstrap writes without exposing client ports publicly.
    - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with
@@ -57,10 +58,12 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
      ```bash
      dist/ploy deploy bootstrap \
-       --beacon-url https://beacon.staging.example.com \
-       --address 45.9.42.212 \
-       --user root \
-       --identity ~/.ssh/ploy-lab
+     --beacon-url https://beacon.staging.example.com \
+     --address 45.9.42.212 \
+     --user root \
+      --identity ~/.ssh/ploy-lab \
+      --admin-authorized-keys ./keys/admin_authorized_keys \
+      --user-authorized-keys ./keys/user_authorized_keys
      ```
 
 4. **Capture Cluster Metadata & PKI**  

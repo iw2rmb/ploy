@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -41,27 +42,29 @@ const (
 
 // Options configure bootstrap execution.
 type Options struct {
-	Host            string
-	Address         string
-	User            string
-	Port            int
-	IdentityFile    string
-	Stdout          io.Writer
-	Stderr          io.Writer
-	Runner          Runner
-	ClusterID       string
-	EtcdClient      *clientv3.Client
-	PloydBinaryPath string
-	InitialBeacons  []string
-	InitialWorkers  []string
-	BeaconURL       string
-	ControlPlaneURL string
-	APIKey          string
-	Clock           func() time.Time
-	Stdin           io.Reader
-	WorkstationOS   string
-	ResolverDir     string
-	EtcdEndpoints   []string
+	Host                string
+	Address             string
+	User                string
+	Port                int
+	IdentityFile        string
+	Stdout              io.Writer
+	Stderr              io.Writer
+	Runner              Runner
+	ClusterID           string
+	EtcdClient          *clientv3.Client
+	PloydBinaryPath     string
+	InitialBeacons      []string
+	InitialWorkers      []string
+	BeaconURL           string
+	ControlPlaneURL     string
+	APIKey              string
+	Clock               func() time.Time
+	Stdin               io.Reader
+	WorkstationOS       string
+	ResolverDir         string
+	EtcdEndpoints       []string
+	AdminAuthorizedKeys []string
+	UserAuthorizedKeys  []string
 }
 
 // IOStreams represents command IO endpoints.
@@ -141,6 +144,15 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		opts.APIKey = key
 	}
 
+	adminKeys := normalizedAuthorizedKeys(opts.AdminAuthorizedKeys)
+	if len(adminKeys) == 0 {
+		return errors.New("bootstrap: admin authorized keys required")
+	}
+	userKeys := normalizedAuthorizedKeys(opts.UserAuthorizedKeys)
+	if len(userKeys) == 0 {
+		return errors.New("bootstrap: user authorized keys required")
+	}
+
 	if opts.BeaconURL == "" {
 		return errors.New("bootstrap: beacon url required")
 	}
@@ -186,8 +198,19 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		return errors.New("bootstrap: ployd binary path required")
 	}
 
+	adminPayload := encodeAuthorizedKeys(adminKeys)
+	if adminPayload == "" {
+		return errors.New("bootstrap: admin authorized keys payload empty")
+	}
+	userPayload := encodeAuthorizedKeys(userKeys)
+	if userPayload == "" {
+		return errors.New("bootstrap: user authorized keys payload empty")
+	}
+
 	envVars := map[string]string{
 		"PLOY_CONTROL_PLANE_ENDPOINT": defaultControlPlaneEndpoint(opts.ControlPlaneURL),
+		"PLOY_SSH_ADMIN_KEYS_B64":     adminPayload,
+		"PLOY_SSH_USER_KEYS_B64":      userPayload,
 	}
 
 	provisionOpts := ProvisionOptions{
@@ -415,6 +438,31 @@ func hasNonEmpty(values []string) bool {
 		}
 	}
 	return false
+}
+
+// normalizedAuthorizedKeys returns a trimmed list of authorized key entries without blanks.
+func normalizedAuthorizedKeys(keys []string) []string {
+	clean := make([]string, 0, len(keys))
+	for _, key := range keys {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" {
+			continue
+		}
+		clean = append(clean, trimmed)
+	}
+	return clean
+}
+
+// encodeAuthorizedKeys returns a base64 payload for the supplied authorized keys slice.
+func encodeAuthorizedKeys(keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	payload := strings.Join(keys, "\n")
+	if !strings.HasSuffix(payload, "\n") {
+		payload += "\n"
+	}
+	return base64.StdEncoding.EncodeToString([]byte(payload))
 }
 
 type configureWorkstationOptions struct {
