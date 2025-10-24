@@ -214,6 +214,63 @@ runtime:
 	}
 }
 
+func TestControlPlaneRoutesMounted(t *testing.T) {
+	t.Helper()
+	cfg := loadConfig(t, `
+mode: worker
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+runtime:
+  plugins:
+    - name: local
+      module: internal
+`)
+	hub := logstream.NewHub(logstream.Options{})
+	status := &stubStatus{}
+
+	var (
+		mu    sync.Mutex
+		paths []string
+	)
+	control := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		w.WriteHeader(http.StatusTeapot)
+	})
+
+	server, err := httpserver.New(httpserver.Options{
+		Config:       cfg,
+		Streams:      hub,
+		Status:       status,
+		ControlPlane: control,
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	app := server.App()
+	req := httptest.NewRequest("GET", "/v2/health", nil)
+	resp, err := app.Test(req, 1000)
+	if err != nil {
+		t.Fatalf("app.Test() error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusTeapot {
+		t.Fatalf("unexpected status %d", resp.StatusCode)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 1 || paths[0] != "/v2/health" {
+		t.Fatalf("control-plane handler paths = %v", paths)
+	}
+}
+
 // Helpers
 
 func loadConfig(t *testing.T, raw string) config.Config {

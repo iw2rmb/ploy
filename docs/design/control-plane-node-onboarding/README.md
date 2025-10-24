@@ -13,6 +13,9 @@ Bootstrap already records beacon metadata, API keys, and the cluster CA in the l
 beacon DNS becomes resolvable immediately after bootstrap. We can therefore rely on HTTPS calls to
 the control-plane API instead of direct etcd access.
 
+> Status (2025-10-24): ployd now mounts the `/v2` control-plane handlers from `internal/ployd/httpserver`.
+> The CLI still needs to transition away from the admin surface to complete the migration.
+
 ## Goals
 
 - Retire `PLOY_ETCD_ENDPOINTS` from workstation workflows.
@@ -85,4 +88,3 @@ All endpoints require mutual TLS using the cluster CA and bearer tokens issued d
 ## Future Work
 
 - Expand `/v2/nodes` to stream probe output in real time.
-

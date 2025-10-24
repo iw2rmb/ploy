@@ -1,4 +1,4 @@
-package httpapi_test
+package httpserver_test
 
 import (
 	"bufio"
@@ -22,12 +22,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
-	"github.com/iw2rmb/ploy/internal/controlplane/httpapi"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/ployd/httpserver"
 )
 
 func TestServerJobLifecycle(t *testing.T) {
@@ -47,7 +47,7 @@ func TestServerJobLifecycle(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -115,7 +115,7 @@ func TestJobRetention(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -225,7 +225,7 @@ func TestServerNodesLifecycle(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -385,7 +385,7 @@ func TestServerBeaconRotateCA(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -454,7 +454,7 @@ func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Gatherer:  reg,
 		Etcd:      client,
@@ -505,7 +505,7 @@ func TestServerGitLabConfig(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -626,7 +626,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		_ = signer.Close()
 	}()
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Signer:    signer,
 		Etcd:      client,
@@ -735,7 +735,7 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	jobID := "job-stream-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Streams:   streams,
 		Etcd:      client,
@@ -876,7 +876,7 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	jobID := "job-resume-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpapi.New(httpapi.Options{
+	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Streams:   streams,
 		Etcd:      client,

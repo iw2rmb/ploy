@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/gofiber/adaptor/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
@@ -33,19 +35,21 @@ type AdminService interface {
 
 // Options configure the HTTP server.
 type Options struct {
-	Config  config.Config
-	Streams *logstream.Hub
-	Status  StatusProvider
-	Admin   AdminService
+	Config       config.Config
+	Streams      *logstream.Hub
+	Status       StatusProvider
+	Admin        AdminService
+	ControlPlane http.Handler
 }
 
-// Server exposes node APIs over Fiber.
+// Server exposes node and control-plane APIs.
 type Server struct {
 	mu        sync.Mutex
 	cfg       config.Config
 	streams   *logstream.Hub
 	status    StatusProvider
 	admin     AdminService
+	control   http.Handler
 	app       *fiber.App
 	listener  net.Listener
 	serveDone chan struct{}
@@ -66,6 +70,7 @@ func New(opts Options) (*Server, error) {
 		streams: opts.Streams,
 		status:  opts.Status,
 		admin:   opts.Admin,
+		control: opts.ControlPlane,
 	}
 	if err := s.ensureApp(); err != nil {
 		return nil, err
@@ -101,22 +106,28 @@ func (s *Server) Address() string {
 // Start begins serving requests.
 func (s *Server) Start(ctx context.Context) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.running {
+		s.mu.Unlock()
 		return errors.New("httpserver: already running")
 	}
 	if err := s.ensureAppLocked(); err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	listener, err := s.listenLocked()
 	if err != nil {
+		s.mu.Unlock()
 		return err
 	}
 	s.listener = listener
 	s.startCtx = ctx
 	s.serveDone = make(chan struct{})
 	s.running = true
-	go s.serve(listener, s.serveDone)
+	app := s.app
+	done := s.serveDone
+	s.mu.Unlock()
+
+	go s.serve(app, listener, done)
 	return nil
 }
 
@@ -181,14 +192,6 @@ func (s *Server) Reload(ctx context.Context, cfg config.Config) error {
 	return nil
 }
 
-func (s *Server) serve(listener net.Listener, done chan<- struct{}) {
-	defer close(done)
-	if err := s.app.Listener(listener); err != nil && !errors.Is(err, net.ErrClosed) && !isUseOfClosedNetworkError(err) {
-		// Fiber listener exited unexpectedly; nothing else to do but log via stderr.
-		fmt.Fprintf(os.Stderr, "[ployd/http] listener stopped: %v\n", err) //nolint:forbidigo // bootstrap logging
-	}
-}
-
 func (s *Server) ensureApp() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -216,6 +219,19 @@ func (s *Server) mountRoutes(app *fiber.App) {
 	app.Get("/node/v2/health", s.handleStatus)
 	app.Get("/node/v2/jobs/:jobID/logs/stream", s.handleLogStream)
 	app.Post("/admin/v1/nodes", s.handleAdminNodeCreate)
+	if s.control != nil {
+		handler := adaptor.HTTPHandler(s.control)
+		app.All("/v2", handler)
+		app.All("/v2/*", handler)
+		app.All("/metrics", handler)
+	}
+}
+
+func (s *Server) serve(app *fiber.App, listener net.Listener, done chan<- struct{}) {
+	defer close(done)
+	if err := app.Listener(listener); err != nil && !errors.Is(err, net.ErrClosed) && !isUseOfClosedNetworkError(err) {
+		fmt.Fprintf(os.Stderr, "[ployd/http] listener stopped: %v\n", err) //nolint:forbidigo
+	}
 }
 
 func (s *Server) listenLocked() (net.Listener, error) {
@@ -233,9 +249,7 @@ func (s *Server) listenLocked() (net.Listener, error) {
 		if err != nil {
 			return nil, fmt.Errorf("httpserver: load certificate: %w", err)
 		}
-		ln, err := tls.Listen("tcp", address, &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		})
+		ln, err := tls.Listen("tcp", address, &tls.Config{Certificates: []tls.Certificate{cert}})
 		if err != nil {
 			return nil, err
 		}
@@ -245,8 +259,7 @@ func (s *Server) listenLocked() (net.Listener, error) {
 }
 
 func (s *Server) handleStatus(c *fiber.Ctx) error {
-	ctx := c.UserContext()
-	status, err := s.status.Snapshot(ctx)
+	status, err := s.status.Snapshot(c.UserContext())
 	if err != nil {
 		return fiber.NewError(fiber.StatusServiceUnavailable, err.Error())
 	}
@@ -323,6 +336,12 @@ func (s *Server) handleAdminNodeCreate(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(resp)
 }
 
+type noopStatus struct{}
+
+func (noopStatus) Snapshot(context.Context) (map[string]any, error) {
+	return map[string]any{"state": "unknown"}, nil
+}
+
 func writeEvent(w *bufio.Writer, evt logstream.Event) error {
 	if evt.ID > 0 {
 		if _, err := fmt.Fprintf(w, "id: %d\n", evt.ID); err != nil {
@@ -369,11 +388,8 @@ func restartRequired(prev, next config.Config) bool {
 }
 
 func isUseOfClosedNetworkError(err error) bool {
+	if err == nil {
+		return false
+	}
 	return strings.Contains(err.Error(), "use of closed network connection")
-}
-
-type noopStatus struct{}
-
-func (noopStatus) Snapshot(context.Context) (map[string]any, error) {
-	return map[string]any{"state": "ok"}, nil
 }

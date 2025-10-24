@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/ployd/config"
@@ -29,27 +30,29 @@ type BootstrapRunner interface {
 
 // Options configure the daemon instance.
 type Options struct {
-	Config          config.Config
-	RuntimeRegistry *runtime.Registry
-	LogStreams      *logstream.Hub
-	HTTP            Component
-	Metrics         Component
-	ControlPlane    Component
-	PKI             Component
-	Scheduler       Component
-	Bootstrap       BootstrapRunner
+	Config               config.Config
+	RuntimeRegistry      *runtime.Registry
+	LogStreams           *logstream.Hub
+	HTTP                 Component
+	Metrics              Component
+	ControlPlane         Component
+	PKI                  Component
+	Scheduler            Component
+	Bootstrap            BootstrapRunner
+	ControlPlaneShutdown func(context.Context) error
 }
 
 // Daemon orchestrates node services.
 type Daemon struct {
-	mu              sync.RWMutex
-	cfg             config.Config
-	runtimeRegistry *runtime.Registry
-	logStreams      *logstream.Hub
-	bootstrap       BootstrapRunner
-	components      []componentEntry
-	started         bool
-	running         bool
+	mu                   sync.RWMutex
+	cfg                  config.Config
+	runtimeRegistry      *runtime.Registry
+	logStreams           *logstream.Hub
+	bootstrap            BootstrapRunner
+	components           []componentEntry
+	started              bool
+	running              bool
+	controlPlaneShutdown func(context.Context) error
 }
 
 type componentEntry struct {
@@ -82,10 +85,11 @@ func New(opts Options) (*Daemon, error) {
 	}
 
 	d := &Daemon{
-		cfg:             opts.Config,
-		runtimeRegistry: opts.RuntimeRegistry,
-		logStreams:      opts.LogStreams,
-		bootstrap:       opts.Bootstrap,
+		cfg:                  opts.Config,
+		runtimeRegistry:      opts.RuntimeRegistry,
+		logStreams:           opts.LogStreams,
+		bootstrap:            opts.Bootstrap,
+		controlPlaneShutdown: opts.ControlPlaneShutdown,
 		components: []componentEntry{
 			{name: "http", comp: opts.HTTP},
 			{name: "metrics", comp: opts.Metrics},
@@ -137,6 +141,14 @@ func (d *Daemon) Run(ctx context.Context) error {
 	<-ctx.Done()
 
 	d.stopComponents(context.Background(), components)
+
+	if d.controlPlaneShutdown != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := d.controlPlaneShutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("daemon: control-plane shutdown: %w", err)
+		}
+	}
 
 	d.mu.Lock()
 	d.running = false
