@@ -38,18 +38,15 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
      and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
      Cluster 1.1.4.  
-   - The CLI always uses `<cluster-id>.ploy` so the beacon domain matches the generated identifier; configure DNS separately when a fixed hostname is required.  
-   - After the remote script succeeds, the CLI elevates via `sudo` to install the cluster CA into
-     the workstation trust store. On macOS it also checks `/etc/resolver/ploy`; when the file is
-     missing it prompts to write a resolver entry pointing `*.ploy` lookups to the beacon IP.
-   - Beacon nodes are regular workers operating in beacon mode. The generated node ID is reused for
-     both the beacon and worker records so the beacon DNS can resolve `*.{cluster-id}.ploy` and
-     `<node-id>.<cluster-id>.ploy` entries for the same machine.
-   - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`.  
-   - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
-   - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
-     refreshed, and logs summarise installed versions.  
-   - Provide `--admin-authorized-keys` and `--user-authorized-keys` pointing at files that contain newline-separated public keys for each role. Blank files are rejected.
+  - The CLI derives a cluster identifier and uses `*.ploy` hostnames by default; configure DNS separately when a fixed hostname is required.  
+  - After the remote script succeeds, the CLI elevates via `sudo` to install the cluster CA into
+    the workstation trust store. On macOS it also checks `/etc/resolver/ploy`; when the file is
+    missing it prompts to write a resolver entry pointing `*.ploy` lookups to the control-plane IP.
+  - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`.  
+  - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
+  - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
+    refreshed, and logs summarise installed versions.  
+  - The CLI derives remote authorized keys from the SSH identity (defaults to `~/.ssh/id_rsa`); ensure the corresponding `.pub` is present or accessible via `ssh-keygen -y`.
    - etcd is installed as a systemd service bound to `127.0.0.1:{2379,2380}` so the CLI can finish
      bootstrap writes without exposing client ports publicly.
    - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with
@@ -57,13 +54,8 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Example command with overrides:
 
      ```bash
-     dist/ploy deploy bootstrap \
-     --beacon-url https://beacon.staging.example.com \
-     --address 45.9.42.212 \
-     --user root \
-      --identity ~/.ssh/ploy-lab \
-      --admin-authorized-keys ./keys/admin_authorized_keys \
-      --user-authorized-keys ./keys/user_authorized_keys
+    dist/ploy deploy \
+      --address 45.9.42.212
      ```
 
 4. **Capture Cluster Metadata & PKI**  
@@ -82,13 +74,11 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      `ploy beacon rotate-ca --dry-run` succeed immediately after bootstrap, enabling smoke tests
      against the lab cluster before onboarding additional nodes.
    - Enables fast reconnection via `ploy cluster connect --cluster-id <id>` or `ploy cluster list`
-     once the descriptor exists; subsequent commands reuse the stored CA bundle and API key. If the CA
-     rotates, the descriptor is refreshed automatically during the rotation workflow.
+     once the descriptor exists; subsequent commands reuse the stored CA bundle and API key.
 
 5. **Configure Ploy CLI**  
    - Install `ploy` binary on operator workstation.  
-   - Set environment variables (`PLOY_BEACON_URL`, `PLOY_CA_PATH`, GitLab API token in etcd).  
-   - Run `ploy beacon promote` if beacon rotation is required.
+   - Set environment variables (`PLOY_CONTROL_PLANE_URL`, `PLOY_CA_PATH`, GitLab API token in etcd).  
 
 6. **Verify**  
    - `ploy beacon status` (or API equivalent) to confirm healthy nodes list.  
@@ -117,39 +107,17 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 
 ## Maintenance
 
-- Use `ploy beacon rotate-ca --cluster-id <id> --dry-run` to preview CA changes, then rerun without
-  `--dry-run` to rotate the CA, reissue beacon/worker certificates, update the trust bundle, and record
-  revocation metadata in etcd. Worker onboarding reads the refreshed descriptors automatically.  
-- Use `ploy logs job <job-id>` for debugging, and clean up old containers using node operations.  
-- Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.
-- Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer. The command talks to the control plane, writes the encrypted secret, and emits rotation events so workers refresh immediately.  
-- Inspect signer health with `ploy config gitlab status [--secret <name>]`. The output includes audit feed metadata from the rotation revocation pipeline (last rotation, revoked nodes, recent failures) outlined in `.archive/gitlab-rotation-revocation/README.md`.  
+- Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.  
+- Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer; follow up with `ploy config gitlab status` to confirm rotation state.  
 - Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/next/logs.md](logs.md)).  
-- For unattended rotations, provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` or ensure the active cluster descriptor contains the control plane endpoint and CA bundle so the CLI can authenticate requests.
-- Use `GET /v1/config?cluster_id=<id>` to audit the active control-plane configuration. Apply updates with
-  `PUT /v1/config` and an `If-Match` header (use `0` for initial creation, the last seen revision for updates,
-  or `*` to override). Every write is recorded by `ploy_config_updates_total` in Prometheus.
-- `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the
-  response is intentionally uncached so dashboards can poll it directly.
-- `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane
-  and is safe to cache client-side for up to a minute.
-- Beacon discovery calls (`GET /v1/beacon/nodes`, `/v1/beacon/config`, `/v1/beacon/ca`) now include
-  signed envelopes. Operators can verify the `signature.value` field with the active CA certificate and
-  promote a standby node by posting to `/v1/beacon/promote` with the `admin` scope.
-
-This operational flow keeps `ployd` nodes consistent and ensures the control plane remains
-authoritative via etcd and beacon mode.
+- Provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` (or rely on the active cluster descriptor) so unattended tooling can authenticate control-plane requests.  
+- Use `GET /v1/config?cluster_id=<id>` to audit the active control-plane configuration. Apply updates with `PUT /v1/config` and an `If-Match` header (use `0` for initial creation, the last seen revision for updates, or `*` to override). Every write is recorded by Prometheus metrics such as `ploy_config_updates_total`.  
+- `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the response is intentionally uncached so dashboards can poll it directly.  
+- `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane and is safe to cache client-side for up to a minute.
 
 ## Certificate Lifecycle
 
-- Deployment bootstrap generates the initial cluster CA and issues leaf certificates for the beacon
-  plus any pre-registered workers. The materials live under `/ploy/clusters/<cluster>/security/` in etcd
-  alongside a trust bundle exposed to CLI consumers.
-   - Subsequent worker onboarding reuses these descriptors; the onboarding flow in
-     [`.archive/deployment-worker-onboarding/README.md`](../../.archive/deployment-worker-onboarding/README.md)
-     reads the same paths to provision node keys.
-- Run `ploy beacon rotate-ca --cluster-id <id>` to mint a new CA, publish refreshed leaf certificates,
-  and mark the previous CA version as revoked under `/security/ca/history/<version>`. Use
-  `--dry-run` to stage the rotation before writing to etcd.
-- After rotation, the trust store and local cluster descriptors are updated automatically so tools and
-  operators download the new CA bundle on their next refresh.
+- Deployment bootstrap generates the initial cluster CA and issues leaf certificates for the control-plane nodes plus any pre-registered workers. The materials live under `/ploy/clusters/<cluster>/security/` in etcd alongside a trust bundle exposed to CLI consumers.  
+   - Subsequent worker onboarding reuses these descriptors; the onboarding flow in [`.archive/deployment-worker-onboarding/README.md`](../../.archive/deployment-worker-onboarding/README.md) reads the same paths to provision node keys.
+- Use the control-plane’s `/v1/ca/rotate` API (surfaced via `ploy cluster rotate-ca`) to mint a new CA, publish refreshed leaf certificates, and mark the previous CA version as revoked under `/security/ca/history/<version>`. Run with `--dry-run` to stage the rotation before committing.  
+- After rotation, the trust store and local cluster descriptors are updated automatically so tooling downloads the new CA bundle on their next refresh.

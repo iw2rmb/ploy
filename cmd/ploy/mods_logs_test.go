@@ -14,7 +14,6 @@ import (
 
 func TestModsLogsStructuredOutput(t *testing.T) {
 	t.Helper()
-	t.Setenv("PLOY_SSH_DISABLE", "1")
 	server := newStreamingServer(t, streamingServerConfig{
 		modTicket: "ticket-123",
 		logEvents: []sseTestEvent{
@@ -53,7 +52,6 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 
 func TestModsLogsRawOutput(t *testing.T) {
 	t.Helper()
-	t.Setenv("PLOY_SSH_DISABLE", "1")
 	server := newStreamingServer(t, streamingServerConfig{
 		modTicket: "ticket-raw",
 		logEvents: []sseTestEvent{
@@ -80,7 +78,6 @@ func TestModsLogsRawOutput(t *testing.T) {
 
 func TestModsLogsRequiresTicket(t *testing.T) {
 	t.Helper()
-	t.Setenv("PLOY_SSH_DISABLE", "1")
 	withEnv(t, "PLOY_CONTROL_PLANE_URL", "https://example.invalid")
 
 	buf := &bytes.Buffer{}
@@ -95,7 +92,6 @@ func TestModsLogsRequiresTicket(t *testing.T) {
 
 func TestModsLogsInvalidFormat(t *testing.T) {
 	t.Helper()
-	t.Setenv("PLOY_SSH_DISABLE", "1")
 	withEnv(t, "PLOY_CONTROL_PLANE_URL", "https://example.invalid")
 
 	buf := &bytes.Buffer{}
@@ -110,7 +106,6 @@ func TestModsLogsInvalidFormat(t *testing.T) {
 
 func TestJobsFollowReconnects(t *testing.T) {
 	t.Helper()
-	t.Setenv("PLOY_SSH_DISABLE", "1")
 	server := newStreamingServer(t, streamingServerConfig{
 		jobID: "job-42",
 		reconnects: []streamReconnectPlan{

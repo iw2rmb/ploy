@@ -6,58 +6,37 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
-
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
-const (
-	DefaultDomainSuffix      = ".ploy"
-	DefaultClusterIDAlphabet = "0123456789abcdef"
-	DefaultClusterIDLength   = 16
-	DefaultWorkerIDAlphabet  = "0123456789abcdef"
-	DefaultWorkerIDLength    = 4
-	DefaultAPIKeyAlphabet    = "0123456789abcdef"
-	DefaultAPIKeyLength      = 64
-)
-
 var (
-	ErrBeaconURLRequired           = errors.New("beacon-url is required")
-	ErrAPIKeyRequired              = errors.New("api-key is required")
-	ErrInitialBeaconIDMissing      = errors.New("at least one beacon-id is required")
-	ErrAdminAuthorizedKeysRequired = errors.New("admin-authorized-keys is required")
-	ErrUserAuthorizedKeysRequired  = errors.New("user-authorized-keys is required")
-	errMissingRunner               = errors.New("deploy: bootstrap runner required")
+	errMissingRunner = errors.New("deploy: bootstrap runner required")
 )
 
 // BootstrapConfig encapsulates the adjustable inputs for bootstrap provisioning.
 type BootstrapConfig struct {
-	User                    string
-	IdentityFile            string
-	Address                 string
-	ControlPlaneURL         string
-	BeaconURL               string
-	PloydBinaryPath         string
-	Stdout                  io.Writer
-	Stderr                  io.Writer
-	Stdin                   io.Reader
-	WorkstationOS           string
-	AdminAuthorizedKeysPath string
-	UserAuthorizedKeysPath  string
+	User            string
+	IdentityFile    string
+	Address         string
+	ControlPlaneURL string
+	BeaconURL       string
+	PloydBinaryPath string
+	Stdout          io.Writer
+	Stderr          io.Writer
+	Stdin           io.Reader
+	WorkstationOS   string
 }
 
 // BootstrapCommand prepares deploy.Options and invokes the deployment runner.
 type BootstrapCommand struct {
-	RunBootstrap      func(context.Context, deploy.Options) error
-	GenerateClusterID func() (string, error)
-	GenerateWorkerID  func() (string, error)
-	GenerateAPIKey    func() (string, error)
+	RunBootstrap    func(context.Context, deploy.Options) error
 	LocatePloydBinary func(string) (string, error)
-	DefaultIdentity   func() string
+	DefaultIdentity func() string
 }
 
 // Run executes the bootstrap flow using the provided configuration.
@@ -70,75 +49,16 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		return errMissingRunner
 	}
 
-	clusterGen := c.GenerateClusterID
-	if clusterGen == nil {
-		clusterGen = func() (string, error) {
-			return gonanoid.Generate(DefaultClusterIDAlphabet, DefaultClusterIDLength)
-		}
-	}
-	workerGen := c.GenerateWorkerID
-	if workerGen == nil {
-		workerGen = func() (string, error) {
-			return gonanoid.Generate(DefaultWorkerIDAlphabet, DefaultWorkerIDLength)
-		}
-	}
-	apiGen := c.GenerateAPIKey
-	if apiGen == nil {
-		apiGen = func() (string, error) {
-			return gonanoid.Generate(DefaultAPIKeyAlphabet, DefaultAPIKeyLength)
-		}
-	}
-
 	workstationOS := strings.TrimSpace(cfg.WorkstationOS)
 	if workstationOS == "" {
 		workstationOS = runtime.GOOS
 	}
 
-	clusterID, err := clusterGen()
-	if err != nil {
-		return fmt.Errorf("generate cluster identifier: %w", err)
-	}
-
 	opts := deploy.Options{}
-	opts.ClusterID = clusterID
 	opts.User = strings.TrimSpace(cfg.User)
 	opts.Address = strings.TrimSpace(cfg.Address)
 	opts.ControlPlaneURL = strings.TrimSpace(cfg.ControlPlaneURL)
 	opts.WorkstationOS = workstationOS
-
-	nodeID, err := workerGen()
-	if err != nil {
-		return fmt.Errorf("generate node identifier: %w", err)
-	}
-	opts.InitialBeacons = []string{nodeID}
-	opts.InitialWorkers = []string{nodeID}
-
-	manualBeaconURL := strings.TrimSpace(cfg.BeaconURL)
-	if manualBeaconURL != "" {
-		opts.BeaconURL = manualBeaconURL
-	} else {
-		opts.BeaconURL = fmt.Sprintf("https://%s.%s%s", nodeID, clusterID, DefaultDomainSuffix)
-	}
-
-	apiKey, err := apiGen()
-	if err != nil {
-		return fmt.Errorf("generate api key: %w", err)
-	}
-	opts.APIKey = apiKey
-
-	opts.Host = clusterID + DefaultDomainSuffix
-
-	connectHost := opts.Address
-	if connectHost == "" {
-		connectHost = opts.Host
-	}
-	if connectHost != "" {
-		etcdHost := connectHost
-		if strings.Contains(etcdHost, ":") && !strings.Contains(etcdHost, "]") && !strings.Contains(etcdHost, "[") {
-			etcdHost = "[" + etcdHost + "]"
-		}
-		opts.EtcdEndpoints = []string{fmt.Sprintf("http://%s:2379", etcdHost)}
-	}
 
 	identity := strings.TrimSpace(cfg.IdentityFile)
 	if identity == "" {
@@ -166,25 +86,24 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		opts.PloydBinaryPath = path
 	}
 
-	adminPath := strings.TrimSpace(cfg.AdminAuthorizedKeysPath)
-	if adminPath == "" {
-		return ErrAdminAuthorizedKeysRequired
-	}
-	adminKeys, err := readAuthorizedKeysFile(ExpandPath(adminPath))
+	adminKeys, err := deriveAuthorizedKeysFromIdentity(opts.IdentityFile)
 	if err != nil {
-		return fmt.Errorf("load admin authorized keys: %w", err)
+		return fmt.Errorf("derive admin authorized keys: %w", err)
 	}
 	opts.AdminAuthorizedKeys = adminKeys
+	opts.UserAuthorizedKeys = append([]string(nil), adminKeys...)
 
-	userPath := strings.TrimSpace(cfg.UserAuthorizedKeysPath)
-	if userPath == "" {
-		return ErrUserAuthorizedKeysRequired
+	if trimmed := strings.TrimSpace(cfg.ControlPlaneURL); trimmed != "" {
+		opts.ControlPlaneURL = trimmed
+	} else if opts.ControlPlaneURL == "" {
+		opts.ControlPlaneURL = "http://127.0.0.1:9094"
 	}
-	userKeys, err := readAuthorizedKeysFile(ExpandPath(userPath))
-	if err != nil {
-		return fmt.Errorf("load user authorized keys: %w", err)
+	if opts.Address == "" {
+		return errors.New("deploy: address required")
 	}
-	opts.UserAuthorizedKeys = userKeys
+	opts.DescriptorID = opts.Address
+	opts.DescriptorAddress = opts.Address
+	opts.DescriptorIdentityPath = opts.IdentityFile
 
 	opts.Stdout = cfg.Stdout
 	if opts.Stdout == nil {
@@ -197,16 +116,6 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 	opts.Stdin = cfg.Stdin
 	if opts.Stdin == nil {
 		opts.Stdin = os.Stdin
-	}
-
-	if opts.BeaconURL == "" {
-		return ErrBeaconURLRequired
-	}
-	if opts.APIKey == "" {
-		return ErrAPIKeyRequired
-	}
-	if len(opts.InitialBeacons) == 0 {
-		return ErrInitialBeaconIDMissing
 	}
 
 	if ctx == nil {
@@ -234,6 +143,28 @@ func readAuthorizedKeysFile(path string) ([]string, error) {
 		return nil, fmt.Errorf("authorized keys file %s has no keys", path)
 	}
 	return keys, nil
+}
+
+func deriveAuthorizedKeysFromIdentity(identityPath string) ([]string, error) {
+	trimmed := strings.TrimSpace(identityPath)
+	if trimmed == "" {
+		return nil, errors.New("identity path required to derive authorized keys")
+	}
+
+	pubPath := trimmed + ".pub"
+	if keys, err := readAuthorizedKeysFile(pubPath); err == nil {
+		return keys, nil
+	}
+
+	out, err := exec.Command("ssh-keygen", "-y", "-f", trimmed).Output()
+	if err != nil {
+		return nil, fmt.Errorf("ssh-keygen derive public key: %w", err)
+	}
+	key := strings.TrimSpace(string(out))
+	if key == "" {
+		return nil, errors.New("ssh-keygen returned empty key")
+	}
+	return []string{key}, nil
 }
 
 // ExpandPath resolves a leading tilde to the user home directory.

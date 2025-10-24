@@ -71,9 +71,6 @@ func ensureCache() (*cache.Cache, error) {
 
 // SetNodes configures the shared manager with the provided node snapshot.
 func SetNodes(nodes []sshtransport.Node) error {
-	if disabled() {
-		return nil
-	}
 	manager, err := Manager()
 	if err != nil {
 		return err
@@ -110,9 +107,6 @@ func NodesFromGridStatus(status gridclient.Status) []sshtransport.Node {
 
 // EnsureFallbackNode registers a single fallback node derived from the base URL when discovery metadata is unavailable.
 func EnsureFallbackNode(base *url.URL) error {
-	if disabled() {
-		return nil
-	}
 	if base == nil {
 		return errors.New("tunnel: base url required")
 	}
@@ -141,9 +135,6 @@ func EnsureFallbackNode(base *url.URL) error {
 
 // AttachHTTP configures the client's transport to dial via the shared tunnel manager.
 func AttachHTTP(client *http.Client) error {
-	if disabled() {
-		return nil
-	}
 	if client == nil {
 		return errors.New("tunnel: http client required")
 	}
@@ -153,6 +144,10 @@ func AttachHTTP(client *http.Client) error {
 	manager, err := Manager()
 	if err != nil {
 		return err
+	}
+
+	if !manager.HasTargets() {
+		return nil
 	}
 
 	switch transport := client.Transport.(type) {
@@ -302,14 +297,4 @@ func expandPath(path string) string {
 		}
 	}
 	return path
-}
-
-func disabled() bool {
-	value := strings.TrimSpace(os.Getenv("PLOY_SSH_DISABLE"))
-	switch strings.ToLower(value) {
-	case "1", "true", "yes", "on":
-		return true
-	default:
-		return false
-	}
 }
