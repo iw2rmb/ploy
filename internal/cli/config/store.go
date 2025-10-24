@@ -12,18 +12,13 @@ import (
 	"time"
 )
 
-// Descriptor captures locally cached cluster metadata such as beacon endpoints and trust bundles.
+// Descriptor captures the minimal metadata required to establish SSH tunnels to a cluster.
 type Descriptor struct {
-	ID              string    `json:"id"`
-	BeaconURL       string    `json:"beacon_url"`
-	ControlPlaneURL string    `json:"control_plane_url,omitempty"`
-	APIKey          string    `json:"api_key,omitempty"`
-	AccessToken     string    `json:"access_token,omitempty"`
-	CABundlePath    string    `json:"ca_path,omitempty"`
-	TrustBundlePath string    `json:"trust_bundle_path,omitempty"`
-	Version         string    `json:"version,omitempty"`
-	LastRefreshed   time.Time `json:"last_refreshed,omitempty"`
-	Default         bool      `json:"default,omitempty"`
+	ID            string    `json:"id"`
+	NodeAddress   string    `json:"node_address"`
+	IdentityPath  string    `json:"identity_path,omitempty"`
+	LastRefreshed time.Time `json:"last_refreshed,omitempty"`
+	Default       bool      `json:"default,omitempty"`
 }
 
 // SaveDescriptor persists a cluster descriptor to disk, returning the stored copy.
@@ -31,6 +26,9 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 	trimmedID := strings.TrimSpace(desc.ID)
 	if trimmedID == "" {
 		return Descriptor{}, errors.New("descriptor id required")
+	}
+	if strings.TrimSpace(desc.NodeAddress) == "" {
+		return Descriptor{}, errors.New("descriptor node address required")
 	}
 	sanitizedID := sanitizeID(trimmedID)
 	if desc.LastRefreshed.IsZero() {
@@ -156,15 +154,6 @@ func descriptorPath(id string) (string, error) {
 		return "", err
 	}
 	return filepath.Join(root, sanitizeID(strings.TrimSpace(id))+".json"), nil
-}
-
-// CABundlePath resolves the storage location for the CA bundle associated with the cluster identifier.
-func CABundlePath(id string) (string, error) {
-	root, err := clusterConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, sanitizeID(strings.TrimSpace(id))+"_ca.pem"), nil
 }
 
 func writeDescriptorFile(path string, desc Descriptor) error {

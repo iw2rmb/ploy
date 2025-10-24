@@ -21,16 +21,20 @@ var deployBootstrapRunner = deploy.RunBootstrap
 func handleDeploy(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
 		printDeployUsage(stderr)
-		return errors.New("deploy subcommand required")
+		return errors.New("deploy requires target address")
 	}
 
-	switch args[0] {
-	case "bootstrap":
-		return handleDeployBootstrap(args[1:], stderr)
-	default:
-		printDeployUsage(stderr)
-		return fmt.Errorf("unknown deploy subcommand %q", args[0])
+	if !strings.HasPrefix(args[0], "-") && args[0] != "" {
+		switch args[0] {
+		case "bootstrap":
+			return handleDeployBootstrap(args[1:], stderr)
+		default:
+			printDeployUsage(stderr)
+			return fmt.Errorf("unknown deploy subcommand %q", args[0])
+		}
 	}
+
+	return handleDeployBootstrap(args, stderr)
 }
 
 func handleDeployBootstrap(args []string, stderr io.Writer) error {
@@ -38,24 +42,18 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		userFlag  stringValue
-		identity  stringValue
-		address   stringValue
-		control   stringValue
-		beacon    stringValue
-		ploydBin  stringValue
-		adminKeys stringValue
-		userKeys  stringValue
+		userFlag stringValue
+		identity stringValue
+		address  stringValue
+		control  stringValue
+		ploydBin stringValue
 	)
 
 	fs.Var(&userFlag, "user", "SSH username (default: root)")
 	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
 	fs.Var(&address, "address", "Override SSH target address (defaults to host)")
 	fs.Var(&control, "control-plane-url", "Control plane endpoint recorded in the local descriptor")
-	fs.Var(&beacon, "beacon-url", "Beacon URL recorded in the local descriptor (default: https://<node-id>.<cluster-id>.ploy)")
 	fs.Var(&ploydBin, "ployd-binary", "Path to the ployd binary uploaded during bootstrap (default: alongside the CLI)")
-	fs.Var(&adminKeys, "admin-authorized-keys", "Path to authorized_keys entries granting admin access")
-	fs.Var(&userKeys, "user-authorized-keys", "Path to authorized_keys entries granting user access")
 
 	if err := fs.Parse(args); err != nil {
 		printDeployBootstrapUsage(stderr)
@@ -83,18 +81,15 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		cfg.Address = strings.TrimSpace(address.value)
 	}
 	cfg.ControlPlaneURL = strings.TrimSpace(control.value)
-	cfg.BeaconURL = strings.TrimSpace(beacon.value)
 	if ploydBin.set {
 		cfg.PloydBinaryPath = strings.TrimSpace(ploydBin.value)
 	}
-	cfg.AdminAuthorizedKeysPath = strings.TrimSpace(adminKeys.value)
-	cfg.UserAuthorizedKeysPath = strings.TrimSpace(userKeys.value)
 
 	cmd := deploycli.BootstrapCommand{
 		RunBootstrap: deployBootstrapRunner,
 	}
 	if err := cmd.Run(context.Background(), cfg); err != nil {
-		if errors.Is(err, deploycli.ErrBeaconURLRequired) || errors.Is(err, deploycli.ErrAPIKeyRequired) || errors.Is(err, deploycli.ErrInitialBeaconIDMissing) || errors.Is(err, deploycli.ErrAdminAuthorizedKeysRequired) || errors.Is(err, deploycli.ErrUserAuthorizedKeysRequired) {
+		if errors.Is(err, deploycli.ErrBeaconURLRequired) || errors.Is(err, deploycli.ErrAPIKeyRequired) || errors.Is(err, deploycli.ErrInitialBeaconIDMissing) {
 			printDeployBootstrapUsage(stderr)
 		}
 		return err

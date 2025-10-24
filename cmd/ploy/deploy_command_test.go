@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
@@ -25,18 +24,21 @@ func ploydFixture(t *testing.T) string {
 }
 
 const (
-	adminBootstrapKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ076bootTestAdmin deploy-admin"
-	userBootstrapKey  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoopbackUserKey deploy-user"
+	identityBootstrapKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ076bootTestAdmin deploy-admin"
 )
 
-func authorizedKeysFixture(t *testing.T, keys ...string) string {
+func identityFixture(t *testing.T, key string) string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "authorized_keys")
-	content := strings.Join(keys, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write authorized keys fixture: %v", err)
+	dir := t.TempDir()
+	priv := filepath.Join(dir, "id_rsa")
+	if err := os.WriteFile(priv, []byte("PRIVATE KEY"), 0o600); err != nil {
+		t.Fatalf("write identity private key: %v", err)
 	}
-	return path
+	pub := priv + ".pub"
+	if err := os.WriteFile(pub, []byte(key+"\n"), 0o644); err != nil {
+		t.Fatalf("write identity public key: %v", err)
+	}
+	return priv
 }
 
 func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
@@ -50,13 +52,11 @@ func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 	}
 
 	ploydPath := ploydFixture(t)
-	adminKeysPath := authorizedKeysFixture(t, adminBootstrapKey)
-	userKeysPath := authorizedKeysFixture(t, userBootstrapKey)
+	identityPath := identityFixture(t, identityBootstrapKey)
 	err := handleDeployBootstrap([]string{
 		"--address", "192.0.2.10",
 		"--ployd-binary", ploydPath,
-		"--admin-authorized-keys", adminKeysPath,
-		"--user-authorized-keys", userKeysPath,
+		"--identity", identityPath,
 	}, io.Discard)
 	if err != nil {
 		t.Fatalf("expected cluster id to be generated, got error: %v", err)
@@ -86,10 +86,10 @@ func TestHandleDeployBootstrapAllowsMissingClusterID(t *testing.T) {
 	if captured.PloydBinaryPath != ploydPath {
 		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
 	}
-	if got := captured.AdminAuthorizedKeys; len(got) != 1 || got[0] != adminBootstrapKey {
+	if got := captured.AdminAuthorizedKeys; len(got) != 1 || got[0] != identityBootstrapKey {
 		t.Fatalf("expected admin authorized key propagated, got %v", got)
 	}
-	if got := captured.UserAuthorizedKeys; len(got) != 1 || got[0] != userBootstrapKey {
+	if got := captured.UserAuthorizedKeys; len(got) != 1 || got[0] != identityBootstrapKey {
 		t.Fatalf("expected user authorized key propagated, got %v", got)
 	}
 }
@@ -106,15 +106,13 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 
 	stderr := &bytes.Buffer{}
 	ploydPath := ploydFixture(t)
-	adminKeysPath := authorizedKeysFixture(t, adminBootstrapKey)
-	userKeysPath := authorizedKeysFixture(t, userBootstrapKey)
+	identityPath := identityFixture(t, identityBootstrapKey)
 	err := handleDeployBootstrap([]string{
 		"--address", "bootstrap.example.com",
 		"--beacon-url", "https://override.example.com",
 		"--control-plane-url", "https://control.example.com",
 		"--ployd-binary", ploydPath,
-		"--admin-authorized-keys", adminKeysPath,
-		"--user-authorized-keys", userKeysPath,
+		"--identity", identityPath,
 	}, stderr)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
@@ -147,10 +145,10 @@ func TestHandleDeployBootstrapParsesFlags(t *testing.T) {
 	if captured.PloydBinaryPath != ploydPath {
 		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
 	}
-	if len(captured.AdminAuthorizedKeys) != 1 || captured.AdminAuthorizedKeys[0] != adminBootstrapKey {
+	if len(captured.AdminAuthorizedKeys) != 1 || captured.AdminAuthorizedKeys[0] != identityBootstrapKey {
 		t.Fatalf("expected admin authorized key propagated")
 	}
-	if len(captured.UserAuthorizedKeys) != 1 || captured.UserAuthorizedKeys[0] != userBootstrapKey {
+	if len(captured.UserAuthorizedKeys) != 1 || captured.UserAuthorizedKeys[0] != identityBootstrapKey {
 		t.Fatalf("expected user authorized key propagated")
 	}
 }
@@ -166,12 +164,10 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 	}
 
 	ploydPath := ploydFixture(t)
-	adminKeysPath := authorizedKeysFixture(t, adminBootstrapKey)
-	userKeysPath := authorizedKeysFixture(t, userBootstrapKey)
+	identityPath := identityFixture(t, identityBootstrapKey)
 	err := handleDeployBootstrap([]string{
 		"--ployd-binary", ploydPath,
-		"--admin-authorized-keys", adminKeysPath,
-		"--user-authorized-keys", userKeysPath,
+		"--identity", identityPath,
 	}, io.Discard)
 	if err != nil {
 		t.Fatalf("handleDeployBootstrap returned error: %v", err)
@@ -211,6 +207,12 @@ func TestHandleDeployBootstrapGeneratesDefaults(t *testing.T) {
 	}
 	if captured.PloydBinaryPath != ploydPath {
 		t.Fatalf("expected ployd binary path %q, got %q", ploydPath, captured.PloydBinaryPath)
+	}
+	if len(captured.AdminAuthorizedKeys) != 1 || captured.AdminAuthorizedKeys[0] != identityBootstrapKey {
+		t.Fatalf("expected admin authorized key propagated")
+	}
+	if len(captured.UserAuthorizedKeys) != 1 || captured.UserAuthorizedKeys[0] != identityBootstrapKey {
+		t.Fatalf("expected user authorized key propagated")
 	}
 }
 func isLowerHex(value string) bool {

@@ -8,13 +8,9 @@ import (
 func TestSaveAndLoadDescriptor(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	desc := Descriptor{
-		ID:              "lab",
-		BeaconURL:       "https://beacon.example",
-		ControlPlaneURL: "https://api.example",
-		APIKey:          "key",
-		AccessToken:     "token",
-		CABundlePath:    filepath.Join("/etc", "ploy", "ca.pem"),
-		Version:         "2025.10.21",
+		ID:           "lab",
+		NodeAddress:  "45.9.42.212",
+		IdentityPath: filepath.Join("/home", "vk", ".ssh", "id_rsa"),
 	}
 	stored, err := SaveDescriptor(desc)
 	if err != nil {
@@ -27,23 +23,11 @@ func TestSaveAndLoadDescriptor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadDescriptor: %v", err)
 	}
-	if loaded.BeaconURL != desc.BeaconURL {
-		t.Fatalf("expected BeaconURL %q, got %q", desc.BeaconURL, loaded.BeaconURL)
+	if loaded.NodeAddress != desc.NodeAddress {
+		t.Fatalf("expected NodeAddress %q, got %q", desc.NodeAddress, loaded.NodeAddress)
 	}
-	if loaded.ControlPlaneURL != desc.ControlPlaneURL {
-		t.Fatalf("expected ControlPlaneURL %q, got %q", desc.ControlPlaneURL, loaded.ControlPlaneURL)
-	}
-	if loaded.APIKey != desc.APIKey {
-		t.Fatalf("expected APIKey %q, got %q", desc.APIKey, loaded.APIKey)
-	}
-	if loaded.AccessToken != desc.AccessToken {
-		t.Fatalf("expected AccessToken %q, got %q", desc.AccessToken, loaded.AccessToken)
-	}
-	if loaded.CABundlePath != desc.CABundlePath {
-		t.Fatalf("expected CABundlePath %q, got %q", desc.CABundlePath, loaded.CABundlePath)
-	}
-	if loaded.Version != desc.Version {
-		t.Fatalf("expected Version %q, got %q", desc.Version, loaded.Version)
+	if loaded.IdentityPath != desc.IdentityPath {
+		t.Fatalf("expected IdentityPath %q, got %q", desc.IdentityPath, loaded.IdentityPath)
 	}
 	if loaded.LastRefreshed.IsZero() {
 		t.Fatalf("expected LastRefreshed set on loaded descriptor")
@@ -52,11 +36,11 @@ func TestSaveAndLoadDescriptor(t *testing.T) {
 
 func TestListDescriptorsSorted(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	_, err := SaveDescriptor(Descriptor{ID: "beta", BeaconURL: "https://b"})
+	_, err := SaveDescriptor(Descriptor{ID: "beta", NodeAddress: "192.0.2.20"})
 	if err != nil {
 		t.Fatalf("save beta: %v", err)
 	}
-	_, err = SaveDescriptor(Descriptor{ID: "alpha", BeaconURL: "https://a"})
+	_, err = SaveDescriptor(Descriptor{ID: "alpha", NodeAddress: "192.0.2.10"})
 	if err != nil {
 		t.Fatalf("save alpha: %v", err)
 	}
@@ -74,11 +58,11 @@ func TestListDescriptorsSorted(t *testing.T) {
 
 func TestSetDefaultDescriptor(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	_, err := SaveDescriptor(Descriptor{ID: "primary", BeaconURL: "https://primary"})
+	_, err := SaveDescriptor(Descriptor{ID: "primary", NodeAddress: "192.0.2.20"})
 	if err != nil {
 		t.Fatalf("save primary: %v", err)
 	}
-	_, err = SaveDescriptor(Descriptor{ID: "secondary", BeaconURL: "https://secondary"})
+	_, err = SaveDescriptor(Descriptor{ID: "secondary", NodeAddress: "192.0.2.21"})
 	if err != nil {
 		t.Fatalf("save secondary: %v", err)
 	}

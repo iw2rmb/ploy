@@ -18,16 +18,9 @@ import (
 	"strings"
 	"time"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/bootstrap"
 )
-
-type clusterPKIState struct {
-	CurrentCA  CABundle
-	Descriptor config.Descriptor
-	CABundle   string
-}
 
 const (
 	// DefaultRemoteUser is applied when no remote user is provided.
@@ -37,12 +30,11 @@ const (
 	// remotePloydBinaryPath is where the ployd binary is installed on the target host.
 	remotePloydBinaryPath = "/usr/local/bin/ployd"
 	// defaultControlPlaneEndpointValue is used when no control plane URL is provided.
-	defaultControlPlaneEndpointValue = "https://control.example.com"
+	defaultControlPlaneEndpointValue = "http://127.0.0.1:9094"
 )
 
 // Options configure bootstrap execution.
 type Options struct {
-	Host                string
 	Address             string
 	User                string
 	Port                int
@@ -50,21 +42,16 @@ type Options struct {
 	Stdout              io.Writer
 	Stderr              io.Writer
 	Runner              Runner
-	ClusterID           string
-	EtcdClient          *clientv3.Client
 	PloydBinaryPath     string
-	InitialBeacons      []string
-	InitialWorkers      []string
-	BeaconURL           string
 	ControlPlaneURL     string
-	APIKey              string
 	Clock               func() time.Time
 	Stdin               io.Reader
 	WorkstationOS       string
-	ResolverDir         string
-	EtcdEndpoints       []string
 	AdminAuthorizedKeys []string
 	UserAuthorizedKeys  []string
+	DescriptorID        string
+	DescriptorAddress   string
+	DescriptorIdentityPath string
 }
 
 // IOStreams represents command IO endpoints.
@@ -122,27 +109,12 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	if goos == "" {
 		goos = runtime.GOOS
 	}
-	resolverDir := strings.TrimSpace(opts.ResolverDir)
-	if resolverDir == "" {
-		resolverDir = "/etc/resolver"
-	}
 
-	clusterID := strings.TrimSpace(opts.ClusterID)
-	if clusterID == "" {
-		return errors.New("bootstrap: cluster id required")
+	address := strings.TrimSpace(opts.Address)
+	if address == "" {
+		return errors.New("bootstrap: address required")
 	}
-	opts.ClusterID = clusterID
-
-	opts.BeaconURL = strings.TrimSpace(opts.BeaconURL)
-	opts.ControlPlaneURL = strings.TrimSpace(opts.ControlPlaneURL)
-	opts.APIKey = strings.TrimSpace(opts.APIKey)
-	if opts.APIKey == "" {
-		key, err := generateAPIKey()
-		if err != nil {
-			return fmt.Errorf("bootstrap: generate api key: %w", err)
-		}
-		opts.APIKey = key
-	}
+	opts.Address = address
 
 	adminKeys := normalizedAuthorizedKeys(opts.AdminAuthorizedKeys)
 	if len(adminKeys) == 0 {
@@ -153,14 +125,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		return errors.New("bootstrap: user authorized keys required")
 	}
 
-	if opts.BeaconURL == "" {
-		return errors.New("bootstrap: beacon url required")
-	}
-	if !hasNonEmpty(opts.InitialBeacons) {
-		return errors.New("bootstrap: at least one beacon id required")
-	}
-
-	user := opts.User
+	user := strings.TrimSpace(opts.User)
 	if user == "" {
 		user = DefaultRemoteUser
 	}
@@ -174,25 +139,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		runner = systemRunner{}
 	}
 
-	if opts.Host == "" {
-		return errors.New("bootstrap: host required")
-	}
-
-	connectHost := strings.TrimSpace(opts.Address)
-	if connectHost == "" {
-		connectHost = strings.TrimSpace(opts.Host)
-	}
-	if connectHost == "" {
-		return errors.New("bootstrap: address required")
-	}
-
-	displayTarget := opts.Host
-	if displayTarget == "" {
-		displayTarget = connectHost
-	} else if opts.Address != "" && opts.Address != opts.Host {
-		displayTarget = fmt.Sprintf("%s (%s)", opts.Host, opts.Address)
-	}
-
+	displayTarget := address
 	ploydBinary := strings.TrimSpace(opts.PloydBinaryPath)
 	if ploydBinary == "" {
 		return errors.New("bootstrap: ployd binary path required")
@@ -211,11 +158,12 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		"PLOY_CONTROL_PLANE_ENDPOINT": defaultControlPlaneEndpoint(opts.ControlPlaneURL),
 		"PLOY_SSH_ADMIN_KEYS_B64":     adminPayload,
 		"PLOY_SSH_USER_KEYS_B64":      userPayload,
+		"PLOY_BOOTSTRAP_VERSION":      bootstrap.Version,
 	}
 
 	provisionOpts := ProvisionOptions{
-		Host:            opts.Host,
-		Address:         connectHost,
+		Host:            address,
+		Address:         address,
 		User:            user,
 		Port:            port,
 		IdentityFile:    opts.IdentityFile,
@@ -225,78 +173,38 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		Stderr:          stderr,
 		Mode:            ProvisionModeBeacon,
 		ScriptEnv:       envVars,
-		ServiceChecks:   []string{"etcd", "ployd"},
+		ServiceChecks:   []string{"ployd"},
 	}
 
 	if err := ProvisionHost(ctx, provisionOpts); err != nil {
 		return err
 	}
 
-	var stopTunnel func() error
-	if opts.EtcdClient == nil {
-		endpoint, closer, err := startEtcdTunnel(ctx, opts, port, stderr, stdin)
-		if err != nil {
-			return err
-		}
-		stopTunnel = closer
-		opts.EtcdEndpoints = []string{endpoint}
-		defer func() {
-			if stopTunnel != nil {
-				_ = stopTunnel()
-			}
-		}()
+	descriptorID := strings.TrimSpace(opts.DescriptorID)
+	if descriptorID == "" {
+		descriptorID = address
 	}
-
-	client := opts.EtcdClient
-	var closeClient bool
-	if client == nil {
-		if len(opts.EtcdEndpoints) == 0 {
-			return errors.New("bootstrap: etcd endpoints required to finalise PKI")
-		}
-		dialCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		var err error
-		client, err = connectEtcd(dialCtx, opts.EtcdEndpoints)
-		if err != nil {
-			return fmt.Errorf("bootstrap: connect etcd: %w", err)
-		}
-		closeClient = true
+	desc := config.Descriptor{
+		ID:           descriptorID,
+		NodeAddress:  strings.TrimSpace(opts.DescriptorAddress),
+		IdentityPath: strings.TrimSpace(opts.DescriptorIdentityPath),
 	}
-	if client != nil {
-		opts.EtcdClient = client
+	if desc.NodeAddress == "" {
+		desc.NodeAddress = address
 	}
-
-	state, err := bootstrapClusterPKI(ctx, clusterID, opts)
+	if desc.IdentityPath == "" {
+		desc.IdentityPath = opts.IdentityFile
+	}
+	saved, err := config.SaveDescriptor(desc)
 	if err != nil {
-		if closeClient {
-			_ = client.Close()
-		}
-		return err
+		return fmt.Errorf("bootstrap: save descriptor: %w", err)
 	}
-
-	if closeClient {
-		_ = client.Close()
-	}
-
-	if err := configureWorkstation(ctx, configureWorkstationOptions{
-		ClusterID:   clusterID,
-		CAPath:      state.CABundle,
-		BeaconIP:    opts.Address,
-		Runner:      runner,
-		Stdout:      stdout,
-		Stderr:      stderr,
-		Stdin:       stdin,
-		GOOS:        goos,
-		ResolverDir: resolverDir,
-	}); err != nil {
-		return err
+	if err := config.SetDefault(saved.ID); err != nil {
+		return fmt.Errorf("bootstrap: set default descriptor: %w", err)
 	}
 
 	if _, err := fmt.Fprintf(stderr, "Bootstrap completed for %s.\n", displayTarget); err != nil {
 		return fmt.Errorf("bootstrap: write completion message: %w", err)
-	}
-	if _, err := fmt.Fprintf(stderr, "Cluster %s PKI bootstrapped (CA version %s).\n", clusterID, state.CurrentCA.Version); err != nil {
-		return fmt.Errorf("bootstrap: write PKI completion message: %w", err)
 	}
 	return nil
 }
@@ -463,18 +371,6 @@ func encodeAuthorizedKeys(keys []string) string {
 		payload += "\n"
 	}
 	return base64.StdEncoding.EncodeToString([]byte(payload))
-}
-
-type configureWorkstationOptions struct {
-	ClusterID   string
-	CAPath      string
-	BeaconIP    string
-	Runner      Runner
-	Stdout      io.Writer
-	Stderr      io.Writer
-	Stdin       io.Reader
-	GOOS        string
-	ResolverDir string
 }
 
 func configureWorkstation(ctx context.Context, cfg configureWorkstationOptions) error {

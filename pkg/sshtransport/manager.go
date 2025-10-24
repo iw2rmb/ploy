@@ -207,6 +207,13 @@ func (m *Manager) SetNodes(nodes []Node) error {
 	return m.cache.RememberNodes(normalised)
 }
 
+// HasTargets reports whether any tunnel targets are currently configured.
+func (m *Manager) HasTargets() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.order) > 0
+}
+
 // Close tears down all active tunnels.
 func (m *Manager) Close() error {
 	m.mu.Lock()
