@@ -984,6 +984,7 @@ type jobDTO struct {
 	EnqueuedAt     string                            `json:"enqueued_at"`
 	ClaimedAt      string                            `json:"claimed_at,omitempty"`
 	CompletedAt    string                            `json:"completed_at,omitempty"`
+	ExpiresAt      string                            `json:"expires_at,omitempty"`
 	LeaseID        int64                             `json:"lease_id,omitempty"`
 	LeaseExpiresAt string                            `json:"lease_expires_at,omitempty"`
 	ClaimedBy      string                            `json:"claimed_by,omitempty"`
@@ -994,6 +995,7 @@ type jobDTO struct {
 	Bundles        map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
 	Shift          *shiftDTO                         `json:"shift,omitempty"`
 	Retention      *scheduler.JobRetention           `json:"retention,omitempty"`
+	NodeSnapshot   *nodeSnapshotDTO                  `json:"node_snapshot,omitempty"`
 	Error          *scheduler.JobError               `json:"error,omitempty"`
 }
 
@@ -1008,6 +1010,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		EnqueuedAt:     job.EnqueuedAt.UTC().Format(time.RFC3339Nano),
 		ClaimedAt:      formatTime(job.ClaimedAt),
 		CompletedAt:    formatTime(job.CompletedAt),
+		ExpiresAt:      formatTime(job.ExpiresAt),
 		LeaseID:        int64(job.LeaseID),
 		LeaseExpiresAt: formatTime(job.LeaseExpiresAt),
 		ClaimedBy:      job.ClaimedBy,
@@ -1018,6 +1021,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		Bundles:        copyBundles(job.Bundles),
 		Shift:          copyShift(job.Shift),
 		Retention:      copyRetention(job.Retention),
+		NodeSnapshot:   copyNodeSnapshot(job.NodeSnapshot),
 		Error:          job.Error,
 	}
 }
@@ -1086,6 +1090,45 @@ func copyRetention(src *scheduler.JobRetention) *scheduler.JobRetention {
 		BundleCID:  src.BundleCID,
 		Inspection: src.Inspection,
 	}
+}
+
+type nodeSnapshotDTO struct {
+	NodeID     string         `json:"node_id"`
+	Capacity   map[string]any `json:"capacity,omitempty"`
+	CapacityAt string         `json:"capacity_at,omitempty"`
+	Status     map[string]any `json:"status,omitempty"`
+	StatusAt   string         `json:"status_at,omitempty"`
+}
+
+func copyNodeSnapshot(src *scheduler.JobNodeSnapshot) *nodeSnapshotDTO {
+	if src == nil {
+		return nil
+	}
+	dto := &nodeSnapshotDTO{NodeID: src.NodeID}
+	if len(src.Capacity) > 0 {
+		dto.Capacity = copyAnyMap(src.Capacity)
+	}
+	if !src.CapacityAt.IsZero() {
+		dto.CapacityAt = src.CapacityAt.UTC().Format(time.RFC3339Nano)
+	}
+	if len(src.Status) > 0 {
+		dto.Status = copyAnyMap(src.Status)
+	}
+	if !src.StatusAt.IsZero() {
+		dto.StatusAt = src.StatusAt.UTC().Format(time.RFC3339Nano)
+	}
+	return dto
+}
+
+func copyAnyMap(src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
 }
 
 func decodeJSON(r *http.Request, dst any) error {
