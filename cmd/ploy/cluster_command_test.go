@@ -84,13 +84,13 @@ func TestHandleClusterConnectStoresDescriptor(t *testing.T) {
 	var configCalls, caCalls int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v2/beacon/config":
+		case "/v1/beacon/config":
 			configCalls++
 			if got := r.Header.Get("Authorization"); got != "Bearer api-key" {
 				t.Fatalf("expected Authorization header, got %q", got)
 			}
 			_, _ = w.Write([]byte(`{"control_plane_url":"https://api.example","version":"2025.10.21"}`))
-		case "/v2/beacon/ca":
+		case "/v1/beacon/ca":
 			caCalls++
 			if got := r.Header.Get("Authorization"); got != "Bearer api-key" {
 				t.Fatalf("expected Authorization header for CA request, got %q", got)

@@ -22,7 +22,7 @@ tags:
 security:
   - bearerAuth: []
 paths:
-  /v2/nodes:
+  /v1/nodes:
     post:
       tags: [Nodes]
       summary: Register a worker node with the cluster.
@@ -128,7 +128,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v2/beacon/rotate-ca:
+  /v1/beacon/rotate-ca:
     post:
       tags: [Beacon]
       summary: Initiate a cluster certificate authority rotation.
@@ -169,7 +169,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /v2/config/gitlab:
+  /v1/config/gitlab:
     get:
       tags: [GitLab]
       summary: Retrieve the sanitized GitLab integration configuration.

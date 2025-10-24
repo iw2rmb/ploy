@@ -619,7 +619,7 @@ func (c *httpGitlabSignerClient) RotateSecret(ctx context.Context, req gitlabRot
 		return gitlabRotateSecretResult{}, fmt.Errorf("marshal rotate payload: %w", err)
 	}
 
-	endpoint := c.endpoint("/v2/gitlab/signer/secrets", nil)
+	endpoint := c.endpoint("/v1/gitlab/signer/secrets", nil)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return gitlabRotateSecretResult{}, fmt.Errorf("build rotate request: %w", err)
@@ -659,7 +659,7 @@ func (c *httpGitlabSignerClient) Status(ctx context.Context, req gitlabSignerSta
 	if trimmed := strings.TrimSpace(req.Secret); trimmed != "" {
 		query.Set("secret", trimmed)
 	}
-	endpoint := c.endpoint("/v2/gitlab/signer/status", query)
+	endpoint := c.endpoint("/v1/gitlab/signer/status", query)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return gitlabSignerStatus{}, fmt.Errorf("build signer status request: %w", err)
@@ -808,7 +808,7 @@ func newHTTPGitlabConfigStore(base *url.URL, httpClient *http.Client) *httpGitla
 func (s *httpGitlabConfigStore) Close() error { return nil }
 
 func (s *httpGitlabConfigStore) Load(ctx context.Context) (gitlabcfg.Config, int64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.endpoint("/v2/config/gitlab"), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.endpoint("/v1/config/gitlab"), nil)
 	if err != nil {
 		return gitlabcfg.Config{}, 0, fmt.Errorf("build gitlab config request: %w", err)
 	}
@@ -850,7 +850,7 @@ func (s *httpGitlabConfigStore) Save(ctx context.Context, cfg gitlabcfg.Config) 
 		return 0, fmt.Errorf("marshal gitlab config: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.endpoint("/v2/config/gitlab"), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.endpoint("/v1/config/gitlab"), bytes.NewReader(body))
 	if err != nil {
 		return 0, fmt.Errorf("build gitlab config update request: %w", err)
 	}

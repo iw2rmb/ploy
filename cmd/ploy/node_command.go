@@ -272,7 +272,7 @@ func registerWorker(ctx context.Context, client *http.Client, baseURL string, pa
 	if err != nil {
 		return nodeJoinResponse{}, err
 	}
-	url := strings.TrimRight(baseURL, "/") + "/v2/nodes"
+	url := strings.TrimRight(baseURL, "/") + "/v1/nodes"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nodeJoinResponse{}, err

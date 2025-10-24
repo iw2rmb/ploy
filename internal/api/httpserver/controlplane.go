@@ -45,7 +45,7 @@ type ControlPlaneOptions struct {
 	Rotations *events.RotationHub
 }
 
-// New returns an HTTP handler rooted at /v2.
+// New returns an HTTP handler rooted at /v1.
 func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux := http.NewServeMux()
 	h := &controlPlaneServer{
@@ -58,16 +58,16 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
 	}
-	mux.HandleFunc("/v2/jobs", h.handleJobs)
-	mux.HandleFunc("/v2/jobs/claim", h.handleClaim)
-	mux.HandleFunc("/v2/jobs/", h.handleJobSubpath)
-	mux.HandleFunc("/v2/health", h.handleHealth)
-	mux.HandleFunc("/v2/gitlab/signer/secrets", h.handleSignerSecrets)
-	mux.HandleFunc("/v2/gitlab/signer/tokens", h.handleSignerTokens)
-	mux.HandleFunc("/v2/gitlab/signer/rotations", h.handleSignerRotations)
-	mux.HandleFunc("/v2/nodes", h.handleNodes)
-	mux.HandleFunc("/v2/beacon/rotate-ca", h.handleBeaconRotateCA)
-	mux.HandleFunc("/v2/config/gitlab", h.handleGitLabConfig)
+	mux.HandleFunc("/v1/jobs", h.handleJobs)
+	mux.HandleFunc("/v1/jobs/claim", h.handleClaim)
+	mux.HandleFunc("/v1/jobs/", h.handleJobSubpath)
+	mux.HandleFunc("/v1/health", h.handleHealth)
+	mux.HandleFunc("/v1/gitlab/signer/secrets", h.handleSignerSecrets)
+	mux.HandleFunc("/v1/gitlab/signer/tokens", h.handleSignerTokens)
+	mux.HandleFunc("/v1/gitlab/signer/rotations", h.handleSignerRotations)
+	mux.HandleFunc("/v1/nodes", h.handleNodes)
+	mux.HandleFunc("/v1/beacon/rotate-ca", h.handleBeaconRotateCA)
+	mux.HandleFunc("/v1/config/gitlab", h.handleGitLabConfig)
 	gatherer := opts.Gatherer
 	if gatherer == nil {
 		gatherer = prometheus.DefaultGatherer
@@ -524,7 +524,7 @@ func (s *controlPlaneServer) handleJobSubpath(w http.ResponseWriter, r *http.Req
 	if !s.ensureScheduler(w) {
 		return
 	}
-	rel := strings.TrimPrefix(r.URL.Path, "/v2/jobs/")
+	rel := strings.TrimPrefix(r.URL.Path, "/v1/jobs/")
 	parts := strings.Split(strings.Trim(rel, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		http.NotFound(w, r)

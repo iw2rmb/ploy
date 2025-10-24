@@ -205,7 +205,7 @@ func TestImplementScriptInvokesCodex(t *testing.T) {
 		t.Fatalf("failed to read %s: %v", docPath, err)
 	}
 	if !strings.Contains(string(data), "CODEX_BIN") {
-		t.Fatalf("expected docs/v2/implement.sh to contain Codex automation wrapper")
+		t.Fatalf("expected docs/next/implement.sh to contain Codex automation wrapper")
 	}
 }
 

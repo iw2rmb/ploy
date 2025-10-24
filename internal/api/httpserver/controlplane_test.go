@@ -21,13 +21,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
-	"github.com/iw2rmb/ploy/internal/api/httpserver"
 )
 
 func TestServerJobLifecycle(t *testing.T) {
@@ -59,25 +59,25 @@ func TestServerJobLifecycle(t *testing.T) {
 		"priority":     "default",
 		"max_attempts": 2,
 	}
-	job := postJSON(t, server.URL+"/v2/jobs", submit)
+	job := postJSON(t, server.URL+"/v1/jobs", submit)
 
 	if job["state"].(string) != "queued" {
 		t.Fatalf("expected queued state, got %v", job["state"])
 	}
 
-	claim := postJSON(t, server.URL+"/v2/jobs/claim", map[string]any{"node_id": "node-http"})
+	claim := postJSON(t, server.URL+"/v1/jobs/claim", map[string]any{"node_id": "node-http"})
 	if claim["status"].(string) != "claimed" {
 		t.Fatalf("claim status: %v", claim)
 	}
 	claimedJob := claim["job"].(map[string]any)
 	jobID := claimedJob["id"].(string)
 
-	postJSON(t, server.URL+"/v2/jobs/"+jobID+"/heartbeat", map[string]any{
+	postJSON(t, server.URL+"/v1/jobs/"+jobID+"/heartbeat", map[string]any{
 		"ticket":  "mod-900",
 		"node_id": "node-http",
 	})
 
-	complete := postJSON(t, server.URL+"/v2/jobs/"+jobID+"/complete", map[string]any{
+	complete := postJSON(t, server.URL+"/v1/jobs/"+jobID+"/complete", map[string]any{
 		"ticket":  "mod-900",
 		"node_id": "node-http",
 		"state":   "succeeded",
@@ -86,7 +86,7 @@ func TestServerJobLifecycle(t *testing.T) {
 		t.Fatalf("completion state: %v", complete["state"])
 	}
 
-	listURL := fmt.Sprintf("%s/v2/jobs?ticket=%s", server.URL, url.QueryEscape("mod-900"))
+	listURL := fmt.Sprintf("%s/v1/jobs?ticket=%s", server.URL, url.QueryEscape("mod-900"))
 	resp := getJSON(t, listURL)
 	jobs := resp["jobs"].([]any)
 	if len(jobs) != 1 {
@@ -127,15 +127,15 @@ func TestJobRetention(t *testing.T) {
 		"priority":     "default",
 		"max_attempts": 1,
 	}
-	job := postJSON(t, server.URL+"/v2/jobs", submit)
+	job := postJSON(t, server.URL+"/v1/jobs", submit)
 	jobID := job["id"].(string)
 
-	claim := postJSON(t, server.URL+"/v2/jobs/claim", map[string]any{"node_id": "node-retention"})
+	claim := postJSON(t, server.URL+"/v1/jobs/claim", map[string]any{"node_id": "node-retention"})
 	if claim["status"].(string) != "claimed" {
 		t.Fatalf("claim status: %v", claim)
 	}
 
-	complete := postJSON(t, server.URL+"/v2/jobs/"+jobID+"/complete", map[string]any{
+	complete := postJSON(t, server.URL+"/v1/jobs/"+jobID+"/complete", map[string]any{
 		"ticket":     "mod-retention",
 		"node_id":    "node-retention",
 		"state":      "failed",
@@ -154,7 +154,7 @@ func TestJobRetention(t *testing.T) {
 		t.Fatalf("expected inspection_ready state, got %v", complete["state"])
 	}
 
-	getURL := fmt.Sprintf("%s/v2/jobs/%s?ticket=%s", server.URL, jobID, url.QueryEscape("mod-retention"))
+	getURL := fmt.Sprintf("%s/v1/jobs/%s?ticket=%s", server.URL, jobID, url.QueryEscape("mod-retention"))
 	jobResp := getJSON(t, getURL)
 	retention, ok := jobResp["retention"].(map[string]any)
 	if !ok {
@@ -192,7 +192,7 @@ func TestJobRetention(t *testing.T) {
 		t.Fatalf("unexpected bundle expires_at: %v want %s", expires, wantExpires)
 	}
 
-	listURL := fmt.Sprintf("%s/v2/jobs?ticket=%s", server.URL, url.QueryEscape("mod-retention"))
+	listURL := fmt.Sprintf("%s/v1/jobs?ticket=%s", server.URL, url.QueryEscape("mod-retention"))
 	listResp := getJSON(t, listURL)
 	items, ok := listResp["jobs"].([]any)
 	if !ok || len(items) != 1 {
@@ -231,7 +231,7 @@ func TestServerNodesLifecycle(t *testing.T) {
 	}))
 	defer server.Close()
 
-	status, nodeResp := postJSONStatus(t, server.URL+"/v2/nodes", map[string]any{
+	status, nodeResp := postJSONStatus(t, server.URL+"/v1/nodes", map[string]any{
 		"cluster_id": "cluster-alpha",
 		"address":    "10.20.1.50",
 		"labels": map[string]any{
@@ -262,7 +262,7 @@ func TestServerNodesLifecycle(t *testing.T) {
 		t.Fatalf("expected ready phase, got %q", phase)
 	}
 
-	listStatus, listResp := getJSONStatus(t, fmt.Sprintf("%s/v2/nodes?cluster_id=%s", server.URL, url.QueryEscape("cluster-alpha")))
+	listStatus, listResp := getJSONStatus(t, fmt.Sprintf("%s/v1/nodes?cluster_id=%s", server.URL, url.QueryEscape("cluster-alpha")))
 	if listStatus != http.StatusOK {
 		t.Fatalf("expected list status 200, got %d", listStatus)
 	}
@@ -319,7 +319,7 @@ func TestServerNodesLifecycle(t *testing.T) {
 		}
 	}()
 
-	deleteStatus, _ := deleteJSONStatus(t, server.URL+"/v2/nodes", map[string]any{
+	deleteStatus, _ := deleteJSONStatus(t, server.URL+"/v1/nodes", map[string]any{
 		"cluster_id":            "cluster-alpha",
 		"worker_id":             workerID,
 		"confirm":               workerID,
@@ -396,7 +396,7 @@ func TestServerBeaconRotateCA(t *testing.T) {
 		t.Fatalf("initial state: %v", err)
 	}
 
-	status, resp := postJSONStatus(t, server.URL+"/v2/beacon/rotate-ca", map[string]any{
+	status, resp := postJSONStatus(t, server.URL+"/v1/beacon/rotate-ca", map[string]any{
 		"cluster_id": "cluster-alpha",
 		"operator":   "ci-bot",
 		"reason":     "expiry-test",
@@ -461,7 +461,7 @@ func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	postJSON(t, server.URL+"/v2/jobs", map[string]any{
+	postJSON(t, server.URL+"/v1/jobs", map[string]any{
 		"ticket":       "mod-observe",
 		"step_id":      "build",
 		"priority":     "default",
@@ -511,7 +511,7 @@ func TestServerGitLabConfig(t *testing.T) {
 	}))
 	defer server.Close()
 
-	status, _ := getJSONStatus(t, server.URL+"/v2/config/gitlab")
+	status, _ := getJSONStatus(t, server.URL+"/v1/config/gitlab")
 	if status != http.StatusNotFound {
 		t.Fatalf("expected 404 for missing config, got %d", status)
 	}
@@ -530,7 +530,7 @@ func TestServerGitLabConfig(t *testing.T) {
 		},
 	}
 
-	putStatus, putResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", createPayload)
+	putStatus, putResp := putJSONStatus(t, server.URL+"/v1/config/gitlab", createPayload)
 	if putStatus != http.StatusOK {
 		t.Fatalf("expected put status 200, got %d", putStatus)
 	}
@@ -539,7 +539,7 @@ func TestServerGitLabConfig(t *testing.T) {
 		t.Fatalf("expected non-zero revision after create")
 	}
 
-	getStatus, getResp := getJSONStatus(t, server.URL+"/v2/config/gitlab")
+	getStatus, getResp := getJSONStatus(t, server.URL+"/v1/config/gitlab")
 	if getStatus != http.StatusOK {
 		t.Fatalf("expected get status 200, got %d", getStatus)
 	}
@@ -574,7 +574,7 @@ func TestServerGitLabConfig(t *testing.T) {
 		},
 	}
 
-	updateStatus, updateResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", updatePayload)
+	updateStatus, updateResp := putJSONStatus(t, server.URL+"/v1/config/gitlab", updatePayload)
 	if updateStatus != http.StatusOK {
 		t.Fatalf("expected update status 200, got %d", updateStatus)
 	}
@@ -587,7 +587,7 @@ func TestServerGitLabConfig(t *testing.T) {
 		"revision": revision,
 		"config":   updatePayload["config"],
 	}
-	staleStatus, staleResp := putJSONStatus(t, server.URL+"/v2/config/gitlab", stalePayload)
+	staleStatus, staleResp := putJSONStatus(t, server.URL+"/v1/config/gitlab", stalePayload)
 	if staleStatus != http.StatusConflict {
 		t.Fatalf("expected conflict status, got %d", staleStatus)
 	}
@@ -633,7 +633,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 	}))
 	defer server.Close()
 
-	rotateResp := putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
+	rotateResp := putJSON(t, server.URL+"/v1/gitlab/signer/secrets", map[string]any{
 		"secret":  "runner",
 		"api_key": "glpat-first",
 		"scopes":  []string{"api", "read_repository"},
@@ -643,7 +643,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		t.Fatalf("expected initial revision > 0")
 	}
 
-	tokenResp := postJSON(t, server.URL+"/v2/gitlab/signer/tokens", map[string]any{
+	tokenResp := postJSON(t, server.URL+"/v1/gitlab/signer/tokens", map[string]any{
 		"secret":      "runner",
 		"scopes":      []string{"read_repository"},
 		"ttl_seconds": 300,
@@ -666,7 +666,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		url := fmt.Sprintf("%s/v2/gitlab/signer/rotations?timeout=5s&since=%d", server.URL, initialRevision)
+		url := fmt.Sprintf("%s/v1/gitlab/signer/rotations?timeout=5s&since=%d", server.URL, initialRevision)
 		resp, err := http.Get(url)
 		if err != nil {
 			errCh <- err
@@ -693,7 +693,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 	}()
 
 	time.Sleep(150 * time.Millisecond)
-	putJSON(t, server.URL+"/v2/gitlab/signer/secrets", map[string]any{
+	putJSON(t, server.URL+"/v1/gitlab/signer/secrets", map[string]any{
 		"secret":  "runner",
 		"api_key": "glpat-second",
 		"scopes":  []string{"api", "read_repository"},
@@ -748,7 +748,7 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	events := make(chan sseEvent, 4)
 	errCh := make(chan error, 1)
 	go func() {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v2/jobs/%s/logs/stream", server.URL, jobID), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/jobs/%s/logs/stream", server.URL, jobID), nil)
 		if err != nil {
 			errCh <- err
 			return
@@ -890,7 +890,7 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	errCh := make(chan error, 1)
 
 	go func() {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v2/jobs/%s/logs/stream", server.URL, jobID), nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v1/jobs/%s/logs/stream", server.URL, jobID), nil)
 		if err != nil {
 			errCh <- err
 			return
@@ -949,7 +949,7 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 		t.Fatalf("expected last event id to be captured")
 	}
 
-	resumeReq, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v2/jobs/%s/logs/stream", server.URL, jobID), nil)
+	resumeReq, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/v1/jobs/%s/logs/stream", server.URL, jobID), nil)
 	if err != nil {
 		t.Fatalf("resume request: %v", err)
 	}

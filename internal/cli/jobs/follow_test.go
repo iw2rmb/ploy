@@ -74,7 +74,7 @@ func newFollowStreamServer(t *testing.T, plans []followPlan) *httptest.Server {
 	t.Helper()
 	var idx int
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v2/jobs/job-1/logs/stream" {
+		if r.URL.Path != "/v1/jobs/job-1/logs/stream" {
 			http.NotFound(w, r)
 			return
 		}

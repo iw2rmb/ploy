@@ -17,10 +17,10 @@ previous workflow stack entirely.
 1. **Repository hygiene**
    - Remove or archive Grid-specific adapters, feature flags, and environment variables.
    - Annotate remaining cross-repo references (grid SDK imports, JetStream helpers) for later deletion.
-   - Review the reuse candidates listed in [docs/v2/reuse.md](reuse.md) and plan how to port them
+   - Review the reuse candidates listed in [docs/next/reuse.md](reuse.md) and plan how to port them
      into the v2 architecture.
 2. **Docs alignment**
-   - Keep `docs/v2/*` in sync with ongoing changes; treat these documents as the contract.
+   - Keep `docs/next/*` in sync with ongoing changes; treat these documents as the contract.
 
 ## Phase 1 — Foundations
 
@@ -29,14 +29,14 @@ previous workflow stack entirely.
    - Port minimum viable job service (`internal/jobs` clone) backed by etcd key/value stores.
 2. **Beacon node**
    - Adapt `gridbeacon` service into a Ploy-focused `ployd` beacon mode (etcd store, no Cloudflare).
-   - Expose discovery + DNS endpoints documented in `docs/v2/api.md`.
+   - Expose discovery + DNS endpoints documented in `docs/next/api.md`.
 
 ## Phase 2 — Job Metadata & Artifacts
 
 1. **Job outcome schema**
    - Implement etcd storage layout `mods/<ticket>/jobs/<job-id>` (status, node, timestamps).
    - Add artifact reference fields (diff CID, build gate report CID, log digest).
-   - Follow the key contracts described in [docs/v2/etcd.md](etcd.md).
+   - Follow the key contracts described in [docs/next/etcd.md](etcd.md).
 2. **Workspace hydration & diff publishing**
    - Teach `ployd` workers to hydrate containers with the original repo plus cumulative diffs before each
      job launches (shared volume mount).
@@ -45,8 +45,8 @@ previous workflow stack entirely.
    - Add build gate report publisher (structured JSON) with CID references recorded alongside job
      outcomes.
 3. **SSE log streaming**
-   - Implement `/v2/jobs/{id}/logs/stream` and `/node/v2/jobs/{id}/logs/stream`.
-   - Ensure log payloads follow the pattern in [docs/v2/logs.md](logs.md).
+   - Implement `/v1/jobs/{id}/logs/stream` on both control-plane and node surfaces.
+   - Ensure log payloads follow the pattern in [docs/next/logs.md](logs.md).
 
 ## Phase 3 — CLI & API Surface
 
@@ -55,15 +55,15 @@ previous workflow stack entirely.
    - `ploy node` namespace (add/remove/list/heal/logs).
    - `ploy deploy bootstrap`, `ploy cluster connect`, `ploy cluster list`.
 2. **API handlers**
-   - Control plane endpoints (`/v2/mods`, `/v2/jobs`, `/v2/nodes`, `/v2/config`).
-   - Node endpoints (`/node/v2/jobs`, `/node/v2/status`, `/node/v2/artifacts`).
+   - Control plane endpoints (`/v1/mods`, `/v1/jobs`, `/v1/nodes`, `/v1/config`).
+   - Node endpoints share the `/v1/...` prefix (`/v1/node/jobs`, `/v1/node/status`, `/v1/node/artifacts`).
 
 ## Phase 4 — Mods & Build Gate Integration
 
 1. **Workflow runner**
    - Replace Grid client wiring with the new runtime adapter.
    - Ensure stage execution stores job metadata + artifact CIDs after every step (see
-     [docs/v2/job.md](job.md) and [docs/v2/queue.md](queue.md)).
+     [docs/next/job.md](job.md) and [docs/next/queue.md](queue.md)).
 
 2. **SHIFT integration**
    - Keep existing build gate packages but adapt output to IPFS & job metadata.
@@ -77,7 +77,7 @@ previous workflow stack entirely.
 2. **Ops commands**
    - Implement `ploy beacon rotate-ca`, `ploy beacon sync`, `ploy node logs`.
    - Surface `ploy status` using the new endpoints.
-   - Wire `ploy gc` and the automated controller as documented in [docs/v2/gc.md](gc.md).
+   - Wire `ploy gc` and the automated controller as documented in [docs/next/gc.md](gc.md).
 
 ## Phase 6 — Cleanup & Validation
 
@@ -86,12 +86,12 @@ previous workflow stack entirely.
 2. **Testing**
    - Add integration tests covering job submission, diff publishing, build gate failure loops, CLI
      end-to-end flows.
-   - Use the VPS lab environment ([docs/v2/vps-lab.md](vps-lab.md)) for multi-node tests and follow
-     the testing guidance in [docs/v2/testing.md](testing.md) (timeouts, coverage expectations).
+   - Use the VPS lab environment ([docs/next/vps-lab.md](vps-lab.md)) for multi-node tests and follow
+     the testing guidance in [docs/next/testing.md](testing.md) (timeouts, coverage expectations).
    - Update CI to run only the new pipelines.
 
 3. **Documentation pass**
-   - Verify `docs/v2` remains accurate, and update the root README when v2 becomes default.
+   - Verify `docs/next` remains accurate, and update the root README when v2 becomes default.
 
 ## Tracking & Delivery
 
