@@ -17,6 +17,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
+const (
+	adminTestKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ8pXL8XfO6YpGkX1l5R+FsoNhasTestAdmin ploy-admin"
+	userTestKey  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN3E0OGN48ZlB+QhFZGNtN4YQtTestUser ploy-user"
+)
+
 func tempPloydBinary(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "ployd")
@@ -78,6 +83,8 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 		EtcdClient:     client,
 		WorkstationOS:  "darwin",
 		Stdin:          strings.NewReader("n\n"),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -137,6 +144,12 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 	if !checkedPloyd {
 		t.Fatalf("expected ployd service check; calls=%v", calls)
 	}
+	if !strings.Contains(scriptBody, "export PLOY_SSH_ADMIN_KEYS_B64=") {
+		t.Fatalf("script missing admin authorized keys export: %q", scriptBody)
+	}
+	if !strings.Contains(scriptBody, "export PLOY_SSH_USER_KEYS_B64=") {
+		t.Fatalf("script missing user authorized keys export: %q", scriptBody)
+	}
 	if !strings.Contains(scriptBody, "export PLOYD_MODE=\"beacon\"") {
 		t.Fatalf("script does not configure beacon mode: %q", scriptBody)
 	}
@@ -175,6 +188,8 @@ func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 		EtcdClient:     client,
 		WorkstationOS:  "darwin",
 		Stdin:          strings.NewReader("n\n"),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -250,6 +265,8 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 		WorkstationOS:   "darwin",
 		Stdin:           strings.NewReader("n\n"),
 		ResolverDir:     filepath.Join(cfgDir, "resolver"),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -461,10 +478,44 @@ func TestRunBootstrapRequiresEtcdClientWhenNotDryRun(t *testing.T) {
 		BeaconURL:      "https://beacon.example.com",
 		InitialBeacons: []string{"beacon-main"},
 		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when etcd client not provided")
+	}
+}
+
+func TestRunBootstrapRequiresAuthorizedKeys(t *testing.T) {
+	ctx := context.Background()
+	etcd, client := newBootstrapTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	opts := Options{
+		Host:           "bootstrap.example.com",
+		ClusterID:      "cluster-alpha",
+		BeaconURL:      "https://beacon.example.com",
+		InitialBeacons: []string{"beacon-main"},
+		EtcdClient:     client,
+		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
+	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
+
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when admin and user keys missing")
+	}
+
+	opts.AdminAuthorizedKeys = []string{adminTestKey}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when user keys missing")
+	}
+
+	opts.AdminAuthorizedKeys = nil
+	opts.UserAuthorizedKeys = []string{userTestKey}
+	if err := RunBootstrap(ctx, opts); err == nil {
+		t.Fatalf("expected error when admin keys missing")
 	}
 }
 
@@ -480,6 +531,8 @@ func TestRunBootstrapRequiresBeaconIdentifiers(t *testing.T) {
 		BeaconURL:  "https://beacon.example.com",
 		EtcdClient: client,
 		Runner:     RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {
@@ -499,6 +552,8 @@ func TestRunBootstrapRequiresBeaconURL(t *testing.T) {
 		InitialBeacons: []string{"beacon-main"},
 		EtcdClient:     client,
 		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
+		AdminAuthorizedKeys: []string{adminTestKey},
+		UserAuthorizedKeys:  []string{userTestKey},
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {

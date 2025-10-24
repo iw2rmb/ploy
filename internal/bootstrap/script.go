@@ -10,7 +10,7 @@ import (
 
 const (
 	// Version identifies the bootstrap script revision applied to target hosts.
-	Version = "2025-10-22"
+	Version = "2025-10-24"
 	// DefaultMinDiskGB represents the minimum free disk required by the bootstrap script.
 	DefaultMinDiskGB = 4
 	// RequiredPackages lists user-facing package names emitted by the bootstrap preflight logs.

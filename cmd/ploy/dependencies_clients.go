@@ -15,6 +15,7 @@ import (
 	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
 	helper "github.com/iw2rmb/grid/sdk/workflowrpc/helper"
 
+	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/grid"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
@@ -237,7 +238,23 @@ func (gridRuntimeAdapter) Connect(ctx context.Context) (runner.GridClient, error
 	}
 
 	status := client.Status()
+	if nodes := tunnel.NodesFromGridStatus(status); len(nodes) > 0 {
+		if err := tunnel.SetNodes(nodes); err != nil {
+			return nil, err
+		}
+	}
+	httpClient, err := client.HTTPClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tunnel.AttachHTTP(httpClient); err != nil {
+		return nil, err
+	}
+
 	endpoint := strings.TrimSpace(status.Beacon.WorkflowEndpoint)
+	if endpoint == "" && len(status.GridInfo.ControlPlane.API) > 0 {
+		endpoint = strings.TrimSpace(status.GridInfo.ControlPlane.API[0])
+	}
 	if endpoint == "" {
 		return nil, fmt.Errorf("configure grid client: workflow endpoint unavailable from beacon metadata")
 	}
@@ -250,7 +267,14 @@ func (gridRuntimeAdapter) Connect(ctx context.Context) (runner.GridClient, error
 		StreamOptions:      gridStreamOptions(),
 		CursorStoreFactory: grid.NewCursorStoreFactory(gridClientStatePath),
 		ControlPlaneHTTP: func(ctx context.Context) (*http.Client, error) {
-			return client.HTTPClient(ctx)
+			httpClient, err := client.HTTPClient(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if err := tunnel.AttachHTTP(httpClient); err != nil {
+				return nil, err
+			}
+			return httpClient, nil
 		},
 		ControlPlaneStatus: func() grid.ControlPlaneStatus {
 			status := client.Status()

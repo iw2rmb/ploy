@@ -68,6 +68,10 @@ additional configuration.
   generates the initial configuration.
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
   `:9100`).
+- `PLOY_SSH_USER` — SSH username applied when establishing control-plane tunnels (default `ploy`).
+- `PLOY_SSH_IDENTITY` — Path to the SSH private key used for tunnel authentication (default `~/.ssh/id_rsa`).
+- `PLOY_SSH_SOCKET_DIR` — Override for the directory holding SSH control sockets (default `~/.ploy/tunnels`).
+- `PLOY_CACHE_HOME` — Optional base directory for CLI cache artifacts such as tunnel node assignments.
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
   until the CLI flips to the new scheduler by default.
 

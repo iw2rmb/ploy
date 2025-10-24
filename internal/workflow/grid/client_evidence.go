@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/pkg/sshtransport"
 )
 
 func (c *Client) collectEvidence(ctx context.Context, runID string, term terminalRun) *runner.StageEvidence {
@@ -20,7 +22,8 @@ func (c *Client) collectEvidence(ctx context.Context, runID string, term termina
 	if c.controlHTTP == nil || c.controlStatus == nil {
 		return nil
 	}
-	httpClient, err := c.controlHTTP(ctx)
+	jobCtx := sshtransport.WithJob(ctx, trimmedRunID)
+	httpClient, err := c.controlHTTP(jobCtx)
 	if err != nil || httpClient == nil {
 		return nil
 	}
@@ -35,7 +38,7 @@ func (c *Client) collectEvidence(ctx context.Context, runID string, term termina
 		Result:   cloneAnyMap(term.result),
 	}
 
-	jobInfo, err := fetchJobStatus(ctx, httpClient, base, trimmedRunID)
+	jobInfo, err := fetchJobStatus(jobCtx, httpClient, base, trimmedRunID)
 	if err == nil && jobInfo != nil {
 		state := strings.TrimSpace(jobInfo.State)
 		if state != "" {
@@ -57,9 +60,10 @@ func (c *Client) collectEvidence(ctx context.Context, runID string, term termina
 				evidence.Metadata[key] = value
 			}
 		}
+		rememberJobAssignment(trimmedRunID, jobInfo.Metadata)
 	}
 
-	events, err := fetchJobEvents(ctx, httpClient, base, trimmedRunID, 200)
+	events, err := fetchJobEvents(jobCtx, httpClient, base, trimmedRunID, 200)
 	if err == nil && len(events) > 0 {
 		evidence.Events = make([]runner.StageEvidenceEvent, 0, len(events))
 		for _, evt := range events {
@@ -77,7 +81,7 @@ func (c *Client) collectEvidence(ctx context.Context, runID string, term termina
 		}
 	}
 
-	if logs, err := fetchLogs(ctx, httpClient, base, trimmedRunID, c.logTail); err == nil {
+	if logs, err := fetchLogs(jobCtx, httpClient, base, trimmedRunID, c.logTail); err == nil {
 		if trimmed := strings.TrimSpace(logs); trimmed != "" {
 			evidence.LogTail = logs
 			evidence.Source = "control_plane_logs"
@@ -192,6 +196,19 @@ type jobStatus struct {
 	Reason      string            `json:"reason"`
 	Metadata    map[string]string `json:"metadata"`
 	TerminalLog []byte            `json:"terminal_log"`
+}
+
+func rememberJobAssignment(runID string, metadata map[string]string) {
+	if len(metadata) == 0 {
+		return
+	}
+	candidates := []string{"node_id", "node", "worker_id"}
+	for _, key := range candidates {
+		if value := strings.TrimSpace(metadata[key]); value != "" {
+			_ = tunnel.RememberJob(runID, value, time.Now())
+			return
+		}
+	}
 }
 
 type jobEvent struct {

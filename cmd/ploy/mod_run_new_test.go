@@ -32,6 +32,7 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	}))
 	defer server.Close()
 
+	t.Setenv("PLOY_SSH_DISABLE", "1")
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
 	buf := &bytes.Buffer{}
@@ -71,6 +72,7 @@ func TestExecuteModRunGeneratesTicket(t *testing.T) {
 	}))
 	defer server.Close()
 
+	t.Setenv("PLOY_SSH_DISABLE", "1")
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
 	if err := executeModRun([]string{"--tenant", "acme"}, io.Discard); err != nil {
