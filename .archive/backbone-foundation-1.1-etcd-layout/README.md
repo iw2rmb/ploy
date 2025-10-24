@@ -1,5 +1,7 @@
 # Backbone Foundation 1.1 – etcd Layout Alignment
 
+**Status**: Completed on 2025-10-24 — scheduler persists the expanded etcd schema with watchers and tests in place.
+
 ## Why
 - Roadmap slice [1.1](../../next/roadmap.md) mandates persisting expanded scheduler metadata and watchers so etcd remains authoritative.
 - [docs/next/etcd.md](../../next/etcd.md) defines the control-plane schema; scheduler writes must comply so downstream services and CLI clients remain consistent.

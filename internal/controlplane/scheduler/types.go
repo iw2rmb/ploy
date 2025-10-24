@@ -57,6 +57,7 @@ type Job struct {
 	EnqueuedAt     time.Time
 	ClaimedAt      time.Time
 	CompletedAt    time.Time
+	ExpiresAt      time.Time
 	LeaseID        clientv3.LeaseID
 	LeaseExpiresAt time.Time
 	ClaimedBy      string
@@ -67,6 +68,7 @@ type Job struct {
 	Bundles        map[string]BundleRecord
 	Shift          *ShiftSummary
 	Retention      *JobRetention
+	NodeSnapshot   *JobNodeSnapshot
 	Error          *JobError
 }
 
@@ -149,4 +151,13 @@ type JobRetention struct {
 	Bundle     string `json:"bundle,omitempty"`
 	BundleCID  string `json:"bundle_cid,omitempty"`
 	Inspection bool   `json:"inspection,omitempty"`
+}
+
+// JobNodeSnapshot records node capacity and status observed with the job.
+type JobNodeSnapshot struct {
+	NodeID     string
+	Capacity   map[string]any
+	CapacityAt time.Time
+	Status     map[string]any
+	StatusAt   time.Time
 }

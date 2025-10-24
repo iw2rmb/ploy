@@ -72,6 +72,7 @@ contracts expected under each.
     "enqueued_at": "2025-10-08T12:34:56Z",
     "claimed_at": "2025-10-08T12:35:00Z",
     "completed_at": "2025-10-08T12:45:00Z",
+    "expires_at": "2025-10-11T12:45:00Z",
     "claimed_by": "node-7",
     "lease_id": 1234567,
     "lease_expires_at": "2025-10-08T12:37:00Z",
@@ -79,6 +80,37 @@ contracts expected under each.
     "max_attempts": 2,
     "artifacts": {
       "diff_cid": "bafy..."
+    },
+    "bundles": {
+      "logs": {
+        "cid": "bafy-log",
+        "digest": "sha256:bundle",
+        "ttl": "72h",
+        "expires_at": "2025-10-11T12:45:00Z",
+        "retained": true
+      }
+    },
+    "retention": {
+      "retained": true,
+      "ttl": "72h",
+      "expires_at": "2025-10-11T12:45:00Z",
+      "bundle": "logs",
+      "bundle_cid": "bafy-log"
+    },
+    "node_snapshot": {
+      "node_id": "node-7",
+      "capacity": {
+        "cpu_free": 6000,
+        "mem_free": 8192,
+        "heartbeat": "2025-10-08T12:35:00Z",
+        "revision": 42
+      },
+      "capacity_at": "2025-10-08T12:35:00Z",
+      "status": {
+        "phase": "ready",
+        "heartbeat": "2025-10-08T12:35:05Z"
+      },
+      "status_at": "2025-10-08T12:35:05Z"
     },
     "error": {
       "reason": "lease_expired",
@@ -88,6 +120,9 @@ contracts expected under each.
   ```
 
 - See [docs/next/job.md](job.md) for the lifecycle and updates.
+- The scheduler persists `expires_at`, bundle retention metadata, and the latest node snapshot on
+  every job mutation; `gc/jobs` updates will fan out through a watcher to keep the record's
+  retention window in sync.
 
 ### Job Leases (`leases/jobs/<job-id>`)
 
@@ -134,7 +169,8 @@ contracts expected under each.
 - Control plane services may watch specific prefixes:
   - `queue/` for new work (scheduler).
   - `leases/jobs/` for lease expiry requeues.
-  - `nodes/<node-id>/status` for heartbeat monitoring.
+  - `gc/jobs/` so job records inherit retention updates.
+  - `nodes/<node-id>/status` for heartbeat monitoring and node health snapshots.
   - `config/` for configuration changes.
 - Ensure watchers are scoped to specific prefixes to avoid excessive load on etcd.
 

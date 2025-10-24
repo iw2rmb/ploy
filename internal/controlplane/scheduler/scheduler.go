@@ -71,7 +71,13 @@ func New(client *clientv3.Client, opts Options) (*Scheduler, error) {
 	}
 
 	s.wg.Add(1)
-	go s.watchLeaseExpiry()
+	go s.watchLeases()
+
+	s.wg.Add(1)
+	go s.watchGCMarkers()
+
+	s.wg.Add(1)
+	go s.watchNodeStatus()
 
 	return s, nil
 }
@@ -118,6 +124,8 @@ func (s *Scheduler) SubmitJob(ctx context.Context, spec JobSpec) (*Job, error) {
 		Metadata:       cloneMap(spec.Metadata),
 		Artifacts:      map[string]string{},
 		Bundles:        map[string]bundleRecord{},
+		ExpiresAt:      "",
+		NodeSnapshot:   nil,
 		LeaseExpiresAt: "",
 	}
 
@@ -242,6 +250,10 @@ func (s *Scheduler) Heartbeat(ctx context.Context, req HeartbeatRequest) error {
 	now := s.now().UTC()
 	record.LeaseExpiresAt = encodeTime(now.Add(time.Duration(ttl.TTL) * time.Second))
 
+	if snapshot := s.captureNodeSnapshot(ctx, req.NodeID); snapshot != nil {
+		record.NodeSnapshot = snapshot
+	}
+
 	jobBytes, err := json.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("scheduler: marshal heartbeat job: %w", err)
@@ -328,6 +340,11 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	if derived := computeRetentionExpiry(record.Bundles, completedAt); !derived.IsZero() {
 		expiry = derived
 	}
+	if expiry.IsZero() {
+		record.ExpiresAt = ""
+	} else {
+		record.ExpiresAt = encodeTime(expiry)
+	}
 	record.Retention = deriveRetentionRecord(record.Bundles, expiry, record.State == JobStateInspectionReady)
 
 	shiftDuration := time.Duration(0)
@@ -344,6 +361,10 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 				DurationSeconds: shiftDuration.Seconds(),
 			}
 		}
+	}
+
+	if snapshot := s.captureNodeSnapshot(ctx, req.NodeID); snapshot != nil {
+		record.NodeSnapshot = snapshot
 	}
 
 	jobBytes, err := json.Marshal(record)
@@ -456,8 +477,8 @@ func (s *Scheduler) RunningJobsForNode(ctx context.Context, nodeID string) ([]*J
 	return jobs, nil
 }
 
-// watchLeaseExpiry monitors lease prefix deletions to requeue expired jobs.
-func (s *Scheduler) watchLeaseExpiry() {
+// watchLeases monitors lease prefix deletions to requeue expired jobs.
+func (s *Scheduler) watchLeases() {
 	defer s.wg.Done()
 
 	watch := s.client.Watch(s.ctx, s.leasesPrefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
@@ -520,6 +541,8 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 	record.ClaimedAt = ""
 	record.LeaseID = 0
 	record.LeaseExpiresAt = ""
+	record.ExpiresAt = ""
+	record.NodeSnapshot = nil
 	record.RetryAttempt++
 	record.Shift = nil
 
@@ -591,6 +614,248 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 	return nil
 }
 
+// watchGCMarkers keeps job expiry metadata aligned with GC markers.
+func (s *Scheduler) watchGCMarkers() {
+	defer s.wg.Done()
+
+	watch := s.client.Watch(s.ctx, s.gcPrefix, clientv3.WithPrefix())
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case resp, ok := <-watch:
+			if !ok || resp.Canceled {
+				return
+			}
+			if err := resp.Err(); err != nil {
+				log.Printf("scheduler: gc watch error: %v", err)
+				continue
+			}
+			for _, ev := range resp.Events {
+				if ev.Type != mvccpb.PUT || ev.Kv == nil {
+					continue
+				}
+				var marker gcEntry
+				if err := json.Unmarshal(ev.Kv.Value, &marker); err != nil {
+					log.Printf("scheduler: decode gc entry: %v", err)
+					continue
+				}
+				if strings.TrimSpace(marker.JobID) == "" || strings.TrimSpace(marker.Ticket) == "" {
+					continue
+				}
+				ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+				if err := s.syncJobExpiry(ctx, marker); err != nil {
+					log.Printf("scheduler: sync job expiry: %v", err)
+				}
+				cancel()
+			}
+		}
+	}
+}
+
+func (s *Scheduler) syncJobExpiry(ctx context.Context, marker gcEntry) error {
+	ticket := strings.TrimSpace(marker.Ticket)
+	jobID := strings.TrimSpace(marker.JobID)
+	if ticket == "" || jobID == "" {
+		return nil
+	}
+	jobKey := s.jobKey(ticket, jobID)
+	resp, err := s.client.Get(ctx, jobKey)
+	if err != nil {
+		return fmt.Errorf("fetch job for gc sync: %w", err)
+	}
+	if len(resp.Kvs) == 0 {
+		return nil
+	}
+	record, err := decodeJobRecord(resp.Kvs[0].Value)
+	if err != nil {
+		return fmt.Errorf("decode job for gc sync: %w", err)
+	}
+
+	expiry := strings.TrimSpace(marker.ExpiresAt)
+	changed := false
+	if expiry != "" {
+		if record.ExpiresAt != expiry {
+			record.ExpiresAt = expiry
+			changed = true
+		}
+		if record.Retention != nil && record.Retention.ExpiresAt != expiry {
+			record.Retention.ExpiresAt = expiry
+			changed = true
+		}
+	} else {
+		if record.ExpiresAt != "" {
+			record.ExpiresAt = ""
+			changed = true
+		}
+		if record.Retention != nil && record.Retention.ExpiresAt != "" {
+			record.Retention.ExpiresAt = ""
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+
+	jobBytes, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("marshal job for gc sync: %w", err)
+	}
+	_, err = s.client.Txn(ctx).If(
+		clientv3.Compare(clientv3.ModRevision(jobKey), "=", resp.Kvs[0].ModRevision),
+	).Then(
+		clientv3.OpPut(jobKey, string(jobBytes)),
+	).Commit()
+	return err
+}
+
+// watchNodeStatus mirrors node health snapshots into running jobs.
+func (s *Scheduler) watchNodeStatus() {
+	defer s.wg.Done()
+
+	watch := s.client.Watch(s.ctx, s.nodesPrefix+"/", clientv3.WithPrefix())
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case resp, ok := <-watch:
+			if !ok || resp.Canceled {
+				return
+			}
+			if err := resp.Err(); err != nil {
+				log.Printf("scheduler: node status watch error: %v", err)
+				continue
+			}
+			for _, ev := range resp.Events {
+				if ev.Type != mvccpb.PUT || ev.Kv == nil {
+					continue
+				}
+				key := string(ev.Kv.Key)
+				if !strings.HasSuffix(key, "/status") {
+					continue
+				}
+				trimmed := strings.TrimPrefix(key, s.nodesPrefix)
+				trimmed = strings.TrimPrefix(trimmed, "/")
+				parts := strings.Split(trimmed, "/")
+				if len(parts) < 2 {
+					continue
+				}
+				nodeID := strings.TrimSpace(parts[0])
+				if nodeID == "" {
+					continue
+				}
+				status := decodeKVMap(ev.Kv.Value)
+				if len(status) == 0 {
+					continue
+				}
+				observed := snapshotTimestamp(status, s.now())
+				ctx, cancel := context.WithTimeout(s.ctx, 10*time.Second)
+				if err := s.applyNodeStatus(ctx, nodeID, status, observed); err != nil {
+					log.Printf("scheduler: apply node status: %v", err)
+				}
+				cancel()
+			}
+		}
+	}
+}
+
+func (s *Scheduler) applyNodeStatus(ctx context.Context, nodeID string, status map[string]any, observed string) error {
+	if len(status) == 0 {
+		return nil
+	}
+	if strings.TrimSpace(observed) == "" {
+		observed = encodeTime(s.now())
+	}
+	prefix := s.jobsPrefix + "/"
+	resp, err := s.client.Get(ctx, prefix, clientv3.WithPrefix())
+	if err != nil {
+		return fmt.Errorf("fetch jobs for node status: %w", err)
+	}
+	for _, kv := range resp.Kvs {
+		record, err := decodeJobRecord(kv.Value)
+		if err != nil {
+			log.Printf("scheduler: decode job for node status: %v", err)
+			continue
+		}
+		if record.State != JobStateRunning || record.ClaimedBy != nodeID {
+			continue
+		}
+		if record.NodeSnapshot == nil {
+			record.NodeSnapshot = &nodeSnapshotRecord{NodeID: nodeID}
+		} else if strings.TrimSpace(record.NodeSnapshot.NodeID) == "" {
+			record.NodeSnapshot.NodeID = nodeID
+		}
+		record.NodeSnapshot.Status = cloneAnyMap(status)
+		record.NodeSnapshot.StatusAt = observed
+
+		jobBytes, err := json.Marshal(record)
+		if err != nil {
+			log.Printf("scheduler: marshal job node status: %v", err)
+			continue
+		}
+		jobKey := string(kv.Key)
+		_, err = s.client.Txn(ctx).If(
+			clientv3.Compare(clientv3.ModRevision(jobKey), "=", kv.ModRevision),
+		).Then(
+			clientv3.OpPut(jobKey, string(jobBytes)),
+		).Commit()
+		if err != nil {
+			log.Printf("scheduler: update node status for job %s: %v", record.ID, err)
+		}
+	}
+	return nil
+}
+
+// captureNodeSnapshot fetches node capacity and status to persist with a job mutation.
+func (s *Scheduler) captureNodeSnapshot(ctx context.Context, nodeID string) *nodeSnapshotRecord {
+	nodeID = strings.TrimSpace(nodeID)
+	if nodeID == "" {
+		return nil
+	}
+
+	baseCtx := ctx
+	if baseCtx == nil {
+		baseCtx = s.ctx
+	}
+
+	snapshot := &nodeSnapshotRecord{NodeID: nodeID}
+
+	capCtx, cancelCap := context.WithTimeout(baseCtx, 2*time.Second)
+	capResp, err := s.client.Get(capCtx, path.Join(s.nodesPrefix, nodeID, "capacity"))
+	cancelCap()
+	if err != nil {
+		log.Printf("scheduler: fetch node capacity: %v", err)
+	} else if len(capResp.Kvs) > 0 {
+		snapshot.Capacity = decodeKVMap(capResp.Kvs[0].Value)
+		if len(snapshot.Capacity) > 0 {
+			snapshot.CapacityAt = snapshotTimestamp(snapshot.Capacity, s.now())
+		}
+	}
+
+	statusCtx, cancelStatus := context.WithTimeout(baseCtx, 2*time.Second)
+	statusResp, err := s.client.Get(statusCtx, path.Join(s.nodesPrefix, nodeID, "status"))
+	cancelStatus()
+	if err != nil {
+		log.Printf("scheduler: fetch node status: %v", err)
+	} else if len(statusResp.Kvs) > 0 {
+		snapshot.Status = decodeKVMap(statusResp.Kvs[0].Value)
+		if len(snapshot.Status) > 0 {
+			snapshot.StatusAt = snapshotTimestamp(snapshot.Status, s.now())
+		}
+	}
+
+	if len(snapshot.Capacity) == 0 && len(snapshot.Status) == 0 {
+		return nil
+	}
+	if snapshot.CapacityAt == "" && len(snapshot.Capacity) > 0 {
+		snapshot.CapacityAt = encodeTime(s.now())
+	}
+	if snapshot.StatusAt == "" && len(snapshot.Status) > 0 {
+		snapshot.StatusAt = encodeTime(s.now())
+	}
+	return snapshot
+}
+
 func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimResult, error) {
 	resp, err := s.client.Get(ctx, s.queuePrefix, clientv3.WithPrefix(), clientv3.WithSort(clientv3.SortByCreateRevision, clientv3.SortAscend), clientv3.WithLimit(1))
 	if err != nil {
@@ -650,6 +915,10 @@ func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimR
 	record.ClaimedAt = encodeTime(now)
 	record.LeaseID = int64(lease.ID)
 	record.LeaseExpiresAt = encodeTime(now.Add(s.leaseTTL + s.clockSkew))
+	record.ExpiresAt = ""
+	if snapshot := s.captureNodeSnapshot(ctx, req.NodeID); snapshot != nil {
+		record.NodeSnapshot = snapshot
+	}
 
 	jobBytes, err := json.Marshal(record)
 	if err != nil {
@@ -817,6 +1086,7 @@ type jobRecord struct {
 	EnqueuedAt     string                  `json:"enqueued_at"`
 	ClaimedAt      string                  `json:"claimed_at,omitempty"`
 	CompletedAt    string                  `json:"completed_at,omitempty"`
+	ExpiresAt      string                  `json:"expires_at,omitempty"`
 	LeaseID        int64                   `json:"lease_id,omitempty"`
 	LeaseExpiresAt string                  `json:"lease_expires_at,omitempty"`
 	ClaimedBy      string                  `json:"claimed_by,omitempty"`
@@ -827,6 +1097,7 @@ type jobRecord struct {
 	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
 	Shift          *shiftRecord            `json:"shift,omitempty"`
 	Retention      *retentionRecord        `json:"retention,omitempty"`
+	NodeSnapshot   *nodeSnapshotRecord     `json:"node_snapshot,omitempty"`
 	Error          *JobError               `json:"error,omitempty"`
 }
 
@@ -841,6 +1112,7 @@ func (r jobRecord) toJob() *Job {
 		EnqueuedAt:     decodeTime(r.EnqueuedAt),
 		ClaimedAt:      decodeTime(r.ClaimedAt),
 		CompletedAt:    decodeTime(r.CompletedAt),
+		ExpiresAt:      decodeTime(r.ExpiresAt),
 		LeaseID:        clientv3.LeaseID(r.LeaseID),
 		LeaseExpiresAt: decodeTime(r.LeaseExpiresAt),
 		ClaimedBy:      r.ClaimedBy,
@@ -851,6 +1123,7 @@ func (r jobRecord) toJob() *Job {
 		Bundles:        exportBundleRecords(r.Bundles),
 		Shift:          exportShiftSummary(r.Shift),
 		Retention:      exportRetention(r.Retention),
+		NodeSnapshot:   exportNodeSnapshot(r.NodeSnapshot),
 		Error:          r.Error,
 	}
 }
@@ -879,6 +1152,14 @@ type retentionRecord struct {
 	Bundle     string `json:"bundle,omitempty"`
 	BundleCID  string `json:"bundle_cid,omitempty"`
 	Inspection bool   `json:"inspection,omitempty"`
+}
+
+type nodeSnapshotRecord struct {
+	NodeID     string         `json:"node_id"`
+	Capacity   map[string]any `json:"capacity,omitempty"`
+	CapacityAt string         `json:"capacity_at,omitempty"`
+	Status     map[string]any `json:"status,omitempty"`
+	StatusAt   string         `json:"status_at,omitempty"`
 }
 
 // exportBundleRecords converts stored bundle metadata into public scheduler state.
@@ -916,6 +1197,28 @@ func exportRetention(src *retentionRecord) *JobRetention {
 		BundleCID:  src.BundleCID,
 		Inspection: src.Inspection,
 	}
+}
+
+func exportNodeSnapshot(rec *nodeSnapshotRecord) *JobNodeSnapshot {
+	if rec == nil {
+		return nil
+	}
+	snapshot := &JobNodeSnapshot{
+		NodeID: rec.NodeID,
+	}
+	if len(rec.Capacity) > 0 {
+		snapshot.Capacity = cloneAnyMap(rec.Capacity)
+	}
+	if len(rec.Status) > 0 {
+		snapshot.Status = cloneAnyMap(rec.Status)
+	}
+	if strings.TrimSpace(rec.CapacityAt) != "" {
+		snapshot.CapacityAt = decodeTime(rec.CapacityAt)
+	}
+	if strings.TrimSpace(rec.StatusAt) != "" {
+		snapshot.StatusAt = decodeTime(rec.StatusAt)
+	}
+	return snapshot
 }
 
 // normalizeBundleRecords trims bundle fields and computes expiry timestamps.
@@ -1082,6 +1385,56 @@ func cloneMap(src map[string]string) map[string]string {
 		dst[k] = v
 	}
 	return dst
+}
+
+func cloneAnyMap(src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]any, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
+}
+
+func decodeKVMap(data []byte) map[string]any {
+	if len(data) == 0 {
+		return nil
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(data, &generic); err != nil {
+		return nil
+	}
+	if len(generic) == 0 {
+		return nil
+	}
+	for key, value := range generic {
+		if str, ok := value.(string); ok {
+			generic[key] = strings.TrimSpace(str)
+		}
+	}
+	return generic
+}
+
+func snapshotTimestamp(fields map[string]any, fallback time.Time) string {
+	if len(fields) == 0 {
+		return ""
+	}
+	for _, key := range []string{"heartbeat", "checked_at", "observed_at", "timestamp"} {
+		if raw, ok := fields[key]; ok {
+			if str, ok := raw.(string); ok {
+				trimmed := strings.TrimSpace(str)
+				if trimmed != "" {
+					return trimmed
+				}
+			}
+		}
+	}
+	if fallback.IsZero() {
+		return ""
+	}
+	return encodeTime(fallback)
 }
 
 var errRetryClaim = errors.New("scheduler: retry claim")
