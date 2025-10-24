@@ -18,7 +18,7 @@
   with CIDs, digests, and TTLs; `cmd/ploy/mod_run.go` and `cmd/ploy/mod_summaries.go` render the
   new output with updated golden coverage.
 - Documentation refreshed to describe immediate artifact availability and CLI inspection flows
-  (`docs/v2/job.md`, `docs/v2/mod.md`, `docs/workflow/README.md`).
+  (`docs/next/job.md`, `docs/next/mod.md`, `docs/workflow/README.md`).
 - Verification (2025-10-21):
   - `go test ./...`
 
@@ -32,7 +32,7 @@
   the same cluster client, including digest reporting and download
   verification (`cmd/ploy/artifact_command.go`, new unit coverage).
 - Documented cluster configuration knobs, updated the workflow overview, and
-  tracked operational guidance in `docs/v2/ipfs.md`.
+  tracked operational guidance in `docs/next/ipfs.md`.
 - Verification (2025-10-21):
   - `go test ./...`
 
@@ -43,8 +43,8 @@
   hydration, diff tarball generation, and artifact staging modules used by the
   local step client.
 - Updated Mods documentation to describe local execution and staged artifacts
-  (`docs/workflow/README.md`, `docs/v2/README.md`, `docs/v2/job.md`,
-  `docs/v2/mod.md`, `docs/v2/shift.md`) and captured the follow-on artifact
+  (`docs/workflow/README.md`, `docs/next/README.md`, `docs/next/job.md`,
+  `docs/next/mod.md`, `docs/next/shift.md`) and captured the follow-on artifact
   publisher work in `docs/tasks/roadmap/03a-mod-runtime-artifacts.md`.
 - Closed out roadmap task `docs/tasks/roadmap/02-mod-step-runtime.md`, marking it
   completed and logging verification steps; refreshed README/env references for
@@ -79,7 +79,7 @@
   etcd fixtures.
 - Created integration suite under `tests/integration/controlplane` exercising multi-worker claims
   and lease expiry requeues; refreshed unit tests for heartbeat renewal and TTL enforcement.
-- Documented scheduler behaviour across `docs/v2/etcd.md`, `docs/v2/queue.md`, `docs/v2/job.md`,
+- Documented scheduler behaviour across `docs/next/etcd.md`, `docs/next/queue.md`, `docs/next/job.md`,
   and added the `docs/runbooks/control-plane/job-recovery.md` operational guide alongside updated
   environment variable references.
 - Updated `docs/design/control-plane/README.md` and roadmap task metadata to reflect completion of

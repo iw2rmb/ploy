@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/api/admin"
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 func TestLogStreamEndpoint(t *testing.T) {
@@ -67,7 +67,7 @@ runtime:
 	if addr == "" {
 		t.Fatal("server address empty")
 	}
-	resp, err := http.Get("http://" + addr + "/node/v2/jobs/" + jobID + "/logs/stream")
+	resp, err := http.Get("http://" + addr + "/v1/node/jobs/" + jobID + "/logs/stream")
 	if err != nil {
 		t.Fatalf("GET logs: %v", err)
 	}
@@ -117,7 +117,7 @@ runtime:
 	}
 
 	app := server.App()
-	req := httptest.NewRequest("GET", "/node/v2/status", nil)
+	req := httptest.NewRequest("GET", "/v1/node/status", nil)
 	resp, err := app.Test(req, 1000)
 	if err != nil {
 		t.Fatalf("app.Test() error = %v", err)
@@ -200,7 +200,7 @@ runtime:
 
 	app := server.App()
 	body := `{"cluster_id":"cluster","address":"10.0.0.5"}`
-	req := httptest.NewRequest("POST", "/admin/v1/nodes", strings.NewReader(body))
+	req := httptest.NewRequest("POST", "/v1/admin/nodes", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := app.Test(req, 1000)
 	if err != nil {
@@ -253,7 +253,7 @@ runtime:
 	}
 
 	app := server.App()
-	req := httptest.NewRequest("GET", "/v2/health", nil)
+	req := httptest.NewRequest("GET", "/v1/health", nil)
 	resp, err := app.Test(req, 1000)
 	if err != nil {
 		t.Fatalf("app.Test() error = %v", err)
@@ -266,7 +266,7 @@ runtime:
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(paths) != 1 || paths[0] != "/v2/health" {
+	if len(paths) != 1 || paths[0] != "/v1/health" {
 		t.Fatalf("control-plane handler paths = %v", paths)
 	}
 }

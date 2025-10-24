@@ -18,12 +18,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/api/admin"
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
-// StatusProvider returns node status snapshots for the /node/v2/status endpoint.
+// StatusProvider returns node status snapshots for the /v1/node/status endpoint.
 type StatusProvider interface {
 	Snapshot(ctx context.Context) (map[string]any, error)
 }
@@ -215,14 +215,14 @@ func (s *Server) ensureAppLocked() error {
 }
 
 func (s *Server) mountRoutes(app *fiber.App) {
-	app.Get("/node/v2/status", s.handleStatus)
-	app.Get("/node/v2/health", s.handleStatus)
-	app.Get("/node/v2/jobs/:jobID/logs/stream", s.handleLogStream)
-	app.Post("/admin/v1/nodes", s.handleAdminNodeCreate)
+	app.Get("/v1/node/status", s.handleStatus)
+	app.Get("/v1/node/health", s.handleStatus)
+	app.Get("/v1/node/jobs/:jobID/logs/stream", s.handleLogStream)
+	app.Post("/v1/admin/nodes", s.handleAdminNodeCreate)
 	if s.control != nil {
 		handler := adaptor.HTTPHandler(s.control)
-		app.All("/v2", handler)
-		app.All("/v2/*", handler)
+		app.All("/v1", handler)
+		app.All("/v1/*", handler)
 		app.All("/metrics", handler)
 	}
 }

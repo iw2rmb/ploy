@@ -51,7 +51,7 @@ worker can claim a job even under heavy contention.
 ## Execution & Completion
 
 - After claiming a job, the node hydrates the workspace, runs the container, and updates the job
-  record with status, timestamps, and artifact CIDs (see `docs/v2/job.md`).
+  record with status, timestamps, and artifact CIDs (see `docs/next/job.md`).
 - When the job finishes, the worker calls the control-plane completion API which transitions the job
   to `succeeded`, `failed`, or `inspection_ready`, clears the lease, and writes a GC marker.
 

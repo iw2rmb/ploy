@@ -109,7 +109,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
    - TLS health probes presenting certificates issued by the deployment CA are trusted automatically during onboarding.  
-  - The CLI first SSHes into the worker, uploads `ployd`, reruns the bootstrap script with `PLOYD_MODE=worker`, and verifies the `ployd` service is active. It then calls the beacon control-plane (`/v2/nodes`) to write worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issue a worker certificate via the deployment CA manager, and record probe outcomes.  
+  - The CLI first SSHes into the worker, uploads `ployd`, reruns the bootstrap script with `PLOYD_MODE=worker`, and verifies the `ployd` service is active. It then calls the beacon control-plane (`/v1/nodes`) to write worker descriptors into etcd (`/ploy/clusters/<cluster>/registry/workers/<id>`), issue a worker certificate via the deployment CA manager, and record probe outcomes.  
    - Use `--dry-run` to preview probes and certificate issuance without modifying etcd. Successful runs store the PEM bundle for the worker under the security prefix and surface the certificate version in the CLI output.  
    - Confirm the worker fetches its materials at `/etc/ploy/pki/` and registers with the beacon services.
 
@@ -126,7 +126,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.
 - Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer. The command talks to the control plane, writes the encrypted secret, and emits rotation events so workers refresh immediately.  
 - Inspect signer health with `ploy config gitlab status [--secret <name>]`. The output includes audit feed metadata from the rotation revocation pipeline (last rotation, revoked nodes, recent failures) outlined in `.archive/gitlab-rotation-revocation/README.md`.  
-- Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/v2/logs.md](logs.md)).  
+- Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/next/logs.md](logs.md)).  
 - For unattended rotations, provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` or ensure the active cluster descriptor contains the control plane endpoint and CA bundle so the CLI can authenticate requests.
 
 This operational flow keeps `ployd` nodes consistent and ensures the control plane remains

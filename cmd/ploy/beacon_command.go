@@ -48,7 +48,7 @@ func (r *httpCARotator) Rotate(ctx context.Context, opts deploy.RotateOptions) (
 		return deploy.RotateResult{}, fmt.Errorf("marshal rotation request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint("/v2/beacon/rotate-ca"), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.endpoint("/v1/beacon/rotate-ca"), bytes.NewReader(body))
 	if err != nil {
 		return deploy.RotateResult{}, fmt.Errorf("build rotation request: %w", err)
 	}

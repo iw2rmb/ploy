@@ -41,15 +41,15 @@ control plane APIs can surface inspection-ready jobs without re-scanning bundle 
 
 ## Streaming
 
-- `GET /v2/jobs/{id}/logs/stream` exposes a server-sent events (SSE) stream backed by the in-memory
+- `GET /v1/jobs/{id}/logs/stream` exposes a server-sent events (SSE) stream backed by the in-memory
   log hub. Calls may provide `Last-Event-ID` to resume from a previously observed frame.
-- Node services expose the same contract at `GET /node/v2/jobs/{id}/logs/stream`, enabling CLI
+- Node services expose the same contract at `GET /v1/node/jobs/{id}/logs/stream`, enabling CLI
   fallbacks when the control plane is unavailable.
 - Streams are bounded (history of 256 frames; per-subscriber buffer of 32). Slow subscribers are
   dropped and must reconnect with `Last-Event-ID`.
-- After completion, `GET /v2/jobs/{id}/logs` fetches the archived bundle from IPFS, optionally
+- After completion, `GET /v1/jobs/{id}/logs` fetches the archived bundle from IPFS, optionally
   truncated via query parameters (e.g., `?tail=2000`).
-- Node-level logs (`/v2/nodes/{node}/logs/stream`) are intended for direct operator access while
+- Node-level logs (`/v1/nodes/{node}/logs/stream`) are intended for direct operator access while
   investigating node behaviour.
 
 ### Event Frames
@@ -68,10 +68,10 @@ numeric SSE id to support resumable replay.
 ### CLI Streaming
 
 - `ploy mods logs <ticket>` establishes an SSE stream against
-  `/v2/mods/{ticket}/logs/stream`. The CLI defaults to a structured view (`timestamp stream line`),
+  `/v1/mods/{ticket}/logs/stream`. The CLI defaults to a structured view (`timestamp stream line`),
   supports `--format raw` for verbatim log output, and automatically retries transient disconnects
   (`--max-retries` and `--retry-wait` tune behaviour).
-- `ploy jobs follow <job-id>` tails job logs in real time using `/v2/jobs/{id}/logs/stream`, sharing
+- `ploy jobs follow <job-id>` tails job logs in real time using `/v1/jobs/{id}/logs/stream`, sharing
   the same formatting and retry semantics so operators can follow a single step through completion.
   When a retention hint arrives, the CLI prints a `Retention: ...` summary with the bundle CID, TTL,
   and expiry window after the stream closes.
@@ -83,7 +83,7 @@ numeric SSE id to support resumable replay.
 ## Retention
 
 - Log bundles follow the same `expires_at` lifecycle as other job artifacts (see
-  [docs/v2/gc.md](gc.md)). When a job’s retention window lapses, the GC controller unpins the log
+  [docs/next/gc.md](gc.md)). When a job’s retention window lapses, the GC controller unpins the log
   CID and removes the reference from etcd. The scheduler computes `expires_at` when recording the
   bundle and publishes an aggregate `retention` summary alongside job records so downstream
   consumers do not need to re-run TTL math.

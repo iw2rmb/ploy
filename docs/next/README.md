@@ -37,7 +37,7 @@ SHIFT sandbox before the next step.
 ### Cluster Roles
 
 - Control plane schedules jobs, stores job metadata in etcd, and exposes the
-  `/v2/jobs` APIs.
+  `/v1/jobs` APIs.
 - Nodes hydrate workspaces, launch containers, run SHIFT, and publish artifacts
   to IPFS Cluster.
 - Beacon mode distributes discovery data (DNS bootstrap, trust bundles) while
@@ -48,8 +48,8 @@ SHIFT sandbox before the next step.
 ## Component Responsibilities
 
 - **Ploy CLI** — Operator interface for Mods submission, artifact management,
-  and node lifecycle. See [docs/v2/cli.md](cli.md).
-- **Control Plane Service (ployd)** — `/v2/jobs` HTTP APIs for submission,
+  and node lifecycle. See [docs/next/cli.md](cli.md).
+- **Control Plane Service (ployd)** — `/v1/jobs` HTTP APIs for submission,
   worker claims, heartbeats, status queries, and job completion. The ployd
   daemon fronts these routes, wrapping the etcd-backed scheduler with
   optimistic concurrency.
@@ -73,8 +73,8 @@ SHIFT sandbox before the next step.
 1. Operator submits a Mod via the CLI, including target repository, manifest,
    and optional overrides (e.g., build gate profile, plan heuristics).
 2. Control plane records the job (`mods/<ticket>/jobs/<job-id>`), enqueues the
-   work (`queue/mods/<priority>/<job-id>`), and exposes status over `/v2/jobs`.
-3. A node claims the job through `/v2/jobs/claim`, hydrates the workspace from
+   work (`queue/mods/<priority>/<job-id>`), and exposes status over `/v1/jobs`.
+3. A node claims the job through `/v1/jobs/claim`, hydrates the workspace from
    snapshot and diff CIDs, and launches the specified container with retention
    enabled for inspection.
 4. On exit, the node captures stdout/stderr, diff tarball, and metadata before
@@ -94,12 +94,12 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 
 ## Interfaces & Access
 
-- CLI command reference — [docs/v2/cli.md](cli.md)
-- Control plane APIs — [docs/v2/api.md](api.md)
-- Job execution model — [docs/v2/job.md](job.md)
-- Mods workflow example — [docs/v2/mod.md](mod.md)
-- IPFS artifact handling — [docs/v2/ipfs.md](ipfs.md)
-- SHIFT integration — [docs/v2/shift.md](shift.md)
+- CLI command reference — [docs/next/cli.md](cli.md)
+- Control plane APIs — [docs/next/api.md](api.md)
+- Job execution model — [docs/next/job.md](job.md)
+- Mods workflow example — [docs/next/mod.md](mod.md)
+- IPFS artifact handling — [docs/next/ipfs.md](ipfs.md)
+- SHIFT integration — [docs/next/shift.md](shift.md)
 
 ## Operations & Observability
 
@@ -109,9 +109,9 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
   policies govern when GC prunes them.
 - Metrics capture queue depth, claim latency, lease expirations, retries, and
   SHIFT duration. Health endpoints report etcd connectivity and backlog size.
-- Prometheus scraping and alerting guidance — [docs/v2/observability.md](observability.md)
+- Prometheus scraping and alerting guidance — [docs/next/observability.md](observability.md)
 - Garbage collection controllers respect retention windows defined in
-  [docs/v2/gc.md](gc.md).
+  [docs/next/gc.md](gc.md).
 
 ## Operational Baseline
 
@@ -126,24 +126,24 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 
 Ploy v2 rolls out sequentially: control plane scheduler, step runtime, artifact
 publisher, CLI refresh, and deployment tooling. Follow
-[`docs/v2/migration.md`](migration.md) for the phase-by-phase plan, the
+[`docs/next/migration.md`](migration.md) for the phase-by-phase plan, the
 dependencies between components, and cleanup guidance for retiring Grid.
 
 ## Further Reading
 
-- [docs/v2/cli.md](cli.md) — Command-line reference.
-- [docs/v2/api.md](api.md) — REST route catalog for control plane, nodes, and beacon.
-- [docs/v2/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
-- [docs/v2/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
+- [docs/next/cli.md](cli.md) — Command-line reference.
+- [docs/next/api.md](api.md) — REST route catalog for control plane, nodes, and beacon.
+- [docs/next/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
+- [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.
-- [docs/v2/reuse.md](reuse.md) — Grid components worth reusing in Ploy v2.
-- [docs/v2/devops.md](devops.md) — Deployment, bootstrap, and node operations playbook.
-- [docs/v2/migration.md](migration.md) — Development roadmap for landing Ploy v2 features (no backward compatibility).
-- [docs/v2/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
-- [docs/v2/gc.md](gc.md) — Retention and garbage collection workflow (controller + `ploy gc`).
-- [docs/v2/logs.md](logs.md) — Log streaming and archival strategy (metadata in etcd, payloads in IPFS).
-- [docs/v2/queue.md](queue.md) — etcd-backed queue, capacity tracking, and scheduling behaviour.
-- [docs/v2/etcd.md](etcd.md) — etcd keyspace layout and contracts.
-- [docs/v2/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
-- [docs/v2/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.
-- [docs/v2/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy v2.
+- [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy v2.
+- [docs/next/devops.md](devops.md) — Deployment, bootstrap, and node operations playbook.
+- [docs/next/migration.md](migration.md) — Development roadmap for landing Ploy v2 features (no backward compatibility).
+- [docs/next/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
+- [docs/next/gc.md](gc.md) — Retention and garbage collection workflow (controller + `ploy gc`).
+- [docs/next/logs.md](logs.md) — Log streaming and archival strategy (metadata in etcd, payloads in IPFS).
+- [docs/next/queue.md](queue.md) — etcd-backed queue, capacity tracking, and scheduling behaviour.
+- [docs/next/etcd.md](etcd.md) — etcd keyspace layout and contracts.
+- [docs/next/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
+- [docs/next/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.
+- [docs/next/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy v2.

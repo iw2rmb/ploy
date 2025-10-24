@@ -49,7 +49,7 @@ highlights the primary candidates, why they are useful, and where to find them.
 2. **Keep interfaces** — Preserve public interfaces where possible so downstream code (CLI,
    workflow runner) requires minimal changes.
 3. **Document differences** — Note behavioural differences (e.g., SSE streams replacing JetStream,
-   metadata version tags stored alongside cluster descriptors) in `docs/v2` so future contributors
+   metadata version tags stored alongside cluster descriptors) in `docs/next` so future contributors
    understand the fork.
 4. **Validate with tests** — Reuse Grid’s unit/integration tests as a starting point, adjusting for
    Ploy’s environment.

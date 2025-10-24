@@ -8,25 +8,25 @@ contracts expected under each.
 
 - **`config/`** — Cluster-scoped configuration (GitLab API keys, feature flags). Managed via
   `ploy config set/show`.
-- **`queue/<kind>/...`** — Waiting jobs (see [docs/v2/queue.md](queue.md)). `<kind>` is `mods` or
+- **`queue/<kind>/...`** — Waiting jobs (see [docs/next/queue.md](queue.md)). `<kind>` is `mods` or
   `buildgate`; entries store resource requirements, priority, and retry counters.
 - **`mods/<ticket>/jobs/<job-id>`** — Durable job records for Mod tickets. Includes lifecycle
   state, timestamps, lease metadata, artifacts, and retry counters (see
-  [docs/v2/job.md](job.md)).
+  [docs/next/job.md](job.md)).
 - **`buildgate/<ticket>/jobs/<job-id>`** — Optional if build gate jobs are stored outside the Mod
   tree. Same schema as Mod jobs but flagged `type: buildgate`.
 - **`leases/jobs/<job-id>`** — Ephemeral keys bound to etcd leases tracking active job claims.
 - **`gc/jobs/<job-id>`** — Garbage-collection markers stamped when jobs enter a terminal state.
-- **`nodes/<node-id>/capacity`** — Node capacity snapshots. See [docs/v2/queue.md](queue.md) for
+- **`nodes/<node-id>/capacity`** — Node capacity snapshots. See [docs/next/queue.md](queue.md) for
   polling/updates.
 - **`nodes/<node-id>/status`** — Health info (heartbeat, current version tag). Populated by `ployd`
   heartbeats; used by the control plane.
 - **`ipfs/peers/<node-id>`** — IPFS Cluster peer metadata (peer ID, multiaddr, last seen; see
-  [docs/v2/ipfs.md](ipfs.md)).
+  [docs/next/ipfs.md](ipfs.md)).
 - **`artifacts/<cid>`** — Optional metadata for artifacts published outside job context. Tracks
   orphaned CIDs or global references.
 - **`gc/pending/<job-id>`** — Jobs pending garbage collection. Set by the GC controller prior to
-  deletion (see [docs/v2/gc.md](gc.md)).
+  deletion (see [docs/next/gc.md](gc.md)).
 
 ## Detailed Contracts
 
@@ -34,7 +34,7 @@ contracts expected under each.
 
 - Keys are simple strings (e.g., `config/gitlab.api_key`).
 - Values are JSON blobs or plain strings depending on the setting. The CLI merges beacon values with
-  local overrides as described in [docs/v2/cli.md](cli.md).
+  local overrides as described in [docs/next/cli.md](cli.md).
 - Changes take effect immediately; nodes may watch the prefix to refresh local configuration.
 
 ### Queue (`queue/<kind>/<priority>/<job-id>`)
@@ -87,7 +87,7 @@ contracts expected under each.
   }
   ```
 
-- See [docs/v2/job.md](job.md) for the lifecycle and updates.
+- See [docs/next/job.md](job.md) for the lifecycle and updates.
 
 ### Job Leases (`leases/jobs/<job-id>`)
 

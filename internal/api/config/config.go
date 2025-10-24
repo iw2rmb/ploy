@@ -281,16 +281,16 @@ func applyDefaults(cfg *Config) {
 		cfg.ControlPlane.StatusPublishInterval = defaultStatusPublish
 	}
 	if strings.TrimSpace(cfg.ControlPlane.HealthEndpoint) == "" {
-		cfg.ControlPlane.HealthEndpoint = "/v2/health"
+		cfg.ControlPlane.HealthEndpoint = "/v1/health"
 	}
 	if strings.TrimSpace(cfg.ControlPlane.ConfigEndpoint) == "" {
-		cfg.ControlPlane.ConfigEndpoint = "/v2/config"
+		cfg.ControlPlane.ConfigEndpoint = "/v1/config"
 	}
 	if strings.TrimSpace(cfg.ControlPlane.AssignmentsEndpoint) == "" {
-		cfg.ControlPlane.AssignmentsEndpoint = "/v2/assignments"
+		cfg.ControlPlane.AssignmentsEndpoint = "/v1/assignments"
 	}
 	if strings.TrimSpace(cfg.ControlPlane.NodeStatusEndpoint) == "" {
-		cfg.ControlPlane.NodeStatusEndpoint = "/v2/nodes"
+		cfg.ControlPlane.NodeStatusEndpoint = "/v1/nodes"
 	}
 
 	if cfg.ControlPlane.AssignmentBatchSize <= 0 {

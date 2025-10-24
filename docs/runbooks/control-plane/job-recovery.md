@@ -139,13 +139,13 @@ jobs failing to re-queue after retry budget resets.
 
 ## Verification
 
-- `curl -s $CONTROL_PLANE_URL/v2/jobs/<job-id>?ticket=<ticket>` should reflect the updated state.
+- `curl -s $CONTROL_PLANE_URL/v1/jobs/<job-id>?ticket=<ticket>` should reflect the updated state.
 - `etcdctl get "queue/mods/default/<job-id>"` returns empty after completion.
 - Integration tests (`go test -tags integration ./tests/integration/controlplane`) pass after the
   change if code adjustments accompanied the recovery.
 
 ## References
 
-- [docs/v2/queue.md](../../v2/queue.md) — Scheduler queue semantics.
-- [docs/v2/etcd.md](../../v2/etcd.md) — Keyspace contracts.
-- [docs/v2/job.md](../../v2/job.md) — Job lifecycle and API touchpoints.
+- [docs/next/queue.md](../../v2/queue.md) — Scheduler queue semantics.
+- [docs/next/etcd.md](../../v2/etcd.md) — Keyspace contracts.
+- [docs/next/job.md](../../v2/job.md) — Job lifecycle and API touchpoints.

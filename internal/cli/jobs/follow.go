@@ -55,7 +55,7 @@ func (c FollowCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v2", "jobs", url.PathEscape(strings.TrimSpace(c.JobID)), "logs", "stream")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "jobs", url.PathEscape(strings.TrimSpace(c.JobID)), "logs", "stream")
 	if err != nil {
 		return fmt.Errorf("jobs: build endpoint: %w", err)
 	}

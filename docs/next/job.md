@@ -7,7 +7,7 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 - **Mod step jobs** — Run the units defined in a Mod plan (plan, apply, healing actions). Each job
   executes a single step manifest locally on the worker node and appears both under
-  `/v2/mods/{ticket}` and `/v2/jobs/{id}`.
+  `/v1/mods/{ticket}` and `/v1/jobs/{id}`.
 - **Build gate jobs** — Execute the SHIFT build gate (sandbox + static checks). They share the same
   schema but are flagged with `type: buildgate` in the metadata.
 - Additional auxiliary jobs (e.g., log ingestion) can reuse the same pattern if future roadmap items
@@ -24,7 +24,7 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 3. **Monitoring** — Runtime state transitions (`queued`, `running`, `succeeded`, `failed`,
    `inspection_ready`) plus timestamps, artifacts, and error metadata are persisted back to etcd.
    Lease heartbeats update the expiry timestamp. Log metadata (CID, digest, tail snippet) is
-   recorded while the full payload lives in IPFS (see [docs/v2/logs.md](logs.md)).
+   recorded while the full payload lives in IPFS (see [docs/next/logs.md](logs.md)).
 4. **Retention** — Job records, stdout/stderr, and structured metadata are retained according to
    policy (default seven days) for audit and debugging. Terminal jobs also gain a GC marker under
    `gc/jobs/<job-id>` with an expiry timestamp for the retention controller.
@@ -41,7 +41,7 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## Log Streaming
 
-- Each job exposes a server-sent events stream at `GET /v2/jobs/{id}/logs/stream`. Events include
+- Each job exposes a server-sent events stream at `GET /v1/jobs/{id}/logs/stream`. Events include
   incremental stdout/stderr chunks with timestamps.
 - The same stream is referenced from Mod/build-gate summaries, allowing the CLI to tail logs in near
   real time.
@@ -76,10 +76,10 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
 
 ## CLI & API Touchpoints
 
-- `POST /v2/jobs` submits work, `POST /v2/jobs/claim` lets workers compete for steps,
-  `POST /v2/jobs/{id}/heartbeat` renews leases, and `POST /v2/jobs/{id}/complete` records terminal
+- `POST /v1/jobs` submits work, `POST /v1/jobs/claim` lets workers compete for steps,
+  `POST /v1/jobs/{id}/heartbeat` renews leases, and `POST /v1/jobs/{id}/complete` records terminal
   states.
-- `GET /v2/jobs/{id}` and `GET /v2/jobs?ticket=` back the CLI (`ploy status`, `ploy mod inspect`)
+- `GET /v1/jobs/{id}` and `GET /v1/jobs?ticket=` back the CLI (`ploy status`, `ploy mod inspect`)
   with complete lifecycle snapshots including lease metadata.
 - `ploy logs job <job-id>` tails logs via SSE and fetches archived bundles from IPFS when complete.
 - Responses include the executing node ID so operators can reach the exact worker for further
