@@ -20,9 +20,11 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
+	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/deploy"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
@@ -33,6 +35,7 @@ type controlPlaneServer struct {
 	rotations *events.RotationHub
 	streams   *logstream.Hub
 	etcd      *clientv3.Client
+	mods      *controlplanemods.Service
 }
 
 // Options configure the HTTP server handlers.
@@ -43,6 +46,7 @@ type ControlPlaneOptions struct {
 	Gatherer  prometheus.Gatherer
 	Etcd      *clientv3.Client
 	Rotations *events.RotationHub
+	Mods      *controlplanemods.Service
 }
 
 // New returns an HTTP handler rooted at /v1.
@@ -54,6 +58,7 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		streams:   opts.Streams,
 		etcd:      opts.Etcd,
 		rotations: opts.Rotations,
+		mods:      opts.Mods,
 	}
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
@@ -68,6 +73,10 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux.HandleFunc("/v1/nodes", h.handleNodes)
 	mux.HandleFunc("/v1/beacon/rotate-ca", h.handleBeaconRotateCA)
 	mux.HandleFunc("/v1/config/gitlab", h.handleGitLabConfig)
+	if h.mods != nil {
+		mux.HandleFunc("/v1/mods/tickets", h.handleModsTickets)
+		mux.HandleFunc("/v1/mods/tickets/", h.handleModsTicketSubpath)
+	}
 	gatherer := opts.Gatherer
 	if gatherer == nil {
 		gatherer = prometheus.DefaultGatherer
@@ -177,6 +186,136 @@ func (s *controlPlaneServer) handleGitLabConfig(w http.ResponseWriter, r *http.R
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *controlPlaneServer) handleModsTickets(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMods(w) {
+		return
+	}
+	switch r.Method {
+	case http.MethodPost:
+		s.handleModsSubmit(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureMods(w) {
+		return
+	}
+	trimmed := strings.TrimPrefix(r.URL.Path, "/v1/mods/tickets/")
+	if trimmed == "" {
+		http.NotFound(w, r)
+		return
+	}
+	parts := strings.Split(trimmed, "/")
+	ticketID := strings.TrimSpace(parts[0])
+	if ticketID == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if len(parts) == 1 {
+		s.handleModsTicketStatus(w, r, ticketID)
+		return
+	}
+	action := strings.TrimSpace(parts[1])
+	switch action {
+	case "cancel":
+		s.handleModsCancel(w, r, ticketID)
+	case "resume":
+		s.handleModsResume(w, r, ticketID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (s *controlPlaneServer) handleModsSubmit(w http.ResponseWriter, r *http.Request) {
+	var req modsapi.TicketSubmitRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if strings.TrimSpace(req.TicketID) == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "ticket_id is required")
+		return
+	}
+	if len(req.Stages) == 0 {
+		writeErrorMessage(w, http.StatusBadRequest, "stages are required")
+		return
+	}
+	spec := controlplanemods.TicketSpec{
+		TicketID:   strings.TrimSpace(req.TicketID),
+		Tenant:     strings.TrimSpace(req.Tenant),
+		Submitter:  strings.TrimSpace(req.Submitter),
+		Repository: strings.TrimSpace(req.Repository),
+		Metadata:   cloneStringMap(req.Metadata),
+		Stages:     make([]controlplanemods.StageDefinition, 0, len(req.Stages)),
+	}
+	for _, stage := range req.Stages {
+		converted := controlplanemods.StageDefinition{
+			ID:           strings.TrimSpace(stage.ID),
+			Dependencies: cloneStringSlice(stage.Dependencies),
+			Lane:         strings.TrimSpace(stage.Lane),
+			Priority:     strings.TrimSpace(stage.Priority),
+			MaxAttempts:  stage.MaxAttempts,
+			Metadata:     cloneStringMap(stage.Metadata),
+		}
+		if converted.ID == "" {
+			writeErrorMessage(w, http.StatusBadRequest, "stage id is required")
+			return
+		}
+		spec.Stages = append(spec.Stages, converted)
+	}
+	status, err := s.mods.Submit(r.Context(), spec)
+	if err != nil {
+		code, msg := mapModsError(err)
+		writeErrorMessage(w, code, msg)
+		return
+	}
+	resp := modsapi.TicketSubmitResponse{Ticket: toAPITicketSummary(status)}
+	writeJSON(w, http.StatusAccepted, resp)
+}
+
+func (s *controlPlaneServer) handleModsTicketStatus(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	status, err := s.mods.TicketStatus(r.Context(), ticketID)
+	if err != nil {
+		code, msg := mapModsError(err)
+		writeErrorMessage(w, code, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, modsapi.TicketStatusResponse{Ticket: toAPITicketSummary(status)})
+}
+
+func (s *controlPlaneServer) handleModsCancel(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := s.mods.Cancel(r.Context(), ticketID); err != nil {
+		code, msg := mapModsError(err)
+		writeErrorMessage(w, code, msg)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (s *controlPlaneServer) handleModsResume(w http.ResponseWriter, r *http.Request, ticketID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	status, err := s.mods.Resume(r.Context(), ticketID)
+	if err != nil {
+		code, msg := mapModsError(err)
+		writeErrorMessage(w, code, msg)
+		return
+	}
+	writeJSON(w, http.StatusOK, modsapi.TicketStatusResponse{Ticket: toAPITicketSummary(status)})
 }
 
 func (s *controlPlaneServer) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
@@ -958,12 +1097,82 @@ func (s *controlPlaneServer) ensureEtcd(w http.ResponseWriter) bool {
 	return true
 }
 
+func (s *controlPlaneServer) ensureMods(w http.ResponseWriter) bool {
+	if s.mods == nil {
+		http.Error(w, "mods orchestrator unavailable", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
 func writeError(w http.ResponseWriter, status int, err error) {
 	if err == nil {
 		writeErrorMessage(w, status, http.StatusText(status))
 		return
 	}
 	writeErrorMessage(w, status, err.Error())
+}
+
+func mapModsError(err error) (int, string) {
+	switch {
+	case errors.Is(err, controlplanemods.ErrTicketNotFound):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, controlplanemods.ErrStageNotFound):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, controlplanemods.ErrStageAlreadyClaimed):
+		return http.StatusConflict, err.Error()
+	default:
+		return http.StatusInternalServerError, err.Error()
+	}
+}
+
+func toAPITicketSummary(status *controlplanemods.TicketStatus) modsapi.TicketSummary {
+	if status == nil {
+		return modsapi.TicketSummary{}
+	}
+	stages := make(map[string]modsapi.StageStatus, len(status.Stages))
+	for id, stage := range status.Stages {
+		stages[id] = modsapi.StageStatus{
+			StageID:      stage.StageID,
+			State:        modsapi.StageState(stage.State),
+			Attempts:     stage.Attempts,
+			MaxAttempts:  stage.MaxAttempts,
+			CurrentJobID: stage.CurrentJobID,
+			Artifacts:    cloneStringMap(stage.Artifacts),
+			LastError:    stage.LastError,
+		}
+	}
+	return modsapi.TicketSummary{
+		TicketID:   status.TicketID,
+		State:      modsapi.TicketState(status.State),
+		Tenant:     status.Tenant,
+		Submitter:  status.Submitter,
+		Repository: status.Repository,
+		Metadata:   cloneStringMap(status.Metadata),
+		CreatedAt:  status.CreatedAt.UTC(),
+		UpdatedAt:  status.UpdatedAt.UTC(),
+		Stages:     stages,
+	}
+}
+
+func cloneStringMap(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func cloneStringSlice(src []string) []string {
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]string, len(src))
+	copy(out, src)
+	return out
 }
 
 func writeErrorMessage(w http.ResponseWriter, status int, message string) {

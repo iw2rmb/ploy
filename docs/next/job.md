@@ -29,6 +29,24 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
    policy (default seven days) for audit and debugging. Terminal jobs also gain a GC marker under
    `gc/jobs/<job-id>` with an expiry timestamp for the retention controller.
 
+## Mods Orchestrator Keys
+
+- `mods/<ticket>/meta` stores ticket-level metadata (`status`, `submitter`, `repository`,
+  timestamps, and CLI-facing annotations). Updates guard against concurrent workflows through etcd
+  compare-and-swap semantics so cancels/resumes cannot clobber active executions.
+- `mods/<ticket>/graph` serialises the stage DAG (identifiers, dependencies, max attempts, lane and
+  priority hints). The control plane reloads this document to determine which stages are eligible
+  when completions arrive or when a resume request is processed.
+- `mods/<ticket>/stages/<stage-id>` materialises per-stage execution state. Fields include
+  `state` (`pending|queued|running|succeeded|failed|cancelling|cancelled`), `attempts`,
+  `max_attempts`, `current_job_id`, `artifacts`, and the last error message. The orchestrator
+  compares the etcd `mod_revision` to enforce optimistic concurrency during claims and transitions.
+- `mods/<ticket>/jobs/<job-id>` retains the scheduler job documents aligned with
+  [Job Execution Model](#job-execution-model) semantics.
+
+These keys provide a single source of truth for the Mods API handlers (`/v1/mods/...`) and for the
+legacy runner adapter while roadmap item 3.5 is still in flight.
+
 ## Container Handling
 
 - Containers are launched with `auto-remove` disabled so logs and exit metadata can be collected,

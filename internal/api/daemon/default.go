@@ -15,11 +15,6 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/iw2rmb/ploy/internal/config/gitlab"
-	"github.com/iw2rmb/ploy/internal/controlplane/events"
-	controlplanescheduler "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
-	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/api/admin"
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
@@ -30,6 +25,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/runtime"
 	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/api/status"
+	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/events"
+	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
+	controlplanescheduler "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
@@ -195,6 +196,16 @@ func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.C
 		return nil, nil, fmt.Errorf("control-plane: scheduler: %w", err)
 	}
 
+	modsService, err := controlplanemods.NewService(client, controlplanemods.Options{
+		Prefix:    "mods/",
+		Scheduler: controlplanemods.NewSchedulerBridge(sched),
+	})
+	if err != nil {
+		_ = sched.Close()
+		_ = client.Close()
+		return nil, nil, fmt.Errorf("control-plane: mods orchestrator: %w", err)
+	}
+
 	var signer *gitlab.Signer
 	if strings.TrimSpace(os.Getenv("PLOY_GITLAB_SIGNER_AES_KEY")) != "" {
 		signer, err = gitlab.NewSignerFromEnv(client)
@@ -216,10 +227,14 @@ func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.C
 		Streams:   streams,
 		Etcd:      client,
 		Rotations: rotations,
+		Mods:      modsService,
 	})
 
 	shutdown := func(ctx context.Context) error {
 		_ = ctx
+		if modsService != nil {
+			_ = modsService.Close()
+		}
 		if rotations != nil {
 			rotations.Close()
 		}
