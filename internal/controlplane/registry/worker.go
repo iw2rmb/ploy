@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -200,6 +201,26 @@ func (r *WorkerRegistry) Exists(ctx context.Context, workerID string) (bool, err
 		return false, nil
 	}
 	return false, err
+}
+
+// List returns all worker descriptors stored in the registry.
+func (r *WorkerRegistry) List(ctx context.Context) ([]WorkerDescriptor, error) {
+	resp, err := r.client.Get(ctx, r.prefix+"/", clientv3.WithPrefix())
+	if err != nil {
+		return nil, fmt.Errorf("registry: list workers: %w", err)
+	}
+	descriptors := make([]WorkerDescriptor, 0, resp.Count)
+	for _, kv := range resp.Kvs {
+		var descriptor WorkerDescriptor
+		if err := json.Unmarshal(kv.Value, &descriptor); err != nil {
+			return nil, fmt.Errorf("registry: decode worker descriptor: %w", err)
+		}
+		descriptors = append(descriptors, descriptor)
+	}
+	sort.Slice(descriptors, func(i, j int) bool {
+		return descriptors[i].ID < descriptors[j].ID
+	})
+	return descriptors, nil
 }
 
 func (r *WorkerRegistry) workerKey(workerID string) string {

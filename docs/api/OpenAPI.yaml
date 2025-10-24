@@ -1,0 +1,543 @@
+openapi: 3.1.0
+info:
+  title: Ploy Control Plane API
+  version: "0.1.0"
+  description: |
+    REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
+    require mutual TLS and a bearer token with the appropriate scope.
+servers:
+  - url: https://{beacon_host}
+    description: Cluster beacon endpoint
+    variables:
+      beacon_host:
+        default: cluster-alpha.example.com
+        description: Beacon DNS entry or override supplied via bootstrap descriptor.
+tags:
+  - name: Nodes
+    description: Worker onboarding, listing, and deregistration.
+  - name: Beacon
+    description: Cluster-wide certificate authority management.
+  - name: GitLab
+    description: GitLab signer configuration.
+security:
+  - bearerAuth: []
+paths:
+  /v2/nodes:
+    post:
+      tags: [Nodes]
+      summary: Register a worker node with the cluster.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeJoinRequest'
+      responses:
+        '201':
+          description: Worker registered successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeJoinResponse'
+        '400':
+          description: Invalid request payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Worker already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    get:
+      tags: [Nodes]
+      summary: List registered workers for a cluster.
+      parameters:
+        - in: query
+          name: cluster_id
+          required: true
+          schema:
+            type: string
+          description: Cluster identifier.
+      responses:
+        '200':
+          description: Node listing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NodeDescriptor'
+                required: [nodes]
+        '400':
+          description: Missing or malformed query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Nodes]
+      summary: Deregister a worker node after drain acknowledgement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeDeleteRequest'
+      responses:
+        '204':
+          description: Worker deregistered.
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Worker not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Worker still has running jobs or concurrent update detected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDrainConflict'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v2/beacon/rotate-ca:
+    post:
+      tags: [Beacon]
+      summary: Initiate a cluster certificate authority rotation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeaconRotateRequest'
+      responses:
+        '200':
+          description: Rotation executed (or previewed in dry-run mode).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeaconRotateResponse'
+        '400':
+          description: Invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A concurrent rotation was detected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '424':
+          description: Cluster PKI has not been bootstrapped.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v2/config/gitlab:
+    get:
+      tags: [GitLab]
+      summary: Retrieve the sanitized GitLab integration configuration.
+      responses:
+        '200':
+          description: GitLab configuration returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitLabConfigResponse'
+        '404':
+          description: No configuration is currently stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [GitLab]
+      summary: Validate and persist the GitLab integration configuration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GitLabConfigWriteRequest'
+      responses:
+        '200':
+          description: Configuration updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitLabConfigResponse'
+        '400':
+          description: Validation failed (normalisation errors).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Revision mismatch detected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Required backing services (etcd) are unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    NodeJoinRequest:
+      type: object
+      required: [cluster_id, address]
+      properties:
+        cluster_id:
+          type: string
+          description: Cluster identifier.
+        worker_id:
+          type: string
+          description: Optional worker identifier. Generated automatically when omitted.
+        address:
+          type: string
+          description: Reachable address for the worker node.
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+          description: Arbitrary key/value metadata.
+        probes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeProbe'
+        dry_run:
+          type: boolean
+          default: false
+          description: When true, health probes run without persisting registry or PKI changes.
+    NodeProbe:
+      type: object
+      required: [endpoint]
+      properties:
+        name:
+          type: string
+          description: Friendly probe name.
+        endpoint:
+          type: string
+          format: uri
+          description: HTTP(S) endpoint probed during registration.
+        expect_status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+          description: Expected HTTP status code. Defaults to 200.
+    NodeJoinResponse:
+      type: object
+      required: [worker_id, descriptor, certificate, health, dry_run]
+      properties:
+        worker_id:
+          type: string
+        descriptor:
+          $ref: '#/components/schemas/NodeDescriptor'
+        certificate:
+          $ref: '#/components/schemas/LeafCertificate'
+        health:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkerProbeResult'
+        dry_run:
+          type: boolean
+    NodeDescriptor:
+      type: object
+      required: [id, address, registered_at, status]
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        registered_at:
+          type: string
+          format: date-time
+        certificate_version:
+          type: string
+        status:
+          $ref: '#/components/schemas/WorkerStatus'
+    WorkerStatus:
+      type: object
+      required: [phase, checked_at]
+      properties:
+        phase:
+          type: string
+          description: Worker lifecycle phase (registering, ready, error).
+        checked_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+        probes:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkerProbeResult'
+    WorkerProbeResult:
+      type: object
+      required: [name, passed, checked_at]
+      properties:
+        name:
+          type: string
+        endpoint:
+          type: string
+          description: Endpoint that was probed.
+        passed:
+          type: boolean
+        status_code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+    LeafCertificate:
+      type: object
+      required: [node_id, usage, version, certificate_pem, key_pem, issued_at, expires_at]
+      properties:
+        node_id:
+          type: string
+        usage:
+          type: string
+          enum: [worker, beacon]
+        version:
+          type: string
+        parent_version:
+          type: string
+        serial_number:
+          type: string
+        certificate_pem:
+          type: string
+          description: PEM-encoded certificate.
+        key_pem:
+          type: string
+          description: PEM-encoded private key.
+        issued_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        previous_version:
+          type: string
+    NodeDeleteRequest:
+      type: object
+      required: [cluster_id, worker_id, confirm]
+      properties:
+        cluster_id:
+          type: string
+        worker_id:
+          type: string
+        confirm:
+          type: string
+          description: Must match `worker_id` for safety.
+        drain_timeout_seconds:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Optional drain window before removal. Defaults to 30 seconds.
+    NodeDrainConflict:
+      type: object
+      required: [error, running_jobs]
+      properties:
+        error:
+          type: string
+        running_jobs:
+          type: integer
+          format: int32
+          description: Number of jobs still running on the worker.
+    BeaconRotateRequest:
+      type: object
+      required: [cluster_id]
+      properties:
+        cluster_id:
+          type: string
+        dry_run:
+          type: boolean
+          default: false
+        operator:
+          type: string
+          description: Operator recorded in audit metadata.
+        reason:
+          type: string
+          description: Free form rotation reason or ticket reference.
+    BeaconRotateResponse:
+      type: object
+      required: [dry_run, old_version, new_version, updated_beacon_certificates, updated_worker_certificates, revoked]
+      properties:
+        dry_run:
+          type: boolean
+        old_version:
+          type: string
+        new_version:
+          type: string
+        operator:
+          type: string
+        reason:
+          type: string
+        updated_beacon_certificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeafCertificate'
+        updated_worker_certificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeafCertificate'
+        revoked:
+          $ref: '#/components/schemas/RevokedRecord'
+    RevokedRecord:
+      type: object
+      required: [version, serial_number, revoked_at]
+      properties:
+        version:
+          type: string
+        serial_number:
+          type: string
+        revoked_at:
+          type: string
+          format: date-time
+    GitLabConfigResponse:
+      type: object
+      required: [config, revision]
+      properties:
+        config:
+          $ref: '#/components/schemas/GitLabConfig'
+        revision:
+          type: integer
+          format: int64
+    GitLabConfigWriteRequest:
+      type: object
+      required: [revision, config]
+      properties:
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Expected etcd revision for optimistic locking (0 when creating).
+        config:
+          $ref: '#/components/schemas/GitLabConfig'
+    GitLabConfig:
+      type: object
+      required: [api_base_url, allowed_projects, default_token, rbac]
+      properties:
+        api_base_url:
+          type: string
+          format: uri
+        allowed_projects:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        default_token:
+          $ref: '#/components/schemas/GitLabToken'
+        deploy_tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitLabToken'
+        branch_policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitLabBranchPolicy'
+        rbac:
+          $ref: '#/components/schemas/GitLabRBAC'
+    GitLabToken:
+      type: object
+      required: [name, value, scopes]
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        scopes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+    GitLabBranchPolicy:
+      type: object
+      required: [pattern]
+      properties:
+        pattern:
+          type: string
+        protected:
+          type: boolean
+        require_approvals:
+          type: integer
+          format: int32
+    GitLabRBAC:
+      type: object
+      required: [readers, updaters]
+      properties:
+        readers:
+          type: array
+          items:
+            type: string
+        updaters:
+          type: array
+          items:
+            type: string
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string

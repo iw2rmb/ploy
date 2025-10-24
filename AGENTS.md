@@ -15,6 +15,8 @@ addendum:
 1. Keep documentation synchronized with the codebase. After each change, update
    the affected docs, link or remove orphaned files, and note completion states
    where applicable.
+2. Control-plane API changes must include updates to `docs/api/OpenAPI.yaml`
+   alongside human-facing docs.
 
 ## Local Development
 

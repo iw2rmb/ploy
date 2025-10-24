@@ -4,18 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	gonanoid "github.com/matoous/go-nanoid/v2"
+
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
@@ -25,14 +32,29 @@ type Server struct {
 	signer    *gitlab.Signer
 	rotations *events.RotationHub
 	streams   *logstream.Hub
+	etcd      *clientv3.Client
+}
+
+// Options configure the HTTP server handlers.
+type Options struct {
+	Scheduler *scheduler.Scheduler
+	Signer    *gitlab.Signer
+	Streams   *logstream.Hub
+	Gatherer  prometheus.Gatherer
+	Etcd      *clientv3.Client
 }
 
 // New returns an HTTP handler rooted at /v2.
-func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub, gatherer prometheus.Gatherer) http.Handler {
+func New(opts Options) http.Handler {
 	mux := http.NewServeMux()
-	h := &Server{scheduler: s, signer: signer, streams: streams}
-	if signer != nil {
-		h.rotations = events.NewRotationHub(context.Background(), signer)
+	h := &Server{
+		scheduler: opts.Scheduler,
+		signer:    opts.Signer,
+		streams:   opts.Streams,
+		etcd:      opts.Etcd,
+	}
+	if opts.Signer != nil {
+		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
 	}
 	mux.HandleFunc("/v2/jobs", h.handleJobs)
 	mux.HandleFunc("/v2/jobs/claim", h.handleClaim)
@@ -41,6 +63,10 @@ func New(s *scheduler.Scheduler, signer *gitlab.Signer, streams *logstream.Hub, 
 	mux.HandleFunc("/v2/gitlab/signer/secrets", h.handleSignerSecrets)
 	mux.HandleFunc("/v2/gitlab/signer/tokens", h.handleSignerTokens)
 	mux.HandleFunc("/v2/gitlab/signer/rotations", h.handleSignerRotations)
+	mux.HandleFunc("/v2/nodes", h.handleNodes)
+	mux.HandleFunc("/v2/beacon/rotate-ca", h.handleBeaconRotateCA)
+	mux.HandleFunc("/v2/config/gitlab", h.handleGitLabConfig)
+	gatherer := opts.Gatherer
 	if gatherer == nil {
 		gatherer = prometheus.DefaultGatherer
 	}
@@ -58,6 +84,343 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	switch r.Method {
+	case http.MethodPost:
+		s.handleNodeJoin(w, r)
+	case http.MethodGet:
+		s.handleNodeList(w, r)
+	case http.MethodDelete:
+		s.handleNodeDelete(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleBeaconRotateCA(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ClusterID string `json:"cluster_id"`
+		DryRun    bool   `json:"dry_run"`
+		Operator  string `json:"operator"`
+		Reason    string `json:"reason"`
+	}
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	clusterID := strings.TrimSpace(req.ClusterID)
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	result, err := manager.Rotate(r.Context(), deploy.RotateOptions{
+		DryRun:      req.DryRun,
+		RequestedAt: time.Now().UTC(),
+		Operator:    strings.TrimSpace(req.Operator),
+		Reason:      strings.TrimSpace(req.Reason),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, deploy.ErrConcurrentRotation):
+			writeErrorMessage(w, http.StatusConflict, err.Error())
+		case errors.Is(err, deploy.ErrPKINotBootstrapped):
+			writeErrorMessage(w, http.StatusFailedDependency, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	payload := map[string]any{
+		"dry_run":                     result.DryRun,
+		"old_version":                 result.OldVersion,
+		"new_version":                 result.NewVersion,
+		"operator":                    strings.TrimSpace(result.Operator),
+		"reason":                      strings.TrimSpace(result.Reason),
+		"updated_beacon_certificates": result.UpdatedBeaconCertificates,
+		"updated_worker_certificates": result.UpdatedWorkerCertificates,
+		"revoked":                     result.Revoked,
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *Server) handleGitLabConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		s.handleGitLabConfigGet(w, r)
+	case http.MethodPut:
+		s.handleGitLabConfigPut(w, r)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleNodeJoin(w http.ResponseWriter, r *http.Request) {
+	var req nodeJoinRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	clusterID := strings.TrimSpace(req.ClusterID)
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+	address := strings.TrimSpace(req.Address)
+	if address == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "address is required")
+		return
+	}
+	workerID := strings.TrimSpace(req.WorkerID)
+	if workerID == "" {
+		generated, err := gonanoid.Generate("abcdefghijklmnopqrstuvwxyz0123456789", 12)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		workerID = generated
+	}
+
+	probes := make([]deploy.WorkerHealthProbe, 0, len(req.Probes))
+	for _, probe := range req.Probes {
+		probes = append(probes, deploy.WorkerHealthProbe{
+			Name:         strings.TrimSpace(probe.Name),
+			Endpoint:     strings.TrimSpace(probe.Endpoint),
+			ExpectStatus: probe.ExpectStatus,
+		})
+	}
+
+	opts := deploy.WorkerJoinOptions{
+		ClusterID:    clusterID,
+		WorkerID:     workerID,
+		Address:      address,
+		Labels:       req.Labels,
+		HealthProbes: probes,
+		DryRun:       req.DryRun,
+		Clock:        func() time.Time { return time.Now().UTC() },
+	}
+
+	result, err := deploy.RunWorkerJoin(r.Context(), s.etcd, opts)
+	if err != nil {
+		switch {
+		case errors.Is(err, registry.ErrWorkerExists), errors.Is(err, deploy.ErrWorkerExists):
+			writeErrorMessage(w, http.StatusConflict, err.Error())
+		default:
+			writeError(w, http.StatusBadRequest, err)
+		}
+		return
+	}
+
+	resp := map[string]any{
+		"worker_id":   result.Descriptor.ID,
+		"descriptor":  descriptorDTOFrom(result.Descriptor),
+		"certificate": result.Certificate,
+		"health":      result.Health,
+		"dry_run":     result.DryRun,
+	}
+	writeJSON(w, http.StatusCreated, resp)
+}
+
+func (s *Server) handleNodeList(w http.ResponseWriter, r *http.Request) {
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id query parameter required")
+		return
+	}
+	reg, err := registry.NewWorkerRegistry(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	descriptors, err := reg.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	nodes := make([]workerDescriptorDTO, 0, len(descriptors))
+	for _, descriptor := range descriptors {
+		nodes = append(nodes, descriptorDTOFrom(descriptor))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"nodes": nodes})
+}
+
+func (s *Server) handleNodeDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureScheduler(w) {
+		return
+	}
+	var req nodeDeleteRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	clusterID := strings.TrimSpace(req.ClusterID)
+	workerID := strings.TrimSpace(req.WorkerID)
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+	if workerID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "worker_id is required")
+		return
+	}
+	if strings.TrimSpace(req.Confirm) != workerID {
+		writeErrorMessage(w, http.StatusBadRequest, "confirm must match worker_id")
+		return
+	}
+	if req.DrainTimeoutSeconds < 0 {
+		writeErrorMessage(w, http.StatusBadRequest, "drain_timeout_seconds must be non-negative")
+		return
+	}
+	timeout := time.Duration(req.DrainTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+
+	if err := s.waitForNodeDrain(r.Context(), workerID, timeout); err != nil {
+		var drainErr nodeDrainError
+		switch {
+		case errors.As(err, &drainErr):
+			writeJSON(w, http.StatusConflict, map[string]any{
+				"error":        fmt.Sprintf("node %s still has running jobs", workerID),
+				"running_jobs": drainErr.Remaining,
+			})
+		case errors.Is(err, context.DeadlineExceeded):
+			writeError(w, http.StatusRequestTimeout, err)
+		case errors.Is(err, context.Canceled):
+			writeError(w, http.StatusRequestTimeout, err)
+		default:
+			writeError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	reg, err := registry.NewWorkerRegistry(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if _, err := reg.Get(r.Context(), workerID); err != nil {
+		if errors.Is(err, registry.ErrWorkerNotFound) {
+			writeErrorMessage(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := manager.RemoveWorker(r.Context(), workerID); err != nil {
+		switch {
+		case errors.Is(err, deploy.ErrWorkerNotFound):
+			writeErrorMessage(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, deploy.ErrConcurrentWorkerUpdate):
+			writeErrorMessage(w, http.StatusConflict, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	if err := reg.Delete(r.Context(), workerID); err != nil {
+		if errors.Is(err, registry.ErrWorkerNotFound) {
+			writeErrorMessage(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleGitLabConfigGet(w http.ResponseWriter, r *http.Request) {
+	store := gitlab.NewStore(gitlab.NewEtcdKV(s.etcd))
+	cfg, revision, err := store.Load(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if revision == 0 {
+		writeErrorMessage(w, http.StatusNotFound, "gitlab configuration not set")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"config":   cfg.Sanitize(),
+		"revision": revision,
+	})
+}
+
+func (s *Server) handleGitLabConfigPut(w http.ResponseWriter, r *http.Request) {
+	var req gitlabConfigRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if req.Revision < 0 {
+		writeErrorMessage(w, http.StatusBadRequest, "revision must be non-negative")
+		return
+	}
+
+	store := gitlab.NewStore(gitlab.NewEtcdKV(s.etcd))
+	_, currentRevision, err := store.Load(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	revisionMismatch := func() {
+		writeErrorMessage(w, http.StatusConflict, "revision mismatch")
+	}
+
+	if currentRevision == 0 {
+		if req.Revision != 0 {
+			revisionMismatch()
+			return
+		}
+	} else if req.Revision != currentRevision {
+		revisionMismatch()
+		return
+	}
+
+	normalized, err := gitlab.Normalize(req.Config)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	newRevision, err := store.Save(r.Context(), normalized)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"revision": newRevision,
+		"config":   normalized.Sanitize(),
+	})
 }
 
 func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
@@ -464,6 +827,148 @@ func (s *Server) handleSignerRotations(w http.ResponseWriter, r *http.Request) {
 		payload["updated_at"] = evt.UpdatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	writeJSON(w, http.StatusOK, payload)
+}
+
+type nodeJoinRequest struct {
+	ClusterID string             `json:"cluster_id"`
+	WorkerID  string             `json:"worker_id"`
+	Address   string             `json:"address"`
+	Labels    map[string]string  `json:"labels"`
+	Probes    []nodeProbeRequest `json:"probes"`
+	DryRun    bool               `json:"dry_run"`
+}
+
+type nodeProbeRequest struct {
+	Name         string `json:"name"`
+	Endpoint     string `json:"endpoint"`
+	ExpectStatus int    `json:"expect_status"`
+}
+
+type nodeDeleteRequest struct {
+	ClusterID           string `json:"cluster_id"`
+	WorkerID            string `json:"worker_id"`
+	Confirm             string `json:"confirm"`
+	DrainTimeoutSeconds int    `json:"drain_timeout_seconds"`
+}
+
+type gitlabConfigRequest struct {
+	Revision int64         `json:"revision"`
+	Config   gitlab.Config `json:"config"`
+}
+
+type workerDescriptorDTO struct {
+	ID                 string            `json:"id"`
+	Address            string            `json:"address"`
+	Labels             map[string]string `json:"labels,omitempty"`
+	RegisteredAt       string            `json:"registered_at"`
+	CertificateVersion string            `json:"certificate_version,omitempty"`
+	Status             workerStatusDTO   `json:"status"`
+}
+
+type workerStatusDTO struct {
+	Phase     string                       `json:"phase"`
+	CheckedAt string                       `json:"checked_at"`
+	Message   string                       `json:"message,omitempty"`
+	Probes    []registry.WorkerProbeResult `json:"probes,omitempty"`
+}
+
+type nodeDrainError struct {
+	Remaining int
+}
+
+func (e nodeDrainError) Error() string {
+	if e.Remaining <= 0 {
+		return "no running jobs"
+	}
+	return fmt.Sprintf("%d jobs still running", e.Remaining)
+}
+
+func descriptorDTOFrom(desc registry.WorkerDescriptor) workerDescriptorDTO {
+	labels := copyMap(desc.Labels)
+	if len(labels) == 0 {
+		labels = nil
+	}
+	statusProbes := make([]registry.WorkerProbeResult, 0, len(desc.Status.Probes))
+	if len(desc.Status.Probes) > 0 {
+		statusProbes = append(statusProbes, desc.Status.Probes...)
+	}
+	dto := workerDescriptorDTO{
+		ID:                 desc.ID,
+		Address:            desc.Address,
+		Labels:             labels,
+		RegisteredAt:       formatTime(desc.RegisteredAt),
+		CertificateVersion: desc.CertificateVersion,
+		Status: workerStatusDTO{
+			Phase:     desc.Status.Phase,
+			CheckedAt: formatTime(desc.Status.CheckedAt),
+			Message:   desc.Status.Message,
+			Probes:    statusProbes,
+		},
+	}
+	if strings.TrimSpace(dto.Status.Message) == "" {
+		dto.Status.Message = ""
+	}
+	if len(dto.Status.Probes) == 0 {
+		dto.Status.Probes = nil
+	}
+	return dto
+}
+
+func (s *Server) waitForNodeDrain(ctx context.Context, nodeID string, timeout time.Duration) error {
+	if s.scheduler == nil {
+		return errors.New("scheduler unavailable")
+	}
+	deadline := time.Time{}
+	if timeout > 0 {
+		deadline = time.Now().Add(timeout)
+	}
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		jobs, err := s.scheduler.RunningJobsForNode(ctx, nodeID)
+		if err != nil {
+			return err
+		}
+		remaining := len(jobs)
+		if remaining == 0 {
+			return nil
+		}
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			return nodeDrainError{Remaining: remaining}
+		}
+		select {
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return nodeDrainError{Remaining: remaining}
+			}
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func (s *Server) ensureEtcd(w http.ResponseWriter) bool {
+	if s.etcd == nil {
+		http.Error(w, "etcd unavailable", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
+func writeError(w http.ResponseWriter, status int, err error) {
+	if err == nil {
+		writeErrorMessage(w, status, http.StatusText(status))
+		return
+	}
+	writeErrorMessage(w, status, err.Error())
+}
+
+func writeErrorMessage(w http.ResponseWriter, status int, message string) {
+	if strings.TrimSpace(message) == "" {
+		message = http.StatusText(status)
+	}
+	writeJSON(w, status, map[string]any{"error": message})
 }
 
 // jobDTO is the API representation for a job.

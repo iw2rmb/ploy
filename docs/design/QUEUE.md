@@ -1,6 +1,5 @@
 # Design Queue
 
-- [ ] `docs/design/control-plane-node-rest-handlers/README.md` - Control-Plane Node REST Handlers
 - [ ] `docs/design/control-plane-node-onboarding/README.md` — migrate CLI workflows from direct etcd access to control-plane APIs.
 - [ ] `docs/design/deployment-cli-management/README.md` — CLI cluster management commands and status output.
 - [ ] `docs/design/deployment-docs-troubleshooting/README.md` — smoke tests, troubleshooting, rollback guidance.
