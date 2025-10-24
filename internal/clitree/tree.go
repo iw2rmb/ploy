@@ -121,7 +121,7 @@ var commandTree = []Node{
 			{
 				Name:        "bootstrap",
 				Description: "Install dependencies and run host preflight checks",
-				Usage:       "ploy deploy bootstrap [--address <addr>] [--user <name>] [--identity <path>] [--port <n>] [--dry-run]",
+				Usage:       "ploy deploy bootstrap [--address <addr>] [--user <name>] [--identity <path>]",
 			},
 		},
 	},

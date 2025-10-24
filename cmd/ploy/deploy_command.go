@@ -52,19 +52,18 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	var (
 		userFlag stringValue
 		identity stringValue
-		portFlag intValue
 		address  stringValue
 		control  stringValue
 		beacon   stringValue
+		ploydBin stringValue
 	)
 
 	fs.Var(&userFlag, "user", "SSH username (default: root)")
 	fs.Var(&identity, "identity", "SSH identity file (default: ~/.ssh/id_rsa)")
-	fs.Var(&portFlag, "port", "SSH port (default: 22)")
 	fs.Var(&address, "address", "Override SSH target address (defaults to host)")
 	fs.Var(&control, "control-plane-url", "Control plane endpoint recorded in the local descriptor")
 	fs.Var(&beacon, "beacon-url", "Beacon URL recorded in the local descriptor (default: https://<node-id>.<cluster-id>.ploy)")
-	dryRun := fs.Bool("dry-run", false, "Print bootstrap script without executing")
+	fs.Var(&ploydBin, "ployd-binary", "Path to the ployd binary uploaded during bootstrap (default: alongside the CLI)")
 
 	if err := fs.Parse(args); err != nil {
 		printDeployBootstrapUsage(stderr)
@@ -82,9 +81,6 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 	}
 	if identity.set {
 		opts.IdentityFile = expandPath(strings.TrimSpace(identity.value))
-	}
-	if portFlag.set {
-		opts.Port = portFlag.value
 	}
 	if address.set {
 		opts.Address = strings.TrimSpace(address.value)
@@ -136,37 +132,37 @@ func handleDeployBootstrap(args []string, stderr io.Writer) error {
 		opts.IdentityFile = expandPath(opts.IdentityFile)
 	}
 
-	opts.DryRun = *dryRun
+	if ploydBin.set {
+		opts.PloydBinaryPath = expandPath(strings.TrimSpace(ploydBin.value))
+	} else {
+		path, err := defaultPloydBinaryPath()
+		if err != nil {
+			return err
+		}
+		opts.PloydBinaryPath = path
+	}
+
 	opts.Stdout = stderr
 	opts.Stderr = stderr
 	opts.Stdin = os.Stdin
 	opts.WorkstationOS = runtime.GOOS
-
-	if opts.DryRun {
-		opts.EtcdClient = nil
-		_, _ = fmt.Fprintln(stderr, "# ploy deploy bootstrap --dry-run (script preview)")
-	} else {
-		if opts.BeaconURL == "" {
-			printDeployBootstrapUsage(stderr)
-			return errors.New("beacon-url is required")
-		}
-		if opts.APIKey == "" {
-			printDeployBootstrapUsage(stderr)
-			return errors.New("api-key is required")
-		}
-		if len(opts.InitialBeacons) == 0 {
-			printDeployBootstrapUsage(stderr)
-			return errors.New("at least one beacon-id is required")
-		}
+	if opts.BeaconURL == "" {
+		printDeployBootstrapUsage(stderr)
+		return errors.New("beacon-url is required")
+	}
+	if opts.APIKey == "" {
+		printDeployBootstrapUsage(stderr)
+		return errors.New("api-key is required")
+	}
+	if len(opts.InitialBeacons) == 0 {
+		printDeployBootstrapUsage(stderr)
+		return errors.New("at least one beacon-id is required")
 	}
 
 	if err := deployBootstrapRunner(context.Background(), opts); err != nil {
 		return err
 	}
 
-	if opts.DryRun {
-		_, _ = fmt.Fprintln(stderr, "# end bootstrap script")
-	}
 	return nil
 }
 
@@ -176,6 +172,31 @@ func printDeployUsage(w io.Writer) {
 
 func printDeployBootstrapUsage(w io.Writer) {
 	printCommandUsage(w, "deploy", "bootstrap")
+}
+
+func defaultPloydBinaryPath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate ploy executable: %w", err)
+	}
+	dir := filepath.Dir(execPath)
+	candidates := []string{
+		filepath.Join(dir, "ployd"),
+	}
+	if runtime.GOOS == "windows" {
+		candidates = append([]string{filepath.Join(dir, "ployd.exe")}, candidates...)
+	}
+	for _, candidate := range candidates {
+		info, err := os.Stat(candidate)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			continue
+		}
+		return candidate, nil
+	}
+	return "", errors.New("ploy deploy bootstrap: ployd binary not found alongside CLI; provide --ployd-binary")
 }
 
 type stringValue struct {

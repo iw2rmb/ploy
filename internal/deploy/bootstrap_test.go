@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -18,37 +17,13 @@ import (
 	"github.com/iw2rmb/ploy/cmd/ploy/config"
 )
 
-func TestRenderBootstrapScriptVersions(t *testing.T) {
-	script := RenderBootstrapScript()
-	for _, fragment := range []string{
-		`ETCD_VERSION="3.6.`,
-		`IPFS_CLUSTER_VERSION="1.1.4"`,
-		`DOCKER_CHANNEL="28"`,
-		`GO_VERSION="1.25`,
-		"check_package_manager",
-		"check_required_ports",
-		"check_disk_space",
-	} {
-		if !strings.Contains(script, fragment) {
-			t.Fatalf("expected bootstrap script to contain %q", fragment)
-		}
+func tempPloydBinary(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "ployd")
+	if err := os.WriteFile(path, []byte("binary"), 0o755); err != nil {
+		t.Fatalf("write temp ployd binary: %v", err)
 	}
-}
-
-func TestRunBootstrapDryRun(t *testing.T) {
-	var buf bytes.Buffer
-	ctx := context.Background()
-	opts := Options{
-		DryRun:    true,
-		Stdout:    &buf,
-		ClusterID: "cluster",
-	}
-	if err := RunBootstrap(ctx, opts); err != nil {
-		t.Fatalf("RunBootstrap(dry-run) returned error: %v", err)
-	}
-	if got := buf.String(); !strings.Contains(got, "PLOY_BOOTSTRAP_VERSION") {
-		t.Fatalf("expected dry-run output to include script metadata, got:\n%s", got)
-	}
+	return path
 }
 
 func TestRunBootstrapRequiresHost(t *testing.T) {
@@ -61,20 +36,16 @@ func TestRunBootstrapRequiresHost(t *testing.T) {
 
 func TestRunBootstrapInvokesSSH(t *testing.T) {
 	ctx := context.Background()
-	var sshCall struct {
-		Command string
-		Args    []string
-		Stdin   string
+	var calls []struct {
+		command string
+		args    []string
 	}
 	runner := RunnerFunc(func(_ context.Context, command string, args []string, stdin io.Reader, _ IOStreams) error {
-		if command == "ssh" && sshCall.Command == "" {
-			sshCall.Command = command
-			sshCall.Args = append([]string(nil), args...)
-			if stdin != nil {
-				data, _ := io.ReadAll(stdin)
-				sshCall.Stdin = string(data)
-			}
-		}
+		cp := append([]string(nil), args...)
+		calls = append(calls, struct {
+			command string
+			args    []string
+		}{command: command, args: cp})
 		return nil
 	})
 
@@ -98,29 +69,68 @@ func TestRunBootstrapInvokesSSH(t *testing.T) {
 		WorkstationOS:  "darwin",
 		Stdin:          strings.NewReader("n\n"),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
 
-	if sshCall.Command != "ssh" {
-		t.Fatalf("expected ssh command, got %q", sshCall.Command)
+	var (
+		copiedBinary bool
+		copiedConfig bool
+		installed    bool
+		executed     bool
+	)
+	for _, call := range calls {
+		switch call.command {
+		case "scp":
+			for _, arg := range call.args {
+				if strings.Contains(arg, "/tmp/ployd-") {
+					copiedBinary = true
+				}
+				if strings.Contains(arg, "/tmp/ployd-bootstrap-") {
+					copiedConfig = true
+				}
+			}
+		case "ssh":
+			if len(call.args) == 0 {
+				continue
+			}
+			payload := call.args[len(call.args)-1]
+			if strings.Contains(payload, "install -m0755") && strings.Contains(payload, remotePloydBinaryPath) {
+				installed = true
+			}
+			if strings.Contains(payload, remotePloydBinaryPath) && strings.Contains(payload, "--mode bootstrap") {
+				executed = true
+			}
+		}
 	}
-	if len(sshCall.Args) == 0 || sshCall.Args[len(sshCall.Args)-1] != "bash -s --" {
-		t.Fatalf("expected trailing stdin exec argument, got %v", sshCall.Args)
+
+	if !copiedBinary {
+		t.Fatalf("expected ployd binary to be copied via scp; calls=%v", calls)
 	}
-	if !strings.Contains(sshCall.Stdin, "ETCD_VERSION=\"3.6.") {
-		t.Fatalf("expected stdin script to contain ETCD version, got:\n%s", sshCall.Stdin)
+	if !copiedConfig {
+		t.Fatalf("expected bootstrap config to be copied via scp; calls=%v", calls)
+	}
+	if !installed {
+		t.Fatalf("expected remote install ssh command; calls=%v", calls)
+	}
+	if !executed {
+		t.Fatalf("expected remote ployd bootstrap execution; calls=%v", calls)
 	}
 }
 
 func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 	ctx := context.Background()
-	var captured []string
+	var calls []struct {
+		command string
+		args    []string
+	}
 	runner := RunnerFunc(func(_ context.Context, command string, args []string, _ io.Reader, _ IOStreams) error {
-		if command == "ssh" && len(captured) == 0 {
-			captured = append([]string(nil), args...)
-		}
+		calls = append(calls, struct {
+			command string
+			args    []string
+		}{command: command, args: append([]string(nil), args...)})
 		return nil
 	})
 
@@ -144,17 +154,25 @@ func TestRunBootstrapUsesAddressOverride(t *testing.T) {
 		WorkstationOS:  "darwin",
 		Stdin:          strings.NewReader("n\n"),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
 
-	if len(captured) == 0 {
-		t.Fatalf("expected ssh arguments captured")
+	var targetMatches bool
+	for _, call := range calls {
+		if call.command != "ssh" || len(call.args) < 2 {
+			continue
+		}
+		target := call.args[len(call.args)-2]
+		if target == "root@45.9.42.212" {
+			targetMatches = true
+			break
+		}
 	}
-	target := captured[len(captured)-2]
-	if target != "root@45.9.42.212" {
-		t.Fatalf("expected ssh target to use address override, got %q", target)
+	if !targetMatches {
+		t.Fatalf("expected ssh invocations to target root@45.9.42.212; calls=%v", calls)
 	}
 }
 
@@ -211,29 +229,58 @@ func TestRunBootstrapBootstrapsPKIAndDescriptor(t *testing.T) {
 		Stdin:           strings.NewReader("n\n"),
 		ResolverDir:     filepath.Join(cfgDir, "resolver"),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 
 	if err := RunBootstrap(ctx, opts); err != nil {
 		t.Fatalf("RunBootstrap returned error: %v", err)
 	}
 
-	var sshSeen bool
-	var caInstalled bool
+	var (
+		binaryCopied  bool
+		configCopied  bool
+		remoteInstall bool
+		remoteExec    bool
+		caInstalled   bool
+	)
 	for _, c := range calls {
-		if c.command == "ssh" {
-			sshSeen = true
+		switch c.command {
+		case "scp":
+			for _, arg := range c.args {
+				if strings.Contains(arg, "/tmp/ployd-") {
+					binaryCopied = true
+				}
+				if strings.Contains(arg, "/tmp/ployd-bootstrap-") {
+					configCopied = true
+				}
+			}
+		case "ssh":
 			if len(c.args) == 0 {
-				t.Fatalf("expected ssh arguments to be populated")
+				continue
 			}
-			if !strings.Contains(c.stdin, "PLOY_BOOTSTRAP_VERSION") {
-				t.Fatalf("expected bootstrap script to render into stdin")
+			payload := c.args[len(c.args)-1]
+			if strings.Contains(payload, "install -m0755") && strings.Contains(payload, remotePloydBinaryPath) {
+				remoteInstall = true
 			}
-		}
-		if c.command == "sudo" && len(c.args) >= 2 && c.args[0] == "security" && c.args[1] == "add-trusted-cert" {
-			caInstalled = true
+			if strings.Contains(payload, remotePloydBinaryPath) && strings.Contains(payload, "--mode bootstrap") {
+				remoteExec = true
+			}
+		case "sudo":
+			if len(c.args) >= 2 && c.args[0] == "security" && c.args[1] == "add-trusted-cert" {
+				caInstalled = true
+			}
 		}
 	}
-	if !sshSeen {
-		t.Fatalf("expected bootstrap runner to execute ssh command")
+	if !binaryCopied {
+		t.Fatalf("expected ployd binary copy command; calls=%v", calls)
+	}
+	if !configCopied {
+		t.Fatalf("expected bootstrap config copy command; calls=%v", calls)
+	}
+	if !remoteInstall {
+		t.Fatalf("expected remote install command; calls=%v", calls)
+	}
+	if !remoteExec {
+		t.Fatalf("expected remote ployd execution; calls=%v", calls)
 	}
 	if !caInstalled {
 		t.Fatalf("expected system CA install command to be invoked")
@@ -384,6 +431,7 @@ func TestRunBootstrapRequiresEtcdClientWhenNotDryRun(t *testing.T) {
 		InitialBeacons: []string{"beacon-main"},
 		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when etcd client not provided")
 	}
@@ -402,6 +450,7 @@ func TestRunBootstrapRequiresBeaconIdentifiers(t *testing.T) {
 		EtcdClient: client,
 		Runner:     RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when no beacon identifiers provided")
 	}
@@ -420,6 +469,7 @@ func TestRunBootstrapRequiresBeaconURL(t *testing.T) {
 		EtcdClient:     client,
 		Runner:         RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
+	opts.PloydBinaryPath = tempPloydBinary(t)
 	if err := RunBootstrap(ctx, opts); err == nil {
 		t.Fatalf("expected error when beacon url missing")
 	}

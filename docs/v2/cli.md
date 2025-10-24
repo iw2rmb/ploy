@@ -41,6 +41,11 @@ operations for the v2 control plane. Commands mirror the structure captured in
 - `ploy cluster list`
   List cached cluster descriptors and their last refresh time.
 
+## Deployment Bootstrap
+
+- `ploy deploy bootstrap [--address <addr>] [--user <name>] [--identity <path>] [--control-plane-url <url>] [--beacon-url <url>] [--ployd-binary <path>]`
+  Copy the ployd daemon to the target host, execute it in bootstrap mode, and finalise cluster PKI on the workstation.
+
 ## Configuration (GitLab)
 
 - `ploy config gitlab show`
