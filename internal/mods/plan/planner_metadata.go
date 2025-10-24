@@ -1,4 +1,4 @@
-package mods
+package plan
 
 import (
 	"context"
@@ -42,6 +42,7 @@ func (p Planner) applyAdvisor(ctx context.Context, stages []Stage, ticket contra
 	}
 }
 
+// applyPlannerHints mounts planner hints such as timeout and max parallel hints.
 func (p Planner) applyPlannerHints(stages []Stage) {
 	planStage := stageByName(stages, StageNamePlan)
 	if planStage == nil {

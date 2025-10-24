@@ -1,19 +1,31 @@
-package mods
+package plan
 
 const (
-	StageNamePlan        = "mods-plan"
-	StageNameORWApply    = "orw-apply"
+	// StageNamePlan identifies the Mods planning stage.
+	StageNamePlan = "mods-plan"
+	// StageNameORWApply identifies the OpenRewrite apply stage.
+	StageNameORWApply = "orw-apply"
+	// StageNameORWGenerate identifies the OpenRewrite generate stage.
 	StageNameORWGenerate = "orw-gen"
-	StageNameLLMPlan     = "llm-plan"
-	StageNameLLMExec     = "llm-exec"
-	StageNameHuman       = "mods-human"
+	// StageNameLLMPlan identifies the LLM planning stage.
+	StageNameLLMPlan = "llm-plan"
+	// StageNameLLMExec identifies the LLM execution stage.
+	StageNameLLMExec = "llm-exec"
+	// StageNameHuman identifies the human review stage.
+	StageNameHuman = "mods-human"
 
-	StageKindPlan        = StageNamePlan
-	StageKindORWApply    = StageNameORWApply
+	// StageKindPlan mirrors StageNamePlan for consumers expecting the kind value.
+	StageKindPlan = StageNamePlan
+	// StageKindORWApply mirrors StageNameORWApply for kind classification.
+	StageKindORWApply = StageNameORWApply
+	// StageKindORWGenerate mirrors StageNameORWGenerate for kind classification.
 	StageKindORWGenerate = StageNameORWGenerate
-	StageKindLLMPlan     = StageNameLLMPlan
-	StageKindLLMExec     = StageNameLLMExec
-	StageKindHuman       = StageNameHuman
+	// StageKindLLMPlan mirrors StageNameLLMPlan for kind classification.
+	StageKindLLMPlan = StageNameLLMPlan
+	// StageKindLLMExec mirrors StageNameLLMExec for kind classification.
+	StageKindLLMExec = StageNameLLMExec
+	// StageKindHuman mirrors StageNameHuman for kind classification.
+	StageKindHuman = StageNameHuman
 
 	defaultPlanLane        = "node-wasm"
 	defaultOpenRewriteLane = "node-wasm"
@@ -59,8 +71,7 @@ type StageModsHuman struct {
 	Playbooks []string
 }
 
-// StageModsRecommendation records individual recommendations surfaced by the
-// Mods advisor.
+// StageModsRecommendation records individual recommendations surfaced by the Mods advisor.
 type StageModsRecommendation struct {
 	Source     string
 	Message    string

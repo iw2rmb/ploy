@@ -6,10 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	gonanoid "github.com/matoous/go-nanoid/v2"
+
+	"github.com/iw2rmb/ploy/internal/cli/mods"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	modplan "github.com/iw2rmb/ploy/internal/mods/plan"
 )
 
 // handleModRun executes the Mods-specific run command.
@@ -26,23 +30,9 @@ func executeModRun(args []string, stderr io.Writer) error {
 	repoBaseRef := fs.String("repo-base-ref", "", "Git base ref used for materialisation")
 	repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
 	repoWorkspace := fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
-	asterGlobal := fs.String("aster", "", "comma-separated optional Aster toggles to include")
-	var stageOverrides stageOverrideFlag
-	fs.Var(&stageOverrides, "aster-step", "per-stage Aster toggles in the form stage=toggle1,toggle2 or stage=off")
-	modsPlanTimeout := fs.Duration("mods-plan-timeout", 0, "planner timeout for Mods plan evaluation (e.g. 2m30s)")
-	modsMaxParallel := fs.Int("mods-max-parallel", 0, "maximum Mods stages to run in parallel")
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
 		return err
-	}
-
-	if *modsPlanTimeout < 0 {
-		printModRunUsage(stderr)
-		return fmt.Errorf("mods plan timeout must be non-negative")
-	}
-	if *modsMaxParallel < 0 {
-		printModRunUsage(stderr)
-		return fmt.Errorf("mods max parallel must be non-negative")
 	}
 
 	trimmedTenant := strings.TrimSpace(*tenant)
@@ -51,23 +41,21 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return errors.New("tenant required")
 	}
 
-	overrides, err := parseStageOverrides(stageOverrides.values)
-	if err != nil {
-		printModRunUsage(stderr)
-		return err
-	}
-
-	compiler, err := manifestRegistryLoader(manifestConfigDir)
-	if err != nil {
-		return fmt.Errorf("load manifests: %w", err)
-	}
-
 	ticketValue := strings.TrimSpace(*ticket)
 	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
-		ticketValue = ""
+		generated, err := gonanoid.Generate("abcdefghijklmnopqrstuvwxyz0123456789", 12)
+		if err != nil {
+			return fmt.Errorf("generate ticket id: %w", err)
+		}
+		ticketValue = fmt.Sprintf("mods-%s", generated)
 	}
 
-	repoSpec := contracts.RepoMaterialization{
+	repoSpec := struct {
+		URL           string
+		BaseRef       string
+		TargetRef     string
+		WorkspaceHint string
+	}{
 		URL:           strings.TrimSpace(*repoURL),
 		BaseRef:       strings.TrimSpace(*repoBaseRef),
 		TargetRef:     strings.TrimSpace(*repoTargetRef),
@@ -78,90 +66,54 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("repo target ref required when repo url is set")
 	}
 
-	events, err := eventsFactory(trimmedTenant)
-	if err != nil {
-		return fmt.Errorf("configure events client: %w", err)
-	}
-	if closer, ok := events.(interface{ Close() }); ok {
-		defer closer.Close()
-	}
-	if repoSpec.URL != "" {
-		events = newRepoAugmentedEventsClient(events, repoSpec)
-	}
-	gridClient, err := gridFactory()
-	if err != nil {
-		return fmt.Errorf("configure grid client: %w", err)
-	}
-	var asterOpts runner.AsterOptions
-	if asterEnabled() {
-		locator, err := asterLocatorLoader(asterConfigDir)
-		if err != nil {
-			return fmt.Errorf("load Aster bundles: %w", err)
-		}
-		asterOpts = runner.AsterOptions{
-			Enabled:           true,
-			Locator:           locator,
-			AdditionalToggles: splitToggles(*asterGlobal),
-			StageOverrides:    overrides,
-		}
-	}
-	modsOptions := runner.ModsOptions{PlanTimeout: *modsPlanTimeout, MaxParallel: *modsMaxParallel}
-	advisor, err := knowledgeBaseAdvisorLoader(knowledgeBaseCatalogPath)
-	if err != nil {
-		return fmt.Errorf("load knowledge base: %w", err)
-	}
-	modsOptions.Advisor = advisor
-	modsOptions.PlanLane = "mods-plan"
-	modsOptions.OpenRewriteLane = "mods-java"
-	modsOptions.LLMPlanLane = "mods-llm"
-	modsOptions.LLMExecLane = "mods-llm"
-	modsOptions.HumanLane = "mods-human"
-	workspacePrep, err := workspacePreparerFactory()
-	if err != nil {
-		return fmt.Errorf("configure workspace preparer: %w", err)
-	}
-	cacheComposer := cacheComposerFactory()
-	jobComposer := jobComposerFactory()
-	opts := runner.Options{
-		Ticket:            ticketValue,
-		Tenant:            trimmedTenant,
-		Events:            events,
-		Grid:              gridClient,
-		Planner:           runner.NewDefaultPlannerWithMods(modsOptions),
-		MaxStageRetries:   1,
-		ManifestCompiler:  compiler,
-		CacheComposer:     cacheComposer,
-		JobComposer:       jobComposer,
-		Mods:              modsOptions,
-		Aster:             asterOpts,
-		WorkspacePreparer: workspacePrep,
-	}
-	err = runnerExecutor.Run(context.Background(), opts)
-	if errors.Is(err, runner.ErrEventsClientRequired) || errors.Is(err, runner.ErrGridClientRequired) || errors.Is(err, runner.ErrTicketValidationFailed) || errors.Is(err, runner.ErrTicketRequired) {
-		printModRunUsage(stderr)
-	}
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	if recorder, ok := events.(interface {
-		RecordedCheckpoints() []contracts.WorkflowCheckpoint
-	}); ok {
-		checkpoints := recorder.RecordedCheckpoints()
-		printBuildGateSummary(stderr, checkpoints)
-		printArtifactSummary(stderr, checkpoints)
+
+	request := modsapi.TicketSubmitRequest{
+		TicketID:   ticketValue,
+		Tenant:     trimmedTenant,
+		Submitter:  strings.TrimSpace(os.Getenv("USER")),
+		Repository: repoSpec.URL,
+		Metadata:   make(map[string]string),
+		Stages:     defaultStageDefinitions(),
 	}
-	if reporter, ok := interface{}(gridClient).(interface {
-		Invocations() []runner.StageInvocation
-	}); ok {
-		invocations := reporter.Invocations()
-		if asterOpts.Enabled {
-			printAsterSummary(stderr, invocations)
-		}
-		printArchiveSummary(stderr, invocations)
+	if repoSpec.BaseRef != "" {
+		request.Metadata["repo_base_ref"] = repoSpec.BaseRef
 	}
+	if repoSpec.TargetRef != "" {
+		request.Metadata["repo_target_ref"] = repoSpec.TargetRef
+	}
+	if repoSpec.WorkspaceHint != "" {
+		request.Metadata["repo_workspace_hint"] = repoSpec.WorkspaceHint
+	}
+
+	cmd := mods.SubmitCommand{
+		Client:  httpClient,
+		BaseURL: base,
+		Request: request,
+	}
+	summary, err := cmd.Run(ctx)
+	if err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.TicketID, summary.State)
 	return nil
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mods-plan-timeout <duration>] [--mods-max-parallel <n>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>]")
+}
+
+func defaultStageDefinitions() []modsapi.StageDefinition {
+	return []modsapi.StageDefinition{
+		{ID: modplan.StageNamePlan, Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
+		{ID: modplan.StageNameORWApply, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameORWGenerate, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameLLMPlan, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
+		{ID: modplan.StageNameLLMExec, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNameORWApply, modplan.StageNameORWGenerate, modplan.StageNameLLMPlan}},
+		{ID: modplan.StageNameHuman, Lane: "mods-human", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNameLLMExec}},
+	}
 }

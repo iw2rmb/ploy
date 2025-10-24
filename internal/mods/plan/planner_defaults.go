@@ -1,10 +1,11 @@
-package mods
+package plan
 
 import (
 	"strings"
 	"time"
 )
 
+// applyDefaults normalises planner options with expected defaults.
 func applyDefaults(opts Options) Options {
 	result := opts
 	if strings.TrimSpace(result.PlanLane) == "" {
@@ -31,6 +32,7 @@ func applyDefaults(opts Options) Options {
 	return result
 }
 
+// formatPlanTimeout renders a human-friendly timeout string.
 func formatPlanTimeout(timeout time.Duration) string {
 	if timeout <= 0 {
 		return ""
