@@ -11,16 +11,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/bootstrap"
 )
 
-// ProvisionMode describes the ployd mode configured on the target host.
-type ProvisionMode string
-
-const (
-	// ProvisionModeBeacon provisions a host to run ployd in beacon mode.
-	ProvisionModeBeacon ProvisionMode = "beacon"
-	// ProvisionModeWorker provisions a host to run ployd in worker mode.
-	ProvisionModeWorker ProvisionMode = "worker"
-)
-
 // ProvisionOptions configure remote host preparation using the embedded bootstrap script.
 type ProvisionOptions struct {
 	Host            string
@@ -33,7 +23,6 @@ type ProvisionOptions struct {
 	Stdout          io.Writer
 	Stderr          io.Writer
 
-	Mode          ProvisionMode
 	ScriptEnv     map[string]string
 	ServiceChecks []string
 }
@@ -52,11 +41,6 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 	runner := opts.Runner
 	if runner == nil {
 		runner = systemRunner{}
-	}
-
-	mode := strings.TrimSpace(string(opts.Mode))
-	if mode == "" {
-		return errors.New("provision: mode required")
 	}
 
 	user := strings.TrimSpace(opts.User)
@@ -120,7 +104,7 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 		return fmt.Errorf("provision: install ployd binary: %w", err)
 	}
 
-	script := renderBootstrapScript(mode, opts.ScriptEnv)
+	script := renderBootstrapScript(opts.ScriptEnv)
 	runScriptArgs := append(append([]string(nil), sshArgs...), target, "bash", "-s", "--")
 	if err := runner.Run(ctx, "ssh", runScriptArgs, strings.NewReader(script), streams); err != nil {
 		return fmt.Errorf("provision: execute bootstrap script: %w", err)
@@ -143,9 +127,8 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 	return nil
 }
 
-func renderBootstrapScript(mode string, env map[string]string) string {
+func renderBootstrapScript(env map[string]string) string {
 	exports := bootstrap.DefaultExports()
-	exports["PLOYD_MODE"] = mode
 	if env != nil {
 		for key, value := range env {
 			key = strings.TrimSpace(key)

@@ -53,7 +53,8 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	statusProvider := status.New(status.Options{Mode: cfg.Mode})
+	role := strings.TrimSpace(cfg.Tags["role"])
+	statusProvider := status.New(status.Options{Role: role})
 	adminSvc := buildAdminService()
 
 	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(streams)

@@ -14,20 +14,13 @@ import (
 )
 
 func main() {
-	var (
-		configPath   string
-		overrideMode string
-	)
+	var configPath string
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd.yaml", "Path to ployd configuration")
-	flag.StringVar(&overrideMode, "mode", "", "Override daemon mode (bootstrap, worker, beacon)")
 	flag.Parse()
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
-	}
-	if overrideMode != "" {
-		cfg.Mode = overrideMode
 	}
 
 	svc, err := daemon.NewDefault(cfg)
@@ -52,9 +45,6 @@ func main() {
 					log.Printf("reload config: %v", err)
 					cancelReload()
 					continue
-				}
-				if overrideMode != "" {
-					updated.Mode = overrideMode
 				}
 				if err := svc.Reload(reloadCtx, updated); err != nil {
 					log.Printf("reload daemon: %v", err)

@@ -150,7 +150,6 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		Runner:          runner,
 		Stdout:          stdout,
 		Stderr:          stderr,
-		Mode:            ProvisionModeBeacon,
 		ScriptEnv:       envVars,
 		ServiceChecks:   []string{"ployd"},
 	}

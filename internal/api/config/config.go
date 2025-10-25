@@ -15,13 +15,6 @@ import (
 )
 
 const (
-	// ModeBootstrap executes the bootstrap workflow.
-	ModeBootstrap = "bootstrap"
-	// ModeWorker executes steady-state orchestration.
-	ModeWorker = "worker"
-	// ModeBeacon executes beacon responsibilities in addition to worker mode.
-	ModeBeacon = "beacon"
-
 	defaultHTTPListen        = ":8443"
 	defaultMetricsListen     = ":9100"
 	defaultAdminSocket       = "/run/ployd.sock"
@@ -36,7 +29,6 @@ const (
 
 // Config represents the ployd daemon configuration.
 type Config struct {
-	Mode         string              `yaml:"mode"`
 	HTTP         HTTPConfig          `yaml:"http"`
 	Metrics      MetricsConfig       `yaml:"metrics"`
 	Admin        AdminConfig         `yaml:"admin"`
@@ -214,7 +206,6 @@ func loadFromReader(r io.Reader) (Config, error) {
 
 func defaultConfig() Config {
 	return Config{
-		Mode: ModeWorker,
 		HTTP: HTTPConfig{
 			Listen: defaultHTTPListen,
 		},
@@ -243,11 +234,6 @@ func defaultConfig() Config {
 func applyDefaults(cfg *Config) {
 	if cfg == nil {
 		return
-	}
-
-	cfg.Mode = normalizeMode(cfg.Mode)
-	if cfg.Mode == "" {
-		cfg.Mode = ModeWorker
 	}
 
 	if strings.TrimSpace(cfg.HTTP.Listen) == "" {
@@ -394,12 +380,6 @@ func validate(cfg *Config) error {
 	if cfg == nil {
 		return errors.New("config: nil configuration")
 	}
-	switch cfg.Mode {
-	case ModeBootstrap, ModeWorker, ModeBeacon:
-	default:
-		return fmt.Errorf("config: invalid mode %q", cfg.Mode)
-	}
-
 	if strings.TrimSpace(cfg.ControlPlane.Endpoint) == "" {
 		return errors.New("config: control_plane.endpoint is required")
 	}
@@ -459,17 +439,4 @@ func (cfg Config) ResolveRelative(p string) string {
 		return p
 	}
 	return filepath.Join(base, p)
-}
-
-func normalizeMode(mode string) string {
-	switch strings.ToLower(strings.TrimSpace(mode)) {
-	case "", ModeWorker:
-		return ModeWorker
-	case ModeBootstrap:
-		return ModeBootstrap
-	case ModeBeacon:
-		return ModeBeacon
-	default:
-		return strings.ToLower(strings.TrimSpace(mode))
-	}
 }

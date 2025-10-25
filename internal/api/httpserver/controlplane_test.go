@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/api/httpserver/security"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
@@ -52,7 +54,7 @@ func TestServerJobLifecycle(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -120,7 +122,7 @@ func TestJobRetention(t *testing.T) {
 		_ = sched.Close()
 	}()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -217,7 +219,7 @@ func TestArtifactsListRequiresReadScope(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"artifact.write"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -235,7 +237,7 @@ func TestArtifactsListEmptyResponse(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"artifact.read"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -265,7 +267,7 @@ func TestArtifactsUploadNotImplemented(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"artifact.write"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -292,7 +294,7 @@ func TestArtifactsDeleteRequiresWriteScope(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"artifact.read"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -310,7 +312,7 @@ func TestConfigGetRequiresAdminScope(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"mods"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -332,7 +334,7 @@ func TestConfigNotFound(t *testing.T) {
 	defer func() { _ = client.Close() }()
 
 	principal := newTestPrincipal([]string{security.ScopeAdmin})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Etcd: client,
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
@@ -358,7 +360,7 @@ func TestConfigPutRoundTrip(t *testing.T) {
 	defer func() { _ = client.Close() }()
 
 	principal := newTestPrincipal([]string{security.ScopeAdmin})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Etcd: client,
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
@@ -515,7 +517,7 @@ func TestVersionEndpointReturnsBuildMetadata(t *testing.T) {
 		version.BuiltAt = origBuilt
 	})
 
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{})
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{})
 	req := newMTLSRequest(t, http.MethodGet, "/v1/version", nil)
 	rec := httptest.NewRecorder()
 
@@ -547,7 +549,7 @@ func TestRegistryManifestGetNotImplemented(t *testing.T) {
 	t.Parallel()
 
 	principal := newTestPrincipal([]string{"registry.pull"})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
 	})
 
@@ -959,7 +961,7 @@ func TestServerNodesLifecycle(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -1091,6 +1093,112 @@ func TestServerNodesLifecycle(t *testing.T) {
 	}
 }
 
+func TestServerNodesRBACEnforced(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
+		Scheduler: sched,
+		Etcd:      client,
+		Authorizer: auth.NewAuthorizer(auth.Options{
+			AllowInsecure: true,
+			DefaultRole:   auth.RoleWorker,
+		}),
+	}))
+	defer server.Close()
+
+	status, _ := postJSONStatus(t, server.URL+"/v1/nodes", map[string]any{
+		"cluster_id": "cluster-rbac",
+		"address":    "10.20.1.70",
+	})
+	if status != http.StatusForbidden {
+		t.Fatalf("expected forbidden when role unauthorized, got %d", status)
+	}
+}
+
+func TestServerNodeJoinAutoBootstrapsPKI(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	status, _ := postJSONStatus(t, server.URL+"/v1/nodes", map[string]any{
+		"cluster_id": "cluster-auto",
+		"address":    "10.20.1.60",
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("expected node join status 201, got %d", status)
+	}
+
+	manager, err := deploy.NewCARotationManager(client, "cluster-auto")
+	if err != nil {
+		t.Fatalf("NewCARotationManager: %v", err)
+	}
+	state, err := manager.State(ctx)
+	if err != nil {
+		t.Fatalf("expected CA state after auto-bootstrap: %v", err)
+	}
+	if state.CurrentCA.Version == "" {
+		t.Fatalf("expected CA version recorded after auto-bootstrap")
+	}
+}
+
+func TestServerSecurityCAStatus(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	mustBootstrapCluster(t, client, "cluster-alpha")
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
+		Scheduler: sched,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	status, payload := getJSONStatus(t, fmt.Sprintf("%s/v1/security/ca?cluster_id=%s", server.URL, url.QueryEscape("cluster-alpha")))
+	if status != http.StatusOK {
+		t.Fatalf("expected CA status 200, got %d", status)
+	}
+	current, _ := payload["current_ca"].(map[string]any)
+	version, _ := current["version"].(string)
+	if strings.TrimSpace(version) == "" {
+		t.Fatalf("expected CA version in response")
+	}
+}
+
 func TestStatusSummaryIncludesQueueAndWorkers(t *testing.T) {
 	t.Parallel()
 
@@ -1136,7 +1244,7 @@ func TestStatusSummaryIncludesQueueAndWorkers(t *testing.T) {
 	defer func() { _ = sched.Close() }()
 
 	principal := newTestPrincipal([]string{security.ScopeAdmin})
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 		Gatherer:  promRegistry,
@@ -1219,7 +1327,7 @@ func TestMetricsEndpointExposesPrometheus(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Gatherer:  reg,
 		Etcd:      client,
@@ -1270,7 +1378,7 @@ func TestServerGitLabConfig(t *testing.T) {
 	}
 	defer func() { _ = sched.Close() }()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 	}))
@@ -1391,7 +1499,7 @@ func TestServerGitLabSignerEndpoints(t *testing.T) {
 		_ = signer.Close()
 	}()
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Signer:    signer,
 		Etcd:      client,
@@ -1500,7 +1608,7 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	jobID := "job-stream-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Streams:   streams,
 		Etcd:      client,
@@ -1641,7 +1749,7 @@ func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	jobID := "job-resume-1"
 	streams.Ensure(jobID)
 
-	server := httptest.NewServer(httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Streams:   streams,
 		Etcd:      client,
@@ -1770,7 +1878,7 @@ func newModsServerFixture(t *testing.T) *modsServerFixture {
 
 	streams := logstream.NewHub(logstream.Options{BufferSize: 8, HistorySize: 32})
 
-	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Etcd:      client,
 		Mods:      service,
@@ -1859,6 +1967,17 @@ func stateCurrentCACert(t *testing.T, manager *deploy.CARotationManager, ctx con
 		t.Fatalf("manager state: %v", err)
 	}
 	return state.CurrentCA.CertificatePEM
+}
+
+func newTestControlPlaneHandler(t *testing.T, opts httpserver.ControlPlaneOptions) http.Handler {
+	t.Helper()
+	if opts.Authorizer == nil {
+		opts.Authorizer = auth.NewAuthorizer(auth.Options{
+			AllowInsecure: true,
+			DefaultRole:   auth.RoleControlPlane,
+		})
+	}
+	return httpserver.NewControlPlaneHandler(opts)
 }
 
 func beaconCanonicalKey(clusterID string) string {
@@ -2020,7 +2139,12 @@ func newMTLSRequest(t *testing.T, method, target string, body io.Reader) *http.R
 	t.Helper()
 	req := httptest.NewRequest(method, target, body)
 	req.TLS = &tls.ConnectionState{
-		PeerCertificates: []*x509.Certificate{{}},
+		PeerCertificates: []*x509.Certificate{{
+			Subject: pkix.Name{
+				CommonName:         "control-plane-test",
+				OrganizationalUnit: []string{"Ploy control-plane"},
+			},
+		}},
 	}
 	req.Header.Set("Authorization", "Bearer test-token")
 	return req

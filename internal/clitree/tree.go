@@ -116,6 +116,18 @@ var commandTree = []Node{
 				Description: "Show locally cached cluster descriptors",
 				Usage:       "ploy cluster list",
 			},
+			{
+				Name:        "cert",
+				Description: "Inspect cluster certificate authority state",
+				Usage:       "ploy cluster cert <command>",
+				Subcommands: []Node{
+					{
+						Name:        "status",
+						Description: "Show the active CA version, expiry, and worker count",
+						Usage:       "ploy cluster cert status [--cluster-id <id>]",
+					},
+				},
+			},
 		},
 	},
 	{

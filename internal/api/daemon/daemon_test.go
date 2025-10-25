@@ -8,16 +8,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/daemon"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
 func TestRunWorkerStartsComponents(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem
@@ -83,73 +82,9 @@ runtime:
 	}
 }
 
-func TestRunBootstrapTransitionsToWorker(t *testing.T) {
-	t.Helper()
-	cfg := loadConfig(t, `
-mode: bootstrap
-control_plane:
-  endpoint: https://control.example.com
-  ca: /etc/ploy/pki/ca.pem
-  certificate: /etc/ploy/pki/node.pem
-  key: /etc/ploy/pki/node-key.pem
-runtime:
-  plugins:
-    - name: local
-      module: internal
-`)
-
-	http := newStubComponent()
-	metrics := newStubComponent()
-	control := newStubComponent()
-	pki := newStubComponent()
-	scheduler := newStubComponent()
-	bootstrap := &stubBootstrap{}
-
-	svc, err := daemon.New(daemon.Options{
-		Config:          cfg,
-		RuntimeRegistry: runtime.NewRegistry(),
-		LogStreams:      logstream.NewHub(logstream.Options{}),
-		HTTP:            http,
-		Metrics:         metrics,
-		ControlPlane:    control,
-		PKI:             pki,
-		Scheduler:       scheduler,
-		Bootstrap:       bootstrap,
-	})
-	if err != nil {
-		t.Fatalf("New() error = %v", err)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-	go func() {
-		if err := svc.Run(ctx); err != nil && err != context.Canceled {
-			t.Errorf("Run() error = %v", err)
-		}
-		close(done)
-	}()
-
-	waitStarted(t, http, metrics, control, pki, scheduler)
-	cancel()
-	waitDone(t, done)
-
-	if bootstrap.calls() != 1 {
-		t.Fatalf("bootstrap calls=%d, want 1", bootstrap.calls())
-	}
-	if http.starts() != 1 {
-		t.Fatalf("http starts=%d, want 1", http.starts())
-	}
-	if cfg.Mode != config.ModeBootstrap {
-		t.Fatalf("original config should remain bootstrap, got %q", cfg.Mode)
-	}
-}
-
 func TestReloadPropagates(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem
@@ -289,24 +224,6 @@ func (s *stubComponent) reloads() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.reloadCount
-}
-
-type stubBootstrap struct {
-	mu    sync.Mutex
-	count int
-}
-
-func (s *stubBootstrap) Run(context.Context, config.Config) error {
-	s.mu.Lock()
-	s.count++
-	s.mu.Unlock()
-	return nil
-}
-
-func (s *stubBootstrap) calls() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.count
 }
 
 func waitStarted(t *testing.T, comps ...*stubComponent) {

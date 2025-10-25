@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
@@ -23,11 +23,6 @@ type Reloadable interface {
 	Reload(ctx context.Context, cfg config.Config) error
 }
 
-// BootstrapRunner executes bootstrap workloads before worker mode starts.
-type BootstrapRunner interface {
-	Run(ctx context.Context, cfg config.Config) error
-}
-
 // Options configure the daemon instance.
 type Options struct {
 	Config               config.Config
@@ -38,7 +33,6 @@ type Options struct {
 	ControlPlane         Component
 	PKI                  Component
 	Scheduler            Component
-	Bootstrap            BootstrapRunner
 	ControlPlaneShutdown func(context.Context) error
 }
 
@@ -48,7 +42,6 @@ type Daemon struct {
 	cfg                  config.Config
 	runtimeRegistry      *runtime.Registry
 	logStreams           *logstream.Hub
-	bootstrap            BootstrapRunner
 	components           []componentEntry
 	started              bool
 	running              bool
@@ -88,7 +81,6 @@ func New(opts Options) (*Daemon, error) {
 		cfg:                  opts.Config,
 		runtimeRegistry:      opts.RuntimeRegistry,
 		logStreams:           opts.LogStreams,
-		bootstrap:            opts.Bootstrap,
 		controlPlaneShutdown: opts.ControlPlaneShutdown,
 		components: []componentEntry{
 			{name: "http", comp: opts.HTTP},
@@ -115,21 +107,9 @@ func (d *Daemon) Run(ctx context.Context) error {
 		d.mu.Unlock()
 		return errors.New("daemon: already started")
 	}
-	cfg := d.cfg
-	bootstrap := d.bootstrap
 	components := append([]componentEntry(nil), d.components...)
 	d.started = true
 	d.mu.Unlock()
-
-	if cfg.Mode == config.ModeBootstrap && bootstrap != nil {
-		if err := bootstrap.Run(ctx, cfg); err != nil {
-			return fmt.Errorf("daemon: bootstrap failed: %w", err)
-		}
-		// Transition into worker mode after bootstrap success.
-		d.mu.Lock()
-		d.cfg.Mode = config.ModeWorker
-		d.mu.Unlock()
-	}
 
 	if err := d.startComponents(ctx, components); err != nil {
 		return err

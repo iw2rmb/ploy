@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -26,13 +27,15 @@ import (
 
 	gonanoid "github.com/matoous/go-nanoid/v2"
 
-	"github.com/iw2rmb/ploy/internal/api/httpserver/security"
+	httpsecurity "github.com/iw2rmb/ploy/internal/api/httpserver/security"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/controlplane/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	cpsecurity "github.com/iw2rmb/ploy/internal/controlplane/security"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
@@ -92,7 +95,8 @@ type controlPlaneServer struct {
 	streams   *logstream.Hub
 	etcd      *clientv3.Client
 	mods      *controlplanemods.Service
-	auth      *security.Manager
+	auth      *httpsecurity.Manager
+	roles     *auth.Authorizer
 	gatherer  prometheus.Gatherer
 	cfgStore  *config.Store
 }
@@ -106,25 +110,31 @@ type ControlPlaneOptions struct {
 	Etcd         *clientv3.Client
 	Rotations    *events.RotationHub
 	Mods         *controlplanemods.Service
-	Auth         *security.Manager
-	AuthVerifier security.TokenVerifier
+	Auth         *httpsecurity.Manager
+	AuthVerifier httpsecurity.TokenVerifier
+	Authorizer   *auth.Authorizer
 }
 
 // New returns an HTTP handler rooted at /v1.
 func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux := http.NewServeMux()
 
-	var authManager *security.Manager
+	var authManager *httpsecurity.Manager
 	switch {
 	case opts.Auth != nil:
 		authManager = opts.Auth
 	case opts.AuthVerifier != nil:
-		authManager = security.NewManager(opts.AuthVerifier)
+		authManager = httpsecurity.NewManager(opts.AuthVerifier)
 	}
 
 	gatherer := opts.Gatherer
 	if gatherer == nil {
 		gatherer = prometheus.DefaultGatherer
+	}
+
+	roleManager := opts.Authorizer
+	if roleManager == nil {
+		roleManager = auth.NewAuthorizer(auth.Options{})
 	}
 
 	var cfgStore *config.Store
@@ -142,6 +152,7 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		rotations: opts.Rotations,
 		mods:      opts.Mods,
 		auth:      authManager,
+		roles:     roleManager,
 		gatherer:  gatherer,
 		cfgStore:  cfgStore,
 	}
@@ -152,22 +163,23 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPost, "/v1/jobs/claim", h.handleClaim)
 	h.registerRoute(mux, "", "/v1/jobs/", h.handleJobSubpath)
 	h.registerRoute(mux, http.MethodGet, "/v1/health", h.handleHealth)
-	h.registerRoute(mux, http.MethodPut, "/v1/gitlab/signer/secrets", h.handleSignerSecrets, security.ScopeAdmin)
-	h.registerRoute(mux, http.MethodPost, "/v1/gitlab/signer/tokens", h.handleSignerTokens, security.ScopeAdmin)
-	h.registerRoute(mux, http.MethodGet, "/v1/gitlab/signer/rotations", h.handleSignerRotations, security.ScopeAdmin)
+	h.registerRoute(mux, http.MethodPut, "/v1/gitlab/signer/secrets", h.handleSignerSecrets, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodPost, "/v1/gitlab/signer/tokens", h.handleSignerTokens, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/gitlab/signer/rotations", h.handleSignerRotations, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
-	h.registerRoute(mux, "", "/v1/config/gitlab", h.handleGitLabConfig, security.ScopeAdmin)
-	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, security.ScopeAdmin)
-	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, security.ScopeAdmin)
+	h.registerRoute(mux, "", "/v1/config/gitlab", h.handleGitLabConfig, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodGet, "/v1/security/ca", h.handleSecurityCA, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/version", h.handleVersion)
 	if h.mods != nil {
-		h.registerRoute(mux, http.MethodPost, "/v1/mods", h.handleModsSubmit, security.ScopeMods)
-		h.registerRoute(mux, "", "/v1/mods/", h.handleModsSubpath, security.ScopeMods)
-		h.registerRoute(mux, http.MethodPost, "/v1/mods/tickets", h.handleModsTickets, security.ScopeMods)
-		h.registerRoute(mux, "", "/v1/mods/tickets/", h.handleModsTicketSubpath, security.ScopeMods)
+		h.registerRoute(mux, http.MethodPost, "/v1/mods", h.handleModsSubmit, httpsecurity.ScopeMods)
+		h.registerRoute(mux, "", "/v1/mods/", h.handleModsSubpath, httpsecurity.ScopeMods)
+		h.registerRoute(mux, http.MethodPost, "/v1/mods/tickets", h.handleModsTickets, httpsecurity.ScopeMods)
+		h.registerRoute(mux, "", "/v1/mods/tickets/", h.handleModsTicketSubpath, httpsecurity.ScopeMods)
 	}
-	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, security.ScopeArtifactsWrite)
-	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, security.ScopeArtifactsRead)
+	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
+	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, "", "/v1/artifacts/", h.handleArtifactsSubpath)
 	h.registerRoute(mux, "", "/v1/registry/", h.handleRegistry)
 	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
@@ -183,10 +195,28 @@ func (s *controlPlaneServer) registerRoute(mux *http.ServeMux, method, path stri
 		}
 		handler(w, r)
 	})
+	if s.roles != nil {
+		if roles := s.routeRoles(path); len(roles) > 0 {
+			final = s.roles.Middleware(roles...)(final)
+		}
+	}
 	if s.auth != nil {
 		final = s.auth.Middleware(scopes...)(final)
 	}
 	mux.Handle(path, final)
+}
+
+func (s *controlPlaneServer) routeRoles(path string) []string {
+	switch path {
+	case "/v1/nodes":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+	case "/v1/status":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker}
+	case "/v1/security/ca":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+	default:
+		return nil
+	}
 }
 
 func (s *controlPlaneServer) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -275,6 +305,64 @@ func (s *controlPlaneServer) handleStatusSummary(w http.ResponseWriter, r *http.
 
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, status, payload)
+}
+
+func (s *controlPlaneServer) handleSecurityCA(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	clusterID := strings.TrimSpace(r.URL.Query().Get("cluster_id"))
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id query parameter required")
+		return
+	}
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		switch {
+		case errors.Is(err, deploy.ErrPKINotBootstrapped):
+			writeErrorMessage(w, http.StatusNotFound, "cluster PKI not bootstrapped")
+		default:
+			writeError(w, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	trustHash := ""
+	if store, err := cpsecurity.NewTrustStore(s.etcd, clusterID); err == nil {
+		if bundle, _, err := store.Current(r.Context()); err == nil {
+			trustHash = bundle.CABundleHash
+		}
+	}
+	current := map[string]any{
+		"version":       state.CurrentCA.Version,
+		"serial_number": state.CurrentCA.SerialNumber,
+	}
+	if !state.CurrentCA.IssuedAt.IsZero() {
+		current["issued_at"] = state.CurrentCA.IssuedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if !state.CurrentCA.ExpiresAt.IsZero() {
+		current["expires_at"] = state.CurrentCA.ExpiresAt.UTC().Format(time.RFC3339Nano)
+	}
+	response := map[string]any{
+		"cluster_id": clusterID,
+		"current_ca": current,
+		"workers": map[string]any{
+			"total": len(state.Nodes.Workers),
+		},
+	}
+	if len(state.Nodes.Beacons) > 0 {
+		response["control_plane"] = map[string]any{
+			"total": len(state.Nodes.Beacons),
+		}
+	}
+	if trustHash != "" {
+		response["trust_bundle_hash"] = trustHash
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *controlPlaneServer) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -481,7 +569,7 @@ func (s *controlPlaneServer) handleGitLabConfig(w http.ResponseWriter, r *http.R
 }
 
 func (s *controlPlaneServer) handleArtifactsList(w http.ResponseWriter, r *http.Request) {
-	if !s.requireScope(w, r, security.ScopeArtifactsRead) {
+	if !s.requireScope(w, r, httpsecurity.ScopeArtifactsRead) {
 		recordArtifactRequest(r.Method, http.StatusForbidden)
 		return
 	}
@@ -490,7 +578,7 @@ func (s *controlPlaneServer) handleArtifactsList(w http.ResponseWriter, r *http.
 }
 
 func (s *controlPlaneServer) handleArtifactsUpload(w http.ResponseWriter, r *http.Request) {
-	if !s.requireScope(w, r, security.ScopeArtifactsWrite) {
+	if !s.requireScope(w, r, httpsecurity.ScopeArtifactsWrite) {
 		recordArtifactRequest(r.Method, http.StatusForbidden)
 		return
 	}
@@ -523,14 +611,14 @@ func (s *controlPlaneServer) handleArtifactsSubpath(w http.ResponseWriter, r *ht
 	}
 	switch r.Method {
 	case http.MethodGet:
-		if !s.requireScope(w, r, security.ScopeArtifactsRead) {
+		if !s.requireScope(w, r, httpsecurity.ScopeArtifactsRead) {
 			recordArtifactRequest(r.Method, http.StatusForbidden)
 			return
 		}
 		recordArtifactRequest(r.Method, http.StatusNotFound)
 		writeErrorMessage(w, http.StatusNotFound, "artifact not found")
 	case http.MethodDelete:
-		if !s.requireScope(w, r, security.ScopeArtifactsWrite) {
+		if !s.requireScope(w, r, httpsecurity.ScopeArtifactsWrite) {
 			recordArtifactRequest(r.Method, http.StatusForbidden)
 			return
 		}
@@ -585,14 +673,14 @@ func (s *controlPlaneServer) handleRegistryManifest(w http.ResponseWriter, r *ht
 	}
 	switch r.Method {
 	case http.MethodGet:
-		if !s.requireScope(w, r, security.ScopeRegistryPull) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPull) {
 			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
 			return
 		}
 		recordRegistryRequest("manifests", r.Method, http.StatusNotImplemented)
 		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryManifest, "registry manifest retrieval pending persistence backends")
 	case http.MethodPut:
-		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPush) {
 			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
 			return
 		}
@@ -613,7 +701,7 @@ func (s *controlPlaneServer) handleRegistryManifest(w http.ResponseWriter, r *ht
 		recordRegistryRequest("manifests", r.Method, http.StatusNotImplemented)
 		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryManifest, "registry manifest write pending persistence backends")
 	case http.MethodDelete:
-		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPush) {
 			recordRegistryRequest("manifests", r.Method, http.StatusForbidden)
 			return
 		}
@@ -658,7 +746,7 @@ func (s *controlPlaneServer) handleRegistryUploadStart(w http.ResponseWriter, r 
 		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if !s.requireScope(w, r, security.ScopeRegistryPush) {
+	if !s.requireScope(w, r, httpsecurity.ScopeRegistryPush) {
 		recordRegistryRequest("uploads", r.Method, http.StatusForbidden)
 		return
 	}
@@ -671,7 +759,7 @@ func (s *controlPlaneServer) handleRegistryUploadSession(w http.ResponseWriter, 
 	_ = sessionID
 	switch r.Method {
 	case http.MethodPatch, http.MethodPut:
-		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPush) {
 			recordRegistryRequest("uploads", r.Method, http.StatusForbidden)
 			return
 		}
@@ -703,14 +791,14 @@ func (s *controlPlaneServer) handleRegistryBlob(w http.ResponseWriter, r *http.R
 	_ = repo
 	switch r.Method {
 	case http.MethodGet:
-		if !s.requireScope(w, r, security.ScopeRegistryPull) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPull) {
 			recordRegistryRequest("blobs", r.Method, http.StatusForbidden)
 			return
 		}
 		recordRegistryRequest("blobs", r.Method, http.StatusNotImplemented)
 		writeErrorWithCode(w, http.StatusNotImplemented, errorCodeRegistryBlob, "registry blob retrieval pending persistence backends")
 	case http.MethodDelete:
-		if !s.requireScope(w, r, security.ScopeRegistryPush) {
+		if !s.requireScope(w, r, httpsecurity.ScopeRegistryPush) {
 			recordRegistryRequest("blobs", r.Method, http.StatusForbidden)
 			return
 		}
@@ -736,7 +824,7 @@ func (s *controlPlaneServer) handleRegistryTags(w http.ResponseWriter, r *http.R
 		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	if !s.requireScope(w, r, security.ScopeRegistryPull) {
+	if !s.requireScope(w, r, httpsecurity.ScopeRegistryPull) {
 		recordRegistryRequest("tags", r.Method, http.StatusForbidden)
 		return
 	}
@@ -1083,6 +1171,15 @@ func (s *controlPlaneServer) handleNodeJoin(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		workerID = generated
+	}
+
+	created, err := deploy.EnsureClusterPKI(r.Context(), s.etcd, clusterID, deploy.EnsurePKIOptions{})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if created {
+		log.Printf("auto-bootstrapped cluster PKI for %s", clusterID)
 	}
 
 	probes := make([]deploy.WorkerHealthProbe, 0, len(req.Probes))
@@ -1953,8 +2050,8 @@ func (s *controlPlaneServer) requireScope(w http.ResponseWriter, r *http.Request
 	return true
 }
 
-func (s *controlPlaneServer) principal(r *http.Request) (security.Principal, bool) {
-	return security.PrincipalFromContext(r.Context())
+func (s *controlPlaneServer) principal(r *http.Request) (httpsecurity.Principal, bool) {
+	return httpsecurity.PrincipalFromContext(r.Context())
 }
 
 func (s *controlPlaneServer) configStore() (*config.Store, error) {

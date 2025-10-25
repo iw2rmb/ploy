@@ -78,10 +78,6 @@ func handleClusterAdd(args []string, stderr io.Writer) error {
 	}
 	isWorker := clusterID.set && strings.TrimSpace(clusterID.value) != ""
 	if !isWorker {
-		if len(labels) > 0 || len(probes) > 0 || *dryRun || sshPort.set {
-			printClusterAddUsage(stderr)
-			return errors.New("worker-only flags require --cluster-id")
-		}
 		return runClusterBootstrap(address.value, userFlag, identity, control, ploydBin, stderr)
 	}
 	if control.set {
@@ -197,7 +193,6 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 			PloydBinaryPath: cfg.PloydBinary,
 			Stdout:          stderr,
 			Stderr:          stderr,
-			Mode:            deploy.ProvisionModeWorker,
 			ScriptEnv: map[string]string{
 				"PLOY_CONTROL_PLANE_ENDPOINT": baseURL,
 			},

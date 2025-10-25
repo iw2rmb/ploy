@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/status"
 )
 
 func TestProviderSnapshot(t *testing.T) {
-	provider := status.New(status.Options{Mode: config.ModeWorker})
+	provider := status.New(status.Options{Role: "control-plane"})
 	data, err := provider.Snapshot(context.Background())
 	if err != nil {
 		ch := err
@@ -21,7 +20,7 @@ func TestProviderSnapshot(t *testing.T) {
 	if data["state"] != "ok" {
 		t.Fatalf("state=%v", data["state"])
 	}
-	if data["mode"] != config.ModeWorker {
-		t.Fatalf("mode=%v", data["mode"])
+	if data["role"] != "control-plane" {
+		t.Fatalf("role=%v", data["role"])
 	}
 }

@@ -515,7 +515,6 @@ configure_ployd_service() {
       warn "PLOY_CONTROL_PLANE_ENDPOINT not set; using placeholder control plane endpoint"
     fi
     cat >"$config_path" <<YAML
-mode: ${PLOYD_MODE:-beacon}
 http:
   listen: "${PLOYD_HTTP_LISTEN:-127.0.0.1:8443}"
 metrics:
