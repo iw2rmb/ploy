@@ -23,12 +23,14 @@ import (
 )
 
 const (
-	defaultCAValidity    = 365 * 24 * time.Hour
-	defaultLeafValidity  = 90 * 24 * time.Hour
-	certSerialBitSize    = 160
-	clusterSecurityRoot  = "/ploy/clusters"
-	beaconCertificateUse = "beacon"
-	workerCertificateUse = "worker"
+	defaultCAValidity   = 365 * 24 * time.Hour
+	defaultLeafValidity = 90 * 24 * time.Hour
+	certSerialBitSize   = 160
+	clusterSecurityRoot = "/ploy/clusters"
+
+	certificateRoleControlPlane = "control-plane"
+	certificateRoleWorker       = "worker"
+	certificateRoleCLIAdmin     = "cli-admin"
 )
 
 var (
@@ -161,9 +163,6 @@ func NewCARotationManager(client *clientv3.Client, clusterID string) (*CARotatio
 // Bootstrap generates the initial CA and node certificates for a cluster.
 func (m *CARotationManager) Bootstrap(ctx context.Context, opts BootstrapOptions) (CAState, error) {
 	beacons := normalizeNodeIDs(opts.BeaconIDs)
-	if len(beacons) == 0 {
-		return CAState{}, errors.New("deploy: at least one beacon id required")
-	}
 	workers := normalizeNodeIDs(opts.WorkerIDs)
 
 	now := opts.RequestedAt
@@ -196,14 +195,14 @@ func (m *CARotationManager) Bootstrap(ctx context.Context, opts BootstrapOptions
 	workerCerts := make(map[string]LeafCertificate, len(workers))
 
 	for _, id := range beacons {
-		cert, err := issueLeafCertificate(id, beaconCertificateUse, caBundle, caCert, caKey, now, leafValidity, "")
+		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, caBundle, caCert, caKey, now, leafValidity, "")
 		if err != nil {
 			return CAState{}, err
 		}
 		beaconCerts[id] = cert
 	}
 	for _, id := range workers {
-		cert, err := issueLeafCertificate(id, workerCertificateUse, caBundle, caCert, caKey, now, leafValidity, "")
+		cert, err := issueLeafCertificate(id, certificateRoleWorker, caBundle, caCert, caKey, now, leafValidity, "")
 		if err != nil {
 			return CAState{}, err
 		}
@@ -282,7 +281,7 @@ func (m *CARotationManager) Rotate(ctx context.Context, opts RotateOptions) (Rot
 
 	beaconUpdates := make([]LeafCertificate, 0, len(state.Nodes.Beacons))
 	for _, id := range state.Nodes.Beacons {
-		cert, err := issueLeafCertificate(id, beaconCertificateUse, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, state.BeaconCertificates[id].Version)
+		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, state.BeaconCertificates[id].Version)
 		if err != nil {
 			return RotateResult{}, err
 		}
@@ -291,7 +290,7 @@ func (m *CARotationManager) Rotate(ctx context.Context, opts RotateOptions) (Rot
 	workerUpdates := make([]LeafCertificate, 0, len(state.Nodes.Workers))
 	for _, id := range state.Nodes.Workers {
 		prev := state.WorkerCertificates[id]
-		cert, err := issueLeafCertificate(id, workerCertificateUse, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, prev.Version)
+		cert, err := issueLeafCertificate(id, certificateRoleWorker, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, prev.Version)
 		if err != nil {
 			return RotateResult{}, err
 		}
@@ -473,7 +472,7 @@ func (m *CARotationManager) IssueWorkerCertificate(ctx context.Context, workerID
 	if err != nil {
 		return LeafCertificate{}, err
 	}
-	cert, err := issueLeafCertificate(id, workerCertificateUse, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, "")
+	cert, err := issueLeafCertificate(id, certificateRoleWorker, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, "")
 	if err != nil {
 		return LeafCertificate{}, err
 	}
@@ -699,10 +698,14 @@ func normalizeNodeIDs(ids []string) []string {
 	}, priv, template, nil
 }
 
-func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string) (LeafCertificate, error) {
+func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string) (LeafCertificate, error) {
+	role = strings.TrimSpace(role)
+	if role == "" {
+		return LeafCertificate{}, errors.New("deploy: certificate role required")
+	}
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return LeafCertificate{}, fmt.Errorf("deploy: generate %s key for %s: %w", usage, nodeID, err)
+		return LeafCertificate{}, fmt.Errorf("deploy: generate %s key for %s: %w", role, nodeID, err)
 	}
 	serial, err := randomSerial()
 	if err != nil {
@@ -711,9 +714,9 @@ func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certif
 	template := &x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
-			CommonName:         fmt.Sprintf("%s-%s", usage, nodeID),
+			CommonName:         fmt.Sprintf("%s-%s", role, nodeID),
 			Organization:       []string{"Ploy Deployment"},
-			OrganizationalUnit: []string{"Ploy " + usage},
+			OrganizationalUnit: []string{"Ploy " + role},
 		},
 		NotBefore: now.Add(-1 * time.Minute),
 		NotAfter:  now.Add(validity),
@@ -725,17 +728,17 @@ func issueLeafCertificate(nodeID, usage string, ca CABundle, caCert *x509.Certif
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, &priv.PublicKey, caKey)
 	if err != nil {
-		return LeafCertificate{}, fmt.Errorf("deploy: create %s certificate for %s: %w", usage, nodeID, err)
+		return LeafCertificate{}, fmt.Errorf("deploy: create %s certificate for %s: %w", role, nodeID, err)
 	}
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 	keyBytes, err := x509.MarshalECPrivateKey(priv)
 	if err != nil {
-		return LeafCertificate{}, fmt.Errorf("deploy: marshal %s private key for %s: %w", usage, nodeID, err)
+		return LeafCertificate{}, fmt.Errorf("deploy: marshal %s private key for %s: %w", role, nodeID, err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 	return LeafCertificate{
 		NodeID:          nodeID,
-		Usage:           usage,
+		Usage:           role,
 		Version:         buildVersion(now),
 		ParentVersion:   ca.Version,
 		SerialNumber:    hex.EncodeToString(serial.Bytes()),

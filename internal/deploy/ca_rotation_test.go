@@ -54,7 +54,7 @@ func TestCARotation(t *testing.T) {
 	if beaconCert.ParentVersion != bootstrapState.CurrentCA.Version {
 		t.Fatalf("expected beacon cert parent %s, got %s", bootstrapState.CurrentCA.Version, beaconCert.ParentVersion)
 	}
-	assertLeafSubject(t, beaconCert.CertificatePEM, "beacon-beacon-main", wantCASubject)
+	assertLeafSubject(t, beaconCert.CertificatePEM, "control-plane-beacon-main", wantCASubject)
 	if len(bootstrapState.WorkerCertificates) != 2 {
 		t.Fatalf("expected worker certificates to be issued, got %d", len(bootstrapState.WorkerCertificates))
 	}

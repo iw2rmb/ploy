@@ -13,6 +13,7 @@ Guidelines:
 
 - Use these hosts for integration/E2E testing.
 - Bootstrap cluster nodes with `dist/ploy cluster add --address <ip>` (omit `--cluster-id` on the first node) and capture output for runbooks, including the descriptor join hint printed at the end. Always connect as `root`; the CLI reuses the exact SSH identity for both the SSH session and the SCP upload so no `PLOY_SSH_ADMIN_KEYS_B64` payload is required.
+- After the first host converges, `ployd` auto-generates the cluster CA. Use `ploy cluster cert status` to confirm the active CA and expiry before onboarding additional workers.
 - Bootstrap the IPFS Cluster lab by running
   `scripts/ipfs/bootstrap_lab_cluster.sh up --ssh-host root@45.9.42.212` (or the desired host) from
   your workstation; the script copies compose assets, installs Docker/compose on the VPS if missing,

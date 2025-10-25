@@ -177,19 +177,29 @@ func TestHandleClusterAddWithoutClusterIDBootstrapsControlPlane(t *testing.T) {
 	}
 }
 
-func TestHandleClusterAddRejectsWorkerFlagsWithoutClusterID(t *testing.T) {
+func TestHandleClusterAddAllowsWorkerFlagsWithoutClusterID(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	orig := clusterBootstrapRunner
 	defer func() { clusterBootstrapRunner = orig }()
+	var invoked bool
 	clusterBootstrapRunner = func(context.Context, deploy.Options) error {
-		t.Fatalf("bootstrap runner should not be called when worker flags are invalid")
+		invoked = true
 		return nil
 	}
 	identityPath := identityFixture(t, identityBootstrapKey)
 	ploydPath := ploydFixture(t)
-	err := handleCluster([]string{"add", "--address", "192.0.2.10", "--label", "role=worker", "--identity", identityPath, "--ployd-binary", ploydPath}, io.Discard)
-	if err == nil || !strings.Contains(err.Error(), "worker-only flags") {
-		t.Fatalf("expected worker flag validation error, got %v", err)
+	err := handleCluster([]string{"add",
+		"--address", "192.0.2.10",
+		"--label", "role=worker",
+		"--health-probe", "ready=https://192.0.2.10:9443/status",
+		"--identity", identityPath,
+		"--ployd-binary", ploydPath,
+	}, io.Discard)
+	if err != nil {
+		t.Fatalf("cluster add bootstrap returned error: %v", err)
+	}
+	if !invoked {
+		t.Fatalf("expected bootstrap runner invoked")
 	}
 }
 
@@ -240,11 +250,14 @@ func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cluster add worker returned error: %v", err)
 	}
-	if provision.Mode != deploy.ProvisionModeWorker {
-		t.Fatalf("expected worker provision mode, got %s", provision.Mode)
-	}
 	if provision.Host != "198.51.100.7" || provision.Address != "198.51.100.7" {
 		t.Fatalf("expected worker address propagated, got %+v", provision)
+	}
+	if _, ok := provision.ScriptEnv["PLOYD_MODE"]; ok {
+		t.Fatalf("expected bootstrap env to omit PLOYD_MODE")
+	}
+	if provision.ScriptEnv["PLOY_CONTROL_PLANE_ENDPOINT"] == "" {
+		t.Fatalf("expected control plane endpoint exported to script env")
 	}
 	if provision.IdentityFile != identityPath {
 		t.Fatalf("expected identity path propagated to provisioner, got %q", provision.IdentityFile)
@@ -260,6 +273,44 @@ func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "worker-1") {
 		t.Fatalf("expected worker join output, got %q", buf.String())
+	}
+}
+
+func TestHandleClusterCertStatus(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	desc, err := config.SaveDescriptor(config.Descriptor{
+		ClusterID:       "cluster-alpha",
+		Address:         "203.0.113.10",
+		SSHIdentityPath: "/home/ploy/.ssh/id_alpha",
+	})
+	if err != nil {
+		t.Fatalf("save descriptor: %v", err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("cluster_id") != desc.ClusterID {
+			t.Fatalf("expected cluster_id query, got %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"cluster_id":"cluster-alpha","current_ca":{"version":"20251025","issued_at":"2025-10-25T12:00:00Z","expires_at":"2026-10-25T12:00:00Z","serial_number":"abcd"},"workers":{"total":3},"trust_bundle_hash":"deadbeef"}`)
+	}))
+	defer server.Close()
+	t.Setenv("PLOYD_ADMIN_ENDPOINT", server.URL)
+	origFactory := clusterHTTPClientFactory
+	defer func() { clusterHTTPClientFactory = origFactory }()
+	clusterHTTPClientFactory = func(config.Descriptor) (*http.Client, func(), error) {
+		return server.Client(), func() {}, nil
+	}
+	buf := &bytes.Buffer{}
+	if err := handleCluster([]string{"cert", "status", "--cluster-id", desc.ClusterID}, buf); err != nil {
+		t.Fatalf("cluster cert status returned error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "Version: 20251025") {
+		t.Fatalf("expected version in output, got %q", output)
+	}
+	if !strings.Contains(output, "Workers: 3") {
+		t.Fatalf("expected worker count in output, got %q", output)
 	}
 }
 

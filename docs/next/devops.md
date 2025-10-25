@@ -34,6 +34,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
     metadata needed for future tunnels rather than beacon URLs or CA material.
   - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and then streams the embedded bootstrap shell script over SSH. The script converges dependencies, writes the initial `/etc/ploy/ployd.yaml`, and installs the systemd unit.
   - Once the script completes, the CLI verifies `etcd` and `ployd` are active via `systemctl` before continuing.
+  - On first start, `ployd` automatically creates the cluster certificate authority and records it in etcd—no manual CA bootstrap step is required.
   - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
     and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
     Cluster 1.1.4.  
@@ -82,7 +83,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
      and generates a 4-character worker identifier automatically.
    - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
-  - The CLI first SSHes into the worker, uploads `ployd`, reruns the bootstrap script with `PLOYD_MODE=worker`, and verifies the `ployd` service is active. It then uses `pkg/sshtransport` to open a tunnel back to the control plane and calls `/v1/nodes` through that tunnel to register the worker metadata and record probe outcomes.  
+  - The CLI first SSHes into the worker, uploads `ployd`, reruns the unified bootstrap script, and verifies the `ployd` service is active. It then uses `pkg/sshtransport` to open a tunnel back to the control plane and calls `/v1/nodes` through that tunnel to register the worker metadata and record probe outcomes.  
    - Use `--dry-run` to preview probes without modifying etcd; the command still validates SSH access and prints the registration payload so you can audit the request before running it for real.  
    - Confirm the worker shows up via `etcdctl get /ploy/clusters/<cluster>/registry/workers --prefix --keys-only` or `ploy cluster list --labels`.
 
@@ -93,6 +94,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 ## Maintenance
 
 - Monitor etcd health (`etcdctl endpoint status`) and IPFS Cluster pinning status regularly.  
+- Use `ploy cluster cert status [--cluster-id <id>]` to confirm the active CA version, expiry, and node counts exposed by `/v1/security/ca`. The command automatically targets the default descriptor when `--cluster-id` is omitted.  
 - Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer; follow up with `ploy config gitlab status` to confirm rotation state.  
 - Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/next/logs.md](logs.md)).  
 - Provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` (or rely on the active cluster descriptor) so unattended tooling can authenticate control-plane requests.  

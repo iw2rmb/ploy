@@ -22,7 +22,6 @@ import (
 func TestLogStreamEndpoint(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 http:
   listen: 127.0.0.1:0
 control_plane:
@@ -87,7 +86,6 @@ runtime:
 func TestStatusEndpoint(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem
@@ -139,7 +137,6 @@ runtime:
 func TestReloadReconfigures(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem
@@ -174,7 +171,6 @@ runtime:
 func TestAdminNodeCreate(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 http:
   listen: 127.0.0.1:0
 control_plane:
@@ -217,7 +213,6 @@ runtime:
 func TestControlPlaneRoutesMounted(t *testing.T) {
 	t.Helper()
 	cfg := loadConfig(t, `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem

@@ -15,7 +15,6 @@ func TestLoadConfigDefaults(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ployd.yaml")
 	raw := `
-mode: worker
 control_plane:
   endpoint: https://control.example.com
   ca: /etc/ploy/pki/ca.pem
@@ -35,9 +34,6 @@ runtime:
 	cfg, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.Mode != config.ModeWorker {
-		t.Fatalf("expected Mode=%q, got %q", config.ModeWorker, cfg.Mode)
 	}
 	if expect := ":8443"; cfg.HTTP.Listen != expect {
 		t.Fatalf("HTTP.Listen = %q, want %q", cfg.HTTP.Listen, expect)
@@ -74,7 +70,6 @@ func TestLoadConfigCustomizations(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ployd.yaml")
 	raw := `
-mode: beacon
 http:
   listen: 127.0.0.1:18443
   tls:
@@ -112,9 +107,6 @@ runtime:
 	cfg, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.Mode != config.ModeBeacon {
-		t.Fatalf("Mode = %q, want %q", cfg.Mode, config.ModeBeacon)
 	}
 	if cfg.HTTP.Listen != "127.0.0.1:18443" {
 		t.Fatalf("HTTP.Listen = %q", cfg.HTTP.Listen)
@@ -166,7 +158,6 @@ func TestLoadConfigValidation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ployd.yaml")
 	raw := `
-mode: worker
 http:
   listen: :8443
 control_plane:

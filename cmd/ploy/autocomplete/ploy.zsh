@@ -59,6 +59,7 @@ _ploy() {
                     commands+=("add:Bootstrap the control-plane node or join workers over SSH")
                     commands+=("connect:Cache beacon metadata and trust bundles locally")
                     commands+=("list:Show locally cached cluster descriptors")
+                    commands+=("cert:Inspect cluster certificate authority state")
                     _describe 'cluster command' commands && ret=0
                     ;;
                 'config')
@@ -108,6 +109,15 @@ _ploy() {
             ;;
         third)
             case $words[2] in
+                'cluster')
+                    case $words[3] in
+                        'cert')
+                            commands=()
+                            commands+=("status:Show the active CA version, expiry, and worker count")
+                            _describe 'cluster cert command' commands && ret=0
+                            ;;
+                    esac
+                    ;;
                 'config')
                     case $words[3] in
                         'gitlab')

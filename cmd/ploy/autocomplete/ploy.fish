@@ -23,6 +23,8 @@ complete -c ploy -n "__fish_seen_subcommand_from artifact" -a 'rm' -d 'Unpin an 
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'add' -d 'Bootstrap the control-plane node or join workers over SSH'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'connect' -d 'Cache beacon metadata and trust bundles locally'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'list' -d 'Show locally cached cluster descriptors'
+complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'cert' -d 'Inspect cluster certificate authority state'
+complete -c ploy -n "__fish_seen_subcommand_from cluster; and __fish_seen_subcommand_from cert" -a 'status' -d 'Show the active CA version, expiry, and worker count'
 complete -c ploy -n "__fish_seen_subcommand_from config" -a 'gitlab' -d 'Manage GitLab integration credentials'
 complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcommand_from gitlab" -a 'show' -d 'Display the current GitLab configuration'
 complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcommand_from gitlab" -a 'set' -d 'set --file <path> - Apply a GitLab configuration JSON file'

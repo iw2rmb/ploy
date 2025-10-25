@@ -55,8 +55,6 @@ configuration.
 - `PLOYD_ADMIN_PORT` — Optional port used for ployd admin API requests. Defaults to `8443`.
 - `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
   location (default `/etc/ploy/ployd.yaml`).
-- `PLOYD_MODE` — Overrides the default daemon mode written into the bootstrap configuration. May be
-  `bootstrap` or `worker`.
 - `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
   generates the initial configuration.
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
