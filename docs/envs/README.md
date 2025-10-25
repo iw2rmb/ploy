@@ -55,8 +55,9 @@ additional configuration.
   when mutual TLS is required. Both values must be provided together.
 - `PLOY_ETCD_TLS_SKIP_VERIFY` — When set to `true`, disables server certificate verification. Use
   only for local development.
-- `PLOYD_ADMIN_ENDPOINT` — Optional base URL used by `ploy node add` when contacting the ployd
-  admin API. If unset the CLI builds a URL from the worker address, scheme, and port.
+- `PLOYD_ADMIN_ENDPOINT` — Optional base URL used by `ploy cluster add --cluster-id <id>` when contacting the
+  ployd admin API during worker onboarding. If unset the CLI builds a URL from the worker address,
+  scheme, and port.
 - `PLOYD_ADMIN_SCHEME` — Optional scheme (`http` or `https`) applied when constructing the ployd
   admin API URL. Defaults to `http`.
 - `PLOYD_ADMIN_PORT` — Optional port used for ployd admin API requests. Defaults to `8443`.
@@ -104,9 +105,9 @@ additional configuration.
 - `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
   to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
   16, 24, or 32 bytes to satisfy AES-GCM requirements.
-- `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL used by
-  `ploy config gitlab` commands when a cluster descriptor or Grid discovery metadata is
-  unavailable.
+- `PLOY_CONTROL_PLANE_URL` — Base URL for control-plane HTTP APIs (`ploy config gitlab`,
+  worker onboarding via `ploy cluster add --cluster-id`, etc.). Required now that cluster descriptors only record SSH
+  metadata and no longer carry beacon/control-plane URLs.
 - `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
   callers omit a TTL while requesting short-lived GitLab tokens.
 - `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.

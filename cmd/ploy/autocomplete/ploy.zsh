@@ -16,8 +16,6 @@ _ploy() {
             commands+=("jobs:Inspect and follow individual jobs")
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("cluster:Manage local cluster descriptors")
-            commands+=("deploy:Bootstrap deployment hosts and verify readiness")
-            commands+=("node:Manage worker nodes and onboarding")
             commands+=("beacon:Rotate deployment CA material and node certificates")
             commands+=("config:Inspect or update cluster configuration")
             commands+=("snapshot:Plan and capture workspace snapshots")
@@ -59,19 +57,10 @@ _ploy() {
                     ;;
                 'cluster')
                     commands=()
+                    commands+=("add:Bootstrap the control-plane node or join workers over SSH")
                     commands+=("connect:Cache beacon metadata and trust bundles locally")
                     commands+=("list:Show locally cached cluster descriptors")
                     _describe 'cluster command' commands && ret=0
-                    ;;
-                'deploy')
-                    commands=()
-                    commands+=("bootstrap:Install dependencies and run host preflight checks")
-                    _describe 'deploy command' commands && ret=0
-                    ;;
-                'node')
-                    commands=()
-                    commands+=("add:Onboard a worker node, register metadata, and verify health probes")
-                    _describe 'node command' commands && ret=0
                     ;;
                 'beacon')
                     commands=()
@@ -114,8 +103,6 @@ _ploy() {
                     commands+=("jobs:Inspect and follow individual jobs")
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("cluster:Manage local cluster descriptors")
-                    commands+=("deploy:Bootstrap deployment hosts and verify readiness")
-                    commands+=("node:Manage worker nodes and onboarding")
                     commands+=("beacon:Rotate deployment CA material and node certificates")
                     commands+=("config:Inspect or update cluster configuration")
                     commands+=("snapshot:Plan and capture workspace snapshots")
