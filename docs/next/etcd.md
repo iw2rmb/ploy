@@ -33,8 +33,8 @@ contracts expected under each.
 ### Configuration (`config/`)
 
 - Keys are simple strings (e.g., `config/gitlab.api_key`).
-- Values are JSON blobs or plain strings depending on the setting. The CLI merges beacon values with
-  local overrides as described in [docs/next/cli.md](cli.md).
+- Values are JSON blobs or plain strings depending on the setting. The CLI merges descriptor-derived
+  defaults with local overrides as described in [docs/next/cli.md](cli.md).
 - Changes take effect immediately; nodes may watch the prefix to refresh local configuration.
 
 ### Queue (`queue/<kind>/<priority>/<job-id>`)

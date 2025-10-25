@@ -552,3 +552,11 @@ func (i *intValue) String() string {
 	}
 	return strconv.Itoa(i.value)
 }
+
+func writef(w io.Writer, format string, args ...any) error {
+	if w == nil {
+		return nil
+	}
+	_, err := fmt.Fprintf(w, format, args...)
+	return err
+}

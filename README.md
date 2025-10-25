@@ -143,15 +143,13 @@ Full design records live in `docs/design/README.md`.
 3. **Run the Mods CLI**
 
    ```bash
-   PLOY_GRID_ID=dev-grid \
-     GRID_BEACON_API_KEY=ghp_example \
-     ./dist/ploy mod run --tenant acme --ticket auto
+   ./dist/ploy mod run --tenant acme --ticket auto
    ```
 
-   The CLI instantiates the shared grid client, authenticates with gridbeacon,
-   and fetches discovery metadata (API endpoint, JetStream routes, IPFS gateway,
-   feature map, version) before connecting. Omitting either `PLOY_GRID_ID` or
-   `GRID_BEACON_API_KEY` keeps the CLI on the in-memory Grid and JetStream stubs.
+   When targeting the legacy Grid backend, set `PLOY_GRID_ID` plus the
+   associated credentials; otherwise the CLI runs entirely against the local
+   control plane over SSH. Omitting the variables keeps the CLI on the
+   in-memory Grid and JetStream stubs for offline development.
 
 4. **Preview snapshot rules**
 
@@ -209,15 +207,10 @@ Full design records live in `docs/design/README.md`.
 Workstation builds rely on discovery to surface remote dependencies. The CLI
 inspects the following environment variables:
 
-- `PLOY_GRID_ID` — Required grid identifier so the CLI can bootstrap discovery and
-  scope its state directory.
-- `GRID_BEACON_API_KEY` — Required beacon API key forwarded to gridbeacon when
-  fetching discovery metadata and workflow credentials. Existing grids must have
-  their metadata backfilled via `gridctl grid client backfill --grid-id $PLOY_GRID_ID`
-  so beacon exposes the `manifestHost` and CA bundle required by the shared grid
-  client.
-- `GRID_BEACON_URL` — Optional beacon base URL override (defaults to
-  `https://beacon.getgrid.dev`).
+- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when the CLI
+  targets the Grid backend instead of the local control plane.
+- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy beacon credentials used to
+  fetch Grid discovery metadata. Omit them for the SSH-only workflow.
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
   directory (defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`).
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set, it

@@ -42,26 +42,20 @@ materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
-exit. When `PLOY_GRID_ID` and `GRID_BEACON_API_KEY` are supplied the CLI initialises the
-shared grid client, authenticates with gridbeacon, and reads discovery metadata
-(API endpoint, JetStream routes, IPFS gateway, feature map, version) before
-dispatching stages; without credentials the CLI remains on the in-memory Grid
-and JetStream stubs. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
+exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
 flow into stage metadata so Grid can respect concurrency/timebox controls. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests. Provide
-`GRID_BEACON_URL` when the beacon origin differs from the default. Both
-credentials must be present; supplying only one results in an error. When
 `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
 successful run so developers can confirm which toggles/bundles were attached to
 each stage. Explicit ticket IDs remain a stub-only workflow until Grid
 integration lands.
 
 `workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
-requires `PLOY_GRID_ID` and `GRID_BEACON_API_KEY` so the CLI can reach a real Grid
-instance; in-memory stubs respond with a friendly reminder instead of attempting
-an unsupported cancellation.
+requires legacy Grid credentials when targeting that backend; in-memory stubs
+respond with a friendly reminder instead of attempting an unsupported
+cancellation.
 Ploy records the cancellation reason (when supplied) and echoes the run status
 so operators can quickly confirm whether the request was accepted or the run
 was already terminal.
@@ -134,14 +128,10 @@ classifier drift without leaving the workstation.
 
 ## Environment
 
-- `PLOY_GRID_ID` — Required grid identifier so the CLI can initialise the shared
-  grid client and scope its state directory per grid.
-- `GRID_BEACON_API_KEY` — Required beacon API key forwarded to beacon/discovery
-  and workflow RPC calls. Ensure the grid has been backfilled via
-  `gridctl grid client backfill --grid-id <grid>` so beacon exposes the
-  `manifestHost` and CA bundle needed by the shared client.
-- `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
-  by default).
+- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when the CLI
+  must talk to a Grid deployment instead of a local control plane.
+- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy Grid credentials. Omit
+  when using SSH descriptors; include them only for legacy Grid workflows.
 - `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
   directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`.
 - `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set it
@@ -151,8 +141,8 @@ classifier drift without leaving the workstation.
   unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
-  keys, manifests, and summaries. Without `PLOY_GRID_ID`/`GRID_BEACON_API_KEY` the CLI falls
-  back to the in-memory Grid and JetStream stubs for offline development.
+  keys, manifests, and summaries. Without `PLOY_GRID_ID` the CLI falls back to the
+  in-memory Grid and JetStream stubs for offline development.
 
 ## Development
 

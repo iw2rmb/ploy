@@ -3,16 +3,11 @@
 Ploy Next benefits from selectively porting mature modules from the Grid repository. This document
 highlights the primary candidates, why they are useful, and where to find them.
 
-## Beacon & Discovery
+## Discovery & Metadata
 
-- **HTTP Service & DNS manager** — `../grid/internal/beacon/http`, `../grid/internal/beacon/dns`,
-  `../grid/internal/beacon/store`. These packages already expose the REST API, DNS updates, and storage
-  abstraction needed for beacon mode.
-- **gridbeacon entrypoint** — `../grid/cmd/gridbeacon/main.go`. Provides configuration parsing and
-  lifecycle wiring that can be adapted to Ploy’s etcd-backed beacon.
-- **GridCTL client** — `../grid/internal/gridctl/beacon`. Reuse the caching client, registration
-  helpers, resolver writer, and metadata version checks so `ploy cluster connect` can detect stale
-  configuration (mirroring Grid’s metadata refresh flow).
+- **Descriptor caches** — Reuse ideas from `../grid/internal/gridctl` for caching discovery metadata,
+  but the SSH descriptor files have replaced the dedicated beacon services. Focus on the state caching
+  patterns rather than the HTTP surface.
 
 ## Job Runtime & Telemetry
 
@@ -39,8 +34,8 @@ highlights the primary candidates, why they are useful, and where to find them.
   references for CLI UX patterns, configuration handling, state caching, and metadata version tags.
 - **Bootstrap scripts** — `../grid/cmd/gridctl/cluster` packages house SSH/deploy helpers that can
   inform the shared bootstrap script embedded in the Ploy CLI.
-- **Tests & fakes** — Look at `../grid/internal/jobs/service_*_test.go`, `../grid/internal/beacon/store/memory_test.go`,
-  and related stubs to accelerate Ploy’s test scaffolding.
+- **Tests & fakes** — Look at `../grid/internal/jobs/service_*_test.go` and related stubs to accelerate
+  Ploy’s test scaffolding.
 
 ## How to Port
 

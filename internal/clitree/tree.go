@@ -119,18 +119,6 @@ var commandTree = []Node{
 		},
 	},
 	{
-		Name:        "beacon",
-		Description: "Rotate deployment CA material and node certificates",
-		Usage:       "ploy beacon <command>",
-		Subcommands: []Node{
-			{
-				Name:        "rotate-ca",
-				Description: "Rotate the cluster CA, update beacon/worker certificates, and record revocations",
-				Usage:       "ploy beacon rotate-ca --cluster-id <id> [--dry-run] [--operator <name>] [--reason <text>]",
-			},
-		},
-	},
-	{
 		Name:        "config",
 		Description: "Inspect or update cluster configuration",
 		Usage:       "ploy config <command>",
