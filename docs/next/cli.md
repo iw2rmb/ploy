@@ -36,15 +36,26 @@ operations for the v2 control plane. Commands mirror the structure captured in
 
 ## Cluster Descriptors
 
-- `ploy cluster connect --beacon-ip <addr> --api-key <key>`
-  Cache beacon metadata and trust bundles locally.
+Descriptors now encode only the SSH metadata needed to open tunnels:
+
+```json
+{
+  "cluster_id": "lab",
+  "address": "203.0.113.10",
+  "ssh_identity_path": "/home/dev/.ssh/id_ed25519",
+  "labels": {
+    "role": "control-plane",
+    "env": "staging"
+  }
+}
+```
+
 - `ploy cluster list`
-  List cached cluster descriptors and their last refresh time.
+  Show the cached descriptors with their SSH target, identity path, and labels so operators can confirm which key will be reused for future commands.
 
-## Deployment Bootstrap
-
-- `ploy deploy [--address <addr>] [--control-plane-url <url>] [--ployd-binary <path>]`
-  Copy the ployd daemon to the target host, execute it in bootstrap mode, and finalise cluster PKI on the workstation. The CLI derives remote authorized keys from the SSH identity at `~/.ssh/id_rsa` (or the identity provided via `--identity`).
+- `ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>] [--label key=value] [--health-probe name=url] [--dry-run]`
+  Bootstrap the first control-plane node by omitting `--cluster-id`; the CLI copies `ployd`, renders configs, and caches the descriptor locally.
+  Provide `--cluster-id` to add workers over SSH tunnels using the descriptor metadata, optionally tagging nodes via `--label` and previewing the flow with `--dry-run`.
 
 ## Configuration (GitLab)
 

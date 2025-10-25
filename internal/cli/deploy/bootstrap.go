@@ -24,7 +24,6 @@ type BootstrapConfig struct {
 	IdentityFile    string
 	Address         string
 	ControlPlaneURL string
-	BeaconURL       string
 	PloydBinaryPath string
 	Stdout          io.Writer
 	Stderr          io.Writer
@@ -34,9 +33,9 @@ type BootstrapConfig struct {
 
 // BootstrapCommand prepares deploy.Options and invokes the deployment runner.
 type BootstrapCommand struct {
-	RunBootstrap    func(context.Context, deploy.Options) error
+	RunBootstrap      func(context.Context, deploy.Options) error
 	LocatePloydBinary func(string) (string, error)
-	DefaultIdentity func() string
+	DefaultIdentity   func() string
 }
 
 // Run executes the bootstrap flow using the provided configuration.
@@ -232,5 +231,5 @@ func defaultPloydBinaryPath(workstationOS string) (string, error) {
 		}
 		return candidate, nil
 	}
-	return "", errors.New("ploy deploy bootstrap: ployd binary not found alongside CLI; provide --ployd-binary")
+	return "", errors.New("ploy cluster add: ployd binary not found alongside CLI; provide --ployd-binary")
 }

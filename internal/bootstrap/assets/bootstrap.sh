@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deployment bootstrap script used by `ploy deploy bootstrap`.
+# Deployment bootstrap script used by `ploy cluster add --address <host>`.
 # The script converges host dependencies to the required versions and
 # performs preflight checks before installing software.
 

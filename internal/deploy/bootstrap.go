@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/bootstrap"
+	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 const (
@@ -35,23 +34,26 @@ const (
 
 // Options configure bootstrap execution.
 type Options struct {
-	Address             string
-	User                string
-	Port                int
-	IdentityFile        string
-	Stdout              io.Writer
-	Stderr              io.Writer
-	Runner              Runner
-	PloydBinaryPath     string
-	ControlPlaneURL     string
-	Clock               func() time.Time
-	Stdin               io.Reader
-	WorkstationOS       string
-	AdminAuthorizedKeys []string
-	UserAuthorizedKeys  []string
-	DescriptorID        string
-	DescriptorAddress   string
+	Host                   string
+	Address                string
+	User                   string
+	Port                   int
+	IdentityFile           string
+	Stdout                 io.Writer
+	Stderr                 io.Writer
+	Runner                 Runner
+	PloydBinaryPath        string
+	ControlPlaneURL        string
+	Clock                  func() time.Time
+	Stdin                  io.Reader
+	WorkstationOS          string
+	AdminAuthorizedKeys    []string
+	UserAuthorizedKeys     []string
+	DescriptorID           string
+	DescriptorAddress      string
 	DescriptorIdentityPath string
+	ClusterID              string
+	InitialWorkers         []string
 }
 
 // IOStreams represents command IO endpoints.
@@ -185,21 +187,21 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		descriptorID = address
 	}
 	desc := config.Descriptor{
-		ID:           descriptorID,
-		NodeAddress:  strings.TrimSpace(opts.DescriptorAddress),
-		IdentityPath: strings.TrimSpace(opts.DescriptorIdentityPath),
+		ClusterID:       descriptorID,
+		Address:         strings.TrimSpace(opts.DescriptorAddress),
+		SSHIdentityPath: strings.TrimSpace(opts.DescriptorIdentityPath),
 	}
-	if desc.NodeAddress == "" {
-		desc.NodeAddress = address
+	if desc.Address == "" {
+		desc.Address = address
 	}
-	if desc.IdentityPath == "" {
-		desc.IdentityPath = opts.IdentityFile
+	if desc.SSHIdentityPath == "" {
+		desc.SSHIdentityPath = opts.IdentityFile
 	}
 	saved, err := config.SaveDescriptor(desc)
 	if err != nil {
 		return fmt.Errorf("bootstrap: save descriptor: %w", err)
 	}
-	if err := config.SetDefault(saved.ID); err != nil {
+	if err := config.SetDefault(saved.ClusterID); err != nil {
 		return fmt.Errorf("bootstrap: set default descriptor: %w", err)
 	}
 
@@ -260,94 +262,6 @@ func defaultControlPlaneEndpoint(value string) string {
 	return value
 }
 
-func bootstrapClusterPKI(ctx context.Context, clusterID string, opts Options) (*clusterPKIState, error) {
-	clusterID = strings.TrimSpace(clusterID)
-	client := opts.EtcdClient
-	if client == nil {
-		return nil, errors.New("bootstrap: etcd client required")
-	}
-	if strings.TrimSpace(opts.BeaconURL) == "" {
-		return nil, errors.New("bootstrap: beacon url required")
-	}
-	if strings.TrimSpace(opts.APIKey) == "" {
-		return nil, errors.New("bootstrap: api key required")
-	}
-	beaconIDs := normalizeNodeIDs(opts.InitialBeacons)
-	if len(beaconIDs) == 0 {
-		return nil, errors.New("bootstrap: at least one beacon id required")
-	}
-	workerIDs := normalizeNodeIDs(opts.InitialWorkers)
-
-	manager, err := NewCARotationManager(client, clusterID)
-	if err != nil {
-		return nil, err
-	}
-
-	clock := opts.Clock
-	var requestedAt time.Time
-	if clock != nil {
-		requestedAt = clock().UTC()
-	} else {
-		requestedAt = time.Now().UTC()
-	}
-
-	state, err := manager.Bootstrap(ctx, BootstrapOptions{
-		BeaconIDs:   beaconIDs,
-		WorkerIDs:   workerIDs,
-		RequestedAt: requestedAt,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	caPath, err := config.CABundlePath(clusterID)
-	if err != nil {
-		return nil, fmt.Errorf("bootstrap: resolve ca bundle path: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(caPath), 0o755); err != nil {
-		return nil, fmt.Errorf("bootstrap: create config directory: %w", err)
-	}
-	if err := os.WriteFile(caPath, []byte(state.CurrentCA.CertificatePEM), 0o600); err != nil {
-		return nil, fmt.Errorf("bootstrap: write ca bundle: %w", err)
-	}
-
-	beaconURL := strings.TrimSpace(opts.BeaconURL)
-	controlPlaneURL := strings.TrimSpace(opts.ControlPlaneURL)
-	apiKey := strings.TrimSpace(opts.APIKey)
-
-	descriptor := config.Descriptor{
-		ID:              clusterID,
-		BeaconURL:       beaconURL,
-		ControlPlaneURL: controlPlaneURL,
-		APIKey:          apiKey,
-		CABundlePath:    caPath,
-		TrustBundlePath: caPath,
-		Version:         state.CurrentCA.Version,
-	}
-	saved, err := config.SaveDescriptor(descriptor)
-	if err != nil {
-		return nil, fmt.Errorf("bootstrap: save descriptor: %w", err)
-	}
-	if err := config.SetDefault(saved.ID); err != nil {
-		return nil, fmt.Errorf("bootstrap: set default descriptor: %w", err)
-	}
-
-	return &clusterPKIState{
-		CurrentCA:  state.CurrentCA,
-		Descriptor: saved,
-		CABundle:   caPath,
-	}, nil
-}
-
-func hasNonEmpty(values []string) bool {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return true
-		}
-	}
-	return false
-}
-
 // normalizedAuthorizedKeys returns a trimmed list of authorized key entries without blanks.
 func normalizedAuthorizedKeys(keys []string) []string {
 	clean := make([]string, 0, len(keys))
@@ -371,6 +285,18 @@ func encodeAuthorizedKeys(keys []string) string {
 		payload += "\n"
 	}
 	return base64.StdEncoding.EncodeToString([]byte(payload))
+}
+
+type configureWorkstationOptions struct {
+	ClusterID   string
+	CAPath      string
+	BeaconIP    string
+	ResolverDir string
+	GOOS        string
+	Runner      Runner
+	Stdout      io.Writer
+	Stderr      io.Writer
+	Stdin       io.Reader
 }
 
 func configureWorkstation(ctx context.Context, cfg configureWorkstationOptions) error {
@@ -546,134 +472,4 @@ func promptYesNo(in io.Reader, out io.Writer, message string) (bool, error) {
 func runCommand(ctx context.Context, runner Runner, command string, args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	streams := IOStreams{Stdout: stdout, Stderr: stderr}
 	return runner.Run(ctx, command, args, stdin, streams)
-}
-
-func startEtcdTunnel(ctx context.Context, opts Options, port int, stderr io.Writer, stdin io.Reader) (string, func() error, error) {
-	connectHost := strings.TrimSpace(opts.Address)
-	if connectHost == "" {
-		connectHost = strings.TrimSpace(opts.Host)
-	}
-	if connectHost == "" {
-		return "", nil, errors.New("bootstrap: address required for etcd tunnel")
-	}
-	user := opts.User
-	if user == "" {
-		user = DefaultRemoteUser
-	}
-	target := connectHost
-	if user != "" {
-		target = fmt.Sprintf("%s@%s", user, connectHost)
-	}
-
-	localPort, err := allocateLocalPort()
-	if err != nil {
-		return "", nil, fmt.Errorf("bootstrap: allocate tunnel port: %w", err)
-	}
-
-	args := []string{
-		"-o", "BatchMode=yes",
-		"-o", "StrictHostKeyChecking=accept-new",
-	}
-	if opts.IdentityFile != "" {
-		args = append(args, "-i", opts.IdentityFile)
-	}
-	if port != DefaultSSHPort {
-		args = append(args, "-p", strconv.Itoa(port))
-	}
-	args = append(args, "-L", fmt.Sprintf("%d:127.0.0.1:2379", localPort), target, "-N")
-
-	tunnelCtx, cancel := context.WithCancel(ctx)
-	cmd := exec.CommandContext(tunnelCtx, "ssh", args...)
-	if stdin != nil {
-		cmd.Stdin = stdin
-	} else {
-		cmd.Stdin = os.Stdin
-	}
-	if stderr != nil {
-		cmd.Stdout = stderr
-		cmd.Stderr = stderr
-	}
-
-	if err := cmd.Start(); err != nil {
-		cancel()
-		return "", nil, fmt.Errorf("bootstrap: start etcd tunnel: %w", err)
-	}
-
-	waitCh := make(chan error, 1)
-	go func() {
-		waitCh <- cmd.Wait()
-	}()
-
-	if err := waitForLocalPort(tunnelCtx, localPort); err != nil {
-		cancel()
-		select {
-		case waitErr := <-waitCh:
-			if waitErr != nil {
-				err = fmt.Errorf("%v: %w", err, waitErr)
-			}
-		default:
-		}
-		return "", nil, err
-	}
-
-	stop := func() error {
-		cancel()
-		return <-waitCh
-	}
-
-	return fmt.Sprintf("http://127.0.0.1:%d", localPort), stop, nil
-}
-
-func allocateLocalPort() (int, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = l.Close() }()
-	addr := l.Addr().(*net.TCPAddr)
-	return addr.Port, nil
-}
-
-func waitForLocalPort(ctx context.Context, port int) error {
-	address := fmt.Sprintf("127.0.0.1:%d", port)
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		conn, err := net.DialTimeout("tcp", address, 200*time.Millisecond)
-		if err == nil {
-			_ = conn.Close()
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("bootstrap: establish etcd tunnel: %w", err)
-		}
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("bootstrap: etcd tunnel cancelled: %w", ctx.Err())
-		case <-time.After(150 * time.Millisecond):
-		}
-	}
-}
-
-func connectEtcd(ctx context.Context, endpoints []string) (*clientv3.Client, error) {
-	if len(endpoints) == 0 {
-		return nil, errors.New("bootstrap: etcd endpoints required")
-	}
-	cfg := clientv3.Config{
-		Endpoints:   endpoints,
-		DialTimeout: 5 * time.Second,
-		Context:     ctx,
-	}
-	client, err := clientv3.New(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
-
-func generateAPIKey() (string, error) {
-	buf := make([]byte, 32)
-	if _, err := rand.Read(buf); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(buf), nil
 }

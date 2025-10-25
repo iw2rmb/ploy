@@ -102,6 +102,11 @@ var commandTree = []Node{
 		Usage:       "ploy cluster <command>",
 		Subcommands: []Node{
 			{
+				Name:        "add",
+				Description: "Bootstrap the control-plane node or join workers over SSH",
+				Usage:       "ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>]",
+			},
+			{
 				Name:        "connect",
 				Description: "Cache beacon metadata and trust bundles locally",
 				Usage:       "ploy cluster connect --beacon-ip <addr> --api-key <key>",
@@ -110,30 +115,6 @@ var commandTree = []Node{
 				Name:        "list",
 				Description: "Show locally cached cluster descriptors",
 				Usage:       "ploy cluster list",
-			},
-		},
-	},
-	{
-		Name:        "deploy",
-		Description: "Bootstrap deployment hosts and verify readiness",
-		Usage:       "ploy deploy <command>",
-		Subcommands: []Node{
-			{
-				Name:        "bootstrap",
-				Description: "Install dependencies and run host preflight checks",
-				Usage:       "ploy deploy bootstrap [--address <addr>] [--user <name>] [--identity <path>]",
-			},
-		},
-	},
-	{
-		Name:        "node",
-		Description: "Manage worker nodes and onboarding",
-		Usage:       "ploy node <command>",
-		Subcommands: []Node{
-			{
-				Name:        "add",
-				Description: "Onboard a worker node, register metadata, and verify health probes",
-				Usage:       "ploy node add [--address <addr>] [--label key=value] [--health-probe name=url] [--dry-run]",
 			},
 		},
 	},

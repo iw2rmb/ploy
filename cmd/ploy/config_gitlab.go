@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -17,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	cfgstore "github.com/iw2rmb/ploy/internal/cli/config"
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
 )
@@ -498,7 +496,6 @@ func limitEntries[T any](items []T, limit int) []T {
 func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error) {
 	var lastErr error
 	endpoint := strings.TrimSpace(os.Getenv(controlPlaneURLEnv))
-	var descriptor *cfgstore.Descriptor
 
 	if endpoint == "" {
 		cfg, err := resolveIntegrationConfig(ctx)
@@ -512,26 +509,10 @@ func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error
 	}
 
 	if endpoint == "" {
-		desc, ok, err := defaultClusterDescriptor()
-		if err != nil {
-			if lastErr == nil {
-				lastErr = err
-			}
-		} else if ok {
-			descriptor = &desc
-			if trimmed := strings.TrimSpace(desc.ControlPlaneURL); trimmed != "" {
-				endpoint = trimmed
-			} else if trimmed := strings.TrimSpace(desc.BeaconURL); trimmed != "" {
-				endpoint = trimmed
-			}
-		}
-	}
-
-	if endpoint == "" {
 		if lastErr != nil {
 			return nil, nil, lastErr
 		}
-		return nil, nil, errors.New("control plane endpoint not configured; set PLOY_CONTROL_PLANE_URL or connect to a cluster descriptor with a control plane URL")
+		return nil, nil, errors.New("control plane endpoint not configured; set PLOY_CONTROL_PLANE_URL or provide an API endpoint via 'ploy config gitlab set'")
 	}
 
 	parsed, err := url.Parse(endpoint)
@@ -546,7 +527,7 @@ func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error
 		return nil, nil, err
 	}
 
-	httpClient, err := newControlPlaneHTTPClient(parsed, descriptor)
+	httpClient, err := newControlPlaneHTTPClient(parsed)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -556,44 +537,12 @@ func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error
 	return parsed, httpClient, nil
 }
 
-func defaultClusterDescriptor() (cfgstore.Descriptor, bool, error) {
-	descs, err := cfgstore.ListDescriptors()
-	if err != nil {
-		return cfgstore.Descriptor{}, false, err
-	}
-	if len(descs) == 0 {
-		return cfgstore.Descriptor{}, false, nil
-	}
-	for _, desc := range descs {
-		if desc.Default {
-			return desc, true, nil
-		}
-	}
-	if len(descs) == 1 {
-		return descs[0], true, nil
-	}
-	return cfgstore.Descriptor{}, false, errors.New("multiple cluster descriptors found without a default; designate one via 'ploy cluster connect' before using GitLab signer commands")
-}
-
-func newControlPlaneHTTPClient(base *url.URL, desc *cfgstore.Descriptor) (*http.Client, error) {
+func newControlPlaneHTTPClient(base *url.URL) (*http.Client, error) {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 	}
 	if strings.EqualFold(base.Scheme, "https") {
 		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
-		if desc != nil {
-			if caPath := strings.TrimSpace(desc.CABundlePath); caPath != "" {
-				data, err := os.ReadFile(caPath)
-				if err != nil {
-					return nil, fmt.Errorf("read control plane CA bundle: %w", err)
-				}
-				pool := x509.NewCertPool()
-				if !pool.AppendCertsFromPEM(data) {
-					return nil, errors.New("parse control plane CA bundle")
-				}
-				tlsCfg.RootCAs = pool
-			}
-		}
 		transport.TLSClientConfig = tlsCfg
 	}
 	client := &http.Client{

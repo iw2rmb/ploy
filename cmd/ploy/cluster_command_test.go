@@ -2,15 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/deploy"
 )
+
+const identityBootstrapKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ076bootTestAdmin deploy-admin"
 
 func TestHandleClusterRequiresSubcommand(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -28,21 +33,19 @@ func TestHandleClusterListOutputsDescriptors(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgDir)
 	_, err := config.SaveDescriptor(config.Descriptor{
-		ID:              "alpha",
-		BeaconURL:       "https://alpha-beacon",
-		ControlPlaneURL: "https://alpha-control",
-		Version:         "2025.09.01",
-		LastRefreshed:   time.Date(2025, 9, 15, 12, 0, 0, 0, time.UTC),
+		ClusterID:       "alpha",
+		Address:         "10.10.0.1",
+		SSHIdentityPath: "/home/ploy/.ssh/id_alpha",
+		Labels:          map[string]string{"env": "dev"},
 	})
 	if err != nil {
 		t.Fatalf("save alpha: %v", err)
 	}
 	_, err = config.SaveDescriptor(config.Descriptor{
-		ID:              "beta",
-		BeaconURL:       "https://beta-beacon",
-		ControlPlaneURL: "https://beta-control",
-		Version:         "2025.10.01",
-		LastRefreshed:   time.Date(2025, 10, 1, 9, 30, 0, 0, time.UTC),
+		ClusterID:       "beta",
+		Address:         "10.10.0.2",
+		SSHIdentityPath: "/home/ploy/.ssh/id_beta",
+		Labels:          map[string]string{"env": "prod"},
 	})
 	if err != nil {
 		t.Fatalf("save beta: %v", err)
@@ -57,12 +60,12 @@ func TestHandleClusterListOutputsDescriptors(t *testing.T) {
 	output := buf.String()
 	if !containsAll(output,
 		"alpha",
-		"https://alpha-beacon",
-		"https://alpha-control",
-		"2025.09.01",
+		"address=10.10.0.1",
+		"identity=/home/ploy/.ssh/id_alpha",
+		"labels=env=dev",
 		"beta (default)",
-		"https://beta-beacon",
-		"https://beta-control") {
+		"address=10.10.0.2",
+		"labels=env=prod") {
 		t.Fatalf("unexpected cluster list output:\n%s", output)
 	}
 }
@@ -117,32 +120,169 @@ func TestHandleClusterConnectStoresDescriptor(t *testing.T) {
 	if !desc.Default {
 		t.Fatalf("expected descriptor marked default")
 	}
-	if desc.APIKey != "api-key" {
-		t.Fatalf("expected API key persisted, got %q", desc.APIKey)
+	if desc.Address == "" {
+		t.Fatalf("expected Address recorded, got empty")
 	}
-	if desc.BeaconURL != server.URL {
-		t.Fatalf("expected beacon url %q, got %q", server.URL, desc.BeaconURL)
-	}
-	if desc.ControlPlaneURL != "https://api.example" {
-		t.Fatalf("expected control plane url, got %q", desc.ControlPlaneURL)
-	}
-	if desc.Version != "2025.10.21" {
-		t.Fatalf("expected version persisted, got %q", desc.Version)
-	}
-	if desc.CABundlePath == "" {
-		t.Fatalf("expected ca bundle path recorded")
-	}
-	data, err := os.ReadFile(desc.CABundlePath)
-	if err != nil {
-		t.Fatalf("read ca bundle: %v", err)
-	}
-	if string(data) != caBody {
-		t.Fatalf("unexpected ca bundle contents: %q", string(data))
-	}
-	if desc.LastRefreshed.IsZero() {
-		t.Fatalf("expected LastRefreshed to be set")
+	if desc.SSHIdentityPath == "" {
+		t.Fatalf("expected SSH identity recorded, got empty")
 	}
 	if buf.Len() == 0 {
 		t.Fatalf("expected output summarizing cluster connection")
 	}
+}
+
+func TestHandleClusterAddRequiresAddress(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	orig := clusterBootstrapRunner
+	defer func() { clusterBootstrapRunner = orig }()
+	clusterBootstrapRunner = func(context.Context, deploy.Options) error {
+		t.Fatalf("bootstrap runner should not be invoked without address")
+		return nil
+	}
+	identityPath := identityFixture(t, identityBootstrapKey)
+	ploydPath := ploydFixture(t)
+	err := handleCluster([]string{"add", "--identity", identityPath, "--ployd-binary", ploydPath}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "address") {
+		t.Fatalf("expected address error, got %v", err)
+	}
+}
+
+func TestHandleClusterAddWithoutClusterIDBootstrapsControlPlane(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	orig := clusterBootstrapRunner
+	defer func() { clusterBootstrapRunner = orig }()
+	var captured deploy.Options
+	clusterBootstrapRunner = func(_ context.Context, opts deploy.Options) error {
+		captured = opts
+		return nil
+	}
+	identityPath := identityFixture(t, identityBootstrapKey)
+	ploydPath := ploydFixture(t)
+	buf := &bytes.Buffer{}
+	err := handleCluster([]string{"add", "--address", "192.0.2.10", "--identity", identityPath, "--ployd-binary", ploydPath}, buf)
+	if err != nil {
+		t.Fatalf("cluster add bootstrap returned error: %v", err)
+	}
+	if captured.Address != "192.0.2.10" {
+		t.Fatalf("expected address propagated, got %q", captured.Address)
+	}
+	if captured.IdentityFile != identityPath {
+		t.Fatalf("expected identity path propagated, got %q", captured.IdentityFile)
+	}
+	if captured.PloydBinaryPath != ploydPath {
+		t.Fatalf("expected ployd binary path propagated, got %q", captured.PloydBinaryPath)
+	}
+	if captured.DescriptorID != "192.0.2.10" {
+		t.Fatalf("expected descriptor id to mirror address, got %q", captured.DescriptorID)
+	}
+}
+
+func TestHandleClusterAddRejectsWorkerFlagsWithoutClusterID(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	orig := clusterBootstrapRunner
+	defer func() { clusterBootstrapRunner = orig }()
+	clusterBootstrapRunner = func(context.Context, deploy.Options) error {
+		t.Fatalf("bootstrap runner should not be called when worker flags are invalid")
+		return nil
+	}
+	identityPath := identityFixture(t, identityBootstrapKey)
+	ploydPath := ploydFixture(t)
+	err := handleCluster([]string{"add", "--address", "192.0.2.10", "--label", "role=worker", "--identity", identityPath, "--ployd-binary", ploydPath}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "worker-only flags") {
+		t.Fatalf("expected worker flag validation error, got %v", err)
+	}
+}
+
+func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
+	cfgDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", cfgDir)
+	descriptor, err := config.SaveDescriptor(config.Descriptor{
+		ClusterID:       "lab",
+		Address:         "203.0.113.10",
+		SSHIdentityPath: "/home/ploy/.ssh/id_lab",
+	})
+	if err != nil {
+		t.Fatalf("save descriptor: %v", err)
+	}
+	identityPath := identityFixture(t, identityBootstrapKey)
+	ploydPath := ploydFixture(t)
+	origProvision := clusterProvisionHost
+	defer func() { clusterProvisionHost = origProvision }()
+	var provision deploy.ProvisionOptions
+	clusterProvisionHost = func(_ context.Context, opts deploy.ProvisionOptions) error {
+		provision = opts
+		return nil
+	}
+	origRegister := clusterWorkerRegister
+	defer func() { clusterWorkerRegister = origRegister }()
+	var payload nodeJoinRequest
+	clusterWorkerRegister = func(_ context.Context, _ *http.Client, baseURL string, req nodeJoinRequest) (nodeJoinResponse, error) {
+		payload = req
+		if baseURL == "" {
+			t.Fatalf("expected base URL propagated")
+		}
+		return nodeJoinResponse{WorkerID: "worker-1"}, nil
+	}
+	origFactory := clusterHTTPClientFactory
+	defer func() { clusterHTTPClientFactory = origFactory }()
+	var factoryDescriptor config.Descriptor
+	clusterHTTPClientFactory = func(desc config.Descriptor) (*http.Client, func(), error) {
+		factoryDescriptor = desc
+		return &http.Client{}, func() {}, nil
+	}
+	buf := &bytes.Buffer{}
+	err = handleCluster([]string{"add",
+		"--cluster-id", descriptor.ClusterID,
+		"--address", "198.51.100.7",
+		"--identity", identityPath,
+		"--ployd-binary", ploydPath,
+	}, buf)
+	if err != nil {
+		t.Fatalf("cluster add worker returned error: %v", err)
+	}
+	if provision.Mode != deploy.ProvisionModeWorker {
+		t.Fatalf("expected worker provision mode, got %s", provision.Mode)
+	}
+	if provision.Host != "198.51.100.7" || provision.Address != "198.51.100.7" {
+		t.Fatalf("expected worker address propagated, got %+v", provision)
+	}
+	if provision.IdentityFile != identityPath {
+		t.Fatalf("expected identity path propagated to provisioner, got %q", provision.IdentityFile)
+	}
+	if factoryDescriptor.ClusterID != descriptor.ClusterID {
+		t.Fatalf("expected descriptor passed to HTTP client factory")
+	}
+	if payload.ClusterID != descriptor.ClusterID {
+		t.Fatalf("expected payload cluster id %s, got %s", descriptor.ClusterID, payload.ClusterID)
+	}
+	if payload.Address != "198.51.100.7" {
+		t.Fatalf("expected payload address propagated, got %s", payload.Address)
+	}
+	if !strings.Contains(buf.String(), "worker-1") {
+		t.Fatalf("expected worker join output, got %q", buf.String())
+	}
+}
+
+func ploydFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ployd")
+	if err := os.WriteFile(path, []byte("binary"), 0o755); err != nil {
+		t.Fatalf("write temp ployd binary: %v", err)
+	}
+	return path
+}
+
+func identityFixture(t *testing.T, key string) string {
+	t.Helper()
+	dir := t.TempDir()
+	priv := filepath.Join(dir, "id_rsa")
+	if err := os.WriteFile(priv, []byte("PRIVATE KEY"), 0o600); err != nil {
+		t.Fatalf("write identity private key: %v", err)
+	}
+	pub := priv + ".pub"
+	if err := os.WriteFile(pub, []byte(key+"\n"), 0o644); err != nil {
+		t.Fatalf("write identity public key: %v", err)
+	}
+	return priv
 }

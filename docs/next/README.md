@@ -20,7 +20,7 @@ Grid stack.
 
 ## Non-Goals
 
-- Multi-cluster federation or beacon-to-beacon failover (future work).
+- Multi-cluster federation or dedicated discovery nodes (future work).
 - Hybrid support for the Grid workflow runner; v2 replaces Grid entirely.
 - Rewriting SHIFT itself—Ploy consumes the existing SHIFT build gate APIs.
 
@@ -56,9 +56,9 @@ SHIFT sandbox before the next step.
 - **Ploy Nodes (ployd workers)** — `ployd` worker daemons hosting Docker,
   SHIFT, IPFS Cluster client, and etcd connectivity. Execute Mod steps, persist
   job state, and stream logs back to the CLI.
-- **Ploy Node (ployd beacon mode)** — `ployd` running in beacon mode acts as
-  the discovery node that distributes API endpoints and trust bundles while
-  remaining eligible to execute jobs.
+- **SSH Tunnel Manager** — `pkg/sshtransport` plus cached descriptors keep
+  persistent SSH tunnels alive so the CLI can reach control-plane HTTP APIs
+  without provisioning separate beacons or TLS bundles.
 - **SHIFT Build Gate** — Executes unit tests and static analysis per step;
   reused from the existing integration without embedding its CLI.
 - **IPFS Cluster** — Artifact store for snapshots, diff bundles, logs, and OCI
@@ -132,7 +132,7 @@ dependencies between components, and cleanup guidance for retiring Grid.
 ## Further Reading
 
 - [docs/next/cli.md](cli.md) — Command-line reference.
-- [docs/next/api.md](api.md) — REST route catalog for control plane, nodes, and beacon.
+- [docs/next/api.md](api.md) — REST route catalog for control plane and node APIs exposed over SSH tunnels.
 - [docs/next/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
 - [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.

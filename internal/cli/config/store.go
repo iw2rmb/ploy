@@ -5,36 +5,64 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
 
-// Descriptor captures the minimal metadata required to establish SSH tunnels to a cluster.
+// Descriptor captures the SSH metadata required to establish tunnels to a cluster.
 type Descriptor struct {
-	ID            string    `json:"id"`
-	NodeAddress   string    `json:"node_address"`
-	IdentityPath  string    `json:"identity_path,omitempty"`
-	LastRefreshed time.Time `json:"last_refreshed,omitempty"`
-	Default       bool      `json:"default,omitempty"`
+	ClusterID       string            `json:"cluster_id"`
+	Address         string            `json:"address"`
+	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+
+	Default bool `json:"-"`
+}
+
+type descriptorFile struct {
+	ClusterID       string            `json:"cluster_id"`
+	Address         string            `json:"address"`
+	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+}
+
+type legacyDescriptorFile struct {
+	ClusterID       string            `json:"cluster_id"`
+	ID              string            `json:"id"`
+	Address         string            `json:"address"`
+	NodeAddress     string            `json:"node_address"`
+	SSHIdentityPath string            `json:"ssh_identity_path"`
+	IdentityPath    string            `json:"identity_path"`
+	Labels          map[string]string `json:"labels"`
+	Default         bool              `json:"default"`
+}
+
+type descriptorLoad struct {
+	descriptor    Descriptor
+	needsWrite    bool
+	legacyDefault bool
 }
 
 // SaveDescriptor persists a cluster descriptor to disk, returning the stored copy.
 func SaveDescriptor(desc Descriptor) (Descriptor, error) {
-	trimmedID := strings.TrimSpace(desc.ID)
+	trimmedID := strings.TrimSpace(desc.ClusterID)
 	if trimmedID == "" {
-		return Descriptor{}, errors.New("descriptor id required")
+		return Descriptor{}, errors.New("descriptor cluster id required")
 	}
-	if strings.TrimSpace(desc.NodeAddress) == "" {
-		return Descriptor{}, errors.New("descriptor node address required")
+	trimmedAddress := strings.TrimSpace(desc.Address)
+	if trimmedAddress == "" {
+		return Descriptor{}, errors.New("descriptor address required")
 	}
+
 	sanitizedID := sanitizeID(trimmedID)
-	if desc.LastRefreshed.IsZero() {
-		desc.LastRefreshed = time.Now().UTC()
-	}
-	desc.ID = sanitizedID
+	desc.ClusterID = sanitizedID
+	desc.Address = trimmedAddress
+	desc.SSHIdentityPath = strings.TrimSpace(desc.SSHIdentityPath)
+	desc.Labels = cloneLabels(desc.Labels)
+
 	root, err := clusterConfigDir()
 	if err != nil {
 		return Descriptor{}, err
@@ -46,6 +74,11 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 	if err := writeDescriptorFile(path, desc); err != nil {
 		return Descriptor{}, err
 	}
+	defaultID, err := readDefaultMarker(root)
+	if err != nil {
+		return Descriptor{}, err
+	}
+	desc.Default = defaultID != "" && defaultID == desc.ClusterID
 	return desc, nil
 }
 
@@ -55,18 +88,28 @@ func LoadDescriptor(id string) (Descriptor, error) {
 	if err != nil {
 		return Descriptor{}, err
 	}
-	data, err := os.ReadFile(path)
+	load, err := loadDescriptorFromPath(path)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return Descriptor{}, fmt.Errorf("cluster %s not found", id)
+		return Descriptor{}, err
+	}
+	if load.needsWrite {
+		if err := writeDescriptorFile(path, load.descriptor); err != nil {
+			return Descriptor{}, err
 		}
-		return Descriptor{}, fmt.Errorf("read descriptor: %w", err)
 	}
-	var desc Descriptor
-	if err := json.Unmarshal(data, &desc); err != nil {
-		return Descriptor{}, fmt.Errorf("decode descriptor: %w", err)
+	root := filepath.Dir(path)
+	defaultID, err := readDefaultMarker(root)
+	if err != nil {
+		return Descriptor{}, err
 	}
-	return desc, nil
+	if defaultID == "" && load.legacyDefault {
+		if err := writeDefaultMarker(root, load.descriptor.ClusterID); err != nil {
+			return Descriptor{}, err
+		}
+		defaultID = load.descriptor.ClusterID
+	}
+	load.descriptor.Default = defaultID != "" && load.descriptor.ClusterID == defaultID
+	return load.descriptor, nil
 }
 
 // ListDescriptors returns all cached descriptors sorted by identifier.
@@ -82,25 +125,45 @@ func ListDescriptors() ([]Descriptor, error) {
 		}
 		return nil, fmt.Errorf("read config directory: %w", err)
 	}
+	defaultID, err := readDefaultMarker(root)
+	if err != nil {
+		return nil, err
+	}
+	hasMarker := defaultID != ""
 	descs := make([]Descriptor, 0, len(entries))
+
 	for _, entry := range entries {
-		if entry.IsDir() {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		if !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		id := strings.TrimSuffix(entry.Name(), ".json")
-		desc, err := LoadDescriptor(id)
+		path := filepath.Join(root, entry.Name())
+		load, err := loadDescriptorFromPath(path)
 		if err != nil {
 			return nil, err
 		}
-		desc.ID = idFromFilename(entry.Name())
-		descs = append(descs, desc)
+		if load.needsWrite {
+			if err := writeDescriptorFile(path, load.descriptor); err != nil {
+				return nil, err
+			}
+		}
+		if !hasMarker && load.legacyDefault {
+			if err := writeDefaultMarker(root, load.descriptor.ClusterID); err != nil {
+				return nil, err
+			}
+			defaultID = load.descriptor.ClusterID
+			hasMarker = true
+		}
+		load.descriptor.Default = defaultID != "" && load.descriptor.ClusterID == defaultID
+		descs = append(descs, load.descriptor)
 	}
+
 	sort.Slice(descs, func(i, j int) bool {
-		return descs[i].ID < descs[j].ID
+		return descs[i].ClusterID < descs[j].ClusterID
 	})
+
+	if defaultID == "" && len(descs) == 1 {
+		descs[0].Default = true
+	}
 	return descs, nil
 }
 
@@ -110,28 +173,17 @@ func SetDefault(id string) error {
 	if trimmed == "" {
 		return errors.New("cluster id required")
 	}
-	descriptors, err := ListDescriptors()
+	if _, err := LoadDescriptor(trimmed); err != nil {
+		return err
+	}
+	root, err := clusterConfigDir()
 	if err != nil {
 		return err
 	}
-	found := false
-	for _, desc := range descriptors {
-		desc.Default = desc.ID == trimmed
-		if desc.Default {
-			found = true
-		}
-		path, err := descriptorPath(desc.ID)
-		if err != nil {
-			return err
-		}
-		if err := writeDescriptorFile(path, desc); err != nil {
-			return err
-		}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
 	}
-	if !found {
-		return fmt.Errorf("cluster %s not found", trimmed)
-	}
-	return nil
+	return writeDefaultMarker(root, sanitizeID(trimmed))
 }
 
 func clusterConfigDir() (string, error) {
@@ -153,11 +205,24 @@ func descriptorPath(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(root, sanitizeID(strings.TrimSpace(id))+".json"), nil
+	slug := sanitizeID(strings.TrimSpace(id))
+	if slug == "" {
+		return "", errors.New("cluster id required")
+	}
+	return filepath.Join(root, slug+".json"), nil
 }
 
 func writeDescriptorFile(path string, desc Descriptor) error {
-	data, err := json.MarshalIndent(desc, "", "  ")
+	payload := descriptorFile{
+		ClusterID:       desc.ClusterID,
+		Address:         desc.Address,
+		SSHIdentityPath: desc.SSHIdentityPath,
+		Labels:          nil,
+	}
+	if len(desc.Labels) > 0 {
+		payload.Labels = cloneLabels(desc.Labels)
+	}
+	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode descriptor: %w", err)
 	}
@@ -187,7 +252,96 @@ func sanitizeID(id string) string {
 	return string(clean)
 }
 
-func idFromFilename(name string) string {
-	trimmed := strings.TrimSuffix(name, ".json")
-	return trimmed
+func loadDescriptorFromPath(path string) (descriptorLoad, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return descriptorLoad{}, fmt.Errorf("cluster %s not found", strings.TrimSuffix(filepath.Base(path), ".json"))
+		}
+		return descriptorLoad{}, fmt.Errorf("read descriptor: %w", err)
+	}
+
+	var current descriptorFile
+	if err := json.Unmarshal(data, &current); err == nil && strings.TrimSpace(current.ClusterID) != "" {
+		desc := Descriptor{
+			ClusterID:       sanitizeID(current.ClusterID),
+			Address:         strings.TrimSpace(current.Address),
+			SSHIdentityPath: strings.TrimSpace(current.SSHIdentityPath),
+			Labels:          cloneLabels(current.Labels),
+		}
+		return descriptorLoad{descriptor: desc}, nil
+	}
+
+	var legacy legacyDescriptorFile
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return descriptorLoad{}, fmt.Errorf("decode descriptor: %w", err)
+	}
+	clusterID := legacy.ClusterID
+	if clusterID == "" {
+		clusterID = legacy.ID
+	}
+	address := legacy.Address
+	if address == "" {
+		address = legacy.NodeAddress
+	}
+	identity := legacy.SSHIdentityPath
+	if identity == "" {
+		identity = legacy.IdentityPath
+	}
+	desc := Descriptor{
+		ClusterID:       sanitizeID(clusterID),
+		Address:         strings.TrimSpace(address),
+		SSHIdentityPath: strings.TrimSpace(identity),
+		Labels:          cloneLabels(legacy.Labels),
+	}
+	if desc.ClusterID == "" || desc.Address == "" {
+		return descriptorLoad{}, errors.New("invalid legacy descriptor")
+	}
+	return descriptorLoad{
+		descriptor:    desc,
+		needsWrite:    true,
+		legacyDefault: legacy.Default,
+	}, nil
+}
+
+func cloneLabels(labels map[string]string) map[string]string {
+	if len(labels) == 0 {
+		return nil
+	}
+	copied := maps.Clone(labels)
+	for k, v := range copied {
+		trimmedKey := strings.TrimSpace(k)
+		trimmedVal := strings.TrimSpace(v)
+		if trimmedKey == "" || trimmedVal == "" {
+			delete(copied, k)
+			continue
+		}
+		if trimmedKey != k || trimmedVal != v {
+			delete(copied, k)
+			copied[trimmedKey] = trimmedVal
+		}
+	}
+	if len(copied) == 0 {
+		return nil
+	}
+	return copied
+}
+
+func defaultMarkerPath(root string) string {
+	return filepath.Join(root, "default")
+}
+
+func readDefaultMarker(root string) (string, error) {
+	data, err := os.ReadFile(defaultMarkerPath(root))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+func writeDefaultMarker(root, id string) error {
+	return os.WriteFile(defaultMarkerPath(root), []byte(strings.TrimSpace(id)+"\n"), 0o644)
 }

@@ -1,15 +1,16 @@
 # Ploy Next API Reference
 
 This document catalogs the service endpoints introduced in Ploy Next. Routes are grouped by surface:
-Ploy control-plane APIs, node-local endpoints, artifact/registry interfaces, and the beacon
-exposure. The `ployd` daemon serves both the control-plane and node APIs described below, exposing
-them over mutual TLS behind the beacon DNS entry.
+Ploy control-plane APIs, node-local endpoints, and artifact/registry interfaces. The `ployd` daemon
+serves both the control-plane and node APIs described below, and the CLI reaches them by tunnelling
+HTTP over SSH using the cached cluster descriptors (`pkg/sshtransport`). No separate beacon or CA
+distribution surface remains.
 
 ## Ploy Control Plane
 
-All routes below are served by the control-plane API (fronted by the beacon DNS), protected by
-mutual TLS and token-based authorization. The cluster's `ployd` control-plane deployment owns this
-surface.
+All routes below are served by the control-plane API and are typically accessed through the SSH
+tunnels managed by the CLI. Token-based authorization still applies, but the SSH transport handles
+end-to-end encryption instead of a standalone beacon TLS proxy.
 
 ### Mods
 
@@ -105,12 +106,11 @@ contract.
 
 ### Node Management & Observability
 
-- `POST /v1/nodes` — Register a node, returning credentials, CA bundles, and initial workload assignments.
+- `POST /v1/nodes` — Register a node, returning the join metadata and any initial workload assignments.
 - `GET /v1/nodes` — List nodes with health, capabilities, and workload counters.
 - `GET /v1/nodes/{node}` — Inspect a specific node’s status, IPFS pin queue depth, running jobs, and cluster version tag.
 - `DELETE /v1/nodes/{node}` — Deregister a node after drain acknowledgement.
 - `POST /v1/nodes/{node}/heal` — Trigger automated remediation routines (restart services, resync pins).
-- `POST /v1/nodes/{node}/promote` — Promote a node to beacon role.
 - `GET /v1/nodes/{node}/logs` — Fetch historical daemon logs.
 - `GET /v1/nodes/{node}/logs/stream` — SSE stream for real-time node logs.
 
@@ -174,49 +174,12 @@ through its local `ployd` instance:
 - `GET /v1/node/status` — Health summary: Docker status, SHIFT availability, IPFS connectivity, resource usage.
 - `GET /v1/node/artifacts/{cid}` — Provide local access to a pinned artifact (used during step execution).
 
-## Beacon API
-
-The beacon node (running in beacon mode) exposes DNS-compatible discovery plus a small HTTPS API:
-
-- `GET /v1/beacon/nodes` — Signed list of healthy nodes, advertised addresses, and capabilities. The
-  control plane responds with a signed envelope:
-
-  ```json
-  {
-    "payload": {
-      "cluster_id": "cluster-alpha",
-      "revision": 42,
-      "nodes_revision": 87,
-      "issued_at": "2025-10-24T17:42:13.123456Z",
-      "beacons": [{"node_id": "beacon-main", "usage": "beacon", "version": "v3", ...}],
-      "workers": [{"node_id": "worker-a1", "usage": "worker", "version": "v7", ...}]
-    },
-    "signature": {
-      "algorithm": "ES256",
-      "key_id": "ca-v5",
-      "value": "BASE64_ECDSA_SIGNATURE"
-    }
-  }
-  ```
-
-  Clients verify the payload using the active CA certificate referenced by `key_id`.
-- `GET /v1/beacon/ca` — Current cluster CA bundle for clients. The response mirrors the signed envelope
-  structure above and includes CA metadata (`version`, `serial_number`, validity range, and revoked
-  history) so CLIs can refresh trust bundles without extra etcd queries.
-- `POST /v1/beacon/rotate-ca` — Initiate CA rotation (admin only); returns new bundle metadata.
-- `GET /v1/beacon/config` — Discovery endpoints (etcd cluster addresses, IPFS Cluster peers,
-  registry endpoints) packaged in the same signed envelope format. Consumers can rely on the `revision`
-  field to detect config changes without re-polling `/v1/config`.
-- `POST /v1/beacon/promote` — Record the canonical beacon node (used during failover). Requires the
-  `admin` scope and returns the signed promotion record (`beacon_id`, `operator`, `promoted_at`,
-  and CA version). The canonical record is stored at `/ploy/clusters/<cluster>/beacon/canonical`.
-
 ## Authentication & Security
 
-- All APIs require mutual TLS certificates issued by the cluster CA.
+- All APIs are reached through SSH tunnels stood up by `pkg/sshtransport`. Within the tunnel the
+  control plane still enforces mutual TLS using the cluster-internal PKI.
 - Control-plane routes additionally accept bearer tokens minted by the GitLab signer. Tokens embed the issuing secret identifier (`sid`) and token id (`tid`) so the control plane can validate them without scanning every secret.
-- Administrative operations (GitLab signer management, beacon rotation, configuration updates) require bearer tokens that include the `admin` scope.
-- Beacon responses are signed with the beacon key so clients can verify node lists and configuration payloads.
+- Administrative operations (GitLab signer management, configuration updates) require bearer tokens that include the `admin` scope.
 
 ## Eventing & Streaming
 
