@@ -231,11 +231,31 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 }
 
 func descriptorControlPlaneURL(desc config.Descriptor) (string, error) {
+	if endpoint := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_ENDPOINT")); endpoint != "" {
+		return endpoint, nil
+	}
 	addr := strings.TrimSpace(desc.Address)
 	if addr == "" {
 		return "", errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
 	}
-	return fmt.Sprintf("https://%s:%d", addr, defaultControlPlanePort), nil
+	scheme := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_SCHEME"))
+	if scheme == "" {
+		scheme = "http"
+	}
+	switch scheme {
+	case "http", "https":
+	default:
+		return "", fmt.Errorf("invalid PLOYD_ADMIN_SCHEME %q", scheme)
+	}
+	port := defaultControlPlanePort
+	if raw := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_PORT")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value <= 0 {
+			return "", fmt.Errorf("invalid PLOYD_ADMIN_PORT %q", raw)
+		}
+		port = value
+	}
+	return fmt.Sprintf("%s://%s:%d", scheme, addr, port), nil
 }
 
 func renderWorkerJoinResult(w io.Writer, clusterID string, result nodeJoinResponse) error {
@@ -387,7 +407,7 @@ func defaultTunnelUser() string {
 	if value := strings.TrimSpace(os.Getenv("PLOY_SSH_USER")); value != "" {
 		return value
 	}
-	return "ploy"
+	return "root"
 }
 
 const defaultWorkerJoinTimeout = 20 * time.Second
