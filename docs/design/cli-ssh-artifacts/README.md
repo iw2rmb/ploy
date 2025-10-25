@@ -18,7 +18,7 @@ Enable repository uploads and report downloads over the SSH transport introduced
 - Building new object store abstractions beyond SSH-forwarded services.
 
 ## Current State
-- Artifact transfer occurs via HTTPS endpoints behind the beacon.
+- Artifact transfer still relies on HTTPS endpoints; the CLI opens tunnels for control-plane RPCs but not for bulk file copy.
 - No SSH-based file movement exists.
 
 ## Proposed Changes

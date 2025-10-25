@@ -28,7 +28,7 @@ Example job record snippet:
 
 ## Cleanup Controller
 
-- The beacon (or dedicated controller) runs a background reconciliation loop (default every hour):
+- The control-plane controller runs a background reconciliation loop (default every hour):
   1. Read job entries with `expires_at <= now`.
   2. For each job:
      - Ensure the Mod ticket is no longer in progress. If retries are pending or the ticket status

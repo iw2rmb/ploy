@@ -10,7 +10,6 @@ Core Commands:
   jobs             Inspect and follow individual jobs
   artifact         Manage IPFS Cluster artifacts
   cluster          Manage local cluster descriptors
-  beacon           Rotate deployment CA material and node certificates
   config           Inspect or update cluster configuration
   snapshot         Plan and capture workspace snapshots
   environment      Materialize integration environments

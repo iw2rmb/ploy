@@ -6,17 +6,15 @@ info:
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS and a bearer token with the appropriate scope.
 servers:
-  - url: https://{beacon_host}
-    description: Cluster beacon endpoint
+  - url: https://{control_host}
+    description: Control-plane endpoint (typically reached via SSH tunnel)
     variables:
-      beacon_host:
+      control_host:
         default: cluster-alpha.example.com
-        description: Beacon DNS entry or override supplied via bootstrap descriptor.
+        description: SSH-targeted control-plane host recorded in the descriptor.
 tags:
   - name: Nodes
     description: Worker onboarding, listing, and deregistration.
-  - name: Beacon
-    description: Cluster-wide certificate authority management.
   - name: GitLab
     description: GitLab signer configuration.
 security:
@@ -122,47 +120,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeDrainConflict'
-        '503':
-          description: Required backing services (etcd) are unavailable.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /v1/beacon/rotate-ca:
-    post:
-      tags: [Beacon]
-      summary: Initiate a cluster certificate authority rotation.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BeaconRotateRequest'
-      responses:
-        '200':
-          description: Rotation executed (or previewed in dry-run mode).
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BeaconRotateResponse'
-        '400':
-          description: Invalid request parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '409':
-          description: A concurrent rotation was detected.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '424':
-          description: Cluster PKI has not been bootstrapped.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '503':
           description: Required backing services (etcd) are unavailable.
           content:
@@ -401,22 +358,6 @@ components:
           type: integer
           format: int32
           description: Number of jobs still running on the worker.
-    BeaconRotateRequest:
-      type: object
-      required: [cluster_id]
-      properties:
-        cluster_id:
-          type: string
-        dry_run:
-          type: boolean
-          default: false
-        operator:
-          type: string
-          description: Operator recorded in audit metadata.
-        reason:
-          type: string
-          description: Free form rotation reason or ticket reference.
-    BeaconRotateResponse:
       type: object
       required: [dry_run, old_version, new_version, updated_beacon_certificates, updated_worker_certificates, revoked]
       properties:

@@ -1,9 +1,9 @@
 # Environment Variables
 
 This reference tracks the environment variables that the workstation CLI
-(gridctl) inspects today and notes the current local values. Update this file
-whenever a new variable is introduced, defaults change, or components adopt
-additional configuration.
+inspects today and notes the current local values. Update this file whenever a
+new variable is introduced, defaults change, or components adopt additional
+configuration.
 
 ## Dependencies
 
@@ -12,23 +12,15 @@ additional configuration.
 - [cmd/ploy/feature_flags.go](../../cmd/ploy/feature_flags.go) — feature flag
   inspection for the Aster integration.
 
-## gridctl (CLI)
+## CLI
 
-- `PLOY_GRID_ID` — Required grid identifier used to scope client state on disk and
-  construct the discovery/beacon requests. The CLI fails fast when unset.
-- `GRID_BEACON_API_KEY` — Required beacon-scoped API key presented to gridbeacon
-  when bootstrapping discovery, trust material, and workflow credentials. For
-  pre-existing grids, run `gridctl grid client backfill --grid-id <grid>` after
-  adopting the new client so beacon publishes the `manifestHost` and CA bundle
-  expected by the SDK.
-- `GRID_BEACON_URL` — Optional override for the gridbeacon base URL.
-  Defaults to the production beacon (`https://beacon.getgrid.dev`).
-- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
-  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`
-  so discovery caches, manifests, and trust bundles persist per grid.
-- `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy override retained for compatibility.
-  When set it controls the workflow SDK cache path and is reused as the grid
-  client state directory.
+- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when running
+  against the legacy Grid stack; the SSH-descriptor workflow does not require
+  it.
+- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy beacon credentials used
+  when talking to the Grid control plane. Unset for the SSH-only workflow.
+- `GRID_CLIENT_STATE_DIR` / `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy overrides for
+  the Grid client's state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (`grid`, `k8s`, `nomad`) plug in here; the CLI
   fails fast when an unknown adapter name is provided.
@@ -64,7 +56,7 @@ additional configuration.
 - `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
   location (default `/etc/ploy/ployd.yaml`).
 - `PLOYD_MODE` — Overrides the default daemon mode written into the bootstrap configuration. May be
-  `bootstrap`, `worker`, or `beacon`.
+  `bootstrap` or `worker`.
 - `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
   generates the initial configuration.
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
@@ -89,11 +81,11 @@ additional configuration.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
   live Grid smoke test should execute (defaults to `simple-openrewrite`).
 
-## Grid (service)
+## Grid (legacy service)
 
-- No environment variables are managed inside this repository slice; Grid
-  settings are discovered dynamically via `sdk/gridclient/go` using the inputs
-  above (grid ID + beacon API key).
+- No additional environment variables are managed inside this repository
+  slice; the legacy Grid client discovers settings via `sdk/gridclient/go`
+  using `PLOY_GRID_ID` plus the optional beacon credentials above.
 
 ## gapi
 

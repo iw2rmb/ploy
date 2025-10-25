@@ -16,7 +16,6 @@ _ploy() {
             commands+=("jobs:Inspect and follow individual jobs")
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("cluster:Manage local cluster descriptors")
-            commands+=("beacon:Rotate deployment CA material and node certificates")
             commands+=("config:Inspect or update cluster configuration")
             commands+=("snapshot:Plan and capture workspace snapshots")
             commands+=("environment:Materialize integration environments")
@@ -62,11 +61,6 @@ _ploy() {
                     commands+=("list:Show locally cached cluster descriptors")
                     _describe 'cluster command' commands && ret=0
                     ;;
-                'beacon')
-                    commands=()
-                    commands+=("rotate-ca:Rotate the cluster CA, update beacon/worker certificates, and record revocations")
-                    _describe 'beacon command' commands && ret=0
-                    ;;
                 'config')
                     commands=()
                     commands+=("gitlab:Manage GitLab integration credentials")
@@ -103,7 +97,6 @@ _ploy() {
                     commands+=("jobs:Inspect and follow individual jobs")
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("cluster:Manage local cluster descriptors")
-                    commands+=("beacon:Rotate deployment CA material and node certificates")
                     commands+=("config:Inspect or update cluster configuration")
                     commands+=("snapshot:Plan and capture workspace snapshots")
                     commands+=("environment:Materialize integration environments")
