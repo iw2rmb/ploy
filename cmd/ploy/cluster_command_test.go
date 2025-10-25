@@ -286,3 +286,50 @@ func identityFixture(t *testing.T, key string) string {
 	}
 	return priv
 }
+
+func TestDescriptorControlPlaneURL(t *testing.T) {
+	desc := config.Descriptor{ClusterID: "lab", Address: "203.0.113.10"}
+	t.Setenv("PLOYD_ADMIN_ENDPOINT", "")
+	t.Setenv("PLOYD_ADMIN_SCHEME", "")
+	t.Setenv("PLOYD_ADMIN_PORT", "")
+
+	url, err := descriptorControlPlaneURL(desc)
+	if err != nil {
+		t.Fatalf("descriptorControlPlaneURL default failed: %v", err)
+	}
+	if url != "http://203.0.113.10:8443" {
+		t.Fatalf("expected default http url, got %s", url)
+	}
+
+	t.Run("scheme override", func(t *testing.T) {
+		t.Setenv("PLOYD_ADMIN_SCHEME", "https")
+		t.Setenv("PLOYD_ADMIN_PORT", "9443")
+		url, err := descriptorControlPlaneURL(desc)
+		if err != nil {
+			t.Fatalf("descriptorControlPlaneURL scheme override failed: %v", err)
+		}
+		if url != "https://203.0.113.10:9443" {
+			t.Fatalf("expected override url, got %s", url)
+		}
+	})
+
+	t.Run("endpoint override", func(t *testing.T) {
+		t.Setenv("PLOYD_ADMIN_ENDPOINT", "https://control.example.com:9000")
+		url, err := descriptorControlPlaneURL(desc)
+		if err != nil {
+			t.Fatalf("descriptorControlPlaneURL endpoint override failed: %v", err)
+		}
+		if url != "https://control.example.com:9000" {
+			t.Fatalf("expected endpoint override, got %s", url)
+		}
+	})
+
+	t.Run("invalid port", func(t *testing.T) {
+		t.Setenv("PLOYD_ADMIN_ENDPOINT", "")
+		t.Setenv("PLOYD_ADMIN_SCHEME", "")
+		t.Setenv("PLOYD_ADMIN_PORT", "not-a-number")
+		if _, err := descriptorControlPlaneURL(desc); err == nil {
+			t.Fatalf("expected error for invalid admin port")
+		}
+	})
+}

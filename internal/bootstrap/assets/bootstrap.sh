@@ -235,8 +235,6 @@ ensure_sshd() {
 }
 
 configure_sshd() {
-  local admin_b64="${PLOY_SSH_ADMIN_KEYS_B64:-}"
-  local user_b64="${PLOY_SSH_USER_KEYS_B64:-}"
   local sshd_dir="/etc/ssh"
   local dropin_dir="${sshd_dir}/sshd_config.d"
 
@@ -247,11 +245,7 @@ ChallengeResponseAuthentication no
 KbdInteractiveAuthentication no
 UsePAM yes
 PermitRootLogin prohibit-password
-AllowUsers ploy-admin ploy-user
-Match User ploy-admin
-  AuthorizedKeysFile /etc/ploy/ssh/admin_authorized_keys
-Match User ploy-user
-  AuthorizedKeysFile /etc/ploy/ssh/user_authorized_keys
+AllowUsers root
 LogLevel VERBOSE
 AllowTcpForwarding yes
 AllowAgentForwarding yes
@@ -260,29 +254,6 @@ X11Forwarding no
 ClientAliveInterval 300
 ClientAliveCountMax 2
 CONF
-
-  mkdir -p /etc/ploy/ssh
-  chmod 0700 /etc/ploy/ssh
-
-  if [[ -n "$admin_b64" ]]; then
-    echo "$admin_b64" | base64 --decode >/etc/ploy/ssh/admin_authorized_keys
-    chmod 0600 /etc/ploy/ssh/admin_authorized_keys
-    chown root:root /etc/ploy/ssh/admin_authorized_keys
-  else
-    warn "PLOY_SSH_ADMIN_KEYS_B64 not provided; admin SSH access disabled"
-    : >/etc/ploy/ssh/admin_authorized_keys
-    chmod 0600 /etc/ploy/ssh/admin_authorized_keys
-  fi
-
-  if [[ -n "$user_b64" ]]; then
-    echo "$user_b64" | base64 --decode >/etc/ploy/ssh/user_authorized_keys
-    chmod 0600 /etc/ploy/ssh/user_authorized_keys
-    chown root:root /etc/ploy/ssh/user_authorized_keys
-  else
-    warn "PLOY_SSH_USER_KEYS_B64 not provided; user SSH access disabled"
-    : >/etc/ploy/ssh/user_authorized_keys
-    chmod 0600 /etc/ploy/ssh/user_authorized_keys
-  fi
 
   if systemctl list-unit-files | grep -q '^ssh\.service'; then
     systemctl enable ssh >/dev/null 2>&1 || true
@@ -496,6 +467,38 @@ configure_docker_service() {
   "exec-opts": ["native.cgroupdriver=systemd"],
   "storage-driver": "overlay2"
 }
+JSON
+    log "wrote /etc/docker/daemon.json"
+  fi
+
+  cat >"${SYSTEMD_DIR}/docker.service" <<'UNIT'
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/dockerd --config-file=/etc/docker/daemon.json
+ExecReload=/bin/kill -s HUP $MAINPID
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+TasksMax=infinity
+TimeoutStartSec=0
+Delegate=yes
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl reset-failed docker.service || true
+  systemctl enable docker
+  systemctl restart docker
+  log "docker service enabled and restarted"
+}
 
 configure_ployd_service() {
   if [[ ! -x "${BIN_DIR}/ployd" ]]; then
@@ -551,46 +554,18 @@ UNIT
 }
 
 start_ployd_service() {
-  if ! systemctl list-unit-files | grep -q '^ployd.service'; then
+  if [[ ! -f "${SYSTEMD_DIR}/ployd.service" ]]; then
+    warn "ployd systemd unit missing; skipping start"
     return
   fi
+  systemctl daemon-reload
+  systemctl enable ployd >/dev/null 2>&1 || true
   systemctl restart ployd
   if ! systemctl is-active --quiet ployd; then
     warn "ployd service failed to start"
   else
     log "ployd service running"
   fi
-}
-JSON
-    log "wrote /etc/docker/daemon.json"
-  fi
-  cat >"${SYSTEMD_DIR}/docker.service" <<'UNIT'
-[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network-online.target firewalld.service
-Wants=network-online.target
-
-[Service]
-Type=notify
-ExecStart=/usr/local/bin/dockerd --config-file=/etc/docker/daemon.json
-ExecReload=/bin/kill -s HUP $MAINPID
-LimitNOFILE=1048576
-LimitNPROC=1048576
-LimitCORE=infinity
-TasksMax=infinity
-TimeoutStartSec=0
-Delegate=yes
-KillMode=process
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-  systemctl daemon-reload
-  systemctl reset-failed docker.service || true
-  systemctl enable docker
-  systemctl restart docker
-  log "docker service enabled and restarted"
 }
 
 summarise_versions() {
@@ -636,8 +611,6 @@ main() {
   check_package_manager
   ensure_prerequisites
   ensure_sshd
-  ensure_system_user "ploy-admin"
-  ensure_system_user "ploy-user"
   configure_sshd
   check_disk_space "$WORKDIR"
   check_required_ports

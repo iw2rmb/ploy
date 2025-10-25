@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -47,8 +46,6 @@ type Options struct {
 	Clock                  func() time.Time
 	Stdin                  io.Reader
 	WorkstationOS          string
-	AdminAuthorizedKeys    []string
-	UserAuthorizedKeys     []string
 	DescriptorID           string
 	DescriptorAddress      string
 	DescriptorIdentityPath string
@@ -118,15 +115,6 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	}
 	opts.Address = address
 
-	adminKeys := normalizedAuthorizedKeys(opts.AdminAuthorizedKeys)
-	if len(adminKeys) == 0 {
-		return errors.New("bootstrap: admin authorized keys required")
-	}
-	userKeys := normalizedAuthorizedKeys(opts.UserAuthorizedKeys)
-	if len(userKeys) == 0 {
-		return errors.New("bootstrap: user authorized keys required")
-	}
-
 	user := strings.TrimSpace(opts.User)
 	if user == "" {
 		user = DefaultRemoteUser
@@ -147,19 +135,8 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		return errors.New("bootstrap: ployd binary path required")
 	}
 
-	adminPayload := encodeAuthorizedKeys(adminKeys)
-	if adminPayload == "" {
-		return errors.New("bootstrap: admin authorized keys payload empty")
-	}
-	userPayload := encodeAuthorizedKeys(userKeys)
-	if userPayload == "" {
-		return errors.New("bootstrap: user authorized keys payload empty")
-	}
-
 	envVars := map[string]string{
 		"PLOY_CONTROL_PLANE_ENDPOINT": defaultControlPlaneEndpoint(opts.ControlPlaneURL),
-		"PLOY_SSH_ADMIN_KEYS_B64":     adminPayload,
-		"PLOY_SSH_USER_KEYS_B64":      userPayload,
 		"PLOY_BOOTSTRAP_VERSION":      bootstrap.Version,
 	}
 
@@ -260,31 +237,6 @@ func defaultControlPlaneEndpoint(value string) string {
 		return defaultControlPlaneEndpointValue
 	}
 	return value
-}
-
-// normalizedAuthorizedKeys returns a trimmed list of authorized key entries without blanks.
-func normalizedAuthorizedKeys(keys []string) []string {
-	clean := make([]string, 0, len(keys))
-	for _, key := range keys {
-		trimmed := strings.TrimSpace(key)
-		if trimmed == "" {
-			continue
-		}
-		clean = append(clean, trimmed)
-	}
-	return clean
-}
-
-// encodeAuthorizedKeys returns a base64 payload for the supplied authorized keys slice.
-func encodeAuthorizedKeys(keys []string) string {
-	if len(keys) == 0 {
-		return ""
-	}
-	payload := strings.Join(keys, "\n")
-	if !strings.HasSuffix(payload, "\n") {
-		payload += "\n"
-	}
-	return base64.StdEncoding.EncodeToString([]byte(payload))
 }
 
 type configureWorkstationOptions struct {

@@ -29,36 +29,18 @@ func TestScriptConfiguresSSHDHardening(t *testing.T) {
 	if !strings.Contains(script, "PermitRootLogin prohibit-password") {
 		t.Fatalf("bootstrap script must restrict root login")
 	}
-	if !strings.Contains(script, "AllowUsers ploy-admin ploy-user") {
-		t.Fatalf("bootstrap script must restrict SSH access to ploy-admin and ploy-user")
-	}
-	if !strings.Contains(script, "Match User ploy-admin") {
-		t.Fatalf("bootstrap script must match admin user for authorized keys")
-	}
-	if !strings.Contains(script, "AuthorizedKeysFile /etc/ploy/ssh/admin_authorized_keys") {
-		t.Fatalf("bootstrap script must reference admin authorized keys file")
-	}
-	if !strings.Contains(script, "Match User ploy-user") {
-		t.Fatalf("bootstrap script must match user role for authorized keys")
-	}
-	if !strings.Contains(script, "AuthorizedKeysFile /etc/ploy/ssh/user_authorized_keys") {
-		t.Fatalf("bootstrap script must reference user authorized keys file")
+	if !strings.Contains(script, "AllowUsers root") {
+		t.Fatalf("bootstrap script must restrict SSH access to root")
 	}
 	if !strings.Contains(script, "LogLevel VERBOSE") {
 		t.Fatalf("bootstrap script must enable verbose sshd logging for telemetry")
 	}
 }
 
-func TestScriptDecodesAuthorizedKeysPayloads(t *testing.T) {
+func TestScriptDoesNotRequireEmbeddedAuthorizedKeys(t *testing.T) {
 	script := Script()
-	if !strings.Contains(script, "base64 --decode") {
-		t.Fatalf("bootstrap script should decode base64-encoded authorized keys")
-	}
-	if !strings.Contains(script, "/etc/ploy/ssh/admin_authorized_keys") {
-		t.Fatalf("bootstrap script must write admin authorized keys")
-	}
-	if !strings.Contains(script, "/etc/ploy/ssh/user_authorized_keys") {
-		t.Fatalf("bootstrap script must write user authorized keys")
+	if strings.Contains(script, "PLOY_SSH_ADMIN_KEYS_B64") || strings.Contains(script, "PLOY_SSH_USER_KEYS_B64") {
+		t.Fatalf("bootstrap script should not require PLOY_SSH_* authorized key payloads")
 	}
 }
 
@@ -69,5 +51,21 @@ func TestScriptBindsHTTPToLoopback(t *testing.T) {
 	}
 	if !strings.Contains(script, "PLOYD_METRICS_LISTEN:-127.0.0.1:9100") {
 		t.Fatalf("ployd config must default metrics listen to loopback")
+	}
+}
+
+func TestDockerDaemonJSONBlockTerminatesBeforePloydConfig(t *testing.T) {
+	script := Script()
+	jsonLog := `log "wrote /etc/docker/daemon.json"`
+	idxLog := strings.Index(script, jsonLog)
+	if idxLog == -1 {
+		t.Fatalf("bootstrap script missing docker daemon.json log marker")
+	}
+	idxFunc := strings.Index(script, "configure_ployd_service() {")
+	if idxFunc == -1 {
+		t.Fatalf("bootstrap script missing ployd configuration function")
+	}
+	if idxLog > idxFunc {
+		t.Fatalf("docker daemon.json heredoc terminator/log must appear before ployd configuration block")
 	}
 }

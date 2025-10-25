@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -85,13 +84,6 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		opts.PloydBinaryPath = path
 	}
 
-	adminKeys, err := deriveAuthorizedKeysFromIdentity(opts.IdentityFile)
-	if err != nil {
-		return fmt.Errorf("derive admin authorized keys: %w", err)
-	}
-	opts.AdminAuthorizedKeys = adminKeys
-	opts.UserAuthorizedKeys = append([]string(nil), adminKeys...)
-
 	if trimmed := strings.TrimSpace(cfg.ControlPlaneURL); trimmed != "" {
 		opts.ControlPlaneURL = trimmed
 	} else if opts.ControlPlaneURL == "" {
@@ -121,49 +113,6 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 		ctx = context.Background()
 	}
 	return runner(ctx, opts)
-}
-
-// readAuthorizedKeysFile loads authorized keys from the provided path, skipping blanks and comments.
-func readAuthorizedKeysFile(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read authorized keys %s: %w", path, err)
-	}
-	lines := strings.Split(string(data), "\n")
-	keys := make([]string, 0, len(lines))
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		keys = append(keys, trimmed)
-	}
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("authorized keys file %s has no keys", path)
-	}
-	return keys, nil
-}
-
-func deriveAuthorizedKeysFromIdentity(identityPath string) ([]string, error) {
-	trimmed := strings.TrimSpace(identityPath)
-	if trimmed == "" {
-		return nil, errors.New("identity path required to derive authorized keys")
-	}
-
-	pubPath := trimmed + ".pub"
-	if keys, err := readAuthorizedKeysFile(pubPath); err == nil {
-		return keys, nil
-	}
-
-	out, err := exec.Command("ssh-keygen", "-y", "-f", trimmed).Output()
-	if err != nil {
-		return nil, fmt.Errorf("ssh-keygen derive public key: %w", err)
-	}
-	key := strings.TrimSpace(string(out))
-	if key == "" {
-		return nil, errors.New("ssh-keygen returned empty key")
-	}
-	return []string{key}, nil
 }
 
 // ExpandPath resolves a leading tilde to the user home directory.

@@ -39,11 +39,10 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
     Cluster 1.1.4.  
   - The CLI derives a cluster identifier and records the SSH target in the descriptor; configure DNS
     only if you prefer names over raw IPs.
-  - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`.  
+  - SSH defaults to `root@<address>` with identity file `~/.ssh/id_rsa`, and the same identity is reused for both SSH and SCP transfers so there is no need to inject additional authorized-key payloads or `PLOY_SSH_ADMIN_KEYS_B64` values.  
   - The minimum disk check defaults to 4 GiB and is enforced automatically; ensure hosts satisfy it before running the bootstrap.
   - All binaries are pinned via static downloads inside `/usr/local/bin`, systemd units are
     refreshed, and logs summarise installed versions.  
-  - The CLI derives remote authorized keys from the SSH identity (defaults to `~/.ssh/id_rsa`); ensure the corresponding `.pub` is present or accessible via `ssh-keygen -y`.
   - etcd is installed as a systemd service bound to `127.0.0.1:{2379,2380}` so the CLI can finish
     bootstrap writes without exposing client ports publicly.
   - The script confines temporary files to `${PLOY_WORKDIR}` and ensures Docker is enabled with

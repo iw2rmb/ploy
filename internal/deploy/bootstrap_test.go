@@ -11,18 +11,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-const (
-	adminTestKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ8pXL8XfO6YpGkX1l5R+FsoNhasTestAdmin ploy-admin"
-	userTestKey  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN3E0OGN48ZlB+QhFZGNtN4YQtTestUser ploy-user"
-)
-
 func TestRunBootstrapRequiresAddress(t *testing.T) {
 	ctx := context.Background()
 	opts := Options{
-		ClusterID:           "cluster",
-		Runner:              RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
-		AdminAuthorizedKeys: []string{adminTestKey},
-		UserAuthorizedKeys:  []string{userTestKey},
+		ClusterID: "cluster",
+		Runner:    RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -61,15 +54,13 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 	})
 
 	opts := Options{
-		Address:             "203.0.113.7",
-		User:                "root",
-		Runner:              runner,
-		Stdout:              io.Discard,
-		Stderr:              io.Discard,
-		ClusterID:           "cluster-alpha",
-		AdminAuthorizedKeys: []string{adminTestKey},
-		UserAuthorizedKeys:  []string{userTestKey},
-		WorkstationOS:       "linux",
+		Address:       "203.0.113.7",
+		User:          "root",
+		Runner:        runner,
+		Stdout:        io.Discard,
+		Stderr:        io.Discard,
+		ClusterID:     "cluster-alpha",
+		WorkstationOS: "linux",
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -102,11 +93,8 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 	if !ranScript {
 		t.Fatalf("expected bootstrap script execution; calls=%v", calls)
 	}
-	if scriptBody == "" || !strings.Contains(scriptBody, "PLOY_SSH_ADMIN_KEYS_B64") {
-		t.Fatalf("expected admin authorized keys export in script: %q", scriptBody)
-	}
-	if !strings.Contains(scriptBody, "PLOY_SSH_USER_KEYS_B64") {
-		t.Fatalf("expected user authorized keys export in script: %q", scriptBody)
+	if scriptBody == "" || !strings.Contains(scriptBody, "PLOY_CONTROL_PLANE_ENDPOINT") {
+		t.Fatalf("expected control plane endpoint export in script: %q", scriptBody)
 	}
 }
 
@@ -118,13 +106,11 @@ func TestRunBootstrapSavesDescriptorAndSetsDefault(t *testing.T) {
 
 	runner := RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil })
 	opts := Options{
-		Address:             "203.0.113.10",
-		Runner:              runner,
-		Stdout:              io.Discard,
-		Stderr:              io.Discard,
-		ClusterID:           "cluster-alpha",
-		AdminAuthorizedKeys: []string{adminTestKey},
-		UserAuthorizedKeys:  []string{userTestKey},
+		Address:   "203.0.113.10",
+		Runner:    runner,
+		Stdout:    io.Discard,
+		Stderr:    io.Discard,
+		ClusterID: "cluster-alpha",
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -144,28 +130,6 @@ func TestRunBootstrapSavesDescriptorAndSetsDefault(t *testing.T) {
 	}
 	if !descs[0].Default {
 		t.Fatalf("expected descriptor to be set default")
-	}
-}
-
-func TestRunBootstrapRequiresAuthorizedKeys(t *testing.T) {
-	ctx := context.Background()
-	opts := Options{
-		Address: "203.0.113.10",
-		Runner:  RunnerFunc(func(context.Context, string, []string, io.Reader, IOStreams) error { return nil }),
-	}
-	opts.PloydBinaryPath = tempPloydBinary(t)
-
-	if err := RunBootstrap(ctx, opts); err == nil {
-		t.Fatalf("expected error when admin and user keys missing")
-	}
-	opts.AdminAuthorizedKeys = []string{adminTestKey}
-	if err := RunBootstrap(ctx, opts); err == nil {
-		t.Fatalf("expected error when user keys missing")
-	}
-	opts.AdminAuthorizedKeys = nil
-	opts.UserAuthorizedKeys = []string{userTestKey}
-	if err := RunBootstrap(ctx, opts); err == nil {
-		t.Fatalf("expected error when admin keys missing")
 	}
 }
 
