@@ -26,15 +26,11 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
      service definition.
 
 3. **Run Bootstrap Script via CLI**  
-  - Execute `dist/ploy cluster add --address <ip>` to prepare the first control-plane node. Omitting
-    `--cluster-id` signals primary-node bootstrap, so the CLI copies `ployd`, renders configs, and
-    caches the descriptor locally. The command automatically generates a 16-character lowercase-hex
-    cluster identifier (persisted as the default descriptor) and a 4-character node identifier.
-  - The bootstrap command installs `ployd` in control-plane mode; descriptors now carry only the SSH
-    metadata needed for future tunnels rather than beacon URLs or CA material.
-  - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and then streams the embedded bootstrap shell script over SSH. The script converges dependencies, writes the initial `/etc/ploy/ployd.yaml`, and installs the systemd unit.
-  - Once the script completes, the CLI verifies `etcd` and `ployd` are active via `systemctl` before continuing.
-  - On first start, `ployd` automatically creates the cluster certificate authority and records it in etcd—no manual CA bootstrap step is required.
+  - Execute `dist/ploy cluster add --address <ip>` to prepare the first control-plane node. If you omit `--cluster-id`, the CLI tells the script to generate one (it writes the chosen ID to `/etc/ploy/cluster-id` and echoes it back so the descriptor can be cached on the workstation). When you pass `--cluster-id`, that exact value is forwarded as a positional flag (`--cluster-id <id>`), so re-running the script on the same host or bootstrapping a secondary node stays deterministic.
+  - The CLI uploads the `ployd` binary (defaults to the executable found alongside the CLI; override with `--ployd-binary <path>`) and then streams the embedded bootstrap shell script over SSH. The only data sent alongside the script are the positional flags: `--cluster-id`, `--node-id`, `--node-address`, and `--primary` for the very first control-plane node. Everything else (package installs, TLS settings, etc.) is decided locally by the script.
+  - Inside the host, the script converges dependencies, rewrites `/etc/ploy/ployd.yaml`, and installs the systemd unit. When `--primary` is set, it wipes the old config, enables HTTPS, and then invokes `ployd bootstrap-ca --cluster-id <id> --node-id <node> --address <addr>` before ployd ever starts listening.
+  - No workstation TLS juggling is required: ployd writes the CA + leaf PEMs to `/etc/ploy/pki`, publishes them to etcd, and `ploy cluster add` only needs to keep the SSH descriptor so future commands know how to reach the host.
+  - The rest of the flow is unchanged: the CLI verifies `etcd`/`ployd` are active, runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`, and port availability), and pins all binaries in `/usr/local/bin` so later upgrades are deterministic.
   - The command runs preflight checks (package manager, disk at `${PLOY_WORKDIR:-/var/lib/ploy}`,
     and port availability) before installing Go 1.25.2, etcd 3.6.0, Docker 28.0.1, and IPFS
     Cluster 1.1.4.  
@@ -54,6 +50,34 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
     dist/ploy cluster add \
       --address 45.9.42.212
     ```
+
+### TLS Bootstrap & Rotation
+
+- **Primary bootstrap**
+  - The CLI calls `bash -s -- --cluster-id <id> --node-id <node> --node-address <addr> --primary`, then steps aside.
+  - The script wipes `/etc/ploy/ployd.yaml`, ensures HTTPS is turned on, and runs `ployd bootstrap-ca` locally so the CA + control-plane leaf cert are minted directly on the host and stored in etcd.
+  - `/etc/ploy/cluster-id` is updated with the final cluster ID (generated or provided) so later maintenance commands can introspect the host without talking to the workstation.
+
+- **Worker bootstrap (`ploy cluster add --cluster-id ...`)**
+  - The CLI invokes the same script but only passes `--cluster-id <id>`; the script reuses the shared logic (installs dependencies, writes config, restarts ployd). No worker-specific mode exists—every node runs the same binary/config layout.
+  - After the script finishes, the CLI registers the worker via `/v1/nodes`, receives the issued worker cert/key/CA bundle, and scps them into `/etc/ploy/pki`. It then rewrites `/etc/ploy/ployd.yaml`’s `control_plane.endpoint` to `https://<control-plane>:8443` and restarts the daemon so the node speaks TLS immediately.
+
+- **Reissuing control-plane certificates**
+  - Hitting `/v1/security/certificates/control-plane` (or the forthcoming `ploy cluster cert issue` wrapper) will mint a fresh control-plane certificate using the existing CA. Example:
+
+    ```bash
+    curl -sS -X POST https://<cp>:8443/v1/security/certificates/control-plane \
+      -H "Authorization: Bearer ${PLOY_TOKEN}" \
+      -H "Content-Type: application/json" \
+      -d '{"cluster_id":"cluster-alpha","node_id":"control-primary","address":"45.9.42.212"}'
+    ```
+
+    The response mirrors `/v1/nodes`: `certificate` and `ca_bundle` can be written straight into `/etc/ploy/pki`, after which `systemctl restart ployd` brings the node back up with a fresh cert.
+  - The API automatically bootstraps the CA if it does not exist, so reinstalling from scratch does not require extra manual steps.
+
+- **Verification & rotation**
+  - `ploy cluster cert status --cluster-id <id>` queries `/v1/security/ca` and shows the active CA version, serial, expiry, and node totals.
+  - Because the CA is stored in etcd, re-running bootstrap on the same host simply reuses the latest CA and issues a new control-plane leaf certificate; operators can safely retry failed installs without worrying about orphaned trust roots.
 
 4. **Capture Descriptor Metadata**  
    - On success the CLI writes `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json` containing only the
@@ -79,11 +103,11 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
-  - Run `ploy cluster add --cluster-id <cluster> --address <host-or-ip>`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
-   - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
-     and generates a 4-character worker identifier automatically.
-   - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
-  - The CLI first SSHes into the worker, uploads `ployd`, reruns the unified bootstrap script, and verifies the `ployd` service is active. It then uses `pkg/sshtransport` to open a tunnel back to the control plane and calls `/v1/nodes` through that tunnel to register the worker metadata and record probe outcomes.  
+ - Run `ploy cluster add --cluster-id <cluster> --address <host-or-ip>`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
+  - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
+    and generates a 4-character worker identifier automatically.
+  - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
+  - The CLI first SSHes into the worker, uploads `ployd`, reruns the unified bootstrap script with `--cluster-id <id>`, and verifies the `ployd` service is active. After registration succeeds the CLI copies the issued worker certificate, key, and cluster CA into `/etc/ploy/pki`, rewrites the worker's `/etc/ploy/ployd.yaml` so it speaks HTTPS back to the control plane, and restarts the service. It then uses `pkg/sshtransport` to open a tunnel back to the control plane and calls `/v1/nodes` through that tunnel to register the worker metadata and record probe outcomes.  
    - Use `--dry-run` to preview probes without modifying etcd; the command still validates SSH access and prints the registration payload so you can audit the request before running it for real.  
    - Confirm the worker shows up via `etcdctl get /ploy/clusters/<cluster>/registry/workers --prefix --keys-only` or `ploy cluster list --labels`.
 

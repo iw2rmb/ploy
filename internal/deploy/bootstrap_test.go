@@ -43,12 +43,14 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 			data, _ := io.ReadAll(stdin)
 			entry.stdin = string(data)
 		}
-		if command == "ssh" && len(args) >= 3 {
-			last := args[len(args)-3:]
-			if last[0] == "bash" && last[1] == "-s" && last[2] == "--" {
+	if command == "ssh" {
+		for i := 0; i+2 < len(args); i++ {
+			if args[i] == "bash" && args[i+1] == "-s" && args[i+2] == "--" {
 				scriptBody = entry.stdin
+				break
 			}
 		}
+	}
 		calls = append(calls, entry)
 		return nil
 	})
@@ -61,6 +63,7 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 		Stderr:        io.Discard,
 		ClusterID:     "cluster-alpha",
 		WorkstationOS: "linux",
+		Primary:       true,
 	}
 	opts.PloydBinaryPath = tempPloydBinary(t)
 
@@ -78,13 +81,13 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 					break
 				}
 			}
-		case "ssh":
-			if len(c.args) >= 3 {
-				last := c.args[len(c.args)-3:]
-				if last[0] == "bash" && last[1] == "-s" && last[2] == "--" {
-					ranScript = true
-				}
+	case "ssh":
+		for i := 0; i+2 < len(c.args); i++ {
+			if c.args[i] == "bash" && c.args[i+1] == "-s" && c.args[i+2] == "--" {
+				ranScript = true
+				break
 			}
+		}
 		}
 	}
 	if !copiedBinary {
@@ -93,8 +96,45 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 	if !ranScript {
 		t.Fatalf("expected bootstrap script execution; calls=%v", calls)
 	}
-	if scriptBody == "" || !strings.Contains(scriptBody, "PLOY_CONTROL_PLANE_ENDPOINT") {
-		t.Fatalf("expected control plane endpoint export in script: %q", scriptBody)
+	if scriptBody == "" || !strings.Contains(scriptBody, "PLOY_BOOTSTRAP_VERSION") {
+		t.Fatalf("expected bootstrap version export in script: %q", scriptBody)
+	}
+	var scriptArgs []string
+	for _, c := range calls {
+		if c.command != "ssh" {
+			continue
+		}
+		for i := 0; i < len(c.args); i++ {
+			if c.args[i] == "bash" && i+2 < len(c.args) && c.args[i+1] == "-s" {
+				if i+3 <= len(c.args) {
+					scriptArgs = append([]string(nil), c.args[i+3:]...)
+				}
+				break
+			}
+		}
+	}
+	if len(scriptArgs) == 0 {
+		t.Fatalf("expected script args captured, got none")
+	}
+	expectPair := func(flag, value string) {
+		for i := 0; i < len(scriptArgs)-1; i++ {
+			if scriptArgs[i] == flag && scriptArgs[i+1] == value {
+				return
+			}
+		}
+		t.Fatalf("expected %s %s in script args %v", flag, value, scriptArgs)
+	}
+	expectPair("--cluster-id", "cluster-alpha")
+	expectPair("--node-id", "control")
+	primaryFlag := false
+	for _, arg := range scriptArgs {
+		if arg == "--primary" {
+			primaryFlag = true
+			break
+		}
+	}
+	if !primaryFlag {
+		t.Fatalf("expected --primary flag in script args %v", scriptArgs)
 	}
 }
 

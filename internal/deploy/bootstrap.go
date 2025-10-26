@@ -27,8 +27,6 @@ const (
 	DefaultSSHPort = 22
 	// remotePloydBinaryPath is where the ployd binary is installed on the target host.
 	remotePloydBinaryPath = "/usr/local/bin/ployd"
-	// defaultControlPlaneEndpointValue is used when no control plane URL is provided.
-	defaultControlPlaneEndpointValue = "http://127.0.0.1:9094"
 )
 
 // Options configure bootstrap execution.
@@ -51,6 +49,9 @@ type Options struct {
 	DescriptorIdentityPath string
 	ClusterID              string
 	InitialWorkers         []string
+	Primary                bool
+	NodeID                 string
+	NodeAddress            string
 }
 
 // IOStreams represents command IO endpoints.
@@ -115,6 +116,22 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	}
 	opts.Address = address
 
+	clusterID := strings.TrimSpace(opts.ClusterID)
+	if clusterID == "" {
+		clusterID = strings.TrimSpace(opts.DescriptorID)
+	}
+	opts.ClusterID = clusterID
+
+	nodeID := strings.TrimSpace(opts.NodeID)
+	if nodeID == "" {
+		nodeID = "control"
+	}
+
+	nodeAddress := strings.TrimSpace(opts.NodeAddress)
+	if nodeAddress == "" {
+		nodeAddress = address
+	}
+
 	user := strings.TrimSpace(opts.User)
 	if user == "" {
 		user = DefaultRemoteUser
@@ -136,8 +153,21 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	}
 
 	envVars := map[string]string{
-		"PLOY_CONTROL_PLANE_ENDPOINT": defaultControlPlaneEndpoint(opts.ControlPlaneURL),
-		"PLOY_BOOTSTRAP_VERSION":      bootstrap.Version,
+		"PLOY_BOOTSTRAP_VERSION": bootstrap.Version,
+	}
+
+	scriptArgs := make([]string, 0, 8)
+	if clusterID != "" {
+		scriptArgs = append(scriptArgs, "--cluster-id", clusterID)
+	}
+	if nodeID != "" {
+		scriptArgs = append(scriptArgs, "--node-id", nodeID)
+	}
+	if nodeAddress != "" {
+		scriptArgs = append(scriptArgs, "--node-address", nodeAddress)
+	}
+	if opts.Primary {
+		scriptArgs = append(scriptArgs, "--primary")
 	}
 
 	provisionOpts := ProvisionOptions{
@@ -151,6 +181,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		Stdout:          stdout,
 		Stderr:          stderr,
 		ScriptEnv:       envVars,
+		ScriptArgs:      scriptArgs,
 		ServiceChecks:   []string{"ployd"},
 	}
 
@@ -228,14 +259,6 @@ func randomHexString(length int) (string, error) {
 		hexStr = hexStr[:length]
 	}
 	return hexStr, nil
-}
-
-func defaultControlPlaneEndpoint(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return defaultControlPlaneEndpointValue
-	}
-	return value
 }
 
 type configureWorkstationOptions struct {

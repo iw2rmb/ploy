@@ -171,6 +171,7 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/security/ca", h.handleSecurityCA, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodPost, "/v1/security/certificates/control-plane", h.handleControlPlaneCertificate, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/version", h.handleVersion)
 	if h.mods != nil {
 		h.registerRoute(mux, http.MethodPost, "/v1/mods", h.handleModsSubmit, httpsecurity.ScopeMods)
@@ -363,6 +364,60 @@ func (s *controlPlaneServer) handleSecurityCA(w http.ResponseWriter, r *http.Req
 		response["trust_bundle_hash"] = trustHash
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *controlPlaneServer) handleControlPlaneCertificate(w http.ResponseWriter, r *http.Request) {
+	if !s.ensureEtcd(w) {
+		return
+	}
+	var req controlPlaneCertRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	clusterID := strings.TrimSpace(req.ClusterID)
+	if clusterID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "cluster_id is required")
+		return
+	}
+	nodeID := strings.TrimSpace(req.NodeID)
+	if nodeID == "" {
+		nodeID = "control"
+	}
+	address := strings.TrimSpace(req.Address)
+	if address == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "address is required")
+		return
+	}
+	created, err := deploy.EnsureClusterPKI(r.Context(), s.etcd, clusterID, deploy.EnsurePKIOptions{})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if created {
+		log.Printf("auto-bootstrapped cluster PKI for %s", clusterID)
+	}
+	manager, err := deploy.NewCARotationManager(s.etcd, clusterID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	cert, err := manager.IssueControlPlaneCertificate(r.Context(), nodeID, address, time.Now().UTC())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	state, err := manager.State(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	resp := map[string]any{
+		"cluster_id":  clusterID,
+		"certificate": cert,
+		"ca_bundle":   state.CurrentCA.CertificatePEM,
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 func (s *controlPlaneServer) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -1218,6 +1273,7 @@ func (s *controlPlaneServer) handleNodeJoin(w http.ResponseWriter, r *http.Reque
 		"certificate": result.Certificate,
 		"health":      result.Health,
 		"dry_run":     result.DryRun,
+		"ca_bundle":   result.CABundle,
 	}
 	writeJSON(w, http.StatusCreated, resp)
 }
@@ -1893,6 +1949,12 @@ func (s *controlPlaneServer) handleSignerRotations(w http.ResponseWriter, r *htt
 		payload["updated_at"] = evt.UpdatedAt.UTC().Format(time.RFC3339Nano)
 	}
 	writeJSON(w, http.StatusOK, payload)
+}
+
+type controlPlaneCertRequest struct {
+	ClusterID string `json:"cluster_id"`
+	NodeID    string `json:"node_id"`
+	Address   string `json:"address"`
 }
 
 type nodeJoinRequest struct {

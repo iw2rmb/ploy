@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -149,6 +150,7 @@ func TestHandleClusterAddRequiresAddress(t *testing.T) {
 
 func TestHandleClusterAddWithoutClusterIDBootstrapsControlPlane(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("PLOY_SKIP_REMOTE_CA_FETCH", "true")
 	orig := clusterBootstrapRunner
 	defer func() { clusterBootstrapRunner = orig }()
 	var captured deploy.Options
@@ -179,6 +181,7 @@ func TestHandleClusterAddWithoutClusterIDBootstrapsControlPlane(t *testing.T) {
 
 func TestHandleClusterAddAllowsWorkerFlagsWithoutClusterID(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("PLOY_SKIP_REMOTE_CA_FETCH", "true")
 	orig := clusterBootstrapRunner
 	defer func() { clusterBootstrapRunner = orig }()
 	var invoked bool
@@ -256,8 +259,11 @@ func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
 	if _, ok := provision.ScriptEnv["PLOYD_MODE"]; ok {
 		t.Fatalf("expected bootstrap env to omit PLOYD_MODE")
 	}
-	if provision.ScriptEnv["PLOY_CONTROL_PLANE_ENDPOINT"] == "" {
-		t.Fatalf("expected control plane endpoint exported to script env")
+	if len(provision.ScriptEnv) != 0 {
+		t.Fatalf("expected no script env overrides, got %+v", provision.ScriptEnv)
+	}
+	if got := strings.Join(provision.ScriptArgs, " "); got != "--cluster-id "+descriptor.ClusterID {
+		t.Fatalf("expected cluster id script arg, got %q", provision.ScriptArgs)
 	}
 	if provision.IdentityFile != identityPath {
 		t.Fatalf("expected identity path propagated to provisioner, got %q", provision.IdentityFile)
@@ -279,23 +285,22 @@ func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
 func TestHandleClusterCertStatus(t *testing.T) {
 	cfgDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", cfgDir)
-	desc, err := config.SaveDescriptor(config.Descriptor{
-		ClusterID:       "cluster-alpha",
-		Address:         "203.0.113.10",
-		SSHIdentityPath: "/home/ploy/.ssh/id_alpha",
-	})
-	if err != nil {
-		t.Fatalf("save descriptor: %v", err)
-	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("cluster_id") != desc.ClusterID {
+		if r.URL.Query().Get("cluster_id") != "cluster-alpha" {
 			t.Fatalf("expected cluster_id query, got %s", r.URL.RawQuery)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"cluster_id":"cluster-alpha","current_ca":{"version":"20251025","issued_at":"2025-10-25T12:00:00Z","expires_at":"2026-10-25T12:00:00Z","serial_number":"abcd"},"workers":{"total":3},"trust_bundle_hash":"deadbeef"}`)
 	}))
 	defer server.Close()
-	t.Setenv("PLOYD_ADMIN_ENDPOINT", server.URL)
+	desc, err := config.SaveDescriptor(config.Descriptor{
+		ClusterID:       "cluster-alpha",
+		Address:         server.URL,
+		SSHIdentityPath: "/home/ploy/.ssh/id_alpha",
+	})
+	if err != nil {
+		t.Fatalf("save descriptor: %v", err)
+	}
 	origFactory := clusterHTTPClientFactory
 	defer func() { clusterHTTPClientFactory = origFactory }()
 	clusterHTTPClientFactory = func(config.Descriptor) (*http.Client, func(), error) {
@@ -340,47 +345,211 @@ func identityFixture(t *testing.T, key string) string {
 
 func TestDescriptorControlPlaneURL(t *testing.T) {
 	desc := config.Descriptor{ClusterID: "lab", Address: "203.0.113.10"}
-	t.Setenv("PLOYD_ADMIN_ENDPOINT", "")
-	t.Setenv("PLOYD_ADMIN_SCHEME", "")
-	t.Setenv("PLOYD_ADMIN_PORT", "")
 
 	url, err := descriptorControlPlaneURL(desc)
 	if err != nil {
 		t.Fatalf("descriptorControlPlaneURL default failed: %v", err)
 	}
-	if url != "http://203.0.113.10:8443" {
-		t.Fatalf("expected default http url, got %s", url)
+	if url != "https://203.0.113.10:8443" {
+		t.Fatalf("expected default https url, got %s", url)
 	}
 
 	t.Run("scheme override", func(t *testing.T) {
-		t.Setenv("PLOYD_ADMIN_SCHEME", "https")
-		t.Setenv("PLOYD_ADMIN_PORT", "9443")
+		desc := config.Descriptor{ClusterID: "lab", Address: "203.0.113.10", Scheme: "http"}
 		url, err := descriptorControlPlaneURL(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL scheme override failed: %v", err)
 		}
-		if url != "https://203.0.113.10:9443" {
-			t.Fatalf("expected override url, got %s", url)
+		if url != "http://203.0.113.10:8443" {
+			t.Fatalf("expected http://..., got %s", url)
 		}
 	})
 
-	t.Run("endpoint override", func(t *testing.T) {
-		t.Setenv("PLOYD_ADMIN_ENDPOINT", "https://control.example.com:9000")
+	t.Run("address with port", func(t *testing.T) {
+		desc := config.Descriptor{ClusterID: "lab", Address: "control.example.com:9000"}
 		url, err := descriptorControlPlaneURL(desc)
 		if err != nil {
-			t.Fatalf("descriptorControlPlaneURL endpoint override failed: %v", err)
+			t.Fatalf("descriptorControlPlaneURL host:port failed: %v", err)
+		}
+		if url != "https://control.example.com:9000" {
+			t.Fatalf("expected host:port preserved, got %s", url)
+		}
+	})
+
+	t.Run("full url preserved", func(t *testing.T) {
+		desc := config.Descriptor{ClusterID: "lab", Address: "https://control.example.com:9000"}
+		url, err := descriptorControlPlaneURL(desc)
+		if err != nil {
+			t.Fatalf("descriptorControlPlaneURL full URL failed: %v", err)
 		}
 		if url != "https://control.example.com:9000" {
 			t.Fatalf("expected endpoint override, got %s", url)
 		}
 	})
+}
 
-	t.Run("invalid port", func(t *testing.T) {
-		t.Setenv("PLOYD_ADMIN_ENDPOINT", "")
-		t.Setenv("PLOYD_ADMIN_SCHEME", "")
-		t.Setenv("PLOYD_ADMIN_PORT", "not-a-number")
-		if _, err := descriptorControlPlaneURL(desc); err == nil {
-			t.Fatalf("expected error for invalid admin port")
-		}
+func TestInstallWorkerArtifactsUploadsCertificatesAndRewritesConfig(t *testing.T) {
+	ca := "-----BEGIN CERTIFICATE-----\nMIIC\n-----END CERTIFICATE-----"
+	cert := "-----BEGIN CERTIFICATE-----\nMIID\n-----END CERTIFICATE-----"
+	key := "-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----"
+	cfg := workerProvisionConfig{
+		WorkerAddress:   "198.51.100.20",
+		User:            "ploy",
+		IdentityFile:    "/home/ploy/.ssh/id_worker",
+		SSHPort:         3022,
+		ControlPlaneURL: "http://cp.internal:9094",
+	}
+	result := nodeJoinResponse{
+		Certificate: deploy.LeafCertificate{
+			CertificatePEM: cert,
+			KeyPEM:         key,
+		},
+		CABundle: ca,
+	}
+
+	fake := &fakeRemoteOps{}
+	origCmd := remoteCommandExecutor
+	origWrite := remoteFileWriter
+	remoteCommandExecutor = fake.command
+	remoteFileWriter = fake.write
+	t.Cleanup(func() {
+		remoteCommandExecutor = origCmd
+		remoteFileWriter = origWrite
 	})
+
+	if err := installWorkerArtifacts(cfg, result, io.Discard); err != nil {
+		t.Fatalf("installWorkerArtifacts: %v", err)
+	}
+
+	if len(fake.commandCalls) != 3 {
+		t.Fatalf("expected 3 remote commands, got %d", len(fake.commandCalls))
+	}
+	first := fake.commandCalls[0]
+	if first.target != "ploy@198.51.100.20" {
+		t.Fatalf("expected target ploy@198.51.100.20, got %s", first.target)
+	}
+	if got := flagValue(first.args, "-i"); got != cfg.IdentityFile {
+		t.Fatalf("expected ssh identity %s, got %s", cfg.IdentityFile, got)
+	}
+	if got := flagValue(first.args, "-p"); got != "3022" {
+		t.Fatalf("expected ssh port 3022, got %s", got)
+	}
+	if first.command != "mkdir -p /etc/ploy/pki && chmod 700 /etc/ploy/pki" {
+		t.Fatalf("unexpected mkdir command: %s", first.command)
+	}
+	second := fake.commandCalls[1]
+	if !strings.Contains(second.command, "https://cp.internal:9094") {
+		t.Fatalf("expected HTTPS endpoint rewrite, got %s", second.command)
+	}
+	if !strings.Contains(second.command, remoteConfigPath) {
+		t.Fatalf("expected config rewrite to touch %s, got %s", remoteConfigPath, second.command)
+	}
+	third := fake.commandCalls[2]
+	if third.command != "systemctl restart ployd" {
+		t.Fatalf("expected ployd restart, got %s", third.command)
+	}
+
+	if len(fake.fileCalls) != 3 {
+		t.Fatalf("expected 3 remote file uploads, got %d", len(fake.fileCalls))
+	}
+	files := map[string]remoteFileCall{}
+	for _, call := range fake.fileCalls {
+		files[call.path] = call
+		if call.target != "ploy@198.51.100.20" {
+			t.Fatalf("expected uploads to target ploy@198.51.100.20, got %s", call.target)
+		}
+	}
+	if files[remoteControlPlaneCAPath].data != ca || files[remoteControlPlaneCAPath].mode != 0o644 {
+		t.Fatalf("unexpected CA upload: %+v", files[remoteControlPlaneCAPath])
+	}
+	if files[remoteNodeCertPath].data != cert || files[remoteNodeCertPath].mode != 0o644 {
+		t.Fatalf("unexpected cert upload: %+v", files[remoteNodeCertPath])
+	}
+	if files[remoteNodeKeyPath].data != key || files[remoteNodeKeyPath].mode != 0o600 {
+		t.Fatalf("unexpected key upload: %+v", files[remoteNodeKeyPath])
+	}
+}
+
+func TestInstallWorkerArtifactsReturnsErrorOnCommandFailure(t *testing.T) {
+	origCmd := remoteCommandExecutor
+	origWrite := remoteFileWriter
+	defer func() {
+		remoteCommandExecutor = origCmd
+		remoteFileWriter = origWrite
+	}()
+	remoteFileWriter = func(context.Context, string, []string, string, os.FileMode, []byte, io.Writer) error {
+		return nil
+	}
+	remoteCommandExecutor = func(ctx context.Context, target string, sshArgs []string, command string, stdin io.Reader, stdout, stderr io.Writer) error {
+		if strings.Contains(command, "mkdir -p") {
+			return errors.New("ssh failed")
+		}
+		return nil
+	}
+
+	cfg := workerProvisionConfig{
+		WorkerAddress: "10.0.0.5",
+	}
+	result := nodeJoinResponse{
+		Certificate: deploy.LeafCertificate{
+			CertificatePEM: "CERT",
+			KeyPEM:         "KEY",
+		},
+		CABundle: "CA",
+	}
+	err := installWorkerArtifacts(cfg, result, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "prepare remote pki dir") {
+		t.Fatalf("expected prepare remote pki dir error, got %v", err)
+	}
+}
+
+type fakeRemoteOps struct {
+	commandCalls []remoteCommandCall
+	fileCalls    []remoteFileCall
+}
+
+type remoteCommandCall struct {
+	target  string
+	args    []string
+	command string
+}
+
+type remoteFileCall struct {
+	target string
+	args   []string
+	path   string
+	mode   os.FileMode
+	data   string
+}
+
+func (f *fakeRemoteOps) command(ctx context.Context, target string, sshArgs []string, command string, stdin io.Reader, stdout, stderr io.Writer) error {
+	argsCopy := append([]string(nil), sshArgs...)
+	f.commandCalls = append(f.commandCalls, remoteCommandCall{
+		target:  target,
+		args:    argsCopy,
+		command: command,
+	})
+	return nil
+}
+
+func (f *fakeRemoteOps) write(ctx context.Context, target string, sshArgs []string, remotePath string, mode os.FileMode, data []byte, stderr io.Writer) error {
+	argsCopy := append([]string(nil), sshArgs...)
+	dataCopy := string(append([]byte(nil), data...))
+	f.fileCalls = append(f.fileCalls, remoteFileCall{
+		target: target,
+		args:   argsCopy,
+		path:   remotePath,
+		mode:   mode,
+		data:   dataCopy,
+	})
+	return nil
+}
+
+func flagValue(args []string, flag string) string {
+	for i := 0; i < len(args); i++ {
+		if args[i] == flag && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }

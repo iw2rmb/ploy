@@ -5,6 +5,8 @@ BUILD_DIR := dist
 build: ## Build the Ploy CLI
 	@mkdir -p $(BUILD_DIR)
 	go build -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
+	go build -o $(BUILD_DIR)/ployd ./cmd/ployd
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-linux ./cmd/ployd
 
 .PHONY: fmt
 fmt: ## Format Go source files
