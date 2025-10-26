@@ -1,0 +1,202 @@
+NodeJoinRequest:
+  type: object
+  required: [cluster_id, address]
+  properties:
+    cluster_id:
+      type: string
+      description: Cluster identifier.
+    worker_id:
+      type: string
+      description: Optional worker identifier. Generated automatically when omitted.
+    address:
+      type: string
+      description: Reachable address for the worker node.
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+      description: Arbitrary key/value metadata.
+    probes:
+      type: array
+      items:
+        $ref: '#/components/schemas/NodeProbe'
+    dry_run:
+      type: boolean
+      default: false
+      description: When true, health probes run without persisting registry or PKI changes.
+NodeProbe:
+  type: object
+  required: [endpoint]
+  properties:
+    name:
+      type: string
+      description: Friendly probe name.
+    endpoint:
+      type: string
+      format: uri
+      description: HTTP(S) endpoint probed during registration.
+    expect_status:
+      type: integer
+      format: int32
+      minimum: 100
+      maximum: 599
+      description: Expected HTTP status code. Defaults to 200.
+NodeJoinResponse:
+  type: object
+  required: [worker_id, descriptor, certificate, health, dry_run]
+  properties:
+    worker_id:
+      type: string
+    descriptor:
+      $ref: '#/components/schemas/NodeDescriptor'
+    certificate:
+      $ref: '#/components/schemas/LeafCertificate'
+    health:
+      type: array
+      items:
+        $ref: '#/components/schemas/WorkerProbeResult'
+    dry_run:
+      type: boolean
+NodeDescriptor:
+  type: object
+  required: [id, address, registered_at, status]
+  properties:
+    id:
+      type: string
+    address:
+      type: string
+    labels:
+      type: object
+      additionalProperties:
+        type: string
+    registered_at:
+      type: string
+      format: date-time
+    certificate_version:
+      type: string
+    status:
+      $ref: '#/components/schemas/WorkerStatus'
+WorkerStatus:
+  type: object
+  required: [phase, checked_at]
+  properties:
+    phase:
+      type: string
+      description: Worker lifecycle phase (registering, ready, error).
+    checked_at:
+      type: string
+      format: date-time
+    message:
+      type: string
+    probes:
+      type: array
+      items:
+        $ref: '#/components/schemas/WorkerProbeResult'
+WorkerProbeResult:
+  type: object
+  required: [name, passed, checked_at]
+  properties:
+    name:
+      type: string
+    endpoint:
+      type: string
+      description: Endpoint that was probed.
+    passed:
+      type: boolean
+    status_code:
+      type: integer
+      format: int32
+    message:
+      type: string
+    checked_at:
+      type: string
+      format: date-time
+LeafCertificate:
+  type: object
+  required: [node_id, usage, version, certificate_pem, key_pem, issued_at, expires_at]
+  properties:
+    node_id:
+      type: string
+    usage:
+      type: string
+      enum: [worker, beacon]
+    version:
+      type: string
+    parent_version:
+      type: string
+    serial_number:
+      type: string
+    certificate_pem:
+      type: string
+      description: PEM-encoded certificate.
+    key_pem:
+      type: string
+      description: PEM-encoded private key.
+    issued_at:
+      type: string
+      format: date-time
+    expires_at:
+      type: string
+      format: date-time
+    previous_version:
+      type: string
+NodeDeleteRequest:
+  type: object
+  required: [cluster_id, worker_id, confirm]
+  properties:
+    cluster_id:
+      type: string
+    worker_id:
+      type: string
+    confirm:
+      type: string
+      description: Must match `worker_id` for safety.
+    drain_timeout_seconds:
+      type: integer
+      format: int32
+      minimum: 0
+      description: Optional drain window before removal. Defaults to 30 seconds.
+NodeDrainConflict:
+  type: object
+  required: [error, running_jobs]
+  properties:
+    error:
+      type: string
+    running_jobs:
+      type: integer
+      format: int32
+      description: Number of jobs still running on the worker.
+  type: object
+  required: [dry_run, old_version, new_version, updated_beacon_certificates, updated_worker_certificates, revoked]
+  properties:
+    dry_run:
+      type: boolean
+    old_version:
+      type: string
+    new_version:
+      type: string
+    operator:
+      type: string
+    reason:
+      type: string
+    updated_beacon_certificates:
+      type: array
+      items:
+        $ref: '#/components/schemas/LeafCertificate'
+    updated_worker_certificates:
+      type: array
+      items:
+        $ref: '#/components/schemas/LeafCertificate'
+    revoked:
+      $ref: '#/components/schemas/RevokedRecord'
+RevokedRecord:
+  type: object
+  required: [version, serial_number, revoked_at]
+  properties:
+    version:
+      type: string
+    serial_number:
+      type: string
+    revoked_at:
+      type: string
+      format: date-time

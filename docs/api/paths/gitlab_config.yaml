@@ -1,0 +1,52 @@
+get:
+  tags: [GitLab]
+  summary: Retrieve the sanitized GitLab integration configuration.
+  responses:
+    '200':
+      description: GitLab configuration returned.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GitLabConfigResponse'
+    '404':
+      description: No configuration is currently stored.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '503':
+      description: Required backing services (etcd) are unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+put:
+  tags: [GitLab]
+  summary: Validate and persist the GitLab integration configuration.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/GitLabConfigWriteRequest'
+  responses:
+    '202':
+      description: Configuration accepted and queued for persistence.
+    '400':
+      description: Validation failure in the configuration payload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '409':
+      description: Optimistic locking failure on the etcd revision.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '503':
+      description: Required backing services (etcd) are unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

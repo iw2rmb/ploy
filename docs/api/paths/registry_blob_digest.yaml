@@ -1,0 +1,53 @@
+get:
+  tags: [Registry]
+  summary: Download a committed blob by digest.
+  parameters:
+    - $ref: '#/components/parameters/RegistryRepository'
+    - $ref: '#/components/parameters/RegistryDigest'
+  responses:
+    '200':
+      description: Blob payload.
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+    '403':
+      description: Caller lacks the required scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '404':
+      description: Blob not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '503':
+      description: Registry backend unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+delete:
+  tags: [Registry]
+  summary: Soft-delete a blob record.
+  parameters:
+    - $ref: '#/components/parameters/RegistryRepository'
+    - $ref: '#/components/parameters/RegistryDigest'
+  responses:
+    '202':
+      description: Blob deletion scheduled.
+    '403':
+      description: Caller lacks the required scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '404':
+      description: Blob not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

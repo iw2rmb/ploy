@@ -1,0 +1,80 @@
+get:
+  tags: [Registry]
+  summary: Fetch a manifest by tag or digest.
+  parameters:
+    - $ref: '#/components/parameters/RegistryRepository'
+    - $ref: '#/components/parameters/RegistryReference'
+  responses:
+    '200':
+      description: Serialized OCI manifest.
+      content:
+        application/vnd.oci.image.manifest.v1+json:
+          schema:
+            type: object
+    '403':
+      description: Caller lacks the required scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '404':
+      description: Manifest/tag not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+put:
+  tags: [Registry]
+  summary: Store a manifest and optionally link it to a tag.
+  parameters:
+    - $ref: '#/components/parameters/RegistryRepository'
+    - $ref: '#/components/parameters/RegistryReference'
+  requestBody:
+    required: true
+    content:
+      application/vnd.oci.image.manifest.v1+json:
+        schema:
+          type: object
+  responses:
+    '201':
+      description: Manifest persisted.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              digest:
+                type: string
+    '400':
+      description: Manifest references missing blobs or is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '403':
+      description: Caller lacks the required scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+delete:
+  tags: [Registry]
+  summary: Delete a manifest by digest or remove a tag reference.
+  parameters:
+    - $ref: '#/components/parameters/RegistryRepository'
+    - $ref: '#/components/parameters/RegistryReference'
+  responses:
+    '202':
+      description: Manifest or tag deleted.
+    '403':
+      description: Caller lacks the required scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    '404':
+      description: Reference not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

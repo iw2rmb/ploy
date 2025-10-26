@@ -57,6 +57,7 @@ configuration.
 - `PLOY_SSH_IDENTITY` — Path to the SSH private key used for tunnel authentication (default `~/.ssh/id_rsa`).
 - `PLOY_SSH_SOCKET_DIR` — Override for the directory holding SSH control sockets (default `~/.ploy/tunnels`).
 - `PLOY_CACHE_HOME` — Optional base directory for CLI cache artifacts such as tunnel node assignments.
+- `PLOY_ARTIFACT_ROOT` — Optional override for the local artifact cache used by the step workspace hydrator and filesystem artifact publisher. Defaults to `$XDG_CACHE_HOME/ploy/artifacts` (or the OS cache dir fallback) when unset.
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
   until the CLI flips to the new scheduler by default.
 
