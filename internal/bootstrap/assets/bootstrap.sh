@@ -821,6 +821,6 @@ main() {
   log "bootstrap complete"
 }
 
-if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" || -z "${BASH_SOURCE[0]:-}" ]]; then
   main "$@"
 fi
