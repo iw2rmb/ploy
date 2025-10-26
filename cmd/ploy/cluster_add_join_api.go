@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/deploy"
@@ -36,7 +37,7 @@ func newDescriptorHTTPClient(desc config.Descriptor) (*http.Client, func(), erro
 		ID:           strings.TrimSpace(desc.ClusterID),
 		Address:      addr,
 		SSHPort:      22,
-		APIPort:      defaultControlPlanePort,
+		APIPort:      controlplane.DefaultPort,
 		User:         defaultTunnelUser(),
 		IdentityFile: deploycli.ExpandPath(identity),
 	}

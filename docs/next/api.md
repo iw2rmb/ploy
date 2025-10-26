@@ -300,8 +300,9 @@ differentiate them.
 
 - `GET /v1/config` — Retrieve effective cluster configuration (IPFS endpoints, node selection policies,
   feature flags, cluster version tag). Responses include the current `revision`, `version_tag`,
-  and timestamps (`updated_at`, `updated_by`). The response is returned with `Cache-Control: no-store`
-  and an `ETag` header whose value matches the etcd revision so callers can cache locally.
+  timestamps (`updated_at`, `updated_by`), and an optional `discovery` block that advertises the
+  control-plane descriptors (`default_descriptor` plus a list of `{cluster_id,address,api_endpoint,ca_bundle}` entries).
+  The response is returned with `Cache-Control: no-store` and an `ETag` header whose value matches the etcd revision so callers can cache locally.
 - `PUT /v1/config` — Update configuration values (requires `admin` scope). Callers must supply an
   `If-Match` header: use `0` to create the document, the last seen revision to update in place, or `*`
   to force an unconditional write. On success the control plane returns the sanitized document,

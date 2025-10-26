@@ -2,30 +2,28 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/controlplane/tunnel"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 )
 
-var gitlabConfigStoreFactory = func(ctx context.Context) (gitlabStore, error) {
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+var gitlabConfigStoreFactory = func(ctx context.Context, opts controlplane.Options) (gitlabStore, error) {
+	base, httpClient, err := controlplane.ResolveHTTP(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 	return newHTTPGitlabConfigStore(base, httpClient), nil
 }
 
-var gitlabSignerClientFactory = func(ctx context.Context) (gitlabSignerClient, error) {
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+var gitlabSignerClientFactory = func(ctx context.Context, opts controlplane.Options) (gitlabSignerClient, error) {
+	base, httpClient, err := controlplane.ResolveHTTP(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -33,62 +31,7 @@ var gitlabSignerClientFactory = func(ctx context.Context) (gitlabSignerClient, e
 }
 
 func resolveControlPlaneHTTP(ctx context.Context) (*url.URL, *http.Client, error) {
-	var lastErr error
-	endpoint := strings.TrimSpace(os.Getenv(controlPlaneURLEnv))
-
-	if endpoint == "" {
-		cfg, err := resolveIntegrationConfig(ctx)
-		if err == nil {
-			if trimmed := strings.TrimSpace(cfg.APIEndpoint); trimmed != "" {
-				endpoint = trimmed
-			}
-		} else if !errors.Is(err, errGridClientDisabled) {
-			lastErr = err
-		}
-	}
-
-	if endpoint == "" {
-		if lastErr != nil {
-			return nil, nil, lastErr
-		}
-		return nil, nil, errors.New("control plane endpoint not configured; set PLOY_CONTROL_PLANE_URL or provide an API endpoint via 'ploy config gitlab set'")
-	}
-
-	parsed, err := url.Parse(endpoint)
-	if err != nil {
-		return nil, nil, fmt.Errorf("parse control plane url: %w", err)
-	}
-	if parsed.Scheme == "" {
-		parsed.Scheme = "https"
-	}
-
-	if err := tunnel.EnsureFallbackNode(parsed); err != nil {
-		return nil, nil, err
-	}
-
-	httpClient, err := newControlPlaneHTTPClient(parsed)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := tunnel.AttachHTTP(httpClient); err != nil {
-		return nil, nil, err
-	}
-	return parsed, httpClient, nil
-}
-
-func newControlPlaneHTTPClient(base *url.URL) (*http.Client, error) {
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-	}
-	if strings.EqualFold(base.Scheme, "https") {
-		tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12}
-		transport.TLSClientConfig = tlsCfg
-	}
-	client := &http.Client{
-		Timeout:   15 * time.Second,
-		Transport: transport,
-	}
-	return client, nil
+	return controlplane.ResolveHTTP(ctx, controlplane.Options{})
 }
 
 func parseTimestamp(value string) time.Time {
