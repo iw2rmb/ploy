@@ -1,6 +1,6 @@
 # SSH Transfer Slice B — Registry (OCI) Backend
 
-- Status: Draft
+- Status: Implemented
 - Owner: Codex
 - Created: 2025-10-26
 - Parent: `docs/design/cli-ssh-artifacts/README.md`

@@ -2,6 +2,8 @@ package transfers_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -72,6 +74,40 @@ func TestCommitPublishesAndStoresMetadata(t *testing.T) {
 	}
 	if len(publisher.payloads) != 1 {
 		t.Fatalf("expected publisher invocation")
+	}
+}
+
+func TestLoadSlotPayloadVerifiesDigest(t *testing.T) {
+	tempDir := t.TempDir()
+	mgr := transfers.NewManager(transfers.Options{BaseDir: tempDir})
+	slot, err := mgr.CreateUploadSlot(transfers.KindRepo, "job-digest", "plan", "node-z", 0)
+	if err != nil {
+		t.Fatalf("CreateUploadSlot: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(slot.RemotePath), 0o755); err != nil {
+		t.Fatalf("prepare slot dir: %v", err)
+	}
+	payload := []byte("registry-blob-payload")
+	if err := os.WriteFile(slot.RemotePath, payload, 0o644); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	expectedDigest := sha256.Sum256(payload)
+	computed := "sha256:" + hex.EncodeToString(expectedDigest[:])
+	loadedSlot, data, digest, err := mgr.LoadSlotPayload(slot.ID, int64(len(payload)), computed)
+	if err != nil {
+		t.Fatalf("LoadSlotPayload: %v", err)
+	}
+	if loadedSlot.ID != slot.ID {
+		t.Fatalf("expected slot copy for %s", slot.ID)
+	}
+	if string(data) != string(payload) {
+		t.Fatalf("unexpected payload data: %q", string(data))
+	}
+	if digest != computed {
+		t.Fatalf("expected digest %s, got %s", computed, digest)
+	}
+	if _, _, _, err := mgr.LoadSlotPayload(slot.ID, int64(len(payload)), "sha256:deadbeef"); err == nil {
+		t.Fatalf("expected digest mismatch error")
 	}
 }
 
