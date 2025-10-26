@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster config snapshot environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact upload report cluster config snapshot environment manifest knowledge-base help" -- "$cur") )
         return 0
     fi
 
@@ -40,6 +40,10 @@ _ploy_completions() {
             COMPREPLY=( $(compgen -W "push pull status rm" -- "$cur") )
             return 0
         fi
+        ;;
+    "upload")
+        ;;
+    "report")
         ;;
     "cluster")
         if [[ $COMP_CWORD -eq 2 ]]; then
@@ -87,7 +91,7 @@ _ploy_completions() {
         ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact cluster config snapshot environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "workflow mod mods jobs artifact upload report cluster config snapshot environment manifest knowledge-base" -- "$cur") )
             return 0
         fi
         ;;

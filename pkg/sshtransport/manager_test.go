@@ -388,6 +388,10 @@ func (h *stubHandle) LocalAddress() string {
 	return h.listener.Addr().String()
 }
 
+func (h *stubHandle) ControlPath() string {
+	return ""
+}
+
 func (h *stubHandle) Wait() <-chan error {
 	return h.done
 }

@@ -32,6 +32,7 @@ type Config struct {
 	Factory          TunnelFactory
 	Cache            AssignmentCache
 	Logger           Logger
+	CommandRunner    CommandRunner
 }
 
 // AssignmentCache captures the persistence hooks Manager relies on to remember job/node mappings.
@@ -72,6 +73,7 @@ type Manager struct {
 	minBack time.Duration
 	maxBack time.Duration
 	dialTO  time.Duration
+	runner  CommandRunner
 
 	nodes map[string]Node
 	order []string
@@ -144,6 +146,11 @@ func NewManager(cfg Config) (*Manager, error) {
 		cache = noopCache{}
 	}
 
+	runner := cfg.CommandRunner
+	if runner == nil {
+		runner = defaultCommandRunner{}
+	}
+
 	return &Manager{
 		factory: factory,
 		cache:   cache,
@@ -153,6 +160,7 @@ func NewManager(cfg Config) (*Manager, error) {
 		minBack: minBack,
 		maxBack: maxBack,
 		dialTO:  dialTO,
+		runner:  runner,
 		nodes:   make(map[string]Node),
 		order:   nil,
 		tunnels: make(map[string]*tunnelState),

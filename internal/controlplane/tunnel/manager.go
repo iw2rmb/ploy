@@ -56,6 +56,15 @@ func Cache() (*cache.Cache, error) {
 	return ensureCache()
 }
 
+// Nodes returns the cached node snapshot known to the tunnel cache.
+func Nodes() []sshtransport.Node {
+	store, err := ensureCache()
+	if err != nil || store == nil {
+		return nil
+	}
+	return store.Nodes()
+}
+
 func ensureCache() (*cache.Cache, error) {
 	cacheOnce.Do(func() {
 		path := cachePath()
