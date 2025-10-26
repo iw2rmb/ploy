@@ -7,6 +7,7 @@
 - [x] 1.3 Expand the HTTP surface in `internal/api/httpserver/controlplane.go` to match `docs/next/api.md`: add `/v1/mods` (submit, resume, cancel, status, events, logs), `/v1/artifacts` CRUD, `/v1/jobs/{id}/events`, `/v1/config`, `/v1/status`, `/v1/version`, and `/v1/registry/*`, enforcing auth across the single control-plane entry point.
 - [ ] 1.4 Introduce artifact/registry backends behind the new endpoints: reuse `internal/workflow/artifacts` for IPFS Cluster pins, implement OCI manifest/blob storage (etcd metadata + IPFS payload), and surface pin status for CLI queries.
 - [ ] 1.5 Harden configuration discovery: update `internal/api/config` and `cmd/ploy/config_gitlab.go` to merge cluster descriptors, SSH tunnel metadata, and local overrides so every CLI call can rely on descriptors without separate CA bundles.
+- [ ] 1.6 Persist SSH transfer slots and enforcement: move the new `/v1/transfers/*` state out of process into etcd, add the `ployd` SFTP guard/cleanup units, and emit structured audit logs so uploads/downloads survive restarts.
 
 ## 2. Worker Runtime & Job Execution
 
@@ -23,6 +24,7 @@
 - [ ] 3.3 Update cluster and node administration flows: ensure the unified `ploy cluster add` command (primary + worker modes), `ploy node rm`, and GitLab signer commands hit the new endpoints, reuse the SSH descriptor format, and surface tunnel status where operators need it.
 - [ ] 3.4 Refresh configuration/environment handling: purge Grid-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
 - [ ] 3.5 Remove the legacy workflow runner path: delete `internal/workflow/grid`, the local `runner.Run` invocation path, and associated tests once the control-plane submission round-trips are covered.
+- [ ] 3.6 Finish SSH transfer UX: add chunked/resumable SFTP support, progress reporting, and CLI resume flows (`ploy upload --resume`, partial downloads) so large artifacts do not require re-sending on flaky links.
 
 ## 4. Observability, Retention & Operations
 
@@ -31,6 +33,7 @@
 - [ ] 4.3 Ship the GC controller and CLI: implement a background reconciler that walks `gc/jobs/**`, unpins artifacts via IPFS Cluster, and deletes expired records; add `ploy gc` with dry-run and filtering options, wiring it to the same logic.
 - [ ] 4.4 Build node administration routes: `/v1/nodes` should report health, running jobs, IPFS peer lag, and support drain/heal actions, all reachable through the SSH tunnel manager.
 - [ ] 4.5 Document and automate operations: update `docs/next/devops.md`, `docs/next/observability.md`, and `docs/next/vps-lab.md` with the new commands, required ports, and smoke tests; ensure bootstrap scripts drop the right resolver entries and verify systemd units.
+- [ ] 4.6 Wire transfer ingestion to jobs/artifacts: have committed slots trigger IPFS publishes, update job metadata with report CIDs/digests, and expose metrics/alerts when uploads stall or digests mismatch.
 
 ## 5. Migration & Cleanup
 

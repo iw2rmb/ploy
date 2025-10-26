@@ -9,6 +9,8 @@ Core Commands:
   mods             Observe Mods execution (logs, events)
   jobs             Inspect and follow individual jobs
   artifact         Manage IPFS Cluster artifacts
+  upload           Upload repository or log bundles via SSH
+  report           Download reports or artifacts via SSH
   cluster          Manage local cluster descriptors
   config           Inspect or update cluster configuration
   snapshot         Plan and capture workspace snapshots

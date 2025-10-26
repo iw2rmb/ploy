@@ -137,6 +137,10 @@ func (h *sshHandle) LocalAddress() string {
 	return h.localAddr
 }
 
+func (h *sshHandle) ControlPath() string {
+	return h.controlPath
+}
+
 func (h *sshHandle) Wait() <-chan error {
 	if h.done == nil {
 		h.done = make(chan error, 1)

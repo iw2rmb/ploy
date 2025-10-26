@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -30,6 +31,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
@@ -194,6 +196,8 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		}
 	}
 
+	artifactPublisher := buildArtifactPublisher()
+
 	var rotations *events.RotationHub
 	if signer != nil {
 		rotations = events.NewRotationHub(context.Background(), signer)
@@ -203,12 +207,13 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 	defaultRole := auth.RoleCLIAdmin
 
 	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
-		Scheduler: sched,
-		Signer:    signer,
-		Streams:   streams,
-		Etcd:      client,
-		Rotations: rotations,
-		Mods:      modsService,
+		Scheduler:         sched,
+		Signer:            signer,
+		Streams:           streams,
+		Etcd:              client,
+		Rotations:         rotations,
+		Mods:              modsService,
+		ArtifactPublisher: artifactPublisher,
 		Authorizer: auth.NewAuthorizer(auth.Options{
 			AllowInsecure: allowInsecure,
 			DefaultRole:   defaultRole,
@@ -232,4 +237,17 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		return nil
 	}
 	return handler, shutdown, nil
+}
+
+const defaultIPFSClusterAPI = "http://127.0.0.1:9094"
+
+func buildArtifactPublisher() *workflowartifacts.ClusterClient {
+	client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
+		BaseURL: defaultIPFSClusterAPI,
+	})
+	if err != nil {
+		log.Printf("control-plane: disabling artifact publisher: %v", err)
+		return nil
+	}
+	return client
 }

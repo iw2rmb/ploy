@@ -97,6 +97,16 @@ var commandTree = []Node{
 		},
 	},
 	{
+		Name:        "upload",
+		Description: "Upload repository or log bundles via SSH",
+		Usage:       "ploy upload --job-id <id> <path>",
+	},
+	{
+		Name:        "report",
+		Description: "Download reports or artifacts via SSH",
+		Usage:       "ploy report --job-id <id> --output <path>",
+	},
+	{
 		Name:        "cluster",
 		Description: "Manage local cluster descriptors",
 		Usage:       "ploy cluster <command>",
