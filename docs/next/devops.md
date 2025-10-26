@@ -80,17 +80,40 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
   - Because the CA is stored in etcd, re-running bootstrap on the same host simply reuses the latest CA and issues a new control-plane leaf certificate; operators can safely retry failed installs without worrying about orphaned trust roots.
 
 4. **Capture Descriptor Metadata**  
-   - On success the CLI writes `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json` containing only the
-     SSH metadata required to re-open tunnels (cluster ID, address/port, identity path, labels).
+   - On success the CLI writes `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json` containing the SSH
+     metadata plus the resolved control-plane endpoint and CA bundle so future commands can dial the
+     API without exporting environment variables.
    - Subsequent commands feed this descriptor into `pkg/sshtransport`, which keeps persistent SSH
-     tunnels alive for control-plane HTTP calls—no CA bundles or resolver entries are required.
+     tunnels alive for control-plane HTTP calls—no manual resolver or PEM juggling required.
    - `ploy cluster list` and the bootstrap output both surface the descriptor so operators can copy
      the join hint when onboarding workers.
+   - Record the same descriptor information centrally via `/v1/config` so new workstations can seed
+     their cache automatically. Example payload:
+
+     ```json
+     {
+       "cluster_id": "cluster-alpha",
+       "config": {
+         "discovery": {
+           "default_descriptor": "cluster-alpha",
+           "descriptors": [
+             {
+               "cluster_id": "cluster-alpha",
+               "address": "control.alpha.ssh",
+               "api_endpoint": "https://control.alpha:8443",
+               "ca_bundle": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+             }
+           ]
+         }
+       }
+     }
+     ```
 
 5. **Configure Ploy CLI**  
    - Install `ploy` binary on operator workstation.  
    - Set environment variables (`PLOY_CONTROL_PLANE_URL`, GitLab API token, etc.) only when you need
-     overrides beyond what the descriptor already records.  
+     overrides beyond what the descriptor already records (for example, pointing automation at a
+     non-default cluster).  
 
 6. **Verify**  
    - `ploy status` to ensure etcd, IPFS, and Docker integrations respond.
@@ -121,7 +144,7 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - Use `ploy cluster cert status [--cluster-id <id>]` to confirm the active CA version, expiry, and node counts exposed by `/v1/security/ca`. The command automatically targets the default descriptor when `--cluster-id` is omitted.  
 - Use `ploy config gitlab rotate --secret <name> --api-key <token> --scope <scope>` to push new GitLab credentials through the signer; follow up with `ploy config gitlab status` to confirm rotation state.  
 - Stream `ploy jobs follow <job-id>` when closing out incidents; the final `Retention:` line echoes the job’s bundle CID, TTL, and expiry so teams can schedule inspections before GC removes the log bundle (see [docs/next/logs.md](logs.md)).  
-- Provide the control-plane base URL via `PLOY_CONTROL_PLANE_URL` (or rely on the active cluster descriptor) so unattended tooling can authenticate control-plane requests.  
+- Use `PLOY_CONTROL_PLANE_URL` only when unattended tooling cannot reuse the cached descriptor; otherwise the CLI reads the endpoint and CA bundle directly from the descriptor written during bootstrap or published through `/v1/config`.  
 - Use `GET /v1/config?cluster_id=<id>` to audit the active control-plane configuration. Apply updates with `PUT /v1/config` and an `If-Match` header (use `0` for initial creation, the last seen revision for updates, or `*` to override). Every write is recorded by Prometheus metrics such as `ploy_config_updates_total`.  
 - `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the response is intentionally uncached so dashboards can poll it directly.  
 - `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane and is safe to cache client-side for up to a minute.

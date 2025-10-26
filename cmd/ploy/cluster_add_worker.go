@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
-	"strconv"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
@@ -39,7 +38,7 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 	if workerAddr == "" {
 		return errors.New("worker address is required")
 	}
-	baseURL, err := descriptorControlPlaneURL(desc)
+	baseURL, err := controlplane.BaseURLFromDescriptor(desc)
 	if err != nil {
 		return err
 	}
@@ -90,34 +89,6 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 		return err
 	}
 	return renderWorkerJoinResult(stderr, desc.ClusterID, result)
-}
-
-func descriptorControlPlaneURL(desc config.Descriptor) (string, error) {
-	addr := strings.TrimSpace(desc.Address)
-	if addr == "" {
-		return "", errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
-	}
-	if strings.Contains(addr, "://") {
-		return addr, nil
-	}
-	scheme := strings.TrimSpace(desc.Scheme)
-	if scheme == "" {
-		scheme = "https"
-	}
-	switch scheme {
-	case "http", "https":
-	default:
-		return "", fmt.Errorf("invalid control plane scheme %q", scheme)
-	}
-	host := addr
-	if h, p, err := net.SplitHostPort(addr); err == nil {
-		port, err := strconv.Atoi(p)
-		if err != nil || port <= 0 {
-			return "", fmt.Errorf("invalid control plane port %q", p)
-		}
-		return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(h, strconv.Itoa(port))), nil
-	}
-	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(host, strconv.Itoa(defaultControlPlanePort))), nil
 }
 
 func renderWorkerJoinResult(w io.Writer, clusterID string, result nodeJoinResponse) error {

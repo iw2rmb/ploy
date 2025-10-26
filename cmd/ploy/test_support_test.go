@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 
 	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
@@ -158,6 +159,12 @@ func (noopStepExecutor) Run(ctx context.Context, req step.Request) (step.Result,
 
 func TestMain(m *testing.M) {
 	withStepExecutorStub(nil, noopStepExecutor{}, nil)
+	configDir, err := os.MkdirTemp("", "ploy-config-test-")
+	if err != nil {
+		panic(err)
+	}
+	_ = os.Setenv("PLOY_CONFIG_HOME", configDir)
+	_ = os.Setenv("PLOY_CACHE_HOME", filepath.Join(configDir, "cache"))
 	code := m.Run()
 	os.Exit(code)
 }

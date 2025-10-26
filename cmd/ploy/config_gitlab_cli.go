@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 )
 
@@ -37,7 +38,7 @@ func handleConfigGitlab(args []string, stderr io.Writer) error {
 
 	switch args[0] {
 	case "show":
-		return runGitlabShow(stderr)
+		return runGitlabShow(args[1:], stderr)
 	case "set":
 		return runGitlabSet(args[1:], stderr)
 	case "validate":
@@ -52,11 +53,24 @@ func handleConfigGitlab(args []string, stderr io.Writer) error {
 	}
 }
 
-func runGitlabShow(stderr io.Writer) error {
+func runGitlabShow(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("config gitlab show", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	var clusterID stringValue
+	fs.Var(&clusterID, "cluster-id", "Cluster identifier to target (default: active descriptor)")
+	if err := fs.Parse(args); err != nil {
+		printConfigGitlabUsage(stderr)
+		return err
+	}
+	if fs.NArg() > 0 {
+		printConfigGitlabUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
 	defer cancel()
 
-	store, err := gitlabConfigStoreFactory(ctx)
+	store, err := gitlabConfigStoreFactory(ctx, controlplane.Options{ClusterID: strings.TrimSpace(clusterID.value)})
 	if err != nil {
 		return err
 	}
@@ -97,9 +111,15 @@ func runGitlabSet(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config gitlab set", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	file := fs.String("file", "", "path to GitLab configuration JSON file")
+	var clusterID stringValue
+	fs.Var(&clusterID, "cluster-id", "Cluster identifier to target (default: active descriptor)")
 	if err := fs.Parse(args); err != nil {
 		printConfigGitlabUsage(stderr)
 		return err
+	}
+	if fs.NArg() > 0 {
+		printConfigGitlabUsage(stderr)
+		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 
 	path := strings.TrimSpace(*file)
@@ -120,7 +140,7 @@ func runGitlabSet(args []string, stderr io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
 	defer cancel()
 
-	store, err := gitlabConfigStoreFactory(ctx)
+	store, err := gitlabConfigStoreFactory(ctx, controlplane.Options{ClusterID: strings.TrimSpace(clusterID.value)})
 	if err != nil {
 		return err
 	}
@@ -172,6 +192,8 @@ func runGitlabStatus(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	secret := fs.String("secret", "", "optional secret name to filter")
 	limit := fs.Int("limit", 10, "maximum recent audit events to display per category")
+	var clusterID stringValue
+	fs.Var(&clusterID, "cluster-id", "Cluster identifier to target (default: active descriptor)")
 	if err := fs.Parse(args); err != nil {
 		printConfigGitlabUsage(stderr)
 		return err
@@ -184,7 +206,7 @@ func runGitlabStatus(args []string, stderr io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
 	defer cancel()
 
-	client, err := gitlabSignerClientFactory(ctx)
+	client, err := gitlabSignerClientFactory(ctx, controlplane.Options{ClusterID: strings.TrimSpace(clusterID.value)})
 	if err != nil {
 		return err
 	}
@@ -207,6 +229,8 @@ func runGitlabRotate(args []string, stderr io.Writer) error {
 	var scopeValues multiScopeFlag
 	fs.Var(&scopeValues, "scope", "GitLab token scope (repeatable)")
 	scopesCSV := fs.String("scopes", "", "comma-separated GitLab token scopes")
+	var clusterID stringValue
+	fs.Var(&clusterID, "cluster-id", "Cluster identifier to target (default: active descriptor)")
 	if err := fs.Parse(args); err != nil {
 		printConfigGitlabUsage(stderr)
 		return err
@@ -236,7 +260,7 @@ func runGitlabRotate(args []string, stderr io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultGitlabTimeout)
 	defer cancel()
 
-	client, err := gitlabSignerClientFactory(ctx)
+	client, err := gitlabSignerClientFactory(ctx, controlplane.Options{ClusterID: strings.TrimSpace(clusterID.value)})
 	if err != nil {
 		return err
 	}

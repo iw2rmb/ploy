@@ -26,8 +26,9 @@ configuration.
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
-- Set `PLOY_CONTROL_PLANE_URL` (documented under **Control Plane** below) whenever descriptors do not
-  embed the API endpoint; the CLI needs it for `ploy upload`, `ploy report`, and other `/v1/*` calls.
+- `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL when cached descriptors do not yet
+  embed the endpoint (new workstation) or you need to target a secondary cluster explicitly. Descriptors discovered via
+  `ploy cluster add` remain the default for CLI calls such as `ploy upload` and `ploy report`.
 - `PLOY_IPFS_CLUSTER_API` — Base URL for the IPFS Cluster REST API used by the
   step runtime and the control-plane artifact publisher. Workstations still
   read this value when executing Mods locally, but `ploy artifact *`, `ploy upload`,
@@ -94,9 +95,8 @@ configuration.
 - `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
   to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
   16, 24, or 32 bytes to satisfy AES-GCM requirements.
-- `PLOY_CONTROL_PLANE_URL` — Base URL for control-plane HTTP APIs (`ploy config gitlab`,
-  worker onboarding via `ploy cluster add --cluster-id`, etc.). Required now that cluster descriptors only record SSH
-  metadata and no longer carry beacon/control-plane URLs.
+- `PLOY_CONTROL_PLANE_URL` — Optional control-plane base URL override used by `ploy config gitlab`, worker onboarding,
+  and CLI log/streaming commands. When unset, the CLI derives the endpoint plus CA bundle from the cached cluster descriptor.
 - `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
   callers omit a TTL while requesting short-lived GitLab tokens.
 - `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.

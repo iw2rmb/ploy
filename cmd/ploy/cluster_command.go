@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 )
 
 func handleCluster(args []string, w io.Writer) error {
@@ -115,7 +116,7 @@ func handleClusterCertStatus(args []string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	baseURL, err := descriptorControlPlaneURL(desc)
+	baseURL, err := controlplane.BaseURLFromDescriptor(desc)
 	if err != nil {
 		return err
 	}

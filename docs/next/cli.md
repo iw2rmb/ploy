@@ -74,16 +74,20 @@ Descriptors now encode only the SSH metadata needed to open tunnels:
 
 ## Configuration (GitLab)
 
-- `ploy config gitlab show`
-  Display the current GitLab integration configuration.
-- `ploy config gitlab set --file <path>`
-  Apply a GitLab configuration JSON document.
+- `ploy config gitlab show [--cluster-id <id>]`
+  Display the current GitLab integration configuration for the selected cluster (defaults to the cached descriptor).
+- `ploy config gitlab set --file <path> [--cluster-id <id>]`
+  Apply a GitLab configuration JSON document to the targeted cluster.
 - `ploy config gitlab validate --file <path>`
   Validate a configuration file without persisting it.
-- `ploy config gitlab status [--limit <n>]`
+- `ploy config gitlab status [--limit <n>] [--cluster-id <id>]`
   Inspect signer health, revision history, and rotation audit entries.
-- `ploy config gitlab rotate --secret <name> --api-key <token> [--scope <scope> ... | --scopes <scope,...>]`
-  Rotate a GitLab secret and trigger node refresh.
+- `ploy config gitlab rotate --secret <name> --api-key <token> [--scope <scope> ... | --scopes <scope,...>] [--cluster-id <id>]`
+  Rotate a GitLab secret and trigger node refresh on the selected cluster.
+
+When no local descriptor exists for the requested cluster, these commands read the `discovery`
+block returned by `/v1/config` to seed `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json`, ensuring
+future calls reuse the SSH and CA metadata without additional environment variables.
 
 ## Snapshot Management
 

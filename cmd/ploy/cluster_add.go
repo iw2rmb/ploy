@@ -10,7 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/deploy"
 )
 
-const defaultControlPlanePort = 8443
 const defaultSSHPort = 22
 const defaultSSHUser = "root"
 const remotePKIDir = "/etc/ploy/pki"

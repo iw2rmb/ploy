@@ -154,13 +154,14 @@ var commandTree = []Node{
 					{
 						Name:        "show",
 						Description: "Display the current GitLab configuration",
-						Usage:       "ploy config gitlab show",
+						Synopsis:    "show [--cluster-id <id>]",
+						Usage:       "ploy config gitlab show [--cluster-id <id>]",
 					},
 					{
 						Name:        "set",
-						Synopsis:    "set --file <path>",
+						Synopsis:    "set --file <path> [--cluster-id <id>]",
 						Description: "Apply a GitLab configuration JSON file",
-						Usage:       "ploy config gitlab set --file <path>",
+						Usage:       "ploy config gitlab set --file <path> [--cluster-id <id>]",
 					},
 					{
 						Name:        "validate",
@@ -171,13 +172,14 @@ var commandTree = []Node{
 					{
 						Name:        "status",
 						Description: "Inspect signer health and recent rotation audit entries",
-						Usage:       "ploy config gitlab status [--limit <n>]",
+						Synopsis:    "status [--limit <n>] [--cluster-id <id>]",
+						Usage:       "ploy config gitlab status [--limit <n>] [--cluster-id <id>]",
 					},
 					{
 						Name:        "rotate",
-						Synopsis:    "rotate --secret <name>",
+						Synopsis:    "rotate --secret <name> --api-key <token> [--cluster-id <id>]",
 						Description: "Rotate a GitLab secret and trigger node refresh",
-						Usage:       "ploy config gitlab rotate --secret <name> [--scopes <scope,...>]",
+						Usage:       "ploy config gitlab rotate --secret <name> [--scopes <scope,...>] [--cluster-id <id>]",
 					},
 				},
 			},

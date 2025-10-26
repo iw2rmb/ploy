@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	cfg "github.com/iw2rmb/ploy/internal/config/gitlab"
 )
 
@@ -31,7 +32,7 @@ func TestConfigGitlabShowPrintsSanitizedConfig(t *testing.T) {
 		},
 		revision: 7,
 	}
-	gitlabConfigStoreFactory = func(context.Context) (gitlabStore, error) {
+	gitlabConfigStoreFactory = func(_ context.Context, _ controlplane.Options) (gitlabStore, error) {
 		return stub, nil
 	}
 
@@ -57,7 +58,7 @@ func TestConfigGitlabSetLoadsFileAndPersists(t *testing.T) {
 	t.Cleanup(func() { gitlabConfigStoreFactory = originalFactory })
 
 	stub := &stubGitlabStore{}
-	gitlabConfigStoreFactory = func(context.Context) (gitlabStore, error) {
+	gitlabConfigStoreFactory = func(_ context.Context, _ controlplane.Options) (gitlabStore, error) {
 		return stub, nil
 	}
 
@@ -140,7 +141,7 @@ func TestConfigGitlabStatusOutputsSignerSummary(t *testing.T) {
 			},
 		},
 	}
-	gitlabSignerClientFactory = func(context.Context) (gitlabSignerClient, error) {
+	gitlabSignerClientFactory = func(_ context.Context, _ controlplane.Options) (gitlabSignerClient, error) {
 		return stub, nil
 	}
 
@@ -172,7 +173,7 @@ func TestConfigGitlabRotateTriggersSecretUpdate(t *testing.T) {
 	t.Cleanup(func() { gitlabSignerClientFactory = originalFactory })
 
 	stub := &stubGitlabSignerOps{}
-	gitlabSignerClientFactory = func(context.Context) (gitlabSignerClient, error) {
+	gitlabSignerClientFactory = func(_ context.Context, _ controlplane.Options) (gitlabSignerClient, error) {
 		return stub, nil
 	}
 
