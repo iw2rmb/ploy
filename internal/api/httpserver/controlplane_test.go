@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,6 +35,7 @@ import (
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
@@ -760,29 +764,145 @@ func TestVersionEndpointReturnsBuildMetadata(t *testing.T) {
 	}
 }
 
-func TestRegistryManifestGetNotImplemented(t *testing.T) {
+func TestRegistryBlobUploadLifecycle(t *testing.T) {
 	t.Parallel()
 
-	principal := newTestPrincipal([]string{"registry.pull"})
-	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
-		Auth: security.NewManager(&testTokenVerifier{principal: principal}),
+	fixture := newRegistryHTTPFixture(t)
+	repo := "acme/widgets"
+	payload := []byte("layer-payload")
+	digest := sha256Digest(payload)
+
+	uploadURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads", fixture.server.URL, repo)
+	status, startResp := postJSONStatus(t, uploadURL, map[string]any{
+		"media_type": "application/vnd.oci.image.layer.v1.tar",
+		"size":       len(payload),
 	})
-
-	req := newMTLSRequest(t, http.MethodGet, "/v1/registry/acme/manifests/latest", nil)
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("expected 501 for registry manifest GET, got %d", rec.Code)
+	if status != http.StatusAccepted {
+		t.Fatalf("expected 202 for upload start, got %d", status)
 	}
-
-	var body map[string]any
-	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
+	slotID := requireString(t, startResp["upload_id"])
+	remotePath := requireString(t, startResp["remote_path"])
+	if err := os.MkdirAll(filepath.Dir(remotePath), 0o755); err != nil {
+		t.Fatalf("prepare slot dir: %v", err)
 	}
-	if code, _ := body["error_code"].(string); code != "REGISTRY_MANIFEST_UNIMPLEMENTED" {
-		t.Fatalf("unexpected error code: %#v", body["error_code"])
+	if err := os.WriteFile(remotePath, payload, 0o644); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	patchURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads/%s", fixture.server.URL, repo, slotID)
+	if patchStatus, _ := sendJSONStatus(t, http.MethodPatch, patchURL, map[string]any{"size": len(payload)}); patchStatus != http.StatusAccepted {
+		t.Fatalf("expected 202 for upload patch, got %d", patchStatus)
+	}
+	values := url.Values{}
+	values.Set("digest", digest)
+	finalizeURL := fmt.Sprintf("%s?%s", patchURL, values.Encode())
+	status, commitResp := sendJSONStatus(t, http.MethodPut, finalizeURL, map[string]any{
+		"media_type": "application/vnd.oci.image.layer.v1.tar",
+		"size":       len(payload),
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("expected 201 for upload commit, got %d", status)
+	}
+	if requireString(t, commitResp["digest"]) != digest {
+		t.Fatalf("commit response digest mismatch")
+	}
+	blobURL := fmt.Sprintf("%s/v1/registry/%s/blobs/%s", fixture.server.URL, repo, digest)
+	resp, err := http.Get(blobURL)
+	if err != nil {
+		t.Fatalf("get blob: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for blob get, got %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read blob body: %v", err)
+	}
+	if !bytes.Equal(body, payload) {
+		t.Fatalf("unexpected blob payload: %q", string(body))
+	}
+}
+
+func TestRegistryManifestLifecycle(t *testing.T) {
+	t.Parallel()
+
+	fixture := newRegistryHTTPFixture(t)
+	repo := "acme/widgets"
+	configDigest := uploadRegistryBlob(t, fixture.server.URL, repo, []byte("config-json"), "application/vnd.oci.image.config.v1+json")
+	layerDigest := uploadRegistryBlob(t, fixture.server.URL, repo, []byte("layer-data"), "application/vnd.oci.image.layer.v1.tar")
+	manifestPayload, err := json.Marshal(map[string]any{
+		"schemaVersion": 2,
+		"mediaType":     "application/vnd.oci.image.manifest.v1+json",
+		"config": map[string]any{
+			"mediaType": "application/vnd.oci.image.config.v1+json",
+			"digest":    configDigest,
+			"size":      12,
+		},
+		"layers": []map[string]any{
+			{
+				"mediaType": "application/vnd.oci.image.layer.v1.tar",
+				"digest":    layerDigest,
+				"size":      10,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	manifestURL := fmt.Sprintf("%s/v1/registry/%s/manifests/latest", fixture.server.URL, repo)
+	putReq, err := http.NewRequest(http.MethodPut, manifestURL, bytes.NewReader(manifestPayload))
+	if err != nil {
+		t.Fatalf("build manifest put: %v", err)
+	}
+	putReq.Header.Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		t.Fatalf("manifest put: %v", err)
+	}
+	putResp.Body.Close()
+	if putResp.StatusCode != http.StatusCreated {
+		t.Fatalf("expected 201 for manifest put, got %d", putResp.StatusCode)
+	}
+	manifestDigest := putResp.Header.Get("Docker-Content-Digest")
+	if manifestDigest == "" {
+		t.Fatalf("expected docker content digest header")
+	}
+	getURL := fmt.Sprintf("%s/v1/registry/%s/manifests/latest", fixture.server.URL, repo)
+	resp, err := http.Get(getURL)
+	if err != nil {
+		t.Fatalf("manifest get: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatalf("read manifest body: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for manifest get, got %d", resp.StatusCode)
+	}
+	if !bytes.Equal(body, manifestPayload) {
+		t.Fatalf("unexpected manifest payload")
+	}
+	tagsURL := fmt.Sprintf("%s/v1/registry/%s/tags/list", fixture.server.URL, repo)
+	status, tagList := getJSONStatus(t, tagsURL)
+	if status != http.StatusOK {
+		t.Fatalf("expected 200 for tags list, got %d", status)
+	}
+	tags, _ := tagList["tags"].([]any)
+	if len(tags) != 1 || tags[0].(string) != "latest" {
+		t.Fatalf("unexpected tags response: %#v", tagList)
+	}
+	deleteURL := fmt.Sprintf("%s/v1/registry/%s/manifests/%s", fixture.server.URL, repo, manifestDigest)
+	status, _ = deleteJSONStatus(t, deleteURL, map[string]any{})
+	if status != http.StatusAccepted {
+		t.Fatalf("expected 202 for manifest delete, got %d", status)
+	}
+	status, tagList = getJSONStatus(t, tagsURL)
+	if status != http.StatusOK {
+		t.Fatalf("tags list after delete status %d", status)
+	}
+	if list, _ := tagList["tags"].([]any); len(list) != 0 {
+		t.Fatalf("expected tags cleared after delete, got %#v", tagList)
 	}
 }
 
@@ -2270,6 +2390,7 @@ type stubArtifactPublisher struct {
 	response workflowartifacts.AddResponse
 	err      error
 	lastReq  workflowartifacts.AddRequest
+	payloads map[string]storedPayload
 }
 
 func (s *stubArtifactPublisher) Add(ctx context.Context, req workflowartifacts.AddRequest) (workflowartifacts.AddResponse, error) {
@@ -2293,7 +2414,33 @@ func (s *stubArtifactPublisher) Add(ctx context.Context, req workflowartifacts.A
 	if resp.Name == "" {
 		resp.Name = req.Name
 	}
+	if s.payloads == nil {
+		s.payloads = make(map[string]storedPayload)
+	}
+	s.payloads[resp.CID] = storedPayload{data: append([]byte(nil), req.Payload...), digest: resp.Digest}
 	return resp, nil
+}
+
+func (s *stubArtifactPublisher) Fetch(ctx context.Context, cid string) (workflowartifacts.FetchResult, error) {
+	if s == nil {
+		return workflowartifacts.FetchResult{}, errors.New("stub publisher missing")
+	}
+	payload, ok := s.payloads[strings.TrimSpace(cid)]
+	if !ok {
+		return workflowartifacts.FetchResult{}, fmt.Errorf("stub fetch: cid %s not found", cid)
+	}
+	data := append([]byte(nil), payload.data...)
+	return workflowartifacts.FetchResult{
+		CID:    cid,
+		Data:   data,
+		Size:   int64(len(data)),
+		Digest: payload.digest,
+	}, nil
+}
+
+type storedPayload struct {
+	data   []byte
+	digest string
 }
 
 func beaconCanonicalKey(clusterID string) string {
@@ -2438,6 +2585,90 @@ func sendJSONStatus(t *testing.T, method, endpoint string, payload map[string]an
 		out = map[string]any{"error": strings.TrimSpace(string(data))}
 	}
 	return status, out
+}
+
+type registryHTTPFixture struct {
+	server    *httptest.Server
+	store     *registry.Store
+	publisher *stubArtifactPublisher
+}
+
+func newRegistryHTTPFixture(t *testing.T) registryHTTPFixture {
+	t.Helper()
+	etcd, client := startTestEtcd(t)
+	store, err := registry.NewStore(client, registry.StoreOptions{})
+	if err != nil {
+		t.Fatalf("new registry store: %v", err)
+	}
+	publisher := &stubArtifactPublisher{}
+	transfersMgr := transfers.NewManager(transfers.Options{BaseDir: t.TempDir()})
+	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
+		Etcd:              client,
+		Transfers:         transfersMgr,
+		ArtifactPublisher: publisher,
+		RegistryStore:     store,
+	})
+	server := httptest.NewServer(handler)
+	t.Cleanup(func() {
+		server.Close()
+		client.Close()
+		etcd.Close()
+	})
+	return registryHTTPFixture{
+		server:    server,
+		store:     store,
+		publisher: publisher,
+	}
+}
+
+func uploadRegistryBlob(t *testing.T, baseURL, repo string, payload []byte, mediaType string) string {
+	t.Helper()
+	uploadURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads", baseURL, repo)
+	status, startResp := postJSONStatus(t, uploadURL, map[string]any{
+		"media_type": mediaType,
+		"size":       len(payload),
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("expected 202 for upload start, got %d", status)
+	}
+	slotID := requireString(t, startResp["upload_id"])
+	remotePath := requireString(t, startResp["remote_path"])
+	if err := os.MkdirAll(filepath.Dir(remotePath), 0o755); err != nil {
+		t.Fatalf("prepare slot dir: %v", err)
+	}
+	if err := os.WriteFile(remotePath, payload, 0o644); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	patchURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads/%s", baseURL, repo, slotID)
+	if patchStatus, _ := sendJSONStatus(t, http.MethodPatch, patchURL, map[string]any{"size": len(payload)}); patchStatus != http.StatusAccepted {
+		t.Fatalf("expected 202 for upload patch, got %d", patchStatus)
+	}
+	digest := sha256Digest(payload)
+	values := url.Values{}
+	values.Set("digest", digest)
+	finalizeURL := fmt.Sprintf("%s?%s", patchURL, values.Encode())
+	status, _ = sendJSONStatus(t, http.MethodPut, finalizeURL, map[string]any{
+		"media_type": mediaType,
+		"size":       len(payload),
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("expected 201 for upload commit, got %d", status)
+	}
+	return digest
+}
+
+func sha256Digest(data []byte) string {
+	sum := sha256.Sum256(data)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func requireString(t *testing.T, value any) string {
+	t.Helper()
+	str, ok := value.(string)
+	if !ok {
+		t.Fatalf("expected string value, got %T", value)
+	}
+	return str
 }
 
 func newTestPrincipal(scopes []string) security.Principal {

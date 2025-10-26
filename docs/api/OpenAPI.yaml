@@ -17,6 +17,8 @@ tags:
     description: Worker onboarding, listing, and deregistration.
   - name: GitLab
     description: GitLab signer configuration.
+  - name: Registry
+    description: OCI registry-style artifact staging and retrieval.
 security:
   - bearerAuth: []
 paths:
@@ -183,12 +185,334 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /v1/registry/{repository}/blobs/uploads:
+    post:
+      tags: [Registry]
+      summary: Start a blob upload session backed by the SSH transfer slots.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryUploadStartRequest'
+      responses:
+        '202':
+          description: Upload slot reserved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryUploadStartResponse'
+        '400':
+          description: Invalid request payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Caller lacks the `registry.push` scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Transfer manager unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/registry/{repository}/blobs/uploads/{session_id}:
+    patch:
+      tags: [Registry]
+      summary: Report progress for an in-flight blob upload session.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistrySession'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryUploadProgressRequest'
+      responses:
+        '202':
+          description: Progress acknowledged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  upload_id:
+                    type: string
+                  uploaded:
+                    type: integer
+                    format: int64
+        '400':
+          description: Invalid payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Upload session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Registry]
+      summary: Finalise an upload session and publish the blob via IPFS.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistrySession'
+        - in: query
+          name: digest
+          required: true
+          schema:
+            type: string
+          description: Expected digest for the staged blob (for example `sha256:deadbeef`).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistryUploadCommitRequest'
+      responses:
+        '201':
+          description: Blob committed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryBlobCommitResponse'
+        '400':
+          description: Validation failed (missing digest, size mismatch, etc.).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Upload session not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Registry backend unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/registry/{repository}/blobs/{digest}:
+    get:
+      tags: [Registry]
+      summary: Download a committed blob by digest.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistryDigest'
+      responses:
+        '200':
+          description: Blob payload.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Blob not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Registry backend unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Registry]
+      summary: Soft-delete a blob record.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistryDigest'
+      responses:
+        '202':
+          description: Blob deletion scheduled.
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Blob not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/registry/{repository}/manifests/{reference}:
+    get:
+      tags: [Registry]
+      summary: Fetch a manifest by tag or digest.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistryReference'
+      responses:
+        '200':
+          description: Serialized OCI manifest.
+          content:
+            application/vnd.oci.image.manifest.v1+json:
+              schema:
+                type: object
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Manifest/tag not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags: [Registry]
+      summary: Store a manifest and optionally link it to a tag.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistryReference'
+      requestBody:
+        required: true
+        content:
+          application/vnd.oci.image.manifest.v1+json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Manifest persisted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  digest:
+                    type: string
+        '400':
+          description: Manifest references missing blobs or is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Registry]
+      summary: Delete a manifest by digest or remove a tag reference.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+        - $ref: '#/components/parameters/RegistryReference'
+      responses:
+        '202':
+          description: Manifest or tag deleted.
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Reference not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/registry/{repository}/tags/list:
+    get:
+      tags: [Registry]
+      summary: List tags for a repository.
+      parameters:
+        - $ref: '#/components/parameters/RegistryRepository'
+      responses:
+        '200':
+          description: Tags (empty if none).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryTagList'
+        '403':
+          description: Caller lacks the required scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Registry backend unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  parameters:
+    RegistryRepository:
+      name: repository
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: .+
+      description: Full repository path (encode '/' as %2F when constructing URLs).
+    RegistrySession:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Upload session identifier returned by POST /v1/registry/{repository}/blobs/uploads.
+    RegistryDigest:
+      name: digest
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9]+:[a-f0-9]{32,}$'
+      description: Content digest (for example sha256:deadbeef...).
+    RegistryReference:
+      name: reference
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Tag or digest referencing a manifest.
   schemas:
     NodeJoinRequest:
       type: object
@@ -476,6 +800,74 @@ components:
           type: array
           items:
             type: string
+    RegistryUploadStartRequest:
+      type: object
+      properties:
+        media_type:
+          type: string
+          description: Media type hint for the blob being uploaded.
+        size:
+          type: integer
+          format: int64
+          description: Optional size hint in bytes.
+        node_id:
+          type: string
+          description: Preferred control-plane node for the SSH session.
+    RegistryUploadStartResponse:
+      type: object
+      required: [upload_id, remote_path, location]
+      properties:
+        upload_id:
+          type: string
+        remote_path:
+          type: string
+          description: Absolute path on the control-plane host used for staging the blob via SSH.
+        node_id:
+          type: string
+          description: Control-plane node associated with the slot.
+        location:
+          type: string
+          description: URL for interacting with the upload session.
+    RegistryUploadProgressRequest:
+      type: object
+      properties:
+        size:
+          type: integer
+          format: int64
+          description: Total bytes staged so far.
+    RegistryUploadCommitRequest:
+      type: object
+      properties:
+        media_type:
+          type: string
+        size:
+          type: integer
+          format: int64
+          description: Optional size assertion in bytes.
+    RegistryBlobCommitResponse:
+      type: object
+      required: [digest, cid, location]
+      properties:
+        digest:
+          type: string
+        cid:
+          type: string
+          description: IPFS content identifier storing the blob.
+        location:
+          type: string
+          description: Relative URL where the blob can be downloaded.
+    RegistryTagList:
+      type: object
+      required: [name, tags]
+      properties:
+        name:
+          type: string
+          description: Repository name.
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags currently defined for the repository.
     Error:
       type: object
       required: [error]

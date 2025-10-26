@@ -25,6 +25,8 @@ const (
 	KindRepo   Kind = "repo"
 	KindLogs   Kind = "logs"
 	KindReport Kind = "report"
+	// KindRegistryBlob represents registry blob staging slots.
+	KindRegistryBlob Kind = "registry-blob"
 )
 
 // SlotState represents lifecycle states for a slot.
@@ -213,6 +215,34 @@ func (m *Manager) Abort(slotID string) {
 	}
 }
 
+// Slot returns a copy of the slot metadata for the given identifier.
+func (m *Manager) Slot(slotID string) (Slot, error) {
+	id := strings.TrimSpace(slotID)
+	if id == "" {
+		return Slot{}, errors.New("slot id required")
+	}
+	m.mu.Lock()
+	slot, ok := m.slots[id]
+	m.mu.Unlock()
+	if !ok {
+		return Slot{}, fmt.Errorf("unknown slot %s", id)
+	}
+	return *slot, nil
+}
+
+// LoadSlotPayload reads and validates the payload staged for the supplied slot.
+func (m *Manager) LoadSlotPayload(slotID string, declaredSize int64, declaredDigest string) (Slot, []byte, string, error) {
+	slot, err := m.Slot(slotID)
+	if err != nil {
+		return Slot{}, nil, "", err
+	}
+	data, digest, err := m.readSlotPayload(slot, declaredSize, declaredDigest)
+	if err != nil {
+		return Slot{}, nil, "", err
+	}
+	return slot, data, digest, nil
+}
+
 func (m *Manager) createSlot(kind Kind, jobID, stageID, nodeID string, sizeHint int64) (Slot, error) {
 	if strings.TrimSpace(jobID) == "" {
 		return Slot{}, errors.New("job id required")
@@ -281,20 +311,11 @@ func firstNonZero(values ...int64) int64 {
 }
 
 func (m *Manager) publishAndStore(ctx context.Context, slot Slot, declaredSize int64, declaredDigest string) (Artifact, error) {
-	data, err := os.ReadFile(slot.RemotePath)
+	data, computedDigest, err := m.readSlotPayload(slot, declaredSize, declaredDigest)
 	if err != nil {
-		return Artifact{}, fmt.Errorf("read slot payload: %w", err)
+		return Artifact{}, err
 	}
 	actualSize := int64(len(data))
-	if declaredSize > 0 && actualSize != declaredSize {
-		return Artifact{}, fmt.Errorf("payload size mismatch: want %d got %d", declaredSize, actualSize)
-	}
-	checksum := sha256.Sum256(data)
-	computedDigest := "sha256:" + hex.EncodeToString(checksum[:])
-	trimmedDigest := strings.TrimSpace(declaredDigest)
-	if trimmedDigest != "" && !strings.EqualFold(trimmedDigest, computedDigest) {
-		return Artifact{}, fmt.Errorf("payload digest mismatch")
-	}
 	name := filepath.Base(slot.RemotePath)
 	addReq := workflowartifacts.AddRequest{
 		Name:    name,
@@ -345,4 +366,22 @@ func (m *Manager) publishAndStore(ctx context.Context, slot Slot, declaredSize i
 		CID:        created.CID,
 		UpdatedAt:  created.UpdatedAt,
 	}, nil
+}
+
+func (m *Manager) readSlotPayload(slot Slot, declaredSize int64, declaredDigest string) ([]byte, string, error) {
+	data, err := os.ReadFile(slot.RemotePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("read slot payload: %w", err)
+	}
+	actualSize := int64(len(data))
+	if declaredSize > 0 && actualSize != declaredSize {
+		return nil, "", fmt.Errorf("payload size mismatch: want %d got %d", declaredSize, actualSize)
+	}
+	checksum := sha256.Sum256(data)
+	computedDigest := "sha256:" + hex.EncodeToString(checksum[:])
+	trimmedDigest := strings.TrimSpace(declaredDigest)
+	if trimmedDigest != "" && !strings.EqualFold(trimmedDigest, computedDigest) {
+		return nil, "", fmt.Errorf("payload digest mismatch")
+	}
+	return data, computedDigest, nil
 }
