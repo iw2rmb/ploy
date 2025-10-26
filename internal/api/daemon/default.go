@@ -2,8 +2,6 @@ package daemon
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -26,21 +23,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/api/status"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	controlplanescheduler "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
-
-var defaultEtcdEndpoints = []string{"http://127.0.0.1:2379"}
-
-func localEtcdEndpoints() []string {
-	out := make([]string, len(defaultEtcdEndpoints))
-	copy(out, defaultEtcdEndpoints)
-	return out
-}
 
 // NewDefault constructs a daemon using default component implementations.
 func NewDefault(cfg config.Config) (*Daemon, error) {
@@ -57,7 +48,7 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	statusProvider := status.New(status.Options{Role: role})
 	adminSvc := buildAdminService()
 
-	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(streams)
+	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(cfg, streams)
 	if err != nil {
 		return nil, err
 	}
@@ -153,32 +144,18 @@ func ensureFile(path string) error {
 }
 
 func buildAdminService() httpserver.AdminService {
-	return &admin.Service{EtcdEndpoints: localEtcdEndpoints()}
+	return &admin.Service{EtcdEndpoints: etcdutil.LocalEndpoints()}
 }
 
-func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.Context) error, error) {
+func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Handler, func(context.Context) error, error) {
 	if streams == nil {
 		return nil, nil, errors.New("control-plane: streams hub required")
 	}
-	cfg := clientv3.Config{
-		Endpoints:   localEtcdEndpoints(),
-		DialTimeout: 5 * time.Second,
-	}
-
-	if user := strings.TrimSpace(os.Getenv("PLOY_ETCD_USERNAME")); user != "" {
-		cfg.Username = user
-		cfg.Password = os.Getenv("PLOY_ETCD_PASSWORD")
-	}
-
-	tlsCfg, err := buildEtcdTLSConfigFromEnv()
+	etcdCfg, err := etcdutil.ConfigFromEnv()
 	if err != nil {
-		return nil, nil, fmt.Errorf("control-plane: etcd tls: %w", err)
+		return nil, nil, fmt.Errorf("control-plane: etcd config: %w", err)
 	}
-	if tlsCfg != nil {
-		cfg.TLS = tlsCfg
-	}
-
-	client, err := clientv3.New(cfg)
+	client, err := clientv3.New(etcdCfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("control-plane: etcd: %w", err)
 	}
@@ -222,6 +199,9 @@ func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.C
 		rotations = events.NewRotationHub(context.Background(), signer)
 	}
 
+	allowInsecure := true
+	defaultRole := auth.RoleCLIAdmin
+
 	handler := httpserver.NewControlPlaneHandler(httpserver.ControlPlaneOptions{
 		Scheduler: sched,
 		Signer:    signer,
@@ -229,6 +209,10 @@ func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.C
 		Etcd:      client,
 		Rotations: rotations,
 		Mods:      modsService,
+		Authorizer: auth.NewAuthorizer(auth.Options{
+			AllowInsecure: allowInsecure,
+			DefaultRole:   defaultRole,
+		}),
 	})
 
 	shutdown := func(ctx context.Context) error {
@@ -248,46 +232,4 @@ func buildControlPlaneHTTP(streams *logstream.Hub) (http.Handler, func(context.C
 		return nil
 	}
 	return handler, shutdown, nil
-}
-
-func buildEtcdTLSConfigFromEnv() (*tls.Config, error) {
-	caPath := strings.TrimSpace(os.Getenv("PLOY_ETCD_TLS_CA"))
-	certPath := strings.TrimSpace(os.Getenv("PLOY_ETCD_TLS_CERT"))
-	keyPath := strings.TrimSpace(os.Getenv("PLOY_ETCD_TLS_KEY"))
-	skipVerify := strings.EqualFold(strings.TrimSpace(os.Getenv("PLOY_ETCD_TLS_SKIP_VERIFY")), "true") ||
-		strings.TrimSpace(os.Getenv("PLOY_ETCD_TLS_SKIP_VERIFY")) == "1"
-
-	if caPath == "" && certPath == "" && keyPath == "" && !skipVerify {
-		return nil, nil
-	}
-
-	tlsCfg := &tls.Config{
-		MinVersion:         tls.VersionTLS12,
-		InsecureSkipVerify: skipVerify, // #nosec G402 — allow operator override for debugging.
-	}
-
-	if caPath != "" {
-		data, err := os.ReadFile(caPath)
-		if err != nil {
-			return nil, fmt.Errorf("load etcd ca: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if ok := pool.AppendCertsFromPEM(data); !ok {
-			return nil, errors.New("control-plane: parse etcd ca")
-		}
-		tlsCfg.RootCAs = pool
-	}
-
-	if certPath != "" || keyPath != "" {
-		if certPath == "" || keyPath == "" {
-			return nil, errors.New("control-plane: both etcd client cert and key required")
-		}
-		cert, err := tls.LoadX509KeyPair(certPath, keyPath)
-		if err != nil {
-			return nil, fmt.Errorf("control-plane: load etcd client certificate: %w", err)
-		}
-		tlsCfg.Certificates = []tls.Certificate{cert}
-	}
-
-	return tlsCfg, nil
 }

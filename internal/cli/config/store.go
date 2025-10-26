@@ -18,6 +18,8 @@ type Descriptor struct {
 	Address         string            `json:"address"`
 	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
+	Scheme          string            `json:"scheme,omitempty"`
+	CABundle        string            `json:"ca_bundle,omitempty"`
 
 	Default bool `json:"-"`
 }
@@ -27,6 +29,8 @@ type descriptorFile struct {
 	Address         string            `json:"address"`
 	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
+	Scheme          string            `json:"scheme,omitempty"`
+	CABundle        string            `json:"ca_bundle,omitempty"`
 }
 
 type legacyDescriptorFile struct {
@@ -62,6 +66,8 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 	desc.Address = trimmedAddress
 	desc.SSHIdentityPath = strings.TrimSpace(desc.SSHIdentityPath)
 	desc.Labels = cloneLabels(desc.Labels)
+	desc.Scheme = strings.TrimSpace(desc.Scheme)
+	desc.CABundle = strings.TrimSpace(desc.CABundle)
 
 	root, err := clusterConfigDir()
 	if err != nil {
@@ -218,6 +224,8 @@ func writeDescriptorFile(path string, desc Descriptor) error {
 		Address:         desc.Address,
 		SSHIdentityPath: desc.SSHIdentityPath,
 		Labels:          nil,
+		Scheme:          desc.Scheme,
+		CABundle:        desc.CABundle,
 	}
 	if len(desc.Labels) > 0 {
 		payload.Labels = cloneLabels(desc.Labels)
@@ -268,6 +276,8 @@ func loadDescriptorFromPath(path string) (descriptorLoad, error) {
 			Address:         strings.TrimSpace(current.Address),
 			SSHIdentityPath: strings.TrimSpace(current.SSHIdentityPath),
 			Labels:          cloneLabels(current.Labels),
+			Scheme:          strings.TrimSpace(current.Scheme),
+			CABundle:        strings.TrimSpace(current.CABundle),
 		}
 		return descriptorLoad{descriptor: desc}, nil
 	}
@@ -293,6 +303,8 @@ func loadDescriptorFromPath(path string) (descriptorLoad, error) {
 		Address:         strings.TrimSpace(address),
 		SSHIdentityPath: strings.TrimSpace(identity),
 		Labels:          cloneLabels(legacy.Labels),
+		Scheme:          "",
+		CABundle:        "",
 	}
 	if desc.ClusterID == "" || desc.Address == "" {
 		return descriptorLoad{}, errors.New("invalid legacy descriptor")
@@ -325,6 +337,11 @@ func cloneLabels(labels map[string]string) map[string]string {
 		return nil
 	}
 	return copied
+}
+
+// SanitizeID normalizes a cluster identifier for persistent storage.
+func SanitizeID(value string) string {
+	return sanitizeID(value)
 }
 
 func defaultMarkerPath(root string) string {

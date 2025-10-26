@@ -1,6 +1,11 @@
 package bootstrap
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -44,10 +49,19 @@ func TestScriptDoesNotRequireEmbeddedAuthorizedKeys(t *testing.T) {
 	}
 }
 
-func TestScriptBindsHTTPToLoopback(t *testing.T) {
+func TestScriptConfiguresHTTPDefaults(t *testing.T) {
 	script := Script()
-	if !strings.Contains(script, "PLOYD_HTTP_LISTEN:-127.0.0.1:8443") {
-		t.Fatalf("ployd config must default HTTP listen to loopback")
+	if !strings.Contains(script, "PLOYD_HTTP_LISTEN:-0.0.0.0:8443") {
+		t.Fatalf("ployd config must default HTTP listen to 0.0.0.0:8443")
+	}
+	if !strings.Contains(script, "PLOYD_HTTP_TLS_ENABLED:-false") {
+		t.Fatalf("ployd config must default HTTP TLS disabled")
+	}
+	if !strings.Contains(script, "PLOYD_TLS_CERT_PATH:-/etc/ploy/pki/node.pem") {
+		t.Fatalf("ployd config must default TLS cert path")
+	}
+	if !strings.Contains(script, "PLOYD_HTTP_TLS_REQUIRE_CLIENT_CERT:-false") {
+		t.Fatalf("ployd config must default TLS client cert requirement to false")
 	}
 	if !strings.Contains(script, "PLOYD_METRICS_LISTEN:-127.0.0.1:9100") {
 		t.Fatalf("ployd config must default metrics listen to loopback")
@@ -67,5 +81,135 @@ func TestDockerDaemonJSONBlockTerminatesBeforePloydConfig(t *testing.T) {
 	}
 	if idxLog > idxFunc {
 		t.Fatalf("docker daemon.json heredoc terminator/log must appear before ployd configuration block")
+	}
+}
+
+func TestStopServiceIfActiveTracksRestarts(t *testing.T) {
+	t.Parallel()
+	scriptPath := writeBootstrapScript(t)
+	logPath := filepath.Join(t.TempDir(), "systemctl.log")
+	snippet := fmt.Sprintf(`
+trap - EXIT
+LOG_PATH=%q
+SERVICE_STATE="active"
+systemctl() {
+	local cmd="$1"
+	shift || true
+	case "$cmd" in
+		list-unit-files)
+			printf 'docker.service\n'
+			;;
+		is-active)
+			local svc=""
+			for arg in "$@"; do
+				svc="$arg"
+			done
+			if [[ "$svc" == "docker" && "$SERVICE_STATE" == "active" ]]; then
+				return 0
+			fi
+			return 1
+			;;
+		stop)
+			SERVICE_STATE="inactive"
+			printf 'stop %%s\n' "$1" >>"$LOG_PATH"
+			return 0
+			;;
+		restart)
+			SERVICE_STATE="active"
+			printf 'restart %%s\n' "$1" >>"$LOG_PATH"
+			return 0
+			;;
+		*)
+			return 0
+			;;
+	esac
+}
+log() { :; }
+warn() { :; }
+
+stop_service_if_active docker
+restart_stopped_services
+restart_stopped_services
+`, logPath)
+	runBootstrapSnippet(t, scriptPath, snippet)
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected stop+restart entries, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != "stop docker" {
+		t.Fatalf("expected first entry 'stop docker', got %q", lines[0])
+	}
+	if lines[1] != "restart docker" {
+		t.Fatalf("expected second entry 'restart docker', got %q", lines[1])
+	}
+}
+
+func TestStopServiceIfActiveSkipsUnknownServices(t *testing.T) {
+	t.Parallel()
+	scriptPath := writeBootstrapScript(t)
+	logPath := filepath.Join(t.TempDir(), "systemctl.log")
+	snippet := fmt.Sprintf(`
+trap - EXIT
+LOG_PATH=%q
+SERVICE_STATE="inactive"
+systemctl() {
+	local cmd="$1"
+	shift || true
+	case "$cmd" in
+		list-unit-files)
+			printf 'etcd.service\n'
+			;;
+		is-active)
+			return 1
+			;;
+		stop|restart)
+			printf '%%s %%s\n' "$cmd" "$1" >>"$LOG_PATH"
+			return 0
+			;;
+		*)
+			return 0
+			;;
+	esac
+}
+log() { :; }
+warn() { :; }
+
+stop_service_if_active docker
+restart_stopped_services
+`, logPath)
+	runBootstrapSnippet(t, scriptPath, snippet)
+	data, err := os.ReadFile(logPath)
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatalf("read log: %v", err)
+	}
+	if len(bytes.TrimSpace(data)) != 0 {
+		t.Fatalf("expected no stop/restart entries, got %q", string(data))
+	}
+}
+
+func writeBootstrapScript(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "bootstrap.sh")
+	if err := os.WriteFile(path, []byte(Script()), 0o700); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	return path
+}
+
+func runBootstrapSnippet(t *testing.T, scriptPath, snippet string) {
+	t.Helper()
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(`set -euo pipefail
+source %q
+%s
+`, scriptPath, snippet))
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("snippet failed: %v\noutput:\n%s", err, buf.String())
 	}
 }

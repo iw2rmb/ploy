@@ -14,6 +14,12 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "bootstrap-ca" {
+		if err := runBootstrapCA(os.Args[2:]); err != nil {
+			log.Fatalf("bootstrap-ca: %v", err)
+		}
+		return
+	}
 	var configPath string
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd.yaml", "Path to ployd configuration")
 	flag.Parse()

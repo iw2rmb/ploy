@@ -16,6 +16,119 @@ TMP_ROOT="${WORKDIR}/tmp"
 DOWNLOAD_DIR="${WORKDIR}/downloads"
 BIN_DIR="/usr/local/bin"
 SYSTEMD_DIR="/etc/systemd/system"
+declare -a STOPPED_SERVICES=()
+
+CLUSTER_ID=""
+NODE_ID=""
+NODE_ADDRESS=""
+BOOTSTRAP_PRIMARY="false"
+
+usage() {
+  cat <<'EOF'
+Usage: bootstrap.sh [--cluster-id ID] [--node-id ID] [--node-address ADDR] [--primary]
+
+Arguments:
+  --cluster-id ID     Cluster identifier (required for joining existing clusters)
+  --node-id ID        Node identifier recorded with issued certificates (default: control)
+  --node-address ADDR Hostname or IP used in control-plane certificates (default: cluster ID)
+  --primary           Indicates this node bootstraps the control-plane CA
+EOF
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --cluster-id)
+        if [[ $# -lt 2 ]]; then
+          fail "--cluster-id requires a value"
+        fi
+        CLUSTER_ID="$2"
+        shift 2
+        ;;
+      --node-id)
+        if [[ $# -lt 2 ]]; then
+          fail "--node-id requires a value"
+        fi
+        NODE_ID="$2"
+        shift 2
+        ;;
+      --node-address)
+        if [[ $# -lt 2 ]]; then
+          fail "--node-address requires a value"
+        fi
+        NODE_ADDRESS="$2"
+        shift 2
+        ;;
+      --primary)
+        BOOTSTRAP_PRIMARY="true"
+        shift
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        fail "unknown argument: $1"
+        ;;
+    esac
+  done
+}
+
+generate_cluster_id() {
+  local rand
+  if command -v hexdump >/dev/null 2>&1; then
+    rand="$(hexdump -vn8 -e ' /1 "%02x"' /dev/urandom 2>/dev/null)"
+  fi
+  if [[ -z "$rand" ]]; then
+    rand="$(date +%s)"
+  fi
+  printf 'cluster-%s' "$rand"
+}
+
+stop_service_if_active() {
+	local service="$1"
+	if [[ -z "$service" ]]; then
+		return
+	fi
+	if ! systemctl list-unit-files | grep -q "^${service}\.service"; then
+		return
+	fi
+	if systemctl is-active --quiet "$service"; then
+		systemctl stop "$service"
+		STOPPED_SERVICES+=("$service")
+		log "stopped ${service} service to release bootstrap resources"
+	fi
+}
+
+restart_stopped_services() {
+	if [[ ${#STOPPED_SERVICES[@]} -eq 0 ]]; then
+		return
+	fi
+	for (( idx=${#STOPPED_SERVICES[@]}-1; idx>=0; idx-- )); do
+		local service="${STOPPED_SERVICES[idx]}"
+		if [[ -z "$service" ]]; then
+			continue
+		fi
+		if ! systemctl list-unit-files | grep -q "^${service}\.service"; then
+			continue
+		fi
+		if systemctl is-active --quiet "$service"; then
+			continue
+		fi
+		if ! systemctl restart "$service"; then
+			warn "failed to restart ${service} service; check logs"
+		else
+			log "restarted ${service} service"
+		fi
+	done
+	STOPPED_SERVICES=()
+}
+
+trap restart_stopped_services EXIT
 
 log() {
   printf '[bootstrap] %s\n' "$*" >&2
@@ -165,6 +278,25 @@ check_required_ports() {
   for port in "${ports[@]}"; do
     [[ -z "$port" ]] && continue
     if ss -tulpn 2>/dev/null | grep -q ":${port} " ; then
+      handled=0
+      case "$port" in
+        2379|2380)
+          stop_service_if_active "etcd"
+          handled=1
+          ;;
+        9094|9095)
+          stop_service_if_active "ployd"
+          handled=1
+          ;;
+      esac
+      if [[ $handled -eq 1 ]]; then
+        sleep 1
+        if ss -tulpn 2>/dev/null | grep -q ":${port} " ; then
+          fail "port ${port} currently in use; cannot continue bootstrap"
+        fi
+        log "port ${port} freed after restarting dependent services"
+        continue
+      fi
       fail "port ${port} currently in use; cannot continue bootstrap"
     fi
     log "port ${port} available"
@@ -271,6 +403,7 @@ install_etcd() {
     current="$(etcd --version | awk '/etcd Version/ {print $3}' | tr -d 'v')"
     if [[ "$current" == "$ETCD_VERSION" ]] || [[ "$current" == 3.6.* ]]; then
       log "etcd already at $current; skipping"
+      start_etcd_service
       return
     fi
     warn "etcd version $current detected, upgrading to $ETCD_VERSION"
@@ -510,17 +643,34 @@ configure_ployd_service() {
   mkdir -p "$(dirname "$config_path")"
   mkdir -p /etc/systemd/system
 
+  if [[ "${BOOTSTRAP_PRIMARY}" == "true" ]]; then
+    rm -f "$config_path"
+  fi
+
   if [[ ! -f "$config_path" ]]; then
-    if [[ -z "${PLOY_CONTROL_PLANE_ENDPOINT:-}" ]]; then
-      warn "PLOY_CONTROL_PLANE_ENDPOINT not set; using placeholder control plane endpoint"
+    local endpoint_host="${NODE_ADDRESS:-127.0.0.1}"
+    local tls_enabled="${PLOYD_HTTP_TLS_ENABLED:-false}"
+    local require_client_cert="${PLOYD_HTTP_TLS_REQUIRE_CLIENT_CERT:-false}"
+    if [[ "${BOOTSTRAP_PRIMARY}" == "true" ]]; then
+      tls_enabled="true"
     fi
+    if [[ "$endpoint_host" == *:* ]] && [[ "$endpoint_host" != \[* ]]; then
+      endpoint_host="[$endpoint_host]"
+    fi
+    local endpoint="https://${endpoint_host}:8443"
     cat >"$config_path" <<YAML
 http:
-  listen: "${PLOYD_HTTP_LISTEN:-127.0.0.1:8443}"
+  listen: "${PLOYD_HTTP_LISTEN:-0.0.0.0:8443}"
+  tls:
+    enabled: ${tls_enabled}
+    cert: "${PLOYD_TLS_CERT_PATH:-/etc/ploy/pki/node.pem}"
+    key: "${PLOYD_TLS_KEY_PATH:-/etc/ploy/pki/node-key.pem}"
+    client_ca: "${PLOYD_TLS_CLIENT_CA_PATH:-/etc/ploy/pki/control-plane-ca.pem}"
+    require_client_cert: ${require_client_cert}
 metrics:
   listen: "${PLOYD_METRICS_LISTEN:-127.0.0.1:9100}"
 control_plane:
-  endpoint: "${PLOY_CONTROL_PLANE_ENDPOINT:-https://control.example.com}"
+  endpoint: "${endpoint}"
   ca: "/etc/ploy/pki/control-plane-ca.pem"
   certificate: "/etc/ploy/pki/node.pem"
   key: "/etc/ploy/pki/node-key.pem"
@@ -567,6 +717,32 @@ start_ployd_service() {
   fi
 }
 
+bootstrap_control_plane_ca() {
+  if [[ "${BOOTSTRAP_PRIMARY}" != "true" ]]; then
+    return
+  fi
+  if [[ ! -x "${BIN_DIR}/ployd" ]]; then
+    fail "ployd binary missing; cannot bootstrap control-plane CA"
+  fi
+  if [[ -z "${CLUSTER_ID}" ]]; then
+    fail "cluster id not set; cannot bootstrap control-plane CA"
+  fi
+  local node_id="${NODE_ID:-control}"
+  local node_addr="${NODE_ADDRESS:-${CLUSTER_ID}}"
+  log "bootstrapping control-plane CA for cluster ${CLUSTER_ID}"
+  if ! ${BIN_DIR}/ployd bootstrap-ca --cluster-id "${CLUSTER_ID}" --node-id "${node_id}" --address "${node_addr}"; then
+    fail "control-plane CA bootstrap failed"
+  fi
+}
+
+persist_cluster_metadata() {
+  if [[ -z "${CLUSTER_ID}" ]]; then
+    return
+  fi
+  mkdir -p /etc/ploy
+  printf '%s\n' "${CLUSTER_ID}" >/etc/ploy/cluster-id
+}
+
 summarise_versions() {
   log "Bootstrap versions:"
   if command -v etcd >/dev/null 2>&1; then
@@ -604,6 +780,25 @@ summarise_versions() {
 }
 
 main() {
+  parse_args "$@"
+
+  if [[ -z "${CLUSTER_ID}" ]]; then
+    if [[ "${BOOTSTRAP_PRIMARY}" == "true" ]]; then
+      CLUSTER_ID="$(generate_cluster_id)"
+      log "generated cluster id ${CLUSTER_ID}"
+    else
+      fail "cluster id required when joining an existing cluster"
+    fi
+  fi
+
+  if [[ -z "${NODE_ID}" ]]; then
+    NODE_ID="control"
+  fi
+
+  if [[ -z "${NODE_ADDRESS}" ]]; then
+    NODE_ADDRESS="${CLUSTER_ID}"
+  fi
+
   log "starting deployment bootstrap (script ${PLOY_BOOTSTRAP_VERSION:-unknown})"
   require_root
   detect_arch
@@ -618,10 +813,14 @@ main() {
   install_ipfs_cluster
   install_docker
   configure_ployd_service
+  bootstrap_control_plane_ca
+  persist_cluster_metadata
   start_ployd_service
   install_go
   summarise_versions
   log "bootstrap complete"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
+  main "$@"
+fi

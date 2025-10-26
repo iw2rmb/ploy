@@ -1,21 +1,22 @@
 package deploy
 
 import (
-    "context"
-    "crypto/ecdsa"
-    "crypto/elliptic"
-    "crypto/rand"
-    "crypto/x509"
-    "crypto/x509/pkix"
-    "encoding/hex"
-    "encoding/json"
-    "encoding/pem"
-    "errors"
-    "fmt"
-    "math/big"
-    "sort"
-    "strings"
-    "time"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"math/big"
+	"net"
+	"sort"
+	"strings"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -54,6 +55,11 @@ type CARotationManager struct {
 	clusterID string
 	prefix    string
 	trust     *security.TrustStore
+}
+
+type leafProfile struct {
+	DNSNames    []string
+	IPAddresses []net.IP
 }
 
 // BootstrapOptions configure the initial PKI generation.
@@ -195,14 +201,14 @@ func (m *CARotationManager) Bootstrap(ctx context.Context, opts BootstrapOptions
 	workerCerts := make(map[string]LeafCertificate, len(workers))
 
 	for _, id := range beacons {
-		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, caBundle, caCert, caKey, now, leafValidity, "")
+		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, caBundle, caCert, caKey, now, leafValidity, "", nil)
 		if err != nil {
 			return CAState{}, err
 		}
 		beaconCerts[id] = cert
 	}
 	for _, id := range workers {
-		cert, err := issueLeafCertificate(id, certificateRoleWorker, caBundle, caCert, caKey, now, leafValidity, "")
+		cert, err := issueLeafCertificate(id, certificateRoleWorker, caBundle, caCert, caKey, now, leafValidity, "", nil)
 		if err != nil {
 			return CAState{}, err
 		}
@@ -281,7 +287,7 @@ func (m *CARotationManager) Rotate(ctx context.Context, opts RotateOptions) (Rot
 
 	beaconUpdates := make([]LeafCertificate, 0, len(state.Nodes.Beacons))
 	for _, id := range state.Nodes.Beacons {
-		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, state.BeaconCertificates[id].Version)
+		cert, err := issueLeafCertificate(id, certificateRoleControlPlane, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, state.BeaconCertificates[id].Version, nil)
 		if err != nil {
 			return RotateResult{}, err
 		}
@@ -290,7 +296,7 @@ func (m *CARotationManager) Rotate(ctx context.Context, opts RotateOptions) (Rot
 	workerUpdates := make([]LeafCertificate, 0, len(state.Nodes.Workers))
 	for _, id := range state.Nodes.Workers {
 		prev := state.WorkerCertificates[id]
-		cert, err := issueLeafCertificate(id, certificateRoleWorker, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, prev.Version)
+		cert, err := issueLeafCertificate(id, certificateRoleWorker, newCABundle, newCACert, newCAKey, now, defaultLeafValidity, prev.Version, nil)
 		if err != nil {
 			return RotateResult{}, err
 		}
@@ -472,7 +478,7 @@ func (m *CARotationManager) IssueWorkerCertificate(ctx context.Context, workerID
 	if err != nil {
 		return LeafCertificate{}, err
 	}
-	cert, err := issueLeafCertificate(id, certificateRoleWorker, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, "")
+	cert, err := issueLeafCertificate(id, certificateRoleWorker, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, "", nil)
 	if err != nil {
 		return LeafCertificate{}, err
 	}
@@ -504,6 +510,83 @@ func (m *CARotationManager) IssueWorkerCertificate(ctx context.Context, workerID
 	resp, err := txn.Commit()
 	if err != nil {
 		return LeafCertificate{}, fmt.Errorf("deploy: persist worker certificate: %w", err)
+	}
+	if !resp.Succeeded {
+		return LeafCertificate{}, ErrConcurrentWorkerUpdate
+	}
+	return cert, nil
+}
+
+// IssueControlPlaneCertificate issues or refreshes the control-plane node certificate.
+func (m *CARotationManager) IssueControlPlaneCertificate(ctx context.Context, nodeID, address string, now time.Time) (LeafCertificate, error) {
+	id := strings.TrimSpace(nodeID)
+	if id == "" {
+		return LeafCertificate{}, errors.New("deploy: control-plane node id required")
+	}
+	addr := strings.TrimSpace(address)
+	if addr == "" {
+		return LeafCertificate{}, errors.New("deploy: control-plane node address required")
+	}
+	state, err := m.State(ctx)
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	caKey, caCert, err := decodeCABundleMaterials(state.CurrentCA)
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+	var profile leafProfile
+	if ip := net.ParseIP(addr); ip != nil {
+		profile.IPAddresses = []net.IP{ip}
+	} else {
+		profile.DNSNames = []string{addr}
+	}
+	prevVersion := ""
+	if existing, ok := state.BeaconCertificates[id]; ok {
+		prevVersion = existing.Version
+	}
+	cert, err := issueLeafCertificate(id, certificateRoleControlPlane, state.CurrentCA, caCert, caKey, now, defaultLeafValidity, prevVersion, &profile)
+	if err != nil {
+		return LeafCertificate{}, err
+	}
+
+	updatedBeacons := append([]string(nil), state.Nodes.Beacons...)
+	found := false
+	for _, existing := range updatedBeacons {
+		if existing == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		updatedBeacons = append(updatedBeacons, id)
+	}
+	sort.Strings(updatedBeacons)
+	nodes := NodeSet{
+		Beacons: updatedBeacons,
+		Workers: append([]string(nil), state.Nodes.Workers...),
+	}
+	nodesBytes, err := json.Marshal(nodes)
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: encode control-plane nodes: %w", err)
+	}
+	certBytes, err := json.Marshal(cert)
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: encode control-plane certificate: %w", err)
+	}
+	txn := m.client.Txn(ctx).If(
+		clientv3.Compare(clientv3.ModRevision(m.caCurrentKey()), "=", state.Revision),
+		clientv3.Compare(clientv3.ModRevision(m.nodesKey()), "=", state.NodesRevision),
+	).Then(
+		clientv3.OpPut(m.nodesKey(), string(nodesBytes)),
+		clientv3.OpPut(m.beaconCertKey(id), string(certBytes)),
+	)
+	resp, err := txn.Commit()
+	if err != nil {
+		return LeafCertificate{}, fmt.Errorf("deploy: persist control-plane certificate: %w", err)
 	}
 	if !resp.Succeeded {
 		return LeafCertificate{}, ErrConcurrentWorkerUpdate
@@ -652,7 +735,7 @@ func normalizeNodeIDs(ids []string) []string {
 	return normalized
 }
 
-	func generateCABundle(clusterID string, now time.Time, validity time.Duration) (CABundle, *ecdsa.PrivateKey, *x509.Certificate, error) {
+func generateCABundle(clusterID string, now time.Time, validity time.Duration) (CABundle, *ecdsa.PrivateKey, *x509.Certificate, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return CABundle{}, nil, nil, fmt.Errorf("deploy: generate CA key: %w", err)
@@ -698,7 +781,7 @@ func normalizeNodeIDs(ids []string) []string {
 	}, priv, template, nil
 }
 
-func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string) (LeafCertificate, error) {
+func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certificate, caKey *ecdsa.PrivateKey, now time.Time, validity time.Duration, previousVersion string, profile *leafProfile) (LeafCertificate, error) {
 	role = strings.TrimSpace(role)
 	if role == "" {
 		return LeafCertificate{}, errors.New("deploy: certificate role required")
@@ -725,6 +808,10 @@ func issueLeafCertificate(nodeID, role string, ca CABundle, caCert *x509.Certifi
 			x509.ExtKeyUsageClientAuth,
 			x509.ExtKeyUsageServerAuth,
 		},
+	}
+	if profile != nil {
+		template.DNSNames = append(template.DNSNames, profile.DNSNames...)
+		template.IPAddresses = append(template.IPAddresses, profile.IPAddresses...)
 	}
 	certDER, err := x509.CreateCertificate(rand.Reader, template, caCert, &priv.PublicKey, caKey)
 	if err != nil {

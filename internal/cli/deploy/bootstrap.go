@@ -28,6 +28,10 @@ type BootstrapConfig struct {
 	Stderr          io.Writer
 	Stdin           io.Reader
 	WorkstationOS   string
+	ClusterID       string
+	NodeID          string
+	NodeAddress     string
+	Primary         bool
 }
 
 // BootstrapCommand prepares deploy.Options and invokes the deployment runner.
@@ -112,6 +116,10 @@ func (c BootstrapCommand) Run(ctx context.Context, cfg BootstrapConfig) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	opts.ClusterID = strings.TrimSpace(cfg.ClusterID)
+	opts.NodeID = strings.TrimSpace(cfg.NodeID)
+	opts.NodeAddress = strings.TrimSpace(cfg.NodeAddress)
+	opts.Primary = cfg.Primary
 	return runner(ctx, opts)
 }
 
@@ -160,16 +168,18 @@ func defaultPloydBinaryPath(workstationOS string) (string, error) {
 		return "", fmt.Errorf("locate ploy executable: %w", err)
 	}
 	dir := filepath.Dir(execPath)
-	candidates := []string{
-		filepath.Join(dir, "ployd"),
-	}
 	osName := workstationOS
 	if osName == "" {
 		osName = runtime.GOOS
 	}
-	if osName == "windows" {
-		candidates = append([]string{filepath.Join(dir, "ployd.exe")}, candidates...)
+	candidates := make([]string, 0, 3)
+	if osName != "linux" {
+		candidates = append(candidates, filepath.Join(dir, "ployd-linux"))
 	}
+	if osName == "windows" {
+		candidates = append(candidates, filepath.Join(dir, "ployd.exe"))
+	}
+	candidates = append(candidates, filepath.Join(dir, "ployd"))
 	for _, candidate := range candidates {
 		info, err := os.Stat(candidate)
 		if err != nil {

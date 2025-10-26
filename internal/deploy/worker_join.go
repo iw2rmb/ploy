@@ -40,6 +40,7 @@ type WorkerJoinResult struct {
 	ClusterID   string
 	Descriptor  registry.WorkerDescriptor
 	Certificate LeafCertificate
+	CABundle    string
 	Health      []registry.WorkerProbeResult
 	DryRun      bool
 }
@@ -168,6 +169,7 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 	if err != nil {
 		return WorkerJoinResult{}, err
 	}
+	cabundle := state.CurrentCA.CertificatePEM
 
 	httpClient, err := newWorkerHealthHTTPClient(state.CurrentCA.CertificatePEM)
 	if err != nil {
@@ -203,6 +205,7 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 		if failed, message := firstFailedProbe(results); failed {
 			return WorkerJoinResult{
 				ClusterID: clusterID,
+				CABundle:  cabundle,
 				DryRun:    true,
 				Health:    results,
 			}, fmt.Errorf("deploy: health probe failed: %s", message)
@@ -222,6 +225,7 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 		return WorkerJoinResult{
 			ClusterID:  clusterID,
 			Descriptor: descriptor,
+			CABundle:   cabundle,
 			Health:     results,
 			DryRun:     true,
 		}, nil
@@ -263,6 +267,7 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 		_ = reg.Delete(ctx, workerID)
 		return WorkerJoinResult{
 			ClusterID: clusterID,
+			CABundle:  cabundle,
 			Health:    results,
 		}, fmt.Errorf("deploy: health probe failed: %s", message)
 	}
@@ -285,6 +290,7 @@ func RunWorkerJoin(ctx context.Context, client *clientv3.Client, opts WorkerJoin
 		ClusterID:   clusterID,
 		Descriptor:  updated.Descriptor,
 		Certificate: cert,
+		CABundle:    cabundle,
 		Health:      results,
 		DryRun:      false,
 	}, nil

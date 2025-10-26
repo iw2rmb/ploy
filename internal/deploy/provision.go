@@ -24,6 +24,7 @@ type ProvisionOptions struct {
 	Stderr          io.Writer
 
 	ScriptEnv     map[string]string
+	ScriptArgs    []string
 	ServiceChecks []string
 }
 
@@ -106,6 +107,7 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 
 	script := renderBootstrapScript(opts.ScriptEnv)
 	runScriptArgs := append(append([]string(nil), sshArgs...), target, "bash", "-s", "--")
+	runScriptArgs = append(runScriptArgs, opts.ScriptArgs...)
 	if err := runner.Run(ctx, "ssh", runScriptArgs, strings.NewReader(script), streams); err != nil {
 		return fmt.Errorf("provision: execute bootstrap script: %w", err)
 	}

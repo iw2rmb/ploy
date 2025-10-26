@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
@@ -24,12 +28,21 @@ import (
 )
 
 const defaultControlPlanePort = 8443
+const defaultSSHPort = 22
+const defaultSSHUser = "root"
+const remotePKIDir = "/etc/ploy/pki"
+const remoteControlPlaneCAPath = remotePKIDir + "/control-plane-ca.pem"
+const remoteNodeCertPath = remotePKIDir + "/node.pem"
+const remoteNodeKeyPath = remotePKIDir + "/node-key.pem"
+const remoteConfigPath = "/etc/ploy/ployd.yaml"
 
 var (
 	clusterBootstrapRunner                               = deploy.RunBootstrap
 	clusterProvisionHost                                 = deploy.ProvisionHost
 	clusterWorkerRegister                                = registerWorker
 	clusterHTTPClientFactory descriptorHTTPClientFactory = newDescriptorHTTPClient
+	remoteCommandExecutor                                = runRemoteCommand
+	remoteFileWriter                                     = writeRemoteFile
 )
 
 type descriptorHTTPClientFactory func(config.Descriptor) (*http.Client, func(), error)
@@ -78,7 +91,7 @@ func handleClusterAdd(args []string, stderr io.Writer) error {
 	}
 	isWorker := clusterID.set && strings.TrimSpace(clusterID.value) != ""
 	if !isWorker {
-		return runClusterBootstrap(address.value, userFlag, identity, control, ploydBin, stderr)
+		return runClusterBootstrap(address.value, userFlag, identity, control, ploydBin, sshPort, stderr)
 	}
 	if control.set {
 		printClusterAddUsage(stderr)
@@ -110,10 +123,18 @@ func printClusterAddUsage(w io.Writer) {
 	printCommandUsage(w, "cluster", "add")
 }
 
-func runClusterBootstrap(address string, userFlag, identity, control, ploydBin stringValue, stderr io.Writer) error {
+func runClusterBootstrap(address string, userFlag, identity, control, ploydBin stringValue, sshPort intValue, stderr io.Writer) error {
 	addr := strings.TrimSpace(address)
 	if addr == "" {
 		return errors.New("address is required")
+	}
+	userName := strings.TrimSpace(userFlag.value)
+	if userName == "" {
+		userName = defaultSSHUser
+	}
+	identityPath, err := resolveIdentityPath(identity)
+	if err != nil {
+		return err
 	}
 	cfg := deploycli.BootstrapConfig{
 		Address:       addr,
@@ -121,12 +142,8 @@ func runClusterBootstrap(address string, userFlag, identity, control, ploydBin s
 		Stderr:        stderr,
 		Stdin:         os.Stdin,
 		WorkstationOS: runtime.GOOS,
-	}
-	if userFlag.set {
-		cfg.User = strings.TrimSpace(userFlag.value)
-	}
-	if identity.set {
-		cfg.IdentityFile = strings.TrimSpace(identity.value)
+		User:          userName,
+		IdentityFile:  identityPath,
 	}
 	if control.set {
 		cfg.ControlPlaneURL = strings.TrimSpace(control.value)
@@ -134,9 +151,25 @@ func runClusterBootstrap(address string, userFlag, identity, control, ploydBin s
 	if ploydBin.set {
 		cfg.PloydBinaryPath = strings.TrimSpace(ploydBin.value)
 	}
+	primary := true
+	if primary {
+		clusterSlug := config.SanitizeID(addr)
+		if clusterSlug == "" {
+			clusterSlug = config.SanitizeID(fmt.Sprintf("cluster-%s", strings.ReplaceAll(addr, ".", "-")))
+		}
+		cfg.ClusterID = clusterSlug
+		cfg.NodeAddress = addr
+		cfg.NodeID = deriveControlPlaneNodeID(addr)
+		cfg.Primary = true
+	}
 	cmd := deploycli.BootstrapCommand{RunBootstrap: clusterBootstrapRunner}
 	if err := cmd.Run(context.Background(), cfg); err != nil {
 		return err
+	}
+	if primary {
+		if err := captureControlPlaneSecurity(cfg.ClusterID, addr, userName, identityPath, sshPort.value, stderr); err != nil {
+			return err
+		}
 	}
 	return writeClusterAddNextSteps(stderr, addr)
 }
@@ -155,15 +188,16 @@ func writeClusterAddNextSteps(w io.Writer, clusterRef string) error {
 }
 
 type workerProvisionConfig struct {
-	ClusterID     string
-	WorkerAddress string
-	User          string
-	IdentityFile  string
-	PloydBinary   string
-	SSHPort       int
-	Labels        map[string]string
-	Probes        []deploy.WorkerHealthProbe
-	DryRun        bool
+	ClusterID       string
+	WorkerAddress   string
+	User            string
+	IdentityFile    string
+	PloydBinary     string
+	SSHPort         int
+	Labels          map[string]string
+	Probes          []deploy.WorkerHealthProbe
+	DryRun          bool
+	ControlPlaneURL string
 }
 
 func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
@@ -183,6 +217,9 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if cfg.ControlPlaneURL == "" {
+		cfg.ControlPlaneURL = baseURL
+	}
 	if !cfg.DryRun {
 		provOpts := deploy.ProvisionOptions{
 			Host:            workerAddr,
@@ -193,10 +230,8 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 			PloydBinaryPath: cfg.PloydBinary,
 			Stdout:          stderr,
 			Stderr:          stderr,
-			ScriptEnv: map[string]string{
-				"PLOY_CONTROL_PLANE_ENDPOINT": baseURL,
-			},
-			ServiceChecks: []string{"ployd"},
+			ScriptArgs:      []string{"--cluster-id", desc.ClusterID},
+			ServiceChecks:   []string{"ployd"},
 		}
 		if err := clusterProvisionHost(context.Background(), provOpts); err != nil {
 			return err
@@ -222,35 +257,41 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := installWorkerArtifacts(cfg, result, stderr); err != nil {
+		return err
+	}
+	if err := updateDescriptorSecurity(desc.ClusterID, "", result.CABundle); err != nil {
+		return err
+	}
 	return renderWorkerJoinResult(stderr, desc.ClusterID, result)
 }
 
 func descriptorControlPlaneURL(desc config.Descriptor) (string, error) {
-	if endpoint := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_ENDPOINT")); endpoint != "" {
-		return endpoint, nil
-	}
 	addr := strings.TrimSpace(desc.Address)
 	if addr == "" {
 		return "", errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
 	}
-	scheme := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_SCHEME"))
+	if strings.Contains(addr, "://") {
+		return addr, nil
+	}
+	scheme := strings.TrimSpace(desc.Scheme)
 	if scheme == "" {
-		scheme = "http"
+		scheme = "https"
 	}
 	switch scheme {
 	case "http", "https":
 	default:
-		return "", fmt.Errorf("invalid PLOYD_ADMIN_SCHEME %q", scheme)
+		return "", fmt.Errorf("invalid control plane scheme %q", scheme)
 	}
-	port := defaultControlPlanePort
-	if raw := strings.TrimSpace(os.Getenv("PLOYD_ADMIN_PORT")); raw != "" {
-		value, err := strconv.Atoi(raw)
-		if err != nil || value <= 0 {
-			return "", fmt.Errorf("invalid PLOYD_ADMIN_PORT %q", raw)
+	host := addr
+	if h, p, err := net.SplitHostPort(addr); err == nil {
+		port, err := strconv.Atoi(p)
+		if err != nil || port <= 0 {
+			return "", fmt.Errorf("invalid control plane port %q", p)
 		}
-		port = value
+		return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(h, strconv.Itoa(port))), nil
 	}
-	return fmt.Sprintf("%s://%s:%d", scheme, addr, port), nil
+	return fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(host, strconv.Itoa(defaultControlPlanePort))), nil
 }
 
 func renderWorkerJoinResult(w io.Writer, clusterID string, result nodeJoinResponse) error {
@@ -300,6 +341,122 @@ func renderWorkerJoinResult(w io.Writer, clusterID string, result nodeJoinRespon
 		}
 	}
 	return nil
+}
+
+func normalizeSSHUser(value string) string {
+	if trimmed := strings.TrimSpace(value); trimmed != "" {
+		return trimmed
+	}
+	return defaultSSHUser
+}
+
+func buildCLISSArgs(identity string, port int) []string {
+	args := []string{
+		"-o", "BatchMode=yes",
+		"-o", "StrictHostKeyChecking=accept-new",
+	}
+	if trimmed := strings.TrimSpace(identity); trimmed != "" {
+		args = append(args, "-i", trimmed)
+	}
+	if port == 0 {
+		port = defaultSSHPort
+	}
+	if port != defaultSSHPort {
+		args = append(args, "-p", strconv.Itoa(port))
+	}
+	return args
+}
+
+func sshTarget(user, host string) string {
+	if trimmed := strings.TrimSpace(user); trimmed != "" {
+		return fmt.Sprintf("%s@%s", trimmed, strings.TrimSpace(host))
+	}
+	return strings.TrimSpace(host)
+}
+
+func runRemoteCommand(ctx context.Context, target string, sshArgs []string, command string, stdin io.Reader, stdout, stderr io.Writer) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	args := append(append([]string(nil), sshArgs...), target, command)
+	cmd := exec.CommandContext(ctx, "ssh", args...)
+	if stdin != nil {
+		cmd.Stdin = stdin
+	}
+	if stdout != nil {
+		cmd.Stdout = stdout
+	}
+	if stderr != nil {
+		cmd.Stderr = stderr
+	}
+	return cmd.Run()
+}
+
+func writeRemoteFile(ctx context.Context, target string, sshArgs []string, remotePath string, mode os.FileMode, data []byte, stderr io.Writer) error {
+	cmd := fmt.Sprintf("install -m%04o /dev/stdin %s", mode, remotePath)
+	return runRemoteCommand(ctx, target, sshArgs, cmd, bytes.NewReader(data), nil, stderr)
+}
+
+func readRemoteFile(ctx context.Context, target string, sshArgs []string, remotePath string, stderr io.Writer) (string, error) {
+	var buf bytes.Buffer
+	cmd := fmt.Sprintf("cat %s", shellQuote(remotePath))
+	if err := runRemoteCommand(ctx, target, sshArgs, cmd, nil, &buf, stderr); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func captureControlPlaneSecurity(clusterID, address, user, identity string, sshPort int, stderr io.Writer) error {
+	if strings.EqualFold(os.Getenv("PLOY_SKIP_REMOTE_CA_FETCH"), "true") {
+		return nil
+	}
+	trimmed := strings.TrimSpace(clusterID)
+	if trimmed == "" {
+		return errors.New("descriptor cluster id required for TLS update")
+	}
+	ctx := context.Background()
+	sshArgs := buildCLISSArgs(identity, sshPort)
+	target := sshTarget(user, address)
+	ca, err := readRemoteFile(ctx, target, sshArgs, remoteControlPlaneCAPath, stderr)
+	if err != nil {
+		return fmt.Errorf("fetch control-plane CA: %w", err)
+	}
+	return updateDescriptorSecurity(trimmed, "https", ca)
+}
+
+func deriveControlPlaneNodeID(address string) string {
+	cleaned := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return unicode.ToLower(r)
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-':
+			return r
+		default:
+			return -1
+		}
+	}, strings.ReplaceAll(address, ".", "-"))
+	if cleaned == "" {
+		cleaned = "control"
+	}
+	return fmt.Sprintf("control-%s", cleaned)
+}
+
+func ensureHTTPS(endpoint string) string {
+	trimmed := strings.TrimSpace(endpoint)
+	switch {
+	case strings.HasPrefix(trimmed, "https://"):
+		return trimmed
+	case strings.HasPrefix(trimmed, "http://"):
+		return "https://" + strings.TrimPrefix(trimmed, "http://")
+	case trimmed != "":
+		return "https://" + trimmed
+	default:
+		return ""
+	}
 }
 
 func resolveIdentityPath(value stringValue) (string, error) {
@@ -392,6 +549,13 @@ func newDescriptorHTTPClient(desc config.Descriptor) (*http.Client, func(), erro
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	if caBundle := strings.TrimSpace(desc.CABundle); caBundle != "" {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM([]byte(caBundle)) {
+			return nil, nil, fmt.Errorf("cluster descriptor CA bundle invalid")
+		}
+		transport.TLSClientConfig.RootCAs = pool
+	}
 	transport.DialContext = manager.DialContext
 	client := &http.Client{Timeout: defaultWorkerJoinTimeout, Transport: transport}
 	cleanup := func() { _ = manager.Close() }
@@ -427,6 +591,7 @@ type nodeJoinResponse struct {
 	Certificate deploy.LeafCertificate       `json:"certificate"`
 	Health      []registry.WorkerProbeResult `json:"health"`
 	DryRun      bool                         `json:"dry_run"`
+	CABundle    string                       `json:"ca_bundle"`
 }
 
 func registerWorker(ctx context.Context, client *http.Client, baseURL string, payload nodeJoinRequest) (nodeJoinResponse, error) {
@@ -573,5 +738,79 @@ func writef(w io.Writer, format string, args ...any) error {
 		return nil
 	}
 	_, err := fmt.Fprintf(w, format, args...)
+	return err
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+	if !strings.Contains(value, "'") {
+		return "'" + value + "'"
+	}
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+func installWorkerArtifacts(cfg workerProvisionConfig, result nodeJoinResponse, stderr io.Writer) error {
+	if cfg.DryRun {
+		return nil
+	}
+	cert := strings.TrimSpace(result.Certificate.CertificatePEM)
+	key := strings.TrimSpace(result.Certificate.KeyPEM)
+	ca := strings.TrimSpace(result.CABundle)
+	if cert == "" || key == "" || ca == "" {
+		return nil
+	}
+	ctx := context.Background()
+	user := normalizeSSHUser(cfg.User)
+	target := sshTarget(user, cfg.WorkerAddress)
+	sshArgs := buildCLISSArgs(cfg.IdentityFile, cfg.SSHPort)
+	if err := remoteCommandExecutor(ctx, target, sshArgs, "mkdir -p "+remotePKIDir+" && chmod 700 "+remotePKIDir, nil, nil, stderr); err != nil {
+		return fmt.Errorf("prepare remote pki dir: %w", err)
+	}
+	if err := remoteFileWriter(ctx, target, sshArgs, remoteControlPlaneCAPath, 0o644, []byte(ca), stderr); err != nil {
+		return fmt.Errorf("install control-plane ca: %w", err)
+	}
+	if err := remoteFileWriter(ctx, target, sshArgs, remoteNodeCertPath, 0o644, []byte(cert), stderr); err != nil {
+		return fmt.Errorf("install worker certificate: %w", err)
+	}
+	if err := remoteFileWriter(ctx, target, sshArgs, remoteNodeKeyPath, 0o600, []byte(key), stderr); err != nil {
+		return fmt.Errorf("install worker key: %w", err)
+	}
+	endpoint := ensureHTTPS(cfg.ControlPlaneURL)
+	if endpoint != "" {
+		escaped := strings.ReplaceAll(endpoint, `"`, `\"`)
+		rewrite := fmt.Sprintf(`perl -0pi -e 's|(control_plane:\s*\n\s+endpoint:\s*)\"[^\"]+\"|\\1\"%s\"|' %s`, escaped, remoteConfigPath)
+		if err := remoteCommandExecutor(ctx, target, sshArgs, rewrite, nil, nil, stderr); err != nil {
+			return fmt.Errorf("update worker config endpoint: %w", err)
+		}
+	}
+	if err := remoteCommandExecutor(ctx, target, sshArgs, "systemctl restart ployd", nil, nil, stderr); err != nil {
+		return fmt.Errorf("restart worker ployd: %w", err)
+	}
+	return nil
+}
+
+func updateDescriptorSecurity(clusterID, scheme, caBundle string) error {
+	trimmedID := strings.TrimSpace(clusterID)
+	if trimmedID == "" {
+		return nil
+	}
+	desc, err := config.LoadDescriptor(trimmedID)
+	if err != nil {
+		return err
+	}
+	changed := false
+	if trimmed := strings.TrimSpace(scheme); trimmed != "" && desc.Scheme != trimmed {
+		desc.Scheme = trimmed
+		changed = true
+	}
+	if trimmed := strings.TrimSpace(caBundle); trimmed != "" && desc.CABundle != trimmed {
+		desc.CABundle = trimmed
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	_, err = config.SaveDescriptor(desc)
 	return err
 }
