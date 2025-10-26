@@ -12,55 +12,6 @@ import (
 	"time"
 )
 
-// Node describes the remote node reachable via SSH and the target API port.
-type Node struct {
-	ID           string
-	Address      string
-	SSHPort      int
-	APIPort      int
-	User         string
-	IdentityFile string
-}
-
-// Config configures tunnel management for control-plane forwarding.
-type Config struct {
-	ControlSocketDir string
-	LocalAddress     string
-	DialTimeout      time.Duration
-	MinBackoff       time.Duration
-	MaxBackoff       time.Duration
-	Factory          TunnelFactory
-	Cache            AssignmentCache
-	Logger           Logger
-	CommandRunner    CommandRunner
-}
-
-// AssignmentCache captures the persistence hooks Manager relies on to remember job/node mappings.
-type AssignmentCache interface {
-	RememberNodes([]Node) error
-	RememberJob(jobID, nodeID string, at time.Time) error
-	LookupJob(jobID string) (string, bool)
-	RemoveJob(jobID string) error
-}
-
-// TunnelFactory provisions SSH tunnels to remote nodes.
-type TunnelFactory interface {
-	Activate(ctx context.Context, node Node, localAddr string) (TunnelHandle, error)
-}
-
-// TunnelHandle exposes lifecycle state for an active tunnel.
-type TunnelHandle interface {
-	LocalAddress() string
-	Wait() <-chan error
-	Close() error
-}
-
-// Logger is the subset of slog.Logger used by the manager.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
 // Manager maintains persistent SSH tunnels keyed by node identifier.
 type Manager struct {
 	mu sync.Mutex
@@ -82,23 +33,6 @@ type Manager struct {
 	nextIdx int
 	closed  bool
 }
-
-type tunnelState struct {
-	node       Node
-	localAddr  string
-	handle     TunnelHandle
-	wait       <-chan error
-	failures   int
-	nextRetry  time.Time
-	lastErr    error
-	lastActive time.Time
-}
-
-// ErrNoTargets indicates that no nodes are available for tunnelling.
-var ErrNoTargets = errors.New("sshtransport: no tunnel targets configured")
-
-// ErrBackoffActive indicates the caller should retry later, typically falling back to another node.
-var ErrBackoffActive = errors.New("sshtransport: backoff active for node")
 
 // NewManager constructs a tunnel manager using the supplied configuration.
 func NewManager(cfg Config) (*Manager, error) {
@@ -197,7 +131,6 @@ func (m *Manager) SetNodes(nodes []Node) error {
 		order = append(order, node.ID)
 	}
 
-	// Close tunnels whose nodes disappeared.
 	for id := range cur {
 		if _, ok := next[id]; !ok {
 			if t := m.tunnels[id]; t != nil && t.handle != nil {
@@ -265,6 +198,7 @@ func (m *Manager) DialContext(ctx context.Context, network, address string) (net
 	return nil, lastErr
 }
 
+// selectCandidates derives the dial order for the current context.
 func (m *Manager) selectCandidates(ctx context.Context) ([]string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -282,7 +216,6 @@ func (m *Manager) selectCandidates(ctx context.Context) ([]string, error) {
 		return []string{nodeID}, nil
 	}
 
-	// Build ordered slice cycling from nextIdx.
 	order := make([]string, 0, len(m.order))
 	if m.nextIdx >= len(m.order) {
 		m.nextIdx = 0
@@ -295,6 +228,7 @@ func (m *Manager) selectCandidates(ctx context.Context) ([]string, error) {
 	return order, nil
 }
 
+// dialThroughNode reuses or establishes a tunnel for the node then dials through it.
 func (m *Manager) dialThroughNode(ctx context.Context, network, nodeID string) (net.Conn, error) {
 	state, err := m.ensureTunnel(ctx, nodeID)
 	if err != nil {
@@ -309,137 +243,3 @@ func (m *Manager) dialThroughNode(ctx context.Context, network, nodeID string) (
 	state.lastActive = time.Now()
 	return conn, nil
 }
-
-func (m *Manager) ensureTunnel(ctx context.Context, nodeID string) (*tunnelState, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.closed {
-		return nil, errors.New("sshtransport: manager closed")
-	}
-	node, ok := m.nodes[nodeID]
-	if !ok {
-		return nil, fmt.Errorf("sshtransport: unknown node %q", nodeID)
-	}
-	state, ok := m.tunnels[nodeID]
-	if !ok {
-		state = &tunnelState{node: node}
-		m.tunnels[nodeID] = state
-	} else {
-		state.node = node
-	}
-	if state.handle != nil {
-		select {
-		case <-state.wait:
-			// Tunnel completed, fall through to re-establish.
-			state.handle = nil
-		default:
-			return state, nil
-		}
-	}
-	now := time.Now()
-	if !state.nextRetry.IsZero() && now.Before(state.nextRetry) {
-		return nil, ErrBackoffActive
-	}
-
-	localAddr, err := m.allocateLocal()
-	if err != nil {
-		state.lastErr = err
-		state.failures++
-		state.nextRetry = now.Add(m.backoffDuration(state.failures))
-		return nil, err
-	}
-	handle, err := m.factory.Activate(ctx, node, localAddr)
-	if err != nil {
-		state.failures++
-		state.lastErr = err
-		state.nextRetry = now.Add(m.backoffDuration(state.failures))
-		return nil, err
-	}
-	state.localAddr = handle.LocalAddress()
-	state.handle = handle
-	state.failures = 0
-	state.lastErr = nil
-	state.nextRetry = time.Time{}
-	state.lastActive = now
-	waitCh := handle.Wait()
-	state.wait = waitCh
-	go m.observe(node.ID, state, waitCh)
-	return state, nil
-}
-
-func (m *Manager) observe(nodeID string, state *tunnelState, wait <-chan error) {
-	err, ok := <-wait
-	if !ok {
-		err = nil
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	current, ok := m.tunnels[nodeID]
-	if !ok || current != state {
-		return
-	}
-	state.handle = nil
-	state.wait = nil
-	state.lastErr = err
-	state.failures++
-	state.nextRetry = time.Now().Add(m.backoffDuration(state.failures))
-}
-
-func (m *Manager) registerFailure(nodeID string, err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	state, ok := m.tunnels[nodeID]
-	if !ok {
-		return
-	}
-	state.lastErr = err
-	state.failures++
-	state.nextRetry = time.Now().Add(m.backoffDuration(state.failures))
-	if state.handle != nil {
-		_ = state.handle.Close()
-		state.handle = nil
-	}
-}
-
-func (m *Manager) backoffDuration(failures int) time.Duration {
-	if failures <= 0 {
-		return m.minBack
-	}
-	delay := m.minBack << (failures - 1)
-	if delay > m.maxBack {
-		delay = m.maxBack
-	}
-	return delay
-}
-
-func (m *Manager) allocateLocal() (string, error) {
-	ln, err := net.Listen("tcp", net.JoinHostPort(m.localIP, "0"))
-	if err != nil {
-		return "", fmt.Errorf("sshtransport: allocate local listener: %w", err)
-	}
-	addr := ln.Addr().String()
-	if err := ln.Close(); err != nil {
-		return "", err
-	}
-	return addr, nil
-}
-
-func normaliseNode(node Node) Node {
-	node.ID = strings.TrimSpace(node.ID)
-	node.Address = strings.TrimSpace(node.Address)
-	if node.SSHPort <= 0 {
-		node.SSHPort = 22
-	}
-	if node.APIPort <= 0 {
-		node.APIPort = 8443
-	}
-	node.User = strings.TrimSpace(node.User)
-	return node
-}
-
-type noopCache struct{}
-
-func (noopCache) RememberNodes([]Node) error                  { return nil }
-func (noopCache) RememberJob(string, string, time.Time) error { return nil }
-func (noopCache) LookupJob(string) (string, bool)             { return "", false }
-func (noopCache) RemoveJob(string) error                      { return nil }

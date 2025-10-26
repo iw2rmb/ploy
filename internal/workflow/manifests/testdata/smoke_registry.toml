@@ -1,0 +1,119 @@
+manifest_version = "v2"
+name = "smoke"
+version = "2025-09-26"
+summary = """
+## Purpose
+Ensure mods workflows stick to baseline caches and fixtures.
+"""
+
+[topology]
+description = "Standard mods topology"
+
+[[topology.allow]]
+from = "mods-api"
+to = "postgres"
+
+[[topology.allow]]
+from = "mods-api"
+to = "redis"
+
+[[topology.deny]]
+from = "mods-api"
+to = "internet"
+reason = "Block egress"
+
+[[services]]
+name = "mods-postgres"
+kind = "postgres"
+[services.identity]
+dns = "mods-postgres.svc.local"
+[[services.ports]]
+name = "psql"
+port = 5432
+protocol = "tcp"
+
+[[services]]
+name = "mods-api"
+kind = "http"
+[services.identity]
+dns = "mods-api.svc.local"
+[[services.ports]]
+name = "metrics"
+port = 9100
+protocol = "tcp"
+[[services.ports]]
+name = "http"
+port = 8080
+protocol = "tcp"
+[[services.requires]]
+target = "mods-postgres"
+edge = "api->postgres"
+[[services.requires]]
+target = "mods-redis"
+edge = "api->redis"
+
+[[services]]
+name = "mods-redis"
+kind = "redis"
+optional = true
+[services.identity]
+dns = "mods-redis.svc.local"
+[[services.ports]]
+name = "tcp"
+port = 6379
+protocol = "tcp"
+
+[fixtures]
+
+[[fixtures.required]]
+name = "postgres"
+reference = "snapshot:dev-db"
+
+[[fixtures.required]]
+name = "redis"
+reference = "cache:redis"
+
+[[fixtures.optional]]
+name = "elasticsearch"
+reference = "service:es"
+reason = "Only when search stack enabled"
+
+[lanes]
+
+[[lanes.required]]
+name = "node-wasm"
+reason = "mods DAG"
+
+[[lanes.required]]
+name = "go-native"
+reason = "build/test baseline"
+
+[[lanes.allowed]]
+name = "python-slim"
+reason = "data tooling"
+
+[aster]
+required = ["plan"]
+optional = ["exec", "lint"]
+
+[[edges]]
+source = "mods-api"
+target = "mods-redis"
+ports = ["tcp"]
+protocols = ["tcp"]
+
+[[edges]]
+source = "mods-api"
+target = "mods-postgres"
+ports = ["psql"]
+protocols = ["tcp"]
+
+[[exposures]]
+service = "mods-api"
+port = "http"
+mode = "public"
+
+[[exposures]]
+service = "mods-api"
+port = "metrics"
+mode = "cluster"

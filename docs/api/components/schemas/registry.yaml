@@ -1,0 +1,68 @@
+RegistryUploadStartRequest:
+  type: object
+  properties:
+    media_type:
+      type: string
+      description: Media type hint for the blob being uploaded.
+    size:
+      type: integer
+      format: int64
+      description: Optional size hint in bytes.
+    node_id:
+      type: string
+      description: Preferred control-plane node for the SSH session.
+RegistryUploadStartResponse:
+  type: object
+  required: [upload_id, remote_path, location]
+  properties:
+    upload_id:
+      type: string
+    remote_path:
+      type: string
+      description: Absolute path on the control-plane host used for staging the blob via SSH.
+    node_id:
+      type: string
+      description: Control-plane node associated with the slot.
+    location:
+      type: string
+      description: URL for interacting with the upload session.
+RegistryUploadProgressRequest:
+  type: object
+  properties:
+    size:
+      type: integer
+      format: int64
+      description: Total bytes staged so far.
+RegistryUploadCommitRequest:
+  type: object
+  properties:
+    media_type:
+      type: string
+    size:
+      type: integer
+      format: int64
+      description: Optional size assertion in bytes.
+RegistryBlobCommitResponse:
+  type: object
+  required: [digest, cid, location]
+  properties:
+    digest:
+      type: string
+    cid:
+      type: string
+      description: IPFS content identifier storing the blob.
+    location:
+      type: string
+      description: Relative URL where the blob can be downloaded.
+RegistryTagList:
+  type: object
+  required: [name, tags]
+  properties:
+    name:
+      type: string
+      description: Repository name.
+    tags:
+      type: array
+      items:
+        type: string
+      description: Tags currently defined for the repository.
