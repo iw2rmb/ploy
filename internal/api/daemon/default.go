@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/api/status"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	controlplaneartifacts "github.com/iw2rmb/ploy/internal/controlplane/artifacts"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
@@ -198,6 +200,15 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 
 	artifactPublisher := buildArtifactPublisher()
 
+	var artStore *controlplaneartifacts.Store
+	if client != nil {
+		if store, err := controlplaneartifacts.NewStore(client, controlplaneartifacts.StoreOptions{}); err == nil {
+			artStore = store
+		} else {
+			log.Printf("control-plane: artifact store init failed: %v", err)
+		}
+	}
+
 	var rotations *events.RotationHub
 	if signer != nil {
 		rotations = events.NewRotationHub(context.Background(), signer)
@@ -213,12 +224,31 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		Etcd:              client,
 		Rotations:         rotations,
 		Mods:              modsService,
+		ArtifactStore:     artStore,
 		ArtifactPublisher: artifactPublisher,
 		Authorizer: auth.NewAuthorizer(auth.Options{
 			AllowInsecure: allowInsecure,
 			DefaultRole:   defaultRole,
 		}),
 	})
+
+	var reconciler *controlplaneartifacts.Reconciler
+	if artStore != nil && artifactPublisher != nil {
+		pinMetrics, err := controlmetrics.NewArtifactPinMetrics(nil)
+		if err != nil {
+			log.Printf("control-plane: pin metrics init failed: %v", err)
+		}
+		reconciler = controlplaneartifacts.NewReconciler(controlplaneartifacts.ReconcilerOptions{
+			Store:   artStore,
+			Cluster: artifactPublisher,
+			Metrics: pinMetrics,
+			Logger:  log.Default(),
+		})
+		if err := reconciler.Start(context.Background()); err != nil {
+			log.Printf("control-plane: artifact reconciler disabled: %v", err)
+			reconciler = nil
+		}
+	}
 
 	shutdown := func(ctx context.Context) error {
 		_ = ctx
@@ -230,6 +260,11 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		}
 		if sched != nil {
 			_ = sched.Close()
+		}
+		if reconciler != nil {
+			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			_ = reconciler.Stop(stopCtx)
+			cancel()
 		}
 		if client != nil {
 			return client.Close()

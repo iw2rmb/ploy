@@ -30,6 +30,24 @@ func (s *Store) listByJob(ctx context.Context, jobID, stage, cursor string, limi
 	return s.collectFromIndex(ctx, kvs, limit, resp.More, includeDeleted)
 }
 
+func (s *Store) listByCID(ctx context.Context, cid, cursor string, limit int, includeDeleted bool) (ListResult, error) {
+	prefix := s.cidIndexPrefix(cid)
+	start := prefix
+	if cursor != "" {
+		start = path.Join(prefix, cursor)
+	}
+	resp, err := s.client.Get(ctx, start,
+		clientv3.WithRange(prefixRangeEnd(prefix)),
+		clientv3.WithLimit(int64(limit+1)),
+		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
+	)
+	if err != nil {
+		return ListResult{}, fmt.Errorf("artifacts: list cid %s: %w", cid, err)
+	}
+	kvs := dropCursor(resp.Kvs, cursor, prefix)
+	return s.collectFromIndex(ctx, kvs, limit, resp.More, includeDeleted)
+}
+
 func (s *Store) listAll(ctx context.Context, cursor string, limit int, includeDeleted bool) (ListResult, error) {
 	prefix := s.artifactPrefix()
 	start := prefix

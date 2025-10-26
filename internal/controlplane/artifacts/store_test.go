@@ -57,6 +57,12 @@ func TestStoreCreateGetAndList(t *testing.T) {
 	if created.ExpiresAt.Sub(created.CreatedAt) != 24*time.Hour {
 		t.Fatalf("expected expires_at 24h ahead, got %s", created.ExpiresAt)
 	}
+	if created.PinState != artifacts.PinStateQueued {
+		t.Fatalf("expected default pin state queued, got %s", created.PinState)
+	}
+	if !created.PinUpdatedAt.Equal(created.CreatedAt) {
+		t.Fatalf("expected pin_updated_at to match created_at, got %s vs %s", created.PinUpdatedAt, created.CreatedAt)
+	}
 
 	fetched, err := store.Get(ctx, input.ID)
 	if err != nil {
@@ -67,6 +73,9 @@ func TestStoreCreateGetAndList(t *testing.T) {
 	}
 	if fetched.TTL != input.TTL {
 		t.Fatalf("expected ttl %q, got %q", input.TTL, fetched.TTL)
+	}
+	if fetched.PinState != artifacts.PinStateQueued {
+		t.Fatalf("expected queued pin state, got %s", fetched.PinState)
 	}
 
 	// Second artifact for another job/stage.
@@ -99,6 +108,121 @@ func TestStoreCreateGetAndList(t *testing.T) {
 	if len(stageList.Artifacts) != 1 || stageList.Artifacts[0].ID != "artifact-beta" {
 		t.Fatalf("unexpected stage list: %#v", stageList.Artifacts)
 	}
+}
+
+func TestStoreUpdatePinState(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	t.Cleanup(func() {
+		etcd.Close()
+		client.Close()
+	})
+
+	clock := fixedClock(time.Date(2025, 10, 26, 14, 30, 0, 0, time.UTC))
+	store, err := artifacts.NewStore(client, artifacts.StoreOptions{Clock: clock})
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	if _, err := store.Create(ctx, artifacts.Metadata{
+		ID:     "artifact-pin",
+		CID:    "bafy-pin",
+		Digest: "sha256:pin",
+		Size:   42,
+		JobID:  "job-pin",
+	}); err != nil {
+		t.Fatalf("seed artifact: %v", err)
+	}
+
+	now := clock()
+	clockAdvance := func(delta time.Duration) {
+		current := now.Add(delta)
+		now = current
+		clock = fixedClock(current)
+		var err error
+		store, err = artifacts.NewStore(client, artifacts.StoreOptions{Clock: clock})
+		if err != nil {
+			t.Fatalf("refresh store: %v", err)
+		}
+	}
+	clockAdvance(time.Minute)
+
+	updated, err := store.UpdatePinState(ctx, "artifact-pin", artifacts.PinStateUpdate{
+		State:           artifacts.PinStatePinning,
+		Replicas:        intPtr(1),
+		RetryCountDelta: 1,
+		Error:           "peer timeout",
+		NextAttemptAt:   now.Add(5 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("UpdatePinState: %v", err)
+	}
+	if updated.PinState != artifacts.PinStatePinning {
+		t.Fatalf("expected pinning state, got %s", updated.PinState)
+	}
+	if updated.PinReplicas != 1 {
+		t.Fatalf("expected replicas=1, got %d", updated.PinReplicas)
+	}
+	if updated.PinRetryCount != 1 {
+		t.Fatalf("expected retry count 1, got %d", updated.PinRetryCount)
+	}
+	if updated.PinError != "peer timeout" {
+		t.Fatalf("unexpected pin error %q", updated.PinError)
+	}
+	if !updated.PinNextAttemptAt.Equal(now.Add(5 * time.Minute)) {
+		t.Fatalf("expected next attempt at %s, got %s", now.Add(5*time.Minute), updated.PinNextAttemptAt)
+	}
+	if !updated.PinUpdatedAt.Equal(updated.UpdatedAt) {
+		t.Fatalf("expected pin_updated_at to match updated_at")
+	}
+}
+
+func TestStoreGetByCIDAndListFilter(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	t.Cleanup(func() {
+		etcd.Close()
+		client.Close()
+	})
+
+	store, err := artifacts.NewStore(client, artifacts.StoreOptions{})
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	if _, err := store.Create(ctx, artifacts.Metadata{
+		ID:     "artifact-cid",
+		CID:    "bafycid",
+		Digest: "sha256:cid",
+		Size:   99,
+		JobID:  "job-cid",
+	}); err != nil {
+		t.Fatalf("seed artifact: %v", err)
+	}
+
+	byCID, err := store.GetByCID(ctx, "bafycid")
+	if err != nil {
+		t.Fatalf("GetByCID: %v", err)
+	}
+	if byCID.ID != "artifact-cid" {
+		t.Fatalf("unexpected metadata: %#v", byCID)
+	}
+
+	list, err := store.List(ctx, artifacts.ListOptions{CID: "bafycid", Limit: 10})
+	if err != nil {
+		t.Fatalf("List by cid: %v", err)
+	}
+	if len(list.Artifacts) != 1 || list.Artifacts[0].ID != "artifact-cid" {
+		t.Fatalf("unexpected filtered list: %#v", list.Artifacts)
+	}
+}
+
+func intPtr(v int) *int {
+	return &v
 }
 
 func TestStoreCursorAndDelete(t *testing.T) {
@@ -158,6 +282,9 @@ func TestStoreCursorAndDelete(t *testing.T) {
 	}
 	if !deleted.Deleted {
 		t.Fatalf("expected deleted flag set")
+	}
+	if _, err := store.GetByCID(ctx, deleted.CID); !errors.Is(err, artifacts.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound for GetByCID after delete, got %v", err)
 	}
 
 	_, err = store.Get(ctx, deleted.ID)
