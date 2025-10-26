@@ -26,9 +26,13 @@ configuration.
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
+- Set `PLOY_CONTROL_PLANE_URL` (documented under **Control Plane** below) whenever descriptors do not
+  embed the API endpoint; the CLI needs it for `ploy upload`, `ploy report`, and other `/v1/*` calls.
 - `PLOY_IPFS_CLUSTER_API` — Base URL for the IPFS Cluster REST API used by the
-  step runtime and CLI artifact commands. Required when artifact publishing is
-  enabled.
+  step runtime and the control-plane artifact publisher. Workstations still
+  read this value when executing Mods locally, but `ploy artifact *`, `ploy upload`,
+  and `ploy report` routes now talk to the control plane instead of hitting the
+  cluster directly.
 - `PLOY_IPFS_CLUSTER_TOKEN` — Optional bearer token passed to the cluster when
   authenticating artifact requests.
 - `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Optional

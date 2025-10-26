@@ -27,6 +27,8 @@ ploy environment materialize <commit-sha> --app <app> --tenant <tenant> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
+ploy upload --job-id <ticket-id> [--kind repo|logs|report] <path>
+ploy report --job-id <ticket-id> [--artifact-id <slot>] --output <path>
 ```
 
 `lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
@@ -82,6 +84,11 @@ preserving schema version ordering. `knowledge-base evaluate` loads curated
 samples, runs them through the advisor with a conservative score floor, and
 prints per-sample match results plus aggregate accuracy so operators can gauge
 classifier drift without leaving the workstation.
+
+`upload` and `report` reuse the cached SSH descriptor to move large payloads through the control-plane
+slot APIs instead of issuing ad-hoc SCP sessions. See
+[docs/next/ssh-transfer-migration.md](../../docs/next/ssh-transfer-migration.md) for rollout guidance,
+required environment variables, and operational limits (slot TTL, digest verification, cleanup).
 
 ## Flags
 

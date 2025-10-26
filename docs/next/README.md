@@ -139,6 +139,8 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy Next.
 - [docs/next/devops.md](devops.md) — Deployment, bootstrap, and node operations playbook.
 - [docs/next/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
+- [docs/next/ssh-transfer-migration.md](ssh-transfer-migration.md) — Migration plan for the SSH slot
+  workflow and CLI transfer commands.
 - [docs/next/gc.md](gc.md) — Retention and garbage collection workflow (controller + `ploy gc`).
 - [docs/next/logs.md](logs.md) — Log streaming and archival strategy (metadata in etcd, payloads in IPFS).
 - [docs/next/queue.md](queue.md) — etcd-backed queue, capacity tracking, and scheduling behaviour.

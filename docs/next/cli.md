@@ -34,6 +34,21 @@ operations for the v2 control plane. Commands mirror the structure captured in
 - `ploy artifact rm <cid>`
   Unpin an artifact from the cluster.
 
+## SSH Transfer Commands
+
+- `ploy upload --job-id <id> [--kind repo|logs|report] [--node-id <node>] <path>`
+  Requests an upload slot via `/v1/transfers/upload`, copies the payload over the cached SSH
+  descriptor, and commits the slot so the control plane can ingest the bytes into IPFS Cluster or the
+  registry backend.
+- `ploy report --job-id <id> [--artifact-id <slot>] [--node-id <node>] --output <path>`
+  Reserves a download slot tied to the latest artifact for a job, pulls the staged file via SSH, and
+  verifies the digest before writing it locally.
+
+Both commands require `PLOY_CONTROL_PLANE_URL` (or a descriptor that already embeds the API endpoint)
+and reuse the same SSH sockets as the rest of the CLI. See
+[docs/next/ssh-transfer-migration.md](ssh-transfer-migration.md) for the full workflow and migration
+guidance.
+
 ## Cluster Descriptors
 
 Descriptors now encode only the SSH metadata needed to open tunnels:
