@@ -83,6 +83,12 @@ type artifactDTO struct {
 	ExpiresAt            string `json:"expires_at,omitempty"`
 	ReplicationFactorMin int    `json:"replication_factor_min,omitempty"`
 	ReplicationFactorMax int    `json:"replication_factor_max,omitempty"`
+	PinState             string `json:"pin_state,omitempty"`
+	PinReplicas          int    `json:"pin_replicas,omitempty"`
+	PinRetryCount        int    `json:"pin_retry_count,omitempty"`
+	PinError             string `json:"pin_error,omitempty"`
+	PinUpdatedAt         string `json:"pin_updated_at,omitempty"`
+	PinNextAttemptAt     string `json:"pin_next_attempt_at,omitempty"`
 	CreatedAt            string `json:"created_at"`
 	UpdatedAt            string `json:"updated_at"`
 	DeletedAt            string `json:"deleted_at,omitempty"`
@@ -103,11 +109,21 @@ func artifactDTOFrom(meta controlplaneartifacts.Metadata) artifactDTO {
 		TTL:                  meta.TTL,
 		ReplicationFactorMin: meta.ReplicationFactorMin,
 		ReplicationFactorMax: meta.ReplicationFactorMax,
+		PinState:             string(meta.PinState),
+		PinReplicas:          meta.PinReplicas,
+		PinRetryCount:        meta.PinRetryCount,
+		PinError:             meta.PinError,
 		CreatedAt:            formatTime(meta.CreatedAt),
 		UpdatedAt:            formatTime(meta.UpdatedAt),
 	}
 	if !meta.ExpiresAt.IsZero() {
 		dto.ExpiresAt = formatTime(meta.ExpiresAt)
+	}
+	if !meta.PinUpdatedAt.IsZero() {
+		dto.PinUpdatedAt = formatTime(meta.PinUpdatedAt)
+	}
+	if !meta.PinNextAttemptAt.IsZero() {
+		dto.PinNextAttemptAt = formatTime(meta.PinNextAttemptAt)
 	}
 	if !meta.DeletedAt.IsZero() {
 		dto.DeletedAt = formatTime(meta.DeletedAt)
@@ -132,4 +148,12 @@ func recordArtifactPayload(operation string, bytesCopied int64) {
 		operation = "unknown"
 	}
 	artifactPayloadBytes.WithLabelValues(operation).Add(float64(bytesCopied))
+}
+
+func wantsDownload(raw string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(raw))
+	if trimmed == "" || trimmed == "0" || trimmed == "false" {
+		return false
+	}
+	return true
 }

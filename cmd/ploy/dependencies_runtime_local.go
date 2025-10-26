@@ -3,12 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+)
+
+const (
+	clusterURLEnv     = "PLOY_IPFS_CLUSTER_API"
+	clusterTokenEnv   = "PLOY_IPFS_CLUSTER_TOKEN"
+	clusterUserEnv    = "PLOY_IPFS_CLUSTER_USERNAME"
+	clusterPassEnv    = "PLOY_IPFS_CLUSTER_PASSWORD"
+	clusterReplMinEnv = "PLOY_IPFS_CLUSTER_REPL_MIN"
+	clusterReplMaxEnv = "PLOY_IPFS_CLUSTER_REPL_MAX"
 )
 
 type stepExecutorFactoryFunc func() (runtime.StepExecutor, error)
@@ -54,7 +66,7 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 		return nil, err
 	}
 	diffGenerator := step.NewFilesystemDiffGenerator(step.FilesystemDiffGeneratorOptions{})
-	client, err := artifactClientFactory()
+	client, err := newClusterArtifactClient()
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +91,34 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 		SHIFT:      shiftClient,
 		Artifacts:  publisher,
 	}, nil
+}
+
+func newClusterArtifactClient() (*artifacts.ClusterClient, error) {
+	baseURL := strings.TrimSpace(os.Getenv(clusterURLEnv))
+	if baseURL == "" {
+		return nil, fmt.Errorf("configure cluster client: %s required", clusterURLEnv)
+	}
+	opts := artifacts.ClusterClientOptions{
+		BaseURL:              baseURL,
+		AuthToken:            strings.TrimSpace(os.Getenv(clusterTokenEnv)),
+		BasicAuthUsername:    strings.TrimSpace(os.Getenv(clusterUserEnv)),
+		BasicAuthPassword:    strings.TrimSpace(os.Getenv(clusterPassEnv)),
+		ReplicationFactorMin: parseEnvInt(clusterReplMinEnv),
+		ReplicationFactorMax: parseEnvInt(clusterReplMaxEnv),
+	}
+	return artifacts.NewClusterClient(opts)
+}
+
+func parseEnvInt(name string) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return 0
+	}
+	num, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return num
 }
 
 func newBuildGateShiftClient() (step.ShiftClient, error) {

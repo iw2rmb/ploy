@@ -27,6 +27,25 @@ const (
 	BlobStatusDeleted = "deleted"
 )
 
+// PinState represents replication progress for registry blobs.
+type PinState string
+
+const (
+	PinStateQueued  PinState = "queued"
+	PinStatePinning PinState = "pinning"
+	PinStatePinned  PinState = "pinned"
+	PinStateFailed  PinState = "failed"
+)
+
+// PinStateUpdate encapsulates an atomic blob pin metadata mutation.
+type PinStateUpdate struct {
+	State           PinState
+	Replicas        *int
+	RetryCountDelta int
+	Error           string
+	NextAttemptAt   time.Time
+}
+
 // StoreOptions configure the registry metadata store.
 type StoreOptions struct {
 	Prefix string

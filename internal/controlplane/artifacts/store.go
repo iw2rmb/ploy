@@ -89,6 +89,15 @@ func (s *Store) Create(ctx context.Context, meta Metadata) (Metadata, error) {
 			meta.ExpiresAt = meta.CreatedAt.Add(duration)
 		}
 	}
+	if strings.TrimSpace(string(meta.PinState)) == "" {
+		meta.PinState = PinStateQueued
+	}
+	if meta.PinUpdatedAt.IsZero() {
+		meta.PinUpdatedAt = meta.CreatedAt
+	}
+	if meta.PinRetryCount < 0 {
+		meta.PinRetryCount = 0
+	}
 
 	record := recordFromMetadata(meta)
 	payload, err := json.Marshal(record)
@@ -102,6 +111,7 @@ func (s *Store) Create(ctx context.Context, meta Metadata) (Metadata, error) {
 	if meta.Stage != "" {
 		ops = append(ops, clientv3.OpPut(s.stageIndexKey(meta.JobID, meta.Stage, meta.ID), meta.ID))
 	}
+	ops = append(ops, clientv3.OpPut(s.cidIndexKey(meta.CID, meta.ID), meta.ID))
 
 	txn := s.client.Txn(ctx).
 		If(clientv3.Compare(clientv3.CreateRevision(key), "=", 0)).
@@ -129,6 +139,34 @@ func (s *Store) Get(ctx context.Context, id string) (Metadata, error) {
 	return meta, nil
 }
 
+// GetByCID resolves the metadata document for the supplied CID.
+func (s *Store) GetByCID(ctx context.Context, cid string) (Metadata, error) {
+	if s == nil || s.client == nil {
+		return Metadata{}, errors.New("artifacts: store uninitialised")
+	}
+	trimmed := strings.TrimSpace(cid)
+	if trimmed == "" {
+		return Metadata{}, errors.New("artifacts: cid required")
+	}
+	prefix := s.cidIndexPrefix(trimmed)
+	resp, err := s.client.Get(ctx, prefix,
+		clientv3.WithRange(prefixRangeEnd(prefix)),
+		clientv3.WithLimit(1),
+		clientv3.WithSort(clientv3.SortByKey, clientv3.SortAscend),
+	)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("artifacts: get cid index: %w", err)
+	}
+	if len(resp.Kvs) == 0 {
+		return Metadata{}, ErrNotFound
+	}
+	id := strings.TrimSpace(string(resp.Kvs[0].Value))
+	if id == "" {
+		id = artifactIDFromKey(string(resp.Kvs[0].Key))
+	}
+	return s.Get(ctx, id)
+}
+
 // List returns artifacts matching the provided filters, ordered lexicographically.
 func (s *Store) List(ctx context.Context, opts ListOptions) (ListResult, error) {
 	if s == nil || s.client == nil {
@@ -144,9 +182,13 @@ func (s *Store) List(ctx context.Context, opts ListOptions) (ListResult, error) 
 
 	jobID := strings.TrimSpace(opts.JobID)
 	stage := strings.TrimSpace(opts.Stage)
+	cid := strings.TrimSpace(opts.CID)
 
 	if jobID != "" {
 		return s.listByJob(ctx, jobID, stage, opts.Cursor, limit, opts.IncludeDeleted)
+	}
+	if cid != "" {
+		return s.listByCID(ctx, cid, opts.Cursor, limit, opts.IncludeDeleted)
 	}
 	return s.listAll(ctx, opts.Cursor, limit, opts.IncludeDeleted)
 }
@@ -183,6 +225,7 @@ func (s *Store) Delete(ctx context.Context, id string) (Metadata, error) {
 	if meta.Stage != "" {
 		ops = append(ops, clientv3.OpDelete(s.stageIndexKey(meta.JobID, meta.Stage, meta.ID)))
 	}
+	ops = append(ops, clientv3.OpDelete(s.cidIndexKey(meta.CID, meta.ID)))
 
 	txn := s.client.Txn(ctx).
 		If(clientv3.Compare(clientv3.ModRevision(key), "=", rev)).

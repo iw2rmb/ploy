@@ -48,6 +48,12 @@ func TestRegistryStoreBlobLifecycle(t *testing.T) {
 	if created.Status != registry.BlobStatusAvailable {
 		t.Fatalf("expected status available, got %q", created.Status)
 	}
+	if created.PinState != registry.PinStateQueued {
+		t.Fatalf("expected default pin state queued, got %s", created.PinState)
+	}
+	if created.PinReplicas != 0 {
+		t.Fatalf("expected zero replicas, got %d", created.PinReplicas)
+	}
 
 	fetched, err := store.GetBlob(ctx, blob.Repo, blob.Digest)
 	if err != nil {
@@ -95,6 +101,50 @@ func TestRegistryStoreManifestRequiresBlobs(t *testing.T) {
 
 	if _, err := store.PutManifest(ctx, manifest, "latest"); err == nil {
 		t.Fatalf("expected error when blobs missing")
+	}
+}
+
+func TestRegistryStoreUpdateBlobPinState(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startRegistryTestEtcd(t)
+	t.Cleanup(func() {
+		etcd.Close()
+		client.Close()
+	})
+
+	store, err := registry.NewStore(client, registry.StoreOptions{})
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+
+	ctx := context.Background()
+	if _, err := store.PutBlob(ctx, registry.BlobDocument{
+		Repo:      "acme/registry",
+		Digest:    "sha256:update",
+		MediaType: "application/vnd.oci.image.layer.v1.tar",
+		Size:      512,
+		CID:       "bafy-update",
+	}); err != nil {
+		t.Fatalf("PutBlob: %v", err)
+	}
+
+	doc, err := store.UpdateBlobPinState(ctx, "acme/registry", "sha256:update", registry.PinStateUpdate{
+		State:           registry.PinStatePinned,
+		Replicas:        intPtr(3),
+		RetryCountDelta: 2,
+	})
+	if err != nil {
+		t.Fatalf("UpdateBlobPinState: %v", err)
+	}
+	if doc.PinState != registry.PinStatePinned {
+		t.Fatalf("expected pinned state, got %s", doc.PinState)
+	}
+	if doc.PinReplicas != 3 {
+		t.Fatalf("expected replicas=3, got %d", doc.PinReplicas)
+	}
+	if doc.PinRetryCount != 2 {
+		t.Fatalf("expected retry count 2, got %d", doc.PinRetryCount)
 	}
 }
 
@@ -257,4 +307,8 @@ func mustParseURL(raw string) url.URL {
 
 func fixedClock(t time.Time) func() time.Time {
 	return func() time.Time { return t }
+}
+
+func intPtr(v int) *int {
+	return &v
 }

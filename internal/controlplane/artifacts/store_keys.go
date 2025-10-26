@@ -37,6 +37,14 @@ func (s *Store) stageIndexKey(jobID, stage, id string) string {
 	return path.Join(s.stageIndexPrefix(jobID, stage), strings.TrimSpace(id))
 }
 
+func (s *Store) cidIndexPrefix(cid string) string {
+	return path.Join(s.prefix, "index", "artifacts", "cids", encodeSegment(cid))
+}
+
+func (s *Store) cidIndexKey(cid, id string) string {
+	return path.Join(s.cidIndexPrefix(cid), strings.TrimSpace(id))
+}
+
 func encodeSegment(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {

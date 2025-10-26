@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	artifactcli "github.com/iw2rmb/ploy/internal/cli/artifact"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
@@ -15,7 +16,13 @@ import (
 )
 
 var (
-	artifactClientFactory artifactcli.ClientFactory = artifactcli.DefaultClientFactory
+	artifactClientFactory artifactcli.ClientFactory = func() (artifactcli.Service, error) {
+		base, httpClient, err := resolveControlPlaneHTTP(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		return artifactcli.NewControlPlaneService(base, httpClient)
+	}
 )
 
 func handleArtifact(args []string, stderr io.Writer) error {
@@ -166,6 +173,21 @@ func printArtifactStatus(w io.Writer, status artifacts.StatusResult) {
 	}
 	if status.Summary != "" {
 		_, _ = fmt.Fprintf(w, "Summary: %s\n", status.Summary)
+	}
+	if status.PinState != "" {
+		_, _ = fmt.Fprintf(w, "Pin State: %s\n", status.PinState)
+	}
+	if status.PinReplicas > 0 {
+		_, _ = fmt.Fprintf(w, "Pin Replicas: %d\n", status.PinReplicas)
+	}
+	if status.PinRetryCount > 0 {
+		_, _ = fmt.Fprintf(w, "Pin Retries: %d\n", status.PinRetryCount)
+	}
+	if status.PinError != "" {
+		_, _ = fmt.Fprintf(w, "Pin Error: %s\n", status.PinError)
+	}
+	if !status.PinNextAttemptAt.IsZero() {
+		_, _ = fmt.Fprintf(w, "Next Attempt: %s\n", status.PinNextAttemptAt.Format(time.RFC3339))
 	}
 	if len(status.Peers) > 0 {
 		_, _ = fmt.Fprintln(w, "Peers:")

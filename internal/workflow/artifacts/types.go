@@ -1,6 +1,8 @@
 package artifacts
 
 import (
+	"time"
+
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
@@ -30,6 +32,12 @@ type AddResponse struct {
 	ReplicationFactorMax int
 }
 
+// PinOptions customises replication behaviour for re-pin attempts.
+type PinOptions struct {
+	ReplicationFactorMin int
+	ReplicationFactorMax int
+}
+
 // FetchResult returns the payload and metadata for an artifact resolved from the cluster.
 type FetchResult struct {
 	CID       string
@@ -53,4 +61,9 @@ type StatusResult struct {
 	Peers                []StatusPeer
 	ReplicationFactorMin int
 	ReplicationFactorMax int
+	PinState             string
+	PinReplicas          int
+	PinError             string
+	PinRetryCount        int
+	PinNextAttemptAt     time.Time
 }

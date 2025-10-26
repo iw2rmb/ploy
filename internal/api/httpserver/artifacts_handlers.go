@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	httpsecurity "github.com/iw2rmb/ploy/internal/api/httpserver/security"
@@ -41,9 +42,11 @@ func (s *controlPlaneServer) handleArtifactsList(w http.ResponseWriter, r *http.
 		writeErrorMessage(w, status, "stage filter requires job_id")
 		return
 	}
+	cid := strings.TrimSpace(query.Get("cid"))
 	list, err := store.List(r.Context(), controlplaneartifacts.ListOptions{
 		JobID:  jobID,
 		Stage:  stage,
+		CID:    cid,
 		Cursor: strings.TrimSpace(query.Get("cursor")),
 		Limit:  limit,
 	})
@@ -215,6 +218,28 @@ func (s *controlPlaneServer) handleArtifactsSubpath(w http.ResponseWriter, r *ht
 			}
 			status = http.StatusInternalServerError
 			writeError(w, status, err)
+			return
+		}
+		if wantsDownload(r.URL.Query().Get("download")) {
+			if s.artifactPublisher == nil {
+				status = http.StatusServiceUnavailable
+				writeErrorMessage(w, status, "artifact download unavailable")
+				return
+			}
+			result, err := s.artifactPublisher.Fetch(r.Context(), meta.CID)
+			if err != nil {
+				status = http.StatusBadGateway
+				writeError(w, status, fmt.Errorf("fetch artifact: %w", err))
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Content-Type", "application/octet-stream")
+			if result.Size > 0 {
+				w.Header().Set("Content-Length", strconv.FormatInt(result.Size, 10))
+			}
+			if _, err := w.Write(result.Data); err != nil {
+				status = http.StatusInternalServerError
+			}
 			return
 		}
 		w.Header().Set("Cache-Control", "no-store")

@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+// PinState describes the replication status recorded for an artifact.
+type PinState string
+
+const (
+	// PinStateQueued marks a pin that has been accepted but not yet processed.
+	PinStateQueued PinState = "queued"
+	// PinStatePinning captures pins actively replicating to peers.
+	PinStatePinning PinState = "pinning"
+	// PinStatePinned indicates replication success.
+	PinStatePinned PinState = "pinned"
+	// PinStateFailed marks pins that require manual or automated retries.
+	PinStateFailed PinState = "failed"
+)
+
 // Metadata captures persisted artifact attributes backed by etcd.
 type Metadata struct {
 	ID                   string
@@ -23,6 +37,12 @@ type Metadata struct {
 	ExpiresAt            time.Time
 	ReplicationFactorMin int
 	ReplicationFactorMax int
+	PinState             PinState
+	PinReplicas          int
+	PinUpdatedAt         time.Time
+	PinRetryCount        int
+	PinNextAttemptAt     time.Time
+	PinError             string
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 	Deleted              bool
@@ -33,6 +53,7 @@ type Metadata struct {
 type ListOptions struct {
 	JobID          string
 	Stage          string
+	CID            string
 	Cursor         string
 	Limit          int
 	IncludeDeleted bool
@@ -60,6 +81,10 @@ func recordFromMetadata(meta Metadata) metadataRecord {
 		TTL:                  meta.TTL,
 		ReplicationFactorMin: meta.ReplicationFactorMin,
 		ReplicationFactorMax: meta.ReplicationFactorMax,
+		PinState:             string(meta.PinState),
+		PinReplicas:          meta.PinReplicas,
+		PinRetryCount:        meta.PinRetryCount,
+		PinError:             meta.PinError,
 		CreatedAt:            meta.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt:            meta.UpdatedAt.UTC().Format(time.RFC3339Nano),
 		Deleted:              meta.Deleted,
@@ -69,6 +94,12 @@ func recordFromMetadata(meta Metadata) metadataRecord {
 	}
 	if !meta.DeletedAt.IsZero() {
 		rec.DeletedAt = meta.DeletedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if !meta.PinUpdatedAt.IsZero() {
+		rec.PinUpdatedAt = meta.PinUpdatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if !meta.PinNextAttemptAt.IsZero() {
+		rec.PinNextAttemptAt = meta.PinNextAttemptAt.UTC().Format(time.RFC3339Nano)
 	}
 	return rec
 }
@@ -89,6 +120,12 @@ type metadataRecord struct {
 	ExpiresAt            string `json:"expires_at,omitempty"`
 	ReplicationFactorMin int    `json:"replication_factor_min,omitempty"`
 	ReplicationFactorMax int    `json:"replication_factor_max,omitempty"`
+	PinState             string `json:"pin_state,omitempty"`
+	PinReplicas          int    `json:"pin_replicas,omitempty"`
+	PinUpdatedAt         string `json:"pin_updated_at,omitempty"`
+	PinRetryCount        int    `json:"pin_retry_count,omitempty"`
+	PinNextAttemptAt     string `json:"pin_next_attempt_at,omitempty"`
+	PinError             string `json:"pin_error,omitempty"`
 	CreatedAt            string `json:"created_at"`
 	UpdatedAt            string `json:"updated_at"`
 	Deleted              bool   `json:"deleted,omitempty"`
@@ -111,6 +148,10 @@ func (r metadataRecord) toMetadata() Metadata {
 		TTL:                  strings.TrimSpace(r.TTL),
 		ReplicationFactorMin: r.ReplicationFactorMin,
 		ReplicationFactorMax: r.ReplicationFactorMax,
+		PinState:             PinState(strings.TrimSpace(r.PinState)),
+		PinReplicas:          r.PinReplicas,
+		PinRetryCount:        r.PinRetryCount,
+		PinError:             strings.TrimSpace(r.PinError),
 		Deleted:              r.Deleted,
 	}
 	if ts, err := time.Parse(time.RFC3339Nano, r.CreatedAt); err == nil {
@@ -127,6 +168,16 @@ func (r metadataRecord) toMetadata() Metadata {
 	if strings.TrimSpace(r.DeletedAt) != "" {
 		if ts, err := time.Parse(time.RFC3339Nano, r.DeletedAt); err == nil {
 			meta.DeletedAt = ts.UTC()
+		}
+	}
+	if strings.TrimSpace(r.PinUpdatedAt) != "" {
+		if ts, err := time.Parse(time.RFC3339Nano, r.PinUpdatedAt); err == nil {
+			meta.PinUpdatedAt = ts.UTC()
+		}
+	}
+	if strings.TrimSpace(r.PinNextAttemptAt) != "" {
+		if ts, err := time.Parse(time.RFC3339Nano, r.PinNextAttemptAt); err == nil {
+			meta.PinNextAttemptAt = ts.UTC()
 		}
 	}
 	return meta
