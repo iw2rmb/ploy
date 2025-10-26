@@ -81,9 +81,128 @@ Example `GET /v1/mods/{ticket}` response:
 
 The upload endpoint is primarily for workstation CLI interactions; runtime nodes typically stream
 artifacts directly to IPFS Cluster via their local daemon and only record the resulting CIDs in etcd.
-Artifacts routes require the `artifact.read` and/or `artifact.write` scopes. Until roadmap item 1.4
-lands persistence, uploads and deletions return a structured `501 Not Implemented` payload with
-`error_code` hints, and listings surface an empty collection.
+Artifacts routes require the `artifact.read` and/or `artifact.write` scopes.
+
+#### Listing artifacts
+
+`GET /v1/artifacts` accepts `job_id`, `stage`, `kind`, `cid`, `limit` (default 50, max 200), and
+`cursor` query parameters. The `stage` filter is only valid when a `job_id` is supplied. Responses are
+cache-busted (`Cache-Control: no-store`) and include an opaque `next_cursor` when additional pages are
+available:
+
+```json
+{
+  "artifacts": [
+    {
+      "id": "artifact-lwt8z8b4m6kqv1vr",
+      "job_id": "mod-1234-plan",
+      "stage": "plan",
+      "kind": "diff",
+      "node_id": "node-a",
+      "cid": "bafybeihdwd...",
+      "digest": "sha256:d9043d...",
+      "size": 7340032,
+      "name": "plan-diff.tar.gz",
+      "source": "ssh-slot",
+      "replication_factor_min": 2,
+      "replication_factor_max": 3,
+      "pin_state": "pinning",
+      "pin_replicas": 1,
+      "pin_retry_count": 0,
+      "created_at": "2025-10-26T12:07:08.123456Z",
+      "updated_at": "2025-10-26T12:07:08.123456Z"
+    }
+  ]
+}
+```
+
+#### Uploading via HTTP
+
+`POST /v1/artifacts/upload` expects the artifact payload in the request body with metadata supplied via
+query parameters:
+
+- `job_id` (required) associates the artifact with a Mod/job record.
+- `stage`, `kind`, and `node_id` (optional) label the artifact.
+- `name` overrides the stored filename (defaults to `artifact-<job_id>`).
+- `digest` enforces an expected `sha256:` hash before the payload is accepted.
+- `replication_min` / `replication_max` override IPFS Cluster pin targets.
+- `ttl` hints at retention windows understood by the GC controllers.
+
+Example request:
+
+```bash
+curl -X POST "https://cp.example.com/v1/artifacts/upload?job_id=mod-1234-plan&stage=plan&kind=diff&name=plan-diff.tar.gz" \
+  -H "Authorization: Bearer <token>" \
+  --data-binary @plan-diff.tar.gz
+```
+
+Successful uploads return `201 Created` and the stored metadata:
+
+```json
+{
+  "artifact": {
+    "id": "artifact-4i4lwtwaz0z9qhgm",
+    "job_id": "mod-1234-plan",
+    "stage": "plan",
+    "kind": "diff",
+    "cid": "bafybeigd4...",
+    "digest": "sha256:2ee6e0...",
+    "size": 7340032,
+    "name": "plan-diff.tar.gz",
+    "source": "http-upload",
+    "created_at": "2025-10-26T12:09:11.000000Z",
+    "updated_at": "2025-10-26T12:09:11.000000Z"
+  }
+}
+```
+
+#### Inspecting, downloading, or deleting artifacts
+
+`GET /v1/artifacts/{id}` returns the metadata above. Appending `?download=true` streams the binary
+payload with `Content-Type: application/octet-stream` and preserves the stored `size` header when
+available. `DELETE /v1/artifacts/{id}` unpins the artifact (subject to retention policy) and returns
+the final metadata snapshot so operators can audit who removed it.
+
+Pin health surfaces through `pin_state`, `pin_replicas`, `pin_retry_count`, `pin_error`, and
+`pin_next_attempt_at`. These fields are also emitted by `ploy artifact status` so workstation runs can
+confirm whether IPFS Cluster finished replicating the upload.
+
+### Transfer Slots (SSH uploads & downloads)
+
+Bulk transfers ride over the persistent SSH tunnels managed by the CLI. Slots are short-lived
+reservations that define which node, directory, and size budget a transfer may target. The control
+plane exposes three endpoints guarded by the `artifact.read`/`artifact.write` scopes:
+
+- `POST /v1/transfers/upload` — Reserve an upload slot for a job (`kind` defaults to `repo`).
+- `POST /v1/transfers/download` — Reserve a download slot bound to an existing artifact ID or kind.
+- `POST /v1/transfers/{slot}/commit` / `.../abort` — Finalise or release the slot once the SSH copy
+  completes.
+
+Each slot response includes the node that should be contacted over SSH, the absolute `remote_path`
+under `/var/lib/ploy/ssh-artifacts/slots/<slot>/payload`, a `max_size` ceiling (default 10 GiB), and a
+30‑minute `expires_at` deadline. The CLI uses those values when running `ploy upload` and `ploy report`:
+
+```json
+{
+  "slot_id": "slot-y7bn0oec8k4q",
+  "kind": "repo",
+  "job_id": "mod-1234-plan",
+  "node_id": "cp-1",
+  "remote_path": "/var/lib/ploy/ssh-artifacts/slots/slot-y7bn0oec8k4q/payload",
+  "max_size": 10737418240,
+  "expires_at": "2025-10-26T12:40:02.000000Z"
+}
+```
+
+Upload clients stream data to `remote_path` via the existing ControlMaster socket; on success they call
+`POST /v1/transfers/{slot}/commit` with the final `size` and `sha256:` digest. Downloads mirror the
+flow: the control plane maps the requested artifact to the node that produced it, the CLI uses `CopyFrom`
+to pull the staged file, and a commit call confirms the checksum before recording an access log.
+
+The control plane keeps slot state in-memory (`pending`, `committed`, `aborted`). Aborts can be issued
+explicitly via `POST /v1/transfers/{slot}/abort` (for example, when the SSH session fails) and the CLI
+invokes it automatically before surfacing errors. Operators can delete orphaned slot directories safely
+after the TTL if a node restarts mid-transfer.
 
 ### OCI Registry
 
@@ -100,9 +219,61 @@ lands persistence, uploads and deletions return a structured `501 Not Implemente
 - `GET /v1/registry/{repo}/tags/list` — List tags for a repository.
 
 Registry endpoints enforce `registry.pull` for read paths and `registry.push` for write/delete
-operations. While the backing registry store is still underway, all write paths and blob/manifest
-reads return `501 Not Implemented` responses carrying `error_code` markers so the CLI can gate on the
-contract.
+operations.
+
+#### Blob uploads
+
+`POST /v1/registry/<repo>/blobs/uploads` allocates an upload slot backed by the same SSH transfer
+manager. The JSON payload may include `node_id`, `size`, and an optional `media_type`; the response
+returns `upload_id`, `slot_id`, `remote_path`, and a `Location` header pointing at
+`/v1/registry/<repo>/blobs/uploads/<upload_id>`.
+
+Registry writers then:
+
+1. Copy the blob to `remote_path` over SSH (typically from the same host running the CLI or build).
+2. Optionally `PATCH /v1/registry/<repo>/blobs/uploads/<upload_id>` with `{"size": <bytes_sent>}` to
+   record progress counters.
+3. `PUT /v1/registry/<repo>/blobs/uploads/<upload_id>?digest=sha256:...` with a JSON body describing the
+   `media_type` and `size`. The control plane verifies the digest, publishes the blob to IPFS Cluster,
+   updates the registry store, deletes the slot, and responds with:
+
+```json
+{
+  "digest": "sha256:8843d7f92416211de9ebb963ff4ce281",
+  "cid": "bafybeiemblobs...",
+  "location": "/v1/registry/acme/web/blobs/sha256:8843d7..."
+}
+```
+
+`Docker-Content-Digest` mirrors the stored digest and allows Docker/OCI clients to validate the commit.
+
+`GET /v1/registry/<repo>/blobs/<digest>` streams the blob (`Content-Type` defaults to
+`application/octet-stream` when unspecified). `DELETE` marks the blob as deleted and returns
+`{"digest": "sha256:...", "state": "deleted"}` with `202 Accepted` once persistence succeeds.
+
+#### Manifests and tags
+
+`GET /v1/registry/<repo>/manifests/<reference>` resolves either a digest or tag, returning the raw
+manifest payload and setting `Docker-Content-Digest`. `PUT` accepts a full OCI manifest document; the
+control plane ensures every referenced blob already exists and optionally associates the provided tag.
+Successful writes respond with `201 Created`, a `Location` header for the canonical digest, and a JSON
+body containing `{ "digest": "sha256:..." }`.
+
+`DELETE /v1/registry/<repo>/manifests/<digest>` removes the immutable record, while deleting a tag via
+`DELETE /v1/registry/<repo>/manifests/<tag>` detaches only that mutable pointer.
+
+Tags can also be listed through `GET /v1/registry/<repo>/tags/list`, which returns:
+
+```json
+{
+  "name": "acme/web",
+  "tags": ["latest", "v1.2.3"]
+}
+```
+
+All registry routes emit metrics (`ploy_registry_http_requests_total` and
+`ploy_registry_payload_bytes_total`) so operators can alert on unexpected 4xx/5xx spikes or large blob
+flows.
 
 ### Node Management & Observability
 

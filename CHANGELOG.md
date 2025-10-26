@@ -1,5 +1,20 @@
 # Changelog
 
+## [2025-10-26] SSH Transfer Documentation Pass
+
+- Expanded `docs/next/api.md` with transfer slot schemas, artifact upload/download examples, and the
+  full OCI registry flow so operators can trace every `/v1/transfers/*`, `/v1/artifacts/*`, and
+  `/v1/registry/*` request.
+- Added SSH transfer workflow, slot lifecycle, monitoring guidance, and FAQ entries to
+  `docs/next/ipfs.md`; recorded the SFTP subsystem requirements in `docs/next/devops.md` and a new
+  runbook at `docs/runbooks/control-plane/ssh-transfer.md`.
+- Authored `docs/next/ssh-transfer-migration.md`, updated the CLI reference/README, and refreshed
+  `docs/envs/README.md` so teams know how to cut over from direct IPFS uploads.
+- Linked the new documentation from `docs/next/README.md` and `cmd/ploy/README.md` so future slices
+  can discover the transfer playbooks quickly.
+- Verification (2025-10-26):
+  - `make test`
+
 ## [2025-10-21] CLI Surface Refresh Decomposition
 
 - Documented the CLI surface refresh roadmap as five focused slices

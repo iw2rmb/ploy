@@ -9,5 +9,4 @@ Always re-open this file right before editing; never rely on a cached copy.
 
 ## Queue
 
- - [ ] `docs/design/cli-ssh-artifacts-slice-d.md` — SSH Transfer Slice D — Schema & Operations Documentation.
- - [ ] `docs/design/scheduler-refactor/README.md` — Decompose the scheduler package monolith into focused files.
+  - [ ] `docs/design/scheduler-refactor/README.md` — Decompose the scheduler package monolith into focused files.

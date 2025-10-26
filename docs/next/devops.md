@@ -126,6 +126,86 @@ It assumes Linux hosts (VPS or bare metal) with SSH access.
 - `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the response is intentionally uncached so dashboards can poll it directly.  
 - `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane and is safe to cache client-side for up to a minute.
 
+## SSH Artifact Subsystem
+
+The `/v1/transfers/*` APIs rely on a hardened SFTP subsystem running on every control-plane node. Set
+it up immediately after bootstrap so `ploy upload`/`ploy report` can move data without opening fresh
+SSH sessions per transfer.
+
+### Directory layout
+
+```bash
+sudo mkdir -p /var/lib/ploy/ssh-artifacts/{slots,logs}
+sudo chown -R ploy:ploy /var/lib/ploy/ssh-artifacts
+sudo chmod 0750 /var/lib/ploy/ssh-artifacts /var/lib/ploy/ssh-artifacts/slots
+sudo setfacl -m "g:ploy-artifacts:rx" /var/lib/ploy/ssh-artifacts
+```
+
+Use a dedicated Unix group (for example, `ploy-artifacts`) for principals allowed to enter the chroot.
+Add the `ploy` service account plus any automation user that needs to service transfers into this
+group.
+
+### sshd configuration
+
+Append the following snippet to `/etc/ssh/sshd_config` (or the drop-in under `/etc/ssh/sshd_config.d/`):
+
+```
+Subsystem ploy-artifacts internal-sftp
+
+Match Group ploy-artifacts
+    ChrootDirectory /var/lib/ploy/ssh-artifacts
+    ForceCommand internal-sftp -d /slots/%u
+    AllowTcpForwarding no
+    X11Forwarding no
+    PermitTTY no
+```
+
+- `ChrootDirectory` confines sessions to the artifact tree so the CLI cannot escape into the rest of
+  the host.
+- `ForceCommand` rewrites the working directory to `/slots/<username>`; the CLI uses the slot ID as the
+  SSH username when copying files so each slot is isolated automatically.
+- Keep ControlMaster sockets enabled globally so `pkg/sshtransport` can reuse them for both HTTP tunnels
+  and SFTP copies.
+
+Reload sshd after testing the new config with `sshd -t`.
+
+### Guard helper (optional but recommended)
+
+When you need additional validation (for example, to prevent writes outside `/slots/<slot-id>/payload`),
+wrap `internal-sftp` with a lightweight guard script:
+
+```bash
+sudo tee /usr/local/libexec/ploy-artifacts-guard <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+slot="$1"
+dest="/slots/${slot}/payload"
+exec /usr/lib/openssh/sftp-server -d "$dest"
+EOF
+sudo chmod 0755 /usr/local/libexec/ploy-artifacts-guard
+```
+
+Then update the `ForceCommand` line to `ForceCommand /usr/local/libexec/ploy-artifacts-guard %u`. The
+guard ensures each slot name resolves to a single directory and lets you insert extra validation (size
+checks, audit logs) without editing every host’s sshd configuration.
+
+### Cleanup and verification
+
+- Register a `systemd-tmpfiles` rule (`D /var/lib/ploy/ssh-artifacts/slots 0750 ploy ploy - -`) so slot
+  directories older than the 30‑minute TTL are purged automatically.
+- Monitor `journalctl -t sshd | grep ploy-artifacts` to confirm uploads log the username (slot ID),
+  transferred bytes, and remote peer.
+- Add disk usage alerts for `/var/lib/ploy/ssh-artifacts`; stalled uploads can fill the filesystem if
+  left unattended.
+- Smoke-test the subsystem from a workstation:
+
+  ```bash
+  ploy upload --job-id smoke --kind repo ./fixtures/smoke.tar.gz
+  ploy report --job-id smoke --output /tmp/smoke-report.tar.gz
+  ```
+
+  Both commands should complete through the cached descriptor without prompting for an SSH password.
+
 ## SSH Tunnel Lifecycle
 
 - Descriptors are the canonical source for SSH addresses and identity files. Re-run `ploy cluster add
