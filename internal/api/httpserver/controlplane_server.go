@@ -3,6 +3,10 @@ package httpserver
 import (
 	"context"
 	"errors"
+	"log"
+	"net/http"
+	"strings"
+
 	httpsecurity "github.com/iw2rmb/ploy/internal/api/httpserver/security"
 	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	controlplaneartifacts "github.com/iw2rmb/ploy/internal/controlplane/artifacts"
@@ -18,8 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"net/http"
-	"strings"
 )
 
 var (
@@ -88,6 +90,7 @@ type ControlPlaneOptions struct {
 	Streams           *logstream.Hub
 	Gatherer          prometheus.Gatherer
 	Etcd              *clientv3.Client
+	ClusterID         string
 	Rotations         *events.RotationHub
 	Mods              *controlplanemods.Service
 	Auth              *httpsecurity.Manager
@@ -165,8 +168,22 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
 	}
+
+	var slotStore *transfers.SlotStore
+	if opts.Transfers == nil && opts.Etcd != nil {
+		store, err := transfers.NewSlotStore(opts.Etcd, transfers.SlotStoreOptions{
+			ClusterID: opts.ClusterID,
+		})
+		if err != nil {
+			log.Printf("control-plane: slot store disabled: %v", err)
+		} else {
+			slotStore = store
+		}
+	}
+
 	if h.transfers == nil {
 		h.transfers = transfers.NewManager(transfers.Options{
+			SlotStore: slotStore,
 			Store:     artStore,
 			Publisher: opts.ArtifactPublisher,
 		})

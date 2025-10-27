@@ -14,11 +14,19 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "bootstrap-ca" {
-		if err := runBootstrapCA(os.Args[2:]); err != nil {
-			log.Fatalf("bootstrap-ca: %v", err)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "bootstrap-ca":
+			if err := runBootstrapCA(os.Args[2:]); err != nil {
+				log.Fatalf("bootstrap-ca: %v", err)
+			}
+			return
+		case "slot-guard":
+			if err := runSlotGuard(os.Args[2:]); err != nil {
+				log.Fatalf("slot-guard: %v", err)
+			}
+			return
 		}
-		return
 	}
 	var configPath string
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd.yaml", "Path to ployd configuration")

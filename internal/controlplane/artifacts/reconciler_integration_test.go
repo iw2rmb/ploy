@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,8 +28,9 @@ func TestReconcilerRetryFlow(t *testing.T) {
 	}
 
 	fakeCluster := &integrationCluster{}
+	baseDir := t.TempDir()
 	manager := transfers.NewManager(transfers.Options{
-		BaseDir:   t.TempDir(),
+		BaseDir:   baseDir,
 		Store:     store,
 		Publisher: fakeCluster,
 	})
@@ -37,10 +39,11 @@ func TestReconcilerRetryFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUploadSlot: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(slot.RemotePath), 0o755); err != nil {
+	localPath := filepath.Join(baseDir, strings.TrimPrefix(filepath.Clean(slot.RemotePath), "/"))
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		t.Fatalf("prepare slot dir: %v", err)
 	}
-	if err := os.WriteFile(slot.RemotePath, []byte("payload"), 0o644); err != nil {
+	if err := os.WriteFile(localPath, []byte("payload"), 0o644); err != nil {
 		t.Fatalf("write slot payload: %v", err)
 	}
 	digest := sha256.Sum256([]byte("payload"))

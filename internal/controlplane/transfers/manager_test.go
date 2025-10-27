@@ -21,8 +21,12 @@ func TestUploadAndDownloadSlotLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUploadSlot: %v", err)
 	}
-	if slot.RemotePath == "" {
-		t.Fatalf("expected remote path")
+	if slot.RemotePath == "" || slot.LocalPath == "" {
+		t.Fatalf("expected remote and local paths")
+	}
+	expectedRemote := filepath.ToSlash(filepath.Join("/slots", slot.ID, "payload"))
+	if slot.RemotePath != expectedRemote {
+		t.Fatalf("unexpected remote path: %s", slot.RemotePath)
 	}
 	if _, err := mgr.Commit(context.Background(), slot.ID, 1024, "sha256:deadbeef"); err != nil {
 		t.Fatalf("Commit: %v", err)
@@ -54,10 +58,10 @@ func TestCommitPublishesAndStoresMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUploadSlot: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(slot.RemotePath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(slot.LocalPath), 0o755); err != nil {
 		t.Fatalf("create slot dir: %v", err)
 	}
-	if err := os.WriteFile(slot.RemotePath, []byte("payload-bytes"), 0o644); err != nil {
+	if err := os.WriteFile(slot.LocalPath, []byte("payload-bytes"), 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
 	if _, err := mgr.Commit(context.Background(), slot.ID, 0, ""); err != nil {
@@ -84,11 +88,11 @@ func TestLoadSlotPayloadVerifiesDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUploadSlot: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(slot.RemotePath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(slot.LocalPath), 0o755); err != nil {
 		t.Fatalf("prepare slot dir: %v", err)
 	}
 	payload := []byte("registry-blob-payload")
-	if err := os.WriteFile(slot.RemotePath, payload, 0o644); err != nil {
+	if err := os.WriteFile(slot.LocalPath, payload, 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
 	expectedDigest := sha256.Sum256(payload)

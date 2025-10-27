@@ -54,5 +54,15 @@ func validate(cfg *Config) error {
 		}
 	}
 
+	if strings.TrimSpace(cfg.Transfers.BaseDir) == "" {
+		return errors.New("config: transfers.base_dir is required")
+	}
+	if strings.TrimSpace(cfg.Transfers.GuardBinary) == "" {
+		return errors.New("config: transfers.guard_binary is required")
+	}
+	if cfg.Transfers.JanitorInterval <= 0 {
+		return errors.New("config: transfers.janitor_interval must be positive")
+	}
+
 	return nil
 }

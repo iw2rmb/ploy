@@ -16,6 +16,9 @@ const (
 	defaultTaskConcurrency   = 2
 	defaultHousekeeping      = 5 * time.Minute
 	defaultDiskPrune         = time.Hour
+	defaultTransfersBaseDir  = "/var/lib/ploy/ssh-artifacts"
+	defaultGuardBinary       = "/usr/lib/openssh/sftp-server"
+	defaultJanitorInterval   = time.Minute
 )
 
 // defaultConfig returns the baseline configuration with baked-in defaults.
@@ -42,6 +45,11 @@ func defaultConfig() Config {
 		},
 		Worker: WorkerConfig{
 			TaskConcurrency: defaultTaskConcurrency,
+		},
+		Transfers: TransfersConfig{
+			BaseDir:         defaultTransfersBaseDir,
+			GuardBinary:     defaultGuardBinary,
+			JanitorInterval: defaultJanitorInterval,
 		},
 	}
 }
@@ -135,6 +143,16 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Extra == nil {
 		cfg.Extra = make(map[string]any)
+	}
+
+	if strings.TrimSpace(cfg.Transfers.BaseDir) == "" {
+		cfg.Transfers.BaseDir = defaultTransfersBaseDir
+	}
+	if strings.TrimSpace(cfg.Transfers.GuardBinary) == "" {
+		cfg.Transfers.GuardBinary = defaultGuardBinary
+	}
+	if cfg.Transfers.JanitorInterval <= 0 {
+		cfg.Transfers.JanitorInterval = defaultJanitorInterval
 	}
 
 	normalizeRuntimeConfig(&cfg.Runtime)

@@ -95,6 +95,9 @@ configuration.
 - `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
   to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
   16, 24, or 32 bytes to satisfy AES-GCM requirements.
+- `PLOY_CLUSTER_ID` — Optional override for the cluster identifier the control plane writes inside
+  etcd prefixes (defaults to the value recorded in `/etc/ploy/cluster-id`). Set this when running
+  multiple clusters from the same environment and `/etc/ploy/cluster-id` is unavailable.
 - `PLOY_CONTROL_PLANE_URL` — Optional control-plane base URL override used by `ploy config gitlab`, worker onboarding,
   and CLI log/streaming commands. When unset, the CLI derives the endpoint plus CA bundle from the cached cluster descriptor.
 - `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
@@ -106,6 +109,9 @@ configuration.
 - `PLOY_GITLAB_ADMIN_TOKEN` — Admin or automation token presented to GitLab when
   calling the revocation API. Required for the rotation revocation workflow to
   disable stale tokens across nodes.
+- `PLOY_TRANSFERS_BASE_DIR` — Optional override for the SSH slot staging root on control-plane
+  nodes. Defaults to `/var/lib/ploy/ssh-artifacts` and is referenced by the slot guard wrapper that
+  bootstrap installs.
 
 ## Related Docs
 

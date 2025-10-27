@@ -4,7 +4,9 @@
 
 Operators use this runbook to diagnose and recover SSH-based artifact transfers. Typical triggers are
 `ploy upload` failures, digest mismatches during `/v1/transfers/{slot}/commit`, or artifacts stuck in
-`pinning` because the underlying slot never committed.
+`pinning` because the underlying slot never committed. Slots are now persisted in etcd under
+`/ploy/clusters/<cluster>/transfers/slots/<slot-id>`, so control-plane restarts no longer drop active
+reservations. Inspect the key with `etcdctl get ... | jq` before deciding whether to abort.
 
 ## Prerequisites
 
@@ -20,6 +22,7 @@ Operators use this runbook to diagnose and recover SSH-based artifact transfers.
 - `/v1/artifacts/{id}` shows `pin_state: pinning` for longer than expected because the slot never
   progressed beyond `pending`.
 - Disk usage under `/var/lib/ploy/ssh-artifacts` grows steadily even when no transfers are running.
+- Guard denials appear in `journalctl -t sshd`.
 
 ## Procedures
 
@@ -66,6 +69,20 @@ Operators use this runbook to diagnose and recover SSH-based artifact transfers.
    slot directory automatically. If the commit fails again, archive `/var/lib/ploy/ssh-artifacts/slots/<slot-id>`
    for later analysis and open an incident.
 
+### Investigate guard denials
+
+1. Inspect the guard logs:
+
+   ```bash
+   journalctl -u sshd -g ploy-slot-guard --since -15m
+   ```
+
+   Look for `slot guard: slot <id> expired` or `slot guard: slot <id> not pending` messages.
+2. Confirm the slot still exists and is pending in etcd. Guard rejections because of expiration usually
+   mean the client retried after TTL; request a fresh slot.
+3. If denials persist for active slots, capture the event (slot ID, node ID, username) and open an
+   incident so the control-plane team can inspect the slot guard logs with higher verbosity.
+
 ### Clean orphaned slot directories
 
 1. List stale slots (the TTL is 30 minutes by default):
@@ -77,8 +94,10 @@ Operators use this runbook to diagnose and recover SSH-based artifact transfers.
 2. Ensure no active `sftp-server` processes reference those paths (`sudo lsof +D /var/lib/ploy/ssh-artifacts/slots`).
 3. Remove the directories with `sudo rm -rf` and monitor `journalctl -t sshd` for new uploads that might
    be reusing the slot IDs.
-4. Add or verify the `systemd-tmpfiles` rule documented in [docs/next/devops.md](../../next/devops.md)
-   to automate this cleanup.
+4. The janitor built into `ployd` performs this sweep every minute; inspect the ployd logs for janitor
+   errors when manual cleanup becomes frequent.
+5. Add or verify the `systemd-tmpfiles` rule documented in [docs/next/devops.md](../../next/devops.md)
+   as a safety net in case the janitor is disabled.
 
 ### Resolve pinning stalls
 

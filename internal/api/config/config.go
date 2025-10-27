@@ -13,6 +13,7 @@ type Config struct {
 	Runtime      RuntimeConfig       `yaml:"runtime"`
 	Scheduler    SchedulerConfig     `yaml:"scheduler"`
 	Logging      LoggingConfig       `yaml:"logging"`
+	Transfers    TransfersConfig     `yaml:"transfers"`
 	FilePath     string              `yaml:"-"`
 	Environment  map[string]string   `yaml:"environment"`
 	Features     map[string]bool     `yaml:"features"`

@@ -30,10 +30,11 @@ func TestRegistryBlobUploadLifecycle(t *testing.T) {
 	}
 	slotID := requireString(t, startResp["upload_id"])
 	remotePath := requireString(t, startResp["remote_path"])
-	if err := os.MkdirAll(filepath.Dir(remotePath), 0o755); err != nil {
+	localPath := fixture.localPath(remotePath)
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		t.Fatalf("prepare slot dir: %v", err)
 	}
-	if err := os.WriteFile(remotePath, payload, 0o644); err != nil {
+	if err := os.WriteFile(localPath, payload, 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
 	patchURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads/%s", fixture.server.URL, repo, slotID)
@@ -76,8 +77,8 @@ func TestRegistryManifestLifecycle(t *testing.T) {
 
 	fixture := newRegistryHTTPFixture(t)
 	repo := "acme/widgets"
-	configDigest := uploadRegistryBlob(t, fixture.server.URL, repo, []byte("config-json"), "application/vnd.oci.image.config.v1+json")
-	layerDigest := uploadRegistryBlob(t, fixture.server.URL, repo, []byte("layer-data"), "application/vnd.oci.image.layer.v1.tar")
+	configDigest := uploadRegistryBlob(t, fixture, repo, []byte("config-json"), "application/vnd.oci.image.config.v1+json")
+	layerDigest := uploadRegistryBlob(t, fixture, repo, []byte("layer-data"), "application/vnd.oci.image.layer.v1.tar")
 	manifestPayload, err := json.Marshal(map[string]any{
 		"schemaVersion": 2,
 		"mediaType":     "application/vnd.oci.image.manifest.v1+json",
