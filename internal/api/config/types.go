@@ -118,3 +118,10 @@ type LoggingConfig struct {
 	JSON         bool              `yaml:"json"`
 	StaticFields map[string]string `yaml:"static_fields"`
 }
+
+// TransfersConfig configures transfer guard and janitor behaviour.
+type TransfersConfig struct {
+	BaseDir         string        `yaml:"base_dir"`
+	GuardBinary     string        `yaml:"guard_binary"`
+	JanitorInterval time.Duration `yaml:"janitor_interval"`
+}

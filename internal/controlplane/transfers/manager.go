@@ -46,6 +46,7 @@ type Slot struct {
 	Stage      string    `json:"stage,omitempty"`
 	NodeID     string    `json:"node_id"`
 	RemotePath string    `json:"remote_path"`
+	LocalPath  string    `json:"local_path,omitempty"`
 	MaxSize    int64     `json:"max_size"`
 	ExpiresAt  time.Time `json:"expires_at"`
 	Digest     string    `json:"digest,omitempty"`
@@ -54,16 +55,16 @@ type Slot struct {
 
 // Artifact captures a committed upload.
 type Artifact struct {
-	ID         string
-	Kind       Kind
-	JobID      string
-	Stage      string
-	NodeID     string
-	RemotePath string
-	Size       int64
-	Digest     string
-	CID        string
-	UpdatedAt  time.Time
+	ID         string    `json:"artifact_id"`
+	Kind       Kind      `json:"kind"`
+	JobID      string    `json:"job_id"`
+	Stage      string    `json:"stage,omitempty"`
+	NodeID     string    `json:"node_id"`
+	RemotePath string    `json:"remote_path"`
+	Size       int64     `json:"size"`
+	Digest     string    `json:"digest"`
+	CID        string    `json:"cid"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // ArtifactStore persists metadata for committed transfers.
@@ -81,6 +82,7 @@ type Options struct {
 	MaxSize   int64
 	TTL       time.Duration
 	Now       func() time.Time
+	SlotStore *SlotStore
 	Store     ArtifactStore
 	Publisher artifactPublisher
 }
@@ -95,6 +97,7 @@ type Manager struct {
 	now       func() time.Time
 	slots     map[string]*Slot
 	artifacts map[string][]Artifact
+	slotStore *SlotStore
 	store     ArtifactStore
 	publisher artifactPublisher
 }
@@ -117,16 +120,18 @@ func NewManager(opts Options) *Manager {
 	if clock == nil {
 		clock = time.Now
 	}
-	return &Manager{
+	m := &Manager{
 		baseDir:   base,
 		maxSize:   maxSize,
 		ttl:       ttl,
 		now:       clock,
-		slots:     make(map[string]*Slot),
-		artifacts: make(map[string][]Artifact),
+		slotStore: opts.SlotStore,
 		store:     opts.Store,
 		publisher: opts.Publisher,
+		slots:     make(map[string]*Slot),
+		artifacts: make(map[string][]Artifact),
 	}
+	return m
 }
 
 // CreateUploadSlot reserves an upload slot targeting the supplied node.
@@ -136,9 +141,37 @@ func (m *Manager) CreateUploadSlot(kind Kind, jobID, stageID, nodeID string, siz
 
 // CreateDownloadSlot reserves a download slot for an existing artifact.
 func (m *Manager) CreateDownloadSlot(jobID, artifactID string, kind Kind) (Slot, Artifact, error) {
+	if m.slotStore != nil {
+		artifacts, err := m.slotStore.JobArtifacts(context.Background(), strings.TrimSpace(jobID))
+		if err != nil {
+			return Slot{}, Artifact{}, err
+		}
+		artifact, err := selectArtifactFromList(artifacts, jobID, artifactID, kind)
+		if err != nil {
+			return Slot{}, Artifact{}, err
+		}
+		slot := Slot{
+			ID:         m.generateSlotID(),
+			Kind:       artifact.Kind,
+			JobID:      artifact.JobID,
+			NodeID:     artifact.NodeID,
+			RemotePath: artifact.RemotePath,
+			MaxSize:    artifact.Size,
+			ExpiresAt:  m.now().Add(m.ttl),
+			State:      SlotPending,
+			Digest:     artifact.Digest,
+		}
+		slot.LocalPath = m.localPathForRemote(slot.RemotePath)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := m.slotStore.CreateSlot(ctx, slot); err != nil {
+			return Slot{}, Artifact{}, err
+		}
+		return slot, artifact, nil
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	artifact, err := m.selectArtifact(jobID, artifactID, kind)
+	artifact, err := selectArtifactFromList(m.artifacts[strings.TrimSpace(jobID)], jobID, artifactID, kind)
 	if err != nil {
 		return Slot{}, Artifact{}, err
 	}
@@ -154,12 +187,59 @@ func (m *Manager) CreateDownloadSlot(jobID, artifactID string, kind Kind) (Slot,
 		State:      SlotPending,
 		Digest:     artifact.Digest,
 	}
+	slot.LocalPath = m.localPathForRemote(slot.RemotePath)
 	m.slots[slotID] = slot
 	return *slot, artifact, nil
 }
 
 // Commit finalises a slot.
 func (m *Manager) Commit(ctx context.Context, slotID string, size int64, digest string) (Slot, error) {
+	if m.slotStore != nil {
+		record, err := m.slotStore.GetSlot(ctx, slotID)
+		if err != nil {
+			return Slot{}, err
+		}
+		if record.Slot.State != SlotPending {
+			return record.Slot, nil
+		}
+		slotCopy := record.Slot
+		var storedArtifact *Artifact
+		if m.publisher != nil && m.store != nil && slotCopy.Kind != "" {
+			artifact, err := m.publishAndStore(ctx, slotCopy, size, digest)
+			if err != nil {
+				return Slot{}, err
+			}
+			storedArtifact = &artifact
+		}
+		updated, err := m.slotStore.UpdateSlotState(ctx, slotID, record.Revision, SlotCommitted, digest)
+		if err != nil {
+			return Slot{}, err
+		}
+		slotCopy = updated.Slot
+		if slotCopy.Kind != "" {
+			var art Artifact
+			if storedArtifact != nil {
+				art = *storedArtifact
+			} else {
+				art = Artifact{
+					ID:         slotCopy.ID,
+					Kind:       slotCopy.Kind,
+					JobID:      slotCopy.JobID,
+					Stage:      slotCopy.Stage,
+					NodeID:     slotCopy.NodeID,
+					RemotePath: slotCopy.RemotePath,
+					Size:       size,
+					Digest:     slotCopy.Digest,
+					UpdatedAt:  m.now(),
+				}
+			}
+			if err := m.slotStore.RecordArtifact(ctx, art); err != nil {
+				return Slot{}, err
+			}
+		}
+		return slotCopy, nil
+	}
+
 	m.mu.Lock()
 	slot, ok := m.slots[slotID]
 	if !ok {
@@ -208,6 +288,15 @@ func (m *Manager) Commit(ctx context.Context, slotID string, size int64, digest 
 
 // Abort releases a slot without committing it.
 func (m *Manager) Abort(slotID string) {
+	if m.slotStore != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		record, err := m.slotStore.GetSlot(ctx, slotID)
+		if err == nil && record.Slot.State == SlotPending {
+			_, _ = m.slotStore.UpdateSlotState(ctx, slotID, record.Revision, SlotAborted, record.Slot.Digest)
+		}
+		return
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if slot, ok := m.slots[slotID]; ok {
@@ -220,6 +309,15 @@ func (m *Manager) Slot(slotID string) (Slot, error) {
 	id := strings.TrimSpace(slotID)
 	if id == "" {
 		return Slot{}, errors.New("slot id required")
+	}
+	if m.slotStore != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		record, err := m.slotStore.GetSlot(ctx, id)
+		if err != nil {
+			return Slot{}, err
+		}
+		return record.Slot, nil
 	}
 	m.mu.Lock()
 	slot, ok := m.slots[id]
@@ -251,7 +349,9 @@ func (m *Manager) createSlot(kind Kind, jobID, stageID, nodeID string, sizeHint 
 		return Slot{}, errors.New("node id required")
 	}
 	slotID := m.generateSlotID()
-	remotePath := filepath.Join(m.baseDir, "slots", slotID, "payload")
+	slotDir := filepath.Join(m.baseDir, "slots", slotID)
+	localPath := filepath.Join(slotDir, "payload")
+	remotePath := filepath.ToSlash(filepath.Join("/slots", slotID, "payload"))
 	slot := &Slot{
 		ID:         slotID,
 		Kind:       kind,
@@ -259,9 +359,18 @@ func (m *Manager) createSlot(kind Kind, jobID, stageID, nodeID string, sizeHint 
 		Stage:      strings.TrimSpace(stageID),
 		NodeID:     strings.TrimSpace(nodeID),
 		RemotePath: remotePath,
+		LocalPath:  localPath,
 		MaxSize:    firstNonZero(sizeHint, m.maxSize),
 		ExpiresAt:  m.now().Add(m.ttl),
 		State:      SlotPending,
+	}
+	if m.slotStore != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := m.slotStore.CreateSlot(ctx, *slot); err != nil {
+			return Slot{}, err
+		}
+		return *slot, nil
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -269,18 +378,18 @@ func (m *Manager) createSlot(kind Kind, jobID, stageID, nodeID string, sizeHint 
 	return *slot, nil
 }
 
-func (m *Manager) selectArtifact(jobID, artifactID string, kind Kind) (Artifact, error) {
-	list := m.artifacts[strings.TrimSpace(jobID)]
+func selectArtifactFromList(list []Artifact, jobID, artifactID string, kind Kind) (Artifact, error) {
 	if len(list) == 0 {
-		return Artifact{}, fmt.Errorf("no artifacts recorded for %s", jobID)
+		return Artifact{}, fmt.Errorf("no artifacts recorded for %s", strings.TrimSpace(jobID))
 	}
-	if strings.TrimSpace(artifactID) != "" {
+	trimmedID := strings.TrimSpace(artifactID)
+	if trimmedID != "" {
 		for _, art := range list {
-			if art.ID == artifactID {
+			if art.ID == trimmedID {
 				return art, nil
 			}
 		}
-		return Artifact{}, fmt.Errorf("artifact %s not found for job %s", artifactID, jobID)
+		return Artifact{}, fmt.Errorf("artifact %s not found for job %s", trimmedID, strings.TrimSpace(jobID))
 	}
 	if kind != "" {
 		for _, art := range list {
@@ -288,7 +397,7 @@ func (m *Manager) selectArtifact(jobID, artifactID string, kind Kind) (Artifact,
 				return art, nil
 			}
 		}
-		return Artifact{}, fmt.Errorf("no artifacts of kind %s for job %s", kind, jobID)
+		return Artifact{}, fmt.Errorf("no artifacts of kind %s for job %s", kind, strings.TrimSpace(jobID))
 	}
 	return list[0], nil
 }
@@ -308,6 +417,19 @@ func firstNonZero(values ...int64) int64 {
 		}
 	}
 	return 0
+}
+
+func (m *Manager) localPathForRemote(remote string) string {
+	trimmed := strings.TrimSpace(remote)
+	if trimmed == "" {
+		return ""
+	}
+	clean := filepath.Clean(trimmed)
+	clean = strings.TrimPrefix(clean, "/")
+	if clean == "" {
+		return ""
+	}
+	return filepath.Join(m.baseDir, clean)
 }
 
 func (m *Manager) publishAndStore(ctx context.Context, slot Slot, declaredSize int64, declaredDigest string) (Artifact, error) {
@@ -353,7 +475,11 @@ func (m *Manager) publishAndStore(ctx context.Context, slot Slot, declaredSize i
 	if err != nil {
 		return Artifact{}, fmt.Errorf("persist artifact metadata: %w", err)
 	}
-	_ = os.RemoveAll(filepath.Dir(slot.RemotePath))
+	if strings.TrimSpace(slot.LocalPath) != "" {
+		_ = os.RemoveAll(filepath.Dir(slot.LocalPath))
+	} else {
+		_ = os.RemoveAll(filepath.Dir(slot.RemotePath))
+	}
 	return Artifact{
 		ID:         slot.ID,
 		Kind:       slot.Kind,
@@ -369,7 +495,11 @@ func (m *Manager) publishAndStore(ctx context.Context, slot Slot, declaredSize i
 }
 
 func (m *Manager) readSlotPayload(slot Slot, declaredSize int64, declaredDigest string) ([]byte, string, error) {
-	data, err := os.ReadFile(slot.RemotePath)
+	path := strings.TrimSpace(slot.LocalPath)
+	if path == "" {
+		path = strings.TrimSpace(slot.RemotePath)
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, "", fmt.Errorf("read slot payload: %w", err)
 	}

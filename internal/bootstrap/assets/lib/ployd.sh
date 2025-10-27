@@ -49,6 +49,8 @@ YAML
     log "wrote default ployd configuration at $config_path"
   fi
 
+  ensure_transfer_guard "$config_path"
+
   cat >"${SYSTEMD_DIR}/ployd.service" <<UNIT
 [Unit]
 Description=ploy node daemon
@@ -108,4 +110,31 @@ persist_cluster_metadata() {
   fi
   mkdir -p /etc/ploy
   printf '%s\n' "${CLUSTER_ID}" >/etc/ploy/cluster-id
+}
+
+ensure_transfer_guard() {
+  local config_path="$1"
+  local base_dir="${PLOY_TRANSFERS_BASE_DIR:-/var/lib/ploy/ssh-artifacts}"
+  mkdir -p "${base_dir}/slots" "${base_dir}/logs"
+  chmod 0750 "${base_dir}" "${base_dir}/slots"
+  if ! getent group ploy-artifacts >/dev/null 2>&1; then
+    groupadd --system ploy-artifacts
+  fi
+  chgrp ploy-artifacts "${base_dir}" || true
+  chmod g+rx "${base_dir}" || true
+
+  local wrapper="/usr/local/libexec/ploy-slot-guard"
+  mkdir -p "$(dirname "$wrapper")"
+  cat >"$wrapper" <<WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+slot="\${1:-}"
+if [[ -z "\$slot" ]]; then
+  echo "slot guard: slot id required" >&2
+  exit 1
+fi
+exec ${BIN_DIR}/ployd slot-guard --config "${config_path}" --slot "\$slot"
+WRAPPER
+  chmod 0755 "$wrapper"
+  log "configured ploy slot guard via $wrapper"
 }

@@ -81,6 +81,7 @@ type registryHTTPFixture struct {
 	server    *httptest.Server
 	store     *registry.Store
 	publisher *stubArtifactPublisher
+	baseDir   string
 }
 
 func newRegistryHTTPFixture(t *testing.T) registryHTTPFixture {
@@ -91,7 +92,8 @@ func newRegistryHTTPFixture(t *testing.T) registryHTTPFixture {
 		t.Fatalf("new registry store: %v", err)
 	}
 	publisher := &stubArtifactPublisher{}
-	transfersMgr := transfers.NewManager(transfers.Options{BaseDir: t.TempDir()})
+	baseDir := t.TempDir()
+	transfersMgr := transfers.NewManager(transfers.Options{BaseDir: baseDir})
 	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
 		Etcd:              client,
 		Transfers:         transfersMgr,
@@ -108,12 +110,19 @@ func newRegistryHTTPFixture(t *testing.T) registryHTTPFixture {
 		server:    server,
 		store:     store,
 		publisher: publisher,
+		baseDir:   baseDir,
 	}
 }
 
-func uploadRegistryBlob(t *testing.T, baseURL, repo string, payload []byte, mediaType string) string {
+func (f registryHTTPFixture) localPath(remote string) string {
+	clean := filepath.Clean(strings.TrimSpace(remote))
+	clean = strings.TrimPrefix(clean, "/")
+	return filepath.Join(f.baseDir, clean)
+}
+
+func uploadRegistryBlob(t *testing.T, fixture registryHTTPFixture, repo string, payload []byte, mediaType string) string {
 	t.Helper()
-	uploadURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads", baseURL, repo)
+	uploadURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads", fixture.server.URL, repo)
 	status, startResp := postJSONStatus(t, uploadURL, map[string]any{
 		"media_type": mediaType,
 		"size":       len(payload),
@@ -123,13 +132,14 @@ func uploadRegistryBlob(t *testing.T, baseURL, repo string, payload []byte, medi
 	}
 	slotID := requireString(t, startResp["upload_id"])
 	remotePath := requireString(t, startResp["remote_path"])
-	if err := os.MkdirAll(filepath.Dir(remotePath), 0o755); err != nil {
+	localPath := fixture.localPath(remotePath)
+	if err := os.MkdirAll(filepath.Dir(localPath), 0o755); err != nil {
 		t.Fatalf("prepare slot dir: %v", err)
 	}
-	if err := os.WriteFile(remotePath, payload, 0o644); err != nil {
+	if err := os.WriteFile(localPath, payload, 0o644); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
-	patchURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads/%s", baseURL, repo, slotID)
+	patchURL := fmt.Sprintf("%s/v1/registry/%s/blobs/uploads/%s", fixture.server.URL, repo, slotID)
 	if patchStatus, _ := sendJSONStatus(t, http.MethodPatch, patchURL, map[string]any{"size": len(payload)}); patchStatus != http.StatusAccepted {
 		t.Fatalf("expected 202 for upload patch, got %d", patchStatus)
 	}

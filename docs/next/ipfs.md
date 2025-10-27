@@ -55,7 +55,8 @@ can ingest the bytes into IPFS Cluster. Downloads follow the same pattern with
 `POST /v1/transfers/download` and `ploy report --job-id <id> --output <path>`.
 
 - Slots are scoped to a job/stage and resolve to a node ID plus `remote_path`
-  (`/var/lib/ploy/ssh-artifacts/slots/<slot-id>/payload`).
+  (`/slots/<slot-id>/payload`). The control plane also records the absolute `local_path`
+  (`/var/lib/ploy/ssh-artifacts/slots/<slot-id>/payload`) for the slot guard and janitor.
 - The transfer manager enforces a 10 GiB ceiling per slot and expires unused reservations after
   30 minutes. The CLI receives both values up front and aborts if the local file exceeds the budget.
 - Commits redeploy the payload into IPFS Cluster (artifacts) or the registry store (OCI blobs) and log
@@ -66,16 +67,13 @@ can ingest the bytes into IPFS Cluster. Downloads follow the same pattern with
 Slots move through three states:
 
 1. **pending** — Returned by `/v1/transfers/upload|download`. The slot reserves disk under
-   `/var/lib/ploy/ssh-artifacts/slots/<slot-id>` but is not yet visible to the artifact store.
+   `/var/lib/ploy/ssh-artifacts/slots/<slot-id>` but is not yet visible to the artifact store. The
+   guard validates this state before launching `internal-sftp`.
 2. **committed** — `POST /v1/transfers/{slot}/commit` validates the declared `size`/`sha256:` digest,
    publishes the payload, records metadata (job_id, kind, CID), and removes the temporary directory.
 3. **aborted** — Triggered via `POST /v1/transfers/{slot}/abort` or by CLI error handling. Aborted
-   slots leave the staged file behind for inspection until the TTL expires; operators can rerun the
-   upload after deleting the orphaned directory.
-
-Because slot state is stored in-memory today, restarting the control plane clears pending slots. If a
-node reboots mid-transfer, the follow-up CLI run should request a fresh slot and the operator can
-remove the abandoned path once they confirm no `sftp` sessions still reference it.
+  slots leave the staged file behind for inspection until the TTL expires; the janitor aborts and
+  removes the directory on the next sweep so disk usage stays bounded.
 
 ## Monitoring & Recovery
 
@@ -97,7 +95,8 @@ at reachable hosts and rerun `ploy cluster add --address <ip> --dry-run` to refr
 
 - **How do I resume a failed upload?** Rerun `ploy upload` with the same `--job-id`. The CLI requests a
   new slot automatically. If you need to reuse the original slot (for forensic purposes), copy the
-  payload into the recorded `remote_path`, verify the digest (`sha256sum payload`), then call
+  payload into `/var/lib/ploy/ssh-artifacts/slots/<slot-id>/payload` (or use the recorded `remote_path`
+  plus the staging root), verify the digest (`sha256sum payload`), then call
   `POST /v1/transfers/<slot>/commit` manually. Always abort (`.../abort`) before retrying if the first
   attempt died mid-transfer so the control plane can release the reservation.
 - **Digest mismatch on commit** — The control plane recalculates `sha256` server-side. When it reports

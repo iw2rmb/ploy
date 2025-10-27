@@ -27,6 +27,10 @@ contracts expected under each.
   orphaned CIDs or global references.
 - **`gc/pending/<job-id>`** — Jobs pending garbage collection. Set by the GC controller prior to
   deletion (see [docs/next/gc.md](gc.md)).
+- **`transfers/slots/<slot-id>` / `transfers/artifacts/<job-id>/<slot-id>`** — SSH transfer slots,
+  their lifecycle events, and the artifact metadata produced when slots commit. Slots sit under
+  `/ploy/clusters/<cluster>/transfers/slots/*` and are bound to leases so they expire automatically
+  after the configured TTL.
 
 ## Detailed Contracts
 
@@ -163,6 +167,24 @@ contracts expected under each.
 - `ipfs/peers` entries store peer ID, multiaddrs, last seen timestamp.
 - `artifacts/<cid>` (if used) tracks global references to CIDs so the GC controller knows when a CID
   remains pinned for other jobs/tickets.
+
+### Transfer Slots (`transfers/slots/<slot-id>`, `transfers/artifacts/<job-id>/<slot-id>`)
+
+- Every slot key stores the public `Slot` payload returned by `/v1/transfers/upload|download` plus
+  `created_at`/`updated_at` timestamps. Keys are attached to an etcd lease sized to
+  `slot_ttl + 5m`, so orphaned slots disappear automatically when the lease expires.
+- Slot documents now record both the guarded remote path (`/slots/<slot-id>/payload`) and an internal
+  `local_path` pointing at the absolute filesystem location
+  (`/var/lib/ploy/ssh-artifacts/slots/<slot-id>/payload`). The guard consumes `local_path` when
+  preparing the chroot and enforcing path normalisation.
+- Slot state transitions (`pending → committed|aborted`) are applied via `ModRevision`-guarded
+  transactions to prevent double commits.
+- Committed slots emit artifact documents under `transfers/artifacts/<job-id>/<slot-id>`.
+  Each value mirrors the public `Artifact` struct (kind, digest, CID, updated_at). The control plane
+  watches this prefix to warm in-memory caches used by `/v1/transfers/download` so nodes can list the
+  most recent artifacts without Range queries.
+- The watcher revision lives under `transfers/state/artifacts_rev`, allowing cache rebuilds to resume
+  from the last processed event after control-plane restarts.
 
 ## Watchers & Notifications
 

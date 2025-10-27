@@ -30,6 +30,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	controlplanescheduler "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
@@ -155,6 +156,7 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 	if streams == nil {
 		return nil, nil, errors.New("control-plane: streams hub required")
 	}
+	clusterID := detectClusterID(cfg)
 	etcdCfg, err := etcdutil.ConfigFromEnv()
 	if err != nil {
 		return nil, nil, fmt.Errorf("control-plane: etcd config: %w", err)
@@ -209,6 +211,44 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		}
 	}
 
+	var slotStore *transfers.SlotStore
+	if client != nil {
+		if store, err := transfers.NewSlotStore(client, transfers.SlotStoreOptions{
+			ClusterID: clusterID,
+		}); err == nil {
+			slotStore = store
+		} else {
+			log.Printf("control-plane: slot store disabled: %v", err)
+		}
+	}
+
+	var transferManager *transfers.Manager
+	if slotStore != nil || artStore != nil || artifactPublisher != nil {
+		transferManager = transfers.NewManager(transfers.Options{
+			BaseDir:   cfg.Transfers.BaseDir,
+			SlotStore: slotStore,
+			Store:     artStore,
+			Publisher: artifactPublisher,
+		})
+	}
+
+	var janitor *transfers.Janitor
+	var janitorCancel context.CancelFunc
+	if slotStore != nil {
+		if j, err := transfers.NewJanitor(transfers.JanitorOptions{
+			Logger:   log.Default(),
+			BaseDir:  cfg.Transfers.BaseDir,
+			Store:    slotStore,
+			Clock:    time.Now,
+			Interval: cfg.Transfers.JanitorInterval,
+		}); err != nil {
+			log.Printf("control-plane: janitor disabled: %v", err)
+		} else {
+			janitor = j
+			janitorCancel = janitor.Start(context.Background())
+		}
+	}
+
 	var rotations *events.RotationHub
 	if signer != nil {
 		rotations = events.NewRotationHub(context.Background(), signer)
@@ -222,10 +262,12 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		Signer:            signer,
 		Streams:           streams,
 		Etcd:              client,
+		ClusterID:         clusterID,
 		Rotations:         rotations,
 		Mods:              modsService,
 		ArtifactStore:     artStore,
 		ArtifactPublisher: artifactPublisher,
+		Transfers:         transferManager,
 		Authorizer: auth.NewAuthorizer(auth.Options{
 			AllowInsecure: allowInsecure,
 			DefaultRole:   defaultRole,
@@ -261,10 +303,25 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		if sched != nil {
 			_ = sched.Close()
 		}
+		if janitorCancel != nil {
+			janitorCancel()
+			done := make(chan struct{})
+			go func() {
+				janitor.Wait()
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+			}
+		}
 		if reconciler != nil {
 			stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			_ = reconciler.Stop(stopCtx)
 			cancel()
+		}
+		if slotStore != nil {
+			_ = slotStore.Close()
 		}
 		if client != nil {
 			return client.Close()
@@ -274,7 +331,29 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 	return handler, shutdown, nil
 }
 
+func detectClusterID(cfg config.Config) string {
+	if cfg.Metadata != nil {
+		if value, ok := cfg.Metadata["cluster_id"]; ok {
+			if str, ok := value.(string); ok {
+				if trimmed := strings.TrimSpace(str); trimmed != "" {
+					return trimmed
+				}
+			}
+		}
+	}
+	if env := strings.TrimSpace(os.Getenv("PLOY_CLUSTER_ID")); env != "" {
+		return env
+	}
+	if data, err := os.ReadFile(clusterIDFile); err == nil {
+		if trimmed := strings.TrimSpace(string(data)); trimmed != "" {
+			return trimmed
+		}
+	}
+	return "default"
+}
+
 const defaultIPFSClusterAPI = "http://127.0.0.1:9094"
+const clusterIDFile = "/etc/ploy/cluster-id"
 
 func buildArtifactPublisher() *workflowartifacts.ClusterClient {
 	client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
