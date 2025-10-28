@@ -70,16 +70,19 @@ func (c *BuildGateShiftClient) Validate(ctx context.Context, req ShiftRequest) (
 		return ShiftResult{}, fmt.Errorf("shift: build gate run: %w", err)
 	}
 
-	metadata := result.Metadata
-	if metadata.StaticChecks == nil && metadata.LogFindings == nil && metadata.LogDigest == "" {
-		metadata = buildgate.Sanitize(result.Metadata)
-	}
+	metadata := buildgate.Sanitize(result.Metadata)
 
-	report, _ := json.Marshal(struct {
+	payload := struct {
 		Metadata buildgate.Metadata `json:"metadata"`
+		Summary  json.RawMessage    `json:"summary,omitempty"`
 	}{
 		Metadata: metadata,
-	})
+	}
+	if len(result.Report) > 0 {
+		payload.Summary = append(payload.Summary, result.Report...)
+	}
+
+	report, _ := json.Marshal(payload)
 
 	failures := collectBuildGateFailures(result, metadata)
 	if len(failures) == 0 {

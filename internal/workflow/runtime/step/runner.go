@@ -29,13 +29,14 @@ type Request struct {
 
 // Result summarises a completed step run.
 type Result struct {
-	ContainerID  string
-	ExitCode     int
-	DiffArtifact PublishedArtifact
-	LogArtifact  PublishedArtifact
-	ShiftReport  ShiftResult
-	RetentionTTL string
-	Retained     bool
+	ContainerID   string
+	ExitCode      int
+	DiffArtifact  PublishedArtifact
+	LogArtifact   PublishedArtifact
+	ShiftArtifact PublishedArtifact
+	ShiftReport   ShiftResult
+	RetentionTTL  string
+	Retained      bool
 }
 
 // Runner executes step manifests using the injected collaborators.
@@ -131,6 +132,7 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	var diffArtifact PublishedArtifact
 	var logArtifact PublishedArtifact
+	var shiftArtifact PublishedArtifact
 	if r.Artifacts != nil {
 		diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
 		if err != nil {
@@ -164,15 +166,26 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		if shiftResult.Duration <= 0 {
 			shiftResult.Duration = elapsed
 		}
+		if r.Artifacts != nil && len(shiftResult.Report) > 0 {
+			shiftArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{
+				Kind:   ArtifactKindShiftReport,
+				Buffer: append([]byte(nil), shiftResult.Report...),
+			})
+			if err != nil {
+				runErr = fmt.Errorf("step: publish shift report: %w", err)
+				return Result{}, runErr
+			}
+		}
 		if !shiftResult.Passed {
 			result := Result{
-				ContainerID:  handle.ID,
-				ExitCode:     containerResult.ExitCode,
-				DiffArtifact: diffArtifact,
-				LogArtifact:  logArtifact,
-				ShiftReport:  shiftResult,
-				Retained:     manifest.Retention.RetainContainer,
-				RetentionTTL: manifest.Retention.TTL,
+				ContainerID:   handle.ID,
+				ExitCode:      containerResult.ExitCode,
+				DiffArtifact:  diffArtifact,
+				LogArtifact:   logArtifact,
+				ShiftArtifact: shiftArtifact,
+				ShiftReport:   shiftResult,
+				Retained:      manifest.Retention.RetainContainer,
+				RetentionTTL:  manifest.Retention.TTL,
 			}
 			if hasStream {
 				r.publishRetentionHint(ctx, streamID, result)
@@ -183,13 +196,14 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 
 	result := Result{
-		ContainerID:  handle.ID,
-		ExitCode:     containerResult.ExitCode,
-		DiffArtifact: diffArtifact,
-		LogArtifact:  logArtifact,
-		ShiftReport:  shiftResult,
-		Retained:     manifest.Retention.RetainContainer,
-		RetentionTTL: manifest.Retention.TTL,
+		ContainerID:   handle.ID,
+		ExitCode:      containerResult.ExitCode,
+		DiffArtifact:  diffArtifact,
+		LogArtifact:   logArtifact,
+		ShiftArtifact: shiftArtifact,
+		ShiftReport:   shiftResult,
+		Retained:      manifest.Retention.RetainContainer,
+		RetentionTTL:  manifest.Retention.TTL,
 	}
 	if hasStream {
 		r.publishRetentionHint(ctx, streamID, result)

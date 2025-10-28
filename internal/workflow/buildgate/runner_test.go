@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +66,14 @@ func TestRunnerAggregatesSandboxStaticChecksAndLogs(t *testing.T) {
 		Success:   true,
 		CacheHit:  true,
 		LogDigest: " sha256:sandbox ",
+		Metadata: buildgate.Metadata{
+			LogFindings: []buildgate.LogFinding{{
+				Code:     "shift.summary",
+				Severity: "info",
+				Message:  "lane lane.docker.jvm via docker",
+			}},
+		},
+		Report: []byte(`{"status":"success"}`),
 	}}, buildgate.SandboxRunnerOptions{Clock: fixedClock{now: time.Unix(0, 0)}})
 
 	registry := buildgate.NewStaticCheckRegistry()
@@ -184,8 +193,17 @@ func TestRunnerAggregatesSandboxStaticChecksAndLogs(t *testing.T) {
 	if len(result.Metadata.StaticChecks) != 1 {
 		t.Fatalf("metadata static checks missing")
 	}
-	if len(result.Metadata.LogFindings) != len(result.Log.Findings) {
-		t.Fatalf("metadata log findings mismatch")
+	if len(result.Metadata.LogFindings) < len(result.Log.Findings) {
+		t.Fatalf("expected metadata to include log ingestion findings")
+	}
+	if len(result.Metadata.LogFindings) == 0 {
+		t.Fatalf("expected sandbox log findings included in metadata")
+	}
+	if !containsFinding(result.Metadata.LogFindings, result.Log.Findings[0].Message) {
+		t.Fatalf("expected metadata to include log ingestion finding message")
+	}
+	if string(result.Report) != `{"status":"success"}` {
+		t.Fatalf("expected sandbox report propagated")
 	}
 }
 
@@ -247,3 +265,12 @@ type fixedClock struct {
 }
 
 func (c fixedClock) Now() time.Time { return c.now }
+
+func containsFinding(findings []buildgate.LogFinding, snippet string) bool {
+	for _, finding := range findings {
+		if strings.Contains(finding.Message, snippet) {
+			return true
+		}
+	}
+	return false
+}

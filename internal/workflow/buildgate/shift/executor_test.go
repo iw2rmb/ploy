@@ -32,7 +32,24 @@ func TestExecutorSuccess(t *testing.T) {
 	t.Helper()
 	runner := &fakeRunner{
 		result: shift.CommandResult{
-			Stdout:   "shift succeeded\n",
+			Stdout: `{
+  "run_id": "1234",
+  "status": "success",
+  "lane": "lane.docker.jvm",
+  "orchestrator": "docker",
+  "exit_code": 0,
+  "duration_ms": 1200,
+  "workspace": "/tmp/workspace",
+  "diagnostics": [
+    {
+      "severity": "warning",
+      "code": "shift.env.missing",
+      "message": "Environment variable FOO missing",
+      "path": "build.gradle"
+    }
+  ]
+}
+`,
 			Stderr:   "",
 			ExitCode: 0,
 		},
@@ -60,6 +77,9 @@ func TestExecutorSuccess(t *testing.T) {
 	if runner.cmd[0] != "shift" {
 		t.Fatalf("expected shift binary, got %q", runner.cmd[0])
 	}
+	if !containsArg(runner.cmd, "--output", "json") {
+		t.Fatalf("expected --output json flag, got %v", runner.cmd)
+	}
 	if !result.Success {
 		t.Fatalf("expected success true")
 	}
@@ -74,13 +94,19 @@ func TestExecutorSuccess(t *testing.T) {
 	if result.LogDigest != expected {
 		t.Fatalf("digest = %q, want %q", result.LogDigest, expected)
 	}
+	if len(result.Metadata.LogFindings) == 0 {
+		t.Fatalf("expected log findings populated")
+	}
+	if len(result.Report) == 0 {
+		t.Fatalf("expected report bytes captured")
+	}
 }
 
 func TestExecutorFailureExitCode(t *testing.T) {
 	t.Helper()
 	runner := &fakeRunner{
 		result: shift.CommandResult{
-			Stdout:   "",
+			Stdout:   `{"status":"failed","exit_code":17,"diagnostics":[{"severity":"error","code":"shift.fail","message":"tests failed"}]}`,
 			Stderr:   "tests failed",
 			ExitCode: 17,
 		},
@@ -98,11 +124,14 @@ func TestExecutorFailureExitCode(t *testing.T) {
 	if result.Success {
 		t.Fatalf("expected success false")
 	}
-	if result.FailureReason != "exit_code" {
+	if result.FailureReason != "failed" {
 		t.Fatalf("unexpected failure reason: %q", result.FailureReason)
 	}
-	if !strings.Contains(result.FailureDetail, "17") {
-		t.Fatalf("expected failure detail to mention exit code, got %q", result.FailureDetail)
+	if !strings.Contains(result.FailureDetail, "tests failed") {
+		t.Fatalf("expected failure detail to mention diagnostics, got %q", result.FailureDetail)
+	}
+	if len(result.Metadata.LogFindings) == 0 {
+		t.Fatalf("expected failure diagnostics captured")
 	}
 }
 
@@ -122,4 +151,18 @@ func TestExecutorPropagatesRunnerError(t *testing.T) {
 	if !strings.Contains(execErr.Error(), "failed to start shift") {
 		t.Fatalf("unexpected error: %v", execErr)
 	}
+}
+
+func containsArg(args []string, flag string, value string) bool {
+	for i := 0; i < len(args); i++ {
+		if args[i] == flag {
+			if value == "" {
+				return true
+			}
+			if i+1 < len(args) && args[i+1] == value {
+				return true
+			}
+		}
+	}
+	return false
 }

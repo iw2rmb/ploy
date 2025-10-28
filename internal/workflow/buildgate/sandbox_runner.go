@@ -43,6 +43,8 @@ type SandboxBuildResult struct {
 	LogDigest     string
 	FailureReason string
 	FailureDetail string
+	Metadata      Metadata
+	Report        []byte
 }
 
 // SandboxOutcome summarises the sandbox execution for checkpoint metadata and callers.
@@ -53,6 +55,8 @@ type SandboxOutcome struct {
 	LogDigest     string
 	FailureReason string
 	FailureDetail string
+	Metadata      Metadata
+	Report        []byte
 }
 
 // SandboxExecutor executes sandbox builds.
@@ -130,6 +134,10 @@ func (r *SandboxRunner) Run(ctx context.Context, spec SandboxSpec) (SandboxOutco
 		Duration:  duration,
 		CacheHit:  result.CacheHit,
 		LogDigest: strings.TrimSpace(result.LogDigest),
+		Metadata:  Sanitize(result.Metadata),
+	}
+	if len(result.Report) > 0 {
+		outcome.Report = append(outcome.Report, result.Report...)
 	}
 
 	if result.Success && execErr == nil {

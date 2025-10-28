@@ -11,9 +11,9 @@
 
 ## 2. Worker Runtime & Job Execution
 
- - [x] 2.1 Replace the assignment polling client (`internal/api/controlplane.Client`) with a job-claim loop that hits `/v1/jobs/claim`, `/v1/jobs/{id}/heartbeat`, and `/v1/jobs/{id}/complete`; integrate the logstream hub so every container run emits SSE frames keyed by job ID.
-- [ ] 2.2 Wire the step runner: assemble the workspace hydrator, Docker runtime, diff capture, IPFS Cluster publisher, and SHIFT client inside a worker executor package; persist retention hints to etcd and stream them via SSE (`internal/node/logstream`).
-- [ ] 2.3 Implement real SHIFT integration per `docs/next/shift.md`: replace `noopSandboxExecutor` in `cmd/ploy/dependencies_runtime_local.go` with a sandbox executor that shells out to the standalone SHIFT binary/library, plumbs static-check adapters, and records structured reports in IPFS; add failure mapping to `buildgate` metadata.
+- [x] 2.1 Replace the assignment polling client (`internal/api/controlplane.Client`) with a job-claim loop that hits `/v1/jobs/claim`, `/v1/jobs/{id}/heartbeat`, and `/v1/jobs/{id}/complete`; integrate the logstream hub so every container run emits SSE frames keyed by job ID.
+- [x] 2.2 Wire the step runner: assemble the workspace hydrator, Docker runtime, diff capture, IPFS Cluster publisher, and SHIFT client inside a worker executor package; persist retention hints to etcd and stream them via SSE (`internal/node/logstream`).
+- [x] 2.3 Implement real SHIFT integration per `docs/next/shift.md`: replace `noopSandboxExecutor` in `cmd/ploy/dependencies_runtime_local.go` with a sandbox executor that shells out to the standalone SHIFT binary/library, and records structured reports in IPFS; add failure mapping to `buildgate` metadata.
 - [ ] 2.4 Support repository hydration and snapshot reuse on nodes: teach the workspace hydrator to pull base snapshots/diff CIDs from IPFS Cluster, materialise ordered diffs, and fall back to GitLab clones using credentials stored in etcd.
 - [ ] 2.5 Add node lifecycle controllers: expose `/v1/node/status`, `/v1/node/jobs`, `/v1/node/logs` in the worker HTTP surface; periodically publish capacity heartbeats (`nodes/<node-id>/capacity`), Docker/SHIFT health, and IPFS peer info so the control plane can schedule intelligently.
 
@@ -38,14 +38,13 @@
 ## 5. Migration & Cleanup
 
 - [ ] 5.1 Remove Grid dependencies: drop `github.com/iw2rmb/grid` from `go.mod`, delete Grid-specific packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
-- [ ] 5.2 Provide migration tooling: add scripts to drain legacy Grid workflows, backfill etcd with existing Mod tickets/artifacts, and document the cut-over sequence in `docs/next/migration.md`.
-- [ ] 5.3 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
-- [ ] 5.4 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/next/devops.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
+- [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
+- [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/next/devops.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
 
 ## 6. Testing & Release Readiness
 
 - [ ] 6.1 Establish TDD coverage for each slice: write unit tests for the new control-plane handlers, scheduler edge cases (leases, retries, retention), node executors, and CLI commands; maintain ≥60% overall coverage and ≥90% on critical workflow packages.
 - [ ] 6.2 Add integration suites: stand up multi-node scenarios in the VPS lab (`docs/next/vps-lab.md`) that exercise job submission, log streaming, artifact pinning, GC, GitLab credential rotation, and SSH tunnel failover; gate them behind `make test` targets.
 - [ ] 6.3 Introduce end-to-end smoke tests for `ploy mod run` against a seeded repository, verifying deterministic diffs, SHIFT enforcement, and artifact retrieval.
-- [ ] 6.4 Wire CI to the new workflow: ensure `make build`, `make test`, static checks, and formatting pass; add IPFS Cluster and etcd fixtures to CI if required.
+- [ ] 6.4 Wire CI to the new workflow: ensure `make build`, `make test`, and formatting pass; add IPFS Cluster and etcd fixtures to CI if required.
 - [ ] 6.5 Prepare release artefacts: update build pipelines to ship `ploy` and `ployd` binaries, embed the bootstrap script, and document version tagging/upgrade steps for operators.

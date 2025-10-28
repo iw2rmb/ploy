@@ -12,6 +12,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
+	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 )
 
 // TestClientClaimsJobAndExecutes verifies the client claims a job and runs the executor.
@@ -65,7 +66,36 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	exec := &stubExecutor{done: make(chan struct{}, 1)}
+	exec := &stubExecutor{
+		done: make(chan struct{}, 1),
+		result: controlplane.AssignmentResult{
+			State: "succeeded",
+			Artifacts: map[string]string{
+				"diff_cid":         "bafy-diff",
+				"shift_report_cid": "bafy-shift",
+			},
+			Bundles: map[string]scheduler.BundleRecord{
+				"logs": {
+					CID:       "bafy-logs",
+					Digest:    "sha256:logs",
+					Size:      1024,
+					Retained:  true,
+					TTL:       "24h",
+					ExpiresAt: "2025-10-28T12:00:00Z",
+				},
+				"shift_report": {
+					CID:    "bafy-shift",
+					Digest: "sha256:shift",
+					Size:   256,
+				},
+			},
+			Shift: &scheduler.ShiftMetrics{
+				Result:   scheduler.ShiftResultPassed,
+				Duration: 2 * time.Second,
+			},
+			Inspection: false,
+		},
+	}
 	cfg := config.ControlPlaneConfig{
 		Endpoint:               srv.URL,
 		NodeID:                 "node-1",
@@ -112,6 +142,39 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 	}
 	if completion["state"] != "succeeded" {
 		t.Fatalf("expected succeeded completion, got %v", completion["state"])
+	}
+	artifacts, ok := completion["artifacts"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected artifacts map, got %T", completion["artifacts"])
+	}
+	if artifacts["diff_cid"] != "bafy-diff" {
+		t.Fatalf("unexpected diff cid: %v", artifacts["diff_cid"])
+	}
+	if artifacts["shift_report_cid"] != "bafy-shift" {
+		t.Fatalf("unexpected shift report cid: %v", artifacts["shift_report_cid"])
+	}
+	bundles, ok := completion["bundles"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected bundles map, got %T", completion["bundles"])
+	}
+	logBundle, ok := bundles["logs"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected logs bundle map, got %T", bundles["logs"])
+	}
+	if logBundle["cid"] != "bafy-logs" {
+		t.Fatalf("unexpected log cid: %v", logBundle["cid"])
+	}
+	if logBundle["ttl"] != "24h" {
+		t.Fatalf("unexpected log ttl: %v", logBundle["ttl"])
+	}
+	if shiftBundle, ok := bundles["shift_report"].(map[string]any); !ok || shiftBundle["cid"] != "bafy-shift" {
+		t.Fatalf("expected shift report bundle, got %v", bundles["shift_report"])
+	}
+	if shift, ok := completion["shift"].(map[string]any); !ok || shift["result"] != "passed" {
+		t.Fatalf("expected shift summary result passed, got %v", completion["shift"])
+	}
+	if inspection, _ := completion["inspection"].(bool); inspection {
+		t.Fatalf("expected inspection false, got true")
 	}
 
 	if err := client.Stop(context.Background()); err != nil {
@@ -215,13 +278,15 @@ func TestClientReloadUpdatesConfig(t *testing.T) {
 }
 
 type stubExecutor struct {
-	mu   sync.Mutex
-	jobs []controlplane.Assignment
-	done chan struct{}
+	mu     sync.Mutex
+	jobs   []controlplane.Assignment
+	done   chan struct{}
+	result controlplane.AssignmentResult
+	err    error
 }
 
 // Execute records the assignment and optionally signals completion.
-func (s *stubExecutor) Execute(ctx context.Context, assignment controlplane.Assignment) error {
+func (s *stubExecutor) Execute(ctx context.Context, assignment controlplane.Assignment) (controlplane.AssignmentResult, error) {
 	_ = ctx
 	s.mu.Lock()
 	s.jobs = append(s.jobs, assignment)
@@ -232,7 +297,7 @@ func (s *stubExecutor) Execute(ctx context.Context, assignment controlplane.Assi
 		default:
 		}
 	}
-	return nil
+	return s.result, s.err
 }
 
 // count returns the number of assignments executed.
