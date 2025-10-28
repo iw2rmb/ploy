@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,10 @@ func (s *controlPlaneServer) handleJobLogs(w http.ResponseWriter, r *http.Reques
 	switch parts[0] {
 	case "stream":
 		s.handleJobLogsStream(w, r, jobID)
+	case "snapshot":
+		s.handleJobLogsSnapshot(w, r, jobID)
+	case "entries":
+		s.handleJobLogsEntry(w, r, jobID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -49,6 +54,95 @@ func (s *controlPlaneServer) handleJobLogsStream(w http.ResponseWriter, r *http.
 		}
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 	}
+}
+
+// handleJobLogsSnapshot returns a JSON snapshot of buffered log events.
+func (s *controlPlaneServer) handleJobLogsSnapshot(w http.ResponseWriter, r *http.Request, jobID string) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.streams == nil {
+		http.Error(w, "log streaming unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	events, err := s.snapshotLogStream(r.Context(), jobID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	dto := buildLogEventDTOs(events)
+	writeJSON(w, http.StatusOK, map[string]any{"events": dto})
+}
+
+// handleJobLogsEntry appends log records emitted by workers.
+func (s *controlPlaneServer) handleJobLogsEntry(w http.ResponseWriter, r *http.Request, jobID string) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.streams == nil {
+		http.Error(w, "log streaming unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if s.scheduler == nil {
+		http.Error(w, "scheduler unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	defer r.Body.Close()
+
+	var req struct {
+		Ticket    string `json:"ticket"`
+		NodeID    string `json:"node_id"`
+		Stream    string `json:"stream"`
+		Line      string `json:"line"`
+		Timestamp string `json:"timestamp"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+	req.Ticket = strings.TrimSpace(req.Ticket)
+	req.NodeID = strings.TrimSpace(req.NodeID)
+	req.Stream = strings.TrimSpace(req.Stream)
+	if req.Stream == "" {
+		req.Stream = "stdout"
+	}
+	if req.Ticket == "" || req.NodeID == "" {
+		http.Error(w, "ticket and node_id required", http.StatusBadRequest)
+		return
+	}
+
+	job, err := s.scheduler.GetJob(r.Context(), req.Ticket, jobID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	if claimed := strings.TrimSpace(job.ClaimedBy); claimed != "" && !strings.EqualFold(claimed, req.NodeID) {
+		http.Error(w, "node mismatch", http.StatusConflict)
+		return
+	}
+
+	timestamp := strings.TrimSpace(req.Timestamp)
+	if timestamp != "" {
+		if _, err := time.Parse(time.RFC3339Nano, timestamp); err != nil {
+			http.Error(w, "invalid timestamp", http.StatusBadRequest)
+			return
+		}
+	} else {
+		timestamp = time.Now().UTC().Format(time.RFC3339Nano)
+	}
+
+	record := logstream.LogRecord{
+		Timestamp: timestamp,
+		Stream:    req.Stream,
+		Line:      req.Line,
+	}
+	if err := s.streams.PublishLog(r.Context(), jobID, record); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 // handleJobEvents streams job state changes via Server-Sent Events.

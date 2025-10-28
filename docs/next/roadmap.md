@@ -11,7 +11,7 @@
 
 ## 2. Worker Runtime & Job Execution
 
-- [ ] 2.1 Replace the assignment polling client (`internal/api/controlplane.Client`) with a job-claim loop that hits `/v1/jobs/claim`, `/v1/jobs/{id}/heartbeat`, and `/v1/jobs/{id}/complete`; integrate the logstream hub so every container run emits SSE frames keyed by job ID.
+ - [x] 2.1 Replace the assignment polling client (`internal/api/controlplane.Client`) with a job-claim loop that hits `/v1/jobs/claim`, `/v1/jobs/{id}/heartbeat`, and `/v1/jobs/{id}/complete`; integrate the logstream hub so every container run emits SSE frames keyed by job ID.
 - [ ] 2.2 Wire the step runner: assemble the workspace hydrator, Docker runtime, diff capture, IPFS Cluster publisher, and SHIFT client inside a worker executor package; persist retention hints to etcd and stream them via SSE (`internal/node/logstream`).
 - [ ] 2.3 Implement real SHIFT integration per `docs/next/shift.md`: replace `noopSandboxExecutor` in `cmd/ploy/dependencies_runtime_local.go` with a sandbox executor that shells out to the standalone SHIFT binary/library, plumbs static-check adapters, and records structured reports in IPFS; add failure mapping to `buildgate` metadata.
 - [ ] 2.4 Support repository hydration and snapshot reuse on nodes: teach the workspace hydrator to pull base snapshots/diff CIDs from IPFS Cluster, materialise ordered diffs, and fall back to GitLab clones using credentials stored in etcd.

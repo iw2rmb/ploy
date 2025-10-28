@@ -45,6 +45,9 @@ addendum:
 - Use descriptive names (`workflow_runner_test.go`, `event_contract_test.go`).
 - Avoid catch-all suffixes such as `_more_test.go` or `_extra_test.go`.
 
+### Deployment Scope
+
+- The VPS lab is the sole environment; no production migration or backward compatibility is required. Prior changes can assume fresh redeploys.
 ## Environment Variables
 
 - Keep the canonical list of required variables in `docs/envs/README.md` and

@@ -199,6 +199,15 @@ func (h *Hub) getStream(streamID string) *stream {
 	return stream
 }
 
+// Snapshot returns a copy of buffered events for the stream.
+func (h *Hub) Snapshot(streamID string) []Event {
+	stream := h.getStream(streamID)
+	if stream == nil {
+		return nil
+	}
+	return stream.snapshot()
+}
+
 type normalizedOptions struct {
 	buffer  int
 	history int
@@ -231,6 +240,17 @@ type stream struct {
 	nextEventID int64
 	nextSubID   int
 	closed      bool
+}
+
+func (s *stream) snapshot() []Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.history) == 0 {
+		return nil
+	}
+	out := make([]Event, len(s.history))
+	copy(out, s.history)
+	return out
 }
 
 func newStream(id string, opts normalizedOptions) *stream {

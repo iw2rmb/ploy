@@ -53,6 +53,10 @@ type ControlPlaneConfig struct {
 	MetricsEndpoint         string        `yaml:"metrics_endpoint"`
 	AdminEndpoint           string        `yaml:"admin_endpoint"`
 	ControlPlaneCACachePath string        `yaml:"control_plane_ca_cache_path"`
+	JobClaimEndpoint        string        `yaml:"job_claim_endpoint"`
+	JobHeartbeatEndpoint    string        `yaml:"job_heartbeat_endpoint"`
+	JobCompleteEndpoint     string        `yaml:"job_complete_endpoint"`
+	JobLogEndpoint          string        `yaml:"job_log_endpoint"`
 }
 
 // PKIConfig configures PKI renewal.
