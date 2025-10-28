@@ -72,8 +72,13 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 
 	logArtifact := PublishedArtifact{CID: "bafy-logs", Kind: ArtifactKindLogs, Digest: "sha256:fixture"}
 	result, err := client.Validate(context.Background(), ShiftRequest{
-		Manifest:    manifest,
-		Workspace:   Workspace{WorkingDir: "/tmp/workspace"},
+		Manifest: manifest,
+		Workspace: Workspace{
+			Inputs: map[string]string{
+				"overlay": "/tmp/workspace",
+			},
+			WorkingDir: "/workspace",
+		},
 		LogArtifact: &logArtifact,
 	})
 	if err != nil {
@@ -93,6 +98,9 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 	}
 	if runner.specs[0].LogArtifact == nil {
 		t.Fatalf("expected log artifact to be requested in run spec")
+	}
+	if runner.specs[0].Sandbox.Workspace != "/tmp/workspace" {
+		t.Fatalf("expected workspace in sandbox spec, got %q", runner.specs[0].Sandbox.Workspace)
 	}
 }
 

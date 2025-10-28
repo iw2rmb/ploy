@@ -9,6 +9,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
+	"github.com/iw2rmb/ploy/internal/workflow/buildgate/shift"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
@@ -122,20 +123,11 @@ func parseEnvInt(name string) int {
 }
 
 func newBuildGateShiftClient() (step.ShiftClient, error) {
-	sandbox := buildgate.NewSandboxRunner(noopSandboxExecutor{}, buildgate.SandboxRunnerOptions{})
-	gateRunner := &buildgate.Runner{
-		Sandbox: sandbox,
+	executor, err := shift.NewExecutor(shift.Options{})
+	if err != nil {
+		return nil, err
 	}
+	sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
+	gateRunner := &buildgate.Runner{Sandbox: sandbox}
 	return step.NewBuildGateShiftClient(step.BuildGateShiftOptions{Runner: gateRunner})
-}
-
-type noopSandboxExecutor struct{}
-
-func (noopSandboxExecutor) Execute(ctx context.Context, spec buildgate.SandboxSpec) (buildgate.SandboxBuildResult, error) {
-	_ = ctx
-	_ = spec
-	return buildgate.SandboxBuildResult{
-		Success:  true,
-		CacheHit: false,
-	}, nil
 }

@@ -33,6 +33,7 @@ type SandboxSpec struct {
 	Env          map[string]string
 	Timeout      time.Duration
 	ForceRebuild bool
+	Workspace    string
 }
 
 // SandboxBuildResult captures the output of the sandbox executor.

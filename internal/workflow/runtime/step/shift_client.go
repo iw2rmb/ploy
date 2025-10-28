@@ -40,10 +40,22 @@ func (c *BuildGateShiftClient) Validate(ctx context.Context, req ShiftRequest) (
 	if c == nil || c.runner == nil {
 		return ShiftResult{}, fmt.Errorf("shift: build gate runner not configured")
 	}
+	workspacePath := resolveWorkspacePath(req.Manifest, req.Workspace)
+	env := cloneShiftEnv(req.Manifest.Shift)
+	if env == nil {
+		env = make(map[string]string)
+	}
+	if req.Manifest.Shift != nil {
+		if profile := strings.TrimSpace(req.Manifest.Shift.Profile); profile != "" {
+			env["PLOY_SHIFT_PROFILE"] = profile
+		}
+	}
+
 	spec := buildgate.RunSpec{
 		Sandbox: buildgate.SandboxSpec{
-			CacheKey: buildSandboxCacheKey(req.Manifest),
-			Env:      cloneShiftEnv(req.Manifest.Shift),
+			CacheKey:  buildSandboxCacheKey(req.Manifest),
+			Env:       env,
+			Workspace: workspacePath,
 		},
 	}
 	if req.LogArtifact != nil && strings.TrimSpace(req.LogArtifact.CID) != "" {
@@ -117,6 +129,25 @@ func cloneShiftEnv(spec *contracts.StepShiftSpec) map[string]string {
 		env[key] = spec.Env[key]
 	}
 	return env
+}
+
+func resolveWorkspacePath(manifest contracts.StepManifest, workspace Workspace) string {
+	if len(workspace.Inputs) == 0 {
+		return ""
+	}
+	for _, input := range manifest.Inputs {
+		if input.Mode == contracts.StepInputModeReadWrite {
+			if path := strings.TrimSpace(workspace.Inputs[input.Name]); path != "" {
+				return path
+			}
+		}
+	}
+	for _, path := range workspace.Inputs {
+		if trimmed := strings.TrimSpace(path); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func collectBuildGateFailures(result buildgate.RunResult, metadata buildgate.Metadata) []string {
