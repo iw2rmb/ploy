@@ -162,6 +162,64 @@ func TestLogsStreamDeliversEvents(t *testing.T) {
 	}
 }
 
+func TestJobLogEntriesAppend(t *testing.T) {
+	t.Parallel()
+
+	etcd, client := startTestEtcd(t)
+	defer etcd.Close()
+	defer func() { _ = client.Close() }()
+
+	sched, err := scheduler.New(client, scheduler.Options{LeaseTTL: 3 * time.Second})
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+	defer func() { _ = sched.Close() }()
+
+	streams := logstream.NewHub(logstream.Options{BufferSize: 8, HistorySize: 16})
+	server := httptest.NewServer(newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
+		Scheduler: sched,
+		Streams:   streams,
+		Etcd:      client,
+	}))
+	defer server.Close()
+
+	submit := map[string]any{
+		"ticket":       "mod-logs",
+		"step_id":      "capture",
+		"priority":     "default",
+		"max_attempts": 1,
+	}
+	job := postJSON(t, server.URL+"/v1/jobs", submit)
+	jobID := job["id"].(string)
+
+	claim := postJSON(t, server.URL+"/v1/jobs/claim", map[string]any{"node_id": "node-stream"})
+	if claim["status"].(string) != "claimed" {
+		t.Fatalf("claim failed: %v", claim)
+	}
+
+	status, _ := postJSONStatus(t, fmt.Sprintf("%s/v1/jobs/%s/logs/entries", server.URL, jobID), map[string]any{
+		"ticket":    "mod-logs",
+		"node_id":   "node-stream",
+		"stream":    "stdout",
+		"line":      "worker log line",
+		"timestamp": time.Date(2025, 10, 27, 21, 0, 0, 0, time.UTC).Format(time.RFC3339Nano),
+	})
+	if status != http.StatusAccepted {
+		t.Fatalf("expected 202 Accepted, got %d", status)
+	}
+
+	snapshot := getJSON(t, fmt.Sprintf("%s/v1/jobs/%s/logs/snapshot", server.URL, jobID))
+	events, ok := snapshot["events"].([]any)
+	if !ok || len(events) == 0 {
+		t.Fatalf("expected log events, got %v", snapshot)
+	}
+	first := events[0].(map[string]any)
+	data := first["data"].(map[string]any)
+	if data["line"].(string) != "worker log line" {
+		t.Fatalf("unexpected log line: %+v", data)
+	}
+}
+
 func TestLogsStreamResumesWithLastEventID(t *testing.T) {
 	t.Parallel()
 

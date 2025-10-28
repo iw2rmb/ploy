@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log"
@@ -83,12 +85,19 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	exec := executor.New(executor.Options{
 		Registry:       registry,
 		DefaultAdapter: cfg.Runtime.DefaultAdapter,
+		LogStreams:     streams,
 	})
 
+	httpClient, err := newControlPlaneHTTPClient(cfg.ControlPlane)
+	if err != nil {
+		return nil, err
+	}
+
 	controlClient, err := controlplane.New(controlplane.Options{
-		Config:   cfg.ControlPlane,
-		Executor: exec,
-		Status:   statusProvider,
+		Config:     cfg.ControlPlane,
+		Executor:   exec,
+		Status:     statusProvider,
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return nil, err
@@ -150,6 +159,48 @@ func ensureFile(path string) error {
 
 func buildAdminService() httpserver.AdminService {
 	return &admin.Service{EtcdEndpoints: etcdutil.LocalEndpoints()}
+}
+
+func newControlPlaneHTTPClient(cfg config.ControlPlaneConfig) (*http.Client, error) {
+	timeout := 15 * time.Second
+	endpoint := strings.TrimSpace(cfg.Endpoint)
+	if !strings.HasPrefix(strings.ToLower(endpoint), "https://") {
+		return nil, errors.New("control-plane: https endpoint required")
+	}
+	tlsCfg := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	caPath := strings.TrimSpace(cfg.CAPath)
+	if caPath == "" {
+		return nil, errors.New("control-plane: ca path required")
+	}
+	caBytes, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("control-plane: load ca %s: %w", caPath, err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caBytes) {
+		return nil, fmt.Errorf("control-plane: invalid ca bundle %s", caPath)
+	}
+	tlsCfg.RootCAs = pool
+
+	certPath := strings.TrimSpace(cfg.Certificate)
+	keyPath := strings.TrimSpace(cfg.Key)
+	if certPath == "" || keyPath == "" {
+		return nil, errors.New("control-plane: client certificate and key required")
+	}
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("control-plane: load client certificate: %w", err)
+	}
+	tlsCfg.Certificates = []tls.Certificate{cert}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = tlsCfg
+	return &http.Client{
+		Timeout:   timeout,
+		Transport: transport,
+	}, nil
 }
 
 func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Handler, func(context.Context) error, error) {

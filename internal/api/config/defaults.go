@@ -102,6 +102,18 @@ func applyDefaults(cfg *Config) {
 	if strings.TrimSpace(cfg.ControlPlane.NodeStatusEndpoint) == "" {
 		cfg.ControlPlane.NodeStatusEndpoint = "/v1/nodes"
 	}
+	if strings.TrimSpace(cfg.ControlPlane.JobClaimEndpoint) == "" {
+		cfg.ControlPlane.JobClaimEndpoint = "/v1/jobs/claim"
+	}
+	if strings.TrimSpace(cfg.ControlPlane.JobHeartbeatEndpoint) == "" {
+		cfg.ControlPlane.JobHeartbeatEndpoint = "/v1/jobs"
+	}
+	if strings.TrimSpace(cfg.ControlPlane.JobCompleteEndpoint) == "" {
+		cfg.ControlPlane.JobCompleteEndpoint = "/v1/jobs"
+	}
+	if strings.TrimSpace(cfg.ControlPlane.JobLogEndpoint) == "" {
+		cfg.ControlPlane.JobLogEndpoint = "/v1/jobs"
+	}
 
 	if cfg.ControlPlane.AssignmentBatchSize <= 0 {
 		cfg.ControlPlane.AssignmentBatchSize = 1

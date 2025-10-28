@@ -1,11 +1,14 @@
 package httpserver
 
 import (
-	"errors"
-	"net/http"
-	"time"
+    "errors"
+    "log"
+    "net/http"
+    "strings"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+    "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+    "github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // handleJobSubmit enqueues a new job via the scheduler.
@@ -57,12 +60,15 @@ func (s *controlPlaneServer) handleClaim(w http.ResponseWriter, r *http.Request)
 	res, err := s.scheduler.ClaimNext(r.Context(), scheduler.ClaimRequest{NodeID: req.NodeID})
 	if err != nil {
 		if errors.Is(err, scheduler.ErrNoJobs) {
+			log.Printf("control-plane: no jobs available for node %s", strings.TrimSpace(req.NodeID))
 			writeJSON(w, http.StatusOK, map[string]any{"status": "empty"})
 			return
 		}
+		log.Printf("control-plane: claim error for node %s: %v", strings.TrimSpace(req.NodeID), err)
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
+	log.Printf("control-plane: node %s claimed job %s (ticket=%s)", res.NodeID, res.Job.ID, res.Job.Ticket)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "claimed",
 		"node_id": res.NodeID,
@@ -135,20 +141,30 @@ func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Re
 			Duration: d,
 		}
 	}
-	job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
-		JobID:      jobID,
-		Ticket:     req.Ticket,
-		NodeID:     req.NodeID,
-		State:      scheduler.JobState(req.State),
-		Artifacts:  req.Artifacts,
-		Bundles:    req.Bundles,
-		Error:      req.Error,
-		Inspection: req.Inspection,
-		Shift:      shiftMetrics,
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusConflict)
-		return
-	}
-	writeJSON(w, http.StatusOK, jobDTOFrom(job))
+    job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
+        JobID:      jobID,
+        Ticket:     req.Ticket,
+        NodeID:     req.NodeID,
+        State:      scheduler.JobState(req.State),
+        Artifacts:  req.Artifacts,
+        Bundles:    req.Bundles,
+        Error:      req.Error,
+        Inspection: req.Inspection,
+        Shift:      shiftMetrics,
+    })
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusConflict)
+        return
+    }
+    writeJSON(w, http.StatusOK, jobDTOFrom(job))
+    if s.streams != nil {
+        status := "completed"
+        switch job.State {
+        case scheduler.JobStateFailed:
+            status = "failed"
+        case scheduler.JobStateInspectionReady:
+            status = "inspection_ready"
+        }
+        _ = s.streams.PublishStatus(r.Context(), jobID, logstream.Status{Status: status})
+    }
 }

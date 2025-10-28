@@ -16,6 +16,9 @@ func modsLogStreamID(ticketID string) string {
 }
 
 func (s *controlPlaneServer) snapshotLogStream(ctx context.Context, streamID string) ([]logstream.Event, error) {
+	if events := s.streams.Snapshot(streamID); len(events) > 0 {
+		return events, nil
+	}
 	sub, err := s.streams.Subscribe(ctx, streamID, 0)
 	if err != nil {
 		return nil, err
