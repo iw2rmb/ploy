@@ -33,7 +33,8 @@ configuration.
   step runtime and the control-plane artifact publisher. Workstations still
   read this value when executing Mods locally, but `ploy artifact *`, `ploy upload`,
   and `ploy report` routes now talk to the control plane instead of hitting the
-  cluster directly.
+  cluster directly. **Required on ployd worker nodes** so the step executor can
+  publish diff/log bundles after each job.
 - `PLOY_IPFS_CLUSTER_TOKEN` — Optional bearer token passed to the cluster when
   authenticating artifact requests.
 - `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Optional

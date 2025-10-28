@@ -96,6 +96,15 @@ func TestWorkflowTicketValidate(t *testing.T) {
 	if err := badRepo.Validate(); err == nil {
 		t.Fatal("expected repo validation error when target ref missing")
 	}
+
+	commitOnly := valid
+	commitOnly.Repo = RepoMaterialization{
+		URL:    "https://gitlab.com/iw2rmb/sample.git",
+		Commit: "abcdef1234567890",
+	}
+	if err := commitOnly.Validate(); err != nil {
+		t.Fatalf("expected repo with commit to validate, got %v", err)
+	}
 }
 
 func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {

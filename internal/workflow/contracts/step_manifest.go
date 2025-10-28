@@ -51,6 +51,7 @@ type StepInput struct {
 	Mode        StepInputMode
 	SnapshotCID string
 	DiffCID     string
+	Hydration   *StepInputHydration
 }
 
 // StepOutput describes expected paths produced by the container.
@@ -71,6 +72,20 @@ type StepShiftSpec struct {
 	Enabled bool
 	Profile string
 	Env     map[string]string
+}
+
+// StepInputHydration describes how to materialise repository state for an input.
+type StepInputHydration struct {
+	BaseSnapshot StepInputArtifactRef   `json:"base_snapshot,omitempty"`
+	Diffs        []StepInputArtifactRef `json:"diffs,omitempty"`
+	Repo         *RepoMaterialization   `json:"repo,omitempty"`
+}
+
+// StepInputArtifactRef references a snapshot or diff artifact.
+type StepInputArtifactRef struct {
+	CID    string `json:"cid"`
+	Digest string `json:"digest,omitempty"`
+	Size   int64  `json:"size,omitempty"`
 }
 
 // StepResourceSpec captures runtime resource hints.
@@ -152,8 +167,17 @@ func (m StepManifest) Validate() error {
 		}
 		hasSnapshot := strings.TrimSpace(input.SnapshotCID) != ""
 		hasDiff := strings.TrimSpace(input.DiffCID) != ""
-		if hasSnapshot == hasDiff {
-			return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
+		if input.Hydration != nil {
+			if err := input.Hydration.validate(fmt.Sprintf("%s hydration", position)); err != nil {
+				return err
+			}
+		}
+		if input.Hydration == nil {
+			if hasSnapshot == hasDiff {
+				return fmt.Errorf("%s must reference exactly one source (snapshot or diff)", position)
+			}
+		} else if !hasSnapshot && !hasDiff && !input.Hydration.hasSource() {
+			return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
 		}
 	}
 	if m.Shift != nil {
@@ -183,5 +207,46 @@ func (m StepManifest) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (h StepInputHydration) hasSource() bool {
+	if strings.TrimSpace(h.BaseSnapshot.CID) != "" {
+		return true
+	}
+	if len(h.Diffs) > 0 {
+		return true
+	}
+	if h.Repo != nil && strings.TrimSpace(h.Repo.URL) != "" {
+		return true
+	}
+	return false
+}
+
+func (h StepInputHydration) validate(position string) error {
+	hasBase := strings.TrimSpace(h.BaseSnapshot.CID) != ""
+	for idx, diff := range h.Diffs {
+		if strings.TrimSpace(diff.CID) == "" {
+			return fmt.Errorf("%s diff[%d] cid required", position, idx)
+		}
+		if diffDigest := strings.TrimSpace(diff.Digest); diffDigest != "" && !strings.HasPrefix(diffDigest, "sha256:") {
+			return fmt.Errorf("%s diff[%d] digest must be sha256", position, idx)
+		}
+	}
+	if hasBase {
+		if strings.TrimSpace(h.BaseSnapshot.Digest) != "" && !strings.HasPrefix(strings.TrimSpace(h.BaseSnapshot.Digest), "sha256:") {
+			return fmt.Errorf("%s base snapshot digest must be sha256", position)
+		}
+	} else if len(h.Diffs) > 0 && (h.Repo == nil || strings.TrimSpace(h.Repo.URL) == "") {
+		return fmt.Errorf("%s base snapshot cid required when diffs are provided", position)
+	}
+	if h.Repo != nil {
+		if err := h.Repo.Validate(); err != nil {
+			return fmt.Errorf("%s repo invalid: %w", position, err)
+		}
+	}
+	if !hasBase && len(h.Diffs) == 0 && (h.Repo == nil || strings.TrimSpace(h.Repo.URL) == "") {
+		return fmt.Errorf("%s requires base snapshot, diffs, or repo metadata", position)
+	}
 	return nil
 }

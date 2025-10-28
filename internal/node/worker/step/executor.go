@@ -1,10 +1,13 @@
 package stepworker
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/node/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate/shift"
@@ -69,20 +73,13 @@ func New(opts Options) (*Executor, error) {
 }
 
 // FromConfig assembles a step executor using daemon configuration.
-func FromConfig(cfg config.Config, streams *logstream.Hub) (*Executor, error) {
-	hydrator, err := stepruntime.NewFilesystemWorkspaceHydrator(stepruntime.FilesystemWorkspaceHydratorOptions{
-		ArtifactRoot: strings.TrimSpace(cfg.Worker.ArtifactDir),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("stepworker: workspace hydrator: %w", err)
-	}
-
-	diffGen := stepruntime.NewFilesystemDiffGenerator(stepruntime.FilesystemDiffGeneratorOptions{})
-
+func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Client) (*Executor, error) {
 	clusterClient, err := newClusterClient(cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	artifactFetcher := &clusterFetcher{client: clusterClient}
 
 	publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
 		Client: clusterClient,
@@ -90,6 +87,42 @@ func FromConfig(cfg config.Config, streams *logstream.Hub) (*Executor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stepworker: cluster publisher: %w", err)
 	}
+
+	var tokenSource hydration.TokenSource
+	if httpClient != nil {
+		baseEndpoint := strings.TrimSpace(cfg.ControlPlane.Endpoint)
+		nodeID := strings.TrimSpace(cfg.ControlPlane.NodeID)
+		if baseEndpoint != "" && nodeID != "" {
+			src, err := hydration.NewSignerTokenSource(hydration.SignerTokenSourceOptions{
+				BaseURL:    baseEndpoint,
+				NodeID:     nodeID,
+				HTTPClient: httpClient,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("stepworker: gitlab token source: %w", err)
+			}
+			tokenSource = src
+		}
+	}
+
+	repoFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
+		Publisher:   publisher,
+		TokenSource: tokenSource,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stepworker: git fetcher: %w", err)
+	}
+
+	hydrator, err := stepruntime.NewFilesystemWorkspaceHydrator(stepruntime.FilesystemWorkspaceHydratorOptions{
+		ArtifactRoot: strings.TrimSpace(cfg.Worker.ArtifactDir),
+		Fetcher:      artifactFetcher,
+		RepoFetcher:  repoFetcher,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stepworker: workspace hydrator: %w", err)
+	}
+
+	diffGen := stepruntime.NewFilesystemDiffGenerator(stepruntime.FilesystemDiffGeneratorOptions{})
 
 	containerRuntime, err := stepruntime.NewDockerContainerRuntime(stepruntime.DockerContainerRuntimeOptions{
 		PullImage: true,
@@ -358,6 +391,27 @@ func resolveConfigInt(cfg config.Config, key string) int {
 		return 0
 	}
 	return num
+}
+
+type clusterFetcher struct {
+	client *artifacts.ClusterClient
+}
+
+func (f *clusterFetcher) Fetch(ctx context.Context, cid string) (stepruntime.RemoteArtifact, error) {
+	if f == nil || f.client == nil {
+		return stepruntime.RemoteArtifact{}, errors.New("stepworker: artifact fetcher not configured")
+	}
+	result, err := f.client.Fetch(ctx, cid)
+	if err != nil {
+		return stepruntime.RemoteArtifact{}, err
+	}
+	reader := bytes.NewReader(result.Data)
+	return stepruntime.RemoteArtifact{
+		CID:     result.CID,
+		Digest:  result.Digest,
+		Size:    result.Size,
+		Content: io.NopCloser(reader),
+	}, nil
 }
 
 // firstNonEmpty returns the first non-empty string in the provided list.

@@ -20,7 +20,7 @@ func TestExecutorResolvesRuntime(t *testing.T) {
 	}
 	exec := executor.New(executor.Options{Registry: registry, DefaultAdapter: "local"})
 	assignment := controlplane.Assignment{ID: "a1", Runtime: "local"}
-	if err := exec.Execute(context.Background(), assignment); err != nil {
+	if _, err := exec.Execute(context.Background(), assignment); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 }
@@ -28,7 +28,7 @@ func TestExecutorResolvesRuntime(t *testing.T) {
 func TestExecutorRequiresAdapter(t *testing.T) {
 	registry := workflowruntime.NewRegistry()
 	exec := executor.New(executor.Options{Registry: registry, DefaultAdapter: "local"})
-	if err := exec.Execute(context.Background(), controlplane.Assignment{ID: "a1"}); err == nil {
+	if _, err := exec.Execute(context.Background(), controlplane.Assignment{ID: "a1"}); err == nil {
 		t.Fatal("expected error for missing adapter")
 	}
 }
@@ -50,7 +50,7 @@ func TestExecutorPublishesLogsOnSuccess(t *testing.T) {
 		},
 	})
 	assign := controlplane.Assignment{ID: "job-1", Runtime: "local"}
-	if err := exec.Execute(context.Background(), assign); err != nil {
+	if _, err := exec.Execute(context.Background(), assign); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
 	sub, err := streams.Subscribe(context.Background(), "job-1", 0)
@@ -87,7 +87,7 @@ func TestExecutorPublishesFailure(t *testing.T) {
 		},
 	})
 	assign := controlplane.Assignment{ID: "job-fail", Runtime: "broken"}
-	if err := exec.Execute(context.Background(), assign); err == nil {
+	if _, err := exec.Execute(context.Background(), assign); err == nil {
 		t.Fatal("expected error from failing adapter")
 	}
 	sub, err := streams.Subscribe(context.Background(), "job-fail", 0)

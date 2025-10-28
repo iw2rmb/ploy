@@ -260,6 +260,8 @@ func defaultNameBuilder(kind step.ArtifactKind) string {
 		return fmt.Sprintf("logs-%s.txt", timestamp)
 	case step.ArtifactKindShiftReport:
 		return fmt.Sprintf("shift-report-%s.json", timestamp)
+	case step.ArtifactKindSnapshot:
+		return fmt.Sprintf("snapshot-%s.tar", timestamp)
 	default:
 		return fmt.Sprintf("artifact-%s.bin", timestamp)
 	}

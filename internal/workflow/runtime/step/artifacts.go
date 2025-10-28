@@ -24,6 +24,8 @@ const (
 	ArtifactKindLogs ArtifactKind = "logs"
 	// ArtifactKindShiftReport identifies SHIFT execution reports.
 	ArtifactKindShiftReport ArtifactKind = "shift_report"
+	// ArtifactKindSnapshot identifies repository snapshot archives.
+	ArtifactKindSnapshot ArtifactKind = "snapshot"
 )
 
 // PublishedArtifact references a stored artifact.
