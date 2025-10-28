@@ -10,6 +10,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
@@ -19,6 +20,7 @@ type Options struct {
 	DefaultAdapter string
 	LogStreams     *logstream.Hub
 	Clock          func() time.Time
+	Worker         *stepworker.Executor
 }
 
 // Executor resolves runtime adapters to process assignments.
@@ -27,6 +29,7 @@ type Executor struct {
 	defaultAdapter string
 	streams        *logstream.Hub
 	now            func() time.Time
+	worker         *stepworker.Executor
 }
 
 // New constructs an Executor instance.
@@ -41,13 +44,15 @@ func New(opts Options) *Executor {
 		defaultAdapter: adapter,
 		streams:        opts.LogStreams,
 		now:            now,
+		worker:         opts.Worker,
 	}
 }
 
 // Execute resolves the target runtime and establishes a connection.
-func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignment) error {
-	if e == nil || e.registry == nil {
-		return errors.New("executor: registry not initialised")
+func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignment) (controlplane.AssignmentResult, error) {
+	var zero controlplane.AssignmentResult
+	if e == nil {
+		return zero, errors.New("executor: not initialised")
 	}
 	name := strings.ToLower(strings.TrimSpace(assignment.Runtime))
 	if name == "" {
@@ -84,27 +89,35 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
 		}
 	}
 
+	if e.worker != nil {
+		return e.worker.Execute(ctx, assignment)
+	}
+
+	if e.registry == nil {
+		return zero, errors.New("executor: registry not initialised")
+	}
+
 	if name == "" {
 		publishLog("executor: runtime unspecified")
 		publishStatus("failed")
-		return errors.New("executor: runtime not specified")
+		return zero, errors.New("executor: runtime not specified")
 	}
 
 	adapter, _, err := e.registry.Resolve(name)
 	if err != nil {
 		publishLog(fmt.Sprintf("executor: resolve runtime %q failed: %v", name, err))
 		publishStatus("failed")
-		return err
+		return zero, err
 	}
 
 	publishLog(fmt.Sprintf("executor: resolved runtime %s", name))
 	if _, err := adapter.Connect(ctx); err != nil {
 		publishLog(fmt.Sprintf("executor: connect runtime %s failed: %v", name, err))
 		publishStatus("failed")
-		return err
+		return zero, err
 	}
 
 	publishLog(fmt.Sprintf("executor: runtime %s connection established", name))
 	publishStatus("completed")
-	return nil
+	return zero, nil
 }

@@ -37,6 +37,7 @@ type RepoMaterialization struct {
 	URL           string `json:"url"`
 	BaseRef       string `json:"base_ref"`
 	TargetRef     string `json:"target_ref"`
+	Commit        string `json:"commit,omitempty"`
 	WorkspaceHint string `json:"workspace_hint,omitempty"`
 }
 
@@ -48,8 +49,8 @@ func (r RepoMaterialization) Validate() error {
 	if !strings.HasPrefix(strings.TrimSpace(r.URL), "http://") && !strings.HasPrefix(strings.TrimSpace(r.URL), "https://") && !strings.HasPrefix(strings.TrimSpace(r.URL), "git@") {
 		return fmt.Errorf("url must be http(s) or ssh")
 	}
-	if strings.TrimSpace(r.TargetRef) == "" {
-		return fmt.Errorf("target_ref is required when repo url is set")
+	if strings.TrimSpace(r.TargetRef) == "" && strings.TrimSpace(r.Commit) == "" {
+		return fmt.Errorf("target_ref or commit is required when repo url is set")
 	}
 	return nil
 }

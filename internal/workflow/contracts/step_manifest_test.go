@@ -22,6 +22,12 @@ func TestStepManifestValidate(t *testing.T) {
 				MountPath:   "/workspace",
 				Mode:        StepInputModeReadOnly,
 				SnapshotCID: "bafybaseline",
+				Hydration: &StepInputHydration{
+					BaseSnapshot: StepInputArtifactRef{
+						CID:    "bafybaseline",
+						Digest: "sha256:baseline",
+					},
+				},
 			},
 			{
 				Name:      "overlay",
@@ -79,8 +85,40 @@ func TestStepManifestValidate(t *testing.T) {
 			mutate: func(m *StepManifest) {
 				m.Inputs[1].DiffCID = ""
 				m.Inputs[1].SnapshotCID = ""
+				m.Inputs[1].Hydration = nil
 			},
 			wantErr: "inputs[1]",
+		},
+		{
+			name: "hydration missing base snapshot",
+			mutate: func(m *StepManifest) {
+				m.Inputs[0].SnapshotCID = ""
+				m.Inputs[0].Hydration = &StepInputHydration{
+					Diffs: []StepInputArtifactRef{
+						{CID: "bafy-diff-1"},
+					},
+				}
+			},
+			wantErr: "inputs[0]",
+		},
+		{
+			name: "hydration base with ordered diffs valid",
+			mutate: func(m *StepManifest) {
+				m.Inputs[0].Hydration = &StepInputHydration{
+					BaseSnapshot: StepInputArtifactRef{
+						CID:    "bafybaseline",
+						Digest: "sha256:baseline",
+					},
+					Diffs: []StepInputArtifactRef{
+						{CID: "bafy-diff-1", Digest: "sha256:diff1"},
+						{CID: "bafy-diff-2", Digest: "sha256:diff2"},
+					},
+					Repo: &RepoMaterialization{
+						URL:       "https://gitlab.example.com/group/project.git",
+						TargetRef: "refs/heads/main",
+					},
+				}
+			},
 		},
 		{
 			name: "duplicate input name",
@@ -154,6 +192,15 @@ func cloneManifest(src StepManifest) StepManifest {
 	if len(src.Inputs) > 0 {
 		clone.Inputs = make([]StepInput, len(src.Inputs))
 		copy(clone.Inputs, src.Inputs)
+		for i := range src.Inputs {
+			if src.Inputs[i].Hydration != nil {
+				h := *src.Inputs[i].Hydration
+				if len(src.Inputs[i].Hydration.Diffs) > 0 {
+					h.Diffs = append([]StepInputArtifactRef(nil), src.Inputs[i].Hydration.Diffs...)
+				}
+				clone.Inputs[i].Hydration = &h
+			}
+		}
 	}
 	if len(src.Env) > 0 {
 		clone.Env = make(map[string]string, len(src.Env))

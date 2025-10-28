@@ -36,6 +36,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
@@ -82,16 +83,22 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	exec := executor.New(executor.Options{
-		Registry:       registry,
-		DefaultAdapter: cfg.Runtime.DefaultAdapter,
-		LogStreams:     streams,
-	})
-
 	httpClient, err := newControlPlaneHTTPClient(cfg.ControlPlane)
 	if err != nil {
 		return nil, err
 	}
+
+	workerExec, err := stepworker.FromConfig(cfg, streams, httpClient)
+	if err != nil {
+		return nil, err
+	}
+
+	exec := executor.New(executor.Options{
+		Registry:       registry,
+		DefaultAdapter: cfg.Runtime.DefaultAdapter,
+		LogStreams:     streams,
+		Worker:         workerExec,
+	})
 
 	controlClient, err := controlplane.New(controlplane.Options{
 		Config:     cfg.ControlPlane,

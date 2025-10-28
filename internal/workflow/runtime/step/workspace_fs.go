@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -19,12 +20,19 @@ type FilesystemWorkspaceHydratorOptions struct {
 	// ArtifactRoot defines where snapshot and diff tarballs are stored. When empty, the hydrator
 	// resolves the root using XDG cache semantics.
 	ArtifactRoot string
+	// Fetcher resolves snapshot and diff artifacts from remote storage when missing locally.
+	Fetcher ArtifactFetcher
+	// RepoFetcher materialises repositories when no snapshot CID is provided.
+	RepoFetcher RepositoryFetcher
 }
 
 // FilesystemWorkspaceHydrator materialises step inputs by extracting snapshot and diff tarballs
 // from the local artifact cache.
 type FilesystemWorkspaceHydrator struct {
 	artifactRoot string
+	fetcher      ArtifactFetcher
+	repoFetcher  RepositoryFetcher
+	locks        sync.Map
 }
 
 // NewFilesystemWorkspaceHydrator constructs a workspace hydrator that reads artifacts from the filesystem.
@@ -40,7 +48,11 @@ func NewFilesystemWorkspaceHydrator(opts FilesystemWorkspaceHydratorOptions) (*F
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return nil, fmt.Errorf("step: ensure artifact root: %w", err)
 	}
-	return &FilesystemWorkspaceHydrator{artifactRoot: root}, nil
+	return &FilesystemWorkspaceHydrator{
+		artifactRoot: root,
+		fetcher:      opts.Fetcher,
+		repoFetcher:  opts.RepoFetcher,
+	}, nil
 }
 
 // Prepare hydrates the workspace for the provided manifest by extracting the referenced artifacts.
@@ -72,6 +84,10 @@ func (h *FilesystemWorkspaceHydrator) Prepare(ctx context.Context, req Workspace
 		}
 
 		switch {
+		case input.Hydration != nil:
+			if err := h.hydrateWithPlan(ctx, input, targetDir); err != nil {
+				return Workspace{}, fmt.Errorf("step: hydrate %s: %w", input.Name, err)
+			}
 		case strings.TrimSpace(input.SnapshotCID) != "":
 			if err := h.extractArtifact(ctx, snapshotArtifactPath(h.artifactRoot, input.SnapshotCID), targetDir); err != nil {
 				return Workspace{}, fmt.Errorf("step: hydrate snapshot %s: %w", input.SnapshotCID, err)

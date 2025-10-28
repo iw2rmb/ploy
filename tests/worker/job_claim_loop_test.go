@@ -11,6 +11,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
+	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 )
 
 // TestClientClaimsJobAndCompletes ensures the worker claims a job and reports completion.
@@ -344,15 +345,32 @@ func newStubExecutor(results <-chan error) *stubExecutor {
 }
 
 // Execute records the assignment and waits for the result channel.
-func (s *stubExecutor) Execute(ctx context.Context, assignment controlplane.Assignment) error {
+func (s *stubExecutor) Execute(ctx context.Context, assignment controlplane.Assignment) (controlplane.AssignmentResult, error) {
 	select {
 	case s.assignments <- assignment:
 	default:
 	}
 	select {
 	case err := <-s.results:
-		return err
+		if err != nil {
+			return controlplane.AssignmentResult{
+				State: string(scheduler.JobStateFailed),
+				Error: &controlplane.AssignmentError{
+					Reason:  "executor_error",
+					Message: err.Error(),
+				},
+			}, err
+		}
+		return controlplane.AssignmentResult{
+			State: string(scheduler.JobStateSucceeded),
+		}, nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return controlplane.AssignmentResult{
+			State: string(scheduler.JobStateFailed),
+			Error: &controlplane.AssignmentError{
+				Reason:  "executor_canceled",
+				Message: ctx.Err().Error(),
+			},
+		}, ctx.Err()
 	}
 }
