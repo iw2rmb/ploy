@@ -17,6 +17,14 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 				FailureReason: "tests",
 				FailureDetail: "go test ./... failed",
 				LogDigest:     "bafy-logs",
+				Metadata: buildgate.Metadata{
+					LogFindings: []buildgate.LogFinding{{
+						Code:     "shift.summary",
+						Severity: "info",
+						Message:  "lane lane.docker.jvm via docker",
+					}},
+				},
+				Report: []byte(`{"status":"failed"}`),
 			},
 			StaticChecks: []buildgate.StaticCheckReport{
 				{
@@ -50,7 +58,13 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 						}},
 					},
 				},
+				LogFindings: []buildgate.LogFinding{{
+					Code:     "shift.env",
+					Severity: "warning",
+					Message:  "Environment mismatch",
+				}},
 			},
+			Report: []byte(`{"status":"failed"}`),
 		},
 	}
 	client, err := NewBuildGateShiftClient(BuildGateShiftOptions{Runner: runner})
@@ -92,6 +106,12 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 	}
 	if len(result.Report) == 0 {
 		t.Fatalf("expected serialized report in ShiftResult")
+	}
+	if !strings.Contains(string(result.Report), `"metadata"`) {
+		t.Fatalf("expected metadata embedded in report, got %s", string(result.Report))
+	}
+	if !strings.Contains(string(result.Report), `"summary"`) {
+		t.Fatalf("expected summary embedded in report, got %s", string(result.Report))
 	}
 	if len(runner.specs) != 1 {
 		t.Fatalf("expected runner invoked once, got %d", len(runner.specs))

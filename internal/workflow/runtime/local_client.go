@@ -165,6 +165,14 @@ func convertPublishedArtifacts(result step.Result) []runner.Artifact {
 			MediaType:   "text/plain",
 		})
 	}
+	if strings.TrimSpace(result.ShiftArtifact.CID) != "" {
+		artifacts = append(artifacts, runner.Artifact{
+			Name:        string(step.ArtifactKindShiftReport),
+			ArtifactCID: strings.TrimSpace(result.ShiftArtifact.CID),
+			Digest:      strings.TrimSpace(result.ShiftArtifact.Digest),
+			MediaType:   "application/json",
+		})
+	}
 	if len(artifacts) == 0 {
 		return nil
 	}

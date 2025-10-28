@@ -37,6 +37,11 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 				Kind:   step.ArtifactKindLogs,
 				Digest: "sha256:beef",
 			},
+			ShiftArtifact: step.PublishedArtifact{
+				CID:    "bafy-shift",
+				Kind:   step.ArtifactKindShiftReport,
+				Digest: "sha256:feed",
+			},
 			ShiftReport: step.ShiftResult{
 				Passed:  false,
 				Message: "build gate failed: go vet reported errors",
@@ -76,14 +81,17 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 	if !strings.Contains(outcome.Message, "go vet") {
 		t.Fatalf("expected shift diagnostics propagated, got %q", outcome.Message)
 	}
-	if len(outcome.Artifacts) != 2 {
-		t.Fatalf("expected diff and log artifacts, got %d", len(outcome.Artifacts))
+	if len(outcome.Artifacts) != 3 {
+		t.Fatalf("expected diff, log, and shift artifacts, got %d", len(outcome.Artifacts))
 	}
 	if !containsArtifact(outcome.Artifacts, "diff", "bafy-diff") {
 		t.Fatalf("expected diff artifact in outcome, got %+v", outcome.Artifacts)
 	}
 	if !containsArtifact(outcome.Artifacts, "logs", "bafy-logs") {
 		t.Fatalf("expected log artifact in outcome, got %+v", outcome.Artifacts)
+	}
+	if !containsArtifact(outcome.Artifacts, "shift_report", "bafy-shift") {
+		t.Fatalf("expected shift artifact in outcome, got %+v", outcome.Artifacts)
 	}
 }
 
@@ -135,6 +143,11 @@ func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
 				Kind:   step.ArtifactKindLogs,
 				Digest: "sha256:babe",
 			},
+			ShiftArtifact: step.PublishedArtifact{
+				CID:    "bafy-shift-apply",
+				Kind:   step.ArtifactKindShiftReport,
+				Digest: "sha256:abba",
+			},
 			ShiftReport: step.ShiftResult{
 				Passed: true,
 			},
@@ -173,7 +186,7 @@ func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
 	if inv.RunID != stepRunner.result.ContainerID {
 		t.Fatalf("expected run id %q, got %q", stepRunner.result.ContainerID, inv.RunID)
 	}
-	if len(inv.Artifacts) != 2 {
+	if len(inv.Artifacts) != 3 {
 		t.Fatalf("expected artifacts recorded, got %d", len(inv.Artifacts))
 	}
 	if !containsArtifact(inv.Artifacts, "diff", "bafy-diff-apply") {
@@ -181,6 +194,9 @@ func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
 	}
 	if !containsArtifact(inv.Artifacts, "logs", "bafy-logs-apply") {
 		t.Fatalf("expected log artifact recorded, got %+v", inv.Artifacts)
+	}
+	if !containsArtifact(inv.Artifacts, "shift_report", "bafy-shift-apply") {
+		t.Fatalf("expected shift artifact recorded, got %+v", inv.Artifacts)
 	}
 	if inv.Evidence == nil {
 		t.Fatalf("expected evidence recorded")

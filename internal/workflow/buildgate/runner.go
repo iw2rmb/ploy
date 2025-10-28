@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // ErrRunnerSandboxMissing indicates the build gate runner is missing a sandbox runner dependency.
@@ -35,6 +36,7 @@ type RunResult struct {
 	StaticChecks []StaticCheckReport
 	Log          *LogIngestionResult
 	Metadata     Metadata
+	Report       []byte
 }
 
 // Run executes the sandbox build, static checks, and log ingestion according to the provided spec.
@@ -75,20 +77,28 @@ func (r *Runner) Run(ctx context.Context, spec RunSpec) (RunResult, error) {
 		result.Log = &ingestion
 	}
 
-	metadata := Metadata{
-		LogDigest:    sandboxOutcome.LogDigest,
-		StaticChecks: result.StaticChecks,
+	metadata := sandboxOutcome.Metadata
+	if strings.TrimSpace(metadata.LogDigest) == "" {
+		metadata.LogDigest = sandboxOutcome.LogDigest
+	}
+	if len(result.StaticChecks) > 0 {
+		metadata.StaticChecks = append(metadata.StaticChecks, result.StaticChecks...)
 	}
 	if result.Log != nil {
 		if result.Log.Digest != "" {
 			metadata.LogDigest = result.Log.Digest
 		}
-		metadata.LogFindings = result.Log.Findings
+		if len(result.Log.Findings) > 0 {
+			metadata.LogFindings = append(metadata.LogFindings, result.Log.Findings...)
+		}
 	}
 
 	sanitized := Sanitize(metadata)
 	result.Metadata = sanitized
 	result.StaticChecks = sanitized.StaticChecks
+	if len(sandboxOutcome.Report) > 0 {
+		result.Report = append(result.Report, sandboxOutcome.Report...)
+	}
 
 	return result, nil
 }

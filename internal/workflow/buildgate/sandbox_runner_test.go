@@ -64,6 +64,14 @@ func TestSandboxRunnerSuccessRecordsDurationAndCacheHit(t *testing.T) {
 		Success:   true,
 		CacheHit:  true,
 		LogDigest: "  sha256:abc123  ",
+		Metadata: buildgate.Metadata{
+			LogFindings: []buildgate.LogFinding{{
+				Code:     "shift.summary",
+				Severity: "info",
+				Message:  "lane lane.docker.jvm via docker",
+			}},
+		},
+		Report: []byte(`{"status":"success"}`),
 	}}
 
 	runner := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{
@@ -101,6 +109,12 @@ func TestSandboxRunnerSuccessRecordsDurationAndCacheHit(t *testing.T) {
 	}
 	if outcome.FailureReason != "" || outcome.FailureDetail != "" {
 		t.Fatalf("expected no failure metadata, got %#v", outcome)
+	}
+	if len(outcome.Metadata.LogFindings) != 1 {
+		t.Fatalf("expected metadata propagated, got %#v", outcome.Metadata)
+	}
+	if string(outcome.Report) != `{"status":"success"}` {
+		t.Fatalf("expected report propagated, got %q", outcome.Report)
 	}
 }
 

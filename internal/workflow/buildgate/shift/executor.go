@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
 )
@@ -81,24 +83,62 @@ func (e *executor) Execute(ctx context.Context, spec buildgate.SandboxSpec) (bui
 	}
 
 	buildResult := buildgate.SandboxBuildResult{
-		Success:   result.ExitCode == 0,
 		CacheHit:  false,
 		LogDigest: logDigest,
 	}
 
-	if result.ExitCode != 0 {
-		detail := strings.TrimSpace(result.Stderr)
-		if detail == "" {
-			detail = strings.TrimSpace(result.Stdout)
+	rawSummary := strings.TrimSpace(result.Stdout)
+	var summary *executionSummary
+	if rawSummary != "" {
+		if parsed, parseErr := parseExecutionSummary(rawSummary); parseErr == nil {
+			summary = &parsed
+			buildResult.Metadata = metadataFromSummary(parsed)
 		}
-		if detail == "" {
-			detail = fmt.Sprintf("shift CLI exited with code %d", result.ExitCode)
-		} else {
-			detail = fmt.Sprintf("shift CLI exited with code %d: %s", result.ExitCode, firstLine(detail))
+		if len(buildResult.Metadata.LogFindings) == 0 && strings.TrimSpace(result.Stderr) != "" {
+			buildResult.Metadata.LogFindings = append(buildResult.Metadata.LogFindings, buildgate.LogFinding{
+				Code:     "shift.stderr",
+				Severity: "error",
+				Message:  firstLine(result.Stderr),
+				Evidence: strings.TrimSpace(result.Stderr),
+			})
 		}
-		buildResult.FailureReason = "exit_code"
-		buildResult.FailureDetail = detail
+		buildResult.Report = []byte(rawSummary)
 	}
+
+	success := result.ExitCode == 0
+	if summary != nil {
+		if !strings.EqualFold(strings.TrimSpace(summary.Status), "success") {
+			success = false
+			if reason := strings.TrimSpace(summary.Status); reason != "" {
+				buildResult.FailureReason = reason
+			}
+			if detail := failureDetailFromSummary(*summary, result.Stderr, result.ExitCode); detail != "" {
+				buildResult.FailureDetail = detail
+			}
+		}
+	}
+
+	if !success {
+		if buildResult.FailureReason == "" {
+			buildResult.FailureReason = "exit_code"
+		}
+		if buildResult.FailureDetail == "" {
+			detail := strings.TrimSpace(result.Stderr)
+			if detail == "" {
+				detail = strings.TrimSpace(result.Stdout)
+			}
+			if detail == "" {
+				detail = fmt.Sprintf("shift CLI exited with code %d", result.ExitCode)
+			} else {
+				detail = fmt.Sprintf("shift CLI exited with code %d: %s", result.ExitCode, firstLine(detail))
+			}
+			buildResult.FailureDetail = detail
+		}
+	} else {
+		buildResult.FailureReason = ""
+		buildResult.FailureDetail = ""
+	}
+	buildResult.Success = success
 
 	return buildResult, nil
 }
@@ -124,6 +164,115 @@ func digest(stdout, stderr string) string {
 	}
 	sum := sha256.Sum256([]byte(stdout + stderr))
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func metadataFromSummary(summary executionSummary) buildgate.Metadata {
+	var findings []buildgate.LogFinding
+	for _, diag := range summary.Diagnostics {
+		message := strings.TrimSpace(diag.Message)
+		if message == "" {
+			message = strings.TrimSpace(diag.Code)
+		}
+		findings = append(findings, buildgate.LogFinding{
+			Code:     strings.TrimSpace(diag.Code),
+			Severity: strings.ToLower(strings.TrimSpace(diag.Severity)),
+			Message:  message,
+			Evidence: strings.TrimSpace(diag.Path),
+		})
+	}
+
+	status := strings.TrimSpace(summary.Status)
+	severity := "info"
+	if !strings.EqualFold(status, "success") && status != "" {
+		severity = "error"
+	}
+	duration := ""
+	if summary.DurationMs > 0 {
+		duration = (time.Duration(summary.DurationMs) * time.Millisecond).Round(time.Millisecond).String()
+	}
+	evidenceParts := []string{}
+	if summary.Lane != "" {
+		evidenceParts = append(evidenceParts, fmt.Sprintf("lane=%s", summary.Lane))
+	}
+	if summary.Orchestrator != "" {
+		evidenceParts = append(evidenceParts, fmt.Sprintf("executor=%s", summary.Orchestrator))
+	}
+	if duration != "" {
+		evidenceParts = append(evidenceParts, fmt.Sprintf("duration=%s", duration))
+	}
+	if summary.ExitCode != 0 {
+		evidenceParts = append(evidenceParts, fmt.Sprintf("exit_code=%d", summary.ExitCode))
+	}
+	if summary.Workspace != "" {
+		evidenceParts = append(evidenceParts, fmt.Sprintf("workspace=%s", summary.Workspace))
+	}
+	findings = append(findings, buildgate.LogFinding{
+		Code:     "shift.summary",
+		Severity: severity,
+		Message:  fmt.Sprintf("shift run status %s", defaultString(status, "unknown")),
+		Evidence: strings.Join(evidenceParts, " "),
+	})
+
+	return buildgate.Metadata{
+		LogFindings: findings,
+	}
+}
+
+func failureDetailFromSummary(summary executionSummary, stderr string, exitCode int) string {
+	for _, diag := range summary.Diagnostics {
+		if strings.TrimSpace(diag.Message) == "" {
+			continue
+		}
+		detail := strings.TrimSpace(diag.Message)
+		if path := strings.TrimSpace(diag.Path); path != "" {
+			detail = fmt.Sprintf("%s (%s)", detail, path)
+		}
+		return detail
+	}
+	trimmed := strings.TrimSpace(stderr)
+	if trimmed != "" {
+		return trimmed
+	}
+	if status := strings.TrimSpace(summary.Status); status != "" {
+		return fmt.Sprintf("shift status %s (exit code %d)", status, exitCode)
+	}
+	return ""
+}
+
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
+}
+
+type executionSummary struct {
+	RunID        string              `json:"run_id"`
+	Status       string              `json:"status"`
+	Lane         string              `json:"lane"`
+	Orchestrator string              `json:"orchestrator"`
+	ExitCode     int                 `json:"exit_code"`
+	DurationMs   int64               `json:"duration_ms"`
+	Workspace    string              `json:"workspace"`
+	Diagnostics  []diagnosticPayload `json:"diagnostics"`
+}
+
+type diagnosticPayload struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Message  string `json:"message"`
+	Path     string `json:"path"`
+}
+
+func parseExecutionSummary(raw string) (executionSummary, error) {
+	if strings.TrimSpace(raw) == "" {
+		return executionSummary{}, fmt.Errorf("shift: empty summary")
+	}
+	var summary executionSummary
+	if err := json.Unmarshal([]byte(raw), &summary); err != nil {
+		return executionSummary{}, fmt.Errorf("shift: parse execution summary: %w", err)
+	}
+	return summary, nil
 }
 
 func firstLine(text string) string {

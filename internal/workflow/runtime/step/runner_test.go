@@ -40,7 +40,7 @@ func TestRunnerBuildsContainerSpec(t *testing.T) {
 		},
 	}
 	diffs := &fakeDiffGenerator{result: DiffResult{Path: "/tmp/diff"}}
-	shift := &fakeShiftClient{result: ShiftResult{Passed: true}}
+	shift := &fakeShiftClient{result: ShiftResult{Passed: true, Report: []byte(`{"metadata":{"log_digest":"bafy"}}`)}}
 	artifacts := &fakeArtifactPublisher{}
 	logger := &fakeLogCollector{logs: []byte("log output")}
 
@@ -91,8 +91,8 @@ func TestRunnerBuildsContainerSpec(t *testing.T) {
 	if len(artifacts.published) == 0 {
 		t.Fatalf("expected artifacts to be published")
 	}
-	if len(artifacts.requests) != 2 {
-		t.Fatalf("expected diff and log publication requests, got %d", len(artifacts.requests))
+	if len(artifacts.requests) != 3 {
+		t.Fatalf("expected diff, log, and shift report publication requests, got %d", len(artifacts.requests))
 	}
 	diffReq := artifacts.requests[0]
 	if diffReq.Kind != ArtifactKindDiff {
@@ -113,6 +113,16 @@ func TestRunnerBuildsContainerSpec(t *testing.T) {
 	}
 	if logReq.Path != "" {
 		t.Fatalf("expected log artifact to omit file path, got %q", logReq.Path)
+	}
+	shiftReq := artifacts.requests[2]
+	if shiftReq.Kind != ArtifactKindShiftReport {
+		t.Fatalf("expected shift report artifact kind, got %s", shiftReq.Kind)
+	}
+	if len(shiftReq.Buffer) == 0 {
+		t.Fatalf("expected shift report artifact to include payload buffer")
+	}
+	if shiftReq.Path != "" {
+		t.Fatalf("expected shift report artifact to omit file path, got %q", shiftReq.Path)
 	}
 }
 
@@ -138,7 +148,7 @@ func TestRunnerPublishesLogStreamEvents(t *testing.T) {
 		},
 	}
 	diffs := &fakeDiffGenerator{result: DiffResult{Path: "/tmp/diff"}}
-	shift := &fakeShiftClient{result: ShiftResult{Passed: true}}
+	shift := &fakeShiftClient{result: ShiftResult{Passed: true, Report: []byte(`{"metadata":{"status":"success"}}`)}}
 	artifacts := &fakeArtifactPublisher{}
 	logger := &fakeLogCollector{logs: []byte("first line\nsecond line\n")}
 	streams := &fakeLogStreamPublisher{}
@@ -206,7 +216,7 @@ func TestRunnerShiftFailureBlocksPipeline(t *testing.T) {
 		},
 	}
 	diffs := &fakeDiffGenerator{result: DiffResult{Path: "/tmp/diff"}}
-	shift := &fakeShiftClient{result: ShiftResult{Passed: false, Message: "tests failed"}}
+	shift := &fakeShiftClient{result: ShiftResult{Passed: false, Message: "tests failed", Report: []byte(`{"metadata":{"status":"failed"}}`)}}
 	artifacts := &fakeArtifactPublisher{}
 	logger := &fakeLogCollector{logs: []byte("log output")}
 
@@ -232,8 +242,11 @@ func TestRunnerShiftFailureBlocksPipeline(t *testing.T) {
 	if artifacts.published[0].Kind != ArtifactKindDiff {
 		t.Fatalf("expected diff artifact to publish")
 	}
-	if len(artifacts.requests) != 2 {
-		t.Fatalf("expected diff and log requests recorded, got %d", len(artifacts.requests))
+	if len(artifacts.requests) != 3 {
+		t.Fatalf("expected diff, log, and shift requests recorded, got %d", len(artifacts.requests))
+	}
+	if artifacts.requests[2].Kind != ArtifactKindShiftReport {
+		t.Fatalf("expected shift report publication on failure")
 	}
 }
 
@@ -295,7 +308,16 @@ type fakeArtifactPublisher struct {
 }
 
 func (f *fakeArtifactPublisher) Publish(ctx context.Context, req ArtifactRequest) (PublishedArtifact, error) {
-	artifact := PublishedArtifact{CID: "bafydiff", Kind: req.Kind, Digest: "sha256:fixture"}
+	cid := "bafyartifact"
+	switch req.Kind {
+	case ArtifactKindDiff:
+		cid = "bafy-diff"
+	case ArtifactKindLogs:
+		cid = "bafy-logs"
+	case ArtifactKindShiftReport:
+		cid = "bafy-shift"
+	}
+	artifact := PublishedArtifact{CID: cid, Kind: req.Kind, Digest: "sha256:fixture"}
 	f.published = append(f.published, artifact)
 	f.requests = append(f.requests, req)
 	return artifact, nil

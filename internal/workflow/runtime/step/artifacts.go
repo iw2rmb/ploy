@@ -22,6 +22,8 @@ const (
 	ArtifactKindDiff ArtifactKind = "diff"
 	// ArtifactKindLogs identifies log bundles.
 	ArtifactKindLogs ArtifactKind = "logs"
+	// ArtifactKindShiftReport identifies SHIFT execution reports.
+	ArtifactKindShiftReport ArtifactKind = "shift_report"
 )
 
 // PublishedArtifact references a stored artifact.
