@@ -35,10 +35,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
+	"github.com/iw2rmb/ploy/internal/node/lifecycle"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
+)
+
+const (
+	envIPFSClusterAPI      = "PLOY_IPFS_CLUSTER_API"
+	envIPFSClusterToken    = "PLOY_IPFS_CLUSTER_TOKEN"
+	envIPFSClusterUsername = "PLOY_IPFS_CLUSTER_USERNAME"
+	envIPFSClusterPassword = "PLOY_IPFS_CLUSTER_PASSWORD"
+	envLifecycleNetIgnore  = "PLOY_LIFECYCLE_NET_IGNORE"
 )
 
 // NewDefault constructs a daemon using default component implementations.
@@ -53,7 +62,11 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	}
 
 	role := strings.TrimSpace(cfg.Tags["role"])
-	statusProvider := status.New(status.Options{Role: role})
+	lifecycleCache := lifecycle.NewCache()
+	statusProvider := status.New(status.Options{
+		Role:   role,
+		Source: lifecycleCache,
+	})
 	adminSvc := buildAdminService()
 
 	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(cfg, streams)
@@ -112,6 +125,72 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 
 	taskScheduler := scheduler.New()
 
+	shutdownFns := make([]func(context.Context) error, 0, 4)
+	if controlPlaneShutdown != nil {
+		shutdownFns = append(shutdownFns, controlPlaneShutdown)
+	}
+
+	nodeID := strings.TrimSpace(cfg.ControlPlane.NodeID)
+
+	var dockerChecker *lifecycle.DockerChecker
+	if checker, err := lifecycle.NewDockerChecker(lifecycle.DockerCheckerOptions{}); err != nil {
+		log.Printf("lifecycle: docker checker disabled: %v", err)
+	} else {
+		dockerChecker = checker
+		shutdownFns = append(shutdownFns, func(context.Context) error { return dockerChecker.Close() })
+	}
+
+	ipfsChecker := buildIPFSChecker(cfg)
+	shiftChecker := lifecycle.NewShiftChecker(lifecycle.ShiftCheckerOptions{})
+
+    collector := lifecycle.NewCollector(lifecycle.Options{
+        Role:             role,
+        NodeID:           nodeID,
+        Docker:           dockerChecker,
+        Shift:            shiftChecker,
+        IPFS:             ipfsChecker,
+        IgnoreInterfaces: lifecycleIgnoreInterfacesFrom(cfg),
+    })
+
+	var publisher *lifecycle.Publisher
+	if etcdCfg, err := etcdutil.ConfigFromEnv(); err != nil {
+		log.Printf("lifecycle: etcd config: %v", err)
+	} else if client, err := clientv3.New(etcdCfg); err != nil {
+		log.Printf("lifecycle: etcd client: %v", err)
+	} else {
+		pub, err := lifecycle.NewPublisher(lifecycle.PublisherOptions{
+			Client:    client,
+			Collector: collector,
+			Cache:     lifecycleCache,
+			NodeID:    nodeID,
+		})
+		if err != nil {
+			log.Printf("lifecycle: publisher disabled: %v", err)
+			shutdownFns = append(shutdownFns, func(context.Context) error { return client.Close() })
+		} else {
+			publisher = pub
+			shutdownFns = append(shutdownFns, func(ctx context.Context) error { return publisher.Close(ctx) })
+			interval := cfg.ControlPlane.StatusPublishInterval
+			if interval <= 0 {
+				interval = 30 * time.Second
+			}
+			taskScheduler.AddTask(lifecycle.NewPublishTask(lifecycle.PublishTaskOptions{
+				Interval:  interval,
+				Publisher: publisher,
+			}))
+			if err := publisher.Publish(context.Background()); err != nil {
+				log.Printf("lifecycle: initial publish failed: %v", err)
+			}
+		}
+	}
+	if publisher == nil {
+		if snapshot, err := collector.Collect(context.Background()); err == nil {
+			lifecycleCache.Store(snapshot.Status)
+		}
+	}
+
+	combinedShutdown := combineShutdowns(shutdownFns)
+
 	svc, err := New(Options{
 		Config:               cfg,
 		RuntimeRegistry:      registry,
@@ -121,7 +200,7 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		ControlPlane:         controlClient,
 		PKI:                  pkiManager,
 		Scheduler:            taskScheduler,
-		ControlPlaneShutdown: controlPlaneShutdown,
+		ControlPlaneShutdown: combinedShutdown,
 	})
 	if err != nil {
 		return nil, err
@@ -422,4 +501,62 @@ func buildArtifactPublisher() *workflowartifacts.ClusterClient {
 		return nil
 	}
 	return client
+}
+
+func buildIPFSChecker(cfg config.Config) lifecycle.HealthChecker {
+	base := resolveLifecycleConfigString(cfg, envIPFSClusterAPI)
+	if base == "" {
+		return nil
+	}
+	return lifecycle.NewIPFSChecker(lifecycle.IPFSCheckerOptions{
+		BaseURL:   base,
+		AuthToken: resolveLifecycleConfigString(cfg, envIPFSClusterToken),
+		Username:  resolveLifecycleConfigString(cfg, envIPFSClusterUsername),
+		Password:  resolveLifecycleConfigString(cfg, envIPFSClusterPassword),
+	})
+}
+
+func resolveLifecycleConfigString(cfg config.Config, key string) string {
+	if cfg.Environment != nil {
+		if value, ok := cfg.Environment[key]; ok {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				return trimmed
+			}
+		}
+	}
+	return strings.TrimSpace(os.Getenv(key))
+}
+
+func lifecycleIgnoreInterfacesFrom(cfg config.Config) []string {
+    raw := resolveLifecycleConfigString(cfg, envLifecycleNetIgnore)
+    if raw == "" {
+        return nil
+    }
+    parts := strings.Split(raw, ",")
+    out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+func combineShutdowns(fns []func(context.Context) error) func(context.Context) error {
+	if len(fns) == 0 {
+		return nil
+	}
+	return func(ctx context.Context) error {
+		var first error
+		for i := len(fns) - 1; i >= 0; i-- {
+			fn := fns[i]
+			if fn == nil {
+				continue
+			}
+			if err := fn(ctx); err != nil && first == nil {
+				first = err
+			}
+		}
+		return first
+	}
 }

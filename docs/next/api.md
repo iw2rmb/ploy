@@ -343,7 +343,12 @@ through its local `ployd` instance:
 - `POST /v1/node/jobs/{id}/cancel` — Stop a running job (if local).
 - `GET /v1/node/jobs/{id}/logs` — Fetch archived stdout/stderr.
 - `GET /v1/node/jobs/{id}/logs/stream` — SSE log stream direct from the node runtime.
-- `GET /v1/node/status` — Health summary: Docker status, SHIFT availability, IPFS connectivity, resource usage.
+- `GET /v1/node/status` — Returns the latest lifecycle snapshot published by the worker:
+  - `state` aggregates component health (`ok`, `degraded`, `error`, `unknown`) across Docker, SHIFT, and IPFS probes.
+  - `resources.cpu|memory|disk` now include host totals/free plus nested disk I/O metrics: `resources.disk.io.read_mb_per_sec`, `write_mb_per_sec`, `read_iops`, and `write_iops`, with `details.initial_sample=true` when the first sample lacks a baseline.
+  - `resources.network` tracks aggregate `rx_bytes_per_sec`, `tx_bytes_per_sec`, `rx_packets_per_sec`, `tx_packets_per_sec`, and an `interfaces` map keyed by device (`eth0`, `bond0`, etc.) so operators can spot per-NIC saturation. Interfaces listed in `PLOY_LIFECYCLE_NET_IGNORE` (glob support) are omitted, and the section exposes `details.initial_sample=true` until the second sample lands.
+  - `components.docker|shift|ipfs` carry `state`, `message`, `version`, and probe timestamps so the control plane can surface detailed diagnostics.
+  - `heartbeat` mirrors the timestamp written to etcd (`nodes/<node-id>/capacity`), letting the scheduler correlate status and capacity updates.
 - `GET /v1/node/artifacts/{cid}` — Provide local access to a pinned artifact (used during step execution).
 
 ## Authentication & Security
