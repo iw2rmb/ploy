@@ -36,6 +36,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
 	"github.com/iw2rmb/ploy/internal/node/lifecycle"
+	"github.com/iw2rmb/ploy/internal/node/jobs"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
@@ -74,13 +75,17 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	httpSrv, err := httpserver.New(httpserver.Options{
-		Config:       cfg,
-		Streams:      streams,
-		Status:       statusProvider,
-		Admin:        adminSvc,
-		ControlPlane: controlPlaneHandler,
-	})
+    // Node-local job tracker.
+    jobStore := jobs.NewStore(jobs.Options{})
+
+    httpSrv, err := httpserver.New(httpserver.Options{
+        Config:       cfg,
+        Streams:      streams,
+        Status:       statusProvider,
+        Admin:        adminSvc,
+        Jobs:         httpserver.NewJobProvider(jobStore),
+        ControlPlane: controlPlaneHandler,
+    })
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +106,10 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	workerExec, err := stepworker.FromConfig(cfg, streams, httpClient)
-	if err != nil {
-		return nil, err
-	}
+    workerExec, err := stepworker.FromConfig(cfg, streams, httpClient, jobStore)
+    if err != nil {
+        return nil, err
+    }
 
 	exec := executor.New(executor.Options{
 		Registry:       registry,

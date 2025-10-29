@@ -17,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/controlplane"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/node/jobs"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/node/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
@@ -42,16 +43,18 @@ type stepRunner interface {
 
 // Executor executes control-plane assignments using the step runner pipeline.
 type Executor struct {
-	runner  stepRunner
-	streams *logstream.Hub
-	now     func() time.Time
+    runner  stepRunner
+    streams *logstream.Hub
+    jobs    *jobs.Store
+    now     func() time.Time
 }
 
 // Options configures the executor.
 type Options struct {
-	Runner  stepRunner
-	Streams *logstream.Hub
-	Clock   func() time.Time
+    Runner  stepRunner
+    Streams *logstream.Hub
+    Jobs    *jobs.Store
+    Clock   func() time.Time
 }
 
 // New constructs an executor from the provided options.
@@ -66,15 +69,16 @@ func New(opts Options) (*Executor, error) {
 	if clock == nil {
 		clock = time.Now
 	}
-	return &Executor{
-		runner:  opts.Runner,
-		streams: opts.Streams,
-		now:     clock,
-	}, nil
+    return &Executor{
+        runner:  opts.Runner,
+        streams: opts.Streams,
+        jobs:    opts.Jobs,
+        now:     clock,
+    }, nil
 }
 
 // FromConfig assembles a step executor using daemon configuration.
-func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Client) (*Executor, error) {
+func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Client, jobStore *jobs.Store) (*Executor, error) {
 	clusterClient, err := newClusterClient(cfg)
 	if err != nil {
 		return nil, err
@@ -146,10 +150,11 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		Streams:    streams,
 	}
 
-	return New(Options{
-		Runner:  runner,
-		Streams: streams,
-	})
+    return New(Options{
+        Runner:  runner,
+        Streams: streams,
+        Jobs:    jobStore,
+    })
 }
 
 // Execute runs the assignment manifest through the step runtime.
@@ -168,9 +173,13 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
 	if streamID == "" {
 		return zero, errors.New("stepworker: assignment id required")
 	}
-	if e.streams != nil {
-		e.streams.Ensure(streamID)
-	}
+    if e.streams != nil {
+        e.streams.Ensure(streamID)
+    }
+
+    if e.jobs != nil {
+        e.jobs.Start(streamID)
+    }
 
 	req := stepruntime.Request{
 		Manifest:    manifest,
@@ -179,8 +188,20 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
 
 	result, runErr := e.runner.Run(ctx, req)
 
-	assignmentResult := e.buildResult(manifest, result, runErr)
-	return assignmentResult, runErr
+    assignmentResult := e.buildResult(manifest, result, runErr)
+
+    if e.jobs != nil {
+        state := jobs.StateSucceeded
+        if runErr != nil {
+            state = jobs.StateFailed
+        }
+        msg := ""
+        if runErr != nil {
+            msg = runErr.Error()
+        }
+        e.jobs.Complete(streamID, state, msg)
+    }
+    return assignmentResult, runErr
 }
 
 // buildResult converts the step runtime result into an assignment result payload.
