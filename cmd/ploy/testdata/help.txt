@@ -7,6 +7,7 @@ Core Commands:
   workflow         Manage workflow runs and cancellations
   mod              Plan and run Mods workflows
   mods             Observe Mods execution (logs, events)
+  hydration        Inspect and tune hydration snapshot policies
   jobs             Inspect and follow individual jobs
   artifact         Manage IPFS Cluster artifacts
   upload           Upload repository or log bundles via SSH

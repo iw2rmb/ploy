@@ -139,11 +139,23 @@ func TestHandleClusterAddWithClusterIDAddsWorker(t *testing.T) {
 	if _, ok := provision.ScriptEnv["PLOYD_MODE"]; ok {
 		t.Fatalf("expected bootstrap env to omit PLOYD_MODE")
 	}
-	if len(provision.ScriptEnv) != 0 {
-		t.Fatalf("expected no script env overrides, got %+v", provision.ScriptEnv)
+	expectedEnv := map[string]string{
+		"PLOY_IPFS_CLUSTER_API": "http://203.0.113.10:9094",
+		"PLOYD_NODE_ID":         "worker-198-51-100-7",
+		"PLOYD_METRICS_LISTEN":  "127.0.0.1:9101",
+		"PLOYD_HOME_DIR":        "/root",
+		"PLOYD_CACHE_HOME":      "/var/cache/ploy",
 	}
-	if got := strings.Join(provision.ScriptArgs, " "); got != "--cluster-id "+descriptor.ClusterID {
-		t.Fatalf("expected cluster id script arg, got %q", provision.ScriptArgs)
+	if len(provision.ScriptEnv) != len(expectedEnv) {
+		t.Fatalf("expected script env %d entries, got %+v", len(expectedEnv), provision.ScriptEnv)
+	}
+	for key, value := range expectedEnv {
+		if got := provision.ScriptEnv[key]; got != value {
+			t.Fatalf("expected %s=%s, got %s", key, value, got)
+		}
+	}
+	if got := strings.Join(provision.ScriptArgs, " "); got != "--cluster-id "+descriptor.ClusterID+" --node-id worker-198-51-100-7 --node-address 198.51.100.7" {
+		t.Fatalf("expected cluster/node script args, got %q", provision.ScriptArgs)
 	}
 	if provision.IdentityFile != identityPath {
 		t.Fatalf("expected identity path propagated to provisioner, got %q", provision.IdentityFile)

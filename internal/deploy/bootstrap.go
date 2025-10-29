@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/iw2rmb/ploy/internal/bootstrap"
 	"github.com/iw2rmb/ploy/internal/cli/config"
@@ -71,6 +73,16 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	envVars := map[string]string{
 		"PLOY_BOOTSTRAP_VERSION": bootstrap.Version,
 	}
+	ipfsAPIHost := formatHost(address)
+	envVars["PLOY_IPFS_CLUSTER_API"] = fmt.Sprintf("http://%s:9094", ipfsAPIHost)
+	envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
+	if sanitized := sanitizeNodeID(nodeID); sanitized != "" {
+		envVars["PLOYD_NODE_ID"] = sanitized
+	} else {
+		envVars["PLOYD_NODE_ID"] = nodeID
+	}
+	envVars["PLOYD_HOME_DIR"] = "/root"
+	envVars["PLOYD_CACHE_HOME"] = "/var/cache/ploy"
 
 	scriptArgs := make([]string, 0, 8)
 	if clusterID != "" {
@@ -132,4 +144,48 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		return fmt.Errorf("bootstrap: write completion message: %w", err)
 	}
 	return nil
+}
+
+func formatHost(address string) string {
+	addr := strings.TrimSpace(address)
+	if host, _, err := net.SplitHostPort(addr); err == nil && host != "" {
+		addr = host
+	}
+	if addr == "" {
+		return "127.0.0.1"
+	}
+	if strings.HasPrefix(addr, "[") {
+		return addr
+	}
+	if strings.Contains(addr, ":") {
+		return "[" + addr + "]"
+	}
+	return addr
+}
+
+func sanitizeNodeID(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+	var builder strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			builder.WriteRune(r)
+		case r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r == '-' || r == '_':
+			builder.WriteRune('-')
+		default:
+			if unicode.IsSpace(r) {
+				builder.WriteRune('-')
+			}
+		}
+	}
+	out := strings.Trim(builder.String(), "-")
+	if out == "" {
+		return ""
+	}
+	return out
 }

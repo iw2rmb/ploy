@@ -181,6 +181,17 @@ func normalizeBundleRecords(src map[string]BundleRecord, completedAt time.Time) 
 	return dst
 }
 
+func cloneBundleMap(src map[string]BundleRecord) map[string]BundleRecord {
+	if len(src) == 0 {
+		return nil
+	}
+	dup := make(map[string]BundleRecord, len(src))
+	for k, v := range src {
+		dup[k] = v
+	}
+	return dup
+}
+
 func computeRetentionExpiry(bundles map[string]bundleRecord, completedAt time.Time) time.Time {
 	var latest time.Time
 	for _, rec := range bundles {

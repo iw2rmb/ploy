@@ -101,6 +101,9 @@ func TestFilesystemWorkspaceHydratorFetchesRemoteSnapshotsAndDiffs(t *testing.T)
 	if _, err := os.Stat(filepath.Join(root, "diffs", sanitizeName("bafy-diff"))); err != nil {
 		t.Fatalf("expected cached diff: %v", err)
 	}
+	if len(ws.HydrationSnapshots) != 0 {
+		t.Fatalf("expected no hydration snapshots, got %+v", ws.HydrationSnapshots)
+	}
 }
 
 func TestFilesystemWorkspaceHydratorClonesRepositoryWhenNoCID(t *testing.T) {
@@ -111,11 +114,16 @@ func TestFilesystemWorkspaceHydratorClonesRepositoryWhenNoCID(t *testing.T) {
 	tarPath, tarDigest := createTarFile(t, tarRoot, "bafy-clone", map[string]string{
 		"main.go": "package main\n",
 	})
+	info, err := os.Stat(tarPath)
+	if err != nil {
+		t.Fatalf("stat tar file: %v", err)
+	}
 	git := &fakeRepoFetcher{
 		result: RepositoryFetchResult{
 			Artifact: contracts.StepInputArtifactRef{
 				CID:    "bafy-clone",
 				Digest: tarDigest,
+				Size:   info.Size(),
 			},
 			TarPath: tarPath,
 			Commit:  "abc123",
@@ -165,6 +173,22 @@ func TestFilesystemWorkspaceHydratorClonesRepositoryWhenNoCID(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "snapshots", sanitizeName("bafy-clone"))); err != nil {
 		t.Fatalf("expected clone cached snapshot: %v", err)
+	}
+	snapshot, ok := ws.HydrationSnapshots["repo"]
+	if !ok {
+		t.Fatalf("expected hydration snapshot metadata")
+	}
+	if snapshot.CID != "bafy-clone" {
+		t.Fatalf("unexpected hydration snapshot cid %q", snapshot.CID)
+	}
+	if snapshot.Digest != tarDigest {
+		t.Fatalf("unexpected hydration snapshot digest %q", snapshot.Digest)
+	}
+	if snapshot.Size != info.Size() {
+		t.Fatalf("unexpected hydration snapshot size %d", snapshot.Size)
+	}
+	if snapshot.Kind != ArtifactKindSnapshot {
+		t.Fatalf("expected snapshot kind, got %s", snapshot.Kind)
 	}
 }
 

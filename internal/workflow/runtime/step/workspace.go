@@ -18,6 +18,7 @@ type WorkspaceRequest struct {
 
 // Workspace describes hydrated paths.
 type Workspace struct {
-	Inputs     map[string]string
-	WorkingDir string
+	Inputs             map[string]string
+	WorkingDir         string
+	HydrationSnapshots map[string]PublishedArtifact
 }

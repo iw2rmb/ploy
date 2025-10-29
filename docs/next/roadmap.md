@@ -14,7 +14,7 @@
 - [x] 2.1 Replace the assignment polling client (`internal/api/controlplane.Client`) with a job-claim loop that hits `/v1/jobs/claim`, `/v1/jobs/{id}/heartbeat`, and `/v1/jobs/{id}/complete`; integrate the logstream hub so every container run emits SSE frames keyed by job ID.
 - [x] 2.2 Wire the step runner: assemble the workspace hydrator, Docker runtime, diff capture, IPFS Cluster publisher, and SHIFT client inside a worker executor package; persist retention hints to etcd and stream them via SSE (`internal/node/logstream`).
 - [x] 2.3 Implement real SHIFT integration per `docs/next/shift.md`: replace `noopSandboxExecutor` in `cmd/ploy/dependencies_runtime_local.go` with a sandbox executor that shells out to the standalone SHIFT binary/library, and records structured reports in IPFS; add failure mapping to `buildgate` metadata.
-- [ ] 2.4 Support repository hydration and snapshot reuse on nodes: teach the workspace hydrator to pull base snapshots/diff CIDs from IPFS Cluster, materialise ordered diffs, and fall back to GitLab clones using credentials stored in etcd.
+- [x] 2.4 Support repository hydration and snapshot reuse on nodes: teach the workspace hydrator to pull base snapshots/diff CIDs from IPFS Cluster, materialise ordered diffs, and fall back to GitLab clones using credentials stored in etcd.
 - [ ] 2.5 Add node lifecycle controllers: expose `/v1/node/status`, `/v1/node/jobs`, `/v1/node/logs` in the worker HTTP surface; periodically publish capacity heartbeats (`nodes/<node-id>/capacity`), Docker/SHIFT health, and IPFS peer info so the control plane can schedule intelligently.
 
 ## 3. CLI & Operator Workflow

@@ -31,6 +31,9 @@ addendum:
   (exercise Grid once available).
 - For Codex execution details on the Mods Grid E2E harness, consult
   `tests/e2e/README.md`.
+- Use the VPS lab control plane for integration/E2E verification. Connection and
+  environment expectations are documented in `docs/next/vps-lab.md`; plan test
+  runs there when validating hydration or other control-plane interactions.
 
 ### CLI Build & Smoke Checks
 
