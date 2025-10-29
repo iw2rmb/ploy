@@ -14,23 +14,24 @@
    where applicable.
 2. Control-plane API changes must include updates to `docs/api/OpenAPI.yaml`
    alongside human-facing docs.
+3. How-to references:
+   - `docs/how-to/deploy-a-cluster.md` — Deploy a cluster from scratch.
+   - `docs/how-to/update-a-cluster.md` — Update `ployd` across VPS nodes.
+   - `docs/envs/README.md` — Canonical environment variables.
 
-## Local Development
+## Development
 
 ### TDD Framework (CRITICAL)
 
-- **LOCAL**: Unit tests and CLI builds (RED/GREEN phases).
-- **VPS**: Reserved for integration/E2E tests once the workflow runner can
-  talk to JetStream (REFACTOR phase).
-- **Coverage**: Maintain ≥60% overall and ≥90% on critical workflow runner
-  packages.
-- **Cycle**: RED (write failing tests) → GREEN (minimal code) → REFACTOR
-  (exercise VPS once available).
-- For Codex execution details on the Mods E2E harness, consult
-  `tests/e2e/README.md`.
-- Use the VPS lab control plane for integration/E2E verification. Connection and
-  environment expectations are documented in `docs/next/vps-lab.md`; plan test
-  runs there when validating hydration or other control-plane interactions.
+- Unit tests and CLI builds (RED/GREEN phases) run locally.
+- VPS lab is reserved for integration/E2E tests and manual smoke:
+  - Nodes: 45.9.42.212 (A), 46.173.16.177 (B), 81.200.119.187 (C).
+  - Reuse the current cluster descriptor from `~/.config/ploy/clusters/` to connect.
+    If multiple descriptors exist, prefer the default marker (`~/.config/ploy/clusters/default`) or
+    pick the one matching the lab’s cluster ID.
+- Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
+- Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise VPS when needed).
+- For Codex execution details on the Mods E2E harness, consult `tests/e2e/README.md`.
 
 ### CLI Build & Smoke Checks
 
@@ -48,4 +49,3 @@
 ### Deployment Scope
 
 - The VPS lab is the sole environment; no production migration or backward compatibility is required. Prior changes can assume fresh redeploys.
-- Environment variables are managed centrally in `docs/envs/README.md`.

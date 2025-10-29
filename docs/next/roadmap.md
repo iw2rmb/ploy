@@ -39,7 +39,7 @@
     - Cancel/Resume flows (LOCAL): simulate `SIGINT` while `--follow` is active and assert the CLI calls `POST /v1/mods/{ticket}/cancel`; verify resume path via `ploy mod resume` is suggested with the correct ticket.
     - Help/UX snapshots (LOCAL): snapshot `ploy mod run --help` and typical success/failure outputs; protect from regressions with minimal golden maintenance.
     - OpenAPI alignment (LOCAL): validate request/response structs against `docs/api/OpenAPI.yaml` using a schema check; fail tests on drift of fields/types.
-    - Integration (VPS): with the VPS lab per `docs/next/vps-lab.md`, run against a seeded repo to exercise submission → events/logs → artifact retrieval; assert deterministic diff CIDs, SHIFT enforcement presence, and final manifest matches.
+    - Integration (VPS): use the VPS lab to run against a seeded repo and exercise submission → events/logs → artifact retrieval; assert deterministic diff CIDs, SHIFT enforcement presence, and final manifest matches.
     - E2E smoke (VPS): drive `ploy mod run` end-to-end with `--json` and verify a stable event stream contract and final artifacts are pinned in IPFS Cluster; collect timings for SLA baselines.
     - Docs guard (LOCAL): extend `tests/guards/docs_guard_test.go` to assert roadmap/API examples reference existing flags/endpoints and that `docs/next/api.md` stays in sync after changes.
 - [ ] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
@@ -54,7 +54,7 @@
 - [ ] 4.2 Expose Prometheus metrics per `docs/next/observability.md`: register queue depth, claim latency, retry counts, SHIFT duration, IPFS pin metrics, GC activity, and log upload status; serve them at `/metrics` with tests covering label cardinality.
 - [ ] 4.3 Ship the GC controller and CLI: implement a background reconciler that walks `gc/jobs/**`, unpins artifacts via IPFS Cluster, and deletes expired records; add `ploy gc` with dry-run and filtering options, wiring it to the same logic.
 - [ ] 4.4 Build node administration routes: `/v1/nodes` should report health, running jobs, IPFS peer lag, and support drain/heal actions, all reachable through the SSH tunnel manager.
-- [ ] 4.5 Document and automate operations: update `docs/how-to/deploy-a-cluster.md`, `docs/next/observability.md`, and `docs/next/vps-lab.md` with the new commands, required ports, and smoke tests; ensure bootstrap scripts drop the right resolver entries and verify systemd units.
+- [ ] 4.5 Document and automate operations: update `docs/how-to/deploy-a-cluster.md` and `docs/next/observability.md` with the new commands, required ports, and smoke tests; ensure bootstrap scripts drop the right resolver entries and verify systemd units.
 - [ ] 4.6 Wire transfer ingestion to jobs/artifacts: have committed slots trigger IPFS publishes, update job metadata with report CIDs/digests, and expose metrics/alerts when uploads stall or digests mismatch.
 
 ## 5. Migration & Cleanup
@@ -66,7 +66,7 @@
 ## 6. Testing & Release Readiness
 
 - [ ] 6.1 Establish TDD coverage for each slice: write unit tests for the new control-plane handlers, scheduler edge cases (leases, retries, retention), node executors, and CLI commands; maintain ≥60% overall coverage and ≥90% on critical workflow packages.
-- [ ] 6.2 Add integration suites: stand up multi-node scenarios in the VPS lab (`docs/next/vps-lab.md`) that exercise job submission, log streaming, artifact pinning, GC, GitLab credential rotation, and SSH tunnel failover; gate them behind `make test` targets.
+- [ ] 6.2 Add integration suites: stand up multi-node scenarios in the VPS lab that exercise job submission, log streaming, artifact pinning, GC, GitLab credential rotation, and SSH tunnel failover; gate them behind `make test` targets.
 - [ ] 6.3 Introduce end-to-end smoke tests for `ploy mod run` against a seeded repository, verifying deterministic diffs, SHIFT enforcement, and artifact retrieval.
 - [ ] 6.4 Wire CI to the new workflow: ensure `make build`, `make test`, and formatting pass; add IPFS Cluster and etcd fixtures to CI if required.
 - [ ] 6.5 Prepare release artefacts: update build pipelines to ship `ploy` and `ployd` binaries, embed the bootstrap script, and document version tagging/upgrade steps for operators.
