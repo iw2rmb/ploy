@@ -2,11 +2,17 @@ package mods
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+
+	"github.com/iw2rmb/ploy/internal/controlplane/hydration"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // StageJobSubmitter defines scheduler interactions required by the orchestrator.
@@ -20,7 +26,21 @@ type Options struct {
 	Scheduler  StageJobSubmitter
 	Clock      func() time.Time
 	JobWatcher JobCompletionWatcher
+	Hydration  HydrationOptions
 }
+
+// HydrationOptions configures snapshot reuse behaviour for stage submission.
+type HydrationOptions struct {
+	Index *hydration.Index
+}
+
+const (
+	manifestMetadataKey   = "step_manifest"
+	metadataRepoURLKey    = "hydration_repo_url"
+	metadataRevisionKey   = "hydration_revision"
+	metadataInputNameKey  = "hydration_input_name"
+	defaultHydrationInput = "workspace"
+)
 
 // Service orchestrates Mods ticket submission and lifecycle transitions.
 type Service struct {
@@ -28,6 +48,7 @@ type Service struct {
 	scheduler StageJobSubmitter
 	clock     func() time.Time
 	watcher   JobCompletionWatcher
+	hydration *hydration.Index
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -51,6 +72,7 @@ func NewService(client *clientv3.Client, opts Options) (*Service, error) {
 		watcher:   cfg.JobWatcher,
 		ctx:       ctx,
 		cancel:    cancel,
+		hydration: cfg.Hydration.Index,
 	}
 	service.startWatchers()
 	return service, nil
@@ -218,6 +240,11 @@ func (s *Service) validateSpec(spec TicketSpec) error {
 
 // enqueueStage submits a stage to the scheduler and marks it queued.
 func (s *Service) enqueueStage(ctx context.Context, ticketID string, def StageDefinition, current StageStatus) (*StageStatus, error) {
+	if updated, err := s.prepareStageHydration(ctx, ticketID, def); err == nil && updated != nil {
+		def = *updated
+	} else if err != nil {
+		return nil, err
+	}
 	spec := StageJobSpec{
 		JobID:        current.CurrentJobID,
 		TicketID:     ticketID,
@@ -232,6 +259,116 @@ func (s *Service) enqueueStage(ctx context.Context, ticketID string, def StageDe
 		return nil, fmt.Errorf("submit stage job: %w", err)
 	}
 	return s.store.markStageQueued(ctx, ticketID, def.ID, job.JobID)
+}
+
+// prepareStageHydration injects reusable hydration snapshots into the manifest when available.
+func (s *Service) prepareStageHydration(ctx context.Context, ticketID string, def StageDefinition) (*StageDefinition, error) {
+	if s.hydration == nil {
+		return nil, nil
+	}
+	if len(def.Metadata) == 0 {
+		return nil, nil
+	}
+	rawManifest := strings.TrimSpace(def.Metadata[manifestMetadataKey])
+	if rawManifest == "" {
+		return nil, nil
+	}
+
+	repo := strings.TrimSpace(def.Metadata[metadataRepoURLKey])
+	revision := strings.TrimSpace(def.Metadata[metadataRevisionKey])
+	if repo == "" || revision == "" {
+		return nil, nil
+	}
+
+	entry, ok, err := s.hydration.LookupSnapshot(ctx, hydration.LookupRequest{
+		RepoURL:  repo,
+		Revision: revision,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mods: hydration lookup: %w", err)
+	}
+	if !ok {
+		return nil, nil
+	}
+
+	now := s.clock().UTC()
+	if !entry.ExpiresAt.IsZero() && !entry.ExpiresAt.After(now) {
+		return nil, nil
+	}
+	if !entry.Sharing.Enabled {
+		if entry.Tickets == nil || len(entry.Tickets) == 0 {
+			return nil, nil
+		}
+		if _, exists := entry.Tickets[ticketID]; !exists {
+			return nil, nil
+		}
+	}
+
+	var manifest contracts.StepManifest
+	if err := json.Unmarshal([]byte(rawManifest), &manifest); err != nil {
+		return nil, fmt.Errorf("mods: decode step manifest: %w", err)
+	}
+
+	inputName := strings.TrimSpace(def.Metadata[metadataInputNameKey])
+	if inputName == "" && len(manifest.Inputs) > 0 {
+		inputName = manifest.Inputs[0].Name
+	}
+	if inputName == "" {
+		inputName = defaultHydrationInput
+	}
+
+	inputIndex := -1
+	for idx, input := range manifest.Inputs {
+		if input.Name == inputName {
+			inputIndex = idx
+			break
+		}
+	}
+	if inputIndex == -1 {
+		return nil, fmt.Errorf("mods: hydration input %q not present in manifest", inputName)
+	}
+
+	baseRef := contracts.StepInputArtifactRef{
+		CID:    entry.Bundle.CID,
+		Digest: entry.Bundle.Digest,
+		Size:   entry.Bundle.Size,
+	}
+	if manifest.Inputs[inputIndex].Hydration == nil {
+		manifest.Inputs[inputIndex].Hydration = &contracts.StepInputHydration{}
+	}
+	manifest.Inputs[inputIndex].Hydration.BaseSnapshot = baseRef
+
+	payload, err := json.Marshal(manifest)
+	if err != nil {
+		return nil, fmt.Errorf("mods: encode updated manifest: %w", err)
+	}
+	if def.Metadata == nil {
+		def.Metadata = map[string]string{}
+	}
+	def.Metadata[manifestMetadataKey] = string(payload)
+	if baseRef.CID != "" {
+		def.Metadata["hydration_shared_cid"] = baseRef.CID
+	}
+	if baseRef.Digest != "" {
+		def.Metadata["hydration_shared_digest"] = baseRef.Digest
+	}
+	if baseRef.Size > 0 {
+		def.Metadata["hydration_shared_size"] = strconv.FormatInt(baseRef.Size, 10)
+	}
+	def.Metadata["hydration_reuse"] = "true"
+
+	_, err = s.hydration.UpsertSnapshot(ctx, hydration.SnapshotRecord{
+		RepoURL:     repo,
+		Revision:    revision,
+		TicketID:    ticketID,
+		Bundle:      entry.Bundle,
+		Replication: entry.Replication,
+		Sharing:     entry.Sharing,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mods: record hydration reuse: %w", err)
+	}
+	return &def, nil
 }
 
 // afterStageSuccess enqueues dependents and updates ticket state post-success.

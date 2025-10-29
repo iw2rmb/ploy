@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -204,6 +205,30 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 	}
 
 	bundles := make(map[string]scheduler.BundleRecord)
+	if artifact, ok := firstHydrationSnapshot(runResult.HydrationSnapshots); ok {
+		cid := strings.TrimSpace(artifact.CID)
+		if cid != "" {
+			artifacts[scheduler.HydrationSnapshotCIDKey] = cid
+			if digest := strings.TrimSpace(artifact.Digest); digest != "" {
+				artifacts[scheduler.HydrationSnapshotDigestKey] = digest
+			}
+			if artifact.Size > 0 {
+				artifacts[scheduler.HydrationSnapshotSizeKey] = strconv.FormatInt(artifact.Size, 10)
+			}
+			ttl := scheduler.HydrationSnapshotTTL
+			bundle := scheduler.BundleRecord{
+				CID:      cid,
+				Digest:   strings.TrimSpace(artifact.Digest),
+				Size:     artifact.Size,
+				Retained: true,
+				TTL:      ttl,
+			}
+			if duration, err := time.ParseDuration(ttl); err == nil && duration > 0 {
+				bundle.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
+			}
+			bundles[scheduler.HydrationSnapshotBundleKey] = bundle
+		}
+	}
 	logTTL := firstNonEmpty(runResult.RetentionTTL, manifest.Retention.TTL)
 	if cid := strings.TrimSpace(runResult.LogArtifact.CID); cid != "" {
 		bundles["logs"] = buildBundleRecord(runResult.LogArtifact, logTTL, manifest.Retention.RetainContainer, now)
@@ -275,6 +300,18 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		Inspection: manifest.Retention.RetainContainer && runErr != nil,
 		Retention:  retentionHint,
 	}
+}
+
+func firstHydrationSnapshot(snapshots map[string]stepruntime.PublishedArtifact) (stepruntime.PublishedArtifact, bool) {
+	if len(snapshots) == 0 {
+		return stepruntime.PublishedArtifact{}, false
+	}
+	keys := make([]string, 0, len(snapshots))
+	for name := range snapshots {
+		keys = append(keys, name)
+	}
+	sort.Strings(keys)
+	return snapshots[keys[0]], true
 }
 
 // buildBundleRecord derives bundle retention metadata for scheduler completion payloads.

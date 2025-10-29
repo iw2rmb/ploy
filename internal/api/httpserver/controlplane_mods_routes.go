@@ -36,6 +36,10 @@ func (s *controlPlaneServer) handleModsSubpath(w http.ResponseWriter, r *http.Re
 	case "events":
 		s.handleModsEvents(w, r, ticketID)
 	default:
+		if parts[1] == "hydration" {
+			s.handleModsHydration(w, r, ticketID)
+			return
+		}
 		http.NotFound(w, r)
 	}
 }
@@ -84,6 +88,10 @@ func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *h
 	case "events":
 		s.handleModsEvents(w, r, ticketID)
 	default:
+		if parts[1] == "hydration" {
+			s.handleModsHydration(w, r, ticketID)
+			return
+		}
 		http.NotFound(w, r)
 	}
 }

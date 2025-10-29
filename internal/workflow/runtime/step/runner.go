@@ -29,14 +29,15 @@ type Request struct {
 
 // Result summarises a completed step run.
 type Result struct {
-	ContainerID   string
-	ExitCode      int
-	DiffArtifact  PublishedArtifact
-	LogArtifact   PublishedArtifact
-	ShiftArtifact PublishedArtifact
-	ShiftReport   ShiftResult
-	RetentionTTL  string
-	Retained      bool
+	ContainerID        string
+	ExitCode           int
+	DiffArtifact       PublishedArtifact
+	LogArtifact        PublishedArtifact
+	ShiftArtifact      PublishedArtifact
+	ShiftReport        ShiftResult
+	HydrationSnapshots map[string]PublishedArtifact
+	RetentionTTL       string
+	Retained           bool
 }
 
 // Runner executes step manifests using the injected collaborators.
@@ -178,14 +179,15 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		}
 		if !shiftResult.Passed {
 			result := Result{
-				ContainerID:   handle.ID,
-				ExitCode:      containerResult.ExitCode,
-				DiffArtifact:  diffArtifact,
-				LogArtifact:   logArtifact,
-				ShiftArtifact: shiftArtifact,
-				ShiftReport:   shiftResult,
-				Retained:      manifest.Retention.RetainContainer,
-				RetentionTTL:  manifest.Retention.TTL,
+				ContainerID:        handle.ID,
+				ExitCode:           containerResult.ExitCode,
+				DiffArtifact:       diffArtifact,
+				LogArtifact:        logArtifact,
+				ShiftArtifact:      shiftArtifact,
+				ShiftReport:        shiftResult,
+				HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
+				Retained:           manifest.Retention.RetainContainer,
+				RetentionTTL:       manifest.Retention.TTL,
 			}
 			if hasStream {
 				r.publishRetentionHint(ctx, streamID, result)
@@ -196,17 +198,29 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 
 	result := Result{
-		ContainerID:   handle.ID,
-		ExitCode:      containerResult.ExitCode,
-		DiffArtifact:  diffArtifact,
-		LogArtifact:   logArtifact,
-		ShiftArtifact: shiftArtifact,
-		ShiftReport:   shiftResult,
-		Retained:      manifest.Retention.RetainContainer,
-		RetentionTTL:  manifest.Retention.TTL,
+		ContainerID:        handle.ID,
+		ExitCode:           containerResult.ExitCode,
+		DiffArtifact:       diffArtifact,
+		LogArtifact:        logArtifact,
+		ShiftArtifact:      shiftArtifact,
+		ShiftReport:        shiftResult,
+		HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
+		Retained:           manifest.Retention.RetainContainer,
+		RetentionTTL:       manifest.Retention.TTL,
 	}
 	if hasStream {
 		r.publishRetentionHint(ctx, streamID, result)
 	}
 	return result, nil
+}
+
+func clonePublishedArtifacts(src map[string]PublishedArtifact) map[string]PublishedArtifact {
+	if len(src) == 0 {
+		return nil
+	}
+	dup := make(map[string]PublishedArtifact, len(src))
+	for k, v := range src {
+		dup[k] = v
+	}
+	return dup
 }

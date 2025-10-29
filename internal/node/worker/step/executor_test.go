@@ -3,6 +3,7 @@ package stepworker
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -179,6 +180,93 @@ func TestExecutorShiftFailureSignalsInspection(t *testing.T) {
 	}
 	if result.Artifacts["shift_report_cid"] != "bafy-shift" {
 		t.Fatalf("expected shift report artifact in failure path")
+	}
+}
+
+func TestExecutorIncludesHydrationSnapshotArtifacts(t *testing.T) {
+	t.Helper()
+	now := time.Date(2025, 10, 28, 12, 0, 0, 0, time.UTC)
+	streams := logstream.NewHub(logstream.Options{})
+	runner := &fakeRunner{
+		result: stepruntime.Result{
+			ContainerID: "ctr-3",
+			ExitCode:    0,
+			DiffArtifact: stepruntime.PublishedArtifact{
+				CID:    "bafy-diff",
+				Digest: "sha256:diff",
+				Size:   1024,
+			},
+			LogArtifact: stepruntime.PublishedArtifact{
+				CID:    "bafy-logs",
+				Digest: "sha256:logs",
+				Size:   2048,
+			},
+			HydrationSnapshots: map[string]stepruntime.PublishedArtifact{
+				"workspace": {
+					CID:    "bafy-snapshot",
+					Digest: "sha256:snapshot",
+					Size:   4096,
+				},
+			},
+			ShiftReport: stepruntime.ShiftResult{
+				Passed:   true,
+				Duration: 2 * time.Second,
+			},
+		},
+	}
+	exec := Executor{
+		runner:  runner,
+		streams: streams,
+		now:     func() time.Time { return now },
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    "mods-plan",
+		Name:  "Mods Plan",
+		Image: "ghcr.io/ploy/mods/plan:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "overlay", Mode: contracts.StepInputModeReadWrite, DiffCID: "bafy-overlay", MountPath: "/workspace"},
+		},
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	assign := controlplane.Assignment{
+		ID:       "job-hydrate",
+		Runtime:  "local",
+		Metadata: map[string]string{"step_manifest": string(data)},
+	}
+
+	result, execErr := exec.Execute(context.Background(), assign)
+	if execErr != nil {
+		t.Fatalf("Execute returned error: %v", execErr)
+	}
+	if cid := result.Artifacts[scheduler.HydrationSnapshotCIDKey]; cid != "bafy-snapshot" {
+		t.Fatalf("expected hydration snapshot cid, got %q", cid)
+	}
+	if digest := result.Artifacts[scheduler.HydrationSnapshotDigestKey]; digest != "sha256:snapshot" {
+		t.Fatalf("expected hydration snapshot digest, got %q", digest)
+	}
+	if size := result.Artifacts[scheduler.HydrationSnapshotSizeKey]; size != strconv.FormatInt(4096, 10) {
+		t.Fatalf("expected hydration snapshot size, got %q", size)
+	}
+	bundle, ok := result.Bundles[scheduler.HydrationSnapshotBundleKey]
+	if !ok {
+		t.Fatalf("expected hydration snapshot bundle in result")
+	}
+	if bundle.CID != "bafy-snapshot" {
+		t.Fatalf("unexpected hydration bundle cid %q", bundle.CID)
+	}
+	if bundle.TTL != scheduler.HydrationSnapshotTTL {
+		t.Fatalf("expected hydration bundle ttl %s, got %q", scheduler.HydrationSnapshotTTL, bundle.TTL)
+	}
+	expectedExpiry := ""
+	if duration, err := time.ParseDuration(scheduler.HydrationSnapshotTTL); err == nil && duration > 0 {
+		expectedExpiry = now.Add(duration).UTC().Format(time.RFC3339Nano)
+	}
+	if bundle.ExpiresAt != expectedExpiry {
+		t.Fatalf("expected hydration expiry %s, got %s", expectedExpiry, bundle.ExpiresAt)
 	}
 }
 

@@ -72,6 +72,7 @@ func (h *FilesystemWorkspaceHydrator) Prepare(ctx context.Context, req Workspace
 	}
 
 	inputPaths := make(map[string]string, len(req.Manifest.Inputs))
+	var hydrationSnapshots map[string]PublishedArtifact
 	for _, input := range req.Manifest.Inputs {
 		select {
 		case <-ctx.Done():
@@ -85,8 +86,15 @@ func (h *FilesystemWorkspaceHydrator) Prepare(ctx context.Context, req Workspace
 
 		switch {
 		case input.Hydration != nil:
-			if err := h.hydrateWithPlan(ctx, input, targetDir); err != nil {
+			artifact, err := h.hydrateWithPlan(ctx, input, targetDir)
+			if err != nil {
 				return Workspace{}, fmt.Errorf("step: hydrate %s: %w", input.Name, err)
+			}
+			if artifact != nil && strings.TrimSpace(artifact.CID) != "" {
+				if hydrationSnapshots == nil {
+					hydrationSnapshots = make(map[string]PublishedArtifact)
+				}
+				hydrationSnapshots[input.Name] = *artifact
 			}
 		case strings.TrimSpace(input.SnapshotCID) != "":
 			if err := h.extractArtifact(ctx, snapshotArtifactPath(h.artifactRoot, input.SnapshotCID), targetDir); err != nil {
@@ -103,8 +111,9 @@ func (h *FilesystemWorkspaceHydrator) Prepare(ctx context.Context, req Workspace
 	}
 
 	return Workspace{
-		Inputs:     inputPaths,
-		WorkingDir: resolveDefaultWorkingDir(req.Manifest),
+		Inputs:             inputPaths,
+		WorkingDir:         resolveDefaultWorkingDir(req.Manifest),
+		HydrationSnapshots: hydrationSnapshots,
 	}, nil
 }
 

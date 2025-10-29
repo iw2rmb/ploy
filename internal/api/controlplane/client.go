@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // Assignment represents a control-plane assignment to be executed by the node.
@@ -28,9 +30,26 @@ type Assignment struct {
 	Payload  map[string]any
 }
 
+// AssignmentError captures executor error metadata.
+type AssignmentError struct {
+	Reason  string
+	Message string
+}
+
+// AssignmentResult summarises the outcome produced by an executor.
+type AssignmentResult struct {
+	State      string
+	Error      *AssignmentError
+	Artifacts  map[string]string
+	Bundles    map[string]scheduler.BundleRecord
+	Shift      *scheduler.ShiftMetrics
+	Inspection bool
+	Retention  *logstream.RetentionHint
+}
+
 // AssignmentExecutor executes control-plane assignments.
 type AssignmentExecutor interface {
-	Execute(ctx context.Context, assignment Assignment) error
+	Execute(ctx context.Context, assignment Assignment) (AssignmentResult, error)
 }
 
 // StatusProvider exposes the node status published back to the control plane.
@@ -289,7 +308,7 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		c.heartbeatLoop(heartbeatCtx, cfg, job)
 	}()
 
-	execErr := c.executor.Execute(jobCtx, assignment)
+	result, execErr := c.executor.Execute(jobCtx, assignment)
 
 	heartbeatCancel()
 	<-heartbeatDone
@@ -302,8 +321,26 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		state  = jobStateSucceeded
 		jobErr *jobErrorPayload
 	)
+	if trimmed := strings.TrimSpace(result.State); trimmed != "" {
+		state = trimmed
+	} else if execErr == nil {
+		state = jobStateSucceeded
+	}
 	if execErr != nil {
-		state = jobStateFailed
+		if state == "" {
+			state = jobStateFailed
+		}
+		c.appendLog(loopCtx, cfg, job, "stderr", fmt.Sprintf("job %s failed: %v", job.ID, execErr))
+	} else {
+		c.appendLog(loopCtx, cfg, job, "stdout", fmt.Sprintf("job %s completed successfully", job.ID))
+	}
+
+	if result.Error != nil {
+		jobErr = &jobErrorPayload{
+			Reason:  strings.TrimSpace(result.Error.Reason),
+			Message: strings.TrimSpace(result.Error.Message),
+		}
+	} else if execErr != nil {
 		reason := "executor_error"
 		if errors.Is(execErr, context.Canceled) {
 			reason = "executor_canceled"
@@ -312,11 +349,9 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 			Reason:  reason,
 			Message: execErr.Error(),
 		}
-		c.appendLog(loopCtx, cfg, job, "stderr", fmt.Sprintf("job %s failed: %v", job.ID, execErr))
-	} else {
-		c.appendLog(loopCtx, cfg, job, "stdout", fmt.Sprintf("job %s completed successfully", job.ID))
 	}
-	if err := c.completeWithRetry(loopCtx, cfg, job, state, jobErr); err != nil {
+
+	if err := c.completeWithRetry(loopCtx, cfg, job, state, jobErr, result); err != nil {
 		log.Printf("controlplane: complete job %s: %v", job.ID, err)
 	}
 }
@@ -370,7 +405,7 @@ func (c *Client) sendHeartbeat(ctx context.Context, cfg config.ControlPlaneConfi
 }
 
 // completeWithRetry attempts to complete the job, retrying transient failures.
-func (c *Client) completeWithRetry(ctx context.Context, cfg config.ControlPlaneConfig, job claimedJob, state string, jobErr *jobErrorPayload) error {
+func (c *Client) completeWithRetry(ctx context.Context, cfg config.ControlPlaneConfig, job claimedJob, state string, jobErr *jobErrorPayload, result AssignmentResult) error {
 	var (
 		attempts     int
 		initial, max = c.backoffDurations(cfg)
@@ -378,7 +413,7 @@ func (c *Client) completeWithRetry(ctx context.Context, cfg config.ControlPlaneC
 	)
 	bo.configure(initial, max)
 	for {
-		retryable, err := c.postCompletion(ctx, cfg, job, state, jobErr)
+		retryable, err := c.postCompletion(ctx, cfg, job, state, jobErr, result)
 		if err == nil {
 			return nil
 		}
@@ -397,7 +432,7 @@ func (c *Client) completeWithRetry(ctx context.Context, cfg config.ControlPlaneC
 }
 
 // postCompletion posts the completion payload and indicates whether to retry.
-func (c *Client) postCompletion(ctx context.Context, cfg config.ControlPlaneConfig, job claimedJob, state string, jobErr *jobErrorPayload) (bool, error) {
+func (c *Client) postCompletion(ctx context.Context, cfg config.ControlPlaneConfig, job claimedJob, state string, jobErr *jobErrorPayload, result AssignmentResult) (bool, error) {
 	if ctx.Err() != nil {
 		return false, ctx.Err()
 	}
@@ -406,10 +441,19 @@ func (c *Client) postCompletion(ctx context.Context, cfg config.ControlPlaneConf
 		return true, err
 	}
 	payload := completionRequest{
-		Ticket: job.Ticket,
-		NodeID: cfg.NodeID,
-		State:  state,
-		Error:  jobErr,
+		Ticket:     job.Ticket,
+		NodeID:     cfg.NodeID,
+		State:      state,
+		Error:      jobErr,
+		Artifacts:  cloneMetadata(result.Artifacts),
+		Bundles:    cloneBundleRecords(result.Bundles),
+		Inspection: result.Inspection,
+	}
+	if result.Shift != nil {
+		payload.Shift = &shiftPayload{
+			Result:          strings.TrimSpace(result.Shift.Result),
+			DurationSeconds: result.Shift.Duration.Seconds(),
+		}
 	}
 	req, err := c.newJSONRequest(ctx, http.MethodPost, endpoint, payload)
 	if err != nil {
@@ -526,34 +570,43 @@ type jobErrorPayload struct {
 
 // completionRequest is the JSON payload posted to the completion endpoint.
 type completionRequest struct {
-	Ticket string           `json:"ticket"`
-	NodeID string           `json:"node_id"`
-	State  string           `json:"state"`
-	Error  *jobErrorPayload `json:"error,omitempty"`
+	Ticket     string                            `json:"ticket"`
+	NodeID     string                            `json:"node_id"`
+	State      string                            `json:"state"`
+	Error      *jobErrorPayload                  `json:"error,omitempty"`
+	Artifacts  map[string]string                 `json:"artifacts,omitempty"`
+	Bundles    map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+	Shift      *shiftPayload                     `json:"shift,omitempty"`
+	Inspection bool                              `json:"inspection,omitempty"`
+}
+
+type shiftPayload struct {
+	Result          string  `json:"result"`
+	DurationSeconds float64 `json:"duration_seconds"`
 }
 
 type jobLogRequest struct {
-    Ticket    string `json:"ticket"`
-    NodeID    string `json:"node_id"`
-    Stream    string `json:"stream"`
-    Line      string `json:"line"`
-    Timestamp string `json:"timestamp"`
+	Ticket    string `json:"ticket"`
+	NodeID    string `json:"node_id"`
+	Stream    string `json:"stream"`
+	Line      string `json:"line"`
+	Timestamp string `json:"timestamp"`
 }
 
 func (c *Client) appendLog(ctx context.Context, cfg config.ControlPlaneConfig, job claimedJob, stream, line string) {
-    record := jobLogRequest{
-        Ticket:    job.Ticket,
-        NodeID:    cfg.NodeID,
-        Stream:    strings.TrimSpace(stream),
-        Line:      line,
-        Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
-    }
-    if record.Stream == "" {
-        record.Stream = "stdout"
-    }
-    if err := c.postJobLog(ctx, cfg, job, record); err != nil {
-        log.Printf("controlplane: post log for job %s failed: %v", job.ID, err)
-    }
+	record := jobLogRequest{
+		Ticket:    job.Ticket,
+		NodeID:    cfg.NodeID,
+		Stream:    strings.TrimSpace(stream),
+		Line:      line,
+		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if record.Stream == "" {
+		record.Stream = "stdout"
+	}
+	if err := c.postJobLog(ctx, cfg, job, record); err != nil {
+		log.Printf("controlplane: post log for job %s failed: %v", job.ID, err)
+	}
 }
 
 // claimBackoff manages exponential backoff between claim attempts.
@@ -597,6 +650,24 @@ func (b *claimBackoff) next() time.Duration {
 // reset clears the accumulated backoff so the next call returns the initial interval.
 func (b *claimBackoff) reset() {
 	b.current = 0
+}
+
+func cloneBundleRecords(src map[string]scheduler.BundleRecord) map[string]scheduler.BundleRecord {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]scheduler.BundleRecord, len(src))
+	for k, v := range src {
+		dst[k] = scheduler.BundleRecord{
+			CID:       strings.TrimSpace(v.CID),
+			Digest:    strings.TrimSpace(v.Digest),
+			Size:      v.Size,
+			Retained:  v.Retained,
+			TTL:       strings.TrimSpace(v.TTL),
+			ExpiresAt: strings.TrimSpace(v.ExpiresAt),
+		}
+	}
+	return dst
 }
 
 // cloneMetadata copies metadata maps for safe reuse.

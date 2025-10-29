@@ -54,8 +54,8 @@ func TestScriptConfiguresHTTPDefaults(t *testing.T) {
 	if !strings.Contains(script, "PLOYD_HTTP_LISTEN:-0.0.0.0:8443") {
 		t.Fatalf("ployd config must default HTTP listen to 0.0.0.0:8443")
 	}
-	if !strings.Contains(script, "PLOYD_HTTP_TLS_ENABLED:-false") {
-		t.Fatalf("ployd config must default HTTP TLS disabled")
+	if !strings.Contains(script, "PLOYD_HTTP_TLS_ENABLED:-true") {
+		t.Fatalf("ployd config must default HTTP TLS enabled")
 	}
 	if !strings.Contains(script, "PLOYD_TLS_CERT_PATH:-/etc/ploy/pki/node.pem") {
 		t.Fatalf("ployd config must default TLS cert path")
@@ -63,8 +63,8 @@ func TestScriptConfiguresHTTPDefaults(t *testing.T) {
 	if !strings.Contains(script, "PLOYD_HTTP_TLS_REQUIRE_CLIENT_CERT:-false") {
 		t.Fatalf("ployd config must default TLS client cert requirement to false")
 	}
-	if !strings.Contains(script, "PLOYD_METRICS_LISTEN:-127.0.0.1:9100") {
-		t.Fatalf("ployd config must default metrics listen to loopback")
+	if !strings.Contains(script, "PLOYD_METRICS_LISTEN:-127.0.0.1:9101") {
+		t.Fatalf("ployd config must default metrics listen to loopback:9101")
 	}
 }
 

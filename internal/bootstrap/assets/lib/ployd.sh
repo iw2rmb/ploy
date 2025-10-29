@@ -15,16 +15,21 @@ configure_ployd_service() {
   fi
 
   if [[ ! -f "$config_path" ]]; then
-    local endpoint_host="${NODE_ADDRESS:-127.0.0.1}"
-    local tls_enabled="${PLOYD_HTTP_TLS_ENABLED:-false}"
-    local require_client_cert="${PLOYD_HTTP_TLS_REQUIRE_CLIENT_CERT:-false}"
-    if [[ "${BOOTSTRAP_PRIMARY}" == "true" ]]; then
-      tls_enabled="true"
+    local raw_host="${NODE_ADDRESS:-127.0.0.1}"
+    if [[ -z "$raw_host" ]]; then
+      raw_host="127.0.0.1"
     fi
-    if [[ "$endpoint_host" == *:* ]] && [[ "$endpoint_host" != \[* ]]; then
-      endpoint_host="[$endpoint_host]"
-    fi
+    local endpoint_host
+    endpoint_host="$(format_host_for_url "$raw_host")"
     local endpoint="https://${endpoint_host}:8443"
+    local metrics_listen="${PLOYD_METRICS_LISTEN:-127.0.0.1:9101}"
+    local tls_enabled="${PLOYD_HTTP_TLS_ENABLED:-true}"
+    local require_client_cert="${PLOYD_HTTP_TLS_REQUIRE_CLIENT_CERT:-false}"
+    local desired_node_id="${PLOYD_NODE_ID:-$NODE_ID}"
+    desired_node_id="$(sanitize_node_id "$desired_node_id")"
+    if [[ -z "$desired_node_id" ]]; then
+      desired_node_id="control"
+    fi
     cat >"$config_path" <<YAML
 http:
   listen: "${PLOYD_HTTP_LISTEN:-0.0.0.0:8443}"
@@ -35,9 +40,10 @@ http:
     client_ca: "${PLOYD_TLS_CLIENT_CA_PATH:-/etc/ploy/pki/control-plane-ca.pem}"
     require_client_cert: ${require_client_cert}
 metrics:
-  listen: "${PLOYD_METRICS_LISTEN:-127.0.0.1:9100}"
+  listen: "${metrics_listen}"
 control_plane:
   endpoint: "${endpoint}"
+  node_id: "${desired_node_id}"
   ca: "/etc/ploy/pki/control-plane-ca.pem"
   certificate: "/etc/ploy/pki/node.pem"
   key: "/etc/ploy/pki/node-key.pem"
@@ -50,6 +56,8 @@ YAML
   fi
 
   ensure_transfer_guard "$config_path"
+
+  configure_ployd_environment "$raw_host"
 
   cat >"${SYSTEMD_DIR}/ployd.service" <<UNIT
 [Unit]
@@ -69,6 +77,26 @@ WantedBy=multi-user.target
 UNIT
   systemctl daemon-reload
   systemctl enable ployd >/dev/null 2>&1 || true
+}
+
+configure_ployd_environment() {
+  local host="$1"
+  local env_dir="/etc/systemd/system/ployd.service.d"
+  mkdir -p "$env_dir"
+
+  local cache_dir="${PLOYD_CACHE_HOME:-/var/cache/ploy}"
+  local home_dir="${PLOYD_HOME_DIR:-/root}"
+  local ipfs_host="$(format_host_for_url "$host")"
+  local ipfs_api="${PLOY_IPFS_CLUSTER_API:-http://${ipfs_host}:9094}"
+
+  mkdir -p "$cache_dir"
+
+  cat >"${env_dir}/env.conf" <<ENV
+[Service]
+Environment=PLOY_IPFS_CLUSTER_API=${ipfs_api}
+Environment=HOME=${home_dir}
+Environment=XDG_CACHE_HOME=${cache_dir}
+ENV
 }
 
 start_ployd_service() {
@@ -137,4 +165,29 @@ exec ${BIN_DIR}/ployd slot-guard --config "${config_path}" --slot "\$slot"
 WRAPPER
   chmod 0755 "$wrapper"
   log "configured ploy slot guard via $wrapper"
+}
+
+sanitize_node_id() {
+  local value="${1,,}"
+  value="${value//[^a-z0-9-]/-}"
+  value="${value##-}"
+  value="${value%%-}"
+  printf '%s' "$value"
+}
+
+format_host_for_url() {
+  local value="$1"
+  if [[ -z "$value" ]]; then
+    printf '127.0.0.1'
+    return
+  fi
+  if [[ "$value" == \[* ]]; then
+    printf '%s' "$value"
+    return
+  fi
+  if [[ "$value" == *:* ]]; then
+    printf '[%s]' "$value"
+    return
+  fi
+  printf '%s' "$value"
 }

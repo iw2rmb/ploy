@@ -37,6 +37,18 @@ func postJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int,
 	return sendJSONStatus(t, http.MethodPost, endpoint, payload)
 }
 
+func patchJSON(t *testing.T, endpoint string, payload map[string]any) map[string]any {
+	status, out := patchJSONStatus(t, endpoint, payload)
+	if status >= 400 {
+		t.Fatalf("patch %s -> http %d: %v", endpoint, status, out)
+	}
+	return out
+}
+
+func patchJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int, map[string]any) {
+	return sendJSONStatus(t, http.MethodPatch, endpoint, payload)
+}
+
 func putJSONStatus(t *testing.T, endpoint string, payload map[string]any) (int, map[string]any) {
 	return sendJSONStatus(t, http.MethodPut, endpoint, payload)
 }

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/url"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
@@ -45,6 +47,7 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 	if cfg.ControlPlaneURL == "" {
 		cfg.ControlPlaneURL = baseURL
 	}
+	workerNodeID := deriveWorkerNodeID(workerAddr)
 	if !cfg.DryRun {
 		provOpts := deploy.ProvisionOptions{
 			Host:            workerAddr,
@@ -55,9 +58,17 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 			PloydBinaryPath: cfg.PloydBinary,
 			Stdout:          stderr,
 			Stderr:          stderr,
-			ScriptArgs:      []string{"--cluster-id", desc.ClusterID},
+			ScriptArgs:      []string{"--cluster-id", desc.ClusterID, "--node-id", workerNodeID, "--node-address", workerAddr},
 			ServiceChecks:   []string{"ployd"},
 		}
+		env := map[string]string{
+			"PLOY_IPFS_CLUSTER_API": fmt.Sprintf("http://%s:9094", deriveIPFSAPIHost(baseURL)),
+			"PLOYD_NODE_ID":         workerNodeID,
+			"PLOYD_METRICS_LISTEN":  "127.0.0.1:9101",
+			"PLOYD_HOME_DIR":        "/root",
+			"PLOYD_CACHE_HOME":      "/var/cache/ploy",
+		}
+		provOpts.ScriptEnv = env
 		if err := clusterProvisionHost(context.Background(), provOpts); err != nil {
 			return err
 		}
@@ -164,6 +175,36 @@ func convertProbes(probes []deploy.WorkerHealthProbe) []nodeJoinProbe {
 		})
 	}
 	return out
+}
+
+func deriveWorkerNodeID(address string) string {
+	host := strings.TrimSpace(address)
+	if parsed, _, err := net.SplitHostPort(host); err == nil && parsed != "" {
+		host = parsed
+	}
+	host = strings.ReplaceAll(host, "::", "-")
+	host = strings.ReplaceAll(host, ":", "-")
+	host = strings.ReplaceAll(host, ".", "-")
+	cleaned := config.SanitizeID(fmt.Sprintf("worker-%s", host))
+	if cleaned == "" {
+		return "worker"
+	}
+	return cleaned
+}
+
+func deriveIPFSAPIHost(base string) string {
+	parsed, err := url.Parse(base)
+	if err != nil {
+		return "127.0.0.1"
+	}
+	host := parsed.Hostname()
+	if host == "" {
+		return "127.0.0.1"
+	}
+	if strings.Contains(host, ":") {
+		return "[" + host + "]"
+	}
+	return host
 }
 
 func installWorkerArtifacts(cfg workerProvisionConfig, result nodeJoinResponse, stderr io.Writer) error {

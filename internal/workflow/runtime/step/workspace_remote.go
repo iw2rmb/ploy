@@ -55,13 +55,13 @@ type RepositoryFetchResult struct {
 	Ref      string
 }
 
-func (h *FilesystemWorkspaceHydrator) hydrateWithPlan(ctx context.Context, input contracts.StepInput, targetDir string) error {
+func (h *FilesystemWorkspaceHydrator) hydrateWithPlan(ctx context.Context, input contracts.StepInput, targetDir string) (*PublishedArtifact, error) {
 	if h == nil {
-		return errors.New("workspace hydrator not configured")
+		return nil, errors.New("workspace hydrator not configured")
 	}
 	plan := input.Hydration
 	if plan == nil {
-		return errors.New("hydration plan missing")
+		return nil, errors.New("hydration plan missing")
 	}
 
 	var baseRef *contracts.StepInputArtifactRef
@@ -90,62 +90,77 @@ func (h *FilesystemWorkspaceHydrator) hydrateWithPlan(ctx context.Context, input
 	if baseRef != nil && strings.TrimSpace(baseRef.CID) != "" {
 		path, err := h.ensureSnapshot(ctx, *baseRef)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := h.extractArtifact(ctx, path, targetDir); err != nil {
-			return err
+			return nil, err
 		}
 		baseExtracted = true
 	}
 
+	var hydrationArtifact *PublishedArtifact
 	if !baseExtracted && repoRef != nil {
-		if err := h.hydrateFromRepo(ctx, *repoRef, targetDir); err != nil {
-			return err
+		art, err := h.hydrateFromRepo(ctx, *repoRef, targetDir)
+		if err != nil {
+			return nil, err
+		}
+		if art != nil {
+			hydrationArtifact = art
 		}
 		baseExtracted = true
 	}
 
 	if !baseExtracted {
-		return fmt.Errorf("input %s hydration missing base snapshot or repo metadata", input.Name)
+		return nil, fmt.Errorf("input %s hydration missing base snapshot or repo metadata", input.Name)
 	}
 
 	for _, diff := range diffRefs {
 		path, err := h.ensureDiff(ctx, diff)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if err := h.extractArtifact(ctx, path, targetDir); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return hydrationArtifact, nil
 }
 
-func (h *FilesystemWorkspaceHydrator) hydrateFromRepo(ctx context.Context, repo contracts.RepoMaterialization, targetDir string) error {
+func (h *FilesystemWorkspaceHydrator) hydrateFromRepo(ctx context.Context, repo contracts.RepoMaterialization, targetDir string) (*PublishedArtifact, error) {
 	if h.repoFetcher == nil {
-		return errors.New("repo fetcher not configured")
+		return nil, errors.New("repo fetcher not configured")
 	}
 	result, err := h.repoFetcher.FetchRepository(ctx, RepositoryFetchRequest{Repo: repo})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	tarPath := strings.TrimSpace(result.TarPath)
 	if tarPath == "" {
-		return errors.New("repo fetcher returned empty tar path")
+		return nil, errors.New("repo fetcher returned empty tar path")
 	}
 
+	var published *PublishedArtifact
 	if strings.TrimSpace(result.Artifact.CID) != "" {
 		cachedPath, err := h.cacheSnapshotFromExisting(result, tarPath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		tarPath = cachedPath
+		published = &PublishedArtifact{
+			CID:    strings.TrimSpace(result.Artifact.CID),
+			Digest: strings.TrimSpace(result.Artifact.Digest),
+			Size:   result.Artifact.Size,
+			Kind:   ArtifactKindSnapshot,
+		}
 	} else if err := h.writeSnapshotMetadata(tarPath, result); err != nil {
-		return err
+		return nil, err
 	}
 
-	return h.extractArtifact(ctx, tarPath, targetDir)
+	if err := h.extractArtifact(ctx, tarPath, targetDir); err != nil {
+		return nil, err
+	}
+	return published, nil
 }
 
 func (h *FilesystemWorkspaceHydrator) ensureSnapshot(ctx context.Context, ref contracts.StepInputArtifactRef) (string, error) {

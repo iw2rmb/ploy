@@ -10,6 +10,8 @@ describes the lifecycle, cleanup controller, and CLI tooling.
   flag).
 - Jobs that are still running or awaiting retries never receive an `expires_at`; only terminal
   states (`succeeded`, `failed`, `cancelled`) do.
+- Repository hydration clones publish `hydration_snapshot` bundles with a fixed `24h` TTL so IPFS
+  pins created during fallback clones expire automatically unless operators repin them.
 
 Example job record snippet:
 

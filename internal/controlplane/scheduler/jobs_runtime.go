@@ -6,10 +6,19 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
+)
+
+const (
+	HydrationSnapshotBundleKey = "hydration_snapshot"
+	HydrationSnapshotCIDKey    = "hydration_snapshot_cid"
+	HydrationSnapshotDigestKey = "hydration_snapshot_digest"
+	HydrationSnapshotSizeKey   = "hydration_snapshot_size"
+	HydrationSnapshotTTL       = "24h"
 )
 
 // ClaimNext attempts to claim the next available job for the provided node.
@@ -169,8 +178,15 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	if req.Error != nil {
 		record.Error = req.Error
 	}
-	if len(req.Bundles) > 0 {
-		record.Bundles = normalizeBundleRecords(req.Bundles, completedAt)
+	bundleInputs := cloneBundleMap(req.Bundles)
+	if rec, ok := hydrationBundleFromArtifacts(req.Artifacts); ok {
+		if bundleInputs == nil {
+			bundleInputs = make(map[string]BundleRecord, len(req.Bundles)+1)
+		}
+		bundleInputs[HydrationSnapshotBundleKey] = rec
+	}
+	if len(bundleInputs) > 0 {
+		record.Bundles = normalizeBundleRecords(bundleInputs, completedAt)
 	}
 	if req.Inspection && req.State == JobStateFailed {
 		record.State = JobStateInspectionReady
@@ -249,6 +265,28 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	}
 
 	return record.toJob(), nil
+}
+
+func hydrationBundleFromArtifacts(artifacts map[string]string) (BundleRecord, bool) {
+	cid := strings.TrimSpace(artifacts[HydrationSnapshotCIDKey])
+	if cid == "" {
+		return BundleRecord{}, false
+	}
+	digest := strings.TrimSpace(artifacts[HydrationSnapshotDigestKey])
+	sizeStr := strings.TrimSpace(artifacts[HydrationSnapshotSizeKey])
+	sizeValue := int64(0)
+	if sizeStr != "" {
+		if parsed, err := strconv.ParseInt(sizeStr, 10, 64); err == nil {
+			sizeValue = parsed
+		}
+	}
+	return BundleRecord{
+		CID:      cid,
+		Digest:   digest,
+		Size:     sizeValue,
+		Retained: true,
+		TTL:      HydrationSnapshotTTL,
+	}, true
 }
 
 func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimResult, error) {

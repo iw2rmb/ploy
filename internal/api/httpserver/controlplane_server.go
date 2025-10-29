@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/controlplane/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
+	"github.com/iw2rmb/ploy/internal/controlplane/hydration"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
@@ -76,6 +77,8 @@ type controlPlaneServer struct {
 	artifacts         *controlplaneartifacts.Store
 	artifactPublisher artifactPublisher
 	registryStore     *registry.Store
+	hydration         *hydration.Index
+	hydrationPolicies *hydration.PolicyStore
 }
 
 type artifactPublisher interface {
@@ -100,6 +103,8 @@ type ControlPlaneOptions struct {
 	ArtifactStore     *controlplaneartifacts.Store
 	ArtifactPublisher artifactPublisher
 	RegistryStore     *registry.Store
+	HydrationIndex    *hydration.Index
+	HydrationPolicies *hydration.PolicyStore
 }
 
 // New returns an HTTP handler rooted at /v1.
@@ -149,6 +154,12 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		}
 	}
 
+	if opts.HydrationPolicies == nil && opts.Etcd != nil {
+		if store, err := hydration.NewPolicyStore(opts.Etcd, hydration.PolicyStoreOptions{}); err == nil {
+			opts.HydrationPolicies = store
+		}
+	}
+
 	h := &controlPlaneServer{
 		scheduler:         opts.Scheduler,
 		signer:            opts.Signer,
@@ -164,6 +175,8 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		artifacts:         artStore,
 		artifactPublisher: opts.ArtifactPublisher,
 		registryStore:     regStore,
+		hydration:         opts.HydrationIndex,
+		hydrationPolicies: opts.HydrationPolicies,
 	}
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
