@@ -40,6 +40,7 @@ type Options struct {
     Status       StatusProvider
     Admin        AdminService
     Jobs         JobProvider
+    JobControl   JobController
     ControlPlane http.Handler
 }
 
@@ -51,6 +52,7 @@ type Server struct {
     status    StatusProvider
     admin     AdminService
     jobs      JobProvider
+    jobCtrl   JobController
     control   http.Handler
     app       *fiber.App
     listener  net.Listener
@@ -73,6 +75,7 @@ func New(opts Options) (*Server, error) {
         status:  opts.Status,
         admin:   opts.Admin,
         jobs:    opts.Jobs,
+        jobCtrl: opts.JobControl,
         control: opts.ControlPlane,
     }
 	if err := s.ensureApp(); err != nil {
@@ -223,11 +226,14 @@ func (s *Server) mountRoutes(app *fiber.App) {
     app.Get("/v1/node/jobs", s.handleNodeJobsList)
     app.Get("/v1/node/jobs/:jobID", s.handleNodeJobsDetail)
     app.Get("/v1/node/jobs/:jobID/logs/stream", s.handleLogStream)
+    app.Get("/v1/node/jobs/:jobID/logs/snapshot", s.handleNodeJobLogsSnapshot)
+    app.Post("/v1/node/jobs/:jobID/logs/entries", s.handleNodeJobLogsEntry)
+    app.Post("/v1/node/jobs/:jobID/cancel", s.handleNodeJobCancel)
     app.Post("/v1/admin/nodes", s.handleAdminNodeCreate)
     if s.control != nil {
-		handler := adaptor.HTTPHandler(s.control)
-		app.All("/v1", handler)
-		app.All("/v1/*", handler)
+        handler := adaptor.HTTPHandler(s.control)
+        app.All("/v1", handler)
+        app.All("/v1/*", handler)
 		app.All("/metrics", handler)
 	}
 }

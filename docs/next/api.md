@@ -378,6 +378,8 @@ through its local `ployd` instance:
 - `POST /v1/node/jobs/{id}/cancel` — Stop a running job (if local).
 - `GET /v1/node/jobs/{id}/logs` — Fetch archived stdout/stderr.
 - `GET /v1/node/jobs/{id}/logs/stream` — SSE log stream direct from the node runtime.
+ - `GET /v1/node/jobs/{id}/logs/snapshot` — JSON snapshot of buffered log events (same shape as control-plane `jobs/{id}/logs/snapshot`).
+ - `POST /v1/node/jobs/{id}/logs/entries` — Append a structured log record to the node stream.
 - `GET /v1/node/status` — Returns the latest lifecycle snapshot published by the worker:
   - `state` aggregates component health (`ok`, `degraded`, `error`, `unknown`) across Docker, SHIFT, and IPFS probes.
   - `resources.cpu|memory|disk` now include host totals/free plus nested disk I/O metrics: `resources.disk.io.read_mb_per_sec`, `write_mb_per_sec`, `read_iops`, and `write_iops`, with `details.initial_sample=true` when the first sample lacks a baseline.

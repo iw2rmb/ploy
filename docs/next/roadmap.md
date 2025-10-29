@@ -15,7 +15,7 @@
 - [x] 2.2 Wire the step runner: assemble the workspace hydrator, Docker runtime, diff capture, IPFS Cluster publisher, and SHIFT client inside a worker executor package; persist retention hints to etcd and stream them via SSE (`internal/node/logstream`).
 - [x] 2.3 Implement real SHIFT integration per `docs/next/shift.md`: replace `noopSandboxExecutor` in `cmd/ploy/dependencies_runtime_local.go` with a sandbox executor that shells out to the standalone SHIFT binary/library, and records structured reports in IPFS; add failure mapping to `buildgate` metadata.
 - [x] 2.4 Support repository hydration and snapshot reuse on nodes: teach the workspace hydrator to pull base snapshots/diff CIDs from IPFS Cluster, materialise ordered diffs, and fall back to GitLab clones using credentials stored in etcd.
-- [ ] 2.5 Add node lifecycle controllers: expose `/v1/node/status`, `/v1/node/jobs`, `/v1/node/logs` in the worker HTTP surface; periodically publish capacity heartbeats (`nodes/<node-id>/capacity`), Docker/SHIFT health, and IPFS peer info so the control plane can schedule intelligently.
+- [x] 2.5 Add node lifecycle controllers: expose `/v1/node/status`, `/v1/node/jobs`, `/v1/node/logs` in the worker HTTP surface; periodically publish capacity heartbeats (`nodes/<node-id>/capacity`), Docker/SHIFT health, and IPFS health; persist node status snapshots via `PATCH /v1/nodes/{node}` to etcd (`nodes/<node-id>/status`) for scheduler consumption.
 
 ## 3. CLI & Operator Workflow
 
