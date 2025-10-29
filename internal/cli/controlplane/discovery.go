@@ -152,23 +152,32 @@ func BaseURLFromDescriptor(desc config.Descriptor) (string, error) {
 }
 
 func newHTTPClient(target Target) (*http.Client, error) {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	if target.Descriptor != nil {
-		pem := strings.TrimSpace(target.Descriptor.CABundle)
-		if pem != "" {
-			pool := x509.NewCertPool()
-			if !pool.AppendCertsFromPEM([]byte(pem)) {
-				return nil, errors.New("control plane descriptor CA bundle invalid")
-			}
-			transport.TLSClientConfig.RootCAs = pool
-		}
-	}
-	client := &http.Client{Timeout: defaultHTTPTimeout, Transport: transport}
-	useTunnel, err := configureTunnels(target)
-	if err != nil {
-		return nil, err
-	}
+    transport := http.DefaultTransport.(*http.Transport).Clone()
+    transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+    if target.Descriptor != nil {
+        pem := strings.TrimSpace(target.Descriptor.CABundle)
+        if pem != "" {
+            pool := x509.NewCertPool()
+            if !pool.AppendCertsFromPEM([]byte(pem)) {
+                return nil, errors.New("control plane descriptor CA bundle invalid")
+            }
+            transport.TLSClientConfig.RootCAs = pool
+        }
+    }
+    // Guard: if callers point the base URL at a loopback host (e.g., https://127.0.0.1:9443)
+    // while tunneling to a remote node, set SNI/verification ServerName to the descriptor's
+    // address so strict TLS verification still succeeds against the remote certificate.
+    if isLoopbackHost(target.BaseURL.Hostname()) && target.Descriptor != nil {
+        host := strings.TrimSpace(target.Descriptor.Address)
+        if host != "" {
+            transport.TLSClientConfig.ServerName = host
+        }
+    }
+    client := &http.Client{Timeout: defaultHTTPTimeout, Transport: transport}
+    useTunnel, err := configureTunnels(target)
+    if err != nil {
+        return nil, err
+    }
 	if useTunnel {
 		if err := attachHTTPClient(client); err != nil {
 			return nil, err
