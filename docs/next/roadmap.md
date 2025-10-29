@@ -20,6 +20,28 @@
 ## 3. CLI & Operator Workflow
 
 - [ ] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on Grid clients and event stubs.
+  - Derivables
+    - CLI behavior: `ploy mod run <path|repo> [--param k=v] [--ticket T] [--follow] [--quiet] [--json] [--artifact-dir DIR]` with clear help text and examples; supports stdin-driven config and param overrides.
+    - Control-plane submission: build a `POST /v1/mods` payload that includes repo/ref, workspace hydration hints (base snapshot, diffs), SHIFT policy selector, and operator notes; map `--param` to submission `params` and persist a returned ticket ID.
+    - Event/Checkpoint streaming: when `--follow` is set, subscribe to `GET /v1/mods/{ticket}/events` (SSE) and render progress with stage names, durations, retry counts, and warnings; optionally `--json` emits machine-readable lines.
+    - Logs access: on demand `--logs` or at completion, stream `GET /v1/mods/{ticket}/logs` with tailing and archive handoff; support `--since` and `--grep` client-side filters.
+    - Artifact retrieval: on success fetch artifact bundle metadata from `GET /v1/mods/{ticket}` and download referenced items via `GET /v1/artifacts/{id}` or IPFS/OCI targets; write to `--artifact-dir` with digest-prefixed filenames and a manifest JSON.
+    - Exit codes & failure mapping: non-zero on terminal Mod failure or policy violation; map severities (policy soft fail vs hard fail) to distinct exit codes; print remediation hint when available.
+    - Config/env integration: respect control-plane URL/token discovery from `docs/envs/README.md` (e.g., `PLOY_API_URL`, `PLOY_TOKEN`, IPFS Cluster toggles); surface effective config with `--debug`.
+    - Telemetry hooks: increment CLI metrics (submissions, follow durations, cancel counts) and include `X-Ploy-Client` header with version/platform; guard behind opt-in env toggle.
+    - Legacy removal: drop direct calls to `internal/workflow/runner` and Grid stubs; depend only on the HTTP client in `internal/api/controlplane` and the logstream reader.
+    - Docs refresh: update `docs/next/api.md` and `docs/api/OpenAPI.yaml` examples for `/v1/mods` submission, events schema, and artifact listing; add a quickstart snippet to the root README.
+  - How to test
+    - Unit tests (LOCAL): flag/args parsing, param merging, and payload construction with table-driven tests in `cmd/ploy/mod_run_test.go`; verify exit code mapping and quiet/json output modes. Target ≥90% coverage for the command package slice.
+    - Client contract tests (LOCAL): mock the control-plane client to emit a golden SSE transcript (events, retries, warnings) and assert rendered output; add a JSON mode golden to ensure machine-readability stability.
+    - Artifact handling tests (LOCAL): fake artifact metadata and downloads, assert pathing under `--artifact-dir`, digest-prefixed names, and manifest structure; include collision handling and partial failure cases.
+    - Resilience tests (LOCAL): inject network timeouts, 5xx retries, and SSE disconnects; ensure exponential backoff, resume behavior, and user-facing warnings are correct without duplicate events.
+    - Cancel/Resume flows (LOCAL): simulate `SIGINT` while `--follow` is active and assert the CLI calls `POST /v1/mods/{ticket}/cancel`; verify resume path via `ploy mod resume` is suggested with the correct ticket.
+    - Help/UX snapshots (LOCAL): snapshot `ploy mod run --help` and typical success/failure outputs; protect from regressions with minimal golden maintenance.
+    - OpenAPI alignment (LOCAL): validate request/response structs against `docs/api/OpenAPI.yaml` using a schema check; fail tests on drift of fields/types.
+    - Integration (GRID/VPS): with the VPS lab per `docs/next/vps-lab.md`, run against a seeded repo to exercise submission → events/logs → artifact retrieval; assert deterministic diff CIDs, SHIFT enforcement presence, and final manifest matches.
+    - E2E smoke (GRID/VPS): drive `ploy mod run` end-to-end with `--json` and verify a stable event stream contract and final artifacts are pinned in IPFS Cluster; collect timings for SLA baselines.
+    - Docs guard (LOCAL): extend `tests/guards/docs_guard_test.go` to assert roadmap/API examples reference existing flags/endpoints and that `docs/next/api.md` stays in sync after changes.
 - [ ] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
 - [ ] 3.3 Update cluster and node administration flows: ensure the unified `ploy cluster add` command (primary + worker modes), `ploy node rm`, and GitLab signer commands hit the new endpoints, reuse the SSH descriptor format, and surface tunnel status where operators need it.
 - [ ] 3.4 Refresh configuration/environment handling: purge Grid-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
