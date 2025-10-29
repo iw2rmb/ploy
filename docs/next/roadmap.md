@@ -54,14 +54,14 @@
 - [ ] 4.2 Expose Prometheus metrics per `docs/next/observability.md`: register queue depth, claim latency, retry counts, SHIFT duration, IPFS pin metrics, GC activity, and log upload status; serve them at `/metrics` with tests covering label cardinality.
 - [ ] 4.3 Ship the GC controller and CLI: implement a background reconciler that walks `gc/jobs/**`, unpins artifacts via IPFS Cluster, and deletes expired records; add `ploy gc` with dry-run and filtering options, wiring it to the same logic.
 - [ ] 4.4 Build node administration routes: `/v1/nodes` should report health, running jobs, IPFS peer lag, and support drain/heal actions, all reachable through the SSH tunnel manager.
-- [ ] 4.5 Document and automate operations: update `docs/next/devops.md`, `docs/next/observability.md`, and `docs/next/vps-lab.md` with the new commands, required ports, and smoke tests; ensure bootstrap scripts drop the right resolver entries and verify systemd units.
+- [ ] 4.5 Document and automate operations: update `docs/how-to/deploy-a-cluster.md`, `docs/next/observability.md`, and `docs/next/vps-lab.md` with the new commands, required ports, and smoke tests; ensure bootstrap scripts drop the right resolver entries and verify systemd units.
 - [ ] 4.6 Wire transfer ingestion to jobs/artifacts: have committed slots trigger IPFS publishes, update job metadata with report CIDs/digests, and expose metrics/alerts when uploads stall or digests mismatch.
 
 ## 5. Migration & Cleanup
 
 - [ ] 5.1 Remove Grid dependencies: drop `github.com/iw2rmb/grid` from `go.mod`, delete Grid-specific packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
 - [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
-- [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/next/devops.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
+- [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/how-to/deploy-a-cluster.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
 
 ## 6. Testing & Release Readiness
 

@@ -38,7 +38,7 @@ SSH transfer slots replace direct IPFS uploads from workstations. This guide wal
 
 ## Step 2 — Enable the SFTP subsystem
 
-Follow [docs/next/devops.md](devops.md#ssh-artifact-subsystem) to create
+Follow [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md#ssh-artifact-subsystem) to create
 `/var/lib/ploy/ssh-artifacts`, add the `ploy-artifacts` group, and update `sshd_config` with the
 `Subsystem ploy-artifacts internal-sftp` stanza. Reload sshd and run a smoke upload/report cycle from
 an operator workstation.
@@ -95,5 +95,5 @@ For artifacts that were uploaded directly to IPFS without control-plane metadata
 
 - [docs/next/api.md](api.md#transfer-slots-ssh-uploads--downloads)
 - [docs/next/ipfs.md](ipfs.md#ssh-transfer-workflow)
-- [docs/next/devops.md](devops.md#ssh-artifact-subsystem)
+- [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md#ssh-artifact-subsystem)
 - [docs/runbooks/control-plane/ssh-transfer.md](../runbooks/control-plane/ssh-transfer.md)
