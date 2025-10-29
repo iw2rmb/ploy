@@ -193,17 +193,24 @@ func SetDefault(id string) error {
 }
 
 func clusterConfigDir() (string, error) {
-	if override := strings.TrimSpace(os.Getenv("PLOY_CONFIG_HOME")); override != "" {
-		return filepath.Join(override, "clusters"), nil
-	}
-	if base := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); base != "" {
-		return filepath.Join(base, "ploy", "clusters"), nil
-	}
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve config dir: %w", err)
-	}
-	return filepath.Join(configDir, "ploy", "clusters"), nil
+    // Canonical location by default: ~/.config/ploy/clusters
+    // Allow test harness to override via PLOY_CONFIG_HOME or XDG_CONFIG_HOME.
+    if override := strings.TrimSpace(os.Getenv("PLOY_CONFIG_HOME")); override != "" {
+        return filepath.Join(override, "clusters"), nil
+    }
+    if base := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); base != "" {
+        return filepath.Join(base, "ploy", "clusters"), nil
+    }
+    home, err := os.UserHomeDir()
+    if err != nil {
+        // Fallback to OS config dir if HOME is not resolvable
+        configDir, derr := os.UserConfigDir()
+        if derr != nil {
+            return "", fmt.Errorf("resolve config dir: %w", err)
+        }
+        return filepath.Join(configDir, "ploy", "clusters"), nil
+    }
+    return filepath.Join(home, ".config", "ploy", "clusters"), nil
 }
 
 func descriptorPath(id string) (string, error) {
