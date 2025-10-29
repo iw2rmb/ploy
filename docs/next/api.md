@@ -218,6 +218,41 @@ after the TTL if a node restarts mid-transfer.
 - `DELETE /v1/registry/{repo}/blobs/{digest}` — Remove a blob (subject to reference tracking).
 - `GET /v1/registry/{repo}/tags/list` — List tags for a repository.
 
+## Node API
+
+### Jobs
+
+- `GET /v1/node/jobs` — List recent jobs executed on this node. Newest first.
+- `GET /v1/node/jobs/{id}` — Inspect a single job record.
+- `GET /v1/node/jobs/{id}/logs/stream` — Server‑sent events stream of live logs for the job.
+
+Example list response:
+
+```json
+[
+  {
+    "id": "job-xyz",
+    "state": "running",
+    "started_at": "2025-10-29T20:20:00Z",
+    "completed_at": "",
+    "log_stream": "job-xyz"
+  }
+]
+```
+
+Example detail response:
+
+```json
+{
+  "id": "job-abc",
+  "state": "failed",
+  "started_at": "2025-10-29T20:18:00Z",
+  "completed_at": "2025-10-29T20:19:01Z",
+  "log_stream": "job-abc",
+  "error": "exit status 1"
+}
+```
+
 Registry endpoints enforce `registry.pull` for read paths and `registry.push` for write/delete
 operations.
 
