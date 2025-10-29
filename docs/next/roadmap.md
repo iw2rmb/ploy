@@ -19,7 +19,7 @@
 
 ## 3. CLI & Operator Workflow
 
-- [ ] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on Grid clients and event stubs.
+ - [x] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on Grid clients and event stubs.
   - Derivables
     - CLI behavior: `ploy mod run <path|repo> [--param k=v] [--ticket T] [--follow] [--quiet] [--json] [--artifact-dir DIR]` with clear help text and examples; supports stdin-driven config and param overrides.
     - Control-plane submission: build a `POST /v1/mods` payload that includes repo/ref, workspace hydration hints (base snapshot, diffs), SHIFT policy selector, and operator notes; map `--param` to submission `params` and persist a returned ticket ID.
@@ -39,8 +39,8 @@
     - Cancel/Resume flows (LOCAL): simulate `SIGINT` while `--follow` is active and assert the CLI calls `POST /v1/mods/{ticket}/cancel`; verify resume path via `ploy mod resume` is suggested with the correct ticket.
     - Help/UX snapshots (LOCAL): snapshot `ploy mod run --help` and typical success/failure outputs; protect from regressions with minimal golden maintenance.
     - OpenAPI alignment (LOCAL): validate request/response structs against `docs/api/OpenAPI.yaml` using a schema check; fail tests on drift of fields/types.
-    - Integration (GRID/VPS): with the VPS lab per `docs/next/vps-lab.md`, run against a seeded repo to exercise submission → events/logs → artifact retrieval; assert deterministic diff CIDs, SHIFT enforcement presence, and final manifest matches.
-    - E2E smoke (GRID/VPS): drive `ploy mod run` end-to-end with `--json` and verify a stable event stream contract and final artifacts are pinned in IPFS Cluster; collect timings for SLA baselines.
+    - Integration (VPS): with the VPS lab per `docs/next/vps-lab.md`, run against a seeded repo to exercise submission → events/logs → artifact retrieval; assert deterministic diff CIDs, SHIFT enforcement presence, and final manifest matches.
+    - E2E smoke (VPS): drive `ploy mod run` end-to-end with `--json` and verify a stable event stream contract and final artifacts are pinned in IPFS Cluster; collect timings for SLA baselines.
     - Docs guard (LOCAL): extend `tests/guards/docs_guard_test.go` to assert roadmap/API examples reference existing flags/endpoints and that `docs/next/api.md` stays in sync after changes.
 - [ ] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
 - [ ] 3.3 Update cluster and node administration flows: ensure the unified `ploy cluster add` command (primary + worker modes), `ploy node rm`, and GitLab signer commands hit the new endpoints, reuse the SSH descriptor format, and surface tunnel status where operators need it.

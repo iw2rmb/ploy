@@ -18,9 +18,9 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/mods/tickets" {
-			t.Fatalf("unexpected path %s", r.URL.Path)
-		}
+    if r.URL.Path != "/v1/mods" {
+        t.Fatalf("unexpected path %s", r.URL.Path)
+    }
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
