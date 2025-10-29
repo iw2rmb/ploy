@@ -48,8 +48,9 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 		cfg.ControlPlaneURL = baseURL
 	}
 	workerNodeID := deriveWorkerNodeID(workerAddr)
-	if !cfg.DryRun {
-		provOpts := deploy.ProvisionOptions{
+    sameHost := strings.EqualFold(workerAddr, strings.TrimSpace(desc.Address))
+    if !cfg.DryRun && !sameHost {
+        provOpts := deploy.ProvisionOptions{
 			Host:            workerAddr,
 			Address:         workerAddr,
 			User:            strings.TrimSpace(cfg.User),
@@ -69,10 +70,10 @@ func runClusterWorkerAdd(cfg workerProvisionConfig, stderr io.Writer) error {
 			"PLOYD_CACHE_HOME":      "/var/cache/ploy",
 		}
 		provOpts.ScriptEnv = env
-		if err := clusterProvisionHost(context.Background(), provOpts); err != nil {
-			return err
-		}
-	}
+        if err := clusterProvisionHost(context.Background(), provOpts); err != nil {
+            return err
+        }
+    }
 	factory := clusterHTTPClientFactory
 	if factory == nil {
 		factory = newDescriptorHTTPClient
