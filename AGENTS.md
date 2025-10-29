@@ -26,7 +26,7 @@
   packages.
 - **Cycle**: RED (write failing tests) → GREEN (minimal code) → REFACTOR
   (exercise VPS once available).
-- For Codex execution details on the Mods Grid E2E harness, consult
+- For Codex execution details on the Mods E2E harness, consult
   `tests/e2e/README.md`.
 - Use the VPS lab control plane for integration/E2E verification. Connection and
   environment expectations are documented in `docs/next/vps-lab.md`; plan test

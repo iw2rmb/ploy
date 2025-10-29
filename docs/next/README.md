@@ -137,7 +137,7 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.
 - [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy Next.
-- [docs/next/devops.md](devops.md) — Deployment, bootstrap, and node operations playbook.
+- [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment, bootstrap, and node operations playbook.
 - [docs/next/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
 - [docs/next/ssh-transfer-migration.md](ssh-transfer-migration.md) — Migration plan for the SSH slot
   workflow and CLI transfer commands.

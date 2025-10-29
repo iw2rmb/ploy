@@ -1,8 +1,9 @@
-# Deployment & Operations Guide
+> Moved: This document now lives at [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md).
 
-This guide describes how to bootstrap a Ploy Next cluster and add additional
-`ployd` nodes.
-It assumes Linux hosts (VPS or bare metal) with SSH access.
+# Deployment & Operations Guide (Moved)
+
+The deployment guide has been relocated to keep how‑to content under `docs/how-to/`.
+Please refer to the updated path above.
 
 ## Prerequisites
 
