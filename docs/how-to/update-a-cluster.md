@@ -1,6 +1,8 @@
 # Update a Ploy Cluster
 
-This guide outlines how to update `ployd` to a new version on the VPS lab or any Ploy node.
+This guide outlines how to update `ployd` to a new version on the VPS lab or any Ploy node. All
+nodes are equivalent: each serves control APIs and can execute jobs. Update all nodes you want
+participating in execution.
 
 ## 1) Build ployd for Linux
 
@@ -67,4 +69,3 @@ curl -sk https://45.9.42.212:8443/v1/version | jq .
 Repeat checks for the other nodes (`46.173.16.177`, `81.200.119.187`).
 
 Tip: roll one node first, validate, then continue with the remaining nodes.
-
