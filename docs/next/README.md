@@ -146,5 +146,5 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/queue.md](queue.md) — etcd-backed queue, capacity tracking, and scheduling behaviour.
 - [docs/next/etcd.md](etcd.md) — etcd keyspace layout and contracts.
 - [docs/next/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
-- [docs/next/vps-lab.md](vps-lab.md) — Shared VPS lab environment for integration and E2E testing.
+  (VPS lab details: see AGENTS.md for node IPs and usage.)
 - [docs/next/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy Next.
