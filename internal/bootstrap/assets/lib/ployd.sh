@@ -88,6 +88,7 @@ configure_ployd_environment() {
   local home_dir="${PLOYD_HOME_DIR:-/root}"
   local ipfs_host="$(format_host_for_url "$host")"
   local ipfs_api="${PLOY_IPFS_CLUSTER_API:-http://${ipfs_host}:9094}"
+  local lifecycle_ignore="${PLOY_LIFECYCLE_NET_IGNORE:-docker*,veth*,br-*}"
 
   mkdir -p "$cache_dir"
 
@@ -96,6 +97,7 @@ configure_ployd_environment() {
 Environment=PLOY_IPFS_CLUSTER_API=${ipfs_api}
 Environment=HOME=${home_dir}
 Environment=XDG_CACHE_HOME=${cache_dir}
+Environment=PLOY_LIFECYCLE_NET_IGNORE=${lifecycle_ignore}
 ENV
 }
 

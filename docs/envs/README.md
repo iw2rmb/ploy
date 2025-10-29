@@ -46,6 +46,8 @@ configuration.
 - `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
+- `PLOY_SHIFT_BINARY` — Optional path override for the SHIFT CLI invoked by worker lifecycle health checks
+  (`shift --version`). Defaults to `shift` when unset.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.
@@ -66,6 +68,14 @@ configuration.
 - `PLOY_ARTIFACT_ROOT` — Optional override for the local artifact cache used by the step workspace hydrator and filesystem artifact publisher. Defaults to `$XDG_CACHE_HOME/ploy/artifacts` (or the OS cache dir fallback) when unset.
 - `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
   until the CLI flips to the new scheduler by default.
+
+## Worker Nodes
+
+- `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
+  - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
+    
+    environment:
+      PLOY_LIFECYCLE_NET_IGNORE: "docker*,veth*,br-*"
 
 ## E2E Harness
 
