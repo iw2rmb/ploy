@@ -11,7 +11,7 @@ Linux hosts (VPS or bare metal) over SSH.
 - IPFS Cluster service 1.1.4 installed.
 - etcd 3.6.0 available.
 
-## Bootstrap Steps (Control Plane)
+## Bootstrap Steps (Single Node or Multi-Node)
 
 1. Provision host
    - Update OS packages.
@@ -36,18 +36,25 @@ Linux hosts (VPS or bare metal) over SSH.
    - Preflight checks verify package manager, `${PLOY_WORKDIR:-/var/lib/ploy}` disk, and port
      availability. Binaries are pinned in `/usr/local/bin` for deterministic upgrades.
 
-   Example:
+   Example (single-node cluster; this one node will both host APIs and execute jobs once added):
 
    ```bash
    dist/ploy cluster add --address 45.9.42.212
    ```
 
+### Node Roles (Conceptual)
+
+All Ploy nodes are equivalent. Each node runs the control APIs and can also run the execution loop
+that claims and executes jobs. A “single-node cluster” simply means you bootstrap one node and add
+the same node to the cluster so it participates in execution. Additional nodes increase parallelism
+and resilience.
+
 ### TLS Bootstrap & Rotation
 
 - Primary: CLI invokes the bootstrap with `--primary`; host wipes config, enables HTTPS, and runs
   `ployd bootstrap-ca` to mint CA + control‑plane leaf cert and persist to etcd.
-- Workers: run `ploy cluster add --cluster-id <id>`; after install, the CLI registers the worker via
-  `/v1/nodes`, scps issued certs to `/etc/ploy/pki`, rewrites
+- Add more nodes: run `ploy cluster add --cluster-id <id>` for each additional host. After install,
+  the CLI registers the node via `/v1/nodes`, scps issued certs to `/etc/ploy/pki`, rewrites
   `control_plane.endpoint=https://<control-plane>:8443`, and restarts `ployd`.
 
 ## Operations Tips
@@ -60,7 +67,7 @@ Linux hosts (VPS or bare metal) over SSH.
   (or from `/v1/config`).
 - Control plane endpoints:
   - `GET /v1/config?cluster_id=<id>` to audit config; update with `PUT /v1/config` and `If-Match`.
-  - `GET /v1/status?cluster_id=<id>` for queue depth and worker readiness (no-store).
+- `GET /v1/status?cluster_id=<id>` for queue depth and node readiness (no-store).
   - `GET /v1/version` for build metadata (cache up to 60s).
 
 ## SSH Artifact Subsystem
@@ -107,4 +114,3 @@ ploy report --job-id smoke --output /tmp/smoke-report.tar.gz
 - Descriptors are canonical for SSH addresses and keys; re-run
   `ploy cluster add --address ... --dry-run` (or edit the descriptor) when IP/keys change.
 - Persistent tunnels live under `~/.ploy/tunnels`; removing a socket forces reconnect.
-
