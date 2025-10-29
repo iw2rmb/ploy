@@ -67,16 +67,18 @@ type Options struct {
 
 // Client coordinates control-plane polling and status updates.
 type Client struct {
-	mu          sync.Mutex
-	cfg         config.ControlPlaneConfig
-	executor    AssignmentExecutor
-	status      StatusProvider
-	httpClient  *http.Client
-	running     bool
-	loopCtx     context.Context
-	cancel      context.CancelFunc
-	group       sync.WaitGroup
-	emptyClaims int64
+    mu          sync.Mutex
+    cfg         config.ControlPlaneConfig
+    executor    AssignmentExecutor
+    status      StatusProvider
+    httpClient  *http.Client
+    running     bool
+    loopCtx     context.Context
+    cancel      context.CancelFunc
+    group       sync.WaitGroup
+    emptyClaims int64
+    activeMu    sync.Mutex
+    active      map[string]context.CancelFunc
 }
 
 // New constructs the control plane client.
@@ -91,12 +93,13 @@ func New(opts Options) (*Client, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
-	return &Client{
-		cfg:        opts.Config,
-		executor:   opts.Executor,
-		status:     opts.Status,
-		httpClient: client,
-	}, nil
+    return &Client{
+        cfg:        opts.Config,
+        executor:   opts.Executor,
+        status:     opts.Status,
+        httpClient: client,
+        active:     make(map[string]context.CancelFunc),
+    }, nil
 }
 
 // Start launches background polling routines.
@@ -298,8 +301,9 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		log.Printf("controlplane: initial heartbeat for job %s failed: %v", job.ID, err)
 	}
 
-	jobCtx, jobCancel := context.WithCancel(loopCtx)
-	defer jobCancel()
+    jobCtx, jobCancel := context.WithCancel(loopCtx)
+    c.registerActive(job.ID, jobCancel)
+    defer jobCancel()
 
 	heartbeatCtx, heartbeatCancel := context.WithCancel(jobCtx)
 	heartbeatDone := make(chan struct{})
@@ -308,7 +312,8 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		c.heartbeatLoop(heartbeatCtx, cfg, job)
 	}()
 
-	result, execErr := c.executor.Execute(jobCtx, assignment)
+    result, execErr := c.executor.Execute(jobCtx, assignment)
+    c.unregisterActive(job.ID)
 
 	heartbeatCancel()
 	<-heartbeatDone
@@ -354,6 +359,39 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 	if err := c.completeWithRetry(loopCtx, cfg, job, state, jobErr, result); err != nil {
 		log.Printf("controlplane: complete job %s: %v", job.ID, err)
 	}
+}
+
+// Cancel requests cancellation of a running job. Returns true if a cancellation signal was sent.
+func (c *Client) Cancel(jobID string) bool {
+    if strings.TrimSpace(jobID) == "" {
+        return false
+    }
+    c.activeMu.Lock()
+    cancel, ok := c.active[jobID]
+    c.activeMu.Unlock()
+    if !ok || cancel == nil {
+        return false
+    }
+    cancel()
+    return true
+}
+
+func (c *Client) registerActive(jobID string, cancel context.CancelFunc) {
+    if strings.TrimSpace(jobID) == "" || cancel == nil {
+        return
+    }
+    c.activeMu.Lock()
+    c.active[jobID] = cancel
+    c.activeMu.Unlock()
+}
+
+func (c *Client) unregisterActive(jobID string) {
+    if strings.TrimSpace(jobID) == "" {
+        return
+    }
+    c.activeMu.Lock()
+    delete(c.active, jobID)
+    c.activeMu.Unlock()
 }
 
 // heartbeatLoop sends periodic heartbeats for the running job.

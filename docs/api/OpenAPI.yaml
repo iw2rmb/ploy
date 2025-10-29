@@ -24,6 +24,8 @@ security:
 paths:
   /v1/nodes:
     $ref: './paths/nodes.yaml'
+  /v1/nodes/{node_id}:
+    $ref: './paths/nodes_id.yaml'
   /v1/config/gitlab:
     $ref: './paths/gitlab_config.yaml'
   /v1/registry/{repository}/blobs/uploads:

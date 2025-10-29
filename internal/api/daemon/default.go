@@ -78,18 +78,6 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
     // Node-local job tracker.
     jobStore := jobs.NewStore(jobs.Options{})
 
-    httpSrv, err := httpserver.New(httpserver.Options{
-        Config:       cfg,
-        Streams:      streams,
-        Status:       statusProvider,
-        Admin:        adminSvc,
-        Jobs:         httpserver.NewJobProvider(jobStore),
-        ControlPlane: controlPlaneHandler,
-    })
-	if err != nil {
-		return nil, err
-	}
-
 	metricsSrv := metrics.New(metrics.Options{Listen: cfg.Metrics.Listen})
 
 	rotator := &fileRotator{}
@@ -111,12 +99,12 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
         return nil, err
     }
 
-	exec := executor.New(executor.Options{
-		Registry:       registry,
-		DefaultAdapter: cfg.Runtime.DefaultAdapter,
-		LogStreams:     streams,
-		Worker:         workerExec,
-	})
+    exec := executor.New(executor.Options{
+        Registry:       registry,
+        DefaultAdapter: cfg.Runtime.DefaultAdapter,
+        LogStreams:     streams,
+        Worker:         workerExec,
+    })
 
 	controlClient, err := controlplane.New(controlplane.Options{
 		Config:     cfg.ControlPlane,
@@ -128,7 +116,7 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-	taskScheduler := scheduler.New()
+    taskScheduler := scheduler.New()
 
 	shutdownFns := make([]func(context.Context) error, 0, 4)
 	if controlPlaneShutdown != nil {
@@ -194,22 +182,32 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		}
 	}
 
-	combinedShutdown := combineShutdowns(shutdownFns)
+    // Build HTTP server after control client to wire job control.
+    httpSrv, err := httpserver.New(httpserver.Options{
+        Config:       cfg,
+        Streams:      streams,
+        Status:       statusProvider,
+        Admin:        adminSvc,
+        Jobs:         httpserver.NewJobProvider(jobStore),
+        JobControl:   &jobController{client: controlClient, store: jobStore},
+        ControlPlane: controlPlaneHandler,
+    })
+    if err != nil {
+        return nil, err
+    }
+    combinedShutdown := combineShutdowns(shutdownFns)
 
-	svc, err := New(Options{
-		Config:               cfg,
-		RuntimeRegistry:      registry,
-		LogStreams:           streams,
-		HTTP:                 httpSrv,
-		Metrics:              metricsSrv,
-		ControlPlane:         controlClient,
-		PKI:                  pkiManager,
-		Scheduler:            taskScheduler,
-		ControlPlaneShutdown: combinedShutdown,
-	})
-	if err != nil {
-		return nil, err
-	}
+    svc, err := New(Options{
+        Config:               cfg,
+        RuntimeRegistry:      registry,
+        LogStreams:           streams,
+        HTTP:                 httpSrv,
+        Metrics:              metricsSrv,
+        ControlPlane:         controlClient,
+        PKI:                  pkiManager,
+        Scheduler:            taskScheduler,
+        ControlPlaneShutdown: combinedShutdown,
+    })
 	return svc, nil
 }
 
@@ -250,6 +248,29 @@ func ensureFile(path string) error {
 
 func buildAdminService() httpserver.AdminService {
 	return &admin.Service{EtcdEndpoints: etcdutil.LocalEndpoints()}
+}
+
+// jobController bridges HTTP job control to the control-plane client and local state.
+type jobController struct {
+    client *controlplane.Client
+    store  *jobs.Store
+}
+
+func (c *jobController) Cancel(jobID string) error {
+    if c == nil || c.client == nil || c.store == nil {
+        return errors.New("node: cancel unavailable")
+    }
+    rec, ok := c.store.Get(strings.TrimSpace(jobID))
+    if !ok {
+        return httpserver.ErrJobNotFound
+    }
+    if rec.State != jobs.StateRunning {
+        return httpserver.ErrJobNotRunning
+    }
+    if ok := c.client.Cancel(jobID); !ok {
+        return httpserver.ErrJobNotRunning
+    }
+    return nil
 }
 
 func newControlPlaneHTTPClient(cfg config.ControlPlaneConfig) (*http.Client, error) {

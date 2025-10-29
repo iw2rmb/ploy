@@ -208,7 +208,9 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPut, "/v1/gitlab/signer/secrets", h.handleSignerSecrets, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodPost, "/v1/gitlab/signer/tokens", h.handleSignerTokens, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/gitlab/signer/rotations", h.handleSignerRotations, httpsecurity.ScopeAdmin)
-	h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
+    h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
+    // Subpath handler for node-specific actions (e.g., PATCH /v1/nodes/{id}).
+    h.registerRoute(mux, "", "/v1/nodes/", h.handleNodeSubpath)
 	h.registerRoute(mux, "", "/v1/config/gitlab", h.handleGitLabConfig, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, httpsecurity.ScopeAdmin)
@@ -253,16 +255,18 @@ func (s *controlPlaneServer) registerRoute(mux *http.ServeMux, method, path stri
 }
 
 func (s *controlPlaneServer) routeRoles(path string) []string {
-	switch path {
-	case "/v1/nodes":
-		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
-	case "/v1/status":
-		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker}
-	case "/v1/security/ca":
-		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
-	default:
-		return nil
-	}
+    switch path {
+    case "/v1/nodes":
+        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+    case "/v1/nodes/":
+        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+    case "/v1/status":
+        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker}
+    case "/v1/security/ca":
+        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+    default:
+        return nil
+    }
 }
 
 func (s *controlPlaneServer) ensureEtcd(w http.ResponseWriter) bool {
