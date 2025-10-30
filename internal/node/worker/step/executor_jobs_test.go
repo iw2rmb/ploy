@@ -64,7 +64,7 @@ func TestExecutorPublishesFailure(t *testing.T) {
     streams := logstream.NewHub(logstream.Options{})
     tracker := jobs.NewStore(jobs.Options{})
 
-    runner := &fakeRunner{result: stepruntime.Result{ExitCode: 1}, err: stepruntime.ErrShiftFailed}
+    runner := &fakeRunner{result: stepruntime.Result{ExitCode: 1}, err: stepruntime.ErrBuildGateFailed}
     exec, err := New(Options{Runner: runner, Streams: streams, Jobs: tracker})
     if err != nil {
         t.Fatalf("New executor: %v", err)

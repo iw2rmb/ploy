@@ -381,7 +381,7 @@ through its local `ployd` instance:
  - `GET /v1/node/jobs/{id}/logs/snapshot` — JSON snapshot of buffered log events (same shape as control-plane `jobs/{id}/logs/snapshot`).
  - `POST /v1/node/jobs/{id}/logs/entries` — Append a structured log record to the node stream.
 - `GET /v1/node/status` — Returns the latest lifecycle snapshot published by the worker:
-  - `state` aggregates component health (`ok`, `degraded`, `error`, `unknown`) across Docker, SHIFT, and IPFS probes.
+  - `state` aggregates component health (`ok`, `degraded`, `error`, `unknown`) across Docker, Build Gate, and IPFS probes.
   - `resources.cpu|memory|disk` now include host totals/free plus nested disk I/O metrics: `resources.disk.io.read_mb_per_sec`, `write_mb_per_sec`, `read_iops`, and `write_iops`, with `details.initial_sample=true` when the first sample lacks a baseline.
   - `resources.network` tracks aggregate `rx_bytes_per_sec`, `tx_bytes_per_sec`, `rx_packets_per_sec`, `tx_packets_per_sec`, and an `interfaces` map keyed by device (`eth0`, `bond0`, etc.) so operators can spot per-NIC saturation. Interfaces listed in `PLOY_LIFECYCLE_NET_IGNORE` (glob support) are omitted, and the section exposes `details.initial_sample=true` until the second sample lands.
   - `components.docker|shift|ipfs` carry `state`, `message`, `version`, and probe timestamps so the control plane can surface detailed diagnostics.

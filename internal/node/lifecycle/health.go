@@ -1,18 +1,15 @@
 package lifecycle
 
 import (
-	"bytes"
-	"context"
-	"errors"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
-	"strings"
-	"sync"
-	"time"
+    "bytes"
+    "context"
+    "fmt"
+    "io"
+    "net/http"
+    "net/url"
+    "os/exec"
+    "strings"
+    "time"
 
 	"github.com/docker/docker/api/types"
 	typesystem "github.com/docker/docker/api/types/system"
@@ -110,94 +107,9 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 	return status
 }
 
-// ShiftChecker verifies the SHIFT CLI is callable and returns its version.
-type ShiftChecker struct {
-	binary string
-	runner commandRunner
-	cache  struct {
-		mu     sync.Mutex
-		status ComponentStatus
-	}
-	timeout time.Duration
-	now     func() time.Time
-}
-
+// commandRunner abstracts simple command execution for health checkers.
 type commandRunner interface {
-	Run(ctx context.Context, name string, args ...string) (string, string, error)
-}
-
-// ShiftCheckerOptions configure the SHIFT health checker.
-type ShiftCheckerOptions struct {
-	Binary  string
-	Runner  commandRunner
-	Timeout time.Duration
-	Clock   func() time.Time
-}
-
-// NewShiftChecker constructs a SHIFT CLI checker.
-func NewShiftChecker(opts ShiftCheckerOptions) *ShiftChecker {
-	binary := strings.TrimSpace(opts.Binary)
-	if binary == "" {
-		if envBinary := strings.TrimSpace(os.Getenv("PLOY_SHIFT_BINARY")); envBinary != "" {
-			binary = envBinary
-		} else {
-			binary = "shift"
-		}
-	}
-	runner := opts.Runner
-	if runner == nil {
-		runner = execRunner{}
-	}
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = 3 * time.Second
-	}
-	clock := opts.Clock
-	if clock == nil {
-		clock = func() time.Time { return time.Now().UTC() }
-	}
-	return &ShiftChecker{
-		binary:  binary,
-		runner:  runner,
-		timeout: timeout,
-		now:     clock,
-	}
-}
-
-// Check executes `shift --version` and caches the latest result.
-func (s *ShiftChecker) Check(ctx context.Context) ComponentStatus {
-	if s == nil || s.runner == nil {
-		return ComponentStatus{State: stateUnknown, CheckedAt: time.Now().UTC(), Message: "shift runner unavailable"}
-	}
-
-	s.cache.mu.Lock()
-	defer s.cache.mu.Unlock()
-
-	checkCtx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
-	stdout, stderr, err := s.runner.Run(checkCtx, s.binary, "--version")
-	status := ComponentStatus{
-		State:     stateOK,
-		Message:   strings.TrimSpace(stdout),
-		Version:   extractFirstLine(stdout),
-		CheckedAt: s.now(),
-	}
-	if err != nil {
-		switch {
-		case errors.Is(err, exec.ErrNotFound):
-			status.State = stateError
-			status.Message = fmt.Sprintf("%s not found", s.binary)
-		default:
-			status.State = stateError
-			if strings.TrimSpace(stderr) != "" {
-				status.Message = strings.TrimSpace(stderr)
-			} else {
-				status.Message = err.Error()
-			}
-		}
-	}
-	s.cache.status = status
-	return status
+    Run(ctx context.Context, name string, args ...string) (string, string, error)
 }
 
 // IPFSChecker validates IPFS Cluster health using the REST API.

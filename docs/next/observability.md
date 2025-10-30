@@ -42,13 +42,13 @@ an ingress controller, use the ingress host/port instead of the node endpoints.
 | `ploy_controlplane_queue_depth` | Gauge | `priority` | Number of queued jobs per priority band. |
 | `ploy_controlplane_claim_latency_seconds` | Histogram | `priority` | Time between enqueue and successful claim. |
 | `ploy_controlplane_job_retry_total` | Counter | `priority`, `reason` | Count of scheduler-triggered retries (e.g. `reason="lease_expired"`). |
-| `ploy_controlplane_shift_duration_seconds` | Histogram | `step_id`, `result` | Measured SHIFT execution duration for each job step. `result` normalises to `passed` / `failed` / `unknown`. |
+| `ploy_controlplane_gate_duration_seconds` | Histogram | `step_id`, `result` | Measured Build Gate execution duration for each job step. `result` normalises to `passed` / `failed` / `unknown`. |
 
-### SHIFT Duration Semantics
+### Build Gate Duration Semantics
 
-SHIFT duration is captured by the runtime as the elapsed wall time for the SHIFT build
+Build Gate duration is captured by the runtime as the elapsed wall time for the build
 gate invocation. The scheduler stores the latest duration per job attempt and feeds the
-`ploy_controlplane_shift_duration_seconds` histogram. Failed runs continue to report the
+`ploy_controlplane_gate_duration_seconds` histogram. Failed runs continue to report the
 observed duration with `result="failed"`, enabling alerting on slow failures or timeouts.
 
 ## Sample Alert Rules
@@ -68,15 +68,15 @@ groups:
             Queue depth has been above 50 for more than 10 minutes.
             Consider scaling schedulers or diagnosing stalled nodes.
 
-      - alert: PloyShiftDurationP99Slow
-        expr: histogram_quantile(0.99, rate(ploy_controlplane_shift_duration_seconds_bucket[10m])) > 180
+      - alert: PloyGateDurationP99Slow
+        expr: histogram_quantile(0.99, rate(ploy_controlplane_gate_duration_seconds_bucket[10m])) > 180
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: SHIFT p99 duration exceeded 3 minutes
+          summary: Build Gate p99 duration exceeded 3 minutes
           description: |
-            The 99th percentile SHIFT duration has stayed above 3 minutes for at least 5 minutes.
+            The 99th percentile Build Gate duration has stayed above 3 minutes for at least 5 minutes.
             Investigate node saturation or failing build gate environments.
 
       - alert: PloyJobRetriesBurst

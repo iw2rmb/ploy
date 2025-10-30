@@ -1,5 +1,20 @@
 # Changelog
 
+## [2025-10-30] Build Gate: Java Executor Embedded
+
+- Replaced the external SHIFT CLI shell-out with an embedded Java build gate executor
+  (`internal/workflow/buildgate/javaexec`). The executor prefers Gradle/Maven wrappers and
+  falls back to a Dockerised Maven image when wrappers are absent.
+- Worker and CLI now wire the BuildGate runner with the Java executor
+  (`internal/node/worker/step/executor.go`, `cmd/ploy/dependencies_runtime_local.go`).
+- Added a lifecycle checker that probes the configured Maven image presence
+  (`internal/node/lifecycle/health_buildgate.go`); removed the SHIFT binary env ref from docs.
+- Documentation updated: build gate overview and environment variables
+  (`docs/workflow/README.md`, `docs/envs/README.md`).
+- Verification (2025-10-30):
+  - `make build`
+  - `make test`
+
 ## [2025-10-26] SSH Transfer Documentation Pass
 
 - Expanded `docs/next/api.md` with transfer slot schemas, artifact upload/download examples, and the
@@ -59,7 +74,7 @@
   local step client.
 - Updated Mods documentation to describe local execution and staged artifacts
   (`docs/workflow/README.md`, `docs/next/README.md`, `docs/next/job.md`,
-  `docs/next/mod.md`, `docs/next/shift.md`) and captured the follow-on artifact
+  `docs/next/mod.md`) and captured the follow-on artifact
   publisher work in `docs/tasks/roadmap/03a-mod-runtime-artifacts.md`.
 - Closed out roadmap task `docs/tasks/roadmap/02-mod-step-runtime.md`, marking it
   completed and logging verification steps; refreshed README/env references for

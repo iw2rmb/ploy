@@ -32,15 +32,15 @@ func TestExecutorProducesAssignmentResult(t *testing.T) {
 				Digest: "sha256:logs",
 				Size:   2048,
 			},
-			ShiftArtifact: stepruntime.PublishedArtifact{
-				CID:    "bafy-shift",
-				Digest: "sha256:shift",
-				Size:   512,
-			},
-			ShiftReport: stepruntime.ShiftResult{
-				Passed:   true,
-				Duration: 5 * time.Second,
-			},
+        GateArtifact: stepruntime.PublishedArtifact{
+            CID:    "bafy-gate",
+            Digest: "sha256:gate",
+            Size:   512,
+        },
+        GateReport: stepruntime.GateResult{
+            Passed:   true,
+            Duration: 5 * time.Second,
+        },
 			Retained:     true,
 			RetentionTTL: "24h",
 		},
@@ -86,15 +86,15 @@ func TestExecutorProducesAssignmentResult(t *testing.T) {
 	if bundle, ok := result.Bundles["logs"]; !ok || bundle.CID != "bafy-logs" {
 		t.Fatalf("unexpected bundle: %+v", result.Bundles["logs"])
 	}
-	if result.Shift == nil || result.Shift.Result != scheduler.ShiftResultPassed {
-		t.Fatalf("expected shift result passed, got %+v", result.Shift)
-	}
-	if result.Artifacts["shift_report_cid"] != "bafy-shift" {
-		t.Fatalf("expected shift report artifact cid, got %s", result.Artifacts["shift_report_cid"])
-	}
-	if bundle, ok := result.Bundles["shift_report"]; !ok || bundle.CID != "bafy-shift" {
-		t.Fatalf("expected shift report bundle, got %+v", result.Bundles["shift_report"])
-	}
+    if result.Gate == nil || result.Gate.Result != scheduler.GateResultPassed {
+        t.Fatalf("expected gate result passed, got %+v", result.Gate)
+    }
+    if result.Artifacts["gate_report_cid"] != "bafy-gate" {
+        t.Fatalf("expected gate report artifact cid, got %s", result.Artifacts["gate_report_cid"])
+    }
+    if bundle, ok := result.Bundles["gate_report"]; !ok || bundle.CID != "bafy-gate" {
+        t.Fatalf("expected gate report bundle, got %+v", result.Bundles["gate_report"])
+    }
 	if result.Retention == nil || result.Retention.Bundle != "bafy-logs" {
 		t.Fatalf("expected retention bundle cid, got %+v", result.Retention)
 	}
@@ -106,7 +106,7 @@ func TestExecutorProducesAssignmentResult(t *testing.T) {
 	}
 }
 
-func TestExecutorShiftFailureSignalsInspection(t *testing.T) {
+func TestExecutorGateFailureSignalsInspection(t *testing.T) {
 	t.Helper()
 	now := time.Date(2025, 10, 28, 12, 0, 0, 0, time.UTC)
 	streams := logstream.NewHub(logstream.Options{})
@@ -119,20 +119,20 @@ func TestExecutorShiftFailureSignalsInspection(t *testing.T) {
 				Digest: "sha256:logs",
 				Size:   2048,
 			},
-			ShiftArtifact: stepruntime.PublishedArtifact{
-				CID:    "bafy-shift",
-				Digest: "sha256:shift",
-				Size:   512,
-			},
-			ShiftReport: stepruntime.ShiftResult{
-				Passed:   false,
+        GateArtifact: stepruntime.PublishedArtifact{
+            CID:    "bafy-gate",
+            Digest: "sha256:gate",
+            Size:   512,
+        },
+        GateReport: stepruntime.GateResult{
+            Passed:   false,
 				Message:  "shift failed",
 				Duration: 3 * time.Second,
 			},
 			Retained:     true,
-			RetentionTTL: "12h",
-		},
-		err: stepruntime.ErrShiftFailed,
+        RetentionTTL: "12h",
+        },
+        err: stepruntime.ErrBuildGateFailed,
 	}
 	exec := Executor{
 		runner:  runner,
@@ -178,9 +178,9 @@ func TestExecutorShiftFailureSignalsInspection(t *testing.T) {
 	if result.Retention == nil || result.Retention.TTL != "12h" {
 		t.Fatalf("expected retention metadata, got %+v", result.Retention)
 	}
-	if result.Artifacts["shift_report_cid"] != "bafy-shift" {
-		t.Fatalf("expected shift report artifact in failure path")
-	}
+    if result.Artifacts["gate_report_cid"] != "bafy-gate" {
+        t.Fatalf("expected gate report artifact in failure path")
+    }
 }
 
 func TestExecutorIncludesHydrationSnapshotArtifacts(t *testing.T) {
@@ -208,10 +208,10 @@ func TestExecutorIncludesHydrationSnapshotArtifacts(t *testing.T) {
 					Size:   4096,
 				},
 			},
-			ShiftReport: stepruntime.ShiftResult{
-				Passed:   true,
-				Duration: 2 * time.Second,
-			},
+        GateReport: stepruntime.GateResult{
+            Passed:   true,
+            Duration: 2 * time.Second,
+        },
 		},
 	}
 	exec := Executor{

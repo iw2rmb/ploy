@@ -42,7 +42,7 @@ type AssignmentResult struct {
 	Error      *AssignmentError
 	Artifacts  map[string]string
 	Bundles    map[string]scheduler.BundleRecord
-	Shift      *scheduler.ShiftMetrics
+    Gate       *scheduler.GateMetrics
 	Inspection bool
 	Retention  *logstream.RetentionHint
 }
@@ -487,12 +487,12 @@ func (c *Client) postCompletion(ctx context.Context, cfg config.ControlPlaneConf
 		Bundles:    cloneBundleRecords(result.Bundles),
 		Inspection: result.Inspection,
 	}
-	if result.Shift != nil {
-		payload.Shift = &shiftPayload{
-			Result:          strings.TrimSpace(result.Shift.Result),
-			DurationSeconds: result.Shift.Duration.Seconds(),
-		}
-	}
+    if result.Gate != nil {
+        payload.Gate = &gatePayload{
+            Result:          strings.TrimSpace(result.Gate.Result),
+            DurationSeconds: result.Gate.Duration.Seconds(),
+        }
+    }
 	req, err := c.newJSONRequest(ctx, http.MethodPost, endpoint, payload)
 	if err != nil {
 		return true, err
@@ -608,19 +608,19 @@ type jobErrorPayload struct {
 
 // completionRequest is the JSON payload posted to the completion endpoint.
 type completionRequest struct {
-	Ticket     string                            `json:"ticket"`
-	NodeID     string                            `json:"node_id"`
-	State      string                            `json:"state"`
-	Error      *jobErrorPayload                  `json:"error,omitempty"`
-	Artifacts  map[string]string                 `json:"artifacts,omitempty"`
-	Bundles    map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
-	Shift      *shiftPayload                     `json:"shift,omitempty"`
-	Inspection bool                              `json:"inspection,omitempty"`
+    Ticket     string                            `json:"ticket"`
+    NodeID     string                            `json:"node_id"`
+    State      string                            `json:"state"`
+    Error      *jobErrorPayload                  `json:"error,omitempty"`
+    Artifacts  map[string]string                 `json:"artifacts,omitempty"`
+    Bundles    map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+    Gate       *gatePayload                      `json:"gate,omitempty"`
+    Inspection bool                              `json:"inspection,omitempty"`
 }
 
-type shiftPayload struct {
-	Result          string  `json:"result"`
-	DurationSeconds float64 `json:"duration_seconds"`
+type gatePayload struct {
+    Result          string  `json:"result"`
+    DurationSeconds float64 `json:"duration_seconds"`
 }
 
 type jobLogRequest struct {

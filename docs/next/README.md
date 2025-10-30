@@ -1,6 +1,6 @@
 # Ploy Next Overview
 
-Ploy Next unifies Mods execution, SHIFT validation, and artifact handling into a
+Ploy Next unifies Mods execution, Build Gate validation, and artifact handling into a
 workstation-first stack. Lightweight `ployd` nodes coordinate Mods locally,
 while an etcd-backed control plane assigns work, enforces optimistic
 concurrency, and
@@ -13,7 +13,7 @@ control-plane stack.
 - Deliver workstation-first Mods orchestration without JetStream; use SSE and HTTP APIs.
 - Keep Mods steps deterministic by replaying repository snapshots plus ordered
   diffs on every node.
-- Streamline artifact publishing so diffs, logs, and SHIFT reports replicate
+- Streamline artifact publishing so diffs, logs, and Build Gate reports replicate
   across the cluster through IPFS Cluster.
 - Provide observability from the first release: job logs, retention metadata,
   and health endpoints behave the same on laptops and shared clusters.
@@ -22,7 +22,7 @@ control-plane stack.
 
 - Multi-cluster federation or dedicated discovery nodes (future work).
 - Hybrid support for the legacy runner; v2 replaces it entirely with the control-plane runtime.
-- Rewriting SHIFT itself—Ploy consumes the existing SHIFT build gate APIs.
+- Rewriting Build Gate itself—Ploy consumes the embedded Build Gate runner APIs.
 
 ## Architecture Summary
 
@@ -32,13 +32,13 @@ Mods stay the primary unit of work. Each Mod expands into a typed plan and runs
 as an ordered set of jobs (plan, LLM, rewrite generation, rewrite apply,
 validation). Every job executes in an OCI image, sees repository plus
 cumulative diffs, and produces a diff tarball plus logs that move through the
-SHIFT sandbox before the next step.
+Build Gate before the next step.
 
 ### Cluster Roles
 
 - Control plane schedules jobs, stores job metadata in etcd, and exposes the
   `/v1/jobs` APIs.
-- Nodes hydrate workspaces, launch containers, run SHIFT, and publish artifacts
+- Nodes hydrate workspaces, launch containers, run the Build Gate, and publish artifacts
   to IPFS Cluster.
 - Beacon mode distributes discovery data (DNS bootstrap, trust bundles) while
   still participating in job execution when capacity allows.
@@ -53,13 +53,13 @@ SHIFT sandbox before the next step.
   worker claims, heartbeats, status queries, and job completion. The ployd
   daemon fronts these routes, wrapping the etcd-backed scheduler with
   optimistic concurrency.
-- **Ploy Nodes (ployd workers)** — `ployd` worker daemons hosting Docker,
-  SHIFT, IPFS Cluster client, and etcd connectivity. Execute Mod steps, persist
+ - **Ploy Nodes (ployd workers)** — `ployd` worker daemons hosting Docker,
+  the Build Gate, IPFS Cluster client, and etcd connectivity. Execute Mod steps, persist
   job state, and stream logs back to the CLI.
 - **SSH Tunnel Manager** — `pkg/sshtransport` plus cached descriptors keep
   persistent SSH tunnels alive so the CLI can reach control-plane HTTP APIs
   without provisioning separate beacons or TLS bundles.
-- **SHIFT Build Gate** — Executes unit tests and static analysis per step;
+- **Build Gate** — Executes unit tests and static analysis per step;
   reused from the existing integration without embedding its CLI.
 - **IPFS Cluster** — Artifact store for snapshots, diff bundles, logs, and OCI
   layers. Cluster pinning replaces embedded IPFS nodes.
@@ -78,8 +78,8 @@ SHIFT sandbox before the next step.
    base archive and diff CIDs, and launches the specified container with retention
    enabled for inspection.
 4. On exit, the node captures stdout/stderr, diff tarball, and metadata before
-   invoking SHIFT to run tests and static analysis.
-5. Artifacts (diffs, logs, SHIFT report) publish to IPFS Cluster; the node
+   invoking the Build Gate to run tests and static analysis.
+5. Artifacts (diffs, logs, Build Gate report) publish to IPFS Cluster; the node
    records resulting CIDs, digests, and retention windows back in etcd.
 6. Control plane updates job state, surfaces observability (SSE log streams,
    status poll APIs), and triggers GC markers for later retention enforcement.
@@ -88,7 +88,7 @@ SHIFT sandbox before the next step.
 
 The control plane persists canonical job records and queue entries in etcd,
 using transactions and leases to guarantee single-worker claims. IPFS Cluster
-stores snapshots, diffs, logs, and SHIFT reports so any node can hydrate the
+stores snapshots, diffs, logs, and Build Gate reports so any node can hydrate the
 same state deterministically. Artifact CIDs live alongside job metadata,
 allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 
@@ -99,7 +99,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 - Job execution model — [docs/next/job.md](job.md)
 - Mods workflow example — [docs/next/mod.md](mod.md)
 - IPFS artifact handling — [docs/next/ipfs.md](ipfs.md)
-- SHIFT integration — [docs/next/shift.md](shift.md)
+- Build Gate integration — [docs/workflow/README.md](../workflow/README.md)
 
 ## Operations & Observability
 
@@ -108,7 +108,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 - Containers remain available after job completion for inspection; retention
   policies govern when GC prunes them.
 - Metrics capture queue depth, claim latency, lease expirations, retries, and
-  SHIFT duration. Health endpoints report etcd connectivity and backlog size.
+  Build Gate duration. Health endpoints report etcd connectivity and backlog size.
 - Prometheus scraping and alerting guidance — [docs/next/observability.md](observability.md)
 - Garbage collection controllers respect retention windows defined in
   [docs/next/gc.md](gc.md).
@@ -147,4 +147,4 @@ publisher, CLI refresh, and deployment tooling. Follow
 - [docs/next/etcd.md](etcd.md) — etcd keyspace layout and contracts.
 - [docs/next/testing.md](testing.md) — Testing requirements (unit/integration coverage, timeouts).
   (VPS lab details: see AGENTS.md for node IPs and usage.)
-- [docs/next/shift.md](shift.md) — Simplifying the SHIFT build gate for Ploy Next.
+- Build Gate integration — see [docs/workflow/README.md](../workflow/README.md).

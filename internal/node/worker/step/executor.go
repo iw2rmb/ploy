@@ -22,7 +22,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/node/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
-	"github.com/iw2rmb/ploy/internal/workflow/buildgate/shift"
+    javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	stepruntime "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -136,7 +136,7 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		return nil, fmt.Errorf("stepworker: docker runtime: %w", err)
 	}
 
-	shiftClient, err := newShiftClient()
+    gateClient, err := newGateClient()
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		Workspace:  hydrator,
 		Containers: containerRuntime,
 		Diffs:      diffGen,
-		SHIFT:      shiftClient,
+        Gate:       gateClient,
 		Artifacts:  publisher,
 		Streams:    streams,
 	}
@@ -313,35 +313,35 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		}
 		bundles["diff"] = record
 	}
-	if cid := strings.TrimSpace(runResult.ShiftArtifact.CID); cid != "" {
-		artifacts["shift_report_cid"] = cid
-		artifacts["shift_report_digest"] = strings.TrimSpace(runResult.ShiftArtifact.Digest)
-		bundle := scheduler.BundleRecord{
-			CID:    cid,
-			Digest: strings.TrimSpace(runResult.ShiftArtifact.Digest),
-			Size:   runResult.ShiftArtifact.Size,
-		}
-		if logTTL != "" {
-			bundle.TTL = logTTL
-			if duration, err := time.ParseDuration(logTTL); err == nil && duration > 0 {
-				bundle.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
-			}
-		}
-		bundles["shift_report"] = bundle
-	}
+        if cid := strings.TrimSpace(runResult.GateArtifact.CID); cid != "" {
+            artifacts["gate_report_cid"] = cid
+            artifacts["gate_report_digest"] = strings.TrimSpace(runResult.GateArtifact.Digest)
+            bundle := scheduler.BundleRecord{
+                CID:    cid,
+                Digest: strings.TrimSpace(runResult.GateArtifact.Digest),
+                Size:   runResult.GateArtifact.Size,
+            }
+            if logTTL != "" {
+                bundle.TTL = logTTL
+                if duration, err := time.ParseDuration(logTTL); err == nil && duration > 0 {
+                    bundle.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
+                }
+            }
+            bundles["gate_report"] = bundle
+        }
 
-	var shiftMetrics *scheduler.ShiftMetrics
-	if runResult.ShiftReport.Duration > 0 || runResult.ShiftReport.Message != "" || !runResult.ShiftReport.Passed {
-		metrics := scheduler.ShiftMetrics{
-			Duration: runResult.ShiftReport.Duration,
-		}
-		if runResult.ShiftReport.Passed {
-			metrics.Result = scheduler.ShiftResultPassed
-		} else {
-			metrics.Result = scheduler.ShiftResultFailed
-		}
-		shiftMetrics = &metrics
-	}
+        var gateMetrics *scheduler.GateMetrics
+        if runResult.GateReport.Duration > 0 || runResult.GateReport.Message != "" || !runResult.GateReport.Passed {
+            metrics := scheduler.GateMetrics{
+                Duration: runResult.GateReport.Duration,
+            }
+            if runResult.GateReport.Passed {
+                metrics.Result = scheduler.GateResultPassed
+            } else {
+                metrics.Result = scheduler.GateResultFailed
+            }
+            gateMetrics = &metrics
+        }
 
 	retentionHint := buildRetentionHint(runResult, manifest.Retention, logTTL, now)
 
@@ -350,9 +350,9 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		reason := "executor_error"
 		if errors.Is(runErr, context.Canceled) {
 			reason = "executor_canceled"
-		} else if errors.Is(runErr, stepruntime.ErrShiftFailed) {
-			reason = "shift_failed"
-		}
+            } else if errors.Is(runErr, stepruntime.ErrBuildGateFailed) {
+                reason = "build_gate_failed"
+            }
 		message := runErr.Error()
 		if strings.TrimSpace(message) == "" {
 			message = reason
@@ -368,10 +368,10 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		Error:      assignErr,
 		Artifacts:  artifacts,
 		Bundles:    bundles,
-		Shift:      shiftMetrics,
-		Inspection: manifest.Retention.RetainContainer && runErr != nil,
-		Retention:  retentionHint,
-	}
+            Gate:       gateMetrics,
+            Inspection: manifest.Retention.RetainContainer && runErr != nil,
+            Retention:  retentionHint,
+        }
 }
 
 func firstHydrationSnapshot(snapshots map[string]stepruntime.PublishedArtifact) (stepruntime.PublishedArtifact, bool) {
@@ -464,17 +464,17 @@ func newClusterClient(cfg config.Config) (*artifacts.ClusterClient, error) {
 	return artifacts.NewClusterClient(opts)
 }
 
-// newShiftClient builds a SHIFT client backed by the default sandbox runner.
-func newShiftClient() (stepruntime.ShiftClient, error) {
-	executor, err := shift.NewExecutor(shift.Options{})
-	if err != nil {
-		return nil, err
-	}
-	sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
-	gateRunner := &buildgate.Runner{
-		Sandbox: sandbox,
-	}
-	return stepruntime.NewBuildGateShiftClient(stepruntime.BuildGateShiftOptions{Runner: gateRunner})
+// newGateClient builds a Build Gate client backed by the default sandbox runner.
+func newGateClient() (stepruntime.GateClient, error) {
+    executor, err := javaexec.NewExecutor(javaexec.Options{})
+    if err != nil {
+        return nil, err
+    }
+    sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
+    gateRunner := &buildgate.Runner{
+        Sandbox: sandbox,
+    }
+    return stepruntime.NewBuildGateClient(stepruntime.BuildGateClientOptions{Runner: gateRunner})
 }
 
 // resolveConfigString prefers config overrides before falling back to process env.
