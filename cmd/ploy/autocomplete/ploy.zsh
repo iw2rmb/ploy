@@ -10,7 +10,6 @@ _ploy() {
     case $state in
         cmds)
             commands=()
-            
             commands+=("mod:Plan and run Mods workflows")
             commands+=("mods:Observe Mods execution (logs, events)")
             commands+=("hydration:Inspect and tune hydration policies")
@@ -28,7 +27,6 @@ _ploy() {
             ;;
         subs)
             case $words[2] in
-                
                 'mod')
                     commands=()
                     commands+=("run:Submit a Mods run to the control plane")
@@ -97,7 +95,6 @@ _ploy() {
                     ;;
                 'help')
                     commands=()
-                    
                     commands+=("mod:Plan and run Mods workflows")
                     commands+=("mods:Observe Mods execution (logs, events)")
                     commands+=("hydration:Inspect and tune hydration policies")
