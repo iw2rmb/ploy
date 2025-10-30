@@ -361,16 +361,7 @@ func Lookup(path ...string) (Node, bool) {
 }
 
 // LegacyCommands returns known legacy Grid command aliases and their replacement guidance.
-func LegacyCommands() map[string]string {
-	return map[string]string{
-		"apps":     "Apps commands moved under 'ploy manifest'. See docs/design/cli-command-tree/README.md for the refreshed layout.",
-		"env":      "Environment commands moved to 'ploy environment'. See docs/design/cli-command-tree/README.md for details.",
-		"grid":     "Grid commands were removed from the workstation CLI. See docs/design/cli-command-tree/README.md for the refreshed layout.",
-		"gridctl":  "Grid commands were removed from the workstation CLI. See docs/design/cli-command-tree/README.md for the refreshed layout.",
-		"lanes":    "Lane inspection now lives under 'ploy manifest' and 'ploy mod'. See docs/design/cli-command-tree/README.md for details.",
-		"security": "Security commands moved to 'ploy config gitlab'. See docs/design/cli-command-tree/README.md for details.",
-	}
-}
+// LegacyCommands removed; legacy aliases are no longer routed.
 
 // cloneNodes returns a deep copy of the supplied node slice.
 func cloneNodes(nodes []Node) []Node {
