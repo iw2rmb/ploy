@@ -1,8 +1,8 @@
 # Ploy Workflow CLI
 
-`ploy` is now a single-purpose CLI that claims workflow tickets from Grid,
-reconstructs the default mods→build→test DAG, and dispatches stages to the
-in-memory Grid stub. Legacy subcommands (apps, env, mods, security, etc.) were
+`ploy` is a single-purpose CLI that claims workflow tickets from the Ploy control plane,
+reconstructs the default mods→build→test DAG, and dispatches stages via the
+configured runtime adapter. Legacy subcommands (apps, env, mods, security, etc.) were
 removed during the workstation legacy teardown.
 
 ## Usage
@@ -34,7 +34,7 @@ command, env, resources), and shows a deterministic cache-key preview that incor
 commit/manifest/Aster toggles. Aster inputs are only included when
 `PLOY_ASTER_ENABLE` is set so the unfinished bundle integration can stay hidden
 behind a feature flag. The preview mirrors what the workflow runner supplies to
-Grid when dispatching stages.
+the runtime when dispatching stages.
 
 `mod run` claims a ticket (auto-generating one if `--ticket auto`),
 materialises the repository passed via `--repo-*` flags (when provided),
@@ -42,19 +42,16 @@ compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
-flow into stage metadata so Grid can respect concurrency/timebox controls. When
+flow into stage metadata so the control plane can respect concurrency/timebox controls. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
-stages before continuing to static checks and tests. Provide
+stages before continuing to static checks and tests. When
 `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
 successful run so developers can confirm which toggles/bundles were attached to
-each stage. Explicit ticket IDs remain a stub-only workflow until Grid
-integration lands.
+each stage.
 
-`workflow cancel` requests cancellation of a Workflow RPC run. The subcommand
-requires legacy Grid credentials when targeting that backend; in-memory stubs
-respond with a friendly reminder instead of attempting an unsupported
-cancellation.
+`workflow cancel` is deprecated in favor of `ploy mod cancel`. It prints a
+friendly reminder when used.
 Ploy records the cancellation reason (when supplied) and echoes the run status
 so operators can quickly confirm whether the request was accepted or the run
 was already terminal.
@@ -62,7 +59,7 @@ was already terminal.
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
-hydration and surfaces any gaps before Grid integration lands.
+hydration and still reports required resources.
 
 `knowledge-base ingest` merges incident fixtures into the workstation catalog
 under `configs/knowledge-base/catalog.json`, enforcing duplicate safeguards and
@@ -114,7 +111,7 @@ required environment variables, and operational limits (slot TTL, digest verific
 
 ## Environment
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`; other adapters (`grid`, `k8s`, `nomad`) register here and
+  `local-step`; other adapters (`k8s`, `nomad`) can register here and
   unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache

@@ -4,7 +4,6 @@ Usage:
   ploy <command> [<args>]
 
 Core Commands:
-  workflow         Manage workflow runs and cancellations
   mod              Plan and run Mods workflows
   mods             Observe Mods execution (logs, events)
   hydration        Inspect and tune hydration policies

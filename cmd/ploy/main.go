@@ -29,8 +29,6 @@ func execute(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "help":
 		return handleHelp(args[1:], stderr)
-	case "workflow":
-		return handleWorkflow(args[1:], stderr)
 	case "mod":
 		return handleMod(args[1:], stderr)
 	case "artifact":

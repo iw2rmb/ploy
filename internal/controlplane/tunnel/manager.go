@@ -168,33 +168,7 @@ func LookupJob(jobID string) (string, bool) {
 	return store.LookupJob(jobID)
 }
 
-// resolveAPIPort deprecated; retained to avoid breaking binary compatibility in rare external usage.
-
-func parsePortFromURL(raw string) int {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return 0
-	}
-	parsed, err := url.Parse(trimmed)
-	if err != nil {
-		return 0
-	}
-	if parsed.Port() != "" {
-		value, err := net.LookupPort(parsed.Scheme, parsed.Port())
-		if err != nil {
-			return 0
-		}
-		return value
-	}
-	switch strings.ToLower(parsed.Scheme) {
-	case "https":
-		return 443
-	case "http":
-		return 80
-	default:
-		return 0
-	}
-}
+// Deprecated URL parsing helpers removed; resolvePort() covers active use cases.
 
 func resolvePort(base *url.URL) int {
 	if base == nil {

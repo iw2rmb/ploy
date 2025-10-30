@@ -25,9 +25,9 @@ func TestRunRequiresGridClient(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
     opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
-	if !errors.Is(err, runner.ErrGridClientRequired) {
-		t.Fatalf("expected ErrGridClientRequired, got %v", err)
-	}
+    if !errors.Is(err, runner.ErrRuntimeClientRequired) {
+        t.Fatalf("expected ErrGridClientRequired, got %v", err)
+    }
 }
 
 func TestRunRequiresManifestCompiler(t *testing.T) {

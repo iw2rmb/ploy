@@ -28,7 +28,7 @@ func (a *fakeRuntimeAdapter) Connect(_ context.Context) (runner.RuntimeClient, e
 	return a.grid, nil
 }
 
-func TestDefaultGridFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
+func TestDefaultRuntimeFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
 	prevRegistry := runtimeRegistry
 	t.Cleanup(func() { runtimeRegistry = prevRegistry })
 	runtimeRegistry = runtime.NewRegistry()
@@ -45,19 +45,19 @@ func TestDefaultGridFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
 
     t.Setenv(runtimeAdapterEnv, "fake")
 
-	client, err := defaultGridFactory()
-	if err != nil {
-		t.Fatalf("defaultGridFactory: %v", err)
-	}
+    client, err := defaultRuntimeFactory()
+    if err != nil {
+        t.Fatalf("defaultRuntimeFactory: %v", err)
+    }
 	if adapter.connectCalled == 0 {
 		t.Fatalf("expected adapter Connect to be called")
 	}
-	if client != adapter.grid {
-		t.Fatalf("expected adapter grid client to be returned")
-	}
+    if client != adapter.grid {
+        t.Fatalf("expected adapter runtime client to be returned")
+    }
 }
 
-func TestDefaultGridFactoryDefaultsToLocalStep(t *testing.T) {
+func TestDefaultRuntimeFactoryDefaultsToLocalStep(t *testing.T) {
 	prevRegistry := runtimeRegistry
 	t.Cleanup(func() { runtimeRegistry = prevRegistry })
 	runtimeRegistry = runtime.NewRegistry()
@@ -74,19 +74,19 @@ func TestDefaultGridFactoryDefaultsToLocalStep(t *testing.T) {
 	}
 
 	t.Setenv(runtimeAdapterEnv, "")
-	client, err := defaultGridFactory()
-	if err != nil {
-		t.Fatalf("defaultGridFactory: %v", err)
-	}
+    client, err := defaultRuntimeFactory()
+    if err != nil {
+        t.Fatalf("defaultRuntimeFactory: %v", err)
+    }
 	if adapter.connectCalled != 1 {
 		t.Fatalf("expected local-step adapter used, calls=%d", adapter.connectCalled)
 	}
-	if client != adapter.grid {
-		t.Fatalf("expected local-step grid client to be returned")
-	}
+    if client != adapter.grid {
+        t.Fatalf("expected local-step runtime client to be returned")
+    }
 }
 
-func TestDefaultGridFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
+func TestDefaultRuntimeFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
 	prevRegistry := runtimeRegistry
 	t.Cleanup(func() { runtimeRegistry = prevRegistry })
 	runtimeRegistry = runtime.NewRegistry()
@@ -94,7 +94,7 @@ func TestDefaultGridFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
 
     t.Setenv(runtimeAdapterEnv, "unknown")
 
-	_, err := defaultGridFactory()
+    _, err := defaultRuntimeFactory()
 	if err == nil {
 		t.Fatalf("expected error when adapter missing")
 	}

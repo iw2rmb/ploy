@@ -14,8 +14,6 @@ import (
 
 type integrationConfig struct {
     APIEndpoint   string
-    JetStreamURL  string
-    JetStreamURLs []string
     IPFSGateway   string
     Features      map[string]string
     Version       string
@@ -34,17 +32,12 @@ func (cfg integrationConfig) FeatureEnabled(name string) bool {
 }
 
 const (
-    jetStreamURLEnv = "PLOY_JETSTREAM_URL"
-    ipfsGatewayEnv  = "PLOY_IPFS_GATEWAY"
+    ipfsGatewayEnv = "PLOY_IPFS_GATEWAY"
 )
 
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
     // Start with environment overrides to keep local/dev and tests simple.
     cfg := integrationConfig{Features: map[string]string{}}
-    if v := strings.TrimSpace(os.Getenv(jetStreamURLEnv)); v != "" {
-        cfg.JetStreamURL = v
-        cfg.JetStreamURLs = []string{v}
-    }
     if v := strings.TrimSpace(os.Getenv(ipfsGatewayEnv)); v != "" {
         cfg.IPFSGateway = v
     }
@@ -94,21 +87,7 @@ func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
     if v := strings.TrimSpace(asString(payload.Config["api_endpoint"])); v != "" {
         cfg.APIEndpoint = v
     }
-    // JetStream can be either a single url or a list.
-    if v := strings.TrimSpace(asString(payload.Config["jetstream_url"])); v != "" {
-        cfg.JetStreamURL = v
-        cfg.JetStreamURLs = append(cfg.JetStreamURLs, v)
-    }
-    if raw, ok := payload.Config["jetstream_urls"].([]any); ok {
-        for _, r := range raw {
-            if s := strings.TrimSpace(asString(r)); s != "" {
-                cfg.JetStreamURLs = append(cfg.JetStreamURLs, s)
-            }
-        }
-        if cfg.JetStreamURL == "" {
-            cfg.JetStreamURL = firstJetStreamRoute(cfg.JetStreamURLs)
-        }
-    }
+    // JetStream routes removed; SSE is the streaming surface.
     // IPFS gateway (optional in Next; worker uses Cluster for publishing).
     if v := strings.TrimSpace(asString(payload.Config["ipfs_gateway"])); v != "" && cfg.IPFSGateway == "" {
         cfg.IPFSGateway = v
@@ -138,33 +117,7 @@ func asString(value any) string {
     }
 }
 
-func normalizeJetStreamRoutes(routes []string) []string {
-	if len(routes) == 0 {
-		return nil
-	}
-	normalized := make([]string, 0, len(routes))
-	for _, route := range routes {
-		trimmed := strings.TrimSpace(route)
-		if trimmed == "" {
-			continue
-		}
-		normalized = append(normalized, trimmed)
-	}
-	if len(normalized) == 0 {
-		return nil
-	}
-	return normalized
-}
-
-func firstJetStreamRoute(routes []string) string {
-	for _, route := range routes {
-		trimmed := strings.TrimSpace(route)
-		if trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
-}
+// JetStream helpers removed.
 
 func copyFeaturesMap(src map[string]string) map[string]string {
 	if len(src) == 0 {
