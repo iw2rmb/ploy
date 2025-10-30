@@ -13,8 +13,11 @@ const defaultLogMaxBytes int64 = 1 << 20 // 1 MiB
 type LogSource string
 
 const (
-	// LogSourceGrid indicates the log originated from a Grid artifact download.
-	LogSourceGrid LogSource = "grid"
+    // LogSourceGrid indicates the log originated from a legacy Grid artifact download.
+    LogSourceGrid LogSource = "grid"
+    // LogSourcePrimary is a compatibility alias for the primary log source.
+    // Prefer LogSourceIPFS when applicable.
+    LogSourcePrimary LogSource = LogSourceGrid
 	// LogSourceIPFS indicates the log was downloaded from IPFS using the artifact CID.
 	LogSourceIPFS LogSource = "ipfs"
 	// LogSourceStub indicates the log came from an in-memory stub (typically workstation tests).

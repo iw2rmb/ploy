@@ -19,7 +19,7 @@ _ploy_completions() {
         ;;
     "mod")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "run" -- "$cur") )
+            COMPREPLY=( $(compgen -W "run cancel resume inspect artifacts" -- "$cur") )
             return 0
         fi
         ;;
@@ -37,7 +37,7 @@ _ploy_completions() {
         ;;
     "jobs")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "follow" -- "$cur") )
+            COMPREPLY=( $(compgen -W "follow ls inspect retry" -- "$cur") )
             return 0
         fi
         ;;

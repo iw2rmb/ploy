@@ -1,59 +1,28 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"strings"
-
-	"github.com/iw2rmb/ploy/internal/cli/workflow"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
+    "errors"
+    "flag"
+    "fmt"
+    "io"
+    "strings"
 )
 
-// handleWorkflowCancel wires the workflow cancel subcommand onto the Grid client.
+// handleWorkflowCancel is deprecated in favour of `ploy mod cancel`.
 func handleWorkflowCancel(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("workflow cancel", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-    runID := fs.String("run-id", "", "workflow run identifier to cancel")
-	workflowID := fs.String("workflow", "", "optional workflow identifier to validate")
-	reason := fs.String("reason", "", "optional reason recorded alongside the cancellation")
-	if err := fs.Parse(args); err != nil {
-		printWorkflowCancelUsage(stderr)
-		return err
-	}
-
-    trimmedRunID := strings.TrimSpace(*runID)
-	if trimmedRunID == "" {
-		printWorkflowCancelUsage(stderr)
-		return errors.New("run id required")
-	}
-
-	gridClient, err := gridFactory()
-	if err != nil {
-		return fmt.Errorf("configure grid client: %w", err)
-	}
-	cmd := workflow.CancelCommand{Client: gridClient}
-    result, err := cmd.Run(context.Background(), workflow.CancelOptions{
-        WorkflowID: strings.TrimSpace(*workflowID),
-        RunID:      trimmedRunID,
-        Reason:     strings.TrimSpace(*reason),
-    })
-	if errors.Is(err, runner.ErrGridCancellationUnsupported) {
-		return fmt.Errorf("workflow cancellation requires Grid credentials; set %s and %s and retry", envLabel(gridIDEnv, gridIDFallbackEnv), envLabel(gridAPIKeyEnv, gridAPIKeyFallbackEnv))
-	}
-	if err != nil {
-		return err
-	}
-
-	status := result.Status
-	if status == "" {
-		status = runner.StageStatusRunning
-	}
-	_, _ = fmt.Fprintf(stderr, "Cancellation requested for run %s (status=%s).\n", strings.TrimSpace(result.RunID), status)
-	if !result.Requested {
-		_, _ = fmt.Fprintln(stderr, "Run was already terminal when the request was processed.")
-	}
-	return nil
+    fs := flag.NewFlagSet("workflow cancel", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    runID := fs.String("run-id", "", "workflow run identifier to cancel (deprecated)")
+    _ = fs.String("workflow", "", "ignored (deprecated)")
+    _ = fs.String("reason", "", "ignored (deprecated)")
+    if err := fs.Parse(args); err != nil {
+        printWorkflowCancelUsage(stderr)
+        return err
+    }
+    if strings.TrimSpace(*runID) == "" {
+        printWorkflowCancelUsage(stderr)
+        return errors.New("run id required")
+    }
+    _, _ = fmt.Fprintln(stderr, "Command deprecated: use 'ploy mod cancel --ticket <ticket> [--reason <text>]' instead.")
+    return fmt.Errorf("workflow cancel is deprecated")
 }

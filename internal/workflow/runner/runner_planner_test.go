@@ -73,11 +73,11 @@ ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, Ticke
 
 func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             noStageGrid{},
+        Runtime:          noStageGrid{},
 		Planner:          nil,
 		WorkspaceRoot:    "",
 		MaxStageRetries:  1,
@@ -103,11 +103,11 @@ func TestRunFailsWhenPlannerErrors(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{}
 	planner := failingPlanner{err: errors.New("planner boom")}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          planner,
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -121,11 +121,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             &fakeGrid{},
+        Runtime:          &fakeGrid{},
 		Planner:          invalidStagePlanner{},
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -139,11 +139,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunFailsWhenPlannerOmitsLane(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             &fakeGrid{},
+        Runtime:          &fakeGrid{},
 		Planner:          missingLanePlanner{},
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

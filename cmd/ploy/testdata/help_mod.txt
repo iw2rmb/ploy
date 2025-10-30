@@ -1,6 +1,10 @@
 Usage: ploy mod <command>
 
 Commands:
-  run   Submit a Mods run to the control plane
+  run         Submit a Mods run to the control plane
+  cancel      Cancel a Mods ticket via the control plane
+  resume      Resume a paused Mods ticket
+  inspect     Show summary for a Mods ticket
+  artifacts   List ticket artifacts by stage
 
 Use 'ploy mod run --help' for flag details.

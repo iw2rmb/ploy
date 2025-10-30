@@ -6,10 +6,10 @@ import "github.com/iw2rmb/ploy/internal/workflow/aster"
 type Options struct {
     Ticket            string
     Events            EventsClient
-    Grid              GridClient
-	Planner           Planner
-	WorkspaceRoot     string
-	MaxStageRetries   int
+    Runtime           RuntimeClient
+    Planner           Planner
+    WorkspaceRoot     string
+    MaxStageRetries   int
 	ManifestCompiler  ManifestCompiler
 	Aster             AsterOptions
 	CacheComposer     CacheComposer

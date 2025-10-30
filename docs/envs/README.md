@@ -15,7 +15,7 @@ configuration.
 ## CLI
 
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`. Other adapters (`grid`, `k8s`, `nomad`) plug in here; the CLI
+  `local-step`. Other adapters (e.g., `k8s`, `nomad`) can plug in here; the CLI
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
@@ -83,7 +83,7 @@ configuration.
 - `PLOY_E2E_GITLAB_TOKEN` — Optional GitLab PAT so the E2E harness can clean up
   branches after creating merge requests.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
-  live Grid smoke test should execute (defaults to `simple-openrewrite`).
+  live Mods smoke test should execute (defaults to `simple-openrewrite`).
 
  
 

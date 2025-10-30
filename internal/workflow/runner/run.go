@@ -29,14 +29,14 @@ func Run(ctx context.Context, opts Options) (err error) {
 	if opts.Events == nil {
 		return ErrEventsClientRequired
 	}
-	if opts.Grid == nil {
-		return ErrGridClientRequired
-	}
+    if opts.Runtime == nil {
+        return ErrRuntimeClientRequired
+    }
 	if opts.ManifestCompiler == nil {
 		return ErrManifestCompilerRequired
 	}
 
-	planner := opts.Planner
+    planner := opts.Planner
 	if planner == nil {
 		planner = NewDefaultPlannerWithMods(opts.Mods)
 	}
@@ -175,16 +175,16 @@ func Run(ctx context.Context, opts Options) (err error) {
 		healingAttempts int
 	)
 	resultCh := make(chan stageResult, len(orderedNodes))
-	executor := stageExecutor{
-		events:      opts.Events,
-		grid:        opts.Grid,
-		ticket:      ticket,
-		workspace:   workspace,
-		maxRetries:  maxRetries,
-		publishMu:   &publishMu,
-		failureOnce: &failureOnce,
-		jobComposer: opts.JobComposer,
-	}
+    executor := stageExecutor{
+        events:      opts.Events,
+        runtime:     opts.Runtime,
+        ticket:      ticket,
+        workspace:   workspace,
+        maxRetries:  maxRetries,
+        publishMu:   &publishMu,
+        failureOnce: &failureOnce,
+        jobComposer: opts.JobComposer,
+    }
 	scheduled := make(map[string]bool, len(stageNodes))
 	startStages := func(nodes []*stageNode) {
 		if runErr != nil || len(nodes) == 0 {

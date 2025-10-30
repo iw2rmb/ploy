@@ -44,7 +44,7 @@ func (localRuntimeAdapter) Metadata() runtime.AdapterMetadata {
 	}
 }
 
-func (localRuntimeAdapter) Connect(ctx context.Context) (runner.GridClient, error) {
+func (localRuntimeAdapter) Connect(ctx context.Context) (runner.RuntimeClient, error) {
 	if stepExecutorFactory == nil {
 		return nil, fmt.Errorf("configure local runtime: executor factory missing")
 	}
@@ -54,7 +54,7 @@ func (localRuntimeAdapter) Connect(ctx context.Context) (runner.GridClient, erro
 	if err != nil {
 		return nil, err
 	}
-	client, err := runtime.NewLocalStepClient(runtime.LocalStepClientOptions{Runner: executor})
+    client, err := runtime.NewLocalStepClient(runtime.LocalStepClientOptions{Runner: executor})
 	if err != nil {
 		return nil, err
 	}

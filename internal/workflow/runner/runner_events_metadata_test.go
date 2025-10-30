@@ -14,11 +14,11 @@ func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := runner.NewInMemoryGrid()
 	composer := &recordingCacheComposer{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -75,11 +75,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -215,11 +215,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test":            []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

@@ -22,6 +22,9 @@ func handleMods(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "logs":
 		return handleModsLogs(args[1:], stderr)
+	case "events":
+		// Alias for logs; reserved for future structured events.
+		return handleModsLogs(args[1:], stderr)
 	default:
 		printModsUsage(stderr)
 		return fmt.Errorf("unknown mods subcommand %q", args[0])
@@ -92,6 +95,12 @@ func handleJobs(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "follow":
 		return handleJobsFollow(args[1:], stderr)
+	case "ls":
+		return handleJobsList(args[1:], stderr)
+	case "inspect":
+		return handleJobsInspect(args[1:], stderr)
+	case "retry":
+		return handleJobsRetry(args[1:], stderr)
 	default:
 		printJobsUsage(stderr)
 		return fmt.Errorf("unknown jobs subcommand %q", args[0])
@@ -152,4 +161,65 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
 		return err
 	}
 	return nil
+}
+
+func handleJobsList(args []string, stderr io.Writer) error {
+    fs := flag.NewFlagSet("jobs ls", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    ticket := fs.String("ticket", "", "mods ticket id to scope the list")
+    if err := fs.Parse(args); err != nil {
+        printJobsUsage(stderr)
+        return err
+    }
+    if strings.TrimSpace(*ticket) == "" {
+        printJobsUsage(stderr)
+        return errors.New("ticket required")
+    }
+    ctx := context.Background()
+    base, httpClient, err := resolveControlPlaneHTTP(ctx)
+    if err != nil { return err }
+    cmd := jobs.ListCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), Output: stderr}
+    return cmd.Run(ctx)
+}
+
+func handleJobsInspect(args []string, stderr io.Writer) error {
+    fs := flag.NewFlagSet("jobs inspect", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    ticket := fs.String("ticket", "", "mods ticket id that owns the job")
+    if err := fs.Parse(args); err != nil {
+        printJobsUsage(stderr)
+        return err
+    }
+    rest := fs.Args()
+    if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
+        printJobsUsage(stderr)
+        return errors.New("ticket and job id required")
+    }
+    jobID := strings.TrimSpace(rest[0])
+    ctx := context.Background()
+    base, httpClient, err := resolveControlPlaneHTTP(ctx)
+    if err != nil { return err }
+    cmd := jobs.InspectCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
+    return cmd.Run(ctx)
+}
+
+func handleJobsRetry(args []string, stderr io.Writer) error {
+    fs := flag.NewFlagSet("jobs retry", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    ticket := fs.String("ticket", "", "mods ticket id that owns the job")
+    if err := fs.Parse(args); err != nil {
+        printJobsUsage(stderr)
+        return err
+    }
+    rest := fs.Args()
+    if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
+        printJobsUsage(stderr)
+        return errors.New("ticket and job id required")
+    }
+    jobID := strings.TrimSpace(rest[0])
+    ctx := context.Background()
+    base, httpClient, err := resolveControlPlaneHTTP(ctx)
+    if err != nil { return err }
+    cmd := jobs.RetryCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
+    return cmd.Run(ctx)
 }
