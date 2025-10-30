@@ -2,8 +2,8 @@
 package httpserver
 
 import (
-	"net/http"
-	"strings"
+    "net/http"
+    "strings"
 )
 
 // handleRegistry routes registry API calls to manifests, blobs, or tag handlers.
@@ -27,6 +27,23 @@ func (s *controlPlaneServer) handleRegistry(w http.ResponseWriter, r *http.Reque
 		recordRegistryRequest("unknown", r.Method, http.StatusNotFound)
 		http.NotFound(w, r)
 	}
+}
+
+// handleRegistryV2 adapts /v2/ requests into the internal /v1/registry/ handler.
+// - GET /v2/ returns 200 for Docker version checks.
+// - All other /v2/<repo>/manifests|blobs|tags paths are re-routed to /v1/registry/...
+func (s *controlPlaneServer) handleRegistryV2(w http.ResponseWriter, r *http.Request) {
+    trimmed := strings.TrimPrefix(r.URL.Path, "/v2")
+    if trimmed == "" || trimmed == "/" {
+        w.WriteHeader(http.StatusOK)
+        return
+    }
+    // Rewrite /v2/<rest> -> /v1/registry/<rest>
+    r2 := *r
+    u := *r.URL
+    u.Path = "/v1/registry" + trimmed
+    r2.URL = &u
+    s.handleRegistry(w, &r2)
 }
 
 // parseRegistryPath extracts the repo, resource, and extra parts from a registry URL path.
