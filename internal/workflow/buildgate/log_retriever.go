@@ -13,15 +13,13 @@ const defaultLogMaxBytes int64 = 1 << 20 // 1 MiB
 type LogSource string
 
 const (
-    // LogSourceGrid indicates the log originated from a legacy Grid artifact download.
-    LogSourceGrid LogSource = "grid"
-    // LogSourcePrimary is a compatibility alias for the primary log source.
-    // Prefer LogSourceIPFS when applicable.
-    LogSourcePrimary LogSource = LogSourceGrid
-	// LogSourceIPFS indicates the log was downloaded from IPFS using the artifact CID.
-	LogSourceIPFS LogSource = "ipfs"
-	// LogSourceStub indicates the log came from an in-memory stub (typically workstation tests).
-	LogSourceStub LogSource = "stub"
+    // LogSourcePrimary identifies the primary/legacy artifact backend for logs.
+    // String value remains "grid" for backward compatibility.
+    LogSourcePrimary LogSource = "grid"
+    // LogSourceIPFS indicates the log was downloaded from IPFS using the artifact CID.
+    LogSourceIPFS LogSource = "ipfs"
+    // LogSourceStub indicates the log came from an in-memory stub (typically workstation tests).
+    LogSourceStub LogSource = "stub"
 )
 
 // ArtifactReference identifies the artifact that stores a build log.
@@ -43,7 +41,7 @@ type LogRetrievalResult struct {
 	Truncated bool
 }
 
-// LogRetriever downloads build logs from Grid artifacts with optional fallbacks.
+// LogRetriever downloads build logs from artifact backends with optional fallbacks.
 type LogRetriever struct {
 	Primary        ArtifactFetcher
 	PrimarySource  LogSource
@@ -97,13 +95,9 @@ func (r *LogRetriever) Retrieve(ctx context.Context, ref ArtifactReference) (Log
 		}
 		digest := sha256.Sum256(data)
 		source := c.source
-		if source == "" {
-			if c.fetcher == r.Primary {
-				source = LogSourceGrid
-			} else {
-				source = LogSourceIPFS
-			}
-		}
+        if source == "" {
+            if c.fetcher == r.Primary { source = LogSourcePrimary } else { source = LogSourceIPFS }
+        }
 		// Copy the data to avoid callers mutating fetcher-owned buffers.
 		copied := append([]byte(nil), data...)
 		return LogRetrievalResult{

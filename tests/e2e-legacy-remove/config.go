@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Config captures runtime knobs required to execute the Grid-based Mods E2E scenarios.
+// Config captures runtime knobs required to execute the legacy Mods E2E scenarios.
 type Config struct {
 	GridID       string
 	BeaconAPIKey string

@@ -1,7 +1,7 @@
 # Job Execution Model
 
 Ploy Next executes every step—Mods, build gate stages, auxiliary tooling—through a consistent job
-abstraction. This mirrors the Grid runtime semantics so workstation workflows remain predictable.
+abstraction. This mirrors the prior runtime semantics so workstation workflows remain predictable.
 
 ## Job Types
 
@@ -19,8 +19,8 @@ abstraction. This mirrors the Grid runtime semantics so workstation workflows re
    retry budget, and metadata, then inserts a queue entry under `queue/<kind>/<priority>/<job-id>`.
 2. **Execution** — Worker nodes claim jobs through the scheduler HTTP API. Successful claims update
    the job to `running`, stamp `claimed_by`, attach an etcd lease, and delete the queue entry. The
-   node hydrates the workspace (snapshot + cumulative diffs) and runs the step manifest inside a
-   retained Docker container.
+   node hydrates the workspace (repository materialization + cumulative diffs) and runs the step
+   manifest inside a retained Docker container.
 3. **Monitoring** — Runtime state transitions (`queued`, `running`, `succeeded`, `failed`,
    `inspection_ready`) plus timestamps, artifacts, and error metadata are persisted back to etcd.
    Lease heartbeats update the expiry timestamp. Log metadata (CID, digest, tail snippet) is

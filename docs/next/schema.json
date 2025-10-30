@@ -24,15 +24,7 @@
           "required": ["url"],
           "additionalProperties": false
         },
-        "snapshot": {
-          "type": "object",
-          "properties": {
-            "cid": { "type": "string" },
-            "digest": { "type": "string" }
-          },
-          "required": ["cid"],
-          "additionalProperties": false
-        },
+        
         "diffs": {
           "type": "array",
           "items": {
@@ -147,4 +139,3 @@
   },
   "additionalProperties": false
 }
-

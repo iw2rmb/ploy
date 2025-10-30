@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Compilation represents the normalized manifest payload consumed by Grid.
+// Compilation represents the normalized manifest payload consumed by the runner/control plane.
 type Compilation struct {
 	Manifest        Metadata   `json:"manifest"`
 	ManifestVersion string     `json:"manifest_version"`

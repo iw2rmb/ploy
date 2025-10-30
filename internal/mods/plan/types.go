@@ -55,7 +55,7 @@ type StageModsMetadata struct {
 	Recommendations []StageModsRecommendation
 }
 
-// StageModsPlan describes the Mods planner output that Grid consumers rely on.
+// StageModsPlan describes the Mods planner output that downstream consumers rely on.
 type StageModsPlan struct {
 	SelectedRecipes []string
 	ParallelStages  []string

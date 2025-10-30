@@ -86,8 +86,8 @@ func SetNodes(nodes []sshtransport.Node) error {
 }
 
 // NodesFromGridStatus converts grid metadata into SSH tunnel nodes.
-// NodesFromGridStatus was deprecated with the Grid removal; callers should compute
-// sshtransport.Node values from their own control-plane discovery.
+// Former helpers that transformed external grid metadata into SSH nodes were removed;
+// callers should compute sshtransport.Node values from their own control-plane discovery.
 
 // EnsureFallbackNode registers a single fallback node derived from the base URL when discovery metadata is unavailable.
 func EnsureFallbackNode(base *url.URL) error {

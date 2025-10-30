@@ -21,7 +21,7 @@ type Request struct {
 	Toggle string
 }
 
-// Metadata captures the provenance for an Aster bundle that Grid can use to
+// Metadata captures the provenance for an Aster bundle that the runtime can use to
 // select accelerator runtimes and cache entries.
 type Metadata struct {
 	Stage       string

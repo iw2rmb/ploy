@@ -8,7 +8,7 @@ manifest to materialize inputs, run the container, and capture outcomes.
 
 - Preserve the high‑level Mods abstraction:
   - Outcomes per stage: `diff`, `plan`, and `data`.
-  - Inputs per stage: original repo snapshot (by CID or repo URL/refs), ordered diffs to apply
+  - Inputs per stage: repository archive (by CID or repo URL/refs), ordered diffs to apply
     before execution, and auxiliary `data` (e.g., a previous plan).
 - Keep the runtime portable: image, command, envs, and resources are explicit and overridable.
 - Allow named step templates via `step_ref` (e.g., `orw-apply`) that pre‑define image/command.
@@ -26,8 +26,9 @@ manifest to materialize inputs, run the container, and capture outcomes.
     - `target_ref` (string, optional): working branch/ref.
     - `commit` (string, optional): exact commit to checkout (overrides refs).
     - `workspace_hint` (string, optional): subdirectory to focus on.
-  - `snapshot` (object, optional): materialize from an existing snapshot.
-    - `cid` (string): IPFS CID of the snapshot tarball.
+- `snapshot` (object, optional): removed. Use `repo` and `diffs` instead. Existing manifests that
+  set `snapshot.cid` will continue to hydrate from the referenced archive when routed through
+  compatibility shims; new manifests should omit this field.
     - `digest` (string, optional): sha256 digest.
   - `diffs` (array, optional): ordered diffs to apply before the step (each as a commit).
     - items: `{ cid: string, digest?: string, message?: string }`.
@@ -52,7 +53,7 @@ See `../schema.json` for the full machine‑readable schema.
 ## Execution semantics (node)
 
 1. Materialize the repository input:
-   - From `inputs.snapshot.cid`, or
+  - From `inputs.repo` revision and optional diffs
    - From `inputs.repo` (URL + refs/commit);
    - Apply each `inputs.diffs[]` as a separate commit (preserving order).
 2. Mount the realized workspace at the step’s working directory (e.g., `/workspace`).
