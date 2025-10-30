@@ -24,10 +24,7 @@ func execute(args []string, stderr io.Writer) error {
 		return errors.New("command required")
 	}
 
-	if msg, ok := clitree.LegacyCommands()[args[0]]; ok {
-		_, _ = fmt.Fprintf(stderr, "Command %q is deprecated. %s\n", args[0], msg)
-		return fmt.Errorf("legacy command %q", args[0])
-	}
+    // Legacy command aliases removed; treat unknown names uniformly.
 
 	switch args[0] {
 	case "help":
