@@ -43,11 +43,7 @@ func TestDefaultGridFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
 		t.Fatalf("register adapter: %v", err)
 	}
 
-	t.Setenv(runtimeAdapterEnv, "fake")
-	t.Setenv(gridIDEnv, "")
-	t.Setenv(gridIDFallbackEnv, "")
-	t.Setenv(gridAPIKeyEnv, "")
-	t.Setenv(gridAPIKeyFallbackEnv, "")
+    t.Setenv(runtimeAdapterEnv, "fake")
 
 	client, err := defaultGridFactory()
 	if err != nil {
@@ -96,11 +92,7 @@ func TestDefaultGridFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
 	runtimeRegistry = runtime.NewRegistry()
 	// No adapters registered; resolution should fail.
 
-	t.Setenv(runtimeAdapterEnv, "unknown")
-	t.Setenv(gridIDEnv, "")
-	t.Setenv(gridIDFallbackEnv, "")
-	t.Setenv(gridAPIKeyEnv, "")
-	t.Setenv(gridAPIKeyFallbackEnv, "")
+    t.Setenv(runtimeAdapterEnv, "unknown")
 
 	_, err := defaultGridFactory()
 	if err == nil {

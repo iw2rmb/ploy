@@ -8,8 +8,6 @@ import (
     "github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-type gridFactoryFunc func() (runner.GridClient, error)
-
 type manifestCompilerLoaderFunc func(dir string) (runner.ManifestCompiler, error)
 
 type environmentService interface {
@@ -23,17 +21,9 @@ type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 type workspacePreparerFactoryFunc func() (runner.WorkspacePreparer, error)
 
 const (
-	workflowSDKStateEnv   = "GRID_WORKFLOW_SDK_STATE_DIR"
-	gridAPIKeyEnv         = "GRID_BEACON_API_KEY"
-	gridAPIKeyFallbackEnv = "GRID_API_KEY"
-	gridIDEnv             = "PLOY_GRID_ID"
-	gridIDFallbackEnv     = "GRID_ID"
-	gridClientBeaconEnv   = "GRID_BEACON_URL"
-	gridClientStateEnv    = "GRID_CLIENT_STATE_DIR"
-	runtimeAdapterEnv     = "PLOY_RUNTIME_ADAPTER"
+    runtimeAdapterEnv = "PLOY_RUNTIME_ADAPTER"
 )
 
 var (
-    gridFactory              gridFactoryFunc              = defaultGridFactory
     workspacePreparerFactory workspacePreparerFactoryFunc = defaultWorkspacePreparerFactory
 )

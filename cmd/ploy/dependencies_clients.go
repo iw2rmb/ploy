@@ -5,7 +5,6 @@ import (
     "errors"
     "fmt"
     "os"
-    "path/filepath"
     "strings"
 
     "github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -46,54 +45,7 @@ func defaultGridFactory() (runner.GridClient, error) {
     return client, nil
 }
 
-// prepareGridClientStateDir is retained for tests that reference workspace dirs; returns a stable path.
-func prepareGridClientStateDir(gridID string) (string, error) {
-    candidates := []string{
-        strings.TrimSpace(os.Getenv(gridClientStateEnv)),
-        strings.TrimSpace(os.Getenv(workflowSDKStateEnv)),
-    }
-    for _, candidate := range candidates {
-        if candidate == "" {
-            continue
-        }
-        if err := os.MkdirAll(candidate, 0o755); err != nil {
-            return "", fmt.Errorf("prepare grid client state dir: %w", err)
-        }
-        return candidate, nil
-    }
-
-    configDir, err := os.UserConfigDir()
-    if err != nil {
-        return "", fmt.Errorf("resolve config dir: %w", err)
-    }
-    baseDir := filepath.Join(configDir, "ploy", "grid")
-    stateDir := filepath.Join(baseDir, sanitizePathComponent(gridID))
-    if err := os.MkdirAll(stateDir, 0o755); err != nil {
-        return "", fmt.Errorf("prepare grid client state dir: %w", err)
-    }
-    return stateDir, nil
-}
-
-func firstEnvValue(keys ...string) string {
-    for _, key := range keys {
-        if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-            return v
-        }
-    }
-    return ""
-}
-
-func envLabel(primary, fallback string) string {
-    p := strings.TrimSpace(primary)
-    f := strings.TrimSpace(fallback)
-    if p == "" {
-        return f
-    }
-    if f == "" {
-        return p
-    }
-    return fmt.Sprintf("%s or %s", p, f)
-}
+// Grid client state helpers removed along with Grid integration.
 
 func init() {
     if runtimeRegistry == nil {
