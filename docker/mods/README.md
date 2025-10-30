@@ -1,7 +1,7 @@
 Mods Image Contexts
 
 - This directory contains Docker build contexts for the Mods lanes referenced by the runner templates (`internal/workflow/runner/job_templates.go`).
-  - `mod-openrewrite` — OpenRewrite apply (Maven) wrapper; entrypoint script `mods-orw`.
+  - `mod-orw` — OpenRewrite apply (Maven) wrapper; entrypoint script `mods-orw`.
   - `mod-llm` — Deterministic E2E planner/executor stub; fixes the known compile error in the sample repo when present.
   - `mod-plan` — Lightweight planner stub to exercise planner integration during E2E.
   - `mod-human` — Human-in-the-loop gate stub that auto-approves.
