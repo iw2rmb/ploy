@@ -17,18 +17,9 @@ var (
     runtimeRegistry = runtime.NewRegistry()
 )
 
-// defaultEventsFactory builds an events client, preferring JetStream when configured.
+// defaultEventsFactory builds an in-memory events client for local runs.
 func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
     _ = tenant
-    cfg, _ := resolveIntegrationConfig(context.Background())
-    jetstreamURL := strings.TrimSpace(cfg.JetStreamURL)
-    if jetstreamURL != "" {
-        client, err := newJetStreamClient(contracts.JetStreamOptions{URL: jetstreamURL})
-        if err != nil {
-            return nil, err
-        }
-        return client, nil
-    }
     return contracts.NewInMemoryBus(), nil
 }
 
@@ -112,4 +103,3 @@ func init() {
         panic(err)
     }
 }
-

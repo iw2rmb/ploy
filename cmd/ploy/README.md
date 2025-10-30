@@ -20,9 +20,6 @@ ploy mod run \
   [--aster-step <stage=toggle,...|stage=off>]
 ploy workflow cancel --run-id <run-id> \
   [--workflow <workflow-id>] [--reason <text>]
-ploy snapshot plan --snapshot <snapshot-name>
-ploy snapshot capture --snapshot <snapshot-name> \
-  --ticket <ticket-id>
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
@@ -34,7 +31,7 @@ ploy report --job-id <ticket-id> [--artifact-id <slot>] --output <path>
 `lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
 displays the runtime family, build/test commands, surfaced job defaults (image,
 command, env, resources), and shows a deterministic cache-key preview that incorporates
-commit/snapshot/manifest/Aster toggles. Aster inputs are only included when
+commit/manifest/Aster toggles. Aster inputs are only included when
 `PLOY_ASTER_ENABLE` is set so the unfinished bundle integration can stay hidden
 behind a feature flag. The preview mirrors what the workflow runner supplies to
 Grid when dispatching stages.
@@ -62,21 +59,10 @@ Ploy records the cancellation reason (when supplied) and echoes the run status
 so operators can quickly confirm whether the request was accepted or the run
 was already terminal.
 
-`snapshot plan` inspects TOML specs under `configs/snapshots/`, counting
-strip/mask/synthetic rules and surfacing per-table highlights before a capture
-runs.
-
-`snapshot capture` loads the fixture referenced in the spec, applies
-strip/mask/synthetic rules, produces a deterministic fingerprint, uploads the
-payload to the IPFS gateway discovered from Grid (falling back to the
-deterministic in-memory publisher when discovery omits one), publishes metadata
-to the current stub, and prints the returned CID.
-
 `environment materialize` evaluates the integration manifest for a given
-app/commit pair, validates required snapshots, optionally captures them
-(execution mode), composes deterministic cache keys for each required lane, and
+app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
-snapshot capture/hydration and surfaces any gaps before Grid integration lands.
+hydration and surfaces any gaps before Grid integration lands.
 
 `knowledge-base ingest` merges incident fixtures into the workstation catalog
 under `configs/knowledge-base/catalog.json`, enforcing duplicate safeguards and
@@ -94,16 +80,12 @@ required environment variables, and operational limits (slot TTL, digest verific
 
 - `--lane` — Lane identifier defined under `configs/lanes` (used by
   `lanes describe`).
-- `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
+- `--commit` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
-- `--ticket` — JetStream ticket identifier to claim (`mod run`) or metadata
-  tag for snapshot captures. Defaults to `auto` for workflows; required for
-  snapshot captures.
-- `--snapshot` — Snapshot identifier defined under `configs/snapshots/*.toml`
-  (required for `snapshot plan` and `snapshot capture`).
+- `--ticket` — Ticket identifier to claim (`mod run`). Defaults to `auto` for workflows.
 - `--app` — Application identifier resolved to an integration manifest (required
   for `environment materialize`).
-- `--dry-run` — Skip snapshot capture and cache hydration while still reporting
+- `--dry-run` — Skip cache hydration while still reporting
   required resources (`environment materialize`).
 - `--manifest` — Override manifest name/version in `<name>@<version>` form
   (`environment materialize`).

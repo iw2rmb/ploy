@@ -1,13 +1,12 @@
 package main
 
 import (
-	"context"
+    "context"
 
-	"github.com/iw2rmb/ploy/internal/workflow/aster"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
-	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
+    "github.com/iw2rmb/ploy/internal/workflow/aster"
+    "github.com/iw2rmb/ploy/internal/workflow/environments"
+    "github.com/iw2rmb/ploy/internal/workflow/runner"
+    "github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 type gridFactoryFunc func() (runner.GridClient, error)
@@ -43,8 +42,6 @@ const (
 )
 
 var (
-	gridFactory              gridFactoryFunc              = defaultGridFactory
-	workspacePreparerFactory workspacePreparerFactoryFunc = defaultWorkspacePreparerFactory
-
-	newJetStreamClient = contracts.NewJetStreamClient
+    gridFactory              gridFactoryFunc              = defaultGridFactory
+    workspacePreparerFactory workspacePreparerFactoryFunc = defaultWorkspacePreparerFactory
 )

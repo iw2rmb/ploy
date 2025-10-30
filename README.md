@@ -35,8 +35,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       cleanly after dispatching jobs (Roadmap 02).
 - [x] Lane engine — deterministic lane specs bundled under `configs/lanes` with
       `ploy lanes describe` previews (Roadmap 03).
-- [x] Snapshot toolkit — `ploy snapshot plan` / `ploy snapshot capture` with
-      strip/mask/synthetic rules baked in (Roadmap 04).
+ 
 - [x] Integration manifests — manifest compiler enforcing topology, fixtures,
       and lane allowlists (Roadmap 05).
 - [x] Commit environments — `ploy environment materialize` assembles
@@ -47,24 +46,18 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       GRID hand-off (Roadmap 08).
 - [x] Cache coordination — checkpoints carry lane cache keys for Grid reuse
       (Roadmap 09).
-- [x] JetStream workflow client — live NATS connectivity with configuration
-      discovered from Grid's cluster info endpoint (Roadmap 10).
+ 
 - [x] Lane documentation hardening — schema enforcement and lane reference
       updates (Roadmap 11).
-- [x] Snapshot validation — cross-engine verification with coverage guardrails
-      (Roadmap 12).
+ 
 - [x] Integration manifest schema — JSON schema + CLI validation hook for
       manifests (Roadmap 13).
 - [x] Grid workflow client — workflow stages submit through the shared grid
       client when `PLOY_GRID_ID`/`GRID_BEACON_API_KEY` are provided (Roadmap 14).
-- [x] IPFS artifact publishing — snapshot captures stream artifacts through the
-      Grid-discovered IPFS gateway (Roadmap 15).
-- [x] Snapshot metadata streams — capture fingerprints and rule counts published
-      to JetStream (Roadmap 16).
+ 
 - [x] Checkpoint enrichment — stage metadata and artifact manifests embedded in
       workflow checkpoints (Roadmap 17).
-- [x] Stage artifact streams — dedicated JetStream envelopes for stage artifacts
-      to feed cache hydrators (Roadmap 18).
+ 
 - [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware
       parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI
@@ -133,7 +126,7 @@ Full design records live in `docs/design/README.md`.
 2. **Inspect lane metadata**
 
    ```bash
-   ./dist/ploy lanes describe --lane go-native --commit HEAD --snapshot dev-db \
+   ./dist/ploy lanes describe --lane go-native --commit HEAD \
      --manifest smoke --aster plan,exec
    ```
 
@@ -151,37 +144,14 @@ Full design records live in `docs/design/README.md`.
    control plane over SSH. Omitting the variables keeps the CLI on the
    in-memory Grid and JetStream stubs for offline development.
 
-4. **Preview snapshot rules**
-
-   ```bash
-   ./dist/ploy snapshot plan --snapshot dev-db
-   ```
-
-   The plan command loads `configs/snapshots/dev-db.toml`, summarises
-   strip/mask/synthetic rules, and highlights which tables/columns are affected
-   before a capture runs.
-
-5. **Capture a snapshot (stub)**
-
-   ```bash
-   ./dist/ploy snapshot capture --snapshot dev-db \
-     --ticket SNAPSHOT-1
-   ```
-
-   Capture applies the configured rules against `configs/snapshots/dev-db.json`,
-   hashes the result, uploads the payload to the IPFS gateway reported by
-   discovery (or the in-memory stub when discovery omits one), and publishes
-   metadata through the current stub path.
-
-6. **Dry-run a commit-scoped environment**
+4. **Dry-run a commit-scoped environment**
 
    ```bash
    ./dist/ploy environment materialize deadbeef --app commit-app --dry-run
    ```
 
-   Dry-run mode compiles the `commit-app` manifest, verifies required snapshots
-   (`commit-db`, `commit-cache`), and previews cache keys for each required lane
-   without mutating state.
+   Dry-run mode compiles the `commit-app` manifest and previews cache keys for
+   each required lane without mutating state.
 
 7. **Tests**
 

@@ -45,14 +45,7 @@ func loadSnapshotRegistry(dir string) (snapshotRegistry, error) {
 		}
 		opts.ArtifactPublisher = publisher
 	}
-	jetstreamURL := strings.TrimSpace(cfg.JetStreamURL)
-	if jetstreamURL != "" {
-		metadataPublisher, err := snapshots.NewJetStreamMetadataPublisher(jetstreamURL, snapshots.JetStreamMetadataOptions{})
-		if err != nil {
-			return nil, err
-		}
-		opts.MetadataPublisher = metadataPublisher
-	}
+    // JetStream metadata publisher removed; CLI no longer publishes snapshot metadata.
 	return snapshots.LoadDirectory(dir, opts)
 }
 

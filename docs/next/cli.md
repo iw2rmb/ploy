@@ -89,12 +89,7 @@ When no local descriptor exists for the requested cluster, these commands read t
 block returned by `/v1/config` to seed `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json`, ensuring
 future calls reuse the SSH and CA metadata without additional environment variables.
 
-## Snapshot Management
-
-- `ploy snapshot plan --snapshot <snapshot-name>`
-  Preview strip, mask, and synthetic rules for a snapshot definition.
-- `ploy snapshot capture --snapshot <snapshot-name> --ticket <ticket-id>`
-  Execute a snapshot capture and publish the resulting metadata.
+ 
 
 ## Environment Materialisation
 
