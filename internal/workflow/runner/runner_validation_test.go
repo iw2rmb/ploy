@@ -22,7 +22,7 @@ func TestRunRequiresEventsClient(t *testing.T) {
 }
 
 func TestRunRequiresGridClient(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrGridClientRequired) {
@@ -31,7 +31,7 @@ func TestRunRequiresGridClient(t *testing.T) {
 }
 
 func TestRunRequiresManifestCompiler(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:          "ticket-123",
 		Events:          events,
@@ -47,7 +47,7 @@ func TestRunRequiresManifestCompiler(t *testing.T) {
 }
 
 func TestRunPropagatesManifestCompilationError(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compilerErr := errors.New("compile failed")
 	opts := runner.Options{
 		Ticket:           "ticket-123",
@@ -65,7 +65,7 @@ func TestRunPropagatesManifestCompilationError(t *testing.T) {
 }
 
 func TestRunPassesManifestConstraintsToGrid(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -102,7 +102,7 @@ func TestRunPassesManifestConstraintsToGrid(t *testing.T) {
 }
 
 func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -137,7 +137,7 @@ func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
 
 func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	withCleanupDeadline(t)
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
@@ -146,7 +146,7 @@ func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -181,10 +181,10 @@ func TestRunErrorsWhenWorkspaceRootInvalid(t *testing.T) {
 	if err := os.WriteFile(file, []byte("lock"), 0o644); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             &fakeGrid{},
 		Planner:          runner.NewDefaultPlanner(),
@@ -199,10 +199,10 @@ func TestRunErrorsWhenWorkspaceRootInvalid(t *testing.T) {
 }
 
 func TestRunErrorsWhenTicketValidationFails(t *testing.T) {
-	events := &recordingEvents{tenant: "acme", invalidTicket: true}
+events := &recordingEvents{invalidTicket: true}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             &fakeGrid{},
 		Planner:          runner.NewDefaultPlanner(),

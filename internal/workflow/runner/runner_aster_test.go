@@ -12,7 +12,7 @@ import (
 )
 
 func TestRunAttachesAsterMetadataToStages(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -86,7 +86,7 @@ func TestRunAttachesAsterMetadataToStages(t *testing.T) {
 }
 
 func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -156,7 +156,7 @@ func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
 }
 
 func TestRunRequiresAsterLocatorWhenManifestRequiresToggles(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -188,7 +188,7 @@ func TestRunRequiresAsterLocatorWhenManifestRequiresToggles(t *testing.T) {
 }
 
 func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -259,7 +259,7 @@ func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
 }
 
 func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -305,7 +305,7 @@ func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
 }
 
 func TestRunPropagatesAsterLocatorError(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},

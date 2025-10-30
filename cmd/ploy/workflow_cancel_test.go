@@ -14,7 +14,7 @@ import (
 
 func TestHandleWorkflowCancelValidatesFlags(t *testing.T) {
 	buf := &bytes.Buffer{}
-	err := handleWorkflowCancel([]string{"--tenant", "acme"}, buf)
+err := handleWorkflowCancel([]string{}, buf)
 	if err == nil {
 		t.Fatal("expected error for missing run id")
 	}
@@ -27,7 +27,7 @@ func TestHandleWorkflowCancelRequiresGridEndpoint(t *testing.T) {
 	prevFactory := gridFactory
 	defer func() { gridFactory = prevFactory }()
 	gridFactory = func() (runner.GridClient, error) { return runner.NewInMemoryGrid(), nil }
-	err := handleWorkflowCancel([]string{"--tenant", "acme", "--run-id", "run-123"}, io.Discard)
+err := handleWorkflowCancel([]string{"--run-id", "run-123"}, io.Discard)
 	if err == nil {
 		t.Fatal("expected cancellation unsupported error")
 	}
@@ -44,12 +44,9 @@ func TestHandleWorkflowCancelSuccess(t *testing.T) {
 	recorder := &recordingCancelGrid{}
 	gridFactory = func() (runner.GridClient, error) { return recorder, nil }
 	buf := &bytes.Buffer{}
-	err := handleWorkflowCancel([]string{"--tenant", "acme", "--run-id", "run-42", "--workflow", "build", "--reason", "testing"}, buf)
+err := handleWorkflowCancel([]string{"--run-id", "run-42", "--workflow", "build", "--reason", "testing"}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	if recorder.request.Tenant != "acme" {
-		t.Fatalf("expected tenant acme, got %s", recorder.request.Tenant)
 	}
 	if recorder.request.RunID != "run-42" {
 		t.Fatalf("expected run id run-42, got %s", recorder.request.RunID)

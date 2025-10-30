@@ -1,0 +1,29 @@
+{
+  "schema_version": "v1",
+  "id": "orw-apply",
+  "name": "OpenRewrite Apply",
+  "step_ref": "orw-apply",
+  "inputs": {
+    "repo": {
+      "url": "https://gitlab.com/acme/repo.git",
+      "base_ref": "main",
+      "target_ref": "feature/java17"
+    },
+    "diffs": [],
+    "data": [
+      { "name": "recipe", "inline": { "json": { "group": "org.openrewrite.recipe", "artifact": "rewrite-migrate-java", "version": "3.17.0", "name": "org.openrewrite.java.migrate.UpgradeToJava17" } }, "media_type": "application/json" }
+    ]
+  },
+  "runtime": {
+  "image": "registry.dev/ploy/mods-openrewrite:latest",
+  "command": ["mods-orw"],
+  "args": ["--apply", "--recipe-json", "/in/recipe.json", "--dir", "/workspace", "--out", "/out"],
+    "env": { "JAVA_TOOL_OPTIONS": "-Xmx2g" },
+    "resources": { "cpu": "2", "memory": "3Gi", "disk": "6Gi" }
+  },
+  "outputs": {
+    "diff": { "target": "/workspace" },
+    "data": [ { "name": "rewrite-report", "path": "/out/report.json", "media_type": "application/json" } ]
+  },
+  "retention": { "retain_container": false, "ttl": "168h" }
+}

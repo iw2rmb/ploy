@@ -1,88 +1,97 @@
 package grid
 
 import (
-	"fmt"
-	"strings"
-	"time"
+    "fmt"
+    "strings"
+    "time"
 
-	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
-	helper "github.com/iw2rmb/grid/sdk/workflowrpc/helper"
+    workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
 
-	"github.com/iw2rmb/ploy/internal/workflow/aster"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
+    "github.com/iw2rmb/ploy/internal/workflow/contracts"
+    "github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 func buildSubmitRequest(ticket contracts.WorkflowTicket, stage runner.Stage, workflowID string) (workflowsdk.SubmitRequest, error) {
-	builder := helper.NewSubmitBuilder().
-		Tenant(strings.TrimSpace(ticket.Tenant)).
-		Workflow(strings.TrimSpace(workflowID)).
-		Correlation(strings.TrimSpace(ticket.TicketID)).
-		Idempotency(idempotencyKey(ticket, stage)).
-		Label("stage", stage.Name).
-		Label("lane", stage.Lane).
-		Label("ticket_id", ticket.TicketID)
+    // Construct request directly to avoid legacy tenant validation in helper.
+    req := workflowsdk.SubmitRequest{
+        Tenant:         "", // tenant concept removed
+        WorkflowID:     strings.TrimSpace(workflowID),
+        IdempotencyKey: idempotencyKey(ticket, stage),
+        RunMetadata: workflowsdk.RunMetadata{
+            CorrelationID: strings.TrimSpace(ticket.TicketID),
+            Labels:        map[string]string{"stage": stage.Name, "lane": stage.Lane, "ticket_id": ticket.TicketID},
+        },
+    }
 
-	manifest := stage.Constraints.Manifest.Manifest
-	if manifest.Name != "" {
-		builder.Label("manifest_name", manifest.Name)
-	}
-	if manifest.Version != "" {
-		builder.Label("manifest_version", manifest.Version)
-	}
+    manifest := stage.Constraints.Manifest.Manifest
+    if manifest.Name != "" {
+        if req.RunMetadata.Labels == nil { req.RunMetadata.Labels = make(map[string]string) }
+        req.RunMetadata.Labels["manifest_name"] = manifest.Name
+    }
+    if manifest.Version != "" {
+        if req.RunMetadata.Labels == nil { req.RunMetadata.Labels = make(map[string]string) }
+        req.RunMetadata.Labels["manifest_version"] = manifest.Version
+    }
 
-	builder.Job(func(job *helper.JobBuilder) {
-		if strings.TrimSpace(stage.Job.Image) != "" {
-			job.Image(stage.Job.Image)
-		}
-		if len(stage.Job.Command) > 0 {
-			job.Command(stage.Job.Command...)
-		}
-		for key, value := range stage.Job.Env {
-			job.Env(key, value)
-		}
-		for key, value := range copyStringMap(stage.Job.Metadata) {
-			job.Metadata(key, value)
-		}
-		if _, ok := stage.Job.Metadata["priority"]; !ok || strings.TrimSpace(stage.Job.Metadata["priority"]) == "" {
-			job.Metadata("priority", "standard")
-		}
-		if stage.Lane != "" {
-			job.Metadata("lane", stage.Lane)
-		}
-		if stage.CacheKey != "" {
-			job.Metadata("cache_key", stage.CacheKey)
-		}
-		if manifest.Name != "" {
-			job.Metadata("manifest_name", manifest.Name)
-		}
-		if manifest.Version != "" {
-			job.Metadata("manifest_version", manifest.Version)
-		}
-		if stage.Job.Resources.CPU != "" {
-			job.Metadata("resources.cpu", stage.Job.Resources.CPU)
-		}
-		if stage.Job.Resources.Memory != "" {
-			job.Metadata("resources.memory", stage.Job.Resources.Memory)
-		}
-		if stage.Job.Resources.Disk != "" {
-			job.Metadata("resources.disk", stage.Job.Resources.Disk)
-		}
-		if stage.Job.Resources.GPU != "" {
-			job.Metadata("resources.gpu", stage.Job.Resources.GPU)
-		}
-		if len(stage.Aster.Toggles) > 0 {
-			job.Metadata("aster.toggles", append([]string(nil), stage.Aster.Toggles...))
-		}
-		if len(stage.Aster.Bundles) > 0 {
-			job.Metadata("aster.bundles", append([]aster.Metadata(nil), stage.Aster.Bundles...))
-		}
-		if runtime := strings.TrimSpace(stage.Job.Runtime); runtime != "" {
-			job.Runtime(runtime)
-		}
-	})
+    // Job
+    // Job metadata uses map[string]any in the SDK; upgrade values accordingly.
+    jobMeta := make(map[string]any, len(stage.Job.Metadata))
+    for k, v := range stage.Job.Metadata { jobMeta[k] = v }
+    if v, ok := jobMeta["priority"]; !ok || strings.TrimSpace(fmt.Sprint(v)) == "" {
+        jobMeta["priority"] = "standard"
+    }
+    if stage.Lane != "" {
+        jobMeta["lane"] = stage.Lane
+    }
+    if stage.CacheKey != "" {
+        jobMeta["cache_key"] = stage.CacheKey
+    }
+    if manifest.Name != "" {
+        jobMeta["manifest_name"] = manifest.Name
+    }
+    if manifest.Version != "" {
+        jobMeta["manifest_version"] = manifest.Version
+    }
+    if stage.Job.Resources.CPU != "" {
+        jobMeta["resources.cpu"] = stage.Job.Resources.CPU
+    }
+    if stage.Job.Resources.Memory != "" {
+        jobMeta["resources.memory"] = stage.Job.Resources.Memory
+    }
+    if stage.Job.Resources.Disk != "" {
+        jobMeta["resources.disk"] = stage.Job.Resources.Disk
+    }
+    if stage.Job.Resources.GPU != "" {
+        jobMeta["resources.gpu"] = stage.Job.Resources.GPU
+    }
+    if len(stage.Aster.Toggles) > 0 {
+        jobMeta["aster.toggles"] = append([]string(nil), stage.Aster.Toggles...)
+    }
+    if len(stage.Aster.Bundles) > 0 {
+        // Preserve bundle metadata shape for downstream consumers.
+        // Use []map[string]any to avoid extra types.
+        bundles := make([]map[string]any, 0, len(stage.Aster.Bundles))
+        for _, b := range stage.Aster.Bundles {
+            bundles = append(bundles, map[string]any{
+                "bundle_id":   b.BundleID,
+                "stage":       b.Stage,
+                "toggle":      b.Toggle,
+                "artifact_cid": b.ArtifactCID,
+                "digest":      b.Digest,
+            })
+        }
+        jobMeta["aster.bundles"] = bundles
+    }
 
-	return builder.Build()
+    req.Job = workflowsdk.JobSpec{
+        Image:    strings.TrimSpace(stage.Job.Image),
+        Command:  append([]string(nil), stage.Job.Command...),
+        Env:      copyStringMap(stage.Job.Env),
+        Metadata: jobMeta,
+        Runtime:  strings.TrimSpace(stage.Job.Runtime),
+    }
+
+    return req, nil
 }
 
 func idempotencyKey(ticket contracts.WorkflowTicket, stage runner.Stage) string {

@@ -61,7 +61,7 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 		Lane:         "build-gate",
 		StepManifest: &manifest,
 	}
-	ticket := contracts.WorkflowTicket{TicketID: "ticket-123", Tenant: "acme"}
+ticket := contracts.WorkflowTicket{TicketID: "ticket-123"}
 	outcome, err := client.ExecuteStage(context.Background(), ticket, stage, "/tmp/workspace")
 	if err != nil {
 		t.Fatalf("ExecuteStage() unexpected error: %v", err)
@@ -165,7 +165,7 @@ func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
 		Lane:         "mods-orw",
 		StepManifest: &manifest,
 	}
-	ticket := contracts.WorkflowTicket{TicketID: "ticket-456", Tenant: "acme"}
+ticket := contracts.WorkflowTicket{TicketID: "ticket-456"}
 
 	outcome, err := client.ExecuteStage(context.Background(), ticket, stage, "/tmp/workspace")
 	if err != nil {

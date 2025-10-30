@@ -9,7 +9,7 @@ these collectors.
 - **Path**: `/metrics`
 - **Handler**: native `promhttp` served by the control-plane HTTP API.
 - **Authentication**: none (scope the listener to the cluster network or front it with
-  an ingress proxy if multi-tenant exposure is required).
+  an ingress proxy if exposure beyond trusted networks is required).
 
 ### Sample Scrape Configuration
 

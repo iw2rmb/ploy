@@ -174,7 +174,7 @@ func (c *Client) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTick
 	}
 	runID := strings.TrimSpace(resp.RunID)
 
-	term, err := c.awaitTerminalStatus(ctx, runID, ticket.Tenant, workflowID)
+    term, err := c.awaitTerminalStatus(ctx, runID, "", workflowID)
 	if err != nil {
 		return runner.StageOutcome{}, err
 	}
@@ -201,16 +201,11 @@ func (c *Client) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (
 	if trimmedRunID == "" {
 		return runner.CancelResult{}, fmt.Errorf("workflow run id is required")
 	}
-	trimmedTenant := strings.TrimSpace(req.Tenant)
-	if trimmedTenant == "" {
-		return runner.CancelResult{}, fmt.Errorf("tenant is required")
-	}
-	resp, err := c.rpc.Cancel(ctx, workflowsdk.CancelRequest{
-		Tenant:     trimmedTenant,
-		WorkflowID: strings.TrimSpace(req.WorkflowID),
-		RunID:      trimmedRunID,
-		Reason:     strings.TrimSpace(req.Reason),
-	})
+    resp, err := c.rpc.Cancel(ctx, workflowsdk.CancelRequest{
+        WorkflowID: strings.TrimSpace(req.WorkflowID),
+        RunID:      trimmedRunID,
+        Reason:     strings.TrimSpace(req.Reason),
+    })
 	if err != nil {
 		return runner.CancelResult{}, err
 	}

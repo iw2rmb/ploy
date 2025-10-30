@@ -40,12 +40,11 @@ func TestCancelCommandTrimsAndInvokesClient(t *testing.T) {
 		result: runner.CancelResult{RunID: "run-123"},
 	}
 	cmd := CancelCommand{Client: stub}
-	options := CancelOptions{
-		Tenant:     "  tenant  ",
-		RunID:      " run-123 ",
-		WorkflowID: " wf-789 ",
-		Reason:     " cleanup ",
-	}
+    options := CancelOptions{
+        RunID:      " run-123 ",
+        WorkflowID: " wf-789 ",
+        Reason:     " cleanup ",
+    }
 	result, err := cmd.Run(nil, options)
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
@@ -55,9 +54,6 @@ func TestCancelCommandTrimsAndInvokesClient(t *testing.T) {
 	}
 	if stub.lastCtx == nil {
 		t.Fatalf("expected non-nil context passed to client")
-	}
-	if stub.lastReq.Tenant != "tenant" {
-		t.Fatalf("expected tenant trimmed to 'tenant', got %q", stub.lastReq.Tenant)
 	}
 	if stub.lastReq.RunID != "run-123" {
 		t.Fatalf("expected run id trimmed to 'run-123', got %q", stub.lastReq.RunID)

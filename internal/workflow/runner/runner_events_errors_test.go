@@ -26,11 +26,7 @@ func TestRunReturnsClaimTicketError(t *testing.T) {
 
 func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 	events := &errorEvents{
-		ticket: contracts.WorkflowTicket{
-			SchemaVersion: contracts.SchemaVersion,
-			TicketID:      "ticket-123",
-			Tenant:        "acme",
-		},
+        ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
 		publishErr: errors.New("checkpoint failure"),
 	}
 	opts := runner.Options{
@@ -50,11 +46,7 @@ func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 
 func TestRunPropagatesPublishArtifactError(t *testing.T) {
 	events := &errorEvents{
-		ticket: contracts.WorkflowTicket{
-			SchemaVersion: contracts.SchemaVersion,
-			TicketID:      "ticket-123",
-			Tenant:        "acme",
-		},
+        ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
 		artifactErr: errors.New("artifact failure"),
 	}
 	grid := runner.NewInMemoryGrid()
@@ -81,10 +73,7 @@ func TestRunPropagatesPublishArtifactError(t *testing.T) {
 }
 
 func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
-	events := &countingEvents{
-		ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Tenant: "acme"},
-		failAt: 3,
-	}
+    events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 3}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -101,10 +90,7 @@ func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
 }
 
 func TestRunFailsWhenFinalPublishFails(t *testing.T) {
-	events := &countingEvents{
-		ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Tenant: "acme"},
-		failAt: 8,
-	}
+    events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 8}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,

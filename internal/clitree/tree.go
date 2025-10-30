@@ -23,7 +23,7 @@ var commandTree = []Node{
 			{
 				Name:        "cancel",
 				Description: "Cancel an in-flight workflow run",
-				Usage:       "ploy workflow cancel --tenant <tenant> --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]",
+            Usage:       "ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]",
 			},
 		},
 	},
@@ -218,7 +218,7 @@ var commandTree = []Node{
 			{
 				Name:        "capture",
 				Description: "Execute snapshot capture and publish metadata",
-				Usage:       "ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>",
+            Usage:       "ploy snapshot capture --snapshot <snapshot-name> --ticket <ticket-id>",
 			},
 		},
 	},
@@ -231,7 +231,7 @@ var commandTree = []Node{
 			{
 				Name:        "materialize",
 				Description: "Materialize integration environments from manifests and snapshots",
-				Usage:       "ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--flags]",
+            Usage:       "ploy environment materialize <commit-sha> --app <app> [--flags]",
 			},
 		},
 	},

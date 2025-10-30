@@ -3,7 +3,6 @@ package main
 import (
     "context"
     "encoding/json"
-    "errors"
     "flag"
     "fmt"
     "io"
@@ -32,7 +31,6 @@ func executeModRun(args []string, stderr io.Writer) error {
     fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
     fs.SetOutput(io.Discard)
     ticket := fs.String("ticket", "auto", "ticket identifier to consume or 'auto'")
-    tenant := fs.String("tenant", "", "tenant slug for subject mapping")
     repoURL := fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
     repoBaseRef := fs.String("repo-base-ref", "", "Git base ref used for materialisation")
     repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
@@ -46,11 +44,6 @@ func executeModRun(args []string, stderr io.Writer) error {
         return err
     }
 
-	trimmedTenant := strings.TrimSpace(*tenant)
-	if trimmedTenant == "" {
-		printModRunUsage(stderr)
-		return errors.New("tenant required")
-	}
 
 	ticketValue := strings.TrimSpace(*ticket)
 	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
@@ -83,14 +76,13 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	request := modsapi.TicketSubmitRequest{
-		TicketID:   ticketValue,
-		Tenant:     trimmedTenant,
-		Submitter:  strings.TrimSpace(os.Getenv("USER")),
-		Repository: repoSpec.URL,
-		Metadata:   make(map[string]string),
-		Stages:     defaultStageDefinitions(),
-	}
+    request := modsapi.TicketSubmitRequest{
+        TicketID:   ticketValue,
+        Submitter:  strings.TrimSpace(os.Getenv("USER")),
+        Repository: repoSpec.URL,
+        Metadata:   make(map[string]string),
+        Stages:     defaultStageDefinitions(),
+    }
 	if repoSpec.BaseRef != "" {
 		request.Metadata["repo_base_ref"] = repoSpec.BaseRef
 	}
@@ -141,7 +133,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-    _, _ = fmt.Fprintln(w, "Usage: ploy mod run --tenant <tenant> [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--follow] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
+    _, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--follow] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
 }
 
 func defaultStageDefinitions() []modsapi.StageDefinition {

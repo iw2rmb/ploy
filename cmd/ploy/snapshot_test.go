@@ -86,7 +86,7 @@ func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
 		Fingerprint: "fp-123",
 		Metadata: snapshots.SnapshotMetadata{
 			SnapshotName: "dev-db",
-			Tenant:       "acme",
+        // tenant removed
 			TicketID:     "ticket-123",
 		},
 	}
@@ -96,7 +96,7 @@ func TestHandleSnapshotCapturePrintsResult(t *testing.T) {
 	}
 	snapshotConfigDir = "ignored"
 
-	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-123"}, buf)
+err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--ticket", "ticket-123"}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -180,7 +180,7 @@ fixture = "dev-db.json"
 		},
 	}))
 
-	err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-42"}, buf)
+err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--ticket", "ticket-42"}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -257,7 +257,7 @@ fixture = "dev-db.json"
 		},
 	}))
 
-	err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--tenant", "acme", "--ticket", "ticket-77"}, buf)
+err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--ticket", "ticket-77"}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -270,14 +270,7 @@ fixture = "dev-db.json"
 		t.Fatalf("unexpected metadata subject: %s", msg.Subject)
 	}
 
-	var envelope struct {
-		SchemaVersion string `json:"schema_version"`
-		SnapshotName  string `json:"snapshot_name"`
-		ArtifactCID   string `json:"artifact_cid"`
-		Tenant        string `json:"tenant"`
-		TicketID      string `json:"ticket_id"`
-		CapturedAt    string `json:"captured_at"`
-	}
+    var envelope struct { SchemaVersion string `json:"schema_version"`; SnapshotName string `json:"snapshot_name"`; ArtifactCID string `json:"artifact_cid"`; TicketID string `json:"ticket_id"`; CapturedAt string `json:"captured_at"` }
 	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 		t.Fatalf("decode metadata envelope: %v", err)
 	}
@@ -287,9 +280,9 @@ fixture = "dev-db.json"
 	if envelope.SnapshotName != "dev-db" {
 		t.Fatalf("snapshot mismatch: %s", envelope.SnapshotName)
 	}
-	if envelope.Tenant != "acme" || envelope.TicketID != "ticket-77" {
-		t.Fatalf("tenant/ticket mismatch: %s/%s", envelope.Tenant, envelope.TicketID)
-	}
+if envelope.TicketID != "ticket-77" {
+    t.Fatalf("ticket mismatch: %s", envelope.TicketID)
+}
 	if envelope.ArtifactCID == "" {
 		t.Fatalf("expected artifact cid in envelope")
 	}

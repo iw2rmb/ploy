@@ -10,11 +10,9 @@ set -euo pipefail
 #   - Go toolchain (for `go run ./cmd/gridctl`)
 #   - GRID_ID / PLOY_GRID_ID
 #   - GRID_API_KEY / PLOY_GRID_API_KEY
-#   - PLOY_E2E_TENANT (defaults to acme)
 # Optional:
 #   - E2E_STAGE_TIMEOUT (default 180s)
 
-TENANT=${PLOY_E2E_TENANT:-${TENANT:-acme}}
 GRID_ID=${PLOY_GRID_ID:-${GRID_ID:-}}
 GRID_API_KEY=${PLOY_GRID_API_KEY:-${GRID_API_KEY:-}}
 TIMEBOX=${E2E_STAGE_TIMEOUT:-180}
@@ -50,7 +48,6 @@ submit_stage() {
   echo "==> Submit ${stage_name} (lane=${lane})"
   local out
   if ! out=$(gridctl workflow submit \
-      --tenant "${TENANT}" \
       --workflow "${WORKFLOW_ID}" \
       --image "${image}" \
       $(printf -- '--cmd %q ' "${cmd[@]}") \
@@ -87,7 +84,7 @@ poll_status() {
   local start_ts=$(date +%s)
   while true; do
     local out
-    if ! out=$(gridctl workflow status "${run_id}" --tenant "${TENANT}"); then
+    if ! out=$(gridctl workflow status "${run_id}"); then
       echo "error: status fetch failed for ${run_id}" >&2
       break
     fi
@@ -100,7 +97,7 @@ poll_status() {
     local now=$(date +%s)
     if (( now - start_ts > TIMEBOX )); then
       echo "    timeout waiting for ${label} to complete (status=${status}); canceling"
-      gridctl workflow cancel "${run_id}" --tenant "${TENANT}" --reason "e2e-timeout" >/dev/null || true
+      gridctl workflow cancel "${run_id}" --reason "e2e-timeout" >/dev/null || true
       return 1
     fi
     sleep 5

@@ -3,14 +3,12 @@
     {
       "id": "evt-1",
       "payload": "{\"kind\":\"login\"}",
-      "ingested_at": "",
-      "tenant": "acme"
+      "ingested_at": ""
     },
     {
       "id": "evt-2",
       "payload": "{\"kind\":\"purchase\"}",
-      "ingested_at": "",
-      "tenant": "acme"
+      "ingested_at": ""
     }
   ]
 }

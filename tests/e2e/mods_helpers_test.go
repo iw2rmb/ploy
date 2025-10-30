@@ -24,15 +24,14 @@ type scenarioOptions struct {
 }
 
 type scenarioHarness struct {
-	t           *testing.T
-	scenario    Scenario
-	options     scenarioOptions
-	tenant      string
-	ticket      string
-	grid        runner.GridClient
-	recorder    *capturingGrid
-	bus         *contracts.InMemoryBus
-	workspace   *recordingWorkspacePreparer
+    t           *testing.T
+    scenario    Scenario
+    options     scenarioOptions
+    ticket      string
+    grid        runner.GridClient
+    recorder    *capturingGrid
+    bus         *contracts.InMemoryBus
+    workspace   *recordingWorkspacePreparer
 	advisor     *recordingAdvisor
 	jobComposer runner.JobComposer
 	compiler    staticManifestCompiler
@@ -71,14 +70,13 @@ func (a *recordingAdvisor) Advise(ctx context.Context, req mods.AdviceRequest) (
 func newScenarioHarness(t *testing.T, scenario Scenario, opts scenarioOptions) *scenarioHarness {
 	t.Helper()
 
-	harness := &scenarioHarness{
-		t:        t,
-		scenario: scenario,
-		options:  opts,
-		tenant:   "acme",
-		ticket:   fmt.Sprintf("ticket-%s", scenario.ID),
-		compiler: staticManifestCompiler{compilation: newModsCompilation()},
-	}
+    harness := &scenarioHarness{
+        t:        t,
+        scenario: scenario,
+        options:  opts,
+        ticket:   fmt.Sprintf("ticket-%s", scenario.ID),
+        compiler: staticManifestCompiler{compilation: newModsCompilation()},
+    }
 
 	if harness.options.WorkspaceHint == "" {
 		harness.options.WorkspaceHint = "mods/java"
@@ -116,7 +114,7 @@ func newScenarioHarness(t *testing.T, scenario Scenario, opts scenarioOptions) *
 		repo.BaseRef = "main"
 	}
 
-	harness.bus = contracts.NewInMemoryBus(harness.tenant)
+    harness.bus = contracts.NewInMemoryBus()
 	harness.bus.Manifest = contracts.ManifestReference{Name: harness.compiler.compilation.Manifest.Name, Version: harness.compiler.compilation.Manifest.Version}
 	harness.bus.Repo = repo
 
@@ -141,14 +139,13 @@ func (h *scenarioHarness) run() error {
 		HumanLane:       "mods-human",
 	}
 
-	opts := runner.Options{
-		Ticket:            h.ticket,
-		Tenant:            h.tenant,
-		Events:            h.bus,
-		Grid:              h.grid,
-		Planner:           runner.NewDefaultPlannerWithMods(modsOpts),
-		MaxStageRetries:   1,
-		ManifestCompiler:  h.compiler,
+    opts := runner.Options{
+        Ticket:            h.ticket,
+        Events:            h.bus,
+        Grid:              h.grid,
+        Planner:           runner.NewDefaultPlannerWithMods(modsOpts),
+        MaxStageRetries:   1,
+        ManifestCompiler:  h.compiler,
 		JobComposer:       h.jobComposer,
 		WorkspacePreparer: h.workspace,
 		Mods:              modsOpts,

@@ -12,7 +12,7 @@ import (
 
 func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 	planner := runner.NewDefaultPlanner()
-	ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Tenant: "acme"}
+ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}
 	plan, err := planner.Build(context.Background(), ticket)
 	if err != nil {
 		t.Fatalf("unexpected error building plan: %v", err)
@@ -72,10 +72,10 @@ func TestDefaultPlannerBuildsOrderedStages(t *testing.T) {
 }
 
 func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             noStageGrid{},
 		Planner:          nil,
@@ -100,12 +100,12 @@ func TestRunUsesDefaultPlannerWhenNil(t *testing.T) {
 }
 
 func TestRunFailsWhenPlannerErrors(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{}
 	planner := failingPlanner{err: errors.New("planner boom")}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          planner,
@@ -120,10 +120,10 @@ func TestRunFailsWhenPlannerErrors(t *testing.T) {
 }
 
 func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             &fakeGrid{},
 		Planner:          invalidStagePlanner{},
@@ -138,10 +138,10 @@ func TestRunFailsWhenPlannerProducesInvalidStage(t *testing.T) {
 }
 
 func TestRunFailsWhenPlannerOmitsLane(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             &fakeGrid{},
 		Planner:          missingLanePlanner{},

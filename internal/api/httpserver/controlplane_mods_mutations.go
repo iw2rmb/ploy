@@ -23,14 +23,13 @@ func (s *controlPlaneServer) handleModsSubmit(w http.ResponseWriter, r *http.Req
 		writeErrorMessage(w, http.StatusBadRequest, "stages are required")
 		return
 	}
-	spec := controlplanemods.TicketSpec{
-		TicketID:   strings.TrimSpace(req.TicketID),
-		Tenant:     strings.TrimSpace(req.Tenant),
-		Submitter:  strings.TrimSpace(req.Submitter),
-		Repository: strings.TrimSpace(req.Repository),
-		Metadata:   cloneStringMap(req.Metadata),
-		Stages:     make([]controlplanemods.StageDefinition, 0, len(req.Stages)),
-	}
+    spec := controlplanemods.TicketSpec{
+        TicketID:   strings.TrimSpace(req.TicketID),
+        Submitter:  strings.TrimSpace(req.Submitter),
+        Repository: strings.TrimSpace(req.Repository),
+        Metadata:   cloneStringMap(req.Metadata),
+        Stages:     make([]controlplanemods.StageDefinition, 0, len(req.Stages)),
+    }
 	for _, stage := range req.Stages {
 		converted := controlplanemods.StageDefinition{
 			ID:           strings.TrimSpace(stage.ID),

@@ -12,6 +12,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/iw2rmb/ploy/internal/controlplane/hydration"
+	modplan "github.com/iw2rmb/ploy/internal/mods/plan"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -240,6 +241,13 @@ func (s *Service) validateSpec(spec TicketSpec) error {
 
 // enqueueStage submits a stage to the scheduler and marks it queued.
 func (s *Service) enqueueStage(ctx context.Context, ticketID string, def StageDefinition, current StageStatus) (*StageStatus, error) {
+	// First, synthesize a manifest for the Mods plan stage when missing.
+	if updated, err := s.synthesizePlanManifest(ctx, ticketID, def); err == nil && updated != nil {
+		def = *updated
+	} else if err != nil {
+		return nil, err
+	}
+	// Then, attempt hydration snapshot reuse which may rewrite the manifest.
 	if updated, err := s.prepareStageHydration(ctx, ticketID, def); err == nil && updated != nil {
 		def = *updated
 	} else if err != nil {
@@ -259,6 +267,84 @@ func (s *Service) enqueueStage(ctx context.Context, ticketID string, def StageDe
 		return nil, fmt.Errorf("submit stage job: %w", err)
 	}
 	return s.store.markStageQueued(ctx, ticketID, def.ID, job.JobID)
+}
+
+// synthesizePlanManifest attaches a default step manifest for the plan stage when none is provided.
+func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, def StageDefinition) (*StageDefinition, error) {
+    // Only synthesize for the plan stage (by id) or when lane explicitly indicates mods-plan.
+    if strings.TrimSpace(def.ID) != modplan.StageNamePlan && strings.TrimSpace(def.Lane) != modplan.StageNamePlan {
+        return nil, nil
+    }
+    if def.Metadata != nil {
+        if raw := strings.TrimSpace(def.Metadata[manifestMetadataKey]); raw != "" {
+            // Manifest already present; nothing to do.
+            return nil, nil
+        }
+    }
+
+    // Fetch ticket meta to source repository and hints.
+    meta, _, err := s.store.readMeta(ctx, ticketID)
+    if err != nil {
+        return nil, fmt.Errorf("mods: read ticket meta: %w", err)
+    }
+
+    repoURL := strings.TrimSpace(meta.Repository)
+    // Optional hints from ticket metadata
+    baseRef := strings.TrimSpace(meta.Metadata["repo_base_ref"])
+    targetRef := strings.TrimSpace(meta.Metadata["repo_target_ref"])
+    commit := strings.TrimSpace(meta.Metadata["repo_commit"])
+    workspaceHint := strings.TrimSpace(meta.Metadata["repo_workspace_hint"])
+
+    // Build a minimal, but valid manifest for mods-plan.
+    manifest := contracts.StepManifest{
+        ID:    modplan.StageNamePlan,
+        Name:  "Mods Plan",
+        Image: "ghcr.io/ploy/mods/plan:latest",
+        Command: []string{"mods-plan"},
+        Args:    []string{"--run"},
+        Env:     map[string]string{"MODS_PLAN_CACHE": "/workspace/cache"},
+        Inputs: []contracts.StepInput{{
+            Name:      defaultHydrationInput,
+            MountPath: "/" + defaultHydrationInput,
+            Mode:      contracts.StepInputModeReadWrite,
+            Hydration: &contracts.StepInputHydration{Repo: &contracts.RepoMaterialization{
+                URL:           repoURL,
+                BaseRef:       baseRef,
+                TargetRef:     targetRef,
+                Commit:        commit,
+                WorkspaceHint: workspaceHint,
+            }},
+        }},
+        Resources: contracts.StepResourceSpec{CPU: "2000m", Memory: "4Gi"},
+        // Keep retention modest by default; nodes may override via lane/catalog later.
+        Retention: contracts.StepRetentionSpec{RetainContainer: false, TTL: "72h"},
+    }
+
+    if err := manifest.Validate(); err != nil {
+        return nil, fmt.Errorf("mods: synthesized plan manifest invalid: %w", err)
+    }
+    payload, err := json.Marshal(manifest)
+    if err != nil {
+        return nil, fmt.Errorf("mods: encode synthesized manifest: %w", err)
+    }
+    if def.Metadata == nil {
+        def.Metadata = map[string]string{}
+    }
+    def.Metadata[manifestMetadataKey] = string(payload)
+    // Inject hydration hints to enable snapshot reuse in prepareStageHydration.
+    if repoURL != "" {
+        def.Metadata[metadataRepoURLKey] = repoURL
+    }
+    // Prefer commit; fall back to target ref if commit is not available.
+    revision := commit
+    if revision == "" {
+        revision = targetRef
+    }
+    if revision != "" {
+        def.Metadata[metadataRevisionKey] = revision
+    }
+    def.Metadata[metadataInputNameKey] = defaultHydrationInput
+    return &def, nil
 }
 
 // prepareStageHydration injects reusable hydration snapshots into the manifest when available.

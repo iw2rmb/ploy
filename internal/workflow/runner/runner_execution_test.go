@@ -11,10 +11,9 @@ import (
 )
 
 func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+    events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
 		Events:           events,
 		Grid:             statuslessGrid{},
 		Planner:          runner.NewDefaultPlanner(),
@@ -43,7 +42,7 @@ func (c *recordingJobComposer) Compose(ctx context.Context, req runner.JobCompos
 }
 
 func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+    events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{outcomes: map[string][]runner.StageOutcome{
 		modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 		buildGateStage: {{Status: runner.StageStatusCompleted}},
@@ -60,7 +59,6 @@ func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
 	}}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -97,7 +95,7 @@ func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
 }
 
 func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
@@ -106,7 +104,7 @@ func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -128,7 +126,7 @@ func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 }
 
 func TestRunUsesFallbackFailureMessage(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
@@ -137,7 +135,7 @@ func TestRunUsesFallbackFailureMessage(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -155,11 +153,11 @@ func TestRunUsesFallbackFailureMessage(t *testing.T) {
 }
 
 func TestRunPropagatesGridError(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	gridErr := errors.New("grid down")
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             errorGrid{err: gridErr},
 		Planner:          runner.NewDefaultPlanner(),
@@ -175,7 +173,7 @@ func TestRunPropagatesGridError(t *testing.T) {
 
 func TestRunRetriesStageOnce(t *testing.T) {
 	withCleanupDeadline(t)
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: {{Status: runner.StageStatusCompleted}},
@@ -190,7 +188,7 @@ func TestRunRetriesStageOnce(t *testing.T) {
 	workspaceRoot := t.TempDir()
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          planner,
@@ -226,7 +224,7 @@ func TestRunRetriesStageOnce(t *testing.T) {
 
 func TestRunStopsAfterRetryLimit(t *testing.T) {
 	withCleanupDeadline(t)
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := &fakeGrid{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
@@ -235,7 +233,7 @@ func TestRunStopsAfterRetryLimit(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),

@@ -14,10 +14,9 @@ import (
 
 // JetStreamOptions controls how the JetStream events client connects to NATS.
 type JetStreamOptions struct {
-	URL         string
-	Tenant      string
-	Durable     string
-	PullTimeout time.Duration
+    URL         string
+    Durable     string
+    PullTimeout time.Duration
 }
 
 // JetStreamClient implements EventsClient backed by NATS JetStream.
@@ -38,15 +37,10 @@ func NewJetStreamClient(opts JetStreamOptions) (*JetStreamClient, error) {
 	if url == "" {
 		return nil, fmt.Errorf("jetstream url is required")
 	}
-	tenant := strings.TrimSpace(opts.Tenant)
-	if tenant == "" {
-		return nil, fmt.Errorf("tenant is required")
-	}
-
-	durable := strings.TrimSpace(opts.Durable)
-	if durable == "" {
-		durable = fmt.Sprintf("ploy-workflow-%s", tenant)
-	}
+    durable := strings.TrimSpace(opts.Durable)
+    if durable == "" {
+        durable = "ploy-workflow"
+    }
 
 	pullTimeout := opts.PullTimeout
 	if pullTimeout <= 0 {
@@ -67,7 +61,7 @@ func NewJetStreamClient(opts JetStreamOptions) (*JetStreamClient, error) {
 	return &JetStreamClient{
 		conn:        conn,
 		js:          js,
-		tenant:      tenant,
+        tenant:      "",
 		durable:     durable,
 		pullTimeout: pullTimeout,
 	}, nil
@@ -118,9 +112,7 @@ func (c *JetStreamClient) ClaimTicket(ctx context.Context, ticketID string) (Wor
 		return WorkflowTicket{}, fmt.Errorf("decode ticket: %w", err)
 	}
 
-	if ticket.Tenant == "" {
-		ticket.Tenant = c.tenant
-	}
+    // Tenant field removed; ignore any legacy values.
 
 	if err := ticket.Validate(); err != nil {
 		return WorkflowTicket{}, fmt.Errorf("validate ticket: %w", err)

@@ -6,7 +6,7 @@ operations for the v2 control plane. Commands mirror the structure captured in
 
 ## Workflow Management
 
-- `ploy workflow cancel --tenant <tenant> --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]`
+- `ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]`
   Cancel an in-flight workflow run and surface workflow control plane errors.
 
 ## Mod Workflows
@@ -14,7 +14,7 @@ operations for the v2 control plane. Commands mirror the structure captured in
 - `ploy mod run [flags]`
   Dispatch a Mod ticket to the control plane, materialise repositories, and
   stream step checkpoints. See `ploy mod run --help` for the full flag catalog
-  (tenant, ticket, repository materialisation, planner hints).
+  (ticket, repository materialisation, planner hints).
 
 ## Observability Commands
 
@@ -93,12 +93,12 @@ future calls reuse the SSH and CA metadata without additional environment variab
 
 - `ploy snapshot plan --snapshot <snapshot-name>`
   Preview strip, mask, and synthetic rules for a snapshot definition.
-- `ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>`
+- `ploy snapshot capture --snapshot <snapshot-name> --ticket <ticket-id>`
   Execute a snapshot capture and publish the resulting metadata.
 
 ## Environment Materialisation
 
-- `ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]`
+- `ploy environment materialize <commit-sha> --app <app> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]`
   Plan or hydrate integration environments for the specified commit.
 
 ## Manifest Tooling

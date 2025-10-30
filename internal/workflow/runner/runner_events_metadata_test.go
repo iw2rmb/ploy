@@ -11,12 +11,12 @@ import (
 )
 
 func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := runner.NewInMemoryGrid()
 	composer := &recordingCacheComposer{}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -57,7 +57,7 @@ func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
 }
 
 func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -77,7 +77,7 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -165,7 +165,7 @@ func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
 }
 
 func TestRunPublishesBuildGateMetadata(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := newStubCompiler()
 	buildGateMetadata := runner.StageMetadata{
 		BuildGate: &runner.StageBuildGateMetadata{
@@ -217,7 +217,7 @@ func TestRunPublishesBuildGateMetadata(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),

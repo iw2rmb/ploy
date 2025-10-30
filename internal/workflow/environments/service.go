@@ -46,27 +46,25 @@ func NewService(opts ServiceOptions) Service {
 
 // Request captures the inputs required to materialize a commit-scoped environment.
 type Request struct {
-	CommitSHA    string
-	App          string
-	Tenant       string
-	DryRun       bool
-	Manifest     manifests.Compilation
-	ManifestRef  contracts.ManifestReference
-	AsterEnabled bool
-	AsterToggles []string
+    CommitSHA    string
+    App          string
+    DryRun       bool
+    Manifest     manifests.Compilation
+    ManifestRef  contracts.ManifestReference
+    AsterEnabled bool
+    AsterToggles []string
 }
 
 // Result summarizes the resources planned or hydrated for the environment.
 type Result struct {
-	CommitSHA    string
-	App          string
-	Tenant       string
-	DryRun       bool
-	Manifest     manifests.Compilation
-	ManifestRef  contracts.ManifestReference
-	AsterToggles []string
-	Snapshots    []SnapshotStatus
-	Caches       []CacheStatus
+    CommitSHA    string
+    App          string
+    DryRun       bool
+    Manifest     manifests.Compilation
+    ManifestRef  contracts.ManifestReference
+    AsterToggles []string
+    Snapshots    []SnapshotStatus
+    Caches       []CacheStatus
 }
 
 // SnapshotStatus reflects the availability/attachment state of a snapshot fixture.
@@ -99,10 +97,7 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 	if trimmedApp == "" {
 		return Result{}, errors.New("app identifier is required")
 	}
-	trimmedTenant := strings.TrimSpace(req.Tenant)
-	if !req.DryRun && trimmedTenant == "" {
-		return Result{}, errors.New("tenant is required when executing materialization")
-	}
+    // tenant removed
 
 	manifestMeta := req.Manifest.Manifest
 	if strings.TrimSpace(manifestMeta.Name) == "" {
@@ -130,7 +125,7 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		}
 		status := SnapshotStatus{Name: snapshotName, Plan: plan}
 		if !req.DryRun {
-			capture, err := s.snapshots.Capture(ctx, snapshotName, snapshots.CaptureOptions{Tenant: trimmedTenant, TicketID: ticketIdentifier(trimmedApp, trimmedCommit)})
+                capture, err := s.snapshots.Capture(ctx, snapshotName, snapshots.CaptureOptions{TicketID: ticketIdentifier(trimmedApp, trimmedCommit)})
 			if err != nil {
 				return Result{}, fmt.Errorf("capture snapshot %s: %w", snapshotName, err)
 			}
@@ -177,17 +172,16 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		cacheStatuses = append(cacheStatuses, status)
 	}
 
-	return Result{
-		CommitSHA:    trimmedCommit,
-		App:          trimmedApp,
-		Tenant:       trimmedTenant,
-		DryRun:       req.DryRun,
-		Manifest:     req.Manifest,
-		ManifestRef:  manifestRef,
-		AsterToggles: toggles,
-		Snapshots:    snapshotsStatus,
-		Caches:       cacheStatuses,
-	}, nil
+    return Result{
+        CommitSHA:    trimmedCommit,
+        App:          trimmedApp,
+        DryRun:       req.DryRun,
+        Manifest:     req.Manifest,
+        ManifestRef:  manifestRef,
+        AsterToggles: toggles,
+        Snapshots:    snapshotsStatus,
+        Caches:       cacheStatuses,
+    }, nil
 }
 
 func (s Service) validate() error {

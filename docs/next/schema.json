@@ -1,0 +1,150 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/ploy/manifest.schema.json",
+  "title": "Ploy Mods Step Manifest",
+  "type": "object",
+  "required": ["schema_version", "id", "name", "runtime", "inputs"],
+  "properties": {
+    "schema_version": { "type": "string", "enum": ["v1"] },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9\-]{2,63}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "step_ref": { "type": "string" },
+    "inputs": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "object",
+          "properties": {
+            "url": { "type": "string" },
+            "base_ref": { "type": "string" },
+            "target_ref": { "type": "string" },
+            "commit": { "type": "string" },
+            "workspace_hint": { "type": "string" }
+          },
+          "required": ["url"],
+          "additionalProperties": false
+        },
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "cid": { "type": "string" },
+            "digest": { "type": "string" }
+          },
+          "required": ["cid"],
+          "additionalProperties": false
+        },
+        "diffs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cid": { "type": "string" },
+              "digest": { "type": "string" },
+              "message": { "type": "string" }
+            },
+            "required": ["cid"],
+            "additionalProperties": false
+          }
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "cid": { "type": "string" },
+              "inline": {
+                "type": "object",
+                "properties": {
+                  "json": {},
+                  "text": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "media_type": { "type": "string" }
+            },
+            "required": ["name"],
+            "anyOf": [
+              { "required": ["cid"] },
+              { "required": ["inline"] }
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["image"],
+      "properties": {
+        "image": { "type": "string" },
+        "entrypoint": { "type": "array", "items": { "type": "string" } },
+        "command": { "type": "array", "items": { "type": "string" } },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": {
+          "type": "object",
+          "patternProperties": { 
+            "^[A-Z0-9_]+$": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "string" },
+            "memory": { "type": "string" },
+            "disk": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "diff": {
+          "type": "object",
+          "properties": {
+            "target": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "plan": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "media_type": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string" },
+              "media_type": { "type": "string" }
+            },
+            "required": ["name", "path"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "retain_container": { "type": "boolean" },
+        "ttl": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
+

@@ -61,10 +61,6 @@ func NewJetStreamMetadataPublisher(endpoint string, opts JetStreamMetadataOption
 }
 
 func (p *jetStreamMetadataPublisher) Publish(ctx context.Context, meta SnapshotMetadata) error {
-	trimmedTenant := strings.TrimSpace(meta.Tenant)
-	if trimmedTenant == "" {
-		return fmt.Errorf("metadata tenant required")
-	}
 	trimmedTicket := strings.TrimSpace(meta.TicketID)
 	if trimmedTicket == "" {
 		return fmt.Errorf("metadata ticket id required")
@@ -73,9 +69,8 @@ func (p *jetStreamMetadataPublisher) Publish(ctx context.Context, meta SnapshotM
 	if trimmedCID == "" {
 		return fmt.Errorf("metadata artifact cid required")
 	}
-	meta.Tenant = trimmedTenant
-	meta.TicketID = trimmedTicket
-	meta.ArtifactCID = trimmedCID
+    meta.TicketID = trimmedTicket
+    meta.ArtifactCID = trimmedCID
 
 	envelope := metadataEnvelope{
 		SchemaVersion:    contracts.SchemaVersion,
@@ -87,11 +82,9 @@ func (p *jetStreamMetadataPublisher) Publish(ctx context.Context, meta SnapshotM
 		return fmt.Errorf("encode metadata envelope: %w", err)
 	}
 
-	subjects := contracts.SubjectsForTenant(trimmedTenant, trimmedTicket)
-	subject := subjects.ArtifactStream
-	if strings.TrimSpace(subject) == "" {
-		return fmt.Errorf("artifact subject missing for tenant %s", trimmedTenant)
-	}
+    subjects := contracts.SubjectsForTenant("", trimmedTicket)
+    subject := subjects.ArtifactStream
+    if strings.TrimSpace(subject) == "" { return fmt.Errorf("artifact subject missing") }
 
 	publishCtx := ctx
 	if publishCtx == nil {
