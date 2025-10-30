@@ -5,24 +5,24 @@ highlights the primary candidates, why they are useful, and where to find them.
 
 ## Discovery & Metadata
 
-- **Descriptor caches** — Reuse ideas from `../grid/internal/gridctl` for caching discovery metadata,
+- **Descriptor caches** — Reuse ideas from the legacy repository for caching discovery metadata,
   but the SSH descriptor files have replaced the dedicated beacon services. Focus on the state caching
   patterns rather than the HTTP surface.
 
 ## Job Runtime & Telemetry
 
-- **Job service** — `../grid/internal/jobs`. Contains the job store interface, runtime adapter
+- **Job service** — legacy repository module. Contains the job store interface, runtime adapter
   integration, and event publishing hooks. Copy/adapt to run against etcd and SSE streams instead of JetStream.
-- **Docker runtime adapter** — `../grid/internal/runtime/docker`. Implements container lifecycle
+- **Docker runtime adapter** — legacy repository module. Implements container lifecycle
   operations, log retrieval, and secret mounting.
-- **Runtime registry** — `../grid/internal/runtime`. Provides adapter registration and metadata that
+- **Runtime registry** — legacy repository module. Provides adapter registration and metadata that
   Ploy can reuse for future alternative schedulers.
-- **Log streaming helpers** — `../grid/internal/jobs/service_runtime.go` and related publishers
+- **Log streaming helpers** — legacy repository module `jobs/service_runtime.go` and related publishers
   provide the SSE/tailing behaviour that Ploy exposes through `ploy logs job` and node log endpoints.
 
 ## Artifact Handling
 
-- **IPFS publisher** — `../grid/internal/registry/store`.
+- **IPFS publisher** — legacy repository module `registry/store`.
   While Ploy pivots to IPFS Cluster and etcd, reuse publishing helpers and IPFS interaction logic
   where applicable. Snapshot-specific helpers are no longer applicable.
 - **Contracts & subjects** — `../grid/internal/workflow/contracts`. Provides consistent schema
@@ -30,11 +30,11 @@ highlights the primary candidates, why they are useful, and where to find them.
 
 ## CLI Support & Automation
 
-- **Legacy runtime adapter wiring** — `../grid/cmd/gridctl` and `../grid/internal/gridctl/*`. Useful
+- **Legacy runtime adapter wiring** — legacy CLI and internal wiring. Useful
   references for CLI UX patterns, configuration handling, state caching, and metadata version tags.
-- **Bootstrap scripts** — `../grid/cmd/gridctl/cluster` packages house SSH/deploy helpers that can
+- **Bootstrap scripts** — legacy CLI cluster packages house SSH/deploy helpers that can
   inform the shared bootstrap script embedded in the Ploy CLI.
-- **Tests & fakes** — Look at `../grid/internal/jobs/service_*_test.go` and related stubs to accelerate
+- **Tests & fakes** — Look at legacy `jobs/service_*_test.go` and related stubs to accelerate
   Ploy’s test scaffolding.
 
 ## How to Port

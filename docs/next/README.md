@@ -10,7 +10,7 @@ control-plane stack.
 
 ## Goals
 
-- Deliver workstation-first Mods orchestration without legacy Grid or JetStream; use SSE and HTTP APIs.
+- Deliver workstation-first Mods orchestration without JetStream; use SSE and HTTP APIs.
 - Keep Mods steps deterministic by replaying repository snapshots plus ordered
   diffs on every node.
 - Streamline artifact publishing so diffs, logs, and SHIFT reports replicate
@@ -127,7 +127,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 Ploy Next rolls out sequentially: control plane scheduler, step runtime, artifact
 publisher, CLI refresh, and deployment tooling. Follow
 [`docs/next/migration.md`](migration.md) for the phase-by-phase plan, the
-dependencies between components, and cleanup guidance for retiring Grid.
+ dependencies between components, and cleanup guidance for retiring the legacy runtime.
 
 ## Further Reading
 

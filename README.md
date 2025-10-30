@@ -85,7 +85,7 @@ Full design records live in `docs/design/README.md`.
 - Unit and CLI tests exercise in‑memory stubs locally.
 - Cadence and coverage thresholds stay governed by `AGENTS.md`.
 - Workspace commands (`make build`, `make test`) remain workstation-first; no
-  VPS/Grid state is required for the slices above.
+  remote controller state is required for the slices above.
 
 ## Success Criteria
 

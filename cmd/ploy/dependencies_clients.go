@@ -45,7 +45,7 @@ func defaultRuntimeFactory() (runner.RuntimeClient, error) {
     return client, nil
 }
 
-// Grid client state helpers removed along with Grid integration.
+// Legacy client state helpers removed along with the old integration.
 
 func init() {
     if runtimeRegistry == nil {

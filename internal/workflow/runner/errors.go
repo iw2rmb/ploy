@@ -17,4 +17,4 @@ var (
     ErrAsterLocatorRequired       = errors.New("aster locator is required")
 )
 
-// Legacy Grid error aliases removed.
+// Legacy error aliases removed.

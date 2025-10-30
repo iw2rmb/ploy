@@ -313,7 +313,6 @@ func Lookup(path ...string) (Node, bool) {
 	return current, true
 }
 
-// LegacyCommands returns known legacy Grid command aliases and their replacement guidance.
 // LegacyCommands removed; legacy aliases are no longer routed.
 
 // cloneNodes returns a deep copy of the supplied node slice.
