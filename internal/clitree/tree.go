@@ -62,25 +62,7 @@ var commandTree = []Node{
 			},
 		},
 	},
-	{
-		Name:        "hydration",
-		Description: "Inspect and tune hydration policies",
-		Usage:       "ploy hydration <command>",
-		Subcommands: []Node{
-			{
-				Name:        "inspect",
-				Synopsis:    "inspect <ticket>",
-				Description: "Show hydration snapshot reuse policy for a Mods ticket",
-				Usage:       "ploy hydration inspect <ticket>",
-			},
-			{
-				Name:        "tune",
-				Synopsis:    "tune [--ttl] [--replication-min] [--replication-max] [--share] <ticket>",
-				Description: "Update hydration retention and sharing settings",
-				Usage:       "ploy hydration tune [--ttl <duration>] [--replication-min <n>] [--replication-max <n>] [--share <true|false>] <ticket>",
-			},
-		},
-	},
+
 	{
 		Name:        "jobs",
 		Description: "Inspect and follow individual jobs",
