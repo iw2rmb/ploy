@@ -44,7 +44,7 @@
     - Docs guard (LOCAL): extend `tests/guards/docs_guard_test.go` to assert roadmap/API examples reference existing flags/endpoints and that `docs/next/api.md` stays in sync after changes.
 - [x] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
 - [ ] 3.3 Update cluster and node administration flows: ensure the unified `ploy cluster add` command (primary + worker modes), `ploy node rm`, and GitLab signer commands hit the new endpoints, reuse the SSH descriptor format, and surface tunnel status where operators need it.
- - [x] 3.4 Refresh configuration/environment handling: purge legacy-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
+- [x] 3.4 Refresh configuration/environment handling: purge legacy-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
 - [x] 3.5 Remove the legacy workflow runner path: delete `internal/workflow/grid`, the local `runner.Run` invocation path, and associated tests once the control-plane submission round-trips are covered.
 - [ ] 3.6 Finish SSH transfer UX: add chunked/resumable SFTP support, progress reporting, and CLI resume flows (`ploy upload --resume`, partial downloads) so large artifacts do not require re-sending on flaky links.
 
@@ -59,7 +59,7 @@
 
 ## 5. Migration & Cleanup
 
- - [x] 5.1 Remove legacy runtime dependencies: drop the old modules from `go.mod`, delete retired packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
+- [x] 5.1 Remove legacy runtime dependencies: drop the old modules from `go.mod`, delete retired packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
 - [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
 - [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/how-to/deploy-a-cluster.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
 
