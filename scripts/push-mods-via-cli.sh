@@ -24,6 +24,12 @@ fi
 
 for name in "${images[@]}"; do
   context="docker/mods/${name}"
+  # Map directory name to registry repo name for backward compatibility:
+  # mod-foo (dir) -> mods-foo (registry repo)
+  repo_name="$name"
+  if [[ "$repo_name" == mod-* ]]; then
+    repo_name="mods-${repo_name#mod-}"
+  fi
   echo "==> Building $name as OCI layout"
   out_tar="$workdir/${name}.oci.tar"
   docker buildx build --platform "$PLATFORM" --output type=oci,dest="$out_tar" "$context"
@@ -44,7 +50,7 @@ for name in "${images[@]}"; do
   cfg_media=$(jq -r '.config.mediaType' "$mf")
   cfg_path="$out_dir/blobs/sha256/${cfg_d#sha256:}"
   echo "--> Pushing config $cfg_d ($cfg_media)"
-  dist/ploy registry push-blob --repo "${REPO_PREFIX}/${name}" --media-type "$cfg_media" "$cfg_path" >/dev/null
+  dist/ploy registry push-blob --repo "${REPO_PREFIX}/${repo_name}" --media-type "$cfg_media" "$cfg_path" >/dev/null
 
   # push layers
   lcount=$(jq '.layers|length' "$mf")
@@ -53,13 +59,12 @@ for name in "${images[@]}"; do
     l_media=$(jq -r ".layers[$i].mediaType" "$mf")
     l_path="$out_dir/blobs/sha256/${l_d#sha256:}"
     echo "--> Pushing layer $((i+1))/$lcount $l_d ($l_media)"
-    dist/ploy registry push-blob --repo "${REPO_PREFIX}/${name}" --media-type "$l_media" "$l_path" >/dev/null
+    dist/ploy registry push-blob --repo "${REPO_PREFIX}/${repo_name}" --media-type "$l_media" "$l_path" >/dev/null
   done
 
   echo "--> Putting manifest as :latest"
-  dist/ploy registry put-manifest --repo "${REPO_PREFIX}/${name}" --reference latest "$mf" >/dev/null
-  echo "OK: ${REPO_PREFIX}/${name}:latest"
+  dist/ploy registry put-manifest --repo "${REPO_PREFIX}/${repo_name}" --reference latest "$mf" >/dev/null
+  echo "OK: ${REPO_PREFIX}/${repo_name}:latest"
 done
 
 echo "All mods images pushed via CLI"
-
