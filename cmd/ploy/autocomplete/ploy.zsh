@@ -84,7 +84,7 @@ _ploy() {
                     ;;
                 'environment')
                     commands=()
-                    commands+=("materialize:Materialize integration environments from manifests and snapshots")
+                    commands+=("materialize:Materialize integration environments from manifests")
                     _describe 'environment command' commands && ret=0
                     ;;
                 'manifest')

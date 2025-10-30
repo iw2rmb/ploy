@@ -1,26 +1,24 @@
 package main
 
 import (
-	"bytes"
-    "context"
-	"errors"
-	"io"
-	"strings"
-	"testing"
+    "bytes"
+    "errors"
+    "io"
+    "strings"
+    "testing"
 
-	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/manifests"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
-    "github.com/iw2rmb/ploy/internal/workflow/snapshots"
+    "github.com/iw2rmb/ploy/internal/workflow/environments"
+    "github.com/iw2rmb/ploy/internal/workflow/manifests"
+    "github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
 func TestHandleEnvironmentMaterializeRequiresCommit(t *testing.T) {
 	prevFactory := environmentServiceFactory
 	defer func() { environmentServiceFactory = prevFactory }()
 
-	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
-		return &recordingEnvironmentService{}, nil
-	}
+    environmentServiceFactory = func() (environmentService, error) {
+        return &recordingEnvironmentService{}, nil
+    }
 
 	buf := &bytes.Buffer{}
     err := handleEnvironmentMaterialize([]string{"--app", "commit-app"}, buf)
@@ -36,9 +34,9 @@ func TestHandleEnvironmentMaterializeRequiresApp(t *testing.T) {
 	prevFactory := environmentServiceFactory
 	defer func() { environmentServiceFactory = prevFactory }()
 
-	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
-		return &recordingEnvironmentService{}, nil
-	}
+    environmentServiceFactory = func() (environmentService, error) {
+        return &recordingEnvironmentService{}, nil
+    }
 
 	buf := &bytes.Buffer{}
     err := handleEnvironmentMaterialize([]string{"deadbeef"}, buf)
@@ -56,32 +54,26 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	prevFactory := environmentServiceFactory
 	prevManifestLoader := manifestRegistryLoader
 	prevManifestDir := manifestConfigDir
-	prevSnapshotLoader := snapshotRegistryLoader
-	prevSnapshotDir := snapshotConfigDir
-	defer func() {
-		environmentServiceFactory = prevFactory
-		manifestRegistryLoader = prevManifestLoader
-		manifestConfigDir = prevManifestDir
-		snapshotRegistryLoader = prevSnapshotLoader
-		snapshotConfigDir = prevSnapshotDir
-	}()
+    defer func() {
+        environmentServiceFactory = prevFactory
+        manifestRegistryLoader = prevManifestLoader
+        manifestConfigDir = prevManifestDir
+    }()
 
-	recorder := &recordingEnvironmentService{
-		result: environments.Result{
-			App:       "commit-app",
-			CommitSHA: "deadbeef",
-			DryRun:    true,
-			Snapshots: []environments.SnapshotStatus{{Name: "commit-db"}},
-			Caches:    []environments.CacheStatus{{Lane: "go-native", CacheKey: "go/go-native@commit=deadbeef@snapshot=none@manifest=2025-09-26@aster=plan", Hydrated: false}},
-		},
-	}
+    recorder := &recordingEnvironmentService{
+        result: environments.Result{
+            App:       "commit-app",
+            CommitSHA: "deadbeef",
+            DryRun:    true,
+            Caches:    []environments.CacheStatus{{Lane: "go-native", CacheKey: "go/go-native@commit=deadbeef@manifest=2025-09-26@aster=plan", Hydrated: false}},
+        },
+    }
 
-	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
-		return recorder, nil
-	}
+    environmentServiceFactory = func() (environmentService, error) {
+        return recorder, nil
+    }
 
-	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return nil, nil }
-	snapshotConfigDir = "ignored"
+    // Snapshot registry no longer loaded by environment command
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
 		return &stubManifestCompiler{compiled: manifests.Compilation{
@@ -114,33 +106,25 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	}
 
 	output := buf.String()
-	for _, fragment := range []string{"Environment: commit-app", "Mode: dry-run", "commit-db", "go-native"} {
-		if !strings.Contains(output, fragment) {
-			t.Fatalf("expected output to contain %q, got %q", fragment, output)
-		}
-	}
+    for _, fragment := range []string{"Environment: commit-app", "Mode: dry-run", "go-native"} {
+        if !strings.Contains(output, fragment) {
+            t.Fatalf("expected output to contain %q, got %q", fragment, output)
+        }
+    }
 }
 
 func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 	prevFactory := environmentServiceFactory
-	prevSnapshotLoader := snapshotRegistryLoader
-	prevSnapshotDir := snapshotConfigDir
-	defer func() { environmentServiceFactory = prevFactory }()
-	defer func() {
-		snapshotRegistryLoader = prevSnapshotLoader
-		snapshotConfigDir = prevSnapshotDir
-	}()
+    defer func() { environmentServiceFactory = prevFactory }()
 
     sentinel := errors.New("boom")
-	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
-		return &recordingEnvironmentService{err: sentinel}, nil
-	}
-    snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return &fakeSnapshotRegistry{}, nil }
-	snapshotConfigDir = "ignored"
+    environmentServiceFactory = func() (environmentService, error) {
+        return &recordingEnvironmentService{err: sentinel}, nil
+    }
 
-	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
-		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
-	}
+    manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
+        return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
+    }
 
     err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app"}, io.Discard)
 	if !errors.Is(err, sentinel) {
@@ -148,13 +132,4 @@ func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 	}
 }
 
-// Minimal fake snapshot registry to satisfy tests after snapshot CLI removal.
-type fakeSnapshotRegistry struct{}
-
-func (f *fakeSnapshotRegistry) Plan(_ context.Context, _ string) (snapshots.PlanReport, error) {
-    return snapshots.PlanReport{}, nil
-}
-
-func (f *fakeSnapshotRegistry) Capture(_ context.Context, _ string, _ snapshots.CaptureOptions) (snapshots.CaptureResult, error) {
-    return snapshots.CaptureResult{}, nil
-}
+// Snapshot registry removed from env command; keep publisher tests in snapshots package.

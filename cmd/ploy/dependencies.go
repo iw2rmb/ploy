@@ -6,25 +6,17 @@ import (
     "github.com/iw2rmb/ploy/internal/workflow/aster"
     "github.com/iw2rmb/ploy/internal/workflow/environments"
     "github.com/iw2rmb/ploy/internal/workflow/runner"
-    "github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 type gridFactoryFunc func() (runner.GridClient, error)
 
-type snapshotRegistry interface {
-	Plan(ctx context.Context, name string) (snapshots.PlanReport, error)
-	Capture(ctx context.Context, name string, opts snapshots.CaptureOptions) (snapshots.CaptureResult, error)
-}
-
-type snapshotRegistryLoaderFunc func(dir string) (snapshotRegistry, error)
-
 type manifestCompilerLoaderFunc func(dir string) (runner.ManifestCompiler, error)
 
 type environmentService interface {
-	Materialize(ctx context.Context, req environments.Request) (environments.Result, error)
+    Materialize(ctx context.Context, req environments.Request) (environments.Result, error)
 }
 
-type environmentFactoryFunc func(s snapshotRegistry) (environmentService, error)
+type environmentFactoryFunc func() (environmentService, error)
 
 type asterLocatorLoaderFunc func(dir string) (aster.Locator, error)
 

@@ -240,19 +240,19 @@ var commandTree = []Node{
 		},
 	},
 
-	{
-		Name:        "environment",
-		Description: "Materialize integration environments",
-		Usage:       "ploy environment <command>",
-		Note:        "Use 'ploy environment materialize --help' for flag details.",
-		Subcommands: []Node{
-			{
-				Name:        "materialize",
-				Description: "Materialize integration environments from manifests and snapshots",
-            Usage:       "ploy environment materialize <commit-sha> --app <app> [--flags]",
-			},
-		},
-	},
+    {
+        Name:        "environment",
+        Description: "Materialize integration environments",
+        Usage:       "ploy environment <command>",
+        Note:        "Use 'ploy environment materialize --help' for flag details.",
+        Subcommands: []Node{
+            {
+                Name:        "materialize",
+                Description: "Materialize integration environments from manifests",
+                Usage:       "ploy environment materialize <commit-sha> --app <app> [--flags]",
+            },
+        },
+    },
 	{
 		Name:        "manifest",
 		Description: "Inspect and validate integration manifests",

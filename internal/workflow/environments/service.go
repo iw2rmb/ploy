@@ -10,7 +10,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
-	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 // Hydrator executes cache hydration for a given lane/cache key pair.
@@ -20,29 +19,17 @@ type Hydrator interface {
 	HydrateCache(ctx context.Context, lane string, cacheKey string) error
 }
 
-type snapshotPlanner interface {
-	Plan(ctx context.Context, name string) (snapshots.PlanReport, error)
-	Capture(ctx context.Context, name string, opts snapshots.CaptureOptions) (snapshots.CaptureResult, error)
-}
-
 // ServiceOptions configures Service dependencies.
 type ServiceOptions struct {
-	Snapshots snapshotPlanner
 	Hydrator  Hydrator
 }
 
 type Service struct {
-	snapshots snapshotPlanner
 	hydrator  Hydrator
 }
 
 // NewService wires the environment materialization service.
-func NewService(opts ServiceOptions) Service {
-	return Service{
-		snapshots: opts.Snapshots,
-		hydrator:  opts.Hydrator,
-	}
-}
+func NewService(opts ServiceOptions) Service { return Service{hydrator: opts.Hydrator} }
 
 // Request captures the inputs required to materialize a commit-scoped environment.
 type Request struct {
@@ -62,18 +49,8 @@ type Result struct {
     DryRun       bool
     Manifest     manifests.Compilation
     ManifestRef  contracts.ManifestReference
-    AsterToggles []string
-    Snapshots    []SnapshotStatus
-    Caches       []CacheStatus
-}
-
-// SnapshotStatus reflects the availability/attachment state of a snapshot fixture.
-type SnapshotStatus struct {
-	Name        string
-	Plan        snapshots.PlanReport
-	Attached    bool
-	Fingerprint string
-	ArtifactCID string
+	AsterToggles []string
+	Caches       []CacheStatus
 }
 
 // CacheStatus reflects the hydration state of a lane cache for the environment.
@@ -115,32 +92,12 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		manifestRef.Version = manifestMeta.Version
 	}
 
-	snapshotNames := extractSnapshotNames(req.Manifest)
-	snapshotsStatus := make([]SnapshotStatus, 0, len(snapshotNames))
-
-	for _, snapshotName := range snapshotNames {
-		plan, err := s.snapshots.Plan(ctx, snapshotName)
-		if err != nil {
-			return Result{}, fmt.Errorf("plan snapshot %s: %w", snapshotName, err)
-		}
-		status := SnapshotStatus{Name: snapshotName, Plan: plan}
-		if !req.DryRun {
-                capture, err := s.snapshots.Capture(ctx, snapshotName, snapshots.CaptureOptions{TicketID: ticketIdentifier(trimmedApp, trimmedCommit)})
-			if err != nil {
-				return Result{}, fmt.Errorf("capture snapshot %s: %w", snapshotName, err)
-			}
-			status.Attached = true
-			status.Fingerprint = capture.Fingerprint
-			status.ArtifactCID = capture.ArtifactCID
-		}
-		snapshotsStatus = append(snapshotsStatus, status)
-	}
+	// Snapshot planning/capture removed from environment materialization.
 
 	var toggles []string
 	if req.AsterEnabled {
 		toggles = mergeAsterToggles(req.Manifest, req.AsterToggles)
 	}
-	snapshotFingerprint := summarizeSnapshotFingerprint(snapshotsStatus)
 	manifestVersion := manifestMeta.Version
 
 	cacheStatuses := make([]CacheStatus, 0, len(req.Manifest.Lanes.Required))
@@ -161,7 +118,7 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 			return Result{}, fmt.Errorf("resolve cache namespace for lane %s: %w", trimmedLane, err)
 		}
 
-		cacheKey := composeCacheKey(cacheNamespace, trimmedLane, trimmedCommit, snapshotFingerprint, manifestVersion, toggles)
+		cacheKey := composeCacheKey(cacheNamespace, trimmedLane, trimmedCommit, manifestVersion, toggles)
 
 		status := CacheStatus{Lane: trimmedLane, CacheKey: cacheKey, Hydrated: !req.DryRun}
 		if !req.DryRun {
@@ -178,56 +135,16 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
         DryRun:       req.DryRun,
         Manifest:     req.Manifest,
         ManifestRef:  manifestRef,
-        AsterToggles: toggles,
-        Snapshots:    snapshotsStatus,
-        Caches:       cacheStatuses,
-    }, nil
+		AsterToggles: toggles,
+		Caches:       cacheStatuses,
+	}, nil
 }
 
 func (s Service) validate() error {
-	if s.snapshots == nil {
-		return errors.New("snapshot registry is required")
-	}
 	if s.hydrator == nil {
 		return errors.New("hydrator is required")
 	}
 	return nil
-}
-
-func extractSnapshotNames(comp manifests.Compilation) []string {
-	set := make(map[string]struct{})
-	for _, fixture := range comp.Fixtures.Required {
-		if name, ok := parseSnapshotReference(fixture.Reference); ok {
-			set[name] = struct{}{}
-		}
-	}
-	for _, fixture := range comp.Fixtures.Optional {
-		if name, ok := parseSnapshotReference(fixture.Reference); ok {
-			set[name] = struct{}{}
-		}
-	}
-	if len(set) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(set))
-	for name := range set {
-		result = append(result, name)
-	}
-	sort.Strings(result)
-	return result
-}
-
-func parseSnapshotReference(ref string) (string, bool) {
-	trimmed := strings.TrimSpace(ref)
-	const prefix = "snapshot:"
-	if !strings.HasPrefix(trimmed, prefix) {
-		return "", false
-	}
-	name := strings.TrimSpace(trimmed[len(prefix):])
-	if name == "" {
-		return "", false
-	}
-	return name, true
 }
 
 func mergeAsterToggles(comp manifests.Compilation, extras []string) []string {
@@ -253,23 +170,7 @@ func mergeAsterToggles(comp manifests.Compilation, extras []string) []string {
 	return result
 }
 
-func summarizeSnapshotFingerprint(snapshots []SnapshotStatus) string {
-	if len(snapshots) == 0 {
-		return "none"
-	}
-	values := make([]string, 0, len(snapshots))
-	for _, snap := range snapshots {
-		candidate := strings.TrimSpace(snap.Fingerprint)
-		if candidate == "" {
-			candidate = "snapshot:" + snap.Name
-		}
-		values = append(values, candidate)
-	}
-	sort.Strings(values)
-	return strings.Join(values, "+")
-}
-
-func composeCacheKey(namespace, lane, commit, snapshot, manifest string, toggles []string) string {
+func composeCacheKey(namespace, lane, commit, manifest string, toggles []string) string {
 	ns := strings.TrimSpace(namespace)
 	if ns == "" {
 		ns = strings.TrimSpace(lane)
@@ -279,11 +180,10 @@ func composeCacheKey(namespace, lane, commit, snapshot, manifest string, toggles
 		laneName = ns
 	}
 	toggleComponent := formatToggleComponent(toggles)
-	return fmt.Sprintf("%s/%s@commit=%s@snapshot=%s@manifest=%s@aster=%s",
+	return fmt.Sprintf("%s/%s@commit=%s@manifest=%s@aster=%s",
 		ns,
 		laneName,
 		sanitizeCacheComponent(commit),
-		sanitizeCacheComponent(snapshot),
 		sanitizeCacheComponent(manifest),
 		toggleComponent,
 	)
