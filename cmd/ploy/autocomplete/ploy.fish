@@ -42,7 +42,7 @@ complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcomm
 complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcommand_from gitlab" -a 'validate' -d 'validate --file <path> - Validate a GitLab configuration without saving'
 complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcommand_from gitlab" -a 'status' -d 'status [--limit <n>] [--cluster-id <id>] - Inspect signer health and recent rotation audit entries'
 complete -c ploy -n "__fish_seen_subcommand_from config; and __fish_seen_subcommand_from gitlab" -a 'rotate' -d 'rotate --secret <name> --api-key <token> [--cluster-id <id>] - Rotate a GitLab secret and trigger node refresh'
-complete -c ploy -n "__fish_seen_subcommand_from environment" -a 'materialize' -d 'Materialize integration environments from manifests and snapshots'
+complete -c ploy -n "__fish_seen_subcommand_from environment" -a 'materialize' -d 'Materialize integration environments from manifests'
 complete -c ploy -n "__fish_seen_subcommand_from manifest" -a 'schema' -d 'Print the integration manifest JSON schema'
 complete -c ploy -n "__fish_seen_subcommand_from manifest" -a 'validate' -d 'Validate manifests and optionally rewrite them to v2'
 complete -c ploy -n "__fish_seen_subcommand_from knowledge-base" -a 'ingest' -d 'Append incidents to the knowledge base catalog'

@@ -14,13 +14,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
-	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
-var (
-	snapshotRegistryLoader snapshotRegistryLoaderFunc = loadSnapshotRegistry
-	snapshotConfigDir                                 = "configs/snapshots"
 
+var (
 	manifestRegistryLoader manifestCompilerLoaderFunc = loadManifestCompiler
 	manifestConfigDir                                 = "configs/manifests"
 
@@ -33,21 +30,6 @@ var (
 
 	manifestSchemaPath = "docs/schemas/integration_manifest.schema.json"
 )
-
-func loadSnapshotRegistry(dir string) (snapshotRegistry, error) {
-	opts := snapshots.LoadOptions{}
-	cfg, _ := resolveIntegrationConfig(context.Background())
-	gateway := strings.TrimSpace(cfg.IPFSGateway)
-	if gateway != "" {
-		publisher, err := snapshots.NewIPFSGatewayPublisher(gateway, snapshots.IPFSGatewayOptions{Pin: true})
-		if err != nil {
-			return nil, err
-		}
-		opts.ArtifactPublisher = publisher
-	}
-    // JetStream metadata publisher removed; CLI no longer publishes snapshot metadata.
-	return snapshots.LoadDirectory(dir, opts)
-}
 
 func loadManifestCompiler(dir string) (runner.ManifestCompiler, error) {
 	registry, err := manifests.LoadDirectory(dir)
@@ -81,15 +63,9 @@ func loadAsterLocator(dir string) (aster.Locator, error) {
 	return aster.NewFilesystemLocator(dir)
 }
 
-func newEnvironmentService(s snapshotRegistry) (environmentService, error) {
-	if s == nil {
-		return nil, fmt.Errorf("environment snapshot registry missing")
-	}
-	hydrator := environments.NewInMemoryHydrator()
-	return environments.NewService(environments.ServiceOptions{
-		Snapshots: s,
-		Hydrator:  hydrator,
-	}), nil
+func newEnvironmentService() (environmentService, error) {
+    hydrator := environments.NewInMemoryHydrator()
+    return environments.NewService(environments.ServiceOptions{Hydrator: hydrator}), nil
 }
 
 type registryCompiler struct {

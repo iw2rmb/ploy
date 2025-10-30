@@ -83,31 +83,26 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 
     // tenant removed
 
-	manifestName, manifestVersion, err := parseManifestOverride(*manifestOverride, trimmedApp)
+    manifestName, manifestVersion, err := parseManifestOverride(*manifestOverride, trimmedApp)
 	if err != nil {
 		printEnvironmentMaterializeUsage(stderr)
 		return err
 	}
 
-	snapshotReg, err := snapshotRegistryLoader(snapshotConfigDir)
-	if err != nil {
-		return err
-	}
-
-	compiler, err := manifestRegistryLoader(manifestConfigDir)
-	if err != nil {
-		return fmt.Errorf("load manifests: %w", err)
-	}
+    compiler, err := manifestRegistryLoader(manifestConfigDir)
+    if err != nil {
+        return fmt.Errorf("load manifests: %w", err)
+    }
 
 	compiled, err := compiler.Compile(context.Background(), contracts.ManifestReference{Name: manifestName, Version: manifestVersion})
 	if err != nil {
 		return err
 	}
 
-	service, err := environmentServiceFactory(snapshotReg)
-	if err != nil {
-		return err
-	}
+    service, err := environmentServiceFactory()
+    if err != nil {
+        return err
+    }
 
 	asterActive := asterEnabled()
 	asterToggles := []string(nil)
@@ -150,22 +145,7 @@ func printEnvironmentMaterialize(w io.Writer, result environments.Result) {
 		_, _ = fmt.Fprintf(w, "Aster Toggles: %s\n", strings.Join(result.AsterToggles, ", "))
 	}
 
-	if len(result.Snapshots) == 0 {
-		_, _ = fmt.Fprintln(w, "Snapshots: none")
-	} else {
-		_, _ = fmt.Fprintln(w, "Snapshots:")
-		for _, snap := range result.Snapshots {
-			status := "planned"
-			if snap.Attached {
-				status = "attached"
-			}
-			fingerprint := snap.Fingerprint
-			if fingerprint == "" {
-				fingerprint = "pending"
-			}
-			_, _ = fmt.Fprintf(w, "  - %s (%s, fingerprint=%s)\n", snap.Name, status, fingerprint)
-		}
-	}
+    // Snapshots removed from environment materialization.
 
 	if len(result.Caches) == 0 {
 		_, _ = fmt.Fprintln(w, "Caches: none")
