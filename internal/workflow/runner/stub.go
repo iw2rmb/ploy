@@ -95,7 +95,7 @@ func cloneArtifacts(src []Artifact) []Artifact {
 func (g *InMemoryGrid) CancelWorkflow(ctx context.Context, req CancelRequest) (CancelResult, error) {
 	_ = ctx
 	_ = req
-	return CancelResult{}, ErrGridCancellationUnsupported
+    return CancelResult{}, ErrCancellationUnsupported
 }
 
 func allowedLaneSet(set manifests.LaneSet) map[string]struct{} {

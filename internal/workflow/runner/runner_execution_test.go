@@ -15,7 +15,7 @@ func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
     opts := runner.Options{
 		Ticket:           "",
 		Events:           events,
-        Runtime:          statuslessGrid{},
+        Runtime:          statuslessRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -43,7 +43,7 @@ func (c *recordingJobComposer) Compose(ctx context.Context, req runner.JobCompos
 
 func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
     events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{outcomes: map[string][]runner.StageOutcome{
+    grid := &fakeRuntime{outcomes: map[string][]runner.StageOutcome{
 		modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 		buildGateStage: {{Status: runner.StageStatusCompleted}},
 	}}
@@ -96,7 +96,7 @@ func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
 
 func TestRunSurfacesNonRetryableStageFailure(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
@@ -127,7 +127,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunUsesFallbackFailureMessage(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false}},
@@ -154,12 +154,12 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunPropagatesGridError(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	gridErr := errors.New("grid down")
+    gridErr := errors.New("runtime down")
     opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          errorGrid{err: gridErr},
+        Runtime:          errorRuntime{err: gridErr},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -174,7 +174,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunRetriesStageOnce(t *testing.T) {
 	withCleanupDeadline(t)
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {
@@ -225,7 +225,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunStopsAfterRetryLimit(t *testing.T) {
 	withCleanupDeadline(t)
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},

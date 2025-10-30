@@ -773,3 +773,9 @@
 Prior releases documented Nomad-based services, security engines, and lane
 orchestration. Refer to the Git history before `2025-09-25` for archival
 details.
+## [2025-10-30] Snapshot/JetStream Removal and Grid Pruning
+
+- Removed snapshot tooling and registry from the CLI and environment materialization.
+- Dropped JetStream/NATS client and metadata publisher; SSE is the only streaming surface.
+- Scrubbed remaining Grid/JetStream mentions from CLI help/completions and top‑level docs.
+- Tests updated accordingly; historical entries below may reference Grid/JetStream — they are legacy and no longer applicable to the current codebase.

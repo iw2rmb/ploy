@@ -1,36 +1,27 @@
 # Ploy — Stateless Workflow Runner
 
-Ploy operates as an on-demand workflow brain: it consumes Grid events, resolves
-workflow DAGs, submits work back to Grid, and exits. The repository now focuses
-entirely on that CLI-driven experience; the feature slices below replaced the
-legacy API, Nomad, Consul, and SeaweedFS footprint.
+Ploy is a workstation‑first workflow runner that talks directly to the Ploy
+control plane. It reconstructs the Mods/build/test DAG, streams checkpoints and
+logs over SSE, and exits cleanly. The repository is focused on a CLI‑driven
+experience; legacy service footprints have been removed.
 
 ## Operating Model
 
-- Grid owns the control surface (webhooks, scheduling, cache promotion, node
-  pools) and persists hot signals in JetStream plus cold artifacts in IPFS.
-- Ploy consumes those streams, assembles the mods/workflow DAG, and submits
-  follow-up jobs back to Grid via the workflow RPC client.
-- Every checkpoint, artifact pointer, and decision is written to JetStream/IPFS
-  so runs stay stateless and retries never depend on long-lived services.
+- The control plane exposes HTTP APIs and SSE streams for tickets, jobs, logs,
+  and artifacts; IPFS Cluster stores artifacts.
+- The CLI assembles the Mods/workflow DAG and submits work to the control plane;
+  checkpoints and logs are streamed over SSE.
+- Runs are stateless: decisions and artifacts are persisted; the CLI exits when
+  work is dispatched or complete.
 
-### Related Grid References
-
-- Workflow RPC contract and SDK expectations live in the Grid repository
-  (`../grid/docs/design/workflow-rpc/README.md`).
-- Webhook intake behaviour is defined in Grid's Webhook Gateway design
-  (`../grid/docs/design/webhook-gateway/README.md`).
-- Scheduler queue, quotas, and cache hints derive from the Grid Scheduler Core
-  design (`../grid/docs/design/scheduler-core/README.md`).
-- Workflow RPC helper usage, builders, and streaming retries are documented in
-  `../grid/sdk/workflowrpc/README.md` and drive configuration parity with Grid.
+ 
 
 ## Feature Highlights
 
 - [x] Legacy teardown — repository scoped to the CLI-only stub and guardrail
       tests (Roadmap 00).
-- [x] Event contracts — JetStream subject map, schema enforcement, and in-memory
-      stubs for offline work (Roadmap 01).
+- [x] Event contracts — subject alignment and in‑memory stubs for offline work
+      (Roadmap 01).
 - [x] Workflow runner CLI — reconstructs DAGs, streams checkpoints, and exits
       cleanly after dispatching jobs (Roadmap 02).
 - [x] Lane engine — deterministic lane specs bundled under `configs/lanes` with
@@ -44,7 +35,7 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
       metadata (Roadmap 07).
 - [x] Documentation refresh — doc set aligned around the CLI-first model and
       GRID hand-off (Roadmap 08).
-- [x] Cache coordination — checkpoints carry lane cache keys for Grid reuse
+- [x] Cache coordination — checkpoints carry lane cache keys for reuse
       (Roadmap 09).
  
 - [x] Lane documentation hardening — schema enforcement and lane reference
@@ -52,28 +43,23 @@ legacy API, Nomad, Consul, and SeaweedFS footprint.
  
 - [x] Integration manifest schema — JSON schema + CLI validation hook for
       manifests (Roadmap 13).
-- [x] Grid workflow client — workflow stages submit through the shared grid
-      client when `PLOY_GRID_ID`/`GRID_BEACON_API_KEY` are provided (Roadmap 14).
+ 
  
 - [x] Checkpoint enrichment — stage metadata and artifact manifests embedded in
       workflow checkpoints (Roadmap 17).
  
-- [x] Mods parallel planner — orchestrates orw/LLM/human stages with Grid-aware
+- [x] Mods parallel planner — orchestrates orw/LLM/human stages with
       parallelism (Roadmap 19, see `docs/design/mods/README.md`).
 - [x] Knowledge base remediation — classifies errors, surfaces CLI
       ingest/evaluate workflows, and seeds `llm-plan` with suggestions (Roadmap
       20, see `docs/design/knowledge-base/README.md`).
-- [x] Build gate reboot — Grid-integrated static checks and log parsing across
+- [x] Build gate reboot — control‑plane integrated static checks and log parsing across
       languages (Roadmap 21, see `docs/design/build-gate/README.md`); sandbox
       runner, static check registry, log ingestion, metadata sanitisation, CLI
       knowledge base surfacing, and Java Error Prone coverage shipped (verified
       2025-09-29 via `cmd/ploy/mod_summaries.go` and
       `internal/workflow/buildgate/error_prone_adapter.go`).
-- [x] Workflow RPC alignment — SDK/helper adoption, job spec schema enforcement,
-      and subject alignment (Roadmap 22, see
-      `docs/design/workflow-rpc-alignment/README.md`); SDK client, helper
-      retries, subject realignment, and lane-driven job composition shipped
-      (verified 2025-10-01 via `internal/workflow/grid/client.go`).
+ 
 
 Full design records live in `docs/design/README.md`.
 
@@ -89,29 +75,26 @@ Full design records live in `docs/design/README.md`.
 
 ## Data & Storage Expectations
 
-- JetStream carries events, run metadata, cache coordination signals, and
-  artifact manifests.
-- IPFS (or compatible object storage) stores build outputs, DB snapshot
-  archives, diff reports, and audit logs.
-- Workspace metadata (hash IDs, eviction policies, ownership) ensures Grid can
-  claim/release caches without bespoke scripting.
+- IPFS (or compatible object storage) stores build outputs, diff reports, and
+  audit logs.
+- Workspace metadata (hash IDs, eviction policies, ownership) enables cache
+  reuse without bespoke scripting.
 
 ## Testing & Tooling Focus
 
-- Unit and CLI tests exercise the JetStream/Grid stubs locally; integration work
-  against live Grid resumes once JetStream wiring completes.
+- Unit and CLI tests exercise in‑memory stubs locally.
 - Cadence and coverage thresholds stay governed by `AGENTS.md`.
 - Workspace commands (`make build`, `make test`) remain workstation-first; no
   VPS/Grid state is required for the slices above.
 
 ## Success Criteria
 
-- Mods workflows complete end-to-end through Grid with faster build/test cycles
-  than the legacy Nomad runs.
-- Developers request deterministic `<sha>-<app>` environments with lane caches,
-  manifests, and snapshots applied automatically.
-- No permanent services are required; when the CLI is idle, Grid continues
-  queuing work for the next invocation.
+- Mods workflows complete end‑to‑end with faster build/test cycles than the
+  legacy runs.
+- Developers request deterministic `<sha>-<app>` environments with lane caches
+  and manifests applied automatically.
+- No permanent services are required; when the CLI is idle, the control plane
+  can queue work for the next invocation.
 
 ## Getting Started
 
@@ -139,10 +122,8 @@ Full design records live in `docs/design/README.md`.
    ./dist/ploy mod run --ticket auto
    ```
 
-   When targeting the legacy Grid backend, set `PLOY_GRID_ID` plus the
-   associated credentials; otherwise the CLI runs entirely against the local
-   control plane over SSH. Omitting the variables keeps the CLI on the
-   in-memory Grid and JetStream stubs for offline development.
+   The CLI runs entirely against the local control plane over SSH in developer
+   workflows.
 
 4. **Dry-run a commit-scoped environment**
 
@@ -174,21 +155,9 @@ Full design records live in `docs/design/README.md`.
 
 ## Environment Variables
 
-Workstation builds rely on discovery to surface remote dependencies. The CLI
-inspects the following environment variables:
-
-- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when the CLI
-  targets the Grid backend instead of the local control plane.
-- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy beacon credentials used to
-  fetch Grid discovery metadata. Omit them for the SSH-only workflow.
-- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
-  directory (defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`).
-- `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set, it
-  also controls the grid client state directory.
-- `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
-  `local-step`; future adapters (`grid`, `k8s`, `nomad`) will plug in here. The
-  CLI fails fast when an unknown adapter is requested.
-- `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
+- `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector (default:
+  `local-step`).
+- `PLOY_ASTER_ENABLE` — Opt‑in switch for the experimental Aster bundle
   integration.
 
 ## Contributing

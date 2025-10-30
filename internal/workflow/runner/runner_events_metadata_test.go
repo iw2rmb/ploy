@@ -67,7 +67,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: {{
 				Status:    runner.StageStatusCompleted,
@@ -197,7 +197,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
 			buildGateStage: []runner.StageOutcome{

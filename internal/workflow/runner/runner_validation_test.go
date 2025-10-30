@@ -75,7 +75,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -138,7 +138,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	withCleanupDeadline(t)
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "no more"}},
@@ -186,7 +186,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          &fakeGrid{},
+        Runtime:          &fakeRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    filepath.Join(file, "workspace"),
 		MaxStageRetries:  1,
@@ -204,7 +204,7 @@ events := &recordingEvents{invalidTicket: true}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          &fakeGrid{},
+        Runtime:          &fakeRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

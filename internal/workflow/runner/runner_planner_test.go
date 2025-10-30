@@ -77,7 +77,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          noStageGrid{},
+        Runtime:          noStageRuntime{},
 		Planner:          nil,
 		WorkspaceRoot:    "",
 		MaxStageRetries:  1,
@@ -101,7 +101,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunFailsWhenPlannerErrors(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
 	planner := failingPlanner{err: errors.New("planner boom")}
     opts := runner.Options{
 		Ticket:           "",
@@ -125,7 +125,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          &fakeGrid{},
+        Runtime:          &fakeRuntime{},
 		Planner:          invalidStagePlanner{},
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -143,7 +143,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-        Runtime:          &fakeGrid{},
+        Runtime:          &fakeRuntime{},
 		Planner:          missingLanePlanner{},
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
