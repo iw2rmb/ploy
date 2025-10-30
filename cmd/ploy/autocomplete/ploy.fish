@@ -45,7 +45,6 @@ complete -c ploy -n "__fish_seen_subcommand_from manifest" -a 'schema' -d 'Print
 complete -c ploy -n "__fish_seen_subcommand_from manifest" -a 'validate' -d 'Validate manifests and optionally rewrite them to v2'
 complete -c ploy -n "__fish_seen_subcommand_from knowledge-base" -a 'ingest' -d 'Append incidents to the knowledge base catalog'
 complete -c ploy -n "__fish_seen_subcommand_from knowledge-base" -a 'evaluate' -d 'Evaluate knowledge base classifier accuracy'
-
 complete -c ploy -n "__fish_seen_subcommand_from help" -a 'mod' -d 'Plan and run Mods workflows'
 complete -c ploy -n "__fish_seen_subcommand_from help" -a 'mods' -d 'Observe Mods execution (logs, events)'
 complete -c ploy -n "__fish_seen_subcommand_from help" -a 'hydration' -d 'Inspect and tune hydration policies'
