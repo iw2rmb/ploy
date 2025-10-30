@@ -12,10 +12,9 @@ var errMissingClient = errors.New("workflow: grid client required")
 
 // CancelOptions captures the inputs for dispatching a workflow cancellation request.
 type CancelOptions struct {
-	Tenant     string
-	RunID      string
-	WorkflowID string
-	Reason     string
+    RunID      string
+    WorkflowID string
+    Reason     string
 }
 
 // CancelCommand issues workflow cancellations through a Grid client.
@@ -28,12 +27,11 @@ func (c CancelCommand) Run(ctx context.Context, opts CancelOptions) (runner.Canc
 	if c.Client == nil {
 		return runner.CancelResult{}, errMissingClient
 	}
-	request := runner.CancelRequest{
-		Tenant:     strings.TrimSpace(opts.Tenant),
-		RunID:      strings.TrimSpace(opts.RunID),
-		WorkflowID: strings.TrimSpace(opts.WorkflowID),
-		Reason:     strings.TrimSpace(opts.Reason),
-	}
+    request := runner.CancelRequest{
+        RunID:      strings.TrimSpace(opts.RunID),
+        WorkflowID: strings.TrimSpace(opts.WorkflowID),
+        Reason:     strings.TrimSpace(opts.Reason),
+    }
 	return c.Client.CancelWorkflow(contextOrBackground(ctx), request)
 }
 

@@ -73,7 +73,7 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 
 	args := []string{
 		"mod", "run",
-		"--tenant", cfg.Tenant,
+        
 		"--ticket", cfg.TicketID(scenario.ID),
 		"--repo-url", repoURL,
 		"--repo-base-ref", baseRef,
@@ -92,7 +92,6 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	envVars := map[string]string{
 		"GRID_BEACON_API_KEY":    cfg.BeaconAPIKey,
 		"GRID_ID":                cfg.GridID,
-		"PLOY_E2E_TENANT":        cfg.Tenant,
 		"PLOY_E2E_TICKET_PREFIX": cfg.TicketPrefix,
 		"PLOY_E2E_REPO_OVERRIDE": cfg.RepoOverride,
 	}

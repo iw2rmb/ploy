@@ -10,7 +10,6 @@ set -euo pipefail
 # Requirements (env):
 #   - GRID_ID / PLOY_GRID_ID
 #   - GRID_API_KEY / PLOY_GRID_API_KEY
-#   - PLOY_E2E_TENANT (defaults to acme)
 # Optional:
 #   - GRID_API_IP (IP used with --resolve for ${GRID_ID}.grid)
 #   - E2E_STAGE_TIMEOUT (default 180s)
@@ -19,7 +18,6 @@ set -euo pipefail
 # - Uses --insecure to skip TLS validation and --resolve to target a known node.
 # - Cancels any run that does not leave queued/running within the timebox.
 
-TENANT=${PLOY_E2E_TENANT:-${TENANT:-acme}}
 GRID_ID=${PLOY_GRID_ID:-${GRID_ID:-}}
 GRID_API_KEY=${PLOY_GRID_API_KEY:-${GRID_API_KEY:-}}
 GRID_API_IP=${GRID_API_IP:-}
@@ -48,7 +46,6 @@ submit_stage() {
   local payload
   payload=$(cat <<JSON
 {
-  "tenant": "${TENANT}",
   "workflow_id": "${WORKFLOW_ID}",
   "idempotency_key": "${idem_key}",
   "labels": {
@@ -100,7 +97,7 @@ poll_status() {
   local status
   while true; do
     local meta
-    if ! meta=$(curl "${curl_args[@]}" -X GET "${API_BASE}/v1/workflows/rpc/runs/${run_id}?tenant=${TENANT}"); then
+  if ! meta=$(curl "${curl_args[@]}" -X GET "${API_BASE}/v1/workflows/rpc/runs/${run_id}"); then
       echo "error: status fetch failed for ${run_id}" >&2
       break
     fi
@@ -121,7 +118,7 @@ poll_status() {
 
 cancel_run() {
   local run_id="$1"
-  curl "${curl_args[@]}" -X POST --data-binary '{"reason":"e2e-timeout"}' "${API_BASE}/v1/workflows/rpc/runs/${run_id}:cancel?tenant=${TENANT}" >/dev/null || true
+  curl "${curl_args[@]}" -X POST --data-binary '{"reason":"e2e-timeout"}' "${API_BASE}/v1/workflows/rpc/runs/${run_id}:cancel" >/dev/null || true
 }
 
 # Stages to execute (min viable ORW path)

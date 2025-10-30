@@ -38,18 +38,7 @@ func TestJetStreamMetadataPublisherPublishesEnvelope(t *testing.T) {
 		t.Fatalf("new metadata publisher: %v", err)
 	}
 
-	meta := SnapshotMetadata{
-		SnapshotName: "dev-db",
-		Description:  "Development database",
-		Tenant:       "acme",
-		TicketID:     "ticket-7",
-		Engine:       "postgres",
-		DSN:          "postgres://dev",
-		Fingerprint:  "fp-123",
-		ArtifactCID:  "cid-abc",
-		CapturedAt:   time.Date(2025, 9, 26, 12, 0, 0, 0, time.UTC),
-		RuleCounts:   RuleCounts{Strip: 1, Mask: 2, Synthetic: 0},
-	}
+    meta := SnapshotMetadata{SnapshotName: "dev-db", Description: "Development database", TicketID: "ticket-7", Engine: "postgres", DSN: "postgres://dev", Fingerprint: "fp-123", ArtifactCID: "cid-abc", CapturedAt: time.Date(2025, 9, 26, 12, 0, 0, 0, time.UTC), RuleCounts: RuleCounts{Strip:1, Mask:2, Synthetic:0}}
 
 	if err := publisher.Publish(context.Background(), meta); err != nil {
 		t.Fatalf("publish metadata: %v", err)
@@ -63,14 +52,7 @@ func TestJetStreamMetadataPublisherPublishesEnvelope(t *testing.T) {
 		t.Fatalf("unexpected subject: %s", msg.Subject)
 	}
 
-	var envelope struct {
-		SchemaVersion string `json:"schema_version"`
-		SnapshotName  string `json:"snapshot_name"`
-		ArtifactCID   string `json:"artifact_cid"`
-		Tenant        string `json:"tenant"`
-		TicketID      string `json:"ticket_id"`
-		Fingerprint   string `json:"fingerprint"`
-	}
+    var envelope struct { SchemaVersion string `json:"schema_version"`; SnapshotName string `json:"snapshot_name"`; ArtifactCID string `json:"artifact_cid"`; TicketID string `json:"ticket_id"`; Fingerprint string `json:"fingerprint"` }
 	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 		t.Fatalf("decode metadata envelope: %v", err)
 	}
@@ -83,9 +65,7 @@ func TestJetStreamMetadataPublisherPublishesEnvelope(t *testing.T) {
 	if envelope.ArtifactCID != meta.ArtifactCID {
 		t.Fatalf("artifact cid mismatch: %s", envelope.ArtifactCID)
 	}
-	if envelope.Tenant != meta.Tenant || envelope.TicketID != meta.TicketID {
-		t.Fatalf("tenant/ticket mismatch: %s/%s", envelope.Tenant, envelope.TicketID)
-	}
+    if envelope.TicketID != meta.TicketID { t.Fatalf("ticket mismatch: %s", envelope.TicketID) }
 	if envelope.Fingerprint != meta.Fingerprint {
 		t.Fatalf("fingerprint mismatch: %s", envelope.Fingerprint)
 	}
@@ -109,20 +89,15 @@ func TestJetStreamMetadataPublisherValidatesInputs(t *testing.T) {
 		ArtifactCID:  "cid-abc",
 	}
 
-	if err := publisher.Publish(context.Background(), meta); err == nil {
-		t.Fatal("expected error for missing tenant")
-	}
+    if err := publisher.Publish(context.Background(), meta); err == nil {
+        t.Fatal("expected error for missing ticket id")
+    }
 
-	meta.Tenant = "acme"
-	if err := publisher.Publish(context.Background(), meta); err == nil {
-		t.Fatal("expected error for missing ticket id")
-	}
-
-	meta.TicketID = "ticket-1"
-	meta.ArtifactCID = ""
-	if err := publisher.Publish(context.Background(), meta); err == nil {
-		t.Fatal("expected error for missing artifact cid")
-	}
+    meta.TicketID = "ticket-1"
+    meta.ArtifactCID = ""
+    if err := publisher.Publish(context.Background(), meta); err == nil {
+        t.Fatal("expected error for missing artifact cid")
+    }
 }
 
 func runJetStreamServer(t *testing.T) *server.Server {

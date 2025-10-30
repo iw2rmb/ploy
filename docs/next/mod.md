@@ -7,24 +7,18 @@ repository. The Mod upgrades a project from Java 11 to Java 17 using OpenRewrite
 
 ```bash
 ploy mod run \
-  --repo gitlab://gitlab.example.com/group/project.git@main \
-  --mod orw-apply \
-  --mod-env MAVEN_PLUGIN_VERSION=6.18.0 \
-  --mod-env RECIPE_NAME=org.openrewrite.java.migrate.UpgradeToJava17 \
-  --mod-env RECIPE_GROUP=org.openrewrite.recipe \
-  --mod-env RECIPE_ARTIFACT=rewrite-migrate-java \
-  --mod-env RECIPE_VERSION=3.17.0 \
-  --mod-env MAX_RETRIES=2 \
-  --mod-env MAX_DEPTH=5 \
-  --build-gate-env BUILD_GATE_ENV=value
+  --ticket mods-java17 \
+  --repo-url https://gitlab.example.com/group/project.git \
+  --repo-base-ref main \
+  --repo-target-ref feature/java17 \
+  --repo-workspace-hint . \
+  --follow
 ```
 
-- The CLI resolves the GitLab credential from etcd (uploaded beforehand via `ploy config set
-  gitlab.api_key ...`) and embeds the access token in the submission payload.
-- The request describes the target repository, the desired Mod sequence (OpenRewrite apply), and the
-  recipe metadata via environment variables consumed by the ORW container. Build gate customisation
-  is also provided through environment overrides.
-- Ploy control plane assigns the Mod ticket to an available node, streaming the plan back to the CLI.
+- The CLI resolves the control-plane endpoint via SSH tunnel (descriptor or `PLOY_CONTROL_PLANE_URL`) and
+  submits the ticket. If the `mods-plan` stage lacks a manifest, the server synthesizes one from the
+  repo URL and refs. Credentials such as GitLab API keys come from prior `ploy config gitlab set`.
+- The control plane assigns the ticket to an available node and streams stage transitions back to the CLI.
 
 ## 2. Node Prepares the Repository
 
@@ -89,3 +83,10 @@ ploy mod run \
   re-enabled once the artifact publisher exposes the detailed reports.
 - **Deterministic Replay** — Each step reconstructs repository state from the original HEAD plus
   ordered diffs, ensuring consistent outcomes across nodes.
+
+## Related: Manifest Format
+
+- Stage execution contract is described by a per‑stage manifest attached as `step_manifest`. See
+  `docs/next/manifest/README.md` and examples under `docs/next/manifest/examples/` (e.g.,
+  `llm-plan.json`, `llm-exec.json`, `orw-apply.json`).
+  The control plane may synthesize this manifest when clients submit only a graph+repo.

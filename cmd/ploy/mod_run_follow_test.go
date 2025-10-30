@@ -86,7 +86,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 
     dir := t.TempDir()
     buf := &bytes.Buffer{}
-    args := []string{"--tenant", "acme", "--ticket", ticketID, "--follow", "--artifact-dir", dir}
+    args := []string{"--ticket", ticketID, "--follow", "--artifact-dir", dir}
     if err := executeModRun(args, buf); err != nil {
         t.Fatalf("executeModRun error: %v", err)
     }

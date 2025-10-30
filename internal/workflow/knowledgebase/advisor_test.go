@@ -77,7 +77,6 @@ func TestAdvisorReturnsTopIncidentAdvice(t *testing.T) {
 		Ticket: contracts.WorkflowTicket{
 			SchemaVersion: contracts.SchemaVersion,
 			TicketID:      "TICKET-123",
-			Tenant:        "acme",
 			Manifest: contracts.ManifestReference{
 				Name:    "repo",
 				Version: "1.0.0",
@@ -164,7 +163,7 @@ func TestAdvisorMatchReturnsIncidentIDAndScore(t *testing.T) {
 		t.Fatalf("new advisor: %v", err)
 	}
 	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{
-		Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123", Tenant: "acme"},
+        Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123"},
 		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
 	})
 	if err != nil {

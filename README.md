@@ -143,7 +143,7 @@ Full design records live in `docs/design/README.md`.
 3. **Run the Mods CLI**
 
    ```bash
-   ./dist/ploy mod run --tenant acme --ticket auto
+   ./dist/ploy mod run --ticket auto
    ```
 
    When targeting the legacy Grid backend, set `PLOY_GRID_ID` plus the
@@ -164,7 +164,7 @@ Full design records live in `docs/design/README.md`.
 5. **Capture a snapshot (stub)**
 
    ```bash
-   ./dist/ploy snapshot capture --snapshot dev-db --tenant acme \
+   ./dist/ploy snapshot capture --snapshot dev-db \
      --ticket SNAPSHOT-1
    ```
 
@@ -176,7 +176,7 @@ Full design records live in `docs/design/README.md`.
 6. **Dry-run a commit-scoped environment**
 
    ```bash
-   ./dist/ploy environment materialize deadbeef --app commit-app --tenant acme --dry-run
+   ./dist/ploy environment materialize deadbeef --app commit-app --dry-run
    ```
 
    Dry-run mode compiles the `commit-app` manifest, verifies required snapshots

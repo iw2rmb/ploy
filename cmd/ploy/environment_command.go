@@ -38,7 +38,7 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("environment materialize", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	app := fs.String("app", "", "application identifier")
-	tenant := fs.String("tenant", "", "tenant slug for metadata publishing")
+    // tenant removed
 	dryRun := fs.Bool("dry-run", false, "plan resources without hydrating caches")
 	manifestOverride := fs.String("manifest", "", "override manifest in the form name@version")
 	aster := fs.String("aster", "", "comma-separated optional Aster toggles to include")
@@ -81,11 +81,7 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		return errors.New("app is required")
 	}
 
-	trimmedTenant := strings.TrimSpace(*tenant)
-	if !*dryRun && trimmedTenant == "" {
-		printEnvironmentMaterializeUsage(stderr)
-		return errors.New("tenant is required")
-	}
+    // tenant removed
 
 	manifestName, manifestVersion, err := parseManifestOverride(*manifestOverride, trimmedApp)
 	if err != nil {
@@ -119,16 +115,15 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 		asterToggles = splitToggles(*aster)
 	}
 
-	result, err := service.Materialize(context.Background(), environments.Request{
-		CommitSHA:    commit,
-		App:          trimmedApp,
-		Tenant:       trimmedTenant,
-		DryRun:       *dryRun,
-		Manifest:     compiled,
-		ManifestRef:  contracts.ManifestReference{Name: compiled.Manifest.Name, Version: compiled.Manifest.Version},
-		AsterEnabled: asterActive,
-		AsterToggles: asterToggles,
-	})
+    result, err := service.Materialize(context.Background(), environments.Request{
+        CommitSHA:    commit,
+        App:          trimmedApp,
+        DryRun:       *dryRun,
+        Manifest:     compiled,
+        ManifestRef:  contracts.ManifestReference{Name: compiled.Manifest.Name, Version: compiled.Manifest.Version},
+        AsterEnabled: asterActive,
+        AsterToggles: asterToggles,
+    })
 	if err != nil {
 		return err
 	}
@@ -139,7 +134,7 @@ func handleEnvironmentMaterialize(args []string, stderr io.Writer) error {
 
 // printEnvironmentMaterializeUsage shows the materialize flags and arguments.
 func printEnvironmentMaterializeUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy environment materialize <commit-sha> --app <app> --tenant <tenant> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]")
+    _, _ = fmt.Fprintln(w, "Usage: ploy environment materialize <commit-sha> --app <app> [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]")
 }
 
 // printEnvironmentMaterialize renders the environment result summary.

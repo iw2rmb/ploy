@@ -47,23 +47,17 @@ var (
 
 // defaultEventsFactory builds an events client, preferring JetStream when configured.
 func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
-	trimmedTenant := strings.TrimSpace(tenant)
-	if trimmedTenant == "" {
-		return nil, fmt.Errorf("tenant is required for events client")
-	}
+    _ = tenant
 	cfg, _ := resolveIntegrationConfig(context.Background())
 	jetstreamURL := strings.TrimSpace(cfg.JetStreamURL)
-	if jetstreamURL != "" {
-		client, err := newJetStreamClient(contracts.JetStreamOptions{
-			URL:    jetstreamURL,
-			Tenant: trimmedTenant,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return client, nil
-	}
-	return contracts.NewInMemoryBus(trimmedTenant), nil
+    if jetstreamURL != "" {
+        client, err := newJetStreamClient(contracts.JetStreamOptions{URL: jetstreamURL})
+        if err != nil {
+            return nil, err
+        }
+        return client, nil
+    }
+    return contracts.NewInMemoryBus(), nil
 }
 
 // defaultGridFactory returns either an in-memory grid client or the shared grid client adapter.

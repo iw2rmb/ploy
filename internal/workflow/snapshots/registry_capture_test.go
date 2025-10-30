@@ -58,10 +58,7 @@ strategy = "uuid"
 		t.Fatalf("load directory: %v", err)
 	}
 
-	result, err := registry.Capture(context.Background(), "dev-db", CaptureOptions{
-		Tenant:   "acme",
-		TicketID: "ticket-42",
-	})
+    result, err := registry.Capture(context.Background(), "dev-db", CaptureOptions{TicketID: "ticket-42"})
 	if err != nil {
 		t.Fatalf("capture dev-db: %v", err)
 	}
@@ -72,9 +69,9 @@ strategy = "uuid"
 	if result.Fingerprint == "" {
 		t.Fatal("expected fingerprint to be set")
 	}
-	if result.Metadata.Tenant != "acme" || result.Metadata.TicketID != "ticket-42" {
-		t.Fatalf("unexpected metadata tenant/ticket: %+v", result.Metadata)
-	}
+    if result.Metadata.TicketID != "ticket-42" {
+        t.Fatalf("unexpected metadata ticket: %+v", result.Metadata)
+    }
 	if metadata.calls != 1 {
 		t.Fatalf("expected metadata publisher to be called once, got %d", metadata.calls)
 	}
@@ -113,7 +110,7 @@ strategy = "uuid"
 
 func TestCaptureErrorsForUnknownSnapshot(t *testing.T) {
 	registry := &Registry{specs: map[string]Spec{}}
-	_, err := registry.Capture(context.Background(), "missing", CaptureOptions{Tenant: "acme", TicketID: "t"})
+    _, err := registry.Capture(context.Background(), "missing", CaptureOptions{TicketID: "t"})
 	if err == nil {
 		t.Fatal("expected error for unknown snapshot")
 	}
@@ -143,7 +140,7 @@ strategy = "unknown"
 	if err != nil {
 		t.Fatalf("load directory: %v", err)
 	}
-	_, err = registry.Capture(context.Background(), "dev-db", CaptureOptions{Tenant: "acme", TicketID: "t"})
+    _, err = registry.Capture(context.Background(), "dev-db", CaptureOptions{TicketID: "t"})
 	if err == nil {
 		t.Fatal("expected error for unknown mask strategy")
 	}
@@ -188,7 +185,7 @@ strategy = "static"
 		t.Fatalf("load directory: %v", err)
 	}
 
-	result, err := registry.Capture(context.Background(), "redact-static", CaptureOptions{Tenant: "acme", TicketID: "ticket"})
+    result, err := registry.Capture(context.Background(), "redact-static", CaptureOptions{TicketID: "ticket"})
 	if err != nil {
 		t.Fatalf("capture: %v", err)
 	}
@@ -243,7 +240,7 @@ columns = ["email"]
 	if err != nil {
 		t.Fatalf("load directory: %v", err)
 	}
-	_, err = registry.Capture(context.Background(), "strip-missing", CaptureOptions{Tenant: "acme", TicketID: "ticket"})
+    _, err = registry.Capture(context.Background(), "strip-missing", CaptureOptions{TicketID: "ticket"})
 	if err == nil {
 		t.Fatal("expected error when strip columns missing")
 	}
@@ -275,7 +272,7 @@ strategy = "hash"
 	if err != nil {
 		t.Fatalf("load directory: %v", err)
 	}
-	result, err := registry.Capture(context.Background(), "defaults", CaptureOptions{Tenant: "acme", TicketID: "ticket"})
+result, err := registry.Capture(context.Background(), "defaults", CaptureOptions{TicketID: "ticket"})
 	if err != nil {
 		t.Fatalf("capture: %v", err)
 	}
@@ -321,7 +318,7 @@ func TestBuiltInSnapshotsCapture(t *testing.T) {
 				t.Fatalf("expected engine %s, got %s", tc.engine, plan.Engine)
 			}
 
-			result, err := registry.Capture(ctx, tc.name, CaptureOptions{Tenant: "acme", TicketID: "ticket-123"})
+            result, err := registry.Capture(ctx, tc.name, CaptureOptions{TicketID: "ticket-123"})
 			if err != nil {
 				t.Fatalf("capture snapshot %s: %v", tc.name, err)
 			}
@@ -338,14 +335,14 @@ func TestBuiltInSnapshotsCapture(t *testing.T) {
 	}
 }
 
-func TestCaptureRequiresTenantAndTicket(t *testing.T) {
+func TestCaptureRequiresTicket(t *testing.T) {
 	dir := t.TempDir()
 	fixturePath := filepath.Join(dir, "fixture.json")
 	writeJSON(t, fixturePath, map[string][]map[string]string{"users": {
 		{"id": "1", "email": "a"},
 	}})
 	specPath := filepath.Join(dir, "snapshot.toml")
-	writeFile(t, specPath, `name = "missing-tenant"
+    writeFile(t, specPath, `name = "missing-ticket"
 [source]
 engine = "postgres"
 dsn = "postgres://dev"
@@ -356,14 +353,11 @@ table = "users"
 column = "email"
 strategy = "hash"
 `)
-	registry, err := LoadDirectory(dir, LoadOptions{})
-	if err != nil {
-		t.Fatalf("load directory: %v", err)
-	}
-	if _, err := registry.Capture(context.Background(), "missing-tenant", CaptureOptions{TicketID: "ticket"}); err == nil {
-		t.Fatal("expected error for missing tenant")
-	}
-	if _, err := registry.Capture(context.Background(), "missing-tenant", CaptureOptions{Tenant: "acme"}); err == nil {
-		t.Fatal("expected error for missing ticket")
-	}
+    registry, err := LoadDirectory(dir, LoadOptions{})
+    if err != nil {
+        t.Fatalf("load directory: %v", err)
+    }
+if _, err := registry.Capture(context.Background(), "missing-ticket", CaptureOptions{}); err == nil {
+        t.Fatal("expected error for missing ticket")
+    }
 }

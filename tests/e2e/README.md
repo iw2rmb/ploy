@@ -48,7 +48,6 @@ Set the following variables before invoking the suite:
   material, and workflow credentials.
 - `GRID_BEACON_URL` — Optional beacon override (`https://beacon.getgrid.dev`
   by default).
-- `PLOY_E2E_TENANT` — Tenant slug to claim tickets under
 - `PLOY_E2E_TICKET_PREFIX` — Optional prefix for ad-hoc ticket IDs (default `e2e`)
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repo URL override for scenarios
 - `PLOY_E2E_GITLAB_TOKEN` — Optional PAT for GitLab cleanup (branch deletion)

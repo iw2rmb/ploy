@@ -35,7 +35,7 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
 	buf := &bytes.Buffer{}
-	args := []string{"--tenant", "acme", "--ticket", "mods-test", "--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
+    args := []string{"--ticket", "mods-test", "--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
@@ -43,12 +43,9 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	if received.TicketID != "mods-test" {
 		t.Fatalf("expected ticket id mods-test, got %s", received.TicketID)
 	}
-	if received.Tenant != "acme" {
-		t.Fatalf("expected tenant acme, got %s", received.Tenant)
-	}
-	if received.Repository != "https://example.com/repo.git" {
-		t.Fatalf("unexpected repository: %s", received.Repository)
-	}
+    if received.Repository != "https://example.com/repo.git" {
+        t.Fatalf("unexpected repository: %s", received.Repository)
+    }
 	if received.Metadata["repo_target_ref"] != "feature" {
 		t.Fatalf("expected repo target metadata, got %v", received.Metadata)
 	}
@@ -73,9 +70,9 @@ func TestExecuteModRunGeneratesTicket(t *testing.T) {
 
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
-	if err := executeModRun([]string{"--tenant", "acme"}, io.Discard); err != nil {
-		t.Fatalf("executeModRun error: %v", err)
-	}
+if err := executeModRun([]string{}, io.Discard); err != nil {
+    t.Fatalf("executeModRun error: %v", err)
+}
 	if received.TicketID == "" {
 		t.Fatalf("expected generated ticket id")
 	}

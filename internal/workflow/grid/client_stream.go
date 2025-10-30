@@ -23,11 +23,11 @@ const (
 )
 
 func (c *Client) awaitTerminalStatus(ctx context.Context, runID, tenant, workflowID string) (terminalRun, error) {
-	streamReq := workflowsdk.StreamRequest{
-		Tenant:     strings.TrimSpace(tenant),
-		WorkflowID: strings.TrimSpace(workflowID),
-		RunID:      strings.TrimSpace(runID),
-	}
+    _ = tenant
+    streamReq := workflowsdk.StreamRequest{
+        WorkflowID: strings.TrimSpace(workflowID),
+        RunID:      strings.TrimSpace(runID),
+    }
 	if streamReq.RunID == "" {
 		return terminalRun{}, fmt.Errorf("workflow run id is required")
 	}
@@ -38,13 +38,13 @@ func (c *Client) awaitTerminalStatus(ctx context.Context, runID, tenant, workflo
 	defer cancel()
 
 	opts := c.streamOpts
-	if opts.CursorStore == nil && c.cursorFactory != nil {
-		store, err := c.cursorFactory(streamReq.Tenant, streamReq.WorkflowID, streamReq.RunID)
-		if err != nil {
-			return terminalRun{}, err
-		}
-		opts.CursorStore = store
-	}
+    if opts.CursorStore == nil && c.cursorFactory != nil {
+        store, err := c.cursorFactory("", streamReq.WorkflowID, streamReq.RunID)
+        if err != nil {
+            return terminalRun{}, err
+        }
+        opts.CursorStore = store
+    }
 
 	streamErr := c.stream(streamCtx, c.rpc.Client(), streamReq, func(evt workflowsdk.StatusEvent) error {
 		if evt.RunID == "" {
@@ -69,7 +69,7 @@ func (c *Client) awaitTerminalStatus(ctx context.Context, runID, tenant, workflo
 		}
 	}
 
-	meta, err := c.rpc.Metadata(ctx, workflowsdk.MetadataRequest{Tenant: tenant, WorkflowID: workflowID, RunID: runID})
+    meta, err := c.rpc.Metadata(ctx, workflowsdk.MetadataRequest{WorkflowID: workflowID, RunID: runID})
 	if err != nil {
 		if final.status == "" {
 			if streamErr != nil {

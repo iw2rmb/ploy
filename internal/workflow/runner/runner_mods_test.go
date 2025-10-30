@@ -12,7 +12,7 @@ import (
 )
 
 func TestRunPublishesModsMetadata(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-123", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-123"}
 	manifest := defaultManifestCompilation()
 	plan := runner.ExecutionPlan{
 		TicketID: "ticket-123",
@@ -69,7 +69,7 @@ func TestRunPublishesModsMetadata(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          planner,
@@ -151,11 +151,11 @@ func TestRunPublishesModsMetadata(t *testing.T) {
 }
 
 func TestRunPublishesModsPlannerHints(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-hints", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-hints"}
 	grid := &fakeGrid{}
 	opts := runner.Options{
 		Ticket:           "ticket-hints",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		WorkspaceRoot:    t.TempDir(),
@@ -215,7 +215,7 @@ func TestRunPublishesModsPlannerHints(t *testing.T) {
 }
 
 func TestRunExecutesParallelModsStages(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-parallel", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-parallel"}
 	grid := newParallelRecordingGrid()
 	grid.addGate(mods.StageNameORWApply)
 	grid.addGate(mods.StageNameORWGenerate)
@@ -229,7 +229,7 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 
 	opts := runner.Options{
 		Ticket:           "ticket-parallel",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -265,7 +265,7 @@ func TestRunExecutesParallelModsStages(t *testing.T) {
 }
 
 func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-parallel-retry", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
 	grid := newParallelRecordingGrid()
 	grid.setOutcomes(mods.StageNameORWApply, []runner.StageOutcome{
 		{Status: runner.StageStatusFailed, Retryable: true, Message: "planner detected failure"},
@@ -275,7 +275,7 @@ func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
 
 	opts := runner.Options{
 		Ticket:           "ticket-parallel-retry",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlanner(),
@@ -321,7 +321,7 @@ func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
 }
 
 func TestRunSchedulesHealingPlanAfterBuildGateFailure(t *testing.T) {
-	events := &recordingEvents{nextTicket: "ticket-buildgate-heal", tenant: "acme"}
+events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
 	grid := &fakeGrid{}
 	grid.setOutcomes(buildGateStage, []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "compile failed"}})
 	grid.setOutcomes(buildGateStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
@@ -339,7 +339,7 @@ func TestRunSchedulesHealingPlanAfterBuildGateFailure(t *testing.T) {
 	}
 	opts := runner.Options{
 		Ticket:           "",
-		Tenant:           "acme",
+    // tenant removed
 		Events:           events,
 		Grid:             grid,
 		Planner:          runner.NewDefaultPlannerWithMods(modsOpts),

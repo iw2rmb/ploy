@@ -11,19 +11,19 @@ removed during the workstation legacy teardown.
 ploy lanes describe --lane <lane-name> \
   [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] \
   [--aster <toggle,...>]
-ploy mod run --tenant <tenant> \
+ploy mod run \
   [--ticket <ticket-id>|--ticket auto] \
   [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
    --repo-workspace-hint <dir>] \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] \
   [--aster <toggle,...>] \
   [--aster-step <stage=toggle,...|stage=off>]
-ploy workflow cancel --tenant <tenant> --run-id <run-id> \
+ploy workflow cancel --run-id <run-id> \
   [--workflow <workflow-id>] [--reason <text>]
 ploy snapshot plan --snapshot <snapshot-name>
-ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> \
+ploy snapshot capture --snapshot <snapshot-name> \
   --ticket <ticket-id>
-ploy environment materialize <commit-sha> --app <app> --tenant <tenant> \
+ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
@@ -96,9 +96,6 @@ required environment variables, and operational limits (slot TTL, digest verific
   `lanes describe`).
 - `--commit` / `--snapshot` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
-- `--tenant` — Tenant slug used to resolve subject namespaces. Required for
-  `mod run`, `workflow cancel`, `snapshot capture`, and execution-mode
-  `environment materialize`.
 - `--ticket` — JetStream ticket identifier to claim (`mod run`) or metadata
   tag for snapshot captures. Defaults to `auto` for workflows; required for
   snapshot captures.

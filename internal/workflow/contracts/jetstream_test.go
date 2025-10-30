@@ -32,12 +32,7 @@ func TestJetStreamClientClaimTicket(t *testing.T) {
 		t.Fatalf("add webhook stream: %v", err)
 	}
 
-	ticket := WorkflowTicket{
-		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
-		Tenant:        "acme",
-		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
-	}
+    ticket := WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: "ticket-123", Manifest: ManifestReference{Name: "smoke", Version: "2025-09-26"}}
 	payload, err := json.Marshal(ticket)
 	if err != nil {
 		t.Fatalf("marshal ticket: %v", err)
@@ -46,7 +41,7 @@ func TestJetStreamClientClaimTicket(t *testing.T) {
 		t.Fatalf("publish ticket: %v", err)
 	}
 
-	client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL(), Tenant: "acme"})
+    client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL()})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
@@ -86,7 +81,7 @@ func TestJetStreamClientPublishCheckpoint(t *testing.T) {
 		t.Fatalf("add checkpoint stream: %v", err)
 	}
 
-	client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL(), Tenant: "acme"})
+    client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL()})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}
@@ -157,7 +152,7 @@ func TestJetStreamClientPublishArtifact(t *testing.T) {
 		t.Fatalf("add artifact stream: %v", err)
 	}
 
-	client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL(), Tenant: "acme"})
+    client, err := NewJetStreamClient(JetStreamOptions{URL: srv.ClientURL()})
 	if err != nil {
 		t.Fatalf("new client: %v", err)
 	}

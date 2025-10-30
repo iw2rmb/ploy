@@ -19,12 +19,7 @@ import (
 const buildGateStageName = "build-gate"
 
 func TestClientExecuteStageSuccess(t *testing.T) {
-	ticket := contracts.WorkflowTicket{
-		SchemaVersion: contracts.SchemaVersion,
-		TicketID:      "ticket-123",
-		Tenant:        "acme",
-		Manifest:      contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"},
-	}
+    ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}
 
 	manifest := manifests.Compilation{
 		Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26", Summary: "sample"},
@@ -109,9 +104,6 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 		t.Fatalf("expected 1 submit request, got %d", len(fake.submits))
 	}
 	req := fake.submits[0]
-	if req.Tenant != "acme" {
-		t.Fatalf("tenant mismatch: %s", req.Tenant)
-	}
 	if req.WorkflowID != "smoke" {
 		t.Fatalf("workflow id mismatch: %s", req.WorkflowID)
 	}
@@ -127,9 +119,9 @@ func TestClientExecuteStageSuccess(t *testing.T) {
 	if got := req.Job.Env["GOFLAGS"]; got != "-mod=vendor" {
 		t.Fatalf("job env mismatch: %s", got)
 	}
-	if lane, ok := req.Job.Metadata["lane"]; !ok || lane != stage.Lane {
-		t.Fatalf("expected lane metadata, got %#v", req.Job.Metadata)
-	}
+    if lane, ok := req.Job.Metadata["lane"]; !ok || lane != stage.Lane {
+        t.Fatalf("expected lane metadata, got %#v", req.Job.Metadata)
+    }
 	if req.Job.Runtime != stage.Job.Runtime {
 		t.Fatalf("expected runtime %s, got %s", stage.Job.Runtime, req.Job.Runtime)
 	}
@@ -165,8 +157,8 @@ func TestClientExecuteStagePropagatesSubmitError(t *testing.T) {
 	}
 
 	_, err = client.ExecuteStage(
-		context.Background(),
-		contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Tenant: "acme", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}},
+        context.Background(),
+        contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}},
 		runner.Stage{
 			Name: mods.StageNamePlan,
 			Kind: runner.StageKindModsPlan,

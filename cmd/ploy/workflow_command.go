@@ -29,5 +29,5 @@ func printWorkflowUsage(w io.Writer) {
 
 // printWorkflowCancelUsage documents the workflow cancellation flags.
 func printWorkflowCancelUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy workflow cancel --tenant <tenant> --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]")
+    _, _ = fmt.Fprintln(w, "Usage: ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]")
 }

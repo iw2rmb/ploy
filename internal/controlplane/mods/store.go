@@ -15,13 +15,12 @@ type store struct {
 }
 
 type ticketMetaDocument struct {
-	TicketID   string            `json:"ticket_id"`
-	Tenant     string            `json:"tenant,omitempty"`
-	Submitter  string            `json:"submitter"`
-	Repository string            `json:"repository"`
-	Status     TicketState       `json:"status"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-	CreatedAt  string            `json:"created_at"`
+    TicketID   string            `json:"ticket_id"`
+    Submitter  string            `json:"submitter"`
+    Repository string            `json:"repository"`
+    Status     TicketState       `json:"status"`
+    Metadata   map[string]string `json:"metadata,omitempty"`
+    CreatedAt  string            `json:"created_at"`
 	UpdatedAt  string            `json:"updated_at"`
 }
 

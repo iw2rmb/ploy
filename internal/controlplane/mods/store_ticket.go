@@ -14,16 +14,15 @@ func (s *store) createTicket(ctx context.Context, spec TicketSpec, graph *stageG
 	metaKey := s.metaKey(spec.TicketID)
 	graphKey := s.graphKey(spec.TicketID)
 	now := s.clock().UTC().Format(time.RFC3339Nano)
-	metaDoc := ticketMetaDocument{
-		TicketID:   spec.TicketID,
-		Tenant:     spec.Tenant,
-		Submitter:  spec.Submitter,
-		Repository: spec.Repository,
-		Status:     TicketStatePending,
-		Metadata:   cloneMap(spec.Metadata),
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	}
+    metaDoc := ticketMetaDocument{
+        TicketID:   spec.TicketID,
+        Submitter:  spec.Submitter,
+        Repository: spec.Repository,
+        Status:     TicketStatePending,
+        Metadata:   cloneMap(spec.Metadata),
+        CreatedAt:  now,
+        UpdatedAt:  now,
+    }
 	graphDoc := ticketGraphDocument{
 		Stages: make(map[string]StageDefinition, len(graph.stages)),
 	}
@@ -85,15 +84,14 @@ func (s *store) ticketStatus(ctx context.Context, ticketID string) (*TicketStatu
 	if err != nil {
 		return nil, err
 	}
-	result := TicketStatus{
-		TicketID:   metaDoc.TicketID,
-		State:      metaDoc.Status,
-		Tenant:     metaDoc.Tenant,
-		Submitter:  metaDoc.Submitter,
-		Repository: metaDoc.Repository,
-		Metadata:   cloneMap(metaDoc.Metadata),
-		Stages:     make(map[string]StageStatus, len(stageDocs)),
-	}
+    result := TicketStatus{
+        TicketID:   metaDoc.TicketID,
+        State:      metaDoc.Status,
+        Submitter:  metaDoc.Submitter,
+        Repository: metaDoc.Repository,
+        Metadata:   cloneMap(metaDoc.Metadata),
+        Stages:     make(map[string]StageStatus, len(stageDocs)),
+    }
 	if metaDoc.CreatedAt != "" {
 		if createdAt, parseErr := time.Parse(time.RFC3339Nano, metaDoc.CreatedAt); parseErr == nil {
 			result.CreatedAt = createdAt

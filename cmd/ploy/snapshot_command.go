@@ -96,7 +96,7 @@ func handleSnapshotCapture(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("snapshot capture", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	snapshotName := fs.String("snapshot", "", "snapshot identifier to capture")
-	tenant := fs.String("tenant", "", "tenant slug for metadata publishing")
+    // tenant removed
 	ticket := fs.String("ticket", "", "ticket identifier associated with capture")
 	if err := fs.Parse(args); err != nil {
 		printSnapshotCaptureUsage(stderr)
@@ -108,11 +108,7 @@ func handleSnapshotCapture(args []string, stderr io.Writer) error {
 		printSnapshotCaptureUsage(stderr)
 		return errors.New("snapshot is required")
 	}
-	trimmedTenant := strings.TrimSpace(*tenant)
-	if trimmedTenant == "" {
-		printSnapshotCaptureUsage(stderr)
-		return errors.New("tenant is required")
-	}
+    // tenant removed
 	trimmedTicket := strings.TrimSpace(*ticket)
 	if trimmedTicket == "" {
 		printSnapshotCaptureUsage(stderr)
@@ -124,10 +120,7 @@ func handleSnapshotCapture(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	result, err := reg.Capture(context.Background(), trimmedSnapshot, snapshots.CaptureOptions{
-		Tenant:   trimmedTenant,
-		TicketID: trimmedTicket,
-	})
+    result, err := reg.Capture(context.Background(), trimmedSnapshot, snapshots.CaptureOptions{TicketID: trimmedTicket})
 	if err != nil {
 		return err
 	}
@@ -138,7 +131,7 @@ func handleSnapshotCapture(args []string, stderr io.Writer) error {
 
 // printSnapshotCaptureUsage displays the capture usage text.
 func printSnapshotCaptureUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy snapshot capture --snapshot <snapshot-name> --tenant <tenant> --ticket <ticket-id>")
+    _, _ = fmt.Fprintln(w, "Usage: ploy snapshot capture --snapshot <snapshot-name> --ticket <ticket-id>")
 }
 
 // printSnapshotCapture renders snapshot capture metadata.

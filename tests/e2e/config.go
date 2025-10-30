@@ -14,11 +14,10 @@ type Config struct {
 	BeaconAPIKey string
 	GridAPIKey   string
 	BeaconURL    string
-	Tenant       string
 	TicketPrefix string
 	RepoOverride string
 	GitLabToken  string
-	SkipReason   string
+    SkipReason   string
 }
 
 // LoadConfig inspects the environment and prepares the E2E configuration.
@@ -28,7 +27,6 @@ func LoadConfig() Config {
 		BeaconAPIKey: strings.TrimSpace(os.Getenv("GRID_BEACON_API_KEY")),
 		GridAPIKey:   strings.TrimSpace(os.Getenv("PLOY_GRID_API_KEY")),
 		BeaconURL:    strings.TrimSpace(os.Getenv("GRID_BEACON_URL")),
-		Tenant:       strings.TrimSpace(os.Getenv("PLOY_E2E_TENANT")),
 		TicketPrefix: strings.TrimSpace(os.Getenv("PLOY_E2E_TICKET_PREFIX")),
 		RepoOverride: strings.TrimSpace(os.Getenv("PLOY_E2E_REPO_OVERRIDE")),
 		GitLabToken:  strings.TrimSpace(os.Getenv("PLOY_E2E_GITLAB_TOKEN")),
@@ -48,10 +46,7 @@ func LoadConfig() Config {
 		cfg.SkipReason = "PLOY_GRID_API_KEY is not set; grid client requires a workflow API token"
 		return cfg
 	}
-	if cfg.Tenant == "" {
-		cfg.SkipReason = "PLOY_E2E_TENANT is not set; mod run requires a tenant"
-		return cfg
-	}
+    // tenant removed
 	return cfg
 }
 

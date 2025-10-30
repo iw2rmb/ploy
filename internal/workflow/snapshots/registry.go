@@ -33,9 +33,6 @@ func (r *Registry) Plan(ctx context.Context, name string) (PlanReport, error) {
 
 // Capture executes the snapshot workflow and emits artifact metadata.
 func (r *Registry) Capture(ctx context.Context, name string, opts CaptureOptions) (CaptureResult, error) {
-	if strings.TrimSpace(opts.Tenant) == "" {
-		return CaptureResult{}, errors.New("tenant is required")
-	}
 	if strings.TrimSpace(opts.TicketID) == "" {
 		return CaptureResult{}, errors.New("ticket id is required")
 	}
@@ -78,13 +75,12 @@ func (r *Registry) Capture(ctx context.Context, name string, opts CaptureOptions
 		return CaptureResult{}, err
 	}
 
-	metadata := SnapshotMetadata{
-		SnapshotName: spec.Name,
-		Description:  spec.Description,
-		Tenant:       opts.Tenant,
-		TicketID:     opts.TicketID,
-		Engine:       spec.Source.Engine,
-		DSN:          spec.Source.DSN,
+    metadata := SnapshotMetadata{
+        SnapshotName: spec.Name,
+        Description:  spec.Description,
+        TicketID:     opts.TicketID,
+        Engine:       spec.Source.Engine,
+        DSN:          spec.Source.DSN,
 		Fingerprint:  fingerprint,
 		ArtifactCID:  cid,
 		CapturedAt:   nowFunc(),

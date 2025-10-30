@@ -73,8 +73,7 @@ type PlanReport struct {
 }
 
 type CaptureOptions struct {
-	Tenant   string
-	TicketID string
+    TicketID string
 }
 
 type DiffSummary struct {
@@ -90,16 +89,15 @@ type RuleCounts struct {
 }
 
 type SnapshotMetadata struct {
-	SnapshotName string     `json:"snapshot_name"`
-	Description  string     `json:"description"`
-	Tenant       string     `json:"tenant"`
-	TicketID     string     `json:"ticket_id"`
-	Engine       string     `json:"engine"`
-	DSN          string     `json:"dsn"`
-	Fingerprint  string     `json:"fingerprint"`
-	ArtifactCID  string     `json:"artifact_cid"`
-	CapturedAt   time.Time  `json:"captured_at"`
-	RuleCounts   RuleCounts `json:"rule_counts"`
+    SnapshotName string     `json:"snapshot_name"`
+    Description  string     `json:"description"`
+    TicketID     string     `json:"ticket_id"`
+    Engine       string     `json:"engine"`
+    DSN          string     `json:"dsn"`
+    Fingerprint  string     `json:"fingerprint"`
+    ArtifactCID  string     `json:"artifact_cid"`
+    CapturedAt   time.Time  `json:"captured_at"`
+    RuleCounts   RuleCounts `json:"rule_counts"`
 }
 
 type CaptureResult struct {

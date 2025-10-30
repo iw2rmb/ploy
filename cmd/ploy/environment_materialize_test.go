@@ -21,7 +21,7 @@ func TestHandleEnvironmentMaterializeRequiresCommit(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	err := handleEnvironmentMaterialize([]string{"--app", "commit-app", "--tenant", "acme"}, buf)
+    err := handleEnvironmentMaterialize([]string{"--app", "commit-app"}, buf)
 	if err == nil {
 		t.Fatal("expected error when commit SHA is missing")
 	}
@@ -39,7 +39,7 @@ func TestHandleEnvironmentMaterializeRequiresApp(t *testing.T) {
 	}
 
 	buf := &bytes.Buffer{}
-	err := handleEnvironmentMaterialize([]string{"deadbeef", "--tenant", "acme"}, buf)
+    err := handleEnvironmentMaterialize([]string{"deadbeef"}, buf)
 	if err == nil {
 		t.Fatal("expected error when app is missing")
 	}
@@ -91,7 +91,7 @@ func TestHandleEnvironmentMaterializeInvokesService(t *testing.T) {
 	manifestConfigDir = "ignored"
 
 	buf := &bytes.Buffer{}
-	err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--tenant", "acme", "--dry-run", "--aster", "lint"}, buf)
+    err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--dry-run", "--aster", "lint"}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 		return &stubManifestCompiler{compiled: defaultManifestPayload()}, nil
 	}
 
-	err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app", "--tenant", "acme"}, io.Discard)
+    err := handleEnvironmentMaterialize([]string{"deadbeef", "--app", "commit-app"}, io.Discard)
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("expected service error, got %v", err)
 	}

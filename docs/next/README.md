@@ -120,7 +120,7 @@ allowing the CLI to pull specific bundles or hydrate new Mods with cached data.
 | etcd cluster    | 3.6.x (recommend 3.6.5)      | Leverages the 3.6 feature set (livez/readyz, downgrade RPC) and security fixes released through September 2025. |
 | IPFS Cluster    | 1.1.4                        | Provides the pin tracker improvements and metrics emitted in May 2025, matching the artifact replication strategy. |
 | Docker Engine   | 28.x                         | Required for the BuildKit and container retention defaults used by the step runner. |
-| Go toolchain    | 1.25                          | Matches the module target (`go 1.25`) and unlocks Go 1.25 runtime improvements relevant to the control plane. |
+| Go toolchain    | 1.25                         | Matches the module target (`go 1.25`) and unlocks Go 1.25 runtime improvements relevant to the control plane. |
 
 ## Adoption Path
 
