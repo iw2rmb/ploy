@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base help" -- "$cur") )
         return 0
     fi
 
@@ -20,12 +20,6 @@ _ploy_completions() {
     "mods")
         if [[ $COMP_CWORD -eq 2 ]]; then
             COMPREPLY=( $(compgen -W "logs" -- "$cur") )
-            return 0
-        fi
-        ;;
-    "hydration")
-        if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "inspect tune" -- "$cur") )
             return 0
         fi
         ;;
@@ -85,7 +79,7 @@ _ploy_completions() {
         ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base" -- "$cur") )
             return 0
         fi
         ;;

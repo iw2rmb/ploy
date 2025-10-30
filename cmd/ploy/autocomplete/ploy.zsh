@@ -12,7 +12,6 @@ _ploy() {
             commands=()
             commands+=("mod:Plan and run Mods workflows")
             commands+=("mods:Observe Mods execution (logs, events)")
-            commands+=("hydration:Inspect and tune hydration policies")
             commands+=("jobs:Inspect and follow individual jobs")
             commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("upload:Upload repository or log bundles via SSH")
@@ -40,12 +39,6 @@ _ploy() {
                     commands=()
                     commands+=("logs:logs <ticket> - Stream Mods logs via SSE (raw|structured formats, auto-retry)")
                     _describe 'mods command' commands && ret=0
-                    ;;
-                'hydration')
-                    commands=()
-                    commands+=("inspect:inspect <ticket> - Show hydration snapshot reuse policy for a Mods ticket")
-                    commands+=("tune:tune [--ttl] [--replication-min] [--replication-max] [--share] <ticket> - Update hydration retention and sharing settings")
-                    _describe 'hydration command' commands && ret=0
                     ;;
                 'jobs')
                     commands=()
@@ -97,7 +90,6 @@ _ploy() {
                     commands=()
                     commands+=("mod:Plan and run Mods workflows")
                     commands+=("mods:Observe Mods execution (logs, events)")
-                    commands+=("hydration:Inspect and tune hydration policies")
                     commands+=("jobs:Inspect and follow individual jobs")
                     commands+=("artifact:Manage IPFS Cluster artifacts")
                     commands+=("upload:Upload repository or log bundles via SSH")
