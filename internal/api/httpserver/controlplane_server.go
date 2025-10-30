@@ -221,7 +221,12 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)
-	h.registerRoute(mux, "", "/v1/registry/", h.handleRegistry)
+    h.registerRoute(mux, "", "/v1/registry/", h.handleRegistry)
+    // OCI Registry v2 alias: expose the same handlers under /v2/ so Docker clients can talk to
+    // https://registry.<cluster>/v2/<repo>/..., while we keep internal handlers unchanged.
+    // GET /v2/ should also return 200 OK for the version check.
+    h.registerRoute(mux, "", "/v2/", h.handleRegistryV2)
+    h.registerRoute(mux, http.MethodGet, "/v2", h.handleRegistryV2)
 	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	return mux
 }
