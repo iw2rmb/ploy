@@ -14,19 +14,7 @@ type Node struct {
 }
 
 var commandTree = []Node{
-	{
-		Name:        "workflow",
-		Description: "Manage workflow runs and cancellations",
-		Usage:       "ploy workflow <command>",
-		Note:        "Use 'ploy help workflow <command>' for command-specific details.",
-			Subcommands: []Node{
-				{
-					Name:        "cancel",
-					Description: "DEPRECATED: use 'ploy mod cancel'",
-	            Usage:       "ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]",
-				},
-		},
-	},
+    
 	{
 		Name:        "mod",
 		Description: "Plan and run Mods workflows",

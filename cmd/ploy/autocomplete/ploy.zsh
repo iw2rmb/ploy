@@ -10,7 +10,7 @@ _ploy() {
     case $state in
         cmds)
             commands=()
-            commands+=("workflow:Manage workflow runs and cancellations")
+            
             commands+=("mod:Plan and run Mods workflows")
             commands+=("mods:Observe Mods execution (logs, events)")
             commands+=("hydration:Inspect and tune hydration policies")
@@ -28,11 +28,7 @@ _ploy() {
             ;;
         subs)
             case $words[2] in
-                'workflow')
-                    commands=()
-                    commands+=("cancel:DEPRECATED: use \'ploy mod cancel\'")
-                    _describe 'workflow command' commands && ret=0
-                    ;;
+                
                 'mod')
                     commands=()
                     commands+=("run:Submit a Mods run to the control plane")
@@ -101,7 +97,7 @@ _ploy() {
                     ;;
                 'help')
                     commands=()
-                    commands+=("workflow:Manage workflow runs and cancellations")
+                    
                     commands+=("mod:Plan and run Mods workflows")
                     commands+=("mods:Observe Mods execution (logs, events)")
                     commands+=("hydration:Inspect and tune hydration policies")

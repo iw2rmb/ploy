@@ -41,7 +41,7 @@ func (a WorkflowArtifact) Validate() error {
 	return nil
 }
 
-// Subject returns the JetStream subject for the artifact envelope.
+// Subject returns the artifact stream subject for the envelope.
 func (a WorkflowArtifact) Subject() string {
 	ticket := strings.TrimSpace(a.TicketID)
 	if ticket == "" {

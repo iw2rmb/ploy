@@ -6,17 +6,11 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "workflow mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base help" -- "$cur") )
         return 0
     fi
 
     case "${COMP_WORDS[1]}" in
-    "workflow")
-        if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "cancel" -- "$cur") )
-            return 0
-        fi
-        ;;
     "mod")
         if [[ $COMP_CWORD -eq 2 ]]; then
             COMPREPLY=( $(compgen -W "run cancel resume inspect artifacts" -- "$cur") )
@@ -91,7 +85,7 @@ _ploy_completions() {
         ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "workflow mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "mod mods hydration jobs artifact upload report cluster config environment manifest knowledge-base" -- "$cur") )
             return 0
         fi
         ;;

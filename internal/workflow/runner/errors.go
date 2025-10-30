@@ -17,8 +17,4 @@ var (
     ErrAsterLocatorRequired       = errors.New("aster locator is required")
 )
 
-// Legacy names retained for compatibility with older call sites and tests.
-var (
-    ErrGridClientRequired          = ErrRuntimeClientRequired
-    ErrGridCancellationUnsupported = ErrCancellationUnsupported
-)
+// Legacy Grid error aliases removed.

@@ -22,8 +22,8 @@ func defaultEventsFactory(tenant string) (runner.EventsClient, error) {
     return contracts.NewInMemoryBus(), nil
 }
 
-// defaultGridFactory returns a workflow runtime client according to the selected adapter.
-func defaultGridFactory() (runner.GridClient, error) {
+// defaultRuntimeFactory returns a workflow runtime client according to the selected adapter.
+func defaultRuntimeFactory() (runner.RuntimeClient, error) {
     selection := strings.TrimSpace(os.Getenv(runtimeAdapterEnv))
     if selection == "" {
         selection = "local-step"
