@@ -77,7 +77,7 @@ func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          noStageGrid{},
+        Runtime:          noStageRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -94,7 +94,7 @@ func TestRunFailsWhenFinalPublishFails(t *testing.T) {
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          noStageGrid{},
+        Runtime:          noStageRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

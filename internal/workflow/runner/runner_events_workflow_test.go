@@ -14,7 +14,7 @@ import (
 func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	withCleanupDeadline(t)
 events := &recordingEvents{nextTicket: "ticket-123"}
-    grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusCompleted}},

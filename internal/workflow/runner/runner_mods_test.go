@@ -56,7 +56,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	planner := metadataPlanner{plan: plan}
-	grid := &fakeGrid{
+    grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			mods.StageNamePlan: {
 				{Status: runner.StageStatusRunning},
@@ -152,7 +152,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunPublishesModsPlannerHints(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-hints"}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-hints",
     // tenant removed
@@ -216,7 +216,7 @@ events := &recordingEvents{nextTicket: "ticket-hints"}
 
 func TestRunExecutesParallelModsStages(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-parallel"}
-	grid := newParallelRecordingGrid()
+    grid := newParallelRecordingGrid()
 	grid.addGate(mods.StageNameORWApply)
 	grid.addGate(mods.StageNameORWGenerate)
 	defer func() {
@@ -266,7 +266,7 @@ events := &recordingEvents{nextTicket: "ticket-parallel"}
 
 func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
-	grid := newParallelRecordingGrid()
+    grid := newParallelRecordingGrid()
 	grid.setOutcomes(mods.StageNameORWApply, []runner.StageOutcome{
 		{Status: runner.StageStatusFailed, Retryable: true, Message: "planner detected failure"},
 		{Status: runner.StageStatusCompleted},
@@ -322,7 +322,7 @@ events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
 
 func TestRunSchedulesHealingPlanAfterBuildGateFailure(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
 	grid.setOutcomes(buildGateStage, []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "compile failed"}})
 	grid.setOutcomes(buildGateStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
 	grid.setOutcomes(staticChecksStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
@@ -369,7 +369,7 @@ events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
 	}
 }
 
-func findStageIndex(calls []gridCall, stage string) int {
+func findStageIndex(calls []runtimeCall, stage string) int {
 	for i, call := range calls {
 		if call.stage.Name == stage {
 			return i
@@ -378,7 +378,7 @@ func findStageIndex(calls []gridCall, stage string) int {
 	return -1
 }
 
-func findLastStageIndex(calls []gridCall, stage string) int {
+func findLastStageIndex(calls []runtimeCall, stage string) int {
 	for i := len(calls) - 1; i >= 0; i-- {
 		if calls[i].stage.Name == stage {
 			return i

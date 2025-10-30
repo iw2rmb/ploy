@@ -36,7 +36,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan", Digest: "sha256:testplan", ArtifactCID: "cid-test-plan", Source: "build/aster/test-plan.tar.zst"},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -109,7 +109,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -167,7 +167,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			Aster: manifests.AsterSet{Required: []string{"plan"}},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -222,7 +222,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/exec":                         {Stage: "test", Toggle: "exec", BundleID: "test-exec"},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
     opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -281,7 +281,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
@@ -314,7 +314,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			Aster:           manifests.AsterSet{Required: []string{"plan"}},
 		},
 	}
-	grid := &fakeGrid{}
+    grid := &fakeRuntime{}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
