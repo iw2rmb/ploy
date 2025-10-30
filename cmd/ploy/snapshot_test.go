@@ -14,8 +14,6 @@ import (
 	"testing"
 	"time"
 
-	discovery "github.com/iw2rmb/grid/sdk/discovery/go"
-	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/snapshots"
 	server "github.com/nats-io/nats-server/v2/server"
@@ -161,24 +159,9 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	defer func() { snapshotConfigDir = prevDir }()
 
-	t.Setenv(gridIDEnv, "grid-dev")
-	t.Setenv(gridIDFallbackEnv, "grid-dev")
-	t.Setenv(gridAPIKeyEnv, "secret")
-	t.Setenv(gridAPIKeyFallbackEnv, "secret")
-	t.Setenv(gridClientStateEnv, t.TempDir())
-	withGridClientStub(t, newStubGridClient(gridclient.Status{
-		Beacon: gridclient.BeaconStatus{
-			APIEndpoint:      "https://api.grid.dev",
-			WorkflowEndpoint: "https://workflow.grid.dev",
-		},
-		Discovery: discovery.ClusterInfo{
-			APIEndpoint:   "https://api.grid.dev",
-			IPFSGateway:   server.URL,
-			JetStreamURLs: nil,
-			Features:      map[string]string{},
-			Version:       "2025.9.29",
-		},
-	}))
+	// Provide IPFS gateway via env override.
+	os.Setenv("PLOY_IPFS_GATEWAY", server.URL)
+	t.Cleanup(func() { os.Unsetenv("PLOY_IPFS_GATEWAY") })
 
 err := handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--ticket", "ticket-42"}, buf)
 	if err != nil {
@@ -238,24 +221,9 @@ fixture = "dev-db.json"
 	snapshotConfigDir = dir
 	t.Cleanup(func() { snapshotConfigDir = prevDir })
 
-	t.Setenv(gridIDEnv, "grid-dev")
-	t.Setenv(gridIDFallbackEnv, "grid-dev")
-	t.Setenv(gridAPIKeyEnv, "secret")
-	t.Setenv(gridAPIKeyFallbackEnv, "secret")
-	t.Setenv(gridClientStateEnv, t.TempDir())
-	withGridClientStub(t, newStubGridClient(gridclient.Status{
-		Beacon: gridclient.BeaconStatus{
-			APIEndpoint:      "https://api.grid.dev",
-			WorkflowEndpoint: "https://workflow.grid.dev",
-		},
-		Discovery: discovery.ClusterInfo{
-			APIEndpoint:   "https://api.grid.dev",
-			JetStreamURLs: []string{srv.ClientURL()},
-			IPFSGateway:   "",
-			Features:      map[string]string{},
-			Version:       "2025.9.29",
-		},
-	}))
+	// Provide JetStream URL via env override so loader wires metadata publishing.
+	os.Setenv("PLOY_JETSTREAM_URL", srv.ClientURL())
+	t.Cleanup(func() { os.Unsetenv("PLOY_JETSTREAM_URL") })
 
 err = handleSnapshot([]string{"capture", "--snapshot", "dev-db", "--ticket", "ticket-77"}, buf)
 	if err != nil {

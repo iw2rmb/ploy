@@ -1,21 +1,24 @@
 package main
 
 import (
-	"context"
-	"errors"
-	"os"
-	"strings"
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "net/url"
+    "os"
+    "strings"
 
-	"github.com/iw2rmb/ploy/internal/workflow/runtime"
+    "github.com/iw2rmb/ploy/internal/cli/controlplane"
 )
 
 type integrationConfig struct {
-	APIEndpoint   string
-	JetStreamURL  string
-	JetStreamURLs []string
-	IPFSGateway   string
-	Features      map[string]string
-	Version       string
+    APIEndpoint   string
+    JetStreamURL  string
+    JetStreamURLs []string
+    IPFSGateway   string
+    Features      map[string]string
+    Version       string
 }
 
 // FeatureEnabled reports whether the named discovery feature is marked as enabled.
@@ -30,51 +33,109 @@ func (cfg integrationConfig) FeatureEnabled(name string) bool {
 	return strings.EqualFold(strings.TrimSpace(value), "enabled")
 }
 
+const (
+    jetStreamURLEnv = "PLOY_JETSTREAM_URL"
+    ipfsGatewayEnv  = "PLOY_IPFS_GATEWAY"
+)
+
 func resolveIntegrationConfig(ctx context.Context) (integrationConfig, error) {
-	selection := strings.TrimSpace(os.Getenv(runtimeAdapterEnv))
-	if selection == "" {
-		selection = "grid"
-	}
-	if runtimeRegistry != nil {
-		_, meta, err := runtimeRegistry.Resolve(selection)
-		if errors.Is(err, runtime.ErrAdapterNotFound) {
-			return integrationConfig{Features: map[string]string{}}, nil
-		}
-		if err != nil {
-			return integrationConfig{}, err
-		}
-		if meta.Name != "grid" {
-			return integrationConfig{Features: map[string]string{}}, nil
-		}
-	} else if !strings.EqualFold(selection, "grid") {
-		return integrationConfig{Features: map[string]string{}}, nil
-	}
+    // Start with environment overrides to keep local/dev and tests simple.
+    cfg := integrationConfig{Features: map[string]string{}}
+    if v := strings.TrimSpace(os.Getenv(jetStreamURLEnv)); v != "" {
+        cfg.JetStreamURL = v
+        cfg.JetStreamURLs = []string{v}
+    }
+    if v := strings.TrimSpace(os.Getenv(ipfsGatewayEnv)); v != "" {
+        cfg.IPFSGateway = v
+    }
 
-	client, err := acquireGridClient(ctx)
-	if errors.Is(err, errGridClientDisabled) {
-		return integrationConfig{Features: map[string]string{}}, nil
-	}
-	if err != nil {
-		return integrationConfig{}, err
-	}
+    // Try control plane discovery for cluster-scoped settings when reachable.
+    target, err := controlplane.ResolveTarget(ctx, controlplane.Options{})
+    if err != nil || target.BaseURL == nil || strings.TrimSpace(target.ClusterID) == "" {
+        // No control plane configured; return env-driven config (may be empty).
+        return cfg, nil
+    }
+    base := *target.BaseURL
+    q := base.Query()
+    q.Set("cluster_id", strings.TrimSpace(target.ClusterID))
+    base.RawQuery = q.Encode()
+    base.Path = strings.TrimSuffix(base.Path, "/") + "/v1/config"
 
-	status := client.Status()
-	discovery := status.Discovery
+    httpBase, httpClient, err := controlplane.ResolveHTTP(ctx, controlplane.Options{})
+    if err != nil || httpBase == nil || httpClient == nil {
+        return cfg, nil
+    }
 
-	cfg := integrationConfig{
-		APIEndpoint:   firstNonEmpty(strings.TrimSpace(discovery.APIEndpoint), strings.TrimSpace(status.Beacon.APIEndpoint)),
-		JetStreamURLs: normalizeJetStreamRoutes(discovery.JetStreamURLs),
-		IPFSGateway:   strings.TrimSpace(discovery.IPFSGateway),
-		Features:      copyFeaturesMap(discovery.Features),
-		Version:       strings.TrimSpace(discovery.Version),
-	}
-	cfg.JetStreamURL = firstJetStreamRoute(cfg.JetStreamURLs)
+    // Build absolute URL reusing the resolved client (with tunnels/TLS).
+    endpoint, _ := url.Parse(httpBase.String())
+    endpoint.RawQuery = base.RawQuery
+    endpoint.Path = base.Path
 
-	if cfg.Features == nil {
-		cfg.Features = map[string]string{}
-	}
+    req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+    if err != nil {
+        return cfg, nil
+    }
+    resp, err := httpClient.Do(req)
+    if err != nil {
+        return cfg, nil
+    }
+    defer resp.Body.Close()
+    if resp.StatusCode != http.StatusOK {
+        return cfg, nil
+    }
 
-	return cfg, nil
+    var payload struct {
+        Config map[string]any `json:"config"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+        return cfg, nil
+    }
+    // Best-effort extraction of optional fields from the config document.
+    if v := strings.TrimSpace(asString(payload.Config["api_endpoint"])); v != "" {
+        cfg.APIEndpoint = v
+    }
+    // JetStream can be either a single url or a list.
+    if v := strings.TrimSpace(asString(payload.Config["jetstream_url"])); v != "" {
+        cfg.JetStreamURL = v
+        cfg.JetStreamURLs = append(cfg.JetStreamURLs, v)
+    }
+    if raw, ok := payload.Config["jetstream_urls"].([]any); ok {
+        for _, r := range raw {
+            if s := strings.TrimSpace(asString(r)); s != "" {
+                cfg.JetStreamURLs = append(cfg.JetStreamURLs, s)
+            }
+        }
+        if cfg.JetStreamURL == "" {
+            cfg.JetStreamURL = firstJetStreamRoute(cfg.JetStreamURLs)
+        }
+    }
+    // IPFS gateway (optional in Next; worker uses Cluster for publishing).
+    if v := strings.TrimSpace(asString(payload.Config["ipfs_gateway"])); v != "" && cfg.IPFSGateway == "" {
+        cfg.IPFSGateway = v
+    }
+    // Version and Features if present.
+    if v := strings.TrimSpace(asString(payload.Config["version"])); v != "" {
+        cfg.Version = v
+    }
+    if features, ok := payload.Config["features"].(map[string]any); ok {
+        cfg.Features = map[string]string{}
+        for k, v := range features {
+            cfg.Features[strings.TrimSpace(k)] = strings.TrimSpace(asString(v))
+        }
+    }
+    return cfg, nil
+}
+
+// asString renders arbitrary interface values as strings.
+func asString(value any) string {
+    switch v := value.(type) {
+    case string:
+        return v
+    case fmt.Stringer:
+        return v.String()
+    default:
+        return ""
+    }
 }
 
 func normalizeJetStreamRoutes(routes []string) []string {
