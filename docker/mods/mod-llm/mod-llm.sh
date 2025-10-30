@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-mods-llm [--plan|--execute] [--input <dir>] [--out <file>]
+mod-llm [--plan|--execute] [--input <dir>] [--out <file>]
 
 This is a minimal stub used for E2E. It simulates:
  - planning: writes a trivial plan JSON
@@ -30,7 +30,7 @@ mkdir -p "$(dirname "$out_file")"
 
 if [[ "$mode" == "plan" ]]; then
   echo '{"actions":[{"type":"create","path":"src/main/java/e2e/UnknownClass.java"}]}' > "$out_file"
-  echo "[mods-llm] Plan written to $out_file"
+  echo "[mod-llm] Plan written to $out_file"
   exit 0
 fi
 
@@ -49,11 +49,10 @@ public class UnknownClass {
     public String toString() { return "llm-heal"; }
 }
 JAVA
-  echo "[mods-llm] Healed missing symbol by creating e2e.UnknownClass"
+  echo "[mod-llm] Healed missing symbol by creating e2e.UnknownClass"
 else
-  echo "[mods-llm] No known failure pattern detected; no-op"
+  echo "[mod-llm] No known failure pattern detected; no-op"
 fi
 
 # Always emit a small execution log for diagnostics
 echo "{\"executed\":true,\"ts\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$(dirname "$out_file")/exec.json"
-

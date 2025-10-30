@@ -68,8 +68,8 @@ if [[ ! -f pom.xml ]]; then
   exit 5
 fi
 
-echo "[mods-orw] Running OpenRewrite recipe: $classname"
-echo "[mods-orw] Coordinates: $group:$artifact:$version (plugin $plugin_ver)"
+echo "[mod-orw] Running OpenRewrite recipe: $classname"
+echo "[mod-orw] Coordinates: $group:$artifact:$version (plugin $plugin_ver)"
 
 # Run OpenRewrite; skip tests, be verbose for diagnostics
 mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run" \
@@ -80,7 +80,7 @@ mvn -B "org.openrewrite.maven:rewrite-maven-plugin:${plugin_ver}:run" \
 
 status=${PIPESTATUS[0]}
 if [[ $status -ne 0 ]]; then
-  echo "[mods-orw] OpenRewrite failed (exit $status)" >&2
+  echo "[mod-orw] OpenRewrite failed (exit $status)" >&2
   echo '{"success":false}' > "$outdir/report.json"
   exit $status
 fi
@@ -94,5 +94,4 @@ cat > "$outdir/report.json" <<JSON
 }
 JSON
 
-echo "[mods-orw] Completed successfully"
-
+echo "[mod-orw] Completed successfully"
