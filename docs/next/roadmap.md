@@ -50,7 +50,7 @@
 
 ## 4. Observability, Retention & Operations
 
-- [ ] 4.1 Implement Mod/job event streaming: aggregate job-level SSE streams into Mod-level streams, broadcast retention hints, and back `/v1/mods/{ticket}/logs` with archived IPFS bundles and tails (`internal/node/logstream`, `docs/next/logs.md`).
+- [x] 4.1 Implement Mod/job event streaming: aggregate job-level SSE streams into Mod-level streams, broadcast retention hints, and back `/v1/mods/{ticket}/logs` with archived IPFS bundles and tails (`internal/node/logstream`, `docs/next/logs.md`).
 - [ ] 4.2 Expose Prometheus metrics per `docs/next/observability.md`: register queue depth, claim latency, retry counts, SHIFT duration, IPFS pin metrics, GC activity, and log upload status; serve them at `/metrics` with tests covering label cardinality.
 - [ ] 4.3 Ship the GC controller and CLI: implement a background reconciler that walks `gc/jobs/**`, unpins artifacts via IPFS Cluster, and deletes expired records; add `ploy gc` with dry-run and filtering options, wiring it to the same logic.
 - [ ] 4.4 Build node administration routes: `/v1/nodes` should report health, running jobs, IPFS peer lag, and support drain/heal actions, all reachable through the SSH tunnel manager.

@@ -181,12 +181,23 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
         e.jobs.Start(streamID)
     }
 
-	req := stepruntime.Request{
+    req := stepruntime.Request{
 		Manifest:    manifest,
 		LogStreamID: streamID,
 	}
 
-	result, runErr := e.runner.Run(ctx, req)
+    // Mirror job logs into the Mods ticket stream when available so
+    // `/v1/mods/{ticket}/logs/stream` can aggregate without extra plumbing.
+    result, runErr := func() (stepruntime.Result, error) {
+        if r, ok := e.runner.(*stepruntime.Runner); ok && strings.TrimSpace(assignment.Ticket) != "" && e.streams != nil {
+            // Shallow copy the runner and override the Streams publisher
+            // with a dual publisher that forwards to both job and ticket streams.
+            cloned := *r
+            cloned.Streams = dualPublisher{hub: e.streams, ticket: strings.TrimSpace(assignment.Ticket)}
+            return cloned.Run(ctx, req)
+        }
+        return e.runner.Run(ctx, req)
+    }()
 
     assignmentResult := e.buildResult(manifest, result, runErr)
 
@@ -202,6 +213,46 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
         e.jobs.Complete(streamID, state, msg)
     }
     return assignmentResult, runErr
+}
+
+// dualPublisher mirrors logstream events to the job stream (as requested)
+// and to the Mods ticket stream, enabling aggregated ticket-level tails.
+type dualPublisher struct {
+    hub    *logstream.Hub
+    ticket string
+}
+
+func (d dualPublisher) PublishLog(ctx context.Context, streamID string, record logstream.LogRecord) error {
+    if d.hub == nil {
+        return nil
+    }
+    _ = d.hub.PublishLog(ctx, streamID, record)
+    if t := strings.TrimSpace(d.ticket); t != "" {
+        _ = d.hub.PublishLog(ctx, t, record)
+    }
+    return nil
+}
+
+func (d dualPublisher) PublishRetention(ctx context.Context, streamID string, hint logstream.RetentionHint) error {
+    if d.hub == nil {
+        return nil
+    }
+    _ = d.hub.PublishRetention(ctx, streamID, hint)
+    if t := strings.TrimSpace(d.ticket); t != "" {
+        _ = d.hub.PublishRetention(ctx, t, hint)
+    }
+    return nil
+}
+
+func (d dualPublisher) PublishStatus(ctx context.Context, streamID string, status logstream.Status) error {
+    if d.hub == nil {
+        return nil
+    }
+    _ = d.hub.PublishStatus(ctx, streamID, status)
+    if t := strings.TrimSpace(d.ticket); t != "" {
+        _ = d.hub.PublishStatus(ctx, t, status)
+    }
+    return nil
 }
 
 // buildResult converts the step runtime result into an assignment result payload.
