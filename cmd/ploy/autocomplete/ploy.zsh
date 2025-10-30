@@ -14,6 +14,7 @@ _ploy() {
             commands+=("mods:Observe Mods execution (logs, events)")
             commands+=("jobs:Inspect and follow individual jobs")
             commands+=("artifact:Manage IPFS Cluster artifacts")
+            commands+=("registry:Push/pull/delete OCI blobs and manifests")
             commands+=("upload:Upload repository or log bundles via SSH")
             commands+=("report:Download reports or artifacts via SSH")
             commands+=("cluster:Manage local cluster descriptors")
@@ -56,6 +57,17 @@ _ploy() {
                     commands+=("rm:Unpin an artifact from the cluster")
                     _describe 'artifact command' commands && ret=0
                     ;;
+                'registry')
+                    commands=()
+                    commands+=("push-blob:Upload an OCI blob via SSH slots")
+                    commands+=("get-blob:Download an OCI blob by digest")
+                    commands+=("rm-blob:Delete an OCI blob by digest")
+                    commands+=("put-manifest:Store an OCI manifest at a tag or digest")
+                    commands+=("get-manifest:Fetch an OCI manifest")
+                    commands+=("rm-manifest:Delete an OCI manifest or untag")
+                    commands+=("tags:List tags for a repository")
+                    _describe 'registry command' commands && ret=0
+                    ;;
                 'cluster')
                     commands=()
                     commands+=("add:Bootstrap the control-plane node or join workers over SSH")
@@ -92,6 +104,7 @@ _ploy() {
                     commands+=("mods:Observe Mods execution (logs, events)")
                     commands+=("jobs:Inspect and follow individual jobs")
                     commands+=("artifact:Manage IPFS Cluster artifacts")
+                    commands+=("registry:Push/pull/delete OCI blobs and manifests")
                     commands+=("upload:Upload repository or log bundles via SSH")
                     commands+=("report:Download reports or artifacts via SSH")
                     commands+=("cluster:Manage local cluster descriptors")
