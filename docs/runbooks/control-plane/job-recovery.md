@@ -3,7 +3,7 @@
 ## Purpose
 
 Operators use this runbook to diagnose and recover stuck jobs in the etcd-backed scheduler without
-Grid tooling. Typical symptoms include jobs stuck in `running` despite the worker disappearing or
+Typical symptoms include jobs stuck in `running` despite the worker disappearing or
 jobs failing to re-queue after retry budget resets.
 
 ## Prerequisites

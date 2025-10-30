@@ -1,27 +1,27 @@
 # SHIFT Build Gate Simplification
 
-Ploy Next drops Grid dependencies, so the SHIFT repository must operate as a standalone build gate
+Ploy Next drops legacy runtime dependencies, so the SHIFT repository must operate as a standalone build gate
 module. Key changes:
 
-## Remove Grid Integrations
+## Remove Legacy Integrations
 
-- Delete Grid RPC clients, JetStream consumers, and queue listeners. SHIFT no longer receives jobs
-  via Grid; Ploy Next dispatches build-gate jobs directly.
-- Remove Grid-specific environment variables (`GRID_*`, JetStream URLs) from configuration structs
+- Delete legacy RPC clients, JetStream consumers, and queue listeners. SHIFT no longer receives jobs
+  via the retired stack; Ploy Next dispatches build-gate jobs directly.
+- Remove legacy-specific environment variables (e.g., `GRID_*`, JetStream URLs) from configuration structs
   and docs.
 
 ## Expose a Clean Library API
 
 - Keep the core build gate runner packages (sandbox, static-check adapters) but ensure they can be
   called as Go libraries with explicit inputs/outputs.
-- If the SHIFT CLI remains, ensure it runs standalone (no implicit Grid bootstrap). Treat it as a
+- If the SHIFT CLI remains, ensure it runs standalone (no implicit legacy bootstrap). Treat it as a
   developer tool for local testing.
 
 ## Tests
 
-- Replace Grid-based integration tests with local ones: run the sandbox/adapter pipeline directly,
+- Replace legacy integration tests with local ones: run the sandbox/adapter pipeline directly,
   asserting the expected outputs.
-- Remove any test harnesses that spun up fake Grid APIs or JetStream fixtures.
+- Remove any test harnesses that spun up fake APIs or JetStream fixtures.
 
 ## Current Status (2025-10)
 
@@ -31,4 +31,4 @@ module. Key changes:
   once available, the SHIFT client will attach the structured reports to the staged artifacts.
 
 By simplifying SHIFT this way, Ploy Next can reuse the build gate logic via module imports without any
-legacy Grid wiring.
+legacy wiring.

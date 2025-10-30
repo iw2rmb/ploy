@@ -419,4 +419,4 @@ data: {"id":"job-9h2d5","ticket":"mod-1234","state":"succeeded",...}
 ```
 
 This layout keeps Ploy APIs modular while mirroring the familiar registry and Mods flows, allowing
-gradual upgrades from Grid-based deployments.
+gradual upgrades from legacy deployments.

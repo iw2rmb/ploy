@@ -19,7 +19,7 @@
 
 ## 3. CLI & Operator Workflow
 
- - [x] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on Grid clients and event stubs.
+ - [x] 3.1 Rebuild `ploy mod run` (see `cmd/ploy/mod_run.go`) to submit Mods over `/v1/mods`, stream checkpoints/events, and fetch final artifact bundles instead of invoking `internal/workflow/runner` locally; remove direct dependencies on legacy clients and event stubs.
   - Derivables
     - CLI behavior: `ploy mod run <path|repo> [--param k=v] [--ticket T] [--follow] [--quiet] [--json] [--artifact-dir DIR]` with clear help text and examples; supports stdin-driven config and param overrides.
     - Control-plane submission: build a `POST /v1/mods` payload that includes repo/ref, workspace hydration hints (base snapshot, diffs), SHIFT policy selector, and operator notes; map `--param` to submission `params` and persist a returned ticket ID.
@@ -29,7 +29,7 @@
     - Exit codes & failure mapping: non-zero on terminal Mod failure or policy violation; map severities (policy soft fail vs hard fail) to distinct exit codes; print remediation hint when available.
     - Config/env integration: respect control-plane URL/token discovery from `docs/envs/README.md` (e.g., `PLOY_API_URL`, `PLOY_TOKEN`, IPFS Cluster toggles); surface effective config with `--debug`.
     - Telemetry hooks: increment CLI metrics (submissions, follow durations, cancel counts) and include `X-Ploy-Client` header with version/platform; guard behind opt-in env toggle.
-    - Legacy removal: drop direct calls to `internal/workflow/runner` and Grid stubs; depend only on the HTTP client in `internal/api/controlplane` and the logstream reader.
+    - Legacy removal: drop direct calls to `internal/workflow/runner` and old stubs; depend only on the HTTP client in `internal/api/controlplane` and the logstream reader.
     - Docs refresh: update `docs/next/api.md` and `docs/api/OpenAPI.yaml` examples for `/v1/mods` submission, events schema, and artifact listing; add a quickstart snippet to the root README.
   - How to test
     - Unit tests (LOCAL): flag/args parsing, param merging, and payload construction with table-driven tests in `cmd/ploy/mod_run_test.go`; verify exit code mapping and quiet/json output modes. Target ≥90% coverage for the command package slice.
@@ -44,7 +44,7 @@
     - Docs guard (LOCAL): extend `tests/guards/docs_guard_test.go` to assert roadmap/API examples reference existing flags/endpoints and that `docs/next/api.md` stays in sync after changes.
 - [x] 3.2 Add CLI commands for control-plane parity: `ploy mod resume`, `ploy mod cancel`, `ploy mod inspect`, `ploy mod artifacts`, `ploy jobs ls`, `ploy jobs inspect`, `ploy jobs retry`, `ploy artifact push/pull/status/rm` wired to the new HTTP API; update the command tree (`internal/clitree/tree.go`) and completions.
 - [ ] 3.3 Update cluster and node administration flows: ensure the unified `ploy cluster add` command (primary + worker modes), `ploy node rm`, and GitLab signer commands hit the new endpoints, reuse the SSH descriptor format, and surface tunnel status where operators need it.
-- [x] 3.4 Refresh configuration/environment handling: purge Grid-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
+ - [x] 3.4 Refresh configuration/environment handling: purge legacy-specific env vars from `docs/envs/README.md`, introduce the Ploy Next variables (IPFS Cluster, control plane URL, token paths), and update `cmd/ploy/config_*` helpers to honour them.
 - [x] 3.5 Remove the legacy workflow runner path: delete `internal/workflow/grid`, the local `runner.Run` invocation path, and associated tests once the control-plane submission round-trips are covered.
 - [ ] 3.6 Finish SSH transfer UX: add chunked/resumable SFTP support, progress reporting, and CLI resume flows (`ploy upload --resume`, partial downloads) so large artifacts do not require re-sending on flaky links.
 
@@ -59,7 +59,7 @@
 
 ## 5. Migration & Cleanup
 
-- [x] 5.1 Remove Grid dependencies: drop `github.com/iw2rmb/grid` from `go.mod`, delete Grid-specific packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
+ - [x] 5.1 Remove legacy runtime dependencies: drop the old modules from `go.mod`, delete retired packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
 - [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
 - [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/how-to/deploy-a-cluster.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
 

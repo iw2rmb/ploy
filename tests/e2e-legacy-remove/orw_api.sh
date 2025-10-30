@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# OpenRewrite E2E via Grid HTTP API (curl)
+# OpenRewrite E2E via control-plane HTTP API (curl)
 #
-# Submits the key Mods stages (mods-plan, orw-apply) directly to Grid's
-# Workflow RPC using curl, then polls for bounded status. This mirrors the
+# Submits the key Mods stages (mods-plan, orw-apply) directly to the
+# workflow RPC using curl, then polls for bounded status. This mirrors the
 # simple-openrewrite scenario without relying on the ploy runner.
 #
 # Requirements (env):
-#   - GRID_ID / PLOY_GRID_ID
-#   - GRID_API_KEY / PLOY_GRID_API_KEY
+#   - API_ID / PLOY_API_ID (legacy aliases GRID_* tolerated)
+#   - API_KEY / PLOY_API_KEY
 # Optional:
 #   - GRID_API_IP (IP used with --resolve for ${GRID_ID}.grid)
 #   - E2E_STAGE_TIMEOUT (default 180s)

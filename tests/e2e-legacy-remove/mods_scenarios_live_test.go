@@ -53,7 +53,7 @@ func TestLiveLegacyScenarioIDsFromEnv(t *testing.T) {
 	}
 }
 
-// runScenarioLive shells out to the CLI to execute a Mods scenario end-to-end on Grid.
+// runScenarioLive shells out to the CLI to execute a Mods scenario end-to-end on the control plane.
 func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	t.Helper()
 	binary := buildPloyBinary(t)
@@ -114,7 +114,7 @@ func runScenarioLive(t *testing.T, cfg Config, scenario Scenario) error {
 	return nil
 }
 
-// buildPloyBinary compiles the CLI into a temporary binary for the live Grid scenario run.
+// buildPloyBinary compiles the CLI into a temporary binary for the live scenario run.
 func buildPloyBinary(t *testing.T) string {
 	t.Helper()
 	out := filepath.Join(t.TempDir(), "ploy-e2e")
@@ -171,7 +171,7 @@ func upsertEnv(env []string, key, value string) []string {
 	return append(env, needle+value)
 }
 
-// liveGridScenarioIDs resolves the list of scenario identifiers to execute against live Grid.
+// liveScenarioIDs resolves the list of scenario identifiers to execute against the live control plane.
 func liveGridScenarioIDs() []string {
 	raw := strings.TrimSpace(os.Getenv("PLOY_E2E_LIVE_SCENARIOS"))
 	if raw == "" {
