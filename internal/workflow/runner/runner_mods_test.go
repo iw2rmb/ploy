@@ -67,11 +67,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          planner,
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -153,11 +153,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunPublishesModsPlannerHints(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-hints"}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-hints",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
 		ManifestCompiler: newStubCompiler(),
@@ -227,11 +227,11 @@ events := &recordingEvents{nextTicket: "ticket-parallel"}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-parallel",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -273,11 +273,11 @@ events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
 	})
 	grid.setOutcomes(mods.StageNameORWGenerate, []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
 
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-parallel-retry",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -341,7 +341,7 @@ events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlannerWithMods(modsOpts),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,

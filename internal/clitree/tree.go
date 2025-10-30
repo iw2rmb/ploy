@@ -19,12 +19,12 @@ var commandTree = []Node{
 		Description: "Manage workflow runs and cancellations",
 		Usage:       "ploy workflow <command>",
 		Note:        "Use 'ploy help workflow <command>' for command-specific details.",
-		Subcommands: []Node{
-			{
-				Name:        "cancel",
-				Description: "Cancel an in-flight workflow run",
-            Usage:       "ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]",
-			},
+			Subcommands: []Node{
+				{
+					Name:        "cancel",
+					Description: "DEPRECATED: use 'ploy mod cancel'",
+	            Usage:       "ploy workflow cancel --run-id <run-id> [--workflow <workflow-id>] [--reason <text>]",
+				},
 		},
 	},
 	{
@@ -32,14 +32,34 @@ var commandTree = []Node{
 		Description: "Plan and run Mods workflows",
 		Usage:       "ploy mod <command>",
 		Note:        "Use 'ploy mod run --help' for flag details.",
-		Subcommands: []Node{
-			{
-				Name:        "run",
-				Description: "Submit a Mods run to the control plane",
-				Usage:       "ploy mod run [--flags]",
+			Subcommands: []Node{
+				{
+					Name:        "run",
+					Description: "Submit a Mods run to the control plane",
+					Usage:       "ploy mod run [--flags]",
+				},
+				{
+					Name:        "cancel",
+					Description: "Cancel a Mods ticket via the control plane",
+					Usage:       "ploy mod cancel --ticket <ticket> [--reason <text>]",
+				},
+				{
+					Name:        "resume",
+					Description: "Resume a paused Mods ticket",
+					Usage:       "ploy mod resume <ticket>",
+				},
+				{
+					Name:        "inspect",
+					Description: "Show summary for a Mods ticket",
+					Usage:       "ploy mod inspect <ticket>",
+				},
+				{
+					Name:        "artifacts",
+					Description: "List ticket artifacts by stage",
+					Usage:       "ploy mod artifacts <ticket>",
+				},
 			},
 		},
-	},
 	{
 		Name:        "mods",
 		Description: "Observe Mods execution (logs, events)",
@@ -78,15 +98,30 @@ var commandTree = []Node{
 		Description: "Inspect and follow individual jobs",
 		Usage:       "ploy jobs <command>",
 		Note:        "Use 'ploy jobs follow --help' for flag details.",
-		Subcommands: []Node{
-			{
-				Name:        "follow",
-				Synopsis:    "follow <job-id>",
-				Description: "Follow job logs via SSE with retry semantics",
-				Usage:       "ploy jobs follow [--format] [--max-retries] [--retry-wait] <job-id>",
+			Subcommands: []Node{
+				{
+					Name:        "follow",
+					Synopsis:    "follow <job-id>",
+					Description: "Follow job logs via SSE with retry semantics",
+					Usage:       "ploy jobs follow [--format] [--max-retries] [--retry-wait] <job-id>",
+				},
+				{
+					Name:        "ls",
+					Description: "List jobs for a Mods ticket",
+					Usage:       "ploy jobs ls --ticket <ticket>",
+				},
+				{
+					Name:        "inspect",
+					Description: "Show details for a job",
+					Usage:       "ploy jobs inspect --ticket <ticket> <job-id>",
+				},
+				{
+					Name:        "retry",
+					Description: "Request a retry for a failed job",
+					Usage:       "ploy jobs retry --ticket <ticket> <job-id>",
+				},
 			},
 		},
-	},
 	{
 		Name:        "artifact",
 		Description: "Manage IPFS Cluster artifacts",

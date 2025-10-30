@@ -10,14 +10,14 @@ import (
 )
 
 type stageExecutor struct {
-	events      EventsClient
-	grid        GridClient
-	ticket      contracts.WorkflowTicket
-	workspace   string
-	maxRetries  int
-	publishMu   *sync.Mutex
-	failureOnce *sync.Once
-	jobComposer JobComposer
+    events      EventsClient
+    runtime     RuntimeClient
+    ticket      contracts.WorkflowTicket
+    workspace   string
+    maxRetries  int
+    publishMu   *sync.Mutex
+    failureOnce *sync.Once
+    jobComposer JobComposer
 }
 
 func (e *stageExecutor) runStage(ctx context.Context, stage Stage) (Stage, StageOutcome, error) {
@@ -33,7 +33,7 @@ func (e *stageExecutor) runStage(ctx context.Context, stage Stage) (Stage, Stage
 		if err := e.publishStage(ctx, stage, StageStatusRunning, nil); err != nil {
 			return Stage{}, StageOutcome{}, err
 		}
-		outcome, execErr := e.grid.ExecuteStage(ctx, e.ticket, stage, e.workspace)
+        outcome, execErr := e.runtime.ExecuteStage(ctx, e.ticket, stage, e.workspace)
 		if execErr != nil {
 			if ctx.Err() != nil {
 				return Stage{}, StageOutcome{}, ctx.Err()

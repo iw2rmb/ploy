@@ -107,9 +107,9 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 
 // CancelWorkflow currently delegates to the legacy cancellation behaviour.
 func (c *LocalStepClient) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
-	_ = ctx
-	_ = req
-	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
+    _ = ctx
+    _ = req
+    return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 // Invocations returns a snapshot of recorded stage invocations executed via the local client.

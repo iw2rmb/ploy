@@ -19,8 +19,8 @@ var ErrAdapterDisabled = errors.New("runtime: adapter disabled")
 
 // Adapter exposes scheduler integrations capable of executing workflow stages.
 type Adapter interface {
-	Metadata() AdapterMetadata
-	Connect(ctx context.Context) (runner.GridClient, error)
+    Metadata() AdapterMetadata
+    Connect(ctx context.Context) (runner.RuntimeClient, error)
 }
 
 // AdapterMetadata describes a runtime adapter.

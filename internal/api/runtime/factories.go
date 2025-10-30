@@ -6,7 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
-	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
+    workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
 
 // RegisterDefaultFactories installs built-in runtime adapters.
@@ -31,8 +31,8 @@ func (localAdapter) Metadata() workflowruntime.AdapterMetadata {
 	return workflowruntime.AdapterMetadata{Name: "local"}
 }
 
-func (localAdapter) Connect(context.Context) (runner.GridClient, error) {
-	return &noopGridClient{}, nil
+func (localAdapter) Connect(context.Context) (runner.RuntimeClient, error) {
+    return &noopGridClient{}, nil
 }
 
 type noopGridClient struct{}
@@ -42,5 +42,5 @@ func (noopGridClient) ExecuteStage(context.Context, contracts.WorkflowTicket, ru
 }
 
 func (noopGridClient) CancelWorkflow(context.Context, runner.CancelRequest) (runner.CancelResult, error) {
-	return runner.CancelResult{}, runner.ErrGridCancellationUnsupported
+    return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }

@@ -12,10 +12,10 @@ import (
 
 func TestRunDefaultsStageOutcomeStatus(t *testing.T) {
     events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
 		Events:           events,
-		Grid:             statuslessGrid{},
+        Runtime:          statuslessGrid{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -57,10 +57,10 @@ func TestRunAttachesComposedJobSpecToStages(t *testing.T) {
 		},
 		Runtime: "docker",
 	}}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -102,11 +102,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false, Message: "bad cache"}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -133,11 +133,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: false}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -155,11 +155,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunPropagatesGridError(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
 	gridErr := errors.New("grid down")
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             errorGrid{err: gridErr},
+        Runtime:          errorGrid{err: gridErr},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -186,11 +186,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 	}
 	planner := runner.NewDefaultPlanner()
 	workspaceRoot := t.TempDir()
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          planner,
 		WorkspaceRoot:    workspaceRoot,
 		MaxStageRetries:  1,
@@ -231,11 +231,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "still broken"}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,

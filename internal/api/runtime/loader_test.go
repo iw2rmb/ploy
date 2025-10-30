@@ -73,9 +73,9 @@ func (s *stubAdapter) Metadata() workflowruntime.AdapterMetadata {
 	return workflowruntime.AdapterMetadata{Name: s.name}
 }
 
-func (s *stubAdapter) Connect(ctx context.Context) (runner.GridClient, error) {
-	_ = ctx
-	return nil, nil
+func (s *stubAdapter) Connect(ctx context.Context) (runner.RuntimeClient, error) {
+    _ = ctx
+    return nil, nil
 }
 
 func boolPtr(v bool) *bool { return &v }

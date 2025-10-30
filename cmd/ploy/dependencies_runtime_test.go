@@ -11,7 +11,7 @@ import (
 
 type fakeRuntimeAdapter struct {
 	meta          runtime.AdapterMetadata
-	grid          runner.GridClient
+    grid          runner.RuntimeClient
 	connectErr    error
 	connectCalled int
 }
@@ -20,7 +20,7 @@ func (a *fakeRuntimeAdapter) Metadata() runtime.AdapterMetadata {
 	return a.meta
 }
 
-func (a *fakeRuntimeAdapter) Connect(_ context.Context) (runner.GridClient, error) {
+func (a *fakeRuntimeAdapter) Connect(_ context.Context) (runner.RuntimeClient, error) {
 	a.connectCalled++
 	if a.connectErr != nil {
 		return nil, a.connectErr

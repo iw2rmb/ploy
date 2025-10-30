@@ -31,12 +31,16 @@ _ploy() {
             case $words[2] in
                 'workflow')
                     commands=()
-                    commands+=("cancel:Cancel an in-flight workflow run")
+                    commands+=("cancel:DEPRECATED: use \'ploy mod cancel\'")
                     _describe 'workflow command' commands && ret=0
                     ;;
                 'mod')
                     commands=()
                     commands+=("run:Submit a Mods run to the control plane")
+                    commands+=("cancel:Cancel a Mods ticket via the control plane")
+                    commands+=("resume:Resume a paused Mods ticket")
+                    commands+=("inspect:Show summary for a Mods ticket")
+                    commands+=("artifacts:List ticket artifacts by stage")
                     _describe 'mod command' commands && ret=0
                     ;;
                 'mods')
@@ -53,6 +57,9 @@ _ploy() {
                 'jobs')
                     commands=()
                     commands+=("follow:follow <job-id> - Follow job logs via SSE with retry semantics")
+                    commands+=("ls:List jobs for a Mods ticket")
+                    commands+=("inspect:Show details for a job")
+                    commands+=("retry:Request a retry for a failed job")
                     _describe 'jobs command' commands && ret=0
                     ;;
                 'artifact')

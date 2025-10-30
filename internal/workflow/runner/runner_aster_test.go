@@ -37,10 +37,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -110,10 +110,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -168,10 +168,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -223,10 +223,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -285,7 +285,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -318,7 +318,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

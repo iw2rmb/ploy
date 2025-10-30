@@ -14,7 +14,7 @@ import (
 )
 
 func TestRunRequiresEventsClient(t *testing.T) {
-	opts := runner.Options{Ticket: "ticket-123", Grid: runner.NewInMemoryGrid(), ManifestCompiler: newStubCompiler()}
+    opts := runner.Options{Ticket: "ticket-123", Runtime: runner.NewInMemoryGrid(), ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrEventsClientRequired) {
 		t.Fatalf("expected ErrEventsClientRequired, got %v", err)
@@ -23,7 +23,7 @@ func TestRunRequiresEventsClient(t *testing.T) {
 
 func TestRunRequiresGridClient(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
+    opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrGridClientRequired) {
 		t.Fatalf("expected ErrGridClientRequired, got %v", err)
@@ -32,10 +32,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunRequiresManifestCompiler(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:          "ticket-123",
 		Events:          events,
-		Grid:            runner.NewInMemoryGrid(),
+        Runtime:         runner.NewInMemoryGrid(),
 		Planner:         runner.NewDefaultPlanner(),
 		WorkspaceRoot:   t.TempDir(),
 		MaxStageRetries: 1,
@@ -49,10 +49,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 func TestRunPropagatesManifestCompilationError(t *testing.T) {
 events := &recordingEvents{nextTicket: "ticket-123"}
 	compilerErr := errors.New("compile failed")
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             runner.NewInMemoryGrid(),
+        Runtime:          runner.NewInMemoryGrid(),
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -76,10 +76,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := &fakeGrid{}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -121,10 +121,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := runner.NewInMemoryGrid()
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -144,11 +144,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "no more"}},
 		},
 	}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             grid,
+        Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  -3,
@@ -186,7 +186,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             &fakeGrid{},
+        Runtime:          &fakeGrid{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    filepath.Join(file, "workspace"),
 		MaxStageRetries:  1,
@@ -200,11 +200,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunErrorsWhenTicketValidationFails(t *testing.T) {
 events := &recordingEvents{invalidTicket: true}
-	opts := runner.Options{
+    opts := runner.Options{
 		Ticket:           "",
     // tenant removed
 		Events:           events,
-		Grid:             &fakeGrid{},
+        Runtime:          &fakeGrid{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

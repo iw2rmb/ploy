@@ -82,7 +82,7 @@ type StageModsMetadata struct {
 	Recommendations []StageModsRecommendation
 }
 
-// StageModsPlan summarises planner output exposed to Grid consumers.
+// StageModsPlan summarises planner output exposed to downstream consumers.
 type StageModsPlan struct {
 	SelectedRecipes []string
 	ParallelStages  []string
@@ -124,7 +124,7 @@ type StageJobSpec struct {
 	Runtime   string
 }
 
-// StageJobResources expresses resource hints for Grid scheduling.
+// StageJobResources expresses resource hints for runtime scheduling.
 type StageJobResources struct {
 	CPU    string
 	Memory string
@@ -171,7 +171,7 @@ type StageArchive struct {
 	QueuedAt time.Time
 }
 
-// StageEvidence captures execution evidence returned by Grid after a workflow stage runs.
+// StageEvidence captures execution evidence returned by the runtime after a workflow stage runs.
 type StageEvidence struct {
 	JobState string
 	ExitCode *int
