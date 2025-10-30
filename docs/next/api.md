@@ -70,9 +70,9 @@ Example `GET /v1/mods/{ticket}` response:
 }
 ```
 
-### Artifacts & Snapshotting
+### Artifacts
 
-- `POST /v1/artifacts/upload` — Stage a repository snapshot or diff bundle; returns the CID published
+- `POST /v1/artifacts/upload` — Stage a repository archive or diff bundle; returns the CID published
   to IPFS Cluster.
 - `GET /v1/artifacts/{cid}` — Fetch artifact metadata, download URL, and pin status.
 - `DELETE /v1/artifacts/{cid}` — Request unpin/garbage collection of an artifact (subject to
@@ -161,7 +161,7 @@ Successful uploads return `201 Created` and the stored metadata:
 `GET /v1/artifacts/{id}` returns the metadata above. Appending `?download=true` streams the binary
 payload with `Content-Type: application/octet-stream` and preserves the stored `size` header when
 available. `DELETE /v1/artifacts/{id}` unpins the artifact (subject to retention policy) and returns
-the final metadata snapshot so operators can audit who removed it.
+the final metadata record so operators can audit who removed it.
 
 Pin health surfaces through `pin_state`, `pin_replicas`, `pin_retry_count`, `pin_error`, and
 `pin_next_attempt_at`. These fields are also emitted by `ploy artifact status` so workstation runs can
@@ -399,7 +399,7 @@ through its local `ployd` instance:
 
 - Job and Mod updates stream over server-sent events (`GET /v1/mods/{ticket}/events`) for CLI consumption.
 - Artifact pin/unpin notifications publish to etcd watch paths (`/ploy/pins/**`), replacing the
-  JetStream event bus.
+  SSE event streams.
 
 Mod event streams emit:
 

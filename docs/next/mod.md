@@ -22,8 +22,8 @@ ploy mod run \
 
 ## 2. Node Prepares the Repository
 
-1. The node checks IPFS Cluster for an existing snapshot of the requested repo@HEAD.  
-2. If missing, it clones the repository from GitLab using the stored API key and pushes the snapshot
+1. The node checks IPFS Cluster for an existing base archive of the requested repo@HEAD.  
+2. If missing, it clones the repository from GitLab using the stored API key and pushes the archive
    into IPFS Cluster (capturing the CID for later steps).  
 3. The workflow runner hydrates the workspace (base repo + cumulative diffs) via the job service so
    the container sees the exact state expected for the step.
@@ -45,7 +45,6 @@ ploy mod run \
 - With the baseline verified, the node launches an OpenRewrite container image using the provided recipe and credentials.
 - Input includes:
   - Repository state (original tree + any healing diffs).
-  - Snapshot artifacts (CIDs) for deterministic checkout.
   - Recipe configuration describing the Java 11 → Java 17 migration.
 - The step generates new diffs (e.g., pom updates, code fixes), uploads the bundle and execution log
   to IPFS Cluster through the node’s local cluster client, and records the diff/log CIDs plus digests
@@ -77,8 +76,8 @@ ploy mod run \
 
 - **GitLab Integration** — Credentials live in etcd, enabling secure repo cloning and MR operations
   without manual token management on nodes.
-- **Artifact Reuse** — Snapshots hydrate locally from cached tarballs and each step’s diff/log bundle
-  is replicated to IPFS Cluster in real time, avoiding redundant clones when repeating Mods.
+- **Artifact Reuse** — Base archives hydrate locally from cached tarballs and each step’s diff/log
+  bundle is replicated to IPFS Cluster in real time, avoiding redundant clones when repeating Mods.
 - **Build Gate Enforcement** — Each step runs the SHIFT sandbox automatically; static checks are
   re-enabled once the artifact publisher exposes the detailed reports.
 - **Deterministic Replay** — Each step reconstructs repository state from the original HEAD plus

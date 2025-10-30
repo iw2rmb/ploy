@@ -13,7 +13,7 @@ import (
 )
 
 // Hydrator executes cache hydration for a given lane/cache key pair.
-// Implementations may prime caches, dispatch Grid jobs, or simply
+// Implementations may prime caches, dispatch runtime jobs, or simply
 // record the requested hydration in memory for tests.
 type Hydrator interface {
 	HydrateCache(ctx context.Context, lane string, cacheKey string) error

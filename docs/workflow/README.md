@@ -5,19 +5,19 @@ are hydrated, executed, and staged for follow-on tasks.
 
 ## Runtime Selection
 
-- The CLI defaults to the `local-step` runtime adapter. Set `PLOY_RUNTIME_ADAPTER=grid` to force the
-  legacy Grid path when debugging environments that still depend on Grid RPC.
+- The CLI defaults to the `local-step` runtime adapter.
 - Local execution uses Docker via `github.com/docker/docker` (API negotiation enabled). Containers
   are created with `auto-remove` disabled so retention TTLs from the manifest can be honoured.
 - When the Docker daemon is unavailable the adapter surfaces an error immediately instead of
-  falling back to Grid.
+  attempting any legacy fallbacks.
 
 ## Workspace Hydration
 
-- Step manifests reference snapshot and diff CIDs. The workspace hydrator extracts those tarballs
-  from `${PLOY_ARTIFACT_ROOT:-$XDG_CACHE_HOME/ploy/artifacts}` into mount-specific directories.
+- Step manifests may reference repository materialization plus optional artifact bundles. The
+  workspace hydrator extracts those tarballs from `${PLOY_ARTIFACT_ROOT:-$XDG_CACHE_HOME/ploy/artifacts}`
+  into mount-specific directories.
 - The first read/write input defines the default working directory inside the container. Read-only
-  inputs (snapshots) remain isolated so diffs can be reapplied deterministically.
+  inputs remain isolated so diffs can be reapplied deterministically.
 
 ## Diff Capture
 
@@ -37,7 +37,7 @@ are hydrated, executed, and staged for follow-on tasks.
   status` to inspect peer health and `ploy artifact rm` to unpin stale artifacts when debugging.
 - Stage checkpoints now include diff/log artifacts plus retention metadata (`retain_container` and
   TTL). The CLI surfaces this in the **Stage Artifacts** summary so operators can pull bundles or
-  plan inspections without querying Grid.
+  plan inspections without querying the control plane.
 
 ## SHIFT Enforcement
 

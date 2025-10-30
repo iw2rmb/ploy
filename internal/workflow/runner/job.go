@@ -6,7 +6,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-// JobComposer builds stage job specifications ahead of Grid submission.
+// JobComposer builds stage job specifications ahead of runtime submission.
 type JobComposer interface {
 	Compose(ctx context.Context, req JobComposeRequest) (StageJobSpec, error)
 }

@@ -9,7 +9,7 @@ removed during the workstation legacy teardown.
 
 ```bash
 ploy lanes describe --lane <lane-name> \
-  [--commit <sha>] [--snapshot <fingerprint>] [--manifest <version>] \
+  [--commit <sha>] [--manifest <version>] \
   [--aster <toggle,...>]
 ploy mod run \
   [--ticket <ticket-id>|--ticket auto] \
@@ -18,8 +18,6 @@ ploy mod run \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] \
   [--aster <toggle,...>] \
   [--aster-step <stage=toggle,...|stage=off>]
-ploy workflow cancel --run-id <run-id> \
-  [--workflow <workflow-id>] [--reason <text>]
 ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
@@ -49,12 +47,6 @@ stages before continuing to static checks and tests. When
 `PLOY_ASTER_ENABLE` is set the CLI resolves Aster bundle provenance after a
 successful run so developers can confirm which toggles/bundles were attached to
 each stage.
-
-`workflow cancel` is deprecated in favor of `ploy mod cancel`. It prints a
-friendly reminder when used.
-Ploy records the cancellation reason (when supplied) and echoes the run status
-so operators can quickly confirm whether the request was accepted or the run
-was already terminal.
 
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and

@@ -3,7 +3,7 @@ name = "commit-app"
 version = "2025-09-26"
 summary = """
 ## Purpose
-Materialise commit-scoped environments for Go + Node services. The manifest captures topology, fixtures, lanes Grid must honour, and now records service, edge, and exposure metadata for Grid's compiler.
+Materialise commit-scoped environments for Go + Node services. The manifest captures topology, fixtures, lanes the runtime must honour, and records service, edge, and exposure metadata for the control-plane compiler.
 
 ## Notes
 - Uses the snapshot toolkit fingerprints for masked production-like datasets.
@@ -88,11 +88,11 @@ protocol = "tcp"
 
 [[fixtures.required]]
 name = "postgres"
-reference = "snapshot:commit-db"
+reference = "service:postgres-dev"
 
 [[fixtures.required]]
 name = "redis"
-reference = "snapshot:commit-cache"
+reference = "service:redis-dev"
 
 [[fixtures.optional]]
 name = "minio"

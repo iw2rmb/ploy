@@ -6,7 +6,7 @@ summary = """
 Ensure mods workflows stick to baseline caches and fixtures.
 
 ## Notes
-- Exercises the Grid-compatible v2 manifest schema with service, edge, and exposure metadata.
+- Exercises the v2 manifest schema with service, edge, and exposure metadata.
 - Keeps optional Redis cache available for feature-flagged smoke tests.
 """
 
@@ -71,7 +71,7 @@ protocol = "tcp"
 
 [[fixtures.required]]
 name = "postgres"
-reference = "snapshot:dev-db"
+reference = "service:postgres-dev"
 
 [[fixtures.required]]
 name = "redis"

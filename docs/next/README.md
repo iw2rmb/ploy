@@ -6,11 +6,11 @@ while an etcd-backed control plane assigns work, enforces optimistic
 concurrency, and
 publishes durable artifacts in IPFS Cluster. The CLI remains the primary
 operator surface, providing familiar workflows without requiring the legacy
-Grid stack.
+control-plane stack.
 
 ## Goals
 
-- Deliver workstation-first Mods orchestration without Grid or JetStream.
+- Deliver workstation-first Mods orchestration without legacy Grid or JetStream; use SSE and HTTP APIs.
 - Keep Mods steps deterministic by replaying repository snapshots plus ordered
   diffs on every node.
 - Streamline artifact publishing so diffs, logs, and SHIFT reports replicate
@@ -21,7 +21,7 @@ Grid stack.
 ## Non-Goals
 
 - Multi-cluster federation or dedicated discovery nodes (future work).
-- Hybrid support for the Grid workflow runner; v2 replaces Grid entirely.
+- Hybrid support for the legacy runner; v2 replaces it entirely with the control-plane runtime.
 - Rewriting SHIFT itself—Ploy consumes the existing SHIFT build gate APIs.
 
 ## Architecture Summary
@@ -75,7 +75,7 @@ SHIFT sandbox before the next step.
 2. Control plane records the job (`mods/<ticket>/jobs/<job-id>`), enqueues the
    work (`queue/mods/<priority>/<job-id>`), and exposes status over `/v1/jobs`.
 3. A node claims the job through `/v1/jobs/claim`, hydrates the workspace from
-   snapshot and diff CIDs, and launches the specified container with retention
+   base archive and diff CIDs, and launches the specified container with retention
    enabled for inspection.
 4. On exit, the node captures stdout/stderr, diff tarball, and metadata before
    invoking SHIFT to run tests and static analysis.
@@ -136,7 +136,7 @@ dependencies between components, and cleanup guidance for retiring Grid.
 - [docs/next/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
 - [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.
-- [docs/next/reuse.md](reuse.md) — Grid components worth reusing in Ploy Next.
+- [docs/next/reuse.md](reuse.md) — Legacy components worth reusing in Ploy Next.
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment, bootstrap, and node operations playbook.
 - [docs/next/ipfs.md](ipfs.md) — IPFS Cluster topology, replication, and operational guidance.
 - [docs/next/ssh-transfer-migration.md](ssh-transfer-migration.md) — Migration plan for the SSH slot

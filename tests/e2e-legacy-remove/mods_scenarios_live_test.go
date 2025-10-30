@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-// TestModsScenariosLiveGrid executes configured Mods scenarios against live Grid when configuration is present.
-func TestModsScenariosLiveGrid(t *testing.T) {
+// TestModsScenariosLiveLegacy executes configured Mods scenarios against the legacy system when configuration is present.
+func TestModsScenariosLiveLegacy(t *testing.T) {
 	cfg := LoadConfig()
 	if cfg.SkipReason != "" {
 		t.Skipf("live grid config missing: %s", cfg.SkipReason)
@@ -38,13 +38,13 @@ func TestModsScenariosLiveGrid(t *testing.T) {
 	}
 }
 
-func TestLiveGridScenarioIDsDefault(t *testing.T) {
+func TestLiveLegacyScenarioIDsDefault(t *testing.T) {
 	if ids := liveGridScenarioIDs(); !reflect.DeepEqual(ids, []string{"simple-openrewrite"}) {
 		t.Fatalf("unexpected live grid scenario ids: %v", ids)
 	}
 }
 
-func TestLiveGridScenarioIDsFromEnv(t *testing.T) {
+func TestLiveLegacyScenarioIDsFromEnv(t *testing.T) {
 	t.Setenv("PLOY_E2E_LIVE_SCENARIOS", "parallel-healing-options, buildgate-self-heal ,simple-openrewrite")
 	want := []string{"buildgate-self-heal", "parallel-healing-options", "simple-openrewrite"}
 	got := liveGridScenarioIDs()

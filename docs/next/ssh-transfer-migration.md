@@ -54,7 +54,7 @@ an operator workstation.
 - Update any scripts that previously called `ploy artifact push/pull` to use:
 
   ```bash
-  ploy upload --job-id $TICKET --kind repo ./repo-snapshot.tar.gz
+  ploy upload --job-id $TICKET --kind repo ./repo-archive.tar.gz
   ploy report --job-id $TICKET --output ./reports/${TICKET}.tar.gz
   ```
 

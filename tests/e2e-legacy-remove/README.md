@@ -18,7 +18,7 @@ go test -tags e2e ./tests/e2e -v
 - `parallel-healing-options` — Parallel OpenRewrite + LLM remediation paths.
   ✅ Drives the live Grid client; parallel reconciliation depends on the staged
   roadmap work landing upstream.
-- `TestModsScenariosLiveGrid` — When `PLOY_GRID_ID` and `GRID_BEACON_API_KEY`
+- `TestModsScenariosLiveLegacy` — When `PLOY_GRID_ID` and `GRID_BEACON_API_KEY`
   are configured (plus optional `GRID_BEACON_URL`),
   runs the same scenario against the live Grid Workflow RPC by shelling out to
   `ploy mod run`.
@@ -55,7 +55,7 @@ Set the following variables before invoking the suite:
   live Grid (defaults to `simple-openrewrite`).
 
 When mandatory variables are missing or the credentials are invalid, the live
-Grid-backed tests fail fast so misconfiguration is surfaced immediately. If
+Legacy-backed tests fail fast so misconfiguration is surfaced immediately. If
 beacon replies without control-plane metadata and the grid client reports
 `gridclient: grid not found`, run `gridctl grid client backfill --grid-id $PLOY_GRID_ID`
 to publish the required `manifestHost` and CA bundle before rerunning the suite.

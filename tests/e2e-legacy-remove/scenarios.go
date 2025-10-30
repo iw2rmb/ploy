@@ -22,7 +22,7 @@ var scenarioRegistry = map[string]Scenario{
 		FailureRef:  "main",
 		Description: "Runs mods-plan → orw-apply on the Java 11→17 playground repo and expects the build gate to pass without healing.",
 		MissingFeatures: []string{
-			"Lane catalog migration pending so Grid smoke can use shared job specs",
+            "Lane catalog migration pending so legacy smoke can use shared job specs",
 		},
 	},
 	"buildgate-self-heal": {
@@ -33,7 +33,7 @@ var scenarioRegistry = map[string]Scenario{
 		FailureRef:  "e2e/fail-missing-symbol",
 		Description: "Applies OpenRewrite, observes the build gate failure, then relies on llm-plan/llm-exec/human stages to self-heal before the build gate succeeds.",
 		MissingFeatures: []string{
-			"Grid-backed smoke test pending until catalog lanes publish",
+            "Legacy-backed smoke test pending until catalog lanes publish",
 		},
 	},
 	"parallel-healing-options": {
@@ -44,7 +44,7 @@ var scenarioRegistry = map[string]Scenario{
 		FailureRef:  "e2e/fail-parallel",
 		Description: "Exercises planner support for running OpenRewrite and LLM fixes concurrently when multiple blocking issues exist.",
 		MissingFeatures: []string{
-			"Parallel branch reconciliation on real Grid scheduled for catalog rollout",
+            "Parallel branch reconciliation on legacy system scheduled for catalog rollout",
 		},
 	},
 }
