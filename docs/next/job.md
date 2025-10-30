@@ -8,7 +8,7 @@ abstraction. This mirrors the prior runtime semantics so workstation workflows r
 - **Mod step jobs** — Run the units defined in a Mod plan (plan, apply, healing actions). Each job
   executes a single step manifest locally on the worker node and appears both under
   `/v1/mods/{ticket}` and `/v1/jobs/{id}`.
-- **Build gate jobs** — Execute the SHIFT build gate (sandbox + static checks). They share the same
+- **Build gate jobs** — Execute the Build Gate (sandbox + static checks). They share the same
   schema but are flagged with `type: buildgate` in the metadata.
 - Additional auxiliary jobs (e.g., log ingestion) can reuse the same pattern if future roadmap items
   require them.

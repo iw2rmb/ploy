@@ -30,7 +30,7 @@ ploy mod run \
 
 ## 3. Initial Build Gate Run
 
-- SHIFT build gate executes unit tests and static analysis against the baseline repository.
+- The Build Gate executes unit tests and static analysis against the baseline repository.
 - If the build gate fails, the node emits diagnostics and flags the Mod for healing.
 - Healing leverages the LLM planner: the node triggers the `llm-plan` step, which produces a refined
   sequence of actions (additional rewrites, dependency adjustments) executed sequentially or in
@@ -52,7 +52,7 @@ ploy mod run \
 
 ## 5. Post-Apply Build Gate
 
-- SHIFT runs again on the updated repository.
+- The Build Gate runs again on the updated repository.
 - On failure:
   - The node re-enters the healing loop (`llm-plan`) to suggest follow-up steps (e.g., dependency
     bumps, code tweaks), applying each recommended fix and re-running the build gate.
@@ -78,7 +78,7 @@ ploy mod run \
   without manual token management on nodes.
 - **Artifact Reuse** — Base archives hydrate locally from cached tarballs and each step’s diff/log
   bundle is replicated to IPFS Cluster in real time, avoiding redundant clones when repeating Mods.
-- **Build Gate Enforcement** — Each step runs the SHIFT sandbox automatically; static checks are
+- **Build Gate Enforcement** — Each step runs the embedded Build Gate automatically; static checks are
   re-enabled once the artifact publisher exposes the detailed reports.
 - **Deterministic Replay** — Each step reconstructs repository state from the original HEAD plus
   ordered diffs, ensuring consistent outcomes across nodes.

@@ -134,13 +134,14 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	}
 
 	ipfsChecker := buildIPFSChecker(cfg)
-	shiftChecker := lifecycle.NewShiftChecker(lifecycle.ShiftCheckerOptions{})
+    // Build gate readiness (Java executor): verify Maven image presence if Docker is available.
+    gateChecker := lifecycle.NewBuildGateJavaChecker(lifecycle.BuildGateJavaCheckerOptions{})
 
     collector := lifecycle.NewCollector(lifecycle.Options{
         Role:             role,
         NodeID:           nodeID,
         Docker:           dockerChecker,
-        Shift:            shiftChecker,
+        Gate:             gateChecker,
         IPFS:             ipfsChecker,
         IgnoreInterfaces: lifecycleIgnoreInterfacesFrom(cfg),
     })

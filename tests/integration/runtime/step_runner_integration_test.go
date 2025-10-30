@@ -14,7 +14,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
-func TestIntegrationStepRunnerCapturesDiffAndShift(t *testing.T) {
+func TestIntegrationStepRunnerCapturesDiffAndGate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -50,7 +50,7 @@ func TestIntegrationStepRunnerCapturesDiffAndShift(t *testing.T) {
 	runtime := &integrationRuntime{overlay: overlayFile}
 	workspace := &integrationWorkspaceHydrator{paths: map[string]string{"baseline": baselineDir, "overlay": overlayDir}, workingDir: overlayDir}
 	diffs := &fileDiffGenerator{}
-	shift := &integrationShiftClient{}
+    gate := &integrationGateClient{}
 	artifacts := &integrationArtifactPublisher{}
 	logs := &integrationLogCollector{}
 
@@ -58,7 +58,7 @@ func TestIntegrationStepRunnerCapturesDiffAndShift(t *testing.T) {
 		Workspace:  workspace,
 		Containers: runtime,
 		Diffs:      diffs,
-		SHIFT:      shift,
+        Gate:       gate,
 		Artifacts:  artifacts,
 		Logs:       logs,
 	}
@@ -70,9 +70,9 @@ func TestIntegrationStepRunnerCapturesDiffAndShift(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", res.ExitCode)
 	}
-	if !shift.called {
-		t.Fatalf("expected SHIFT to be invoked")
-	}
+    if !gate.called {
+        t.Fatalf("expected Build Gate to be invoked")
+    }
 	if len(artifacts.published) != 2 {
 		t.Fatalf("expected diff and log artifacts, got %d", len(artifacts.published))
 	}
@@ -145,13 +145,13 @@ func (f *fileDiffGenerator) Capture(ctx context.Context, req step.DiffRequest) (
 	return step.DiffResult{Path: diffPath}, nil
 }
 
-type integrationShiftClient struct {
-	called bool
+type integrationGateClient struct {
+    called bool
 }
 
-func (i *integrationShiftClient) Validate(ctx context.Context, req step.ShiftRequest) (step.ShiftResult, error) {
-	i.called = true
-	return step.ShiftResult{Passed: true}, nil
+func (i *integrationGateClient) Validate(ctx context.Context, req step.GateRequest) (step.GateResult, error) {
+    i.called = true
+    return step.GateResult{Passed: true}, nil
 }
 
 type integrationArtifactPublisher struct {

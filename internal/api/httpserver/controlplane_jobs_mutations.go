@@ -121,26 +121,26 @@ func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Re
 		Bundles    map[string]scheduler.BundleRecord `json:"bundles"`
 		Error      *scheduler.JobError               `json:"error"`
 		Inspection bool                              `json:"inspection"`
-		Shift      *struct {
-			Result          string  `json:"result"`
-			DurationSeconds float64 `json:"duration_seconds"`
-		} `json:"shift"`
+        Gate       *struct {
+            Result          string  `json:"result"`
+            DurationSeconds float64 `json:"duration_seconds"`
+        } `json:"gate"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var shiftMetrics *scheduler.ShiftMetrics
-	if req.Shift != nil {
-		d := time.Duration(req.Shift.DurationSeconds * float64(time.Second))
-		if d < 0 {
-			d = 0
-		}
-		shiftMetrics = &scheduler.ShiftMetrics{
-			Result:   req.Shift.Result,
-			Duration: d,
-		}
-	}
+    var gateMetrics *scheduler.GateMetrics
+    if req.Gate != nil {
+        d := time.Duration(req.Gate.DurationSeconds * float64(time.Second))
+        if d < 0 {
+            d = 0
+        }
+        gateMetrics = &scheduler.GateMetrics{
+            Result:   req.Gate.Result,
+            Duration: d,
+        }
+    }
     job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
         JobID:      jobID,
         Ticket:     req.Ticket,
@@ -150,7 +150,7 @@ func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Re
         Bundles:    req.Bundles,
         Error:      req.Error,
         Inspection: req.Inspection,
-        Shift:      shiftMetrics,
+        Gate:       gateMetrics,
     })
     if err != nil {
         http.Error(w, err.Error(), http.StatusConflict)

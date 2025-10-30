@@ -25,10 +25,10 @@ const (
 	JobStateInspectionReady JobState = "inspection_ready"
 )
 
-// Shift result classifications recorded with job completions.
+// Build Gate result classifications recorded with job completions.
 const (
-	ShiftResultPassed = "passed"
-	ShiftResultFailed = "failed"
+    GateResultPassed = "passed"
+    GateResultFailed = "failed"
 )
 
 // JobSpec describes a job submission.
@@ -66,22 +66,22 @@ type Job struct {
 	Metadata       map[string]string
 	Artifacts      map[string]string
 	Bundles        map[string]BundleRecord
-	Shift          *ShiftSummary
+    Gate           *GateSummary
 	Retention      *JobRetention
 	NodeSnapshot   *JobNodeSnapshot
 	Error          *JobError
 }
 
-// ShiftSummary stores SHIFT execution metadata persisted with the job.
-type ShiftSummary struct {
-	Result   string
-	Duration time.Duration
+// GateSummary stores Build Gate execution metadata persisted with the job.
+type GateSummary struct {
+    Result   string
+    Duration time.Duration
 }
 
-// ShiftMetrics captures SHIFT execution details supplied when completing a job.
-type ShiftMetrics struct {
-	Result   string
-	Duration time.Duration
+// GateMetrics captures Build Gate execution details supplied when completing a job.
+type GateMetrics struct {
+    Result   string
+    Duration time.Duration
 }
 
 // ClaimRequest scopes a claim attempt.
@@ -110,7 +110,7 @@ type CompleteRequest struct {
 	Ticket     string
 	State      JobState
 	Artifacts  map[string]string
-	Shift      *ShiftMetrics
+    Gate       *GateMetrics
 	Error      *JobError
 	Inspection bool
 	Bundles    map[string]BundleRecord

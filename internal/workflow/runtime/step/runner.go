@@ -17,8 +17,8 @@ var ErrManifestInvalid = errors.New("step: manifest invalid")
 // ErrWorkspaceUnavailable indicates workspace hydration failed.
 var ErrWorkspaceUnavailable = errors.New("step: workspace unavailable")
 
-// ErrShiftFailed indicates SHIFT validation failed.
-var ErrShiftFailed = errors.New("step: SHIFT validation failed")
+// ErrBuildGateFailed indicates Build Gate validation failed.
+var ErrBuildGateFailed = errors.New("step: build gate validation failed")
 
 // Request captures the data required to execute a step manifest.
 type Request struct {
@@ -31,10 +31,10 @@ type Request struct {
 type Result struct {
 	ContainerID        string
 	ExitCode           int
-	DiffArtifact       PublishedArtifact
-	LogArtifact        PublishedArtifact
-	ShiftArtifact      PublishedArtifact
-	ShiftReport        ShiftResult
+    DiffArtifact       PublishedArtifact
+    LogArtifact        PublishedArtifact
+    GateArtifact       PublishedArtifact
+    GateReport         GateResult
 	HydrationSnapshots map[string]PublishedArtifact
 	RetentionTTL       string
 	Retained           bool
@@ -44,8 +44,8 @@ type Result struct {
 type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
-	Diffs      DiffGenerator
-	SHIFT      ShiftClient
+    Diffs      DiffGenerator
+    Gate       GateClient
 	Artifacts  ArtifactPublisher
 	Logs       LogCollector
 	Streams    LogStreamPublisher
@@ -133,7 +133,7 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 	var diffArtifact PublishedArtifact
 	var logArtifact PublishedArtifact
-	var shiftArtifact PublishedArtifact
+    var gateArtifact PublishedArtifact
 	if r.Artifacts != nil {
 		diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
 		if err != nil {
@@ -147,63 +147,63 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		}
 	}
 
-	shiftResult := ShiftResult{Passed: true}
-	if r.SHIFT != nil && manifest.Shift != nil {
-		shiftReq := ShiftRequest{
-			Manifest:  manifest,
-			Workspace: workspace,
-		}
-		if logArtifact.CID != "" {
-			artifactCopy := logArtifact
-			shiftReq.LogArtifact = &artifactCopy
-		}
-		shiftStart := time.Now()
-		shiftResult, err = r.SHIFT.Validate(ctx, shiftReq)
-		elapsed := time.Since(shiftStart)
-		if err != nil {
-			runErr = fmt.Errorf("step: SHIFT validation: %w", err)
-			return Result{}, runErr
-		}
-		if shiftResult.Duration <= 0 {
-			shiftResult.Duration = elapsed
-		}
-		if r.Artifacts != nil && len(shiftResult.Report) > 0 {
-			shiftArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{
-				Kind:   ArtifactKindShiftReport,
-				Buffer: append([]byte(nil), shiftResult.Report...),
-			})
-			if err != nil {
-				runErr = fmt.Errorf("step: publish shift report: %w", err)
-				return Result{}, runErr
-			}
-		}
-		if !shiftResult.Passed {
-			result := Result{
-				ContainerID:        handle.ID,
-				ExitCode:           containerResult.ExitCode,
-				DiffArtifact:       diffArtifact,
-				LogArtifact:        logArtifact,
-				ShiftArtifact:      shiftArtifact,
-				ShiftReport:        shiftResult,
-				HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
-				Retained:           manifest.Retention.RetainContainer,
-				RetentionTTL:       manifest.Retention.TTL,
-			}
-			if hasStream {
-				r.publishRetentionHint(ctx, streamID, result)
-			}
-			runErr = fmt.Errorf("%w: %s", ErrShiftFailed, shiftResult.Message)
-			return result, runErr
-		}
-	}
+    gateResult := GateResult{Passed: true}
+    if r.Gate != nil && selectGateSpec(manifest) != nil {
+        gateReq := GateRequest{
+            Manifest:  manifest,
+            Workspace: workspace,
+        }
+        if logArtifact.CID != "" {
+            artifactCopy := logArtifact
+            gateReq.LogArtifact = &artifactCopy
+        }
+        gateStart := time.Now()
+        gateResult, err = r.Gate.Validate(ctx, gateReq)
+        elapsed := time.Since(gateStart)
+        if err != nil {
+            runErr = fmt.Errorf("step: build gate validation: %w", err)
+            return Result{}, runErr
+        }
+        if gateResult.Duration <= 0 {
+            gateResult.Duration = elapsed
+        }
+        if r.Artifacts != nil && len(gateResult.Report) > 0 {
+            gateArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{
+                Kind:   ArtifactKindGateReport,
+                Buffer: append([]byte(nil), gateResult.Report...),
+            })
+            if err != nil {
+                runErr = fmt.Errorf("step: publish gate report: %w", err)
+                return Result{}, runErr
+            }
+        }
+        if !gateResult.Passed {
+            result := Result{
+                ContainerID:        handle.ID,
+                ExitCode:           containerResult.ExitCode,
+                DiffArtifact:       diffArtifact,
+                LogArtifact:        logArtifact,
+                GateArtifact:       gateArtifact,
+                GateReport:         gateResult,
+                HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
+                Retained:           manifest.Retention.RetainContainer,
+                RetentionTTL:       manifest.Retention.TTL,
+            }
+            if hasStream {
+                r.publishRetentionHint(ctx, streamID, result)
+            }
+            runErr = fmt.Errorf("%w: %s", ErrBuildGateFailed, gateResult.Message)
+            return result, runErr
+        }
+    }
 
 	result := Result{
 		ContainerID:        handle.ID,
 		ExitCode:           containerResult.ExitCode,
 		DiffArtifact:       diffArtifact,
 		LogArtifact:        logArtifact,
-		ShiftArtifact:      shiftArtifact,
-		ShiftReport:        shiftResult,
+        GateArtifact:       gateArtifact,
+        GateReport:         gateResult,
 		HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
 		Retained:           manifest.Retention.RetainContainer,
 		RetentionTTL:       manifest.Retention.TTL,

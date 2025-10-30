@@ -27,7 +27,7 @@ type jobRecord struct {
 	Metadata       map[string]string       `json:"metadata,omitempty"`
 	Artifacts      map[string]string       `json:"artifacts,omitempty"`
 	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
-	Shift          *shiftRecord            `json:"shift,omitempty"`
+    Gate           *gateRecord             `json:"gate,omitempty"`
 	Retention      *retentionRecord        `json:"retention,omitempty"`
 	NodeSnapshot   *nodeSnapshotRecord     `json:"node_snapshot,omitempty"`
 	Error          *JobError               `json:"error,omitempty"`
@@ -53,7 +53,7 @@ func (r jobRecord) toJob() *Job {
 		Metadata:       cloneMap(r.Metadata),
 		Artifacts:      cloneMap(r.Artifacts),
 		Bundles:        exportBundleRecords(r.Bundles),
-		Shift:          exportShiftSummary(r.Shift),
+        Gate:           exportGateSummary(r.Gate),
 		Retention:      exportRetention(r.Retention),
 		NodeSnapshot:   exportNodeSnapshot(r.NodeSnapshot),
 		Error:          r.Error,
@@ -106,15 +106,15 @@ func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
 	return dst
 }
 
-func exportShiftSummary(rec *shiftRecord) *ShiftSummary {
-	if rec == nil {
-		return nil
-	}
-	summary := &ShiftSummary{Result: rec.Result}
-	if rec.DurationSeconds > 0 {
-		summary.Duration = time.Duration(rec.DurationSeconds * float64(time.Second))
-	}
-	return summary
+func exportGateSummary(rec *gateRecord) *GateSummary {
+    if rec == nil {
+        return nil
+    }
+    summary := &GateSummary{Result: rec.Result}
+    if rec.DurationSeconds > 0 {
+        summary.Duration = time.Duration(rec.DurationSeconds * float64(time.Second))
+    }
+    return summary
 }
 
 func exportRetention(src *retentionRecord) *JobRetention {
@@ -282,9 +282,9 @@ type queueEntry struct {
 	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
-type shiftRecord struct {
-	Result          string  `json:"result,omitempty"`
-	DurationSeconds float64 `json:"duration_seconds,omitempty"`
+type gateRecord struct {
+    Result          string  `json:"result,omitempty"`
+    DurationSeconds float64 `json:"duration_seconds,omitempty"`
 }
 
 type leaseEntry struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
-func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
+func TestLocalStepClientInvokesRunnerAndSurfacesGateFailure(t *testing.T) {
 	manifest := contracts.StepManifest{
 		ID:    "mods-plan",
 		Name:  "Mods Plan",
@@ -22,7 +22,7 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 			{Name: "baseline", MountPath: "/mnt/baseline", Mode: contracts.StepInputModeReadOnly, SnapshotCID: "bafy-baseline"},
 			{Name: "overlay", MountPath: "/mnt/overlay", Mode: contracts.StepInputModeReadWrite, DiffCID: "bafy-overlay"},
 		},
-		Shift: &contracts.StepShiftSpec{Enabled: true, Profile: "default"},
+        Shift: &contracts.StepShiftSpec{Enabled: true, Profile: "default"},
 	}
 	fake := &recordingStepRunner{
 		result: step.Result{
@@ -37,16 +37,16 @@ func TestLocalStepClientInvokesRunnerAndSurfacesShiftFailure(t *testing.T) {
 				Kind:   step.ArtifactKindLogs,
 				Digest: "sha256:beef",
 			},
-			ShiftArtifact: step.PublishedArtifact{
-				CID:    "bafy-shift",
-				Kind:   step.ArtifactKindShiftReport,
-				Digest: "sha256:feed",
-			},
-			ShiftReport: step.ShiftResult{
-				Passed:  false,
-				Message: "build gate failed: go vet reported errors",
-				Report:  []byte(`{"static_checks":[{"tool":"go vet"}]}`),
-			},
+        GateArtifact: step.PublishedArtifact{
+            CID:    "bafy-gate",
+            Kind:   step.ArtifactKindGateReport,
+            Digest: "sha256:feed",
+        },
+        GateReport: step.GateResult{
+            Passed:  false,
+            Message: "build gate failed: go vet reported errors",
+            Report:  []byte(`{"static_checks":[{"tool":"go vet"}]}`),
+        },
 			Retained:     true,
 			RetentionTTL: "24h",
 		},
@@ -78,21 +78,21 @@ ticket := contracts.WorkflowTicket{TicketID: "ticket-123"}
 	if outcome.Status != runner.StageStatusFailed {
 		t.Fatalf("expected stage to fail, got %s", outcome.Status)
 	}
-	if !strings.Contains(outcome.Message, "go vet") {
-		t.Fatalf("expected shift diagnostics propagated, got %q", outcome.Message)
-	}
-	if len(outcome.Artifacts) != 3 {
-		t.Fatalf("expected diff, log, and shift artifacts, got %d", len(outcome.Artifacts))
-	}
+    if !strings.Contains(outcome.Message, "go vet") {
+        t.Fatalf("expected build gate diagnostics propagated, got %q", outcome.Message)
+    }
+    if len(outcome.Artifacts) != 3 {
+        t.Fatalf("expected diff, log, and gate artifacts, got %d", len(outcome.Artifacts))
+    }
 	if !containsArtifact(outcome.Artifacts, "diff", "bafy-diff") {
 		t.Fatalf("expected diff artifact in outcome, got %+v", outcome.Artifacts)
 	}
 	if !containsArtifact(outcome.Artifacts, "logs", "bafy-logs") {
 		t.Fatalf("expected log artifact in outcome, got %+v", outcome.Artifacts)
 	}
-	if !containsArtifact(outcome.Artifacts, "shift_report", "bafy-shift") {
-		t.Fatalf("expected shift artifact in outcome, got %+v", outcome.Artifacts)
-	}
+    if !containsArtifact(outcome.Artifacts, "gate_report", "bafy-gate") {
+        t.Fatalf("expected gate artifact in outcome, got %+v", outcome.Artifacts)
+    }
 }
 
 type recordingStepRunner struct {
@@ -143,14 +143,14 @@ func TestLocalStepClientRecordsStageInvocation(t *testing.T) {
 				Kind:   step.ArtifactKindLogs,
 				Digest: "sha256:babe",
 			},
-			ShiftArtifact: step.PublishedArtifact{
-				CID:    "bafy-shift-apply",
-				Kind:   step.ArtifactKindShiftReport,
-				Digest: "sha256:abba",
-			},
-			ShiftReport: step.ShiftResult{
-				Passed: true,
-			},
+        GateArtifact: step.PublishedArtifact{
+            CID:    "bafy-gate-apply",
+            Kind:   step.ArtifactKindGateReport,
+            Digest: "sha256:abba",
+        },
+        GateReport: step.GateResult{
+            Passed: true,
+        },
 			Retained:     true,
 			RetentionTTL: "36h",
 		},
@@ -195,9 +195,9 @@ ticket := contracts.WorkflowTicket{TicketID: "ticket-456"}
 	if !containsArtifact(inv.Artifacts, "logs", "bafy-logs-apply") {
 		t.Fatalf("expected log artifact recorded, got %+v", inv.Artifacts)
 	}
-	if !containsArtifact(inv.Artifacts, "shift_report", "bafy-shift-apply") {
-		t.Fatalf("expected shift artifact recorded, got %+v", inv.Artifacts)
-	}
+    if !containsArtifact(inv.Artifacts, "gate_report", "bafy-gate-apply") {
+        t.Fatalf("expected gate artifact recorded, got %+v", inv.Artifacts)
+    }
 	if inv.Evidence == nil {
 		t.Fatalf("expected evidence recorded")
 	}

@@ -39,10 +39,12 @@ are hydrated, executed, and staged for follow-on tasks.
   TTL). The CLI surfaces this in the **Stage Artifacts** summary so operators can pull bundles or
   plan inspections without querying the control plane.
 
-## SHIFT Enforcement
+## Build Gate
 
-- The runtime adapts the build gate sandbox runner via `step.NewBuildGateShiftClient`. Static-check
-  adapters are temporarily disabled; the sandbox result is still recorded in stage metadata and
+- The runtime adapts the Build Gate sandbox runner via `step.NewBuildGateClient` using the
+  embedded Java executor (Gradle/Maven wrappers, with a Dockerised Maven fallback). Static-check
+  adapters are temporarily disabled; the sandbox result is recorded in stage metadata and
   failures block downstream stages.
 - Once artifact publishing is wired, static-check findings and log digests will be attached to the
-  staged report artifact.
+  staged report artifact. Java Error Prone integration is implemented but kept disabled by default
+  pending artifact plumbing.

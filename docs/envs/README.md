@@ -41,8 +41,9 @@ configuration.
   unset or zero.
 - `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used for artifact
   uploads from the workstation. Not required on nodes (they use IPFS Cluster directly).
-- `PLOY_SHIFT_BINARY` — Optional path override for the SHIFT CLI invoked by worker lifecycle health checks
-  (`shift --version`). Defaults to `shift` when unset.
+- `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
+  Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
+  Defaults to `maven:3-eclipse-temurin-17`.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.

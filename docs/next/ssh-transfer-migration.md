@@ -64,7 +64,7 @@ an operator workstation.
 
 For artifacts that were uploaded directly to IPFS without control-plane metadata:
 
-1. Locate the original payload (diff tarball, logs, SHIFT report) on the workstation or long-term
+1. Locate the original payload (diff tarball, logs, Build Gate report) on the workstation or long-term
    storage.
 2. Re-run `ploy upload --job-id <existing-job> --kind <diff|logs|report> <path>` so the control plane
    records the CID, digest, and retention fields. The job ID does not have to be active; it is only

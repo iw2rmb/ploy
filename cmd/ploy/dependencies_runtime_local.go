@@ -9,7 +9,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
-	"github.com/iw2rmb/ploy/internal/workflow/buildgate/shift"
+    javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
@@ -81,17 +81,17 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 	if err != nil {
 		return nil, err
 	}
-	shiftClient, err := newBuildGateShiftClient()
-	if err != nil {
-		return nil, err
-	}
-	return step.Runner{
-		Workspace:  hydrator,
-		Containers: containerRuntime,
-		Diffs:      diffGenerator,
-		SHIFT:      shiftClient,
-		Artifacts:  publisher,
-	}, nil
+    gateClient, err := newBuildGateClient()
+    if err != nil {
+        return nil, err
+    }
+    return step.Runner{
+        Workspace:  hydrator,
+        Containers: containerRuntime,
+        Diffs:      diffGenerator,
+        Gate:       gateClient,
+        Artifacts:  publisher,
+    }, nil
 }
 
 func newClusterArtifactClient() (*artifacts.ClusterClient, error) {
@@ -122,12 +122,12 @@ func parseEnvInt(name string) int {
 	return num
 }
 
-func newBuildGateShiftClient() (step.ShiftClient, error) {
-	executor, err := shift.NewExecutor(shift.Options{})
-	if err != nil {
-		return nil, err
-	}
-	sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
-	gateRunner := &buildgate.Runner{Sandbox: sandbox}
-	return step.NewBuildGateShiftClient(step.BuildGateShiftOptions{Runner: gateRunner})
+func newBuildGateClient() (step.GateClient, error) {
+    executor, err := javaexec.NewExecutor(javaexec.Options{})
+    if err != nil {
+        return nil, err
+    }
+    sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
+    gateRunner := &buildgate.Runner{Sandbox: sandbox}
+    return step.NewBuildGateClient(step.BuildGateClientOptions{Runner: gateRunner})
 }

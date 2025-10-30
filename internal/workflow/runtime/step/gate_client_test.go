@@ -9,7 +9,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
-func TestBuildGateShiftClientReportsFailures(t *testing.T) {
+func TestBuildGateClientReportsFailures(t *testing.T) {
 	runner := &fakeBuildGateRunner{
 		result: buildgate.RunResult{
 			Sandbox: buildgate.SandboxOutcome{
@@ -19,7 +19,7 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 				LogDigest:     "bafy-logs",
 				Metadata: buildgate.Metadata{
 					LogFindings: []buildgate.LogFinding{{
-						Code:     "shift.summary",
+                    Code:     "gate.summary",
 						Severity: "info",
 						Message:  "lane lane.docker.jvm via docker",
 					}},
@@ -59,7 +59,7 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 					},
 				},
 				LogFindings: []buildgate.LogFinding{{
-					Code:     "shift.env",
+                    Code:     "gate.env",
 					Severity: "warning",
 					Message:  "Environment mismatch",
 				}},
@@ -67,7 +67,7 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 			Report: []byte(`{"status":"failed"}`),
 		},
 	}
-	client, err := NewBuildGateShiftClient(BuildGateShiftOptions{Runner: runner})
+    client, err := NewBuildGateClient(BuildGateClientOptions{Runner: runner})
 	if err != nil {
 		t.Fatalf("NewBuildGateShiftClient() error: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 	}
 
 	logArtifact := PublishedArtifact{CID: "bafy-logs", Kind: ArtifactKindLogs, Digest: "sha256:fixture"}
-	result, err := client.Validate(context.Background(), ShiftRequest{
+    result, err := client.Validate(context.Background(), GateRequest{
 		Manifest: manifest,
 		Workspace: Workspace{
 			Inputs: map[string]string{
@@ -98,15 +98,15 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Validate() error: %v", err)
 	}
-	if result.Passed {
-		t.Fatalf("expected shift failure")
-	}
+    if result.Passed {
+        t.Fatalf("expected build gate failure")
+    }
 	if !strings.Contains(result.Message, "go vet") || !strings.Contains(result.Message, "unused import") {
 		t.Fatalf("expected failure diagnostics in message, got %q", result.Message)
 	}
-	if len(result.Report) == 0 {
-		t.Fatalf("expected serialized report in ShiftResult")
-	}
+    if len(result.Report) == 0 {
+        t.Fatalf("expected serialized report in GateResult")
+    }
 	if !strings.Contains(string(result.Report), `"metadata"`) {
 		t.Fatalf("expected metadata embedded in report, got %s", string(result.Report))
 	}
@@ -124,9 +124,9 @@ func TestBuildGateShiftClientReportsFailures(t *testing.T) {
 	}
 }
 
-func TestBuildGateShiftClientPropagatesRunnerError(t *testing.T) {
+func TestBuildGateClientPropagatesRunnerError(t *testing.T) {
 	runner := &fakeBuildGateRunner{err: context.DeadlineExceeded}
-	client, err := NewBuildGateShiftClient(BuildGateShiftOptions{Runner: runner})
+    client, err := NewBuildGateClient(BuildGateClientOptions{Runner: runner})
 	if err != nil {
 		t.Fatalf("NewBuildGateShiftClient() error: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestBuildGateShiftClientPropagatesRunnerError(t *testing.T) {
 		},
 		Shift: &contracts.StepShiftSpec{Enabled: true, Profile: "default"},
 	}
-	_, err = client.Validate(context.Background(), ShiftRequest{
+    _, err = client.Validate(context.Background(), GateRequest{
 		Manifest:  manifest,
 		Workspace: Workspace{WorkingDir: "/tmp/workspace"},
 	})

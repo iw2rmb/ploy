@@ -78,7 +78,7 @@ func (s *Scheduler) handleLeaseExpiry(ctx context.Context, lease leaseEntry, lea
 	record.ExpiresAt = ""
 	record.NodeSnapshot = nil
 	record.RetryAttempt++
-	record.Shift = nil
+    record.Gate = nil
 
 	var (
 		queuePut clientv3.Op

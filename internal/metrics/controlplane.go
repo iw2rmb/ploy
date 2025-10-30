@@ -14,7 +14,7 @@ type SchedulerRecorder interface {
 	QueueDequeued(priority string)
 	ObserveClaimLatency(priority string, latency time.Duration)
 	ObserveJobRetry(priority, reason string)
-	ObserveShiftDuration(stepID, result string, duration time.Duration)
+    ObserveGateDuration(stepID, result string, duration time.Duration)
 }
 
 // SchedulerMetrics exports Prometheus collectors for the control plane scheduler.
@@ -22,7 +22,7 @@ type SchedulerMetrics struct {
 	queueDepth    *prometheus.GaugeVec
 	claimLatency  *prometheus.HistogramVec
 	jobRetry      *prometheus.CounterVec
-	shiftDuration *prometheus.HistogramVec
+    gateDuration *prometheus.HistogramVec
 }
 
 // NewSchedulerMetrics registers scheduler Prometheus collectors against the provided registry.
@@ -53,13 +53,13 @@ func NewSchedulerMetrics(reg prometheus.Registerer) (*SchedulerMetrics, error) {
 		Help:      "Count of job retries triggered by the scheduler partitioned by priority and reason.",
 	}, []string{"priority", "reason"})
 
-	shiftDuration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "ploy",
-		Subsystem: "controlplane",
-		Name:      "shift_duration_seconds",
-		Help:      "Duration of SHIFT execution per step.",
-		Buckets:   []float64{0.25, 0.5, 1, 2, 5, 10, 20, 40, 80, 160},
-	}, []string{"step_id", "result"})
+    gateDuration := prometheus.NewHistogramVec(prometheus.HistogramOpts{
+        Namespace: "ploy",
+        Subsystem: "controlplane",
+        Name:      "gate_duration_seconds",
+        Help:      "Duration of Build Gate execution per step.",
+        Buckets:   []float64{0.25, 0.5, 1, 2, 5, 10, 20, 40, 80, 160},
+    }, []string{"step_id", "result"})
 
 	var err error
 	queueDepth, err = registerGaugeVec(reg, queueDepth)
@@ -74,17 +74,17 @@ func NewSchedulerMetrics(reg prometheus.Registerer) (*SchedulerMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
-	shiftDuration, err = registerHistogramVec(reg, shiftDuration)
-	if err != nil {
-		return nil, err
-	}
+    gateDuration, err = registerHistogramVec(reg, gateDuration)
+    if err != nil {
+        return nil, err
+    }
 
-	return &SchedulerMetrics{
-		queueDepth:    queueDepth,
-		claimLatency:  claimLatency,
-		jobRetry:      jobRetry,
-		shiftDuration: shiftDuration,
-	}, nil
+    return &SchedulerMetrics{
+        queueDepth:    queueDepth,
+        claimLatency:  claimLatency,
+        jobRetry:      jobRetry,
+        gateDuration:  gateDuration,
+    }, nil
 }
 
 // NewNoopSchedulerRecorder returns a scheduler recorder that discards observations.
@@ -126,15 +126,15 @@ func (m *SchedulerMetrics) ObserveJobRetry(priority, reason string) {
 }
 
 // ObserveShiftDuration records the duration of SHIFT execution per step.
-func (m *SchedulerMetrics) ObserveShiftDuration(stepID, result string, duration time.Duration) {
-	if m == nil || duration <= 0 {
-		return
-	}
-	seconds := math.Max(duration.Seconds(), 0)
-	if strings.TrimSpace(result) == "" {
-		result = "unknown"
-	}
-	m.shiftDuration.WithLabelValues(stepID, result).Observe(seconds)
+func (m *SchedulerMetrics) ObserveGateDuration(stepID, result string, duration time.Duration) {
+    if m == nil || duration <= 0 {
+        return
+    }
+    seconds := math.Max(duration.Seconds(), 0)
+    if strings.TrimSpace(result) == "" {
+        result = "unknown"
+    }
+    m.gateDuration.WithLabelValues(stepID, result).Observe(seconds)
 }
 
 type noopSchedulerRecorder struct{}
@@ -143,4 +143,4 @@ func (noopSchedulerRecorder) QueueEnqueued(string)                              
 func (noopSchedulerRecorder) QueueDequeued(string)                               {}
 func (noopSchedulerRecorder) ObserveClaimLatency(string, time.Duration)          {}
 func (noopSchedulerRecorder) ObserveJobRetry(string, string)                     {}
-func (noopSchedulerRecorder) ObserveShiftDuration(string, string, time.Duration) {}
+func (noopSchedulerRecorder) ObserveGateDuration(string, string, time.Duration) {}
