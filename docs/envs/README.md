@@ -8,7 +8,7 @@ configuration.
 ## Dependencies
 
 - [cmd/ploy/dependencies.go](../../cmd/ploy/dependencies.go) — runtime factories
-  resolving control-plane, JetStream, and IPFS endpoints.
+  resolving control-plane and IPFS endpoints.
 - [cmd/ploy/feature_flags.go](../../cmd/ploy/feature_flags.go) — feature flag
   inspection for the Aster integration.
 
@@ -39,10 +39,8 @@ configuration.
 - `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
-- `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used by the workstation-only snapshot
-  tooling to upload artifacts when present. Not required on nodes (they use IPFS Cluster directly).
-- `PLOY_JETSTREAM_URL` — Optional NATS JetStream route used by the snapshot tooling to publish
-  artifact metadata envelopes. When unset, metadata is not published.
+- `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used for artifact
+  uploads from the workstation. Not required on nodes (they use IPFS Cluster directly).
 - `PLOY_SHIFT_BINARY` — Optional path override for the SHIFT CLI invoked by worker lifecycle health checks
   (`shift --version`). Defaults to `shift` when unset.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
@@ -120,4 +118,4 @@ configuration.
 - [docs/design/overview/README.md](../design/overview/README.md)
 - [docs/design/workflow-rpc-alignment/README.md](../design/workflow-rpc-alignment/README.md)
 - [docs/design/ipfs-artifacts/README.md](../design/ipfs-artifacts/README.md)
-- [docs/design/snapshot-metadata/README.md](../design/snapshot-metadata/README.md)
+ 

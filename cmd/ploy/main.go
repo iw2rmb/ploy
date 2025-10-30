@@ -43,8 +43,7 @@ func execute(args []string, stderr io.Writer) error {
 		return handleConfig(args[1:], stderr)
 	case "cluster":
 		return handleCluster(args[1:], stderr)
-	case "snapshot":
-		return handleSnapshot(args[1:], stderr)
+
 	case "environment":
 		return handleEnvironment(args[1:], stderr)
 	case "manifest":

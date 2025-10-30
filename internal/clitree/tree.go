@@ -76,7 +76,7 @@ var commandTree = []Node{
 	},
 	{
 		Name:        "hydration",
-		Description: "Inspect and tune hydration snapshot policies",
+		Description: "Inspect and tune hydration policies",
 		Usage:       "ploy hydration <command>",
 		Subcommands: []Node{
 			{
@@ -239,24 +239,7 @@ var commandTree = []Node{
 			},
 		},
 	},
-	{
-		Name:        "snapshot",
-		Description: "Plan and capture workspace snapshots",
-		Usage:       "ploy snapshot <command>",
-		Note:        "Use 'ploy snapshot <command> --help' for flag details.",
-		Subcommands: []Node{
-			{
-				Name:        "plan",
-				Description: "Preview strip/mask/synthetic rules for a snapshot",
-				Usage:       "ploy snapshot plan --snapshot <snapshot-name>",
-			},
-			{
-				Name:        "capture",
-				Description: "Execute snapshot capture and publish metadata",
-            Usage:       "ploy snapshot capture --snapshot <snapshot-name> --ticket <ticket-id>",
-			},
-		},
-	},
+
 	{
 		Name:        "environment",
 		Description: "Materialize integration environments",

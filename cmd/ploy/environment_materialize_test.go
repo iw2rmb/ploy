@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+    "context"
 	"errors"
 	"io"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/environments"
 	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
+    "github.com/iw2rmb/ploy/internal/workflow/snapshots"
 )
 
 func TestHandleEnvironmentMaterializeRequiresCommit(t *testing.T) {
@@ -129,11 +131,11 @@ func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 		snapshotConfigDir = prevSnapshotDir
 	}()
 
-	sentinel := errors.New("boom")
+    sentinel := errors.New("boom")
 	environmentServiceFactory = func(s snapshotRegistry) (environmentService, error) {
 		return &recordingEnvironmentService{err: sentinel}, nil
 	}
-	snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return &fakeSnapshotRegistry{}, nil }
+    snapshotRegistryLoader = func(dir string) (snapshotRegistry, error) { return &fakeSnapshotRegistry{}, nil }
 	snapshotConfigDir = "ignored"
 
 	manifestRegistryLoader = func(dir string) (runner.ManifestCompiler, error) {
@@ -144,4 +146,15 @@ func TestHandleEnvironmentMaterializePropagatesServiceError(t *testing.T) {
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("expected service error, got %v", err)
 	}
+}
+
+// Minimal fake snapshot registry to satisfy tests after snapshot CLI removal.
+type fakeSnapshotRegistry struct{}
+
+func (f *fakeSnapshotRegistry) Plan(_ context.Context, _ string) (snapshots.PlanReport, error) {
+    return snapshots.PlanReport{}, nil
+}
+
+func (f *fakeSnapshotRegistry) Capture(_ context.Context, _ string, _ snapshots.CaptureOptions) (snapshots.CaptureResult, error) {
+    return snapshots.CaptureResult{}, nil
 }
