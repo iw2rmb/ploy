@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
-
 	"github.com/iw2rmb/ploy/internal/controlplane/cache"
 	"github.com/iw2rmb/ploy/pkg/sshtransport"
 )
@@ -88,31 +86,8 @@ func SetNodes(nodes []sshtransport.Node) error {
 }
 
 // NodesFromGridStatus converts grid metadata into SSH tunnel nodes.
-func NodesFromGridStatus(status gridclient.Status) []sshtransport.Node {
-	nodes := make([]sshtransport.Node, 0, len(status.GridInfo.Nodes))
-	port := resolveAPIPort(status)
-	user := defaultSSHUser()
-	identity := defaultIdentityFile()
-
-	for _, item := range status.GridInfo.Nodes {
-		address := strings.TrimSpace(item.IP)
-		if address == "" {
-			address = strings.TrimSpace(item.Domain)
-		}
-		if address == "" {
-			continue
-		}
-		nodes = append(nodes, sshtransport.Node{
-			ID:           strings.TrimSpace(item.ID),
-			Address:      address,
-			SSHPort:      22,
-			APIPort:      port,
-			User:         user,
-			IdentityFile: identity,
-		})
-	}
-	return nodes
-}
+// NodesFromGridStatus was deprecated with the Grid removal; callers should compute
+// sshtransport.Node values from their own control-plane discovery.
 
 // EnsureFallbackNode registers a single fallback node derived from the base URL when discovery metadata is unavailable.
 func EnsureFallbackNode(base *url.URL) error {
@@ -193,19 +168,7 @@ func LookupJob(jobID string) (string, bool) {
 	return store.LookupJob(jobID)
 }
 
-func resolveAPIPort(status gridclient.Status) int {
-	if len(status.GridInfo.ControlPlane.API) > 0 {
-		if port := parsePortFromURL(status.GridInfo.ControlPlane.API[0]); port > 0 {
-			return port
-		}
-	}
-	if endpoint := strings.TrimSpace(status.Beacon.APIEndpoint); endpoint != "" {
-		if port := parsePortFromURL(endpoint); port > 0 {
-			return port
-		}
-	}
-	return 443
-}
+// resolveAPIPort deprecated; retained to avoid breaking binary compatibility in rare external usage.
 
 func parsePortFromURL(raw string) int {
 	trimmed := strings.TrimSpace(raw)

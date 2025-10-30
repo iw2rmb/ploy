@@ -119,8 +119,8 @@ required environment variables, and operational limits (slot TTL, digest verific
   required; `--repo-base-ref` defaults to the repository's default branch. The
   workspace hint creates an auxiliary directory (e.g. `mods/java`) before Mods
   stages execute.
-- `--mods-plan-timeout` — Duration string passed to the Mods planner so Grid can
-  timebox plan evaluation (`mod run`).
+- `--mods-plan-timeout` — Duration string passed to the Mods planner to timebox
+  plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
 
@@ -131,22 +131,12 @@ required environment variables, and operational limits (slot TTL, digest verific
   downstream error).
 
 ## Environment
-
-- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when the CLI
-  must talk to a Grid deployment instead of a local control plane.
-- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy Grid credentials. Omit
-  when using SSH descriptors; include them only for legacy Grid workflows.
-- `GRID_CLIENT_STATE_DIR` — Optional override for the grid client state
-  directory. Defaults to `${XDG_CONFIG_HOME:-$HOME/.config}/ploy/grid/<grid-id>`.
-- `GRID_WORKFLOW_SDK_STATE_DIR` — Backwards compatible override; when set it
-  also dictates the grid client state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`; other adapters (`grid`, `k8s`, `nomad`) register here and
   unknown names cause the CLI to fail fast.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster integration.
   When unset the CLI skips bundle lookups and omits Aster toggles from cache
-  keys, manifests, and summaries. Without `PLOY_GRID_ID` the CLI falls back to the
-  in-memory Grid and JetStream stubs for offline development.
+  keys, manifests, and summaries.
 
 ## Development
 
@@ -154,7 +144,7 @@ required environment variables, and operational limits (slot TTL, digest verific
 - Run unit tests with `make test` (ensures `go test -cover ./...` stays ≥60%
   overall, ≥90% on the runner package).
 - Roadmap slices should extend `internal/workflow/runner` and keep the CLI
-  focused on stateless execution against JetStream/Grid contracts.
+  focused on stateless execution against the new control-plane contracts.
 - See `docs/MANIFESTS.md` for schema details and authoring guidance on
   integration manifests.
 - Review `docs/DOCS.md` for the documentation matrix and editing conventions

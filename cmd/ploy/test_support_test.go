@@ -1,22 +1,18 @@
 package main
 
 import (
-	"context"
-	"net/http"
-	"os"
-	"path/filepath"
-	"testing"
+    "context"
+    "os"
+    "path/filepath"
+    "testing"
 
-	gridclient "github.com/iw2rmb/grid/sdk/gridclient/go"
-	workflowsdk "github.com/iw2rmb/grid/sdk/workflowrpc/go"
-
-	"github.com/iw2rmb/ploy/internal/workflow/aster"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
-	"github.com/iw2rmb/ploy/internal/workflow/environments"
-	"github.com/iw2rmb/ploy/internal/workflow/manifests"
-	"github.com/iw2rmb/ploy/internal/workflow/runner"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime"
-	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+    "github.com/iw2rmb/ploy/internal/workflow/aster"
+    "github.com/iw2rmb/ploy/internal/workflow/contracts"
+    "github.com/iw2rmb/ploy/internal/workflow/environments"
+    "github.com/iw2rmb/ploy/internal/workflow/manifests"
+    "github.com/iw2rmb/ploy/internal/workflow/runner"
+    "github.com/iw2rmb/ploy/internal/workflow/runtime"
+    "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 type recordingRunner struct {
@@ -89,56 +85,7 @@ func withStubWorkspacePreparer(t *testing.T) *stubWorkspacePreparer {
 	return stub
 }
 
-type stubGridClient struct {
-	status        gridclient.Status
-	workflow      *workflowsdk.Client
-	workflowError error
-	calls         int
-}
 
-func newStubGridClient(status gridclient.Status) *stubGridClient {
-	return &stubGridClient{
-		status:   status,
-		workflow: &workflowsdk.Client{},
-	}
-}
-
-func (s *stubGridClient) Status() gridclient.Status {
-	return s.status
-}
-
-func (s *stubGridClient) WorkflowClient(context.Context) (*workflowsdk.Client, error) {
-	s.calls++
-	if s.workflowError != nil {
-		return nil, s.workflowError
-	}
-	if s.workflow != nil {
-		return s.workflow, nil
-	}
-	return &workflowsdk.Client{}, nil
-}
-
-func (s *stubGridClient) HTTPClient(context.Context) (*http.Client, error) {
-	return &http.Client{}, nil
-}
-
-func withGridClientStub(t *testing.T, stub gridClientAPI) {
-	if t != nil {
-		t.Helper()
-	}
-
-	prevNew := newGridClient
-	resetGridClientState()
-	newGridClient = func(context.Context, gridclient.Config) (gridClientAPI, error) {
-		return stub, nil
-	}
-	if t != nil {
-		t.Cleanup(func() {
-			newGridClient = prevNew
-			resetGridClientState()
-		})
-	}
-}
 
 func withStepExecutorStub(t *testing.T, executor runtime.StepExecutor, err error) {
 	prevFactory := stepExecutorFactory

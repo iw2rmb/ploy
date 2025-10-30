@@ -8,19 +8,12 @@ configuration.
 ## Dependencies
 
 - [cmd/ploy/dependencies.go](../../cmd/ploy/dependencies.go) — runtime factories
-  resolving Grid, JetStream, and IPFS endpoints.
+  resolving control-plane, JetStream, and IPFS endpoints.
 - [cmd/ploy/feature_flags.go](../../cmd/ploy/feature_flags.go) — feature flag
   inspection for the Aster integration.
 
 ## CLI
 
-- `PLOY_GRID_ID` — Optional legacy Grid identifier. Provide only when running
-  against the legacy Grid stack; the SSH-descriptor workflow does not require
-  it.
-- `GRID_BEACON_API_KEY` / `GRID_BEACON_URL` — Legacy beacon credentials used
-  when talking to the Grid control plane. Unset for the SSH-only workflow.
-- `GRID_CLIENT_STATE_DIR` / `GRID_WORKFLOW_SDK_STATE_DIR` — Legacy overrides for
-  the Grid client's state directory.
 - `PLOY_RUNTIME_ADAPTER` — Optional runtime adapter selector. Defaults to
   `local-step`. Other adapters (`grid`, `k8s`, `nomad`) plug in here; the CLI
   fails fast when an unknown adapter name is provided.
@@ -46,6 +39,10 @@ configuration.
 - `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
+- `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used by the workstation-only snapshot
+  tooling to upload artifacts when present. Not required on nodes (they use IPFS Cluster directly).
+- `PLOY_JETSTREAM_URL` — Optional NATS JetStream route used by the snapshot tooling to publish
+  artifact metadata envelopes. When unset, metadata is not published.
 - `PLOY_SHIFT_BINARY` — Optional path override for the SHIFT CLI invoked by worker lifecycle health checks
   (`shift --version`). Defaults to `shift` when unset.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
@@ -66,8 +63,7 @@ configuration.
 - `PLOY_SSH_SOCKET_DIR` — Override for the directory holding SSH control sockets (default `~/.ploy/tunnels`).
 - `PLOY_CACHE_HOME` — Optional base directory for CLI cache artifacts such as tunnel node assignments.
 - `PLOY_ARTIFACT_ROOT` — Optional override for the local artifact cache used by the step workspace hydrator and filesystem artifact publisher. Defaults to `$XDG_CACHE_HOME/ploy/artifacts` (or the OS cache dir fallback) when unset.
-- `PLOY_SCHEDULER_MODE` — Selects the control-plane backend (`grid` or `etcd`). Defaults to `grid`
-  until the CLI flips to the new scheduler by default.
+  
 
 ## Worker Nodes
 
@@ -79,7 +75,7 @@ configuration.
 
 ## E2E Harness
 
-- `ploy mod run` executes Mods end-to-end against Grid; no tenant variable is required.
+- `ploy mod run` executes Mods against the Ploy control plane; no tenant variable is required.
 - `PLOY_E2E_TICKET_PREFIX` — Optional ticket ID prefix for Mods E2E runs
   (default `e2e`).
 - `PLOY_E2E_REPO_OVERRIDE` — Optional Git repository override used by the Mods
@@ -89,11 +85,7 @@ configuration.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
   live Grid smoke test should execute (defaults to `simple-openrewrite`).
 
-## Grid (legacy service)
-
-- No additional environment variables are managed inside this repository
-  slice; the legacy Grid client discovers settings via `sdk/gridclient/go`
-  using `PLOY_GRID_ID` plus the optional beacon credentials above.
+ 
 
 ## gapi
 
