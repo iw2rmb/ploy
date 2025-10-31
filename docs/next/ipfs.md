@@ -46,13 +46,18 @@ The CLI routes artifact management commands to the cluster client:
   which peers report lagging pins. Combine with cluster daemon logs to isolate
   connectivity or disk pressure problems.
 
-## SSH Transfer Workflow
+## Transfer Workflow (HTTPS preferred)
 
-Artifact uploads no longer hit the IPFS Cluster API directly from the workstation. Instead, the CLI
-requests a short-lived slot (`POST /v1/transfers/upload`), copies the payload over the existing SSH
-ControlMaster socket (`ploy upload --job-id <id> <path>`), and commits the slot so the control plane
-can ingest the bytes into IPFS Cluster. Downloads follow the same pattern with
-`POST /v1/transfers/download` and `ploy report --job-id <id> --output <path>`.
+When the workstation descriptor contains `api_endpoints` and a `ca_bundle`, the CLI uses HTTPS
+endpoints by default:
+
+- Upload: `POST /v2/artifacts/upload` (`ploy upload`)
+- Download: `GET /v2/artifacts/{id}?download=true` (`ploy report`)
+
+For environments that have not switched to HTTPS yet, the legacy SSH slots remain available:
+
+- Upload slot: `POST /v1/transfers/upload` (payload copied over ControlMaster SSH)
+- Download slot: `POST /v1/transfers/download`
 
 - Slots are scoped to a job/stage and resolve to a node ID plus `remote_path`
   (`/slots/<slot-id>/payload`). The control plane also records the absolute `local_path`

@@ -14,7 +14,7 @@
 **Build + Publish Mods Images (via CLI)**
 
 - Build Docker contexts under `docker/mods/...` locally (requires Docker):
-  - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mods-openrewrite`
+  - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-openrewrite`
   - Repeat for `mods-llm`, `mods-plan`, `mods-human`.
 - Export each image to OCI layout and push via the Ploy CLI `registry` group:
   - Example roundtrip test that does not depend on Docker: `tests/registry/registry-roundtrip.sh` builds a minimal OCI image from scratch, pushes via CLI, fetches, and deletes it.
