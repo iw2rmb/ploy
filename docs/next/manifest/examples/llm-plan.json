@@ -13,7 +13,7 @@
     "data": []
   },
   "runtime": {
-  "image": "registry.dev/ploy/mods-llm:latest",
+  "image": "registry.<cluster-id>.ploy/ploy/mods-llm:latest",
   "command": ["mods-llm"],
   "args": ["--plan", "--input", "/workspace", "--out", "/out/plan.json"],
   "env": { "OPENAI_API_KEY": "${OPENAI_API_KEY}" },

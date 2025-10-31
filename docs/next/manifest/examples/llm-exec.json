@@ -17,7 +17,7 @@
     ]
   },
   "runtime": {
-  "image": "registry.dev/ploy/mods-llm:latest",
+  "image": "registry.<cluster-id>.ploy/ploy/mods-llm:latest",
   "command": ["mods-llm"],
   "args": ["--execute", "--workspace", "/workspace", "--plan", "/in/plan.json", "--out", "/out"],
     "env": {},
