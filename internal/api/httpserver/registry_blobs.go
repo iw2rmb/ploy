@@ -63,39 +63,63 @@ func (s *controlPlaneServer) handleRegistryUploadStart(w http.ResponseWriter, r 
 		status = http.StatusForbidden
 		return
 	}
-	manager := s.transfers
-	if manager == nil {
-		status = http.StatusServiceUnavailable
-		writeErrorMessage(w, status, "transfer manager unavailable")
-		return
-	}
-	var payload registryUploadRequest
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && err != io.EOF {
-		status = http.StatusBadRequest
-		writeErrorMessage(w, status, "invalid upload payload")
-		return
-	}
-	nodeID := strings.TrimSpace(payload.NodeID)
-	if nodeID == "" {
-		nodeID = "registry"
-	}
-	jobID := fmt.Sprintf("registry:%s", repo)
-	slot, err := manager.CreateUploadSlot(transfers.KindRegistryBlob, jobID, repo, nodeID, payload.Size)
-	if err != nil {
-		status = http.StatusBadRequest
-		writeError(w, status, err)
-		return
-	}
-	location := fmt.Sprintf("/v1/registry/%s/blobs/uploads/%s", repo, slot.ID)
-	w.Header().Set("Location", location)
-	status = http.StatusAccepted
-	writeJSON(w, status, map[string]any{
-		"upload_id":   slot.ID,
-		"slot_id":     slot.ID,
-		"remote_path": slot.RemotePath,
-		"node_id":     slot.NodeID,
-		"location":    location,
-	})
+
+    // Fast-path: accept entire blob in one call when digest query is provided or octet-stream payload is present.
+    digest := strings.TrimSpace(r.URL.Query().Get("digest"))
+    if ct := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))); ct == "application/octet-stream" || isDigest(digest) {
+        if !isDigest(digest) {
+            // Compute digest if not provided
+            data, err := io.ReadAll(r.Body)
+            if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
+            sum := workflowartifacts.SHA256Bytes(data)
+            digest = "sha256:" + sum
+            r.Body = io.NopCloser(strings.NewReader(string(data)))
+        }
+        payload, err := io.ReadAll(r.Body)
+        if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
+        if len(payload) == 0 { status = http.StatusBadRequest; writeErrorMessage(w, status, "empty blob payload"); return }
+        // Publish as artifact then register blob
+        publisher := s.artifactPublisher
+        store := s.registryStore
+        if publisher == nil || store == nil { status = http.StatusServiceUnavailable; writeErrorMessage(w, status, "registry unavailable"); return }
+        addResp, err := publisher.Add(r.Context(), workflowartifacts.AddRequest{Name: fmt.Sprintf("blob-%s", strings.ReplaceAll(digest, ":", "-")), Payload: payload})
+        if err != nil { status = http.StatusBadGateway; writeError(w, status, err); return }
+        media := strings.TrimSpace(r.Header.Get("Docker-Upload-Media-Type"))
+        if media == "" { media = strings.TrimSpace(r.Header.Get("Content-Type")) }
+        if media == "" { media = "application/octet-stream" }
+        doc := registry.BlobDocument{Repo: repo, Digest: digest, MediaType: media, Size: int64(len(payload)), CID: addResp.CID, Status: registry.BlobStatusAvailable}
+        stored, err := store.PutBlob(r.Context(), doc)
+        if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
+        location := fmt.Sprintf("/v1/registry/%s/blobs/%s", repo, stored.Digest)
+        w.Header().Set("Location", location)
+        w.Header().Set("Docker-Content-Digest", stored.Digest)
+        status = http.StatusCreated
+        writeJSON(w, status, map[string]any{"digest": stored.Digest, "cid": stored.CID, "location": location})
+        return
+    }
+
+    // Legacy: allocate SSH transfer slot for staging
+    manager := s.transfers
+    if manager == nil {
+        status = http.StatusServiceUnavailable
+        writeErrorMessage(w, status, "transfer manager unavailable")
+        return
+    }
+    var payload registryUploadRequest
+    if err := json.NewDecoder(r.Body).Decode(&payload); err != nil && err != io.EOF {
+        status = http.StatusBadRequest
+        writeErrorMessage(w, status, "invalid upload payload")
+        return
+    }
+    nodeID := strings.TrimSpace(payload.NodeID)
+    if nodeID == "" { nodeID = "registry" }
+    jobID := fmt.Sprintf("registry:%s", repo)
+    slot, err := manager.CreateUploadSlot(transfers.KindRegistryBlob, jobID, repo, nodeID, payload.Size)
+    if err != nil { status = http.StatusBadRequest; writeError(w, status, err); return }
+    location := fmt.Sprintf("/v1/registry/%s/blobs/uploads/%s", repo, slot.ID)
+    w.Header().Set("Location", location)
+    status = http.StatusAccepted
+    writeJSON(w, status, map[string]any{"upload_id": slot.ID, "slot_id": slot.ID, "remote_path": slot.RemotePath, "node_id": slot.NodeID, "location": location})
 }
 
 // handleRegistryUploadSession updates upload progress or finalizes a blob upload session.
