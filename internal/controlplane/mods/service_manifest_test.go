@@ -64,7 +64,7 @@ func TestServiceSynthesizesPlanManifest(t *testing.T) {
     if manifest.ID != modplan.StageNamePlan {
         t.Fatalf("unexpected manifest id: %s", manifest.ID)
     }
-    if manifest.Image != "ghcr.io/ploy/mods/plan:latest" {
+    if manifest.Image != "docker.io/iw2rmb/mods-plan:latest" {
         t.Fatalf("unexpected manifest image: %s", manifest.Image)
     }
     if len(manifest.Inputs) == 0 {

@@ -51,6 +51,9 @@ configuration.
   `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
 - `MODS_IMAGE_PREFIX` — Optional absolute image prefix (e.g., `docker.io/org` or `ghcr.io/org`).
   Takes effect only when `DOCKERHUB_USERNAME` is unset.
+- `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
+  plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
+  worker nodes via a systemd drop-in to make it available cluster-wide.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.

@@ -36,6 +36,7 @@ func executeModRun(args []string, stderr io.Writer) error {
     repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
     repoWorkspace := fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
     follow := fs.Bool("follow", false, "follow ticket events until completion")
+    capDuration := fs.Duration("cap", 0, "optional overall time cap for --follow; cancels the Mods ticket when exceeded (e.g., 5m)")
     artifactDir := fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
     maxRetries := fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
     retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
@@ -105,9 +106,15 @@ func executeModRun(args []string, stderr io.Writer) error {
     _, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.TicketID, summary.State)
 
     if *follow {
+        followCtx := ctx
+        var cancel context.CancelFunc
+        if *capDuration > 0 {
+            followCtx, cancel = context.WithTimeout(ctx, *capDuration)
+            defer cancel()
+        }
         ev := mods.EventsCommand{
             Client: stream.Client{
-                HTTPClient:   httpClient,
+                HTTPClient:   cloneForStream(httpClient),
                 MaxRetries:   *maxRetries,
                 RetryBackoff: *retryWait,
             },
@@ -115,8 +122,13 @@ func executeModRun(args []string, stderr io.Writer) error {
             Ticket:  summary.TicketID,
             Output:  stderr,
         }
-        final, err := ev.Run(ctx)
+        final, err := ev.Run(followCtx)
         if err != nil {
+            if *capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+                _, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
+                _ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: summary.TicketID, Reason: "cap exceeded", Output: stderr}.Run(context.Background())
+                return fmt.Errorf("mod run capped after %s", (*capDuration).String())
+            }
             return err
         }
         _, _ = fmt.Fprintf(stderr, "Final state: %s\n", strings.ToLower(string(final)))
@@ -133,7 +145,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-    _, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--follow] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
+    _, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
 }
 
 func defaultStageDefinitions() []modsapi.StageDefinition {

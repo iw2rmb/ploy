@@ -37,7 +37,7 @@ manifest to materialize inputs, run the container, and capture outcomes.
       - `{ name: string, cid: string, media_type?: string }` (content by CID), or
       - `{ name: string, inline: { json?: any, text?: string }, media_type?: string }`.
 - `runtime` (object):
-  - `image` (string): container image (e.g., `ghcr.io/org/image:tag`).
+  - `image` (string): container image (e.g., `docker.io/org/image:tag`).
   - `command` (array[string]): executable and args (preferred), or use `entrypoint` + `args`.
   - `args` (array[string], optional): additional arguments.
   - `env` (object, optional): map of `KEY: "VALUE"`.

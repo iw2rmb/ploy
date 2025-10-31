@@ -169,11 +169,19 @@ func (StaticJobComposer) Compose(ctx context.Context, req JobComposeRequest) (St
 	if lane == "" {
 		return StageJobSpec{}, fmt.Errorf("stage lane is required")
 	}
-	template, ok := jobTemplates[lane]
-	if !ok {
-		return StageJobSpec{}, fmt.Errorf("no job template registered for lane %q", lane)
-	}
-	return cloneJobTemplate(template.Spec), nil
+    template, ok := jobTemplates[lane]
+    if !ok {
+        return StageJobSpec{}, fmt.Errorf("no job template registered for lane %q", lane)
+    }
+    spec := cloneJobTemplate(template.Spec)
+    // Inject OPENAI_API_KEY for LLM lanes when present at compose time.
+    if lane == "mods-llm" {
+        if key := strings.TrimSpace(os.Getenv("PLOY_OPENAI_API_KEY")); key != "" {
+            if spec.Env == nil { spec.Env = map[string]string{} }
+            spec.Env["OPENAI_API_KEY"] = key
+        }
+    }
+    return spec, nil
 }
 
 func cloneJobTemplate(spec StageJobSpec) StageJobSpec {

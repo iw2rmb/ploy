@@ -1,16 +1,17 @@
 package mods
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
-	"sync"
-	"time"
+    "context"
+    "encoding/json"
+    "fmt"
+    "strings"
+    "sync"
+    "time"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
-	modplan "github.com/iw2rmb/ploy/internal/mods/plan"
-	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+    clientv3 "go.etcd.io/etcd/client/v3"
+    modplan "github.com/iw2rmb/ploy/internal/mods/plan"
+    "github.com/iw2rmb/ploy/internal/workflow/contracts"
+    "os"
 )
 
 // StageJobSubmitter defines scheduler interactions required by the orchestrator.
@@ -290,7 +291,7 @@ func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, d
     manifest := contracts.StepManifest{
         ID:    modplan.StageNamePlan,
         Name:  "Mods Plan",
-        Image: "ghcr.io/ploy/mods/plan:latest",
+        Image: dockerImageRef("mods-plan"),
         Command: []string{"mods-plan"},
         Args:    []string{"--run"},
         Env:     map[string]string{"MODS_PLAN_CACHE": "/workspace/cache"},
@@ -334,6 +335,21 @@ func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, d
     }
     def.Metadata[metadataInputNameKey] = defaultHydrationInput
     return &def, nil
+}
+// dockerImageRef builds the fully-qualified image reference for a Mods image name
+// using Docker Hub by default. It mirrors the precedence used by runner templates:
+//  1) DOCKERHUB_USERNAME -> docker.io/$DOCKERHUB_USERNAME
+//  2) MODS_IMAGE_PREFIX  -> absolute prefix (e.g., docker.io/org or ghcr.io/org)
+//  3) fallback           -> docker.io/iw2rmb
+func dockerImageRef(name string) string {
+    ns := strings.TrimSpace(os.Getenv("DOCKERHUB_USERNAME"))
+    if ns != "" {
+        return "docker.io/" + ns + "/" + name + ":latest"
+    }
+    if p := strings.TrimSpace(os.Getenv("MODS_IMAGE_PREFIX")); p != "" {
+        return p + "/" + name + ":latest"
+    }
+    return "docker.io/iw2rmb/" + name + ":latest"
 }
 // prepareStageHydration removed.
 
