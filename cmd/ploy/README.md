@@ -15,7 +15,7 @@ ploy mod run \
   [--ticket <ticket-id>|--ticket auto] \
   [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
    --repo-workspace-hint <dir>] \
-  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] \
+  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] \
   [--aster <toggle,...>] \
   [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
@@ -40,7 +40,8 @@ compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
-flow into stage metadata so the control plane can respect concurrency/timebox controls. When
+flow into stage metadata so the control plane can respect concurrency/timebox controls. `--cap` enforces an overall
+time limit for `--follow`; if exceeded, the CLI requests cancellation of the Mods ticket and exits with an error. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests. When
@@ -94,6 +95,8 @@ required environment variables, and operational limits (slot TTL, digest verific
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
+- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI
+  cancels the Mods ticket and exits (e.g., `--cap 5m`).
 
 ## Exit Codes
 

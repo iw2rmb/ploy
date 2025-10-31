@@ -67,17 +67,17 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	cmd := mods.LogsCommand{
-		Ticket: ticket,
-		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
-		Output: stderr,
-		Client: stream.Client{
-			HTTPClient:   httpClient,
-			MaxRetries:   *maxRetries,
-			RetryBackoff: *retryWait,
-		},
-		BaseURL: base,
-	}
+    cmd := mods.LogsCommand{
+        Ticket: ticket,
+        Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
+        Output: stderr,
+        Client: stream.Client{
+            HTTPClient:   cloneForStream(httpClient),
+            MaxRetries:   *maxRetries,
+            RetryBackoff: *retryWait,
+        },
+        BaseURL: base,
+    }
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, mods.ErrInvalidFormat) {
 			printModsUsage(stderr)
@@ -143,17 +143,17 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
 		return err
 	}
 
-	cmd := jobs.FollowCommand{
-		JobID:  jobID,
-		Format: jobs.Format(strings.ToLower(strings.TrimSpace(*format))),
-		Output: stderr,
-		Client: stream.Client{
-			HTTPClient:   httpClient,
-			MaxRetries:   *maxRetries,
-			RetryBackoff: *retryWait,
-		},
-		BaseURL: base,
-	}
+    cmd := jobs.FollowCommand{
+        JobID:  jobID,
+        Format: jobs.Format(strings.ToLower(strings.TrimSpace(*format))),
+        Output: stderr,
+        Client: stream.Client{
+            HTTPClient:   cloneForStream(httpClient),
+            MaxRetries:   *maxRetries,
+            RetryBackoff: *retryWait,
+        },
+        BaseURL: base,
+    }
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, jobs.ErrInvalidFormat) {
 			printJobsUsage(stderr)
