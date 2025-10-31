@@ -70,6 +70,16 @@ and resilience.
 - `GET /v1/status?cluster_id=<id>` for queue depth and node readiness (no-store).
   - `GET /v1/version` for build metadata (cache up to 60s).
 
+## Transfers: HTTPS Preferred (SSH Back-Compat)
+
+For workstation uploads/downloads, prefer the HTTPS v2 endpoints:
+
+- Upload: `POST /v2/artifacts/upload` (used by `ploy upload` when the descriptor has `api_endpoints` and a CA bundle).
+- Download: `GET /v2/artifacts/{id}?download=true` (used by `ploy report`).
+
+Keep SSH slots available during migration; the legacy subsystem is documented below for environments
+that have not yet switched to HTTPS.
+
 ## SSH Artifact Subsystem
 
 The `/v1/transfers/*` APIs rely on an SFTP subsystem on each control‑plane node.
