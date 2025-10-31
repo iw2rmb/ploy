@@ -109,6 +109,30 @@ func (c Client) CommitUpload(ctx context.Context, repo, uploadID, digest string,
     return out, nil
 }
 
+// UploadBlob performs a single-shot HTTPS upload of a registry blob using an octet-stream body.
+// It targets the v2 alias: POST /v2/<repo>/blobs/uploads?digest=sha256:...
+func (c Client) UploadBlob(ctx context.Context, repo, digest, mediaType string, body io.Reader) (BlobCommitResponse, error) {
+    var out BlobCommitResponse
+    endpoint := c.joinPath("v2", strings.TrimPrefix(repo, "/"), "blobs", "uploads")
+    u, err := url.Parse(endpoint)
+    if err != nil { return out, err }
+    q := u.Query(); if strings.TrimSpace(digest) != "" { q.Set("digest", strings.TrimSpace(digest)) }
+    u.RawQuery = q.Encode()
+    req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), body)
+    if err != nil { return out, err }
+    ct := strings.TrimSpace(mediaType); if ct == "" { ct = "application/octet-stream" }
+    req.Header.Set("Content-Type", ct)
+    resp, err := c.HTTPClient.Do(req)
+    if err != nil { return out, err }
+    defer resp.Body.Close()
+    if resp.StatusCode != http.StatusCreated {
+        data, _ := io.ReadAll(resp.Body)
+        return out, fmt.Errorf("upload blob: %s", strings.TrimSpace(string(data)))
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&out); err != nil { return out, err }
+    return out, nil
+}
+
 func (c Client) GetBlob(ctx context.Context, repo, digest string) ([]byte, error) {
     endpoint := c.joinPath("v1", "registry", strings.TrimPrefix(repo, "/"), "blobs", strings.TrimSpace(digest))
     req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -203,4 +227,3 @@ func (c Client) joinPath(parts ...string) string {
     ref := &url.URL{Path: path.Join(parts...)}
     return c.BaseURL.ResolveReference(ref).String()
 }
-
