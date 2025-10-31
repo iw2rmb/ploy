@@ -1,0 +1,6 @@
+{
+  "success": true,
+  "recipe": "org.openrewrite.java.migrate.UpgradeToJava17",
+  "coords": "org.openrewrite.recipe:rewrite-migrate-java:3.17.0"
+}
+

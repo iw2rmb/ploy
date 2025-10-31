@@ -15,7 +15,7 @@ ploy mod run \
   [--ticket <ticket-id>|--ticket auto] \
   [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
    --repo-workspace-hint <dir>] \
-  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] \
+  [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap] \
   [--aster <toggle,...>] \
   [--aster-step <stage=toggle,...|stage=off>]
 ploy environment materialize <commit-sha> --app <app> \
@@ -41,7 +41,7 @@ publishes checkpoints for every stage transition (including lane cache keys),
 executes mods/build/test against a temporary workspace, and cleans up before
 exit. Mods planner hints (`--mods-plan-timeout`, `--mods-max-parallel`)
 flow into stage metadata so the control plane can respect concurrency/timebox controls. `--cap` enforces an overall
-time limit for `--follow`; if exceeded, the CLI requests cancellation of the Mods ticket and exits with an error. When
+time limit for `--follow`. If exceeded, the CLI exits the follow; add `--cancel-on-cap` to also cancel the ticket. When
 build-gate fails with a retryable outcome the runner collects the failure
 metadata, re-plans a healing branch using the Mods planner, and appends `#healN`
 stages before continuing to static checks and tests. When
@@ -97,8 +97,7 @@ required environment variables, and operational limits (slot TTL, digest verific
   planner (`mod run`).
 - Streaming guards (long-lived SSE):
   - `mods logs` and `jobs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
-- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI
-  cancels the Mods ticket and exits (e.g., `--cap 5m`).
+- `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Exit Codes
 

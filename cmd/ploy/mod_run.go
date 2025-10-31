@@ -36,7 +36,8 @@ func executeModRun(args []string, stderr io.Writer) error {
     repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
     repoWorkspace := fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
     follow := fs.Bool("follow", false, "follow ticket events until completion")
-    capDuration := fs.Duration("cap", 0, "optional overall time cap for --follow; cancels the Mods ticket when exceeded (e.g., 5m)")
+    capDuration := fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
+    cancelOnCap := fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the ticket if the cap is exceeded")
     artifactDir := fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
     maxRetries := fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
     retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
@@ -125,9 +126,13 @@ func executeModRun(args []string, stderr io.Writer) error {
         final, err := ev.Run(followCtx)
         if err != nil {
             if *capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-                _, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
-                _ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: summary.TicketID, Reason: "cap exceeded", Output: stderr}.Run(context.Background())
-                return fmt.Errorf("mod run capped after %s", (*capDuration).String())
+                if *cancelOnCap {
+                    _, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
+                    _ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: summary.TicketID, Reason: "cap exceeded", Output: stderr}.Run(context.Background())
+                } else {
+                    _, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", (*capDuration).String(), summary.TicketID)
+                }
+                return nil
             }
             return err
         }

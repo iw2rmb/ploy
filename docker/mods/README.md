@@ -4,7 +4,7 @@ Mods Image Contexts
   - `mod-orw` — OpenRewrite apply (Maven) wrapper; entrypoint script `mods-orw`.
   - `mod-llm` — Deterministic E2E planner/executor stub; fixes the known compile error in the sample repo when present.
   - `mod-plan` — Lightweight planner stub to exercise planner integration during E2E.
-  - `mod-human` — Human-in-the-loop gate stub that auto-approves.
+  - (Human gate image removed for now.)
 
 Build and publish (Docker Hub)
 - Use: `scripts/push-mods-via-cli.sh` to iterate all subdirectories and `docker buildx build --push` images as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.

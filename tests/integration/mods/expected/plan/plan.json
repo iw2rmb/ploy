@@ -1,0 +1,6 @@
+{
+  "selected_recipes": [
+    "org.openrewrite.java.migrate.UpgradeToJava17"
+  ]
+}
+

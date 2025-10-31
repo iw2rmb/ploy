@@ -9,7 +9,7 @@ We migrated Mods image publishing and pulls from the in‑cluster OCI registry t
 - docker.io/<org>/mods-plan:latest
 - docker.io/<org>/mods-llm:latest
 - docker.io/<org>/mods-openrewrite:latest
-- docker.io/<org>/mods-human:latest
+  (Human gate image removed for now.)
 
 Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can override fully; fallback is docker.io/iw2rmb.
 
@@ -25,6 +25,8 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 - Published Mods images to docker.io/iwtormb and pre-pulled them on all lab nodes.
 - Fixed worker env:
   - Ensured PLOY_IPFS_CLUSTER_API via systemd drop‑in on all three nodes; ployd active.
+- Auto-MR publishing:
+  - Control plane now creates a GitLab branch and merge request using the ORW diff bundle once all Mods stages succeed. Uses `PLOY_GITLAB_PAT` via the signer config, commits files to the `repo_target_ref` branch (creating it off `repo_base_ref` if needed), and opens an MR.
 
 ## Current Issues / Findings
 
@@ -72,6 +74,7 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 
 5) Rebuild + roll ployd; re‑run Mods smoke and verify images pull from Docker Hub and plan proceeds past hydration.
    - Smoke attempt ran under `--cap 5m` and was automatically cancelled on timeout after 5 minutes. Docker Hub pulls were verified separately on all nodes.
+   - Next: run with a higher cap (e.g., `--cap 20m`) or without `--follow`, and confirm an MR is created on success. Use `mods logs --timeout` if needed to avoid hanging tails.
 
 ## Execution Log (this slice)
 
@@ -82,6 +85,8 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 - Injected OPENAI_API_KEY for mods-llm at compose time.
 - Added script to publish PLOY_OPENAI_API_KEY to nodes.
 - Added `--cap` to `ploy mod run` to enforce an overall time limit and cancel the ticket on timeout.
+ - Added symlink aliases in Mods images (mods-*/mod-* parity) and a self-test fast path for mods-openrewrite.
+ - Wrote Docker-based integration tests to validate Mods images locally and measure execution time: `tests/integration/mods/mods_images_test.go` (passes; total ~4s on this host).
 
 ## Next
 

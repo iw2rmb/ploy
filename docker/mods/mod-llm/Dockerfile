@@ -11,4 +11,5 @@ RUN apk add --no-cache bash coreutils jq
 WORKDIR /workspace
 
 COPY mod-llm.sh /usr/local/bin/mod-llm
-RUN chmod +x /usr/local/bin/mod-llm
+RUN chmod +x /usr/local/bin/mod-llm \
+ && ln -s /usr/local/bin/mod-llm /usr/local/bin/mods-llm

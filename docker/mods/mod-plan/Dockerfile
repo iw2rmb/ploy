@@ -11,4 +11,5 @@ RUN apk add --no-cache bash jq
 WORKDIR /workspace
 
 COPY mod-plan.sh /usr/local/bin/mod-plan
-RUN chmod +x /usr/local/bin/mod-plan
+RUN chmod +x /usr/local/bin/mod-plan \
+ && ln -s /usr/local/bin/mod-plan /usr/local/bin/mods-plan
