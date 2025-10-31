@@ -15,7 +15,7 @@
 
 - Build Docker contexts under `docker/mods/...` locally (requires Docker):
   - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-orw`
-  - Repeat for `mods-llm`, `mods-plan`, `mods-human` (contexts: `mod-llm`, `mod-plan`, `mod-human`).
+- Repeat for `mods-llm` and `mods-plan` (contexts: `mod-llm`, `mod-plan`).
 - Push to Docker Hub using the helper script:
   - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/push-mods-via-cli.sh`
   - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.

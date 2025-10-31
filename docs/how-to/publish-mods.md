@@ -5,7 +5,7 @@ Overview
   - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`
-  - `mod-human` — Human gate stub → `mods-human`
+  - (Human gate image removed for now.)
 - The runner pulls images from Docker Hub by default: `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 
 Prerequisites

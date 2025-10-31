@@ -32,6 +32,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "${MODS_SELF_TEST:-}" == "1" ]]; then
+  echo "[mod-orw] Self-test mode: writing success report to $outdir"
+  mkdir -p "$outdir"
+  echo '{"success":true,"self_test":true}' > "$outdir/report.json"
+  exit 0
+fi
+
 if [[ -z "$action" || -z "$recipe_json" || -z "$workspace" ]]; then
   echo "error: required flags missing" >&2
   usage >&2
