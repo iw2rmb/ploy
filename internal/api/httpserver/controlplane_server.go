@@ -218,6 +218,10 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
 	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, "", "/v1/artifacts/", h.handleArtifactsSubpath)
+    // v2 artifacts (HTTPS direct uploads): alias v2 to v1 handlers during migration.
+    h.registerRoute(mux, http.MethodPost, "/v2/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
+    h.registerRoute(mux, http.MethodGet, "/v2/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
+    h.registerRoute(mux, "", "/v2/artifacts/", h.handleArtifactsSubpath)
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)

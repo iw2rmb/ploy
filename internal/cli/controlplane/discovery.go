@@ -42,9 +42,9 @@ type Options struct {
 
 // Target captures the resolved control-plane endpoint and backing descriptor metadata.
 type Target struct {
-	ClusterID  string
-	BaseURL    *url.URL
-	Descriptor *config.Descriptor
+    ClusterID  string
+    BaseURL    *url.URL
+    Descriptor *config.Descriptor
 }
 
 // ResolveTarget selects the control-plane endpoint according to the supplied options,
@@ -103,19 +103,30 @@ func ResolveTarget(ctx context.Context, opts Options) (Target, error) {
 
 // ResolveHTTP returns a configured HTTP client plus the base URL for control-plane requests.
 func ResolveHTTP(ctx context.Context, opts Options) (*url.URL, *http.Client, error) {
-	target, err := ResolveTarget(ctx, opts)
-	if err != nil {
-		return nil, nil, err
-	}
-	client, err := newHTTPClient(target)
-	if err != nil {
-		return nil, nil, err
-	}
-	return target.BaseURL, client, nil
+    target, err := ResolveTarget(ctx, opts)
+    if err != nil {
+        return nil, nil, err
+    }
+    client, err := newHTTPClient(target)
+    if err != nil {
+        return nil, nil, err
+    }
+    return target.BaseURL, client, nil
 }
 
 // BaseURLFromDescriptor derives the HTTPS endpoint from the provided descriptor metadata.
 func BaseURLFromDescriptor(desc config.Descriptor) (string, error) {
+    // Prefer explicit HTTPS endpoints if provided.
+    if len(desc.APIEndpoints) > 0 {
+        trimmed := strings.TrimSpace(desc.APIEndpoints[0])
+        if trimmed == "" {
+            return "", errors.New("descriptor api_endpoints contains empty entry")
+        }
+        if !strings.Contains(trimmed, "://") {
+            trimmed = "https://" + trimmed
+        }
+        return trimmed, nil
+    }
 	addr := strings.TrimSpace(desc.Address)
 	if addr == "" {
 		return "", errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
@@ -164,26 +175,77 @@ func newHTTPClient(target Target) (*http.Client, error) {
             transport.TLSClientConfig.RootCAs = pool
         }
     }
-    // Guard: if callers point the base URL at a loopback host (e.g., https://127.0.0.1:9443)
-    // while tunneling to a remote node, set SNI/verification ServerName to the descriptor's
-    // address so strict TLS verification still succeeds against the remote certificate.
-    if isLoopbackHost(target.BaseURL.Hostname()) && target.Descriptor != nil {
+    // Prefer explicit ServerName when provided.
+    if target.Descriptor != nil && strings.TrimSpace(target.Descriptor.APIServerName) != "" {
+        transport.TLSClientConfig.ServerName = strings.TrimSpace(target.Descriptor.APIServerName)
+    } else if isLoopbackHost(target.BaseURL.Hostname()) && target.Descriptor != nil {
+        // Guard: loopback host while reaching a remote certificate
         host := strings.TrimSpace(target.Descriptor.Address)
         if host != "" {
             transport.TLSClientConfig.ServerName = host
         }
     }
     client := &http.Client{Timeout: defaultHTTPTimeout, Transport: transport}
-    useTunnel, err := configureTunnels(target)
-    if err != nil {
-        return nil, err
+    // When APIEndpoints are provided or DisableSSH is true, skip SSH tunnels entirely.
+    if target.Descriptor == nil || (len(target.Descriptor.APIEndpoints) == 0 && !target.Descriptor.DisableSSH) {
+        useTunnel, err := configureTunnels(target)
+        if err != nil {
+            return nil, err
+        }
+        if useTunnel {
+            if err := attachHTTPClient(client); err != nil {
+                return nil, err
+            }
+        }
     }
-	if useTunnel {
-		if err := attachHTTPClient(client); err != nil {
-			return nil, err
-		}
-	}
-	return client, nil
+    // Multi-endpoint failover transport: if descriptor lists multiple endpoints, try them in order
+    // on network error or 502/503/504.
+    if target.Descriptor != nil && len(target.Descriptor.APIEndpoints) > 0 {
+        eps := make([]*url.URL, 0, len(target.Descriptor.APIEndpoints))
+        for _, raw := range target.Descriptor.APIEndpoints {
+            if u, err := url.Parse(strings.TrimSpace(raw)); err == nil && u.Host != "" {
+                if u.Scheme == "" { u.Scheme = target.BaseURL.Scheme }
+                eps = append(eps, u)
+            }
+        }
+        if len(eps) > 0 {
+            client.Transport = &multiEndpointTransport{endpoints: eps, base: client.Transport, retryStatuses: map[int]struct{}{502:{},503:{},504:{}}, serverName: transport.TLSClientConfig.ServerName}
+            // pin BaseURL to first endpoint to keep command path composition consistent
+            target.BaseURL = eps[0]
+        }
+    }
+    return client, nil
+}
+
+type multiEndpointTransport struct {
+    endpoints    []*url.URL
+    base         http.RoundTripper
+    retryStatuses map[int]struct{}
+    serverName   string
+}
+
+func (m *multiEndpointTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+    var lastErr error
+    for i, ep := range m.endpoints {
+        clone := req.Clone(req.Context())
+        u := *clone.URL
+        u.Scheme = ep.Scheme
+        u.Host = ep.Host
+        clone.URL = &u
+        // Attempt
+        resp, err := m.base.RoundTrip(clone)
+        if err != nil {
+            lastErr = err
+            continue
+        }
+        if _, retry := m.retryStatuses[resp.StatusCode]; retry && i+1 < len(m.endpoints) {
+            // Drain and try next endpoint
+            _ = resp.Body.Close()
+            continue
+        }
+        return resp, nil
+    }
+    return nil, lastErr
 }
 
 func configureTunnels(target Target) (bool, error) {

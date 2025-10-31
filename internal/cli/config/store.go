@@ -14,23 +14,33 @@ import (
 
 // Descriptor captures the SSH metadata required to establish tunnels to a cluster.
 type Descriptor struct {
-	ClusterID       string            `json:"cluster_id"`
-	Address         string            `json:"address"`
-	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Scheme          string            `json:"scheme,omitempty"`
-	CABundle        string            `json:"ca_bundle,omitempty"`
+    ClusterID       string            `json:"cluster_id"`
+    Address         string            `json:"address"`
+    SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
+    Labels          map[string]string `json:"labels,omitempty"`
+    Scheme          string            `json:"scheme,omitempty"`
+    CABundle        string            `json:"ca_bundle,omitempty"`
+
+    // HTTPS-first fields (optional): when present, the CLI prefers direct HTTPS without SSH tunnels.
+    APIEndpoints  []string          `json:"api_endpoints,omitempty"`
+    APIServerName string            `json:"api_server_name,omitempty"`
+    RegistryHost  string            `json:"registry_host,omitempty"`
+    DisableSSH    bool              `json:"disable_ssh,omitempty"`
 
 	Default bool `json:"-"`
 }
 
 type descriptorFile struct {
-	ClusterID       string            `json:"cluster_id"`
-	Address         string            `json:"address"`
-	SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Scheme          string            `json:"scheme,omitempty"`
-	CABundle        string            `json:"ca_bundle,omitempty"`
+    ClusterID       string            `json:"cluster_id"`
+    Address         string            `json:"address"`
+    SSHIdentityPath string            `json:"ssh_identity_path,omitempty"`
+    Labels          map[string]string `json:"labels,omitempty"`
+    Scheme          string            `json:"scheme,omitempty"`
+    CABundle        string            `json:"ca_bundle,omitempty"`
+    APIEndpoints    []string          `json:"api_endpoints,omitempty"`
+    APIServerName   string            `json:"api_server_name,omitempty"`
+    RegistryHost    string            `json:"registry_host,omitempty"`
+    DisableSSH      bool              `json:"disable_ssh,omitempty"`
 }
 
 type legacyDescriptorFile struct {
@@ -226,14 +236,18 @@ func descriptorPath(id string) (string, error) {
 }
 
 func writeDescriptorFile(path string, desc Descriptor) error {
-	payload := descriptorFile{
-		ClusterID:       desc.ClusterID,
-		Address:         desc.Address,
-		SSHIdentityPath: desc.SSHIdentityPath,
-		Labels:          nil,
-		Scheme:          desc.Scheme,
-		CABundle:        desc.CABundle,
-	}
+    payload := descriptorFile{
+        ClusterID:       desc.ClusterID,
+        Address:         desc.Address,
+        SSHIdentityPath: desc.SSHIdentityPath,
+        Labels:          nil,
+        Scheme:          desc.Scheme,
+        CABundle:        desc.CABundle,
+        APIEndpoints:    append([]string(nil), desc.APIEndpoints...),
+        APIServerName:   desc.APIServerName,
+        RegistryHost:    desc.RegistryHost,
+        DisableSSH:      desc.DisableSSH,
+    }
 	if len(desc.Labels) > 0 {
 		payload.Labels = cloneLabels(desc.Labels)
 	}
@@ -286,6 +300,10 @@ func loadDescriptorFromPath(path string) (descriptorLoad, error) {
 			Scheme:          strings.TrimSpace(current.Scheme),
 			CABundle:        strings.TrimSpace(current.CABundle),
 		}
+		desc.APIEndpoints = append([]string(nil), current.APIEndpoints...)
+		desc.APIServerName = strings.TrimSpace(current.APIServerName)
+		desc.RegistryHost = strings.TrimSpace(current.RegistryHost)
+		desc.DisableSSH = current.DisableSSH
 		return descriptorLoad{descriptor: desc}, nil
 	}
 
