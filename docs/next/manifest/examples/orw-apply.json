@@ -15,7 +15,7 @@
     ]
   },
   "runtime": {
-  "image": "registry.dev/ploy/mods-openrewrite:latest",
+  "image": "registry.<cluster-id>.ploy/ploy/mods-openrewrite:latest",
   "command": ["mods-orw"],
   "args": ["--apply", "--recipe-json", "/in/recipe.json", "--dir", "/workspace", "--out", "/out"],
     "env": { "JAVA_TOOL_OPTIONS": "-Xmx2g" },

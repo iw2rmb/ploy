@@ -155,6 +155,11 @@ var commandTree = []Node{
 				Usage:       "ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>]",
 			},
 			{
+				Name:        "https",
+				Description: "Set HTTPS endpoints, registry host, and CA on a descriptor",
+				Usage:       "ploy cluster https [--cluster-id <id>] [--api-endpoint <url>]... [--api-server-name <name>] [--registry-host <host>] [--ca-file <path>] [--disable-ssh]",
+			},
+			{
 				Name:        "connect",
 				Description: "Cache beacon metadata and trust bundles locally",
 				Usage:       "ploy cluster connect --beacon-ip <addr> --api-key <key>",

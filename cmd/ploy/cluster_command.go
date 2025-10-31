@@ -1,19 +1,20 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"sort"
-	"strings"
+    "context"
+    "encoding/json"
+    "errors"
+    "flag"
+    "fmt"
+    "io"
+    "os"
+    "net/http"
+    "net/url"
+    "sort"
+    "strings"
 
-	"github.com/iw2rmb/ploy/internal/cli/config"
-	"github.com/iw2rmb/ploy/internal/cli/controlplane"
+    "github.com/iw2rmb/ploy/internal/cli/config"
+    "github.com/iw2rmb/ploy/internal/cli/controlplane"
 )
 
 func handleCluster(args []string, w io.Writer) error {
@@ -26,6 +27,8 @@ func handleCluster(args []string, w io.Writer) error {
 		return handleClusterList(w)
 	case "add":
 		return handleClusterAdd(args[1:], w)
+	case "https":
+		return handleClusterHTTPS(args[1:], w)
 	case "connect":
 		return handleClusterConnect(args[1:], w)
 	case "cert":
@@ -64,8 +67,64 @@ func handleClusterList(w io.Writer) error {
 }
 
 func handleClusterConnect(args []string, w io.Writer) error {
-	printClusterUsage(w)
-	return errors.New("cluster connect not yet implemented")
+    printClusterUsage(w)
+    return errors.New("cluster connect not yet implemented")
+}
+
+// handleClusterHTTPS patches a cached descriptor with HTTPS endpoints, SNI server name,
+// registry host, and an optional CA bundle, then saves it.
+func handleClusterHTTPS(args []string, w io.Writer) error {
+    fs := flag.NewFlagSet("cluster https", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    var clusterID stringValue
+    var apiServerName string
+    var registryHost string
+    var caFile string
+    var disableSSH bool
+    var endpoints multiString
+    fs.Var(&clusterID, "cluster-id", "Cluster identifier to update (default: current)")
+    fs.Var(&endpoints, "api-endpoint", "Control-plane HTTPS endpoint (repeatable)")
+    fs.StringVar(&apiServerName, "api-server-name", "", "TLS ServerName (SNI) to verify, e.g. api.<cluster-id>.ploy")
+    fs.StringVar(&registryHost, "registry-host", "", "Registry host used by nodes, e.g. registry.<cluster-id>.ploy")
+    fs.StringVar(&caFile, "ca-file", "", "Path to CA bundle PEM to trust")
+    fs.BoolVar(&disableSSH, "disable-ssh", false, "Disable SSH tunnels and prefer HTTPS endpoints only")
+    if err := fs.Parse(args); err != nil { printClusterUsage(w); return err }
+    if fs.NArg() > 0 { printClusterUsage(w); return fmt.Errorf("unexpected args: %s", strings.Join(fs.Args(), " ")) }
+
+    desc, err := loadClusterDescriptor(clusterID.value)
+    if err != nil { return err }
+    if len(endpoints.values) > 0 {
+        desc.APIEndpoints = endpoints.values
+        // Prefer first endpoint as Address for compatibility
+        desc.Address = strings.TrimSpace(endpoints.values[0])
+    }
+    if strings.TrimSpace(apiServerName) != "" { desc.APIServerName = strings.TrimSpace(apiServerName) }
+    if strings.TrimSpace(registryHost) != "" { desc.RegistryHost = strings.TrimSpace(registryHost) }
+    if disableSSH { desc.DisableSSH = true }
+    if strings.TrimSpace(caFile) != "" {
+        data, err := os.ReadFile(strings.TrimSpace(caFile))
+        if err != nil { return fmt.Errorf("read ca file: %w", err) }
+        desc.CABundle = string(data)
+    }
+    if _, err := config.SaveDescriptor(desc); err != nil { return err }
+    _, _ = fmt.Fprintf(w, "Updated descriptor %s\n", desc.ClusterID)
+    if len(desc.APIEndpoints) > 0 {
+        _, _ = fmt.Fprintf(w, "  api_endpoints: %s\n", strings.Join(desc.APIEndpoints, ", "))
+    }
+    if desc.APIServerName != "" { _, _ = fmt.Fprintf(w, "  api_server_name: %s\n", desc.APIServerName) }
+    if desc.RegistryHost != "" { _, _ = fmt.Fprintf(w, "  registry_host: %s\n", desc.RegistryHost) }
+    if desc.DisableSSH { _, _ = fmt.Fprintln(w, "  disable_ssh: true") }
+    if strings.TrimSpace(desc.CABundle) != "" { _, _ = fmt.Fprintln(w, "  ca_bundle: (set)") }
+    return nil
+}
+
+type multiString struct{ values []string }
+func (m *multiString) String() string { return strings.Join(m.values, ",") }
+func (m *multiString) Set(v string) error {
+    v = strings.TrimSpace(v)
+    if v == "" { return nil }
+    m.values = append(m.values, v)
+    return nil
 }
 
 func formatDescriptorLabels(labels map[string]string) string {
