@@ -71,6 +71,7 @@ _ploy() {
                 'cluster')
                     commands=()
                     commands+=("add:Bootstrap the control-plane node or join workers over SSH")
+                    commands+=("https:Set HTTPS endpoints, registry host, and CA on a descriptor")
                     commands+=("connect:Cache beacon metadata and trust bundles locally")
                     commands+=("list:Show locally cached cluster descriptors")
                     commands+=("cert:Inspect cluster certificate authority state")

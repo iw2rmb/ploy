@@ -47,7 +47,7 @@ _ploy_completions() {
         ;;
     "cluster")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "add connect list cert" -- "$cur") )
+            COMPREPLY=( $(compgen -W "add https connect list cert" -- "$cur") )
             return 0
         fi
         if [[ $COMP_CWORD -eq 3 && "${COMP_WORDS[2]}" == "cert" ]]; then

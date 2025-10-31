@@ -35,6 +35,7 @@ complete -c ploy -n "__fish_seen_subcommand_from registry" -a 'get-manifest' -d 
 complete -c ploy -n "__fish_seen_subcommand_from registry" -a 'rm-manifest' -d 'Delete an OCI manifest or untag'
 complete -c ploy -n "__fish_seen_subcommand_from registry" -a 'tags' -d 'List tags for a repository'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'add' -d 'Bootstrap the control-plane node or join workers over SSH'
+complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'https' -d 'Set HTTPS endpoints, registry host, and CA on a descriptor'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'connect' -d 'Cache beacon metadata and trust bundles locally'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'list' -d 'Show locally cached cluster descriptors'
 complete -c ploy -n "__fish_seen_subcommand_from cluster" -a 'cert' -d 'Inspect cluster certificate authority state'
