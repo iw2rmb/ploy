@@ -32,15 +32,17 @@ func handleMods(args []string, stderr io.Writer) error {
 }
 
 func handleModsLogs(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mods logs", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
-	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	retryWait := fs.Duration("retry-wait", time.Second, "wait duration between reconnect attempts")
-	if err := fs.Parse(args); err != nil {
-		printModsUsage(stderr)
-		return err
-	}
+    fs := flag.NewFlagSet("mods logs", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
+    maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
+    retryWait := fs.Duration("retry-wait", time.Second, "wait duration between reconnect attempts")
+    idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
+    overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
+    if err := fs.Parse(args); err != nil {
+        printModsUsage(stderr)
+        return err
+    }
 
 	ticketArgs := fs.Args()
 	if len(ticketArgs) == 0 {
@@ -61,8 +63,13 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		return fmt.Errorf("retry wait must be non-negative")
 	}
 
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+    ctx := context.Background()
+    if *overall > 0 {
+        var cancel context.CancelFunc
+        ctx, cancel = context.WithTimeout(ctx, *overall)
+        defer cancel()
+    }
+    base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
@@ -75,6 +82,7 @@ func handleModsLogs(args []string, stderr io.Writer) error {
             HTTPClient:   cloneForStream(httpClient),
             MaxRetries:   *maxRetries,
             RetryBackoff: *retryWait,
+            IdleTimeout:  *idle,
         },
         BaseURL: base,
     }
@@ -108,15 +116,17 @@ func handleJobs(args []string, stderr io.Writer) error {
 }
 
 func handleJobsFollow(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("jobs follow", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	format := fs.String("format", string(jobs.FormatStructured), "output format (raw|structured)")
-	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait duration between reconnect attempts")
-	if err := fs.Parse(args); err != nil {
-		printJobsUsage(stderr)
-		return err
-	}
+    fs := flag.NewFlagSet("jobs follow", flag.ContinueOnError)
+    fs.SetOutput(io.Discard)
+    format := fs.String("format", string(jobs.FormatStructured), "output format (raw|structured)")
+    maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
+    retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait duration between reconnect attempts")
+    idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
+    overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
+    if err := fs.Parse(args); err != nil {
+        printJobsUsage(stderr)
+        return err
+    }
 
 	jobArgs := fs.Args()
 	if len(jobArgs) == 0 {
@@ -137,8 +147,13 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
 		return fmt.Errorf("retry wait must be non-negative")
 	}
 
-	ctx := context.Background()
-	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+    ctx := context.Background()
+    if *overall > 0 {
+        var cancel context.CancelFunc
+        ctx, cancel = context.WithTimeout(ctx, *overall)
+        defer cancel()
+    }
+    base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
@@ -151,6 +166,7 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
             HTTPClient:   cloneForStream(httpClient),
             MaxRetries:   *maxRetries,
             RetryBackoff: *retryWait,
+            IdleTimeout:  *idle,
         },
         BaseURL: base,
     }
@@ -218,6 +234,7 @@ func handleJobsRetry(args []string, stderr io.Writer) error {
     }
     jobID := strings.TrimSpace(rest[0])
     ctx := context.Background()
+    
     base, httpClient, err := resolveControlPlaneHTTP(ctx)
     if err != nil { return err }
     cmd := jobs.RetryCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}

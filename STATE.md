@@ -40,10 +40,9 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 - Control-plane synthesis for mods-plan now resolves image via Docker Hub precedence:
   DOCKERHUB_USERNAME -> MODS_IMAGE_PREFIX -> docker.io/iw2rmb. Path is `<prefix>/mods-plan:latest`.
 
-3) CLI SSE streams (mods events, job logs) time out (fixed client side)
+3) CLI SSE streams (mods events, job logs) time out or hang (fixed client side)
 
-- CLI commands now clone the control‑plane HTTP client and set Timeout=0 for streaming calls (mods logs, jobs follow, mod run --follow).
-  Server-side remains unchanged.
+- Streaming clients now use Timeout=0 to avoid premature header timeouts, and include an idle guard: `--idle-timeout` (default 45s). When no events arrive for the idle window, the commands exit with a clear error instead of hanging.
 
 4) LLM/OpenAI key propagation (partially fixed)
 
@@ -67,21 +66,19 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 - `internal/workflow/runner/job_templates.go` injects OPENAI_API_KEY into mods-llm when PLOY_OPENAI_API_KEY is present at compose time.
 - Pending: publish key to nodes and verify LLM stage sees it.
 
-4) GitLab configuration
+4) GitLab configuration (done)
 
-- Source ~/.zshenv locally to read PLOY_GITLAB_PAT.
-- Create minimal config and apply via `dist/ploy config gitlab set --file`:
-  - api_base_url: https://gitlab.com
-  - allowed_projects: ["iw2rmb/*"]
-  - default_token: value=PLOY_GITLAB_PAT, scopes=["api"]
-  - rbac.updaters/readers: ["*"]
+- Applied via CLI with PLOY_GITLAB_PAT from local env. `ploy config gitlab show` reports the expected values.
 
 5) Rebuild + roll ployd; re‑run Mods smoke and verify images pull from Docker Hub and plan proceeds past hydration.
+   - Smoke attempt ran under `--cap 5m` and was automatically cancelled on timeout after 5 minutes. Docker Hub pulls were verified separately on all nodes.
 
 ## Execution Log (this slice)
 
 - Patched control-plane Mods synthesis to Docker Hub and updated test expectations.
 - Added zero-timeout SSE clients for CLI streaming commands.
+- Added idle guard in stream client and flags `--idle-timeout` for `mods logs` and `jobs follow` (default 45s).
+- Added overall stream timeouts `--timeout` for `mods logs` and `jobs follow`. Together with `mod run --cap`, streaming commands now cannot hang indefinitely.
 - Injected OPENAI_API_KEY for mods-llm at compose time.
 - Added script to publish PLOY_OPENAI_API_KEY to nodes.
 - Added `--cap` to `ploy mod run` to enforce an overall time limit and cancel the ticket on timeout.

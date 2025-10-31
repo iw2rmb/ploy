@@ -95,6 +95,8 @@ required environment variables, and operational limits (slot TTL, digest verific
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
+- Streaming guards (long-lived SSE):
+  - `mods logs` and `jobs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI
   cancels the Mods ticket and exits (e.g., `--cap 5m`).
 

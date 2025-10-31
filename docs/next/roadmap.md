@@ -60,7 +60,7 @@
 ## 5. Migration & Cleanup
 
 - [x] 5.1 Remove legacy runtime dependencies: drop the old modules from `go.mod`, delete retired packages, and migrate any reusable helpers into the new control-plane or runtime packages as needed.
-- [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, retire stale design docs to `.archive/`, and ensure `CHANGELOG.md` records the migration milestones.
+- [ ] 5.2 Normalise docs: replace the root `README.md` with the Ploy Next narrative, rm stale design docs, and ensure `CHANGELOG.md` records the migration milestones.
 - [ ] 5.3 Audit environment variables, configs, and system dependencies to confirm they match the versions listed in `docs/next/README.md` and `docs/how-to/deploy-a-cluster.md`; call out TODOs in `docs/envs/README.md` if a value cannot be finalised yet.
 
 ## 6. Testing & Release Readiness
