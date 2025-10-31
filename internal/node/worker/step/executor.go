@@ -28,12 +28,13 @@ import (
 )
 
 const (
-	envClusterURL     = "PLOY_IPFS_CLUSTER_API"
-	envClusterToken   = "PLOY_IPFS_CLUSTER_TOKEN"
-	envClusterUser    = "PLOY_IPFS_CLUSTER_USERNAME"
-	envClusterPass    = "PLOY_IPFS_CLUSTER_PASSWORD"
-	envClusterReplMin = "PLOY_IPFS_CLUSTER_REPL_MIN"
-	envClusterReplMax = "PLOY_IPFS_CLUSTER_REPL_MAX"
+    envClusterURL     = "PLOY_IPFS_CLUSTER_API"
+    envClusterToken   = "PLOY_IPFS_CLUSTER_TOKEN"
+    envClusterUser    = "PLOY_IPFS_CLUSTER_USERNAME"
+    envClusterPass    = "PLOY_IPFS_CLUSTER_PASSWORD"
+    envClusterReplMin = "PLOY_IPFS_CLUSTER_REPL_MIN"
+    envClusterReplMax = "PLOY_IPFS_CLUSTER_REPL_MAX"
+    envClusterLocal   = "PLOY_IPFS_CLUSTER_LOCAL"
 )
 
 // stepRunner abstracts the step runtime runner for testability.
@@ -86,12 +87,30 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 
 	artifactFetcher := &clusterFetcher{client: clusterClient}
 
-	publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
-		Client: clusterClient,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("stepworker: cluster publisher: %w", err)
-	}
+    // Prefer local-only pinning when explicitly requested to reduce
+    // cross-peer failures in unstable clusters.
+    localPin := strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "1") ||
+        strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "true")
+
+    publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
+        Client: clusterClient,
+        Local:  localPin,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("stepworker: cluster publisher: %w", err)
+    }
+
+    // Allow disabling artifact publication entirely (diff/log/gate) when the
+    // backing store is unhealthy. When disabled, artifacts are not uploaded
+    // and runs rely solely on live logs.
+    publishArtifacts := true
+    if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_ARTIFACT_PUBLISH")); v != "" {
+        publishArtifacts = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
+    }
+    var artifactPublisher stepruntime.ArtifactPublisher
+    if publishArtifacts {
+        artifactPublisher = publisher
+    }
 
 	var tokenSource hydration.TokenSource
 	if httpClient != nil {
@@ -110,10 +129,16 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		}
 	}
 
-	repoFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		Publisher:   publisher,
-		TokenSource: tokenSource,
-	})
+    // Allow turning off snapshot publish to work around unstable IPFS clusters.
+    publishSnapshots := true
+    if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_HYDRATION_PUBLISH_SNAPSHOT")); v != "" {
+        publishSnapshots = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
+    }
+    repoFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
+        Publisher:       publisher,
+        TokenSource:     tokenSource,
+        PublishSnapshot: publishSnapshots,
+    })
 	if err != nil {
 		return nil, fmt.Errorf("stepworker: git fetcher: %w", err)
 	}
@@ -141,14 +166,14 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		return nil, err
 	}
 
-	runner := &stepruntime.Runner{
-		Workspace:  hydrator,
-		Containers: containerRuntime,
-		Diffs:      diffGen,
+    runner := &stepruntime.Runner{
+        Workspace:  hydrator,
+        Containers: containerRuntime,
+        Diffs:      diffGen,
         Gate:       gateClient,
-		Artifacts:  publisher,
-		Streams:    streams,
-	}
+        Artifacts:  artifactPublisher,
+        Streams:    streams,
+    }
 
     return New(Options{
         Runner:  runner,

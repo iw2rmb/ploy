@@ -45,16 +45,18 @@ func (c *ClusterClient) Add(ctx context.Context, req AddRequest) (AddResponse, e
 	}
 
 	endpoint := c.resolve("/add")
-	query := endpoint.Query()
-	query.Set("stream-channels", "false")
-	replMin := firstNonZero(req.ReplicationFactorMin, c.defaultReplMin)
-	if replMin != 0 {
-		query.Set("repl_min", strconv.Itoa(replMin))
-	}
-	replMax := firstNonZero(req.ReplicationFactorMax, c.defaultReplMax)
-	if replMax != 0 {
-		query.Set("repl_max", strconv.Itoa(replMax))
-	}
+    query := endpoint.Query()
+    query.Set("stream-channels", "false")
+    replMin := firstNonZero(req.ReplicationFactorMin, c.defaultReplMin)
+    if replMin != 0 {
+        // IPFS Cluster expects replication_factor_min in /add
+        query.Set("replication_factor_min", strconv.Itoa(replMin))
+    }
+    replMax := firstNonZero(req.ReplicationFactorMax, c.defaultReplMax)
+    if replMax != 0 {
+        // IPFS Cluster expects replication_factor_max in /add
+        query.Set("replication_factor_max", strconv.Itoa(replMax))
+    }
 	if req.Local {
 		query.Set("local", "true")
 	}

@@ -21,16 +21,21 @@ import (
 
 // GitFetcherOptions configures the Git-based repository fetcher.
 type GitFetcherOptions struct {
-	Publisher   stepruntime.ArtifactPublisher
-	TokenSource TokenSource
-	GitBinary   string
+    Publisher   stepruntime.ArtifactPublisher
+    TokenSource TokenSource
+    GitBinary   string
+    // PublishSnapshot controls whether the archived repo snapshot is uploaded
+    // to remote storage (IPFS Cluster). When false, the snapshot tarball path
+    // is returned without a CID and the workspace hydrator will use it directly.
+    PublishSnapshot bool
 }
 
 // GitFetcher clones Git repositories and publishes snapshot tarballs.
 type GitFetcher struct {
-	publisher stepruntime.ArtifactPublisher
-	gitBinary string
-	tokens    TokenSource
+    publisher stepruntime.ArtifactPublisher
+    gitBinary string
+    tokens    TokenSource
+    publish   bool
 }
 
 // NewGitFetcher constructs a Git-backed repository fetcher.
@@ -42,11 +47,21 @@ func NewGitFetcher(opts GitFetcherOptions) (*GitFetcher, error) {
 	if git == "" {
 		git = "git"
 	}
-	return &GitFetcher{
-		publisher: opts.Publisher,
-		gitBinary: git,
-		tokens:    opts.TokenSource,
-	}, nil
+    publish := opts.PublishSnapshot
+    // Default to publishing unless explicitly disabled via env.
+    if !publish {
+        if v := strings.TrimSpace(os.Getenv("PLOY_HYDRATION_PUBLISH_SNAPSHOT")); v != "" {
+            publish = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
+        } else {
+            publish = true
+        }
+    }
+    return &GitFetcher{
+        publisher: opts.Publisher,
+        gitBinary: git,
+        tokens:    opts.TokenSource,
+        publish:   publish,
+    }, nil
 }
 
 // FetchRepository clones the repository and returns an archived snapshot artifact.
@@ -95,26 +110,31 @@ func (f *GitFetcher) FetchRepository(ctx context.Context, req stepruntime.Reposi
 		return stepruntime.RepositoryFetchResult{}, err
 	}
 
-	artifact, err := f.publisher.Publish(ctx, stepruntime.ArtifactRequest{
-		Kind: stepruntime.ArtifactKindSnapshot,
-		Path: tarFile,
-	})
-	if err != nil {
-		return stepruntime.RepositoryFetchResult{}, fmt.Errorf("hydration: publish snapshot: %w", err)
-	}
-
-	ref := contracts.StepInputArtifactRef{
-		CID:    artifact.CID,
-		Digest: firstNonEmpty(artifact.Digest, digest),
-		Size:   artifact.Size,
-	}
+    var ref contracts.StepInputArtifactRef
+    if f.publish {
+        artifact, err := f.publisher.Publish(ctx, stepruntime.ArtifactRequest{
+            Kind: stepruntime.ArtifactKindSnapshot,
+            Path: tarFile,
+        })
+        if err != nil {
+            return stepruntime.RepositoryFetchResult{}, fmt.Errorf("hydration: publish snapshot: %w", err)
+        }
+        ref = contracts.StepInputArtifactRef{
+            CID:    artifact.CID,
+            Digest: firstNonEmpty(artifact.Digest, digest),
+            Size:   artifact.Size,
+        }
+    } else {
+        // Do not publish; return tar path only and let the hydrator use it directly.
+        ref = contracts.StepInputArtifactRef{}
+    }
 
 	return stepruntime.RepositoryFetchResult{
-		Artifact: ref,
-		TarPath:  tarFile,
-		Commit:   commit,
-		Ref:      repo.TargetRef,
-	}, nil
+        Artifact: ref,
+        TarPath:  tarFile,
+        Commit:   commit,
+        Ref:      repo.TargetRef,
+    }, nil
 }
 
 func normalizeRepoURL(raw string) (string, error) {
