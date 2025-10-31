@@ -98,6 +98,9 @@ Environment=PLOY_IPFS_CLUSTER_API=${ipfs_api}
 Environment=HOME=${home_dir}
 Environment=XDG_CACHE_HOME=${cache_dir}
 Environment=PLOY_LIFECYCLE_NET_IGNORE=${lifecycle_ignore}
+# Optional Docker Hub credentials for private pulls
+Environment=DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
+Environment=DOCKERHUB_PAT=${DOCKERHUB_PAT}
 ENV
 }
 

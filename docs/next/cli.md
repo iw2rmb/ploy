@@ -38,13 +38,13 @@ operations for the v2 control plane. Commands mirror the structure captured in
 
 - `ploy upload --job-id <id> [--kind repo|logs|report] <path>`
   Streams the payload over HTTPS to `/v2/artifacts/upload` when the descriptor includes
-  `api_endpoints` + `ca_bundle`. Falls back to SSH transfers when HTTPS is not configured.
+  `api_endpoints` + `ca_bundle`. Falls back to SSH transfers only when HTTPS is not configured.
 - `ploy report --job-id <id> --artifact-id <id> --output <path>`
   Downloads the artifact via HTTPS from `/v2/artifacts/{id}?download=true`.
 
 Configure HTTPS:
 - Use `ploy cluster https --api-endpoint https://<ip>:8443 --api-server-name api.<cluster>.ploy \
-  --registry-host registry.<cluster>.ploy --ca-file ca.pem --disable-ssh`.
+  --ca-file ca.pem --disable-ssh`.
   The CLI will verify TLS using the descriptor CA and attempt endpoints in order.
 
 ## Cluster Descriptors

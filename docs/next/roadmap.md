@@ -4,8 +4,8 @@
 
 - [x] 1.1 Align the etcd layout with `docs/next/etcd.md`: extend `internal/controlplane/scheduler` to persist `expires_at`, retention bundles, lease metadata, and node capacity snapshots; add watchers for `leases/jobs`, `gc/jobs`, and node status prefixes; document the schema contract in the package tests.
 - [x] 1.2 Build a Mods orchestrator in the control plane: create a service that persists Mod tickets under `mods/<ticket>` (status, stage graph, artifact references) and translates submissions into scheduler jobs; wire optimistic concurrency so nodes cannot double-claim stages.
-- [x] 1.3 Expand the HTTP surface in `internal/api/httpserver/controlplane.go` to match `docs/next/api.md`: add `/v1/mods` (submit, resume, cancel, status, events, logs), `/v1/artifacts` CRUD, `/v1/jobs/{id}/events`, `/v1/config`, `/v1/status`, `/v1/version`, and `/v1/registry/*`, enforcing auth across the single control-plane entry point.
-- [x] 1.4 Introduce artifact/registry backends behind the new endpoints: reuse `internal/workflow/artifacts` for IPFS Cluster pins, implement OCI manifest/blob storage (etcd metadata + IPFS payload), and surface pin status for CLI queries.
+- [x] 1.3 Expand the HTTP surface in `internal/api/httpserver/controlplane.go` to match `docs/next/api.md`: add `/v1/mods` (submit, resume, cancel, status, events, logs), `/v1/artifacts` CRUD, `/v1/jobs/{id}/events`, `/v1/config`, `/v1/status`, `/v1/version` (registry endpoints removed in favor of Docker Hub).
+- [x] 1.4 Consolidate on artifacts backend; OCI registry removed. Reuse `internal/controlplane/artifacts` for IPFS Cluster pins and surface pin status for CLI queries.
 - [x] 1.5 Harden configuration discovery: update `internal/api/config` and `cmd/ploy/config_gitlab.go` to merge cluster descriptors, SSH tunnel metadata, and local overrides so every CLI call can rely on descriptors without separate CA bundles. (See `.archive/config-discovery/README.md`.)
 - [x] 1.6 Persist SSH transfer slots and enforcement: move the new `/v1/transfers/*` state out of process into etcd, add the `ployd` SFTP guard/cleanup units, and emit structured audit logs so uploads/downloads survive restarts.
 

@@ -69,10 +69,9 @@ For artifacts that were uploaded directly to IPFS without control-plane metadata
 2. Re-run `ploy upload --job-id <existing-job> --kind <diff|logs|report> <path>` so the control plane
    records the CID, digest, and retention fields. The job ID does not have to be active; it is only
    used for indexing purposes.
-3. For OCI blobs, start a registry upload session and stage the layer via the returned slot before
-   calling `PUT /v1/registry/<repo>/blobs/uploads/<slot>?digest=sha256:...`.
-4. Validate pin status with `ploy artifact status <cid>` (artifacts) or `curl /v1/registry/<repo>/blobs/<digest>`
-   (registry) before deleting any legacy copies.
+3. For Mods images, use Docker Hub for publishing; the control plane no longer exposes a registry upload
+   surface (previously `PUT /v1/registry/<repo>/blobs/uploads/<slot>?digest=sha256:...`).
+4. Validate pin status with `ploy artifact status <cid>` and remove any legacy copies.
 
 ## Step 5 — Cut over operators
 

@@ -44,9 +44,13 @@ configuration.
 - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
   Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
   Defaults to `maven:3-eclipse-temurin-17`.
-- `PLOY_REGISTRY_HOST` — Registry host injected into job image templates (defaults to
-  `registry.dev`). Set to `registry.<cluster-id>.ploy` once HTTPS ingress for the registry is
-  active. Example: `PLOY_REGISTRY_HOST=registry.alpha.ploy`.
+- `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to
+  `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+- `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
+  on worker nodes during bootstrap. If set on the node, bootstrap performs
+  `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
+- `MODS_IMAGE_PREFIX` — Optional absolute image prefix (e.g., `docker.io/org` or `ghcr.io/org`).
+  Takes effect only when `DOCKERHUB_USERNAME` is unset.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.

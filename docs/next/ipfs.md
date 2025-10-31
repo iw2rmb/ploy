@@ -64,7 +64,7 @@ For environments that have not switched to HTTPS yet, the legacy SSH slots remai
   (`/var/lib/ploy/ssh-artifacts/slots/<slot-id>/payload`) for the slot guard and janitor.
 - The transfer manager enforces a 10 GiB ceiling per slot and expires unused reservations after
   30 minutes. The CLI receives both values up front and aborts if the local file exceeds the budget.
-- Commits redeploy the payload into IPFS Cluster (artifacts) or the registry store (OCI blobs) and log
+- Commits redeploy the payload into IPFS Cluster (artifacts); OCI images are published to Docker Hub.
   the digest, caller, and byte count so auditors can trace who uploaded what.
 
 ## Slot Lifecycle

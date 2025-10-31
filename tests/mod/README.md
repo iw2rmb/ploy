@@ -11,15 +11,14 @@
 - Optional: `OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm “healer” stub that does not call external APIs.
 - IPFS Cluster coordinates are handled by the control plane; workers must have `PLOY_IPFS_CLUSTER_API` set. Workstations do not need direct cluster access.
 
-**Build + Publish Mods Images (via CLI)**
+**Build + Publish Mods Images (Docker Hub)**
 
 - Build Docker contexts under `docker/mods/...` locally (requires Docker):
   - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-orw`
   - Repeat for `mods-llm`, `mods-plan`, `mods-human` (contexts: `mod-llm`, `mod-plan`, `mod-human`).
-- Export each image to OCI layout and push via the Ploy CLI `registry` group:
-  - Example roundtrip test that does not depend on Docker: `tests/registry/registry-roundtrip.sh` builds a minimal OCI image from scratch, pushes via CLI, fetches, and deletes it.
-  - To push real Mods images, export them to an OCI tar and use the same sequence as the roundtrip script (push blobs from the layout, then the manifest, tag as `latest`). A helper script can be added if you prefer automation.
-  - Helper provided: `scripts/push-mods-via-cli.sh` builds OCI layouts with `docker buildx` and pushes all Mods images to `<repo-prefix>/<name>:latest` (defaults to `ploy/<name>:latest`).
+- Push to Docker Hub using the helper script:
+  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/push-mods-via-cli.sh`
+  - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 
 Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match runner templates.
@@ -93,7 +92,7 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 **Troubleshooting**
 
 - Images not found / pull errors:
-  - Ensure you published the Mods images to the cluster’s registry with the expected prefixes/tags. Use the new CLI registry flow (`ploy registry push-blob` + `put-manifest`). See `tests/registry/registry-roundtrip.sh` for a complete example.
+  - Ensure images are pushed to Docker Hub and nodes can pull them. For private repos, log in on each node: `echo "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin`.
 - Git access / MR creation:
   - Export `PLOY_GITLAB_PAT` and confirm the control plane has connectivity to GitLab. The sample repo is public for read; MRs require auth for branch writes.
 - Build Gate keeps failing in Scenario B:

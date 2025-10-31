@@ -12,15 +12,25 @@ type jobTemplate struct {
 	CacheNamespace string
 }
 
-func registryHost() string {
-    if h := strings.TrimSpace(os.Getenv("PLOY_REGISTRY_HOST")); h != "" {
-        return h
+// dockerHubNamespace returns the Docker Hub namespace used for Mods images.
+//
+// Precedence:
+// - DOCKERHUB_USERNAME when set (preferred)
+// - MODS_IMAGE_PREFIX when set (absolute registry/repo prefix like docker.io/org)
+// - fallback to "iw2rmb" (sensible default for this repo)
+func dockerHubNamespace() string {
+    if u := strings.TrimSpace(os.Getenv("DOCKERHUB_USERNAME")); u != "" {
+        return "docker.io/" + u
     }
-    return "registry.dev"
+    if p := strings.TrimSpace(os.Getenv("MODS_IMAGE_PREFIX")); p != "" {
+        // Caller can provide full prefix such as docker.io/org or ghcr.io/org
+        return p
+    }
+    return "docker.io/iw2rmb"
 }
 
 func registryImage(name string) string {
-    return registryHost() + "/ploy/" + name + ":latest"
+    return dockerHubNamespace() + "/" + name + ":latest"
 }
 
 var jobTemplates = map[string]jobTemplate{

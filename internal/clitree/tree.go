@@ -121,20 +121,6 @@ var commandTree = []Node{
 		},
 	},
 	{
-		Name:        "registry",
-		Description: "Push/pull/delete OCI blobs and manifests",
-		Usage:       "ploy registry <command>",
-		Subcommands: []Node{
-			{Name: "push-blob", Description: "Upload an OCI blob via SSH slots", Usage: "ploy registry push-blob --repo <name> [--media-type <type>] <path>"},
-			{Name: "get-blob", Description: "Download an OCI blob by digest", Usage: "ploy registry get-blob --repo <name> --digest <sha256:...> --output <path>"},
-			{Name: "rm-blob", Description: "Delete an OCI blob by digest", Usage: "ploy registry rm-blob --repo <name> --digest <sha256:...>"},
-			{Name: "put-manifest", Description: "Store an OCI manifest at a tag or digest", Usage: "ploy registry put-manifest --repo <name> --reference <ref> <manifest.json>"},
-			{Name: "get-manifest", Description: "Fetch an OCI manifest", Usage: "ploy registry get-manifest --repo <name> --reference <ref> --output <path>"},
-			{Name: "rm-manifest", Description: "Delete an OCI manifest or untag", Usage: "ploy registry rm-manifest --repo <name> --reference <ref>"},
-			{Name: "tags", Description: "List tags for a repository", Usage: "ploy registry tags --repo <name>"},
-		},
-	},
-	{
 		Name:        "upload",
 		Description: "Upload repository or log bundles via SSH",
 		Usage:       "ploy upload --job-id <id> <path>",
@@ -154,11 +140,11 @@ var commandTree = []Node{
 				Description: "Bootstrap the control-plane node or join workers over SSH",
 				Usage:       "ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>]",
 			},
-			{
-				Name:        "https",
-				Description: "Set HTTPS endpoints, registry host, and CA on a descriptor",
-				Usage:       "ploy cluster https [--cluster-id <id>] [--api-endpoint <url>]... [--api-server-name <name>] [--registry-host <host>] [--ca-file <path>] [--disable-ssh]",
-			},
+            {
+                Name:        "https",
+                Description: "Set HTTPS endpoints and CA on a descriptor",
+                Usage:       "ploy cluster https [--cluster-id <id>] [--api-endpoint <url>]... [--api-server-name <name>] [--ca-file <path>] [--disable-ssh]",
+            },
 			{
 				Name:        "connect",
 				Description: "Cache beacon metadata and trust bundles locally",

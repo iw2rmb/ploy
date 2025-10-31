@@ -6,9 +6,9 @@ Mods Image Contexts
   - `mod-plan` — Lightweight planner stub to exercise planner integration during E2E.
   - `mod-human` — Human-in-the-loop gate stub that auto-approves.
 
-Build and publish (CLI-first)
-- Recommended path is to publish via the Ploy CLI registry commands after building OCI layouts with `docker buildx`.
-- Use: `scripts/push-mods-via-cli.sh` to iterate all subdirectories here, export to OCI, and push blobs + manifest as `<prefix>/<name>:latest` (defaults to `ploy/<name>:latest`).
+Build and publish (Docker Hub)
+- Use: `scripts/push-mods-via-cli.sh` to iterate all subdirectories and `docker buildx build --push` images as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
+- Set `DOCKERHUB_USERNAME` (and `DOCKERHUB_PAT` if pushing to private repos) in your shell.
 
 Notes
 - Images are intentionally minimal: they’re designed for E2E and cluster smoke. Swap with production-capable images as needed by editing runner job templates or re-pushing different tags.
