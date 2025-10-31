@@ -33,8 +33,6 @@ func execute(args []string, stderr io.Writer) error {
 		return handleMod(args[1:], stderr)
 	case "artifact":
 		return handleArtifact(args[1:], stderr)
-	case "registry":
-		return handleRegistry(args[1:], stderr)
 	case "upload":
 		return handleUpload(args[1:], stderr)
 	case "report":

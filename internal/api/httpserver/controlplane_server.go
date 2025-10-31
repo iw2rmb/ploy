@@ -14,7 +14,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/events"
 	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
-	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
@@ -33,14 +32,6 @@ var (
 		Name: "ploy_artifact_payload_bytes_total",
 		Help: "Bytes processed by artifact API payloads.",
 	}, []string{"operation"})
-	registryRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "ploy_registry_http_requests_total",
-		Help: "Count of control-plane registry API requests.",
-	}, []string{"resource", "method", "status"})
-	registryPayloadBytes = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "ploy_registry_payload_bytes_total",
-		Help: "Bytes processed by registry API payloads.",
-	}, []string{"resource", "operation"})
 	configRequestsTotal = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "ploy_config_http_requests_total",
 		Help: "Count of control-plane config API requests.",
@@ -56,8 +47,8 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(artifactRequestsTotal, artifactPayloadBytes, registryRequestsTotal, registryPayloadBytes)
-	prometheus.MustRegister(configRequestsTotal, configUpdatesTotal, beaconRequestsTotal)
+    prometheus.MustRegister(artifactRequestsTotal, artifactPayloadBytes)
+    prometheus.MustRegister(configRequestsTotal, configUpdatesTotal, beaconRequestsTotal)
 }
 
 // Server exposes the control-plane scheduler over HTTP.
@@ -74,9 +65,7 @@ type controlPlaneServer struct {
 	cfgStore          *config.Store
 	transfers         *transfers.Manager
 	artifacts         *controlplaneartifacts.Store
-	artifactPublisher artifactPublisher
-	registryStore     *registry.Store
-    
+    	artifactPublisher artifactPublisher
 }
 
 type artifactPublisher interface {
@@ -99,9 +88,7 @@ type ControlPlaneOptions struct {
 	Authorizer        *auth.Authorizer
 	Transfers         *transfers.Manager
 	ArtifactStore     *controlplaneartifacts.Store
-	ArtifactPublisher artifactPublisher
-	RegistryStore     *registry.Store
-    
+    	ArtifactPublisher artifactPublisher
 }
 
 // New returns an HTTP handler rooted at /v1.
@@ -142,15 +129,6 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		}
 	}
 
-	var regStore *registry.Store
-	if opts.RegistryStore != nil {
-		regStore = opts.RegistryStore
-	} else if opts.Etcd != nil {
-		if store, err := registry.NewStore(opts.Etcd, registry.StoreOptions{}); err == nil {
-			regStore = store
-		}
-	}
-
     
 
 	h := &controlPlaneServer{
@@ -166,8 +144,7 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		cfgStore:          cfgStore,
 		transfers:         opts.Transfers,
 		artifacts:         artStore,
-		artifactPublisher: opts.ArtifactPublisher,
-		registryStore:     regStore,
+            artifactPublisher: opts.ArtifactPublisher,
         
 	}
 	if h.rotations == nil && opts.Signer != nil {
@@ -222,15 +199,9 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
     h.registerRoute(mux, http.MethodPost, "/v2/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
     h.registerRoute(mux, http.MethodGet, "/v2/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
     h.registerRoute(mux, "", "/v2/artifacts/", h.handleArtifactsSubpath)
-	h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
-	h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
-	h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)
-    h.registerRoute(mux, "", "/v1/registry/", h.handleRegistry)
-    // OCI Registry v2 alias: expose the same handlers under /v2/ so Docker clients can talk to
-    // https://registry.<cluster>/v2/<repo>/..., while we keep internal handlers unchanged.
-    // GET /v2/ should also return 200 OK for the version check.
-    h.registerRoute(mux, "", "/v2/", h.handleRegistryV2)
-    h.registerRoute(mux, http.MethodGet, "/v2", h.handleRegistryV2)
+    h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
+    h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
+    h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)
 	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	return mux
 }

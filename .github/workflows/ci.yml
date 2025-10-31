@@ -175,7 +175,6 @@ jobs:
           MODS_SEAWEED_MASTER: ${{ secrets.MODS_SEAWEED_MASTER }}
           MODS_SEAWEED_FALLBACKS: ${{ secrets.MODS_SEAWEED_FALLBACKS }}
           MODS_ALLOW_PARTIAL_ORW: ${{ secrets.MODS_ALLOW_PARTIAL_ORW }}
-          MODS_REGISTRY: ${{ secrets.MODS_REGISTRY }}
           MODS_PLANNER_IMAGE: ${{ secrets.MODS_PLANNER_IMAGE }}
           MODS_REDUCER_IMAGE: ${{ secrets.MODS_REDUCER_IMAGE }}
           MODS_LLM_EXEC_IMAGE: ${{ secrets.MODS_LLM_EXEC_IMAGE }}

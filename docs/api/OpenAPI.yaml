@@ -17,8 +17,8 @@ tags:
     description: Worker onboarding, listing, and deregistration.
   - name: GitLab
     description: GitLab signer configuration.
-  - name: Registry
-    description: OCI registry-style artifact staging and retrieval.
+  - name: Artifacts
+    description: HTTPS artifact upload, list, inspect, delete.
 security:
   - bearerAuth: []
 paths:
@@ -28,27 +28,7 @@ paths:
     $ref: './paths/nodes_id.yaml'
   /v1/config/gitlab:
     $ref: './paths/gitlab_config.yaml'
-  /v1/registry/{repository}/blobs/uploads:
-    $ref: './paths/registry_blob_uploads.yaml'
-  /v1/registry/{repository}/blobs/uploads/{session_id}:
-    $ref: './paths/registry_blob_upload_session.yaml'
-  /v1/registry/{repository}/blobs/{digest}:
-    $ref: './paths/registry_blob_digest.yaml'
-  /v1/registry/{repository}/manifests/{reference}:
-    $ref: './paths/registry_manifest.yaml'
-  /v1/registry/{repository}/tags/list:
-    $ref: './paths/registry_tags.yaml'
-  # v2 registry aliases
-  /v2/{repository}/blobs/uploads:
-    $ref: './paths/registry_blob_uploads.yaml'
-  /v2/{repository}/blobs/uploads/{session_id}:
-    $ref: './paths/registry_blob_upload_session.yaml'
-  /v2/{repository}/blobs/{digest}:
-    $ref: './paths/registry_blob_digest.yaml'
-  /v2/{repository}/manifests/{reference}:
-    $ref: './paths/registry_manifest.yaml'
-  /v2/{repository}/tags/list:
-    $ref: './paths/registry_tags.yaml'
+  # Registry removed; Docker Hub is used for images.
   # v2 artifacts aliases
   /v2/artifacts/upload:
     post:
@@ -95,15 +75,7 @@ components:
   securitySchemes:
     bearerAuth:
       $ref: './components/securitySchemes/bearerAuth.yaml'
-  parameters:
-    RegistryRepository:
-      $ref: './components/parameters/registry.yaml#/RegistryRepository'
-    RegistrySession:
-      $ref: './components/parameters/registry.yaml#/RegistrySession'
-    RegistryDigest:
-      $ref: './components/parameters/registry.yaml#/RegistryDigest'
-    RegistryReference:
-      $ref: './components/parameters/registry.yaml#/RegistryReference'
+  parameters: {}
   schemas:
     NodeJoinRequest:
       $ref: './components/schemas/nodes.yaml#/NodeJoinRequest'
@@ -137,17 +109,6 @@ components:
       $ref: './components/schemas/gitlab.yaml#/GitLabBranchPolicy'
     GitLabRBAC:
       $ref: './components/schemas/gitlab.yaml#/GitLabRBAC'
-    RegistryUploadStartRequest:
-      $ref: './components/schemas/registry.yaml#/RegistryUploadStartRequest'
-    RegistryUploadStartResponse:
-      $ref: './components/schemas/registry.yaml#/RegistryUploadStartResponse'
-    RegistryUploadProgressRequest:
-      $ref: './components/schemas/registry.yaml#/RegistryUploadProgressRequest'
-    RegistryUploadCommitRequest:
-      $ref: './components/schemas/registry.yaml#/RegistryUploadCommitRequest'
-    RegistryBlobCommitResponse:
-      $ref: './components/schemas/registry.yaml#/RegistryBlobCommitResponse'
-    RegistryTagList:
-      $ref: './components/schemas/registry.yaml#/RegistryTagList'
+    # registry schemas removed
     Error:
       $ref: './components/schemas/common.yaml#/Error'

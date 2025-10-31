@@ -15,15 +15,15 @@ highlights the primary candidates, why they are useful, and where to find them.
   integration, and event publishing hooks. Copy/adapt to run against etcd and SSE streams instead of JetStream.
 - **Docker runtime adapter** — legacy repository module. Implements container lifecycle
   operations, log retrieval, and secret mounting.
-- **Runtime registry** — legacy repository module. Provides adapter registration and metadata that
-  Ploy can reuse for future alternative schedulers.
+- **Runtime registry** — legacy repository module for adapter registration/metadata. OCI
+  registry storage has been removed in Ploy Next in favor of Docker Hub publishing.
 - **Log streaming helpers** — legacy repository module `jobs/service_runtime.go` and related publishers
   provide the SSE/tailing behaviour that Ploy exposes through `ploy logs job` and node log endpoints.
 
 ## Artifact Handling
 
-- **IPFS publisher** — legacy repository module `registry/store`.
-  While Ploy pivots to IPFS Cluster and etcd, reuse publishing helpers and IPFS interaction logic
+- **IPFS publisher** — use Ploy’s `internal/controlplane/artifacts` store; the legacy
+  `registry/store` has been removed. Reuse IPFS interaction patterns where applicable
   where applicable. Snapshot-specific helpers are no longer applicable.
 - **Contracts & subjects** — `../grid/internal/workflow/contracts`. Provides consistent schema
   definitions for checkpoints, artifacts, and ticket subjects.

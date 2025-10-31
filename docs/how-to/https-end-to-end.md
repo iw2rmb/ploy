@@ -1,15 +1,13 @@
-HTTPS End‑to‑End: Verify v2 APIs and Registry
+HTTPS End‑to‑End: Verify v2 APIs
 
 Prerequisites
-- Cluster CA + server certs deployed for:
-  - api.<cluster-id>.ploy (control plane)
-  - registry.<cluster-id>.ploy (registry v2)
+- Cluster CA + server certs deployed for api.<cluster-id>.ploy (control plane)
 - Workstation trusts CA (save to ca.pem) and has a valid token (Authorization header) if your deployment enforces it.
-- Nodes trust the registry CA at `/etc/docker/certs.d/registry.<cluster-id>.ploy/ca.crt`.
+ 
 
-1) Control Plane v2 health (registry alias)
+1) Control Plane v2 health
 ```bash
-curl -sSI --cacert ca.pem https://registry.<cluster-id>.ploy/v2/ | head -n1
+curl -sSI --cacert ca.pem https://api.<cluster-id>.ploy/v2/ | head -n1
 # Expect: HTTP/2 200
 ```
 
@@ -34,13 +32,5 @@ curl -sS --cacert ca.pem "https://api.<cluster-id>.ploy/v2/artifacts/${artifact_
 curl -sS --cacert ca.pem -o download.bin "https://api.<cluster-id>.ploy/v2/artifacts/${artifact_id}?download=true"
 ```
 
-4) Docker Registry v2 pull over TLS
-```bash
-# After publishing images via CLI (scripts/push-mods-via-cli.sh)
-docker pull registry.<cluster-id>.ploy/ploy/mods-openrewrite:latest
-```
-
 Notes
-- Pushing OCI blobs and manifests: use the `ploy registry` CLI commands. The server exposes standard v2 endpoints, but the current publish workflow stages blobs via the control plane.
-- For worker pulls, set `PLOY_REGISTRY_HOST=registry.<cluster-id>.ploy` on the control plane (or as an env) so job templates resolve the correct host.
-
+- Images are now published and pulled from Docker Hub. See `docs/how-to/publish-mods.md` for details.

@@ -208,12 +208,13 @@ func (s *Server) ensureAppLocked() error {
 	if s.app != nil {
 		return nil
 	}
-	app := fiber.New(fiber.Config{
-		DisableStartupMessage: true,
-		ReadTimeout:           s.cfg.HTTP.ReadTimeout,
-		WriteTimeout:          s.cfg.HTTP.WriteTimeout,
-		IdleTimeout:           s.cfg.HTTP.IdleTimeout,
-	})
+    app := fiber.New(fiber.Config{
+        DisableStartupMessage: true,
+        ReadTimeout:           s.cfg.HTTP.ReadTimeout,
+        WriteTimeout:          s.cfg.HTTP.WriteTimeout,
+        IdleTimeout:           s.cfg.HTTP.IdleTimeout,
+        BodyLimit:             2 << 30, // allow up to 2GiB payloads (large OCI layers)
+    })
 	app.Use(recover.New())
 	s.mountRoutes(app)
 	s.app = app

@@ -7,10 +7,6 @@ on:
         description: "api.<cluster-id>.ploy"
         required: true
         type: string
-      registry_host:
-        description: "registry.<cluster-id>.ploy"
-        required: true
-        type: string
 
 jobs:
   https-artifacts:
@@ -27,13 +23,5 @@ jobs:
           API_HOST: ${{ inputs.api_host }}
           AUTH: ${{ secrets.PLOY_TOKEN }}
         run: |
-          chmod +x tests/registry/curl-artifacts-v2.sh
-          tests/registry/curl-artifacts-v2.sh
-  https-registry:
-    runs-on: ubuntu-latest
-    needs: https-artifacts
-    steps:
-      - name: Verify registry v2 root
-        run: |
-          echo "Checking https://${{ inputs.registry_host }}/v2/"
-          curl -sSI https://${{ inputs.registry_host }}/v2/ | head -n1
+          chmod +x tests/artifacts/curl-artifacts-v2.sh
+          tests/artifacts/curl-artifacts-v2.sh

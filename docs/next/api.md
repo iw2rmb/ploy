@@ -1,7 +1,7 @@
 # Ploy Next API Reference
 
 This document catalogs the service endpoints introduced in Ploy Next. Routes are grouped by surface:
-Ploy control-plane APIs, node-local endpoints, and artifact/registry interfaces. The `ployd` daemon
+Ploy control-plane APIs, node-local endpoints, and artifact interfaces. The `ployd` daemon
 serves both the control-plane and node APIs described below, and the CLI reaches them by tunnelling
 HTTP over SSH using the cached cluster descriptors (`pkg/sshtransport`). No separate beacon or CA
 distribution surface remains.
@@ -204,19 +204,9 @@ explicitly via `POST /v1/transfers/{slot}/abort` (for example, when the SSH sess
 invokes it automatically before surfacing errors. Operators can delete orphaned slot directories safely
 after the TTL if a node restarts mid-transfer.
 
-### OCI Registry
+### Registry (Removed)
 
-- `PUT /v1/registry/{repo}/manifests/{reference}` — Store an OCI manifest (schema 2).
-  Publishes pin events to IPFS Cluster.
-- `GET /v1/registry/{repo}/manifests/{reference}` — Retrieve a manifest and associated metadata.
-- `DELETE /v1/registry/{repo}/manifests/{reference}` — Remove a manifest and release pins.
-- `POST /v1/registry/{repo}/blobs/uploads/` — Start a blob upload session (standard Docker Registry v2 semantics).
-- `PATCH /v1/registry/{repo}/blobs/uploads/{uuid}` — Append chunk data to an upload session.
-- `PUT /v1/registry/{repo}/blobs/uploads/{uuid}?digest=sha256:...` — Complete an upload, committing
-  the blob and pinning it.
-- `GET /v1/registry/{repo}/blobs/{digest}` — Stream a blob.
-- `DELETE /v1/registry/{repo}/blobs/{digest}` — Remove a blob (subject to reference tracking).
-- `GET /v1/registry/{repo}/tags/list` — List tags for a repository.
+Registry endpoints have been removed. Mods images are pushed to and pulled from Docker Hub.
 
 ## Node API
 
@@ -253,62 +243,15 @@ Example detail response:
 }
 ```
 
-Registry endpoints enforce `registry.pull` for read paths and `registry.push` for write/delete
-operations.
+ 
 
 #### Blob uploads
 
-`POST /v1/registry/<repo>/blobs/uploads` allocates an upload slot backed by the same SSH transfer
-manager. The JSON payload may include `node_id`, `size`, and an optional `media_type`; the response
-returns `upload_id`, `slot_id`, `remote_path`, and a `Location` header pointing at
-`/v1/registry/<repo>/blobs/uploads/<upload_id>`.
+ 
 
-Registry writers then:
+ 
 
-1. Copy the blob to `remote_path` over SSH (typically from the same host running the CLI or build).
-2. Optionally `PATCH /v1/registry/<repo>/blobs/uploads/<upload_id>` with `{"size": <bytes_sent>}` to
-   record progress counters.
-3. `PUT /v1/registry/<repo>/blobs/uploads/<upload_id>?digest=sha256:...` with a JSON body describing the
-   `media_type` and `size`. The control plane verifies the digest, publishes the blob to IPFS Cluster,
-   updates the registry store, deletes the slot, and responds with:
-
-```json
-{
-  "digest": "sha256:8843d7f92416211de9ebb963ff4ce281",
-  "cid": "bafybeiemblobs...",
-  "location": "/v1/registry/acme/web/blobs/sha256:8843d7..."
-}
-```
-
-`Docker-Content-Digest` mirrors the stored digest and allows Docker/OCI clients to validate the commit.
-
-`GET /v1/registry/<repo>/blobs/<digest>` streams the blob (`Content-Type` defaults to
-`application/octet-stream` when unspecified). `DELETE` marks the blob as deleted and returns
-`{"digest": "sha256:...", "state": "deleted"}` with `202 Accepted` once persistence succeeds.
-
-#### Manifests and tags
-
-`GET /v1/registry/<repo>/manifests/<reference>` resolves either a digest or tag, returning the raw
-manifest payload and setting `Docker-Content-Digest`. `PUT` accepts a full OCI manifest document; the
-control plane ensures every referenced blob already exists and optionally associates the provided tag.
-Successful writes respond with `201 Created`, a `Location` header for the canonical digest, and a JSON
-body containing `{ "digest": "sha256:..." }`.
-
-`DELETE /v1/registry/<repo>/manifests/<digest>` removes the immutable record, while deleting a tag via
-`DELETE /v1/registry/<repo>/manifests/<tag>` detaches only that mutable pointer.
-
-Tags can also be listed through `GET /v1/registry/<repo>/tags/list`, which returns:
-
-```json
-{
-  "name": "acme/web",
-  "tags": ["latest", "v1.2.3"]
-}
-```
-
-All registry routes emit metrics (`ploy_registry_http_requests_total` and
-`ploy_registry_payload_bytes_total`) so operators can alert on unexpected 4xx/5xx spikes or large blob
-flows.
+ 
 
 ### Node Management & Observability
 
@@ -418,5 +361,5 @@ event: job
 data: {"id":"job-9h2d5","ticket":"mod-1234","state":"succeeded",...}
 ```
 
-This layout keeps Ploy APIs modular while mirroring the familiar registry and Mods flows, allowing
+This layout keeps Ploy APIs modular while aligning with Mods flows and Docker Hub publishing, allowing
 gradual upgrades from legacy deployments.

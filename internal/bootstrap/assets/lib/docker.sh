@@ -80,4 +80,13 @@ UNIT
   systemctl enable docker
   systemctl restart docker
   log "docker service enabled and restarted"
+
+  # Non-interactive Docker Hub login when creds present
+  if [[ -n "${DOCKERHUB_USERNAME:-}" && -n "${DOCKERHUB_PAT:-}" ]]; then
+    if printf '%s' "${DOCKERHUB_PAT}" | ${BIN_DIR}/docker login -u "${DOCKERHUB_USERNAME}" --password-stdin >/dev/null 2>&1; then
+      log "docker hub login configured for ${DOCKERHUB_USERNAME}"
+    else
+      warn "docker hub login failed; continuing without saved auth"
+    fi
+  fi
 }

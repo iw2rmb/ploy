@@ -72,9 +72,10 @@ func NewClusterClient(opts ClusterClientOptions) (*ClusterClient, error) {
     }
 
 	httpClient := opts.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
+    if httpClient == nil {
+        // Large artifact uploads can take time; allow generous timeout.
+        httpClient = &http.Client{Timeout: 10 * time.Minute}
+    }
 
 	authHeader := ""
 	if token := strings.TrimSpace(opts.AuthToken); token != "" {

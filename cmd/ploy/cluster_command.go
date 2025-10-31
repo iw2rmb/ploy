@@ -85,7 +85,7 @@ func handleClusterHTTPS(args []string, w io.Writer) error {
     fs.Var(&clusterID, "cluster-id", "Cluster identifier to update (default: current)")
     fs.Var(&endpoints, "api-endpoint", "Control-plane HTTPS endpoint (repeatable)")
     fs.StringVar(&apiServerName, "api-server-name", "", "TLS ServerName (SNI) to verify, e.g. api.<cluster-id>.ploy")
-    fs.StringVar(&registryHost, "registry-host", "", "Registry host used by nodes, e.g. registry.<cluster-id>.ploy")
+    fs.StringVar(&registryHost, "registry-host", "", "(deprecated) Registry host previously used by nodes")
     fs.StringVar(&caFile, "ca-file", "", "Path to CA bundle PEM to trust")
     fs.BoolVar(&disableSSH, "disable-ssh", false, "Disable SSH tunnels and prefer HTTPS endpoints only")
     if err := fs.Parse(args); err != nil { printClusterUsage(w); return err }

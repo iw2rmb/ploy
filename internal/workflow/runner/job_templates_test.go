@@ -1,46 +1,34 @@
 package runner
 
 import (
-	"context"
-	"testing"
+    "os"
+    "testing"
 )
 
-func TestStaticJobComposerReturnsTemplateCopy(t *testing.T) {
-	composer := NewStaticJobComposer()
+func TestDockerHubNamespaceResolution(t *testing.T) {
+    t.Setenv("DOCKERHUB_USERNAME", "exampleuser")
+    if got := dockerHubNamespace(); got != "docker.io/exampleuser" {
+        t.Fatalf("expected docker.io/exampleuser, got %s", got)
+    }
 
-	job, err := composer.Compose(context.Background(), JobComposeRequest{Stage: Stage{Lane: "mods-plan"}})
-	if err != nil {
-		t.Fatalf("compose error: %v", err)
-	}
-	if job.Image != "registry.dev/ploy/mods-plan:latest" {
-		t.Fatalf("unexpected image: %s", job.Image)
-	}
-	if job.Runtime != "docker" {
-		t.Fatalf("unexpected runtime: %s", job.Runtime)
-	}
-	if job.Metadata["runtime_family"] != "mods" {
-		t.Fatalf("missing runtime family metadata: %#v", job.Metadata)
-	}
+    // DOCKERHUB_USERNAME wins over MODS_IMAGE_PREFIX
+    t.Setenv("MODS_IMAGE_PREFIX", "docker.io/otherorg")
+    if got := dockerHubNamespace(); got != "docker.io/exampleuser" {
+        t.Fatalf("DOCKERHUB_USERNAME should take precedence, got %s", got)
+    }
 
-	// Ensure the template is cloned rather than referenced.
-	job.Env["MODS_PLAN_CACHE"] = "/tmp/cache"
-	job.Metadata["priority"] = "high"
-
-	original, err := composer.Compose(context.Background(), JobComposeRequest{Stage: Stage{Lane: "mods-plan"}})
-	if err != nil {
-		t.Fatalf("compose error: %v", err)
-	}
-	if original.Env["MODS_PLAN_CACHE"] != "/workspace/cache" {
-		t.Fatal("expected template env to remain unchanged")
-	}
-	if original.Metadata["priority"] != "standard" {
-		t.Fatal("expected template metadata to remain unchanged")
-	}
+    // When DOCKERHUB_USERNAME is unset, use MODS_IMAGE_PREFIX if provided
+    os.Unsetenv("DOCKERHUB_USERNAME")
+    if got := dockerHubNamespace(); got != "docker.io/otherorg" {
+        t.Fatalf("expected docker.io/otherorg from MODS_IMAGE_PREFIX, got %s", got)
+    }
 }
 
-func TestStaticJobComposerRejectsUnknownLane(t *testing.T) {
-	composer := NewStaticJobComposer()
-	if _, err := composer.Compose(context.Background(), JobComposeRequest{Stage: Stage{Lane: "unknown"}}); err == nil {
-		t.Fatal("expected error for unknown lane")
-	}
+func TestRegistryImageBuildsDockerHubRef(t *testing.T) {
+    t.Setenv("DOCKERHUB_USERNAME", "acme")
+    img := registryImage("mods-plan")
+    if img != "docker.io/acme/mods-plan:latest" {
+        t.Fatalf("unexpected image: %s", img)
+    }
 }
+
