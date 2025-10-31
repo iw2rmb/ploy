@@ -38,6 +38,59 @@ paths:
     $ref: './paths/registry_manifest.yaml'
   /v1/registry/{repository}/tags/list:
     $ref: './paths/registry_tags.yaml'
+  # v2 registry aliases
+  /v2/{repository}/blobs/uploads:
+    $ref: './paths/registry_blob_uploads.yaml'
+  /v2/{repository}/blobs/uploads/{session_id}:
+    $ref: './paths/registry_blob_upload_session.yaml'
+  /v2/{repository}/blobs/{digest}:
+    $ref: './paths/registry_blob_digest.yaml'
+  /v2/{repository}/manifests/{reference}:
+    $ref: './paths/registry_manifest.yaml'
+  /v2/{repository}/tags/list:
+    $ref: './paths/registry_tags.yaml'
+  # v2 artifacts aliases
+  /v2/artifacts/upload:
+    post:
+      tags: [Artifacts]
+      summary: Upload an artifact via HTTPS (v2 alias)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Artifact created
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid request
+        '403':
+          description: Insufficient scope
+  /v2/artifacts:
+    get:
+      tags: [Artifacts]
+      summary: List artifacts (v2 alias)
+      responses:
+        '200':
+          description: OK
+  /v2/artifacts/{id}:
+    get:
+      tags: [Artifacts]
+      summary: Inspect or download an artifact (v2 alias)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
 components:
   securitySchemes:
     bearerAuth:
