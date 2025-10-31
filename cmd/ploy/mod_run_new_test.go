@@ -49,9 +49,9 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	if received.Metadata["repo_target_ref"] != "feature" {
 		t.Fatalf("expected repo target metadata, got %v", received.Metadata)
 	}
-	if len(received.Stages) != 6 {
-		t.Fatalf("expected 6 stages, got %d", len(received.Stages))
-	}
+    if len(received.Stages) != 5 {
+        t.Fatalf("expected 5 stages, got %d", len(received.Stages))
+    }
 	output := buf.String()
 	if !strings.Contains(output, "Mods ticket mods-test submitted") {
 		t.Fatalf("unexpected output: %s", output)
