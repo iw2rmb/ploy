@@ -49,6 +49,18 @@ func cloneRepo(t *testing.T, branch string) string {
     return dir
 }
 
+func writeReportFile(t *testing.T, name string, data []byte) {
+    t.Helper()
+    rel := filepath.Join("report")
+    if err := os.MkdirAll(rel, 0o755); err != nil {
+        t.Fatalf("mkdir report: %v", err)
+    }
+    dst := filepath.Join(rel, name)
+    if err := os.WriteFile(dst, data, 0o644); err != nil {
+        t.Fatalf("write report %s: %v", dst, err)
+    }
+}
+
 func dockerRun(t *testing.T, timeout time.Duration, args ...string) (string, time.Duration) {
     t.Helper()
     ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -77,6 +89,7 @@ func TestModsPlanClusterArgs(t *testing.T) {
     // Verify plan.json selected_recipes against golden
     data, err := os.ReadFile(filepath.Join(outDir, "plan.json"))
     if err != nil { t.Fatalf("read plan.json: %v", err) }
+    writeReportFile(t, "plan.json", data)
     var actual struct{ Selected []string `json:"selected_recipes"` }
     if err := json.Unmarshal(data, &actual); err != nil { t.Fatalf("decode plan: %v", err) }
     golden, err := os.ReadFile(filepath.Join("expected", "plan", "plan.json"))
@@ -116,6 +129,7 @@ func TestModsOpenRewriteApply_MainBranch(t *testing.T) {
     report := filepath.Join(outDir, "report.json")
     got, err := os.ReadFile(report)
     if err != nil { t.Fatalf("read report.json: %v", err) }
+    writeReportFile(t, "orw-report.json", got)
     want, err := os.ReadFile(filepath.Join("expected", "orw", "report.json"))
     if err != nil { t.Fatalf("read golden: %v", err) }
     if strings.TrimSpace(string(got)) != strings.TrimSpace(string(want)) {
@@ -132,6 +146,7 @@ func TestModsLLMExec_HealsFailingBranch(t *testing.T) {
     healed := filepath.Join(ws, "src/main/java/e2e/UnknownClass.java")
     got, err := os.ReadFile(healed)
     if err != nil { t.Fatalf("healed file: %v", err) }
+    writeReportFile(t, "llm-UnknownClass.java", got)
     want, err := os.ReadFile(filepath.Join("expected", "llm", "UnknownClass.java"))
     if err != nil { t.Fatalf("read golden: %v", err) }
     if strings.TrimSpace(string(got)) != strings.TrimSpace(string(want)) {

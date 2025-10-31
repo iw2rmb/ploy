@@ -86,7 +86,7 @@ func TestServiceSynthesizesPlanManifest(t *testing.T) {
     if ws.Hydration == nil || ws.Hydration.Repo == nil {
         t.Fatalf("expected repo hydration configured: %#v", *ws)
     }
-    if ws.Hydration.Repo.URL != spec.Repository || ws.Hydration.Repo.TargetRef != spec.Metadata["repo_target_ref"] || ws.Hydration.Repo.BaseRef != spec.Metadata["repo_base_ref"] || ws.Hydration.Repo.WorkspaceHint != spec.Metadata["repo_workspace_hint"] {
+    if ws.Hydration.Repo.URL != spec.Repository || ws.Hydration.Repo.TargetRef != spec.Metadata["repo_base_ref"] || ws.Hydration.Repo.BaseRef != spec.Metadata["repo_base_ref"] || ws.Hydration.Repo.WorkspaceHint != spec.Metadata["repo_workspace_hint"] {
         t.Fatalf("unexpected repo hydration: %#v", *ws.Hydration.Repo)
     }
 
@@ -96,8 +96,8 @@ func TestServiceSynthesizesPlanManifest(t *testing.T) {
     if job.Metadata["hydration_input_name"] != "workspace" {
         t.Fatalf("expected hydration_input_name=workspace, got %#v", job.Metadata)
     }
-    if job.Metadata["hydration_revision"] != spec.Metadata["repo_target_ref"] {
-        t.Fatalf("expected hydration_revision to match target ref, got %q", job.Metadata["hydration_revision"])
+    if job.Metadata["hydration_revision"] != spec.Metadata["repo_base_ref"] {
+        t.Fatalf("expected hydration_revision to match base ref, got %q", job.Metadata["hydration_revision"])
     }
 
     // Basic runtime hints present
