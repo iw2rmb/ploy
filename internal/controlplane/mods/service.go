@@ -311,7 +311,9 @@ func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, d
             Hydration: &contracts.StepInputHydration{Repo: &contracts.RepoMaterialization{
                 URL:           repoURL,
                 BaseRef:       baseRef,
-                TargetRef:     targetRef,
+                // For initial planning we always materialize the base ref;
+                // the target branch will be created later during MR publish.
+                TargetRef:     firstNonEmpty(baseRef, targetRef),
                 Commit:        commit,
                 WorkspaceHint: workspaceHint,
             }},
@@ -337,7 +339,8 @@ func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, d
     // Prefer commit; fall back to target ref if commit is not available.
     revision := commit
     if revision == "" {
-        revision = targetRef
+        // When no commit is specified, prefer baseRef to reflect the materialized revision.
+        revision = firstNonEmpty(baseRef, targetRef)
     }
     if revision != "" {
         def.Metadata[metadataRevisionKey] = revision
@@ -359,6 +362,16 @@ func dockerImageRef(name string) string {
         return p + "/" + name + ":latest"
     }
     return "docker.io/iw2rmb/" + name + ":latest"
+}
+
+// firstNonEmpty returns the first non-empty string from the provided values.
+func firstNonEmpty(values ...string) string {
+    for _, v := range values {
+        if strings.TrimSpace(v) != "" {
+            return v
+        }
+    }
+    return ""
 }
 // prepareStageHydration removed.
 

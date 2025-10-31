@@ -1,0 +1,8 @@
+{
+  "summary": "Plan suggests Java 11->17 migration via OpenRewrite and healing if build fails.",
+  "selected_recipes": [
+    "org.openrewrite.java.migrate.UpgradeToJava17"
+  ],
+  "human_gate": false,
+  "max_parallel": 3
+}
