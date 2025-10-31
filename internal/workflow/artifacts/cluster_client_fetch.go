@@ -22,7 +22,7 @@ func (c *ClusterClient) Fetch(ctx context.Context, cid string) (FetchResult, err
 		return FetchResult{}, errors.New("artifacts: cid required")
 	}
 
-	endpoint := c.resolve("/ipfs/" + trimmed)
+    endpoint := c.resolveFetch("/ipfs/" + trimmed)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return FetchResult{}, fmt.Errorf("artifacts: build fetch request: %w", err)

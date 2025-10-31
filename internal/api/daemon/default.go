@@ -517,17 +517,19 @@ func detectClusterID(cfg config.Config) string {
 }
 
 const defaultIPFSClusterAPI = "http://127.0.0.1:9094"
+const defaultIPFSGateway = "http://127.0.0.1:8080"
 const clusterIDFile = "/etc/ploy/cluster-id"
 
 func buildArtifactPublisher() *workflowartifacts.ClusterClient {
-	client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
-		BaseURL: defaultIPFSClusterAPI,
-	})
-	if err != nil {
-		log.Printf("control-plane: disabling artifact publisher: %v", err)
-		return nil
-	}
-	return client
+    client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
+        BaseURL:      defaultIPFSClusterAPI,
+        FetchBaseURL: defaultIPFSGateway,
+    })
+    if err != nil {
+        log.Printf("control-plane: disabling artifact publisher: %v", err)
+        return nil
+    }
+    return client
 }
 
 func buildIPFSChecker(cfg config.Config) lifecycle.HealthChecker {
