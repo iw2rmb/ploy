@@ -30,12 +30,12 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 
 ## Current Issues / Findings
 
-1) Mods plan stage failing due to missing GitLab signer/config
+1) Mods plan stage failing due to missing GitLab signer/config (fixed)
 
-- Job inspect shows:
+- Initially job inspect showed:
   - reason=executor_error
-  - message: "step: workspace unavailable: step: hydrate workspace: hydration: gitlab config request returned 404 Not Found"
-- Root cause: control plane lacks GitLab configuration, so repo materialization cannot obtain a token when needed.
+  - message: "step: workspace unavailable: step: hydrate workspace: hydration: gitlab config request returned 404/503"
+  Root cause: control plane lacked GitLab signer (missing AES key) and default secret. Fixed by publishing `PLOY_GITLAB_SIGNER_AES_KEY` to nodes and rotating `default` secret with `PLOY_GITLAB_PAT`.
 
 2) Synthesised plan manifest points to Docker Hub (fixed)
 
@@ -72,9 +72,8 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 
 - Applied via CLI with PLOY_GITLAB_PAT from local env. `ploy config gitlab show` reports the expected values.
 
-5) Rebuild + roll ployd; re‑run Mods smoke and verify images pull from Docker Hub and plan proceeds past hydration.
-   - Smoke attempt ran under `--cap 5m` and was automatically cancelled on timeout after 5 minutes. Docker Hub pulls were verified separately on all nodes.
-   - Next: run with a higher cap (e.g., `--cap 20m`) or without `--follow`, and confirm an MR is created on success. Use `mods logs --timeout` if needed to avoid hanging tails.
+5) Rebuild + roll ployd; re‑run Mods smoke and verify images pull from Docker Hub and hydration proceeds.
+   - Current blocker after fixes: IPFS Cluster returns 500 during workspace snapshot publish ("failed to put block on all destinations"). Replication factors set to min=1/max=1 but peers may be unhealthy.
 
 ## Execution Log (this slice)
 
@@ -91,12 +90,26 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 ## Next
 
 1) `make test` then `make build` to ensure GREEN status locally. (done)
-2) Source `~/.zshenv`; verify the following envs are present: DOCKERHUB_USERNAME, DOCKERHUB_PAT, PLOY_GITLAB_PAT, PLOY_OPENAI_API_KEY.
-3) Apply GitLab signer config via CLI and verify with `ploy config gitlab show/status`.
-4) Publish OpenAI key to lab nodes using `scripts/publish-openai-key-to-cluster.sh` and restart ployd.
-5) Kick Mods smoke (plan->java->llm->human) and confirm pulls from Docker Hub + hydration succeeds.
+2) Source `~/.zshenv`; verify envs: DOCKERHUB_USERNAME, DOCKERHUB_PAT, PLOY_GITLAB_PAT, PLOY_OPENAI_API_KEY. (done)
+3) Apply GitLab signer config via CLI and verify with `ploy config gitlab show/status`. (done)
+4) Publish OpenAI key to lab nodes via `scripts/publish-openai-key-to-cluster.sh` and restart ployd. (done)
+5) Publish signer AES key to lab and rotate default secret. (done)
+6) Update ployd on nodes. (done)
+7) Kick Mods smoke (plan->java->llm) and confirm pulls + hydration. (in progress — blocked by IPFS Cluster 500)
 
 ## Notes
 
 - Nodes already proved Docker Hub pulls for all Mods images.
-- After fixes, if plan still fails, capture /v1/mods/<ticket>/logs (snapshot) and node journal logs for root cause.
+- New blocker: IPFS Cluster pin/add failing with 500. Next steps below.
+
+## Immediate Next Steps (IPFS Cluster)
+- Validate Cluster health from node A (`curl http://127.0.0.1:9094/health` and `/id`, `/peers`). Ensure peers are connected.
+- If only one peer is healthy, keep replication=1 (already set) and retry. If add still fails, set `FetchBaseURL` to a working gateway or temporarily bypass publish by switching hydration to local (feature flag TBD).
+- Capture `journalctl -u ployd` around the failure for the exact add payload sizes and retry policy.
+
+## Integration Test Reports
+- Generated under `tests/integration/mods/report/` from local Docker runs:
+  - plan.json
+  - orw-report.json
+  - llm-UnknownClass.java
+  Execution times: plan ~0.35s, ORW ~1m18s (cached), LLM ~0.28s.

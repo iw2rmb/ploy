@@ -39,6 +39,15 @@ configuration.
 - `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
   factor applied to artifact pins. Defaults to the cluster-defined value when
   unset or zero.
+
+  Additional worker guards (for unstable clusters):
+  - `PLOY_IPFS_CLUSTER_LOCAL` — When `true`/`1`, workers publish artifacts with
+    `local=true` to prefer the local IPFS daemon and reduce cross‑peer pressure.
+  - `PLOY_HYDRATION_PUBLISH_SNAPSHOT` — When `false`/`0`, workers skip publishing
+    the repo hydration snapshot to IPFS Cluster and hydrate directly from the
+    local tarball.
+  - `PLOY_ARTIFACT_PUBLISH` — When `false`/`0`, workers skip publishing diff/log
+    artifacts entirely. Live logs still stream via SSE.
 - `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used for artifact
   uploads from the workstation. Not required on nodes (they use IPFS Cluster directly).
 - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
