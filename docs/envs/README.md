@@ -44,6 +44,9 @@ configuration.
 - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
   Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
   Defaults to `maven:3-eclipse-temurin-17`.
+- `PLOY_REGISTRY_HOST` — Registry host injected into job image templates (defaults to
+  `registry.dev`). Set to `registry.<cluster-id>.ploy` once HTTPS ingress for the registry is
+  active. Example: `PLOY_REGISTRY_HOST=registry.alpha.ploy`.
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
   ployd connects to the local etcd instance.
 - `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.

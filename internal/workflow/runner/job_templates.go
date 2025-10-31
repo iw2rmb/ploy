@@ -1,9 +1,10 @@
 package runner
 
 import (
-	"context"
-	"fmt"
-	"strings"
+    "context"
+    "fmt"
+    "os"
+    "strings"
 )
 
 type jobTemplate struct {
@@ -11,9 +12,20 @@ type jobTemplate struct {
 	CacheNamespace string
 }
 
+func registryHost() string {
+    if h := strings.TrimSpace(os.Getenv("PLOY_REGISTRY_HOST")); h != "" {
+        return h
+    }
+    return "registry.dev"
+}
+
+func registryImage(name string) string {
+    return registryHost() + "/ploy/" + name + ":latest"
+}
+
 var jobTemplates = map[string]jobTemplate{
-	"mods-plan": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/mods-plan:latest",
+    "mods-plan": {Spec: StageJobSpec{
+        Image:   registryImage("mods-plan"),
 		Command: []string{"mods-plan", "--run"},
 		Env: map[string]string{
 			"MODS_PLAN_CACHE": "/workspace/cache",
@@ -28,8 +40,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-plan"},
-	"mods-java": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/mods-openrewrite:latest",
+    "mods-java": {Spec: StageJobSpec{
+        Image:   registryImage("mods-openrewrite"),
 		Command: []string{"mods-orw", "--apply"},
 		Env: map[string]string{
 			"MAVEN_OPTS":                 "-Dmaven.repo.local=/workspace/.m2",
@@ -45,8 +57,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-java"},
-	"mods-llm": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/mods-llm:latest",
+    "mods-llm": {Spec: StageJobSpec{
+        Image:   registryImage("mods-llm"),
 		Command: []string{"mods-llm", "--execute"},
 		Env: map[string]string{
 			"OPENAI_API_TYPE": "",
@@ -63,8 +75,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-llm"},
-	"mods-human": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/mods-human:latest",
+    "mods-human": {Spec: StageJobSpec{
+        Image:   registryImage("mods-human"),
 		Command: []string{"mods-human", "--gate"},
 		Env: map[string]string{
 			"MODS_HUMAN_QUEUE": "review",
@@ -79,8 +91,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-human"},
-	"build-gate": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/build-gate:latest",
+    "build-gate": {Spec: StageJobSpec{
+        Image:   registryImage("build-gate"),
 		Command: []string{"bash", "-lc", "go test -race ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
@@ -96,8 +108,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "build-gate"},
-	"static-checks": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/static-checks:latest",
+    "static-checks": {Spec: StageJobSpec{
+        Image:   registryImage("static-checks"),
 		Command: []string{"bash", "-lc", "go vet ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
@@ -113,8 +125,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "static-checks"},
-	"test": {Spec: StageJobSpec{
-		Image:   "registry.dev/ploy/test-runner:latest",
+    "test": {Spec: StageJobSpec{
+        Image:   registryImage("test-runner"),
 		Command: []string{"bash", "-lc", "go test -race ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
