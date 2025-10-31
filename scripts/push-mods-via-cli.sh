@@ -26,9 +26,13 @@ for name in "${images[@]}"; do
   context="docker/mods/${name}"
   # Map directory name to registry repo name for backward compatibility:
   # mod-foo (dir) -> mods-foo (registry repo)
+  # Special-case: mod-orw directory produces mods-openrewrite image to match runner templates.
   repo_name="$name"
   if [[ "$repo_name" == mod-* ]]; then
     repo_name="mods-${repo_name#mod-}"
+  fi
+  if [[ "$name" == "mod-orw" ]]; then
+    repo_name="mods-openrewrite"
   fi
   echo "==> Building $name as OCI layout"
   out_tar="$workdir/${name}.oci.tar"

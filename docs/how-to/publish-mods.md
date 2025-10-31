@@ -2,7 +2,7 @@ Publish Mods Images via CLI (HTTPS)
 
 Overview
 - Mods images live under `docker/mods/`:
-  - `mod-openrewrite` — OpenRewrite apply (Maven)
+  - `mod-orw` — OpenRewrite apply (Maven)
   - `mod-llm` — LLM plan/execute stub
   - `mod-plan` — Planner stub
   - `mod-human` — Human gate stub
@@ -34,7 +34,7 @@ scripts/push-mods-via-cli.sh
 Option B — Publish a single Mods image
 ```bash
 # 1) Build OCI layout for a single context
-name=mod-openrewrite
+name=mod-orw
 docker buildx build --platform linux/amd64 --output type=oci,dest=${name}.oci.tar docker/mods/${name}
 mkdir -p /tmp/${name}.oci && tar -C /tmp/${name}.oci -xf ${name}.oci.tar
 
@@ -58,6 +58,5 @@ docker pull registry.<cluster-id>.ploy/ploy/mods-openrewrite:latest
 ```
 
 Notes
-- Directory name to repo mapping: `mod-foo` (folder) corresponds to `ploy/mods-foo` (registry repo) to match runner templates.
+- Directory name to repo mapping: `mod-foo` (folder) corresponds to `ploy/mods-foo` (registry repo) to match runner templates. Special-case: `mod-orw` maps to `ploy/mods-openrewrite`.
 - If you customize repo names, also adjust the runner templates or set `PLOY_REGISTRY_HOST` and image paths accordingly.
-

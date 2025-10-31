@@ -67,27 +67,24 @@ func (s *controlPlaneServer) handleRegistryUploadStart(w http.ResponseWriter, r 
     // Fast-path: accept entire blob in one call when digest query is provided or octet-stream payload is present.
     digest := strings.TrimSpace(r.URL.Query().Get("digest"))
     if ct := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))); ct == "application/octet-stream" || isDigest(digest) {
+        // Read the payload exactly once; avoid converting to string to preserve binary content.
+        data, err := io.ReadAll(r.Body)
+        if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
+        if len(data) == 0 { status = http.StatusBadRequest; writeErrorMessage(w, status, "empty blob payload"); return }
         if !isDigest(digest) {
-            // Compute digest if not provided
-            data, err := io.ReadAll(r.Body)
-            if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
             sum := workflowartifacts.SHA256Bytes(data)
             digest = "sha256:" + sum
-            r.Body = io.NopCloser(strings.NewReader(string(data)))
         }
-        payload, err := io.ReadAll(r.Body)
-        if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
-        if len(payload) == 0 { status = http.StatusBadRequest; writeErrorMessage(w, status, "empty blob payload"); return }
         // Publish as artifact then register blob
         publisher := s.artifactPublisher
         store := s.registryStore
         if publisher == nil || store == nil { status = http.StatusServiceUnavailable; writeErrorMessage(w, status, "registry unavailable"); return }
-        addResp, err := publisher.Add(r.Context(), workflowartifacts.AddRequest{Name: fmt.Sprintf("blob-%s", strings.ReplaceAll(digest, ":", "-")), Payload: payload})
+        addResp, err := publisher.Add(r.Context(), workflowartifacts.AddRequest{Name: fmt.Sprintf("blob-%s", strings.ReplaceAll(digest, ":", "-")), Payload: data})
         if err != nil { status = http.StatusBadGateway; writeError(w, status, err); return }
         media := strings.TrimSpace(r.Header.Get("Docker-Upload-Media-Type"))
         if media == "" { media = strings.TrimSpace(r.Header.Get("Content-Type")) }
         if media == "" { media = "application/octet-stream" }
-        doc := registry.BlobDocument{Repo: repo, Digest: digest, MediaType: media, Size: int64(len(payload)), CID: addResp.CID, Status: registry.BlobStatusAvailable}
+        doc := registry.BlobDocument{Repo: repo, Digest: digest, MediaType: media, Size: int64(len(data)), CID: addResp.CID, Status: registry.BlobStatusAvailable}
         stored, err := store.PutBlob(r.Context(), doc)
         if err != nil { status = http.StatusInternalServerError; writeError(w, status, err); return }
         location := fmt.Sprintf("/v1/registry/%s/blobs/%s", repo, stored.Digest)

@@ -52,5 +52,5 @@ Rollout
 
 Status
 - /v2 registry alias added: control-plane maps /v2/* to existing registry handlers (GET /v2/ returns 200).
-- Next: implement descriptor-based HTTPS client + failover in CLI; add HTTPS artifact upload/report routes.
-
+- Implemented: descriptor-based HTTPS client with CA pinning, SNI, and multi-endpoint failover in CLI.
+- Implemented: artifact upload/report over HTTPS (`/v2/artifacts/...`), SSH kept only as fallback for legacy flows.

@@ -14,14 +14,15 @@
 **Build + Publish Mods Images (via CLI)**
 
 - Build Docker contexts under `docker/mods/...` locally (requires Docker):
-  - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-openrewrite`
-  - Repeat for `mods-llm`, `mods-plan`, `mods-human`.
+  - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-orw`
+  - Repeat for `mods-llm`, `mods-plan`, `mods-human` (contexts: `mod-llm`, `mod-plan`, `mod-human`).
 - Export each image to OCI layout and push via the Ploy CLI `registry` group:
   - Example roundtrip test that does not depend on Docker: `tests/registry/registry-roundtrip.sh` builds a minimal OCI image from scratch, pushes via CLI, fetches, and deletes it.
   - To push real Mods images, export them to an OCI tar and use the same sequence as the roundtrip script (push blobs from the layout, then the manifest, tag as `latest`). A helper script can be added if you prefer automation.
   - Helper provided: `scripts/push-mods-via-cli.sh` builds OCI layouts with `docker buildx` and pushes all Mods images to `<repo-prefix>/<name>:latest` (defaults to `ploy/<name>:latest`).
 
 Notes:
+- Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match runner templates.
 - The OpenRewrite image executes Maven plugin `org.openrewrite.maven:rewrite-maven-plugin` and expects a recipe JSON with keys: `group`, `artifact`, `version`, `name`. See `docs/next/manifest/examples/orw-apply.json`.
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 
