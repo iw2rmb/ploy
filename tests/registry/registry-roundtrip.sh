@@ -37,8 +37,8 @@ layer_digest="sha256:$(sha256 "$workdir/layer.tar.gz")"
 config_digest="sha256:$(sha256 "$workdir/config.json")"
 
 # Push blobs via CLI
-DigestLayer=$(dist/ploy registry push-blob --repo "$repo" --media-type application/vnd.oci.image.layer.v1.tar+gzip "$workdir/layer.tar.gz" | awk '/^Digest:/ {print $2}')
-DigestConfig=$(dist/ploy registry push-blob --repo "$repo" --media-type application/vnd.oci.image.config.v1+json "$workdir/config.json" | awk '/^Digest:/ {print $2}')
+DigestLayer=$(dist/ploy registry push-blob --repo "$repo" --media-type application/vnd.oci.image.layer.v1.tar+gzip "$workdir/layer.tar.gz" 2>&1 | awk '/^Digest:/ {print $2}')
+DigestConfig=$(dist/ploy registry push-blob --repo "$repo" --media-type application/vnd.oci.image.config.v1+json "$workdir/config.json" 2>&1 | awk '/^Digest:/ {print $2}')
 
 test "$DigestLayer" = "$layer_digest" || { echo "layer digest mismatch" >&2; exit 2; }
 test "$DigestConfig" = "$config_digest" || { echo "config digest mismatch" >&2; exit 2; }
@@ -55,23 +55,22 @@ cat > "$workdir/manifest.json" << JSON
 }
 JSON
 
-Manifest=$(dist/ploy registry put-manifest --repo "$repo" --reference "$tag" "$workdir/manifest.json" | awk '/^Manifest:/ {print $2}')
+Manifest=$(dist/ploy registry put-manifest --repo "$repo" --reference "$tag" "$workdir/manifest.json" 2>&1 | awk '/^Manifest:/ {print $2}')
 test -n "$Manifest" || { echo "missing manifest digest" >&2; exit 3; }
 
 # Verify presence
-dist/ploy registry get-manifest --repo "$repo" --reference "$tag" --output "$workdir/manifest.out.json"
+dist/ploy registry get-manifest --repo "$repo" --reference "$tag" --output "$workdir/manifest.out.json" 2>/dev/null
 diff -u <(jq -S . "$workdir/manifest.json") <(jq -S . "$workdir/manifest.out.json")
 
 # Download layer back and verify digest
-dist/ploy registry get-blob --repo "$repo" --digest "$layer_digest" --output "$workdir/layer.pull.tgz"
+dist/ploy registry get-blob --repo "$repo" --digest "$layer_digest" --output "$workdir/layer.pull.tgz" 2>/dev/null
 GotLayer="sha256:$(sha256 "$workdir/layer.pull.tgz")"
 test "$GotLayer" = "$layer_digest" || { echo "roundtrip digest mismatch" >&2; exit 4; }
 
 # Delete tag, manifest, blobs
-dist/ploy registry rm-manifest --repo "$repo" --reference "$tag"
-dist/ploy registry rm-manifest --repo "$repo" --reference "$Manifest"
-dist/ploy registry rm-blob --repo "$repo" --digest "$config_digest"
-dist/ploy registry rm-blob --repo "$repo" --digest "$layer_digest"
+dist/ploy registry rm-manifest --repo "$repo" --reference "$tag" 2>/dev/null
+dist/ploy registry rm-manifest --repo "$repo" --reference "$Manifest" 2>/dev/null
+dist/ploy registry rm-blob --repo "$repo" --digest "$config_digest" 2>/dev/null
+dist/ploy registry rm-blob --repo "$repo" --digest "$layer_digest" 2>/dev/null
 
 echo "OK: registry roundtrip ($repo:$tag)"
-
