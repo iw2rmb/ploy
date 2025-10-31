@@ -2,16 +2,25 @@ package mods
 
 import (
     "context"
+    "archive/tar"
+    "bytes"
     "encoding/json"
+    "encoding/base64"
     "fmt"
+    "io"
+    "net/http"
+    "net/url"
+    "path/filepath"
     "strings"
     "sync"
     "time"
 
     clientv3 "go.etcd.io/etcd/client/v3"
+    gitlabcfg "github.com/iw2rmb/ploy/internal/config/gitlab"
     modplan "github.com/iw2rmb/ploy/internal/mods/plan"
     "github.com/iw2rmb/ploy/internal/workflow/contracts"
     "os"
+    artifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 )
 
 // StageJobSubmitter defines scheduler interactions required by the orchestrator.
@@ -365,10 +374,17 @@ func (s *Service) afterStageSuccess(ctx context.Context, ticketID, stageID strin
 	if err := s.enqueueDependents(ctx, ticketID, graph, status.Stages, stageID); err != nil {
 		return err
 	}
-	if allStagesSucceeded(status.Stages) {
-		return s.store.updateTicketState(ctx, ticketID, TicketStateSucceeded)
-	}
-	return s.store.updateTicketState(ctx, ticketID, TicketStateRunning)
+    if allStagesSucceeded(status.Stages) {
+        if err := s.store.updateTicketState(ctx, ticketID, TicketStateSucceeded); err != nil {
+            return err
+        }
+        // Best-effort MR publication; log/return errors to caller.
+        if err := s.publishMergeRequest(ctx, ticketID, status); err != nil {
+            return err
+        }
+        return nil
+    }
+    return s.store.updateTicketState(ctx, ticketID, TicketStateRunning)
 }
 
 // enqueueDependents queues dependent stages whose prerequisites are satisfied.
@@ -474,4 +490,171 @@ func applyServiceDefaults(opts Options) Options {
 		opts.Prefix += "/"
 	}
 	return opts
+}
+
+// publishMergeRequest creates a GitLab branch + MR using the diff bundle from orw-apply, when configured.
+func (s *Service) publishMergeRequest(ctx context.Context, ticketID string, status *TicketStatus) error {
+    if status == nil {
+        st, err := s.store.ticketStatus(ctx, ticketID)
+        if err != nil { return err }
+        status = st
+    }
+    repoURL := strings.TrimSpace(status.Repository)
+    if repoURL == "" {
+        return nil
+    }
+    baseRef := strings.TrimSpace(status.Metadata["repo_base_ref"])
+    targetRef := strings.TrimSpace(status.Metadata["repo_target_ref"])
+    if baseRef == "" || targetRef == "" {
+        return nil
+    }
+    // Locate diff artifact from ORW apply stage.
+    orw := strings.TrimSpace(modplan.StageNameORWApply)
+    st, ok := status.Stages[orw]
+    if !ok || strings.ToLower(string(st.State)) != string(StageStateSucceeded) {
+        // No ORW stage or not successful; skip MR.
+        return nil
+    }
+    diffCID := strings.TrimSpace(st.Artifacts["diff_cid"])
+    if diffCID == "" {
+        return nil
+    }
+    // Load GitLab config
+    kv := gitlabcfg.NewEtcdKV(s.store.client)
+    cfgStore := gitlabcfg.NewStore(kv)
+    cfg, _, err := cfgStore.Load(ctx)
+    if err != nil {
+        return fmt.Errorf("mods: load gitlab config: %w", err)
+    }
+    if strings.TrimSpace(cfg.APIBaseURL) == "" || strings.TrimSpace(cfg.DefaultToken.Value) == "" {
+        return nil
+    }
+    apiBase := strings.TrimSuffix(strings.TrimSpace(cfg.APIBaseURL), "/")
+    parsedRepo, err := url.Parse(repoURL)
+    if err != nil { return nil }
+    if !strings.EqualFold(parsedRepo.Hostname(), strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(cfg.APIBaseURL), "https://"), "http://"), "/")) {
+        // Repo host does not match configured API base; skip.
+        // This simplistic check ensures we only act on repos under the configured GitLab.
+        // It is best-effort to avoid publishing to different providers.
+        return nil
+    }
+    projectPath := strings.TrimSuffix(strings.TrimPrefix(parsedRepo.Path, "/"), ".git")
+    if projectPath == "" { return nil }
+    projectID := url.PathEscape(projectPath)
+
+    // Fetch diff tar from IPFS Cluster
+    artClient, err := newClusterClientFromEnv()
+    if err != nil { return fmt.Errorf("mods: artifacts client: %w", err) }
+    art, err := artClient.Fetch(ctx, diffCID)
+    if err != nil { return fmt.Errorf("mods: fetch diff artifact %s: %w", diffCID, err) }
+    files, err := untarToMemory(bytes.NewReader(art.Data))
+    if err != nil { return fmt.Errorf("mods: decode diff tar: %w", err) }
+    if len(files) == 0 {
+        return nil
+    }
+    gl := gitlabClient{base: apiBase, token: strings.TrimSpace(cfg.DefaultToken.Value), http: &http.Client{Timeout: 30 * time.Second}}
+    // Ensure branch exists (via commits API with start_branch) and commit changes.
+    actions := make([]gitlabCommitAction, 0, len(files))
+    for path, content := range files {
+        // Use base64 for safety (binary-safe)
+        actions = append(actions, gitlabCommitAction{Action: "create", FilePath: path, Content: base64Encode(content), Encoding: "base64"})
+    }
+    // First try commit with start_branch to create branch; on 400 (branch exists), try without start_branch with updates.
+    msg := fmt.Sprintf("Ploy Mods: apply OpenRewrite + upgrades (ticket %s)", ticketID)
+    if err := gl.commit(ctx, projectID, targetRef, baseRef, msg, actions); err != nil {
+        // Try falling back to update actions when files exist
+        for i := range actions { actions[i].Action = "update" }
+        if err2 := gl.commit(ctx, projectID, targetRef, "", msg, actions); err2 != nil {
+            return fmt.Errorf("mods: gitlab commit: %v (retry: %v)", err, err2)
+        }
+    }
+    // Create MR (idempotent-ish: if already exists, ignore)
+    title := fmt.Sprintf("Ploy Mods: Upgrade Java 11→17 (%s)", ticketID)
+    desc := "Automated Mods run applying OpenRewrite and validations."
+    _ = gl.createMR(ctx, projectID, targetRef, baseRef, title, desc)
+    return nil
+}
+
+// newClusterClientFromEnv wires an IPFS Cluster client from environment.
+func newClusterClientFromEnv() (*artifacts.ClusterClient, error) {
+    base := strings.TrimSpace(os.Getenv("PLOY_IPFS_CLUSTER_API"))
+    if base == "" {
+        return nil, fmt.Errorf("PLOY_IPFS_CLUSTER_API not set")
+    }
+    return artifacts.NewClusterClient(artifacts.ClusterClientOptions{
+        BaseURL:           base,
+        AuthToken:         strings.TrimSpace(os.Getenv("PLOY_IPFS_CLUSTER_TOKEN")),
+        BasicAuthUsername: strings.TrimSpace(os.Getenv("PLOY_IPFS_CLUSTER_USERNAME")),
+        BasicAuthPassword: strings.TrimSpace(os.Getenv("PLOY_IPFS_CLUSTER_PASSWORD")),
+    })
+}
+
+// untarToMemory returns a map of relative file paths to content.
+func untarToMemory(r io.Reader) (map[string][]byte, error) {
+    files := make(map[string][]byte)
+    tr := tar.NewReader(r)
+    for {
+        hdr, err := tr.Next()
+        if err == io.EOF { break }
+        if err != nil { return nil, err }
+        name := filepath.Clean(hdr.Name)
+        if name == "." || strings.HasSuffix(name, "/") { continue }
+        if hdr.FileInfo().Mode().IsDir() || (hdr.FileInfo().Mode()&os.ModeSymlink) != 0 { continue }
+        data, err := io.ReadAll(tr)
+        if err != nil { return nil, err }
+        files[name] = data
+    }
+    return files, nil
+}
+
+func base64Encode(b []byte) string { return base64.StdEncoding.EncodeToString(b) }
+
+// gitlabClient is a minimal GitLab REST client.
+type gitlabClient struct {
+    base  string
+    token string
+    http  *http.Client
+}
+
+type gitlabCommitAction struct {
+    Action   string `json:"action"`
+    FilePath string `json:"file_path"`
+    Content  string `json:"content"`
+    Encoding string `json:"encoding,omitempty"`
+}
+
+func (g gitlabClient) commit(ctx context.Context, project, branch, startBranch, message string, actions []gitlabCommitAction) error {
+    if g.base == "" || g.token == "" { return fmt.Errorf("gitlab: client not configured") }
+    endpoint := fmt.Sprintf("%s/api/v4/projects/%s/repository/commits", strings.TrimSuffix(g.base, "/"), project)
+    payload := map[string]any{"branch": branch, "commit_message": message, "actions": actions}
+    if strings.TrimSpace(startBranch) != "" { payload["start_branch"] = startBranch }
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("PRIVATE-TOKEN", g.token)
+    resp, err := g.http.Do(req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        data, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+        return fmt.Errorf("gitlab: commit %s", strings.TrimSpace(string(data)))
+    }
+    return nil
+}
+
+func (g gitlabClient) createMR(ctx context.Context, project, source, target, title, description string) error {
+    endpoint := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests", strings.TrimSuffix(g.base, "/"), project)
+    payload := map[string]any{"source_branch": source, "target_branch": target, "title": title, "description": description}
+    body, _ := json.Marshal(payload)
+    req, _ := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("PRIVATE-TOKEN", g.token)
+    resp, err := g.http.Do(req)
+    if err != nil { return err }
+    defer resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        // Best-effort: ignore errors (e.g., MR exists or permissions) to avoid failing the ticket.
+        return nil
+    }
+    return nil
 }

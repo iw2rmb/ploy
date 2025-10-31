@@ -8,7 +8,7 @@
 
 - Ploy cluster descriptor present (CLI auto-discovers). To override, export `PLOY_CONTROL_PLANE_URL` for this session.
 - GitLab access for the sample repo’s MRs: export `PLOY_GITLAB_PAT` (or set via cluster’s signer if configured).
-- Optional: `OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm “healer” stub that does not call external APIs.
+- Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm “healer” stub that does not call external APIs.
 - IPFS Cluster coordinates are handled by the control plane; workers must have `PLOY_IPFS_CLUSTER_API` set. Workstations do not need direct cluster access.
 
 **Build + Publish Mods Images (Docker Hub)**
@@ -77,7 +77,7 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 - Cluster targeting:
   - Prefer your cached cluster descriptor under `~/.config/ploy/clusters/`. To override, set `PLOY_CONTROL_PLANE_URL`.
 - LLM:
-  - The stub `mods-llm` does not require `OPENAI_API_KEY`. If you swap the image for a real implementation, export your API key and any MCP endpoints as needed.
+  - The stub `mods-llm` does not require `PLOY_OPENAI_API_KEY`. If you swap the image for a real implementation, export your API key and any MCP endpoints as needed.
 - Build Gate image override:
   - To change the Java build executor container (e.g., custom Maven image), use `PLOY_BUILDGATE_JAVA_IMAGE` on worker nodes.
 
