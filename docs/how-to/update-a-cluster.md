@@ -39,6 +39,15 @@ done
 
 If not using `root`, prefix commands with `sudo` and ensure your user has permission to write under `/usr/local/bin`.
 
+Shortcut script
+
+```bash
+# pass nodes as args or via NODES env
+scripts/update_ployd_cluster.sh 45.9.42.212 46.173.16.177 81.200.119.187
+# or
+NODES="45.9.42.212 46.173.16.177 81.200.119.187" scripts/update_ployd_cluster.sh
+```
+
 ## 3) Restart the service
 
 ```bash

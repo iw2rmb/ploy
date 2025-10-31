@@ -234,6 +234,9 @@ func (s *Server) mountRoutes(app *fiber.App) {
         handler := adaptor.HTTPHandler(s.control)
         app.All("/v1", handler)
         app.All("/v1/*", handler)
+        // Expose v2 aliases for control-plane (registry and artifacts) via the same handler.
+        app.All("/v2", handler)
+        app.All("/v2/*", handler)
 		app.All("/metrics", handler)
 	}
 }

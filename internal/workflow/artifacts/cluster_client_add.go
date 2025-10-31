@@ -109,11 +109,26 @@ type addResponseMeta struct {
 
 // parseAddResponse extracts the first valid metadata object from the multipart add response.
 func parseAddResponse(payload []byte) (addResponseMeta, error) {
-	lines := bytes.Split(payload, []byte("\n"))
-	for _, line := range lines {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
+    // Some IPFS Cluster versions return a single JSON array with one object
+    // instead of a newline-delimited stream. Handle that format first.
+    trimmed := bytes.TrimSpace(payload)
+    if len(trimmed) > 0 && trimmed[0] == '[' {
+        var arr []map[string]any
+        if err := json.Unmarshal(trimmed, &arr); err == nil {
+            for _, raw := range arr {
+                cid := parseCID(raw)
+                if cid == "" { continue }
+                name := firstNonEmpty(asString(raw["Name"]), asString(raw["name"]))
+                size := parseSize(raw["Size"], raw["Bytes"])
+                return addResponseMeta{cid: cid, name: name, size: size}, nil
+            }
+        }
+    }
+    lines := bytes.Split(payload, []byte("\n"))
+    for _, line := range lines {
+        line = bytes.TrimSpace(line)
+        if len(line) == 0 {
+            continue
 		}
 		var raw map[string]any
 		if err := json.Unmarshal(line, &raw); err != nil {
