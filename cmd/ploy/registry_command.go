@@ -12,8 +12,6 @@ import (
     "strings"
 
     regcli "github.com/iw2rmb/ploy/internal/cli/registry"
-    "github.com/iw2rmb/ploy/internal/controlplane/tunnel"
-    "github.com/iw2rmb/ploy/pkg/sshtransport"
 )
 
 func handleRegistry(args []string, stderr io.Writer) error {
@@ -52,7 +50,7 @@ func handleRegistryPushBlob(args []string, stderr io.Writer) error {
     fs.SetOutput(io.Discard)
     repo := fs.String("repo", "", "Repository, e.g. ploy/mods-openrewrite")
     media := fs.String("media-type", "application/octet-stream", "Blob media type")
-    node := fs.String("node-id", "", "Preferred control-plane node for staging")
+    _ = fs.String("node-id", "", "(unused; HTTPS mode)")
     if err := fs.Parse(args); err != nil { printRegistryPushBlobUsage(stderr); return err }
     remaining := fs.Args()
     if strings.TrimSpace(*repo) == "" || len(remaining) == 0 {
@@ -60,25 +58,18 @@ func handleRegistryPushBlob(args []string, stderr io.Writer) error {
         return errors.New("--repo and <path> are required")
     }
     path := remaining[0]
-    info, err := os.Stat(path)
-    if err != nil { return err }
+    if _, err := os.Stat(path); err != nil { return err }
     digest, err := fileSHA256(path)
     if err != nil { return err }
     ctx := context.Background()
     base, httpClient, err := resolveControlPlaneHTTP(ctx)
     if err != nil { return err }
     client := regcli.Client{BaseURL: base, HTTPClient: httpClient}
-    start, err := client.StartUpload(ctx, *repo, regcli.UploadStartRequest{MediaType: *media, Size: info.Size(), NodeID: strings.TrimSpace(*node)})
-    if err != nil { return err }
-    mgr, err := tunnel.Manager()
-    if err != nil { return err }
-    if err := mgr.CopyTo(ctx, start.NodeID, sshtransport.CopyToOptions{LocalPath: path, RemotePath: start.RemotePath}); err != nil {
-        return fmt.Errorf("stage blob via ssh: %w", err)
-    }
-    if err := client.PatchUpload(ctx, *repo, start.UploadID, regcli.UploadProgressRequest{Size: info.Size()}); err != nil {
-        return err
-    }
-    commit, err := client.CommitUpload(ctx, *repo, start.UploadID, digest, regcli.UploadCommitRequest{MediaType: *media, Size: info.Size()})
+    // Prefer direct HTTPS upload using v2 alias.
+    f, err := os.Open(path)
+    if err != nil { return fmt.Errorf("open %s: %w", path, err) }
+    defer f.Close()
+    commit, err := client.UploadBlob(ctx, *repo, digest, *media, f)
     if err != nil { return err }
     _, _ = fmt.Fprintf(stderr, "Digest: %s\nCID: %s\n", strings.TrimSpace(commit.Digest), strings.TrimSpace(commit.CID))
     return nil
@@ -257,4 +248,3 @@ func filepathDir(p string) string {
     if i <= 0 { return "." }
     return p[:i]
 }
-
