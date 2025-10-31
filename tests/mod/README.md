@@ -25,6 +25,10 @@ Notes:
 - The OpenRewrite image executes Maven plugin `org.openrewrite.maven:rewrite-maven-plugin` and expects a recipe JSON with keys: `group`, `artifact`, `version`, `name`. See `docs/next/manifest/examples/orw-apply.json`.
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 
+See also:
+- `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
+- `docs/how-to/descriptor-https-quickstart.md` to configure descriptors for HTTPS-only operation.
+
 **Sample Repository**
 
 - Canonical E2E target: `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`.
