@@ -170,6 +170,8 @@ They are not required for day‑to‑day CLI usage but are documented here for c
 - `PLOY_BOOTSTRAP_VERSION` — Version string embedded at the top of generated bootstrap scripts.
 - `PLOY_INSTALL_POSTGRESQL` — When `true`, bootstrap installs PostgreSQL on the target host and derives
   `PLOY_SERVER_PG_DSN`; when `false`, the provided DSN is used as-is.
+- `PLOY_DB_PASSWORD` — Ephemeral password generated during PostgreSQL install flows and used to create the
+  `ploy` role and DSN. Exported only within the bootstrap script; not required by the server or CLI.
 - `CLUSTER_ID` — Cluster identifier used during provisioning to label generated assets.
 - `NODE_ID` — Node identifier provided to the bootstrap script (control plane uses `control`).
 - `NODE_ADDRESS` — IP/hostname of the node being provisioned.
