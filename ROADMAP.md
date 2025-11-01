@@ -8,7 +8,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Adopt RED → GREEN → REFACTOR for every slice (unit first; E2E later).
 - [x] Maintain docs parity: update README.md, docs/api, docs/envs, how-to guides per slice.
 - [x] Keep coverage ≥60% overall; ≥90% on scheduler/PKI/ingest critical paths.
-- [ ] Verify required envs exist or add TODOs in docs/envs/README.md.
+- [x] Verify required envs exist or add TODOs in docs/envs/README.md.
 
 ## Naming & Build Surface
 - [ ] Standardize server binary name to `ployd` (keep current path `cmd/ployd`).
