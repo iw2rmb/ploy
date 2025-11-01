@@ -305,6 +305,16 @@ type mockStore struct {
 	createEventParams store.CreateEventParams
 	createEventResult store.Event
 	createEventErr    error
+
+	getStageCalled bool
+	getStageParams pgtype.UUID
+	getStageResult store.Stage
+	getStageErr    error
+
+	createDiffCalled bool
+	createDiffParams store.CreateDiffParams
+	createDiffResult store.Diff
+	createDiffErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -387,6 +397,18 @@ func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventPar
 	m.createEventCalled = true
 	m.createEventParams = params
 	return m.createEventResult, m.createEventErr
+}
+
+func (m *mockStore) GetStage(ctx context.Context, id pgtype.UUID) (store.Stage, error) {
+	m.getStageCalled = true
+	m.getStageParams = id
+	return m.getStageResult, m.getStageErr
+}
+
+func (m *mockStore) CreateDiff(ctx context.Context, params store.CreateDiffParams) (store.Diff, error) {
+	m.createDiffCalled = true
+	m.createDiffParams = params
+	return m.createDiffResult, m.createDiffErr
 }
 
 // no-op
@@ -3397,5 +3419,555 @@ func TestCreateNodeEventsHandler_CreateEventError(t *testing.T) {
 	}
 	if !mockSt.createEventCalled {
 		t.Fatal("expected CreateEvent to be called")
+	}
+}
+
+func TestCreateDiffHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	diffID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		getRunResult: store.Run{
+			ID: pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusQueued,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getStageResult: store.Stage{
+			ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
+			Name:   "build",
+			Status: store.StageStatusRunning,
+		},
+		createDiffResult: store.Diff{
+			ID:      pgtype.UUID{Bytes: diffID, Valid: true},
+			RunID:   pgtype.UUID{Bytes: runID, Valid: true},
+			StageID: pgtype.UUID{Bytes: stageID, Valid: true},
+			Patch:   []byte("gzipped-diff-data"),
+			Summary: []byte(`{"added":10,"removed":5}`),
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"patch": "Z3ppcHBlZC1kaWZmLWRhdGE=",
+		"summary": {"added": 10, "removed": 5}
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if !mockSt.createDiffCalled {
+		t.Fatal("expected CreateDiff to be called")
+	}
+
+	// Verify response.
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	if _, ok := resp["diff_id"]; !ok {
+		t.Errorf("expected diff_id in response, got %v", resp)
+	}
+}
+
+func TestCreateDiffHandler_MissingNodeID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//stage/"+uuid.New().String()+"/diff", nil)
+	req.SetPathValue("id", "")
+	req.SetPathValue("stage", uuid.New().String())
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_InvalidNodeID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid-uuid/stage/"+uuid.New().String()+"/diff", nil)
+	req.SetPathValue("id", "invalid-uuid")
+	req.SetPathValue("stage", uuid.New().String())
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_MissingStageID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage//diff", nil)
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", "")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_InvalidStageID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/invalid-uuid/diff", nil)
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", "invalid-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_PayloadTooLarge(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	// Create a payload larger than 1 MiB.
+	largePayload := make([]byte, 1<<20+1)
+	for i := range largePayload {
+		largePayload[i] = 'A'
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", bytes.NewReader(largePayload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_PayloadTooLarge_Streaming(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	// Create a JSON payload that is valid but exceeds 1 MiB when read.
+	largePatch := strings.Repeat("A", 1<<20)
+	payload := `{
+		"run_id": "` + uuid.New().String() + `",
+		"patch": "` + largePatch + `"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_InvalidJSON(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{invalid json`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_MissingRunID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_InvalidRunID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{
+		"run_id": "invalid-uuid",
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_MissingPatch(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{
+		"run_id": "` + uuid.New().String() + `"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateDiffHandler_NodeNotFound(t *testing.T) {
+	mockSt := &mockStore{
+		getNodeErr: pgx.ErrNoRows,
+	}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called when node not found")
+	}
+}
+
+func TestCreateDiffHandler_RunNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		getRunErr: pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if mockSt.getStageCalled {
+		t.Fatal("expected GetStage not to be called when run not found")
+	}
+}
+
+func TestCreateDiffHandler_StageNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		getRunResult: store.Run{
+			ID: pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusQueued,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getStageErr: pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if mockSt.createDiffCalled {
+		t.Fatal("expected CreateDiff not to be called when stage not found")
+	}
+}
+
+func TestCreateDiffHandler_CreateDiffError(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		getRunResult: store.Run{
+			ID: pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusQueued,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getStageResult: store.Stage{
+			ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
+			Name:   "build",
+			Status: store.StageStatusRunning,
+		},
+		createDiffErr: &pgconn.PgError{Code: "23514"},
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"patch": "Z3ppcHBlZC1kaWZm"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "diff size exceeds 1 MiB cap") {
+		t.Errorf("expected error about size cap, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if !mockSt.createDiffCalled {
+		t.Fatal("expected CreateDiff to be called")
 	}
 }
