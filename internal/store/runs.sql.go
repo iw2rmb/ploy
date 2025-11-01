@@ -11,6 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const ackRunStart = `-- name: AckRunStart :exec
+UPDATE runs
+SET status = 'running'
+WHERE id = $1 AND status = 'assigned'
+`
+
+func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, ackRunStart, id)
+	return err
+}
+
 const claimRun = `-- name: ClaimRun :one
 WITH cte AS (
   SELECT id FROM runs

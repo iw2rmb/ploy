@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AckRunStart(ctx context.Context, id pgtype.UUID) error
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateCluster(ctx context.Context, arg CreateClusterParams) (Cluster, error)

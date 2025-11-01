@@ -134,6 +134,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
 	// Register node claim endpoint (node agents pull work).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st), auth.RoleWorker)
+	// Register node acknowledgement endpoint (node agents acknowledge run start).
+	httpSrv.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st), auth.RoleWorker)
 	// Register node events endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	// Register node diff upload endpoint (node agents).

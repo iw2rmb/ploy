@@ -383,6 +383,162 @@ func TestClaimRun_NoQueuedRuns(t *testing.T) {
 	}
 }
 
+// TestAckRunStart_Basic tests the acknowledgement of run start:
+// - Creates a repo, mod, and run in queued status
+// - Claims the run for a node (transitions to assigned)
+// - Acknowledges run start (transitions to running)
+// - Verifies the run status is updated correctly
+func TestAckRunStart_Basic(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test repo.
+	repo, err := db.CreateRepo(ctx, CreateRepoParams{
+		Url:    "https://github.com/test/ackstart",
+		Branch: ptrStr("main"),
+	})
+	if err != nil {
+		t.Fatalf("CreateRepo() failed: %v", err)
+	}
+
+	// Create a test mod.
+	mod, err := db.CreateMod(ctx, CreateModParams{
+		RepoID: repo.ID,
+		Spec:   []byte(`{"type":"acktest"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	// Create a queued run.
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ModID:     mod.ID,
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create a test node.
+	node, err := db.CreateNode(ctx, CreateNodeParams{
+		Name:      "test-node-ack",
+		IpAddress: mustParseAddr(t, "192.168.5.100"),
+	})
+	if err != nil {
+		t.Fatalf("CreateNode() failed: %v", err)
+	}
+
+	// Claim the run for the node.
+	claimedRun, err := db.ClaimRun(ctx, node.ID)
+	if err != nil {
+		t.Fatalf("ClaimRun() failed: %v", err)
+	}
+
+	// Verify the run is in assigned status.
+	if claimedRun.Status != RunStatusAssigned {
+		t.Errorf("Expected status assigned, got %s", claimedRun.Status)
+	}
+
+	// Acknowledge run start.
+	err = db.AckRunStart(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("AckRunStart() failed: %v", err)
+	}
+
+	// Fetch the run to verify status transition.
+	updatedRun, err := db.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+
+	// Verify the run is now in running status.
+	if updatedRun.Status != RunStatusRunning {
+		t.Errorf("Expected status running after ack, got %s", updatedRun.Status)
+	}
+
+	// Verify started_at is still set (unchanged).
+	if !updatedRun.StartedAt.Valid {
+		t.Error("Expected started_at to remain set after ack")
+	}
+
+	// Verify node_id is still set (unchanged).
+	if !updatedRun.NodeID.Valid || updatedRun.NodeID.Bytes != node.ID.Bytes {
+		t.Errorf("Expected node_id to remain %v, got %v", node.ID, updatedRun.NodeID)
+	}
+}
+
+// TestAckRunStart_WrongStatus tests that AckRunStart only transitions from assigned.
+func TestAckRunStart_WrongStatus(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test repo.
+	repo, err := db.CreateRepo(ctx, CreateRepoParams{
+		Url:    "https://github.com/test/wrongstatus",
+		Branch: ptrStr("main"),
+	})
+	if err != nil {
+		t.Fatalf("CreateRepo() failed: %v", err)
+	}
+
+	// Create a test mod.
+	mod, err := db.CreateMod(ctx, CreateModParams{
+		RepoID: repo.ID,
+		Spec:   []byte(`{"type":"wrongstatustest"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	// Create a queued run (not assigned).
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ModID:     mod.ID,
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Try to acknowledge run start without claiming first.
+	err = db.AckRunStart(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("AckRunStart() returned error: %v", err)
+	}
+
+	// Fetch the run to verify no status change occurred.
+	fetchedRun, err := db.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+
+	// Verify the run is still in queued status (not changed).
+	if fetchedRun.Status != RunStatusQueued {
+		t.Errorf("Expected status to remain queued, got %s", fetchedRun.Status)
+	}
+}
+
 // Helper functions.
 
 func ptrStr(s string) *string {
