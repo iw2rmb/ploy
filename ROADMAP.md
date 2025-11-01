@@ -93,7 +93,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
   - [x] Install systemd unit `ployd.service` (server) or `ployd-node.service` (node) with `Restart=always`.
   - [x] `systemctl daemon-reload && systemctl enable --now <unit>`.
   - [x] Echo final status and key paths.
-- [ ] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
+- [x] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
 
 ## OpenAPI & Docs
 - [ ] Ensure docs/api OpenAPI matches implemented endpoints (PKI, repos/mods/runs, SSE, ingest, heartbeat).
