@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -273,6 +274,49 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					slog.Error("failed to upload diff", "run_id", req.RunID, "error", err)
 				} else {
 					slog.Info("diff uploaded successfully", "run_id", req.RunID, "size", len(diffBytes))
+				}
+			}
+		}
+	}
+
+	// Upload artifact bundles where configured.
+	// Check options for artifact_paths configuration.
+	if artifactPaths, ok := req.Options["artifact_paths"].([]interface{}); ok && len(artifactPaths) > 0 {
+		// Convert to string slice.
+		var paths []string
+		for _, p := range artifactPaths {
+			if pathStr, ok := p.(string); ok && pathStr != "" {
+				// Resolve path relative to workspace.
+				fullPath := filepath.Join(workspaceRoot, pathStr)
+				// Check if path exists before adding.
+				if _, err := os.Stat(fullPath); err == nil {
+					paths = append(paths, fullPath)
+				} else {
+					slog.Warn("artifact path not found", "run_id", req.RunID, "path", pathStr)
+				}
+			}
+		}
+
+		if len(paths) > 0 {
+			// Create artifact uploader and upload the bundle.
+			artifactUploader, err := NewArtifactUploader(r.cfg)
+			if err != nil {
+				slog.Error("failed to create artifact uploader", "run_id", req.RunID, "error", err)
+			} else {
+				// Use the run_id as the stage_id (simplified).
+				stageID := req.RunID
+
+				// Optional: get artifact name from options.
+				artifactName := ""
+				if name, ok := req.Options["artifact_name"].(string); ok {
+					artifactName = name
+				}
+
+				// Upload the artifact bundle to the server.
+				if err := artifactUploader.UploadArtifact(ctx, req.RunID, stageID, paths, artifactName); err != nil {
+					slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "error", err)
+				} else {
+					slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "paths", len(paths))
 				}
 			}
 		}

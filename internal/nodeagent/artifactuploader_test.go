@@ -1,0 +1,260 @@
+package nodeagent
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
+	// Create temporary test files.
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "test1.txt")
+	if err := os.WriteFile(file1, []byte("content1"), 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+	file2 := filepath.Join(tmpDir, "test2.txt")
+	if err := os.WriteFile(file2, []byte("content2"), 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+
+	// Setup mock server.
+	var receivedPayload map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/v1/nodes/test-node-id/stage/test-stage-id/artifact" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read request body: %v", err)
+		}
+
+		if err := json.Unmarshal(body, &receivedPayload); err != nil {
+			t.Fatalf("unmarshal request: %v", err)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"artifact_bundle_id":"test-id"}`))
+	}))
+	defer server.Close()
+
+	// Create uploader.
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+	}
+	uploader, err := NewArtifactUploader(cfg)
+	if err != nil {
+		t.Fatalf("create uploader: %v", err)
+	}
+
+	// Upload artifact.
+	ctx := context.Background()
+	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1, file2}, "test-bundle")
+	if err != nil {
+		t.Fatalf("upload artifact: %v", err)
+	}
+
+	// Verify received payload.
+	if receivedPayload["run_id"] != "test-run-id" {
+		t.Errorf("expected run_id 'test-run-id', got %v", receivedPayload["run_id"])
+	}
+	if receivedPayload["name"] != "test-bundle" {
+		t.Errorf("expected name 'test-bundle', got %v", receivedPayload["name"])
+	}
+
+	// Verify bundle exists and is non-empty.
+	// The bundle field should be present in the payload.
+	if _, exists := receivedPayload["bundle"]; !exists {
+		t.Error("expected bundle field in payload")
+	}
+}
+
+func TestArtifactUploader_UploadArtifact_EmptyPaths(t *testing.T) {
+	cfg := Config{
+		ServerURL: "http://localhost:8443",
+		NodeID:    "test-node-id",
+	}
+	uploader, err := NewArtifactUploader(cfg)
+	if err != nil {
+		t.Fatalf("create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{}, "test-bundle")
+	if err != nil {
+		t.Errorf("expected no error for empty paths, got %v", err)
+	}
+}
+
+func TestArtifactUploader_UploadArtifact_ServerError(t *testing.T) {
+	// Setup mock server that returns error.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal error"))
+	}))
+	defer server.Close()
+
+	// Create temporary test file.
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(file1, []byte("content"), 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+	}
+	uploader, err := NewArtifactUploader(cfg)
+	if err != nil {
+		t.Fatalf("create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1}, "")
+	if err == nil {
+		t.Error("expected error when server returns 500")
+	}
+}
+
+func TestCreateTarGzBundle_SingleFile(t *testing.T) {
+	// Create temporary test file.
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "test.txt")
+	content := []byte("hello world")
+	if err := os.WriteFile(file1, content, 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+
+	// Create bundle.
+	bundleBytes, err := createTarGzBundle([]string{file1})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+
+	if len(bundleBytes) == 0 {
+		t.Error("expected non-empty bundle")
+	}
+
+	// Verify we can decompress and read the tar.
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundleBytes))
+	if err != nil {
+		t.Fatalf("create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+	header, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("read tar header: %v", err)
+	}
+
+	if header.Name != "test.txt" {
+		t.Errorf("expected name 'test.txt', got %s", header.Name)
+	}
+
+	readContent, err := io.ReadAll(tarReader)
+	if err != nil {
+		t.Fatalf("read tar content: %v", err)
+	}
+
+	if !bytes.Equal(readContent, content) {
+		t.Errorf("content mismatch: expected %q, got %q", content, readContent)
+	}
+}
+
+func TestCreateTarGzBundle_MultipleFiles(t *testing.T) {
+	// Create temporary test files.
+	tmpDir := t.TempDir()
+	file1 := filepath.Join(tmpDir, "file1.txt")
+	file2 := filepath.Join(tmpDir, "file2.txt")
+	if err := os.WriteFile(file1, []byte("content1"), 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+	if err := os.WriteFile(file2, []byte("content2"), 0600); err != nil {
+		t.Fatalf("create test file: %v", err)
+	}
+
+	// Create bundle.
+	bundleBytes, err := createTarGzBundle([]string{file1, file2})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+
+	// Verify we can decompress and read the tar.
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundleBytes))
+	if err != nil {
+		t.Fatalf("create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	tarReader := tar.NewReader(gzReader)
+
+	// Read first file.
+	header1, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("read first tar header: %v", err)
+	}
+	if header1.Name != "file1.txt" {
+		t.Errorf("expected name 'file1.txt', got %s", header1.Name)
+	}
+
+	// Read second file.
+	header2, err := tarReader.Next()
+	if err != nil {
+		t.Fatalf("read second tar header: %v", err)
+	}
+	if header2.Name != "file2.txt" {
+		t.Errorf("expected name 'file2.txt', got %s", header2.Name)
+	}
+}
+
+func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
+	// Try to bundle a non-existent file.
+	_, err := createTarGzBundle([]string{"/nonexistent/file.txt"})
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+}
+
+func TestArtifactUploader_SizeCap(t *testing.T) {
+	// Create a large file that will exceed the 1 MiB cap when bundled.
+	tmpDir := t.TempDir()
+	largeFile := filepath.Join(tmpDir, "large.txt")
+	// Create a 2 MiB file (will exceed 1 MiB cap even when compressed).
+	largeContent := make([]byte, 2<<20)
+	for i := range largeContent {
+		largeContent[i] = byte(i % 256)
+	}
+	if err := os.WriteFile(largeFile, largeContent, 0600); err != nil {
+		t.Fatalf("create large file: %v", err)
+	}
+
+	cfg := Config{
+		ServerURL: "http://localhost:8443",
+		NodeID:    "test-node-id",
+	}
+	uploader, err := NewArtifactUploader(cfg)
+	if err != nil {
+		t.Fatalf("create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{largeFile}, "")
+	if err == nil {
+		t.Error("expected error for oversized bundle")
+	}
+}

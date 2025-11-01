@@ -70,7 +70,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Hook Build Gate (re-use lifecycle checker interfaces); capture per-stage/build timings.
 - [x] Stream logs as gzipped chunks to server; enforce ≤1 MiB client-side cap.
 - [x] Produce unified diff and summary; gzip and POST to server.
-- [ ] Upload artifact bundles (tar.gz) where configured.
+- [x] Upload artifact bundles (tar.gz) where configured.
 - [ ] Emit terminal status + cleanup workspace.
 
 ## Store & Migrations
