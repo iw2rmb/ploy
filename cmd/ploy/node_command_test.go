@@ -50,3 +50,19 @@ func TestHandleNodeAddRejectsExtraArgs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestHandleNodeAddRequiresServerURL(t *testing.T) {
+	buf := &bytes.Buffer{}
+	// Provide cluster-id and address but no server-url (and no binary path)
+	err := handleNodeAdd([]string{
+		"--cluster-id", "c1",
+		"--address", "10.0.0.5",
+		"--ployd-node-binary", "/dev/null",
+	}, buf)
+	if err == nil {
+		t.Fatalf("expected error when --server-url is missing")
+	}
+	if !strings.Contains(err.Error(), "server-url is required") {
+		t.Fatalf("expected server-url required error, got: %v", err)
+	}
+}
