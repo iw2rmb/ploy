@@ -34,7 +34,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] `POST /v1/mods/crud` + `GET /v1/mods/crud?repo_id=`.
 - [x] `POST /v1/runs` (create run; status=queued) returns `{run_id}`.
 - [x] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
-- [ ] `GET /v1/runs?view=timing` to read from `runs_timing`.
+- [x] `GET /v1/runs?view=timing` to read from `runs_timing`.
 
 ## API: Events/SSE
 - [ ] Add in-memory log/Event hub using `internal/node/logstream` for SSE fanout.

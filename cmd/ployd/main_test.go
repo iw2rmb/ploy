@@ -275,6 +275,11 @@ type mockStore struct {
 	getRunResult store.Run
 	getRunErr    error
 
+	getRunTimingCalled bool
+	getRunTimingParams pgtype.UUID
+	getRunTimingResult store.RunsTiming
+	getRunTimingErr    error
+
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
 	deleteRunErr    error
@@ -324,6 +329,12 @@ func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, erro
 	m.getRunCalled = true
 	m.getRunParams = id
 	return m.getRunResult, m.getRunErr
+}
+
+func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
+	m.getRunTimingCalled = true
+	m.getRunTimingParams = id
+	return m.getRunTimingResult, m.getRunTimingErr
 }
 
 func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
@@ -2058,5 +2069,250 @@ func TestDeleteRunHandler_DeleteError(t *testing.T) {
 	}
 	if !mockSt.deleteRunCalled {
 		t.Fatal("expected DeleteRun to be called")
+	}
+}
+
+func TestGetRunTimingHandler_Success(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunTimingResult: store.RunsTiming{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			QueueMs: 1500,
+			RunMs:   3000,
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String()+"&view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		ID      string `json:"id"`
+		QueueMs int64  `json:"queue_ms"`
+		RunMs   int64  `json:"run_ms"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.ID != runID.String() {
+		t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+	}
+	if resp.QueueMs != 1500 {
+		t.Errorf("expected queue_ms 1500, got %d", resp.QueueMs)
+	}
+	if resp.RunMs != 3000 {
+		t.Errorf("expected run_ms 3000, got %d", resp.RunMs)
+	}
+
+	if !mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming to be called")
+	}
+}
+
+func TestGetRunTimingHandler_PathParam(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunTimingResult: store.RunsTiming{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			QueueMs: 500,
+			RunMs:   2000,
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"?view=timing", nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		ID      string `json:"id"`
+		QueueMs int64  `json:"queue_ms"`
+		RunMs   int64  `json:"run_ms"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.ID != runID.String() {
+		t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+	}
+	if resp.QueueMs != 500 {
+		t.Errorf("expected queue_ms 500, got %d", resp.QueueMs)
+	}
+	if resp.RunMs != 2000 {
+		t.Errorf("expected run_ms 2000, got %d", resp.RunMs)
+	}
+
+	if !mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming to be called")
+	}
+}
+
+func TestGetRunTimingHandler_ZeroValues(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunTimingResult: store.RunsTiming{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			QueueMs: 0,
+			RunMs:   0,
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String()+"&view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		ID      string `json:"id"`
+		QueueMs int64  `json:"queue_ms"`
+		RunMs   int64  `json:"run_ms"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.ID != runID.String() {
+		t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+	}
+	if resp.QueueMs != 0 {
+		t.Errorf("expected queue_ms 0, got %d", resp.QueueMs)
+	}
+	if resp.RunMs != 0 {
+		t.Errorf("expected run_ms 0, got %d", resp.RunMs)
+	}
+
+	if !mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming to be called")
+	}
+}
+
+func TestGetRunTimingHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id query parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming not to be called")
+	}
+}
+
+func TestGetRunTimingHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id=invalid-uuid&view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming not to be called")
+	}
+}
+
+func TestGetRunTimingHandler_NotFound(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunTimingErr: pgx.ErrNoRows,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String()+"&view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "run not found") {
+		t.Errorf("expected error about run not found, got: %s", body)
+	}
+
+	if !mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming to be called")
+	}
+}
+
+func TestGetRunTimingHandler_DatabaseError(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunTimingErr: &pgconn.PgError{Code: "08000"},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String()+"&view=timing", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to get run timing") {
+		t.Errorf("expected error about database failure, got: %s", body)
+	}
+
+	if !mockSt.getRunTimingCalled {
+		t.Fatal("expected GetRunTiming to be called")
 	}
 }
