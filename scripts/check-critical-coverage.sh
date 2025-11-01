@@ -39,23 +39,38 @@ echo ""
 echo "Checking critical paths (threshold: ${CRITICAL_THRESHOLD}%)..."
 FAILED=0
 
+# Compute per‑package coverage using the raw coverage.out (exact, statement‑weighted).
+# Fallback to `go test -cover` for the package import path if filtering fails.
 for path in "${CRITICAL_PATHS[@]}"; do
-    # Extract coverage for this path
-    COVERAGE=$(go tool cover -func="$COVERAGE_FILE" | grep "^$path" | awk '{sum+=$3; count++} END {if (count > 0) print sum/count; else print 0}' | sed 's/%//')
+    # Statement‑weighted computation from coverage file
+    COVERAGE=$(awk -v p="$path/" '
+        BEGIN { FS = "[[:space:]]+"; covered=0; total=0 }
+        /^mode:/ { next }
+        {
+            f=$1; sub(/:.*/, "", f);
+            if (index(f, p)==1) {
+                stmts=$2; cnt=$3;
+                total += stmts;
+                if (cnt > 0) covered += stmts;
+            }
+        }
+        END {
+            if (total>0) printf "%.4f", (covered*100.0)/total; else print "";
+        }
+    ' "$COVERAGE_FILE")
 
-    # Handle empty coverage (package might not have statements)
-    if [ -z "$COVERAGE" ] || [ "$COVERAGE" = "0" ]; then
-        # Try alternative approach - get package summary
-        PACKAGE_SUMMARY=$(go test -coverprofile=/dev/null -covermode=atomic "./$path" 2>&1 | grep "coverage:" | awk '{print $5}' | sed 's/%//')
-        if [ -n "$PACKAGE_SUMMARY" ]; then
-            COVERAGE="$PACKAGE_SUMMARY"
-        else
-            COVERAGE="0"
-        fi
+    # Fallback: run `go test -cover` for the import path to get a single percentage.
+    if [ -z "$COVERAGE" ]; then
+        PACKAGE_SUMMARY=$(go test -cover "$path" 2>&1 | grep "coverage:" | awk '{print $5}' | sed 's/%//') || true
+        COVERAGE="$PACKAGE_SUMMARY"
     fi
 
-    echo -n "  $path: ${COVERAGE}% ... "
+    # If still empty, treat as 0
+    if [ -z "$COVERAGE" ]; then
+        COVERAGE=0
+    fi
 
+    printf "  %s: %s%% ... " "$path" "$COVERAGE"
     if (( $(echo "$COVERAGE < $CRITICAL_THRESHOLD" | bc -l) )); then
         echo "FAIL (below ${CRITICAL_THRESHOLD}%)"
         FAILED=1
