@@ -21,6 +21,7 @@ import (
 	apiconfig "github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/events"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 	internalPKI "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -2538,4 +2539,107 @@ func createTestEventsService() (*events.Service, error) {
 		HistorySize: 256,
 		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
 	})
+}
+
+// flushRecorder adapts httptest.ResponseRecorder to also implement http.Flusher.
+type flushRecorder struct{ *httptest.ResponseRecorder }
+
+func (f *flushRecorder) Flush() {}
+
+// TestGetRunEventsHandler_Success verifies SSE frames are written for an existing run.
+func TestGetRunEventsHandler_Success(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ModID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			Stats:     []byte("{}"),
+		},
+	}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	// Publish history: two logs then done to close the stream.
+	ctx := context.Background()
+	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().Format(time.RFC3339), Stream: "stdout", Line: "first"})
+	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().Format(time.RFC3339), Stream: "stdout", Line: "second"})
+	_ = hub.PublishStatus(ctx, runID.String(), logstream.Status{Status: "completed"})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/events", nil)
+	req.SetPathValue("id", runID.String())
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, ":ok\n\n") {
+		t.Fatalf("expected initial comment, got: %q", body)
+	}
+	if !strings.Contains(body, "event: log") || !strings.Contains(body, "event: done") {
+		t.Fatalf("expected log and done events, got: %q", body)
+	}
+	if !strings.Contains(body, "first") || !strings.Contains(body, "second") {
+		t.Fatalf("expected both log lines, got: %q", body)
+	}
+}
+
+// TestGetRunEventsHandler_Resume verifies Last-Event-ID is honored for resumption.
+func TestGetRunEventsHandler_Resume(t *testing.T) {
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ModID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			Stats:     []byte("{}"),
+		},
+	}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+	hub := eventsService.Hub()
+
+	// Publish three events so that resuming after id=1 returns second log and done.
+	ctx := context.Background()
+	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().Format(time.RFC3339), Stream: "stdout", Line: "first"})  // id=1
+	_ = hub.PublishLog(ctx, runID.String(), logstream.LogRecord{Timestamp: time.Now().Format(time.RFC3339), Stream: "stdout", Line: "second"}) // id=2
+	_ = hub.PublishStatus(ctx, runID.String(), logstream.Status{Status: "completed"})                                                          // id=3
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String()+"/events", nil)
+	req.SetPathValue("id", runID.String())
+	req.Header.Set("Last-Event-ID", "1") // resume after first log
+	rr := &flushRecorder{httptest.NewRecorder()}
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, "first") {
+		t.Fatalf("did not expect 'first' after resume, got: %q", body)
+	}
+	if !strings.Contains(body, "second") || !strings.Contains(body, "event: done") {
+		t.Fatalf("expected 'second' and 'done' after resume, got: %q", body)
+	}
 }
