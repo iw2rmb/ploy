@@ -17,7 +17,7 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("config: open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	cfg, err := loadFromReader(f)
 	if err != nil {
 		return Config{}, err

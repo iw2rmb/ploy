@@ -48,7 +48,7 @@ func (c ListCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		data, _ := io.ReadAll(resp.Body)
 		msg := strings.TrimSpace(string(data))
@@ -57,10 +57,13 @@ func (c ListCommand) Run(ctx context.Context) error {
 		}
 		return fmt.Errorf("jobs ls: %s", msg)
 	}
+	type jobRow struct {
+		ID     string
+		StepID string
+		State  string
+	}
 	var payload struct {
-		Jobs []struct {
-			ID, StepID, State string `json:"id" json2:"step_id"`
-		} `json:"jobs"`
+		Jobs []jobRow
 	}
 	// decode into generic map then pick fields to avoid brittle tags
 	var raw struct {
@@ -73,9 +76,7 @@ func (c ListCommand) Run(ctx context.Context) error {
 		id := strings.TrimSpace(asString(j["id"]))
 		step := strings.TrimSpace(asString(j["step_id"]))
 		state := strings.TrimSpace(asString(j["state"]))
-		payload.Jobs = append(payload.Jobs, struct {
-			ID, StepID, State string `json:"id" json2:"step_id"`
-		}{ID: id, StepID: step, State: state})
+		payload.Jobs = append(payload.Jobs, jobRow{ID: id, StepID: step, State: state})
 	}
 	if c.Output == nil {
 		return nil

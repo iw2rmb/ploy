@@ -23,10 +23,6 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	if stderr == nil {
 		stderr = os.Stderr
 	}
-	stdin := opts.Stdin
-	if stdin == nil {
-		stdin = os.Stdin
-	}
 
 	address := strings.TrimSpace(opts.Address)
 	if address == "" {
@@ -73,7 +69,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	envVars := map[string]string{
 		"PLOY_BOOTSTRAP_VERSION": bootstrap.Version,
 	}
-    envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
+	envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
 	if sanitized := sanitizeNodeID(nodeID); sanitized != "" {
 		envVars["PLOYD_NODE_ID"] = sanitized
 	} else {

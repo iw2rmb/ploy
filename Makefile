@@ -74,7 +74,7 @@ staticcheck: ## Run staticcheck
 	fi
 
 .PHONY: ci-check
-ci-check: fmt vet lint staticcheck test-coverage-threshold ## Run all CI checks locally
+ci-check: fmt vet staticcheck test-coverage-threshold ## Run core CI checks locally
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install

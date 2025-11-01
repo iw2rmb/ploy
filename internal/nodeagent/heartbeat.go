@@ -126,7 +126,7 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("heartbeat failed with status %d", resp.StatusCode)

@@ -83,23 +83,19 @@ func NewCollector(opts Options) *Collector {
 		nowFn = func() time.Time { return time.Now().UTC() }
 	}
 	return &Collector{
-		role:     strings.TrimSpace(opts.Role),
-		nodeID:   strings.TrimSpace(opts.NodeID),
-		hostname: hostFn,
-		docker:   opts.Docker,
-		gate:     opts.Gate,
-		now:      nowFn,
-		loadFunc: load.AvgWithContext,
-		memFunc:  mem.VirtualMemoryWithContext,
-		diskUsageFunc: func(ctx context.Context, path string) (*disk.UsageStat, error) {
-			return disk.UsageWithContext(ctx, path)
-		},
+		role:          strings.TrimSpace(opts.Role),
+		nodeID:        strings.TrimSpace(opts.NodeID),
+		hostname:      hostFn,
+		docker:        opts.Docker,
+		gate:          opts.Gate,
+		now:           nowFn,
+		loadFunc:      load.AvgWithContext,
+		memFunc:       mem.VirtualMemoryWithContext,
+		diskUsageFunc: disk.UsageWithContext,
 		diskCountersFunc: func(ctx context.Context) (map[string]disk.IOCountersStat, error) {
 			return disk.IOCountersWithContext(ctx)
 		},
-		netCountersFunc: func(ctx context.Context) ([]net.IOCountersStat, error) {
-			return net.IOCountersWithContext(ctx, true)
-		},
+		netCountersFunc:  func(ctx context.Context) ([]net.IOCountersStat, error) { return net.IOCountersWithContext(ctx, true) },
 		ignoreInterfaces: normalizePatterns(opts.IgnoreInterfaces),
 		metrics:          newMetricsCache(),
 	}

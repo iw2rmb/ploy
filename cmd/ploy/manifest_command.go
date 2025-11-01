@@ -1,10 +1,10 @@
 package main
 
 import (
-    "errors"
-    "fmt"
-    "io"
-    "strings"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
 
 	manifestcli "github.com/iw2rmb/ploy/internal/cli/manifest"
 )

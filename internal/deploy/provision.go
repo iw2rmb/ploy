@@ -112,30 +112,30 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 		return fmt.Errorf("provision: execute bootstrap script: %w", err)
 	}
 
-    for _, service := range opts.ServiceChecks {
-        service = strings.TrimSpace(service)
-        if service == "" {
-            continue
-        }
-        checkArgs := append(append([]string(nil), sshArgs...), target, fmt.Sprintf("systemctl is-active --quiet %s", shellQuote(service)))
-        if err := runner.Run(ctx, "ssh", checkArgs, nil, streams); err != nil {
-            statusArgs := append(append([]string(nil), sshArgs...), target, fmt.Sprintf("systemctl status %s --no-pager", shellQuote(service)))
-            _ = runner.Run(ctx, "ssh", statusArgs, nil, streams)
-            return fmt.Errorf("provision: %s service not active", service)
-        }
-    }
-    return nil
+	for _, service := range opts.ServiceChecks {
+		service = strings.TrimSpace(service)
+		if service == "" {
+			continue
+		}
+		checkArgs := append(append([]string(nil), sshArgs...), target, fmt.Sprintf("systemctl is-active --quiet %s", shellQuote(service)))
+		if err := runner.Run(ctx, "ssh", checkArgs, nil, streams); err != nil {
+			statusArgs := append(append([]string(nil), sshArgs...), target, fmt.Sprintf("systemctl status %s --no-pager", shellQuote(service)))
+			_ = runner.Run(ctx, "ssh", statusArgs, nil, streams)
+			return fmt.Errorf("provision: %s service not active", service)
+		}
+	}
+	return nil
 }
 
 func renderBootstrapScript(env map[string]string) string {
-    exports := bootstrap.DefaultExports()
-    for key, value := range env {
-        key = strings.TrimSpace(key)
-        if key == "" {
-            continue
-        }
-        exports[key] = strings.TrimSpace(value)
-    }
+	exports := bootstrap.DefaultExports()
+	for key, value := range env {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		exports[key] = strings.TrimSpace(value)
+	}
 
 	return bootstrap.PrefixedScript(exports)
 }
