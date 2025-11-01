@@ -58,10 +58,10 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Remove token-based auth; update OpenAPI to mTLS-only.
 - [x] Remove `pkg/sshtransport` (no SSH tunnels in new architecture).
 
-- [ ] Knowledge Base (in scope)
-  - [ ] Keep `ploy knowledge-base ingest/evaluate` working with new layout.
-  - [ ] Ensure Mods advisor consumes `configs/knowledge-base/catalog.json` and surfaces recommendations in runs.
-  - [ ] Update docs: `configs/knowledge-base/README.md`, CLI reference.
+- [x] Knowledge Base (in scope)
+  - [x] Keep `ploy knowledge-base ingest/evaluate` working with new layout.
+  - [x] Ensure Mods advisor consumes `configs/knowledge-base/catalog.json` and surfaces recommendations in runs.
+  - [x] Update docs: `configs/knowledge-base/README.md`, CLI reference.
 
 - [ ] OpenAPI + docs pass
   - [ ] Update `docs/api/OpenAPI.yaml` to new endpoints and mTLS-only auth.
