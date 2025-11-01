@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -134,6 +135,7 @@ type Runner struct {
 	Diffs      DiffGenerator
 	Artifacts  ArtifactPublisher
 	Gate       GateExecutor
+	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
 
 // Request describes a step execution request.
@@ -180,6 +182,14 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	executionStart := time.Now()
 	// Container execution is stubbed; future work will invoke Containers.
 	// For now, we simulate successful execution with exit code 0.
+	// When container execution is implemented, stdout/stderr will be written to LogWriter.
+	if r.LogWriter != nil {
+		// Placeholder log message to demonstrate streaming works.
+		_, _ = fmt.Fprintf(r.LogWriter, "Starting execution for manifest %s\n", req.Manifest.ID)
+		_, _ = fmt.Fprintf(r.LogWriter, "Workspace: %s\n", req.Workspace)
+		_, _ = fmt.Fprintf(r.LogWriter, "Image: %s\n", req.Manifest.Image)
+		_, _ = fmt.Fprintf(r.LogWriter, "Command: %v\n", req.Manifest.Command)
+	}
 	result.ExitCode = 0
 	result.Timings.ExecutionDuration = time.Since(executionStart)
 
