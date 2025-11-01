@@ -1309,8 +1309,9 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 			BaseRef:   run.BaseRef,
 			TargetRef: run.TargetRef,
 			CommitSha: run.CommitSha,
-			StartedAt: run.StartedAt.Time.Format(time.RFC3339Nano),
-			CreatedAt: run.CreatedAt.Time.Format(time.RFC3339Nano),
+            // Use RFC3339 for consistency with other API responses.
+            StartedAt: run.StartedAt.Time.Format(time.RFC3339),
+            CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
