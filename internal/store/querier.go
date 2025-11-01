@@ -26,6 +26,14 @@ type Querier interface {
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
 	DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	// DeleteExpiredArtifactBundles removes artifact bundle rows older than the specified timestamp.
+	DeleteExpiredArtifactBundles(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
+	// DeleteExpiredDiffs removes diff rows older than the specified timestamp.
+	DeleteExpiredDiffs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
+	// DeleteExpiredEvents removes event rows older than the specified timestamp.
+	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
+	// DeleteExpiredLogs removes log rows older than the specified timestamp.
+	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteMod(ctx context.Context, id pgtype.UUID) error

@@ -40,6 +40,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
@@ -205,6 +206,22 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	if publisher == nil {
 		if snapshot, err := collector.Collect(context.Background()); err == nil {
 			lifecycleCache.Store(snapshot.Status)
+		}
+	}
+
+	// Register TTL worker if Postgres store is available.
+	if pgStore != nil {
+		ttlTask, err := ttlworker.New(ttlworker.Options{
+			Store:    pgStore,
+			TTL:      30 * 24 * time.Hour, // 30 days default
+			Interval: time.Hour,           // Run every hour
+			Logger:   nil,                 // Use default logger
+		})
+		if err != nil {
+			log.Printf("ttl-worker: disabled: %v", err)
+		} else if ttlTask != nil {
+			taskScheduler.AddTask(ttlTask)
+			log.Printf("ttl-worker: registered with interval=%v ttl=%v", ttlTask.Interval(), 30*24*time.Hour)
 		}
 	}
 
