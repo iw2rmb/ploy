@@ -50,4 +50,16 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 			t.Fatalf("expected endpoint override, got %s", url)
 		}
 	})
+
+	// IPv6 address without port should be bracketed and default to 8443.
+	t.Run("ipv6 default port", func(t *testing.T) {
+		desc := config.Descriptor{ClusterID: "lab", Address: "2001:db8::1"}
+		url, err := controlplane.BaseURLFromDescriptor(desc)
+		if err != nil {
+			t.Fatalf("descriptorControlPlaneURL ipv6 failed: %v", err)
+		}
+		if url != "https://[2001:db8::1]:8443" {
+			t.Fatalf("expected bracketed IPv6 with default port, got %s", url)
+		}
+	})
 }
