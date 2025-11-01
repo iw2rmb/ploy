@@ -39,7 +39,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 ## API: Events/SSE
 - [x] Add in-memory log/Event hub using `internal/node/logstream` for SSE fanout.
 - [x] `GET /v1/runs/{id}/events` (SSE) with Last-Event-ID support.
-- [ ] Wrap DB append so that server both persists events and fans out to SSE.
+- [x] Wrap DB append so that server both persists events and fans out to SSE.
 
 ## API: Node Ingest/Heartbeat
 - [ ] `POST /v1/nodes/{id}/heartbeat`: update `nodes` snapshot (cpu/mem/disk + version) and `last_heartbeat`.
