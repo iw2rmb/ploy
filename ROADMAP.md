@@ -62,7 +62,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Ensure config loader `internal/nodeagent/config.go` and server start wire TLS client/server correctly.
 - [x] Implement `POST /v1/run/start` and `POST /v1/run/stop` handlers (already present under build tag; enable).
 - [x] Heartbeat manager: confirm `internal/nodeagent/heartbeat.go` posts to server endpoint with mTLS.
-- [ ] Add basic backoff for server 5xx on heartbeat.
+- [x] Add basic backoff for server 5xx on heartbeat.
 
 ## Node Execution Contract
 - [ ] Ephemeral workspace create/cleanup per run (tmpdir, unique prefix).
