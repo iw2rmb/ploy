@@ -50,10 +50,13 @@ defaults change, or components adopt additional configuration.
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
   location (default `/etc/ploy/ployd.yaml`).
+  TODO: not yet consumed by code in this repo; wire in bootstrap/ployd config slice.
 - `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
   generates the initial configuration (default `0.0.0.0:8443`).
-- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
-  `:9100`).
+  TODO: not yet consumed by code in this repo; wire in bootstrap/ployd config slice.
+- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener.
+  Currently set to `127.0.0.1:9101` by `server deploy` bootstrap. TODO: confirm final default and
+  consumption in ployd.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap to a sanitized
   version of the node name. Used by the daemon to identify itself in logs and metrics.
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Defaults to `/root` when running
@@ -75,6 +78,7 @@ defaults change, or components adopt additional configuration.
   `/etc/ploy/pki/node-key.pem`.
 - `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute (default: `1`).
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
+  TODO: lifecycle collector to read this in an upcoming slice.
   - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
 
     environment:
@@ -91,6 +95,9 @@ defaults change, or components adopt additional configuration.
   branches after creating merge requests.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
   live Mods smoke test should execute (defaults to `simple-openrewrite`).
+
+- `PLOY_GITLAB_PAT` — Optional GitLab Personal Access Token used by the Mods E2E
+  walkthroughs and MR creation notes in `STATE.md`. TODO: server-side GitLab wiring pending.
 
  
 
@@ -109,18 +116,24 @@ defaults change, or components adopt additional configuration.
 ### Server (Control Plane)
 
 - `PLOY_SERVER_HTTP_LISTEN` — Address the server listens on for HTTPS API/SSE (default: `:8443`).
+  TODO: not yet consumed by `cmd/ployd`; see ROADMAP tasks under "Server Bootstrap".
 - `PLOY_SERVER_METRICS_LISTEN` — Address for Prometheus metrics endpoint (default: `:9100`).
+  TODO: not yet consumed by `cmd/ployd`.
 - `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy server deploy`).
+  TODO: persisted/loaded by server in upcoming slices.
 - `PLOY_SERVER_TLS_CERT` / `PLOY_SERVER_TLS_KEY` — PEM-encoded server TLS certificate and key
   for the HTTPS API. Issued by the cluster CA during `ploy server deploy`.
+  TODO: server main to load these from env/config.
 
 ### PKI
 
 - `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate presented to nodes. Required for
   the `/v1/pki/sign` endpoint to return signed certificates.
+  TODO: handler wiring pending; see ROADMAP "API: PKI".
 - `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs. Required
   alongside `PLOY_SERVER_CA_CERT` for `/v1/pki/sign`. When either value is missing, the server
   responds with `503 PKI not configured`.
+  TODO: handler wiring pending.
 
 ## PostgreSQL
 
@@ -135,6 +148,21 @@ The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
   `PLOY_SERVER_PG_DSN` going forward.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by `internal/store` integration tests. When unset, tests
   that require a live database are skipped.
+
+TODO: server startup wiring for `PLOY_SERVER_PG_DSN`/`PLOY_POSTGRES_DSN` is tracked in ROADMAP "Server Bootstrap".
+
+## Bootstrap Script (exports)
+
+These are exported by the bootstrap script used during `ploy server deploy` and `ploy node add` flows.
+They are not required for day‑to‑day CLI usage but are documented here for completeness.
+
+- `PLOY_BOOTSTRAP_VERSION` — Version string embedded at the top of generated bootstrap scripts.
+- `PLOY_INSTALL_POSTGRESQL` — When `true`, bootstrap installs PostgreSQL on the target host and derives
+  `PLOY_SERVER_PG_DSN`; when `false`, the provided DSN is used as-is.
+- `CLUSTER_ID` — Cluster identifier used during provisioning to label generated assets.
+- `NODE_ID` — Node identifier provided to the bootstrap script (control plane uses `control`).
+- `NODE_ADDRESS` — IP/hostname of the node being provisioned.
+- `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions.
 
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
