@@ -264,6 +264,29 @@ func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams
 	return items, nil
 }
 
+const updateRunCompletion = `-- name: UpdateRunCompletion :exec
+UPDATE runs
+SET status = $2, reason = $3, finished_at = now(), stats = $4
+WHERE id = $1
+`
+
+type UpdateRunCompletionParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status RunStatus   `json:"status"`
+	Reason *string     `json:"reason"`
+	Stats  []byte      `json:"stats"`
+}
+
+func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
+	_, err := q.db.Exec(ctx, updateRunCompletion,
+		arg.ID,
+		arg.Status,
+		arg.Reason,
+		arg.Stats,
+	)
+	return err
+}
+
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
 SET status = $2, reason = $3, finished_at = $4

@@ -333,6 +333,11 @@ type mockStore struct {
 	ackRunStartCalled bool
 	ackRunStartParam  pgtype.UUID
 	ackRunStartErr    error
+
+	// UpdateRunCompletion tracking
+	updateRunCompletionCalled bool
+	updateRunCompletionParams store.UpdateRunCompletionParams
+	updateRunCompletionErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -445,6 +450,12 @@ func (m *mockStore) AckRunStart(ctx context.Context, id pgtype.UUID) error {
 	m.ackRunStartCalled = true
 	m.ackRunStartParam = id
 	return m.ackRunStartErr
+}
+
+func (m *mockStore) UpdateRunCompletion(ctx context.Context, params store.UpdateRunCompletionParams) error {
+	m.updateRunCompletionCalled = true
+	m.updateRunCompletionParams = params
+	return m.updateRunCompletionErr
 }
 
 // no-op
@@ -3355,6 +3366,196 @@ func TestAckRunStartHandler_WrongStatus(t *testing.T) {
 	}
 	if mockSt.ackRunStartCalled {
 		t.Fatal("expected AckRunStart not to be called when wrong status")
+	}
+}
+
+func TestCompleteRunHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+	reason := "test completed successfully"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID:        pgtype.UUID{Bytes: nodeID, Valid: true},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.RunStatusRunning,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "succeeded", "reason": "` + reason + `", "stats": {"duration_ms": 1234, "tests_passed": 42}}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called")
+	}
+	if uuid.UUID(mockSt.updateRunCompletionParams.ID.Bytes) != runID {
+		t.Fatalf("expected UpdateRunCompletion ID %s, got %s", runID, uuid.UUID(mockSt.updateRunCompletionParams.ID.Bytes))
+	}
+	if mockSt.updateRunCompletionParams.Status != store.RunStatusSucceeded {
+		t.Fatalf("expected status succeeded, got %s", mockSt.updateRunCompletionParams.Status)
+	}
+	if mockSt.updateRunCompletionParams.Reason == nil || *mockSt.updateRunCompletionParams.Reason != reason {
+		t.Fatalf("expected reason %q, got %v", reason, mockSt.updateRunCompletionParams.Reason)
+	}
+	expectedStats := `{"duration_ms": 1234, "tests_passed": 42}`
+	if string(mockSt.updateRunCompletionParams.Stats) != expectedStats {
+		t.Fatalf("expected stats %s, got %s", expectedStats, string(mockSt.updateRunCompletionParams.Stats))
+	}
+}
+
+func TestCompleteRunHandler_FailedStatus(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+	reason := "build failed"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "failed", "reason": "` + reason + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Fatalf("expected status failed, got %s", mockSt.updateRunCompletionParams.Status)
+	}
+}
+
+func TestCompleteRunHandler_WrongNode(t *testing.T) {
+	nodeID := uuid.New()
+	otherNode := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning, NodeID: pgtype.UUID{Bytes: otherNode, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "succeeded"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion not to be called when wrong node")
+	}
+}
+
+func TestCompleteRunHandler_WrongStatus(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "succeeded"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion not to be called when wrong status")
+	}
+}
+
+func TestCompleteRunHandler_InvalidTerminalStatus(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "running"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion not to be called with invalid terminal status")
+	}
+}
+
+func TestCompleteRunHandler_EmptyStats(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `", "status": "succeeded"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if string(mockSt.updateRunCompletionParams.Stats) != "{}" {
+		t.Fatalf("expected empty stats {}, got %s", string(mockSt.updateRunCompletionParams.Stats))
 	}
 }
 

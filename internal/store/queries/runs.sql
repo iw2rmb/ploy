@@ -41,6 +41,11 @@ UPDATE runs
 SET status = 'running'
 WHERE id = $1 AND status = 'assigned';
 
+-- name: UpdateRunCompletion :exec
+UPDATE runs
+SET status = $2, reason = $3, finished_at = now(), stats = $4
+WHERE id = $1;
+
 -- name: DeleteRun :exec
 DELETE FROM runs
 WHERE id = $1;

@@ -295,6 +295,147 @@ func ackRunStartHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
+// completeRunHandler marks a run as completed with terminal status and stats.
+// Sets finished_at timestamp and populates runs.stats field.
+func completeRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract node id from path parameter.
+		nodeIDStr := r.PathValue("id")
+		if strings.TrimSpace(nodeIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate node_id.
+		nodeUUID, err := uuid.Parse(nodeIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Decode request body to get run_id, status, reason, and stats.
+		var req struct {
+			RunID  string          `json:"run_id"`
+			Status string          `json:"status"`
+			Reason *string         `json:"reason,omitempty"`
+			Stats  json.RawMessage `json:"stats,omitempty"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate run_id is present.
+		if strings.TrimSpace(req.RunID) == "" {
+			http.Error(w, "run_id is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate run_id.
+		runUUID, err := uuid.Parse(req.RunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate status is a terminal state.
+		if strings.TrimSpace(req.Status) == "" {
+			http.Error(w, "status is required", http.StatusBadRequest)
+			return
+		}
+
+		// Normalize status to match RunStatus enum values.
+		normalizedStatus := store.RunStatus(strings.ToLower(strings.TrimSpace(req.Status)))
+
+		// Validate that status is a terminal state (succeeded, failed, or canceled).
+		if normalizedStatus != store.RunStatusSucceeded &&
+			normalizedStatus != store.RunStatusFailed &&
+			normalizedStatus != store.RunStatusCanceled {
+			http.Error(w, fmt.Sprintf("status must be succeeded, failed, or canceled, got %s", req.Status), http.StatusBadRequest)
+			return
+		}
+
+		// Verify node exists before attempting to complete the run.
+		_, err = st.GetNode(r.Context(), pgtype.UUID{
+			Bytes: nodeUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "node not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			slog.Error("complete run: node check failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Verify run exists and is assigned to this node.
+		run, err := st.GetRun(r.Context(), pgtype.UUID{
+			Bytes: runUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
+			slog.Error("complete run: run check failed", "run_id", req.RunID, "err", err)
+			return
+		}
+
+		// Verify the run is assigned to the requesting node.
+		if !run.NodeID.Valid || uuid.UUID(run.NodeID.Bytes) != nodeUUID {
+			http.Error(w, "run not assigned to this node", http.StatusForbidden)
+			return
+		}
+
+		// Verify the run is in 'running' status before transitioning to terminal state.
+		if run.Status != store.RunStatusRunning {
+			http.Error(w, fmt.Sprintf("run status is %s, expected running", run.Status), http.StatusConflict)
+			return
+		}
+
+		// Prepare stats field (default to empty JSON object if not provided).
+		statsBytes := []byte("{}")
+		if len(req.Stats) > 0 {
+			// Validate that stats is valid JSON.
+			if !json.Valid(req.Stats) {
+				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
+				return
+			}
+			statsBytes = req.Stats
+		}
+
+		// Update run completion: set status, reason, finished_at (server-side now()), and stats.
+		err = st.UpdateRunCompletion(r.Context(), store.UpdateRunCompletionParams{
+			ID: pgtype.UUID{
+				Bytes: runUUID,
+				Valid: true,
+			},
+			Status: normalizedStatus,
+			Reason: req.Reason,
+			Stats:  statsBytes,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to complete run: %v", err), http.StatusInternalServerError)
+			slog.Error("complete run: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("run completed",
+			"run_id", req.RunID,
+			"node_id", nodeIDStr,
+			"status", req.Status,
+			"has_reason", req.Reason != nil,
+			"stats_size", len(statsBytes),
+		)
+	}
+}
+
 // createNodeEventsHandler appends structured events/log frames to DB with SSE fanout.
 func createNodeEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	const maxRequestSize = 1 << 20 // 1 MiB

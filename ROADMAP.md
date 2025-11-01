@@ -51,7 +51,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Implement `ClaimRun` RPC: server assigns one queued run via `FOR UPDATE SKIP LOCKED` (sqlc: `ClaimRun`).
 - [x] Add server endpoint for claims (pull) or server→node push client (choose pull first per SIMPLE.md).
 - [x] On assign, set `started_at`, status `assigned` then `running` when node acknowledges.
-- [ ] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
+- [x] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
 
 ## TTL & Partitions
 - [ ] Mount `internal/store/ttlworker` in server: periodic deletes for `logs/events/diffs/artifact_bundles` older than retention.
