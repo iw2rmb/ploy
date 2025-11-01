@@ -73,7 +73,7 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 - Applied via CLI with PLOY_GITLAB_PAT from local env. `ploy config gitlab show` reports the expected values.
 
 5) Rebuild + roll ployd; re‑run Mods smoke and verify images pull from Docker Hub and hydration proceeds.
-   - Current blocker after fixes: IPFS Cluster returns 500 during workspace snapshot publish ("failed to put block on all destinations"). Replication factors set to min=1/max=1 but peers may be unhealthy.
+   - Status: runs are flowing. We removed plan-stage artifact uploads and corrected IPFS /add params; snapshot publish guards are in place. Full Mods runs now complete on the lab.
 
 ## Execution Log (this slice)
 
@@ -95,12 +95,23 @@ Org defaults to DOCKERHUB_USERNAME if set; otherwise MODS_IMAGE_PREFIX can overr
 4) Publish OpenAI key to lab nodes via `scripts/publish-openai-key-to-cluster.sh` and restart ployd. (done)
 5) Publish signer AES key to lab and rotate default secret. (done)
 6) Update ployd on nodes. (done)
-7) Kick Mods smoke (plan->java->llm) and confirm pulls + hydration. (in progress — blocked by IPFS Cluster 500)
+7) Kick Mods smoke (plan->java->llm) and confirm pulls + hydration. (done)
+8) Ensure MR creation by producing a non-empty diff in orw-apply (choose a baseline branch needing migration or a recipe guaranteed to rewrite sources), then re-run and verify MR opened.
 
 ## Notes
 
 - Nodes already proved Docker Hub pulls for all Mods images.
-- New blocker: IPFS Cluster pin/add failing with 500. Next steps below.
+- IPFS add/pin: fixed client params and added guardrails; manual /add up to 100MB succeeds.
+
+## Ticket mods-014410 — MR Status and Local Repro
+
+- Ticket: mods-014410
+- Repo: https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git (base=main, target=mod/e2e-20251101014410)
+- Outcome: succeeded; MR not created because `orw-apply` produced no diff bundle.
+- Local reproduction (matching cluster args) confirmed this:
+  - Ran `mods-openrewrite:latest` with recipe `org.openrewrite.java.migrate.UpgradeToJava17` against branch `main`.
+  - Container completed successfully; `git status` showed only `target/` outputs and no source changes.
+  - Conclusion: absence of MR is consistent with an empty diff; to create an MR we need a baseline that yields changes or a different recipe.
 
 ## Immediate Next Steps (IPFS Cluster)
 - Validate Cluster health from node A (`curl http://127.0.0.1:9094/health` and `/id`, `/peers`). Ensure peers are connected.
