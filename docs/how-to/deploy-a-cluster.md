@@ -28,15 +28,28 @@ dist/ploy server deploy --address <host-or-ip>
 ```
 
 This command:
-- Installs the `ployd` server binary over SSH.
-- Generates a cluster Certificate Authority (CA).
+- Copies the `ployd` server binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd` (mode 0755).
+- Generates a cluster Certificate Authority (CA) locally.
 - Issues a server TLS certificate with appropriate SANs.
-- Creates a `cluster_id` and records it in PostgreSQL and `/etc/ploy/cluster-id`.
-- If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS and creates database `ploy`.
-- Writes server configuration to `/etc/ploy/ployd.yaml` (includes `http.tls` cert/key/CA paths and `postgres.dsn: ${PLOY_SERVER_PG_DSN}`).
-- Bootstraps the `ployd` systemd unit with `PLOY_SERVER_PG_DSN` and sets `PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml`.
+- Creates a `cluster_id` and records it in PostgreSQL.
+- Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
+- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
+- Writes server certificate to `/etc/ploy/pki/server.crt` (mode 644) and private key to `/etc/ploy/pki/server.key` (mode 600).
+- If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS, creates database `ploy` and user `ploy` with a randomly generated 32-character hex password, and exports `PLOY_SERVER_PG_DSN` in the format `postgres://ploy:{PASSWORD}@localhost:5432/ploy?sslmode=disable`.
+- Writes server configuration to `/etc/ploy/ployd.yaml` with the following structure:
+  - `http.listen: :8443` with TLS enabled, mTLS required
+  - `http.tls.cert/key/client_ca` pointing to `/etc/ploy/pki/server.{crt,key}` and `ca.crt`
+  - `metrics.listen: :9100`
+  - `control_plane.endpoint: https://127.0.0.1:8443` with local mTLS paths
+  - `postgres.dsn: ${PLOY_SERVER_PG_DSN}` (environment variable expansion at runtime)
+- Installs systemd unit `/etc/systemd/system/ployd.service` with:
+  - `ExecStart=/usr/local/bin/ployd`
+  - `Restart=always`, `RestartSec=5`
+  - `Environment=PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml`
+  - `After=network.target postgresql.service`
+- Runs `systemctl daemon-reload` and `systemctl enable --now ployd.service`.
 
-At the end of bootstrap, a concise summary is printed showing the config path, PKI directory, detected certificate files, the systemd service name, and quick commands for viewing logs and checking status, for example:
+At the end of bootstrap, a summary is printed showing the config path, PKI directory, detected certificate files, the systemd service name (with active/enabled status), and helpful commands for viewing logs and checking status, for example:
 
 ```
 ========================================
@@ -83,12 +96,25 @@ dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url
 ```
 
 This command:
-- Installs `ployd-node` binary over SSH.
+- Copies the `ployd-node` binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd-node` (mode 0755).
 - Generates a node private key and CSR locally.
 - Submits the CSR to the server's `/v1/pki/sign` endpoint for signing.
-- Installs the issued node certificate, key, and CA bundle on the node under `/etc/ploy/pki`.
+- Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
+- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
+- Writes node certificate to `/etc/ploy/pki/node.crt` (mode 644) and private key to `/etc/ploy/pki/node.key` (mode 600).
 - Records the node IP in the `nodes` table.
-- Bootstraps the `ployd-node` systemd unit; node communicates with server via mTLS.
+- Writes node configuration to `/etc/ploy/ployd-node.yaml` with the following structure:
+  - `server_url: ${PLOY_SERVER_URL}` (from environment)
+  - `node_id: ${NODE_ID}` (from environment)
+  - `http.listen: :8444` with TLS enabled
+  - `http.tls.ca_path/cert_path/key_path` pointing to `/etc/ploy/pki/{ca.crt,node.crt,node.key}`
+  - `heartbeat.interval: 30s`, `heartbeat.timeout: 10s`
+- Installs systemd unit `/etc/systemd/system/ployd-node.service` with:
+  - `ExecStart=/usr/local/bin/ployd-node`
+  - `Restart=always`, `RestartSec=5`
+  - `After=network.target`
+  - (Node reads config from default path `/etc/ploy/ployd-node.yaml` via `--config` flag; no environment override)
+- Runs `systemctl daemon-reload` and `systemctl enable --now ployd-node.service`.
 
 Example:
 
