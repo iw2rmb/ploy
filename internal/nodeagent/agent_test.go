@@ -3,6 +3,7 @@ package nodeagent
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -277,4 +278,110 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestWorkspaceLifecycle(t *testing.T) {
+	t.Run("workspace is created with unique prefix", func(t *testing.T) {
+		// Create two workspaces and verify they have unique paths.
+		ws1, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create first workspace: %v", err)
+		}
+		defer cleanupWorkspace(ws1)
+
+		ws2, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create second workspace: %v", err)
+		}
+		defer cleanupWorkspace(ws2)
+
+		if ws1 == ws2 {
+			t.Errorf("expected unique workspace paths, got %q == %q", ws1, ws2)
+		}
+
+		// Verify prefix is correct.
+		if !strings.Contains(ws1, "ploy-run-") {
+			t.Errorf("expected workspace path to contain 'ploy-run-', got %q", ws1)
+		}
+		if !strings.Contains(ws2, "ploy-run-") {
+			t.Errorf("expected workspace path to contain 'ploy-run-', got %q", ws2)
+		}
+	})
+
+	t.Run("workspace directory exists after creation", func(t *testing.T) {
+		ws, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create workspace: %v", err)
+		}
+		defer cleanupWorkspace(ws)
+
+		info, err := os.Stat(ws)
+		if err != nil {
+			t.Fatalf("workspace directory does not exist: %v", err)
+		}
+		if !info.IsDir() {
+			t.Errorf("workspace path %q is not a directory", ws)
+		}
+	})
+
+	t.Run("workspace cleanup removes directory", func(t *testing.T) {
+		ws, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create workspace: %v", err)
+		}
+
+		// Verify it exists.
+		if _, err := os.Stat(ws); err != nil {
+			t.Fatalf("workspace should exist before cleanup: %v", err)
+		}
+
+		// Cleanup.
+		cleanupWorkspace(ws)
+
+		// Verify it no longer exists.
+		if _, err := os.Stat(ws); err == nil {
+			t.Errorf("workspace %q should not exist after cleanup", ws)
+		}
+	})
+
+	t.Run("workspace cleanup removes nested content", func(t *testing.T) {
+		ws, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create workspace: %v", err)
+		}
+
+		// Create nested files and directories.
+		testFile := fmt.Sprintf("%s/test.txt", ws)
+		if err := os.WriteFile(testFile, []byte("test content"), 0o600); err != nil {
+			t.Fatalf("failed to write test file: %v", err)
+		}
+
+		nestedDir := fmt.Sprintf("%s/nested", ws)
+		if err := os.Mkdir(nestedDir, 0o700); err != nil {
+			t.Fatalf("failed to create nested dir: %v", err)
+		}
+
+		nestedFile := fmt.Sprintf("%s/nested/file.txt", ws)
+		if err := os.WriteFile(nestedFile, []byte("nested content"), 0o600); err != nil {
+			t.Fatalf("failed to write nested file: %v", err)
+		}
+
+		// Cleanup should remove everything.
+		cleanupWorkspace(ws)
+
+		// Verify workspace and all content is gone.
+		if _, err := os.Stat(ws); err == nil {
+			t.Errorf("workspace %q should not exist after cleanup", ws)
+		}
+	})
+}
+
+// createEphemeralWorkspace creates a temporary workspace directory with a unique prefix.
+func createEphemeralWorkspace() (string, error) {
+	return os.MkdirTemp("", "ploy-run-*")
+}
+
+// cleanupWorkspace removes a workspace directory and all its contents.
+func cleanupWorkspace(path string) {
+	_ = os.RemoveAll(path)
 }
