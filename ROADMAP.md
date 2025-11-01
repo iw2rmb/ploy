@@ -90,7 +90,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
   - [x] Create DB user/db `ploy` with password; derive DSN and export `PLOY_SERVER_PG_DSN`.
   - [x] Write server config `/etc/ploy/ployd.yaml` (postgres.dsn + TLS paths).
   - [x] Write node config `/etc/ploy/ployd-node.yaml` on non-primary bootstraps.
-  - [ ] Install systemd unit `ployd.service` (server) or `ployd-node.service` (node) with `Restart=always`.
+  - [x] Install systemd unit `ployd.service` (server) or `ployd-node.service` (node) with `Restart=always`.
   - [ ] `systemctl daemon-reload && systemctl enable --now <unit>`.
   - [ ] Echo final status and key paths.
 - [ ] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
