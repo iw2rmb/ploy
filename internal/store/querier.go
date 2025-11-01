@@ -13,29 +13,38 @@ import (
 type Querier interface {
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateCluster(ctx context.Context, arg CreateClusterParams) (Cluster, error)
+	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
+	CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error)
 	DeleteMod(ctx context.Context, id pgtype.UUID) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRepo(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
+	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetCluster(ctx context.Context) (Cluster, error)
+	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetMod(ctx context.Context, id pgtype.UUID) (Mod, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRepo(ctx context.Context, id pgtype.UUID) (Repo, error)
 	GetRepoByURL(ctx context.Context, url string) (Repo, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
+	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
+	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
+	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
 	ListMods(ctx context.Context) ([]Mod, error)
 	ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]Mod, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListRepos(ctx context.Context) ([]Repo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, error)
+	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
+	UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)
