@@ -21,11 +21,11 @@ type Hydrator interface {
 
 // ServiceOptions configures Service dependencies.
 type ServiceOptions struct {
-	Hydrator  Hydrator
+	Hydrator Hydrator
 }
 
 type Service struct {
-	hydrator  Hydrator
+	hydrator Hydrator
 }
 
 // NewService wires the environment materialization service.
@@ -33,22 +33,22 @@ func NewService(opts ServiceOptions) Service { return Service{hydrator: opts.Hyd
 
 // Request captures the inputs required to materialize a commit-scoped environment.
 type Request struct {
-    CommitSHA    string
-    App          string
-    DryRun       bool
-    Manifest     manifests.Compilation
-    ManifestRef  contracts.ManifestReference
-    AsterEnabled bool
-    AsterToggles []string
+	CommitSHA    string
+	App          string
+	DryRun       bool
+	Manifest     manifests.Compilation
+	ManifestRef  contracts.ManifestReference
+	AsterEnabled bool
+	AsterToggles []string
 }
 
 // Result summarizes the resources planned or hydrated for the environment.
 type Result struct {
-    CommitSHA    string
-    App          string
-    DryRun       bool
-    Manifest     manifests.Compilation
-    ManifestRef  contracts.ManifestReference
+	CommitSHA    string
+	App          string
+	DryRun       bool
+	Manifest     manifests.Compilation
+	ManifestRef  contracts.ManifestReference
 	AsterToggles []string
 	Caches       []CacheStatus
 }
@@ -74,7 +74,7 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 	if trimmedApp == "" {
 		return Result{}, errors.New("app identifier is required")
 	}
-    // tenant removed
+	// tenant removed
 
 	manifestMeta := req.Manifest.Manifest
 	if strings.TrimSpace(manifestMeta.Name) == "" {
@@ -129,12 +129,12 @@ func (s Service) Materialize(ctx context.Context, req Request) (Result, error) {
 		cacheStatuses = append(cacheStatuses, status)
 	}
 
-    return Result{
-        CommitSHA:    trimmedCommit,
-        App:          trimmedApp,
-        DryRun:       req.DryRun,
-        Manifest:     req.Manifest,
-        ManifestRef:  manifestRef,
+	return Result{
+		CommitSHA:    trimmedCommit,
+		App:          trimmedApp,
+		DryRun:       req.DryRun,
+		Manifest:     req.Manifest,
+		ManifestRef:  manifestRef,
 		AsterToggles: toggles,
 		Caches:       cacheStatuses,
 	}, nil

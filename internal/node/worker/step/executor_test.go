@@ -32,15 +32,15 @@ func TestExecutorProducesAssignmentResult(t *testing.T) {
 				Digest: "sha256:logs",
 				Size:   2048,
 			},
-        GateArtifact: stepruntime.PublishedArtifact{
-            CID:    "bafy-gate",
-            Digest: "sha256:gate",
-            Size:   512,
-        },
-        GateReport: stepruntime.GateResult{
-            Passed:   true,
-            Duration: 5 * time.Second,
-        },
+			GateArtifact: stepruntime.PublishedArtifact{
+				CID:    "bafy-gate",
+				Digest: "sha256:gate",
+				Size:   512,
+			},
+			GateReport: stepruntime.GateResult{
+				Passed:   true,
+				Duration: 5 * time.Second,
+			},
 			Retained:     true,
 			RetentionTTL: "24h",
 		},
@@ -86,15 +86,15 @@ func TestExecutorProducesAssignmentResult(t *testing.T) {
 	if bundle, ok := result.Bundles["logs"]; !ok || bundle.CID != "bafy-logs" {
 		t.Fatalf("unexpected bundle: %+v", result.Bundles["logs"])
 	}
-    if result.Gate == nil || result.Gate.Result != scheduler.GateResultPassed {
-        t.Fatalf("expected gate result passed, got %+v", result.Gate)
-    }
-    if result.Artifacts["gate_report_cid"] != "bafy-gate" {
-        t.Fatalf("expected gate report artifact cid, got %s", result.Artifacts["gate_report_cid"])
-    }
-    if bundle, ok := result.Bundles["gate_report"]; !ok || bundle.CID != "bafy-gate" {
-        t.Fatalf("expected gate report bundle, got %+v", result.Bundles["gate_report"])
-    }
+	if result.Gate == nil || result.Gate.Result != scheduler.GateResultPassed {
+		t.Fatalf("expected gate result passed, got %+v", result.Gate)
+	}
+	if result.Artifacts["gate_report_cid"] != "bafy-gate" {
+		t.Fatalf("expected gate report artifact cid, got %s", result.Artifacts["gate_report_cid"])
+	}
+	if bundle, ok := result.Bundles["gate_report"]; !ok || bundle.CID != "bafy-gate" {
+		t.Fatalf("expected gate report bundle, got %+v", result.Bundles["gate_report"])
+	}
 	if result.Retention == nil || result.Retention.Bundle != "bafy-logs" {
 		t.Fatalf("expected retention bundle cid, got %+v", result.Retention)
 	}
@@ -119,20 +119,20 @@ func TestExecutorGateFailureSignalsInspection(t *testing.T) {
 				Digest: "sha256:logs",
 				Size:   2048,
 			},
-        GateArtifact: stepruntime.PublishedArtifact{
-            CID:    "bafy-gate",
-            Digest: "sha256:gate",
-            Size:   512,
-        },
-        GateReport: stepruntime.GateResult{
-            Passed:   false,
+			GateArtifact: stepruntime.PublishedArtifact{
+				CID:    "bafy-gate",
+				Digest: "sha256:gate",
+				Size:   512,
+			},
+			GateReport: stepruntime.GateResult{
+				Passed:   false,
 				Message:  "shift failed",
 				Duration: 3 * time.Second,
 			},
 			Retained:     true,
-        RetentionTTL: "12h",
-        },
-        err: stepruntime.ErrBuildGateFailed,
+			RetentionTTL: "12h",
+		},
+		err: stepruntime.ErrBuildGateFailed,
 	}
 	exec := Executor{
 		runner:  runner,
@@ -178,9 +178,9 @@ func TestExecutorGateFailureSignalsInspection(t *testing.T) {
 	if result.Retention == nil || result.Retention.TTL != "12h" {
 		t.Fatalf("expected retention metadata, got %+v", result.Retention)
 	}
-    if result.Artifacts["gate_report_cid"] != "bafy-gate" {
-        t.Fatalf("expected gate report artifact in failure path")
-    }
+	if result.Artifacts["gate_report_cid"] != "bafy-gate" {
+		t.Fatalf("expected gate report artifact in failure path")
+	}
 }
 
 func TestExecutorIncludesHydrationSnapshotArtifacts(t *testing.T) {
@@ -208,10 +208,10 @@ func TestExecutorIncludesHydrationSnapshotArtifacts(t *testing.T) {
 					Size:   4096,
 				},
 			},
-        GateReport: stepruntime.GateResult{
-            Passed:   true,
-            Duration: 2 * time.Second,
-        },
+			GateReport: stepruntime.GateResult{
+				Passed:   true,
+				Duration: 2 * time.Second,
+			},
 		},
 	}
 	exec := Executor{

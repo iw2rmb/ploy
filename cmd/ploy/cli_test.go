@@ -63,15 +63,15 @@ func TestExecuteUnknownCommandSuggestsHelp(t *testing.T) {
 }
 
 func TestExecuteLegacyGridCommandIsUnknown(t *testing.T) {
-    t.Helper()
-    buf := &bytes.Buffer{}
-    err := execute([]string{"grid"}, buf)
-    if err == nil {
-        t.Fatal("expected error for unknown command")
-    }
-    if !strings.Contains(err.Error(), "unknown command") {
-        t.Fatalf("expected unknown command error, got %v", err)
-    }
+	t.Helper()
+	buf := &bytes.Buffer{}
+	err := execute([]string{"grid"}, buf)
+	if err == nil {
+		t.Fatal("expected error for unknown command")
+	}
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("expected unknown command error, got %v", err)
+	}
 }
 
 func loadGolden(t *testing.T, name string) string {

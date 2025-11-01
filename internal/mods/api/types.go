@@ -39,11 +39,11 @@ type StageDefinition struct {
 
 // TicketSubmitRequest represents a ticket submission payload.
 type TicketSubmitRequest struct {
-    TicketID   string            `json:"ticket_id"`
-    Submitter  string            `json:"submitter,omitempty"`
-    Repository string            `json:"repository,omitempty"`
-    Metadata   map[string]string `json:"metadata,omitempty"`
-    Stages     []StageDefinition `json:"stages"`
+	TicketID   string            `json:"ticket_id"`
+	Submitter  string            `json:"submitter,omitempty"`
+	Repository string            `json:"repository,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	Stages     []StageDefinition `json:"stages"`
 }
 
 // TicketSubmitResponse returns the persisted ticket summary after submission.
@@ -58,14 +58,14 @@ type TicketStatusResponse struct {
 
 // TicketSummary summarises ticket lifecycle state and associated stages.
 type TicketSummary struct {
-    TicketID   string                 `json:"ticket_id"`
-    State      TicketState            `json:"state"`
-    Submitter  string                 `json:"submitter,omitempty"`
-    Repository string                 `json:"repository,omitempty"`
-    Metadata   map[string]string      `json:"metadata,omitempty"`
-    CreatedAt  time.Time              `json:"created_at"`
-    UpdatedAt  time.Time              `json:"updated_at"`
-    Stages     map[string]StageStatus `json:"stages"`
+	TicketID   string                 `json:"ticket_id"`
+	State      TicketState            `json:"state"`
+	Submitter  string                 `json:"submitter,omitempty"`
+	Repository string                 `json:"repository,omitempty"`
+	Metadata   map[string]string      `json:"metadata,omitempty"`
+	CreatedAt  time.Time              `json:"created_at"`
+	UpdatedAt  time.Time              `json:"updated_at"`
+	Stages     map[string]StageStatus `json:"stages"`
 }
 
 // StageStatus summarises the execution state for a ticket stage.

@@ -14,61 +14,61 @@ import (
 
 // BuildGateRunner executes Build Gate validation.
 type BuildGateRunner interface {
-    Run(ctx context.Context, spec buildgate.RunSpec) (buildgate.RunResult, error)
+	Run(ctx context.Context, spec buildgate.RunSpec) (buildgate.RunResult, error)
 }
 
 // BuildGateClientOptions configures the build gate client.
 type BuildGateClientOptions struct {
-    Runner BuildGateRunner
+	Runner BuildGateRunner
 }
 
 // BuildGateClient adapts the build gate runner to the step.GateClient interface.
 type BuildGateClient struct {
-    runner BuildGateRunner
+	runner BuildGateRunner
 }
 
 // NewBuildGateClient constructs a Build Gate client backed by the build gate runner.
 func NewBuildGateClient(opts BuildGateClientOptions) (*BuildGateClient, error) {
-    if opts.Runner == nil {
-        return nil, errors.New("buildgate: runner required")
-    }
-    return &BuildGateClient{runner: opts.Runner}, nil
+	if opts.Runner == nil {
+		return nil, errors.New("buildgate: runner required")
+	}
+	return &BuildGateClient{runner: opts.Runner}, nil
 }
 
 // Validate executes the build gate runner for the provided manifest workspace context.
 func (c *BuildGateClient) Validate(ctx context.Context, req GateRequest) (GateResult, error) {
-    if c == nil || c.runner == nil {
-        return GateResult{}, fmt.Errorf("buildgate: runner not configured")
-    }
-    workspacePath := resolveWorkspacePath(req.Manifest, req.Workspace)
-    gs := selectGateSpec(req.Manifest)
-    env := cloneGateEnv(gs)
-    if env == nil {
-        env = make(map[string]string)
-    }
-    if gs != nil {
-        if profile := strings.TrimSpace(gs.Profile); profile != "" {
-            env["PLOY_SHIFT_PROFILE"] = profile
-        }
-    }
+	if c == nil || c.runner == nil {
+		return GateResult{}, fmt.Errorf("buildgate: runner not configured")
+	}
+	workspacePath := resolveWorkspacePath(req.Manifest, req.Workspace)
+	gs := selectGateSpec(req.Manifest)
+	env := cloneGateEnv(gs)
+	if env == nil {
+		env = make(map[string]string)
+	}
+	if gs != nil {
+		if profile := strings.TrimSpace(gs.Profile); profile != "" {
+			env["PLOY_SHIFT_PROFILE"] = profile
+		}
+	}
 
-runSpec := buildgate.RunSpec{
-        Sandbox: buildgate.SandboxSpec{
-            CacheKey:  buildSandboxCacheKey(req.Manifest),
-            Env:       env,
-            Workspace: workspacePath,
-        },
-    }
-    if req.LogArtifact != nil && strings.TrimSpace(req.LogArtifact.CID) != "" {
-        runSpec.LogArtifact = &buildgate.ArtifactReference{
-            CID:         strings.TrimSpace(req.LogArtifact.CID),
-            Description: fmt.Sprintf("logs for step %s", req.Manifest.ID),
-        }
-    }
-    result, err := c.runner.Run(ctx, runSpec)
-    if err != nil {
-        return GateResult{}, fmt.Errorf("buildgate: run: %w", err)
-    }
+	runSpec := buildgate.RunSpec{
+		Sandbox: buildgate.SandboxSpec{
+			CacheKey:  buildSandboxCacheKey(req.Manifest),
+			Env:       env,
+			Workspace: workspacePath,
+		},
+	}
+	if req.LogArtifact != nil && strings.TrimSpace(req.LogArtifact.CID) != "" {
+		runSpec.LogArtifact = &buildgate.ArtifactReference{
+			CID:         strings.TrimSpace(req.LogArtifact.CID),
+			Description: fmt.Sprintf("logs for step %s", req.Manifest.ID),
+		}
+	}
+	result, err := c.runner.Run(ctx, runSpec)
+	if err != nil {
+		return GateResult{}, fmt.Errorf("buildgate: run: %w", err)
+	}
 
 	metadata := buildgate.Sanitize(result.Metadata)
 
@@ -82,30 +82,30 @@ runSpec := buildgate.RunSpec{
 		payload.Summary = append(payload.Summary, result.Report...)
 	}
 
-    report, _ := json.Marshal(payload)
+	report, _ := json.Marshal(payload)
 
-    failures := collectBuildGateFailures(result, metadata)
-    if len(failures) == 0 {
-        return GateResult{
-            Passed: true,
-            Report: report,
-        }, nil
-    }
+	failures := collectBuildGateFailures(result, metadata)
+	if len(failures) == 0 {
+		return GateResult{
+			Passed: true,
+			Report: report,
+		}, nil
+	}
 
-    message := strings.Join(failures, "; ")
-    return GateResult{
-        Passed:  false,
-        Message: message,
-        Report:  report,
-    }, nil
+	message := strings.Join(failures, "; ")
+	return GateResult{
+		Passed:  false,
+		Message: message,
+		Report:  report,
+	}, nil
 }
 
 func buildSandboxCacheKey(manifest contracts.StepManifest) string {
-    id := strings.TrimSpace(manifest.ID)
-    profile := ""
-    if s := selectGateSpec(manifest); s != nil {
-        profile = strings.TrimSpace(s.Profile)
-    }
+	id := strings.TrimSpace(manifest.ID)
+	profile := ""
+	if s := selectGateSpec(manifest); s != nil {
+		profile = strings.TrimSpace(s.Profile)
+	}
 	switch {
 	case id != "" && profile != "":
 		return fmt.Sprintf("%s:%s", id, profile)
@@ -119,30 +119,30 @@ func buildSandboxCacheKey(manifest contracts.StepManifest) string {
 }
 
 func cloneGateEnv(spec *contracts.StepGateSpec) map[string]string {
-    if spec == nil || len(spec.Env) == 0 {
-        return nil
-    }
-    env := make(map[string]string, len(spec.Env))
-    keys := make([]string, 0, len(spec.Env))
-    for key := range spec.Env {
-        keys = append(keys, key)
-    }
-    sort.Strings(keys)
-    for _, key := range keys {
-        env[key] = spec.Env[key]
-    }
-    return env
+	if spec == nil || len(spec.Env) == 0 {
+		return nil
+	}
+	env := make(map[string]string, len(spec.Env))
+	keys := make([]string, 0, len(spec.Env))
+	for key := range spec.Env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		env[key] = spec.Env[key]
+	}
+	return env
 }
 
 func selectGateSpec(manifest contracts.StepManifest) *contracts.StepGateSpec {
-    if manifest.Gate != nil {
-        return manifest.Gate
-    }
-    if manifest.Shift != nil {
-        // Backward compatibility: map Shift to Gate.
-        return &contracts.StepGateSpec{Enabled: manifest.Shift.Enabled, Profile: manifest.Shift.Profile, Env: manifest.Shift.Env}
-    }
-    return nil
+	if manifest.Gate != nil {
+		return manifest.Gate
+	}
+	if manifest.Shift != nil {
+		// Backward compatibility: map Shift to Gate.
+		return &contracts.StepGateSpec{Enabled: manifest.Shift.Enabled, Profile: manifest.Shift.Profile, Env: manifest.Shift.Env}
+	}
+	return nil
 }
 
 func resolveWorkspacePath(manifest contracts.StepManifest, workspace Workspace) string {

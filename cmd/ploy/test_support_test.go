@@ -1,18 +1,18 @@
 package main
 
 import (
-    "context"
-    "os"
-    "path/filepath"
-    "testing"
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
 
-    "github.com/iw2rmb/ploy/internal/workflow/aster"
-    "github.com/iw2rmb/ploy/internal/workflow/contracts"
-    "github.com/iw2rmb/ploy/internal/workflow/environments"
-    "github.com/iw2rmb/ploy/internal/workflow/manifests"
-    "github.com/iw2rmb/ploy/internal/workflow/runner"
-    "github.com/iw2rmb/ploy/internal/workflow/runtime"
-    "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/aster"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/environments"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/runner"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 type recordingRunner struct {
@@ -84,8 +84,6 @@ func withStubWorkspacePreparer(t *testing.T) *stubWorkspacePreparer {
 	}
 	return stub
 }
-
-
 
 func withStepExecutorStub(t *testing.T, executor runtime.StepExecutor, err error) {
 	prevFactory := stepExecutorFactory

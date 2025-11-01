@@ -52,23 +52,23 @@ type StageDefinition struct {
 
 // TicketSpec captures submission inputs for creating a Mods ticket.
 type TicketSpec struct {
-    TicketID   string
-    Submitter  string
-    Repository string
-    Stages     []StageDefinition
-    Metadata   map[string]string
+	TicketID   string
+	Submitter  string
+	Repository string
+	Stages     []StageDefinition
+	Metadata   map[string]string
 }
 
 // TicketStatus summarises ticket lifecycle state for callers.
 type TicketStatus struct {
-    TicketID   string
-    State      TicketState
-    Submitter  string
-    Repository string
-    Metadata   map[string]string
-    CreatedAt  time.Time
-    UpdatedAt  time.Time
-    Stages     map[string]StageStatus
+	TicketID   string
+	State      TicketState
+	Submitter  string
+	Repository string
+	Metadata   map[string]string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Stages     map[string]StageStatus
 }
 
 // StageStatus surfaces the current execution state for a single stage.

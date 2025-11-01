@@ -1,15 +1,15 @@
 package httpserver
 
 import (
-    "errors"
-    "log"
-    "net/http"
-    "strings"
-    "time"
+	"errors"
+	"log"
+	"net/http"
+	"strings"
+	"time"
 
-    controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
-    "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
-    "github.com/iw2rmb/ploy/internal/node/logstream"
+	controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
+	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // handleJobSubmit enqueues a new job via the scheduler.
@@ -122,81 +122,81 @@ func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Re
 		Bundles    map[string]scheduler.BundleRecord `json:"bundles"`
 		Error      *scheduler.JobError               `json:"error"`
 		Inspection bool                              `json:"inspection"`
-        Gate       *struct {
-            Result          string  `json:"result"`
-            DurationSeconds float64 `json:"duration_seconds"`
-        } `json:"gate"`
+		Gate       *struct {
+			Result          string  `json:"result"`
+			DurationSeconds float64 `json:"duration_seconds"`
+		} `json:"gate"`
 	}
 	if err := decodeJSON(r, &req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-    var gateMetrics *scheduler.GateMetrics
-    if req.Gate != nil {
-        d := time.Duration(req.Gate.DurationSeconds * float64(time.Second))
-        if d < 0 {
-            d = 0
-        }
-        gateMetrics = &scheduler.GateMetrics{
-            Result:   req.Gate.Result,
-            Duration: d,
-        }
-    }
-    job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
-        JobID:      jobID,
-        Ticket:     req.Ticket,
-        NodeID:     req.NodeID,
-        State:      scheduler.JobState(req.State),
-        Artifacts:  req.Artifacts,
-        Bundles:    req.Bundles,
-        Error:      req.Error,
-        Inspection: req.Inspection,
-        Gate:       gateMetrics,
-    })
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusConflict)
-        return
-    }
-    writeJSON(w, http.StatusOK, jobDTOFrom(job))
-    if s.streams != nil {
-        status := "completed"
-        switch job.State {
-        case scheduler.JobStateFailed:
-            status = "failed"
-        case scheduler.JobStateInspectionReady:
-            status = "inspection_ready"
-        }
-        _ = s.streams.PublishStatus(r.Context(), jobID, logstream.Status{Status: status})
-    }
+	var gateMetrics *scheduler.GateMetrics
+	if req.Gate != nil {
+		d := time.Duration(req.Gate.DurationSeconds * float64(time.Second))
+		if d < 0 {
+			d = 0
+		}
+		gateMetrics = &scheduler.GateMetrics{
+			Result:   req.Gate.Result,
+			Duration: d,
+		}
+	}
+	job, err := s.scheduler.CompleteJob(r.Context(), scheduler.CompleteRequest{
+		JobID:      jobID,
+		Ticket:     req.Ticket,
+		NodeID:     req.NodeID,
+		State:      scheduler.JobState(req.State),
+		Artifacts:  req.Artifacts,
+		Bundles:    req.Bundles,
+		Error:      req.Error,
+		Inspection: req.Inspection,
+		Gate:       gateMetrics,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusOK, jobDTOFrom(job))
+	if s.streams != nil {
+		status := "completed"
+		switch job.State {
+		case scheduler.JobStateFailed:
+			status = "failed"
+		case scheduler.JobStateInspectionReady:
+			status = "inspection_ready"
+		}
+		_ = s.streams.PublishStatus(r.Context(), jobID, logstream.Status{Status: status})
+	}
 
-    // Notify Mods orchestrator about stage completion to drive dependent
-    // scheduling. This supplements background watchers and ensures timely
-    // transitions even when watchers are disabled.
-    if s.mods != nil {
-        state := controlplanemods.JobCompletionState(strings.ToLower(string(job.State)))
-        // Map completion state to orchestrator variants; ignore inspection_ready here.
-        switch job.State {
-        case scheduler.JobStateSucceeded:
-            state = controlplanemods.JobCompletionSucceeded
-        case scheduler.JobStateFailed:
-            state = controlplanemods.JobCompletionFailed
-        default:
-            // Treat unsupported states as failed to trigger retry/cancel paths if any.
-            if state == "" {
-                state = controlplanemods.JobCompletionFailed
-            }
-        }
-        var errMsg string
-        if req.Error != nil && strings.TrimSpace(req.Error.Message) != "" {
-            errMsg = req.Error.Message
-        }
-        _ = s.mods.ProcessJobCompletion(r.Context(), controlplanemods.JobCompletion{
-            TicketID:  job.Ticket,
-            StageID:   job.StepID,
-            JobID:     job.ID,
-            State:     state,
-            Error:     errMsg,
-            Artifacts: job.Artifacts,
-        })
-    }
+	// Notify Mods orchestrator about stage completion to drive dependent
+	// scheduling. This supplements background watchers and ensures timely
+	// transitions even when watchers are disabled.
+	if s.mods != nil {
+		state := controlplanemods.JobCompletionState(strings.ToLower(string(job.State)))
+		// Map completion state to orchestrator variants; ignore inspection_ready here.
+		switch job.State {
+		case scheduler.JobStateSucceeded:
+			state = controlplanemods.JobCompletionSucceeded
+		case scheduler.JobStateFailed:
+			state = controlplanemods.JobCompletionFailed
+		default:
+			// Treat unsupported states as failed to trigger retry/cancel paths if any.
+			if state == "" {
+				state = controlplanemods.JobCompletionFailed
+			}
+		}
+		var errMsg string
+		if req.Error != nil && strings.TrimSpace(req.Error.Message) != "" {
+			errMsg = req.Error.Message
+		}
+		_ = s.mods.ProcessJobCompletion(r.Context(), controlplanemods.JobCompletion{
+			TicketID:  job.Ticket,
+			StageID:   job.StepID,
+			JobID:     job.ID,
+			State:     state,
+			Error:     errMsg,
+			Artifacts: job.Artifacts,
+		})
+	}
 }

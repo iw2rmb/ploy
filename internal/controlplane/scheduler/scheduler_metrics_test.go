@@ -113,69 +113,69 @@ func TestSchedulerRecordsGateMetrics(t *testing.T) {
 	sched := mustNewScheduler(t, client, opts)
 	defer func() { _ = sched.Close() }()
 
-    job, err := sched.SubmitJob(ctx, scheduler.JobSpec{
-        Ticket:      "mod-gate",
-        StepID:      "test",
-        Priority:    "batch",
-        MaxAttempts: 1,
-    })
+	job, err := sched.SubmitJob(ctx, scheduler.JobSpec{
+		Ticket:      "mod-gate",
+		StepID:      "test",
+		Priority:    "batch",
+		MaxAttempts: 1,
+	})
 	if err != nil {
 		t.Fatalf("submit job: %v", err)
 	}
 
-    claim, err := sched.ClaimNext(ctx, scheduler.ClaimRequest{NodeID: "node-gate"})
+	claim, err := sched.ClaimNext(ctx, scheduler.ClaimRequest{NodeID: "node-gate"})
 	if err != nil {
 		t.Fatalf("claim job: %v", err)
 	}
 
-    gateDuration := 2*time.Second + 500*time.Millisecond
+	gateDuration := 2*time.Second + 500*time.Millisecond
 
-    result, err := sched.CompleteJob(ctx, scheduler.CompleteRequest{
-        JobID:  claim.Job.ID,
-        Ticket: job.Ticket,
-        NodeID: "node-gate",
-        State:  scheduler.JobStateSucceeded,
-        Gate: &scheduler.GateMetrics{
-            Result:   scheduler.GateResultPassed,
-            Duration: gateDuration,
-        },
-    })
+	result, err := sched.CompleteJob(ctx, scheduler.CompleteRequest{
+		JobID:  claim.Job.ID,
+		Ticket: job.Ticket,
+		NodeID: "node-gate",
+		State:  scheduler.JobStateSucceeded,
+		Gate: &scheduler.GateMetrics{
+			Result:   scheduler.GateResultPassed,
+			Duration: gateDuration,
+		},
+	})
 	if err != nil {
 		t.Fatalf("complete job: %v", err)
 	}
 
-    if result.Gate == nil {
-        t.Fatalf("expected gate summary on completion result")
-    }
-    if result.Gate.Result != scheduler.GateResultPassed {
-        t.Fatalf("unexpected result.Gate.Result: %s", result.Gate.Result)
-    }
-    if diff := math.Abs(result.Gate.Duration.Seconds() - gateDuration.Seconds()); diff > 1e-6 {
-        t.Fatalf("unexpected gate duration %.6f", result.Gate.Duration.Seconds())
-    }
+	if result.Gate == nil {
+		t.Fatalf("expected gate summary on completion result")
+	}
+	if result.Gate.Result != scheduler.GateResultPassed {
+		t.Fatalf("unexpected result.Gate.Result: %s", result.Gate.Result)
+	}
+	if diff := math.Abs(result.Gate.Duration.Seconds() - gateDuration.Seconds()); diff > 1e-6 {
+		t.Fatalf("unexpected gate duration %.6f", result.Gate.Duration.Seconds())
+	}
 
 	stored, err := sched.GetJob(ctx, job.Ticket, job.ID)
 	if err != nil {
 		t.Fatalf("get job: %v", err)
 	}
-    if stored.Gate == nil {
-        t.Fatalf("expected stored job to include gate summary")
-    }
-    if stored.Gate.Result != scheduler.GateResultPassed {
-        t.Fatalf("unexpected stored.Gate.Result: %s", stored.Gate.Result)
-    }
-    if diff := math.Abs(stored.Gate.Duration.Seconds() - gateDuration.Seconds()); diff > 1e-6 {
-        t.Fatalf("unexpected stored gate duration %.6f", stored.Gate.Duration.Seconds())
-    }
+	if stored.Gate == nil {
+		t.Fatalf("expected stored job to include gate summary")
+	}
+	if stored.Gate.Result != scheduler.GateResultPassed {
+		t.Fatalf("unexpected stored.Gate.Result: %s", stored.Gate.Result)
+	}
+	if diff := math.Abs(stored.Gate.Duration.Seconds() - gateDuration.Seconds()); diff > 1e-6 {
+		t.Fatalf("unexpected stored gate duration %.6f", stored.Gate.Duration.Seconds())
+	}
 
-    count, sum, ok := histogramValue(reg, "ploy_controlplane_gate_duration_seconds", map[string]string{"step_id": job.StepID, "result": scheduler.GateResultPassed})
-    if !ok {
-        t.Fatalf("expected gate duration histogram sample")
-    }
-    if count != 1 {
-        t.Fatalf("expected gate histogram count 1, got %d", count)
-    }
-    if diff := math.Abs(sum - gateDuration.Seconds()); diff > 0.05 {
-        t.Fatalf("expected gate histogram sum %.3f, got %.3f (diff %.3f)", gateDuration.Seconds(), sum, diff)
-    }
+	count, sum, ok := histogramValue(reg, "ploy_controlplane_gate_duration_seconds", map[string]string{"step_id": job.StepID, "result": scheduler.GateResultPassed})
+	if !ok {
+		t.Fatalf("expected gate duration histogram sample")
+	}
+	if count != 1 {
+		t.Fatalf("expected gate histogram count 1, got %d", count)
+	}
+	if diff := math.Abs(sum - gateDuration.Seconds()); diff > 0.05 {
+		t.Fatalf("expected gate histogram sum %.3f, got %.3f (diff %.3f)", gateDuration.Seconds(), sum, diff)
+	}
 }

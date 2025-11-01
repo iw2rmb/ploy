@@ -88,7 +88,7 @@ func (s *Server) Stop(ctx context.Context) error {
 	if listener != nil {
 		_ = listener.Close()
 	}
-    if server != nil {
+	if server != nil {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {

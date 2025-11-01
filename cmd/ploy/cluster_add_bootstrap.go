@@ -53,43 +53,43 @@ func runClusterBootstrap(address string, userFlag, identity, control, ploydBin s
 		cfg.NodeID = deriveControlPlaneNodeID(addr)
 		cfg.Primary = true
 	}
-    cmd := deploycli.BootstrapCommand{RunBootstrap: clusterBootstrapRunner}
-    if err := cmd.Run(context.Background(), cfg); err != nil {
-        return err
-    }
-    if primary {
-        if err := captureControlPlaneSecurity(cfg.ClusterID, addr, userName, identityPath, sshPort.value, stderr); err != nil {
-            return err
-        }
-        // Ensure the descriptor is available under the cluster ID as well as the address key.
-        if descByAddr, err := config.LoadDescriptor(addr); err == nil {
-            alias := config.Descriptor{
-                ClusterID:       cfg.ClusterID,
-                Address:         descByAddr.Address,
-                SSHIdentityPath: descByAddr.SSHIdentityPath,
-                Labels:          descByAddr.Labels,
-                Scheme:          descByAddr.Scheme,
-                CABundle:        descByAddr.CABundle,
-            }
-            _, _ = config.SaveDescriptor(alias)
-        }
-    }
-    // Also add this node as an executing node so tickets can run on single-node clusters.
-    if _, err := config.LoadDescriptor(cfg.ClusterID); err == nil {
-        workerCfg := workerProvisionConfig{
-            ClusterID:       cfg.ClusterID,
-            WorkerAddress:   addr,
-            User:            userName,
-            IdentityFile:    identityPath,
-            PloydBinary:     cfg.PloydBinaryPath,
-            SSHPort:         sshPort.value,
-            ControlPlaneURL: "https://" + addr + ":8443",
-        }
-        if err := runClusterWorkerAdd(workerCfg, stderr); err != nil {
-            return err
-        }
-    }
-    return writeClusterAddNextSteps(stderr, addr)
+	cmd := deploycli.BootstrapCommand{RunBootstrap: clusterBootstrapRunner}
+	if err := cmd.Run(context.Background(), cfg); err != nil {
+		return err
+	}
+	if primary {
+		if err := captureControlPlaneSecurity(cfg.ClusterID, addr, userName, identityPath, sshPort.value, stderr); err != nil {
+			return err
+		}
+		// Ensure the descriptor is available under the cluster ID as well as the address key.
+		if descByAddr, err := config.LoadDescriptor(addr); err == nil {
+			alias := config.Descriptor{
+				ClusterID:       cfg.ClusterID,
+				Address:         descByAddr.Address,
+				SSHIdentityPath: descByAddr.SSHIdentityPath,
+				Labels:          descByAddr.Labels,
+				Scheme:          descByAddr.Scheme,
+				CABundle:        descByAddr.CABundle,
+			}
+			_, _ = config.SaveDescriptor(alias)
+		}
+	}
+	// Also add this node as an executing node so tickets can run on single-node clusters.
+	if _, err := config.LoadDescriptor(cfg.ClusterID); err == nil {
+		workerCfg := workerProvisionConfig{
+			ClusterID:       cfg.ClusterID,
+			WorkerAddress:   addr,
+			User:            userName,
+			IdentityFile:    identityPath,
+			PloydBinary:     cfg.PloydBinaryPath,
+			SSHPort:         sshPort.value,
+			ControlPlaneURL: "https://" + addr + ":8443",
+		}
+		if err := runClusterWorkerAdd(workerCfg, stderr); err != nil {
+			return err
+		}
+	}
+	return writeClusterAddNextSteps(stderr, addr)
 }
 
 func writeClusterAddNextSteps(w io.Writer, clusterRef string) error {

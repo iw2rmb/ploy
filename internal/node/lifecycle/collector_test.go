@@ -23,13 +23,13 @@ func (s staticChecker) Check(context.Context) ComponentStatus {
 func TestCollectorSnapshotAggregatesComponents(t *testing.T) {
 	t.Helper()
 
-    collector := NewCollector(Options{
-        Role:   "worker",
-        NodeID: "node-1",
-        Docker: staticChecker{status: ComponentStatus{State: stateOK, Version: "25.0.0", CheckedAt: time.Now()}},
-        Gate:   staticChecker{status: ComponentStatus{State: stateError, Message: "missing image", CheckedAt: time.Now()}},
-        IPFS:   staticChecker{status: ComponentStatus{State: stateUnknown, Message: "disabled", CheckedAt: time.Now()}},
-    })
+	collector := NewCollector(Options{
+		Role:   "worker",
+		NodeID: "node-1",
+		Docker: staticChecker{status: ComponentStatus{State: stateOK, Version: "25.0.0", CheckedAt: time.Now()}},
+		Gate:   staticChecker{status: ComponentStatus{State: stateError, Message: "missing image", CheckedAt: time.Now()}},
+		IPFS:   staticChecker{status: ComponentStatus{State: stateUnknown, Message: "disabled", CheckedAt: time.Now()}},
+	})
 	collector.resourcesFunc = func(context.Context) (resourceSnapshot, error) {
 		return resourceSnapshot{
 			CPUTotalMilli: 8000,
@@ -63,13 +63,13 @@ func TestCollectorSnapshotAggregatesComponents(t *testing.T) {
 	if !ok {
 		t.Fatalf("components missing %T", snapshot.Status["components"])
 	}
-    gateComponent, ok := components["gate"].(map[string]any)
-    if !ok {
-        t.Fatalf("gate component missing")
-    }
-    if gateComponent["state"] != stateError {
-        t.Fatalf("gate state mismatch: %v", gateComponent["state"])
-    }
+	gateComponent, ok := components["gate"].(map[string]any)
+	if !ok {
+		t.Fatalf("gate component missing")
+	}
+	if gateComponent["state"] != stateError {
+		t.Fatalf("gate state mismatch: %v", gateComponent["state"])
+	}
 }
 
 func TestCollectorSnapshotIncludesDiskAndNetworkMetrics(t *testing.T) {

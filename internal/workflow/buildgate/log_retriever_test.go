@@ -25,7 +25,7 @@ func TestLogRetrieverPrefersPrimary(t *testing.T) {
 	fallback := &fakeFetcher{data: []byte("fallback log")}
 	retriever := &LogRetriever{
 		Primary:        primary,
-        PrimarySource:  LogSourcePrimary,
+		PrimarySource:  LogSourcePrimary,
 		Fallback:       fallback,
 		FallbackSource: LogSourceIPFS,
 		MaxBytes:       1024,
@@ -38,7 +38,7 @@ func TestLogRetrieverPrefersPrimary(t *testing.T) {
 	if string(result.Content) != "primary log" {
 		t.Fatalf("expected primary content, got %q", string(result.Content))
 	}
-if result.Source != LogSourcePrimary {
+	if result.Source != LogSourcePrimary {
 		t.Fatalf("expected grid source, got %q", result.Source)
 	}
 	expectedDigest := sha256.Sum256([]byte("primary log"))
@@ -55,7 +55,7 @@ func TestLogRetrieverFallsBackWhenPrimaryFails(t *testing.T) {
 	fallback := &fakeFetcher{data: []byte("fallback")}
 	retriever := &LogRetriever{
 		Primary:        primary,
-        PrimarySource:  LogSourcePrimary,
+		PrimarySource:  LogSourcePrimary,
 		Fallback:       fallback,
 		FallbackSource: LogSourceIPFS,
 	}
@@ -76,7 +76,7 @@ func TestLogRetrieverTruncatesLargeLogs(t *testing.T) {
 	primary := &fakeFetcher{data: []byte("0123456789")}
 	retriever := &LogRetriever{
 		Primary:       primary,
-        PrimarySource: LogSourcePrimary,
+		PrimarySource: LogSourcePrimary,
 		MaxBytes:      4,
 	}
 
@@ -96,7 +96,7 @@ func TestLogRetrieverErrorsWhenNoFetcherSucceeds(t *testing.T) {
 	retriever := &LogRetriever{
 		Primary:       &fakeFetcher{err: errors.New("primary failed")},
 		Fallback:      &fakeFetcher{err: errors.New("fallback failed")},
-        PrimarySource: LogSourcePrimary,
+		PrimarySource: LogSourcePrimary,
 	}
 
 	_, err := retriever.Retrieve(context.Background(), ArtifactReference{CID: "bafy"})

@@ -49,11 +49,11 @@ const (
 	envIPFSClusterToken    = "PLOY_IPFS_CLUSTER_TOKEN"
 	envIPFSClusterUsername = "PLOY_IPFS_CLUSTER_USERNAME"
 	envIPFSClusterPassword = "PLOY_IPFS_CLUSTER_PASSWORD"
-    envLifecycleNetIgnore  = "PLOY_LIFECYCLE_NET_IGNORE"
-    // Preferred server DSN variable; aligns with SIMPLE.md and docs/envs/README.md.
-    envServerPgDSN         = "PLOY_SERVER_PG_DSN"
-    // Backward-compatible alias accepted by ployd during the transition.
-    envPostgresDSN         = "PLOY_POSTGRES_DSN"
+	envLifecycleNetIgnore  = "PLOY_LIFECYCLE_NET_IGNORE"
+	// Preferred server DSN variable; aligns with SIMPLE.md and docs/envs/README.md.
+	envServerPgDSN = "PLOY_SERVER_PG_DSN"
+	// Backward-compatible alias accepted by ployd during the transition.
+	envPostgresDSN = "PLOY_POSTGRES_DSN"
 )
 
 // NewDefault constructs a daemon using default component implementations.
@@ -223,21 +223,21 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	}
 	combinedShutdown := combineShutdowns(shutdownFns)
 
-    svc, err := New(Options{
-        Config:               cfg,
-        RuntimeRegistry:      registry,
-        LogStreams:           streams,
-        HTTP:                 httpSrv,
-        Metrics:              metricsSrv,
-        ControlPlane:         controlClient,
-        PKI:                  pkiManager,
-        Scheduler:            taskScheduler,
-        ControlPlaneShutdown: combinedShutdown,
-    })
-    if err != nil {
-        return nil, err
-    }
-    return svc, nil
+	svc, err := New(Options{
+		Config:               cfg,
+		RuntimeRegistry:      registry,
+		LogStreams:           streams,
+		HTTP:                 httpSrv,
+		Metrics:              metricsSrv,
+		ControlPlane:         controlClient,
+		PKI:                  pkiManager,
+		Scheduler:            taskScheduler,
+		ControlPlaneShutdown: combinedShutdown,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return svc, nil
 }
 
 type fileRotator struct {
@@ -586,17 +586,17 @@ func resolveLifecycleConfigString(cfg config.Config, key string) string {
 }
 
 func resolvePostgresDSN(cfg config.Config) string {
-    // Preference order:
-    // 1) PLOY_SERVER_PG_DSN (canonical)
-    // 2) PLOY_POSTGRES_DSN (compatibility)
-    // 3) Config file: postgres.dsn
-    if env := strings.TrimSpace(os.Getenv(envServerPgDSN)); env != "" {
-        return env
-    }
-    if env := strings.TrimSpace(os.Getenv(envPostgresDSN)); env != "" {
-        return env
-    }
-    return strings.TrimSpace(cfg.Postgres.DSN)
+	// Preference order:
+	// 1) PLOY_SERVER_PG_DSN (canonical)
+	// 2) PLOY_POSTGRES_DSN (compatibility)
+	// 3) Config file: postgres.dsn
+	if env := strings.TrimSpace(os.Getenv(envServerPgDSN)); env != "" {
+		return env
+	}
+	if env := strings.TrimSpace(os.Getenv(envPostgresDSN)); env != "" {
+		return env
+	}
+	return strings.TrimSpace(cfg.Postgres.DSN)
 }
 
 func lifecycleIgnoreInterfacesFrom(cfg config.Config) []string {

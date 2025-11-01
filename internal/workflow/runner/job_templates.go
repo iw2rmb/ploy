@@ -1,10 +1,10 @@
 package runner
 
 import (
-    "context"
-    "fmt"
-    "os"
-    "strings"
+	"context"
+	"fmt"
+	"os"
+	"strings"
 )
 
 type jobTemplate struct {
@@ -19,30 +19,30 @@ type jobTemplate struct {
 // - MODS_IMAGE_PREFIX when set (absolute registry/repo prefix like docker.io/org)
 // - fallback to "iw2rmb" (sensible default for this repo)
 func dockerHubNamespace() string {
-    if u := strings.TrimSpace(os.Getenv("DOCKERHUB_USERNAME")); u != "" {
-        return "docker.io/" + u
-    }
-    if p := strings.TrimSpace(os.Getenv("MODS_IMAGE_PREFIX")); p != "" {
-        // Caller can provide full prefix such as docker.io/org or ghcr.io/org
-        return p
-    }
-    return "docker.io/iw2rmb"
+	if u := strings.TrimSpace(os.Getenv("DOCKERHUB_USERNAME")); u != "" {
+		return "docker.io/" + u
+	}
+	if p := strings.TrimSpace(os.Getenv("MODS_IMAGE_PREFIX")); p != "" {
+		// Caller can provide full prefix such as docker.io/org or ghcr.io/org
+		return p
+	}
+	return "docker.io/iw2rmb"
 }
 
 func registryImage(name string) string {
-    return dockerHubNamespace() + "/" + name + ":latest"
+	return dockerHubNamespace() + "/" + name + ":latest"
 }
 
 var jobTemplates = map[string]jobTemplate{
-    "mods-plan": {Spec: StageJobSpec{
-        Image:   registryImage("mods-plan"),
-        Command: []string{"mods-plan", "--run"},
-        Env: map[string]string{
-            "MODS_PLAN_CACHE": "/workspace/cache",
-            // Avoid artifact uploads on the plan stage; downstream stages
-            // (e.g., orw-apply) produce the diff used for MR publication.
-            "STEP_SKIP_ARTIFACTS": "1",
-        },
+	"mods-plan": {Spec: StageJobSpec{
+		Image:   registryImage("mods-plan"),
+		Command: []string{"mods-plan", "--run"},
+		Env: map[string]string{
+			"MODS_PLAN_CACHE": "/workspace/cache",
+			// Avoid artifact uploads on the plan stage; downstream stages
+			// (e.g., orw-apply) produce the diff used for MR publication.
+			"STEP_SKIP_ARTIFACTS": "1",
+		},
 		Resources: StageJobResources{
 			CPU:    "2000m",
 			Memory: "4Gi",
@@ -53,8 +53,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-plan"},
-    "mods-java": {Spec: StageJobSpec{
-        Image:   registryImage("mods-openrewrite"),
+	"mods-java": {Spec: StageJobSpec{
+		Image:   registryImage("mods-openrewrite"),
 		Command: []string{"mods-orw", "--apply"},
 		Env: map[string]string{
 			"MAVEN_OPTS":                 "-Dmaven.repo.local=/workspace/.m2",
@@ -70,8 +70,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-java"},
-    "mods-llm": {Spec: StageJobSpec{
-        Image:   registryImage("mods-llm"),
+	"mods-llm": {Spec: StageJobSpec{
+		Image:   registryImage("mods-llm"),
 		Command: []string{"mods-llm", "--execute"},
 		Env: map[string]string{
 			"OPENAI_API_TYPE": "",
@@ -88,8 +88,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-llm"},
-    "mods-human": {Spec: StageJobSpec{
-        Image:   registryImage("mods-human"),
+	"mods-human": {Spec: StageJobSpec{
+		Image:   registryImage("mods-human"),
 		Command: []string{"mods-human", "--gate"},
 		Env: map[string]string{
 			"MODS_HUMAN_QUEUE": "review",
@@ -104,8 +104,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "mods-human"},
-    "build-gate": {Spec: StageJobSpec{
-        Image:   registryImage("build-gate"),
+	"build-gate": {Spec: StageJobSpec{
+		Image:   registryImage("build-gate"),
 		Command: []string{"bash", "-lc", "go test -race ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
@@ -121,8 +121,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "build-gate"},
-    "static-checks": {Spec: StageJobSpec{
-        Image:   registryImage("static-checks"),
+	"static-checks": {Spec: StageJobSpec{
+		Image:   registryImage("static-checks"),
 		Command: []string{"bash", "-lc", "go vet ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
@@ -138,8 +138,8 @@ var jobTemplates = map[string]jobTemplate{
 		},
 		Runtime: "docker",
 	}, CacheNamespace: "static-checks"},
-    "test": {Spec: StageJobSpec{
-        Image:   registryImage("test-runner"),
+	"test": {Spec: StageJobSpec{
+		Image:   registryImage("test-runner"),
 		Command: []string{"bash", "-lc", "go test -race ./..."},
 		Env: map[string]string{
 			"GOFLAGS":     "-mod=vendor",
@@ -172,19 +172,21 @@ func (StaticJobComposer) Compose(ctx context.Context, req JobComposeRequest) (St
 	if lane == "" {
 		return StageJobSpec{}, fmt.Errorf("stage lane is required")
 	}
-    template, ok := jobTemplates[lane]
-    if !ok {
-        return StageJobSpec{}, fmt.Errorf("no job template registered for lane %q", lane)
-    }
-    spec := cloneJobTemplate(template.Spec)
-    // Inject OPENAI_API_KEY for LLM lanes when present at compose time.
-    if lane == "mods-llm" {
-        if key := strings.TrimSpace(os.Getenv("PLOY_OPENAI_API_KEY")); key != "" {
-            if spec.Env == nil { spec.Env = map[string]string{} }
-            spec.Env["OPENAI_API_KEY"] = key
-        }
-    }
-    return spec, nil
+	template, ok := jobTemplates[lane]
+	if !ok {
+		return StageJobSpec{}, fmt.Errorf("no job template registered for lane %q", lane)
+	}
+	spec := cloneJobTemplate(template.Spec)
+	// Inject OPENAI_API_KEY for LLM lanes when present at compose time.
+	if lane == "mods-llm" {
+		if key := strings.TrimSpace(os.Getenv("PLOY_OPENAI_API_KEY")); key != "" {
+			if spec.Env == nil {
+				spec.Env = map[string]string{}
+			}
+			spec.Env["OPENAI_API_KEY"] = key
+		}
+	}
+	return spec, nil
 }
 
 func cloneJobTemplate(spec StageJobSpec) StageJobSpec {

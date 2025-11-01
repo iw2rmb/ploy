@@ -32,16 +32,16 @@ func toAPITicketSummary(status *controlplanemods.TicketStatus) modsapi.TicketSum
 		stageCopy := stage
 		stages[id] = toAPIStageStatus(&stageCopy)
 	}
-    return modsapi.TicketSummary{
-        TicketID:   status.TicketID,
-        State:      modsapi.TicketState(status.State),
-        Submitter:  status.Submitter,
-        Repository: status.Repository,
-        Metadata:   cloneStringMap(status.Metadata),
-        CreatedAt:  status.CreatedAt.UTC(),
-        UpdatedAt:  status.UpdatedAt.UTC(),
-        Stages:     stages,
-    }
+	return modsapi.TicketSummary{
+		TicketID:   status.TicketID,
+		State:      modsapi.TicketState(status.State),
+		Submitter:  status.Submitter,
+		Repository: status.Repository,
+		Metadata:   cloneStringMap(status.Metadata),
+		CreatedAt:  status.CreatedAt.UTC(),
+		UpdatedAt:  status.UpdatedAt.UTC(),
+		Stages:     stages,
+	}
 }
 
 // cloneStringMap copies the provided string map to avoid aliasing request data.

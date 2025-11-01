@@ -27,8 +27,8 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 	if c.BaseURL == nil {
 		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: base url required")
 	}
-    // New control-plane submission endpoint (3.1): POST /v1/mods
-    endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
+	// New control-plane submission endpoint (3.1): POST /v1/mods
+	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
 
 	payload, err := json.Marshal(c.Request)
 	if err != nil {

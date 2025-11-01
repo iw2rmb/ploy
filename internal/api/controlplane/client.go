@@ -42,7 +42,7 @@ type AssignmentResult struct {
 	Error      *AssignmentError
 	Artifacts  map[string]string
 	Bundles    map[string]scheduler.BundleRecord
-    Gate       *scheduler.GateMetrics
+	Gate       *scheduler.GateMetrics
 	Inspection bool
 	Retention  *logstream.RetentionHint
 }
@@ -67,18 +67,18 @@ type Options struct {
 
 // Client coordinates control-plane polling and status updates.
 type Client struct {
-    mu          sync.Mutex
-    cfg         config.ControlPlaneConfig
-    executor    AssignmentExecutor
-    status      StatusProvider
-    httpClient  *http.Client
-    running     bool
-    loopCtx     context.Context
-    cancel      context.CancelFunc
-    group       sync.WaitGroup
-    emptyClaims int64
-    activeMu    sync.Mutex
-    active      map[string]context.CancelFunc
+	mu          sync.Mutex
+	cfg         config.ControlPlaneConfig
+	executor    AssignmentExecutor
+	status      StatusProvider
+	httpClient  *http.Client
+	running     bool
+	loopCtx     context.Context
+	cancel      context.CancelFunc
+	group       sync.WaitGroup
+	emptyClaims int64
+	activeMu    sync.Mutex
+	active      map[string]context.CancelFunc
 }
 
 // New constructs the control plane client.
@@ -93,13 +93,13 @@ func New(opts Options) (*Client, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 15 * time.Second}
 	}
-    return &Client{
-        cfg:        opts.Config,
-        executor:   opts.Executor,
-        status:     opts.Status,
-        httpClient: client,
-        active:     make(map[string]context.CancelFunc),
-    }, nil
+	return &Client{
+		cfg:        opts.Config,
+		executor:   opts.Executor,
+		status:     opts.Status,
+		httpClient: client,
+		active:     make(map[string]context.CancelFunc),
+	}, nil
 }
 
 // Start launches background polling routines.
@@ -301,9 +301,9 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		log.Printf("controlplane: initial heartbeat for job %s failed: %v", job.ID, err)
 	}
 
-    jobCtx, jobCancel := context.WithCancel(loopCtx)
-    c.registerActive(job.ID, jobCancel)
-    defer jobCancel()
+	jobCtx, jobCancel := context.WithCancel(loopCtx)
+	c.registerActive(job.ID, jobCancel)
+	defer jobCancel()
 
 	heartbeatCtx, heartbeatCancel := context.WithCancel(jobCtx)
 	heartbeatDone := make(chan struct{})
@@ -312,8 +312,8 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 		c.heartbeatLoop(heartbeatCtx, cfg, job)
 	}()
 
-    result, execErr := c.executor.Execute(jobCtx, assignment)
-    c.unregisterActive(job.ID)
+	result, execErr := c.executor.Execute(jobCtx, assignment)
+	c.unregisterActive(job.ID)
 
 	heartbeatCancel()
 	<-heartbeatDone
@@ -363,35 +363,35 @@ func (c *Client) executeJob(loopCtx context.Context, cfg config.ControlPlaneConf
 
 // Cancel requests cancellation of a running job. Returns true if a cancellation signal was sent.
 func (c *Client) Cancel(jobID string) bool {
-    if strings.TrimSpace(jobID) == "" {
-        return false
-    }
-    c.activeMu.Lock()
-    cancel, ok := c.active[jobID]
-    c.activeMu.Unlock()
-    if !ok || cancel == nil {
-        return false
-    }
-    cancel()
-    return true
+	if strings.TrimSpace(jobID) == "" {
+		return false
+	}
+	c.activeMu.Lock()
+	cancel, ok := c.active[jobID]
+	c.activeMu.Unlock()
+	if !ok || cancel == nil {
+		return false
+	}
+	cancel()
+	return true
 }
 
 func (c *Client) registerActive(jobID string, cancel context.CancelFunc) {
-    if strings.TrimSpace(jobID) == "" || cancel == nil {
-        return
-    }
-    c.activeMu.Lock()
-    c.active[jobID] = cancel
-    c.activeMu.Unlock()
+	if strings.TrimSpace(jobID) == "" || cancel == nil {
+		return
+	}
+	c.activeMu.Lock()
+	c.active[jobID] = cancel
+	c.activeMu.Unlock()
 }
 
 func (c *Client) unregisterActive(jobID string) {
-    if strings.TrimSpace(jobID) == "" {
-        return
-    }
-    c.activeMu.Lock()
-    delete(c.active, jobID)
-    c.activeMu.Unlock()
+	if strings.TrimSpace(jobID) == "" {
+		return
+	}
+	c.activeMu.Lock()
+	delete(c.active, jobID)
+	c.activeMu.Unlock()
 }
 
 // heartbeatLoop sends periodic heartbeats for the running job.
@@ -487,12 +487,12 @@ func (c *Client) postCompletion(ctx context.Context, cfg config.ControlPlaneConf
 		Bundles:    cloneBundleRecords(result.Bundles),
 		Inspection: result.Inspection,
 	}
-    if result.Gate != nil {
-        payload.Gate = &gatePayload{
-            Result:          strings.TrimSpace(result.Gate.Result),
-            DurationSeconds: result.Gate.Duration.Seconds(),
-        }
-    }
+	if result.Gate != nil {
+		payload.Gate = &gatePayload{
+			Result:          strings.TrimSpace(result.Gate.Result),
+			DurationSeconds: result.Gate.Duration.Seconds(),
+		}
+	}
 	req, err := c.newJSONRequest(ctx, http.MethodPost, endpoint, payload)
 	if err != nil {
 		return true, err
@@ -608,19 +608,19 @@ type jobErrorPayload struct {
 
 // completionRequest is the JSON payload posted to the completion endpoint.
 type completionRequest struct {
-    Ticket     string                            `json:"ticket"`
-    NodeID     string                            `json:"node_id"`
-    State      string                            `json:"state"`
-    Error      *jobErrorPayload                  `json:"error,omitempty"`
-    Artifacts  map[string]string                 `json:"artifacts,omitempty"`
-    Bundles    map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
-    Gate       *gatePayload                      `json:"gate,omitempty"`
-    Inspection bool                              `json:"inspection,omitempty"`
+	Ticket     string                            `json:"ticket"`
+	NodeID     string                            `json:"node_id"`
+	State      string                            `json:"state"`
+	Error      *jobErrorPayload                  `json:"error,omitempty"`
+	Artifacts  map[string]string                 `json:"artifacts,omitempty"`
+	Bundles    map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
+	Gate       *gatePayload                      `json:"gate,omitempty"`
+	Inspection bool                              `json:"inspection,omitempty"`
 }
 
 type gatePayload struct {
-    Result          string  `json:"result"`
-    DurationSeconds float64 `json:"duration_seconds"`
+	Result          string  `json:"result"`
+	DurationSeconds float64 `json:"duration_seconds"`
 }
 
 type jobLogRequest struct {

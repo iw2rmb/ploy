@@ -29,7 +29,7 @@ func (e *errorEvents) ClaimTicket(ctx context.Context, ticketID string) (contrac
 	if e.ticket.SchemaVersion == "" {
 		e.ticket.SchemaVersion = contracts.SchemaVersion
 	}
-    // tenant removed
+	// tenant removed
 	if e.ticket.Manifest.Name == "" || e.ticket.Manifest.Version == "" {
 		e.ticket.Manifest = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
@@ -70,7 +70,7 @@ func (c *countingEvents) ClaimTicket(ctx context.Context, ticketID string) (cont
 	if c.ticket.TicketID == "" {
 		c.ticket.TicketID = ticketID
 	}
-    // tenant removed
+	// tenant removed
 	if c.ticket.Manifest.Name == "" || c.ticket.Manifest.Version == "" {
 		c.ticket.Manifest = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
@@ -131,11 +131,11 @@ func requireStageStatuses(t *testing.T, sequence []stageStatusEntry, stage strin
 }
 
 type recordingEvents struct {
-    nextTicket     string
-    invalidTicket  bool
-    manifest       contracts.ManifestReference
-    claimedTickets []string
-    checkpoints    []contracts.WorkflowCheckpoint
+	nextTicket     string
+	invalidTicket  bool
+	manifest       contracts.ManifestReference
+	claimedTickets []string
+	checkpoints    []contracts.WorkflowCheckpoint
 	artifacts      []contracts.WorkflowArtifact
 	mu             sync.Mutex
 }
@@ -155,7 +155,7 @@ func (r *recordingEvents) ClaimTicket(ctx context.Context, ticketID string) (con
 	if ref.Name == "" && ref.Version == "" {
 		ref = contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
-    return contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: ticketID, Manifest: ref}, nil
+	return contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: ticketID, Manifest: ref}, nil
 }
 
 func (r *recordingEvents) PublishCheckpoint(ctx context.Context, checkpoint contracts.WorkflowCheckpoint) error {

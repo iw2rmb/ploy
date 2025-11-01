@@ -12,7 +12,7 @@ import (
 )
 
 func TestRunAttachesAsterMetadataToStages(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -36,11 +36,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan", Digest: "sha256:testplan", ArtifactCID: "cid-test-plan", Source: "build/aster/test-plan.tar.zst"},
 		},
 	}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
+	grid := &fakeRuntime{}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -86,7 +86,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunAllowsDisablingAsterPerStage(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -109,11 +109,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
+	grid := &fakeRuntime{}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -156,7 +156,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunRequiresAsterLocatorWhenManifestRequiresToggles(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -167,11 +167,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			Aster: manifests.AsterSet{Required: []string{"plan"}},
 		},
 	}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
+	grid := &fakeRuntime{}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -188,7 +188,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunMergesAsterOverridesAndToggles(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -222,11 +222,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/exec":                         {Stage: "test", Toggle: "exec", BundleID: "test-exec"},
 		},
 	}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
+	grid := &fakeRuntime{}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -259,7 +259,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunFillsMissingAsterMetadataFields(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -281,11 +281,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test/plan":                         {Stage: "test", Toggle: "plan", BundleID: "test-plan"},
 		},
 	}
-    grid := &fakeRuntime{}
+	grid := &fakeRuntime{}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -305,7 +305,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPropagatesAsterLocatorError(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -314,11 +314,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			Aster:           manifests.AsterSet{Required: []string{"plan"}},
 		},
 	}
-    grid := &fakeRuntime{}
+	grid := &fakeRuntime{}
 	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

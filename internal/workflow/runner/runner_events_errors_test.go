@@ -11,10 +11,10 @@ import (
 
 func TestRunReturnsClaimTicketError(t *testing.T) {
 	events := &errorEvents{claimErr: errors.New("claim failed")}
-    opts := runner.Options{
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          runner.NewInMemoryGrid(),
+		Runtime:          runner.NewInMemoryGrid(),
 		Planner:          runner.NewDefaultPlanner(),
 		ManifestCompiler: newStubCompiler(),
 	}
@@ -26,13 +26,13 @@ func TestRunReturnsClaimTicketError(t *testing.T) {
 
 func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 	events := &errorEvents{
-        ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
+		ticket:     contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
 		publishErr: errors.New("checkpoint failure"),
 	}
-    opts := runner.Options{
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          runner.NewInMemoryGrid(),
+		Runtime:          runner.NewInMemoryGrid(),
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -46,7 +46,7 @@ func TestRunPropagatesPublishCheckpointError(t *testing.T) {
 
 func TestRunPropagatesPublishArtifactError(t *testing.T) {
 	events := &errorEvents{
-        ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
+		ticket:      contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
 		artifactErr: errors.New("artifact failure"),
 	}
 	grid := runner.NewInMemoryGrid()
@@ -57,10 +57,10 @@ func TestRunPropagatesPublishArtifactError(t *testing.T) {
 			ArtifactCID: "cid-mods-plan",
 		}},
 	}}
-    opts := runner.Options{
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -73,11 +73,11 @@ func TestRunPropagatesPublishArtifactError(t *testing.T) {
 }
 
 func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
-    events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 3}
-    opts := runner.Options{
+	events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 3}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          noStageRuntime{},
+		Runtime:          noStageRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -90,11 +90,11 @@ func TestRunFailsWhenStageCompletionPublishFails(t *testing.T) {
 }
 
 func TestRunFailsWhenFinalPublishFails(t *testing.T) {
-    events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 8}
-    opts := runner.Options{
+	events := &countingEvents{ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"}, failAt: 8}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          noStageRuntime{},
+		Runtime:          noStageRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

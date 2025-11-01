@@ -15,7 +15,7 @@ import (
 )
 
 type errorRuntime struct {
-    err error
+	err error
 }
 
 func (g errorRuntime) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
@@ -23,13 +23,13 @@ func (g errorRuntime) ExecuteStage(ctx context.Context, ticket contracts.Workflo
 	_ = ticket
 	_ = stage
 	_ = workspace
-    return runner.StageOutcome{}, g.err
+	return runner.StageOutcome{}, g.err
 }
 
 func (g errorRuntime) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 type recordingCacheComposer struct {
@@ -48,13 +48,13 @@ func (statuslessRuntime) ExecuteStage(ctx context.Context, ticket contracts.Work
 	_ = ctx
 	_ = ticket
 	_ = workspace
-    return runner.StageOutcome{Stage: stage}, nil
+	return runner.StageOutcome{Stage: stage}, nil
 }
 
 func (statuslessRuntime) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 type noStageRuntime struct{}
@@ -63,32 +63,32 @@ func (noStageRuntime) ExecuteStage(ctx context.Context, ticket contracts.Workflo
 	_ = ctx
 	_ = ticket
 	_ = workspace
-    return runner.StageOutcome{Status: runner.StageStatusCompleted}, nil
+	return runner.StageOutcome{Status: runner.StageStatusCompleted}, nil
 }
 
 func (noStageRuntime) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 type runtimeCall struct {
-    stage     runner.Stage
-    workspace string
+	stage     runner.Stage
+	workspace string
 }
 
 type fakeRuntime struct {
-    mu            sync.Mutex
-    outcomes      map[string][]runner.StageOutcome
-    calls         []runtimeCall
-    lastWorkspace string
+	mu            sync.Mutex
+	outcomes      map[string][]runner.StageOutcome
+	calls         []runtimeCall
+	lastWorkspace string
 }
 
 func (g *fakeRuntime) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	_ = ctx
 	_ = ticket
 	g.mu.Lock()
-    g.calls = append(g.calls, runtimeCall{stage: stage, workspace: workspace})
+	g.calls = append(g.calls, runtimeCall{stage: stage, workspace: workspace})
 	g.lastWorkspace = workspace
 	queue := g.outcomes[stage.Name]
 	var outcome runner.StageOutcome
@@ -103,7 +103,7 @@ func (g *fakeRuntime) ExecuteStage(ctx context.Context, ticket contracts.Workflo
 	if outcome.Status == "" {
 		outcome.Status = runner.StageStatusCompleted
 	}
-    return outcome, nil
+	return outcome, nil
 }
 
 func (g *fakeRuntime) setOutcomes(stage string, outcomes []runner.StageOutcome) {
@@ -120,15 +120,15 @@ func (g *fakeRuntime) setOutcomes(stage string, outcomes []runner.StageOutcome) 
 func (g *fakeRuntime) callsSnapshot() []runtimeCall {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-    dup := make([]runtimeCall, len(g.calls))
+	dup := make([]runtimeCall, len(g.calls))
 	copy(dup, g.calls)
-    return dup
+	return dup
 }
 
 func (g *fakeRuntime) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 func gatherStageAttempts(calls []runtimeCall, stage string) int {
@@ -147,7 +147,7 @@ func findStageCall(calls []runtimeCall, stageName string) runtimeCall {
 			return call
 		}
 	}
-    return runtimeCall{}
+	return runtimeCall{}
 }
 
 type failingPlanner struct {
@@ -247,7 +247,7 @@ type parallelRecordingGrid struct {
 	outcomes      map[string][]runner.StageOutcome
 	gates         map[string]*stageGate
 	startCh       chan string
-    calls         []runtimeCall
+	calls         []runtimeCall
 	pendingStarts map[string]int
 }
 
@@ -316,7 +316,7 @@ func (g *parallelRecordingGrid) waitForStart(stage string, timeout time.Duration
 func (g *parallelRecordingGrid) callsSnapshot() []runtimeCall {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-    clone := make([]runtimeCall, len(g.calls))
+	clone := make([]runtimeCall, len(g.calls))
 	copy(clone, g.calls)
 	return clone
 }
@@ -324,7 +324,7 @@ func (g *parallelRecordingGrid) callsSnapshot() []runtimeCall {
 func (g *parallelRecordingGrid) ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage runner.Stage, workspace string) (runner.StageOutcome, error) {
 	_ = ticket
 	g.mu.Lock()
-    g.calls = append(g.calls, runtimeCall{stage: stage, workspace: workspace})
+	g.calls = append(g.calls, runtimeCall{stage: stage, workspace: workspace})
 	gate := g.gates[stage.Name]
 	g.mu.Unlock()
 
@@ -362,5 +362,5 @@ func (g *parallelRecordingGrid) ExecuteStage(ctx context.Context, ticket contrac
 func (g *parallelRecordingGrid) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
 	_ = ctx
 	_ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }

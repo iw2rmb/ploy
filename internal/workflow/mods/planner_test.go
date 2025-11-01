@@ -23,7 +23,7 @@ func TestPlannerBuildsModsStageGraph(t *testing.T) {
 		HumanLane:       "mods-human",
 	})
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
-        Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
@@ -92,7 +92,7 @@ func TestPlannerAnnotatesModsMetadataFromAdvisor(t *testing.T) {
 	planner := mods.NewPlanner(mods.Options{Advisor: advisor})
 
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
-        Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-knowledge"},
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-knowledge"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
@@ -146,7 +146,7 @@ func TestPlannerFallsBackWhenAdvisorErrors(t *testing.T) {
 	planner := mods.NewPlanner(mods.Options{Advisor: errAdvisor})
 
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
-        Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-fallback"},
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-fallback"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
@@ -167,7 +167,7 @@ func TestPlannerExposesExecutionHints(t *testing.T) {
 	planner := mods.NewPlanner(options)
 
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
-        Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-hints"},
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-hints"},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error planning mods stages: %v", err)
@@ -233,7 +233,7 @@ func TestPlannerIntegratesKnowledgeBaseAdvisor(t *testing.T) {
 	}
 	planner := mods.NewPlanner(mods.Options{Advisor: advisor})
 
-        ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-1", Manifest: contracts.ManifestReference{Name: "repo", Version: "1.0.0"}}
+	ticket := contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-1", Manifest: contracts.ManifestReference{Name: "repo", Version: "1.0.0"}}
 	stages, err := planner.Plan(context.Background(), mods.PlanInput{
 		Ticket:  ticket,
 		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},

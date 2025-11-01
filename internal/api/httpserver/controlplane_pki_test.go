@@ -209,20 +209,20 @@ func TestHandlePKISignInvalidJSON(t *testing.T) {
 }
 
 func TestHandlePKISignRejectsUnknownFields(t *testing.T) {
-    t.Setenv("PLOY_SERVER_CA_CERT", "dummy")
-    t.Setenv("PLOY_SERVER_CA_KEY", "dummy")
+	t.Setenv("PLOY_SERVER_CA_CERT", "dummy")
+	t.Setenv("PLOY_SERVER_CA_KEY", "dummy")
 
-    server := &controlPlaneServer{store: &mockPKIStore{}}
-    // Include an unknown field to exercise decodeJSON.DisallowUnknownFields.
-    body := []byte(`{"node_id":"` + uuid.New().String() + `","csr":"x","extra":"y"}`)
-    req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(body))
-    rec := httptest.NewRecorder()
+	server := &controlPlaneServer{store: &mockPKIStore{}}
+	// Include an unknown field to exercise decodeJSON.DisallowUnknownFields.
+	body := []byte(`{"node_id":"` + uuid.New().String() + `","csr":"x","extra":"y"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
 
-    server.handlePKISign(rec, req)
+	server.handlePKISign(rec, req)
 
-    if rec.Code != http.StatusBadRequest {
-        t.Fatalf("expected status 400 for unknown fields, got %d", rec.Code)
-    }
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 for unknown fields, got %d", rec.Code)
+	}
 }
 
 func TestHandlePKISignMissingNodeID(t *testing.T) {

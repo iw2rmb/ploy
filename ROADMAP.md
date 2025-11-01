@@ -29,9 +29,9 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Implement `FOR UPDATE SKIP LOCKED` claim on `runs.status='queued'`.
   - [x] Record `started_at`/`finished_at`; expose `runs_timing` view.
 
-- [ ] Node agent (ployd-node) skeleton
-  - [ ] HTTPS server with mTLS; endpoints: `/v1/run/start`, `/v1/run/stop`.
-  - [ ] Heartbeat POST with resource snapshot; update `nodes` row.
+- [x] Node agent (ployd-node) skeleton
+  - [x] HTTPS server with mTLS; endpoints: `/v1/run/start`, `/v1/run/stop`.
+  - [x] Heartbeat POST with resource snapshot; update `nodes` row.
 
 - [ ] Node execution contract
   - [ ] Ephemeral workspace + shallow/sparse clone from URL (branch/commit optional, default to remote default/HEAD).

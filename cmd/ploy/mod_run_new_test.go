@@ -18,9 +18,9 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("expected POST, got %s", r.Method)
 		}
-    if r.URL.Path != "/v1/mods" {
-        t.Fatalf("unexpected path %s", r.URL.Path)
-    }
+		if r.URL.Path != "/v1/mods" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
@@ -35,7 +35,7 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
 	buf := &bytes.Buffer{}
-    args := []string{"--ticket", "mods-test", "--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
+	args := []string{"--ticket", "mods-test", "--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}
@@ -43,15 +43,15 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	if received.TicketID != "mods-test" {
 		t.Fatalf("expected ticket id mods-test, got %s", received.TicketID)
 	}
-    if received.Repository != "https://example.com/repo.git" {
-        t.Fatalf("unexpected repository: %s", received.Repository)
-    }
+	if received.Repository != "https://example.com/repo.git" {
+		t.Fatalf("unexpected repository: %s", received.Repository)
+	}
 	if received.Metadata["repo_target_ref"] != "feature" {
 		t.Fatalf("expected repo target metadata, got %v", received.Metadata)
 	}
-    if len(received.Stages) != 5 {
-        t.Fatalf("expected 5 stages, got %d", len(received.Stages))
-    }
+	if len(received.Stages) != 5 {
+		t.Fatalf("expected 5 stages, got %d", len(received.Stages))
+	}
 	output := buf.String()
 	if !strings.Contains(output, "Mods ticket mods-test submitted") {
 		t.Fatalf("unexpected output: %s", output)
@@ -70,9 +70,9 @@ func TestExecuteModRunGeneratesTicket(t *testing.T) {
 
 	t.Setenv(controlPlaneURLEnv, server.URL)
 
-if err := executeModRun([]string{}, io.Discard); err != nil {
-    t.Fatalf("executeModRun error: %v", err)
-}
+	if err := executeModRun([]string{}, io.Discard); err != nil {
+		t.Fatalf("executeModRun error: %v", err)
+	}
 	if received.TicketID == "" {
 		t.Fatalf("expected generated ticket id")
 	}

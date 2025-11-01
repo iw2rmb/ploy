@@ -31,10 +31,10 @@ type Request struct {
 type Result struct {
 	ContainerID        string
 	ExitCode           int
-    DiffArtifact       PublishedArtifact
-    LogArtifact        PublishedArtifact
-    GateArtifact       PublishedArtifact
-    GateReport         GateResult
+	DiffArtifact       PublishedArtifact
+	LogArtifact        PublishedArtifact
+	GateArtifact       PublishedArtifact
+	GateReport         GateResult
 	HydrationSnapshots map[string]PublishedArtifact
 	RetentionTTL       string
 	Retained           bool
@@ -44,8 +44,8 @@ type Result struct {
 type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
-    Diffs      DiffGenerator
-    Gate       GateClient
+	Diffs      DiffGenerator
+	Gate       GateClient
 	Artifacts  ArtifactPublisher
 	Logs       LogCollector
 	Streams    LogStreamPublisher
@@ -131,81 +131,81 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		return Result{}, runErr
 	}
 
-    var diffArtifact PublishedArtifact
-    var logArtifact PublishedArtifact
-    var gateArtifact PublishedArtifact
-    skipArtifacts := strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "1") ||
-        strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "true")
-    if r.Artifacts != nil && !skipArtifacts {
-        diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
-        if err != nil {
-            runErr = fmt.Errorf("step: publish diff: %w", err)
-            return Result{}, runErr
-        }
-        logArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindLogs, Buffer: logBytes})
-        if err != nil {
-            runErr = fmt.Errorf("step: publish logs: %w", err)
-            return Result{}, runErr
-        }
-    }
+	var diffArtifact PublishedArtifact
+	var logArtifact PublishedArtifact
+	var gateArtifact PublishedArtifact
+	skipArtifacts := strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "1") ||
+		strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "true")
+	if r.Artifacts != nil && !skipArtifacts {
+		diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
+		if err != nil {
+			runErr = fmt.Errorf("step: publish diff: %w", err)
+			return Result{}, runErr
+		}
+		logArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindLogs, Buffer: logBytes})
+		if err != nil {
+			runErr = fmt.Errorf("step: publish logs: %w", err)
+			return Result{}, runErr
+		}
+	}
 
-    gateResult := GateResult{Passed: true}
-    if r.Gate != nil && selectGateSpec(manifest) != nil {
-        gateReq := GateRequest{
-            Manifest:  manifest,
-            Workspace: workspace,
-        }
-        if logArtifact.CID != "" {
-            artifactCopy := logArtifact
-            gateReq.LogArtifact = &artifactCopy
-        }
-        gateStart := time.Now()
-        gateResult, err = r.Gate.Validate(ctx, gateReq)
-        elapsed := time.Since(gateStart)
-        if err != nil {
-            runErr = fmt.Errorf("step: build gate validation: %w", err)
-            return Result{}, runErr
-        }
-        if gateResult.Duration <= 0 {
-            gateResult.Duration = elapsed
-        }
-        if r.Artifacts != nil && len(gateResult.Report) > 0 {
-            gateArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{
-                Kind:   ArtifactKindGateReport,
-                Buffer: append([]byte(nil), gateResult.Report...),
-            })
-            if err != nil {
-                runErr = fmt.Errorf("step: publish gate report: %w", err)
-                return Result{}, runErr
-            }
-        }
-        if !gateResult.Passed {
-            result := Result{
-                ContainerID:        handle.ID,
-                ExitCode:           containerResult.ExitCode,
-                DiffArtifact:       diffArtifact,
-                LogArtifact:        logArtifact,
-                GateArtifact:       gateArtifact,
-                GateReport:         gateResult,
-                HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
-                Retained:           manifest.Retention.RetainContainer,
-                RetentionTTL:       manifest.Retention.TTL,
-            }
-            if hasStream {
-                r.publishRetentionHint(ctx, streamID, result)
-            }
-            runErr = fmt.Errorf("%w: %s", ErrBuildGateFailed, gateResult.Message)
-            return result, runErr
-        }
-    }
+	gateResult := GateResult{Passed: true}
+	if r.Gate != nil && selectGateSpec(manifest) != nil {
+		gateReq := GateRequest{
+			Manifest:  manifest,
+			Workspace: workspace,
+		}
+		if logArtifact.CID != "" {
+			artifactCopy := logArtifact
+			gateReq.LogArtifact = &artifactCopy
+		}
+		gateStart := time.Now()
+		gateResult, err = r.Gate.Validate(ctx, gateReq)
+		elapsed := time.Since(gateStart)
+		if err != nil {
+			runErr = fmt.Errorf("step: build gate validation: %w", err)
+			return Result{}, runErr
+		}
+		if gateResult.Duration <= 0 {
+			gateResult.Duration = elapsed
+		}
+		if r.Artifacts != nil && len(gateResult.Report) > 0 {
+			gateArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{
+				Kind:   ArtifactKindGateReport,
+				Buffer: append([]byte(nil), gateResult.Report...),
+			})
+			if err != nil {
+				runErr = fmt.Errorf("step: publish gate report: %w", err)
+				return Result{}, runErr
+			}
+		}
+		if !gateResult.Passed {
+			result := Result{
+				ContainerID:        handle.ID,
+				ExitCode:           containerResult.ExitCode,
+				DiffArtifact:       diffArtifact,
+				LogArtifact:        logArtifact,
+				GateArtifact:       gateArtifact,
+				GateReport:         gateResult,
+				HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
+				Retained:           manifest.Retention.RetainContainer,
+				RetentionTTL:       manifest.Retention.TTL,
+			}
+			if hasStream {
+				r.publishRetentionHint(ctx, streamID, result)
+			}
+			runErr = fmt.Errorf("%w: %s", ErrBuildGateFailed, gateResult.Message)
+			return result, runErr
+		}
+	}
 
 	result := Result{
 		ContainerID:        handle.ID,
 		ExitCode:           containerResult.ExitCode,
 		DiffArtifact:       diffArtifact,
 		LogArtifact:        logArtifact,
-        GateArtifact:       gateArtifact,
-        GateReport:         gateResult,
+		GateArtifact:       gateArtifact,
+		GateReport:         gateResult,
 		HydrationSnapshots: clonePublishedArtifacts(workspace.HydrationSnapshots),
 		Retained:           manifest.Retention.RetainContainer,
 		RetentionTTL:       manifest.Retention.TTL,

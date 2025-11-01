@@ -50,7 +50,7 @@ func TestIntegrationStepRunnerCapturesDiffAndGate(t *testing.T) {
 	runtime := &integrationRuntime{overlay: overlayFile}
 	workspace := &integrationWorkspaceHydrator{paths: map[string]string{"baseline": baselineDir, "overlay": overlayDir}, workingDir: overlayDir}
 	diffs := &fileDiffGenerator{}
-    gate := &integrationGateClient{}
+	gate := &integrationGateClient{}
 	artifacts := &integrationArtifactPublisher{}
 	logs := &integrationLogCollector{}
 
@@ -58,7 +58,7 @@ func TestIntegrationStepRunnerCapturesDiffAndGate(t *testing.T) {
 		Workspace:  workspace,
 		Containers: runtime,
 		Diffs:      diffs,
-        Gate:       gate,
+		Gate:       gate,
 		Artifacts:  artifacts,
 		Logs:       logs,
 	}
@@ -70,9 +70,9 @@ func TestIntegrationStepRunnerCapturesDiffAndGate(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", res.ExitCode)
 	}
-    if !gate.called {
-        t.Fatalf("expected Build Gate to be invoked")
-    }
+	if !gate.called {
+		t.Fatalf("expected Build Gate to be invoked")
+	}
 	if len(artifacts.published) != 2 {
 		t.Fatalf("expected diff and log artifacts, got %d", len(artifacts.published))
 	}
@@ -146,12 +146,12 @@ func (f *fileDiffGenerator) Capture(ctx context.Context, req step.DiffRequest) (
 }
 
 type integrationGateClient struct {
-    called bool
+	called bool
 }
 
 func (i *integrationGateClient) Validate(ctx context.Context, req step.GateRequest) (step.GateResult, error) {
-    i.called = true
-    return step.GateResult{Passed: true}, nil
+	i.called = true
+	return step.GateResult{Passed: true}, nil
 }
 
 type integrationArtifactPublisher struct {

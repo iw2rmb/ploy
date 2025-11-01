@@ -74,8 +74,8 @@ func (s *stubAdapter) Metadata() workflowruntime.AdapterMetadata {
 }
 
 func (s *stubAdapter) Connect(ctx context.Context) (runner.RuntimeClient, error) {
-    _ = ctx
-    return nil, nil
+	_ = ctx
+	return nil, nil
 }
 
 func boolPtr(v bool) *bool { return &v }

@@ -13,13 +13,13 @@ const defaultLogMaxBytes int64 = 1 << 20 // 1 MiB
 type LogSource string
 
 const (
-    // LogSourcePrimary identifies the primary/legacy artifact backend for logs.
-    // String value remains "grid" for backward compatibility.
-    LogSourcePrimary LogSource = "grid"
-    // LogSourceIPFS indicates the log was downloaded from IPFS using the artifact CID.
-    LogSourceIPFS LogSource = "ipfs"
-    // LogSourceStub indicates the log came from an in-memory stub (typically workstation tests).
-    LogSourceStub LogSource = "stub"
+	// LogSourcePrimary identifies the primary/legacy artifact backend for logs.
+	// String value remains "grid" for backward compatibility.
+	LogSourcePrimary LogSource = "grid"
+	// LogSourceIPFS indicates the log was downloaded from IPFS using the artifact CID.
+	LogSourceIPFS LogSource = "ipfs"
+	// LogSourceStub indicates the log came from an in-memory stub (typically workstation tests).
+	LogSourceStub LogSource = "stub"
 )
 
 // ArtifactReference identifies the artifact that stores a build log.
@@ -95,9 +95,13 @@ func (r *LogRetriever) Retrieve(ctx context.Context, ref ArtifactReference) (Log
 		}
 		digest := sha256.Sum256(data)
 		source := c.source
-        if source == "" {
-            if c.fetcher == r.Primary { source = LogSourcePrimary } else { source = LogSourceIPFS }
-        }
+		if source == "" {
+			if c.fetcher == r.Primary {
+				source = LogSourcePrimary
+			} else {
+				source = LogSourceIPFS
+			}
+		}
 		// Copy the data to avoid callers mutating fetcher-owned buffers.
 		copied := append([]byte(nil), data...)
 		return LogRetrievalResult{

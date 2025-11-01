@@ -27,7 +27,7 @@ type jobRecord struct {
 	Metadata       map[string]string       `json:"metadata,omitempty"`
 	Artifacts      map[string]string       `json:"artifacts,omitempty"`
 	Bundles        map[string]bundleRecord `json:"bundles,omitempty"`
-    Gate           *gateRecord             `json:"gate,omitempty"`
+	Gate           *gateRecord             `json:"gate,omitempty"`
 	Retention      *retentionRecord        `json:"retention,omitempty"`
 	NodeSnapshot   *nodeSnapshotRecord     `json:"node_snapshot,omitempty"`
 	Error          *JobError               `json:"error,omitempty"`
@@ -53,7 +53,7 @@ func (r jobRecord) toJob() *Job {
 		Metadata:       cloneMap(r.Metadata),
 		Artifacts:      cloneMap(r.Artifacts),
 		Bundles:        exportBundleRecords(r.Bundles),
-        Gate:           exportGateSummary(r.Gate),
+		Gate:           exportGateSummary(r.Gate),
 		Retention:      exportRetention(r.Retention),
 		NodeSnapshot:   exportNodeSnapshot(r.NodeSnapshot),
 		Error:          r.Error,
@@ -107,14 +107,14 @@ func exportBundleRecords(src map[string]bundleRecord) map[string]BundleRecord {
 }
 
 func exportGateSummary(rec *gateRecord) *GateSummary {
-    if rec == nil {
-        return nil
-    }
-    summary := &GateSummary{Result: rec.Result}
-    if rec.DurationSeconds > 0 {
-        summary.Duration = time.Duration(rec.DurationSeconds * float64(time.Second))
-    }
-    return summary
+	if rec == nil {
+		return nil
+	}
+	summary := &GateSummary{Result: rec.Result}
+	if rec.DurationSeconds > 0 {
+		summary.Duration = time.Duration(rec.DurationSeconds * float64(time.Second))
+	}
+	return summary
 }
 
 func exportRetention(src *retentionRecord) *JobRetention {
@@ -283,8 +283,8 @@ type queueEntry struct {
 }
 
 type gateRecord struct {
-    Result          string  `json:"result,omitempty"`
-    DurationSeconds float64 `json:"duration_seconds,omitempty"`
+	Result          string  `json:"result,omitempty"`
+	DurationSeconds float64 `json:"duration_seconds,omitempty"`
 }
 
 type leaseEntry struct {

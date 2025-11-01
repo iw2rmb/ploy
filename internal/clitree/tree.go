@@ -14,40 +14,40 @@ type Node struct {
 }
 
 var commandTree = []Node{
-    
+
 	{
 		Name:        "mod",
 		Description: "Plan and run Mods workflows",
 		Usage:       "ploy mod <command>",
 		Note:        "Use 'ploy mod run --help' for flag details.",
-			Subcommands: []Node{
-				{
-					Name:        "run",
-					Description: "Submit a Mods run to the control plane",
-					Usage:       "ploy mod run [--flags]",
-				},
-				{
-					Name:        "cancel",
-					Description: "Cancel a Mods ticket via the control plane",
-					Usage:       "ploy mod cancel --ticket <ticket> [--reason <text>]",
-				},
-				{
-					Name:        "resume",
-					Description: "Resume a paused Mods ticket",
-					Usage:       "ploy mod resume <ticket>",
-				},
-				{
-					Name:        "inspect",
-					Description: "Show summary for a Mods ticket",
-					Usage:       "ploy mod inspect <ticket>",
-				},
-				{
-					Name:        "artifacts",
-					Description: "List ticket artifacts by stage",
-					Usage:       "ploy mod artifacts <ticket>",
-				},
+		Subcommands: []Node{
+			{
+				Name:        "run",
+				Description: "Submit a Mods run to the control plane",
+				Usage:       "ploy mod run [--flags]",
+			},
+			{
+				Name:        "cancel",
+				Description: "Cancel a Mods ticket via the control plane",
+				Usage:       "ploy mod cancel --ticket <ticket> [--reason <text>]",
+			},
+			{
+				Name:        "resume",
+				Description: "Resume a paused Mods ticket",
+				Usage:       "ploy mod resume <ticket>",
+			},
+			{
+				Name:        "inspect",
+				Description: "Show summary for a Mods ticket",
+				Usage:       "ploy mod inspect <ticket>",
+			},
+			{
+				Name:        "artifacts",
+				Description: "List ticket artifacts by stage",
+				Usage:       "ploy mod artifacts <ticket>",
 			},
 		},
+	},
 	{
 		Name:        "mods",
 		Description: "Observe Mods execution (logs, events)",
@@ -68,30 +68,30 @@ var commandTree = []Node{
 		Description: "Inspect and follow individual jobs",
 		Usage:       "ploy jobs <command>",
 		Note:        "Use 'ploy jobs follow --help' for flag details.",
-			Subcommands: []Node{
-				{
-					Name:        "follow",
-					Synopsis:    "follow <job-id>",
-					Description: "Follow job logs via SSE with retry semantics",
-					Usage:       "ploy jobs follow [--format] [--max-retries] [--retry-wait] <job-id>",
-				},
-				{
-					Name:        "ls",
-					Description: "List jobs for a Mods ticket",
-					Usage:       "ploy jobs ls --ticket <ticket>",
-				},
-				{
-					Name:        "inspect",
-					Description: "Show details for a job",
-					Usage:       "ploy jobs inspect --ticket <ticket> <job-id>",
-				},
-				{
-					Name:        "retry",
-					Description: "Request a retry for a failed job",
-					Usage:       "ploy jobs retry --ticket <ticket> <job-id>",
-				},
+		Subcommands: []Node{
+			{
+				Name:        "follow",
+				Synopsis:    "follow <job-id>",
+				Description: "Follow job logs via SSE with retry semantics",
+				Usage:       "ploy jobs follow [--format] [--max-retries] [--retry-wait] <job-id>",
+			},
+			{
+				Name:        "ls",
+				Description: "List jobs for a Mods ticket",
+				Usage:       "ploy jobs ls --ticket <ticket>",
+			},
+			{
+				Name:        "inspect",
+				Description: "Show details for a job",
+				Usage:       "ploy jobs inspect --ticket <ticket> <job-id>",
+			},
+			{
+				Name:        "retry",
+				Description: "Request a retry for a failed job",
+				Usage:       "ploy jobs retry --ticket <ticket> <job-id>",
 			},
 		},
+	},
 	{
 		Name:        "artifact",
 		Description: "Manage IPFS Cluster artifacts",
@@ -140,11 +140,11 @@ var commandTree = []Node{
 				Description: "Bootstrap the control-plane node or join workers over SSH",
 				Usage:       "ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>]",
 			},
-            {
-                Name:        "https",
-                Description: "Set HTTPS endpoints and CA on a descriptor",
-                Usage:       "ploy cluster https [--cluster-id <id>] [--api-endpoint <url>]... [--api-server-name <name>] [--ca-file <path>] [--disable-ssh]",
-            },
+			{
+				Name:        "https",
+				Description: "Set HTTPS endpoints and CA on a descriptor",
+				Usage:       "ploy cluster https [--cluster-id <id>] [--api-endpoint <url>]... [--api-server-name <name>] [--ca-file <path>] [--disable-ssh]",
+			},
 			{
 				Name:        "connect",
 				Description: "Cache beacon metadata and trust bundles locally",
@@ -215,19 +215,19 @@ var commandTree = []Node{
 		},
 	},
 
-    {
-        Name:        "environment",
-        Description: "Materialize integration environments",
-        Usage:       "ploy environment <command>",
-        Note:        "Use 'ploy environment materialize --help' for flag details.",
-        Subcommands: []Node{
-            {
-                Name:        "materialize",
-                Description: "Materialize integration environments from manifests",
-                Usage:       "ploy environment materialize <commit-sha> --app <app> [--flags]",
-            },
-        },
-    },
+	{
+		Name:        "environment",
+		Description: "Materialize integration environments",
+		Usage:       "ploy environment <command>",
+		Note:        "Use 'ploy environment materialize --help' for flag details.",
+		Subcommands: []Node{
+			{
+				Name:        "materialize",
+				Description: "Materialize integration environments from manifests",
+				Usage:       "ploy environment materialize <commit-sha> --app <app> [--flags]",
+			},
+		},
+	},
 	{
 		Name:        "manifest",
 		Description: "Inspect and validate integration manifests",
