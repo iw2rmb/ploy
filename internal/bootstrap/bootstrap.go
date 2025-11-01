@@ -39,13 +39,12 @@ func PrefixedScript(env map[string]string) string {
 	var b strings.Builder
 	for _, k := range keys {
 		v := strings.TrimSpace(env[k])
-		// Very simple shell quoting: wrap in double quotes and escape existing ones.
-		v = strings.ReplaceAll(v, "\"", "\\\"")
+		// Shell-safe single-quote quoting to prevent expansion of $, ``, etc.
 		b.WriteString("export ")
 		b.WriteString(k)
-		b.WriteString("=\"")
-		b.WriteString(v)
-		b.WriteString("\"\n")
+		b.WriteString("=")
+		b.WriteString(singleQuote(v))
+		b.WriteString("\n")
 	}
 	// Separator between exports and script body
 	b.WriteString("\n")
@@ -204,4 +203,15 @@ func PrefixedScript(env map[string]string) string {
 
 	b.WriteString("echo 'Bootstrap completed successfully.'\n")
 	return b.String()
+}
+
+// singleQuote returns a shell-safe single-quoted literal. Empty becomes ”.
+func singleQuote(s string) string {
+	if s == "" {
+		return "''"
+	}
+	if !strings.Contains(s, "'") {
+		return "'" + s + "'"
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }

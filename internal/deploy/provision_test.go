@@ -18,9 +18,9 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 		}
 	}
 
-	assertContains("export PLOY_SERVER_PG_DSN=\"postgres://user:pass@localhost:5432/ploy?sslmode=disable\"")
-	assertContains("export PLOY_INSTALL_POSTGRESQL=\"true\"")
-	assertContains("export PLOY_CA_CERT_PEM=\"-----BEGIN CERTIFICATE-----")
+	assertContains("export PLOY_SERVER_PG_DSN='postgres://user:pass@localhost:5432/ploy?sslmode=disable'")
+	assertContains("export PLOY_INSTALL_POSTGRESQL='true'")
+	assertContains("export PLOY_CA_CERT_PEM='-----BEGIN CERTIFICATE-----")
 
 	// Verify functional body fragments exist
 	assertContains("mkdir -p /etc/ploy/pki")
@@ -41,7 +41,7 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	}
 
 	// Should contain the install flag
-	assertContains("export PLOY_INSTALL_POSTGRESQL=\"true\"")
+	assertContains("export PLOY_INSTALL_POSTGRESQL='true'")
 
 	// Should NOT contain PLOY_SERVER_PG_DSN in the initial environment exports
 	// (but it's fine if it appears later in the script as part of derive_postgresql_dsn function)
