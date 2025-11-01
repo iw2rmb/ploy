@@ -73,9 +73,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 	envVars := map[string]string{
 		"PLOY_BOOTSTRAP_VERSION": bootstrap.Version,
 	}
-	ipfsAPIHost := formatHost(address)
-	envVars["PLOY_IPFS_CLUSTER_API"] = fmt.Sprintf("http://%s:9094", ipfsAPIHost)
-	envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
+    envVars["PLOYD_METRICS_LISTEN"] = "127.0.0.1:9101"
 	if sanitized := sanitizeNodeID(nodeID); sanitized != "" {
 		envVars["PLOYD_NODE_ID"] = sanitized
 	} else {

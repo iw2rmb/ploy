@@ -1,5 +1,7 @@
 # Environment Variables
 
+Note: As of the Postgres/mTLS pivot (November 2025), legacy IPFS Cluster and etcd variables are deprecated and removed from the runtime. Sections that reference `PLOY_IPFS_*` and `PLOY_ETCD_*` remain for historical context and transition, but are no longer consumed by the codebase.
+
 This reference tracks the environment variables that the workstation CLI
 inspects today and notes the current local values. Update this file whenever a
 new variable is introduced, defaults change, or components adopt additional

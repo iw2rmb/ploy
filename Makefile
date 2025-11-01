@@ -4,11 +4,15 @@ BUILD_DIR := dist
 .PHONY: build
 build: ## Build the Ploy CLI
 	@mkdir -p $(BUILD_DIR)
-	go build -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
-	go build -o $(BUILD_DIR)/ployd ./cmd/ployd
-	go build -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-linux ./cmd/ployd
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node
+	cd cmd/ploy && GOFLAGS= go build -o ../$(BUILD_DIR)/$(BINARY) .
+	@if [ -d ./cmd/ployd ]; then \
+		go build -o $(BUILD_DIR)/ployd ./cmd/ployd; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-linux ./cmd/ployd; \
+	fi
+	@if [ -d ./cmd/ployd-node ]; then \
+		go build -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node; \
+	fi
 
 .PHONY: fmt
 fmt: ## Format Go source files

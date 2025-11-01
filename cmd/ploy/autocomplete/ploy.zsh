@@ -99,23 +99,6 @@ _ploy() {
                     commands+=("add:Add a worker node to the cluster")
                     _describe 'node command' commands && ret=0
                     ;;
-                'help')
-                    commands=()
-                    commands+=("mod:Plan and run Mods workflows")
-                    commands+=("mods:Observe Mods execution (logs, events)")
-                    commands+=("jobs:Inspect and follow individual jobs")
-                    commands+=("artifact:Manage IPFS Cluster artifacts")
-                    commands+=("upload:Upload repository or log bundles via SSH")
-                    commands+=("report:Download reports or artifacts via SSH")
-                    commands+=("cluster:Manage local cluster descriptors")
-                    commands+=("config:Inspect or update cluster configuration")
-                    commands+=("environment:Materialize integration environments")
-                    commands+=("manifest:Inspect and validate integration manifests")
-                    commands+=("knowledge-base:Curate knowledge base fixtures")
-                    commands+=("server:Manage control plane server")
-                    commands+=("node:Manage worker nodes")
-                    _describe 'help command' commands && ret=0
-                    ;;
             esac
             ;;
         third)
