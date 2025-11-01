@@ -1,0 +1,19 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string }
+get:
+  tags: [Control]
+  summary: Stream job logs (SSE)
+  description: |
+    Server-Sent Events stream of job log events. The CLI reconnects automatically
+    on disconnects and resumes streaming.
+  responses:
+    '200':
+      description: OK
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '404': { description: Not Found }

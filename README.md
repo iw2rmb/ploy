@@ -68,10 +68,10 @@ This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote inst
     --follow
   ```
 
-- Follow run logs via SSE:
+ - Follow job logs via SSE:
 
   ```bash
-  dist/ploy jobs follow <run-id>
+  dist/ploy jobs follow <job-id>
   ```
 
 **Environment Variables**
