@@ -135,17 +135,21 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		Listen: cfg.Metrics.Listen,
 	})
 
-	// Start HTTP server.
-	if err := httpSrv.Start(ctx); err != nil {
-		return fmt.Errorf("start http server: %w", err)
-	}
+    // Start HTTP server.
+    if err := httpSrv.Start(ctx); err != nil {
+        // Ensure background tasks are stopped on failure.
+        _ = sched.Stop(context.Background())
+        return fmt.Errorf("start http server: %w", err)
+    }
 
-	// Start metrics server.
-	if err := metricsSrv.Start(ctx); err != nil {
-		// Stop HTTP server on failure to start metrics.
-		_ = httpSrv.Stop(context.Background())
-		return fmt.Errorf("start metrics server: %w", err)
-	}
+    // Start metrics server.
+    if err := metricsSrv.Start(ctx); err != nil {
+        // Stop HTTP server on failure to start metrics.
+        _ = httpSrv.Stop(context.Background())
+        // Stop scheduler to avoid leaking background goroutines.
+        _ = sched.Stop(context.Background())
+        return fmt.Errorf("start metrics server: %w", err)
+    }
 
 	slog.Info("ployd servers started",
 		"api", httpSrv.Addr(),
