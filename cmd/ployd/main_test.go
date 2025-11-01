@@ -507,3 +507,42 @@ func TestPKISignHandler_StoreError(t *testing.T) {
 		t.Errorf("expected error message about persist failure, got: %s", rr.Body.String())
 	}
 }
+
+func TestPKISignHandler_CSRNodeMismatch(t *testing.T) {
+    // Generate test CA.
+    ca, err := internalPKI.GenerateCA("test-cluster", time.Now())
+    if err != nil {
+        t.Fatalf("generate CA: %v", err)
+    }
+
+    // Generate CSR for a different node ID.
+    actualNodeID := uuid.New().String()
+    keyBundle, csrPEM, err := internalPKI.GenerateNodeCSR(actualNodeID, "test-cluster", "192.168.1.10")
+    if err != nil {
+        t.Fatalf("generate CSR: %v", err)
+    }
+    _ = keyBundle
+
+    t.Setenv("PLOY_SERVER_CA_CERT", ca.CertPEM)
+    t.Setenv("PLOY_SERVER_CA_KEY", ca.KeyPEM)
+
+    // Prepare request with a different node_id than the CSR CN.
+    reqBody := map[string]string{
+        "node_id": uuid.New().String(), // mismatch
+        "csr":     string(csrPEM),
+    }
+    reqJSON, _ := json.Marshal(reqBody)
+
+    req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+    rr := httptest.NewRecorder()
+
+    handler := pkiSignHandler(&mockStore{})
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusBadRequest {
+        t.Fatalf("expected status 400 on mismatch, got %d", rr.Code)
+    }
+    if !strings.Contains(rr.Body.String(), "csr subject common name must match") {
+        t.Errorf("expected mismatch error, got: %s", rr.Body.String())
+    }
+}

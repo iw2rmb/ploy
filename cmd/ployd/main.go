@@ -1,13 +1,15 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"log/slog"
+    "crypto/x509"
+    "context"
+    "encoding/json"
+    "encoding/pem"
+    "errors"
+    "flag"
+    "fmt"
+    "io"
+    "log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -251,54 +253,68 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // pkiSignHandler returns an HTTP handler that signs node CSRs with the cluster CA.
 // It requires admin role authorization and returns a PEM bundle with the signed certificate.
 func pkiSignHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Decode request body.
-		var req struct {
-			NodeID string `json:"node_id"`
-			CSR    string `json:"csr"`
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Decode request body.
+        var req struct {
+            NodeID string `json:"node_id"`
+            CSR    string `json:"csr"`
+        }
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
-			return
-		}
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+            return
+        }
 
-		// Validate node_id format.
-		nodeUUID, err := uuid.Parse(req.NodeID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid node_id: %v", err), http.StatusBadRequest)
-			return
-		}
+        // Validate node_id format.
+        nodeUUID, err := uuid.Parse(req.NodeID)
+        if err != nil {
+            http.Error(w, fmt.Sprintf("invalid node_id: %v", err), http.StatusBadRequest)
+            return
+        }
 
-		// Validate CSR is not empty.
-		if strings.TrimSpace(req.CSR) == "" {
-			http.Error(w, "csr field is required", http.StatusBadRequest)
-			return
-		}
+        // Validate CSR is not empty.
+        if strings.TrimSpace(req.CSR) == "" {
+            http.Error(w, "csr field is required", http.StatusBadRequest)
+            return
+        }
 
-		// Load cluster CA from environment.
-		caCertPEM := os.Getenv("PLOY_SERVER_CA_CERT")
-		caKeyPEM := os.Getenv("PLOY_SERVER_CA_KEY")
-		if caCertPEM == "" || caKeyPEM == "" {
-			http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
-			slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
-			return
-		}
+        // Load cluster CA from environment.
+        caCertPEM := os.Getenv("PLOY_SERVER_CA_CERT")
+        caKeyPEM := os.Getenv("PLOY_SERVER_CA_KEY")
+        if caCertPEM == "" || caKeyPEM == "" {
+            http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
+            slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
+            return
+        }
 
-		ca, err := internalPKI.LoadCA(caCertPEM, caKeyPEM)
-		if err != nil {
-			http.Error(w, "failed to load CA", http.StatusInternalServerError)
-			slog.Error("pki sign: load CA failed", "err", err)
-			return
-		}
+        ca, err := internalPKI.LoadCA(caCertPEM, caKeyPEM)
+        if err != nil {
+            http.Error(w, "failed to load CA", http.StatusInternalServerError)
+            slog.Error("pki sign: load CA failed", "err", err)
+            return
+        }
 
-		// Sign the CSR.
-		cert, err := internalPKI.SignNodeCSR(ca, []byte(req.CSR), time.Now())
-		if err != nil {
-			http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
-			slog.Warn("pki sign: sign CSR failed", "node_id", req.NodeID, "err", err)
-			return
-		}
+        // Parse CSR to validate subject common name matches node_id when possible.
+        if block, _ := pem.Decode([]byte(req.CSR)); block != nil && block.Type == "CERTIFICATE REQUEST" {
+            if parsedCSR, err := x509.ParseCertificateRequest(block.Bytes); err == nil {
+                if err := parsedCSR.CheckSignature(); err == nil {
+                    expectedCN := "node:" + req.NodeID
+                    if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
+                        http.Error(w, "csr subject common name must match node:<node_id>", http.StatusBadRequest)
+                        return
+                    }
+                }
+            }
+            // If parsing/signature fails, fall through to SignNodeCSR for consistent error path.
+        }
+
+        // Sign the CSR.
+        cert, err := internalPKI.SignNodeCSR(ca, []byte(req.CSR), time.Now())
+        if err != nil {
+            http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
+            slog.Warn("pki sign: sign CSR failed", "node_id", req.NodeID, "err", err)
+            return
+        }
 
 		// Persist certificate metadata to the database.
 		err = st.UpdateNodeCertMetadata(r.Context(), store.UpdateNodeCertMetadataParams{
