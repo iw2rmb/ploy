@@ -2,7 +2,7 @@ package config
 
 import "time"
 
-// HTTPConfig configures the Fiber HTTP server.
+// HTTPConfig configures the HTTP server.
 type HTTPConfig struct {
 	Listen       string        `yaml:"listen"`
 	TLS          TLSConfig     `yaml:"tls"`
