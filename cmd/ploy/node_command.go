@@ -1,25 +1,26 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
-	"flag"
-	"fmt"
-	"io"
-	"net/http"
-	"net/netip"
-	"os"
-	"strings"
-	"time"
+    "bytes"
+    "context"
+    "encoding/json"
+    "errors"
+    "flag"
+    "fmt"
+    "io"
+    "net/http"
+    "net/netip"
+    "net/url"
+    "os"
+    "strings"
 
-	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/api/httpserver"
-	"github.com/iw2rmb/ploy/internal/deploy"
-	"github.com/iw2rmb/ploy/internal/pki"
-	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgxpool"
+    "github.com/google/uuid"
+    "github.com/iw2rmb/ploy/internal/api/httpserver"
+    clicp "github.com/iw2rmb/ploy/internal/cli/controlplane"
+    "github.com/iw2rmb/ploy/internal/deploy"
+    "github.com/iw2rmb/ploy/internal/pki"
+    "github.com/iw2rmb/ploy/internal/store"
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 func handleNode(args []string, stderr io.Writer) error {
@@ -153,70 +154,62 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintln(stderr, "Node key and CSR generated")
 
-	// Get server URL and database DSN from environment.
-	// The server URL is needed to call the PKI sign endpoint.
-	// The database DSN is needed to record the node.
-	// For now, we require the user to provide a --server-url flag or PLOY_SERVER_URL env var.
-	// In production, this would be derived from the cluster configuration.
-	serverURL := os.Getenv("PLOY_SERVER_URL")
-	if strings.TrimSpace(serverURL) == "" {
-		return fmt.Errorf("node add: PLOY_SERVER_URL environment variable required (e.g., https://<server-ip>:8443)")
-	}
+    // Resolve control-plane endpoint (descriptor or PLOY_CONTROL_PLANE_URL).
+    baseURL, httpClient, err := clicp.ResolveHTTP(ctx, clicp.Options{ClusterID: cfg.ClusterID})
+    if err != nil {
+        return fmt.Errorf("node add: resolve control-plane: %w", err)
+    }
 
-	pgDSN := os.Getenv("PLOY_SERVER_PG_DSN")
-	if strings.TrimSpace(pgDSN) == "" {
-		return fmt.Errorf("node add: PLOY_SERVER_PG_DSN environment variable required")
-	}
+    // Postgres DSN used to create the node record prior to CSR signing.
+    pgDSN := os.Getenv("PLOY_SERVER_PG_DSN")
+    if strings.TrimSpace(pgDSN) == "" {
+        return fmt.Errorf("node add: PLOY_SERVER_PG_DSN environment variable required")
+    }
 
-	// Parse node UUID from the node ID.
-	nodeUUID, err := parseNodeUUID(nodeID)
-	if err != nil {
-		return fmt.Errorf("node add: %w", err)
-	}
+    // Record node in database.
+    _, _ = fmt.Fprintln(stderr, "Recording node in database...")
+    nodeUUID, err := recordNode(ctx, pgDSN, nodeID, cfg.Address)
+    if err != nil {
+        return fmt.Errorf("node add: record node: %w", err)
+    }
+    _, _ = fmt.Fprintln(stderr, "Node recorded in database")
 
-	// Record node in database.
-	_, _ = fmt.Fprintln(stderr, "Recording node in database...")
-	if err := recordNode(ctx, pgDSN, nodeUUID, nodeID, cfg.Address); err != nil {
-		return fmt.Errorf("node add: record node: %w", err)
-	}
-	_, _ = fmt.Fprintln(stderr, "Node recorded in database")
+    // Submit CSR to server for signing.
+    _, _ = fmt.Fprintln(stderr, "Submitting CSR to server for signing...")
+    nodeCert, caBundle, err := signNodeCSR(ctx, baseURL, httpClient, nodeUUID.String(), csrPEM)
+    if err != nil {
+        return fmt.Errorf("node add: sign CSR: %w", err)
+    }
+    _, _ = fmt.Fprintln(stderr, "CSR signed successfully")
 
-	// Submit CSR to server for signing.
-	_, _ = fmt.Fprintln(stderr, "Submitting CSR to server for signing...")
-	nodeCert, caBundle, err := signNodeCSR(ctx, serverURL, nodeUUID.String(), csrPEM)
-	if err != nil {
-		return fmt.Errorf("node add: sign CSR: %w", err)
-	}
-	_, _ = fmt.Fprintln(stderr, "CSR signed successfully")
-
-	// Prepare environment variables for bootstrap script.
-	scriptEnv := map[string]string{
-		"CLUSTER_ID":            cfg.ClusterID,
-		"NODE_ID":               nodeID,
-		"NODE_ADDRESS":          cfg.Address,
-		"BOOTSTRAP_PRIMARY":     "false",
-		"PLOY_NODE_SERVER_URL":  serverURL,
-		"PLOY_NODE_CERT_PEM":    nodeCert,
-		"PLOY_NODE_KEY_PEM":     nodeKey.KeyPEM,
-		"PLOY_CA_CERT_PEM":      caBundle,
-		"PLOY_INSTALL_POSTGRES": "false",
-	}
+    // Prepare environment variables for bootstrap script.
+    scriptEnv := map[string]string{
+        "CLUSTER_ID":            cfg.ClusterID,
+        "NODE_ID":               nodeID,
+        "NODE_ADDRESS":          cfg.Address,
+        "BOOTSTRAP_PRIMARY":     "false",
+        // Bootstrap expects these names for both server and node flows.
+        "PLOY_CA_CERT_PEM":        caBundle,
+        "PLOY_SERVER_CERT_PEM":    nodeCert,
+        "PLOY_SERVER_KEY_PEM":     nodeKey.KeyPEM,
+        "PLOY_INSTALL_POSTGRESQL": "false",
+    }
 
 	// Provision the node host.
 	_, _ = fmt.Fprintln(stderr, "Installing ployd binary and bootstrapping node...")
-	provisionOpts := deploy.ProvisionOptions{
-		Host:            cfg.Address,
-		Address:         cfg.Address,
-		User:            user,
-		Port:            sshPort,
-		IdentityFile:    identityPath,
-		PloydBinaryPath: ploydBinaryPath,
-		Stdout:          os.Stdout,
-		Stderr:          stderr,
-		ScriptEnv:       scriptEnv,
-		ScriptArgs:      []string{"--cluster-id", cfg.ClusterID, "--node-id", nodeID, "--node-address", cfg.Address},
-		ServiceChecks:   []string{"ployd-node"},
-	}
+    provisionOpts := deploy.ProvisionOptions{
+        Host:            cfg.Address,
+        Address:         cfg.Address,
+        User:            user,
+        Port:            sshPort,
+        IdentityFile:    identityPath,
+        PloydBinaryPath: ploydBinaryPath,
+        Stdout:          os.Stdout,
+        Stderr:          stderr,
+        ScriptEnv:       scriptEnv,
+        ScriptArgs:      []string{"--cluster-id", cfg.ClusterID, "--node-id", nodeID, "--node-address", cfg.Address},
+        ServiceChecks:   []string{"ployd"},
+    }
 
 	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
 		return fmt.Errorf("node add: provision host: %w", err)
@@ -225,80 +218,71 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintln(stderr, "\nNode addition complete!")
 	_, _ = fmt.Fprintf(stderr, "Node ID: %s\n", nodeID)
 	_, _ = fmt.Fprintf(stderr, "Node address: %s\n", cfg.Address)
-	_, _ = fmt.Fprintf(stderr, "Server URL: %s\n", serverURL)
+    _, _ = fmt.Fprintf(stderr, "Server URL: %s\n", baseURL.String())
 
-	return nil
-}
-
-// parseNodeUUID extracts or generates a UUID from a node ID.
-// Node IDs are in the format "node-<hex>". We'll generate a UUID from the node ID.
-func parseNodeUUID(nodeID string) (uuid.UUID, error) {
-	// Generate a new UUID for the node.
-	// The node ID string will be stored in the name field.
-	nodeUUID := uuid.New()
-	return nodeUUID, nil
+    return nil
 }
 
 // recordNode creates a node entry in the database.
-func recordNode(ctx context.Context, dsn string, nodeUUID uuid.UUID, nodeName, nodeIP string) error {
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		return fmt.Errorf("connect to database: %w", err)
-	}
-	defer pool.Close()
+func recordNode(ctx context.Context, dsn string, nodeName, nodeIP string) (uuid.UUID, error) {
+    pool, err := pgxpool.New(ctx, dsn)
+    if err != nil {
+        return uuid.UUID{}, fmt.Errorf("connect to database: %w", err)
+    }
+    defer pool.Close()
 
-	queries := store.New(pool)
+    queries := store.New(pool)
 
-	// Parse IP address.
-	addr, err := netip.ParseAddr(nodeIP)
-	if err != nil {
-		return fmt.Errorf("parse node IP: %w", err)
-	}
+    // Parse IP address.
+    addr, err := netip.ParseAddr(nodeIP)
+    if err != nil {
+        return uuid.UUID{}, fmt.Errorf("parse node IP: %w", err)
+    }
 
-	// Create node in database.
-	params := store.CreateNodeParams{
-		Name:        nodeName,
-		IpAddress:   addr,
-		Concurrency: 1,
-	}
-
-	_, err = queries.CreateNode(ctx, params)
-	if err != nil {
-		return fmt.Errorf("create node: %w", err)
-	}
-
-	return nil
+    // Create node in database.
+    params := store.CreateNodeParams{
+        Name:        nodeName,
+        IpAddress:   addr,
+        Concurrency: 1,
+    }
+    created, err := queries.CreateNode(ctx, params)
+    if err != nil {
+        return uuid.UUID{}, fmt.Errorf("create node: %w", err)
+    }
+    // Convert pgtype.UUID to uuid.UUID
+    if !created.ID.Valid {
+        return uuid.UUID{}, errors.New("create node returned invalid ID")
+    }
+    return uuid.UUID(created.ID.Bytes), nil
 }
 
 // signNodeCSR submits a CSR to the server's PKI sign endpoint and returns the signed certificate and CA bundle.
-func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (string, string, error) {
-	pkiURL := fmt.Sprintf("%s/v1/pki/sign", strings.TrimRight(serverURL, "/"))
+func signNodeCSR(ctx context.Context, baseURL *url.URL, client *http.Client, nodeID string, csrPEM []byte) (string, string, error) {
+    // Compose endpoint using resolved base URL (descriptor/env aware).
+    pkiURL := *baseURL
+    pkiURL.Path = strings.TrimRight(pkiURL.Path, "/") + "/v1/pki/sign"
 
-	reqBody := httpserver.PKISignRequest{
-		NodeID: nodeID,
-		CSR:    string(csrPEM),
-	}
+    reqBody := httpserver.PKISignRequest{
+        NodeID: nodeID,
+        CSR:    string(csrPEM),
+    }
 
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, pkiURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", "", fmt.Errorf("create request: %w", err)
-	}
+    req, err := http.NewRequestWithContext(ctx, http.MethodPost, pkiURL.String(), bytes.NewReader(bodyBytes))
+    if err != nil {
+        return "", "", fmt.Errorf("create request: %w", err)
+    }
 
-	req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("send request: %w", err)
-	}
+    resp, err := client.Do(req)
+    if err != nil {
+        return "", "", fmt.Errorf("send request: %w", err)
+    }
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
