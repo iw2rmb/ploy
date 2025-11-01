@@ -12,20 +12,32 @@ import (
 
 type Querier interface {
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
+	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateCluster(ctx context.Context, arg CreateClusterParams) (Cluster, error)
+	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error)
+	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
+	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	DeleteDiff(ctx context.Context, id pgtype.UUID) error
+	DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
+	DeleteLog(ctx context.Context, id int64) error
+	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteMod(ctx context.Context, id pgtype.UUID) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRepo(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
+	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetCluster(ctx context.Context) (Cluster, error)
+	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
+	GetLog(ctx context.Context, id int64) (Log, error)
 	GetMod(ctx context.Context, id pgtype.UUID) (Mod, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRepo(ctx context.Context, id pgtype.UUID) (Repo, error)
@@ -33,8 +45,14 @@ type Querier interface {
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
+	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error)
+	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
 	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error)
+	ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAndStageParams) ([]Log, error)
+	ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error)
 	ListMods(ctx context.Context) ([]Mod, error)
 	ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]Mod, error)
 	ListNodes(ctx context.Context) ([]Node, error)

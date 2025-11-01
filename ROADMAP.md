@@ -38,9 +38,9 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Execute Build Gate (node-only), stream logs; measure stage/build durations.
   - [x] Generate unified diff and upload; enforce client-side caps (≤1 MiB gz per diff/log chunk/bundle).
 
-- [ ] Artifact, diff, and log ingestion (server)
-  - [ ] POST endpoints to accept gzipped diffs, log chunks, and artifact bundles.
-  - [ ] Enforce DB constraints (1 MiB gziped) and reject oversize payloads.
+- [x] Artifact, diff, and log ingestion (server)
+  - [x] POST endpoints to accept gzipped diffs, log chunks, and artifact bundles.
+  - [x] Enforce DB constraints (1 MiB gziped) and reject oversize payloads.
 
 - [ ] TTL and partitions
   - [ ] Add TTL worker for `logs`, `events`, `diffs`, `artifact_bundles` (default 30 days for bundles).
