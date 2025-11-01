@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -153,10 +154,11 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("git diff cancelled: %w", ctx.Err())
 		}
-		// If stderr has content, there was likely a real error.
+		// If stderr has content, surface it; otherwise propagate the run error.
 		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("git diff failed: %s", stderr.String())
+			return nil, fmt.Errorf("git diff failed: %s", strings.TrimSpace(stderr.String()))
 		}
+		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
 	return stdout.Bytes(), nil
