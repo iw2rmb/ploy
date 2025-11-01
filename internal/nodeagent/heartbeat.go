@@ -1,17 +1,20 @@
 package nodeagent
 
 import (
-	"bytes"
-	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"os"
-	"time"
+    "bytes"
+    "context"
+    "crypto/tls"
+    "crypto/x509"
+    "encoding/json"
+    "fmt"
+    "log/slog"
+    "net/http"
+    "os"
+    "net/url"
+    "path"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/node/lifecycle"
+    "github.com/iw2rmb/ploy/internal/node/lifecycle"
 )
 
 // HeartbeatPayload contains resource snapshot data sent to the server.
@@ -58,20 +61,20 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 	defer ticker.Stop()
 
 	// Send initial heartbeat.
-	if err := h.sendHeartbeat(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "[ployd-node/heartbeat] initial heartbeat failed: %v\n", err) //nolint:forbidigo
-	}
+    if err := h.sendHeartbeat(ctx); err != nil {
+        slog.Error("initial heartbeat failed", "err", err)
+    }
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := h.sendHeartbeat(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "[ployd-node/heartbeat] heartbeat failed: %v\n", err) //nolint:forbidigo
-			}
-		}
-	}
+            if err := h.sendHeartbeat(ctx); err != nil {
+                slog.Error("heartbeat failed", "err", err)
+            }
+        }
+    }
 }
 
 func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
@@ -104,11 +107,15 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	reqCtx, cancel := context.WithTimeout(ctx, h.cfg.Heartbeat.Timeout)
 	defer cancel()
 
-	url := fmt.Sprintf("%s/v1/nodes/%s/heartbeat", h.cfg.ServerURL, h.cfg.NodeID)
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
+    hbURL, err := buildURL(h.cfg.ServerURL, path.Join("/v1/nodes", url.PathEscape(h.cfg.NodeID), "heartbeat"))
+    if err != nil {
+        return fmt.Errorf("build heartbeat url: %w", err)
+    }
+
+    req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, hbURL, bytes.NewReader(body))
+    if err != nil {
+        return fmt.Errorf("create request: %w", err)
+    }
 
 	req.Header.Set("Content-Type", "application/json")
 
@@ -123,6 +130,19 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// buildURL resolves a base URL and a path, preserving scheme/host.
+func buildURL(base, p string) (string, error) {
+    bu, err := url.Parse(base)
+    if err != nil {
+        return "", fmt.Errorf("parse base url: %w", err)
+    }
+    pu, err := url.Parse(p)
+    if err != nil {
+        return "", fmt.Errorf("parse path: %w", err)
+    }
+    return bu.ResolveReference(pu).String(), nil
 }
 
 func newHTTPClient(cfg Config) (*http.Client, error) {

@@ -73,11 +73,12 @@ ployd-node -config /path/to/config.yaml
 3. Run is tracked in memory (execution logic to be implemented in next phase)
 4. Server can cancel via `POST /v1/run/stop`
 
-### Security
+### Security & Logging
 
 - TLS 1.3 minimum version
 - Mutual TLS (mTLS) required for all endpoints
 - Client certificates verified against cluster CA
+- Structured logging via Go's `log/slog` to stderr
 
 ### Testing
 

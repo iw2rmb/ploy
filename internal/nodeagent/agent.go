@@ -1,11 +1,12 @@
 package nodeagent
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"sync"
-	"time"
+    "context"
+    "errors"
+    "fmt"
+    "log/slog"
+    "sync"
+    "time"
 )
 
 // Agent coordinates the node agent's HTTP server and heartbeat manager.
@@ -43,10 +44,10 @@ func New(cfg Config) (*Agent, error) {
 
 // Run starts the node agent and blocks until the context is canceled.
 func (a *Agent) Run(ctx context.Context) error {
-	if err := a.server.Start(ctx); err != nil {
-		return fmt.Errorf("start server: %w", err)
-	}
-	fmt.Printf("[ployd-node] HTTP server listening on %s\n", a.server.Address()) //nolint:forbidigo
+    if err := a.server.Start(ctx); err != nil {
+        return fmt.Errorf("start server: %w", err)
+    }
+    slog.Info("node http server listening", "addr", a.server.Address())
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, 1)
