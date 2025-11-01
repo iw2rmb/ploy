@@ -153,8 +153,10 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 
 	if installPostgres {
 		_, _ = fmt.Fprintln(stderr, "No PostgreSQL DSN provided; will install PostgreSQL on target host")
-		// The DSN will be constructed by the bootstrap script after installing PostgreSQL
-		pgDSN = "host=/var/run/postgresql user=ploy dbname=ploy sslmode=disable"
+		// The DSN will be derived by the bootstrap script after installing PostgreSQL
+		// and testing the connection. We pass an empty value here, and the bootstrap
+		// script's derive_postgresql_dsn() function will export PLOY_SERVER_PG_DSN.
+		pgDSN = ""
 	} else {
 		_, _ = fmt.Fprintf(stderr, "Using provided PostgreSQL DSN\n")
 	}
@@ -165,12 +167,17 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		"NODE_ID":                 "control",
 		"NODE_ADDRESS":            cfg.Address,
 		"BOOTSTRAP_PRIMARY":       "true",
-		"PLOY_SERVER_PG_DSN":      pgDSN,
 		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
 		"PLOY_CA_CERT_PEM":        ca.CertPEM,
 		"PLOY_CA_KEY_PEM":         ca.KeyPEM,
 		"PLOY_SERVER_CERT_PEM":    serverCert.CertPEM,
 		"PLOY_SERVER_KEY_PEM":     serverCert.KeyPEM,
+	}
+
+	// Only set PLOY_SERVER_PG_DSN if the user provided one.
+	// When installing PostgreSQL, the bootstrap script will derive and export the DSN.
+	if pgDSN != "" {
+		scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
 	}
 
 	// Provision the server host
