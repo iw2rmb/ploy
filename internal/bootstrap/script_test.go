@@ -191,6 +191,95 @@ restart_stopped_services
 	}
 }
 
+func TestDerivePostgreSQLDSN_SocketConnection(t *testing.T) {
+	t.Parallel()
+	scriptPath := writeBootstrapScript(t)
+	snippet := `
+trap - EXIT
+log() { :; }
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# Mock sudo to accept socket connection
+sudo() {
+	if [[ "$1" == "-u" && "$2" == "ploy" && "$3" == "psql" ]]; then
+		# Simulate successful connection
+		return 0
+	fi
+	command sudo "$@"
+}
+
+derive_postgresql_dsn
+
+if [[ -z "$PLOY_SERVER_PG_DSN" ]]; then
+	fail "PLOY_SERVER_PG_DSN not set"
+fi
+
+if [[ ! "$PLOY_SERVER_PG_DSN" =~ ^host= ]]; then
+	fail "DSN should start with host=, got: $PLOY_SERVER_PG_DSN"
+fi
+
+if [[ ! "$PLOY_SERVER_PG_DSN" =~ user=ploy ]]; then
+	fail "DSN should contain user=ploy, got: $PLOY_SERVER_PG_DSN"
+fi
+
+if [[ ! "$PLOY_SERVER_PG_DSN" =~ dbname=ploy ]]; then
+	fail "DSN should contain dbname=ploy, got: $PLOY_SERVER_PG_DSN"
+fi
+
+echo "DSN: $PLOY_SERVER_PG_DSN"
+`
+	runBootstrapSnippet(t, scriptPath, snippet)
+}
+
+func TestDerivePostgreSQLDSN_TCPFallback(t *testing.T) {
+	t.Parallel()
+	scriptPath := writeBootstrapScript(t)
+	snippet := `
+trap - EXIT
+log() { :; }
+fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# Mock sudo to fail socket connection but succeed with TCP
+sudo() {
+	if [[ "$1" == "-u" && "$2" == "ploy" && "$3" == "psql" ]]; then
+		# Simulate socket connection failure
+		return 1
+	fi
+	if [[ "$1" == "-u" && "$2" == "postgres" && "$3" == "psql" ]]; then
+		# Mock postgres user psql for port query
+		echo "5432"
+		return 0
+	fi
+	command sudo "$@"
+}
+
+# Mock psql to succeed with password auth
+psql() {
+	if [[ "$PGPASSWORD" == "ploy" ]]; then
+		return 0
+	fi
+	return 1
+}
+
+derive_postgresql_dsn
+
+if [[ -z "$PLOY_SERVER_PG_DSN" ]]; then
+	fail "PLOY_SERVER_PG_DSN not set"
+fi
+
+if [[ ! "$PLOY_SERVER_PG_DSN" =~ password=ploy ]]; then
+	fail "DSN should contain password=ploy for TCP connection, got: $PLOY_SERVER_PG_DSN"
+fi
+
+if [[ ! "$PLOY_SERVER_PG_DSN" =~ host=localhost ]]; then
+	fail "DSN should contain host=localhost for TCP connection, got: $PLOY_SERVER_PG_DSN"
+fi
+
+echo "DSN: $PLOY_SERVER_PG_DSN"
+`
+	runBootstrapSnippet(t, scriptPath, snippet)
+}
+
 func writeBootstrapScript(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "bootstrap.sh")
