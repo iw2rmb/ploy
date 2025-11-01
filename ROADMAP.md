@@ -17,9 +17,9 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Introduce `sqlc.yaml`, `internal/store/migrations/` from SIMPLE.sql, and `internal/store/queries/`.
   - [x] Wire `pgx/v5` + `pgxpool` in server startup; inject store via interfaces.
 
-- [ ] PKI (mTLS) foundation
-  - [ ] Implement cluster CA generation and server cert issuance.
-  - [ ] Add `/v1/pki/sign` to sign node CSRs; persist node cert metadata (serial/fingerprint/notBefore/notAfter).
+- [x] PKI (mTLS) foundation
+  - [x] Implement cluster CA generation and server cert issuance.
+  - [x] Add `/v1/pki/sign` to sign node CSRs; persist node cert metadata (serial/fingerprint/notBefore/notAfter).
 
 - [ ] Core control-plane models and endpoints
   - [ ] CRUD: `repos`, `mods`, `runs`; create-run returns `run_id`.

@@ -144,6 +144,35 @@ func (q *Queries) ListNodes(ctx context.Context) ([]Node, error) {
 	return items, nil
 }
 
+const updateNodeCertMetadata = `-- name: UpdateNodeCertMetadata :exec
+UPDATE nodes
+SET
+  cert_serial = $2,
+  cert_fingerprint = $3,
+  cert_not_before = $4,
+  cert_not_after = $5
+WHERE id = $1
+`
+
+type UpdateNodeCertMetadataParams struct {
+	ID              pgtype.UUID        `json:"id"`
+	CertSerial      *string            `json:"cert_serial"`
+	CertFingerprint *string            `json:"cert_fingerprint"`
+	CertNotBefore   pgtype.Timestamptz `json:"cert_not_before"`
+	CertNotAfter    pgtype.Timestamptz `json:"cert_not_after"`
+}
+
+func (q *Queries) UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateNodeCertMetadata,
+		arg.ID,
+		arg.CertSerial,
+		arg.CertFingerprint,
+		arg.CertNotBefore,
+		arg.CertNotAfter,
+	)
+	return err
+}
+
 const updateNodeHeartbeat = `-- name: UpdateNodeHeartbeat :exec
 UPDATE nodes
 SET
