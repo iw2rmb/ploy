@@ -1418,8 +1418,11 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 // createDiffHandler stores gzipped diff in diffs table (≤1 MiB), rejects oversize.
 func createDiffHandler(st store.Store) http.HandlerFunc {
-	const maxRequestSize = 1 << 20 // 1 MiB
-	return func(w http.ResponseWriter, r *http.Request) {
+    // Accept up to 2 MiB for the JSON body to accommodate base64 overhead
+    // while still enforcing a strict 1 MiB cap on the decoded patch bytes.
+    const maxBodySize = 2 << 20  // 2 MiB
+    const maxPatchSize = 1 << 20 // 1 MiB
+    return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
 		if strings.TrimSpace(nodeIDStr) == "" {
@@ -1448,14 +1451,14 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Check payload size before reading body.
-		if r.ContentLength > maxRequestSize {
-			http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
-			return
-		}
+        // Check payload size before reading body.
+        if r.ContentLength > maxBodySize {
+            http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+            return
+        }
 
-		// Limit request body to 1 MiB to prevent memory exhaustion.
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
+        // Limit request body size to avoid memory exhaustion but allow base64 overhead.
+        r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		// Decode request body.
 		var req struct {
@@ -1465,15 +1468,15 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Return 413 when MaxBytesReader trips the size cap.
-			var maxErr *http.MaxBytesError
-			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
-				return
-			}
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
-			return
-		}
+            // Return 413 when MaxBytesReader trips the size cap.
+            var maxErr *http.MaxBytesError
+            if errors.As(err, &maxErr) {
+                http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
+                return
+            }
+            http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+            return
+        }
 
 		// Validate run_id is present.
 		if strings.TrimSpace(req.RunID) == "" {
@@ -1488,11 +1491,17 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate patch is present.
-		if len(req.Patch) == 0 {
-			http.Error(w, "patch is required", http.StatusBadRequest)
-			return
-		}
+        // Validate patch is present.
+        if len(req.Patch) == 0 {
+            http.Error(w, "patch is required", http.StatusBadRequest)
+            return
+        }
+
+        // Enforce decoded patch size cap (≤ 1 MiB gzipped, base64-decoded here).
+        if len(req.Patch) > maxPatchSize {
+            http.Error(w, "diff size exceeds 1 MiB cap", http.StatusRequestEntityTooLarge)
+            return
+        }
 
 		// Check if the node exists before processing.
 		_, err = st.GetNode(r.Context(), pgtype.UUID{
@@ -1525,19 +1534,25 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the stage exists.
-		_, err = st.GetStage(r.Context(), pgtype.UUID{
-			Bytes: stageUUID,
-			Valid: true,
-		})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				http.Error(w, "stage not found", http.StatusNotFound)
-				return
-			}
-			http.Error(w, fmt.Sprintf("failed to check stage: %v", err), http.StatusInternalServerError)
-			slog.Error("diff: stage check failed", "stage_id", stageIDStr, "err", err)
-			return
-		}
+        stage, err := st.GetStage(r.Context(), pgtype.UUID{
+            Bytes: stageUUID,
+            Valid: true,
+        })
+        if err != nil {
+            if errors.Is(err, pgx.ErrNoRows) {
+                http.Error(w, "stage not found", http.StatusNotFound)
+                return
+            }
+            http.Error(w, fmt.Sprintf("failed to check stage: %v", err), http.StatusInternalServerError)
+            slog.Error("diff: stage check failed", "stage_id", stageIDStr, "err", err)
+            return
+        }
+
+        // Ensure the stage belongs to the provided run.
+        if uuid.UUID(stage.RunID.Bytes) != runUUID {
+            http.Error(w, "stage does not belong to run", http.StatusBadRequest)
+            return
+        }
 
 		// Encode summary as JSON.
 		var summaryBytes []byte
@@ -1580,14 +1595,14 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Return success response with diff_id.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"diff_id": diff.ID.Bytes,
-		}); err != nil {
-			slog.Error("diff: encode response failed", "err", err)
-		}
+        // Return success response with diff_id.
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusCreated)
+        if err := json.NewEncoder(w).Encode(map[string]interface{}{
+            "diff_id": uuid.UUID(diff.ID.Bytes).String(),
+        }); err != nil {
+            slog.Error("diff: encode response failed", "err", err)
+        }
 
 		slog.Debug("diff created",
 			"node_id", nodeIDStr,
