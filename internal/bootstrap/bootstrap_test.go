@@ -200,3 +200,19 @@ func TestPrefixedScript_SystemdOperations(t *testing.T) {
 		t.Fatalf("script should start systemd service")
 	}
 }
+
+func TestPrefixedScript_UsesEnableNow_ForServer(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY": "true",
+	})
+	if !strings.Contains(script, "systemctl enable --now ployd.service") {
+		t.Fatalf("server branch should use 'systemctl enable --now ployd.service'\nscript:\n%s", script)
+	}
+}
+
+func TestPrefixedScript_UsesEnableNow_ForNode(t *testing.T) {
+	script := PrefixedScript(map[string]string{})
+	if !strings.Contains(script, "systemctl enable --now ployd-node.service") {
+		t.Fatalf("node branch should use 'systemctl enable --now ployd-node.service'\nscript:\n%s", script)
+	}
+}
