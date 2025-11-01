@@ -1,10 +1,12 @@
 package step
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -118,7 +120,9 @@ func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRun
 type FilesystemDiffGeneratorOptions struct{}
 
 // DiffGenerator generates diffs between states.
-type DiffGenerator interface{}
+type DiffGenerator interface {
+	Generate(ctx context.Context, workspace string) ([]byte, error)
+}
 
 type filesystemDiffGenerator struct{}
 
@@ -126,6 +130,36 @@ type filesystemDiffGenerator struct{}
 func NewFilesystemDiffGenerator(opts FilesystemDiffGeneratorOptions) DiffGenerator {
 	_ = opts
 	return &filesystemDiffGenerator{}
+}
+
+// Generate produces a unified diff of all changes in the workspace using git diff.
+func (d *filesystemDiffGenerator) Generate(ctx context.Context, workspace string) ([]byte, error) {
+	return generateGitDiff(ctx, workspace)
+}
+
+// generateGitDiff runs git diff to capture all changes in the workspace.
+func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
+	// Run git diff to get unified diff of all changes (staged and unstaged).
+	cmd := exec.CommandContext(ctx, "git", "diff", "HEAD")
+	cmd.Dir = workspace
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		// git diff returns exit code 0 even when there are diffs.
+		// Only fail if there's an actual error (not just "no diff").
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("git diff cancelled: %w", ctx.Err())
+		}
+		// If stderr has content, there was likely a real error.
+		if stderr.Len() > 0 {
+			return nil, fmt.Errorf("git diff failed: %s", stderr.String())
+		}
+	}
+
+	return stdout.Bytes(), nil
 }
 
 // Runner executes workflow steps.
@@ -214,9 +248,25 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.BuildGateDuration = time.Since(gateStart)
 
-	// Stage 4: Generate diff (placeholder for now).
+	// Stage 4: Generate diff.
 	diffStart := time.Now()
-	// Diff generation is stubbed; future work will invoke Diffs.
+	if r.Diffs != nil {
+		diffBytes, err := r.Diffs.Generate(ctx, req.Workspace)
+		if err != nil {
+			return Result{}, fmt.Errorf("diff generation failed: %w", err)
+		}
+		// Publish diff as an artifact if there are changes.
+		if len(diffBytes) > 0 && r.Artifacts != nil {
+			diffArtifact, err := r.Artifacts.Publish(ctx, ArtifactRequest{
+				Kind:   ArtifactKindDiff,
+				Buffer: diffBytes,
+			})
+			if err != nil {
+				return Result{}, fmt.Errorf("diff publish failed: %w", err)
+			}
+			result.DiffArtifact = diffArtifact
+		}
+	}
 	result.Timings.DiffDuration = time.Since(diffStart)
 
 	// Stage 5: Publish artifacts (placeholder for now).

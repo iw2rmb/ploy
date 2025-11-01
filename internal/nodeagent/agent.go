@@ -240,6 +240,44 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		return
 	}
 
+	// Generate and upload diff to server if diff generator is available.
+	if diffGenerator != nil {
+		diffBytes, err := diffGenerator.Generate(ctx, workspaceRoot)
+		if err != nil {
+			slog.Error("failed to generate diff", "run_id", req.RunID, "error", err)
+		} else if len(diffBytes) > 0 {
+			// Create diff uploader and upload the diff.
+			diffUploader, err := NewDiffUploader(r.cfg)
+			if err != nil {
+				slog.Error("failed to create diff uploader", "run_id", req.RunID, "error", err)
+			} else {
+				// Build a summary with basic metadata.
+				summary := map[string]interface{}{
+					"exit_code": result.ExitCode,
+					"timings": map[string]interface{}{
+						"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
+						"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
+						"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
+						"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
+						"publish_duration_ms":    result.Timings.PublishDuration.Milliseconds(),
+						"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
+					},
+				}
+
+				// For now, we use the run_id as the stage_id (simplified).
+				// In a full implementation, stage_id would be tracked separately.
+				stageID := req.RunID
+
+				// Upload the diff to the server.
+				if err := diffUploader.UploadDiff(ctx, req.RunID, stageID, diffBytes, summary); err != nil {
+					slog.Error("failed to upload diff", "run_id", req.RunID, "error", err)
+				} else {
+					slog.Info("diff uploaded successfully", "run_id", req.RunID, "size", len(diffBytes))
+				}
+			}
+		}
+	}
+
 	slog.Info("run execution completed",
 		"run_id", req.RunID,
 		"duration", duration,
