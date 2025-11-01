@@ -121,6 +121,18 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 	return i, err
 }
 
+const getRunTiming = `-- name: GetRunTiming :one
+SELECT id, queue_ms, run_ms FROM runs_timing
+WHERE id = $1
+`
+
+func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error) {
+	row := q.db.QueryRow(ctx, getRunTiming, id)
+	var i RunsTiming
+	err := row.Scan(&i.ID, &i.QueueMs, &i.RunMs)
+	return i, err
+}
+
 const listRuns = `-- name: ListRuns :many
 SELECT id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 ORDER BY created_at DESC
@@ -194,6 +206,37 @@ func (q *Queries) ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, 
 			&i.CommitSha,
 			&i.Stats,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRunsTimings = `-- name: ListRunsTimings :many
+SELECT id, queue_ms, run_ms FROM runs_timing
+ORDER BY id DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListRunsTimingsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error) {
+	rows, err := q.db.Query(ctx, listRunsTimings, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RunsTiming{}
+	for rows.Next() {
+		var i RunsTiming
+		if err := rows.Scan(&i.ID, &i.QueueMs, &i.RunMs); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

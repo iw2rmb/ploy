@@ -25,9 +25,9 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] CRUD: `repos`, `mods`, `runs`; create-run returns `run_id`.
   - [x] SSE: `/v1/runs/{id}/events` (basic log/event fanout only).
 
-- [ ] Scheduler (minimal)
-  - [ ] Implement `FOR UPDATE SKIP LOCKED` claim on `runs.status='queued'`.
-  - [ ] Record `started_at`/`finished_at`; expose `runs_timing` view.
+- [x] Scheduler (minimal)
+  - [x] Implement `FOR UPDATE SKIP LOCKED` claim on `runs.status='queued'`.
+  - [x] Record `started_at`/`finished_at`; expose `runs_timing` view.
 
 - [ ] Node agent (ployd-node) skeleton
   - [ ] HTTPS server with mTLS; endpoints: `/v1/run/start`, `/v1/run/stop`.

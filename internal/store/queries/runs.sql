@@ -39,3 +39,12 @@ RETURNING r.*;
 -- name: DeleteRun :exec
 DELETE FROM runs
 WHERE id = $1;
+
+-- name: GetRunTiming :one
+SELECT * FROM runs_timing
+WHERE id = $1;
+
+-- name: ListRunsTimings :many
+SELECT * FROM runs_timing
+ORDER BY id DESC
+LIMIT $1 OFFSET $2;

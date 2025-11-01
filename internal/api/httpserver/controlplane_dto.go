@@ -1,12 +1,12 @@
 package httpserver
 
 import (
-    "encoding/json"
-    "time"
+	"encoding/json"
+	"time"
 
-    "github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 
-    "github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // RepoDTO represents a repository in API responses.
@@ -90,8 +90,8 @@ type CreateRunRequest struct {
 
 // CreateRunResponse represents the response after creating a run.
 type CreateRunResponse struct {
-	RunID string  `json:"run_id"`
-	Run   RunDTO  `json:"run"`
+	RunID string `json:"run_id"`
+	Run   RunDTO `json:"run"`
 }
 
 // ListReposResponse represents a list of repositories.
@@ -107,6 +107,18 @@ type ListModsResponse struct {
 // ListRunsResponse represents a list of runs.
 type ListRunsResponse struct {
 	Runs []RunDTO `json:"runs"`
+}
+
+// RunTimingDTO represents timing information for a run.
+type RunTimingDTO struct {
+	ID      string `json:"id"`
+	QueueMs int64  `json:"queue_ms"`
+	RunMs   int64  `json:"run_ms"`
+}
+
+// ListRunsTimingsResponse represents a list of run timings.
+type ListRunsTimingsResponse struct {
+	Timings []RunTimingDTO `json:"timings"`
 }
 
 // repoDTOFrom converts a store.Repo to a RepoDTO.
@@ -259,4 +271,13 @@ func timestampToString(ts pgtype.Timestamptz) string {
 		return ""
 	}
 	return ts.Time.Format(time.RFC3339Nano)
+}
+
+// runTimingDTOFrom converts a store.RunsTiming to a RunTimingDTO.
+func runTimingDTOFrom(timing store.RunsTiming) RunTimingDTO {
+	return RunTimingDTO{
+		ID:      uuidToString(timing.ID),
+		QueueMs: timing.QueueMs,
+		RunMs:   timing.RunMs,
+	}
 }
