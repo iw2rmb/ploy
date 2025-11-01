@@ -41,8 +41,8 @@
 │                                                                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ 4. Status Provider + Lifecycle Collector                 │  │
-│  │    → Node health: Docker, IPFS, Java build gate          │  │
-│  │    → Publishes to etcd (if available)                    │  │
+│  │    → Node health: Docker, Build Gate readiness           │  │
+│  │    → Persists state in PostgreSQL where applicable       │  │
 │  │    → Falls back to local cache                           │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                   │
@@ -56,7 +56,7 @@
 │                                                                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ 6. Control-Plane Handler (HTTP Handler Tree)             │  │
-│  │    → Etcd client for cluster coordination                │  │
+│  │    → PostgreSQL-backed scheduler and state               │  │
 │  │    → Scheduler, Mods Service, Artifact Store             │  │
 │  │    → Authorization + Role-Based Access Control           │  │
 │  │    → Routes: /v1/*, /v2/*, /metrics                      │  │
@@ -94,32 +94,31 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                   internal/api/httpserver/                       │
-│                    HTTP Server & Routes                          │
+│                   internal/controlplane/                         │
+│                    Control-Plane Handlers                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
-│  Fiber Application (fiber.App)                                  │
-│  ├─ TLS Listener (crypto/tls or plain TCP)                     │
+│  Go net/http server                                            │
+│  ├─ TLS Listener (mTLS)                                        │
 │  ├─ Graceful Shutdown (5 second timeout)                       │
 │  └─ Hot Reload Support (Reload method)                         │
 │                                                                   │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │ Node-Local Routes (No Auth Required)                    │   │
+│  │ Control-Plane Routes (Mutual TLS Only)                  │   │
+│  │ [See docs/api/OpenAPI.yaml]                             │   │
 │  ├─────────────────────────────────────────────────────────┤   │
-│  │ GET  /v1/node/status                                    │   │
-│  │ GET  /v1/node/health                                    │   │
-│  │ GET  /v1/node/jobs                                      │   │
-│  │ GET  /v1/node/jobs/{id}                                 │   │
-│  │ GET  /v1/node/jobs/{id}/logs/stream (SSE)              │   │
-│  │ GET  /v1/node/jobs/{id}/logs/snapshot                  │   │
-│  │ POST /v1/node/jobs/{id}/logs/entries                   │   │
-│  │ POST /v1/node/jobs/{id}/cancel                         │   │
-│  │ POST /v1/admin/nodes (RegisterNode)                    │   │
+│  │ PKI:   /v1/pki/sign                                      │   │
+│  │ Repos: /v1/repos, /v1/repos/{id}                        │   │
+│  │ Mods:  /v1/mods/crud, /v1/mods/crud/{id}                │   │
+│  │ Runs:  /v1/runs, /v1/runs/{id}                          │   │
+│  │ SSE:   /v1/runs/{id}/events                              │   │
+│  │ Ingest: /v1/runs/{id}/diffs|logs|artifact_bundles        │   │
+│  │ /metrics (Prometheus)                                   │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                   │
 │  ┌─────────────────────────────────────────────────────────┐   │
-│  │ Control-Plane Routes (Mutual TLS + Bearer Token)        │   │
-│  │ [Delegated to controlPlaneHandler]                      │   │
+│  │ Control-Plane Routes (Mutual TLS Only)                  │   │
+│  │ [Delegated to control-plane handlers]                   │   │
 │  ├─────────────────────────────────────────────────────────┤   │
 │  │ All /v1/* and /v2/* routes                              │   │
 │  │ /metrics (Prometheus)                                   │   │
@@ -129,8 +128,8 @@
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              internal/api/httpserver/controlplane_server.go      │
-│                  Control-Plane HTTP Handler                      │
+│              Control-plane handler wiring                         │
+│                  Authorization + Roles                            │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                   │
 │  http.ServeMux with Security Middleware Stack                   │
@@ -140,13 +139,8 @@
 │  └────────────────────────────────────────────────────────┘    │
 │                      ↓                                           │
 │  ┌────────────────────────────────────────────────────────┐    │
-│  │ Layer 2: Bearer Token Authentication                  │    │
-│  │ (TokenVerifier.Verify() → Principal with scopes)       │    │
-│  └────────────────────────────────────────────────────────┘    │
-│                      ↓                                           │
-│  ┌────────────────────────────────────────────────────────┐    │
-│  │ Layer 3: Scope-Based Authorization                    │    │
-│  │ Scopes: admin, mods, jobs, artifact.read/write, etc.   │    │
+│  │ Layer 2: Role Authorization                            │    │
+│  │ Handler-level role checks as needed                    │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                      ↓                                           │
 │  ┌────────────────────────────────────────────────────────┐    │
@@ -157,16 +151,13 @@
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │ Registered Routes (registerRoute Method)               │    │
 │  ├────────────────────────────────────────────────────────┤    │
-│  │ Jobs:        /v1/jobs, /v1/jobs/claim, /v1/jobs/{id}*  │    │
-│  │ Nodes:       /v1/nodes, /v1/nodes/{id}*                │    │
-│  │ Config:      /v1/config, /v1/config/gitlab             │    │
-│  │ Security:    /v1/security/ca                           │    │
-│  │              /v1/security/certificates/control-plane   │    │
-│  │ Mods:        /v1/mods, /v1/mods/{id}*, /v1/mods/...*  │    │
-│  │ Artifacts:   /v1/artifacts, /v1/artifacts/*, /v2/...*  │    │
-│  │ Transfers:   /v1/transfers/upload, /download, /{id}*   │    │
-│  │ Misc:        /v1/health, /v1/version, /v1/status       │    │
-│  │              /v1/gitlab/signer/*, /metrics             │    │
+│  │ PKI:         /v1/pki/sign                               │    │
+│  │ Repos:       /v1/repos, /v1/repos/{id}                  │    │
+│  │ Mods:        /v1/mods/crud, /v1/mods/crud/{id}          │    │
+│  │ Runs:        /v1/runs, /v1/runs/{id}                    │    │
+│  │ SSE:         /v1/runs/{id}/events                       │    │
+│  │ Ingest:      /v1/runs/{id}/diffs|logs|artifact_bundles  │    │
+│  │ Metrics:     /metrics                                    │    │
 │  └────────────────────────────────────────────────────────┘    │
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘
@@ -176,7 +167,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│               Mutual TLS + Bearer Token Authentication            │
+│                     Mutual TLS Authentication                     │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                    │
 │  Node → Control-Plane Request                                    │
@@ -186,9 +177,7 @@
 │  │    - Client Cert: cfg.ControlPlane.Certificate             │ │
 │  │    - Client Key:  cfg.ControlPlane.Key                     │ │
 │  │    - Server CA:   cfg.ControlPlane.CAPath                  │ │
-│  │ 3. Adds bearer token header:                               │ │
-│  │    Authorization: Bearer <token>                           │ │
-│  │ 4. Send HTTP request                                       │ │
+│  │ 3. Send HTTP request (no bearer token)                     │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                          ↓                                        │
 │  Control-Plane Receives Request                                  │
@@ -198,20 +187,10 @@
 │  │ 1. Check Mutual TLS: r.TLS.PeerCertificates must exist     │ │
 │  │    → Deny with HTTP 400 Bad Request if missing             │ │
 │  │                                                             │ │
-│  │ 2. Extract Bearer Token: Authorization header              │ │
-│  │    → Deny with HTTP 401 Unauthorized if missing            │ │
-│  │                                                             │ │
-│  │ 3. Verify Token: TokenVerifier.Verify()                    │ │
-│  │    → Returns Principal{scopes, expiry, ...}                │ │
-│  │    → Deny with HTTP 401 if token invalid                   │ │
-│  │                                                             │ │
-│  │ 4. Check Scopes: principal.HasScope(required)              │ │
-│  │    → Deny with HTTP 403 Forbidden if scope missing         │ │
-│  │                                                             │ │
-│  │ 5. Apply Role-Based Access (if Authorizer present)         │ │
+│  │ 2. Apply Role-Based Access (if Authorizer present)         │ │
 │  │    → Additional role checks per route                      │ │
 │  │                                                             │ │
-│  │ 6. Store Principal in Context: WithPrincipal()             │ │
+│  │ 3. Store Principal in Context: WithPrincipal()             │ │
 │  │    → Available in handler via PrincipalFromContext()       │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                    │
@@ -253,8 +232,6 @@
 │                                                                    │
 │  Environment Variable Overrides:                                 │
 │  ├─ PLOY_SERVER_PG_DSN (preferred) / PLOY_POSTGRES_DSN          │
-│  ├─ PLOY_IPFS_CLUSTER_API, _TOKEN, _USERNAME, _PASSWORD         │
-│  ├─ PLOY_GITLAB_SIGNER_AES_KEY                                   │
 │  ├─ PLOY_CLUSTER_ID                                              │
 │  └─ PLOY_LIFECYCLE_NET_IGNORE                                    │
 │                                                                    │
@@ -326,7 +303,7 @@
 │  │   --node-id control \                                      │ │
 │  │   --address hostname                                       │ │
 │  │                                                             │ │
-│  │ 1. Connect to etcd (ConfigFromEnv)                        │ │
+│  │ 1. Connect to PostgreSQL (PLOY_SERVER_PG_DSN)             │ │
 │  │ 2. deploy.EnsureClusterPKI(ctx, client, cluster_id)      │ │
 │  │    → Initialize root CA if not exists                      │ │
 │  │ 3. NewCARotationManager(client, cluster_id)              │ │
@@ -361,7 +338,7 @@
 │                                                                    │
 │  TLS Server Configuration:                                       │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │ internal/api/httpserver/server.go::listenLocked()          │ │
+│  │ HTTP/TLS server (mTLS enforced)                            │ │
 │  │                                                             │ │
 │  │ if cfg.HTTP.TLS.Enabled:                                   │ │
 │  │   ├─ Load cert: tls.LoadX509KeyPair(certPath, keyPath)    │ │
@@ -384,23 +361,16 @@ Client → Control-Plane: Submit Job
 │  └─ Client verifies server with: cfg.ControlPlane.CAPath
 │
 ├─ HTTP Request
-│  POST /v1/jobs
-│  Authorization: Bearer <token>
+│  POST /v1/runs
 │
-└─ Server Processing (controlplane_server.go::registerRoute)
+└─ Server Processing
    │
    ├─ Layer 1: Mutual TLS Check
    │  └─ security.Manager checks r.TLS.PeerCertificates
    │  └─ Fail → HTTP 400 Bad Request
    │
-   ├─ Layer 2: Bearer Token Verification
-   │  └─ Extract: Authorization header
-   │  └─ Verify: TokenVerifier.Verify(ctx, token)
-   │  └─ Fail → HTTP 401 Unauthorized
-   │
-   ├─ Layer 3: Scope Check
-   │  └─ Route registered with scopes (e.g., "jobs")
-   │  └─ Check: principal.HasScope("jobs")
+   ├─ Layer 2: Role Check (optional)
+   │  └─ Handler checks caller roles where applicable
    │  └─ Fail → HTTP 403 Forbidden
    │
    ├─ Layer 4: Role Check (optional)
@@ -416,6 +386,6 @@ Client → Control-Plane: Submit Job
 
 This architecture ensures:
 1. **Confidentiality**: Mutual TLS encrypts all traffic
-2. **Authentication**: Client cert identifies node, bearer token identifies caller
-3. **Authorization**: Scopes + roles ensure fine-grained access control
+2. **Authentication**: Client certificate identifies the caller
+3. **Authorization**: Role checks in handlers
 4. **Auditability**: Principal available in all handlers for logging

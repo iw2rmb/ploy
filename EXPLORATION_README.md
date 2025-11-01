@@ -15,7 +15,7 @@ This directory contains comprehensive documentation of the Ploy codebase structu
 - Store/database integration (PostgreSQL + sqlc)
 - Bootstrap and PKI initialization
 - Configuration types and resolution
-- Security patterns (mTLS, bearer tokens, scopes, roles)
+- Security patterns (mTLS, roles)
 - Key integration points
 - File summary table
 
@@ -50,9 +50,9 @@ This directory contains comprehensive documentation of the Ploy codebase structu
 |------|-------|
 | **Server entry point** | `cmd/ployd/main.go` |
 | **Component wiring** | `internal/api/daemon/default.go` |
-| **HTTP routes** | `internal/api/httpserver/server.go` (Fiber) + `internal/api/httpserver/controlplane_server.go` (control-plane) |
-| **API endpoints** | `internal/api/httpserver/controlplane_server.go` (lines 174-206 show route registration) |
-| **Security** | `internal/api/httpserver/security/security.go` (mutual TLS + bearer token) |
+| **HTTP routes** | See control-plane packages under `internal/api/*` and `internal/controlplane/*` |
+| **API endpoints** | `docs/api/OpenAPI.yaml` (authoritative routes) |
+| **Security** | mTLS-only; see `internal/controlplane/auth` and `internal/api/pki` |
 | **PKI management** | `internal/api/pki/manager.go` + `cmd/ployd/bootstrap_ca.go` |
 | **Database** | `internal/store/store.go` (pgx + sqlc) |
 | **Configuration** | `internal/api/config/types.go` + `loader.go` + `defaults.go` |
@@ -62,8 +62,8 @@ This directory contains comprehensive documentation of the Ploy codebase structu
 | Scenario | Key Files |
 |----------|-----------|
 | **Server startup** | `cmd/ployd/main.go` → `daemon.NewDefault()` in `internal/api/daemon/default.go` |
-| **HTTP request handling** | `httpserver/server.go` (Fiber) → `controlplane_server.go` (routes + security middleware) |
-| **PKI bootstrap** | `cmd/ployd/bootstrap_ca.go` → `internal/deploy/*` → etcd + file I/O |
+| **HTTP request handling** | Control-plane handlers under `internal/controlplane/*` |
+| **PKI bootstrap** | `cmd/ployd/bootstrap_ca.go` → `internal/deploy/*` → file I/O + PostgreSQL |
 | **Certificate renewal** | `internal/api/pki/manager.go` (periodic loop) → `fileRotator.Renew()` |
 | **Database queries** | `internal/store/store.go` (Store interface) → sqlc-generated code in `cluster.sql.go`, etc. |
 
@@ -83,14 +83,10 @@ All components are wired in `daemon.NewDefault()`:
 4. Later components depend on earlier ones
 5. Shutdown functions are collected for graceful termination
 
-### 3. Two-Level HTTP Security
-- **Transport layer**: Mutual TLS with X509 certificates
-  - Ensures node-to-control-plane encryption
-  - Client cert identifies the node
-- **Application layer**: Bearer token + scopes + roles
-  - TokenVerifier validates and extracts principal
-  - Scopes provide fine-grained authorization
-  - Roles (RoleControlPlane, RoleCLIAdmin, RoleWorker) provide coarse-grained roles
+### 3. HTTP Security
+- **Transport layer**: Mutual TLS with X509 certificates (mTLS-only)
+  - Ensures encryption and client identity via certificates
+  - Roles (RoleControlPlane, RoleCLIAdmin, RoleWorker) applied inside handlers
 
 ### 4. Fiber + Standard Library
 - **Fiber app**: Handles node-local endpoints, admin endpoints
@@ -112,32 +108,27 @@ All components are wired in `daemon.NewDefault()`:
 
 - [x] **Mutual TLS**: Client must present valid certificate
 - [x] **Encrypted Transport**: HTTPS (TLS 1.2+) for all control-plane traffic
-- [x] **Bearer Token Auth**: Application-level authentication via Authorization header
-- [x] **Token Verification**: TokenVerifier interface allows custom verification logic
-- [x] **Scope-Based Access Control**: Fine-grained per-endpoint authorization
-- [x] **Role-Based Access Control**: Coarse-grained role checks
+- [x] **Role-Based Access Control**: Coarse-grained role checks within handlers
 - [x] **Principal Context**: Authenticated caller available in handlers for audit logging
-- [x] **Certificate Renewal**: PKI manager automatically renews certificates
+- [x] **Certificate Renewal**: PKI manager handles certificate lifetimes
 - [x] **Bootstrap PKI**: One-time CA setup utility
 
 ## Configuration Resolution Order
 
 1. Load YAML configuration file (default: `/etc/ploy/ployd.yaml`)
 2. Apply built-in defaults from `internal/api/config/defaults.go`
-3. Override with environment variables:
+3. Override with environment variables (see `docs/envs/README.md`):
    - `PLOY_SERVER_PG_DSN` (preferred) / `PLOY_POSTGRES_DSN`
-   - `PLOY_IPFS_CLUSTER_API`, etc.
-   - `PLOY_GITLAB_SIGNER_AES_KEY`
    - `PLOY_CLUSTER_ID`
    - `PLOY_LIFECYCLE_NET_IGNORE`
 
 ## Common Questions
 
 **Q: Where do I add a new API endpoint?**
-A: In `internal/api/httpserver/controlplane_server.go`, add a call to `h.registerRoute()` (after line 206) and implement the handler function.
+A: Implement a handler under `internal/controlplane/` and register it per the package’s pattern. Keep `docs/api/OpenAPI.yaml` in sync.
 
 **Q: How does authentication work?**
-A: Client establishes mutual TLS connection, then includes `Authorization: Bearer <token>` header. Server's `security.Manager.Middleware()` validates both.
+A: Client establishes a mutual TLS connection. The server authenticates the caller from the client certificate; no bearer tokens are used.
 
 **Q: How is configuration reloaded?**
 A: Send SIGHUP to the daemon. `main.go` intercepts it, reloads the config file, and calls `svc.Reload()`.
@@ -146,21 +137,21 @@ A: Send SIGHUP to the daemon. `main.go` intercepts it, reloads the config file, 
 A: Generated by sqlc in `internal/store/models.go`. SQL definitions in `internal/store/queries/`.
 
 **Q: How does PKI work?**
-A: Bootstrap command (`ployd bootstrap-ca`) generates initial CA + node certs via etcd-backed CA. Runtime PKI manager periodically calls `fileRotator.Renew()` to ensure files exist.
+A: Bootstrap command (`ployd bootstrap-ca`) generates the cluster CA and server certificate. Nodes submit CSRs to the control plane (`/v1/pki/sign`) to receive signed certificates. The runtime PKI manager monitors certificate lifetimes.
 
 **Q: Can I run without PostgreSQL?**
-A: Yes — the store is optional. If `pgDSN` is empty, `pgStore` stays nil, and control-plane features requiring DB are disabled.
+A: No — the control plane requires PostgreSQL for state. For tests, use `PLOY_TEST_PG_DSN` or skip DB-backed tests when unset.
 
 **Q: Can I run without TLS on the HTTP server?**
-A: Yes — set `http.tls.enabled: false` in config. But control-plane client still uses mTLS to call the control-plane.
+A: No — all control-plane traffic uses mutual TLS. Development flows rely on a generated cluster CA.
 
 ## Files to Review First
 
 For a quick understanding, read in this order:
 1. **cmd/ployd/main.go** (3-5 min) — Understand the entry point
 2. **internal/api/daemon/default.go** (10 min) — See how all components wire together
-3. **internal/api/httpserver/server.go** (5 min) — Understand HTTP server setup
-4. **internal/api/httpserver/controlplane_server.go** (first 200 lines, 10 min) — See route registration and security
+3. **internal/controlplane/** (10 min) — Review handler organization and authorization
+4. **docs/api/OpenAPI.yaml** (5 min) — Confirm routes and schemas
 5. **internal/api/config/types.go** (5 min) — Understand configuration structure
 
 Total time: ~35 minutes for a solid understanding of the core system.
