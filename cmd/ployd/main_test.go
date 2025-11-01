@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-    "github.com/jackc/pgx/v5/pgtype"
-    "github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	apiconfig "github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
@@ -739,9 +739,9 @@ func TestCreateRepoHandler_EmptyURL(t *testing.T) {
 }
 
 func TestCreateRepoHandler_DuplicateURL(t *testing.T) {
-    mockSt := &mockStore{
-        createRepoErr: &pgconn.PgError{Code: "23505", ConstraintName: "repos_url_unique"},
-    }
+	mockSt := &mockStore{
+		createRepoErr: &pgconn.PgError{Code: "23505", ConstraintName: "repos_url_unique"},
+	}
 
 	reqBody := map[string]string{
 		"url": "https://github.com/example/repo",
@@ -808,29 +808,29 @@ func TestListReposHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-    var wrapper struct {
-        Repos []struct {
-            ID        string  `json:"id"`
-            URL       string  `json:"url"`
-            Branch    *string `json:"branch,omitempty"`
-            CommitSha *string `json:"commit_sha,omitempty"`
-            CreatedAt string  `json:"created_at"`
-        } `json:"repos"`
-    }
-    if err := json.NewDecoder(rr.Body).Decode(&wrapper); err != nil {
-        t.Fatalf("decode response: %v", err)
-    }
+	var wrapper struct {
+		Repos []struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		} `json:"repos"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&wrapper); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
-    if len(wrapper.Repos) != 2 {
-        t.Fatalf("expected 2 repos, got %d", len(wrapper.Repos))
-    }
+	if len(wrapper.Repos) != 2 {
+		t.Fatalf("expected 2 repos, got %d", len(wrapper.Repos))
+	}
 
-    if wrapper.Repos[0].ID != repo1ID.String() {
-        t.Errorf("expected first repo id %s, got %s", repo1ID.String(), wrapper.Repos[0].ID)
-    }
-    if wrapper.Repos[1].ID != repo2ID.String() {
-        t.Errorf("expected second repo id %s, got %s", repo2ID.String(), wrapper.Repos[1].ID)
-    }
+	if wrapper.Repos[0].ID != repo1ID.String() {
+		t.Errorf("expected first repo id %s, got %s", repo1ID.String(), wrapper.Repos[0].ID)
+	}
+	if wrapper.Repos[1].ID != repo2ID.String() {
+		t.Errorf("expected second repo id %s, got %s", repo2ID.String(), wrapper.Repos[1].ID)
+	}
 
 	if !mockSt.listReposCalled {
 		t.Fatal("expected ListRepos to be called")
@@ -852,22 +852,22 @@ func TestListReposHandler_EmptyList(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", rr.Code)
 	}
 
-    var resp struct {
-        Repos []struct {
-            ID        string  `json:"id"`
-            URL       string  `json:"url"`
-            Branch    *string `json:"branch,omitempty"`
-            CommitSha *string `json:"commit_sha,omitempty"`
-            CreatedAt string  `json:"created_at"`
-        } `json:"repos"`
-    }
-    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-        t.Fatalf("decode response: %v", err)
-    }
+	var resp struct {
+		Repos []struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		} `json:"repos"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
 
-    if len(resp.Repos) != 0 {
-        t.Fatalf("expected empty list, got %d repos", len(resp.Repos))
-    }
+	if len(resp.Repos) != 0 {
+		t.Fatalf("expected empty list, got %d repos", len(resp.Repos))
+	}
 }
 
 func TestListReposHandler_DatabaseError(t *testing.T) {
