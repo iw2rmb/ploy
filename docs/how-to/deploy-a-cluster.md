@@ -36,6 +36,32 @@ This command:
 - Writes server configuration to `/etc/ploy/ployd.yaml` (includes `http.tls` cert/key/CA paths and `postgres.dsn: ${PLOY_SERVER_PG_DSN}`).
 - Bootstraps the `ployd` systemd unit with `PLOY_SERVER_PG_DSN` and sets `PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml`.
 
+At the end of bootstrap, a concise summary is printed showing the config path, PKI directory, detected certificate files, the systemd service name, and quick commands for viewing logs and checking status, for example:
+
+```
+========================================
+Bootstrap completed successfully.
+========================================
+
+Configuration:
+  Config file: /etc/ploy/ployd.yaml
+  PKI directory: /etc/ploy/pki
+    - CA cert: /etc/ploy/pki/ca.crt
+    - Server cert: /etc/ploy/pki/server.crt
+    - Server key: /etc/ploy/pki/server.key
+
+Service:
+  Service name: ployd.service
+  Status: active
+  Enabled: enabled
+
+To view logs:
+  journalctl -u ployd.service -f
+
+To check status:
+  systemctl status ployd.service
+```
+
 **Optional flags:**
 - `--postgresql-dsn <dsn>` — Use an external PostgreSQL instance instead of installing locally.
 - `--cluster-id <id>` — Override the generated cluster ID (useful for deterministic deployments).
