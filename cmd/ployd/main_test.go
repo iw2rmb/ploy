@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +11,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 
 	apiconfig "github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	internalPKI "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -223,5 +229,281 @@ func newTestRecorder() *httptest.ResponseRecorder {
 func testHandler(t *testing.T) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// mockStore is a minimal Store implementation for testing pkiSignHandler.
+type mockStore struct {
+	store.Store
+	updateCertMetadataCalled bool
+	updateCertMetadataParams store.UpdateNodeCertMetadataParams
+	updateCertMetadataErr    error
+}
+
+func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
+	m.updateCertMetadataCalled = true
+	m.updateCertMetadataParams = params
+	return m.updateCertMetadataErr
+}
+
+func TestPKISignHandler_Success(t *testing.T) {
+	// Generate test CA.
+	ca, err := internalPKI.GenerateCA("test-cluster", time.Now())
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	// Generate test CSR.
+	nodeID := uuid.New().String()
+	keyBundle, csrPEM, err := internalPKI.GenerateNodeCSR(nodeID, "test-cluster", "192.168.1.100")
+	if err != nil {
+		t.Fatalf("generate CSR: %v", err)
+	}
+	_ = keyBundle // Unused in this test, but would be stored by node.
+
+	// Set CA environment variables.
+	t.Setenv("PLOY_SERVER_CA_CERT", ca.CertPEM)
+	t.Setenv("PLOY_SERVER_CA_KEY", ca.KeyPEM)
+
+	// Create mock store.
+	mockSt := &mockStore{}
+
+	// Create request.
+	reqBody := map[string]string{
+		"node_id": nodeID,
+		"csr":     string(csrPEM),
+	}
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	// Call handler.
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	// Verify response status.
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify response body.
+	var resp struct {
+		Certificate string `json:"certificate"`
+		CABundle    string `json:"ca_bundle"`
+		Serial      string `json:"serial"`
+		Fingerprint string `json:"fingerprint"`
+		NotBefore   string `json:"not_before"`
+		NotAfter    string `json:"not_after"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	// Verify response fields are non-empty.
+	if resp.Certificate == "" {
+		t.Error("expected non-empty certificate")
+	}
+	if resp.CABundle == "" {
+		t.Error("expected non-empty ca_bundle")
+	}
+	if resp.Serial == "" {
+		t.Error("expected non-empty serial")
+	}
+	if resp.Fingerprint == "" {
+		t.Error("expected non-empty fingerprint")
+	}
+	if resp.NotBefore == "" {
+		t.Error("expected non-empty not_before")
+	}
+	if resp.NotAfter == "" {
+		t.Error("expected non-empty not_after")
+	}
+
+	// Verify CA bundle matches.
+	if resp.CABundle != ca.CertPEM {
+		t.Error("expected CA bundle to match generated CA")
+	}
+
+	// Verify timestamps are valid RFC3339 format.
+	if _, err := time.Parse(time.RFC3339, resp.NotBefore); err != nil {
+		t.Errorf("invalid not_before timestamp: %v", err)
+	}
+	if _, err := time.Parse(time.RFC3339, resp.NotAfter); err != nil {
+		t.Errorf("invalid not_after timestamp: %v", err)
+	}
+
+	// Verify store was called with correct parameters.
+	if !mockSt.updateCertMetadataCalled {
+		t.Fatal("expected UpdateNodeCertMetadata to be called")
+	}
+
+	expectedUUID, _ := uuid.Parse(nodeID)
+	if mockSt.updateCertMetadataParams.ID.Bytes != expectedUUID {
+		t.Errorf("expected node ID %v, got %v", expectedUUID, mockSt.updateCertMetadataParams.ID.Bytes)
+	}
+	if mockSt.updateCertMetadataParams.CertSerial == nil || *mockSt.updateCertMetadataParams.CertSerial != resp.Serial {
+		t.Errorf("expected serial %s, got %v", resp.Serial, mockSt.updateCertMetadataParams.CertSerial)
+	}
+	if mockSt.updateCertMetadataParams.CertFingerprint == nil || *mockSt.updateCertMetadataParams.CertFingerprint != resp.Fingerprint {
+		t.Errorf("expected fingerprint %s, got %v", resp.Fingerprint, mockSt.updateCertMetadataParams.CertFingerprint)
+	}
+}
+
+func TestPKISignHandler_InvalidJSON(t *testing.T) {
+	mockSt := &mockStore{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader([]byte("invalid json")))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid request") {
+		t.Errorf("expected error message about invalid request, got: %s", rr.Body.String())
+	}
+}
+
+func TestPKISignHandler_InvalidNodeID(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]string{
+		"node_id": "not-a-uuid",
+		"csr":     "some-csr",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid node_id") {
+		t.Errorf("expected error message about invalid node_id, got: %s", rr.Body.String())
+	}
+}
+
+func TestPKISignHandler_EmptyCSR(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]string{
+		"node_id": uuid.New().String(),
+		"csr":     "  ",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "csr field is required") {
+		t.Errorf("expected error message about empty CSR, got: %s", rr.Body.String())
+	}
+}
+
+func TestPKISignHandler_CANotConfigured(t *testing.T) {
+	// Ensure CA environment variables are not set.
+	t.Setenv("PLOY_SERVER_CA_CERT", "")
+	t.Setenv("PLOY_SERVER_CA_KEY", "")
+
+	mockSt := &mockStore{}
+	reqBody := map[string]string{
+		"node_id": uuid.New().String(),
+		"csr":     "some-csr",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "PKI not configured") {
+		t.Errorf("expected error message about PKI not configured, got: %s", rr.Body.String())
+	}
+}
+
+func TestPKISignHandler_InvalidCSR(t *testing.T) {
+	// Generate test CA.
+	ca, err := internalPKI.GenerateCA("test-cluster", time.Now())
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	t.Setenv("PLOY_SERVER_CA_CERT", ca.CertPEM)
+	t.Setenv("PLOY_SERVER_CA_KEY", ca.KeyPEM)
+
+	mockSt := &mockStore{}
+	reqBody := map[string]string{
+		"node_id": uuid.New().String(),
+		"csr":     "invalid-csr-pem-data",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "sign failed") {
+		t.Errorf("expected error message about sign failed, got: %s", rr.Body.String())
+	}
+}
+
+func TestPKISignHandler_StoreError(t *testing.T) {
+	// Generate test CA.
+	ca, err := internalPKI.GenerateCA("test-cluster", time.Now())
+	if err != nil {
+		t.Fatalf("generate CA: %v", err)
+	}
+
+	// Generate test CSR.
+	nodeID := uuid.New().String()
+	_, csrPEM, err := internalPKI.GenerateNodeCSR(nodeID, "test-cluster", "192.168.1.100")
+	if err != nil {
+		t.Fatalf("generate CSR: %v", err)
+	}
+
+	t.Setenv("PLOY_SERVER_CA_CERT", ca.CertPEM)
+	t.Setenv("PLOY_SERVER_CA_KEY", ca.KeyPEM)
+
+	// Create mock store that returns an error.
+	mockSt := &mockStore{
+		updateCertMetadataErr: context.DeadlineExceeded,
+	}
+
+	reqBody := map[string]string{
+		"node_id": nodeID,
+		"csr":     string(csrPEM),
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := pkiSignHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "failed to persist certificate metadata") {
+		t.Errorf("expected error message about persist failure, got: %s", rr.Body.String())
 	}
 }
