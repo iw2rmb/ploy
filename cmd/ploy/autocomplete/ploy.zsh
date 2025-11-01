@@ -21,6 +21,8 @@ _ploy() {
             commands+=("environment:Materialize integration environments")
             commands+=("manifest:Inspect and validate integration manifests")
             commands+=("knowledge-base:Curate knowledge base fixtures")
+            commands+=("server:Manage control plane server")
+            commands+=("node:Manage worker nodes")
             commands+=("help:Show help for commands")
             _describe 'command' commands && ret=0
             ;;
@@ -87,6 +89,16 @@ _ploy() {
                     commands+=("evaluate:Evaluate knowledge base classifier accuracy")
                     _describe 'knowledge-base command' commands && ret=0
                     ;;
+                'server')
+                    commands=()
+                    commands+=("deploy:Deploy and configure a control plane server")
+                    _describe 'server command' commands && ret=0
+                    ;;
+                'node')
+                    commands=()
+                    commands+=("add:Add a worker node to the cluster")
+                    _describe 'node command' commands && ret=0
+                    ;;
                 'help')
                     commands=()
                     commands+=("mod:Plan and run Mods workflows")
@@ -100,6 +112,8 @@ _ploy() {
                     commands+=("environment:Materialize integration environments")
                     commands+=("manifest:Inspect and validate integration manifests")
                     commands+=("knowledge-base:Curate knowledge base fixtures")
+                    commands+=("server:Manage control plane server")
+                    commands+=("node:Manage worker nodes")
                     _describe 'help command' commands && ret=0
                     ;;
             esac
