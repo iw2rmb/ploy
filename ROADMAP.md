@@ -71,7 +71,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Stream logs as gzipped chunks to server; enforce ≤1 MiB client-side cap.
 - [x] Produce unified diff and summary; gzip and POST to server.
 - [x] Upload artifact bundles (tar.gz) where configured.
-- [ ] Emit terminal status + cleanup workspace.
+- [x] Emit terminal status + cleanup workspace.
 
 ## Store & Migrations
 - [ ] Apply SIMPLE.sql as migrations under `internal/store/migrations/`; verify `sqlc` queries cover needed paths.

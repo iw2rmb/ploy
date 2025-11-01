@@ -225,20 +225,20 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Execute the step.
 	startTime := time.Now()
-	result, err := runner.Run(ctx, step.Request{
+	result, execErr := runner.Run(ctx, step.Request{
 		Manifest:  manifest,
 		Workspace: workspaceRoot,
 	})
 	duration := time.Since(startTime)
 
-	if err != nil {
+	if execErr != nil {
 		slog.Error("run execution failed",
 			"run_id", req.RunID,
-			"error", err,
+			"error", execErr,
 			"duration", duration,
 			"exit_code", result.ExitCode,
 		)
-		return
+		// Continue to emit terminal status even on failure.
 	}
 
 	// Generate and upload diff to server if diff generator is available.
@@ -319,6 +319,54 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "paths", len(paths))
 				}
 			}
+		}
+	}
+
+	// Emit terminal status to server.
+	statusUploader, err := NewStatusUploader(r.cfg)
+	if err != nil {
+		slog.Error("failed to create status uploader", "run_id", req.RunID, "error", err)
+	} else {
+		// Determine terminal status based on execution result.
+		terminalStatus := "succeeded"
+		var reason *string
+		if execErr != nil {
+			terminalStatus = "failed"
+			errMsg := execErr.Error()
+			reason = &errMsg
+		} else if result.ExitCode != 0 {
+			terminalStatus = "failed"
+			failureMsg := fmt.Sprintf("exit code %d", result.ExitCode)
+			reason = &failureMsg
+		}
+
+		// Build stats with execution metrics.
+		stats := map[string]interface{}{
+			"exit_code":   result.ExitCode,
+			"duration_ms": duration.Milliseconds(),
+			"timings": map[string]interface{}{
+				"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
+				"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
+				"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
+				"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
+				"publish_duration_ms":    result.Timings.PublishDuration.Milliseconds(),
+				"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
+			},
+		}
+
+		// Add artifact CIDs if available.
+		if result.DiffArtifact.CID != "" {
+			stats["diff_cid"] = result.DiffArtifact.CID
+		}
+		if result.LogArtifact.CID != "" {
+			stats["log_cid"] = result.LogArtifact.CID
+		}
+
+		// Upload terminal status to server.
+		if uploadErr := statusUploader.UploadStatus(ctx, req.RunID, terminalStatus, reason, stats); uploadErr != nil {
+			slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
+		} else {
+			slog.Info("terminal status uploaded successfully", "run_id", req.RunID, "status", terminalStatus)
 		}
 	}
 
