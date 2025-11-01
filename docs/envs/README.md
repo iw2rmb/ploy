@@ -129,11 +129,10 @@ defaults change, or components adopt additional configuration.
 
 - `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate presented to nodes. Required for
   the `/v1/pki/sign` endpoint to return signed certificates.
-  TODO: handler wiring pending; see ROADMAP "API: PKI".
 - `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs. Required
   alongside `PLOY_SERVER_CA_CERT` for `/v1/pki/sign`. When either value is missing, the server
   responds with `503 PKI not configured`.
-  TODO: handler wiring pending.
+
 
 ## PostgreSQL
 

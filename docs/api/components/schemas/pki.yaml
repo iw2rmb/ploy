@@ -8,7 +8,9 @@ PKISignRequest:
       description: Node identifier requesting a signed certificate.
     csr:
       type: string
-      description: PEM-encoded PKCS#10 certificate signing request.
+      description: |
+        PEM-encoded PKCS#10 certificate signing request.
+        The CSR subject common name must be exactly `node:<node_id>`.
 
 PKISignResponse:
   type: object
@@ -34,4 +36,3 @@ PKISignResponse:
       type: string
       format: date-time
       description: Certificate validity end timestamp (UTC).
-
