@@ -58,6 +58,12 @@ func main() {
 	}
 	defer st.Close()
 
+	// Run database migrations to ensure schema is present and up-to-date.
+	if err := store.RunMigrations(ctx, st.Pool()); err != nil {
+		slog.Error("run migrations", "err", err)
+		os.Exit(1)
+	}
+
 	// Initialize Authorizer for mTLS-based authentication.
 	// Default role is RoleControlPlane; AllowInsecure is false for production.
 	authorizer := auth.NewAuthorizer(auth.Options{
