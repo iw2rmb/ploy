@@ -16,7 +16,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Ensure `make build` emits `dist/ployd{,-linux}` consistently (Makefile already supports; verify).
 
 ## Server Bootstrap (Unstub cmd/ployd)
-- [ ] Replace `cmd/ployd/main.go` stub with real main: parse config/env, init logging, graceful shutdown.
+- [x] Replace `cmd/ployd/main.go` stub with real main: parse config/env, init logging, graceful shutdown.
 - [ ] Wire Postgres store via `PLOY_SERVER_PG_DSN` or `internal/api/config` (fallback to env over file).
 - [ ] Initialize Authorizer (mTLS) from `internal/controlplane/auth` with `RoleControlPlane` default.
 - [ ] Add HTTP mux package `internal/api/httpserver` (new) to mount routes and middlewares.
