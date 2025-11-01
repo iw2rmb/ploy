@@ -52,6 +52,53 @@ func TestGenerateClusterID(t *testing.T) {
 	})
 }
 
+func TestGenerateNodeID(t *testing.T) {
+	t.Run("generates valid node ID", func(t *testing.T) {
+		id, err := GenerateNodeID()
+		if err != nil {
+			t.Fatalf("GenerateNodeID() error = %v, want nil", err)
+		}
+
+		if !strings.HasPrefix(id, "node-") {
+			t.Errorf("GenerateNodeID() = %q, want prefix 'node-'", id)
+		}
+
+		// Expect format: node-<16 hex chars>
+		// Total length should be 5 ("node-") + 16 = 21
+		if len(id) != 21 {
+			t.Errorf("GenerateNodeID() length = %d, want 21", len(id))
+		}
+
+		// Extract hex part and validate it's hex
+		hexPart := strings.TrimPrefix(id, "node-")
+		if len(hexPart) != 16 {
+			t.Errorf("hex part length = %d, want 16", len(hexPart))
+		}
+
+		for _, c := range hexPart {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				t.Errorf("invalid hex character %q in node ID %q", c, id)
+			}
+		}
+	})
+
+	t.Run("generates unique IDs", func(t *testing.T) {
+		id1, err := GenerateNodeID()
+		if err != nil {
+			t.Fatalf("GenerateNodeID() error = %v", err)
+		}
+
+		id2, err := GenerateNodeID()
+		if err != nil {
+			t.Fatalf("GenerateNodeID() error = %v", err)
+		}
+
+		if id1 == id2 {
+			t.Errorf("GenerateNodeID() generated duplicate IDs: %q", id1)
+		}
+	})
+}
+
 func TestRandomHexString(t *testing.T) {
 	tests := []struct {
 		name    string

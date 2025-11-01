@@ -278,6 +278,67 @@ func TestLoadCAInvalidPEM(t *testing.T) {
 	}
 }
 
+func TestGenerateNodeCSR(t *testing.T) {
+	nodeID := "node-abc123"
+	clusterID := "cluster-xyz789"
+	nodeIP := "192.168.1.20"
+
+	keyBundle, csrPEM, err := GenerateNodeCSR(nodeID, clusterID, nodeIP)
+	if err != nil {
+		t.Fatalf("GenerateNodeCSR failed: %v", err)
+	}
+
+	// Check key bundle.
+	if keyBundle == nil {
+		t.Fatal("expected non-nil key bundle")
+	}
+	if keyBundle.KeyPEM == "" {
+		t.Fatal("expected non-empty key PEM")
+	}
+	if keyBundle.Key == nil {
+		t.Fatal("expected parsed private key")
+	}
+
+	// Check CSR PEM.
+	if len(csrPEM) == 0 {
+		t.Fatal("expected non-empty CSR PEM")
+	}
+
+	// Parse and validate the CSR.
+	block, _ := pem.Decode(csrPEM)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		t.Fatal("expected valid CSR PEM block")
+	}
+
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse CSR: %v", err)
+	}
+
+	// Verify CSR signature.
+	if err := csr.CheckSignature(); err != nil {
+		t.Fatalf("CSR signature verification failed: %v", err)
+	}
+
+	// Check subject CN.
+	expectedCN := "node:" + nodeID
+	if csr.Subject.CommonName != expectedCN {
+		t.Fatalf("expected CN %q, got: %q", expectedCN, csr.Subject.CommonName)
+	}
+
+	// Check DNS names.
+	expectedDNS := "ploy-node-" + nodeID + "." + clusterID + ".ploy"
+	if len(csr.DNSNames) != 1 || csr.DNSNames[0] != expectedDNS {
+		t.Fatalf("expected DNS name %q, got: %v", expectedDNS, csr.DNSNames)
+	}
+
+	// Check IP addresses.
+	expectedIP := net.ParseIP(nodeIP)
+	if len(csr.IPAddresses) != 1 || !csr.IPAddresses[0].Equal(expectedIP) {
+		t.Fatalf("expected IP %s, got: %v", nodeIP, csr.IPAddresses)
+	}
+}
+
 func elliptic256() elliptic.Curve {
 	return elliptic.P256()
 }
