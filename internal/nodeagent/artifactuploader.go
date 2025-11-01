@@ -96,11 +96,57 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 	gzWriter := gzip.NewWriter(&buf)
 	tarWriter := tar.NewWriter(gzWriter)
 
-	for _, path := range paths {
-		if err := addPathToTar(tarWriter, path); err != nil {
+	for _, root := range paths {
+		// Resolve to absolute path for consistent walking; header names will be relative.
+		absRoot, err := filepath.Abs(root)
+		if err != nil {
 			_ = tarWriter.Close()
 			_ = gzWriter.Close()
-			return nil, fmt.Errorf("add %s to tar: %w", path, err)
+			return nil, fmt.Errorf("abs path: %w", err)
+		}
+
+		info, err := os.Lstat(absRoot)
+		if err != nil {
+			_ = tarWriter.Close()
+			_ = gzWriter.Close()
+			return nil, fmt.Errorf("stat %s: %w", root, err)
+		}
+
+		base := filepath.Base(absRoot)
+
+		// Write the root itself (dir or file) and recurse when directory.
+		if err := addPathToTar(tarWriter, absRoot, base, info); err != nil {
+			_ = tarWriter.Close()
+			_ = gzWriter.Close()
+			return nil, fmt.Errorf("add %s to tar: %w", root, err)
+		}
+
+		if info.IsDir() {
+			// Walk directory contents and add entries relative to the root base.
+			err = filepath.WalkDir(absRoot, func(p string, d os.DirEntry, walkErr error) error {
+				if walkErr != nil {
+					return walkErr
+				}
+				if p == absRoot { // already added root
+					return nil
+				}
+				fi, err := d.Info()
+				if err != nil {
+					return err
+				}
+				// Compute name inside archive as base/rel
+				rel, err := filepath.Rel(absRoot, p)
+				if err != nil {
+					return err
+				}
+				name := filepath.Join(base, rel)
+				return addPathToTar(tarWriter, p, name, fi)
+			})
+			if err != nil {
+				_ = tarWriter.Close()
+				_ = gzWriter.Close()
+				return nil, fmt.Errorf("walk %s: %w", root, err)
+			}
 		}
 	}
 
@@ -116,31 +162,31 @@ func createTarGzBundle(paths []string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// addPathToTar adds a file or directory to the tar archive.
-func addPathToTar(tw *tar.Writer, path string) error {
-	// Get file info.
-	info, err := os.Lstat(path)
-	if err != nil {
-		return fmt.Errorf("stat: %w", err)
+// addPathToTar writes a single filesystem entry to the tar using the provided name.
+func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo) error {
+	// Support symlink headers by reading the target.
+	linkTarget := ""
+	if info.Mode()&os.ModeSymlink != 0 {
+		t, err := os.Readlink(fsPath)
+		if err != nil {
+			return fmt.Errorf("readlink: %w", err)
+		}
+		linkTarget = t
 	}
 
-	// Create tar header from file info.
-	header, err := tar.FileInfoHeader(info, "")
+	header, err := tar.FileInfoHeader(info, linkTarget)
 	if err != nil {
 		return fmt.Errorf("create tar header: %w", err)
 	}
+	header.Name = name
 
-	// Use relative path as the name in the archive.
-	header.Name = filepath.Base(path)
-
-	// Write header.
 	if err := tw.WriteHeader(header); err != nil {
 		return fmt.Errorf("write header: %w", err)
 	}
 
-	// If it's a regular file, write the content.
+	// Write file content for regular files only.
 	if info.Mode().IsRegular() {
-		file, err := os.Open(path)
+		file, err := os.Open(fsPath)
 		if err != nil {
 			return fmt.Errorf("open file: %w", err)
 		}
@@ -150,6 +196,5 @@ func addPathToTar(tw *tar.Writer, path string) error {
 			return fmt.Errorf("copy file: %w", err)
 		}
 	}
-
 	return nil
 }
