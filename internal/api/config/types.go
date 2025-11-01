@@ -129,3 +129,8 @@ type TransfersConfig struct {
 	GuardBinary     string        `yaml:"guard_binary"`
 	JanitorInterval time.Duration `yaml:"janitor_interval"`
 }
+
+// PostgresConfig configures PostgreSQL connection.
+type PostgresConfig struct {
+	DSN string `yaml:"dsn"`
+}
