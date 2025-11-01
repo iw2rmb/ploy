@@ -49,7 +49,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Scheduling & Assignment
 - [x] Implement `ClaimRun` RPC: server assigns one queued run via `FOR UPDATE SKIP LOCKED` (sqlc: `ClaimRun`).
-- [ ] Add server endpoint for claims (pull) or server→node push client (choose pull first per SIMPLE.md).
+- [x] Add server endpoint for claims (pull) or server→node push client (choose pull first per SIMPLE.md).
 - [ ] On assign, set `started_at`, status `assigned` then `running` when node acknowledges.
 - [ ] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
 
