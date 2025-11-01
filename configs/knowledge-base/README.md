@@ -1,8 +1,8 @@
 # Knowledge Base Catalog
 
 The workstation knowledge base catalog powers the Mods advisor by default when
-running `ploy mod run`. Populate `catalog.json` in this directory with the
-JSON format described in `docs/design/knowledge-base/README.md`.
+running `ploy mod run`. Populate `catalog.json` in this directory using the
+format described below.
 
 ## Format
 
