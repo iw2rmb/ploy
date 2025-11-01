@@ -52,6 +52,10 @@ func execute(args []string, stderr io.Writer) error {
 		return handleMods(args[1:], stderr)
 	case "jobs":
 		return handleJobs(args[1:], stderr)
+	case "server":
+		return handleServer(args[1:], stderr)
+	case "node":
+		return handleNode(args[1:], stderr)
 
 	default:
 		printUsage(stderr)

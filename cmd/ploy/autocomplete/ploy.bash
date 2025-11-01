@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base server node help" -- "$cur") )
         return 0
     fi
 
@@ -77,9 +77,21 @@ _ploy_completions() {
             return 0
         fi
         ;;
+    "server")
+        if [[ $COMP_CWORD -eq 2 ]]; then
+            COMPREPLY=( $(compgen -W "deploy" -- "$cur") )
+            return 0
+        fi
+        ;;
+    "node")
+        if [[ $COMP_CWORD -eq 2 ]]; then
+            COMPREPLY=( $(compgen -W "add" -- "$cur") )
+            return 0
+        fi
+        ;;
     "help")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base" -- "$cur") )
+            COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base server node" -- "$cur") )
             return 0
         fi
         ;;

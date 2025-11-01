@@ -15,5 +15,7 @@ Core Commands:
   environment      Materialize integration environments
   manifest         Inspect and validate integration manifests
   knowledge-base   Curate knowledge base fixtures
+  server           Manage control plane server
+  node             Manage worker nodes
 
 Use 'ploy help <command>' for detailed command help.

@@ -264,6 +264,32 @@ var commandTree = []Node{
 			},
 		},
 	},
+	{
+		Name:        "server",
+		Description: "Manage control plane server",
+		Usage:       "ploy server <command>",
+		Note:        "Use 'ploy server deploy --help' for flag details.",
+		Subcommands: []Node{
+			{
+				Name:        "deploy",
+				Description: "Deploy and configure a control plane server",
+				Usage:       "ploy server deploy --address <host> [--postgresql-dsn <dsn>] [--identity <path>] [--user <username>] [--ssh-port <port>] [--ployd-binary <path>]",
+			},
+		},
+	},
+	{
+		Name:        "node",
+		Description: "Manage worker nodes",
+		Usage:       "ploy node <command>",
+		Note:        "Use 'ploy node add --help' for flag details.",
+		Subcommands: []Node{
+			{
+				Name:        "add",
+				Description: "Add a worker node to the cluster",
+				Usage:       "ploy node add --cluster-id <id> --address <host> [--identity <path>] [--user <username>] [--ssh-port <port>] [--ployd-binary <path>]",
+			},
+		},
+	},
 }
 
 // Tree returns a deep copy of the CLI command tree including the synthetic help node.
