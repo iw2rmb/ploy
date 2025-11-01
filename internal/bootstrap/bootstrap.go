@@ -57,21 +57,14 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("echo 'Creating ploy directories...'\n")
 	b.WriteString("mkdir -p /etc/ploy/pki\n\n")
 
-	// Write CA and server certs if provided via environment
+	// Write CA cert if provided via environment
 	b.WriteString("if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
 	b.WriteString("  echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
 	b.WriteString("  chmod 644 /etc/ploy/pki/ca.crt\n")
 	b.WriteString("fi\n\n")
 
-	b.WriteString("if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
-	b.WriteString("  echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt\n")
-	b.WriteString("  chmod 644 /etc/ploy/pki/server.crt\n")
-	b.WriteString("fi\n\n")
-
-	b.WriteString("if [ -n \"${PLOY_SERVER_KEY_PEM:-}\" ]; then\n")
-	b.WriteString("  echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/server.key\n")
-	b.WriteString("  chmod 600 /etc/ploy/pki/server.key\n")
-	b.WriteString("fi\n\n")
+	// Leaf certificate and key are written later in primary/non-primary branches
+	// to match correct file names (server.* vs node.*).
 
 	// PostgreSQL installation
 	b.WriteString("if [ \"${PLOY_INSTALL_POSTGRESQL:-false}\" = \"true\" ]; then\n")
@@ -103,15 +96,35 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("fi\n\n")
 
 	// Write server config if this is a primary bootstrap
-	b.WriteString("if [ \"${PLOY_BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then\n")
-	b.WriteString("  echo 'Writing server configuration...'\n")
+	// Note: BOOTSTRAP_PRIMARY (without PLOY_ prefix) is the canonical toggle per docs/envs.
+	b.WriteString("if [ \"${BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then\n")
+	b.WriteString("  echo 'Writing server certificate and configuration...'\n")
+	b.WriteString("  if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt\n")
+	b.WriteString("    chmod 644 /etc/ploy/pki/server.crt\n")
+	b.WriteString("  fi\n")
+	b.WriteString("  if [ -n \"${PLOY_SERVER_KEY_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/server.key\n")
+	b.WriteString("    chmod 600 /etc/ploy/pki/server.key\n")
+	b.WriteString("  fi\n")
 	b.WriteString("  cat > /etc/ploy/ployd.yaml <<'EOF'\n")
+	b.WriteString("http:\n")
+	b.WriteString("  listen: :8443\n")
+	b.WriteString("  tls:\n")
+	b.WriteString("    enabled: true\n")
+	b.WriteString("    cert: /etc/ploy/pki/server.crt\n")
+	b.WriteString("    key: /etc/ploy/pki/server.key\n")
+	b.WriteString("    client_ca: /etc/ploy/pki/ca.crt\n")
+	b.WriteString("    require_client_cert: true\n")
+	b.WriteString("metrics:\n")
+	b.WriteString("  listen: :9100\n")
+	b.WriteString("control_plane:\n")
+	b.WriteString("  endpoint: https://127.0.0.1:8443\n")
+	b.WriteString("  ca: /etc/ploy/pki/ca.crt\n")
+	b.WriteString("  certificate: /etc/ploy/pki/server.crt\n")
+	b.WriteString("  key: /etc/ploy/pki/server.key\n")
 	b.WriteString("postgres:\n")
 	b.WriteString("  dsn: ${PLOY_SERVER_PG_DSN}\n")
-	b.WriteString("tls:\n")
-	b.WriteString("  ca_cert: /etc/ploy/pki/ca.crt\n")
-	b.WriteString("  cert: /etc/ploy/pki/server.crt\n")
-	b.WriteString("  key: /etc/ploy/pki/server.key\n")
 	b.WriteString("EOF\n\n")
 
 	// Install systemd unit for server
@@ -140,14 +153,28 @@ func PrefixedScript(env map[string]string) string {
 
 	// Write node config if this is NOT a primary bootstrap
 	b.WriteString("else\n")
-	b.WriteString("  echo 'Writing node configuration...'\n")
+	b.WriteString("  echo 'Writing node certificate and configuration...'\n")
+	b.WriteString("  if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/node.crt\n")
+	b.WriteString("    chmod 644 /etc/ploy/pki/node.crt\n")
+	b.WriteString("  fi\n")
+	b.WriteString("  if [ -n \"${PLOY_SERVER_KEY_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/node.key\n")
+	b.WriteString("    chmod 600 /etc/ploy/pki/node.key\n")
+	b.WriteString("  fi\n")
 	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<'EOF'\n")
-	b.WriteString("server:\n")
-	b.WriteString("  address: ${PLOY_SERVER_ADDRESS:-}\n")
-	b.WriteString("tls:\n")
-	b.WriteString("  ca_cert: /etc/ploy/pki/ca.crt\n")
-	b.WriteString("  cert: /etc/ploy/pki/node.crt\n")
-	b.WriteString("  key: /etc/ploy/pki/node.key\n")
+	b.WriteString("server_url: ${PLOY_SERVER_URL:-}\n")
+	b.WriteString("node_id: ${NODE_ID:-}\n")
+	b.WriteString("http:\n")
+	b.WriteString("  listen: :8444\n")
+	b.WriteString("  tls:\n")
+	b.WriteString("    enabled: true\n")
+	b.WriteString("    ca_path: /etc/ploy/pki/ca.crt\n")
+	b.WriteString("    cert_path: /etc/ploy/pki/node.crt\n")
+	b.WriteString("    key_path: /etc/ploy/pki/node.key\n")
+	b.WriteString("heartbeat:\n")
+	b.WriteString("  interval: 30s\n")
+	b.WriteString("  timeout: 10s\n")
 	b.WriteString("EOF\n\n")
 
 	// Install systemd unit for node
