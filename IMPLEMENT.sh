@@ -3,7 +3,7 @@ set -euo pipefail
 
 # IMPLEMENT automation runner (folder-aware)
 # - Operates on a target folder containing ROADMAP.md
-# - Uses RUST.md from monorepo root (where this script lives)
+# - Uses GOLANG.md from monorepo root (where this script lives)
 # - Calls Claude to implement next unchecked task and Codex to review
 # - Includes the last "## Summary" cut from .claude/loop/claude.log (in the target folder) in the Codex prompt
 
@@ -17,7 +17,7 @@ REF_MD="$TARGET_DIR/ROADMAP.md"
 GOLANG_MD_PATH="$MONO_ROOT/GOLANG.md"
 
 if [[ ! -f "$GOLANG_MD_PATH" ]]; then
-  echo "[implement] Could not find RUST.md at monorepo root: $GOLANG_MD_PATH" >&2
+  echo "[implement] Could not find GOLANG.md at monorepo root: $GOLANG_MD_PATH" >&2
   exit 1
 fi
 
@@ -108,9 +108,12 @@ build_prompt_impl() {
     echo
     echo "Constraints:"
     echo "- Strictly follow engineering rules in: $GOLANG_MD_PATH"
-    echo "- Scope ONLY this task; do not modify unrelated items/files."
+    echo "- Scope **ONLY** this task; **DO NOT** modify unrelated items/files."
     echo "- Make minimal, well-scoped changes; add/update tests as required."
-    echo "- Run relevant builds/tests locally before finishing."
+    echo "- **DO NOT** run repo-wide format/lint/race checks (pre-commit/CI handle these)."
+    echo "- **DO NOT** call 'goimports' or 'gofmt' directly; pre-commit applies formatting on commit."
+    echo "- Limit testing to fast unit/package tests for changed code (omit '-race' repo-wide)."
+    echo "- Keep output concise: delta-style summary (goal, files, tests, result)."
     echo "- When done, in ROADMAP.md change only that line's checkbox to '[x]'."
     echo
     echo "Reference files to read (do not inline contents):"
@@ -146,8 +149,12 @@ build_prompt_review() {
     echo
     echo "Goals:"
     echo "- Verify alignment with $GOLANG_MD_PATH."
-    echo "- Fix inconsistencies, tighten APIs, add/adjust tests if needed."
-    echo "- Run relevant builds/tests; ensure code compiles and tests pass."
+    echo "- You own repo-wide checks (summarize results, do not paste long logs):"
+    echo "  * go vet ./... && staticcheck ./..."
+    echo "  * go test -race ./..."
+    echo "- Do **NOT** call 'goimports' or 'gofmt' (pre-commit formats on commit)."
+    echo "- Add edge/fuzz/integration tests as needed; prefer minimal corrections over rewrites."
+    echo "- Keep log output compact: one-line status per tool + short delta (files changed, rationale)."
     echo "- Do not alter other unchecked items in ROADMAP.md."
     echo
     echo "Reference files to read (do not inline contents):"
@@ -181,6 +188,16 @@ commit_if_changes() {
 
 require_tools
 require_clean_tree
+
+# If managed git hooks are present, point core.hooksPath to .githooks so
+# formatting runs automatically on commits made by this script and developers.
+if [[ -d "$MONO_ROOT/.githooks" ]]; then
+  current_hooks_path="$(git -C "$REPO_DIR" config --get core.hooksPath || true)"
+  if [[ "$current_hooks_path" != ".githooks" ]]; then
+    echo "[implement] Configuring git hooks path to .githooks (one-time)."
+    git -C "$REPO_DIR" config core.hooksPath .githooks || true
+  fi
+fi
 
 while :; do
   require_clean_tree
