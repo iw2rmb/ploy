@@ -146,12 +146,10 @@ CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
-  patch      BYTEA NOT NULL,      -- expected gzipped (cap: 1 MiB)
+  patch      BYTEA NOT NULL CHECK (octet_length(patch) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-ALTER TABLE diffs
-  ADD CONSTRAINT IF NOT EXISTS diffs_patch_size_cap CHECK (octet_length(patch) <= 1048576);
 CREATE INDEX IF NOT EXISTS diffs_run_idx ON diffs(run_id);
 
 -- Logs (append-only, partitioned by time)
@@ -161,12 +159,10 @@ CREATE TABLE IF NOT EXISTS logs (
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
   build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
   chunk_no   INTEGER NOT NULL,
-  data       BYTEA NOT NULL,      -- expected gzipped (cap: 1 MiB)
+  data       BYTEA NOT NULL CHECK (octet_length(data) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
-ALTER TABLE ONLY logs
-  ADD CONSTRAINT IF NOT EXISTS logs_chunk_size_cap CHECK (octet_length(data) <= 1048576);
 
 -- Example current-month partition (create future partitions via a scheduler)
 -- CREATE TABLE IF NOT EXISTS logs_2025_10 PARTITION OF logs
@@ -182,11 +178,9 @@ CREATE TABLE IF NOT EXISTS artifact_bundles (
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
   build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
   name       TEXT,                -- optional logical name
-  bundle     BYTEA NOT NULL,      -- expected gzipped tar (cap: 1 MiB)
+  bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 ) PARTITION BY RANGE (created_at);
-ALTER TABLE ONLY artifact_bundles
-  ADD CONSTRAINT IF NOT EXISTS artifact_bundles_size_cap CHECK (octet_length(bundle) <= 1048576);
 
 -- Example partition stub
 -- CREATE TABLE IF NOT EXISTS artifact_bundles_2025_10 PARTITION OF artifact_bundles
@@ -214,7 +208,7 @@ CREATE TABLE IF NOT EXISTS node_metrics (
 
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
-  
+
 -- Advisory lock usage (documentation only)
 --   Assignment query sketch:
 --   WITH cte AS (
