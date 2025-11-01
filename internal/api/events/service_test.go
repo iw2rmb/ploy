@@ -1,14 +1,15 @@
 package events
 
 import (
-	"context"
-	"testing"
-	"time"
+    "context"
+    "testing"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
-	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
+    "github.com/google/uuid"
+    "github.com/iw2rmb/ploy/internal/node/logstream"
+    "github.com/iw2rmb/ploy/internal/store"
+    "github.com/jackc/pgx/v5/pgtype"
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestNew(t *testing.T) {
@@ -279,16 +280,19 @@ func TestCreateAndPublishEvent(t *testing.T) {
 			}
 
 			// Check if event was published to hub.
-			if tt.checkEvents {
-				streamID := uuidToString(tt.params.RunID)
-				snapshot := svc.Hub().Snapshot(streamID)
-				if len(snapshot) == 0 {
-					t.Fatal("expected event in hub snapshot, got none")
-				}
-				if snapshot[0].Type != "log" {
-					t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
-				}
-			}
+            if tt.checkEvents {
+                streamID := ""
+                if tt.params.RunID.Valid {
+                    streamID = uuid.UUID(tt.params.RunID.Bytes).String()
+                }
+                snapshot := svc.Hub().Snapshot(streamID)
+                if len(snapshot) == 0 {
+                    t.Fatal("expected event in hub snapshot, got none")
+                }
+                if snapshot[0].Type != "log" {
+                    t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
+                }
+            }
 		})
 	}
 }
@@ -393,16 +397,19 @@ func TestCreateAndPublishLog(t *testing.T) {
 			}
 
 			// Check if log was published to hub.
-			if tt.checkEvents {
-				streamID := uuidToString(tt.params.RunID)
-				snapshot := svc.Hub().Snapshot(streamID)
-				if len(snapshot) == 0 {
-					t.Fatal("expected log event in hub snapshot, got none")
-				}
-				if snapshot[0].Type != "log" {
-					t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
-				}
-			}
+            if tt.checkEvents {
+                streamID := ""
+                if tt.params.RunID.Valid {
+                    streamID = uuid.UUID(tt.params.RunID.Bytes).String()
+                }
+                snapshot := svc.Hub().Snapshot(streamID)
+                if len(snapshot) == 0 {
+                    t.Fatal("expected log event in hub snapshot, got none")
+                }
+                if snapshot[0].Type != "log" {
+                    t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
+                }
+            }
 		})
 	}
 }

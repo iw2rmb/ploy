@@ -1,15 +1,16 @@
 package events
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"log/slog"
-	"time"
+    "context"
+    "errors"
+    "fmt"
+    "log/slog"
+    "time"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
-	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgtype"
+    "github.com/google/uuid"
+    "github.com/iw2rmb/ploy/internal/node/logstream"
+    "github.com/iw2rmb/ploy/internal/store"
+    "github.com/jackc/pgx/v5/pgtype"
 )
 
 // Options configures the events service.
@@ -77,7 +78,8 @@ func (s *Service) Stop(ctx context.Context) error {
 
 // CreateAndPublishEvent persists an event to the database and publishes it to the SSE hub.
 // The runID is used as the streamID for SSE fanout.
-// Returns the created event from the database or an error if either operation fails.
+// Returns the created event from the database. If persistence fails, an error
+// is returned; SSE fanout errors are logged but do not fail the operation.
 func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
@@ -90,7 +92,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 	}
 
 	// Convert runID to string for streamID.
-	streamID := uuidToString(params.RunID)
+    streamID := uuidToString(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
@@ -121,7 +123,7 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 	}
 
 	// Convert runID to string for streamID.
-	streamID := uuidToString(params.RunID)
+    streamID := uuidToString(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
@@ -166,24 +168,18 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 
 // uuidToString converts a pgtype.UUID to its string representation.
 // Returns empty string if the UUID is invalid or null.
-func uuidToString(uuid pgtype.UUID) string {
-	if !uuid.Valid {
-		return ""
-	}
-	// Format as standard UUID string.
-	return fmt.Sprintf("%x-%x-%x-%x-%x",
-		uuid.Bytes[0:4],
-		uuid.Bytes[4:6],
-		uuid.Bytes[6:8],
-		uuid.Bytes[8:10],
-		uuid.Bytes[10:16])
+func uuidToString(id pgtype.UUID) string {
+    if !id.Valid {
+        return ""
+    }
+    return uuid.UUID(id.Bytes).String()
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.
 // Returns empty string if the timestamp is invalid or null.
 func timestampToString(ts pgtype.Timestamptz) string {
-	if !ts.Valid {
-		return time.Now().Format(time.RFC3339)
-	}
-	return ts.Time.Format(time.RFC3339)
+    if !ts.Valid {
+        return ""
+    }
+    return ts.Time.Format(time.RFC3339)
 }
