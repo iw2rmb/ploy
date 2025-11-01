@@ -222,6 +222,67 @@ func TestCreateTarGzBundle_MultipleFiles(t *testing.T) {
 	}
 }
 
+func TestCreateTarGzBundle_DirectoryRecursive(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create directory tree: rootDir/{a.txt, sub/b.txt}
+	rootDir := filepath.Join(tmpDir, "root")
+	if err := os.MkdirAll(filepath.Join(rootDir, "sub"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	aPath := filepath.Join(rootDir, "a.txt")
+	bPath := filepath.Join(rootDir, "sub", "b.txt")
+	aContent := []byte("A")
+	bContent := []byte("B")
+	if err := os.WriteFile(aPath, aContent, 0o600); err != nil {
+		t.Fatalf("write a: %v", err)
+	}
+	if err := os.WriteFile(bPath, bContent, 0o600); err != nil {
+		t.Fatalf("write b: %v", err)
+	}
+
+	bundleBytes, err := createTarGzBundle([]string{rootDir})
+	if err != nil {
+		t.Fatalf("create bundle: %v", err)
+	}
+
+	gzReader, err := gzip.NewReader(bytes.NewReader(bundleBytes))
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+	tr := tar.NewReader(gzReader)
+
+	got := map[string][]byte{}
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar read: %v", err)
+		}
+		// Skip dir headers when reading content
+		if hdr.FileInfo().IsDir() {
+			continue
+		}
+		data, err := io.ReadAll(tr)
+		if err != nil {
+			t.Fatalf("read file: %v", err)
+		}
+		got[hdr.Name] = data
+	}
+
+	// Expect names include the base directory name
+	wantA := filepath.Join("root", "a.txt")
+	wantB := filepath.Join("root", "sub", "b.txt")
+	if !bytes.Equal(got[wantA], aContent) {
+		t.Fatalf("content %s mismatch", wantA)
+	}
+	if !bytes.Equal(got[wantB], bContent) {
+		t.Fatalf("content %s mismatch", wantB)
+	}
+}
+
 func TestCreateTarGzBundle_NonExistentFile(t *testing.T) {
 	// Try to bundle a non-existent file.
 	_, err := createTarGzBundle([]string{"/nonexistent/file.txt"})
