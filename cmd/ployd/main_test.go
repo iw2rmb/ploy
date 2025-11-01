@@ -295,6 +295,11 @@ type mockStore struct {
 	deleteRunParams pgtype.UUID
 	deleteRunErr    error
 
+	claimRunCalled bool
+	claimRunParams pgtype.UUID
+	claimRunResult store.Run
+	claimRunErr    error
+
 	getNodeCalled bool
 	getNodeParams pgtype.UUID
 	getNodeResult store.Node
@@ -387,6 +392,12 @@ func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 	m.deleteRunCalled = true
 	m.deleteRunParams = id
 	return m.deleteRunErr
+}
+
+func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run, error) {
+	m.claimRunCalled = true
+	m.claimRunParams = nodeID
+	return m.claimRunResult, m.claimRunErr
 }
 
 func (m *mockStore) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
@@ -2961,6 +2972,278 @@ func TestHeartbeatHandler_UpdateError(t *testing.T) {
 	}
 	if !mockSt.updateNodeHeartbeatCalled {
 		t.Fatal("expected UpdateNodeHeartbeat to be called")
+	}
+}
+
+func TestClaimRunHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	modID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		claimRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status: store.RunStatusAssigned,
+			NodeID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			StartedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC().Add(-5 * time.Minute),
+				Valid: true,
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun to be called")
+	}
+
+	// Verify response body contains the claimed run.
+	var resp struct {
+		ID        string  `json:"id"`
+		ModID     string  `json:"mod_id"`
+		Status    string  `json:"status"`
+		NodeID    string  `json:"node_id"`
+		BaseRef   string  `json:"base_ref"`
+		TargetRef string  `json:"target_ref"`
+		CommitSha *string `json:"commit_sha,omitempty"`
+		StartedAt string  `json:"started_at"`
+		CreatedAt string  `json:"created_at"`
+	}
+
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.ID != runID.String() {
+		t.Errorf("expected run_id=%s, got %s", runID.String(), resp.ID)
+	}
+	if resp.ModID != modID.String() {
+		t.Errorf("expected mod_id=%s, got %s", modID.String(), resp.ModID)
+	}
+	if resp.Status != string(store.RunStatusAssigned) {
+		t.Errorf("expected status=assigned, got %s", resp.Status)
+	}
+	if resp.NodeID != nodeID.String() {
+		t.Errorf("expected node_id=%s, got %s", nodeID.String(), resp.NodeID)
+	}
+	if resp.BaseRef != "main" {
+		t.Errorf("expected base_ref=main, got %s", resp.BaseRef)
+	}
+	if resp.TargetRef != "feature-branch" {
+		t.Errorf("expected target_ref=feature-branch, got %s", resp.TargetRef)
+	}
+}
+
+func TestClaimRunHandler_NoRunsAvailable(t *testing.T) {
+	nodeID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		claimRunErr: pgx.ErrNoRows,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun to be called")
+	}
+}
+
+func TestClaimRunHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//claim", nil)
+	req.SetPathValue("id", "")
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id path parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+	if mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun not to be called")
+	}
+}
+
+func TestClaimRunHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/not-a-uuid/claim", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+	if mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun not to be called")
+	}
+}
+
+func TestClaimRunHandler_NodeNotFound(t *testing.T) {
+	nodeID := uuid.New()
+
+	mockSt := &mockStore{
+		getNodeErr: pgx.ErrNoRows,
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "node not found") {
+		t.Errorf("expected error about node not found, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun not to be called after GetNode failed")
+	}
+}
+
+func TestClaimRunHandler_ClaimError(t *testing.T) {
+	nodeID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		claimRunErr: &pgconn.PgError{Code: "08000"},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := claimRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to claim run") {
+		t.Errorf("expected error about claim failure, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.claimRunCalled {
+		t.Fatal("expected ClaimRun to be called")
 	}
 }
 

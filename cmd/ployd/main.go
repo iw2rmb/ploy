@@ -221,6 +221,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 
 	// Register node heartbeat endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
+	// Register node claim endpoint (node agents pull work).
+	httpSrv.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st), auth.RoleWorker)
 	// Register node events endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	// Register node diff upload endpoint (node agents).
@@ -1234,6 +1236,94 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 			"mem_free_mb", req.MemFreeMB,
 			"disk_free_mb", req.DiskFreeMB,
 			"version", req.Version,
+		)
+	}
+}
+
+// claimRunHandler allows nodes to claim a queued run for execution.
+// Returns the assigned run or 204 No Content if no runs are available.
+func claimRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract node id from path parameter.
+		nodeIDStr := r.PathValue("id")
+		if strings.TrimSpace(nodeIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate node_id.
+		nodeUUID, err := uuid.Parse(nodeIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Verify node exists before attempting to claim a run.
+		_, err = st.GetNode(r.Context(), pgtype.UUID{
+			Bytes: nodeUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "node not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			slog.Error("claim run: node check failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Attempt to claim a run using FOR UPDATE SKIP LOCKED.
+		run, err := st.ClaimRun(r.Context(), pgtype.UUID{
+			Bytes: nodeUUID,
+			Valid: true,
+		})
+		if err != nil {
+			// No queued runs available is a valid state; return 204 No Content.
+			if errors.Is(err, pgx.ErrNoRows) {
+				w.WriteHeader(http.StatusNoContent)
+				slog.Debug("claim run: no queued runs available", "node_id", nodeIDStr)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to claim run: %v", err), http.StatusInternalServerError)
+			slog.Error("claim run: database error", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Build response with claimed run details.
+		resp := struct {
+			ID        string  `json:"id"`
+			ModID     string  `json:"mod_id"`
+			Status    string  `json:"status"`
+			NodeID    string  `json:"node_id"`
+			BaseRef   string  `json:"base_ref"`
+			TargetRef string  `json:"target_ref"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			StartedAt string  `json:"started_at"`
+			CreatedAt string  `json:"created_at"`
+		}{
+			ID:        uuid.UUID(run.ID.Bytes).String(),
+			ModID:     uuid.UUID(run.ModID.Bytes).String(),
+			Status:    string(run.Status),
+			NodeID:    uuid.UUID(run.NodeID.Bytes).String(),
+			BaseRef:   run.BaseRef,
+			TargetRef: run.TargetRef,
+			CommitSha: run.CommitSha,
+			StartedAt: run.StartedAt.Time.Format(time.RFC3339Nano),
+			CreatedAt: run.CreatedAt.Time.Format(time.RFC3339Nano),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("claim run: encode response failed", "err", err)
+		}
+
+		slog.Info("run claimed",
+			"run_id", resp.ID,
+			"node_id", nodeIDStr,
+			"mod_id", resp.ModID,
+			"status", resp.Status,
 		)
 	}
 }
