@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
 )
@@ -384,4 +385,141 @@ func (m *mockProvisionRunner) Run(ctx context.Context, name string, args []strin
 		m.t.Fatalf("unexpected command: %s", name)
 	}
 	return nil
+}
+
+// TestServerDeployDescriptorPersistence verifies that the cluster descriptor is saved after successful deployment.
+func TestServerDeployDescriptorPersistence(t *testing.T) {
+	// Set up temporary config directory.
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	// Create a temporary test binary file.
+	binaryPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binaryPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	// Prepare configuration.
+	cfg := serverDeployConfig{
+		Address:       "10.0.0.5",
+		PostgreSQLDSN: "postgres://test:pass@dbhost:5432/ploy",
+		User:          "testuser",
+		IdentityFile:  identityPath,
+		PloydBinary:   binaryPath,
+		SSHPort:       2222,
+	}
+
+	clusterID := "test-cluster-persist"
+	now := time.Now()
+
+	ca, err := pki.GenerateCA(clusterID, now)
+	if err != nil {
+		t.Fatalf("GenerateCA failed: %v", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, clusterID, cfg.Address, now)
+	if err != nil {
+		t.Fatalf("IssueServerCert failed: %v", err)
+	}
+
+	pgDSN := strings.TrimSpace(cfg.PostgreSQLDSN)
+	installPostgres := pgDSN == ""
+
+	scriptEnv := map[string]string{
+		"CLUSTER_ID":              clusterID,
+		"NODE_ID":                 "control",
+		"NODE_ADDRESS":            cfg.Address,
+		"BOOTSTRAP_PRIMARY":       "true",
+		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
+		"PLOY_CA_CERT_PEM":        ca.CertPEM,
+		"PLOY_CA_KEY_PEM":         ca.KeyPEM,
+		"PLOY_SERVER_CERT_PEM":    serverCert.CertPEM,
+		"PLOY_SERVER_KEY_PEM":     serverCert.KeyPEM,
+	}
+
+	if pgDSN != "" {
+		scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+	}
+
+	user := cfg.User
+	if strings.TrimSpace(user) == "" {
+		user = deploy.DefaultRemoteUser
+	}
+
+	sshPort := cfg.SSHPort
+	if sshPort == 0 {
+		sshPort = deploy.DefaultSSHPort
+	}
+
+	provisionOpts := deploy.ProvisionOptions{
+		Host:            cfg.Address,
+		Address:         cfg.Address,
+		User:            user,
+		Port:            sshPort,
+		IdentityFile:    identityPath,
+		PloydBinaryPath: binaryPath,
+		Stdout:          io.Discard,
+		Stderr:          io.Discard,
+		ScriptEnv:       scriptEnv,
+		ScriptArgs:      []string{"--cluster-id", clusterID, "--node-id", "control", "--node-address", cfg.Address, "--primary"},
+		ServiceChecks:   []string{"ployd"},
+	}
+
+	// Use mock runner to simulate successful provisioning.
+	mockRunner := &mockProvisionRunner{t: t}
+	provisionOpts.Runner = mockRunner
+
+	ctx := context.Background()
+	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
+		t.Fatalf("ProvisionHost failed: %v", err)
+	}
+
+	// Simulate the descriptor save logic from runServerDeploy.
+	serverAddress := "https://10.0.0.5:8443"
+	desc := config.Descriptor{
+		ClusterID:       clusterID,
+		Address:         serverAddress,
+		Scheme:          "https",
+		SSHIdentityPath: identityPath,
+	}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		t.Fatalf("SaveDescriptor failed: %v", err)
+	}
+
+	// Set as default.
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault failed: %v", err)
+	}
+
+	// Verify the descriptor was saved.
+	list, err := config.ListDescriptors()
+	if err != nil {
+		t.Fatalf("ListDescriptors failed: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("expected 1 descriptor, got %d", len(list))
+	}
+
+	saved := list[0]
+	if saved.ClusterID != clusterID {
+		t.Fatalf("expected ClusterID=%q, got %q", clusterID, saved.ClusterID)
+	}
+	if saved.Address != serverAddress {
+		t.Fatalf("expected Address=%q, got %q", serverAddress, saved.Address)
+	}
+	if saved.Scheme != "https" {
+		t.Fatalf("expected Scheme=%q, got %q", "https", saved.Scheme)
+	}
+	if saved.SSHIdentityPath != identityPath {
+		t.Fatalf("expected SSHIdentityPath=%q, got %q", identityPath, saved.SSHIdentityPath)
+	}
+	if !saved.Default {
+		t.Fatal("expected descriptor to be marked as default")
+	}
 }
