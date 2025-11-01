@@ -85,7 +85,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Bootstrap Script (Replace stub)
 - [x] Teach `internal/bootstrap.PrefixedScript` to render a functional body:
-  - [ ] Create `/etc/ploy` and `/etc/ploy/pki`; write CA/server certs from env.
+  - [x] Create `/etc/ploy` and `/etc/ploy/pki`; write CA/server certs from env.
   - [ ] When `PLOY_INSTALL_POSTGRESQL=true`, install PostgreSQL packages.
   - [ ] Create DB user/db `ploy` with password; derive DSN and export `PLOY_SERVER_PG_DSN`.
   - [ ] Write server config `/etc/ploy/ployd.yaml` (postgres.dsn + TLS paths).
