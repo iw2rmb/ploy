@@ -68,6 +68,12 @@ func (s *controlPlaneServer) handleRunsSubpath(w http.ResponseWriter, r *http.Re
 		s.handleRunsEvents(w, r, runID)
 	case "timing":
 		s.handleRunsTiming(w, r, runID)
+	case "diffs":
+		s.handleRunsDiffs(w, r, runID)
+	case "logs":
+		s.handleRunsLogs(w, r, runID)
+	case "artifact_bundles":
+		s.handleRunsArtifactBundles(w, r, runID)
 	default:
 		http.NotFound(w, r)
 	}
