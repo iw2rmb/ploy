@@ -3,6 +3,16 @@ get:
   summary: List runs
   parameters:
     - in: query
+      name: view
+      schema:
+        type: string
+        enum: [timing]
+      required: false
+      description: |
+        Alternate view for this collection. When set to `timing`,
+        the response body contains a `timings` array with queue/run durations
+        instead of the default `runs` array.
+    - in: query
       name: mod_id
       schema: { type: string, format: uuid }
       required: false
@@ -20,12 +30,15 @@ get:
       content:
         application/json:
           schema:
-            type: object
-            properties:
-              runs:
-                type: array
-                items:
-                  $ref: '../components/schemas/controlplane.yaml#/Run'
+            oneOf:
+              - type: object
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: '../components/schemas/controlplane.yaml#/Run'
+                required: [runs]
+              - $ref: '../components/schemas/controlplane.yaml#/ListRunsTimingsResponse'
 post:
   tags: [Control]
   summary: Create run
@@ -42,4 +55,3 @@ post:
         application/json:
           schema:
             $ref: '../components/schemas/controlplane.yaml#/CreateRunResponse'
-

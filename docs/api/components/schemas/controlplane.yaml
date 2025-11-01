@@ -93,3 +93,19 @@ Stage:
     meta: {}
   required: [id, run_id, name, status, duration_ms]
 
+RunTiming:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    queue_ms: { type: integer, format: int64 }
+    run_ms: { type: integer, format: int64 }
+  required: [id, queue_ms, run_ms]
+
+ListRunsTimingsResponse:
+  type: object
+  properties:
+    timings:
+      type: array
+      items:
+        $ref: '#/RunTiming'
+  required: [timings]

@@ -41,10 +41,16 @@ DELETE FROM runs
 WHERE id = $1;
 
 -- name: GetRunTiming :one
-SELECT * FROM runs_timing
+SELECT id,
+       COALESCE(queue_ms, 0) AS queue_ms,
+       COALESCE(run_ms, 0)   AS run_ms
+FROM runs_timing
 WHERE id = $1;
 
 -- name: ListRunsTimings :many
-SELECT * FROM runs_timing
+SELECT id,
+       COALESCE(queue_ms, 0) AS queue_ms,
+       COALESCE(run_ms, 0)   AS run_ms
+FROM runs_timing
 ORDER BY id DESC
 LIMIT $1 OFFSET $2;
