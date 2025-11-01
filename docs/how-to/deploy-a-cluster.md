@@ -33,7 +33,8 @@ This command:
 - Issues a server TLS certificate with appropriate SANs.
 - Creates a `cluster_id` and records it in PostgreSQL and `/etc/ploy/cluster-id`.
 - If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS and creates database `ploy`.
-- Bootstraps the `ployd` systemd unit with `PLOY_SERVER_PG_DSN`.
+- Writes server configuration to `/etc/ploy/ployd.yaml` (includes `http.tls` cert/key/CA paths and `postgres.dsn: ${PLOY_SERVER_PG_DSN}`).
+- Bootstraps the `ployd` systemd unit with `PLOY_SERVER_PG_DSN` and sets `PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml`.
 
 **Optional flags:**
 - `--postgresql-dsn <dsn>` — Use an external PostgreSQL instance instead of installing locally.
