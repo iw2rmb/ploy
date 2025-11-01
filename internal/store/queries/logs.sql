@@ -7,14 +7,29 @@ SELECT * FROM logs
 WHERE run_id = $1
 ORDER BY chunk_no ASC;
 
+-- name: ListLogsByRunSince :many
+SELECT * FROM logs
+WHERE run_id = $1 AND id > $2
+ORDER BY chunk_no ASC;
+
 -- name: ListLogsByRunAndStage :many
 SELECT * FROM logs
 WHERE run_id = $1 AND stage_id = $2
 ORDER BY chunk_no ASC;
 
+-- name: ListLogsByRunAndStageSince :many
+SELECT * FROM logs
+WHERE run_id = $1 AND stage_id = $2 AND id > $3
+ORDER BY chunk_no ASC;
+
 -- name: ListLogsByRunStageAndBuild :many
 SELECT * FROM logs
 WHERE run_id = $1 AND stage_id = $2 AND build_id = $3
+ORDER BY chunk_no ASC;
+
+-- name: ListLogsByRunStageAndBuildSince :many
+SELECT * FROM logs
+WHERE run_id = $1 AND stage_id = $2 AND build_id = $3 AND id > $4
 ORDER BY chunk_no ASC;
 
 -- name: CreateLog :one
