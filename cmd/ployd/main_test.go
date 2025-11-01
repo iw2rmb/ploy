@@ -249,6 +249,20 @@ type mockStore struct {
 	listReposCalled bool
 	listReposResult []store.Repo
 	listReposErr    error
+
+	createModCalled bool
+	createModParams store.CreateModParams
+	createModResult store.Mod
+	createModErr    error
+
+	listModsCalled bool
+	listModsResult []store.Mod
+	listModsErr    error
+
+	listModsByRepoCalled bool
+	listModsByRepoParams pgtype.UUID
+	listModsByRepoResult []store.Mod
+	listModsByRepoErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -266,6 +280,23 @@ func (m *mockStore) CreateRepo(ctx context.Context, params store.CreateRepoParam
 func (m *mockStore) ListRepos(ctx context.Context) ([]store.Repo, error) {
 	m.listReposCalled = true
 	return m.listReposResult, m.listReposErr
+}
+
+func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams) (store.Mod, error) {
+	m.createModCalled = true
+	m.createModParams = params
+	return m.createModResult, m.createModErr
+}
+
+func (m *mockStore) ListMods(ctx context.Context) ([]store.Mod, error) {
+	m.listModsCalled = true
+	return m.listModsResult, m.listModsErr
+}
+
+func (m *mockStore) ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]store.Mod, error) {
+	m.listModsByRepoCalled = true
+	m.listModsByRepoParams = repoID
+	return m.listModsByRepoResult, m.listModsByRepoErr
 }
 
 // no-op
@@ -854,6 +885,427 @@ func TestListReposHandler_DatabaseError(t *testing.T) {
 		t.Fatalf("expected status 500, got %d", rr.Code)
 	}
 	if !strings.Contains(rr.Body.String(), "failed to list repositories") {
+		t.Errorf("expected error message about database error, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateModHandler_Success(t *testing.T) {
+	modID := uuid.New()
+	repoID := uuid.New()
+	createdBy := "user@example.com"
+	now := time.Now()
+	specJSON := []byte(`{"stages":["build","test"]}`)
+
+	mockSt := &mockStore{
+		createModResult: store.Mod{
+			ID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			RepoID: pgtype.UUID{
+				Bytes: repoID,
+				Valid: true,
+			},
+			Spec:      specJSON,
+			CreatedBy: &createdBy,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  now,
+				Valid: true,
+			},
+		},
+	}
+
+	reqBody := map[string]interface{}{
+		"repo_id":    repoID.String(),
+		"spec":       json.RawMessage(specJSON),
+		"created_by": createdBy,
+	}
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader(reqJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		ID        string          `json:"id"`
+		RepoID    string          `json:"repo_id"`
+		Spec      json.RawMessage `json:"spec"`
+		CreatedBy *string         `json:"created_by"`
+		CreatedAt string          `json:"created_at"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.ID != modID.String() {
+		t.Errorf("expected id %s, got %s", modID.String(), resp.ID)
+	}
+	if resp.RepoID != repoID.String() {
+		t.Errorf("expected repo_id %s, got %s", repoID.String(), resp.RepoID)
+	}
+	if resp.CreatedBy == nil || *resp.CreatedBy != createdBy {
+		t.Errorf("expected created_by %s, got %v", createdBy, resp.CreatedBy)
+	}
+
+	if !mockSt.createModCalled {
+		t.Fatal("expected CreateMod to be called")
+	}
+	if uuid.UUID(mockSt.createModParams.RepoID.Bytes) != repoID {
+		t.Errorf("expected repo_id %s, got %s", repoID.String(), uuid.UUID(mockSt.createModParams.RepoID.Bytes).String())
+	}
+}
+
+func TestCreateModHandler_InvalidJSON(t *testing.T) {
+	mockSt := &mockStore{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader([]byte("invalid json")))
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid request") {
+		t.Errorf("expected error message about invalid request, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateModHandler_EmptyRepoID(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"repo_id": "  ",
+		"spec":    json.RawMessage(`{}`),
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "repo_id field is required") {
+		t.Errorf("expected error message about repo_id required, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateModHandler_InvalidRepoID(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"repo_id": "not-a-uuid",
+		"spec":    json.RawMessage(`{}`),
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid repo_id") {
+		t.Errorf("expected error message about invalid repo_id, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateModHandler_EmptySpec(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"repo_id": uuid.New().String(),
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "spec field is required") {
+		t.Errorf("expected error message about spec required, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateModHandler_RepoNotFound(t *testing.T) {
+	mockSt := &mockStore{
+		createModErr: &pgconn.PgError{Code: "23503"},
+	}
+
+	reqBody := map[string]interface{}{
+		"repo_id": uuid.New().String(),
+		"spec":    json.RawMessage(`{}`),
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/crud", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createModHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "repository not found") {
+		t.Errorf("expected error message about repository not found, got: %s", rr.Body.String())
+	}
+}
+
+func TestListModsHandler_AllMods(t *testing.T) {
+	mod1ID := uuid.New()
+	mod2ID := uuid.New()
+	repo1ID := uuid.New()
+	repo2ID := uuid.New()
+	now := time.Now()
+	spec1 := []byte(`{"stages":["build"]}`)
+	spec2 := []byte(`{"stages":["test"]}`)
+
+	mockSt := &mockStore{
+		listModsResult: []store.Mod{
+			{
+				ID: pgtype.UUID{
+					Bytes: mod1ID,
+					Valid: true,
+				},
+				RepoID: pgtype.UUID{
+					Bytes: repo1ID,
+					Valid: true,
+				},
+				Spec:      spec1,
+				CreatedBy: nil,
+				CreatedAt: pgtype.Timestamptz{
+					Time:  now,
+					Valid: true,
+				},
+			},
+			{
+				ID: pgtype.UUID{
+					Bytes: mod2ID,
+					Valid: true,
+				},
+				RepoID: pgtype.UUID{
+					Bytes: repo2ID,
+					Valid: true,
+				},
+				Spec:      spec2,
+				CreatedBy: nil,
+				CreatedAt: pgtype.Timestamptz{
+					Time:  now.Add(-1 * time.Hour),
+					Valid: true,
+				},
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud", nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var wrapper struct {
+		Mods []struct {
+			ID        string          `json:"id"`
+			RepoID    string          `json:"repo_id"`
+			Spec      json.RawMessage `json:"spec"`
+			CreatedBy *string         `json:"created_by,omitempty"`
+			CreatedAt string          `json:"created_at"`
+		} `json:"mods"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&wrapper); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(wrapper.Mods) != 2 {
+		t.Fatalf("expected 2 mods, got %d", len(wrapper.Mods))
+	}
+
+	if wrapper.Mods[0].ID != mod1ID.String() {
+		t.Errorf("expected first mod id %s, got %s", mod1ID.String(), wrapper.Mods[0].ID)
+	}
+	if wrapper.Mods[1].ID != mod2ID.String() {
+		t.Errorf("expected second mod id %s, got %s", mod2ID.String(), wrapper.Mods[1].ID)
+	}
+
+	if !mockSt.listModsCalled {
+		t.Fatal("expected ListMods to be called")
+	}
+}
+
+func TestListModsHandler_ByRepoID(t *testing.T) {
+	modID := uuid.New()
+	repoID := uuid.New()
+	now := time.Now()
+	spec := []byte(`{"stages":["build"]}`)
+	createdBy := "user@example.com"
+
+	mockSt := &mockStore{
+		listModsByRepoResult: []store.Mod{
+			{
+				ID: pgtype.UUID{
+					Bytes: modID,
+					Valid: true,
+				},
+				RepoID: pgtype.UUID{
+					Bytes: repoID,
+					Valid: true,
+				},
+				Spec:      spec,
+				CreatedBy: &createdBy,
+				CreatedAt: pgtype.Timestamptz{
+					Time:  now,
+					Valid: true,
+				},
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud?repo_id="+repoID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var wrapper struct {
+		Mods []struct {
+			ID        string          `json:"id"`
+			RepoID    string          `json:"repo_id"`
+			Spec      json.RawMessage `json:"spec"`
+			CreatedBy *string         `json:"created_by,omitempty"`
+			CreatedAt string          `json:"created_at"`
+		} `json:"mods"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&wrapper); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(wrapper.Mods) != 1 {
+		t.Fatalf("expected 1 mod, got %d", len(wrapper.Mods))
+	}
+
+	if wrapper.Mods[0].ID != modID.String() {
+		t.Errorf("expected mod id %s, got %s", modID.String(), wrapper.Mods[0].ID)
+	}
+	if wrapper.Mods[0].RepoID != repoID.String() {
+		t.Errorf("expected repo_id %s, got %s", repoID.String(), wrapper.Mods[0].RepoID)
+	}
+
+	if !mockSt.listModsByRepoCalled {
+		t.Fatal("expected ListModsByRepo to be called")
+	}
+	if uuid.UUID(mockSt.listModsByRepoParams.Bytes) != repoID {
+		t.Errorf("expected repo_id param %s, got %s", repoID.String(), uuid.UUID(mockSt.listModsByRepoParams.Bytes).String())
+	}
+}
+
+func TestListModsHandler_InvalidRepoID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud?repo_id=not-a-uuid", nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid repo_id") {
+		t.Errorf("expected error message about invalid repo_id, got: %s", rr.Body.String())
+	}
+}
+
+func TestListModsHandler_EmptyList(t *testing.T) {
+	mockSt := &mockStore{
+		listModsResult: []store.Mod{},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud", nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rr.Code)
+	}
+
+	var resp struct {
+		Mods []struct {
+			ID        string          `json:"id"`
+			RepoID    string          `json:"repo_id"`
+			Spec      json.RawMessage `json:"spec"`
+			CreatedBy *string         `json:"created_by,omitempty"`
+			CreatedAt string          `json:"created_at"`
+		} `json:"mods"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if len(resp.Mods) != 0 {
+		t.Fatalf("expected empty list, got %d mods", len(resp.Mods))
+	}
+}
+
+func TestListModsHandler_DatabaseError(t *testing.T) {
+	mockSt := &mockStore{
+		listModsErr: context.DeadlineExceeded,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud", nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "failed to list mods") {
+		t.Errorf("expected error message about database error, got: %s", rr.Body.String())
+	}
+}
+
+func TestListModsHandler_DatabaseErrorByRepo(t *testing.T) {
+	mockSt := &mockStore{
+		listModsByRepoErr: context.DeadlineExceeded,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/crud?repo_id="+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	handler := listModsHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "failed to list mods") {
 		t.Errorf("expected error message about database error, got: %s", rr.Body.String())
 	}
 }
