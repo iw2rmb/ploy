@@ -17,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/scheduler"
 	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/store"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -47,8 +48,8 @@ var (
 )
 
 func init() {
-    prometheus.MustRegister(artifactRequestsTotal, artifactPayloadBytes)
-    prometheus.MustRegister(configRequestsTotal, configUpdatesTotal, beaconRequestsTotal)
+	prometheus.MustRegister(artifactRequestsTotal, artifactPayloadBytes)
+	prometheus.MustRegister(configRequestsTotal, configUpdatesTotal, beaconRequestsTotal)
 }
 
 // Server exposes the control-plane scheduler over HTTP.
@@ -65,7 +66,8 @@ type controlPlaneServer struct {
 	cfgStore          *config.Store
 	transfers         *transfers.Manager
 	artifacts         *controlplaneartifacts.Store
-    	artifactPublisher artifactPublisher
+	artifactPublisher artifactPublisher
+	store             store.Store
 }
 
 type artifactPublisher interface {
@@ -88,7 +90,8 @@ type ControlPlaneOptions struct {
 	Authorizer        *auth.Authorizer
 	Transfers         *transfers.Manager
 	ArtifactStore     *controlplaneartifacts.Store
-    	ArtifactPublisher artifactPublisher
+	ArtifactPublisher artifactPublisher
+	Store             store.Store
 }
 
 // New returns an HTTP handler rooted at /v1.
@@ -129,8 +132,6 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		}
 	}
 
-    
-
 	h := &controlPlaneServer{
 		scheduler:         opts.Scheduler,
 		signer:            opts.Signer,
@@ -144,8 +145,8 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		cfgStore:          cfgStore,
 		transfers:         opts.Transfers,
 		artifacts:         artStore,
-            artifactPublisher: opts.ArtifactPublisher,
-        
+		artifactPublisher: opts.ArtifactPublisher,
+		store:             opts.Store,
 	}
 	if h.rotations == nil && opts.Signer != nil {
 		h.rotations = events.NewRotationHub(context.Background(), opts.Signer)
@@ -177,9 +178,9 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPut, "/v1/gitlab/signer/secrets", h.handleSignerSecrets, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodPost, "/v1/gitlab/signer/tokens", h.handleSignerTokens, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/gitlab/signer/rotations", h.handleSignerRotations, httpsecurity.ScopeAdmin)
-    h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
-    // Subpath handler for node-specific actions (e.g., PATCH /v1/nodes/{id}).
-    h.registerRoute(mux, "", "/v1/nodes/", h.handleNodeSubpath)
+	h.registerRoute(mux, "", "/v1/nodes", h.handleNodes)
+	// Subpath handler for node-specific actions (e.g., PATCH /v1/nodes/{id}).
+	h.registerRoute(mux, "", "/v1/nodes/", h.handleNodeSubpath)
 	h.registerRoute(mux, "", "/v1/config/gitlab", h.handleGitLabConfig, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, "", "/v1/config", h.handleClusterConfig, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, httpsecurity.ScopeAdmin)
@@ -195,13 +196,13 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
 	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, "", "/v1/artifacts/", h.handleArtifactsSubpath)
-    // v2 artifacts (HTTPS direct uploads): alias v2 to v1 handlers during migration.
-    h.registerRoute(mux, http.MethodPost, "/v2/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
-    h.registerRoute(mux, http.MethodGet, "/v2/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
-    h.registerRoute(mux, "", "/v2/artifacts/", h.handleArtifactsSubpath)
-    h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
-    h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
-    h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)
+	// v2 artifacts (HTTPS direct uploads): alias v2 to v1 handlers during migration.
+	h.registerRoute(mux, http.MethodPost, "/v2/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
+	h.registerRoute(mux, http.MethodGet, "/v2/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
+	h.registerRoute(mux, "", "/v2/artifacts/", h.handleArtifactsSubpath)
+	h.registerRoute(mux, http.MethodPost, "/v1/transfers/upload", h.handleTransfersUpload, httpsecurity.ScopeArtifactsWrite)
+	h.registerRoute(mux, http.MethodPost, "/v1/transfers/download", h.handleTransfersDownload, httpsecurity.ScopeArtifactsRead)
+	h.registerRoute(mux, http.MethodPost, "/v1/transfers/", h.handleTransfersSlotAction, httpsecurity.ScopeArtifactsWrite)
 	mux.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
 	return mux
 }
@@ -227,18 +228,18 @@ func (s *controlPlaneServer) registerRoute(mux *http.ServeMux, method, path stri
 }
 
 func (s *controlPlaneServer) routeRoles(path string) []string {
-    switch path {
-    case "/v1/nodes":
-        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
-    case "/v1/nodes/":
-        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
-    case "/v1/status":
-        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker}
-    case "/v1/security/ca":
-        return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
-    default:
-        return nil
-    }
+	switch path {
+	case "/v1/nodes":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+	case "/v1/nodes/":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+	case "/v1/status":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin, auth.RoleWorker}
+	case "/v1/security/ca":
+		return []string{auth.RoleControlPlane, auth.RoleCLIAdmin}
+	default:
+		return nil
+	}
 }
 
 func (s *controlPlaneServer) ensureEtcd(w http.ResponseWriter) bool {

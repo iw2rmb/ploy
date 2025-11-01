@@ -15,7 +15,7 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
 
 - [x] Add Postgres store scaffolding
   - [x] Introduce `sqlc.yaml`, `internal/store/migrations/` from SIMPLE.sql, and `internal/store/queries/`.
-  - [ ] Wire `pgx/v5` + `pgxpool` in server startup; inject store via interfaces.
+  - [x] Wire `pgx/v5` + `pgxpool` in server startup; inject store via interfaces.
 
 - [ ] PKI (mTLS) foundation
   - [ ] Implement cluster CA generation and server cert issuance.

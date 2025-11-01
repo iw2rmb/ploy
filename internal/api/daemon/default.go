@@ -35,10 +35,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/controlplane/transfers"
 	"github.com/iw2rmb/ploy/internal/etcdutil"
 	controlmetrics "github.com/iw2rmb/ploy/internal/metrics"
-	"github.com/iw2rmb/ploy/internal/node/lifecycle"
 	"github.com/iw2rmb/ploy/internal/node/jobs"
+	"github.com/iw2rmb/ploy/internal/node/lifecycle"
 	"github.com/iw2rmb/ploy/internal/node/logstream"
 	stepworker "github.com/iw2rmb/ploy/internal/node/worker/step"
+	"github.com/iw2rmb/ploy/internal/store"
 	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	workflowruntime "github.com/iw2rmb/ploy/internal/workflow/runtime"
 )
@@ -49,6 +50,7 @@ const (
 	envIPFSClusterUsername = "PLOY_IPFS_CLUSTER_USERNAME"
 	envIPFSClusterPassword = "PLOY_IPFS_CLUSTER_PASSWORD"
 	envLifecycleNetIgnore  = "PLOY_LIFECYCLE_NET_IGNORE"
+	envPostgresDSN         = "PLOY_POSTGRES_DSN"
 )
 
 // NewDefault constructs a daemon using default component implementations.
@@ -70,13 +72,27 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	})
 	adminSvc := buildAdminService()
 
-	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(cfg, streams)
+	// Initialize Postgres store if DSN is provided.
+	var pgStore store.Store
+	pgDSN := resolvePostgresDSN(cfg)
+	if pgDSN != "" {
+		var err error
+		pgStore, err = store.NewStore(context.Background(), pgDSN)
+		if err != nil {
+			return nil, fmt.Errorf("initialize postgres store: %w", err)
+		}
+	}
+
+	controlPlaneHandler, controlPlaneShutdown, err := buildControlPlaneHTTP(cfg, streams, pgStore)
 	if err != nil {
+		if pgStore != nil {
+			pgStore.Close()
+		}
 		return nil, err
 	}
 
-    // Node-local job tracker.
-    jobStore := jobs.NewStore(jobs.Options{})
+	// Node-local job tracker.
+	jobStore := jobs.NewStore(jobs.Options{})
 
 	metricsSrv := metrics.New(metrics.Options{Listen: cfg.Metrics.Listen})
 
@@ -94,17 +110,17 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-    workerExec, err := stepworker.FromConfig(cfg, streams, httpClient, jobStore)
-    if err != nil {
-        return nil, err
-    }
+	workerExec, err := stepworker.FromConfig(cfg, streams, httpClient, jobStore)
+	if err != nil {
+		return nil, err
+	}
 
-    exec := executor.New(executor.Options{
-        Registry:       registry,
-        DefaultAdapter: cfg.Runtime.DefaultAdapter,
-        LogStreams:     streams,
-        Worker:         workerExec,
-    })
+	exec := executor.New(executor.Options{
+		Registry:       registry,
+		DefaultAdapter: cfg.Runtime.DefaultAdapter,
+		LogStreams:     streams,
+		Worker:         workerExec,
+	})
 
 	controlClient, err := controlplane.New(controlplane.Options{
 		Config:     cfg.ControlPlane,
@@ -116,11 +132,17 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 
-    taskScheduler := scheduler.New()
+	taskScheduler := scheduler.New()
 
 	shutdownFns := make([]func(context.Context) error, 0, 4)
 	if controlPlaneShutdown != nil {
 		shutdownFns = append(shutdownFns, controlPlaneShutdown)
+	}
+	if pgStore != nil {
+		shutdownFns = append(shutdownFns, func(context.Context) error {
+			pgStore.Close()
+			return nil
+		})
 	}
 
 	nodeID := strings.TrimSpace(cfg.ControlPlane.NodeID)
@@ -134,17 +156,17 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 	}
 
 	ipfsChecker := buildIPFSChecker(cfg)
-    // Build gate readiness (Java executor): verify Maven image presence if Docker is available.
-    gateChecker := lifecycle.NewBuildGateJavaChecker(lifecycle.BuildGateJavaCheckerOptions{})
+	// Build gate readiness (Java executor): verify Maven image presence if Docker is available.
+	gateChecker := lifecycle.NewBuildGateJavaChecker(lifecycle.BuildGateJavaCheckerOptions{})
 
-    collector := lifecycle.NewCollector(lifecycle.Options{
-        Role:             role,
-        NodeID:           nodeID,
-        Docker:           dockerChecker,
-        Gate:             gateChecker,
-        IPFS:             ipfsChecker,
-        IgnoreInterfaces: lifecycleIgnoreInterfacesFrom(cfg),
-    })
+	collector := lifecycle.NewCollector(lifecycle.Options{
+		Role:             role,
+		NodeID:           nodeID,
+		Docker:           dockerChecker,
+		Gate:             gateChecker,
+		IPFS:             ipfsChecker,
+		IgnoreInterfaces: lifecycleIgnoreInterfacesFrom(cfg),
+	})
 
 	var publisher *lifecycle.Publisher
 	if etcdCfg, err := etcdutil.ConfigFromEnv(); err != nil {
@@ -183,32 +205,32 @@ func NewDefault(cfg config.Config) (*Daemon, error) {
 		}
 	}
 
-    // Build HTTP server after control client to wire job control.
-    httpSrv, err := httpserver.New(httpserver.Options{
-        Config:       cfg,
-        Streams:      streams,
-        Status:       statusProvider,
-        Admin:        adminSvc,
-        Jobs:         httpserver.NewJobProvider(jobStore),
-        JobControl:   &jobController{client: controlClient, store: jobStore},
-        ControlPlane: controlPlaneHandler,
-    })
-    if err != nil {
-        return nil, err
-    }
-    combinedShutdown := combineShutdowns(shutdownFns)
+	// Build HTTP server after control client to wire job control.
+	httpSrv, err := httpserver.New(httpserver.Options{
+		Config:       cfg,
+		Streams:      streams,
+		Status:       statusProvider,
+		Admin:        adminSvc,
+		Jobs:         httpserver.NewJobProvider(jobStore),
+		JobControl:   &jobController{client: controlClient, store: jobStore},
+		ControlPlane: controlPlaneHandler,
+	})
+	if err != nil {
+		return nil, err
+	}
+	combinedShutdown := combineShutdowns(shutdownFns)
 
-    svc, err := New(Options{
-        Config:               cfg,
-        RuntimeRegistry:      registry,
-        LogStreams:           streams,
-        HTTP:                 httpSrv,
-        Metrics:              metricsSrv,
-        ControlPlane:         controlClient,
-        PKI:                  pkiManager,
-        Scheduler:            taskScheduler,
-        ControlPlaneShutdown: combinedShutdown,
-    })
+	svc, err := New(Options{
+		Config:               cfg,
+		RuntimeRegistry:      registry,
+		LogStreams:           streams,
+		HTTP:                 httpSrv,
+		Metrics:              metricsSrv,
+		ControlPlane:         controlClient,
+		PKI:                  pkiManager,
+		Scheduler:            taskScheduler,
+		ControlPlaneShutdown: combinedShutdown,
+	})
 	return svc, nil
 }
 
@@ -253,25 +275,25 @@ func buildAdminService() httpserver.AdminService {
 
 // jobController bridges HTTP job control to the control-plane client and local state.
 type jobController struct {
-    client *controlplane.Client
-    store  *jobs.Store
+	client *controlplane.Client
+	store  *jobs.Store
 }
 
 func (c *jobController) Cancel(jobID string) error {
-    if c == nil || c.client == nil || c.store == nil {
-        return errors.New("node: cancel unavailable")
-    }
-    rec, ok := c.store.Get(strings.TrimSpace(jobID))
-    if !ok {
-        return httpserver.ErrJobNotFound
-    }
-    if rec.State != jobs.StateRunning {
-        return httpserver.ErrJobNotRunning
-    }
-    if ok := c.client.Cancel(jobID); !ok {
-        return httpserver.ErrJobNotRunning
-    }
-    return nil
+	if c == nil || c.client == nil || c.store == nil {
+		return errors.New("node: cancel unavailable")
+	}
+	rec, ok := c.store.Get(strings.TrimSpace(jobID))
+	if !ok {
+		return httpserver.ErrJobNotFound
+	}
+	if rec.State != jobs.StateRunning {
+		return httpserver.ErrJobNotRunning
+	}
+	if ok := c.client.Cancel(jobID); !ok {
+		return httpserver.ErrJobNotRunning
+	}
+	return nil
 }
 
 func newControlPlaneHTTPClient(cfg config.ControlPlaneConfig) (*http.Client, error) {
@@ -316,7 +338,7 @@ func newControlPlaneHTTPClient(cfg config.ControlPlaneConfig) (*http.Client, err
 	}, nil
 }
 
-func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Handler, func(context.Context) error, error) {
+func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub, pgStore store.Store) (http.Handler, func(context.Context) error, error) {
 	if streams == nil {
 		return nil, nil, errors.New("control-plane: streams hub required")
 	}
@@ -432,6 +454,7 @@ func buildControlPlaneHTTP(cfg config.Config, streams *logstream.Hub) (http.Hand
 		ArtifactStore:     artStore,
 		ArtifactPublisher: artifactPublisher,
 		Transfers:         transferManager,
+		Store:             pgStore,
 		Authorizer: auth.NewAuthorizer(auth.Options{
 			AllowInsecure: allowInsecure,
 			DefaultRole:   defaultRole,
@@ -521,15 +544,15 @@ const defaultIPFSGateway = "http://127.0.0.1:8080"
 const clusterIDFile = "/etc/ploy/cluster-id"
 
 func buildArtifactPublisher() *workflowartifacts.ClusterClient {
-    client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
-        BaseURL:      defaultIPFSClusterAPI,
-        FetchBaseURL: defaultIPFSGateway,
-    })
-    if err != nil {
-        log.Printf("control-plane: disabling artifact publisher: %v", err)
-        return nil
-    }
-    return client
+	client, err := workflowartifacts.NewClusterClient(workflowartifacts.ClusterClientOptions{
+		BaseURL:      defaultIPFSClusterAPI,
+		FetchBaseURL: defaultIPFSGateway,
+	})
+	if err != nil {
+		log.Printf("control-plane: disabling artifact publisher: %v", err)
+		return nil
+	}
+	return client
 }
 
 func buildIPFSChecker(cfg config.Config) lifecycle.HealthChecker {
@@ -556,13 +579,21 @@ func resolveLifecycleConfigString(cfg config.Config, key string) string {
 	return strings.TrimSpace(os.Getenv(key))
 }
 
+func resolvePostgresDSN(cfg config.Config) string {
+	// Prefer environment variable, then config file.
+	if env := strings.TrimSpace(os.Getenv(envPostgresDSN)); env != "" {
+		return env
+	}
+	return strings.TrimSpace(cfg.Postgres.DSN)
+}
+
 func lifecycleIgnoreInterfacesFrom(cfg config.Config) []string {
-    raw := resolveLifecycleConfigString(cfg, envLifecycleNetIgnore)
-    if raw == "" {
-        return nil
-    }
-    parts := strings.Split(raw, ",")
-    out := make([]string, 0, len(parts))
+	raw := resolveLifecycleConfigString(cfg, envLifecycleNetIgnore)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
 	for _, part := range parts {
 		if trimmed := strings.TrimSpace(part); trimmed != "" {
 			out = append(out, trimmed)
