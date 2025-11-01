@@ -1,0 +1,29 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+post:
+  tags: [Artifacts]
+  summary: Ingest a gzipped log chunk for a run (node → server)
+  description: |
+    Node agents upload gzipped log chunks for a specific run. The server enforces
+    a hard cap of ≤ 1 MiB on the decoded `data` bytes. The JSON request body is
+    allowed up to ~2 MiB to accommodate base64 overhead.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/NodeCreateLogRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/Log'
+    '400': { description: Bad Request }
+    '404': { description: Node or run not found }
+    '413': { description: Payload Too Large (body or decoded data) }
+

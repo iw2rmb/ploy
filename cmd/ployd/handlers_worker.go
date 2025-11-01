@@ -628,7 +628,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 // createNodeLogsHandler handles POST /v1/nodes/{id}/logs for receiving gzipped log chunks.
 func createNodeLogsHandler(st store.Store) http.HandlerFunc {
-	const maxRequestSize = 1 << 20 // 1 MiB
+	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
+	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
+	const maxBodySize = 2 << 20  // 2 MiB
+	const maxChunkSize = 1 << 20 // 1 MiB
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -645,13 +648,13 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check payload size before reading body.
-		if r.ContentLength > maxRequestSize {
-			http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
+		if r.ContentLength > maxBodySize {
+			http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
 			return
 		}
 
-		// Limit request body to 1 MiB to prevent memory exhaustion.
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
+		// Limit request body but allow base64 overhead.
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		// Decode request body.
 		var req struct {
@@ -665,7 +668,7 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 			// Return 413 when MaxBytesReader trips the size cap.
 			var maxErr *http.MaxBytesError
 			if errors.As(err, &maxErr) {
-				http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
+				http.Error(w, "payload exceeds body size cap", http.StatusRequestEntityTooLarge)
 				return
 			}
 			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
@@ -691,8 +694,8 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Enforce 1 MiB cap on gzipped data.
-		if len(req.Data) > maxRequestSize {
+		// Enforce 1 MiB cap on decoded gzipped data bytes.
+		if len(req.Data) > maxChunkSize {
 			http.Error(w, fmt.Sprintf("data exceeds 1 MiB: %d bytes", len(req.Data)), http.StatusRequestEntityTooLarge)
 			return
 		}

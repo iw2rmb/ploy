@@ -3,7 +3,6 @@ package nodeagent
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +17,9 @@ import (
 const (
 	// maxChunkSize is the maximum size of a gzipped log chunk (1 MiB).
 	maxChunkSize = 1 << 20
+	// softChunkSize provides headroom for gzip footer so finalized chunks
+	// never exceed the hard cap. Keep conservative margin.
+	softChunkSize = maxChunkSize - 64
 	// flushInterval is how often to flush buffered logs to the server.
 	flushInterval = 2 * time.Second
 )
@@ -33,21 +35,18 @@ type LogStreamer struct {
 	mu        sync.Mutex
 	flushDone chan struct{}
 	closeOnce sync.Once
-	ctx       context.Context
-	cancel    context.CancelFunc
+	stopCh    chan struct{}
 }
 
 // NewLogStreamer creates a new log streamer for a specific run.
 func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
-	ctx, cancel := context.WithCancel(context.Background())
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
 		stageID:   stageID,
 		chunkNo:   0,
 		flushDone: make(chan struct{}),
-		ctx:       ctx,
-		cancel:    cancel,
+		stopCh:    make(chan struct{}),
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
@@ -73,7 +72,8 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 		return written, fmt.Errorf("flush gzip: %w", err)
 	}
 
-	if ls.buffer.Len() >= maxChunkSize {
+	// Use soft threshold to ensure finalized (Close) chunk stays under hard cap.
+	if ls.buffer.Len() >= softChunkSize {
 		if flushErr := ls.flushLocked(); flushErr != nil {
 			slog.Warn("log streamer flush failed", "run_id", ls.runID, "error", flushErr)
 		}
@@ -97,7 +97,7 @@ func (ls *LogStreamer) periodicFlush() {
 				}
 			}
 			ls.mu.Unlock()
-		case <-ls.ctx.Done():
+		case <-ls.stopCh:
 			close(ls.flushDone)
 			return
 		}
@@ -121,6 +121,10 @@ func (ls *LogStreamer) flushLocked() error {
 
 	// Enforce size cap.
 	if len(compressed) > maxChunkSize {
+		// Drop the oversize payload to preserve forward progress but report an error.
+		// Reset state so subsequent writes proceed with a fresh chunk.
+		ls.buffer.Reset()
+		ls.gzWriter = gzip.NewWriter(&ls.buffer)
 		return fmt.Errorf("compressed chunk exceeds 1 MiB: %d bytes", len(compressed))
 	}
 
@@ -174,7 +178,8 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	// Send to server endpoint.
 	url := fmt.Sprintf("%s/v1/nodes/%s/logs", ls.cfg.ServerURL, nodeID.String())
-	req, err := http.NewRequestWithContext(ls.ctx, http.MethodPost, url, bytes.NewReader(body))
+	// Per-request timeout; no struct-stored context.
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -202,7 +207,7 @@ func (ls *LogStreamer) Close() error {
 	var closeErr error
 	ls.closeOnce.Do(func() {
 		// Stop the background flusher.
-		ls.cancel()
+		close(ls.stopCh)
 		<-ls.flushDone
 
 		// Flush any remaining logs.
