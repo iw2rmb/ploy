@@ -62,3 +62,35 @@ func TestUploadSlot(t *testing.T) {
 		t.Fatalf("unexpected remote path: %s", slot.RemotePath)
 	}
 }
+
+func TestTransferErrors(t *testing.T) {
+    client := transfer.Client{}
+    if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{}); err == nil {
+        t.Fatalf("expected base URL required error")
+    }
+    mux := http.NewServeMux()
+    mux.HandleFunc("/v1/transfers/upload", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "nope", http.StatusTeapot) })
+    mux.HandleFunc("/v1/transfers/x/commit", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "bad", http.StatusBadRequest) })
+    srv := httptest.NewServer(mux)
+    defer srv.Close()
+    base, _ := url.Parse(srv.URL)
+    client = transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
+    if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j"}); err == nil {
+        t.Fatalf("expected upload error")
+    }
+    if err := client.Commit(context.Background(), "x", transfer.CommitRequest{Size: 1, Digest: "d"}); err == nil {
+        t.Fatalf("expected commit error")
+    }
+}
+
+func TestAbortSuccess(t *testing.T) {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/v1/transfers/x/abort", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+    srv := httptest.NewServer(mux)
+    defer srv.Close()
+    base, _ := url.Parse(srv.URL)
+    client := transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
+    if err := client.Abort(context.Background(), "x"); err != nil {
+        t.Fatalf("Abort error: %v", err)
+    }
+}
