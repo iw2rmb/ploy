@@ -68,9 +68,11 @@ func (q *Queries) DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timest
 }
 
 const listArtifactBundlePartitions = `-- name: ListArtifactBundlePartitions :many
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.artifact_bundles'::regclass
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.artifact_bundles'::regclass
 `
 
 // ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
@@ -95,9 +97,11 @@ func (q *Queries) ListArtifactBundlePartitions(ctx context.Context) ([]string, e
 }
 
 const listEventPartitions = `-- name: ListEventPartitions :many
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.events'::regclass
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.events'::regclass
 `
 
 // ListEventPartitions retrieves all partition names for the events table.
@@ -122,9 +126,11 @@ func (q *Queries) ListEventPartitions(ctx context.Context) ([]string, error) {
 }
 
 const listLogPartitions = `-- name: ListLogPartitions :many
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.logs'::regclass
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.logs'::regclass
 `
 
 // ListLogPartitions retrieves all partition names for the logs table.
@@ -149,9 +155,11 @@ func (q *Queries) ListLogPartitions(ctx context.Context) ([]string, error) {
 }
 
 const listNodeMetricsPartitions = `-- name: ListNodeMetricsPartitions :many
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.node_metrics'::regclass
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.node_metrics'::regclass
 `
 
 // ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.

@@ -20,24 +20,32 @@ WHERE created_at < $1;
 
 -- name: ListLogPartitions :many
 -- ListLogPartitions retrieves all partition names for the logs table.
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.logs'::regclass;
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.logs'::regclass;
 
 -- name: ListEventPartitions :many
 -- ListEventPartitions retrieves all partition names for the events table.
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.events'::regclass;
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.events'::regclass;
 
 -- name: ListArtifactBundlePartitions :many
 -- ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.artifact_bundles'::regclass;
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.artifact_bundles'::regclass;
 
 -- name: ListNodeMetricsPartitions :many
 -- ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
-SELECT inhrelid::regclass::text AS partition_name
-FROM pg_catalog.pg_inherits
-WHERE inhparent = 'ploy.node_metrics'::regclass;
+SELECT format('%I.%I', n.nspname, c.relname) AS partition_name
+FROM pg_catalog.pg_inherits i
+JOIN pg_catalog.pg_class c ON c.oid = i.inhrelid
+JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE i.inhparent = 'ploy.node_metrics'::regclass;
