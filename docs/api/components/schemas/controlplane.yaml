@@ -175,6 +175,20 @@ CreateLogRequest:
       contentEncoding: base64
   required: [chunk_no, data]
 
+# Request used by node → server log ingestion.
+NodeCreateLogRequest:
+  type: object
+  properties:
+    run_id: { type: string, format: uuid }
+    stage_id: { type: string, format: uuid, nullable: true }
+    build_id: { type: string, format: uuid, nullable: true }
+    chunk_no: { type: integer, format: int32 }
+    data:
+      type: string
+      description: Gzipped log chunk (≤1 MiB gzipped), base64-encoded.
+      contentEncoding: base64
+  required: [run_id, chunk_no, data]
+
 ArtifactBundle:
   type: object
   properties:
