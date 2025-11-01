@@ -3,12 +3,15 @@ package main
 import (
     "context"
     "log/slog"
+    "net/http"
+    "net/http/httptest"
     "os"
     "path/filepath"
     "strings"
     "testing"
 
     apiconfig "github.com/iw2rmb/ploy/internal/api/config"
+    "github.com/iw2rmb/ploy/internal/controlplane/auth"
     "github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -118,8 +121,56 @@ func TestRun_Shutdown(t *testing.T) {
     cancel()
     var cfg apiconfig.Config
     var st store.Store // nil is fine; run() does not use it yet.
+    authorizer := auth.NewAuthorizer(auth.Options{
+        AllowInsecure: false,
+        DefaultRole:   auth.RoleControlPlane,
+    })
 
-    if err := run(ctx, cfg, st); err != nil {
+    if err := run(ctx, cfg, st, authorizer); err != nil {
         t.Fatalf("run() error: %v", err)
+    }
+}
+
+func TestAuthorizer_DefaultConfig(t *testing.T) {
+    // Verify authorizer is configured with mTLS enforcement and RoleControlPlane default.
+    authorizer := auth.NewAuthorizer(auth.Options{
+        AllowInsecure: false,
+        DefaultRole:   auth.RoleControlPlane,
+    })
+
+    if authorizer == nil {
+        t.Fatal("NewAuthorizer() returned nil")
+    }
+
+    // Test that insecure requests are rejected (no client certificate).
+    // This verifies AllowInsecure=false is working.
+    t.Run("RejectsInsecureRequest", func(t *testing.T) {
+        req := newTestRequest(t, "GET", "/v1/test")
+        rr := newTestRecorder()
+        handler := authorizer.Middleware(auth.RoleControlPlane)(testHandler(t))
+
+        handler.ServeHTTP(rr, req)
+        if rr.Code != 403 {
+            t.Fatalf("expected 403 for insecure request, got %d", rr.Code)
+        }
+    })
+}
+
+// Helper functions for testing
+func newTestRequest(t *testing.T, method, path string) *http.Request {
+    req, err := http.NewRequest(method, path, nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+    return req
+}
+
+func newTestRecorder() *httptest.ResponseRecorder {
+    return httptest.NewRecorder()
+}
+
+func testHandler(t *testing.T) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
     }
 }

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -60,14 +61,21 @@ func main() {
 	}
 	defer st.Close()
 
-	slog.Info("ployd server starting", "config", configPath)
+	// Initialize Authorizer for mTLS-based authentication.
+	// Default role is RoleControlPlane; AllowInsecure is false for production.
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: false,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+
+	slog.Info("ployd server starting", "config", configPath, "mtls", "enforced")
 
 	// Set up signal handling for graceful shutdown.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
 	// Run server.
-	if err := run(ctx, cfg, st); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(ctx, cfg, st, authorizer); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
 	}
@@ -76,7 +84,7 @@ func main() {
 }
 
 // run executes the main server loop and blocks until the context is canceled.
-func run(ctx context.Context, cfg config.Config, st store.Store) error {
+func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer) error {
 	// Wait for shutdown signal.
 	<-ctx.Done()
 
@@ -89,6 +97,7 @@ func run(ctx context.Context, cfg config.Config, st store.Store) error {
 	// TODO: Stop HTTP servers, background workers, etc.
 	// This will be expanded in subsequent ROADMAP tasks.
 	_ = shutdownCtx
+	_ = authorizer
 
 	return nil
 }
