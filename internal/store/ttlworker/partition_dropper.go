@@ -15,7 +15,9 @@ import (
 )
 
 // partitionPattern matches partition names like "ploy.logs_2025_10" and extracts year and month.
-var partitionPattern = regexp.MustCompile(`^ploy\.(\w+)_(\d{4})_(\d{2})$`)
+// partitionPattern enforces month range 01..12 to avoid mis-parsing invalid names
+// like 00 or 13, which Go's time.Date would otherwise normalize to adjacent months.
+var partitionPattern = regexp.MustCompile(`^ploy\.(\w+)_(\d{4})_(0[1-9]|1[0-2])$`)
 
 // DropOldPartitions drops entire monthly partitions older than the cutoff date.
 // This is much more efficient than row-by-row deletion for large partitions.
