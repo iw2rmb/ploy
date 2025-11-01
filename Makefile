@@ -30,6 +30,63 @@ lanes-validate: ## Validate bundled lane catalog
 test: ## Run all unit tests with coverage output
 	go test -cover ./...
 
+.PHONY: test-race
+test-race: ## Run all unit tests with race detector
+	go test -race -cover ./...
+
+.PHONY: test-coverage
+test-coverage: ## Run tests and generate coverage report
+	@mkdir -p $(BUILD_DIR)
+	go test -coverprofile=$(BUILD_DIR)/coverage.out -covermode=atomic ./...
+	@echo "\n=== Coverage Summary ==="
+	@go tool cover -func=$(BUILD_DIR)/coverage.out | grep total:
+
+.PHONY: test-coverage-threshold
+test-coverage-threshold: test-coverage ## Run tests and enforce 60% coverage threshold
+	@COVERAGE=$$(go tool cover -func=$(BUILD_DIR)/coverage.out | grep total: | awk '{print $$3}' | sed 's/%//'); \
+	THRESHOLD=60; \
+	echo "Coverage: $$COVERAGE% (threshold: $$THRESHOLD%)"; \
+	if [ $$(echo "$$COVERAGE < $$THRESHOLD" | bc -l) -eq 1 ]; then \
+		echo "ERROR: Coverage $$COVERAGE% is below threshold $$THRESHOLD%"; \
+		exit 1; \
+	fi
+
+.PHONY: vet
+vet: ## Run go vet
+	go vet ./...
+
+.PHONY: lint
+lint: ## Run golangci-lint
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "golangci-lint not installed. Install from https://golangci-lint.run/usage/install/"; \
+		exit 1; \
+	fi
+
+.PHONY: staticcheck
+staticcheck: ## Run staticcheck
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		staticcheck ./...; \
+	else \
+		echo "staticcheck not installed. Run: go install honnef.co/go/tools/cmd/staticcheck@latest"; \
+		exit 1; \
+	fi
+
+.PHONY: ci-check
+ci-check: fmt vet lint staticcheck test-coverage-threshold ## Run all CI checks locally
+	@echo "\n=== All CI checks passed ==="
+
+.PHONY: pre-commit-install
+pre-commit-install: ## Install pre-commit hooks
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		pre-commit install; \
+		echo "Pre-commit hooks installed successfully"; \
+	else \
+		echo "pre-commit not installed. Install from https://pre-commit.com/"; \
+		exit 1; \
+	fi
+
 .PHONY: experiment-role-sep
 experiment-role-sep: ## Run role-separated TDD experiment (stub fails, impl passes)
 	@echo "[Phase A] Expect failing HT under stub build" && \
@@ -48,7 +105,15 @@ clean: ## Remove build artifacts
 .PHONY: help
 help: ## Show available targets
 	@echo "Targets:"
-	@echo "  make build  # Build the CLI"
-	@echo "  make fmt    # Run gofmt over Go source"
-	@echo "  make test   # Run go test ./... with coverage"
-	@echo "  make clean  # Remove build artifacts"
+	@echo "  make build                      # Build the CLI and server binaries"
+	@echo "  make fmt                        # Run gofmt over Go source"
+	@echo "  make test                       # Run go test ./... with coverage"
+	@echo "  make test-race                  # Run tests with race detector"
+	@echo "  make test-coverage              # Run tests and generate coverage report"
+	@echo "  make test-coverage-threshold    # Run tests and enforce 60% coverage threshold"
+	@echo "  make vet                        # Run go vet"
+	@echo "  make lint                       # Run golangci-lint"
+	@echo "  make staticcheck                # Run staticcheck"
+	@echo "  make ci-check                   # Run all CI checks locally (RED → GREEN workflow)"
+	@echo "  make pre-commit-install         # Install pre-commit hooks"
+	@echo "  make clean                      # Remove build artifacts"
