@@ -51,18 +51,14 @@ defaults change, or components adopt additional configuration.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The CLI flag `--config` overrides this
   environment variable when explicitly provided.
-- `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
-  generates the initial configuration (default `0.0.0.0:8443`).
-  TODO: not yet consumed by code in this repo; wire in bootstrap/ployd config slice.
-- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener.
-  Currently set to `127.0.0.1:9101` by `server deploy` bootstrap. TODO: confirm final default and
-  consumption in ployd.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap to a sanitized
   version of the node name. Used by the daemon to identify itself in logs and metrics.
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Defaults to `/root` when running
   as a system service. Set during bootstrap.
 - `PLOYD_CACHE_HOME` — Cache directory for the ployd daemon. Defaults to `/var/cache/ploy`.
   Set during bootstrap and used for ephemeral workspaces and intermediate build artifacts.
+- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener.
+  Set to `127.0.0.1:9101` by `server deploy` bootstrap; config file default is `:9100`.
 
 
 ## Worker Nodes
@@ -76,7 +72,8 @@ defaults change, or components adopt additional configuration.
   (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
   for both server and node flows and writes to `/etc/ploy/pki/node.crt` and
   `/etc/ploy/pki/node.key` on worker nodes.
-- `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute (default: `1`).
+- `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute. When specified in
+  the node config YAML (`concurrency` key), defaults to `1` if not set.
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
   TODO: lifecycle collector to read this in an upcoming slice.
   - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
@@ -122,14 +119,15 @@ defaults change, or components adopt additional configuration.
 ### Server (Control Plane)
 
 - `PLOY_SERVER_HTTP_LISTEN` — Address the server listens on for HTTPS API/SSE (default: `:8443`).
-  TODO: not yet consumed by `cmd/ployd`; see ROADMAP tasks under "Server Bootstrap".
+  Consumed via the `http.listen` config key with fallback to the hardcoded default.
 - `PLOY_SERVER_METRICS_LISTEN` — Address for Prometheus metrics endpoint (default: `:9100`).
-  TODO: not yet consumed by `cmd/ployd`.
+  Consumed via the `metrics.listen` config key with fallback to the hardcoded default.
 - `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy server deploy`).
-  TODO: persisted/loaded by server in upcoming slices.
+  Currently set by bootstrap but not yet persisted or loaded by the server runtime.
 - `PLOY_SERVER_TLS_CERT` / `PLOY_SERVER_TLS_KEY` — PEM-encoded server TLS certificate and key
   for the HTTPS API. Issued by the cluster CA during `ploy server deploy`.
-  TODO: server main to load these from env/config.
+  Currently consumed via the `http.tls.cert_path` and `http.tls.key_path` config keys, which
+  point to files written by the bootstrap script from these environment variables.
 
 ### PKI
 
@@ -162,21 +160,28 @@ Precedence at server startup:
 `ployd` reads `PLOY_SERVER_PG_DSN` (or `PLOY_POSTGRES_DSN`) at startup; when unset,
 it falls back to `postgres.dsn` in the config file.
 
-## Bootstrap Script (exports)
+## Bootstrap Script
 
-These are exported by the bootstrap script used during `ploy server deploy` and `ploy node add` flows.
-They are not required for day‑to‑day CLI usage but are documented here for completeness.
+These environment variables are used internally by the bootstrap script generated during
+`ploy server deploy` and `ploy node add` flows. They are not required for day‑to‑day CLI
+usage but are documented here for completeness.
 
-- `PLOY_BOOTSTRAP_VERSION` — Version string embedded at the top of generated bootstrap scripts.
-- `PLOY_INSTALL_POSTGRESQL` — When `true`, bootstrap installs PostgreSQL on the target host and derives
-  `PLOY_SERVER_PG_DSN`; when `false`, the provided DSN is used as-is.
-- `PLOY_DB_PASSWORD` — Ephemeral password generated during PostgreSQL install flows and used to create the
-  `ploy` role and DSN. Exported only within the bootstrap script; not required by the server or CLI.
-- `CLUSTER_ID` — Cluster identifier used during provisioning to label generated assets.
-- `NODE_ID` — Node identifier provided to the bootstrap script (control plane uses `control`).
-- `NODE_ADDRESS` — IP/hostname of the node being provisioned.
-- `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions.
-
+- `PLOY_BOOTSTRAP_VERSION` — Version string exported at the top of generated bootstrap scripts
+  (default: `dev` in source, overridden at build time).
+- `PLOY_INSTALL_POSTGRESQL` — When `true`, the bootstrap script installs PostgreSQL on the
+  target host and derives `PLOY_SERVER_PG_DSN`; when `false`, the provided DSN is used as-is.
+  Not exported as an environment variable; checked inline within the script body.
+- `PLOY_DB_PASSWORD` — Ephemeral password generated during PostgreSQL install flows and used
+  to create the `ploy` database role and DSN. Set only within the bootstrap script scope.
+- `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions
+  (e.g., writing server certs instead of node certs). Passed as `--primary` flag and checked
+  inline within the script.
+- `NODE_ID` — Node identifier used in the node agent config. Passed as `--node-id` script
+  argument and referenced in `/etc/ploy/ployd-node.yaml` generation.
+- `CLUSTER_ID` — Cluster identifier passed as `--cluster-id` script argument. Currently used
+  for labeling during provisioning; not yet persisted or consumed by server runtime.
+- `NODE_ADDRESS` — IP/hostname of the node being provisioned, passed as `--node-address` script
+  argument.
 - `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
   `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
   This variable is consumed only by the bootstrap script; the CLI separately exposes a
