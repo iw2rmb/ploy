@@ -18,7 +18,7 @@ The node agent is configured via a YAML file (default: `/etc/ploy/ployd-node.yam
 
 ```yaml
 # Server URL for the control-plane
-server_url: https://ployd-server.example.com:8443
+server_url: https://ployd.example.com:8443
 
 # Node identifier
 node_id: node-001

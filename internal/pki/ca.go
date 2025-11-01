@@ -107,7 +107,7 @@ func GenerateCA(clusterID string, now time.Time) (*CABundle, error) {
 // IssueServerCert issues a server certificate signed by the CA.
 // The serverIP should be the server's IP address for use in SANs.
 func IssueServerCert(ca *CABundle, clusterID, serverIP string, now time.Time) (*IssuedCert, error) {
-	return issueCert(ca, fmt.Sprintf("ployd-server-%s", clusterID), []string{fmt.Sprintf("ployd-server.%s.ploy", clusterID)}, []string{serverIP}, now, ServerCertValidity)
+	return issueCert(ca, fmt.Sprintf("ployd-%s", clusterID), []string{fmt.Sprintf("ployd.%s.ploy", clusterID)}, []string{serverIP}, now, ServerCertValidity)
 }
 
 // SignNodeCSR signs a node certificate signing request using the cluster CA.
