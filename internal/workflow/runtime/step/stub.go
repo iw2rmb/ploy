@@ -3,6 +3,7 @@ package step
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -53,20 +54,46 @@ func (p *filesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactR
 	return PublishedArtifact{}, errors.New("not implemented")
 }
 
+// GitFetcher is the interface for fetching git repositories.
+type GitFetcher interface {
+	Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
+}
+
 // FilesystemWorkspaceHydratorOptions holds configuration for workspace hydrator.
 type FilesystemWorkspaceHydratorOptions struct {
-	RepoFetcher interface{}
+	RepoFetcher GitFetcher
 }
 
 // WorkspaceHydrator prepares a workspace for execution.
-type WorkspaceHydrator interface{}
+type WorkspaceHydrator interface {
+	Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error
+}
 
-type filesystemWorkspaceHydrator struct{}
+type filesystemWorkspaceHydrator struct {
+	fetcher GitFetcher
+}
 
 // NewFilesystemWorkspaceHydrator creates a new workspace hydrator.
 func NewFilesystemWorkspaceHydrator(opts FilesystemWorkspaceHydratorOptions) (WorkspaceHydrator, error) {
-	_ = opts
-	return &filesystemWorkspaceHydrator{}, nil
+	if opts.RepoFetcher == nil {
+		return nil, errors.New("repo fetcher is required")
+	}
+	return &filesystemWorkspaceHydrator{fetcher: opts.RepoFetcher}, nil
+}
+
+// Hydrate prepares the workspace by fetching repository sources as needed.
+func (h *filesystemWorkspaceHydrator) Hydrate(ctx context.Context, manifest contracts.StepManifest, workspace string) error {
+	// Process each input that has repository hydration configured.
+	for _, input := range manifest.Inputs {
+		if input.Hydration != nil && input.Hydration.Repo != nil {
+			// Fetch the repository into the workspace at the input's mount path.
+			// For now, we fetch directly into workspace; future work may use mount paths.
+			if err := h.fetcher.Fetch(ctx, input.Hydration.Repo, workspace); err != nil {
+				return fmt.Errorf("failed to hydrate input %s: %w", input.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // DockerContainerRuntimeOptions holds configuration for Docker runtime.

@@ -66,7 +66,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Node Execution Contract
 - [x] Ephemeral workspace create/cleanup per run (tmpdir, unique prefix).
-- [ ] Shallow/sparse clone by repo URL; checkout `base_ref` then fetch `target_ref` or `commit_sha`.
+- [x] Shallow/sparse clone by repo URL; checkout `base_ref` then fetch `target_ref` or `commit_sha`.
 - [ ] Hook Build Gate (re-use lifecycle checker interfaces); capture per-stage/build timings.
 - [ ] Stream logs as gzipped chunks to server; enforce ≤1 MiB client-side cap.
 - [ ] Produce unified diff and summary; gzip and POST to server.
