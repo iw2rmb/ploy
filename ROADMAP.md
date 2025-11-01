@@ -25,7 +25,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Integrate PKI manager (renew loop) with config hot-reload stub.
 
 ## API: PKI
-- [ ] Implement `POST /v1/pki/sign` handler (admin-only): parse CSR, sign with cluster CA, persist node cert metadata via store.
+- [x] Implement `POST /v1/pki/sign` handler (admin-only): parse CSR, sign with cluster CA, persist node cert metadata via store.
 - [ ] Return PEM bundle according to docs/api/components/schemas/pki.yaml.
 - [ ] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
 
