@@ -110,6 +110,14 @@ type RuntimePluginConfig struct {
 type SchedulerConfig struct {
 	HousekeepingInterval time.Duration `yaml:"housekeeping_interval"`
 	DiskPruneInterval    time.Duration `yaml:"disk_prune_interval"`
+	// TTL is the retention period for logs, events, diffs, and artifact bundles.
+	// Data older than this will be purged by the TTL worker. Default: 30 days.
+	TTL time.Duration `yaml:"ttl"`
+	// TTLInterval is how often the TTL worker runs cleanup. Default: 1 hour.
+	TTLInterval time.Duration `yaml:"ttl_interval"`
+	// DropPartitions enables dropping entire monthly partitions for expired data
+	// instead of row-by-row deletion. More efficient for large datasets.
+	DropPartitions bool `yaml:"drop_partitions"`
 }
 
 // LoggingConfig configures logging destinations.

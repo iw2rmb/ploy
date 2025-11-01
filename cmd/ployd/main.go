@@ -17,8 +17,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/api/metrics"
+	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 )
 
 func main() {
@@ -71,12 +73,12 @@ func main() {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-    // Reflect configured transport settings in startup logs (before listeners come up).
-    slog.Info("ployd server starting",
-        "config", configPath,
-        "tls", cfg.HTTP.TLS.Enabled,
-        "mtls", cfg.HTTP.TLS.RequireClientCert,
-    )
+	// Reflect configured transport settings in startup logs (before listeners come up).
+	slog.Info("ployd server starting",
+		"config", configPath,
+		"tls", cfg.HTTP.TLS.Enabled,
+		"mtls", cfg.HTTP.TLS.RequireClientCert,
+	)
 
 	// Set up signal handling for graceful shutdown.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -93,6 +95,29 @@ func main() {
 
 // run executes the main server loop and blocks until the context is canceled.
 func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer) error {
+	// Initialize TTL worker.
+	ttlWorker, err := ttlworker.New(ttlworker.Options{
+		Store:          st,
+		TTL:            cfg.Scheduler.TTL,
+		Interval:       cfg.Scheduler.TTLInterval,
+		Logger:         slog.Default(),
+		DropPartitions: cfg.Scheduler.DropPartitions,
+	})
+	if err != nil {
+		return fmt.Errorf("create ttl worker: %w", err)
+	}
+
+	// Initialize scheduler and register background tasks.
+	sched := scheduler.New()
+	if ttlWorker != nil {
+		sched.AddTask(ttlWorker)
+	}
+
+	// Start scheduler.
+	if err := sched.Start(ctx); err != nil {
+		return fmt.Errorf("start scheduler: %w", err)
+	}
+
 	// Initialize HTTP server for API endpoints.
 	httpSrv, err := httpserver.New(httpserver.Options{
 		Config:     cfg.HTTP,
@@ -135,6 +160,11 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	defer cancel()
 
 	slog.Info("graceful shutdown initiated", "timeout", "10s")
+
+	// Stop scheduler.
+	if err := sched.Stop(shutdownCtx); err != nil {
+		slog.Error("stop scheduler", "err", err)
+	}
 
 	// Stop HTTP server.
 	if err := httpSrv.Stop(shutdownCtx); err != nil {
