@@ -18,8 +18,14 @@ import (
 )
 
 func main() {
+	// Allow env to supply the default config path; CLI flag still has highest precedence.
+	defaultConfigPath := strings.TrimSpace(os.Getenv("PLOYD_CONFIG_PATH"))
+	if defaultConfigPath == "" {
+		defaultConfigPath = "/etc/ploy/ployd.yaml"
+	}
+
 	var configPath string
-	flag.StringVar(&configPath, "config", "/etc/ploy/ployd.yaml", "Path to ployd configuration")
+	flag.StringVar(&configPath, "config", defaultConfigPath, "Path to ployd configuration (flag overrides $PLOYD_CONFIG_PATH)")
 	flag.Parse()
 
 	// Configure structured logger early (will be reconfigured after loading config).

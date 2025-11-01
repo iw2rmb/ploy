@@ -48,9 +48,9 @@ defaults change, or components adopt additional configuration.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
-- `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
-  location (default `/etc/ploy/ployd.yaml`).
-  TODO: not yet consumed by code in this repo; wire in bootstrap/ployd config slice.
+- `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
+  location (default `/etc/ploy/ployd.yaml`). The CLI flag `--config` overrides this
+  environment variable when explicitly provided.
 - `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
   generates the initial configuration (default `0.0.0.0:8443`).
   TODO: not yet consumed by code in this repo; wire in bootstrap/ployd config slice.
@@ -149,7 +149,8 @@ The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by `internal/store` integration tests. When unset, tests
   that require a live database are skipped.
 
-TODO: server startup wiring for `PLOY_SERVER_PG_DSN`/`PLOY_POSTGRES_DSN` is tracked in ROADMAP "Server Bootstrap".
+`ployd` reads `PLOY_SERVER_PG_DSN` (or `PLOY_POSTGRES_DSN`) at startup; when unset,
+it falls back to `postgres.dsn` in the config file.
 
 ## Bootstrap Script (exports)
 
