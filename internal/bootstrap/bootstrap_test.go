@@ -182,6 +182,9 @@ func TestPrefixedScript_NodeConfig(t *testing.T) {
 	if !strings.Contains(script, "Description=Ploy Node Agent") {
 		t.Fatalf("ployd-node.service should have proper description")
 	}
+	if !strings.Contains(script, "Restart=always") {
+		t.Fatalf("ployd-node.service should have Restart=always")
+	}
 }
 
 func TestPrefixedScript_SystemdOperations(t *testing.T) {
