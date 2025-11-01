@@ -17,7 +17,6 @@ type Task interface {
 type Scheduler struct {
 	mu      sync.Mutex
 	tasks   []Task
-	ctx     context.Context
 	cancel  context.CancelFunc
 	running bool
 	group   sync.WaitGroup
@@ -45,12 +44,15 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		s.mu.Unlock()
 		return nil
 	}
-	s.ctx, s.cancel = context.WithCancel(ctx)
+	// Derive an internal context for all tasks without storing it on the struct
+	// to comply with the guideline: do not store Context in structs.
+	internalCtx, cancel := context.WithCancel(ctx)
+	s.cancel = cancel
 	s.running = true
 	for _, task := range s.tasks {
 		s.group.Add(1)
 		t := task
-		go s.runTask(t)
+		go s.runTask(t, internalCtx)
 	}
 	s.mu.Unlock()
 	return nil
@@ -85,13 +87,12 @@ func (s *Scheduler) Stop(ctx context.Context) error {
 	}
 }
 
-func (s *Scheduler) runTask(task Task) {
+func (s *Scheduler) runTask(task Task, ctx context.Context) {
 	defer s.group.Done()
 	interval := task.Interval()
 	if interval <= 0 {
 		interval = time.Minute
 	}
-	ctx := s.taskContext()
 	for {
 		if ctx.Err() != nil {
 			return
@@ -105,11 +106,4 @@ func (s *Scheduler) runTask(task Task) {
 		case <-timer.C:
 		}
 	}
-}
-
-func (s *Scheduler) taskContext() context.Context {
-	s.mu.Lock()
-	ctx := s.ctx
-	s.mu.Unlock()
-	return ctx
 }

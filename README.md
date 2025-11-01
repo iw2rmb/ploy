@@ -53,6 +53,14 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - API: `:8443` (TLS; optionally mTLS when configured). Health at `/health`.
 - Metrics: `:9100` (plain HTTP) exposing Prometheus at `/metrics`.
 
+**Scheduler & TTL**
+- Background tasks run under `internal/api/scheduler`.
+- TTL cleanup (`internal/store/ttlworker`) purges old rows and can drop monthly partitions.
+- YAML (`scheduler` section):
+  - `ttl`: retention for logs/events/diffs/artifact_bundles (default 30d if unset)
+  - `ttl_interval`: how often the cleanup runs (default 1h if unset)
+  - `drop_partitions`: when true, drop whole monthly partitions older than `ttl`
+
 **Quick Start**
 - Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` not provided):
 
