@@ -1,0 +1,65 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Post a node heartbeat (node → server)
+  description: |
+    Updates the node's last heartbeat timestamp and resource snapshot (CPU, memory, disk).
+    Node agents call this endpoint periodically to report health and resource availability.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - cpu_free_millis
+            - cpu_total_millis
+            - mem_free_mb
+            - mem_total_mb
+            - disk_free_mb
+            - disk_total_mb
+          properties:
+            cpu_free_millis:
+              type: number
+              format: double
+              description: Free CPU in millicores
+              example: 1500.0
+            cpu_total_millis:
+              type: number
+              format: double
+              description: Total CPU in millicores
+              example: 4000.0
+            mem_free_mb:
+              type: number
+              format: double
+              description: Free memory in megabytes
+              example: 2048.0
+            mem_total_mb:
+              type: number
+              format: double
+              description: Total memory in megabytes
+              example: 8192.0
+            disk_free_mb:
+              type: number
+              format: double
+              description: Free disk space in megabytes
+              example: 10240.0
+            disk_total_mb:
+              type: number
+              format: double
+              description: Total disk space in megabytes
+              example: 51200.0
+  responses:
+    '204':
+      description: Heartbeat accepted and node snapshot updated
+    '400':
+      description: Bad Request (invalid node ID or malformed payload)
+    '404':
+      description: Node not found
+    '500':
+      description: Internal server error

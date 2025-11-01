@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -290,6 +291,15 @@ type mockStore struct {
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
 	deleteRunErr    error
+
+	getNodeCalled bool
+	getNodeParams pgtype.UUID
+	getNodeResult store.Node
+	getNodeErr    error
+
+	updateNodeHeartbeatCalled bool
+	updateNodeHeartbeatParams store.UpdateNodeHeartbeatParams
+	updateNodeHeartbeatErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -354,6 +364,18 @@ func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 	m.deleteRunCalled = true
 	m.deleteRunParams = id
 	return m.deleteRunErr
+}
+
+func (m *mockStore) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
+	m.getNodeCalled = true
+	m.getNodeParams = id
+	return m.getNodeResult, m.getNodeErr
+}
+
+func (m *mockStore) UpdateNodeHeartbeat(ctx context.Context, params store.UpdateNodeHeartbeatParams) error {
+	m.updateNodeHeartbeatCalled = true
+	m.updateNodeHeartbeatParams = params
+	return m.updateNodeHeartbeatErr
 }
 
 // no-op
@@ -2641,5 +2663,252 @@ func TestGetRunEventsHandler_Resume(t *testing.T) {
 	}
 	if !strings.Contains(body, "second") || !strings.Contains(body, "event: done") {
 		t.Fatalf("expected 'second' and 'done' after resume, got: %q", body)
+	}
+}
+
+func TestHeartbeatHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+	}
+
+	payload := `{
+		"cpu_free_millis": 1500.0,
+		"cpu_total_millis": 4000.0,
+		"mem_free_mb": 2048.0,
+		"mem_total_mb": 8192.0,
+		"disk_free_mb": 10240.0,
+		"disk_total_mb": 51200.0
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/heartbeat", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat to be called")
+	}
+
+	// Verify the update parameters (conversion from MB to bytes).
+	params := mockSt.updateNodeHeartbeatParams
+	if params.CpuFreeMillis != 1500 {
+		t.Errorf("expected cpu_free_millis=1500, got %d", params.CpuFreeMillis)
+	}
+	if params.CpuTotalMillis != 4000 {
+		t.Errorf("expected cpu_total_millis=4000, got %d", params.CpuTotalMillis)
+	}
+	if params.MemFreeBytes != 2048*1048576 {
+		t.Errorf("expected mem_free_bytes=2147483648, got %d", params.MemFreeBytes)
+	}
+	if params.MemTotalBytes != 8192*1048576 {
+		t.Errorf("expected mem_total_bytes=8589934592, got %d", params.MemTotalBytes)
+	}
+	if params.DiskFreeBytes != 10240*1048576 {
+		t.Errorf("expected disk_free_bytes=10737418240, got %d", params.DiskFreeBytes)
+	}
+	if params.DiskTotalBytes != 51200*1048576 {
+		t.Errorf("expected disk_total_bytes=53687091200, got %d", params.DiskTotalBytes)
+	}
+}
+
+func TestHeartbeatHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//heartbeat", nil)
+	req.SetPathValue("id", "")
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id path parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+	if mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat not to be called")
+	}
+}
+
+func TestHeartbeatHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/not-a-uuid/heartbeat", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+	if mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat not to be called")
+	}
+}
+
+func TestHeartbeatHandler_InvalidJSON(t *testing.T) {
+	nodeID := uuid.New()
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/heartbeat", strings.NewReader("{invalid json"))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid request") {
+		t.Errorf("expected error about invalid request, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+	if mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat not to be called")
+	}
+}
+
+func TestHeartbeatHandler_NodeNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	mockSt := &mockStore{
+		getNodeErr: pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"cpu_free_millis": 1500.0,
+		"cpu_total_millis": 4000.0,
+		"mem_free_mb": 2048.0,
+		"mem_total_mb": 8192.0,
+		"disk_free_mb": 10240.0,
+		"disk_total_mb": 51200.0
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/heartbeat", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "node not found") {
+		t.Errorf("expected error about node not found, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat not to be called after GetNode failed")
+	}
+}
+
+func TestHeartbeatHandler_UpdateError(t *testing.T) {
+	nodeID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		updateNodeHeartbeatErr: &pgconn.PgError{Code: "08000"},
+	}
+
+	payload := `{
+		"cpu_free_millis": 1500.0,
+		"cpu_total_millis": 4000.0,
+		"mem_free_mb": 2048.0,
+		"mem_total_mb": 8192.0,
+		"disk_free_mb": 10240.0,
+		"disk_total_mb": 51200.0
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/heartbeat", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := heartbeatHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to update heartbeat") {
+		t.Errorf("expected error about update failure, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.updateNodeHeartbeatCalled {
+		t.Fatal("expected UpdateNodeHeartbeat to be called")
 	}
 }

@@ -67,6 +67,9 @@ paths:
     $ref: './paths/runs_id_logs.yaml'
   /v1/runs/{id}/artifact_bundles:
     $ref: './paths/runs_id_artifact_bundles.yaml'
+  # Node heartbeat endpoint
+  /v1/nodes/{id}/heartbeat:
+    $ref: './paths/nodes_id_heartbeat.yaml'
   # Legacy removed:
   # - /v1/nodes (node registry now managed via server → node mTLS RPC)
   # - /v1/config/gitlab (GitLab signer removed)

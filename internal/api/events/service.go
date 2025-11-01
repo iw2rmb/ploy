@@ -1,16 +1,16 @@
 package events
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "log/slog"
-    "time"
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"time"
 
-    "github.com/google/uuid"
-    "github.com/iw2rmb/ploy/internal/node/logstream"
-    "github.com/iw2rmb/ploy/internal/store"
-    "github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Options configures the events service.
@@ -92,7 +92,7 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 	}
 
 	// Convert runID to string for streamID.
-    streamID := uuidToString(params.RunID)
+	streamID := uuidToString(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return event.
 		s.logger.Warn("event persisted but runID invalid for SSE fanout", "event_id", event.ID)
@@ -123,7 +123,7 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 	}
 
 	// Convert runID to string for streamID.
-    streamID := uuidToString(params.RunID)
+	streamID := uuidToString(params.RunID)
 	if streamID == "" {
 		// DB succeeded but SSE fanout skipped; log and return.
 		s.logger.Warn("log persisted but runID invalid for SSE fanout", "log_id", log.ID)
@@ -169,17 +169,17 @@ func (s *Service) publishLogToHub(ctx context.Context, streamID string, log stor
 // uuidToString converts a pgtype.UUID to its string representation.
 // Returns empty string if the UUID is invalid or null.
 func uuidToString(id pgtype.UUID) string {
-    if !id.Valid {
-        return ""
-    }
-    return uuid.UUID(id.Bytes).String()
+	if !id.Valid {
+		return ""
+	}
+	return uuid.UUID(id.Bytes).String()
 }
 
 // timestampToString converts a pgtype.Timestamptz to RFC3339 string.
 // Returns empty string if the timestamp is invalid or null.
 func timestampToString(ts pgtype.Timestamptz) string {
-    if !ts.Valid {
-        return ""
-    }
-    return ts.Time.Format(time.RFC3339)
+	if !ts.Valid {
+		return ""
+	}
+	return ts.Time.Format(time.RFC3339)
 }
