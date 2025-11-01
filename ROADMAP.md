@@ -96,7 +96,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
 
 ## OpenAPI & Docs
-- [ ] Ensure docs/api OpenAPI matches implemented endpoints (PKI, repos/mods/runs, SSE, ingest, heartbeat).
+- [x] Ensure docs/api OpenAPI matches implemented endpoints (PKI, repos/mods/runs, SSE, ingest, heartbeat).
 - [ ] Add examples for heartbeat payload and log/diff upload boundaries.
 - [ ] Update docs/how-to/deploy-a-cluster.md to match real bootstrap behavior (what gets written where).
 - [ ] Update docs/envs/README.md for final env names and defaults encountered in code.
