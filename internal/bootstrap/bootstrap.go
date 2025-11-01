@@ -138,7 +138,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("Restart=always\n")
 	b.WriteString("RestartSec=5\n")
 	b.WriteString("User=root\n")
-	b.WriteString("Environment=PLOY_SERVER_CONFIG=/etc/ploy/ployd.yaml\n\n")
+	b.WriteString("Environment=PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml\n\n")
 	b.WriteString("[Install]\n")
 	b.WriteString("WantedBy=multi-user.target\n")
 	b.WriteString("EOF\n\n")

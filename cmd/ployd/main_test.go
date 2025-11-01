@@ -90,6 +90,18 @@ func TestResolvePgDSN_TrimEnvAlias(t *testing.T) {
 	}
 }
 
+func TestResolvePgDSN_PlaceholderIgnored(t *testing.T) {
+	t.Setenv("PLOY_SERVER_PG_DSN", "")
+	t.Setenv("PLOY_POSTGRES_DSN", "")
+	cfg := apiconfig.Config{}
+	cfg.Postgres.DSN = "${PLOY_SERVER_PG_DSN}"
+
+	got := resolvePgDSN(cfg)
+	if got != "" {
+		t.Fatalf("resolvePgDSN()=%q want empty for placeholder value", got)
+	}
+}
+
 func TestParseLogLevel(t *testing.T) {
 	cases := map[string]slog.Level{
 		"debug":   slog.LevelDebug,
