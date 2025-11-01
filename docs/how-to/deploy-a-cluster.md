@@ -124,7 +124,7 @@ See also:
 
 ### Monitoring
 
-- **Metrics**: Both server and nodes expose Prometheus metrics on port `:9100`.
+- **Metrics**: Both server and nodes expose Prometheus metrics on port `:9100` (scrape `/metrics`).
 - **Logs**: Structured logs (slog) on stdout; capture with journalctl or systemd.
 - **Database**: Monitor PostgreSQL disk usage, connection pool, and query performance.
 
