@@ -49,16 +49,17 @@ defaults change, or components adopt additional configuration.
   plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
-  location (default `/etc/ploy/ployd.yaml`). The CLI flag `--config` overrides this
+  location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
 - `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap to a sanitized
-  version of the node name. Used by the daemon to identify itself in logs and metrics.
-- `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Defaults to `/root` when running
-  as a system service. Set during bootstrap.
-- `PLOYD_CACHE_HOME` — Cache directory for the ployd daemon. Defaults to `/var/cache/ploy`.
-  Set during bootstrap and used for ephemeral workspaces and intermediate build artifacts.
-- `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener.
-  Set to `127.0.0.1:9101` by `server deploy` bootstrap; config file default is `:9100`.
+  version of the node name. Note: currently exported by bootstrap but not consumed at runtime;
+  node identity is specified in the node YAML (`node_id`).
+- `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Exported by bootstrap as `/root` for
+  systemd context; not currently read by the codebase.
+- `PLOYD_CACHE_HOME` — Cache directory for working data. Defaults to `/var/cache/ploy` when set
+  by bootstrap. Used at runtime by the node agent for ephemeral workspaces.
+- `PLOYD_METRICS_LISTEN` — Exported by bootstrap as `127.0.0.1:9101` for early scripts; not
+  read by `ployd` at runtime. Use the YAML key `metrics.listen` (default `:9100`).
 
 
 ## Worker Nodes
@@ -72,8 +73,8 @@ defaults change, or components adopt additional configuration.
   (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
   for both server and node flows and writes to `/etc/ploy/pki/node.crt` and
   `/etc/ploy/pki/node.key` on worker nodes.
-- `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute. When specified in
-  the node config YAML (`concurrency` key), defaults to `1` if not set.
+- `concurrency` (config YAML) — Maximum concurrent runs the node will execute. Set in the
+  node YAML under `concurrency`; defaults to `1` if not set.
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
   TODO: lifecycle collector to read this in an upcoming slice.
   - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
@@ -118,16 +119,16 @@ defaults change, or components adopt additional configuration.
 
 ### Server (Control Plane)
 
-- `PLOY_SERVER_HTTP_LISTEN` — Address the server listens on for HTTPS API/SSE (default: `:8443`).
-  Consumed via the `http.listen` config key with fallback to the hardcoded default.
-- `PLOY_SERVER_METRICS_LISTEN` — Address for Prometheus metrics endpoint (default: `:9100`).
-  Consumed via the `metrics.listen` config key with fallback to the hardcoded default.
+- `http.listen` (config YAML) — Address the server listens on for HTTPS API/SSE. Default `:8443`.
+  There is no environment variable; set this in `ployd.yaml` under `http.listen`.
+- `metrics.listen` (config YAML) — Address for Prometheus metrics endpoint. Default `:9100`.
+  There is no environment variable; set this in `ployd.yaml` under `metrics.listen`.
 - `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy server deploy`).
   Currently set by bootstrap but not yet persisted or loaded by the server runtime.
-- `PLOY_SERVER_TLS_CERT` / `PLOY_SERVER_TLS_KEY` — PEM-encoded server TLS certificate and key
-  for the HTTPS API. Issued by the cluster CA during `ploy server deploy`.
-  Currently consumed via the `http.tls.cert_path` and `http.tls.key_path` config keys, which
-  point to files written by the bootstrap script from these environment variables.
+- `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — PEM-encoded server TLS certificate and key
+  used by the bootstrap script to write files at `/etc/ploy/pki/server.crt` and
+  `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
+  config: `http.tls.cert`, `http.tls.key`, and `http.tls.client_ca`.
 
 ### PKI
 
@@ -158,7 +159,8 @@ Precedence at server startup:
   that require a live database are skipped.
 
 `ployd` reads `PLOY_SERVER_PG_DSN` (or `PLOY_POSTGRES_DSN`) at startup; when unset,
-it falls back to `postgres.dsn` in the config file.
+it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_SERVER_PG_DSN}` in
+the config file are treated as unset unless the environment variable is actually present.
 
 ## Bootstrap Script
 
