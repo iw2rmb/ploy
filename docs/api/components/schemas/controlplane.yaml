@@ -60,26 +60,26 @@ CreateRunRequest:
     commit_sha: { type: string, nullable: true }
   required: [mod_id, base_ref, target_ref]
 
-  CreateRunResponse:
-    type: object
-    properties:
-      run_id: { type: string, format: uuid }
-    required: [run_id]
+CreateRunResponse:
+  type: object
+  properties:
+    run_id: { type: string, format: uuid }
+  required: [run_id]
 
-  # Response returned by POST /v1/nodes/{id}/claim
-  NodeClaimResponse:
-    type: object
-    properties:
-      id: { type: string, format: uuid }
-      mod_id: { type: string, format: uuid }
-      status: { type: string }
-      node_id: { type: string, format: uuid }
-      base_ref: { type: string }
-      target_ref: { type: string }
-      commit_sha: { type: string, nullable: true }
-      started_at: { type: string, format: date-time }
-      created_at: { type: string, format: date-time }
-    required: [id, mod_id, status, node_id, base_ref, target_ref, started_at, created_at]
+# Response returned by POST /v1/nodes/{id}/claim
+NodeClaimResponse:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    mod_id: { type: string, format: uuid }
+    status: { type: string }
+    node_id: { type: string, format: uuid }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    commit_sha: { type: string, nullable: true }
+    started_at: { type: string, format: date-time }
+    created_at: { type: string, format: date-time }
+  required: [id, mod_id, status, node_id, base_ref, target_ref, started_at, created_at]
 
 Event:
   type: object
