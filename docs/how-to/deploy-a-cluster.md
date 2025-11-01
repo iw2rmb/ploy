@@ -91,7 +91,7 @@ Use the shared VPS lab nodes from `AGENTS.md`:
 - C (node):   `81.200.119.187`
 
 Steps:
-- Build CLI/binaries locally: `make build` (creates `dist/ploy`, `dist/ployd-node(-linux)`).
+- Build CLI/binaries locally: `make build` (creates `dist/ploy`, `dist/ployd`, `dist/ployd-linux`, `dist/ployd-node`, `dist/ployd-node-linux`).
 - Deploy server on A (installs PostgreSQL if DSN omitted):
   - `dist/ploy server deploy --address 45.9.42.212`
   - The command prints the generated `cluster_id` and persists a local descriptor under `~/.config/ploy/clusters/`.

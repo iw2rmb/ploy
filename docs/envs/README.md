@@ -50,9 +50,16 @@ defaults change, or components adopt additional configuration.
 
 ## Worker Nodes
 
+- `PLOY_CA_CERT_PEM` — Cluster CA presented to the node for mTLS trust (PEM-encoded).
+  Required for node→server and server→node mTLS connections.
+- `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — The node's TLS certificate and key
+  (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
+  for both server and node flows and writes to `/etc/ploy/pki/node.pem` and
+  `/etc/ploy/pki/node-key.pem`.
+- `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute (default: `1`).
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
   - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
-    
+
     environment:
       PLOY_LIFECYCLE_NET_IGNORE: "docker*,veth*,br-*"
 
@@ -81,6 +88,14 @@ defaults change, or components adopt additional configuration.
   the CLI and node bootstrap commands. When unset, the CLI derives the endpoint
   and CA bundle from the cached cluster descriptor created during
   `ploy server deploy`.
+
+### Server (Control Plane)
+
+- `PLOY_SERVER_HTTP_LISTEN` — Address the server listens on for HTTPS API/SSE (default: `:8443`).
+- `PLOY_SERVER_METRICS_LISTEN` — Address for Prometheus metrics endpoint (default: `:9100`).
+- `PLOY_SERVER_CLUSTER_ID` — Unique identifier for the cluster (set during `ploy server deploy`).
+- `PLOY_SERVER_TLS_CERT` / `PLOY_SERVER_TLS_KEY` — PEM-encoded server TLS certificate and key
+  for the HTTPS API. Issued by the cluster CA during `ploy server deploy`.
 
 ### PKI
 

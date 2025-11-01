@@ -6,7 +6,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Ground Rules
 - [x] Adopt RED → GREEN → REFACTOR for every slice (unit first; E2E later).
-- [ ] Maintain docs parity: update README.md, docs/api, docs/envs, how-to guides per slice.
+- [x] Maintain docs parity: update README.md, docs/api, docs/envs, how-to guides per slice.
 - [ ] Keep coverage ≥60% overall; ≥90% on scheduler/PKI/ingest critical paths.
 - [ ] Verify required envs exist or add TODOs in docs/envs/README.md.
 
