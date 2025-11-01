@@ -660,6 +660,7 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 		var req struct {
 			RunID   string  `json:"run_id"`
 			StageID *string `json:"stage_id,omitempty"`
+			BuildID *string `json:"build_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
 		}
@@ -729,6 +730,20 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
+		// Parse build_id if provided.
+		var buildID pgtype.UUID
+		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
+			buildUUID, err := uuid.Parse(*req.BuildID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("invalid build_id: %v", err), http.StatusBadRequest)
+				return
+			}
+			buildID = pgtype.UUID{
+				Bytes: buildUUID,
+				Valid: true,
+			}
+		}
+
 		// Store the gzipped log chunk in the database.
 		params := store.CreateLogParams{
 			RunID: pgtype.UUID{
@@ -736,7 +751,7 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 				Valid: true,
 			},
 			StageID: stageID,
-			BuildID: pgtype.UUID{}, // Optional, not provided by node agent yet.
+			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
 		}
