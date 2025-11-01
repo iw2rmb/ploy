@@ -139,6 +139,11 @@ defaults change, or components adopt additional configuration.
 
 The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 
+Precedence at server startup:
+- `PLOY_SERVER_PG_DSN` (preferred)
+- `PLOY_POSTGRES_DSN` (alias)
+- `postgres.dsn` in the config file
+
 - `PLOY_SERVER_PG_DSN` — Primary DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
   When `ploy server deploy` runs without `--postgresql-dsn`, the bootstrap installs
