@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -187,6 +188,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 
 	// Register runs endpoints (control plane).
 	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
@@ -814,5 +817,142 @@ func createRunHandler(st store.Store) http.HandlerFunc {
 			"mod_id", req.ModID,
 			"status", "queued",
 		)
+	}
+}
+
+// getRunHandler returns an HTTP handler that retrieves a run by id query parameter.
+func getRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract id from query parameter.
+		runIDStr := r.URL.Query().Get("id")
+		if strings.TrimSpace(runIDStr) == "" {
+			http.Error(w, "id query parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate run_id.
+		runUUID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Get the run from the database.
+		run, err := st.GetRun(r.Context(), pgtype.UUID{
+			Bytes: runUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get run: %v", err), http.StatusInternalServerError)
+			slog.Error("get run: database error", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Build response.
+		resp := struct {
+			ID         string  `json:"id"`
+			ModID      string  `json:"mod_id"`
+			Status     string  `json:"status"`
+			Reason     *string `json:"reason,omitempty"`
+			CreatedAt  string  `json:"created_at"`
+			StartedAt  *string `json:"started_at,omitempty"`
+			FinishedAt *string `json:"finished_at,omitempty"`
+			NodeID     *string `json:"node_id,omitempty"`
+			BaseRef    string  `json:"base_ref"`
+			TargetRef  string  `json:"target_ref"`
+			CommitSha  *string `json:"commit_sha,omitempty"`
+			Stats      *string `json:"stats,omitempty"`
+		}{
+			ID:        uuid.UUID(run.ID.Bytes).String(),
+			ModID:     uuid.UUID(run.ModID.Bytes).String(),
+			Status:    string(run.Status),
+			Reason:    run.Reason,
+			CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
+			BaseRef:   run.BaseRef,
+			TargetRef: run.TargetRef,
+			CommitSha: run.CommitSha,
+		}
+
+		// Handle optional timestamp fields.
+		if run.StartedAt.Valid {
+			startedAt := run.StartedAt.Time.Format(time.RFC3339)
+			resp.StartedAt = &startedAt
+		}
+		if run.FinishedAt.Valid {
+			finishedAt := run.FinishedAt.Time.Format(time.RFC3339)
+			resp.FinishedAt = &finishedAt
+		}
+
+		// Handle optional node_id.
+		if run.NodeID.Valid {
+			nodeID := uuid.UUID(run.NodeID.Bytes).String()
+			resp.NodeID = &nodeID
+		}
+
+		// Handle stats (JSONB).
+		if len(run.Stats) > 0 && string(run.Stats) != "{}" {
+			stats := string(run.Stats)
+			resp.Stats = &stats
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("get run: encode response failed", "err", err)
+		}
+
+		slog.Info("run retrieved", "run_id", resp.ID)
+	}
+}
+
+// deleteRunHandler returns an HTTP handler that deletes a run by id.
+func deleteRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract id from path parameter.
+		runIDStr := r.PathValue("id")
+		if strings.TrimSpace(runIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate run_id.
+		runUUID, err := uuid.Parse(runIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Check if the run exists before attempting to delete.
+		_, err = st.GetRun(r.Context(), pgtype.UUID{
+			Bytes: runUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "run not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
+			slog.Error("delete run: check failed", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		// Delete the run.
+		err = st.DeleteRun(r.Context(), pgtype.UUID{
+			Bytes: runUUID,
+			Valid: true,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to delete run: %v", err), http.StatusInternalServerError)
+			slog.Error("delete run: database error", "run_id", runIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("run deleted", "run_id", runIDStr)
 	}
 }

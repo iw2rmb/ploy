@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -268,6 +269,15 @@ type mockStore struct {
 	createRunParams store.CreateRunParams
 	createRunResult store.Run
 	createRunErr    error
+
+	getRunCalled bool
+	getRunParams pgtype.UUID
+	getRunResult store.Run
+	getRunErr    error
+
+	deleteRunCalled bool
+	deleteRunParams pgtype.UUID
+	deleteRunErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -308,6 +318,18 @@ func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams)
 	m.createRunCalled = true
 	m.createRunParams = params
 	return m.createRunResult, m.createRunErr
+}
+
+func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+	m.getRunCalled = true
+	m.getRunParams = id
+	return m.getRunResult, m.getRunErr
+}
+
+func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
+	m.deleteRunCalled = true
+	m.deleteRunParams = id
+	return m.deleteRunErr
 }
 
 // no-op
@@ -1618,5 +1640,380 @@ func TestCreateRunHandler_WithoutCommitSha(t *testing.T) {
 	}
 	if mockSt.createRunParams.CommitSha != nil {
 		t.Errorf("expected commit_sha to be nil, got %v", mockSt.createRunParams.CommitSha)
+	}
+}
+
+func TestGetRunHandler_Success(t *testing.T) {
+	runID := uuid.New()
+	modID := uuid.New()
+	nodeID := uuid.New()
+	createdAt := time.Now().UTC()
+	startedAt := time.Now().UTC().Add(time.Second)
+	commitSha := "abc123def456"
+	reason := "test reason"
+	stats := `{"foo":"bar"}`
+
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status: store.RunStatusRunning,
+			Reason: &reason,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  createdAt,
+				Valid: true,
+			},
+			StartedAt: pgtype.Timestamptz{
+				Time:  startedAt,
+				Valid: true,
+			},
+			FinishedAt: pgtype.Timestamptz{
+				Valid: false,
+			},
+			NodeID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CommitSha: &commitSha,
+			Stats:     []byte(stats),
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		ID         string  `json:"id"`
+		ModID      string  `json:"mod_id"`
+		Status     string  `json:"status"`
+		Reason     *string `json:"reason,omitempty"`
+		CreatedAt  string  `json:"created_at"`
+		StartedAt  *string `json:"started_at,omitempty"`
+		FinishedAt *string `json:"finished_at,omitempty"`
+		NodeID     *string `json:"node_id,omitempty"`
+		BaseRef    string  `json:"base_ref"`
+		TargetRef  string  `json:"target_ref"`
+		CommitSha  *string `json:"commit_sha,omitempty"`
+		Stats      *string `json:"stats,omitempty"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.ID != runID.String() {
+		t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+	}
+	if resp.ModID != modID.String() {
+		t.Errorf("expected mod_id %s, got %s", modID.String(), resp.ModID)
+	}
+	if resp.Status != "running" {
+		t.Errorf("expected status 'running', got %s", resp.Status)
+	}
+	if resp.Reason == nil || *resp.Reason != reason {
+		t.Errorf("expected reason %q, got %v", reason, resp.Reason)
+	}
+	if resp.CommitSha == nil || *resp.CommitSha != commitSha {
+		t.Errorf("expected commit_sha %q, got %v", commitSha, resp.CommitSha)
+	}
+	if resp.NodeID == nil || *resp.NodeID != nodeID.String() {
+		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp.NodeID)
+	}
+	if resp.Stats == nil || *resp.Stats != stats {
+		t.Errorf("expected stats %q, got %v", stats, resp.Stats)
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+}
+
+func TestGetRunHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id query parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called")
+	}
+}
+
+func TestGetRunHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id=not-a-uuid", nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called")
+	}
+}
+
+func TestGetRunHandler_NotFound(t *testing.T) {
+	runID := uuid.New()
+	mockSt := &mockStore{
+		getRunErr: pgx.ErrNoRows,
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "run not found") {
+		t.Errorf("expected error about run not found, got: %s", body)
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+}
+
+func TestGetRunHandler_DatabaseError(t *testing.T) {
+	runID := uuid.New()
+	mockSt := &mockStore{
+		getRunErr: &pgconn.PgError{Code: "08000"},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?id="+runID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to get run") {
+		t.Errorf("expected error about database failure, got: %s", body)
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+}
+
+func TestDeleteRunHandler_Success(t *testing.T) {
+	runID := uuid.New()
+	modID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+			Stats: []byte("{}"),
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
+
+	handler := deleteRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.deleteRunCalled {
+		t.Fatal("expected DeleteRun to be called")
+	}
+}
+
+func TestDeleteRunHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/", nil)
+	req.SetPathValue("id", "")
+	rr := httptest.NewRecorder()
+
+	handler := deleteRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id path parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called")
+	}
+	if mockSt.deleteRunCalled {
+		t.Fatal("expected DeleteRun not to be called")
+	}
+}
+
+func TestDeleteRunHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/not-a-uuid", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := deleteRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called")
+	}
+	if mockSt.deleteRunCalled {
+		t.Fatal("expected DeleteRun not to be called")
+	}
+}
+
+func TestDeleteRunHandler_NotFound(t *testing.T) {
+	runID := uuid.New()
+	mockSt := &mockStore{
+		getRunErr: pgx.ErrNoRows,
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
+
+	handler := deleteRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "run not found") {
+		t.Errorf("expected error about run not found, got: %s", body)
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if mockSt.deleteRunCalled {
+		t.Fatal("expected DeleteRun not to be called after GetRun failed")
+	}
+}
+
+func TestDeleteRunHandler_DeleteError(t *testing.T) {
+	runID := uuid.New()
+	modID := uuid.New()
+
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+			Stats: []byte("{}"),
+		},
+		deleteRunErr: &pgconn.PgError{Code: "08000"},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
+
+	handler := deleteRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to delete run") {
+		t.Errorf("expected error about delete failure, got: %s", body)
+	}
+
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.deleteRunCalled {
+		t.Fatal("expected DeleteRun to be called")
 	}
 }
