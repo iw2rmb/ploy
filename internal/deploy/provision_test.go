@@ -21,6 +21,11 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	assertContains("export PLOY_SERVER_PG_DSN=\"postgres://user:pass@localhost:5432/ploy?sslmode=disable\"")
 	assertContains("export PLOY_INSTALL_POSTGRESQL=\"true\"")
 	assertContains("export PLOY_CA_CERT_PEM=\"-----BEGIN CERTIFICATE-----")
+
+	// Verify functional body fragments exist
+	assertContains("mkdir -p /etc/ploy/pki")
+	assertContains("cat > /etc/ploy/ployd.yaml")
+	assertContains("systemctl daemon-reload")
 }
 
 func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
@@ -59,4 +64,9 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	if foundInEnvExports {
 		t.Fatalf("PLOY_SERVER_PG_DSN should not be in initial environment exports when installing PostgreSQL")
 	}
+
+	// Verify functional body fragments exist
+	assertContains("mkdir -p /etc/ploy/pki")
+	assertContains("CREATE DATABASE ploy OWNER ploy")
+	assertContains("systemctl enable postgresql")
 }

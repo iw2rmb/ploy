@@ -49,10 +49,132 @@ func PrefixedScript(env map[string]string) string {
 	}
 	// Separator between exports and script body
 	b.WriteString("\n")
-	// Minimal body stub; real provisioning logic lives in the remote bootstraper.
-	b.WriteString("# ploy bootstrap body (stub for unit tests)\n")
-	b.WriteString("derive_postgresql_dsn() {\n")
-	b.WriteString("  : # placeholder; actual DSN derivation happens on target host\n")
-	b.WriteString("}\n")
+	// Functional bootstrap script body
+	b.WriteString("set -euo pipefail\n\n")
+	b.WriteString("# ploy bootstrap script\n\n")
+
+	// Create directories
+	b.WriteString("echo 'Creating ploy directories...'\n")
+	b.WriteString("mkdir -p /etc/ploy/pki\n\n")
+
+	// Write CA and server certs if provided via environment
+	b.WriteString("if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("  echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
+	b.WriteString("  chmod 644 /etc/ploy/pki/ca.crt\n")
+	b.WriteString("fi\n\n")
+
+	b.WriteString("if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("  echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt\n")
+	b.WriteString("  chmod 644 /etc/ploy/pki/server.crt\n")
+	b.WriteString("fi\n\n")
+
+	b.WriteString("if [ -n \"${PLOY_SERVER_KEY_PEM:-}\" ]; then\n")
+	b.WriteString("  echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/server.key\n")
+	b.WriteString("  chmod 600 /etc/ploy/pki/server.key\n")
+	b.WriteString("fi\n\n")
+
+	// PostgreSQL installation
+	b.WriteString("if [ \"${PLOY_INSTALL_POSTGRESQL:-false}\" = \"true\" ]; then\n")
+	b.WriteString("  echo 'Installing PostgreSQL...'\n")
+	b.WriteString("  if command -v apt-get >/dev/null 2>&1; then\n")
+	b.WriteString("    export DEBIAN_FRONTEND=noninteractive\n")
+	b.WriteString("    apt-get update -qq\n")
+	b.WriteString("    apt-get install -y -qq postgresql postgresql-contrib\n")
+	b.WriteString("  elif command -v yum >/dev/null 2>&1; then\n")
+	b.WriteString("    yum install -y -q postgresql-server postgresql-contrib\n")
+	b.WriteString("    postgresql-setup --initdb --unit postgresql\n")
+	b.WriteString("  else\n")
+	b.WriteString("    echo 'Error: Unsupported package manager. Only apt-get and yum are supported.' >&2\n")
+	b.WriteString("    exit 1\n")
+	b.WriteString("  fi\n")
+	b.WriteString("  systemctl enable postgresql\n")
+	b.WriteString("  systemctl start postgresql\n\n")
+
+	// Create database and user
+	b.WriteString("  echo 'Creating ploy database and user...'\n")
+	b.WriteString("  PLOY_DB_PASSWORD=\"$(openssl rand -hex 16)\"\n")
+	b.WriteString("  sudo -u postgres psql -c \"CREATE USER ploy WITH PASSWORD '$PLOY_DB_PASSWORD';\" || true\n")
+	b.WriteString("  sudo -u postgres psql -c \"CREATE DATABASE ploy OWNER ploy;\" || true\n")
+	b.WriteString("  sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE ploy TO ploy;\" || true\n\n")
+
+	// Derive DSN
+	b.WriteString("  export PLOY_SERVER_PG_DSN=\"postgres://ploy:${PLOY_DB_PASSWORD}@localhost:5432/ploy?sslmode=disable\"\n")
+	b.WriteString("  echo 'PostgreSQL configured successfully.'\n")
+	b.WriteString("fi\n\n")
+
+	// Write server config if this is a primary bootstrap
+	b.WriteString("if [ \"${PLOY_BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then\n")
+	b.WriteString("  echo 'Writing server configuration...'\n")
+	b.WriteString("  cat > /etc/ploy/ployd.yaml <<'EOF'\n")
+	b.WriteString("postgres:\n")
+	b.WriteString("  dsn: ${PLOY_SERVER_PG_DSN}\n")
+	b.WriteString("tls:\n")
+	b.WriteString("  ca_cert: /etc/ploy/pki/ca.crt\n")
+	b.WriteString("  cert: /etc/ploy/pki/server.crt\n")
+	b.WriteString("  key: /etc/ploy/pki/server.key\n")
+	b.WriteString("EOF\n\n")
+
+	// Install systemd unit for server
+	b.WriteString("  echo 'Installing ployd systemd unit...'\n")
+	b.WriteString("  cat > /etc/systemd/system/ployd.service <<'EOF'\n")
+	b.WriteString("[Unit]\n")
+	b.WriteString("Description=Ploy Server\n")
+	b.WriteString("After=network.target postgresql.service\n\n")
+	b.WriteString("[Service]\n")
+	b.WriteString("Type=simple\n")
+	b.WriteString("ExecStart=/usr/local/bin/ployd\n")
+	b.WriteString("Restart=always\n")
+	b.WriteString("RestartSec=5\n")
+	b.WriteString("User=root\n")
+	b.WriteString("Environment=PLOY_SERVER_CONFIG=/etc/ploy/ployd.yaml\n\n")
+	b.WriteString("[Install]\n")
+	b.WriteString("WantedBy=multi-user.target\n")
+	b.WriteString("EOF\n\n")
+
+	b.WriteString("  systemctl daemon-reload\n")
+	b.WriteString("  systemctl enable ployd.service\n")
+	b.WriteString("  systemctl start ployd.service\n")
+	b.WriteString("  echo 'Server configuration: /etc/ploy/ployd.yaml'\n")
+	b.WriteString("  echo 'PKI directory: /etc/ploy/pki'\n")
+	b.WriteString("  echo 'Service: ployd.service (active)'\n")
+
+	// Write node config if this is NOT a primary bootstrap
+	b.WriteString("else\n")
+	b.WriteString("  echo 'Writing node configuration...'\n")
+	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<'EOF'\n")
+	b.WriteString("server:\n")
+	b.WriteString("  address: ${PLOY_SERVER_ADDRESS:-}\n")
+	b.WriteString("tls:\n")
+	b.WriteString("  ca_cert: /etc/ploy/pki/ca.crt\n")
+	b.WriteString("  cert: /etc/ploy/pki/node.crt\n")
+	b.WriteString("  key: /etc/ploy/pki/node.key\n")
+	b.WriteString("EOF\n\n")
+
+	// Install systemd unit for node
+	b.WriteString("  echo 'Installing ployd-node systemd unit...'\n")
+	b.WriteString("  cat > /etc/systemd/system/ployd-node.service <<'EOF'\n")
+	b.WriteString("[Unit]\n")
+	b.WriteString("Description=Ploy Node Agent\n")
+	b.WriteString("After=network.target\n\n")
+	b.WriteString("[Service]\n")
+	b.WriteString("Type=simple\n")
+	b.WriteString("ExecStart=/usr/local/bin/ployd-node\n")
+	b.WriteString("Restart=always\n")
+	b.WriteString("RestartSec=5\n")
+	b.WriteString("User=root\n")
+	b.WriteString("Environment=PLOY_NODE_CONFIG=/etc/ploy/ployd-node.yaml\n\n")
+	b.WriteString("[Install]\n")
+	b.WriteString("WantedBy=multi-user.target\n")
+	b.WriteString("EOF\n\n")
+
+	b.WriteString("  systemctl daemon-reload\n")
+	b.WriteString("  systemctl enable ployd-node.service\n")
+	b.WriteString("  systemctl start ployd-node.service\n")
+	b.WriteString("  echo 'Node configuration: /etc/ploy/ployd-node.yaml'\n")
+	b.WriteString("  echo 'PKI directory: /etc/ploy/pki'\n")
+	b.WriteString("  echo 'Service: ployd-node.service (active)'\n")
+	b.WriteString("fi\n\n")
+
+	b.WriteString("echo 'Bootstrap completed successfully.'\n")
 	return b.String()
 }
