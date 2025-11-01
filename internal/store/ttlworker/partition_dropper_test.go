@@ -98,6 +98,16 @@ func TestPartitionPattern(t *testing.T) {
 			wantMonth: "06",
 		},
 		{
+			name:      "month out of range 00",
+			partition: "ploy.logs_2025_00",
+			wantMatch: false,
+		},
+		{
+			name:      "month out of range 13",
+			partition: "ploy.logs_2025_13",
+			wantMatch: false,
+		},
+		{
 			name:      "invalid schema",
 			partition: "public.logs_2025_10",
 			wantMatch: false,
