@@ -185,6 +185,9 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
 
+	// Register runs endpoints (control plane).
+	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
+
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
 		Listen: cfg.Metrics.Listen,
@@ -730,5 +733,86 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(wrapper); err != nil {
 			slog.Error("list mods: encode response failed", "err", err)
 		}
+	}
+}
+
+// createRunHandler returns an HTTP handler that creates a new run.
+func createRunHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Decode request body.
+		var req struct {
+			ModID     string  `json:"mod_id"`
+			BaseRef   string  `json:"base_ref"`
+			TargetRef string  `json:"target_ref"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate required fields.
+		if strings.TrimSpace(req.ModID) == "" {
+			http.Error(w, "mod_id field is required", http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.BaseRef) == "" {
+			http.Error(w, "base_ref field is required", http.StatusBadRequest)
+			return
+		}
+		if strings.TrimSpace(req.TargetRef) == "" {
+			http.Error(w, "target_ref field is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate mod_id format.
+		modUUID, err := uuid.Parse(req.ModID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid mod_id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Create the run with status=queued.
+		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
+			ModID: pgtype.UUID{
+				Bytes: modUUID,
+				Valid: true,
+			},
+			Status:    store.RunStatusQueued,
+			BaseRef:   req.BaseRef,
+			TargetRef: req.TargetRef,
+			CommitSha: req.CommitSha,
+		})
+		if err != nil {
+			// Check if this is a foreign key violation (mod does not exist).
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" { // foreign_key_violation
+				http.Error(w, "mod not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
+			slog.Error("create run: database error", "mod_id", req.ModID, "err", err)
+			return
+		}
+
+		// Build response with run_id.
+		resp := struct {
+			RunID string `json:"run_id"`
+		}{
+			RunID: uuid.UUID(run.ID.Bytes).String(),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("create run: encode response failed", "err", err)
+		}
+
+		slog.Info("run created",
+			"run_id", resp.RunID,
+			"mod_id", req.ModID,
+			"status", "queued",
+		)
 	}
 }
