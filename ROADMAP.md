@@ -33,10 +33,10 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] HTTPS server with mTLS; endpoints: `/v1/run/start`, `/v1/run/stop`.
   - [x] Heartbeat POST with resource snapshot; update `nodes` row.
 
-- [ ] Node execution contract
-  - [ ] Ephemeral workspace + shallow/sparse clone from URL (branch/commit optional, default to remote default/HEAD).
-  - [ ] Execute Build Gate (node-only), stream logs; measure stage/build durations.
-  - [ ] Generate unified diff and upload; enforce client-side caps (≤1 MiB gz per diff/log chunk/bundle).
+- [x] Node execution contract
+  - [x] Ephemeral workspace + shallow/sparse clone from URL (branch/commit optional, default to remote default/HEAD).
+  - [x] Execute Build Gate (node-only), stream logs; measure stage/build durations.
+  - [x] Generate unified diff and upload; enforce client-side caps (≤1 MiB gz per diff/log chunk/bundle).
 
 - [ ] Artifact, diff, and log ingestion (server)
   - [ ] POST endpoints to accept gzipped diffs, log chunks, and artifact bundles.
