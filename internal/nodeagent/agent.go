@@ -202,12 +202,15 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	diffGenerator := step.NewFilesystemDiffGenerator(step.FilesystemDiffGeneratorOptions{})
 
+	gateExecutor := step.NewGateExecutor()
+
 	// Create the step runner with all components.
 	runner := step.Runner{
 		Workspace:  workspaceHydrator,
 		Containers: containerRuntime,
 		Diffs:      diffGenerator,
 		Artifacts:  newSizeLimitedPublisher(artifactPublisher, maxArtifactSize),
+		Gate:       gateExecutor,
 	}
 
 	// Execute the step.
