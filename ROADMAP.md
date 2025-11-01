@@ -1,83 +1,132 @@
-# ROADMAP — Ploy Server/Node Pivot (Postgres, No IPFS)
+# ROADMAP — Complete the SIMPLE Architecture
 
-Key references to keep aligned during implementation:
-- SIMPLE.md — architecture, API surface, caps, security
-- SIMPLE.sql — canonical schema, constraints, indexes, timing view
-- docs/api/OpenAPI.yaml — control-plane + node RPC (switch to mTLS, add new paths)
-- docs/envs/README.md — server/node TLS + PG env vars; remove IPFS/etcd
-- docs/how-to/deploy-a-cluster.md — deployment playbook changes
-- README.md — high-level overview pointing to SIMPLE.md
-- AGENTS.md — VPS lab scope and constraints
+This checklist breaks the migration into the smallest verifiable slices to ship a fully working Ploy aligned with SIMPLE.md. Keep RED → GREEN → REFACTOR. After each slice, run `make test` and sync docs.
 
-Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and update docs with each slice.
+References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, docs/how-to/deploy-a-cluster.md.
 
-## Minimal Checklist
+## Ground Rules
+- [ ] Adopt RED → GREEN → REFACTOR for every slice (unit first; E2E later).
+- [ ] Maintain docs parity: update README.md, docs/api, docs/envs, how-to guides per slice.
+- [ ] Keep coverage ≥60% overall; ≥90% on scheduler/PKI/ingest critical paths.
+- [ ] Verify required envs exist or add TODOs in docs/envs/README.md.
 
-- [x] Add Postgres store scaffolding
-  - [x] Introduce `sqlc.yaml`, `internal/store/migrations/` from SIMPLE.sql, and `internal/store/queries/`.
-  - [x] Wire `pgx/v5` + `pgxpool` in server startup; inject store via interfaces.
+## Naming & Build Surface
+- [ ] Standardize server binary name to `ployd` (keep current path `cmd/ployd`).
+- [ ] Sweep docs for `ployd-server` and replace with `ployd` or add a one-line alias note in README.md.
+- [ ] Ensure `make build` emits `dist/ployd{,-linux}` consistently (Makefile already supports; verify).
 
-- [x] PKI (mTLS) foundation
-  - [x] Implement cluster CA generation and server cert issuance.
-  - [x] Add `/v1/pki/sign` to sign node CSRs; persist node cert metadata (serial/fingerprint/notBefore/notAfter).
+## Server Bootstrap (Unstub cmd/ployd)
+- [ ] Replace `cmd/ployd/main.go` stub with real main: parse config/env, init logging, graceful shutdown.
+- [ ] Wire Postgres store via `PLOY_SERVER_PG_DSN` or `internal/api/config` (fallback to env over file).
+- [ ] Initialize Authorizer (mTLS) from `internal/controlplane/auth` with `RoleControlPlane` default.
+- [ ] Add HTTP mux package `internal/api/httpserver` (new) to mount routes and middlewares.
+- [ ] Expose metrics listener `:9100` (plain HTTP) and API listener `:8443` (TLS/mTLS).
+- [ ] Start background Scheduler `internal/api/scheduler` and TTL workers.
+- [ ] Integrate PKI manager (renew loop) with config hot-reload stub.
 
-- [x] Core control-plane models and endpoints
-  - [x] CRUD: `repos`, `mods`, `runs`; create-run returns `run_id`.
-  - [x] SSE: `/v1/runs/{id}/events` (basic log/event fanout only).
+## API: PKI
+- [ ] Implement `POST /v1/pki/sign` handler (admin-only): parse CSR, sign with cluster CA, persist node cert metadata via store.
+- [ ] Return PEM bundle according to docs/api/components/schemas/pki.yaml.
+- [ ] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
 
-- [x] Scheduler (minimal)
-  - [x] Implement `FOR UPDATE SKIP LOCKED` claim on `runs.status='queued'`.
-  - [x] Record `started_at`/`finished_at`; expose `runs_timing` view.
+## API: Control (Repos/Mods/Runs)
+- [ ] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
+- [ ] `POST /v1/mods/crud` + `GET /v1/mods/crud?repo_id=`.
+- [ ] `POST /v1/runs` (create run; status=queued) returns `{run_id}`.
+- [ ] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
+- [ ] `GET /v1/runs?view=timing` to read from `runs_timing`.
 
-- [x] Node agent (ployd-node) skeleton
-  - [x] HTTPS server with mTLS; endpoints: `/v1/run/start`, `/v1/run/stop`.
-  - [x] Heartbeat POST with resource snapshot; update `nodes` row.
+## API: Events/SSE
+- [ ] Add in-memory log/Event hub using `internal/node/logstream` for SSE fanout.
+- [ ] `GET /v1/runs/{id}/events` (SSE) with Last-Event-ID support.
+- [ ] Wrap DB append so that server both persists events and fans out to SSE.
 
-- [x] Node execution contract
-  - [x] Ephemeral workspace + shallow/sparse clone from URL (branch/commit optional, default to remote default/HEAD).
-  - [x] Execute Build Gate (node-only), stream logs; measure stage/build durations.
-  - [x] Generate unified diff and upload; enforce client-side caps (≤1 MiB gz per diff/log chunk/bundle).
+## API: Node Ingest/Heartbeat
+- [ ] `POST /v1/nodes/{id}/heartbeat`: update `nodes` snapshot (cpu/mem/disk + version) and `last_heartbeat`.
+- [ ] `POST /v1/nodes/{id}/events`: append structured events/log frames to DB (size cap checks) + SSE fanout.
+- [ ] `POST /v1/nodes/{id}/stage/{stage}/diff`: store gzipped diff in `diffs` (≤1 MiB), reject oversize.
+- [ ] `POST /v1/nodes/{id}/stage/{stage}/artifact`: store gzipped bundle in `artifact_bundles` (≤1 MiB), reject oversize.
 
-- [x] Artifact, diff, and log ingestion (server)
-  - [x] POST endpoints to accept gzipped diffs, log chunks, and artifact bundles.
-  - [x] Enforce DB constraints (1 MiB gziped) and reject oversize payloads.
+## Scheduling & Assignment
+- [ ] Implement `ClaimRun` RPC: server assigns one queued run via `FOR UPDATE SKIP LOCKED` (sqlc: `ClaimRun`).
+- [ ] Add server endpoint for claims (pull) or server→node push client (choose pull first per SIMPLE.md).
+- [ ] On assign, set `started_at`, status `assigned` then `running` when node acknowledges.
+- [ ] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
 
-- [x] TTL and partitions
-  - [x] Add TTL worker for `logs`, `events`, `diffs`, `artifact_bundles` (default 30 days for bundles).
-  - [x] Optional: daily partition dropper based on naming scheme (see SIMPLE.md snippet).
+## TTL & Partitions
+- [ ] Mount `internal/store/ttlworker` in server: periodic deletes for `logs/events/diffs/artifact_bundles` older than retention.
+- [ ] Add partition lister + dropper integration (monthly tables) guarded by feature flag.
 
-- [x] CLI commands
-  - [x] `ploy server deploy --address`: install server, create CA, issue server cert, create `cluster_id`, configure `PLOY_SERVER_PG_DSN`.
-    - [x] If `--postgresql-dns` is not provided, install PostgreSQL on the VPS and create DB `ploy`; derive DSN.
-  - [x] `ploy node add --cluster-id --address`: install node, generate key+CSR, call `/v1/pki/sign`, record node IP, configure mTLS.
+## Node Agent (Unstub default build)
+- [ ] Make `cmd/ployd-node/main.go` compile by default (remove `legacy` build tag; gate stub under a `stub` tag).
+- [ ] Ensure config loader `internal/nodeagent/config.go` and server start wire TLS client/server correctly.
+- [ ] Implement `POST /v1/run/start` and `POST /v1/run/stop` handlers (already present under build tag; enable).
+- [ ] Heartbeat manager: confirm `internal/nodeagent/heartbeat.go` posts to server endpoint with mTLS.
+- [ ] Add basic backoff for server 5xx on heartbeat.
 
-- [x] Remove legacy systems (code + scripts + docs)
-  - [x] Purge IPFS Cluster codepaths, health checks, installers, and envs.
-  - [x] Remove etcd clients/publishers and embedded etcd tests.
-  - [x] Drop node labels from APIs/CLI; replace with resource-snapshot scheduling.
-  - [x] Remove token-based auth; update OpenAPI to mTLS-only.
-- [x] Remove `pkg/sshtransport` (no SSH tunnels in new architecture).
+## Node Execution Contract
+- [ ] Ephemeral workspace create/cleanup per run (tmpdir, unique prefix).
+- [ ] Shallow/sparse clone by repo URL; checkout `base_ref` then fetch `target_ref` or `commit_sha`.
+- [ ] Hook Build Gate (re-use lifecycle checker interfaces); capture per-stage/build timings.
+- [ ] Stream logs as gzipped chunks to server; enforce ≤1 MiB client-side cap.
+- [ ] Produce unified diff and summary; gzip and POST to server.
+- [ ] Upload artifact bundles (tar.gz) where configured.
+- [ ] Emit terminal status + cleanup workspace.
 
-- [x] Knowledge Base (in scope)
-  - [x] Keep `ploy knowledge-base ingest/evaluate` working with new layout.
-  - [x] Ensure Mods advisor consumes `configs/knowledge-base/catalog.json` and surfaces recommendations in runs.
-  - [x] Update docs: `configs/knowledge-base/README.md`, CLI reference.
+## Store & Migrations
+- [ ] Apply SIMPLE.sql as migrations under `internal/store/migrations/`; verify `sqlc` queries cover needed paths.
+- [ ] Add migration runner (server startup) that ensures schema present; log version.
+- [ ] Expand/adjust sqlc queries as endpoints require (e.g., list-by-since for events/logs).
 
-- [x] OpenAPI + docs pass
-  - [x] Update `docs/api/OpenAPI.yaml` to new endpoints and mTLS-only auth.
-  - [x] Refresh `docs/envs/README.md` with new envs; mark IPFS/etcd as legacy and remove.
-  - [x] Update how-to deploy and README; point operators to the new CLI flows.
+## CLI Surfaces (Server/Node)
+- [ ] `ploy server deploy`: verify CA+server cert generation, DSN handling, and `deploy.ProvisionHost` call path.
+- [ ] `ploy node add`: implement full provisioning: upload `ployd-node`, CSR flow to `/v1/pki/sign`, install certs, start service.
+- [ ] Save/refresh local cluster descriptor in `~/.config/ploy/clusters/` after each deploy/add.
 
-- [x] Tests and coverage
-  - [x] Unit: scheduler claim fairness/backoff; diff/log ingestion; PKI/CSR flow; resource-cap rejects.
-  - [x] Integration: one server + one node; submit run with a public repo; assert logs/diff stored and TTL job deletes old rows.
-  - [x] Target coverage: ≥60% overall; ≥90% critical runner packages.
+## Bootstrap Script (Replace stub)
+- [ ] Teach `internal/bootstrap.PrefixedScript` to render a functional body:
+  - [ ] Create `/etc/ploy` and `/etc/ploy/pki`; write CA/server certs from env.
+  - [ ] When `PLOY_INSTALL_POSTGRESQL=true`, install PostgreSQL packages.
+  - [ ] Create DB user/db `ploy` with password; derive DSN and export `PLOY_SERVER_PG_DSN`.
+  - [ ] Write server config `/etc/ploy/ployd.yaml` (postgres.dsn + TLS paths).
+  - [ ] Write node config `/etc/ploy/ployd-node.yaml` on non-primary bootstraps.
+  - [ ] Install systemd unit `ployd.service` (server) or `ployd-node.service` (node) with `Restart=always`.
+  - [ ] `systemctl daemon-reload && systemctl enable --now <unit>`.
+  - [ ] Echo final status and key paths.
+- [ ] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
 
-## Acceptance criteria
-- Server starts with Postgres DSN and mTLS; `/v1/runs` + SSE work.
-- Node can receive `/v1/run/start`, fetch repo shallowly, run a build, stream logs, upload diff and an artifact bundle.
-- DB enforces size caps; TTL worker prunes data; indices support basic dashboards via `runs_timing`.
-- No remaining references to IPFS, etcd, tokens, or labels in code or docs.
-- Works on VPS lab: one host as server+Postgres, two hosts as nodes.
-- Migration note honored: no backward compatibility or data migration required; redeploy lab fresh.
-- Knowledge Base CLI and advisor recommendations function as before (catalog from `configs/knowledge-base/catalog.json`).
+## OpenAPI & Docs
+- [ ] Ensure docs/api OpenAPI matches implemented endpoints (PKI, repos/mods/runs, SSE, ingest, heartbeat).
+- [ ] Add examples for heartbeat payload and log/diff upload boundaries.
+- [ ] Update docs/how-to/deploy-a-cluster.md to match real bootstrap behavior (what gets written where).
+- [ ] Update docs/envs/README.md for final env names and defaults encountered in code.
+
+## Security
+- [ ] Enforce TLS 1.3 and client cert verification everywhere (node→server and CLI→server).
+- [ ] Validate roles via `Authorizer` middleware; restrict PKI to `cli-admin`.
+- [ ] Scrub PII from logs via node-side hooks (document a placeholder; no-op first).
+
+## Tests (Unit → Integration → Lab)
+- [ ] Unit: PKI CSR sign success/error paths.
+- [ ] Unit: Authorizer role gates and insecure default off.
+- [ ] Unit: Repos/Mods/Runs handlers JSON and status codes.
+- [ ] Unit: SSE hub resume with Last-Event-ID and concurrent subscribers.
+- [ ] Unit: Ingest caps (oversize gzipped chunks rejected with 413).
+- [ ] Unit: TTL worker deletes rows older than horizon; partition dropper no-ops when none.
+- [ ] Integration (local Postgres via `PLOY_TEST_PG_DSN`): happy path create repo→mod→run; simulate node appends.
+- [ ] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
+- [ ] CLI: `server deploy` flag validation and path resolution; `node add` flag validation + dry-run scaffolding.
+- [ ] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
+
+## Legacy & Dead Code Removal
+- [ ] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
+- [ ] Remove IPFS references and scripts (already mostly gone; sweep `scripts/` and docs).
+- [ ] Delete `cmd/ployd-node/stub.go` once default build is real (or keep under `-tags stub`).
+- [ ] Cull ARCHITECTURE_DIAGRAM.md references to now-removed packages (daemon wiring, legacy paths).
+
+## Acceptance Checklist
+- [ ] Server starts with `PLOY_SERVER_PG_DSN` and serves all documented endpoints over mTLS on `:8443`.
+- [ ] Node starts by default (no build tags) and can run the end-to-end flow: start → stream logs → upload diff/artifacts → finish.
+- [ ] `make test` green; coverage thresholds met; docs up to date.
+- [ ] VPS lab walkthrough in docs executes successfully with the provided IPs and commands.
+
