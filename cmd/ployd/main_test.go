@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -315,6 +318,11 @@ type mockStore struct {
 	createDiffParams store.CreateDiffParams
 	createDiffResult store.Diff
 	createDiffErr    error
+
+	createArtifactBundleCalled bool
+	createArtifactBundleParams store.CreateArtifactBundleParams
+	createArtifactBundleResult store.ArtifactBundle
+	createArtifactBundleErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -409,6 +417,12 @@ func (m *mockStore) CreateDiff(ctx context.Context, params store.CreateDiffParam
 	m.createDiffCalled = true
 	m.createDiffParams = params
 	return m.createDiffResult, m.createDiffErr
+}
+
+func (m *mockStore) CreateArtifactBundle(ctx context.Context, params store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
+	m.createArtifactBundleCalled = true
+	m.createArtifactBundleParams = params
+	return m.createArtifactBundleResult, m.createArtifactBundleErr
 }
 
 // no-op
@@ -3130,35 +3144,35 @@ func TestCreateNodeEventsHandler_PayloadTooLarge(t *testing.T) {
 // Ensure we return 413 when the body exceeds the MaxBytesReader limit
 // even if Content-Length is unknown (streamed/chunked uploads).
 func TestCreateNodeEventsHandler_PayloadTooLarge_Streaming(t *testing.T) {
-    nodeID := uuid.New()
-    runID := uuid.New()
-    mockSt := &mockStore{}
-    eventsService, err := createTestEventsService()
-    if err != nil {
-        t.Fatalf("create events service: %v", err)
-    }
+	nodeID := uuid.New()
+	runID := uuid.New()
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
 
-    // Build a valid JSON payload whose size exceeds 1 MiB by stuffing a large message.
-    big := strings.Repeat("a", 1100*1024) // >1MiB
-    payload := `{"run_id":"` + runID.String() + `","events":[{"level":"info","message":"` + big + `"}]}`
+	// Build a valid JSON payload whose size exceeds 1 MiB by stuffing a large message.
+	big := strings.Repeat("a", 1100*1024) // >1MiB
+	payload := `{"run_id":"` + runID.String() + `","events":[{"level":"info","message":"` + big + `"}]}`
 
-    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
-    req.SetPathValue("id", nodeID.String())
-    req.Header.Set("Content-Type", "application/json")
-    // Pretend Content-Length is unknown to avoid the pre-check branch.
-    req.ContentLength = -1
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	// Pretend Content-Length is unknown to avoid the pre-check branch.
+	req.ContentLength = -1
+	rr := httptest.NewRecorder()
 
-    handler := createNodeEventsHandler(mockSt, eventsService)
-    handler.ServeHTTP(rr, req)
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusRequestEntityTooLarge {
-        t.Fatalf("expected status 413, got %d: %s", rr.Code, rr.Body.String())
-    }
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d: %s", rr.Code, rr.Body.String())
+	}
 
-    if mockSt.getNodeCalled {
-        t.Fatal("expected GetNode not to be called for oversized streaming body")
-    }
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called for oversized streaming body")
+	}
 }
 
 func TestCreateNodeEventsHandler_InvalidJSON(t *testing.T) {
@@ -3444,8 +3458,8 @@ func TestCreateDiffHandler_Success(t *testing.T) {
 			},
 		},
 		getRunResult: store.Run{
-			ID: pgtype.UUID{Bytes: runID, Valid: true},
-			Status: store.RunStatusQueued,
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.RunStatusQueued,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getStageResult: store.Stage{
@@ -3455,11 +3469,11 @@ func TestCreateDiffHandler_Success(t *testing.T) {
 			Status: store.StageStatusRunning,
 		},
 		createDiffResult: store.Diff{
-			ID:      pgtype.UUID{Bytes: diffID, Valid: true},
-			RunID:   pgtype.UUID{Bytes: runID, Valid: true},
-			StageID: pgtype.UUID{Bytes: stageID, Valid: true},
-			Patch:   []byte("gzipped-diff-data"),
-			Summary: []byte(`{"added":10,"removed":5}`),
+			ID:        pgtype.UUID{Bytes: diffID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
+			Patch:     []byte("gzipped-diff-data"),
+			Summary:   []byte(`{"added":10,"removed":5}`),
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 	}
@@ -3496,19 +3510,19 @@ func TestCreateDiffHandler_Success(t *testing.T) {
 		t.Fatal("expected CreateDiff to be called")
 	}
 
-    // Verify response.
-    var resp map[string]interface{}
-    if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-        t.Fatalf("failed to unmarshal response: %v", err)
-    }
+	// Verify response.
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
 
-    idStr, ok := resp["diff_id"].(string)
-    if !ok {
-        t.Fatalf("expected diff_id string in response, got %T (%v)", resp["diff_id"], resp["diff_id"]) 
-    }
-    if idStr != diffID.String() {
-        t.Errorf("unexpected diff_id: got %s want %s", idStr, diffID.String())
-    }
+	idStr, ok := resp["diff_id"].(string)
+	if !ok {
+		t.Fatalf("expected diff_id string in response, got %T (%v)", resp["diff_id"], resp["diff_id"])
+	}
+	if idStr != diffID.String() {
+		t.Errorf("unexpected diff_id: got %s want %s", idStr, diffID.String())
+	}
 }
 
 func TestCreateDiffHandler_MissingNodeID(t *testing.T) {
@@ -3598,8 +3612,8 @@ func TestCreateDiffHandler_PayloadTooLarge(t *testing.T) {
 	nodeID := uuid.New()
 	stageID := uuid.New()
 
-    // Create a payload larger than body cap (2 MiB).
-    largePayload := make([]byte, 2<<20+1)
+	// Create a payload larger than body cap (2 MiB).
+	largePayload := make([]byte, 2<<20+1)
 	for i := range largePayload {
 		largePayload[i] = 'A'
 	}
@@ -3627,8 +3641,8 @@ func TestCreateDiffHandler_PayloadTooLarge_Streaming(t *testing.T) {
 	nodeID := uuid.New()
 	stageID := uuid.New()
 
-    // Create a JSON payload that is valid but exceeds 2 MiB when read.
-    largePatch := strings.Repeat("A", 2<<20)
+	// Create a JSON payload that is valid but exceeds 2 MiB when read.
+	largePatch := strings.Repeat("A", 2<<20)
 	payload := `{
 		"run_id": "` + uuid.New().String() + `",
 		"patch": "` + largePatch + `"
@@ -3866,8 +3880,8 @@ func TestCreateDiffHandler_StageNotFound(t *testing.T) {
 			},
 		},
 		getRunResult: store.Run{
-			ID: pgtype.UUID{Bytes: runID, Valid: true},
-			Status: store.RunStatusQueued,
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.RunStatusQueued,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getStageErr: pgx.ErrNoRows,
@@ -3926,8 +3940,8 @@ func TestCreateDiffHandler_CreateDiffError(t *testing.T) {
 			},
 		},
 		getRunResult: store.Run{
-			ID: pgtype.UUID{Bytes: runID, Valid: true},
-			Status: store.RunStatusQueued,
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.RunStatusQueued,
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 		},
 		getStageResult: store.Stage{
@@ -3977,90 +3991,652 @@ func TestCreateDiffHandler_CreateDiffError(t *testing.T) {
 }
 
 func TestCreateDiffHandler_PatchBytesTooLarge(t *testing.T) {
-    // Ensure that when the decoded patch bytes exceed 1 MiB, we return 413,
-    // even if the JSON body stays under the 2 MiB body cap.
-    nodeID := uuid.New()
-    stageID := uuid.New()
-    runID := uuid.New()
-    version := "1.0.0"
+	// Ensure that when the decoded patch bytes exceed 1 MiB, we return 413,
+	// even if the JSON body stays under the 2 MiB body cap.
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
 
-    mockSt := &mockStore{
-        getNodeResult: store.Node{
-            ID: pgtype.UUID{Bytes: nodeID, Valid: true},
-            Name: "test-node",
-            IpAddress: netip.MustParseAddr("192.168.1.100"),
-            Version: &version,
-            CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-        },
-        getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
-        getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
-    }
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID:        pgtype.UUID{Bytes: nodeID, Valid: true},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getRunResult:   store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+	}
 
-    // Construct a base64 string that decodes to >1 MiB.
-    // Using only 'A' chars keeps it valid base64; length must be a multiple of 4.
-    // (len/4)*3 = 1,048,578 bytes (> 1 MiB) for len=1,398,104.
-    b64 := strings.Repeat("A", 1_398_104)
-    payload := `{
+	// Construct a base64 string that decodes to >1 MiB.
+	// Using only 'A' chars keeps it valid base64; length must be a multiple of 4.
+	// (len/4)*3 = 1,048,578 bytes (> 1 MiB) for len=1,398,104.
+	b64 := strings.Repeat("A", 1_398_104)
+	payload := `{
         "run_id": "` + runID.String() + `",
         "patch": "` + b64 + `"
     }`
 
-    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
-    req.SetPathValue("id", nodeID.String())
-    req.SetPathValue("stage", stageID.String())
-    req.Header.Set("Content-Type", "application/json")
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
 
-    handler := createDiffHandler(mockSt)
-    handler.ServeHTTP(rr, req)
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusRequestEntityTooLarge {
-        t.Fatalf("expected status 413 for oversized decoded patch, got %d", rr.Code)
-    }
-    if !strings.Contains(rr.Body.String(), "diff size exceeds 1 MiB cap") {
-        t.Errorf("expected error about size cap, got: %s", rr.Body.String())
-    }
-    // No DB create should have happened.
-    if mockSt.createDiffCalled {
-        t.Fatal("expected CreateDiff not to be called when patch too large")
-    }
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413 for oversized decoded patch, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "diff size exceeds 1 MiB cap") {
+		t.Errorf("expected error about size cap, got: %s", rr.Body.String())
+	}
+	// No DB create should have happened.
+	if mockSt.createDiffCalled {
+		t.Fatal("expected CreateDiff not to be called when patch too large")
+	}
 }
 
 func TestCreateDiffHandler_StageRunMismatch(t *testing.T) {
-    nodeID := uuid.New()
-    stageID := uuid.New()
-    runID := uuid.New()
-    otherRunID := uuid.New()
-    version := "1.0.0"
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	otherRunID := uuid.New()
+	version := "1.0.0"
 
-    mockSt := &mockStore{
-        getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
-        getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
-        // Stage belongs to a different run.
-        getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: otherRunID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
-    }
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		// Stage belongs to a different run.
+		getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: otherRunID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+	}
 
-    payload := `{
+	payload := `{
         "run_id": "` + runID.String() + `",
         "patch": "Z3ppcHBlZC1kaWZm"
     }`
 
-    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
-    req.SetPathValue("id", nodeID.String())
-    req.SetPathValue("stage", stageID.String())
-    req.Header.Set("Content-Type", "application/json")
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
 
-    handler := createDiffHandler(mockSt)
-    handler.ServeHTTP(rr, req)
+	handler := createDiffHandler(mockSt)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusBadRequest {
-        t.Fatalf("expected status 400 on stage/run mismatch, got %d", rr.Code)
-    }
-    if !strings.Contains(rr.Body.String(), "stage does not belong to run") {
-        t.Errorf("expected mismatch error message, got: %s", rr.Body.String())
-    }
-    if mockSt.createDiffCalled {
-        t.Fatal("expected CreateDiff not to be called on stage/run mismatch")
-    }
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 on stage/run mismatch, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "stage does not belong to run") {
+		t.Errorf("expected mismatch error message, got: %s", rr.Body.String())
+	}
+	if mockSt.createDiffCalled {
+		t.Fatal("expected CreateDiff not to be called on stage/run mismatch")
+	}
+}
+
+func TestCreateArtifactBundleHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	buildID := uuid.New()
+	artifactID := uuid.New()
+	version := "1.0.0"
+	artifactName := "build-output.tar.gz"
+
+	mockSt := &mockStore{
+		getNodeResult:              store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:               store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getStageResult:             store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+		createArtifactBundleResult: store.ArtifactBundle{ID: pgtype.UUID{Bytes: artifactID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, StageID: pgtype.UUID{Bytes: stageID, Valid: true}, BuildID: pgtype.UUID{Bytes: buildID, Valid: true}, Name: &artifactName, Bundle: []byte("gzipped-bundle"), CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"build_id": "` + buildID.String() + `",
+		"name": "build-output.tar.gz",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if !mockSt.createArtifactBundleCalled {
+		t.Fatal("expected CreateArtifactBundle to be called")
+	}
+
+	// Verify response.
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	idStr, ok := resp["artifact_bundle_id"].(string)
+	if !ok {
+		t.Fatalf("expected artifact_bundle_id string in response, got %T (%v)", resp["artifact_bundle_id"], resp["artifact_bundle_id"])
+	}
+	if idStr != artifactID.String() {
+		t.Errorf("unexpected artifact_bundle_id: got %s want %s", idStr, artifactID.String())
+	}
+}
+
+func TestCreateArtifactBundleHandler_MissingNodeID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//stage/"+uuid.New().String()+"/artifact", nil)
+	req.SetPathValue("id", "")
+	req.SetPathValue("stage", uuid.New().String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_InvalidNodeID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid-uuid/stage/"+uuid.New().String()+"/artifact", nil)
+	req.SetPathValue("id", "invalid-uuid")
+	req.SetPathValue("stage", uuid.New().String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_MissingStageID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage//artifact", nil)
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", "")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_InvalidStageID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/invalid-uuid/artifact", nil)
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", "invalid-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_PayloadTooLarge(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	// Create a payload that exceeds 2 MiB.
+	largePayload := make([]byte, 2<<20+1)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", bytes.NewReader(largePayload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", rr.Code)
+	}
+}
+
+func TestCreateArtifactBundleHandler_PayloadTooLarge_Streaming(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	// Create a large JSON payload that exceeds 2 MiB with proper structure.
+	largeBundle := make([]byte, 2<<20+1)
+	payload := fmt.Sprintf(`{"run_id": "%s", "bundle": "%s"}`, uuid.New().String(), string(largeBundle))
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", rr.Code)
+	}
+}
+
+func TestCreateArtifactBundleHandler_InvalidJSON(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader("not-json"))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+}
+
+func TestCreateArtifactBundleHandler_MissingRunID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_InvalidRunID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+
+	payload := `{
+		"run_id": "invalid-uuid",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_InvalidBuildID(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"build_id": "invalid-uuid",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_MissingBundle(t *testing.T) {
+	mockSt := &mockStore{}
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+
+	payload := `{
+		"run_id": "` + runID.String() + `"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_NodeNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+
+	mockSt := &mockStore{
+		getNodeErr: pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if mockSt.getRunCalled {
+		t.Fatal("expected GetRun not to be called when node not found")
+	}
+}
+
+func TestCreateArtifactBundleHandler_RunNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunErr:     pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if mockSt.getStageCalled {
+		t.Fatal("expected GetStage not to be called when run not found")
+	}
+}
+
+func TestCreateArtifactBundleHandler_StageNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getStageErr:   pgx.ErrNoRows,
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if mockSt.createArtifactBundleCalled {
+		t.Fatal("expected CreateArtifactBundle not to be called when stage not found")
+	}
+}
+
+func TestCreateArtifactBundleHandler_CreateArtifactBundleError(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult:           store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:            store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getStageResult:          store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+		createArtifactBundleErr: errors.New("db error"),
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.getStageCalled {
+		t.Fatal("expected GetStage to be called")
+	}
+	if !mockSt.createArtifactBundleCalled {
+		t.Fatal("expected CreateArtifactBundle to be called")
+	}
+}
+
+func TestCreateArtifactBundleHandler_BundleBytesTooLarge(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult:  store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:   store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+	}
+
+	// Create a bundle that exceeds 1 MiB when decoded.
+	largeBundle := make([]byte, 1<<20+1) // 1 MiB + 1 byte
+	for i := range largeBundle {
+		largeBundle[i] = byte(i % 256)
+	}
+	encodedBundle := base64.StdEncoding.EncodeToString(largeBundle)
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "` + encodedBundle + `"
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "exceeds 1 MiB cap") {
+		t.Errorf("expected size cap error message, got: %s", rr.Body.String())
+	}
+	// No DB create should have happened.
+	if mockSt.createArtifactBundleCalled {
+		t.Fatal("expected CreateArtifactBundle not to be called when bundle too large")
+	}
+}
+
+func TestCreateArtifactBundleHandler_StageRunMismatch(t *testing.T) {
+	nodeID := uuid.New()
+	stageID := uuid.New()
+	runID := uuid.New()
+	otherRunID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		// Stage belongs to a different run.
+		getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: otherRunID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"bundle": "Z3ppcHBlZC1idW5kbGU="
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/artifact", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.SetPathValue("stage", stageID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createArtifactBundleHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400 on stage/run mismatch, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "stage does not belong to run") {
+		t.Errorf("expected mismatch error message, got: %s", rr.Body.String())
+	}
+	if mockSt.createArtifactBundleCalled {
+		t.Fatal("expected CreateArtifactBundle not to be called on stage/run mismatch")
+	}
 }
