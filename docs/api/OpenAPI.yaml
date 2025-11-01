@@ -70,6 +70,9 @@ paths:
   # Node heartbeat endpoint
   /v1/nodes/{id}/heartbeat:
     $ref: './paths/nodes_id_heartbeat.yaml'
+  # Node claim endpoint (pull-based work assignment)
+  /v1/nodes/{id}/claim:
+    $ref: './paths/nodes_id_claim.yaml'
   # Node events endpoint
   /v1/nodes/{id}/events:
     $ref: './paths/nodes_id_events.yaml'
@@ -115,6 +118,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
     CreateRunResponse:
       $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
+    NodeClaimResponse:
+      $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
     Event:
       $ref: './components/schemas/controlplane.yaml#/Event'
     Stage:

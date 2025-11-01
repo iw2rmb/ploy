@@ -1,0 +1,29 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Claim a queued run for execution (node → server)
+  description: |
+    Nodes poll this endpoint to claim a single queued run. The server performs
+    an atomic assignment using `FOR UPDATE SKIP LOCKED` and returns the run
+    details if available. When no runs are available, the server returns `204 No Content`.
+  responses:
+    '200':
+      description: Run successfully claimed and assigned to the node
+      content:
+        application/json:
+          schema:
+            $ref: '../OpenAPI.yaml#/components/schemas/NodeClaimResponse'
+    '204':
+      description: No queued runs available to claim
+    '400':
+      description: Bad Request (invalid node ID)
+    '404':
+      description: Node not found
+    '500':
+      description: Internal server error
+
