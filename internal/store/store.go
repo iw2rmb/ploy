@@ -13,6 +13,7 @@ import (
 type Store interface {
 	Querier
 	Close()
+	Pool() *pgxpool.Pool
 }
 
 // PgStore wraps a pgxpool connection pool and implements Store.
@@ -52,4 +53,11 @@ func (s *PgStore) Close() {
 	if s.pool != nil {
 		s.pool.Close()
 	}
+}
+
+// Pool returns the underlying connection pool.
+// This is useful for operations that need direct pool access,
+// such as partition management.
+func (s *PgStore) Pool() *pgxpool.Pool {
+	return s.pool
 }

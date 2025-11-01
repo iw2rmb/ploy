@@ -17,3 +17,27 @@ WHERE created_at < $1;
 -- DeleteExpiredArtifactBundles removes artifact bundle rows older than the specified timestamp.
 DELETE FROM artifact_bundles
 WHERE created_at < $1;
+
+-- name: ListLogPartitions :many
+-- ListLogPartitions retrieves all partition names for the logs table.
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.logs'::regclass;
+
+-- name: ListEventPartitions :many
+-- ListEventPartitions retrieves all partition names for the events table.
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.events'::regclass;
+
+-- name: ListArtifactBundlePartitions :many
+-- ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.artifact_bundles'::regclass;
+
+-- name: ListNodeMetricsPartitions :many
+-- ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.node_metrics'::regclass;

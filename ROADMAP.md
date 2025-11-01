@@ -44,7 +44,7 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
 
 - [x] TTL and partitions
   - [x] Add TTL worker for `logs`, `events`, `diffs`, `artifact_bundles` (default 30 days for bundles).
-  - [ ] Optional: daily partition dropper based on naming scheme (see SIMPLE.md snippet).
+  - [x] Optional: daily partition dropper based on naming scheme (see SIMPLE.md snippet).
 
 - [ ] CLI commands
   - [ ] `ploy server deploy --address`: install server, create CA, issue server cert, create `cluster_id`, configure `PLOY_SERVER_PG_DSN`.
