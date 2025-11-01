@@ -1,5 +1,5 @@
-//go:build legacy
-// +build legacy
+//go:build !stub
+// +build !stub
 
 package main
 
