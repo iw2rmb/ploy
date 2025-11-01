@@ -35,6 +35,34 @@ post:
             summary:
               type: object
               description: Optional summary metadata (stored as JSONB)
+        examples:
+          minimal_diff:
+            summary: Minimal diff upload
+            description: |
+              Basic diff upload with gzipped unified diff data (base64-encoded).
+              The patch field contains the gzipped diff limited to 1 MiB.
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              patch: "H4sIAAAAAAAA/0rOyS9NScxRKM8vyknV1VHIT0/VLy4pysxL1wEAAAD//3fmxMMbAAAA"
+          with_summary:
+            summary: Diff upload with summary metadata
+            description: |
+              Example including optional summary with metadata about the changes.
+              Summary is stored as JSONB and can contain arbitrary structured data.
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              patch: "H4sIAAAAAAAA/0rOyS9NScxRKM8vyknV1VHIT0/VLy4pysxL1wEAAAD//3fmxMMbAAAA"
+              summary:
+                files_changed: 3
+                insertions: 42
+                deletions: 17
+                is_conflict: false
+          size_limit:
+            summary: Maximum size boundary
+            description: |
+              The decoded gzipped patch is capped at 1 MiB (1048576 bytes).
+              The JSON body limit is 2 MiB to accommodate base64 encoding overhead (~33%).
+              Server returns 413 if decoded patch exceeds 1 MiB or body exceeds 2 MiB.
   responses:
     '201':
       description: Created
