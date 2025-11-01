@@ -122,6 +122,8 @@ func setupTestGitRepo(t *testing.T, variant string) string {
 
 	// Initialize git repo.
 	runCmd(t, repoDir, "git", "init")
+	// Ensure the default branch is 'main' for deterministic tests across environments.
+	runCmd(t, repoDir, "git", "checkout", "-b", "main")
 	runCmd(t, repoDir, "git", "config", "user.name", "Test User")
 	runCmd(t, repoDir, "git", "config", "user.email", "test@example.com")
 
