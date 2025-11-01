@@ -2,11 +2,12 @@ package httpserver
 
 import (
 	"context"
-	"github.com/iw2rmb/ploy/internal/config/gitlab"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/config/gitlab"
 )
 
 func (s *controlPlaneServer) handleSignerSecrets(w http.ResponseWriter, r *http.Request) {

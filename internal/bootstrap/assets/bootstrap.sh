@@ -62,6 +62,8 @@ source "${LIB_DIR}/docker.sh"
 source "${LIB_DIR}/ployd.sh"
 # shellcheck disable=SC1091
 source "${LIB_DIR}/tools.sh"
+# shellcheck disable=SC1091
+source "${LIB_DIR}/postgresql.sh"
 
 trap restart_stopped_services EXIT
 
@@ -95,6 +97,8 @@ main() {
   check_disk_space "$WORKDIR"
   check_required_ports
   prepare_workspace
+  install_postgresql
+  write_pki_certificates
   install_etcd
   install_ipfs_cluster
   install_docker

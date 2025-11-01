@@ -56,3 +56,13 @@ func randomHexString(length int) (string, error) {
 	}
 	return hexStr, nil
 }
+
+// GenerateClusterID creates a new cluster identifier using random bytes.
+// Returns a string in the format "cluster-<16 hex chars>".
+func GenerateClusterID() (string, error) {
+	hexPart, err := randomHexString(16)
+	if err != nil {
+		return "", fmt.Errorf("generate cluster id: %w", err)
+	}
+	return fmt.Sprintf("cluster-%s", hexPart), nil
+}

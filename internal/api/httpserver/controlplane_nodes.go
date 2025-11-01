@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/controlplane/registry"
-	"github.com/iw2rmb/ploy/internal/deploy"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
+	"github.com/iw2rmb/ploy/internal/deploy"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 func (s *controlPlaneServer) handleNodes(w http.ResponseWriter, r *http.Request) {

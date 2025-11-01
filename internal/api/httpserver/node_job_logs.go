@@ -2,10 +2,11 @@ package httpserver
 
 import (
 	"encoding/json"
-	"github.com/gofiber/fiber/v2"
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"strings"
 	"time"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // handleNodeJobLogsSnapshot serves GET /v1/node/jobs/:jobID/logs/snapshot.
