@@ -17,7 +17,7 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 │   ├── api/               # HTTP and daemon components
 │   │   ├── config/        # Configuration loading and types
 │   │   ├── daemon/        # Daemon initialization (default.go is main entry)
-│   │   ├── httpserver/    # Fiber HTTP server and endpoints
+│   │   ├── httpserver/    # HTTP server (net/http ServeMux)
 │   │   ├── pki/           # PKI/certificate management
 │   │   ├── controlplane/  # Control-plane handlers
 │   │   ├── admin/         # Admin service (node registration)
@@ -91,11 +91,10 @@ This is the **primary integration point** where all major components wire togeth
    - Uses `fileRotator` to ensure certificate files exist
    - Default renewal interval: `cfg.PKI.RenewBefore` (default 1 hour)
 
-7. **HTTP Server** (lines 212-223)
-   - Fiber-based server with:
-     - Node-local endpoints (`/v1/node/*`)
-     - Admin registration endpoints (`/v1/admin/*`)
-     - Control-plane routes (`/v1/*`, `/v2/*`, `/metrics`)
+7. **HTTP Server** (internal/api/httpserver)
+   - Thin wrapper around the standard library `http.ServeMux`
+   - Supports TLS 1.3 and optional mutual TLS (mTLS)
+   - Route mounting helpers with role-based middleware via `internal/controlplane/auth`
 
 8. **Lifecycle Collector & Publisher** (lines 153-209)
    - Collects node health data (Docker, IPFS, Java build gate readiness)
@@ -119,10 +118,10 @@ This is the **primary integration point** where all major components wire togeth
 ## Server Implementation: internal/api/httpserver/server.go
 
 ### HTTP Server Structure
-- Uses **Fiber v2** framework for request handling
-- TLS support: Configurable via `cfg.HTTP.TLS.Enabled`, `CertPath`, `KeyPath`
-- Graceful shutdown with timeout (5 seconds)
-- Configuration hot-reload via `Reload()` method
+- Standard library `net/http` with `http.ServeMux`
+- TLS support: Configurable via `cfg.HTTP.TLS` (TLS 1.3 minimum)
+- Optional mTLS via `ClientCAPath` + `RequireClientCert`
+- Graceful shutdown using `(*http.Server).Shutdown`
 
 ### Route Mounting (lines 224-243)
 
@@ -137,29 +136,11 @@ This is the **primary integration point** where all major components wire togeth
 - `POST /v1/node/jobs/{jobID}/cancel` — Cancel running job
 - `POST /v1/admin/nodes` — Node registration (via `AdminService.RegisterNode`)
 
-**Control-Plane Routes** (mutual TLS + bearer token + scope-based):
-- All routes under `/v1/*` and `/v2/*` are delegated to `controlPlaneHandler`
-- Also includes `/metrics` (Prometheus)
+**Control-Plane Routes**: Deferred to future ROADMAP slices (not implemented in this package yet).
 
-## Control-Plane API Handler: internal/api/httpserver/controlplane_server.go
+## Control-Plane API Handler
 
-### Security Architecture
-1. **Mutual TLS** (requires client certificate)
-   - Enforced by `security.Manager.Middleware()`
-   - Checks `r.TLS.PeerCertificates` or `r.TLS.VerifiedChains`
-
-2. **Bearer Token Authentication**
-   - Extracted from `Authorization: Bearer <token>` header
-   - Verified via `TokenVerifier.Verify()` interface
-   - Returns `Principal` with scopes and expiry
-
-3. **Scope-Based Authorization**
-   - Scopes: `admin`, `mods`, `jobs`, `artifact.read`, `artifact.write`, `registry.pull`, `registry.push`
-   - Enforced per route via `registerRoute(..., scopes...)`
-
-4. **Role-Based Access Control** (optional)
-   - Roles: `RoleControlPlane`, `RoleCLIAdmin`, `RoleWorker`
-   - Applied via `Authorizer.Middleware(roles...)`
+Not implemented in this slice. The httpserver package only provides the HTTP mux and TLS/mTLS scaffolding. Control‑plane routes, bearer auth, and scope enforcement will be introduced in later ROADMAP items.
 
 ### Registered Routes
 
@@ -324,13 +305,10 @@ ployd bootstrap-ca \
 3. Both require CA bundle for verification
 
 ### Bearer Token Authentication
-- Managed by `httpserver/security/security.go`
-- Token verified via `TokenVerifier` interface
-- Principal stored in context via `WithPrincipal()`
+Planned for future slices. Current server uses only mTLS with optional role gating via `internal/controlplane/auth`.
 
 ### Scope-Based Access Control
-- Defined in `httpserver/security/security.go`: `ScopeAdmin`, `ScopeMods`, `ScopeJobs`, etc.
-- Enforced per route in `controlplane_server.go::registerRoute()`
+Planned for future slices alongside bearer tokens.
 
 ### Role-Based Access Control
 - Defined in `controlplane/auth/` (not shown in detail)
@@ -341,11 +319,11 @@ ployd bootstrap-ca \
 
 1. **Daemon Startup** → `cmd/ployd/main.go` → `daemon.NewDefault(cfg)`
 2. **Config Loading** → `internal/api/config/loader.go`
-3. **HTTP Server** → `internal/api/httpserver/server.go` (Fiber)
-4. **Control-Plane Handler** → `internal/api/httpserver/controlplane_server.go` (http.ServeMux)
+3. **HTTP Server** → `internal/api/httpserver/server.go` (net/http ServeMux)
+4. **Control-Plane Handler** → pending (future slice per ROADMAP)
 5. **PKI Management** → `internal/api/pki/manager.go` + `cmd/ployd/bootstrap_ca.go`
 6. **Database** → `internal/store/store.go` (pgx + sqlc)
-7. **Security** → `internal/api/httpserver/security/security.go`
+7. **Security** → role middleware via `internal/controlplane/auth`
 8. **Authorization** → `internal/controlplane/auth/` (roles)
 9. **Node Coordination** → etcd via `internal/api/daemon/default.go::buildControlPlaneHTTP()`
 
@@ -357,9 +335,9 @@ ployd bootstrap-ca \
 | `cmd/ployd/bootstrap_ca.go` | PKI bootstrap utility |
 | `internal/api/daemon/default.go` | Component wiring and initialization |
 | `internal/api/daemon/daemon.go` | Daemon interface and lifecycle |
-| `internal/api/httpserver/server.go` | Fiber HTTP server |
-| `internal/api/httpserver/controlplane_server.go` | Control-plane route registration |
-| `internal/api/httpserver/security/security.go` | Bearer token + mutual TLS middleware |
+| `internal/api/httpserver/server.go` | HTTP server (net/http mux) |
+| (future) control-plane handler | Pending in subsequent roadmap slice |
+| (future) security middleware | Bearer/scopes to be added later |
 | `internal/api/pki/manager.go` | Certificate renewal orchestration |
 | `internal/api/config/types.go` | Configuration struct definitions |
 | `internal/api/config/loader.go` | YAML config loading |

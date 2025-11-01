@@ -88,10 +88,9 @@ All components are wired in `daemon.NewDefault()`:
   - Ensures encryption and client identity via certificates
   - Roles (RoleControlPlane, RoleCLIAdmin, RoleWorker) applied inside handlers
 
-### 4. Fiber + Standard Library
-- **Fiber app**: Handles node-local endpoints, admin endpoints
-- **http.ServeMux**: Handles control-plane endpoints (for better middleware composition)
-- Both mounted in the same server via Fiber's adaptor
+### 4. HTTP Using net/http
+- **http.ServeMux**: Thin server wrapper for route mounting
+- Future slices will add control-plane and metrics endpoints
 
 ### 5. PostgreSQL with sqlc
 - Eliminates ORM boilerplate

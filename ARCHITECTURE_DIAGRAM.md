@@ -70,7 +70,7 @@
 │  └──────────────────────────────────────────────────────────┘  │
 │                                                                   │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │ 8. HTTP Server (Fiber v2)                                │  │
+│  │ 8. HTTP Server (net/http ServeMux)                       │  │
 │  │    → Node-local endpoints (/v1/node/*)                   │  │
 │  │    → Admin endpoints (/v1/admin/*)                       │  │
 │  │    → Control-plane routes (delegated handler)            │  │

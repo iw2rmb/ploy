@@ -66,7 +66,7 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 - **Metrics**: Prometheus
 
 ### Key Components
-1. **HTTP Server** (Fiber + standard library)
+1. **HTTP Server** (net/http ServeMux)
 2. **PKI Manager** (certificate renewal)
 3. **PostgreSQL Store** (pgx + sqlc)
 4. **Control-Plane Client** (mTLS to control-plane)
