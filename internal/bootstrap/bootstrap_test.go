@@ -101,11 +101,20 @@ func TestPrefixedScript_PostgreSQLInstallation(t *testing.T) {
 	if !strings.Contains(script, "if [ \"${PLOY_INSTALL_POSTGRESQL:-false}\" = \"true\" ]; then") {
 		t.Fatalf("script should check PLOY_INSTALL_POSTGRESQL flag")
 	}
+	if !strings.Contains(script, "DEBIAN_FRONTEND=noninteractive") {
+		t.Fatalf("script should set DEBIAN_FRONTEND for apt installs")
+	}
+	if !strings.Contains(script, "apt-get update -qq") {
+		t.Fatalf("script should run apt-get update -qq before install")
+	}
 	if !strings.Contains(script, "apt-get install -y -qq postgresql postgresql-contrib") {
 		t.Fatalf("script should install PostgreSQL via apt-get")
 	}
 	if !strings.Contains(script, "yum install -y -q postgresql-server postgresql-contrib") {
 		t.Fatalf("script should install PostgreSQL via yum")
+	}
+	if !strings.Contains(script, "postgresql-setup --initdb --unit postgresql") {
+		t.Fatalf("script should initialize postgres on RHEL via postgresql-setup")
 	}
 	if !strings.Contains(script, "CREATE USER ploy WITH PASSWORD") {
 		t.Fatalf("script should create ploy database user")
