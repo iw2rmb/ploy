@@ -33,6 +33,7 @@ type Querier interface {
 	ListRepos(ctx context.Context) ([]Repo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, error)
+	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 }

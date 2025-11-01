@@ -32,3 +32,12 @@ WHERE id = $1;
 -- name: DeleteNode :exec
 DELETE FROM nodes
 WHERE id = $1;
+
+-- name: UpdateNodeCertMetadata :exec
+UPDATE nodes
+SET
+  cert_serial = $2,
+  cert_fingerprint = $3,
+  cert_not_before = $4,
+  cert_not_after = $5
+WHERE id = $1;

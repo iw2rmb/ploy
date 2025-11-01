@@ -186,6 +186,7 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	h.registerRoute(mux, http.MethodGet, "/v1/status", h.handleStatusSummary, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/security/ca", h.handleSecurityCA, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodPost, "/v1/security/certificates/control-plane", h.handleControlPlaneCertificate, httpsecurity.ScopeAdmin)
+	h.registerRoute(mux, http.MethodPost, "/v1/pki/sign", h.handlePKISign, httpsecurity.ScopeAdmin)
 	h.registerRoute(mux, http.MethodGet, "/v1/version", h.handleVersion)
 	if h.mods != nil {
 		h.registerRoute(mux, http.MethodPost, "/v1/mods", h.handleModsSubmit, httpsecurity.ScopeMods)
