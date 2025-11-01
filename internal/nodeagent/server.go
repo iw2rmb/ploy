@@ -1,17 +1,18 @@
 package nodeagent
 
 import (
-	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"errors"
-	"fmt"
-	"net"
-	"net/http"
-	"os"
-	"strings"
-	"sync"
-	"time"
+    "context"
+    "crypto/tls"
+    "crypto/x509"
+    "errors"
+    "fmt"
+    "log/slog"
+    "net"
+    "net/http"
+    "os"
+    "strings"
+    "sync"
+    "time"
 )
 
 // RunController manages run lifecycle on the node.
@@ -74,11 +75,11 @@ func (s *Server) Start(ctx context.Context) error {
 	s.running = true
 	s.mu.Unlock()
 
-	go func() {
-		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			fmt.Fprintf(os.Stderr, "[ployd-node/http] server stopped: %v\n", err) //nolint:forbidigo
-		}
-	}()
+    go func() {
+        if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+            slog.Error("http server stopped", "err", err)
+        }
+    }()
 
 	return nil
 }
