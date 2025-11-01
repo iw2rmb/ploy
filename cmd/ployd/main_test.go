@@ -2686,14 +2686,15 @@ func TestHeartbeatHandler_Success(t *testing.T) {
 		},
 	}
 
-	payload := `{
-		"cpu_free_millis": 1500.0,
-		"cpu_total_millis": 4000.0,
-		"mem_free_mb": 2048.0,
-		"mem_total_mb": 8192.0,
-		"disk_free_mb": 10240.0,
-		"disk_total_mb": 51200.0
-	}`
+    payload := `{
+        "cpu_free_millis": 1500.0,
+        "cpu_total_millis": 4000.0,
+        "mem_free_mb": 2048.0,
+        "mem_total_mb": 8192.0,
+        "disk_free_mb": 10240.0,
+        "disk_total_mb": 51200.0,
+        "version": "1.2.3"
+    }`
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/heartbeat", strings.NewReader(payload))
 	req.SetPathValue("id", nodeID.String())
@@ -2731,9 +2732,12 @@ func TestHeartbeatHandler_Success(t *testing.T) {
 	if params.DiskFreeBytes != 10240*1048576 {
 		t.Errorf("expected disk_free_bytes=10737418240, got %d", params.DiskFreeBytes)
 	}
-	if params.DiskTotalBytes != 51200*1048576 {
-		t.Errorf("expected disk_total_bytes=53687091200, got %d", params.DiskTotalBytes)
-	}
+    if params.DiskTotalBytes != 51200*1048576 {
+        t.Errorf("expected disk_total_bytes=53687091200, got %d", params.DiskTotalBytes)
+    }
+    if params.Version != "1.2.3" {
+        t.Errorf("expected version=1.2.3, got %q", params.Version)
+    }
 }
 
 func TestHeartbeatHandler_MissingID(t *testing.T) {

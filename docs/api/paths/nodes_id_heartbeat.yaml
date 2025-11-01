@@ -54,6 +54,10 @@ post:
               format: double
               description: Total disk space in megabytes
               example: 51200.0
+            version:
+              type: string
+              description: Optional node agent version string. When omitted or empty, the stored version remains unchanged.
+              example: "ployd-node/1.2.3 (linux/amd64)"
   responses:
     '204':
       description: Heartbeat accepted and node snapshot updated

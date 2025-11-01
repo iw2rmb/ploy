@@ -182,7 +182,9 @@ SET
   mem_total_bytes = $5,
   mem_free_bytes = $6,
   disk_total_bytes = $7,
-  disk_free_bytes = $8
+  disk_free_bytes = $8,
+  -- Update version only when provided (non-empty); keep existing otherwise.
+  version = COALESCE(NULLIF($9::text, ''), version)
 WHERE id = $1
 `
 
@@ -195,6 +197,7 @@ type UpdateNodeHeartbeatParams struct {
 	MemFreeBytes   int64              `json:"mem_free_bytes"`
 	DiskTotalBytes int64              `json:"disk_total_bytes"`
 	DiskFreeBytes  int64              `json:"disk_free_bytes"`
+	Version        string             `json:"version"`
 }
 
 func (q *Queries) UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error {
@@ -207,6 +210,7 @@ func (q *Queries) UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbe
 		arg.MemFreeBytes,
 		arg.DiskTotalBytes,
 		arg.DiskFreeBytes,
+		arg.Version,
 	)
 	return err
 }
