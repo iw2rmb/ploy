@@ -81,11 +81,9 @@ Please refer to the updated path above.
   - Because the CA is stored in etcd, re-running bootstrap on the same host simply reuses the latest CA and issues a new control-plane leaf certificate; operators can safely retry failed installs without worrying about orphaned trust roots.
 
 4. **Capture Descriptor Metadata**  
-   - On success the CLI writes `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json` containing the SSH
-     metadata plus the resolved control-plane endpoint and CA bundle so future commands can dial the
-     API without exporting environment variables.
-   - Subsequent commands feed this descriptor into `pkg/sshtransport`, which keeps persistent SSH
-     tunnels alive for control-plane HTTP calls—no manual resolver or PEM juggling required.
+   - On success the CLI writes `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json` containing the
+     resolved control-plane HTTPS endpoint and CA bundle so future commands can dial the API without
+     exporting environment variables.
    - `ploy cluster list` and the bootstrap output both surface the descriptor so operators can copy
      the join hint when onboarding workers.
    - Record the same descriptor information centrally via `/v1/config` so new workstations can seed
@@ -127,11 +125,11 @@ Please refer to the updated path above.
    - Install etcd client tools if needed.
 
 2. **Deploy Runtime via CLI**  
- - Run `ploy cluster add --cluster-id <cluster> --address <host-or-ip>`. Use `--user`, `--identity`, `--ssh-port`, or `--ployd-binary` if the defaults (`root`, `~/.ssh/id_rsa`, `22`, CLI-adjacent `ployd`) are unsuitable.  
+ - Run `ploy cluster add --cluster-id <cluster> --address <host-or-ip>`. Use `--ployd-binary` to provide a custom binary path if the default is unsuitable.  
   - The CLI derives the target cluster from the default cached descriptor (created during bootstrap)
     and generates a 4-character worker identifier automatically.
   - Provide at least one health endpoint using `--health-probe name=https://<addr>:9443/healthz`; multiple probes are allowed.  
-  - The CLI first SSHes into the worker, uploads `ployd`, reruns the unified bootstrap script with `--cluster-id <id>`, and verifies the `ployd` service is active. After registration succeeds the CLI copies the issued worker certificate, key, and cluster CA into `/etc/ploy/pki`, rewrites the worker's `/etc/ploy/ployd.yaml` so it speaks HTTPS back to the control plane, and restarts the service. It then uses `pkg/sshtransport` to open a tunnel back to the control plane and calls `/v1/nodes` through that tunnel to register the worker metadata and record probe outcomes.  
+  - The CLI connects to the worker over SSH to upload `ployd`, reruns the unified bootstrap script with `--cluster-id <id>`, and verifies the `ployd` service is active. After registration succeeds the CLI copies the issued worker certificate, key, and cluster CA into `/etc/ploy/pki`, rewrites the worker's `/etc/ploy/ployd.yaml` so it speaks HTTPS back to the control plane, and restarts the service. It then calls the control-plane HTTPS endpoint to register the worker metadata and record probe outcomes.  
    - Use `--dry-run` to preview probes without modifying etcd; the command still validates SSH access and prints the registration payload so you can audit the request before running it for real.  
    - Confirm the worker shows up via `etcdctl get /ploy/clusters/<cluster>/registry/workers --prefix --keys-only` or `ploy cluster list --labels`.
 
@@ -150,12 +148,11 @@ Please refer to the updated path above.
 - `GET /v1/status?cluster_id=<id>` surfaces an aggregated view of queue depth and worker readiness; the response is intentionally uncached so dashboards can poll it directly.  
 - `GET /v1/version` returns the build metadata (`version`, `commit`, `built_at`) served by the control plane and is safe to cache client-side for up to a minute.
 
-## SSH Artifact Subsystem
+## Artifact Uploads
 
-The `/v1/transfers/*` APIs rely on a hardened SFTP subsystem running on every control-plane node. The
-bootstrap flow now installs the slot guard wrapper (`/usr/local/libexec/ploy-slot-guard`) that shells
-into `ployd slot-guard` and prepares the chroot. Validate the setup immediately after bootstrap so
-`ploy upload`/`ploy report` can move data without opening fresh SSH sessions per transfer.
+The `/v1/transfers/*` APIs accept uploads over HTTPS. The previous SSH-based transfer subsystem has
+been removed. Validate the setup immediately after bootstrap so `ploy upload`/`ploy report` can move
+data as expected.
 
 ### Directory layout
 
@@ -190,8 +187,7 @@ Match Group ploy-artifacts
 - `ForceCommand` executes the wrapper that delegates to `ployd slot-guard --slot %u`. The guard looks
   up the slot in etcd, verifies `pending` state/expiry, prepares `/var/lib/ploy/ssh-artifacts/slots/<slot-id>`,
   and finally execs `internal-sftp` with a bounded `-d` path.
-- Keep ControlMaster sockets enabled globally so `pkg/sshtransport` can reuse them for both HTTP tunnels
-  and SFTP copies.
+  (Deprecated) Prior SSH-based transfer guidance removed; uploads use HTTPS.
 
 Reload sshd after testing the new config with `sshd -t`.
 
@@ -214,15 +210,5 @@ Reload sshd after testing the new config with `sshd -t`.
   ploy report --job-id smoke --output /tmp/smoke-report.tar.gz
   ```
 
-  Both commands should complete through the cached descriptor without prompting for an SSH password.
-
-## SSH Tunnel Lifecycle
-
-- Descriptors are the canonical source for SSH addresses and identity files. Re-run `ploy cluster add
-  --address ... --dry-run` (or edit the descriptor) whenever a host IP or key rotates so that future
-  tunnels reuse the latest metadata.
-- `pkg/sshtransport.Manager` keeps persistent tunnels alive for control-plane HTTP clients. Use
-  `rm -rf ~/.config/ploy/clusters/<old>.json` or `ploy cluster list` to prune stale descriptors and
-  avoid dangling sockets.
-- When troubleshooting connectivity, inspect `~/.ploy/tunnels` (default control-socket directory) to
-  confirm tunnels are recycling; deleting a socket and rerunning the CLI command forces a reconnect.
+  Both commands should complete using the cached HTTPS endpoint and CA bundle.
+ 

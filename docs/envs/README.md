@@ -76,10 +76,11 @@ configuration.
   generates the initial configuration (default `0.0.0.0:8443`).
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
   `:9100`).
-- `PLOY_SSH_USER` — SSH username applied when establishing control-plane tunnels (default `ploy`).
-- `PLOY_SSH_IDENTITY` — Path to the SSH private key used for tunnel authentication (default `~/.ssh/id_rsa`).
-- `PLOY_SSH_SOCKET_DIR` — Override for the directory holding SSH control sockets (default `~/.ploy/tunnels`).
-- `PLOY_CACHE_HOME` — Optional base directory for CLI cache artifacts such as tunnel node assignments.
+Removed (SSH tunnels deprecated; CLI uses direct HTTPS):
+  - `PLOY_SSH_USER`
+  - `PLOY_SSH_IDENTITY`
+  - `PLOY_SSH_SOCKET_DIR`
+  - `PLOY_CACHE_HOME`
 - `PLOY_ARTIFACT_ROOT` — Optional override for the local artifact cache used by the step workspace hydrator and filesystem artifact publisher. Defaults to `$XDG_CACHE_HOME/ploy/artifacts` (or the OS cache dir fallback) when unset.
   
 

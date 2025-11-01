@@ -26,7 +26,7 @@ For a proposed simplified architecture that replaces etcd with PostgreSQL and re
 - Worker runtime: `internal/node/worker/step/*` and container adapter in `internal/workflow/runtime/step/*`.
 - Build Gate: `internal/workflow/buildgate/*` (sandbox runner, static checks, Java executor, log ingestion).
 - Artifacts and transfers: control‑plane store/reconciler in `internal/controlplane/artifacts/*`, workflow publishers in `internal/workflow/artifacts/*`, SSH transfer guard in `internal/controlplane/transfers/*`.
-- SSH tunnels: `pkg/sshtransport/*` keeps persistent tunnels for CLI→control‑plane HTTP.
+- Control-plane connectivity: CLI uses direct HTTPS (mTLS) to reach the control plane; SSH tunnels have been removed.
 
 **Docs You’ll Want**
 - Architecture and concepts: docs/next/README.md

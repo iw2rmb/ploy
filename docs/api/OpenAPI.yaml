@@ -7,11 +7,11 @@ info:
     require mutual TLS and a bearer token with the appropriate scope.
 servers:
   - url: https://{control_host}
-    description: Control-plane endpoint (typically reached via SSH tunnel)
+    description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
     variables:
       control_host:
         default: cluster-alpha.example.com
-        description: SSH-targeted control-plane host recorded in the descriptor.
+        description: Control-plane host recorded in the descriptor.
 tags:
   - name: Nodes
     description: Worker onboarding, listing, and deregistration.

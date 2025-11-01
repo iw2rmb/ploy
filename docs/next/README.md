@@ -56,9 +56,8 @@ Build Gate before the next step.
  - **Ploy Nodes (ployd workers)** — `ployd` worker daemons hosting Docker,
   the Build Gate, IPFS Cluster client, and etcd connectivity. Execute Mod steps, persist
   job state, and stream logs back to the CLI.
-- **SSH Tunnel Manager** — `pkg/sshtransport` plus cached descriptors keep
-  persistent SSH tunnels alive so the CLI can reach control-plane HTTP APIs
-  without provisioning separate beacons or TLS bundles.
+- **Direct HTTPS Connectivity** — The CLI reaches control-plane HTTP APIs over
+  HTTPS with mTLS using cluster descriptors. SSH tunnels have been removed.
 - **Build Gate** — Executes unit tests and static analysis per step;
   reused from the existing integration without embedding its CLI.
 - **IPFS Cluster** — Artifact store for snapshots, diff bundles, logs, and OCI
@@ -132,7 +131,7 @@ publisher, CLI refresh, and deployment tooling. Follow
 ## Further Reading
 
 - [docs/next/cli.md](cli.md) — Command-line reference.
-- [docs/next/api.md](api.md) — REST route catalog for control plane and node APIs exposed over SSH tunnels.
+- [docs/next/api.md](api.md) — REST route catalog for control plane and node APIs (HTTPS, mTLS).
 - [docs/next/job.md](job.md) — Job abstraction, log streaming, and retention guarantees.
 - [docs/next/mod.md](mod.md) — Example Mods workflow (Java 11 → Java 17 upgrade) illustrating
   end-to-end orchestration.

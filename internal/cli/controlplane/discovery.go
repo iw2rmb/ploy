@@ -17,8 +17,6 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
-	controlplanetunnel "github.com/iw2rmb/ploy/internal/controlplane/tunnel"
-	"github.com/iw2rmb/ploy/pkg/sshtransport"
 )
 
 const (
@@ -29,9 +27,6 @@ const (
 
 var (
 	defaultHTTPTimeout   = 15 * time.Second
-	attachHTTPClient     = controlplanetunnel.AttachHTTP
-	setTunnelNodes       = controlplanetunnel.SetNodes
-	ensureFallbackTunnel = controlplanetunnel.EnsureFallbackNode
 )
 
 // Options controls how ResolveTarget / ResolveHTTP derive the control-plane endpoint.
@@ -163,41 +158,30 @@ func BaseURLFromDescriptor(desc config.Descriptor) (string, error) {
 }
 
 func newHTTPClient(target Target) (*http.Client, error) {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	if target.Descriptor != nil {
-		pem := strings.TrimSpace(target.Descriptor.CABundle)
-		if pem != "" {
-			pool := x509.NewCertPool()
-			if !pool.AppendCertsFromPEM([]byte(pem)) {
-				return nil, errors.New("control plane descriptor CA bundle invalid")
-			}
-			transport.TLSClientConfig.RootCAs = pool
-		}
-	}
-	// Prefer explicit ServerName when provided.
-	if target.Descriptor != nil && strings.TrimSpace(target.Descriptor.APIServerName) != "" {
-		transport.TLSClientConfig.ServerName = strings.TrimSpace(target.Descriptor.APIServerName)
-	} else if isLoopbackHost(target.BaseURL.Hostname()) && target.Descriptor != nil {
-		// Guard: loopback host while reaching a remote certificate
-		host := strings.TrimSpace(target.Descriptor.Address)
-		if host != "" {
-			transport.TLSClientConfig.ServerName = host
-		}
-	}
-	client := &http.Client{Timeout: defaultHTTPTimeout, Transport: transport}
-	// When APIEndpoints are provided or DisableSSH is true, skip SSH tunnels entirely.
-	if target.Descriptor == nil || (len(target.Descriptor.APIEndpoints) == 0 && !target.Descriptor.DisableSSH) {
-		useTunnel, err := configureTunnels(target)
-		if err != nil {
-			return nil, err
-		}
-		if useTunnel {
-			if err := attachHTTPClient(client); err != nil {
-				return nil, err
-			}
-		}
-	}
+    transport := http.DefaultTransport.(*http.Transport).Clone()
+    transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+    if target.Descriptor != nil {
+        pem := strings.TrimSpace(target.Descriptor.CABundle)
+        if pem != "" {
+            pool := x509.NewCertPool()
+            if !pool.AppendCertsFromPEM([]byte(pem)) {
+                return nil, errors.New("control plane descriptor CA bundle invalid")
+            }
+            transport.TLSClientConfig.RootCAs = pool
+        }
+    }
+    // Prefer explicit ServerName when provided.
+    if target.Descriptor != nil && strings.TrimSpace(target.Descriptor.APIServerName) != "" {
+        transport.TLSClientConfig.ServerName = strings.TrimSpace(target.Descriptor.APIServerName)
+    } else if isLoopbackHost(target.BaseURL.Hostname()) && target.Descriptor != nil {
+        // Guard: loopback host while reaching a remote certificate
+        host := strings.TrimSpace(target.Descriptor.Address)
+        if host != "" {
+            transport.TLSClientConfig.ServerName = host
+        }
+    }
+    // SSH tunnels have been removed; all control-plane traffic is direct HTTPS.
+    client := &http.Client{Timeout: defaultHTTPTimeout, Transport: transport}
 	// Multi-endpoint failover transport: if descriptor lists multiple endpoints, try them in order
 	// on network error or 502/503/504.
 	if target.Descriptor != nil && len(target.Descriptor.APIEndpoints) > 0 {
@@ -216,14 +200,14 @@ func newHTTPClient(target Target) (*http.Client, error) {
 			target.BaseURL = eps[0]
 		}
 	}
-	return client, nil
+    return client, nil
 }
 
 type multiEndpointTransport struct {
-	endpoints     []*url.URL
-	base          http.RoundTripper
-	retryStatuses map[int]struct{}
-	serverName    string
+    endpoints     []*url.URL
+    base          http.RoundTripper
+    retryStatuses map[int]struct{}
+    serverName    string
 }
 
 func (m *multiEndpointTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -250,49 +234,11 @@ func (m *multiEndpointTransport) RoundTrip(req *http.Request) (*http.Response, e
 	return nil, lastErr
 }
 
-func configureTunnels(target Target) (bool, error) {
-	if isLoopbackHost(target.BaseURL.Hostname()) {
-		return false, nil
-	}
-	if target.Descriptor != nil {
-		node, err := nodeFromDescriptor(*target.Descriptor, target.BaseURL)
-		if err != nil {
-			return false, err
-		}
-		return true, setTunnelNodes([]sshtransport.Node{node})
-	}
-	return true, ensureFallbackTunnel(target.BaseURL)
-}
-
-func nodeFromDescriptor(desc config.Descriptor, base *url.URL) (sshtransport.Node, error) {
-	identity := strings.TrimSpace(desc.SSHIdentityPath)
-	if identity == "" {
-		identity = defaultIdentityPath()
-	} else {
-		identity = expandPath(identity)
-	}
-	if identity == "" {
-		return sshtransport.Node{}, errors.New("cluster descriptor missing SSH identity path")
-	}
-	host, err := descriptorHost(desc.Address, base)
-	if err != nil {
-		return sshtransport.Node{}, err
-	}
-	return sshtransport.Node{
-		ID:           strings.TrimSpace(desc.ClusterID),
-		Address:      host,
-		SSHPort:      22,
-		APIPort:      apiPort(base),
-		User:         defaultSSHUser(),
-		IdentityFile: identity,
-	}, nil
-}
-
 func descriptorHost(address string, base *url.URL) (string, error) {
-	addr := strings.TrimSpace(address)
-	if addr == "" && base != nil {
-		return base.Hostname(), nil
-	}
+    addr := strings.TrimSpace(address)
+    if addr == "" && base != nil {
+        return base.Hostname(), nil
+    }
 	if addr == "" {
 		return "", errors.New("cluster descriptor missing address")
 	}

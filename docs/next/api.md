@@ -2,15 +2,15 @@
 
 This document catalogs the service endpoints introduced in Ploy Next. Routes are grouped by surface:
 Ploy control-plane APIs, node-local endpoints, and artifact interfaces. The `ployd` daemon
-serves both the control-plane and node APIs described below, and the CLI reaches them by tunnelling
-HTTP over SSH using the cached cluster descriptors (`pkg/sshtransport`). No separate beacon or CA
-distribution surface remains.
+serves both the control-plane and node APIs described below. The CLI reaches these endpoints over
+direct HTTPS with mTLS using cached cluster descriptors. SSH tunnels have been removed; no separate
+beacon or TLS proxy is required.
 
 ## Ploy Control Plane
 
-All routes below are served by the control-plane API and are typically accessed through the SSH
-tunnels managed by the CLI. Token-based authorization still applies, but the SSH transport handles
-end-to-end encryption instead of a standalone beacon TLS proxy.
+All routes below are served by the control-plane API and are accessed directly over HTTPS with mTLS.
+Token-based authorization is being phased out in favor of mTLS-only auth as part of the Postgres
+pivot.
 
 ### Mods
 
@@ -167,19 +167,19 @@ Pin health surfaces through `pin_state`, `pin_replicas`, `pin_retry_count`, `pin
 `pin_next_attempt_at`. These fields are also emitted by `ploy artifact status` so workstation runs can
 confirm whether IPFS Cluster finished replicating the upload.
 
-### Transfer Slots (SSH uploads & downloads)
+### Transfer Slots (HTTPS uploads & downloads)
 
-Bulk transfers ride over the persistent SSH tunnels managed by the CLI. Slots are short-lived
-reservations that define which node, directory, and size budget a transfer may target. The control
-plane exposes three endpoints guarded by the `artifact.read`/`artifact.write` scopes:
+Bulk transfers occur over HTTPS. Slots are short-lived reservations that define which node, directory,
+and size budget a transfer may target. The control plane exposes three endpoints guarded by the
+`artifact.read`/`artifact.write` scopes:
 
 - `POST /v1/transfers/upload` — Reserve an upload slot for a job (`kind` defaults to `repo`).
 - `POST /v1/transfers/download` — Reserve a download slot bound to an existing artifact ID or kind.
 - `POST /v1/transfers/{slot}/commit` / `.../abort` — Finalise or release the slot once the SSH copy
   completes.
 
-Each slot response includes the node that should be contacted over SSH, the absolute `remote_path`
-under `/var/lib/ploy/ssh-artifacts/slots/<slot>/payload`, a `max_size` ceiling (default 10 GiB), and a
+Each slot response includes the node handling the transfer, the absolute `remote_path` used for staging,
+a `max_size` ceiling (default 10 GiB), and a
 30‑minute `expires_at` deadline. The CLI uses those values when running `ploy upload` and `ploy report`:
 
 ```json
@@ -194,10 +194,10 @@ under `/var/lib/ploy/ssh-artifacts/slots/<slot>/payload`, a `max_size` ceiling (
 }
 ```
 
-Upload clients stream data to `remote_path` via the existing ControlMaster socket; on success they call
+Upload clients stream data to `remote_path` via HTTPS; on success they call
 `POST /v1/transfers/{slot}/commit` with the final `size` and `sha256:` digest. Downloads mirror the
-flow: the control plane maps the requested artifact to the node that produced it, the CLI uses `CopyFrom`
-to pull the staged file, and a commit call confirms the checksum before recording an access log.
+flow: the control plane maps the requested artifact to the node that produced it, the CLI pulls the
+staged file over HTTPS, and a commit call confirms the checksum before recording an access log.
 
 The control plane keeps slot state in-memory (`pending`, `committed`, `aborted`). Aborts can be issued
 explicitly via `POST /v1/transfers/{slot}/abort` (for example, when the SSH session fails) and the CLI
@@ -333,8 +333,7 @@ through its local `ployd` instance:
 
 ## Authentication & Security
 
-- All APIs are reached through SSH tunnels stood up by `pkg/sshtransport`. Within the tunnel the
-  control plane still enforces mutual TLS using the cluster-internal PKI.
+- All APIs are reached directly over HTTPS with mutual TLS using the cluster-internal PKI.
 - Control-plane routes additionally accept bearer tokens minted by the GitLab signer. Tokens embed the issuing secret identifier (`sid`) and token id (`tid`) so the control plane can validate them without scanning every secret.
 - Administrative operations (GitLab signer management, configuration updates) require bearer tokens that include the `admin` scope.
 

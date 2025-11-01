@@ -10,66 +10,36 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
-	"github.com/iw2rmb/ploy/internal/cli/controlplane"
-	deploycli "github.com/iw2rmb/ploy/internal/cli/deploy"
 	"github.com/iw2rmb/ploy/internal/controlplane/registry"
 	"github.com/iw2rmb/ploy/internal/deploy"
-	"github.com/iw2rmb/ploy/pkg/sshtransport"
 )
 
 type descriptorHTTPClientFactory func(config.Descriptor) (*http.Client, func(), error)
 
 func newDescriptorHTTPClient(desc config.Descriptor) (*http.Client, func(), error) {
-	addr := strings.TrimSpace(desc.Address)
-	if addr == "" {
-		return nil, nil, errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
-	}
-	identity := strings.TrimSpace(desc.SSHIdentityPath)
-	if identity == "" {
-		return nil, nil, errors.New("cluster descriptor missing SSH identity path")
-	}
-	node := sshtransport.Node{
-		ID:           strings.TrimSpace(desc.ClusterID),
-		Address:      addr,
-		SSHPort:      22,
-		APIPort:      controlplane.DefaultPort,
-		User:         defaultTunnelUser(),
-		IdentityFile: deploycli.ExpandPath(identity),
-	}
-	manager, err := sshtransport.NewManager(sshtransport.Config{})
-	if err != nil {
-		return nil, nil, err
-	}
-	if err := manager.SetNodes([]sshtransport.Node{node}); err != nil {
-		_ = manager.Close()
-		return nil, nil, err
-	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
-	if caBundle := strings.TrimSpace(desc.CABundle); caBundle != "" {
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM([]byte(caBundle)) {
-			return nil, nil, fmt.Errorf("cluster descriptor CA bundle invalid")
-		}
-		transport.TLSClientConfig.RootCAs = pool
-	}
-	transport.DialContext = manager.DialContext
-	client := &http.Client{Timeout: defaultWorkerJoinTimeout, Transport: transport}
-	cleanup := func() { _ = manager.Close() }
-	return client, cleanup, nil
+    addr := strings.TrimSpace(desc.Address)
+    if addr == "" {
+        return nil, nil, errors.New("cluster descriptor missing address; re-run 'ploy cluster add'")
+    }
+    transport := http.DefaultTransport.(*http.Transport).Clone()
+    transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+    if caBundle := strings.TrimSpace(desc.CABundle); caBundle != "" {
+        pool := x509.NewCertPool()
+        if !pool.AppendCertsFromPEM([]byte(caBundle)) {
+            return nil, nil, fmt.Errorf("cluster descriptor CA bundle invalid")
+        }
+        transport.TLSClientConfig.RootCAs = pool
+    }
+    client := &http.Client{Timeout: defaultWorkerJoinTimeout, Transport: transport}
+    cleanup := func() {}
+    return client, cleanup, nil
 }
 
-func defaultTunnelUser() string {
-	if value := strings.TrimSpace(os.Getenv("PLOY_SSH_USER")); value != "" {
-		return value
-	}
-	return "root"
-}
+func defaultTunnelUser() string { return "" }
 
 const defaultWorkerJoinTimeout = 20 * time.Second
 

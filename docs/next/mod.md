@@ -15,7 +15,7 @@ ploy mod run \
   --follow
 ```
 
-- The CLI resolves the control-plane endpoint via SSH tunnel (descriptor or `PLOY_CONTROL_PLANE_URL`) and
+- The CLI resolves the control-plane endpoint from the descriptor (or `PLOY_CONTROL_PLANE_URL`) and
   submits the ticket. If the `mods-plan` stage lacks a manifest, the server synthesizes one from the
   repo URL and refs. Credentials such as GitLab API keys come from prior `ploy config gitlab set`.
 - The control plane assigns the ticket to an available node and streams stage transitions back to the CLI.
