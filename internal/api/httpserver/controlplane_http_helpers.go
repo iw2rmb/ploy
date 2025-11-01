@@ -1,11 +1,11 @@
 package httpserver
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
-	"net/http"
-	"strings"
+    "encoding/json"
+    "errors"
+    "io"
+    "net/http"
+    "strings"
 )
 
 func writeError(w http.ResponseWriter, status int, err error) {
@@ -32,22 +32,27 @@ func writeErrorWithCode(w http.ResponseWriter, status int, code, message string)
 	writeJSON(w, status, payload)
 }
 
+// decodeJSON decodes a JSON request with a default 1 MiB body cap.
 func decodeJSON(r *http.Request, dst any) error {
-	defer func() {
-		_ = r.Body.Close()
-	}()
-	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(dst); err != nil {
-		return err
-	}
-	if err := dec.Decode(new(struct{})); err != io.EOF {
-		if err == nil {
-			return errors.New("unexpected trailing json data")
-		}
-		return err
-	}
-	return nil
+    return decodeJSONWithLimit(r, dst, 1<<20)
+}
+
+// decodeJSONWithLimit decodes a JSON request with an explicit byte limit.
+// It also rejects extra trailing JSON tokens.
+func decodeJSONWithLimit(r *http.Request, dst any, limit int64) error {
+    defer func() { _ = r.Body.Close() }()
+    dec := json.NewDecoder(io.LimitReader(r.Body, limit))
+    dec.DisallowUnknownFields()
+    if err := dec.Decode(dst); err != nil {
+        return err
+    }
+    if err := dec.Decode(new(struct{})); err != io.EOF {
+        if err == nil {
+            return errors.New("unexpected trailing json data")
+        }
+        return err
+    }
+    return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {

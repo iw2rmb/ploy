@@ -50,6 +50,12 @@ paths:
     $ref: './paths/runs_id_events.yaml'
   /v1/runs/{id}/timing:
     $ref: './paths/runs_id_timing.yaml'
+  /v1/runs/{id}/diffs:
+    $ref: './paths/runs_id_diffs.yaml'
+  /v1/runs/{id}/logs:
+    $ref: './paths/runs_id_logs.yaml'
+  /v1/runs/{id}/artifact_bundles:
+    $ref: './paths/runs_id_artifact_bundles.yaml'
   # Registry removed; Docker Hub is used for images.
   # v2 artifacts aliases
   /v2/artifacts/upload:
