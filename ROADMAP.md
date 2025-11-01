@@ -21,9 +21,9 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Implement cluster CA generation and server cert issuance.
   - [x] Add `/v1/pki/sign` to sign node CSRs; persist node cert metadata (serial/fingerprint/notBefore/notAfter).
 
-- [ ] Core control-plane models and endpoints
-  - [ ] CRUD: `repos`, `mods`, `runs`; create-run returns `run_id`.
-  - [ ] SSE: `/v1/runs/{id}/events` (basic log/event fanout only).
+- [x] Core control-plane models and endpoints
+  - [x] CRUD: `repos`, `mods`, `runs`; create-run returns `run_id`.
+  - [x] SSE: `/v1/runs/{id}/events` (basic log/event fanout only).
 
 - [ ] Scheduler (minimal)
   - [ ] Implement `FOR UPDATE SKIP LOCKED` claim on `runs.status='queued'`.

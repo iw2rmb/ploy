@@ -194,6 +194,15 @@ func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 		h.registerRoute(mux, http.MethodPost, "/v1/mods/tickets", h.handleModsTickets, httpsecurity.ScopeMods)
 		h.registerRoute(mux, "", "/v1/mods/tickets/", h.handleModsTicketSubpath, httpsecurity.ScopeMods)
 	}
+	// Core control-plane CRUD endpoints for repos, mods, runs
+	if h.store != nil {
+		h.registerRoute(mux, "", "/v1/repos", h.handleRepos)
+		h.registerRoute(mux, "", "/v1/repos/", h.handleReposSubpath)
+		h.registerRoute(mux, "", "/v1/mods/crud", h.handleModsCRUD)
+		h.registerRoute(mux, "", "/v1/mods/crud/", h.handleModsCRUDSubpath)
+		h.registerRoute(mux, "", "/v1/runs", h.handleRuns)
+		h.registerRoute(mux, "", "/v1/runs/", h.handleRunsSubpath)
+	}
 	h.registerRoute(mux, http.MethodPost, "/v1/artifacts/upload", h.handleArtifactsUpload, httpsecurity.ScopeArtifactsWrite)
 	h.registerRoute(mux, http.MethodGet, "/v1/artifacts", h.handleArtifactsList, httpsecurity.ScopeArtifactsRead)
 	h.registerRoute(mux, "", "/v1/artifacts/", h.handleArtifactsSubpath)
