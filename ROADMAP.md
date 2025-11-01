@@ -56,7 +56,7 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [ ] Remove etcd clients/publishers and embedded etcd tests.
   - [ ] Drop node labels from APIs/CLI; replace with resource-snapshot scheduling.
   - [ ] Remove token-based auth; update OpenAPI to mTLS-only.
-  - [ ] Remove `pkg/sshtransport` (no SSH tunnels in new architecture).
+- [x] Remove `pkg/sshtransport` (no SSH tunnels in new architecture).
 
 - [ ] Knowledge Base (in scope)
   - [ ] Keep `ploy knowledge-base ingest/evaluate` working with new layout.

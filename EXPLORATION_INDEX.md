@@ -163,7 +163,7 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 │   └── ...
 │
 ├── pkg/
-│   └── sshtransport/ (SSH utilities)
+│   └── (empty — SSH tunnel utilities removed; CLI uses HTTPS)
 │
 └── docs/
     ├── next/ (Architectural docs)

@@ -86,15 +86,13 @@ Slots move through three states:
   rates and throughput for `/v1/artifacts*`. Create alerts for sustained `5xx` rates or payload spikes.
 - `ploy_registry_http_requests_total` / `ploy_registry_payload_bytes_total` provide similar coverage
   for OCI blob and manifest routes.
-- Host-level monitoring should include `journalctl -u sshd | grep ploy-artifacts` (every SFTP
-  subsystem invocation logs the user, remote host, and byte counts) and disk usage under
-  `/var/lib/ploy/ssh-artifacts` to catch leaked slots.
+- Host-level monitoring should include control-plane API metrics and disk usage for staged uploads.
 - The artifact metadata includes `pin_state`, `pin_replicas`, `pin_retry_count`, and
   `pin_error`. Query them via `ploy artifact status <cid>` or `GET /v1/artifacts/{id}` to confirm
   whether IPFS Cluster finished replicating a payload.
 
-If SSH copies fail repeatedly, inspect `~/.ploy/tunnels` to ensure the cached descriptors still point
-at reachable hosts and rerun `ploy cluster add --address <ip> --dry-run` to refresh metadata.
+If uploads fail repeatedly, verify the control-plane HTTPS endpoint and CA bundle in the cluster
+descriptor and rerun `ploy cluster add --address <ip> --dry-run` to refresh metadata.
 
 ## FAQ & Troubleshooting
 

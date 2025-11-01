@@ -1,8 +1,10 @@
-# SSH Transfer Slot Recovery
+# SSH Transfer Slot Recovery (Deprecated)
 
 ## Purpose
 
-Operators use this runbook to diagnose and recover SSH-based artifact transfers. Typical triggers are
+Operators used this runbook to diagnose and recover SSH-based artifact transfers. The CLI no longer
+uses SSH tunnels; artifact uploads proceed over HTTPS to the control plane. This document remains for
+historical reference.
 `ploy upload` failures, digest mismatches during `/v1/transfers/{slot}/commit`, or artifacts stuck in
 `pinning` because the underlying slot never committed. Slots are now persisted in etcd under
 `/ploy/clusters/<cluster>/transfers/slots/<slot-id>`, so control-plane restarts no longer drop active
@@ -13,7 +15,7 @@ reservations. Inspect the key with `etcdctl get ... | jq` before deciding whethe
 - SSH access (sudo) to the control-plane node hosting `/var/lib/ploy/ssh-artifacts`.
 - A control-plane API token with `artifact.read`/`artifact.write` scopes.
 - `curl`, `jq`, and `sha256sum` available on the operator workstation.
-- Cluster descriptor cached locally so `pkg/sshtransport` can reopen tunnels if needed.
+  (Deprecated) Cluster descriptor metadata for SSH tunnels; not required with HTTPS uploads.
 
 ## Symptoms
 

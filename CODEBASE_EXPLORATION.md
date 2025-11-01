@@ -34,8 +34,7 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 │   ├── workflow/          # Workflow execution and artifacts
 │   ├── metrics/           # Metrics collection
 │   └── ... (other internal packages)
-├── pkg/                   # Public packages
-│   └── sshtransport/      # SSH tunnel utilities for CLI
+├── pkg/                   # Public packages (no SSH tunnels; CLI uses HTTPS)
 ├── tests/                 # Integration and unit tests
 └── docs/                  # Documentation
 ```
@@ -377,4 +376,3 @@ ployd bootstrap-ca \
 5. **Middleware Pattern**: Security enforcement via HTTP middleware wrapping
 6. **Event-Driven Logging**: Log streaming via SSE (`text/event-stream`)
 7. **Prometheus Metrics**: Built-in observability with standard prometheus client
-

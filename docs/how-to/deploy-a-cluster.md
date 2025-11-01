@@ -119,8 +119,8 @@ ploy upload --job-id smoke --kind repo ./fixtures/smoke.tar.gz
 ploy report --job-id smoke --output /tmp/smoke-report.tar.gz
 ```
 
-## SSH Tunnels
+## Connectivity
 
-- Descriptors are canonical for SSH addresses and keys; re-run
-  `ploy cluster add --address ... --dry-run` (or edit the descriptor) when IP/keys change.
-- Persistent tunnels live under `~/.ploy/tunnels`; removing a socket forces reconnect.
+- The CLI communicates with the control plane over HTTPS (mTLS). Cluster descriptors capture
+  the HTTPS endpoints and CA bundle; rerun `ploy cluster add --address ... --dry-run` (or edit the
+  descriptor) when endpoints or certificates change.

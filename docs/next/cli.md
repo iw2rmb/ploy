@@ -37,25 +37,24 @@ operations for the v2 control plane. Commands mirror the structure captured in
 ## Transfer Commands (SSH → HTTPS)
 
 - `ploy upload --job-id <id> [--kind repo|logs|report] <path>`
-  Streams the payload over HTTPS to `/v2/artifacts/upload` when the descriptor includes
-  `api_endpoints` + `ca_bundle`. Falls back to SSH transfers only when HTTPS is not configured.
+  Streams the payload over HTTPS to `/v2/artifacts/upload`. SSH-based transfers have been removed.
 - `ploy report --job-id <id> --artifact-id <id> --output <path>`
   Downloads the artifact via HTTPS from `/v2/artifacts/{id}?download=true`.
 
 Configure HTTPS:
 - Use `ploy cluster https --api-endpoint https://<ip>:8443 --api-server-name api.<cluster>.ploy \
-  --ca-file ca.pem --disable-ssh`.
-  The CLI will verify TLS using the descriptor CA and attempt endpoints in order.
+  --ca-file ca.pem`.
+  The CLI verifies TLS using the descriptor CA and attempts endpoints in order.
 
 ## Cluster Descriptors
 
-Descriptors now encode only the SSH metadata needed to open tunnels:
+Descriptors encode the control-plane endpoint and CA bundle:
 
 ```json
 {
   "cluster_id": "lab",
-  "address": "203.0.113.10",
-  "ssh_identity_path": "/home/dev/.ssh/id_ed25519",
+  "api_endpoints": ["https://203.0.113.10:8443"],
+  "ca_bundle": "-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----",
   "labels": {
     "role": "control-plane",
     "env": "staging"
@@ -64,11 +63,11 @@ Descriptors now encode only the SSH metadata needed to open tunnels:
 ```
 
 - `ploy cluster list`
-  Show the cached descriptors with their SSH target, identity path, and labels so operators can confirm which key will be reused for future commands.
+  Show the cached descriptors with their HTTPS endpoints, CA bundle presence, and labels so operators can confirm which endpoint will be reused for future commands.
 
 - `ploy cluster add --address <host> [--cluster-id <id>] [--identity <path>] [--label key=value] [--health-probe name=url] [--dry-run]`
   Bootstrap the first control-plane node by omitting `--cluster-id`; the CLI copies `ployd`, renders configs, and caches the descriptor locally.
-  Provide `--cluster-id` to add workers over SSH tunnels using the descriptor metadata, optionally tagging nodes via `--label` and previewing the flow with `--dry-run`.
+  Provide `--cluster-id` to add workers using the descriptor metadata over direct HTTPS, optionally tagging nodes via `--label` and previewing the flow with `--dry-run`.
 
 ## Configuration (GitLab)
 
@@ -85,7 +84,7 @@ Descriptors now encode only the SSH metadata needed to open tunnels:
 
 When no local descriptor exists for the requested cluster, these commands read the `discovery`
 block returned by `/v1/config` to seed `${XDG_CONFIG_HOME}/ploy/clusters/<cluster>.json`, ensuring
-future calls reuse the SSH and CA metadata without additional environment variables.
+future calls reuse the HTTPS endpoint and CA metadata without additional environment variables.
 
  
 
