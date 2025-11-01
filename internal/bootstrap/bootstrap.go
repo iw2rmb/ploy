@@ -144,8 +144,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("EOF\n\n")
 
 	b.WriteString("  systemctl daemon-reload\n")
-	b.WriteString("  systemctl enable ployd.service\n")
-	b.WriteString("  systemctl start ployd.service\n")
+	b.WriteString("  systemctl enable --now ployd.service\n")
 	b.WriteString("  echo 'Server configuration: /etc/ploy/ployd.yaml'\n")
 	b.WriteString("  echo 'PKI directory: /etc/ploy/pki'\n")
 	b.WriteString("  echo 'Service: ployd.service (active)'\n")
@@ -197,8 +196,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("EOF\n\n")
 
 	b.WriteString("  systemctl daemon-reload\n")
-	b.WriteString("  systemctl enable ployd-node.service\n")
-	b.WriteString("  systemctl start ployd-node.service\n")
+	b.WriteString("  systemctl enable --now ployd-node.service\n")
 	b.WriteString("  echo 'Node configuration: /etc/ploy/ployd-node.yaml'\n")
 	b.WriteString("  echo 'PKI directory: /etc/ploy/pki'\n")
 	b.WriteString("  echo 'Service: ployd-node.service (active)'\n")
