@@ -58,7 +58,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Add partition lister + dropper integration (monthly tables) guarded by feature flag.
 
 ## Node Agent (Unstub default build)
-- [ ] Make `cmd/ployd-node/main.go` compile by default (remove `legacy` build tag; gate stub under a `stub` tag).
+- [x] Make `cmd/ployd-node/main.go` compile by default (remove `legacy` build tag; gate stub under a `stub` tag).
 - [ ] Ensure config loader `internal/nodeagent/config.go` and server start wire TLS client/server correctly.
 - [ ] Implement `POST /v1/run/start` and `POST /v1/run/stop` handlers (already present under build tag; enable).
 - [ ] Heartbeat manager: confirm `internal/nodeagent/heartbeat.go` posts to server endpoint with mTLS.

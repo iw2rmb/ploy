@@ -1,6 +1,3 @@
-//go:build legacy
-// +build legacy
-
 package nodeagent
 
 import (
