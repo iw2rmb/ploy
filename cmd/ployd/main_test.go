@@ -263,6 +263,11 @@ type mockStore struct {
 	listModsByRepoParams pgtype.UUID
 	listModsByRepoResult []store.Mod
 	listModsByRepoErr    error
+
+	createRunCalled bool
+	createRunParams store.CreateRunParams
+	createRunResult store.Run
+	createRunErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -297,6 +302,12 @@ func (m *mockStore) ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]s
 	m.listModsByRepoCalled = true
 	m.listModsByRepoParams = repoID
 	return m.listModsByRepoResult, m.listModsByRepoErr
+}
+
+func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
+	m.createRunCalled = true
+	m.createRunParams = params
+	return m.createRunResult, m.createRunErr
 }
 
 // no-op
@@ -1307,5 +1318,305 @@ func TestListModsHandler_DatabaseErrorByRepo(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "failed to list mods") {
 		t.Errorf("expected error message about database error, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_Success(t *testing.T) {
+	runID := uuid.New()
+	modID := uuid.New()
+	commitSha := "abc123def456"
+	now := time.Now()
+
+	mockSt := &mockStore{
+		createRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CommitSha: &commitSha,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  now,
+				Valid: true,
+			},
+		},
+	}
+
+	reqBody := map[string]interface{}{
+		"mod_id":     modID.String(),
+		"base_ref":   "main",
+		"target_ref": "feature-branch",
+		"commit_sha": commitSha,
+	}
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.RunID != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), resp.RunID)
+	}
+
+	if !mockSt.createRunCalled {
+		t.Fatal("expected CreateRun to be called")
+	}
+	if uuid.UUID(mockSt.createRunParams.ModID.Bytes) != modID {
+		t.Errorf("expected mod_id %s, got %s", modID.String(), uuid.UUID(mockSt.createRunParams.ModID.Bytes).String())
+	}
+	if mockSt.createRunParams.Status != store.RunStatusQueued {
+		t.Errorf("expected status queued, got %s", mockSt.createRunParams.Status)
+	}
+	if mockSt.createRunParams.BaseRef != "main" {
+		t.Errorf("expected base_ref main, got %s", mockSt.createRunParams.BaseRef)
+	}
+	if mockSt.createRunParams.TargetRef != "feature-branch" {
+		t.Errorf("expected target_ref feature-branch, got %s", mockSt.createRunParams.TargetRef)
+	}
+	if mockSt.createRunParams.CommitSha == nil || *mockSt.createRunParams.CommitSha != commitSha {
+		t.Errorf("expected commit_sha %s, got %v", commitSha, mockSt.createRunParams.CommitSha)
+	}
+}
+
+func TestCreateRunHandler_InvalidJSON(t *testing.T) {
+	mockSt := &mockStore{}
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader([]byte("invalid json")))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid request") {
+		t.Errorf("expected error message about invalid request, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_EmptyModID(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"mod_id":     "  ",
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "mod_id field is required") {
+		t.Errorf("expected error message about mod_id required, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_EmptyBaseRef(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"mod_id":     uuid.New().String(),
+		"base_ref":   "  ",
+		"target_ref": "feature",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "base_ref field is required") {
+		t.Errorf("expected error message about base_ref required, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_EmptyTargetRef(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"mod_id":     uuid.New().String(),
+		"base_ref":   "main",
+		"target_ref": "  ",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "target_ref field is required") {
+		t.Errorf("expected error message about target_ref required, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_InvalidModID(t *testing.T) {
+	mockSt := &mockStore{}
+	reqBody := map[string]interface{}{
+		"mod_id":     "not-a-uuid",
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid mod_id") {
+		t.Errorf("expected error message about invalid mod_id, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_ModNotFound(t *testing.T) {
+	mockSt := &mockStore{
+		createRunErr: &pgconn.PgError{Code: "23503"},
+	}
+
+	reqBody := map[string]interface{}{
+		"mod_id":     uuid.New().String(),
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "mod not found") {
+		t.Errorf("expected error message about mod not found, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_DatabaseError(t *testing.T) {
+	mockSt := &mockStore{
+		createRunErr: context.DeadlineExceeded,
+	}
+
+	reqBody := map[string]interface{}{
+		"mod_id":     uuid.New().String(),
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	reqJSON, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "failed to create run") {
+		t.Errorf("expected error message about database error, got: %s", rr.Body.String())
+	}
+}
+
+func TestCreateRunHandler_WithoutCommitSha(t *testing.T) {
+	runID := uuid.New()
+	modID := uuid.New()
+	now := time.Now()
+
+	mockSt := &mockStore{
+		createRunResult: store.Run{
+			ID: pgtype.UUID{
+				Bytes: runID,
+				Valid: true,
+			},
+			ModID: pgtype.UUID{
+				Bytes: modID,
+				Valid: true,
+			},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature-branch",
+			CommitSha: nil,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  now,
+				Valid: true,
+			},
+		},
+	}
+
+	reqBody := map[string]interface{}{
+		"mod_id":     modID.String(),
+		"base_ref":   "main",
+		"target_ref": "feature-branch",
+	}
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs", bytes.NewReader(reqJSON))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		RunID string `json:"run_id"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if resp.RunID != runID.String() {
+		t.Errorf("expected run_id %s, got %s", runID.String(), resp.RunID)
+	}
+
+	if !mockSt.createRunCalled {
+		t.Fatal("expected CreateRun to be called")
+	}
+	if mockSt.createRunParams.CommitSha != nil {
+		t.Errorf("expected commit_sha to be nil, got %v", mockSt.createRunParams.CommitSha)
 	}
 }
