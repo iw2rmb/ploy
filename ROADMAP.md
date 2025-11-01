@@ -42,8 +42,8 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] POST endpoints to accept gzipped diffs, log chunks, and artifact bundles.
   - [x] Enforce DB constraints (1 MiB gziped) and reject oversize payloads.
 
-- [ ] TTL and partitions
-  - [ ] Add TTL worker for `logs`, `events`, `diffs`, `artifact_bundles` (default 30 days for bundles).
+- [x] TTL and partitions
+  - [x] Add TTL worker for `logs`, `events`, `diffs`, `artifact_bundles` (default 30 days for bundles).
   - [ ] Optional: daily partition dropper based on naming scheme (see SIMPLE.md snippet).
 
 - [ ] CLI commands

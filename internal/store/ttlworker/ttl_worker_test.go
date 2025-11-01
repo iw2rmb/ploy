@@ -1,0 +1,208 @@
+package ttlworker
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// mockStore implements store.Store for testing.
+type mockStore struct {
+	store.Store
+	deleteLogsCount       int64
+	deleteEventsCount     int64
+	deleteDiffsCount      int64
+	deleteArtifactsCount  int64
+	deleteLogsCalled      bool
+	deleteEventsCalled    bool
+	deleteDiffsCalled     bool
+	deleteArtifactsCalled bool
+	deleteLogsErr         error
+	deleteEventsErr       error
+	deleteDiffsErr        error
+	deleteArtifactsErr    error
+}
+
+func (m *mockStore) DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error) {
+	m.deleteLogsCalled = true
+	return m.deleteLogsCount, m.deleteLogsErr
+}
+
+func (m *mockStore) DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error) {
+	m.deleteEventsCalled = true
+	return m.deleteEventsCount, m.deleteEventsErr
+}
+
+func (m *mockStore) DeleteExpiredDiffs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error) {
+	m.deleteDiffsCalled = true
+	return m.deleteDiffsCount, m.deleteDiffsErr
+}
+
+func (m *mockStore) DeleteExpiredArtifactBundles(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error) {
+	m.deleteArtifactsCalled = true
+	return m.deleteArtifactsCount, m.deleteArtifactsErr
+}
+
+func (m *mockStore) Close() {}
+
+func TestNew(t *testing.T) {
+	t.Run("nil store returns nil worker", func(t *testing.T) {
+		worker, err := New(Options{Store: nil})
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if worker != nil {
+			t.Errorf("expected nil worker, got %v", worker)
+		}
+	})
+
+	t.Run("default TTL is 30 days", func(t *testing.T) {
+		mock := &mockStore{}
+		worker, err := New(Options{Store: mock})
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if worker == nil {
+			t.Fatal("expected worker, got nil")
+		}
+		expected := 30 * 24 * time.Hour
+		if worker.ttl != expected {
+			t.Errorf("expected TTL %v, got %v", expected, worker.ttl)
+		}
+	})
+
+	t.Run("default interval is 1 hour", func(t *testing.T) {
+		mock := &mockStore{}
+		worker, err := New(Options{Store: mock})
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if worker == nil {
+			t.Fatal("expected worker, got nil")
+		}
+		expected := time.Hour
+		if worker.interval != expected {
+			t.Errorf("expected interval %v, got %v", expected, worker.interval)
+		}
+	})
+
+	t.Run("custom TTL and interval", func(t *testing.T) {
+		mock := &mockStore{}
+		customTTL := 7 * 24 * time.Hour
+		customInterval := 30 * time.Minute
+		worker, err := New(Options{
+			Store:    mock,
+			TTL:      customTTL,
+			Interval: customInterval,
+		})
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		if worker == nil {
+			t.Fatal("expected worker, got nil")
+		}
+		if worker.ttl != customTTL {
+			t.Errorf("expected TTL %v, got %v", customTTL, worker.ttl)
+		}
+		if worker.interval != customInterval {
+			t.Errorf("expected interval %v, got %v", customInterval, worker.interval)
+		}
+	})
+}
+
+func TestWorker_Name(t *testing.T) {
+	mock := &mockStore{}
+	worker, _ := New(Options{Store: mock})
+	if worker.Name() != "ttl-worker" {
+		t.Errorf("expected name 'ttl-worker', got %q", worker.Name())
+	}
+}
+
+func TestWorker_Interval(t *testing.T) {
+	mock := &mockStore{}
+	expected := 2 * time.Hour
+	worker, _ := New(Options{Store: mock, Interval: expected})
+	if worker.Interval() != expected {
+		t.Errorf("expected interval %v, got %v", expected, worker.Interval())
+	}
+}
+
+func TestWorker_Run(t *testing.T) {
+	t.Run("nil worker does nothing", func(t *testing.T) {
+		var worker *Worker
+		if err := worker.Run(context.Background()); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("successful cleanup", func(t *testing.T) {
+		mock := &mockStore{
+			deleteLogsCount:      10,
+			deleteEventsCount:    20,
+			deleteDiffsCount:     5,
+			deleteArtifactsCount: 3,
+		}
+		worker, err := New(Options{
+			Store: mock,
+			TTL:   24 * time.Hour,
+		})
+		if err != nil {
+			t.Fatalf("failed to create worker: %v", err)
+		}
+
+		if err := worker.Run(context.Background()); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+
+		if !mock.deleteLogsCalled {
+			t.Error("expected DeleteExpiredLogs to be called")
+		}
+		if !mock.deleteEventsCalled {
+			t.Error("expected DeleteExpiredEvents to be called")
+		}
+		if !mock.deleteDiffsCalled {
+			t.Error("expected DeleteExpiredDiffs to be called")
+		}
+		if !mock.deleteArtifactsCalled {
+			t.Error("expected DeleteExpiredArtifactBundles to be called")
+		}
+	})
+
+	t.Run("continues on error", func(t *testing.T) {
+		mock := &mockStore{
+			deleteLogsErr:      nil,
+			deleteEventsErr:    nil,
+			deleteDiffsErr:     nil,
+			deleteArtifactsErr: nil,
+		}
+		worker, err := New(Options{
+			Store: mock,
+		})
+		if err != nil {
+			t.Fatalf("failed to create worker: %v", err)
+		}
+
+		// Should not return error even if individual operations fail.
+		if err := worker.Run(context.Background()); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+
+		// All operations should still be attempted.
+		if !mock.deleteLogsCalled {
+			t.Error("expected DeleteExpiredLogs to be called")
+		}
+		if !mock.deleteEventsCalled {
+			t.Error("expected DeleteExpiredEvents to be called")
+		}
+		if !mock.deleteDiffsCalled {
+			t.Error("expected DeleteExpiredDiffs to be called")
+		}
+		if !mock.deleteArtifactsCalled {
+			t.Error("expected DeleteExpiredArtifactBundles to be called")
+		}
+	})
+}
