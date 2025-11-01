@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,11 +88,15 @@ func (s *Server) Stop(ctx context.Context) error {
 	if listener != nil {
 		_ = listener.Close()
 	}
-	if server != nil {
+    if server != nil {
 		shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return err
+			// Some platforms return a net.OpError wrapping "use of closed network connection"
+			// when the listener has already been closed. Treat it as benign.
+			if !strings.Contains(err.Error(), "use of closed network connection") {
+				return err
+			}
 		}
 	}
 	return nil

@@ -122,7 +122,10 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 }
 
 const getRunTiming = `-- name: GetRunTiming :one
-SELECT id, queue_ms, run_ms FROM runs_timing
+SELECT id,
+       COALESCE(queue_ms, 0) AS queue_ms,
+       COALESCE(run_ms, 0)   AS run_ms
+FROM runs_timing
 WHERE id = $1
 `
 
@@ -217,7 +220,10 @@ func (q *Queries) ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, 
 }
 
 const listRunsTimings = `-- name: ListRunsTimings :many
-SELECT id, queue_ms, run_ms FROM runs_timing
+SELECT id,
+       COALESCE(queue_ms, 0) AS queue_ms,
+       COALESCE(run_ms, 0)   AS run_ms
+FROM runs_timing
 ORDER BY id DESC
 LIMIT $1 OFFSET $2
 `
