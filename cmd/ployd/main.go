@@ -186,10 +186,12 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
 
-	// Register runs endpoints (control plane).
-	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
+    // Register runs endpoints (control plane).
+    httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
+    // Support both query (?id=) and RESTful path (/v1/runs/{id}) for basic run view.
+    httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
+    httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+    httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
@@ -822,13 +824,16 @@ func createRunHandler(st store.Store) http.HandlerFunc {
 
 // getRunHandler returns an HTTP handler that retrieves a run by id query parameter.
 func getRunHandler(st store.Store) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Extract id from query parameter.
-		runIDStr := r.URL.Query().Get("id")
-		if strings.TrimSpace(runIDStr) == "" {
-			http.Error(w, "id query parameter is required", http.StatusBadRequest)
-			return
-		}
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Accept id from path parameter first, then fallback to query parameter.
+        runIDStr := strings.TrimSpace(r.PathValue("id"))
+        if runIDStr == "" {
+            runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
+        }
+        if runIDStr == "" {
+            http.Error(w, "id query parameter is required", http.StatusBadRequest)
+            return
+        }
 
 		// Parse and validate run_id.
 		runUUID, err := uuid.Parse(runIDStr)
@@ -853,29 +858,29 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response.
-		resp := struct {
-			ID         string  `json:"id"`
-			ModID      string  `json:"mod_id"`
-			Status     string  `json:"status"`
-			Reason     *string `json:"reason,omitempty"`
-			CreatedAt  string  `json:"created_at"`
-			StartedAt  *string `json:"started_at,omitempty"`
-			FinishedAt *string `json:"finished_at,omitempty"`
-			NodeID     *string `json:"node_id,omitempty"`
-			BaseRef    string  `json:"base_ref"`
-			TargetRef  string  `json:"target_ref"`
-			CommitSha  *string `json:"commit_sha,omitempty"`
-			Stats      *string `json:"stats,omitempty"`
-		}{
-			ID:        uuid.UUID(run.ID.Bytes).String(),
-			ModID:     uuid.UUID(run.ModID.Bytes).String(),
-			Status:    string(run.Status),
-			Reason:    run.Reason,
-			CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
-			BaseRef:   run.BaseRef,
-			TargetRef: run.TargetRef,
-			CommitSha: run.CommitSha,
-		}
+        resp := struct {
+            ID         string          `json:"id"`
+            ModID      string          `json:"mod_id"`
+            Status     string          `json:"status"`
+            Reason     *string         `json:"reason,omitempty"`
+            CreatedAt  string          `json:"created_at"`
+            StartedAt  *string         `json:"started_at,omitempty"`
+            FinishedAt *string         `json:"finished_at,omitempty"`
+            NodeID     *string         `json:"node_id,omitempty"`
+            BaseRef    string          `json:"base_ref"`
+            TargetRef  string          `json:"target_ref"`
+            CommitSha  *string         `json:"commit_sha,omitempty"`
+            Stats      json.RawMessage `json:"stats,omitempty"`
+        }{
+            ID:        uuid.UUID(run.ID.Bytes).String(),
+            ModID:     uuid.UUID(run.ModID.Bytes).String(),
+            Status:    string(run.Status),
+            Reason:    run.Reason,
+            CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
+            BaseRef:   run.BaseRef,
+            TargetRef: run.TargetRef,
+            CommitSha: run.CommitSha,
+        }
 
 		// Handle optional timestamp fields.
 		if run.StartedAt.Valid {
@@ -893,11 +898,10 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 			resp.NodeID = &nodeID
 		}
 
-		// Handle stats (JSONB).
-		if len(run.Stats) > 0 && string(run.Stats) != "{}" {
-			stats := string(run.Stats)
-			resp.Stats = &stats
-		}
+        // Handle stats (JSONB): return as raw JSON if not empty object.
+        if len(run.Stats) > 0 && string(run.Stats) != "{}" {
+            resp.Stats = json.RawMessage(run.Stats)
+        }
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
