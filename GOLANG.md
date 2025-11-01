@@ -12,9 +12,9 @@ This document codifies Go engineering rules for this repository. It complements 
 - Package boundaries: keep CLI thin; orchestration logic lives under `internal/...` packages per `AGENTS.md`.
 
 ## Formatting & Linting
-- Run `gofmt -w` (or `gofumpt -w` if the repo standardizes on it), followed by `goimports -w` to group imports (stdlib, third‑party, local). Code must be mechanically formatted; no hand‑tuned style deviations.
-- `go vet ./...` and `staticcheck ./...` on touched packages before submit. Integrate `golangci-lint` locally/CI for aggregate checks.
-- Keep the working tree clean between tool runs; commit only after format/lint/test pass.
+- Formatting is enforced automatically by a pre‑commit hook in `.githooks/pre-commit` (run `git config core.hooksPath .githooks` once; `IMPLEMENT.sh` sets this automatically when present).
+- The hook runs `goimports -w` (if available) and `gofmt -s -w` on all tracked `*.go` files and re‑stages the changes. No manual formatting needed.
+- Reviewer/CI owns repo‑wide hygiene checks: `go vet ./...` and `staticcheck ./...`. Implementers do not need to run these by default.
 
 ## Error Handling
 - Don’t use panic for normal errors; prefer `error` returns. Error strings are lowercase without trailing punctuation; wrap with `%w` and use `errors.Is/As` for inspection.
@@ -30,7 +30,9 @@ This document codifies Go engineering rules for this repository. It complements 
 ## Testing, Fuzzing, Coverage
 - Unit tests are table‑driven with subtests (`t.Run`). Keep clear failure messages; follow RED → GREEN → REFACTOR.
 - Fuzzing: add fuzz targets for critical parsing/decoding paths (`FuzzXxx(*testing.F)`); keep targets deterministic and fast.
-- Always run with the race detector on touched packages: `go test -race ./pkg/...`.
+- Role split:
+  - Implementer: run fast tests for changed packages (e.g., `go test ./internal/pkg1 ./cmd/tool`), omit repo‑wide `-race`.
+  - Reviewer/CI: run `go test -race ./...` across the repo.
 - Coverage targets: ≥60% overall and ≥90% on critical workflow runner packages (per `AGENTS.md`).
 
 ## Security & Supply Chain
@@ -54,15 +56,15 @@ This document codifies Go engineering rules for this repository. It complements 
 - Avoid unnecessary allocations; preallocate slices where size is known. Avoid `defer` in hot loops. Reuse buffers where safe. Measure with benchmarks and pprof before optimizing.
 
 ## CLI & Build Rules
-- Use `make build` to compile, `make test` to run `go test -cover ./...` along with guardrails (see `AGENTS.md`). Keep the CLI binary minimal.
+- Use `make build` to compile, `make test` for `go test -cover ./...` if provided. Keep the CLI thin; orchestration lives in `internal/...`.
 
 ## Code Review Expectations
-- Reviews enforce this guide and Go’s Code Review Comments. Prefer small, focused PRs with tests; table‑driven tests and race detector required on changed packages. Cite relevant rule in feedback.
+- Reviews enforce this guide and Go’s Code Review Comments. Prefer small, focused PRs with tests.
+- Reviewer runs repo‑wide hygiene (format is verified by hook), `go vet`, `staticcheck`, and `go test -race ./...`, and summarizes results succinctly.
 
 ## Tooling Quick Commands (baseline)
-- Format/imports: `gofmt -w . && goimports -w .`
-- Vet/lint: `go vet ./... && staticcheck ./...` (or `golangci-lint run`)
-- Tests: `go test ./...` (add `-race`, `-cover` as needed)
+- Implementer (local fast loop): `go test ./changed/pkg1 ./changed/pkg2`
+- Reviewer/CI (full sweep): `goimports -w . && gofmt -s -w . && go vet ./... && staticcheck ./... && go test -race ./...`
 - Fuzz: `go test -fuzz=Fuzz -run=^$ ./...`
 - Vulns: `govulncheck ./...`
 - Mods: `go mod tidy -v`
