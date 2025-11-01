@@ -54,7 +54,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
 
 ## TTL & Partitions
-- [ ] Mount `internal/store/ttlworker` in server: periodic deletes for `logs/events/diffs/artifact_bundles` older than retention.
+- [x] Mount `internal/store/ttlworker` in server: periodic deletes for `logs/events/diffs/artifact_bundles` older than retention.
 - [ ] Add partition lister + dropper integration (monthly tables) guarded by feature flag.
 
 ## Node Agent (Unstub default build)
