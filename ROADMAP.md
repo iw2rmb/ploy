@@ -122,11 +122,10 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [ ] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
 - [ ] Remove IPFS references and scripts (already mostly gone; sweep `scripts/` and docs).
 - [ ] Delete `cmd/ployd-node/stub.go` once default build is real (or keep under `-tags stub`).
-- [ ] Cull ARCHITECTURE_DIAGRAM.md references to now-removed packages (daemon wiring, legacy paths).
+ - [x] Consolidate exploration docs into README/SIMPLE; remove `ARCHITECTURE_DIAGRAM.md` and related (`CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`).
 
 ## Acceptance Checklist
 - [ ] Server starts with `PLOY_SERVER_PG_DSN` and serves all documented endpoints over mTLS on `:8443`.
 - [ ] Node starts by default (no build tags) and can run the end-to-end flow: start → stream logs → upload diff/artifacts → finish.
 - [ ] `make test` green; coverage thresholds met; docs up to date.
 - [ ] VPS lab walkthrough in docs executes successfully with the provided IPs and commands.
-

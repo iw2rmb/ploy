@@ -12,6 +12,8 @@ diffs/logs/artifacts to the server's PostgreSQL database.
 
 See `SIMPLE.md` for the detailed architecture, deployment topology, and migration notes.
 
+Note on docs consolidation (2025‑11‑01): prior exploration files (ARCHITECTURE_DIAGRAM.md, CODEBASE_EXPLORATION.md, EXPLORATION_INDEX.md, EXPLORATION_README.md) were folded into this README and SIMPLE.md to reduce duplication and confusion.
+
 **What Changed (2025‑11 — Postgres/mTLS Pivot)**
 - **Server/Node Split**: Separate `ployd` (control-plane) and `ployd-node` (worker) binaries.
 - **PostgreSQL**: Replaces etcd for state; stores runs, logs, diffs, and artifact bundles.
@@ -36,6 +38,14 @@ See `SIMPLE.md` for the detailed architecture, deployment topology, and migratio
 - Control‑plane APIs: `docs/api/OpenAPI.yaml`
 - Environment variables: `docs/envs/README.md`
 - Engineering rules: `GOLANG.md`
+
+**Docs Map**
+- Overview & quick start: this `README.md` (canonical entry).
+- Deep architecture: `SIMPLE.md` (source of truth for diagrams/flows).
+- APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas).
+- How‑tos: `docs/how-to/*.md` (deploy/update guides).
+- Envs: `docs/envs/README.md` (canonical env reference).
+- Contributor process: `AGENTS.md` (TDD, coverage, docs policy).
 
 **Build**
 - Requirements: Go 1.25+, Docker 28.x for local step execution.
