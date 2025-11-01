@@ -51,6 +51,10 @@ test-coverage-threshold: test-coverage ## Run tests and enforce 60% coverage thr
 		exit 1; \
 	fi
 
+.PHONY: test-coverage-critical
+test-coverage-critical: test-coverage ## Enforce 90% coverage on scheduler/PKI/ingest critical paths
+	@./scripts/check-critical-coverage.sh $(BUILD_DIR)/coverage.out
+
 .PHONY: vet
 vet: ## Run go vet
 	go vet ./...
@@ -74,7 +78,7 @@ staticcheck: ## Run staticcheck
 	fi
 
 .PHONY: ci-check
-ci-check: fmt vet staticcheck test-coverage-threshold ## Run core CI checks locally
+ci-check: fmt vet staticcheck test-coverage-threshold test-coverage-critical ## Run core CI checks locally
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install
@@ -111,6 +115,7 @@ help: ## Show available targets
 	@echo "  make test-race                  # Run tests with race detector"
 	@echo "  make test-coverage              # Run tests and generate coverage report"
 	@echo "  make test-coverage-threshold    # Run tests and enforce 60% coverage threshold"
+	@echo "  make test-coverage-critical     # Enforce 90% coverage on scheduler/PKI/ingest critical paths"
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
