@@ -17,6 +17,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/api/metrics"
+	"github.com/iw2rmb/ploy/internal/api/pki"
 	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -85,7 +86,7 @@ func main() {
 	defer cancel()
 
 	// Run server.
-	if err := run(ctx, cfg, st, authorizer); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(ctx, cfg, configPath, st, authorizer); err != nil && !errors.Is(err, context.Canceled) {
 		slog.Error("server exited", "err", err)
 		os.Exit(1)
 	}
@@ -94,7 +95,29 @@ func main() {
 }
 
 // run executes the main server loop and blocks until the context is canceled.
-func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer) error {
+func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer) error {
+	// Initialize PKI manager for certificate renewal.
+	rotator := pki.NewDefaultRotator(slog.Default())
+	pkiManager, err := pki.New(pki.Options{
+		Config:  cfg.PKI,
+		Rotator: rotator,
+	})
+	if err != nil {
+		return fmt.Errorf("create pki manager: %w", err)
+	}
+
+	// Initialize config watcher for hot-reload.
+	configWatcher, err := config.NewWatcher(config.WatcherOptions{
+		Path:   configPath,
+		Logger: slog.Default(),
+	})
+	if err != nil {
+		return fmt.Errorf("create config watcher: %w", err)
+	}
+
+	// Subscribe PKI manager to config changes.
+	configWatcher.Subscribe(pkiManager)
+
 	// Initialize TTL worker.
 	ttlWorker, err := ttlworker.New(ttlworker.Options{
 		Store:          st,
@@ -113,8 +136,21 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		sched.AddTask(ttlWorker)
 	}
 
+	// Start PKI manager.
+	if err := pkiManager.Start(ctx); err != nil {
+		return fmt.Errorf("start pki manager: %w", err)
+	}
+
+	// Start config watcher.
+	if err := configWatcher.Start(ctx); err != nil {
+		_ = pkiManager.Stop(context.Background())
+		return fmt.Errorf("start config watcher: %w", err)
+	}
+
 	// Start scheduler.
 	if err := sched.Start(ctx); err != nil {
+		_ = configWatcher.Stop(context.Background())
+		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start scheduler: %w", err)
 	}
 
@@ -135,21 +171,25 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 		Listen: cfg.Metrics.Listen,
 	})
 
-    // Start HTTP server.
-    if err := httpSrv.Start(ctx); err != nil {
-        // Ensure background tasks are stopped on failure.
-        _ = sched.Stop(context.Background())
-        return fmt.Errorf("start http server: %w", err)
-    }
+	// Start HTTP server.
+	if err := httpSrv.Start(ctx); err != nil {
+		// Ensure background tasks are stopped on failure.
+		_ = sched.Stop(context.Background())
+		_ = configWatcher.Stop(context.Background())
+		_ = pkiManager.Stop(context.Background())
+		return fmt.Errorf("start http server: %w", err)
+	}
 
-    // Start metrics server.
-    if err := metricsSrv.Start(ctx); err != nil {
-        // Stop HTTP server on failure to start metrics.
-        _ = httpSrv.Stop(context.Background())
-        // Stop scheduler to avoid leaking background goroutines.
-        _ = sched.Stop(context.Background())
-        return fmt.Errorf("start metrics server: %w", err)
-    }
+	// Start metrics server.
+	if err := metricsSrv.Start(ctx); err != nil {
+		// Stop HTTP server on failure to start metrics.
+		_ = httpSrv.Stop(context.Background())
+		// Stop scheduler to avoid leaking background goroutines.
+		_ = sched.Stop(context.Background())
+		_ = configWatcher.Stop(context.Background())
+		_ = pkiManager.Stop(context.Background())
+		return fmt.Errorf("start metrics server: %w", err)
+	}
 
 	slog.Info("ployd servers started",
 		"api", httpSrv.Addr(),
@@ -168,6 +208,16 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 	// Stop scheduler.
 	if err := sched.Stop(shutdownCtx); err != nil {
 		slog.Error("stop scheduler", "err", err)
+	}
+
+	// Stop config watcher.
+	if err := configWatcher.Stop(shutdownCtx); err != nil {
+		slog.Error("stop config watcher", "err", err)
+	}
+
+	// Stop PKI manager.
+	if err := pkiManager.Stop(shutdownCtx); err != nil {
+		slog.Error("stop pki manager", "err", err)
 	}
 
 	// Stop HTTP server.
