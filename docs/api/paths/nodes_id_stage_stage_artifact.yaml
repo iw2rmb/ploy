@@ -42,6 +42,31 @@ post:
               type: string
               description: Gzipped tar archive (≤1 MiB gzipped), base64-encoded.
               contentEncoding: base64
+        examples:
+          minimal_artifact:
+            summary: Minimal artifact bundle upload
+            description: |
+              Basic artifact upload with gzipped tar archive (base64-encoded).
+              The bundle field contains the compressed tar limited to 1 MiB.
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
+          named_artifact:
+            summary: Named artifact bundle with build ID
+            description: |
+              Example including optional name and build_id for artifact tracking.
+              Name can be used to identify the artifact type (e.g., "dist", "coverage").
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              build_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              name: "dist"
+              bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
+          size_limit:
+            summary: Maximum size boundary
+            description: |
+              The decoded gzipped bundle is capped at 1 MiB (1048576 bytes).
+              The JSON body limit is 2 MiB to accommodate base64 encoding overhead (~33%).
+              Server returns 413 if decoded bundle exceeds 1 MiB or body exceeds 2 MiB.
   responses:
     '201':
       description: Created

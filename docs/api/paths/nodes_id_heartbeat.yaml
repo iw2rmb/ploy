@@ -58,6 +58,26 @@ post:
               type: string
               description: Optional node agent version string. When omitted or empty, the stored version remains unchanged.
               example: "ployd-node/1.2.3 (linux/amd64)"
+        examples:
+          minimal:
+            summary: Minimal heartbeat (all required fields)
+            value:
+              cpu_free_millis: 1500.0
+              cpu_total_millis: 4000.0
+              mem_free_mb: 2048.0
+              mem_total_mb: 8192.0
+              disk_free_mb: 10240.0
+              disk_total_mb: 51200.0
+          with_version:
+            summary: Heartbeat with agent version
+            value:
+              cpu_free_millis: 2800.0
+              cpu_total_millis: 4000.0
+              mem_free_mb: 5632.0
+              mem_total_mb: 16384.0
+              disk_free_mb: 204800.0
+              disk_total_mb: 512000.0
+              version: "ployd-node/1.2.3 (linux/amd64)"
   responses:
     '204':
       description: Heartbeat accepted and node snapshot updated

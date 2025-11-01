@@ -16,6 +16,33 @@ post:
       application/json:
         schema:
           $ref: '../components/schemas/controlplane.yaml#/NodeCreateLogRequest'
+        examples:
+          minimal_chunk:
+            summary: First log chunk for a run
+            description: |
+              Minimal example with gzipped log data (base64-encoded).
+              The actual payload size is limited to 2 MiB JSON body, with decoded data ≤ 1 MiB.
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              chunk_no: 0
+              data: "H4sIAAAAAAAA/8rJT0/VLy4pysxLBwQAAP//f0hXFQwAAAA="
+          with_stage:
+            summary: Log chunk for a specific stage
+            description: |
+              Example with stage_id and build_id included. Demonstrates chunked upload
+              pattern where chunk_no increments for each subsequent chunk.
+            value:
+              run_id: "550e8400-e29b-41d4-a716-446655440000"
+              stage_id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+              build_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+              chunk_no: 5
+              data: "H4sIAAAAAAAA/0vOz0lNzNFQKslIVSjPLMnQL1XQzUtMzlCyUgIEAAD//z3OX5QdAAAA="
+          size_limit:
+            summary: Maximum size boundary
+            description: |
+              The decoded gzipped data is capped at 1 MiB (1048576 bytes).
+              The JSON body limit is 2 MiB to accommodate base64 encoding overhead (~33%).
+              Server returns 413 if decoded data exceeds 1 MiB or body exceeds 2 MiB.
   responses:
     '201':
       description: Created
