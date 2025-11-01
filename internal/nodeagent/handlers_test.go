@@ -177,6 +177,68 @@ func TestHandleRunStop(t *testing.T) {
 	}
 }
 
+func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
+	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	mock := &mockRunController{}
+	srv := &Server{cfg: cfg, controller: mock}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/run/start", nil)
+	w := httptest.NewRecorder()
+
+	srv.handleRunStart(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
+	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	mock := &mockRunController{}
+	srv := &Server{cfg: cfg, controller: mock}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/run/stop", nil)
+	w := httptest.NewRecorder()
+
+	srv.handleRunStop(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHandleRunStart_InvalidJSON(t *testing.T) {
+	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	mock := &mockRunController{}
+	srv := &Server{cfg: cfg, controller: mock}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/run/start", bytes.NewBufferString("not-json"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleRunStart(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestHandleRunStop_InvalidJSON(t *testing.T) {
+	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	mock := &mockRunController{}
+	srv := &Server{cfg: cfg, controller: mock}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/run/stop", bytes.NewBufferString("not-json"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	srv.handleRunStop(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHandleHealth(t *testing.T) {
 	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
 	mock := &mockRunController{}
