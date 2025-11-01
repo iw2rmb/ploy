@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/events"
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/api/metrics"
 	"github.com/iw2rmb/ploy/internal/api/pki"
@@ -140,6 +141,16 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("create ttl worker: %w", err)
 	}
 
+	// Initialize events service for SSE fanout.
+	eventsService, err := events.New(events.Options{
+		BufferSize:  32,
+		HistorySize: 256,
+		Logger:      slog.Default(),
+	})
+	if err != nil {
+		return fmt.Errorf("create events service: %w", err)
+	}
+
 	// Initialize scheduler and register background tasks.
 	sched := scheduler.New()
 	if ttlWorker != nil {
@@ -157,8 +168,16 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("start config watcher: %w", err)
 	}
 
+	// Start events service.
+	if err := eventsService.Start(ctx); err != nil {
+		_ = configWatcher.Stop(context.Background())
+		_ = pkiManager.Stop(context.Background())
+		return fmt.Errorf("start events service: %w", err)
+	}
+
 	// Start scheduler.
 	if err := sched.Start(ctx); err != nil {
+		_ = eventsService.Stop(context.Background())
 		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start scheduler: %w", err)
@@ -205,6 +224,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	if err := httpSrv.Start(ctx); err != nil {
 		// Ensure background tasks are stopped on failure.
 		_ = sched.Stop(context.Background())
+		_ = eventsService.Stop(context.Background())
 		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start http server: %w", err)
@@ -216,6 +236,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		_ = httpSrv.Stop(context.Background())
 		// Stop scheduler to avoid leaking background goroutines.
 		_ = sched.Stop(context.Background())
+		_ = eventsService.Stop(context.Background())
 		_ = configWatcher.Stop(context.Background())
 		_ = pkiManager.Stop(context.Background())
 		return fmt.Errorf("start metrics server: %w", err)
@@ -238,6 +259,11 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	// Stop scheduler.
 	if err := sched.Stop(shutdownCtx); err != nil {
 		slog.Error("stop scheduler", "err", err)
+	}
+
+	// Stop events service.
+	if err := eventsService.Stop(shutdownCtx); err != nil {
+		slog.Error("stop events service", "err", err)
 	}
 
 	// Stop config watcher.
