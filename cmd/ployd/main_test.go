@@ -1697,20 +1697,20 @@ func TestGetRunHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	var resp struct {
-		ID         string  `json:"id"`
-		ModID      string  `json:"mod_id"`
-		Status     string  `json:"status"`
-		Reason     *string `json:"reason,omitempty"`
-		CreatedAt  string  `json:"created_at"`
-		StartedAt  *string `json:"started_at,omitempty"`
-		FinishedAt *string `json:"finished_at,omitempty"`
-		NodeID     *string `json:"node_id,omitempty"`
-		BaseRef    string  `json:"base_ref"`
-		TargetRef  string  `json:"target_ref"`
-		CommitSha  *string `json:"commit_sha,omitempty"`
-		Stats      *string `json:"stats,omitempty"`
-	}
+    var resp struct {
+        ID         string          `json:"id"`
+        ModID      string          `json:"mod_id"`
+        Status     string          `json:"status"`
+        Reason     *string         `json:"reason,omitempty"`
+        CreatedAt  string          `json:"created_at"`
+        StartedAt  *string         `json:"started_at,omitempty"`
+        FinishedAt *string         `json:"finished_at,omitempty"`
+        NodeID     *string         `json:"node_id,omitempty"`
+        BaseRef    string          `json:"base_ref"`
+        TargetRef  string          `json:"target_ref"`
+        CommitSha  *string         `json:"commit_sha,omitempty"`
+        Stats      json.RawMessage `json:"stats,omitempty"`
+    }
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -1733,9 +1733,9 @@ func TestGetRunHandler_Success(t *testing.T) {
 	if resp.NodeID == nil || *resp.NodeID != nodeID.String() {
 		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp.NodeID)
 	}
-	if resp.Stats == nil || *resp.Stats != stats {
-		t.Errorf("expected stats %q, got %v", stats, resp.Stats)
-	}
+    if len(resp.Stats) == 0 || string(resp.Stats) != stats {
+        t.Errorf("expected stats %q, got %s", stats, string(resp.Stats))
+    }
 
 	if !mockSt.getRunCalled {
 		t.Fatal("expected GetRun to be called")
@@ -1838,6 +1838,49 @@ func TestGetRunHandler_DatabaseError(t *testing.T) {
 	if !mockSt.getRunCalled {
 		t.Fatal("expected GetRun to be called")
 	}
+}
+
+func TestGetRunHandler_PathParam_Success(t *testing.T) {
+    runID := uuid.New()
+    modID := uuid.New()
+    now := time.Now().UTC()
+
+    mockSt := &mockStore{
+        getRunResult: store.Run{
+            ID: pgtype.UUID{Bytes: runID, Valid: true},
+            ModID: pgtype.UUID{Bytes: modID, Valid: true},
+            Status:    store.RunStatusQueued,
+            BaseRef:   "main",
+            TargetRef: "feature",
+            CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+            Stats:     []byte("{}"),
+        },
+    }
+
+    req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+    req.SetPathValue("id", runID.String())
+    rr := httptest.NewRecorder()
+
+    handler := getRunHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusOK {
+        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+    }
+
+    var resp struct {
+        ID    string `json:"id"`
+        ModID string `json:"mod_id"`
+    }
+    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+        t.Fatalf("decode response: %v", err)
+    }
+    if resp.ID != runID.String() {
+        t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+    }
+    if resp.ModID != modID.String() {
+        t.Errorf("expected mod_id %s, got %s", modID.String(), resp.ModID)
+    }
 }
 
 func TestDeleteRunHandler_Success(t *testing.T) {
