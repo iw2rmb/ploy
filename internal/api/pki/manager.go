@@ -1,10 +1,11 @@
 package pki
 
 import (
-	"context"
-	"errors"
-	"sync"
-	"time"
+    "context"
+    "errors"
+    "log/slog"
+    "sync"
+    "time"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
 )
@@ -114,7 +115,10 @@ func (m *Manager) loop() {
 		if ctx.Err() != nil {
 			return
 		}
-		_ = m.rotator.Renew(ctx, cfg)
+        if err := m.rotator.Renew(ctx, cfg); err != nil {
+            // Background task: log at the edge per GOLANG.md guidance.
+            slog.Error("pki renew failed", "err", err)
+        }
 
 		delay := cfg.RenewBefore
 		if delay <= 0 {
