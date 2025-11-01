@@ -84,6 +84,12 @@ defaults change, or components adopt additional configuration.
     environment:
       PLOY_LIFECYCLE_NET_IGNORE: "docker*,veth*,br-*"
 
+- ployd-node config path — The node agent reads its YAML config from
+  `/etc/ploy/ployd-node.yaml` by default and accepts an override via the
+  CLI flag `--config`. There is currently no environment variable override
+  for this path. TODO: consider introducing `PLOYD_NODE_CONFIG_PATH` for
+  parity with the server’s `PLOYD_CONFIG_PATH`.
+
 ## E2E Harness
 
 - `ploy mod run` executes Mods against the Ploy control plane; no tenant variable is required.
