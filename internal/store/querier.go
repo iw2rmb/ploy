@@ -31,6 +31,7 @@ type Querier interface {
 	GetRepo(ctx context.Context, id pgtype.UUID) (Repo, error)
 	GetRepoByURL(ctx context.Context, url string) (Repo, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
+	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
@@ -40,6 +41,7 @@ type Querier interface {
 	ListRepos(ctx context.Context) ([]Repo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, error)
+	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
