@@ -64,9 +64,7 @@ CreateRunResponse:
   type: object
   properties:
     run_id: { type: string, format: uuid }
-    run:
-      $ref: '#/Run'
-  required: [run_id, run]
+  required: [run_id]
 
 Event:
   type: object
