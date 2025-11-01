@@ -3496,15 +3496,19 @@ func TestCreateDiffHandler_Success(t *testing.T) {
 		t.Fatal("expected CreateDiff to be called")
 	}
 
-	// Verify response.
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to unmarshal response: %v", err)
-	}
+    // Verify response.
+    var resp map[string]interface{}
+    if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+        t.Fatalf("failed to unmarshal response: %v", err)
+    }
 
-	if _, ok := resp["diff_id"]; !ok {
-		t.Errorf("expected diff_id in response, got %v", resp)
-	}
+    idStr, ok := resp["diff_id"].(string)
+    if !ok {
+        t.Fatalf("expected diff_id string in response, got %T (%v)", resp["diff_id"], resp["diff_id"]) 
+    }
+    if idStr != diffID.String() {
+        t.Errorf("unexpected diff_id: got %s want %s", idStr, diffID.String())
+    }
 }
 
 func TestCreateDiffHandler_MissingNodeID(t *testing.T) {
@@ -3594,8 +3598,8 @@ func TestCreateDiffHandler_PayloadTooLarge(t *testing.T) {
 	nodeID := uuid.New()
 	stageID := uuid.New()
 
-	// Create a payload larger than 1 MiB.
-	largePayload := make([]byte, 1<<20+1)
+    // Create a payload larger than body cap (2 MiB).
+    largePayload := make([]byte, 2<<20+1)
 	for i := range largePayload {
 		largePayload[i] = 'A'
 	}
@@ -3623,8 +3627,8 @@ func TestCreateDiffHandler_PayloadTooLarge_Streaming(t *testing.T) {
 	nodeID := uuid.New()
 	stageID := uuid.New()
 
-	// Create a JSON payload that is valid but exceeds 1 MiB when read.
-	largePatch := strings.Repeat("A", 1<<20)
+    // Create a JSON payload that is valid but exceeds 2 MiB when read.
+    largePatch := strings.Repeat("A", 2<<20)
 	payload := `{
 		"run_id": "` + uuid.New().String() + `",
 		"patch": "` + largePatch + `"
@@ -3970,4 +3974,93 @@ func TestCreateDiffHandler_CreateDiffError(t *testing.T) {
 	if !mockSt.createDiffCalled {
 		t.Fatal("expected CreateDiff to be called")
 	}
+}
+
+func TestCreateDiffHandler_PatchBytesTooLarge(t *testing.T) {
+    // Ensure that when the decoded patch bytes exceed 1 MiB, we return 413,
+    // even if the JSON body stays under the 2 MiB body cap.
+    nodeID := uuid.New()
+    stageID := uuid.New()
+    runID := uuid.New()
+    version := "1.0.0"
+
+    mockSt := &mockStore{
+        getNodeResult: store.Node{
+            ID: pgtype.UUID{Bytes: nodeID, Valid: true},
+            Name: "test-node",
+            IpAddress: netip.MustParseAddr("192.168.1.100"),
+            Version: &version,
+            CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+        },
+        getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+        getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+    }
+
+    // Construct a base64 string that decodes to >1 MiB.
+    // Using only 'A' chars keeps it valid base64; length must be a multiple of 4.
+    // (len/4)*3 = 1,048,578 bytes (> 1 MiB) for len=1,398,104.
+    b64 := strings.Repeat("A", 1_398_104)
+    payload := `{
+        "run_id": "` + runID.String() + `",
+        "patch": "` + b64 + `"
+    }`
+
+    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+    req.SetPathValue("id", nodeID.String())
+    req.SetPathValue("stage", stageID.String())
+    req.Header.Set("Content-Type", "application/json")
+    rr := httptest.NewRecorder()
+
+    handler := createDiffHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusRequestEntityTooLarge {
+        t.Fatalf("expected status 413 for oversized decoded patch, got %d", rr.Code)
+    }
+    if !strings.Contains(rr.Body.String(), "diff size exceeds 1 MiB cap") {
+        t.Errorf("expected error about size cap, got: %s", rr.Body.String())
+    }
+    // No DB create should have happened.
+    if mockSt.createDiffCalled {
+        t.Fatal("expected CreateDiff not to be called when patch too large")
+    }
+}
+
+func TestCreateDiffHandler_StageRunMismatch(t *testing.T) {
+    nodeID := uuid.New()
+    stageID := uuid.New()
+    runID := uuid.New()
+    otherRunID := uuid.New()
+    version := "1.0.0"
+
+    mockSt := &mockStore{
+        getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+        getRunResult: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+        // Stage belongs to a different run.
+        getStageResult: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: otherRunID, Valid: true}, Name: "build", Status: store.StageStatusRunning},
+    }
+
+    payload := `{
+        "run_id": "` + runID.String() + `",
+        "patch": "Z3ppcHBlZC1kaWZm"
+    }`
+
+    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/stage/"+stageID.String()+"/diff", strings.NewReader(payload))
+    req.SetPathValue("id", nodeID.String())
+    req.SetPathValue("stage", stageID.String())
+    req.Header.Set("Content-Type", "application/json")
+    rr := httptest.NewRecorder()
+
+    handler := createDiffHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusBadRequest {
+        t.Fatalf("expected status 400 on stage/run mismatch, got %d", rr.Code)
+    }
+    if !strings.Contains(rr.Body.String(), "stage does not belong to run") {
+        t.Errorf("expected mismatch error message, got: %s", rr.Body.String())
+    }
+    if mockSt.createDiffCalled {
+        t.Fatal("expected CreateDiff not to be called on stage/run mismatch")
+    }
 }
