@@ -236,7 +236,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("validates manifest", func(t *testing.T) {
+		t.Run("validates manifest", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:     "run-123",
 			RepoURL:   "https://github.com/example/repo.git",
@@ -250,6 +250,31 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 		if err := manifest.Validate(); err != nil {
 			t.Errorf("manifest validation failed: %v", err)
+		}
+	})
+
+	// Accept command as either []string or single string.
+	t.Run("command option string maps to shell", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-123",
+			RepoURL: "https://github.com/example/repo.git",
+			Options: map[string]any{
+				"command": "echo hi",
+			},
+		}
+
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+		want := []string{"/bin/sh", "-c", "echo hi"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("command len=%d, want %d", len(manifest.Command), len(want))
+		}
+		for i := range want {
+			if manifest.Command[i] != want[i] {
+				t.Fatalf("command[%d]=%q, want %q", i, manifest.Command[i], want[i])
+			}
 		}
 	})
 }
