@@ -42,7 +42,7 @@ This project contains a comprehensive exploration of the Ploy codebase structure
 - **Purpose**: Visual representations and data flows
 - **Key Diagrams**:
   - High-level component diagram
-  - Security architecture (mTLS + bearer token)
+  - Security architecture (mTLS-only)
   - Configuration flow
   - Database integration (PostgreSQL + sqlc)
   - PKI management lifecycle
@@ -59,10 +59,10 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 
 ### Core Technology Stack
 - **Language**: Go 1.25+
-- **HTTP Server**: Fiber v2 (for node endpoints) + http.ServeMux (for control-plane)
+- **HTTP Server**: Go net/http for control-plane and node RPC
 - **Database**: PostgreSQL with pgx/v5 + sqlc
-- **Security**: Mutual TLS + Bearer token authentication
-- **Message Queue**: etcd for cluster coordination
+- **Security**: Mutual TLS (mTLS-only; bearer tokens removed)
+- **State/Queue**: PostgreSQL (DB-claimed scheduling)
 - **Metrics**: Prometheus
 
 ### Key Components
@@ -89,28 +89,21 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 
 ### API Endpoints
 
-**Node-Local** (no auth):
-- `/v1/node/status` — Health status
-- `/v1/node/jobs/*` — Job management
-- `/v1/admin/nodes` — Node registration
+Refer to `docs/api/OpenAPI.yaml` for the authoritative list. Key paths:
 
-**Control-Plane** (mTLS + bearer token + scopes):
-- `/v1/jobs/*` — Job submission, claiming
-- `/v1/nodes/*` — Node management
-- `/v1/config/*` — Configuration management
-- `/v1/security/*` — PKI/certificates
-- `/v1/mods/*` — Mods orchestration
-- `/v1/artifacts/*` — Artifact management
-- `/v1/transfers/*` — File transfers
-- `/metrics` — Prometheus metrics
+**Control-Plane** (mTLS-only):
+- `/v1/pki/sign` — Sign node CSRs (cluster CA)
+- `/v1/repos` and `/v1/repos/{id}` — Repos CRUD
+- `/v1/mods/crud` and `/v1/mods/crud/{id}` — Mods CRUD
+- `/v1/runs` and `/v1/runs/{id}` — Runs CRUD
+- `/v1/runs/{id}/events` — SSE log/event stream
+- `/v1/runs/{id}/diffs|logs|artifact_bundles` — Gzipped ingest endpoints
 
 ### Security Features
 - Mutual TLS (X509 client certificates)
-- Bearer token authentication
-- Scope-based access control (admin, mods, jobs, artifact.read/write, registry.pull/push)
-- Role-based access control (ControlPlane, CLIAdmin, Worker)
+- Role-based authorization at handlers where applicable
 - Principal context for audit logging
-- Automatic certificate renewal (default: 1 hour checks)
+- Automatic certificate renewal (cluster CA rotates infrequently)
 - TLS 1.2+ enforcement
 
 ## File Structure
@@ -134,12 +127,11 @@ Ploy is a workstation-first orchestration stack for code-mod (Mods) workflows. I
 │   │   ├── daemon/
 │   │   │   ├── default.go ⭐ COMPONENT WIRING
 │   │   │   └── daemon.go
-│   │   ├── httpserver/
-│   │   │   ├── server.go ⭐ HTTP SERVER
-│   │   │   ├── controlplane_server.go ⭐ ROUTES & SECURITY
-│   │   │   └── security/
-│   │   │       ├── security.go ⭐ AUTH MIDDLEWARE
-│   │   │       └── ...
+│   │   ├── metrics/
+│   │   ├── pki/
+│   │   │   └── manager.go ⭐ PKI RENEWAL
+│   │   ├── scheduler/
+│   │   └── ...
 │   │   ├── config/
 │   │   │   ├── types.go ⭐ CONFIG STRUCTS
 │   │   │   ├── loader.go
@@ -184,9 +176,9 @@ Legend: ⭐ = Key files to understand first
 4. Skim **CODEBASE_EXPLORATION.md** "Daemon Initialization" section
 
 ### Phase 3: HTTP & Security (15 minutes)
-5. Read **internal/api/httpserver/server.go** — Understand Fiber setup
-6. Skim **internal/api/httpserver/controlplane_server.go** (first 250 lines)
-7. Read **internal/api/httpserver/security/security.go** — See auth middleware
+5. Review **docs/api/OpenAPI.yaml** — Endpoints and schemas
+6. Skim **internal/controlplane/** — Authorization and handler wiring
+7. Read **internal/api/pki/** — PKI manager and CSR signing
 
 ### Phase 4: Visual Understanding (10 minutes)
 8. Review **ARCHITECTURE_DIAGRAM.md** diagrams
@@ -210,18 +202,14 @@ Total time for Phases 1-4: **45 minutes**
 6. **Event-Driven Logging**: Server-sent events for real-time logs
 
 ### Security Model
-- **Layer 1 (Transport)**: Mutual TLS with X509 certificates
-- **Layer 2 (Authentication)**: Bearer token verification
-- **Layer 3 (Authorization)**: Scope-based per-endpoint authorization
-- **Layer 4 (Access Control)**: Role-based coarse-grained checks
+- **Transport**: Mutual TLS with X509 client certificates
+- **Authorization**: Role-based checks within handlers
 
 ### Data Flow
 1. Client establishes TLS connection with client certificate
-2. Client sends HTTP request with `Authorization: Bearer <token>` header
-3. Server validates certificate, extracts and verifies token
-4. Server checks scopes and roles
-5. Handler receives authenticated context
-6. Handler can access `Principal` for audit logging
+2. Server validates certificate and maps identity
+3. Handler checks roles/permissions as needed
+4. Handler can access `Principal` for audit logging
 
 ### Configuration Resolution
 1. YAML file loads defaults

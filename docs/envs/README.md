@@ -77,26 +77,10 @@ defaults change, or components adopt additional configuration.
 
 ## Control Plane
 
-- `PLOY_GITLAB_SIGNER_AES_KEY` — Required base64-encoded AES key used by the signer
-  to encrypt GitLab API keys before persisting them in etcd. The decoded key must be
-  16, 24, or 32 bytes to satisfy AES-GCM requirements.
-- `PLOY_CLUSTER_ID` — Optional override for the cluster identifier the control plane writes inside
-  etcd prefixes (defaults to the value recorded in `/etc/ploy/cluster-id`). Set this when running
-  multiple clusters from the same environment and `/etc/ploy/cluster-id` is unavailable.
-- `PLOY_CONTROL_PLANE_URL` — Optional control-plane base URL override used by `ploy config gitlab`, worker onboarding,
-  and CLI log/streaming commands. When unset, the CLI derives the endpoint plus CA bundle from the cached cluster descriptor.
-- `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Optional duration (e.g., `15m`) applied when
-  callers omit a TTL while requesting short-lived GitLab tokens.
-- `PLOY_GITLAB_SIGNER_MAX_TTL` — Optional duration that caps the maximum issued TTL.
-  Requests above this threshold are rejected. Defaults to `12h` when unset.
-- `PLOY_GITLAB_API_BASE_URL` — Base URL for GitLab API requests when revoking
-  stale runner tokens during credential rotations.
-- `PLOY_GITLAB_ADMIN_TOKEN` — Admin or automation token presented to GitLab when
-  calling the revocation API. Required for the rotation revocation workflow to
-  disable stale tokens across nodes.
-- `PLOY_TRANSFERS_BASE_DIR` — Optional override for the SSH slot staging root on control-plane
-  nodes. Defaults to `/var/lib/ploy/ssh-artifacts` and is referenced by the slot guard wrapper that
-  bootstrap installs.
+- `PLOY_CONTROL_PLANE_URL` — Optional control-plane base URL override used by
+  the CLI and node bootstrap commands. When unset, the CLI derives the endpoint
+  and CA bundle from the cached cluster descriptor created during
+  `ploy server deploy`.
 
 ### PKI
 
@@ -127,6 +111,13 @@ precedence over the config file when both are present.
 
 The following variables are **no longer consumed** by the codebase after the Postgres/mTLS pivot:
 
+### GitLab Signer (Removed)
+- `PLOY_GITLAB_SIGNER_AES_KEY` — Removed (GitLab signer deleted).
+- `PLOY_GITLAB_SIGNER_DEFAULT_TTL` — Removed.
+- `PLOY_GITLAB_SIGNER_MAX_TTL` — Removed.
+- `PLOY_GITLAB_API_BASE_URL` — Removed.
+- `PLOY_GITLAB_ADMIN_TOKEN` — Removed.
+
 ### IPFS Cluster (Removed)
 - `PLOY_IPFS_CLUSTER_API` — Replaced with PostgreSQL storage for diffs/logs/artifact bundles.
 - `PLOY_IPFS_CLUSTER_TOKEN` — Token auth removed; mTLS only.
@@ -147,6 +138,7 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - `PLOY_SSH_IDENTITY` — Removed.
 - `PLOY_SSH_SOCKET_DIR` — Removed.
 - `PLOY_CACHE_HOME` — Removed.
+- `PLOY_TRANSFERS_BASE_DIR` — Removed (SSH-based artifact staging deleted).
 
 ### Other
 - `PLOY_ARTIFACT_ROOT` — Local artifact caching removed; nodes use ephemeral workspaces.
@@ -156,4 +148,3 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - [SIMPLE.md](../../SIMPLE.md) — Server/node pivot architecture
 - [ROADMAP.md](../../ROADMAP.md) — Migration checklist
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
-
