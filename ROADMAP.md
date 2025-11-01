@@ -68,10 +68,10 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Refresh `docs/envs/README.md` with new envs; mark IPFS/etcd as legacy and remove.
   - [x] Update how-to deploy and README; point operators to the new CLI flows.
 
-- [ ] Tests and coverage
-  - [ ] Unit: scheduler claim fairness/backoff; diff/log ingestion; PKI/CSR flow; resource-cap rejects.
-  - [ ] Integration: one server + one node; submit run with a public repo; assert logs/diff stored and TTL job deletes old rows.
-  - [ ] Target coverage: ≥60% overall; ≥90% critical runner packages.
+- [x] Tests and coverage
+  - [x] Unit: scheduler claim fairness/backoff; diff/log ingestion; PKI/CSR flow; resource-cap rejects.
+  - [x] Integration: one server + one node; submit run with a public repo; assert logs/diff stored and TTL job deletes old rows.
+  - [x] Target coverage: ≥60% overall; ≥90% critical runner packages.
 
 ## Acceptance criteria
 - Server starts with Postgres DSN and mTLS; `/v1/runs` + SSE work.
