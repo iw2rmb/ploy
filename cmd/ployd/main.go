@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+    "strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -191,6 +192,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
     // Support both query (?id=) and RESTful path (/v1/runs/{id}) for basic run view.
     httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
     httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+    // Explicit timing subresource for clarity and OpenAPI alignment.
+    httpSrv.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
     httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Initialize metrics server.
@@ -824,12 +827,25 @@ func createRunHandler(st store.Store) http.HandlerFunc {
 
 // getRunHandler returns an HTTP handler that retrieves a run by id query parameter.
 // Supports view=timing query parameter to retrieve timing data from runs_timing view.
+// If view=timing and no id is provided, returns a collection of timings
+// honoring optional limit/offset pagination.
 func getRunHandler(st store.Store) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
         // Check if view=timing is requested.
         view := strings.TrimSpace(r.URL.Query().Get("view"))
         if view == "timing" {
-            getRunTimingHandler(st).ServeHTTP(w, r)
+            // Accept id from path parameter first, then fallback to query parameter.
+            runIDStr := strings.TrimSpace(r.PathValue("id"))
+            if runIDStr == "" {
+                runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
+            }
+            if runIDStr != "" {
+                // Single-run timing
+                getRunTimingHandler(st).ServeHTTP(w, r)
+                return
+            }
+            // Collection view of timings
+            listRunTimingsHandler(st).ServeHTTP(w, r)
             return
         }
 
@@ -975,6 +991,78 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 
 		slog.Info("run timing retrieved", "run_id", resp.ID, "queue_ms", resp.QueueMs, "run_ms", resp.RunMs)
 	}
+}
+
+// listRunTimingsHandler returns an HTTP handler that lists run timings with pagination.
+// Defaults: limit=100, offset=0. Enforces maximum limit of 200.
+func listRunTimingsHandler(st store.Store) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // Parse pagination params with sane defaults.
+        const (
+            defaultLimit = 100
+            maxLimit     = 200
+        )
+        q := r.URL.Query()
+        // limit
+        limit := defaultLimit
+        if v := strings.TrimSpace(q.Get("limit")); v != "" {
+            if n, err := strconv.Atoi(v); err != nil || n < 1 {
+                http.Error(w, "invalid limit", http.StatusBadRequest)
+                return
+            } else {
+                limit = n
+            }
+        }
+        if limit > maxLimit {
+            limit = maxLimit
+        }
+        // offset
+        offset := 0
+        if v := strings.TrimSpace(q.Get("offset")); v != "" {
+            if n, err := strconv.Atoi(v); err != nil || n < 0 {
+                http.Error(w, "invalid offset", http.StatusBadRequest)
+                return
+            } else {
+                offset = n
+            }
+        }
+
+        // Query store
+        items, err := st.ListRunsTimings(r.Context(), store.ListRunsTimingsParams{
+            Limit:  int32(limit),
+            Offset: int32(offset),
+        })
+        if err != nil {
+            http.Error(w, fmt.Sprintf("failed to list run timings: %v", err), http.StatusInternalServerError)
+            slog.Error("list run timings: database error", "err", err)
+            return
+        }
+
+        // Build response
+        type timing struct {
+            ID      string `json:"id"`
+            QueueMs int64  `json:"queue_ms"`
+            RunMs   int64  `json:"run_ms"`
+        }
+        resp := struct {
+            Timings []timing `json:"timings"`
+        }{Timings: make([]timing, len(items))}
+
+        for i, it := range items {
+            resp.Timings[i] = timing{
+                ID:      uuid.UUID(it.ID.Bytes).String(),
+                QueueMs: it.QueueMs,
+                RunMs:   it.RunMs,
+            }
+        }
+
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        if err := json.NewEncoder(w).Encode(resp); err != nil {
+            slog.Error("list run timings: encode response failed", "err", err)
+        }
+        slog.Debug("run timings listed", "count", len(resp.Timings), "limit", limit, "offset", offset)
+    }
 }
 
 // deleteRunHandler returns an HTTP handler that deletes a run by id.

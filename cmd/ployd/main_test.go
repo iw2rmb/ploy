@@ -275,10 +275,15 @@ type mockStore struct {
 	getRunResult store.Run
 	getRunErr    error
 
-	getRunTimingCalled bool
-	getRunTimingParams pgtype.UUID
-	getRunTimingResult store.RunsTiming
-	getRunTimingErr    error
+    getRunTimingCalled bool
+    getRunTimingParams pgtype.UUID
+    getRunTimingResult store.RunsTiming
+    getRunTimingErr    error
+
+    listRunsTimingsCalled bool
+    listRunsTimingsParams store.ListRunsTimingsParams
+    listRunsTimingsResult []store.RunsTiming
+    listRunsTimingsErr    error
 
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
@@ -332,9 +337,15 @@ func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, erro
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
-	m.getRunTimingCalled = true
-	m.getRunTimingParams = id
-	return m.getRunTimingResult, m.getRunTimingErr
+    m.getRunTimingCalled = true
+    m.getRunTimingParams = id
+    return m.getRunTimingResult, m.getRunTimingErr
+}
+
+func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
+    m.listRunsTimingsCalled = true
+    m.listRunsTimingsParams = arg
+    return m.listRunsTimingsResult, m.listRunsTimingsErr
 }
 
 func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
@@ -2217,27 +2228,99 @@ func TestGetRunTimingHandler_ZeroValues(t *testing.T) {
 	}
 }
 
-func TestGetRunTimingHandler_MissingID(t *testing.T) {
-	mockSt := &mockStore{}
+func TestListRunTimingsHandler_Default(t *testing.T) {
+    mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{}}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing", nil)
-	rr := httptest.NewRecorder()
+    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing", nil)
+    rr := httptest.NewRecorder()
 
-	handler := getRunHandler(mockSt)
-	handler.ServeHTTP(rr, req)
+    handler := getRunHandler(mockSt)
+    handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
-	}
+    if rr.Code != http.StatusOK {
+        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+    }
 
-	body := strings.TrimSpace(rr.Body.String())
-	if !strings.Contains(body, "id query parameter is required") {
-		t.Errorf("expected error about missing id, got: %s", body)
-	}
+    var resp struct {
+        Timings []struct {
+            ID      string `json:"id"`
+            QueueMs int64  `json:"queue_ms"`
+            RunMs   int64  `json:"run_ms"`
+        } `json:"timings"`
+    }
+    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+        t.Fatalf("decode response: %v", err)
+    }
+    if len(resp.Timings) != 0 {
+        t.Fatalf("expected empty timings, got %d", len(resp.Timings))
+    }
+    if !mockSt.listRunsTimingsCalled {
+        t.Fatal("expected ListRunsTimings to be called")
+    }
+    if mockSt.listRunsTimingsParams.Limit != 100 || mockSt.listRunsTimingsParams.Offset != 0 {
+        t.Fatalf("expected default limit=100 offset=0, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
+    }
+}
 
-	if mockSt.getRunTimingCalled {
-		t.Fatal("expected GetRunTiming not to be called")
-	}
+func TestListRunTimingsHandler_WithPagination(t *testing.T) {
+    runA := uuid.New()
+    runB := uuid.New()
+    mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{
+        {ID: pgtype.UUID{Bytes: runA, Valid: true}, QueueMs: 10, RunMs: 20},
+        {ID: pgtype.UUID{Bytes: runB, Valid: true}, QueueMs: 30, RunMs: 40},
+    }}
+
+    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=5&offset=10", nil)
+    rr := httptest.NewRecorder()
+
+    handler := getRunHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusOK {
+        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+    }
+
+    var resp struct {
+        Timings []struct {
+            ID      string `json:"id"`
+            QueueMs int64  `json:"queue_ms"`
+            RunMs   int64  `json:"run_ms"`
+        } `json:"timings"`
+    }
+    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+        t.Fatalf("decode response: %v", err)
+    }
+    if len(resp.Timings) != 2 {
+        t.Fatalf("expected 2 timings, got %d", len(resp.Timings))
+    }
+    if resp.Timings[0].ID != runA.String() || resp.Timings[0].QueueMs != 10 || resp.Timings[0].RunMs != 20 {
+        t.Fatalf("unexpected first timing: %+v", resp.Timings[0])
+    }
+    if !mockSt.listRunsTimingsCalled {
+        t.Fatal("expected ListRunsTimings to be called")
+    }
+    if mockSt.listRunsTimingsParams.Limit != 5 || mockSt.listRunsTimingsParams.Offset != 10 {
+        t.Fatalf("expected limit=5 offset=10, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
+    }
+}
+
+func TestListRunTimingsHandler_InvalidParams(t *testing.T) {
+    mockSt := &mockStore{}
+    // invalid limit
+    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=zero", nil)
+    rr := httptest.NewRecorder()
+    handler := getRunHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+    if rr.Code != http.StatusBadRequest {
+        t.Fatalf("expected 400 for invalid limit, got %d", rr.Code)
+    }
+    // invalid offset
+    req2 := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&offset=-1", nil)
+    rr2 := httptest.NewRecorder()
+    handler.ServeHTTP(rr2, req2)
+    if rr2.Code != http.StatusBadRequest {
+        t.Fatalf("expected 400 for invalid offset, got %d", rr2.Code)
+    }
 }
 
 func TestGetRunTimingHandler_InvalidID(t *testing.T) {
