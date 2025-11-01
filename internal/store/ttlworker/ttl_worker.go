@@ -73,16 +73,17 @@ func (w *Worker) Run(ctx context.Context) error {
 		return nil
 	}
 
-	cutoff := time.Now().Add(-w.ttl)
-	cutoffTs := pgtype.Timestamptz{
-		Time:  cutoff,
-		Valid: true,
-	}
+    cutoff := time.Now().Add(-w.ttl)
+    // cutoffTS follows initialism casing rules (ST1003).
+    cutoffTS := pgtype.Timestamptz{
+        Time:  cutoff,
+        Valid: true,
+    }
 
 	w.logger.Info("ttl-worker: starting cleanup", "cutoff", cutoff.Format(time.RFC3339))
 
 	// Delete expired logs.
-	logsDeleted, err := w.store.DeleteExpiredLogs(ctx, cutoffTs)
+    logsDeleted, err := w.store.DeleteExpiredLogs(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired logs", "err", err)
 	} else {
@@ -90,7 +91,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired events.
-	eventsDeleted, err := w.store.DeleteExpiredEvents(ctx, cutoffTs)
+    eventsDeleted, err := w.store.DeleteExpiredEvents(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired events", "err", err)
 	} else {
@@ -98,7 +99,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired diffs.
-	diffsDeleted, err := w.store.DeleteExpiredDiffs(ctx, cutoffTs)
+    diffsDeleted, err := w.store.DeleteExpiredDiffs(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired diffs", "err", err)
 	} else {
@@ -106,7 +107,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired artifact bundles.
-	artifactsDeleted, err := w.store.DeleteExpiredArtifactBundles(ctx, cutoffTs)
+    artifactsDeleted, err := w.store.DeleteExpiredArtifactBundles(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired artifact bundles", "err", err)
 	} else {
