@@ -36,6 +36,11 @@ FROM cte
 WHERE r.id = cte.id
 RETURNING r.*;
 
+-- name: AckRunStart :exec
+UPDATE runs
+SET status = 'running'
+WHERE id = $1 AND status = 'assigned';
+
 -- name: DeleteRun :exec
 DELETE FROM runs
 WHERE id = $1;
