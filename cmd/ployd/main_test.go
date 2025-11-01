@@ -3105,6 +3105,40 @@ func TestCreateNodeEventsHandler_PayloadTooLarge(t *testing.T) {
 	}
 }
 
+// Ensure we return 413 when the body exceeds the MaxBytesReader limit
+// even if Content-Length is unknown (streamed/chunked uploads).
+func TestCreateNodeEventsHandler_PayloadTooLarge_Streaming(t *testing.T) {
+    nodeID := uuid.New()
+    runID := uuid.New()
+    mockSt := &mockStore{}
+    eventsService, err := createTestEventsService()
+    if err != nil {
+        t.Fatalf("create events service: %v", err)
+    }
+
+    // Build a valid JSON payload whose size exceeds 1 MiB by stuffing a large message.
+    big := strings.Repeat("a", 1100*1024) // >1MiB
+    payload := `{"run_id":"` + runID.String() + `","events":[{"level":"info","message":"` + big + `"}]}`
+
+    req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+    req.SetPathValue("id", nodeID.String())
+    req.Header.Set("Content-Type", "application/json")
+    // Pretend Content-Length is unknown to avoid the pre-check branch.
+    req.ContentLength = -1
+    rr := httptest.NewRecorder()
+
+    handler := createNodeEventsHandler(mockSt, eventsService)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusRequestEntityTooLarge {
+        t.Fatalf("expected status 413, got %d: %s", rr.Code, rr.Body.String())
+    }
+
+    if mockSt.getNodeCalled {
+        t.Fatal("expected GetNode not to be called for oversized streaming body")
+    }
+}
+
 func TestCreateNodeEventsHandler_InvalidJSON(t *testing.T) {
 	nodeID := uuid.New()
 	mockSt := &mockStore{}
