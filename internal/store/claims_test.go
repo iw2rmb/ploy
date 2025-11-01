@@ -1,13 +1,12 @@
 package store
 
 import (
-	"context"
-	"net/netip"
-	"os"
-	"sync"
-	"testing"
-
-	"github.com/jackc/pgx/v5/pgtype"
+    "context"
+    "net/netip"
+    "os"
+    "strconv"
+    "sync"
+    "testing"
 )
 
 // TestRunClaim tests basic run claiming functionality.
@@ -269,21 +268,19 @@ func TestClaimRun_SkipLocked(t *testing.T) {
 		t.Fatalf("CreateMod() failed: %v", err)
 	}
 
-	// Create multiple queued runs for concurrent claiming.
-	const numRuns = 10
-	runIDs := make([]pgtype.UUID, numRuns)
-	for i := 0; i < numRuns; i++ {
-		run, err := db.CreateRun(ctx, CreateRunParams{
-			ModID:     mod.ID,
-			Status:    RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "concurrent",
-		})
-		if err != nil {
-			t.Fatalf("CreateRun() %d failed: %v", i, err)
-		}
-		runIDs[i] = run.ID
-	}
+    // Create multiple queued runs for concurrent claiming.
+    const numRuns = 10
+    for i := 0; i < numRuns; i++ {
+        _, err := db.CreateRun(ctx, CreateRunParams{
+            ModID:     mod.ID,
+            Status:    RunStatusQueued,
+            BaseRef:   "main",
+            TargetRef: "concurrent",
+        })
+        if err != nil {
+            t.Fatalf("CreateRun() %d failed: %v", i, err)
+        }
+    }
 
 	// Create multiple nodes to claim concurrently.
 	const numNodes = 10
@@ -299,10 +296,10 @@ func TestClaimRun_SkipLocked(t *testing.T) {
 		nodes[i] = node
 	}
 
-	// Claim runs concurrently.
-	var wg sync.WaitGroup
-	claimedRuns := make([]Run, numNodes)
-	errors := make([]error, numNodes)
+    // Claim runs concurrently.
+    var wg sync.WaitGroup
+    claimedRuns := make([]Run, numNodes)
+    errors := make([]error, numNodes)
 
 	for i := 0; i < numNodes; i++ {
 		wg.Add(1)
@@ -312,22 +309,38 @@ func TestClaimRun_SkipLocked(t *testing.T) {
 		}(i)
 	}
 
-	wg.Wait()
+    wg.Wait()
 
-	// Count successful claims.
-	successCount := 0
-	claimedIDs := make(map[[16]byte]bool)
-	for i := 0; i < numNodes; i++ {
-		if errors[i] == nil {
-			successCount++
-			// Verify each run is claimed only once.
-			idBytes := claimedRuns[i].ID.Bytes
-			if claimedIDs[idBytes] {
-				t.Errorf("Run %v was claimed multiple times", claimedRuns[i].ID)
-			}
-			claimedIDs[idBytes] = true
-		}
-	}
+    // Count successful claims.
+    successCount := 0
+    claimedIDs := make(map[[16]byte]bool)
+    // Build a set of valid node IDs to verify assignment correctness.
+    validNode := make(map[[16]byte]bool, numNodes)
+    for i := range nodes {
+        validNode[nodes[i].ID.Bytes] = true
+    }
+    for i := 0; i < numNodes; i++ {
+        if errors[i] == nil {
+            successCount++
+            // Verify each run is claimed only once.
+            idBytes := claimedRuns[i].ID.Bytes
+            if claimedIDs[idBytes] {
+                t.Errorf("Run %v was claimed multiple times", claimedRuns[i].ID)
+            }
+            claimedIDs[idBytes] = true
+
+            // Additional invariants for claimed runs.
+            if claimedRuns[i].Status != RunStatusAssigned {
+                t.Errorf("claimed run %v status = %s, want assigned", claimedRuns[i].ID, claimedRuns[i].Status)
+            }
+            if !claimedRuns[i].StartedAt.Valid {
+                t.Errorf("claimed run %v missing started_at", claimedRuns[i].ID)
+            }
+            if !claimedRuns[i].NodeID.Valid || !validNode[claimedRuns[i].NodeID.Bytes] {
+                t.Errorf("claimed run %v has unexpected node_id %v", claimedRuns[i].ID, claimedRuns[i].NodeID)
+            }
+        }
+    }
 
 	// Verify all runs were claimed exactly once.
 	if successCount != numRuns {
@@ -373,35 +386,28 @@ func TestClaimRun_NoQueuedRuns(t *testing.T) {
 // Helper functions.
 
 func ptrStr(s string) *string {
-	return &s
-}
-
-func mustParseAddr(t *testing.T, s string) netip.Addr {
-	addr, err := netip.ParseAddr(s)
-	if err != nil {
-		t.Fatalf("mustParseAddr(%q) failed: %v", s, err)
-	}
-	return addr
+    return &s
 }
 
 func nodeNameForTest(t *testing.T, prefix string, idx int) string {
-	return prefix + "-node-" + t.Name() + "-" + itoa(idx)
+    t.Helper()
+    return prefix + "-node-" + t.Name() + "-" + strconv.Itoa(idx)
 }
 
 func ipForTest(subnet, host int) string {
-	if host > 254 {
-		host = 254
-	}
-	// Generate unique IPs in the 192.168.subnet.host range.
-	return "192.168." + itoa(subnet) + "." + itoa(host)
+    if host > 254 {
+        host = 254
+    }
+    // Generate unique IPs in the 192.168.subnet.host range.
+    return "192.168." + strconv.Itoa(subnet) + "." + strconv.Itoa(host)
 }
 
-func itoa(i int) string {
-	if i < 0 {
-		return "-" + itoa(-i)
-	}
-	if i < 10 {
-		return string(rune('0' + i))
-	}
-	return itoa(i/10) + string(rune('0'+i%10))
+// Helper annotations
+func mustParseAddr(t *testing.T, s string) netip.Addr {
+    t.Helper()
+    addr, err := netip.ParseAddr(s)
+    if err != nil {
+        t.Fatalf("mustParseAddr(%q) failed: %v", s, err)
+    }
+    return addr
 }
