@@ -1,13 +1,15 @@
 package main
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"strings"
+    "errors"
+    "fmt"
+    "io"
+    "strings"
 
 	manifestcli "github.com/iw2rmb/ploy/internal/cli/manifest"
 )
+
+const manifestSchemaPath = "docs/schemas/integration_manifest.schema.json"
 
 // handleManifest routes manifest subcommands.
 func handleManifest(args []string, stderr io.Writer) error {

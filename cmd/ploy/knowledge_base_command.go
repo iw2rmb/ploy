@@ -15,6 +15,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/mods"
 )
 
+// Default catalog path for knowledge-base commands.
+var knowledgeBaseCatalogPath = "configs/knowledge-base/catalog.json"
+
 // handleKnowledgeBase routes knowledge-base subcommands.
 func handleKnowledgeBase(args []string, stderr io.Writer) error {
 	if len(args) == 0 {

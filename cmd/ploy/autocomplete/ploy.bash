@@ -90,10 +90,6 @@ _ploy_completions() {
         fi
         ;;
     "help")
-        if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "mod mods jobs artifact upload report cluster config environment manifest knowledge-base server node" -- "$cur") )
-            return 0
-        fi
         ;;
     esac
 }
