@@ -26,7 +26,9 @@ SET
   mem_total_bytes = $5,
   mem_free_bytes = $6,
   disk_total_bytes = $7,
-  disk_free_bytes = $8
+  disk_free_bytes = $8,
+  -- Update version only when provided (non-empty); keep existing otherwise.
+  version = COALESCE(NULLIF(sqlc.arg(version)::text, ''), version)
 WHERE id = $1;
 
 -- name: DeleteNode :exec
