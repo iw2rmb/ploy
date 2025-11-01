@@ -1,0 +1,107 @@
+# golangci-lint configuration for Ploy
+# See https://golangci-lint.run/usage/configuration/ for full options
+
+run:
+  timeout: 5m
+  tests: true
+  # Include test files in linting
+  skip-dirs:
+    - dist
+    - vendor
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Go static analysis
+    - unused        # Check for unused constants, variables, functions and types
+    - gofmt         # Check gofmt formatting
+    - goimports     # Check goimports formatting
+    - misspell      # Spell checker
+    - revive        # Fast, configurable, extensible, flexible, and beautiful linter
+    - gosec         # Security-focused linter
+    - unconvert     # Remove unnecessary type conversions
+    - typecheck     # Type checking
+    - gocritic      # Go source code linter providing checks currently missing from other linters
+    - bodyclose     # Check HTTP response body is closed
+    - noctx         # Find sending http request without context.Context
+    - sqlclosecheck # Check sql.Rows and sql.Stmt are closed
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    exclude-functions:
+      # Allow common patterns that don't need error checking
+      - (*database/sql.Rows).Close
+      - (*database/sql.Stmt).Close
+
+  gosec:
+    # Enable all security checks
+    excludes: []
+    severity: low
+    confidence: low
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow  # Too noisy for now
+
+  revive:
+    rules:
+      - name: exported
+        arguments:
+          - disableStutteringCheck
+
+  gocritic:
+    enabled-checks:
+      - appendAssign
+      - assignOp
+      - boolExprSimplify
+      - builtinShadow
+      - captLocal
+      - caseOrder
+      - deprecatedComment
+      - dupImport
+      - elseif
+      - emptyFallthrough
+      - emptyStringTest
+      - hexLiteral
+      - ifElseChain
+      - nilValReturn
+      - regexpMust
+      - singleCaseSwitch
+      - sloppyLen
+      - switchTrue
+      - typeSwitchVar
+      - underef
+      - unlambda
+      - unslice
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Exclude specific patterns
+  exclude-rules:
+    # Exclude test files from some checks
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+        - gocritic
+
+    # Allow init functions
+    - text: "should not use init functions"
+      linters:
+        - revive
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
