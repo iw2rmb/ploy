@@ -11,7 +11,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Verify required envs exist or add TODOs in docs/envs/README.md.
 
 ## Naming & Build Surface
-- [ ] Standardize server binary name to `ployd` (keep current path `cmd/ployd`).
+- [x] Standardize server binary name to `ployd` (keep current path `cmd/ployd`).
 - [ ] Sweep docs for `ployd-server` and replace with `ployd` or add a one-line alias note in README.md.
 - [ ] Ensure `make build` emits `dist/ployd{,-linux}` consistently (Makefile already supports; verify).
 

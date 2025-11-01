@@ -57,7 +57,7 @@ Trade‑offs (and mitigations):
 
 ## Identity and Names
 
-- Server DNS name: `ployd-server <cluster-id>.ploy`.
+- Server DNS name: `ployd.<cluster-id>.ploy` (binary: `ployd`).
 - Node DNS name: `ploy-node <node-id>.<cluster-id>.ploy`.
 - Connections use HTTPS over IP addresses; certificates include both the DNS
   names above and the node/server IP in Subject Alternative Names (SANs).
@@ -164,7 +164,7 @@ Optional pull vs push
 
 ## Components Split
 
-- ployd-server
+- ployd (server)
   - API + SSE, auth via mTLS only (no tokens)
   - PKI CA and CSR signing
   - Scheduler and run orchestration
@@ -192,7 +192,7 @@ Optional pull vs push
 
 Certificate issuance
 - `ploy server deploy` creates a cluster CA (`<cluster-id>-ca.key/.crt`) and a
-  server TLS cert with SANs for the server IP and `ployd-server` DNS name.
+  server TLS cert with SANs for the server IP and `ployd` DNS name.
 - `ploy node add` generates the node key on the node, builds a CSR with CN
   `node:<node-id>` and SANs for the node IP and `ploy-node` DNS name, submits
   it to the server’s PKI endpoint, and installs the signed cert and CA.
