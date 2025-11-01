@@ -401,9 +401,19 @@ func completeRunHandler(st store.Store) http.HandlerFunc {
 		// Prepare stats field (default to empty JSON object if not provided).
 		statsBytes := []byte("{}")
 		if len(req.Stats) > 0 {
-			// Validate that stats is valid JSON.
+			// Validate that stats is valid JSON and a JSON object.
 			if !json.Valid(req.Stats) {
 				http.Error(w, "stats field must be valid JSON", http.StatusBadRequest)
+				return
+			}
+			// Require JSON object for stats (not string/number/array/etc.).
+			var tmp any
+			if err := json.Unmarshal(req.Stats, &tmp); err != nil {
+				http.Error(w, "invalid stats JSON", http.StatusBadRequest)
+				return
+			}
+			if _, ok := tmp.(map[string]any); !ok {
+				http.Error(w, "stats must be a JSON object", http.StatusBadRequest)
 				return
 			}
 			statsBytes = req.Stats

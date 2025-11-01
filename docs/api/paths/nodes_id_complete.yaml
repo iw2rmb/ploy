@@ -1,0 +1,50 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Mark run as completed (running → terminal)
+  description: |
+    Nodes call this endpoint when execution finishes to transition a run from
+    `running` to a terminal status. The server validates ownership and state,
+    sets `finished_at` to server time, stores an optional `reason`, and writes
+    `stats` (arbitrary JSON) into `runs.stats`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [ run_id, status ]
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: The run ID to complete
+            status:
+              type: string
+              description: Terminal status
+              enum: [ succeeded, failed, canceled ]
+            reason:
+              type: string
+              nullable: true
+              description: Optional human-readable failure/cancel reason
+            stats:
+              type: object
+              description: JSON object with run statistics/metrics
+  responses:
+    '204':
+      description: Completed; run transitioned to terminal status
+    '400':
+      description: Bad Request (invalid IDs, non-terminal status, or malformed `stats` JSON)
+    '403':
+      description: Forbidden (run not assigned to this node)
+    '404':
+      description: Node or run not found
+    '409':
+      description: Conflict (run not in `running` state)
+    '500':
+      description: Internal server error

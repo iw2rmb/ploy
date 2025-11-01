@@ -3559,6 +3559,33 @@ func TestCompleteRunHandler_EmptyStats(t *testing.T) {
 	}
 }
 
+func TestCompleteRunHandler_InvalidStatsJSON(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusRunning, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	// stats is invalid JSON here
+	payload := `{"run_id": "` + runID.String() + `", "status": "succeeded", "stats": "not-json"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := completeRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion not to be called with invalid stats JSON")
+	}
+}
+
 func TestCreateNodeEventsHandler_Success(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
