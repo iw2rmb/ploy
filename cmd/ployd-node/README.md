@@ -34,9 +34,9 @@ http:
   idle_timeout: 120s
   tls:
     enabled: true
-    cert_path: /etc/ploy/certs/node.crt
-    key_path: /etc/ploy/certs/node.key
-    ca_path: /etc/ploy/certs/ca.crt
+    cert_path: /etc/ploy/pki/node.crt
+    key_path: /etc/ploy/pki/node.key
+    ca_path: /etc/ploy/pki/ca.crt
 
 # Heartbeat configuration
 heartbeat:

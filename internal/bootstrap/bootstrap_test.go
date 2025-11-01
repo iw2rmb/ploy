@@ -170,6 +170,9 @@ func TestPrefixedScript_NodeConfig(t *testing.T) {
 	if !strings.Contains(script, "server_url:") {
 		t.Fatalf("node config should include server_url")
 	}
+	if !strings.Contains(script, "server_url: ${PLOY_SERVER_URL:-}") {
+		t.Fatalf("node config should source server_url from $PLOY_SERVER_URL")
+	}
 	if !strings.Contains(script, "cert_path:") || !strings.Contains(script, "key_path:") || !strings.Contains(script, "ca_path:") {
 		t.Fatalf("node config should include http.tls cert_path/key_path/ca_path")
 	}

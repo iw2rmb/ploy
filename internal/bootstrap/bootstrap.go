@@ -188,7 +188,10 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("Restart=always\n")
 	b.WriteString("RestartSec=5\n")
 	b.WriteString("User=root\n")
-	b.WriteString("Environment=PLOY_NODE_CONFIG=/etc/ploy/ployd-node.yaml\n\n")
+	// No environment override for node config path; see docs/envs/README.md.
+	// The node reads config path from the --config flag (default /etc/ploy/ployd-node.yaml).
+	// Avoid setting a non-existent env knob to keep parity with docs.
+	// (Server uses PLOYD_CONFIG_PATH; node does not have an equivalent yet.)
 	b.WriteString("[Install]\n")
 	b.WriteString("WantedBy=multi-user.target\n")
 	b.WriteString("EOF\n\n")
