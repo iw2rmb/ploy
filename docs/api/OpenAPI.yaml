@@ -19,6 +19,8 @@ tags:
     description: GitLab signer configuration.
   - name: Artifacts
     description: HTTPS artifact upload, list, inspect, delete.
+  - name: Security
+    description: PKI operations (CA info, CSR signing).
 security:
   - bearerAuth: []
 paths:
@@ -28,6 +30,8 @@ paths:
     $ref: './paths/nodes_id.yaml'
   /v1/config/gitlab:
     $ref: './paths/gitlab_config.yaml'
+  /v1/pki/sign:
+    $ref: './paths/pki_sign.yaml'
   # Registry removed; Docker Hub is used for images.
   # v2 artifacts aliases
   /v2/artifacts/upload:
@@ -77,6 +81,10 @@ components:
       $ref: './components/securitySchemes/bearerAuth.yaml'
   parameters: {}
   schemas:
+    PKISignRequest:
+      $ref: './components/schemas/pki.yaml#/PKISignRequest'
+    PKISignResponse:
+      $ref: './components/schemas/pki.yaml#/PKISignResponse'
     NodeJoinRequest:
       $ref: './components/schemas/nodes.yaml#/NodeJoinRequest'
     NodeProbe:
