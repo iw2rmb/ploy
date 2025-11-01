@@ -328,6 +328,11 @@ type mockStore struct {
 	createArtifactBundleParams store.CreateArtifactBundleParams
 	createArtifactBundleResult store.ArtifactBundle
 	createArtifactBundleErr    error
+
+	// AckRunStart tracking
+	ackRunStartCalled bool
+	ackRunStartParam  pgtype.UUID
+	ackRunStartErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -434,6 +439,12 @@ func (m *mockStore) CreateArtifactBundle(ctx context.Context, params store.Creat
 	m.createArtifactBundleCalled = true
 	m.createArtifactBundleParams = params
 	return m.createArtifactBundleResult, m.createArtifactBundleErr
+}
+
+func (m *mockStore) AckRunStart(ctx context.Context, id pgtype.UUID) error {
+	m.ackRunStartCalled = true
+	m.ackRunStartParam = id
+	return m.ackRunStartErr
 }
 
 // no-op
@@ -3244,6 +3255,106 @@ func TestClaimRunHandler_ClaimError(t *testing.T) {
 	}
 	if !mockSt.claimRunCalled {
 		t.Fatal("expected ClaimRun to be called")
+	}
+}
+
+func TestAckRunStartHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID:        pgtype.UUID{Bytes: nodeID, Valid: true},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			Status:    store.RunStatusAssigned,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+		},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := ackRunStartHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+	if !mockSt.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called")
+	}
+	if uuid.UUID(mockSt.ackRunStartParam.Bytes) != runID {
+		t.Fatalf("expected AckRunStart param %s, got %s", runID, uuid.UUID(mockSt.ackRunStartParam.Bytes))
+	}
+}
+
+func TestAckRunStartHandler_WrongNode(t *testing.T) {
+	nodeID := uuid.New()
+	otherNode := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusAssigned, NodeID: pgtype.UUID{Bytes: otherNode, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := ackRunStartHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.ackRunStartCalled {
+		t.Fatal("expected AckRunStart not to be called when wrong node")
+	}
+}
+
+func TestAckRunStartHandler_WrongStatus(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}, Name: "n", IpAddress: netip.MustParseAddr("192.168.1.1"), Version: &version, CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}},
+		getRunResult:  store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}, Status: store.RunStatusQueued, NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+	}
+
+	payload := `{"run_id": "` + runID.String() + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := ackRunStartHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if mockSt.ackRunStartCalled {
+		t.Fatal("expected AckRunStart not to be called when wrong status")
 	}
 }
 

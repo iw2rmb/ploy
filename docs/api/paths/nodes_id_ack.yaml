@@ -1,0 +1,39 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Acknowledge run start (assigned → running)
+  description: |
+    Nodes call this endpoint to acknowledge that execution of a previously claimed
+    run has started. The server validates ownership and transitions the run status
+    from `assigned` to `running`.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [ run_id ]
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: The run ID to acknowledge
+  responses:
+    '204':
+      description: Acknowledged; run status transitioned to `running`
+    '400':
+      description: Bad Request (invalid IDs or malformed payload)
+    '403':
+      description: Forbidden (run not assigned to this node)
+    '404':
+      description: Node or run not found
+    '409':
+      description: Conflict (run not in `assigned` state)
+    '500':
+      description: Internal server error
+
