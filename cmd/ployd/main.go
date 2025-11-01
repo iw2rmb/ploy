@@ -147,6 +147,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		BufferSize:  32,
 		HistorySize: 256,
 		Logger:      slog.Default(),
+		Store:       st,
 	})
 	if err != nil {
 		return fmt.Errorf("create events service: %w", err)
