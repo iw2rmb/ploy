@@ -74,8 +74,8 @@ defaults change, or components adopt additional configuration.
   only be present on the control-plane server; worker nodes do not require this variable.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — The node's TLS certificate and key
   (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
-  for both server and node flows and writes to `/etc/ploy/pki/node.pem` and
-  `/etc/ploy/pki/node-key.pem`.
+  for both server and node flows and writes to `/etc/ploy/pki/node.crt` and
+  `/etc/ploy/pki/node.key` on worker nodes.
 - `PLOY_NODE_CONCURRENCY` — Maximum concurrent runs the node will execute (default: `1`).
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
   TODO: lifecycle collector to read this in an upcoming slice.
@@ -176,6 +176,11 @@ They are not required for day‑to‑day CLI usage but are documented here for c
 - `NODE_ID` — Node identifier provided to the bootstrap script (control plane uses `control`).
 - `NODE_ADDRESS` — IP/hostname of the node being provisioned.
 - `BOOTSTRAP_PRIMARY` — When `true`, the bootstrap script performs control‑plane specific actions.
+
+- `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
+  `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
+  This variable is consumed only by the bootstrap script; the CLI separately exposes a
+  `--server-url` flag and `PLOY_CONTROL_PLANE_URL` override for client operations.
 
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
