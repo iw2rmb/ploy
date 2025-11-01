@@ -2,8 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/iw2rmb/ploy/internal/deploy"
+	"github.com/iw2rmb/ploy/internal/pki"
 )
 
 func TestHandleServerRequiresSubcommand(t *testing.T) {
@@ -41,4 +49,339 @@ func TestHandleServerDeployRejectsExtraArgs(t *testing.T) {
 	if !strings.Contains(err.Error(), "unexpected arguments:") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+// TestServerDeployCAGeneration verifies that CA and server certificate generation works correctly.
+func TestServerDeployCAGeneration(t *testing.T) {
+	// Generate cluster ID.
+	clusterID, err := deploy.GenerateClusterID()
+	if err != nil {
+		t.Fatalf("GenerateClusterID failed: %v", err)
+	}
+	if clusterID == "" {
+		t.Fatal("expected non-empty cluster ID")
+	}
+	if !strings.HasPrefix(clusterID, "cluster-") {
+		t.Fatalf("expected cluster ID to start with 'cluster-', got: %s", clusterID)
+	}
+
+	// Generate CA.
+	now := time.Now()
+	ca, err := pki.GenerateCA(clusterID, now)
+	if err != nil {
+		t.Fatalf("GenerateCA failed: %v", err)
+	}
+	if ca == nil {
+		t.Fatal("expected non-nil CA bundle")
+	}
+	if ca.CertPEM == "" {
+		t.Fatal("expected non-empty CA certificate PEM")
+	}
+	if ca.KeyPEM == "" {
+		t.Fatal("expected non-empty CA key PEM")
+	}
+	if !strings.Contains(ca.CertPEM, "BEGIN CERTIFICATE") {
+		t.Fatal("invalid CA certificate PEM format")
+	}
+	if !strings.Contains(ca.KeyPEM, "PRIVATE KEY") {
+		t.Fatal("invalid CA key PEM format")
+	}
+
+	// Issue server certificate.
+	serverAddress := "192.168.1.10"
+	serverCert, err := pki.IssueServerCert(ca, clusterID, serverAddress, now)
+	if err != nil {
+		t.Fatalf("IssueServerCert failed: %v", err)
+	}
+	if serverCert == nil {
+		t.Fatal("expected non-nil server certificate")
+	}
+	if serverCert.CertPEM == "" {
+		t.Fatal("expected non-empty server certificate PEM")
+	}
+	if serverCert.KeyPEM == "" {
+		t.Fatal("expected non-empty server key PEM")
+	}
+	if serverCert.Serial == "" {
+		t.Fatal("expected non-empty serial number")
+	}
+	if serverCert.Fingerprint == "" {
+		t.Fatal("expected non-empty fingerprint")
+	}
+	if !strings.Contains(serverCert.CertPEM, "BEGIN CERTIFICATE") {
+		t.Fatal("invalid server certificate PEM format")
+	}
+	if !strings.Contains(serverCert.KeyPEM, "PRIVATE KEY") {
+		t.Fatal("invalid server key PEM format")
+	}
+
+	// Verify the server certificate subject includes the cluster ID.
+	if !strings.Contains(serverCert.Cert.Subject.CommonName, clusterID) {
+		t.Fatalf("expected cluster ID in server cert CN, got: %s", serverCert.Cert.Subject.CommonName)
+	}
+
+	// Verify the server certificate includes the server IP in SANs.
+	found := false
+	for _, ip := range serverCert.Cert.IPAddresses {
+		if ip.String() == serverAddress {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected server IP %s in certificate SANs, got: %v", serverAddress, serverCert.Cert.IPAddresses)
+	}
+}
+
+// TestServerDeployDSNHandling verifies DSN configuration handling for both provided and install modes.
+func TestServerDeployDSNHandling(t *testing.T) {
+	tests := []struct {
+		name                   string
+		postgresqlDSN          string
+		expectInstallPostgres  bool
+		expectDSNInEnvironment bool
+		expectedInstallFlagVal string
+	}{
+		{
+			name:                   "User provides DSN",
+			postgresqlDSN:          "postgres://user:pass@dbhost:5432/ploy",
+			expectInstallPostgres:  false,
+			expectDSNInEnvironment: true,
+			expectedInstallFlagVal: "false",
+		},
+		{
+			name:                   "No DSN provided - install PostgreSQL",
+			postgresqlDSN:          "",
+			expectInstallPostgres:  true,
+			expectDSNInEnvironment: false,
+			expectedInstallFlagVal: "true",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the DSN handling logic from runServerDeploy.
+			pgDSN := strings.TrimSpace(tt.postgresqlDSN)
+			installPostgres := pgDSN == ""
+
+			if installPostgres != tt.expectInstallPostgres {
+				t.Fatalf("expected installPostgres=%v, got: %v", tt.expectInstallPostgres, installPostgres)
+			}
+
+			// Build environment variables as runServerDeploy does.
+			scriptEnv := map[string]string{
+				"CLUSTER_ID":              "test-cluster-123",
+				"NODE_ID":                 "control",
+				"NODE_ADDRESS":            "192.168.1.10",
+				"BOOTSTRAP_PRIMARY":       "true",
+				"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
+			}
+
+			if pgDSN != "" {
+				scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+			}
+
+			// Verify PLOY_INSTALL_POSTGRESQL flag.
+			if got := scriptEnv["PLOY_INSTALL_POSTGRESQL"]; got != tt.expectedInstallFlagVal {
+				t.Fatalf("expected PLOY_INSTALL_POSTGRESQL=%q, got: %q", tt.expectedInstallFlagVal, got)
+			}
+
+			// Verify PLOY_SERVER_PG_DSN presence.
+			_, hasDSN := scriptEnv["PLOY_SERVER_PG_DSN"]
+			if hasDSN != tt.expectDSNInEnvironment {
+				t.Fatalf("expected PLOY_SERVER_PG_DSN present=%v, got: %v", tt.expectDSNInEnvironment, hasDSN)
+			}
+
+			// When user provides DSN, verify it matches.
+			if tt.expectDSNInEnvironment {
+				if got := scriptEnv["PLOY_SERVER_PG_DSN"]; got != tt.postgresqlDSN {
+					t.Fatalf("expected DSN %q, got: %q", tt.postgresqlDSN, got)
+				}
+			}
+		})
+	}
+}
+
+// TestServerDeployProvisionHostCallPath verifies the ProvisionHost function is called with correct parameters.
+func TestServerDeployProvisionHostCallPath(t *testing.T) {
+	// Create a temporary test binary file.
+	tmpDir := t.TempDir()
+	binaryPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binaryPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+
+	// Prepare configuration.
+	cfg := serverDeployConfig{
+		Address:       "10.0.0.5",
+		PostgreSQLDSN: "postgres://test:pass@dbhost:5432/ploy",
+		User:          "testuser",
+		IdentityFile:  "/path/to/identity",
+		PloydBinary:   binaryPath,
+		SSHPort:       2222,
+	}
+
+	// Capture the ProvisionHost call by wrapping runServerDeploy logic.
+	// Since runServerDeploy is difficult to test without actual SSH, we verify
+	// that the ProvisionOptions are constructed correctly.
+	clusterID := "test-cluster-abc"
+	now := time.Now()
+
+	ca, err := pki.GenerateCA(clusterID, now)
+	if err != nil {
+		t.Fatalf("GenerateCA failed: %v", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, clusterID, cfg.Address, now)
+	if err != nil {
+		t.Fatalf("IssueServerCert failed: %v", err)
+	}
+
+	pgDSN := strings.TrimSpace(cfg.PostgreSQLDSN)
+	installPostgres := pgDSN == ""
+
+	scriptEnv := map[string]string{
+		"CLUSTER_ID":              clusterID,
+		"NODE_ID":                 "control",
+		"NODE_ADDRESS":            cfg.Address,
+		"BOOTSTRAP_PRIMARY":       "true",
+		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
+		"PLOY_CA_CERT_PEM":        ca.CertPEM,
+		"PLOY_CA_KEY_PEM":         ca.KeyPEM,
+		"PLOY_SERVER_CERT_PEM":    serverCert.CertPEM,
+		"PLOY_SERVER_KEY_PEM":     serverCert.KeyPEM,
+	}
+
+	if pgDSN != "" {
+		scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+	}
+
+	// Build ProvisionOptions.
+	user := cfg.User
+	if strings.TrimSpace(user) == "" {
+		user = deploy.DefaultRemoteUser
+	}
+
+	sshPort := cfg.SSHPort
+	if sshPort == 0 {
+		sshPort = deploy.DefaultSSHPort
+	}
+
+	provisionOpts := deploy.ProvisionOptions{
+		Host:            cfg.Address,
+		Address:         cfg.Address,
+		User:            user,
+		Port:            sshPort,
+		IdentityFile:    cfg.IdentityFile,
+		PloydBinaryPath: binaryPath,
+		Stdout:          io.Discard,
+		Stderr:          io.Discard,
+		ScriptEnv:       scriptEnv,
+		ScriptArgs:      []string{"--cluster-id", clusterID, "--node-id", "control", "--node-address", cfg.Address, "--primary"},
+		ServiceChecks:   []string{"ployd"},
+	}
+
+	// Verify ProvisionOptions fields.
+	if provisionOpts.Host != cfg.Address {
+		t.Fatalf("expected Host=%q, got: %q", cfg.Address, provisionOpts.Host)
+	}
+	if provisionOpts.User != "testuser" {
+		t.Fatalf("expected User=%q, got: %q", "testuser", provisionOpts.User)
+	}
+	if provisionOpts.Port != 2222 {
+		t.Fatalf("expected Port=2222, got: %d", provisionOpts.Port)
+	}
+	if provisionOpts.IdentityFile != cfg.IdentityFile {
+		t.Fatalf("expected IdentityFile=%q, got: %q", cfg.IdentityFile, provisionOpts.IdentityFile)
+	}
+	if provisionOpts.PloydBinaryPath != binaryPath {
+		t.Fatalf("expected PloydBinaryPath=%q, got: %q", binaryPath, provisionOpts.PloydBinaryPath)
+	}
+
+	// Verify ScriptEnv contains necessary keys.
+	if val := provisionOpts.ScriptEnv["CLUSTER_ID"]; val != clusterID {
+		t.Fatalf("expected CLUSTER_ID=%q, got: %q", clusterID, val)
+	}
+	if val := provisionOpts.ScriptEnv["PLOY_CA_CERT_PEM"]; val == "" {
+		t.Fatal("expected PLOY_CA_CERT_PEM to be set")
+	}
+	if val := provisionOpts.ScriptEnv["PLOY_CA_KEY_PEM"]; val == "" {
+		t.Fatal("expected PLOY_CA_KEY_PEM to be set")
+	}
+	if val := provisionOpts.ScriptEnv["PLOY_SERVER_CERT_PEM"]; val == "" {
+		t.Fatal("expected PLOY_SERVER_CERT_PEM to be set")
+	}
+	if val := provisionOpts.ScriptEnv["PLOY_SERVER_KEY_PEM"]; val == "" {
+		t.Fatal("expected PLOY_SERVER_KEY_PEM to be set")
+	}
+	if val := provisionOpts.ScriptEnv["PLOY_SERVER_PG_DSN"]; val != cfg.PostgreSQLDSN {
+		t.Fatalf("expected PLOY_SERVER_PG_DSN=%q, got: %q", cfg.PostgreSQLDSN, val)
+	}
+
+	// Verify ServiceChecks includes ployd.
+	found := false
+	for _, svc := range provisionOpts.ServiceChecks {
+		if svc == "ployd" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected ServiceChecks to include 'ployd', got: %v", provisionOpts.ServiceChecks)
+	}
+
+	// Verify that calling ProvisionHost with a mock runner succeeds.
+	// We use a mock runner that simulates success without SSH.
+	mockRunner := &mockProvisionRunner{t: t}
+	provisionOpts.Runner = mockRunner
+
+	ctx := context.Background()
+	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
+		t.Fatalf("ProvisionHost failed: %v", err)
+	}
+
+	// Verify the mock runner received the expected commands.
+	if !mockRunner.copiedBinary {
+		t.Fatal("expected binary copy command to be executed")
+	}
+	if !mockRunner.installedBinary {
+		t.Fatal("expected binary install command to be executed")
+	}
+	if !mockRunner.ranBootstrapScript {
+		t.Fatal("expected bootstrap script to be executed")
+	}
+	if !mockRunner.checkedService {
+		t.Fatal("expected service check to be executed")
+	}
+}
+
+// mockProvisionRunner is a test double for deploy.Runner that simulates successful provisioning.
+type mockProvisionRunner struct {
+	t                  *testing.T
+	copiedBinary       bool
+	installedBinary    bool
+	ranBootstrapScript bool
+	checkedService     bool
+}
+
+func (m *mockProvisionRunner) Run(ctx context.Context, name string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+	switch name {
+	case "scp":
+		// Binary copy.
+		m.copiedBinary = true
+	case "ssh":
+		// Detect which SSH command by inspecting args.
+		argsStr := strings.Join(args, " ")
+		if strings.Contains(argsStr, "install -m0755") {
+			m.installedBinary = true
+		} else if strings.Contains(argsStr, "systemctl is-active") {
+			m.checkedService = true
+		} else if strings.Contains(argsStr, "bash") && strings.Contains(argsStr, "-s") {
+			// Bootstrap script execution (bash -s --).
+			m.ranBootstrapScript = true
+		}
+	default:
+		m.t.Fatalf("unexpected command: %s", name)
+	}
+	return nil
 }

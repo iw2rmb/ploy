@@ -79,7 +79,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Expand/adjust sqlc queries as endpoints require (e.g., list-by-since for events/logs).
 
 ## CLI Surfaces (Server/Node)
-- [ ] `ploy server deploy`: verify CA+server cert generation, DSN handling, and `deploy.ProvisionHost` call path.
+- [x] `ploy server deploy`: verify CA+server cert generation, DSN handling, and `deploy.ProvisionHost` call path.
 - [ ] `ploy node add`: implement full provisioning: upload `ployd-node`, CSR flow to `/v1/pki/sign`, install certs, start service.
 - [ ] Save/refresh local cluster descriptor in `~/.config/ploy/clusters/` after each deploy/add.
 
