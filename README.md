@@ -3,7 +3,7 @@
 Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
 
 - `ploy` — a CLI for submitting Mods, following logs, managing runs, and administering clusters.
-- `ployd-server` — the control-plane daemon with scheduler, API, and PostgreSQL-backed storage.
+- `ployd` — the control-plane daemon with scheduler, API, and PostgreSQL-backed storage.
 - `ployd-node` — lightweight worker nodes that execute jobs in ephemeral workspaces.
 
 **Architecture**: Ploy uses a server/node split with PostgreSQL for state and mTLS-only authentication.
@@ -13,7 +13,7 @@ diffs/logs/artifacts to the server's PostgreSQL database.
 See `SIMPLE.md` for the detailed architecture, deployment topology, and migration notes.
 
 **What Changed (2025‑11 — Postgres/mTLS Pivot)**
-- **Server/Node Split**: Separate `ployd-server` (control-plane) and `ployd-node` (worker) binaries.
+- **Server/Node Split**: Separate `ployd` (control-plane) and `ployd-node` (worker) binaries.
 - **PostgreSQL**: Replaces etcd for state; stores runs, logs, diffs, and artifact bundles.
 - **mTLS Only**: Bearer token auth removed; all communication uses mutual TLS.
 - **No IPFS**: Artifacts stored in PostgreSQL; nodes clone repos shallow on-demand.
@@ -21,7 +21,7 @@ See `SIMPLE.md` for the detailed architecture, deployment topology, and migratio
 
 **Core Components**
 - CLI entrypoint: `cmd/ploy` (commands: `server`, `node`, `mod`, `mods`, `runs`, `knowledge-base`).
-- Server daemon: `cmd/ployd-server` with PostgreSQL (`pgx/v5` + `sqlc`), scheduler, and PKI.
+- Server daemon: `cmd/ployd` with PostgreSQL (`pgx/v5` + `sqlc`), scheduler, and PKI.
 - Node daemon: `cmd/ployd-node` with ephemeral workspaces, Build Gate, and mTLS client.
 - Control‑plane HTTP/SSE: handlers in `internal/api/httpserver/*` and OpenAPI in `docs/api/OpenAPI.yaml`.
 - Scheduler: In-DB queue using `FOR UPDATE SKIP LOCKED` on `runs.status='queued'`.
