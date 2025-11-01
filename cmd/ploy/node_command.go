@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
 )
@@ -191,6 +192,18 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 
 	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
 		return fmt.Errorf("node add: provision host: %w", err)
+	}
+
+	// Refresh cluster descriptor to ensure it exists
+	// (It should have been created by 'ploy server deploy', but we verify/update here)
+	desc := config.Descriptor{
+		ClusterID:       cfg.ClusterID,
+		Address:         serverURL,
+		Scheme:          "https",
+		SSHIdentityPath: identityPath,
+	}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Warning: failed to save/refresh cluster descriptor: %v\n", err)
 	}
 
 	_, _ = fmt.Fprintln(stderr, "\nNode provisioning complete!")

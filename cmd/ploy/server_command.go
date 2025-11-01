@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
 )
@@ -200,9 +201,28 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		return fmt.Errorf("server deploy: provision host: %w", err)
 	}
 
+	// Save cluster descriptor locally
+	serverAddress := fmt.Sprintf("https://%s:8443", cfg.Address)
+	desc := config.Descriptor{
+		ClusterID:       clusterID,
+		Address:         serverAddress,
+		Scheme:          "https",
+		SSHIdentityPath: identityPath,
+	}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		_, _ = fmt.Fprintf(stderr, "Warning: failed to save cluster descriptor: %v\n", err)
+	} else {
+		// Set this cluster as the default
+		if err := config.SetDefault(clusterID); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Warning: failed to set default cluster: %v\n", err)
+		} else {
+			_, _ = fmt.Fprintf(stderr, "Cluster descriptor saved to ~/.config/ploy/clusters/%s.json\n", clusterID)
+		}
+	}
+
 	_, _ = fmt.Fprintln(stderr, "\nServer deployment complete!")
 	_, _ = fmt.Fprintf(stderr, "Cluster ID: %s\n", clusterID)
-	_, _ = fmt.Fprintf(stderr, "Server address: https://%s:8443\n", cfg.Address)
+	_, _ = fmt.Fprintf(stderr, "Server address: %s\n", serverAddress)
 	_, _ = fmt.Fprintln(stderr, "\nNext steps:")
 	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes with: ploy node add --cluster-id %s --address <node-address>\n", clusterID)
 	_, _ = fmt.Fprintln(stderr, "  2. Configure your local environment to point to this server")
