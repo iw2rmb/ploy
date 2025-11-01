@@ -1,0 +1,38 @@
+post:
+  tags: [Security]
+  summary: Sign a node CSR
+  description: |
+    Signs a node certificate signing request (CSR) using the cluster CA.
+    Requires admin scope and mutual TLS.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../OpenAPI.yaml#/components/schemas/PKISignRequest'
+  responses:
+    '200':
+      description: Signed certificate returned
+      content:
+        application/json:
+          schema:
+            $ref: '../OpenAPI.yaml#/components/schemas/PKISignResponse'
+    '400':
+      description: Invalid request (JSON, CSR, or parameters)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Insufficient scope
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '503':
+      description: PKI not configured on the server
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

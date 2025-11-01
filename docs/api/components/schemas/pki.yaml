@@ -1,0 +1,37 @@
+PKISignRequest:
+  type: object
+  required: [node_id, csr]
+  properties:
+    node_id:
+      type: string
+      format: uuid
+      description: Node identifier requesting a signed certificate.
+    csr:
+      type: string
+      description: PEM-encoded PKCS#10 certificate signing request.
+
+PKISignResponse:
+  type: object
+  required: [certificate, ca_bundle, serial, fingerprint, not_before, not_after]
+  properties:
+    certificate:
+      type: string
+      description: PEM-encoded node certificate signed by the cluster CA.
+    ca_bundle:
+      type: string
+      description: PEM-encoded cluster CA certificate.
+    serial:
+      type: string
+      description: Hex-encoded serial number of the issued certificate.
+    fingerprint:
+      type: string
+      description: SHA-256 fingerprint of the issued certificate (hex).
+    not_before:
+      type: string
+      format: date-time
+      description: Certificate validity start timestamp (UTC).
+    not_after:
+      type: string
+      format: date-time
+      description: Certificate validity end timestamp (UTC).
+

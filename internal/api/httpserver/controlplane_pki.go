@@ -1,17 +1,16 @@
 package httpserver
 
 import (
-	"encoding/json"
-	"io"
-	"log"
-	"net/http"
-	"os"
-	"time"
+    "encoding/json"
+    "log"
+    "net/http"
+    "os"
+    "time"
 
-	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/pki"
-	"github.com/iw2rmb/ploy/internal/store"
-	"github.com/jackc/pgx/v5/pgtype"
+    "github.com/google/uuid"
+    "github.com/iw2rmb/ploy/internal/pki"
+    "github.com/iw2rmb/ploy/internal/store"
+    "github.com/jackc/pgx/v5/pgtype"
 )
 
 // PKISignRequest represents a request to sign a node CSR.
@@ -33,28 +32,22 @@ type PKISignResponse struct {
 // handlePKISign signs a node certificate signing request.
 // POST /v1/pki/sign
 func (s *controlPlaneServer) handlePKISign(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
+    if r.Method != http.MethodPost {
+        w.Header().Set("Allow", http.MethodPost)
+        writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+        return
+    }
 
 	if s.store == nil {
 		writeErrorMessage(w, http.StatusServiceUnavailable, "store unavailable")
 		return
 	}
 
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64*1024))
-	if err != nil {
-		writeErrorMessage(w, http.StatusBadRequest, "request body too large or unreadable")
-		return
-	}
-
-	var req PKISignRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		writeErrorMessage(w, http.StatusBadRequest, "invalid JSON")
-		return
-	}
+    var req PKISignRequest
+    if err := decodeJSON(r, &req); err != nil {
+        writeErrorMessage(w, http.StatusBadRequest, "invalid JSON")
+        return
+    }
 
 	if req.NodeID == "" {
 		writeErrorMessage(w, http.StatusBadRequest, "node_id required")
