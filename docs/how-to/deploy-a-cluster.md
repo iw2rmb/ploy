@@ -31,7 +31,7 @@ This command:
 - Copies the `ployd` server binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd` (mode 0755).
 - Generates a cluster Certificate Authority (CA) locally.
 - Issues a server TLS certificate with appropriate SANs.
-- Creates a `cluster_id` and records it in PostgreSQL.
+- Generates a `cluster_id` (used for PKI and local descriptors). No row is written to PostgreSQL during bootstrap.
 - Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
 - Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
 - Writes server certificate to `/etc/ploy/pki/server.crt` (mode 644) and private key to `/etc/ploy/pki/server.key` (mode 600).
@@ -77,7 +77,6 @@ To check status:
 
 **Optional flags:**
 - `--postgresql-dsn <dsn>` — Use an external PostgreSQL instance instead of installing locally.
-- `--cluster-id <id>` — Override the generated cluster ID (useful for deterministic deployments).
 - `--user <name>` / `--ssh-port <port>` / `--identity <path>` — Override SSH connection parameters.
 - `--ployd-binary <path>` — Explicit path to the `ployd` server binary to upload (defaults to alongside the CLI).
 
@@ -102,7 +101,6 @@ This command:
 - Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
 - Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
 - Writes node certificate to `/etc/ploy/pki/node.crt` (mode 644) and private key to `/etc/ploy/pki/node.key` (mode 600).
-- Records the node IP in the `nodes` table.
 - Writes node configuration to `/etc/ploy/ployd-node.yaml` with the following structure:
   - `server_url: ${PLOY_SERVER_URL}` (from environment)
   - `node_id: ${NODE_ID}` (from environment)
@@ -177,7 +175,7 @@ See also:
 
 ### Monitoring
 
-- **Metrics**: Both server and nodes expose Prometheus metrics on port `:9100` (scrape `/metrics`).
+- **Metrics**: The server exposes Prometheus metrics on port `:9100` (scrape `/metrics`). Node metrics endpoints are not emitted by `ployd-node` yet.
 - **Logs**: Structured logs (slog) on stdout; capture with journalctl or systemd.
 - **Database**: Monitor PostgreSQL disk usage, connection pool, and query performance.
 
@@ -207,9 +205,8 @@ The cluster CA itself should be rotated infrequently and requires reissuing all 
 ## Connectivity and Authentication
 
 - **mTLS Only**: All communication uses mutual TLS. Bearer tokens have been removed.
-- **CLI**: Uses mTLS with operator client certificate (minted during `ploy server deploy`).
 - **Nodes**: Use certificates issued via `/v1/pki/sign` to communicate with the server.
-- **Descriptors**: The CLI reads endpoint + CA bundle from cluster descriptors saved during deployment.
+- **CLI & descriptors (current state)**: The server bootstrap saves a local cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json` and marks it as default. The descriptor contains the control‑plane address and SSH identity path. The CLI resolves the control‑plane URL via environment or direct flags; it does not yet load a client certificate from the descriptor, and the descriptor does not include a CA bundle.
 
 ## Appendix: Environment Variables
 
