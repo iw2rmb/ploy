@@ -12,29 +12,29 @@ This document codifies Go engineering rules for this repository. It complements 
 - Package boundaries: keep CLI thin; orchestration logic lives under `internal/...` packages per `AGENTS.md`.
 
 ## Formatting & Linting
-- Run `gofmt -w` (or `gofumpt -w` if the repo standardizes on it), followed by `goimports -w` to group imports (stdlib, third‑party, local). Code must be mechanically formatted; no hand‑tuned style deviations. 
+- Run `gofmt -w` (or `gofumpt -w` if the repo standardizes on it), followed by `goimports -w` to group imports (stdlib, third‑party, local). Code must be mechanically formatted; no hand‑tuned style deviations.
 - `go vet ./...` and `staticcheck ./...` on touched packages before submit. Integrate `golangci-lint` locally/CI for aggregate checks.
 - Keep the working tree clean between tool runs; commit only after format/lint/test pass.
 
 ## Error Handling
-- Don’t use panic for normal errors; prefer `error` returns. Error strings are lowercase without trailing punctuation; wrap with `%w` and use `errors.Is/As` for inspection. 
+- Don’t use panic for normal errors; prefer `error` returns. Error strings are lowercase without trailing punctuation; wrap with `%w` and use `errors.Is/As` for inspection.
 - Avoid double-reporting (log and return). Return errors to the caller or log at the edge.
 
 ## Documentation & Naming
-- Exported identifiers require doc comments that start with the identifier name and end with a period. Use mixedCaps; avoid ALL_CAPS. 
+- Exported identifiers require doc comments that start with the identifier name and end with a period. Use mixedCaps; avoid ALL_CAPS.
 
 ## Context & Concurrency
-- Accept `context.Context` as the first parameter when work is request‑scoped; propagate deadlines/cancellation. Do not store `Context` in structs. 
-- Make goroutine lifetimes explicit; avoid leaks. Prefer cancellation via context and `errgroup` patterns (or channel close rules). Be careful with `t.Parallel()` in table tests—capture loop vars correctly. 
+- Accept `context.Context` as the first parameter when work is request‑scoped; propagate deadlines/cancellation. Do not store `Context` in structs.
+- Make goroutine lifetimes explicit; avoid leaks. Prefer cancellation via context and `errgroup` patterns (or channel close rules). Be careful with `t.Parallel()` in table tests—capture loop vars correctly.
 
 ## Testing, Fuzzing, Coverage
-- Unit tests are table‑driven with subtests (`t.Run`). Keep clear failure messages; follow RED → GREEN → REFACTOR. 
-- Fuzzing: add fuzz targets for critical parsing/decoding paths (`FuzzXxx(*testing.F)`); keep targets deterministic and fast. 
+- Unit tests are table‑driven with subtests (`t.Run`). Keep clear failure messages; follow RED → GREEN → REFACTOR.
+- Fuzzing: add fuzz targets for critical parsing/decoding paths (`FuzzXxx(*testing.F)`); keep targets deterministic and fast.
 - Always run with the race detector on touched packages: `go test -race ./pkg/...`.
 - Coverage targets: ≥60% overall and ≥90% on critical workflow runner packages (per `AGENTS.md`).
 
 ## Security & Supply Chain
-- Scan dependencies with `govulncheck ./...` as part of release and when changing dependencies. Prefer fixes that upgrade vulnerable modules. 
+- Scan dependencies with `govulncheck ./...` as part of release and when changing dependencies. Prefer fixes that upgrade vulnerable modules.
 - Prefer standard library first; add third‑party deps only with rationale. Keep `go.mod` minimal; run `go mod tidy -v`.
 
 ## Logging & Observability
@@ -68,8 +68,8 @@ This document codifies Go engineering rules for this repository. It complements 
 - Mods: `go mod tidy -v`
 
 ## References
-- Go Code Review Comments (wiki).
-- Effective Go.
-- Fuzzing docs and tutorial.
-- Vulnerability management and govulncheck.
-- Uber Go Style Guide (industry reference).
+- Go Code Review Comments (style, errors, naming, concurrency). [go.dev](https://go.dev/wiki/CodeReviewComments?utm_source=openai)
+- Effective Go (formatting, comments, naming, errors, functions). [tip.golang.org](https://tip.golang.org/doc/effective_go?utm_source=openai)
+- Fuzzing tutorial (FuzzXxx, workflows). [go.dev](https://go.dev/doc/tutorial/fuzz?utm_source=openai)
+- govulncheck (blog + tutorial: usage and CI). [go.dev](https://go.dev/blog/govulncheck?utm_source=openai)
+- slog (structured logging) docs/blog. [pkg.go.dev](https://pkg.go.dev/log/slog?utm_source=openaiq)
