@@ -2,39 +2,40 @@
 
 Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
 
-- `ploy` — a CLI for submitting Mods, following logs, managing artifacts, and administering nodes.
-- `ployd` — a daemon that runs both the HTTPS control‑plane APIs and the worker execution loop.
+- `ploy` — a CLI for submitting Mods, following logs, managing runs, and administering clusters.
+- `ployd-server` — the control-plane daemon with scheduler, API, and PostgreSQL-backed storage.
+- `ployd-node` — lightweight worker nodes that execute jobs in ephemeral workspaces.
 
-The v2 architecture removes external orchestrators and build‑gate dependencies. Ploy embeds its own
-scheduler and step runtime, integrates a language‑agnostic Build Gate, and persists artifacts in
-IPFS Cluster.
+**Architecture**: Ploy uses a server/node split with PostgreSQL for state and mTLS-only authentication.
+etcd and IPFS Cluster have been removed. Nodes clone repositories shallow on-demand and upload
+diffs/logs/artifacts to the server's PostgreSQL database.
 
-See docs/next/README.md for the broader “Ploy Next” overview.
+See `SIMPLE.md` for the detailed architecture, deployment topology, and migration notes.
 
-For a proposed simplified architecture that replaces etcd with PostgreSQL and removes IPFS in favor of ephemeral repo clones, see `SIMPLE.md`.
-
-**What Changed (2025‑10)**
-- Not CLI‑only anymore: the repository ships a control plane (`cmd/ployd`) alongside the CLI.
-- Grid orchestrator removed: scheduling and queueing live in `internal/controlplane/scheduler`.
-- SHIFT build gate removed: the integrated Build Gate lives under `internal/workflow/buildgate`.
+**What Changed (2025‑11 — Postgres/mTLS Pivot)**
+- **Server/Node Split**: Separate `ployd-server` (control-plane) and `ployd-node` (worker) binaries.
+- **PostgreSQL**: Replaces etcd for state; stores runs, logs, diffs, and artifact bundles.
+- **mTLS Only**: Bearer token auth removed; all communication uses mutual TLS.
+- **No IPFS**: Artifacts stored in PostgreSQL; nodes clone repos shallow on-demand.
+- **Simplified Deployment**: `ploy server deploy` and `ploy node add` CLI commands.
 
 **Core Components**
-- CLI entrypoint: `cmd/ploy` (top‑level commands: `mod`, `mods`, `jobs`, `artifact`, `cluster`, `manifest`, `environment`, `knowledge-base`).
-- Daemon: `cmd/ployd` with defaults in `internal/api/config/*` and wiring in `internal/api/daemon/*`.
-- Control‑plane HTTP/SSE: handlers in `internal/api/httpserver/*` and OpenAPI in docs/api/OpenAPI.yaml.
-- Scheduler and state: `internal/controlplane/scheduler/*` with etcd integration in `internal/api/daemon/default.go`.
-- Worker runtime: `internal/node/worker/step/*` and container adapter in `internal/workflow/runtime/step/*`.
-- Build Gate: `internal/workflow/buildgate/*` (sandbox runner, static checks, Java executor, log ingestion).
-- Artifacts and transfers: control‑plane store/reconciler in `internal/controlplane/artifacts/*`, workflow publishers in `internal/workflow/artifacts/*`, SSH transfer guard in `internal/controlplane/transfers/*`.
-- Control-plane connectivity: CLI uses direct HTTPS (mTLS) to reach the control plane; SSH tunnels have been removed.
+- CLI entrypoint: `cmd/ploy` (commands: `server`, `node`, `mod`, `mods`, `runs`, `knowledge-base`).
+- Server daemon: `cmd/ployd-server` with PostgreSQL (`pgx/v5` + `sqlc`), scheduler, and PKI.
+- Node daemon: `cmd/ployd-node` with ephemeral workspaces, Build Gate, and mTLS client.
+- Control‑plane HTTP/SSE: handlers in `internal/api/httpserver/*` and OpenAPI in `docs/api/OpenAPI.yaml`.
+- Scheduler: In-DB queue using `FOR UPDATE SKIP LOCKED` on `runs.status='queued'`.
+- Build Gate: `internal/workflow/buildgate/*` (sandbox runner, static checks, Java executor).
+- Storage: PostgreSQL migrations in `internal/store/migrations/`, queries in `internal/store/queries/`.
+- PKI: Cluster CA issues certificates; nodes submit CSRs via `/v1/pki/sign`.
 
-**Docs You’ll Want**
-- Architecture and concepts: docs/next/README.md
-- CLI reference: docs/next/cli.md
-- Control‑plane APIs: docs/next/api.md and docs/api/OpenAPI.yaml
-- Job and Mods model: docs/next/job.md and docs/next/mod.md
-- Artifact handling: docs/next/ipfs.md and docs/workflow/README.md
-- Deploy/operate a cluster: docs/how-to/deploy-a-cluster.md and docs/next/observability.md
+**Docs You'll Want**
+- Architecture: `SIMPLE.md` (server/node pivot, PostgreSQL, mTLS)
+- Deployment: `docs/how-to/deploy-a-cluster.md`
+- Roadmap: `ROADMAP.md` (migration checklist)
+- Control‑plane APIs: `docs/api/OpenAPI.yaml`
+- Environment variables: `docs/envs/README.md`
+- Engineering rules: `GOLANG.md`
 
 **Build**
 - Requirements: Go 1.25+, Docker 28.x for local step execution.
@@ -47,51 +48,49 @@ For a proposed simplified architecture that replaces etcd with PostgreSQL and re
 This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote installs).
 
 **Quick Start**
-- Bootstrap a first control‑plane node over SSH (see the how‑to for prerequisites):
+- Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` not provided):
 
   ```bash
-  dist/ploy cluster add --address <host-or-ip>
+  dist/ploy server deploy --address <host-or-ip>
   ```
 
-- Add more workers to the same cluster:
+- Add worker nodes to the cluster:
 
   ```bash
-  dist/ploy cluster add --address <host-or-ip> --cluster-id <cluster-id>
+  dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip>
   ```
 
 - Submit a Mods run and follow events:
 
   ```bash
-  dist/ploy mod run --repo-url https://example.com/repo.git \
-    --repo-base-ref main --repo-target-ref mods-upgrade-java17 \
-    --follow --artifact-dir /tmp/mods-artifacts
+  dist/ploy mod run --repo-url https://github.com/example/repo.git \
+    --repo-base-ref main --repo-target-ref feature-branch \
+    --follow
   ```
 
-- Follow an individual job’s logs:
+- Follow run logs via SSE:
 
   ```bash
-  dist/ploy jobs follow <job-id>
-  ```
-
-- Plan an integration environment (no cache hydration in dry‑run):
-
-  ```bash
-  dist/ploy environment materialize <commit-sha> --app commit-app --dry-run
+  dist/ploy jobs follow <run-id>
   ```
 
 **Environment Variables**
-- Full reference: docs/envs/README.md
-- Common examples:
-  - `PLOY_CONTROL_PLANE_URL` — override when no cached cluster descriptor exists.
-  - `PLOY_IPFS_CLUSTER_API` — required on worker nodes for artifact publishing.
-  - `PLOY_BUILDGATE_JAVA_IMAGE` — optional Java image for the Build Gate.
+- Full reference: `docs/envs/README.md`
+- Key variables:
+  - `PLOY_SERVER_PG_DSN` — PostgreSQL DSN for the server (e.g., `postgres://user:pass@localhost:5432/ploy`).
+  - `PLOY_CONTROL_PLANE_URL` — Override control-plane URL (descriptors preferred).
+  - `PLOY_SERVER_CA_CERT` / `PLOY_SERVER_CA_KEY` — Cluster CA for PKI operations.
+  - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional Java image for the Build Gate.
 
 **Contributing**
-- Follow AGENTS.md (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).
-- Keep docs in sync; prefer docs/next/* and remove or update stale references in the same PR.
+- Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).
+- Keep docs in sync; update `SIMPLE.md`, `ROADMAP.md`, and `docs/` as needed.
 
-**Notes on Removed/Legacy Items**
-- References to `configs/lanes/*`, legacy “lanes describe”, or docs/design/* are obsolete and have been removed here.
-- External GRID/SHIFT integrations are no longer part of this codebase.
+**Legacy Removed (November 2025)**
+- **etcd**: Replaced with PostgreSQL for all state.
+- **IPFS Cluster**: Artifacts now stored in PostgreSQL; repos cloned shallow on-demand.
+- **Token auth**: mTLS-only; bearer tokens removed.
+- **Node labels**: Replaced with resource-snapshot scheduling.
+- **SSH tunnels**: CLI uses direct HTTPS/mTLS to control-plane.
 
 License: see `LICENSE` when present.

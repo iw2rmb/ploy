@@ -1,18 +1,21 @@
 # Environment Variables
 
-Note: As of the Postgres/mTLS pivot (November 2025), legacy IPFS Cluster and etcd variables are deprecated and removed from the runtime. Sections that reference `PLOY_IPFS_*` and `PLOY_ETCD_*` remain for historical context and transition, but are no longer consumed by the codebase.
+**Note: Postgres/mTLS Pivot (November 2025)**
 
-This reference tracks the environment variables that the workstation CLI
-inspects today and notes the current local values. Update this file whenever a
-new variable is introduced, defaults change, or components adopt additional
-configuration.
+As of the server/node pivot described in `SIMPLE.md`, the following legacy systems have been removed:
+- **IPFS Cluster**: All `PLOY_IPFS_*` variables are no longer consumed by the codebase.
+- **etcd**: All `PLOY_ETCD_*` variables are no longer consumed by the codebase.
+- **Token-based auth**: Bearer tokens replaced with mTLS-only authentication.
+- **Node labels**: Removed in favor of resource-snapshot scheduling.
+
+This document tracks the environment variables that the server, node, and CLI
+use after the pivot. Update this file whenever a new variable is introduced,
+defaults change, or components adopt additional configuration.
 
 ## Dependencies
 
 - [cmd/ploy/dependencies.go](../../cmd/ploy/dependencies.go) — runtime factories
-  resolving control-plane and IPFS endpoints.
-- [cmd/ploy/feature_flags.go](../../cmd/ploy/feature_flags.go) — feature flag
-  inspection for the Aster integration.
+  resolving control-plane endpoints via mTLS.
 
 ## CLI
 
@@ -23,35 +26,7 @@ configuration.
   integration. Current default: `unset` (Aster toggles stay disabled).
 - `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL when cached descriptors do not yet
   embed the endpoint (new workstation) or you need to target a secondary cluster explicitly. Descriptors discovered via
-  `ploy cluster add` remain the default for CLI calls such as `ploy upload` and `ploy report`.
-- `PLOY_IPFS_CLUSTER_API` — Base URL for the IPFS Cluster REST API used by the
-  step runtime and the control-plane artifact publisher. Workstations still
-  read this value when executing Mods locally, but `ploy artifact *`, `ploy upload`,
-  and `ploy report` routes now talk to the control plane instead of hitting the
-  cluster directly. **Required on ployd worker nodes** so the step executor can
-  publish diff/log bundles after each job.
-- `PLOY_IPFS_CLUSTER_TOKEN` — Optional bearer token passed to the cluster when
-  authenticating artifact requests.
-- `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Optional
-  basic-auth credentials used when a bearer token is not available. Username
-  and password must be provided together.
-- `PLOY_IPFS_CLUSTER_REPL_MIN` — Optional override for the minimum replication
-  factor applied to artifact pins. Defaults to the cluster-defined value when
-  unset or zero.
-- `PLOY_IPFS_CLUSTER_REPL_MAX` — Optional override for the maximum replication
-  factor applied to artifact pins. Defaults to the cluster-defined value when
-  unset or zero.
-
-  Additional worker guards (for unstable clusters):
-  - `PLOY_IPFS_CLUSTER_LOCAL` — When `true`/`1`, workers publish artifacts with
-    `local=true` to prefer the local IPFS daemon and reduce cross‑peer pressure.
-  - `PLOY_HYDRATION_PUBLISH_SNAPSHOT` — When `false`/`0`, workers skip publishing
-    the repo hydration snapshot to IPFS Cluster and hydrate directly from the
-    local tarball.
-  - `PLOY_ARTIFACT_PUBLISH` — When `false`/`0`, workers skip publishing diff/log
-    artifacts entirely. Live logs still stream via SSE.
-- `PLOY_IPFS_GATEWAY` — Optional IPFS HTTP gateway base URL used for artifact
-  uploads from the workstation. Not required on nodes (they use IPFS Cluster directly).
+  `ploy server deploy` or `ploy node add` remain the default for CLI calls.
 - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
   Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
   Defaults to `maven:3-eclipse-temurin-17`.
@@ -65,25 +40,12 @@ configuration.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
-- `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Optional etcd basic-auth credentials applied when
-  ployd connects to the local etcd instance.
-- `PLOY_ETCD_TLS_CA` — Path to a PEM bundle used to trust etcd server certificates. Optional.
-- `PLOY_ETCD_TLS_CERT` / `PLOY_ETCD_TLS_KEY` — Optional client certificate pair presented to etcd
-  when mutual TLS is required. Both values must be provided together.
-- `PLOY_ETCD_TLS_SKIP_VERIFY` — When set to `true`, disables server certificate verification. Use
-  only for local development.
 - `PLOYD_CONFIG_PATH` — When set during bootstrap, overrides the generated ployd configuration file
   location (default `/etc/ploy/ployd.yaml`).
 - `PLOYD_HTTP_LISTEN` — Optional address override for the ployd HTTP API listener when bootstrap
   generates the initial configuration (default `0.0.0.0:8443`).
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
   `:9100`).
-Removed (SSH tunnels deprecated; CLI uses direct HTTPS):
-  - `PLOY_SSH_USER`
-  - `PLOY_SSH_IDENTITY`
-  - `PLOY_SSH_SOCKET_DIR`
-  - `PLOY_CACHE_HOME`
-- `PLOY_ARTIFACT_ROOT` — Optional override for the local artifact cache used by the step workspace hydrator and filesystem artifact publisher. Defaults to `$XDG_CACHE_HOME/ploy/artifacts` (or the OS cache dir fallback) when unset.
   
 
 ## Worker Nodes
@@ -161,9 +123,37 @@ The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
 
+## Legacy (Removed November 2025)
+
+The following variables are **no longer consumed** by the codebase after the Postgres/mTLS pivot:
+
+### IPFS Cluster (Removed)
+- `PLOY_IPFS_CLUSTER_API` — Replaced with PostgreSQL storage for diffs/logs/artifact bundles.
+- `PLOY_IPFS_CLUSTER_TOKEN` — Token auth removed; mTLS only.
+- `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Removed.
+- `PLOY_IPFS_CLUSTER_REPL_MIN` / `PLOY_IPFS_CLUSTER_REPL_MAX` — No IPFS replication.
+- `PLOY_IPFS_CLUSTER_LOCAL` — Removed.
+- `PLOY_IPFS_GATEWAY` — Removed.
+- `PLOY_HYDRATION_PUBLISH_SNAPSHOT` — Removed (repos cloned shallow on-demand).
+- `PLOY_ARTIFACT_PUBLISH` — Removed.
+
+### etcd (Removed)
+- `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Replaced with PostgreSQL.
+- `PLOY_ETCD_TLS_CA` / `PLOY_ETCD_TLS_CERT` / `PLOY_ETCD_TLS_KEY` — Removed.
+- `PLOY_ETCD_TLS_SKIP_VERIFY` — Removed.
+
+### SSH Tunnels (Removed)
+- `PLOY_SSH_USER` — CLI uses direct HTTPS/mTLS.
+- `PLOY_SSH_IDENTITY` — Removed.
+- `PLOY_SSH_SOCKET_DIR` — Removed.
+- `PLOY_CACHE_HOME` — Removed.
+
+### Other
+- `PLOY_ARTIFACT_ROOT` — Local artifact caching removed; nodes use ephemeral workspaces.
+
 ## Related Docs
 
-- [docs/design/overview/README.md](../design/overview/README.md)
-- [docs/design/workflow-rpc-alignment/README.md](../design/workflow-rpc-alignment/README.md)
-- [docs/design/ipfs-artifacts/README.md](../design/ipfs-artifacts/README.md)
- 
+- [SIMPLE.md](../../SIMPLE.md) — Server/node pivot architecture
+- [ROADMAP.md](../../ROADMAP.md) — Migration checklist
+- [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
+

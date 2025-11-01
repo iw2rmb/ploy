@@ -4,7 +4,7 @@ info:
   version: "0.1.0"
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
-    require mutual TLS and a bearer token with the appropriate scope.
+    require mutual TLS authentication. Bearer token auth has been removed.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -13,27 +13,19 @@ servers:
         default: cluster-alpha.example.com
         description: Control-plane host recorded in the descriptor.
 tags:
-  - name: Nodes
-    description: Worker onboarding, listing, and deregistration.
-  - name: GitLab
-    description: GitLab signer configuration.
-  - name: Artifacts
-    description: HTTPS artifact upload, list, inspect, delete.
   - name: Security
     description: PKI operations (CA info, CSR signing).
   - name: Control
     description: Core control-plane CRUD surfaces (repos, mods, runs).
+  - name: Artifacts
+    description: Artifact bundles, diffs, and logs stored in PostgreSQL.
 security:
-  - bearerAuth: []
+  - mtls: []
 paths:
-  /v1/nodes:
-    $ref: './paths/nodes.yaml'
-  /v1/nodes/{node_id}:
-    $ref: './paths/nodes_id.yaml'
-  /v1/config/gitlab:
-    $ref: './paths/gitlab_config.yaml'
+  # PKI endpoints
   /v1/pki/sign:
     $ref: './paths/pki_sign.yaml'
+  # Control-plane CRUD
   /v1/repos:
     $ref: './paths/repos.yaml'
   /v1/repos/{id}:
@@ -56,92 +48,26 @@ paths:
     $ref: './paths/runs_id_logs.yaml'
   /v1/runs/{id}/artifact_bundles:
     $ref: './paths/runs_id_artifact_bundles.yaml'
-  # Registry removed; Docker Hub is used for images.
-  # v2 artifacts aliases
-  /v2/artifacts/upload:
-    post:
-      tags: [Artifacts]
-      summary: Upload an artifact via HTTPS (v2 alias)
-      parameters: []
-      requestBody:
-        required: true
-        content:
-          application/octet-stream:
-            schema:
-              type: string
-              format: binary
-      responses:
-        '201':
-          description: Artifact created
-          content:
-            application/json:
-              schema:
-                type: object
-        '400':
-          description: Invalid request
-        '403':
-          description: Insufficient scope
-  /v2/artifacts:
-    get:
-      tags: [Artifacts]
-      summary: List artifacts (v2 alias)
-      responses:
-        '200':
-          description: OK
-  /v2/artifacts/{id}:
-    get:
-      tags: [Artifacts]
-      summary: Inspect or download an artifact (v2 alias)
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string }
-      responses:
-        '200': { description: OK }
+  # Legacy removed:
+  # - /v1/nodes (node registry now managed via server → node mTLS RPC)
+  # - /v1/config/gitlab (GitLab signer removed)
+  # - /v2/artifacts/* (IPFS artifacts replaced with PostgreSQL storage)
 components:
   securitySchemes:
-    bearerAuth:
-      $ref: './components/securitySchemes/bearerAuth.yaml'
+    mtls:
+      type: mutualTLS
+      description: |
+        Mutual TLS authentication using certificates issued by the cluster CA.
+        The server verifies client certificates during the TLS handshake.
+        Node certificates are issued via the `/v1/pki/sign` endpoint.
   parameters: {}
   schemas:
+    # PKI schemas
     PKISignRequest:
       $ref: './components/schemas/pki.yaml#/PKISignRequest'
     PKISignResponse:
       $ref: './components/schemas/pki.yaml#/PKISignResponse'
-    NodeJoinRequest:
-      $ref: './components/schemas/nodes.yaml#/NodeJoinRequest'
-    NodeProbe:
-      $ref: './components/schemas/nodes.yaml#/NodeProbe'
-    NodeJoinResponse:
-      $ref: './components/schemas/nodes.yaml#/NodeJoinResponse'
-    NodeDescriptor:
-      $ref: './components/schemas/nodes.yaml#/NodeDescriptor'
-    WorkerStatus:
-      $ref: './components/schemas/nodes.yaml#/WorkerStatus'
-    WorkerProbeResult:
-      $ref: './components/schemas/nodes.yaml#/WorkerProbeResult'
-    LeafCertificate:
-      $ref: './components/schemas/nodes.yaml#/LeafCertificate'
-    NodeDeleteRequest:
-      $ref: './components/schemas/nodes.yaml#/NodeDeleteRequest'
-    NodeDrainConflict:
-      $ref: './components/schemas/nodes.yaml#/NodeDrainConflict'
-    RevokedRecord:
-      $ref: './components/schemas/nodes.yaml#/RevokedRecord'
-    GitLabConfigResponse:
-      $ref: './components/schemas/gitlab.yaml#/GitLabConfigResponse'
-    GitLabConfigWriteRequest:
-      $ref: './components/schemas/gitlab.yaml#/GitLabConfigWriteRequest'
-    GitLabConfig:
-      $ref: './components/schemas/gitlab.yaml#/GitLabConfig'
-    GitLabToken:
-      $ref: './components/schemas/gitlab.yaml#/GitLabToken'
-    GitLabBranchPolicy:
-      $ref: './components/schemas/gitlab.yaml#/GitLabBranchPolicy'
-    GitLabRBAC:
-      $ref: './components/schemas/gitlab.yaml#/GitLabRBAC'
-    # registry schemas removed
+    # Control-plane schemas
     Error:
       $ref: './components/schemas/common.yaml#/Error'
     Repo:
@@ -162,3 +88,6 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Event'
     Stage:
       $ref: './components/schemas/controlplane.yaml#/Stage'
+    # Legacy removed:
+    # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
+    # - GitLab schemas (gitlab.yaml) — GitLab signer removed

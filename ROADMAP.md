@@ -63,10 +63,10 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Ensure Mods advisor consumes `configs/knowledge-base/catalog.json` and surfaces recommendations in runs.
   - [x] Update docs: `configs/knowledge-base/README.md`, CLI reference.
 
-- [ ] OpenAPI + docs pass
-  - [ ] Update `docs/api/OpenAPI.yaml` to new endpoints and mTLS-only auth.
-  - [ ] Refresh `docs/envs/README.md` with new envs; mark IPFS/etcd as legacy and remove.
-  - [ ] Update how-to deploy and README; point operators to the new CLI flows.
+- [x] OpenAPI + docs pass
+  - [x] Update `docs/api/OpenAPI.yaml` to new endpoints and mTLS-only auth.
+  - [x] Refresh `docs/envs/README.md` with new envs; mark IPFS/etcd as legacy and remove.
+  - [x] Update how-to deploy and README; point operators to the new CLI flows.
 
 - [ ] Tests and coverage
   - [ ] Unit: scheduler claim fairness/backoff; diff/log ingestion; PKI/CSR flow; resource-cap rejects.
