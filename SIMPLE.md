@@ -146,11 +146,11 @@ Timing
     provisions a database named `ploy`; derives the DSN for server config.
 
 - `ploy node add --cluster-id <id> --address <host-or-ip>`
-  - Over SSH, installs `ployd-node` and registers it with the server.
+  - Over SSH, installs `ployd` and registers it with the server.
   - Generates a private key and CSR on the node; submits CSR to server for
     signing; installs the issued node certificate and CA bundle.
   - Records the node IP in the database.
-  - Bootstraps `ployd-node` systemd unit pointing at `PLOY_NODE_SERVER_URL`.
+  - Bootstraps `ployd` systemd unit; the endpoint derives from the cluster descriptor or `PLOY_CONTROL_PLANE_URL`.
 
 ## Scheduling
 
@@ -279,13 +279,12 @@ TTL enforcement (example)
   - `PLOY_SERVER_CA_CERT` / `PLOY_SERVER_CA_KEY`
 
 - Node
-  - `PLOY_NODE_SERVER_URL` (e.g., `https://ployd.example.com:8443`)
-  - `PLOY_NODE_TLS_CERT` / `PLOY_NODE_TLS_KEY`
-  - `PLOY_NODE_CA_CERT`
+  - `PLOY_CA_CERT_PEM` — Cluster CA presented to the node for mTLS trust.
+  - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — The node’s TLS certificate and key (CSR-signed by the control plane). Despite the name, bootstrap uses these variables for both server and node flows and writes to `/etc/ploy/pki/node.pem` and `/etc/ploy/pki/node-key.pem`.
   - `PLOY_NODE_CONCURRENCY` (default `1`)
 
 - CLI
-  - `PLOY_SERVER_URL` (optional override; descriptors remain preferred)
+  - `PLOY_CONTROL_PLANE_URL` (optional override; descriptors remain preferred)
 
 Legacy IPFS and etcd envs become no‑ops then removed after migration.
 
