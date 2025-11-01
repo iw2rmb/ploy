@@ -46,36 +46,22 @@ install_postgresql() {
 derive_postgresql_dsn() {
   log "deriving PostgreSQL DSN"
 
-  # Try to determine the socket directory
-  local socket_dir="/var/run/postgresql"
-  if [[ ! -d "$socket_dir" ]]; then
-    # Common alternative on RHEL/CentOS
-    socket_dir="/tmp"
-  fi
-
-  # Determine the port
+  # Determine the port from the running instance
   local pg_port="5432"
-  if command -v pg_config >/dev/null 2>&1; then
-    local configured_port
-    configured_port="$(sudo -u postgres psql -t -c 'SHOW port;' 2>/dev/null | tr -d '[:space:]')" || true
-    if [[ -n "$configured_port" ]]; then
-      pg_port="$configured_port"
-    fi
+  local configured_port
+  configured_port="$(sudo -u postgres psql -t -c 'SHOW port;' 2>/dev/null | tr -d '[:space:]')" || true
+  if [[ -n "$configured_port" ]]; then
+    pg_port="$configured_port"
   fi
 
-  # Build DSN - prefer socket connection for local installation
-  # Format: host=/var/run/postgresql user=ploy dbname=ploy sslmode=disable
-  local derived_dsn="host=${socket_dir} user=ploy dbname=ploy sslmode=disable"
+  # Always derive a TCP DSN with password auth. ployd runs as root by default,
+  # so peer auth over a local socket would fail unless the service user matches
+  # the database role. A TCP DSN is stable across distros and packaging.
+  local derived_dsn="host=127.0.0.1 port=${pg_port} user=ploy password=ploy dbname=ploy sslmode=disable"
 
-  # Test the connection
-  if ! sudo -u ploy psql "${derived_dsn}" -c '\q' >/dev/null 2>&1; then
-    log "socket connection failed, trying TCP with password"
-    # Fall back to TCP connection with password
-    derived_dsn="host=localhost port=${pg_port} user=ploy password=ploy dbname=ploy sslmode=disable"
-
-    if ! PGPASSWORD=ploy psql "${derived_dsn}" -c '\q' >/dev/null 2>&1; then
-      fail "failed to establish PostgreSQL connection with derived DSN"
-    fi
+  # Verify the connection works with the derived DSN
+  if ! PGPASSWORD=ploy psql "${derived_dsn}" -c '\q' >/dev/null 2>&1; then
+    fail "failed to establish PostgreSQL connection with derived DSN"
   fi
 
   # Export the derived DSN so it's available to the ployd service configuration

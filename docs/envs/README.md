@@ -147,6 +147,9 @@ The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 
 - `PLOY_SERVER_PG_DSN` — Primary DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
+  When `ploy server deploy` runs without `--postgresql-dsn`, the bootstrap installs
+  PostgreSQL on the VPS and derives a password‑based TCP DSN suitable for the
+  root‑run `ployd` service, e.g.: `host=127.0.0.1 port=5432 user=ploy password=ploy dbname=ploy sslmode=disable`.
 - `PLOY_POSTGRES_DSN` — Backward‑compatible alias recognized by `ployd` during the transition. Prefer
   `PLOY_SERVER_PG_DSN` going forward.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by `internal/store` integration tests. When unset, tests
