@@ -12,9 +12,12 @@ import (
 // TestServiceSynthesizesPlanManifest verifies the server builds a step manifest for
 // the mods plan stage when none is provided by the client.
 func TestServiceSynthesizesPlanManifest(t *testing.T) {
-    t.Parallel()
+    // Note: cannot use t.Parallel with t.Setenv; keep this test sequential.
 
     ctx := context.Background()
+    // Ensure image selection uses the repository fallback, independent of host env.
+    t.Setenv("DOCKERHUB_USERNAME", "")
+    t.Setenv("MODS_IMAGE_PREFIX", "")
     e, client := newTestEtcd(t)
     defer e.Close()
     defer client.Close()

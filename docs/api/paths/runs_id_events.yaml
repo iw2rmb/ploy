@@ -1,0 +1,19 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+get:
+  tags: [Control]
+  summary: Stream run events (SSE)
+  description: |
+    Server-Sent Events stream of run events. Supports `Last-Event-ID` header for resume.
+  responses:
+    '200':
+      description: OK
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '404': { description: Not Found }
+
