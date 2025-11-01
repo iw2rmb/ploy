@@ -112,8 +112,8 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 		return fmt.Errorf("run %s already exists", req.RunID)
 	}
 
-    // Create a cancellable context for this run, derived from caller.
-    runCtx, cancel := context.WithCancel(ctx)
+	// Create a cancellable context for this run, derived from caller.
+	runCtx, cancel := context.WithCancel(ctx)
 	r.runs[req.RunID] = &runContext{
 		runID:  req.RunID,
 		cancel: cancel,
@@ -247,22 +247,22 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	}
 
 	// Default to a basic build container if not specified in options.
-    image := "ubuntu:latest"
-    command := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
-    if imgOpt, ok := req.Options["image"].(string); ok && strings.TrimSpace(imgOpt) != "" {
-        image = strings.TrimSpace(imgOpt)
-    }
-    // Accept command as []string or single shell string.
-    switch v := req.Options["command"].(type) {
-    case []string:
-        if len(v) > 0 {
-            command = v
-        }
-    case string:
-        if s := strings.TrimSpace(v); s != "" {
-            command = []string{"/bin/sh", "-c", s}
-        }
-    }
+	image := "ubuntu:latest"
+	command := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
+	if imgOpt, ok := req.Options["image"].(string); ok && strings.TrimSpace(imgOpt) != "" {
+		image = strings.TrimSpace(imgOpt)
+	}
+	// Accept command as []string or single shell string.
+	switch v := req.Options["command"].(type) {
+	case []string:
+		if len(v) > 0 {
+			command = v
+		}
+	case string:
+		if s := strings.TrimSpace(v); s != "" {
+			command = []string{"/bin/sh", "-c", s}
+		}
+	}
 
 	// Determine the ref to clone.
 	targetRef := strings.TrimSpace(req.TargetRef)
@@ -279,19 +279,19 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	}
 
 	// Create a single read-write input that will be hydrated from the repository.
-    // Defensive copy of env to avoid aliasing caller map.
-    env := make(map[string]string, len(req.Env))
-    for k, v := range req.Env {
-        env[k] = v
-    }
+	// Defensive copy of env to avoid aliasing caller map.
+	env := make(map[string]string, len(req.Env))
+	for k, v := range req.Env {
+		env[k] = v
+	}
 
-    manifest := contracts.StepManifest{
-        ID:         req.RunID,
-        Name:       fmt.Sprintf("Run %s", req.RunID),
-        Image:      image,
-        Command:    command,
-        WorkingDir: "/workspace",
-        Env:        env,
+	manifest := contracts.StepManifest{
+		ID:         req.RunID,
+		Name:       fmt.Sprintf("Run %s", req.RunID),
+		Image:      image,
+		Command:    command,
+		WorkingDir: "/workspace",
+		Env:        env,
 		Inputs: []contracts.StepInput{
 			{
 				Name:      "workspace",

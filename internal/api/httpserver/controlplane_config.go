@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/config/gitlab"
-	"github.com/iw2rmb/ploy/internal/controlplane/config"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/config/gitlab"
+	"github.com/iw2rmb/ploy/internal/controlplane/config"
 )
 
 func (s *controlPlaneServer) handleClusterConfig(w http.ResponseWriter, r *http.Request) {

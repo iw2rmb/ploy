@@ -47,7 +47,7 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
   - [x] Optional: daily partition dropper based on naming scheme (see SIMPLE.md snippet).
 
 - [x] CLI commands
-  - [ ] `ploy server deploy --address`: install server, create CA, issue server cert, create `cluster_id`, configure `PLOY_SERVER_PG_DSN`.
+  - [x] `ploy server deploy --address`: install server, create CA, issue server cert, create `cluster_id`, configure `PLOY_SERVER_PG_DSN`.
     - [ ] If `--postgresql-dns` is not provided, install PostgreSQL on the VPS and create DB `ploy`; derive DSN.
   - [ ] `ploy node add --cluster-id --address`: install node, generate key+CSR, call `/v1/pki/sign`, record node IP, configure mTLS.
 

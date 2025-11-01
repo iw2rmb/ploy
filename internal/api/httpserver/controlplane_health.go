@@ -10,16 +10,17 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/iw2rmb/ploy/internal/controlplane/registry"
-	cpsecurity "github.com/iw2rmb/ploy/internal/controlplane/security"
-	"github.com/iw2rmb/ploy/internal/deploy"
-	"github.com/iw2rmb/ploy/internal/version"
-	dto "github.com/prometheus/client_model/go"
 	"log"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
+	cpsecurity "github.com/iw2rmb/ploy/internal/controlplane/security"
+	"github.com/iw2rmb/ploy/internal/deploy"
+	"github.com/iw2rmb/ploy/internal/version"
+	dto "github.com/prometheus/client_model/go"
 )
 
 func (s *controlPlaneServer) handleHealth(w http.ResponseWriter, r *http.Request) {

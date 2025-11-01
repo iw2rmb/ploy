@@ -236,7 +236,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 
-		t.Run("validates manifest", func(t *testing.T) {
+	t.Run("validates manifest", func(t *testing.T) {
 		req := StartRunRequest{
 			RunID:     "run-123",
 			RepoURL:   "https://github.com/example/repo.git",

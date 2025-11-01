@@ -1,16 +1,16 @@
 package httpserver
 
 import (
-    "encoding/json"
-    "errors"
-    "net/http"
-    "strings"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
 
-    "github.com/jackc/pgx/v5"
-    "github.com/jackc/pgx/v5/pgconn"
-    "github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
-    "github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 const maxIngestionPayloadSize = 1 << 20 // 1 MiB (binary payload cap)
@@ -96,11 +96,11 @@ func (s *controlPlaneServer) handleRunsDiffs(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-    var req CreateDiffRequest
-    if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
-        writeError(w, http.StatusBadRequest, err)
-        return
-    }
+	var req CreateDiffRequest
+	if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	// Enforce 1 MiB size constraint
 	if len(req.Patch) > maxIngestionPayloadSize {
@@ -168,11 +168,11 @@ func (s *controlPlaneServer) handleRunsLogs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-    var req CreateLogRequest
-    if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
-        writeError(w, http.StatusBadRequest, err)
-        return
-    }
+	var req CreateLogRequest
+	if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	// Enforce 1 MiB size constraint
 	if len(req.Data) > maxIngestionPayloadSize {
@@ -205,20 +205,20 @@ func (s *controlPlaneServer) handleRunsLogs(w http.ResponseWriter, r *http.Reque
 		ChunkNo: req.ChunkNo,
 		Data:    req.Data,
 	})
-    if err != nil {
-        // Database size constraint
-        if isConstraintError(err, "logs_chunk_size_cap") {
-            writeErrorMessage(w, http.StatusRequestEntityTooLarge, "log data exceeds database size limit")
-            return
-        }
-        // Unique chunk per (run,stage,build,chunk_no)
-        if isUniqueViolation(err, "logs_run_stage_build_chunk_uniq") {
-            writeErrorMessage(w, http.StatusConflict, "log chunk already exists")
-            return
-        }
-        writeError(w, http.StatusInternalServerError, err)
-        return
-    }
+	if err != nil {
+		// Database size constraint
+		if isConstraintError(err, "logs_chunk_size_cap") {
+			writeErrorMessage(w, http.StatusRequestEntityTooLarge, "log data exceeds database size limit")
+			return
+		}
+		// Unique chunk per (run,stage,build,chunk_no)
+		if isUniqueViolation(err, "logs_run_stage_build_chunk_uniq") {
+			writeErrorMessage(w, http.StatusConflict, "log chunk already exists")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 
 	writeJSON(w, http.StatusCreated, logDTOFrom(logChunk))
 }
@@ -247,11 +247,11 @@ func (s *controlPlaneServer) handleRunsArtifactBundles(w http.ResponseWriter, r 
 		return
 	}
 
-    var req CreateArtifactBundleRequest
-    if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
-        writeError(w, http.StatusBadRequest, err)
-        return
-    }
+	var req CreateArtifactBundleRequest
+	if err := decodeJSONWithLimit(r, &req, maxIngestionJSONBodySize); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 
 	// Enforce 1 MiB size constraint
 	if len(req.Bundle) > maxIngestionPayloadSize {
@@ -354,39 +354,39 @@ func artifactBundleDTOFrom(bundle store.ArtifactBundle) ArtifactBundleDTO {
 
 // isConstraintError checks if the error is a PostgreSQL constraint violation for the given constraint name.
 func isConstraintError(err error, constraintName string) bool {
-    if err == nil || strings.TrimSpace(constraintName) == "" {
-        return false
-    }
-    var pgErr *pgconn.PgError
-    if errors.As(err, &pgErr) {
-        return pgErr.ConstraintName == constraintName
-    }
-    // Fallback to substring match for non-pg errors in tests/mocks
-    return strings.Contains(strings.ToLower(err.Error()), strings.ToLower(constraintName))
+	if err == nil || strings.TrimSpace(constraintName) == "" {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.ConstraintName == constraintName
+	}
+	// Fallback to substring match for non-pg errors in tests/mocks
+	return strings.Contains(strings.ToLower(err.Error()), strings.ToLower(constraintName))
 }
 
 // isUniqueViolation reports a unique constraint/index violation optionally matching a specific constraint/index name.
 func isUniqueViolation(err error, constraintName string) bool {
-    if err == nil {
-        return false
-    }
-    var pgErr *pgconn.PgError
-    if errors.As(err, &pgErr) {
-        if pgErr.Code == "23505" { // unique_violation
-            if strings.TrimSpace(constraintName) == "" {
-                return true
-            }
-            return pgErr.ConstraintName == constraintName
-        }
-        return false
-    }
-    // Fallback for mock errors: look for words "duplicate" and "unique"
-    lower := strings.ToLower(err.Error())
-    if strings.Contains(lower, "duplicate") && strings.Contains(lower, "unique") {
-        if strings.TrimSpace(constraintName) == "" {
-            return true
-        }
-        return strings.Contains(lower, strings.ToLower(constraintName))
-    }
-    return false
+	if err == nil {
+		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23505" { // unique_violation
+			if strings.TrimSpace(constraintName) == "" {
+				return true
+			}
+			return pgErr.ConstraintName == constraintName
+		}
+		return false
+	}
+	// Fallback for mock errors: look for words "duplicate" and "unique"
+	lower := strings.ToLower(err.Error())
+	if strings.Contains(lower, "duplicate") && strings.Contains(lower, "unique") {
+		if strings.TrimSpace(constraintName) == "" {
+			return true
+		}
+		return strings.Contains(lower, strings.ToLower(constraintName))
+	}
+	return false
 }

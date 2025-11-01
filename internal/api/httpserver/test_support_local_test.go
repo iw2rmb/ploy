@@ -2,11 +2,12 @@ package httpserver_test
 
 import (
 	"context"
-	"github.com/iw2rmb/ploy/internal/api/config"
-	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/api/config"
+	workflowartifacts "github.com/iw2rmb/ploy/internal/workflow/artifacts"
 )
 
 // loadConfig writes the given YAML to a temp file and loads it via the config loader.

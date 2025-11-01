@@ -1,11 +1,17 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+	"time"
+
+	"github.com/iw2rmb/ploy/internal/deploy"
+	"github.com/iw2rmb/ploy/internal/pki"
 )
 
 func handleServer(args []string, stderr io.Writer) error {
@@ -30,12 +36,12 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		address      stringValue
+		address       stringValue
 		postgresqlDSN stringValue
-		identity     stringValue
-		userFlag     stringValue
-		ploydBin     stringValue
-		sshPort      intValue
+		identity      stringValue
+		userFlag      stringValue
+		ploydBin      stringValue
+		sshPort       intValue
 	)
 
 	fs.Var(&address, "address", "Target host or IP address for server deployment")
@@ -53,10 +59,10 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		printServerDeployUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
-    if !address.set || strings.TrimSpace(address.value) == "" {
-        printServerDeployUsage(stderr)
-        return errors.New("address is required")
-    }
+	if !address.set || strings.TrimSpace(address.value) == "" {
+		printServerDeployUsage(stderr)
+		return errors.New("address is required")
+	}
 
 	serverCfg := serverDeployConfig{
 		Address:       address.value,
@@ -88,17 +94,118 @@ type serverDeployConfig struct {
 }
 
 func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
-	// TODO: Implement server deployment logic.
-	// This should:
-	// 1. Install ployd-server binary on target host via SSH
-	// 2. Generate cluster CA and issue server TLS certificate
-	// 3. Create cluster_id and persist it in Postgres and on disk
-	// 4. If PostgreSQLDSN is empty, install PostgreSQL locally and create 'ploy' database
-	// 5. Bootstrap ployd-server systemd unit with PLOY_SERVER_PG_DSN
-	// 6. Store cluster descriptor locally for CLI access
+	if stderr == nil {
+		stderr = os.Stderr
+	}
+	ctx := context.Background()
 
-	_, _ = fmt.Fprintf(stderr, "server deploy: address=%s postgresql-dsn=%s\n", cfg.Address, cfg.PostgreSQLDSN)
-	_, _ = fmt.Fprintln(stderr, "Server deployment is not yet implemented.")
-	_, _ = fmt.Fprintln(stderr, "TODO: Install ployd-server, generate CA, create cluster, configure PostgreSQL.")
-	return errors.New("server deploy not yet implemented")
+	// Resolve default paths
+	identityPath, err := resolveIdentityPath(stringValue{set: cfg.IdentityFile != "", value: cfg.IdentityFile})
+	if err != nil {
+		return fmt.Errorf("server deploy: %w", err)
+	}
+
+	ploydBinaryPath, err := resolvePloydBinaryPath(stringValue{set: cfg.PloydBinary != "", value: cfg.PloydBinary})
+	if err != nil {
+		return fmt.Errorf("server deploy: %w", err)
+	}
+
+	user := cfg.User
+	if strings.TrimSpace(user) == "" {
+		user = deploy.DefaultRemoteUser
+	}
+
+	sshPort := cfg.SSHPort
+	if sshPort == 0 {
+		sshPort = deploy.DefaultSSHPort
+	}
+
+	_, _ = fmt.Fprintf(stderr, "Deploying Ploy server to %s\n", cfg.Address)
+	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
+	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
+	_, _ = fmt.Fprintf(stderr, "  Identity: %s\n", identityPath)
+	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydBinaryPath)
+
+	// Generate cluster ID
+	clusterID, err := deploy.GenerateClusterID()
+	if err != nil {
+		return fmt.Errorf("server deploy: %w", err)
+	}
+	_, _ = fmt.Fprintf(stderr, "Generated cluster ID: %s\n", clusterID)
+
+	// Generate cluster CA and server certificate
+	_, _ = fmt.Fprintln(stderr, "Generating cluster CA and server certificate...")
+	now := time.Now()
+	ca, err := pki.GenerateCA(clusterID, now)
+	if err != nil {
+		return fmt.Errorf("server deploy: generate CA: %w", err)
+	}
+
+	serverCert, err := pki.IssueServerCert(ca, clusterID, cfg.Address, now)
+	if err != nil {
+		return fmt.Errorf("server deploy: issue server cert: %w", err)
+	}
+	_, _ = fmt.Fprintln(stderr, "CA and server certificate generated")
+
+	// Determine PostgreSQL DSN
+	pgDSN := strings.TrimSpace(cfg.PostgreSQLDSN)
+	installPostgres := pgDSN == ""
+
+	if installPostgres {
+		_, _ = fmt.Fprintln(stderr, "No PostgreSQL DSN provided; will install PostgreSQL on target host")
+		// The DSN will be constructed by the bootstrap script after installing PostgreSQL
+		pgDSN = "host=/var/run/postgresql user=ploy dbname=ploy sslmode=disable"
+	} else {
+		_, _ = fmt.Fprintf(stderr, "Using provided PostgreSQL DSN\n")
+	}
+
+	// Prepare environment variables for bootstrap script
+	scriptEnv := map[string]string{
+		"CLUSTER_ID":              clusterID,
+		"NODE_ID":                 "control",
+		"NODE_ADDRESS":            cfg.Address,
+		"BOOTSTRAP_PRIMARY":       "true",
+		"PLOY_SERVER_PG_DSN":      pgDSN,
+		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
+		"PLOY_CA_CERT_PEM":        ca.CertPEM,
+		"PLOY_CA_KEY_PEM":         ca.KeyPEM,
+		"PLOY_SERVER_CERT_PEM":    serverCert.CertPEM,
+		"PLOY_SERVER_KEY_PEM":     serverCert.KeyPEM,
+	}
+
+	// Provision the server host
+	_, _ = fmt.Fprintln(stderr, "Installing ployd binary and bootstrapping server...")
+	provisionOpts := deploy.ProvisionOptions{
+		Host:            cfg.Address,
+		Address:         cfg.Address,
+		User:            user,
+		Port:            sshPort,
+		IdentityFile:    identityPath,
+		PloydBinaryPath: ploydBinaryPath,
+		Stdout:          os.Stdout,
+		Stderr:          stderr,
+		ScriptEnv:       scriptEnv,
+		ScriptArgs:      []string{"--cluster-id", clusterID, "--node-id", "control", "--node-address", cfg.Address, "--primary"},
+		ServiceChecks:   []string{"ployd"},
+	}
+
+	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
+		return fmt.Errorf("server deploy: provision host: %w", err)
+	}
+
+	_, _ = fmt.Fprintln(stderr, "\nServer deployment complete!")
+	_, _ = fmt.Fprintf(stderr, "Cluster ID: %s\n", clusterID)
+	_, _ = fmt.Fprintf(stderr, "Server address: https://%s:8443\n", cfg.Address)
+	_, _ = fmt.Fprintln(stderr, "\nNext steps:")
+	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes with: ploy node add --cluster-id %s --address <node-address>\n", clusterID)
+	_, _ = fmt.Fprintln(stderr, "  2. Configure your local environment to point to this server")
+
+	return nil
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }

@@ -102,6 +102,15 @@ Environment=PLOY_LIFECYCLE_NET_IGNORE=${lifecycle_ignore}
 Environment=DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
 Environment=DOCKERHUB_PAT=${DOCKERHUB_PAT}
 ENV
+
+  # Add PostgreSQL DSN for server mode
+  if [[ -n "${PLOY_SERVER_PG_DSN:-}" ]]; then
+    cat >>"${env_dir}/env.conf" <<PGENV
+# PostgreSQL connection for server mode
+Environment=PLOY_SERVER_PG_DSN=${PLOY_SERVER_PG_DSN}
+PGENV
+    log "configured PostgreSQL DSN for server mode"
+  fi
 }
 
 start_ployd_service() {

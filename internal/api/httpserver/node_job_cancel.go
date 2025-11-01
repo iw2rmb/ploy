@@ -1,8 +1,9 @@
 package httpserver
 
 import (
-	"github.com/gofiber/fiber/v2"
 	"strings"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 // handleNodeJobCancel serves POST /v1/node/jobs/:jobID/cancel.
