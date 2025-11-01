@@ -204,6 +204,14 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	gateExecutor := step.NewGateExecutor()
 
+	// Create log streamer to stream logs as gzipped chunks to the server.
+	logStreamer := NewLogStreamer(r.cfg, req.RunID, "")
+	defer func() {
+		if closeErr := logStreamer.Close(); closeErr != nil {
+			slog.Warn("failed to close log streamer", "run_id", req.RunID, "error", closeErr)
+		}
+	}()
+
 	// Create the step runner with all components.
 	runner := step.Runner{
 		Workspace:  workspaceHydrator,
@@ -211,6 +219,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		Diffs:      diffGenerator,
 		Artifacts:  newSizeLimitedPublisher(artifactPublisher, maxArtifactSize),
 		Gate:       gateExecutor,
+		LogWriter:  logStreamer,
 	}
 
 	// Execute the step.

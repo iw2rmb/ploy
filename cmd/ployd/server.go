@@ -140,6 +140,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st), auth.RoleWorker)
 	// Register node events endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
+	// Register node logs endpoint (node agents stream gzipped log chunks).
+	httpSrv.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st), auth.RoleWorker)
 	// Register node diff upload endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/diff", createDiffHandler(st), auth.RoleWorker)
 	// Register node artifact bundle upload endpoint (node agents).
