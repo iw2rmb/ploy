@@ -122,7 +122,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [ ] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
 - [ ] Remove IPFS references and scripts (already mostly gone; sweep `scripts/` and docs).
 - [ ] Delete `cmd/ployd-node/stub.go` once default build is real (or keep under `-tags stub`).
- - [x] Consolidate exploration docs into README/SIMPLE; remove `ARCHITECTURE_DIAGRAM.md` and related (`CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`).
+- [x] Consolidate exploration docs into README/SIMPLE; remove `ARCHITECTURE_DIAGRAM.md` and related (`CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`).
 
 ## Acceptance Checklist
 - [ ] Server starts with `PLOY_SERVER_PG_DSN` and serves all documented endpoints over mTLS on `:8443`.
