@@ -133,15 +133,19 @@ configuration.
   nodes. Defaults to `/var/lib/ploy/ssh-artifacts` and is referenced by the slot guard wrapper that
   bootstrap installs.
 
-## PostgreSQL (scaffolding)
+## PostgreSQL
 
-These variables are introduced as part of the new Postgres-backed store scaffolding. They will expand as
-the control plane is wired to Postgres per ROADMAP.md.
+The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 
+- `PLOY_SERVER_PG_DSN` — Primary DSN the server reads at startup to open a PostgreSQL pool.
+  Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
+- `PLOY_POSTGRES_DSN` — Backward‑compatible alias recognized by `ployd` during the transition. Prefer
+  `PLOY_SERVER_PG_DSN` going forward.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by `internal/store` integration tests. When unset, tests
-  that require a live database are skipped. Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
-- `PLOY_SERVER_PG_DSN` — Planned control‑plane DSN for server startup and migrations (not yet wired).
-  See ROADMAP.md “Wire pgx/v5 + pgxpool in server startup; inject store via interfaces.”
+  that require a live database are skipped.
+
+Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
+precedence over the config file when both are present.
 
 ## Related Docs
 

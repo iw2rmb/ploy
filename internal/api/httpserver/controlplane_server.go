@@ -75,7 +75,7 @@ type artifactPublisher interface {
 	Fetch(ctx context.Context, cid string) (workflowartifacts.FetchResult, error)
 }
 
-// Options configure the HTTP server handlers.
+// ControlPlaneOptions configure the HTTP server handlers for the control plane.
 type ControlPlaneOptions struct {
 	Scheduler         *scheduler.Scheduler
 	Signer            *gitlab.Signer
@@ -94,7 +94,7 @@ type ControlPlaneOptions struct {
 	Store             store.Store
 }
 
-// New returns an HTTP handler rooted at /v1.
+// NewControlPlaneHandler returns an HTTP handler rooted at /v1 for control-plane routes.
 func NewControlPlaneHandler(opts ControlPlaneOptions) http.Handler {
 	mux := http.NewServeMux()
 
