@@ -27,7 +27,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 ## API: PKI
 - [x] Implement `POST /v1/pki/sign` handler (admin-only): parse CSR, sign with cluster CA, persist node cert metadata via store.
 - [x] Return PEM bundle according to docs/api/components/schemas/pki.yaml.
-- [ ] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
+- [x] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
 
 ## API: Control (Repos/Mods/Runs)
 - [ ] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
