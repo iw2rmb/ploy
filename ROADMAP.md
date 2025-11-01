@@ -51,11 +51,11 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
     - [x] If `--postgresql-dns` is not provided, install PostgreSQL on the VPS and create DB `ploy`; derive DSN.
   - [x] `ploy node add --cluster-id --address`: install node, generate key+CSR, call `/v1/pki/sign`, record node IP, configure mTLS.
 
-- [ ] Remove legacy systems (code + scripts + docs)
-  - [ ] Purge IPFS Cluster codepaths, health checks, installers, and envs.
-  - [ ] Remove etcd clients/publishers and embedded etcd tests.
-  - [ ] Drop node labels from APIs/CLI; replace with resource-snapshot scheduling.
-  - [ ] Remove token-based auth; update OpenAPI to mTLS-only.
+- [x] Remove legacy systems (code + scripts + docs)
+  - [x] Purge IPFS Cluster codepaths, health checks, installers, and envs.
+  - [x] Remove etcd clients/publishers and embedded etcd tests.
+  - [x] Drop node labels from APIs/CLI; replace with resource-snapshot scheduling.
+  - [x] Remove token-based auth; update OpenAPI to mTLS-only.
 - [x] Remove `pkg/sshtransport` (no SSH tunnels in new architecture).
 
 - [ ] Knowledge Base (in scope)
