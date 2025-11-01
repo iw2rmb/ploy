@@ -11,7 +11,7 @@ import (
 
 type fakeRuntimeAdapter struct {
 	meta          runtime.AdapterMetadata
-    grid          runner.RuntimeClient
+	grid          runner.RuntimeClient
 	connectErr    error
 	connectCalled int
 }
@@ -43,18 +43,18 @@ func TestDefaultRuntimeFactoryUsesSelectedRuntimeAdapter(t *testing.T) {
 		t.Fatalf("register adapter: %v", err)
 	}
 
-    t.Setenv(runtimeAdapterEnv, "fake")
+	t.Setenv(runtimeAdapterEnv, "fake")
 
-    client, err := defaultRuntimeFactory()
-    if err != nil {
-        t.Fatalf("defaultRuntimeFactory: %v", err)
-    }
+	client, err := defaultRuntimeFactory()
+	if err != nil {
+		t.Fatalf("defaultRuntimeFactory: %v", err)
+	}
 	if adapter.connectCalled == 0 {
 		t.Fatalf("expected adapter Connect to be called")
 	}
-    if client != adapter.grid {
-        t.Fatalf("expected adapter runtime client to be returned")
-    }
+	if client != adapter.grid {
+		t.Fatalf("expected adapter runtime client to be returned")
+	}
 }
 
 func TestDefaultRuntimeFactoryDefaultsToLocalStep(t *testing.T) {
@@ -74,16 +74,16 @@ func TestDefaultRuntimeFactoryDefaultsToLocalStep(t *testing.T) {
 	}
 
 	t.Setenv(runtimeAdapterEnv, "")
-    client, err := defaultRuntimeFactory()
-    if err != nil {
-        t.Fatalf("defaultRuntimeFactory: %v", err)
-    }
+	client, err := defaultRuntimeFactory()
+	if err != nil {
+		t.Fatalf("defaultRuntimeFactory: %v", err)
+	}
 	if adapter.connectCalled != 1 {
 		t.Fatalf("expected local-step adapter used, calls=%d", adapter.connectCalled)
 	}
-    if client != adapter.grid {
-        t.Fatalf("expected local-step runtime client to be returned")
-    }
+	if client != adapter.grid {
+		t.Fatalf("expected local-step runtime client to be returned")
+	}
 }
 
 func TestDefaultRuntimeFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
@@ -92,9 +92,9 @@ func TestDefaultRuntimeFactoryErrorsWhenRuntimeAdapterMissing(t *testing.T) {
 	runtimeRegistry = runtime.NewRegistry()
 	// No adapters registered; resolution should fail.
 
-    t.Setenv(runtimeAdapterEnv, "unknown")
+	t.Setenv(runtimeAdapterEnv, "unknown")
 
-    _, err := defaultRuntimeFactory()
+	_, err := defaultRuntimeFactory()
 	if err == nil {
 		t.Fatalf("expected error when adapter missing")
 	}

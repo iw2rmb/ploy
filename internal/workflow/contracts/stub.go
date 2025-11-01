@@ -7,20 +7,20 @@ import (
 )
 
 type InMemoryBus struct {
-    ClaimedTickets []string
-    Checkpoints    []WorkflowCheckpoint
-    Artifacts      []WorkflowArtifact
-    tickets        []string
-    Manifest       ManifestReference
-    Repo           RepoMaterialization
+	ClaimedTickets []string
+	Checkpoints    []WorkflowCheckpoint
+	Artifacts      []WorkflowArtifact
+	tickets        []string
+	Manifest       ManifestReference
+	Repo           RepoMaterialization
 }
 
 func NewInMemoryBus() *InMemoryBus {
-    return &InMemoryBus{}
+	return &InMemoryBus{}
 }
 
 func (b *InMemoryBus) EnqueueTicket(ticketID string) {
-    b.tickets = append(b.tickets, ticketID)
+	b.tickets = append(b.tickets, ticketID)
 }
 
 func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (WorkflowTicket, error) {
@@ -34,12 +34,12 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 			trimmed = fmt.Sprintf("ticket-auto-%d", len(b.ClaimedTickets)+1)
 		}
 	}
-    b.ClaimedTickets = append(b.ClaimedTickets, trimmed)
+	b.ClaimedTickets = append(b.ClaimedTickets, trimmed)
 	manifest := b.Manifest
 	if manifest.Name == "" || manifest.Version == "" {
 		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
-    return WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: trimmed, Manifest: manifest, Repo: b.Repo}, nil
+	return WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: trimmed, Manifest: manifest, Repo: b.Repo}, nil
 }
 
 func (b *InMemoryBus) PublishCheckpoint(ctx context.Context, checkpoint WorkflowCheckpoint) error {

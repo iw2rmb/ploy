@@ -19,12 +19,12 @@ func TestClusterClientAddPublishesArtifact(t *testing.T) {
 		if r.URL.Path != "/add" {
 			t.Fatalf("expected /add path, got %s", r.URL.Path)
 		}
-        if got := r.URL.Query().Get("replication_factor_min"); got != "2" {
-            t.Fatalf("expected replication_factor_min=2, got %s", got)
-        }
-        if got := r.URL.Query().Get("replication_factor_max"); got != "3" {
-            t.Fatalf("expected replication_factor_max=3, got %s", got)
-        }
+		if got := r.URL.Query().Get("replication_factor_min"); got != "2" {
+			t.Fatalf("expected replication_factor_min=2, got %s", got)
+		}
+		if got := r.URL.Query().Get("replication_factor_max"); got != "3" {
+			t.Fatalf("expected replication_factor_max=3, got %s", got)
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatalf("read request body: %v", err)

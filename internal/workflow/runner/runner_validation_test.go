@@ -14,7 +14,7 @@ import (
 )
 
 func TestRunRequiresEventsClient(t *testing.T) {
-    opts := runner.Options{Ticket: "ticket-123", Runtime: runner.NewInMemoryGrid(), ManifestCompiler: newStubCompiler()}
+	opts := runner.Options{Ticket: "ticket-123", Runtime: runner.NewInMemoryGrid(), ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
 	if !errors.Is(err, runner.ErrEventsClientRequired) {
 		t.Fatalf("expected ErrEventsClientRequired, got %v", err)
@@ -22,20 +22,20 @@ func TestRunRequiresEventsClient(t *testing.T) {
 }
 
 func TestRunRequiresGridClient(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
-    opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
+	events := &recordingEvents{nextTicket: "ticket-123"}
+	opts := runner.Options{Ticket: "ticket-123", Events: events, ManifestCompiler: newStubCompiler()}
 	err := runner.Run(context.Background(), opts)
-    if !errors.Is(err, runner.ErrRuntimeClientRequired) {
-        t.Fatalf("expected ErrGridClientRequired, got %v", err)
-    }
+	if !errors.Is(err, runner.ErrRuntimeClientRequired) {
+		t.Fatalf("expected ErrGridClientRequired, got %v", err)
+	}
 }
 
 func TestRunRequiresManifestCompiler(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
-    opts := runner.Options{
+	events := &recordingEvents{nextTicket: "ticket-123"}
+	opts := runner.Options{
 		Ticket:          "ticket-123",
 		Events:          events,
-        Runtime:         runner.NewInMemoryGrid(),
+		Runtime:         runner.NewInMemoryGrid(),
 		Planner:         runner.NewDefaultPlanner(),
 		WorkspaceRoot:   t.TempDir(),
 		MaxStageRetries: 1,
@@ -47,12 +47,12 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPropagatesManifestCompilationError(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compilerErr := errors.New("compile failed")
-    opts := runner.Options{
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          runner.NewInMemoryGrid(),
+		Runtime:          runner.NewInMemoryGrid(),
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -65,7 +65,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPassesManifestConstraintsToGrid(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -75,11 +75,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
+	grid := &fakeRuntime{}
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -102,7 +102,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunAcceptsAllowedLaneAssignments(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -121,10 +121,10 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	grid := runner.NewInMemoryGrid()
-    opts := runner.Options{
+	opts := runner.Options{
 		Ticket:           "ticket-123",
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -137,18 +137,18 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 
 func TestRunTreatsNegativeRetriesAsZero(t *testing.T) {
 	withCleanupDeadline(t)
-events := &recordingEvents{nextTicket: "ticket-123"}
-    grid := &fakeRuntime{
+	events := &recordingEvents{nextTicket: "ticket-123"}
+	grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusFailed, Retryable: true, Message: "no more"}},
 		},
 	}
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  -3,
@@ -181,12 +181,12 @@ func TestRunErrorsWhenWorkspaceRootInvalid(t *testing.T) {
 	if err := os.WriteFile(file, []byte("lock"), 0o644); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          &fakeRuntime{},
+		Runtime:          &fakeRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    filepath.Join(file, "workspace"),
 		MaxStageRetries:  1,
@@ -199,12 +199,12 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunErrorsWhenTicketValidationFails(t *testing.T) {
-events := &recordingEvents{invalidTicket: true}
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	events := &recordingEvents{invalidTicket: true}
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          &fakeRuntime{},
+		Runtime:          &fakeRuntime{},
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

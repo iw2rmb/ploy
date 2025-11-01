@@ -27,8 +27,8 @@ const (
 
 // Build Gate result classifications recorded with job completions.
 const (
-    GateResultPassed = "passed"
-    GateResultFailed = "failed"
+	GateResultPassed = "passed"
+	GateResultFailed = "failed"
 )
 
 // JobSpec describes a job submission.
@@ -66,7 +66,7 @@ type Job struct {
 	Metadata       map[string]string
 	Artifacts      map[string]string
 	Bundles        map[string]BundleRecord
-    Gate           *GateSummary
+	Gate           *GateSummary
 	Retention      *JobRetention
 	NodeSnapshot   *JobNodeSnapshot
 	Error          *JobError
@@ -74,14 +74,14 @@ type Job struct {
 
 // GateSummary stores Build Gate execution metadata persisted with the job.
 type GateSummary struct {
-    Result   string
-    Duration time.Duration
+	Result   string
+	Duration time.Duration
 }
 
 // GateMetrics captures Build Gate execution details supplied when completing a job.
 type GateMetrics struct {
-    Result   string
-    Duration time.Duration
+	Result   string
+	Duration time.Duration
 }
 
 // ClaimRequest scopes a claim attempt.
@@ -110,7 +110,7 @@ type CompleteRequest struct {
 	Ticket     string
 	State      JobState
 	Artifacts  map[string]string
-    Gate       *GateMetrics
+	Gate       *GateMetrics
 	Error      *JobError
 	Inspection bool
 	Bundles    map[string]BundleRecord

@@ -9,7 +9,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
-    javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
+	javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
@@ -54,7 +54,7 @@ func (localRuntimeAdapter) Connect(ctx context.Context) (runner.RuntimeClient, e
 	if err != nil {
 		return nil, err
 	}
-    client, err := runtime.NewLocalStepClient(runtime.LocalStepClientOptions{Runner: executor})
+	client, err := runtime.NewLocalStepClient(runtime.LocalStepClientOptions{Runner: executor})
 	if err != nil {
 		return nil, err
 	}
@@ -81,17 +81,17 @@ func defaultStepExecutorFactory() (runtime.StepExecutor, error) {
 	if err != nil {
 		return nil, err
 	}
-    gateClient, err := newBuildGateClient()
-    if err != nil {
-        return nil, err
-    }
-    return step.Runner{
-        Workspace:  hydrator,
-        Containers: containerRuntime,
-        Diffs:      diffGenerator,
-        Gate:       gateClient,
-        Artifacts:  publisher,
-    }, nil
+	gateClient, err := newBuildGateClient()
+	if err != nil {
+		return nil, err
+	}
+	return step.Runner{
+		Workspace:  hydrator,
+		Containers: containerRuntime,
+		Diffs:      diffGenerator,
+		Gate:       gateClient,
+		Artifacts:  publisher,
+	}, nil
 }
 
 func newClusterArtifactClient() (*artifacts.ClusterClient, error) {
@@ -123,11 +123,11 @@ func parseEnvInt(name string) int {
 }
 
 func newBuildGateClient() (step.GateClient, error) {
-    executor, err := javaexec.NewExecutor(javaexec.Options{})
-    if err != nil {
-        return nil, err
-    }
-    sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
-    gateRunner := &buildgate.Runner{Sandbox: sandbox}
-    return step.NewBuildGateClient(step.BuildGateClientOptions{Runner: gateRunner})
+	executor, err := javaexec.NewExecutor(javaexec.Options{})
+	if err != nil {
+		return nil, err
+	}
+	sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
+	gateRunner := &buildgate.Runner{Sandbox: sandbox}
+	return step.NewBuildGateClient(step.BuildGateClientOptions{Runner: gateRunner})
 }

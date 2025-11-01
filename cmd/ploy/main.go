@@ -24,7 +24,7 @@ func execute(args []string, stderr io.Writer) error {
 		return errors.New("command required")
 	}
 
-    // Legacy command aliases removed; treat unknown names uniformly.
+	// Legacy command aliases removed; treat unknown names uniformly.
 
 	switch args[0] {
 	case "help":
@@ -52,7 +52,7 @@ func execute(args []string, stderr io.Writer) error {
 		return handleMods(args[1:], stderr)
 	case "jobs":
 		return handleJobs(args[1:], stderr)
-    
+
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])

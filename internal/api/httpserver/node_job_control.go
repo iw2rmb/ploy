@@ -10,7 +10,6 @@ var ErrJobNotRunning = errors.New("node: job not running")
 
 // JobController exposes controls for node-local jobs.
 type JobController interface {
-    // Cancel requests cancellation of a running job.
-    Cancel(jobID string) error
+	// Cancel requests cancellation of a running job.
+	Cancel(jobID string) error
 }
-

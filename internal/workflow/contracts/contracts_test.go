@@ -13,10 +13,10 @@ const (
 )
 
 func TestSubjectsForTenant(t *testing.T) {
-    subjects := SubjectsForTenant("", "ticket-123")
-    if subjects.TicketInbox != "" {
-        t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
-    }
+	subjects := SubjectsForTenant("", "ticket-123")
+	if subjects.TicketInbox != "" {
+		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
+	}
 	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
@@ -66,25 +66,25 @@ func TestWorkflowTicketValidate(t *testing.T) {
 		t.Fatal("expected validation error for empty ticket")
 	}
 
-    valid := WorkflowTicket{
-        SchemaVersion: SchemaVersion,
-        TicketID:      "ticket-123",
-        Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
-    }
+	valid := WorkflowTicket{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-123",
+		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
+	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("expected valid ticket, got %v", err)
 	}
 
-    withRepo := WorkflowTicket{
-        SchemaVersion: SchemaVersion,
-        TicketID:      "ticket-456",
-        Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
-        Repo: RepoMaterialization{
-            URL:       "https://gitlab.com/iw2rmb/sample.git",
-            BaseRef:   "main",
-            TargetRef: "mods/shift-grid",
-        },
-    }
+	withRepo := WorkflowTicket{
+		SchemaVersion: SchemaVersion,
+		TicketID:      "ticket-456",
+		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
+		Repo: RepoMaterialization{
+			URL:       "https://gitlab.com/iw2rmb/sample.git",
+			BaseRef:   "main",
+			TargetRef: "mods/shift-grid",
+		},
+	}
 	if err := withRepo.Validate(); err != nil {
 		t.Fatalf("expected ticket with repo to validate, got %v", err)
 	}
@@ -306,12 +306,12 @@ func TestModsPlanMetadataValidateRejectsInvalidValues(t *testing.T) {
 }
 
 func TestInMemoryBusRecordsMessages(t *testing.T) {
-    bus := NewInMemoryBus()
+	bus := NewInMemoryBus()
 	ticket, err := bus.ClaimTicket(context.Background(), "ticket-123")
 	if err != nil {
 		t.Fatalf("claim error: %v", err)
 	}
-    // tenant removed
+	// tenant removed
 	if len(bus.ClaimedTickets) != 1 {
 		t.Fatalf("expected claimed ticket to be recorded")
 	}
@@ -350,7 +350,7 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 }
 
 func TestInMemoryBusAutoTicketFallback(t *testing.T) {
-    bus := NewInMemoryBus()
+	bus := NewInMemoryBus()
 	bus.EnqueueTicket("queued-1")
 	ticket, err := bus.ClaimTicket(context.Background(), "")
 	if err != nil {

@@ -19,22 +19,22 @@ var (
 
 // StepManifest defines the execution contract for a single Mod step.
 type StepManifest struct {
-    ID         string
-    Name       string
-    Image      string
-    Command    []string
-    Args       []string
-    WorkingDir string
-    Env        map[string]string
-    Inputs     []StepInput
-    Outputs    []StepOutput
-    Artifacts  []StepArtifact
-    // Gate replaces Shift; when both are present, Gate takes precedence.
-    Gate       *StepGateSpec
-    // Deprecated: Shift is accepted for backward compatibility. Prefer Gate.
-    Shift      *StepShiftSpec
-    Resources  StepResourceSpec
-    Retention  StepRetentionSpec
+	ID         string
+	Name       string
+	Image      string
+	Command    []string
+	Args       []string
+	WorkingDir string
+	Env        map[string]string
+	Inputs     []StepInput
+	Outputs    []StepOutput
+	Artifacts  []StepArtifact
+	// Gate replaces Shift; when both are present, Gate takes precedence.
+	Gate *StepGateSpec
+	// Deprecated: Shift is accepted for backward compatibility. Prefer Gate.
+	Shift     *StepShiftSpec
+	Resources StepResourceSpec
+	Retention StepRetentionSpec
 }
 
 // StepInputMode describes how the input is mounted into the container.
@@ -72,16 +72,16 @@ type StepArtifact struct {
 
 // StepShiftSpec configures SHIFT validation post step execution.
 type StepShiftSpec struct {
-    Enabled bool
-    Profile string
-    Env     map[string]string
+	Enabled bool
+	Profile string
+	Env     map[string]string
 }
 
 // StepGateSpec configures Build Gate validation post step execution.
 type StepGateSpec struct {
-    Enabled bool
-    Profile string
-    Env     map[string]string
+	Enabled bool
+	Profile string
+	Env     map[string]string
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
@@ -190,34 +190,34 @@ func (m StepManifest) Validate() error {
 			return fmt.Errorf("%s hydration requires base snapshot, diff, or repo metadata", position)
 		}
 	}
-    // Validate Gate first (preferred), then fallback to Shift for backward compatibility.
-    if m.Gate != nil {
-        if m.Gate.Enabled || strings.TrimSpace(m.Gate.Profile) != "" {
-            if strings.TrimSpace(m.Gate.Profile) == "" {
-                return errors.New("gate profile required when enabled")
-            }
-            if len(m.Gate.Env) > 0 {
-                for key := range m.Gate.Env {
-                    if !envKeyPattern.MatchString(key) {
-                        return fmt.Errorf("gate environment key invalid: %q", key)
-                    }
-                }
-            }
-        }
-    } else if m.Shift != nil {
-        if m.Shift.Enabled || strings.TrimSpace(m.Shift.Profile) != "" {
-            if strings.TrimSpace(m.Shift.Profile) == "" {
-                return errors.New("shift profile required when enabled")
-            }
-            if len(m.Shift.Env) > 0 {
-                for key := range m.Shift.Env {
-                    if !envKeyPattern.MatchString(key) {
-                        return fmt.Errorf("shift environment key invalid: %q", key)
-                    }
-                }
-            }
-        }
-    }
+	// Validate Gate first (preferred), then fallback to Shift for backward compatibility.
+	if m.Gate != nil {
+		if m.Gate.Enabled || strings.TrimSpace(m.Gate.Profile) != "" {
+			if strings.TrimSpace(m.Gate.Profile) == "" {
+				return errors.New("gate profile required when enabled")
+			}
+			if len(m.Gate.Env) > 0 {
+				for key := range m.Gate.Env {
+					if !envKeyPattern.MatchString(key) {
+						return fmt.Errorf("gate environment key invalid: %q", key)
+					}
+				}
+			}
+		}
+	} else if m.Shift != nil {
+		if m.Shift.Enabled || strings.TrimSpace(m.Shift.Profile) != "" {
+			if strings.TrimSpace(m.Shift.Profile) == "" {
+				return errors.New("shift profile required when enabled")
+			}
+			if len(m.Shift.Env) > 0 {
+				for key := range m.Shift.Env {
+					if !envKeyPattern.MatchString(key) {
+						return fmt.Errorf("shift environment key invalid: %q", key)
+					}
+				}
+			}
+		}
+	}
 	if m.Retention.RetainContainer {
 		if strings.TrimSpace(m.Retention.TTL) == "" {
 			return errors.New("retention ttl required when retaining container")

@@ -163,7 +163,7 @@ func TestAdvisorMatchReturnsIncidentIDAndScore(t *testing.T) {
 		t.Fatalf("new advisor: %v", err)
 	}
 	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{
-        Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123"},
+		Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123"},
 		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
 	})
 	if err != nil {

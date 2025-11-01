@@ -1,14 +1,14 @@
 package httpserver
 
 import (
-    "errors"
-    "io"
-    "net/http"
-    "time"
+	"errors"
+	"io"
+	"net/http"
+	"time"
 
-    "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5"
 
-    "github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // handleRunsEvents implements Server-Sent Events (SSE) for run events.

@@ -22,8 +22,8 @@ const (
 	ArtifactKindDiff ArtifactKind = "diff"
 	// ArtifactKindLogs identifies log bundles.
 	ArtifactKindLogs ArtifactKind = "logs"
-    // ArtifactKindGateReport identifies Build Gate execution reports.
-    ArtifactKindGateReport ArtifactKind = "gate_report"
+	// ArtifactKindGateReport identifies Build Gate execution reports.
+	ArtifactKindGateReport ArtifactKind = "gate_report"
 	// ArtifactKindSnapshot identifies repository snapshot archives.
 	ArtifactKindSnapshot ArtifactKind = "snapshot"
 )

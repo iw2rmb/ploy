@@ -16,15 +16,14 @@ import (
 )
 
 type modsServerFixture struct {
-	server         *httptest.Server
-	etcd           *embed.Etcd
-	client         *clientv3.Client
-	scheduler      *scheduler.Scheduler
-	mods           *controlplanemods.Service
-	streams        *logstream.Hub
-	ctx            context.Context
-	cancel         context.CancelFunc
-    
+	server    *httptest.Server
+	etcd      *embed.Etcd
+	client    *clientv3.Client
+	scheduler *scheduler.Scheduler
+	mods      *controlplanemods.Service
+	streams   *logstream.Hub
+	ctx       context.Context
+	cancel    context.CancelFunc
 }
 
 func newModsServerFixture(t *testing.T) *modsServerFixture {
@@ -48,23 +47,22 @@ func newModsServerFixture(t *testing.T) *modsServerFixture {
 	streams := logstream.NewHub(logstream.Options{BufferSize: 8, HistorySize: 32})
 
 	handler := newTestControlPlaneHandler(t, httpserver.ControlPlaneOptions{
-		Scheduler:         sched,
-		Etcd:              client,
-		Mods:              service,
-		Streams:           streams,
+		Scheduler: sched,
+		Etcd:      client,
+		Mods:      service,
+		Streams:   streams,
 	})
 	server := httptest.NewServer(handler)
 
 	fixture := &modsServerFixture{
-		server:         server,
-		etcd:           etcd,
-		client:         client,
-		scheduler:      sched,
-		mods:           service,
-		streams:        streams,
-		ctx:            ctx,
-		cancel:         cancel,
-		
+		server:    server,
+		etcd:      etcd,
+		client:    client,
+		scheduler: sched,
+		mods:      service,
+		streams:   streams,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 
 	t.Cleanup(func() {

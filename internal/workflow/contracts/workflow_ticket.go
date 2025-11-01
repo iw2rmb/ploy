@@ -6,10 +6,10 @@ import (
 )
 
 type WorkflowTicket struct {
-    SchemaVersion string              `json:"schema_version"`
-    TicketID      string              `json:"ticket_id"`
-    Manifest      ManifestReference   `json:"manifest"`
-    Repo          RepoMaterialization `json:"repo,omitempty"`
+	SchemaVersion string              `json:"schema_version"`
+	TicketID      string              `json:"ticket_id"`
+	Manifest      ManifestReference   `json:"manifest"`
+	Repo          RepoMaterialization `json:"repo,omitempty"`
 }
 
 func (t WorkflowTicket) Validate() error {

@@ -1,13 +1,13 @@
 package httpserver
 
 import (
-    "errors"
-    "net/http"
-    "strings"
+	"errors"
+	"net/http"
+	"strings"
 
-    "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5"
 
-    "github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // handleModsCRUD handles collection-level CRUD operations for /v1/mods (not tickets).

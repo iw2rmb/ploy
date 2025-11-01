@@ -22,19 +22,19 @@ import (
 	"github.com/iw2rmb/ploy/internal/node/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/artifacts"
 	"github.com/iw2rmb/ploy/internal/workflow/buildgate"
-    javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
+	javaexec "github.com/iw2rmb/ploy/internal/workflow/buildgate/javaexec"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	stepruntime "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 const (
-    envClusterURL     = "PLOY_IPFS_CLUSTER_API"
-    envClusterToken   = "PLOY_IPFS_CLUSTER_TOKEN"
-    envClusterUser    = "PLOY_IPFS_CLUSTER_USERNAME"
-    envClusterPass    = "PLOY_IPFS_CLUSTER_PASSWORD"
-    envClusterReplMin = "PLOY_IPFS_CLUSTER_REPL_MIN"
-    envClusterReplMax = "PLOY_IPFS_CLUSTER_REPL_MAX"
-    envClusterLocal   = "PLOY_IPFS_CLUSTER_LOCAL"
+	envClusterURL     = "PLOY_IPFS_CLUSTER_API"
+	envClusterToken   = "PLOY_IPFS_CLUSTER_TOKEN"
+	envClusterUser    = "PLOY_IPFS_CLUSTER_USERNAME"
+	envClusterPass    = "PLOY_IPFS_CLUSTER_PASSWORD"
+	envClusterReplMin = "PLOY_IPFS_CLUSTER_REPL_MIN"
+	envClusterReplMax = "PLOY_IPFS_CLUSTER_REPL_MAX"
+	envClusterLocal   = "PLOY_IPFS_CLUSTER_LOCAL"
 )
 
 // stepRunner abstracts the step runtime runner for testability.
@@ -44,18 +44,18 @@ type stepRunner interface {
 
 // Executor executes control-plane assignments using the step runner pipeline.
 type Executor struct {
-    runner  stepRunner
-    streams *logstream.Hub
-    jobs    *jobs.Store
-    now     func() time.Time
+	runner  stepRunner
+	streams *logstream.Hub
+	jobs    *jobs.Store
+	now     func() time.Time
 }
 
 // Options configures the executor.
 type Options struct {
-    Runner  stepRunner
-    Streams *logstream.Hub
-    Jobs    *jobs.Store
-    Clock   func() time.Time
+	Runner  stepRunner
+	Streams *logstream.Hub
+	Jobs    *jobs.Store
+	Clock   func() time.Time
 }
 
 // New constructs an executor from the provided options.
@@ -70,12 +70,12 @@ func New(opts Options) (*Executor, error) {
 	if clock == nil {
 		clock = time.Now
 	}
-    return &Executor{
-        runner:  opts.Runner,
-        streams: opts.Streams,
-        jobs:    opts.Jobs,
-        now:     clock,
-    }, nil
+	return &Executor{
+		runner:  opts.Runner,
+		streams: opts.Streams,
+		jobs:    opts.Jobs,
+		now:     clock,
+	}, nil
 }
 
 // FromConfig assembles a step executor using daemon configuration.
@@ -87,30 +87,30 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 
 	artifactFetcher := &clusterFetcher{client: clusterClient}
 
-    // Prefer local-only pinning when explicitly requested to reduce
-    // cross-peer failures in unstable clusters.
-    localPin := strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "1") ||
-        strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "true")
+	// Prefer local-only pinning when explicitly requested to reduce
+	// cross-peer failures in unstable clusters.
+	localPin := strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "1") ||
+		strings.EqualFold(resolveConfigString(cfg, envClusterLocal), "true")
 
-    publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
-        Client: clusterClient,
-        Local:  localPin,
-    })
-    if err != nil {
-        return nil, fmt.Errorf("stepworker: cluster publisher: %w", err)
-    }
+	publisher, err := artifacts.NewClusterPublisher(artifacts.ClusterPublisherOptions{
+		Client: clusterClient,
+		Local:  localPin,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("stepworker: cluster publisher: %w", err)
+	}
 
-    // Allow disabling artifact publication entirely (diff/log/gate) when the
-    // backing store is unhealthy. When disabled, artifacts are not uploaded
-    // and runs rely solely on live logs.
-    publishArtifacts := true
-    if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_ARTIFACT_PUBLISH")); v != "" {
-        publishArtifacts = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
-    }
-    var artifactPublisher stepruntime.ArtifactPublisher
-    if publishArtifacts {
-        artifactPublisher = publisher
-    }
+	// Allow disabling artifact publication entirely (diff/log/gate) when the
+	// backing store is unhealthy. When disabled, artifacts are not uploaded
+	// and runs rely solely on live logs.
+	publishArtifacts := true
+	if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_ARTIFACT_PUBLISH")); v != "" {
+		publishArtifacts = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
+	}
+	var artifactPublisher stepruntime.ArtifactPublisher
+	if publishArtifacts {
+		artifactPublisher = publisher
+	}
 
 	var tokenSource hydration.TokenSource
 	if httpClient != nil {
@@ -129,16 +129,16 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		}
 	}
 
-    // Allow turning off snapshot publish to work around unstable IPFS clusters.
-    publishSnapshots := true
-    if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_HYDRATION_PUBLISH_SNAPSHOT")); v != "" {
-        publishSnapshots = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
-    }
-    repoFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
-        Publisher:       publisher,
-        TokenSource:     tokenSource,
-        PublishSnapshot: publishSnapshots,
-    })
+	// Allow turning off snapshot publish to work around unstable IPFS clusters.
+	publishSnapshots := true
+	if v := strings.TrimSpace(resolveConfigString(cfg, "PLOY_HYDRATION_PUBLISH_SNAPSHOT")); v != "" {
+		publishSnapshots = strings.EqualFold(v, "1") || strings.EqualFold(v, "true")
+	}
+	repoFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
+		Publisher:       publisher,
+		TokenSource:     tokenSource,
+		PublishSnapshot: publishSnapshots,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("stepworker: git fetcher: %w", err)
 	}
@@ -161,25 +161,25 @@ func FromConfig(cfg config.Config, streams *logstream.Hub, httpClient *http.Clie
 		return nil, fmt.Errorf("stepworker: docker runtime: %w", err)
 	}
 
-    gateClient, err := newGateClient()
+	gateClient, err := newGateClient()
 	if err != nil {
 		return nil, err
 	}
 
-    runner := &stepruntime.Runner{
-        Workspace:  hydrator,
-        Containers: containerRuntime,
-        Diffs:      diffGen,
-        Gate:       gateClient,
-        Artifacts:  artifactPublisher,
-        Streams:    streams,
-    }
+	runner := &stepruntime.Runner{
+		Workspace:  hydrator,
+		Containers: containerRuntime,
+		Diffs:      diffGen,
+		Gate:       gateClient,
+		Artifacts:  artifactPublisher,
+		Streams:    streams,
+	}
 
-    return New(Options{
-        Runner:  runner,
-        Streams: streams,
-        Jobs:    jobStore,
-    })
+	return New(Options{
+		Runner:  runner,
+		Streams: streams,
+		Jobs:    jobStore,
+	})
 }
 
 // Execute runs the assignment manifest through the step runtime.
@@ -198,86 +198,86 @@ func (e *Executor) Execute(ctx context.Context, assignment controlplane.Assignme
 	if streamID == "" {
 		return zero, errors.New("stepworker: assignment id required")
 	}
-    if e.streams != nil {
-        e.streams.Ensure(streamID)
-    }
+	if e.streams != nil {
+		e.streams.Ensure(streamID)
+	}
 
-    if e.jobs != nil {
-        e.jobs.Start(streamID)
-    }
+	if e.jobs != nil {
+		e.jobs.Start(streamID)
+	}
 
-    req := stepruntime.Request{
+	req := stepruntime.Request{
 		Manifest:    manifest,
 		LogStreamID: streamID,
 	}
 
-    // Mirror job logs into the Mods ticket stream when available so
-    // `/v1/mods/{ticket}/logs/stream` can aggregate without extra plumbing.
-    result, runErr := func() (stepruntime.Result, error) {
-        if r, ok := e.runner.(*stepruntime.Runner); ok && strings.TrimSpace(assignment.Ticket) != "" && e.streams != nil {
-            // Shallow copy the runner and override the Streams publisher
-            // with a dual publisher that forwards to both job and ticket streams.
-            cloned := *r
-            cloned.Streams = dualPublisher{hub: e.streams, ticket: strings.TrimSpace(assignment.Ticket)}
-            return cloned.Run(ctx, req)
-        }
-        return e.runner.Run(ctx, req)
-    }()
+	// Mirror job logs into the Mods ticket stream when available so
+	// `/v1/mods/{ticket}/logs/stream` can aggregate without extra plumbing.
+	result, runErr := func() (stepruntime.Result, error) {
+		if r, ok := e.runner.(*stepruntime.Runner); ok && strings.TrimSpace(assignment.Ticket) != "" && e.streams != nil {
+			// Shallow copy the runner and override the Streams publisher
+			// with a dual publisher that forwards to both job and ticket streams.
+			cloned := *r
+			cloned.Streams = dualPublisher{hub: e.streams, ticket: strings.TrimSpace(assignment.Ticket)}
+			return cloned.Run(ctx, req)
+		}
+		return e.runner.Run(ctx, req)
+	}()
 
-    assignmentResult := e.buildResult(manifest, result, runErr)
+	assignmentResult := e.buildResult(manifest, result, runErr)
 
-    if e.jobs != nil {
-        state := jobs.StateSucceeded
-        if runErr != nil {
-            state = jobs.StateFailed
-        }
-        msg := ""
-        if runErr != nil {
-            msg = runErr.Error()
-        }
-        e.jobs.Complete(streamID, state, msg)
-    }
-    return assignmentResult, runErr
+	if e.jobs != nil {
+		state := jobs.StateSucceeded
+		if runErr != nil {
+			state = jobs.StateFailed
+		}
+		msg := ""
+		if runErr != nil {
+			msg = runErr.Error()
+		}
+		e.jobs.Complete(streamID, state, msg)
+	}
+	return assignmentResult, runErr
 }
 
 // dualPublisher mirrors logstream events to the job stream (as requested)
 // and to the Mods ticket stream, enabling aggregated ticket-level tails.
 type dualPublisher struct {
-    hub    *logstream.Hub
-    ticket string
+	hub    *logstream.Hub
+	ticket string
 }
 
 func (d dualPublisher) PublishLog(ctx context.Context, streamID string, record logstream.LogRecord) error {
-    if d.hub == nil {
-        return nil
-    }
-    _ = d.hub.PublishLog(ctx, streamID, record)
-    if t := strings.TrimSpace(d.ticket); t != "" {
-        _ = d.hub.PublishLog(ctx, t, record)
-    }
-    return nil
+	if d.hub == nil {
+		return nil
+	}
+	_ = d.hub.PublishLog(ctx, streamID, record)
+	if t := strings.TrimSpace(d.ticket); t != "" {
+		_ = d.hub.PublishLog(ctx, t, record)
+	}
+	return nil
 }
 
 func (d dualPublisher) PublishRetention(ctx context.Context, streamID string, hint logstream.RetentionHint) error {
-    if d.hub == nil {
-        return nil
-    }
-    _ = d.hub.PublishRetention(ctx, streamID, hint)
-    if t := strings.TrimSpace(d.ticket); t != "" {
-        _ = d.hub.PublishRetention(ctx, t, hint)
-    }
-    return nil
+	if d.hub == nil {
+		return nil
+	}
+	_ = d.hub.PublishRetention(ctx, streamID, hint)
+	if t := strings.TrimSpace(d.ticket); t != "" {
+		_ = d.hub.PublishRetention(ctx, t, hint)
+	}
+	return nil
 }
 
 func (d dualPublisher) PublishStatus(ctx context.Context, streamID string, status logstream.Status) error {
-    if d.hub == nil {
-        return nil
-    }
-    _ = d.hub.PublishStatus(ctx, streamID, status)
-    if t := strings.TrimSpace(d.ticket); t != "" {
-        _ = d.hub.PublishStatus(ctx, t, status)
-    }
-    return nil
+	if d.hub == nil {
+		return nil
+	}
+	_ = d.hub.PublishStatus(ctx, streamID, status)
+	if t := strings.TrimSpace(d.ticket); t != "" {
+		_ = d.hub.PublishStatus(ctx, t, status)
+	}
+	return nil
 }
 
 // buildResult converts the step runtime result into an assignment result payload.
@@ -338,35 +338,35 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		}
 		bundles["diff"] = record
 	}
-        if cid := strings.TrimSpace(runResult.GateArtifact.CID); cid != "" {
-            artifacts["gate_report_cid"] = cid
-            artifacts["gate_report_digest"] = strings.TrimSpace(runResult.GateArtifact.Digest)
-            bundle := scheduler.BundleRecord{
-                CID:    cid,
-                Digest: strings.TrimSpace(runResult.GateArtifact.Digest),
-                Size:   runResult.GateArtifact.Size,
-            }
-            if logTTL != "" {
-                bundle.TTL = logTTL
-                if duration, err := time.ParseDuration(logTTL); err == nil && duration > 0 {
-                    bundle.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
-                }
-            }
-            bundles["gate_report"] = bundle
-        }
+	if cid := strings.TrimSpace(runResult.GateArtifact.CID); cid != "" {
+		artifacts["gate_report_cid"] = cid
+		artifacts["gate_report_digest"] = strings.TrimSpace(runResult.GateArtifact.Digest)
+		bundle := scheduler.BundleRecord{
+			CID:    cid,
+			Digest: strings.TrimSpace(runResult.GateArtifact.Digest),
+			Size:   runResult.GateArtifact.Size,
+		}
+		if logTTL != "" {
+			bundle.TTL = logTTL
+			if duration, err := time.ParseDuration(logTTL); err == nil && duration > 0 {
+				bundle.ExpiresAt = now.Add(duration).UTC().Format(time.RFC3339Nano)
+			}
+		}
+		bundles["gate_report"] = bundle
+	}
 
-        var gateMetrics *scheduler.GateMetrics
-        if runResult.GateReport.Duration > 0 || runResult.GateReport.Message != "" || !runResult.GateReport.Passed {
-            metrics := scheduler.GateMetrics{
-                Duration: runResult.GateReport.Duration,
-            }
-            if runResult.GateReport.Passed {
-                metrics.Result = scheduler.GateResultPassed
-            } else {
-                metrics.Result = scheduler.GateResultFailed
-            }
-            gateMetrics = &metrics
-        }
+	var gateMetrics *scheduler.GateMetrics
+	if runResult.GateReport.Duration > 0 || runResult.GateReport.Message != "" || !runResult.GateReport.Passed {
+		metrics := scheduler.GateMetrics{
+			Duration: runResult.GateReport.Duration,
+		}
+		if runResult.GateReport.Passed {
+			metrics.Result = scheduler.GateResultPassed
+		} else {
+			metrics.Result = scheduler.GateResultFailed
+		}
+		gateMetrics = &metrics
+	}
 
 	retentionHint := buildRetentionHint(runResult, manifest.Retention, logTTL, now)
 
@@ -375,9 +375,9 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		reason := "executor_error"
 		if errors.Is(runErr, context.Canceled) {
 			reason = "executor_canceled"
-            } else if errors.Is(runErr, stepruntime.ErrBuildGateFailed) {
-                reason = "build_gate_failed"
-            }
+		} else if errors.Is(runErr, stepruntime.ErrBuildGateFailed) {
+			reason = "build_gate_failed"
+		}
 		message := runErr.Error()
 		if strings.TrimSpace(message) == "" {
 			message = reason
@@ -393,10 +393,10 @@ func (e *Executor) buildResult(manifest contracts.StepManifest, runResult stepru
 		Error:      assignErr,
 		Artifacts:  artifacts,
 		Bundles:    bundles,
-            Gate:       gateMetrics,
-            Inspection: manifest.Retention.RetainContainer && runErr != nil,
-            Retention:  retentionHint,
-        }
+		Gate:       gateMetrics,
+		Inspection: manifest.Retention.RetainContainer && runErr != nil,
+		Retention:  retentionHint,
+	}
 }
 
 func firstHydrationSnapshot(snapshots map[string]stepruntime.PublishedArtifact) (stepruntime.PublishedArtifact, bool) {
@@ -491,15 +491,15 @@ func newClusterClient(cfg config.Config) (*artifacts.ClusterClient, error) {
 
 // newGateClient builds a Build Gate client backed by the default sandbox runner.
 func newGateClient() (stepruntime.GateClient, error) {
-    executor, err := javaexec.NewExecutor(javaexec.Options{})
-    if err != nil {
-        return nil, err
-    }
-    sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
-    gateRunner := &buildgate.Runner{
-        Sandbox: sandbox,
-    }
-    return stepruntime.NewBuildGateClient(stepruntime.BuildGateClientOptions{Runner: gateRunner})
+	executor, err := javaexec.NewExecutor(javaexec.Options{})
+	if err != nil {
+		return nil, err
+	}
+	sandbox := buildgate.NewSandboxRunner(executor, buildgate.SandboxRunnerOptions{})
+	gateRunner := &buildgate.Runner{
+		Sandbox: sandbox,
+	}
+	return stepruntime.NewBuildGateClient(stepruntime.BuildGateClientOptions{Runner: gateRunner})
 }
 
 // resolveConfigString prefers config overrides before falling back to process env.

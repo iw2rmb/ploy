@@ -1,40 +1,40 @@
 package main
 
 import (
-    "context"
-    "flag"
-    "encoding/json"
-    "log"
-    "os"
-    "os/signal"
-    "syscall"
-    "time"
+	"context"
+	"encoding/json"
+	"flag"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-    "github.com/iw2rmb/ploy/internal/api/config"
-    "github.com/iw2rmb/ploy/internal/api/daemon"
-    "github.com/iw2rmb/ploy/internal/node/lifecycle"
+	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/daemon"
+	"github.com/iw2rmb/ploy/internal/node/lifecycle"
 )
 
 func main() {
-    if len(os.Args) > 1 {
-        switch os.Args[1] {
-        case "bootstrap-ca":
-            if err := runBootstrapCA(os.Args[2:]); err != nil {
-                log.Fatalf("bootstrap-ca: %v", err)
-            }
-            return
-        case "slot-guard":
-            if err := runSlotGuard(os.Args[2:]); err != nil {
-                log.Fatalf("slot-guard: %v", err)
-            }
-            return
-        case "status-snapshot":
-            if err := runStatusSnapshot(os.Args[2:]); err != nil {
-                log.Fatalf("status-snapshot: %v", err)
-            }
-            return
-        }
-    }
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "bootstrap-ca":
+			if err := runBootstrapCA(os.Args[2:]); err != nil {
+				log.Fatalf("bootstrap-ca: %v", err)
+			}
+			return
+		case "slot-guard":
+			if err := runSlotGuard(os.Args[2:]); err != nil {
+				log.Fatalf("slot-guard: %v", err)
+			}
+			return
+		case "status-snapshot":
+			if err := runStatusSnapshot(os.Args[2:]); err != nil {
+				log.Fatalf("status-snapshot: %v", err)
+			}
+			return
+		}
+	}
 	var configPath string
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd.yaml", "Path to ployd configuration")
 	flag.Parse()
@@ -82,35 +82,35 @@ func main() {
 
 // runStatusSnapshot collects a one-shot lifecycle snapshot and prints it as JSON.
 func runStatusSnapshot(args []string) error {
-    fs := flag.NewFlagSet("status-snapshot", flag.ContinueOnError)
-    role := fs.String("role", "worker", "Node role")
-    nodeID := fs.String("node-id", "", "Node identifier")
-    samples := fs.Int("samples", 1, "Number of samples to collect")
-    interval := fs.Duration("interval", 2*time.Second, "Interval between samples")
-    _ = fs.Parse(args)
+	fs := flag.NewFlagSet("status-snapshot", flag.ContinueOnError)
+	role := fs.String("role", "worker", "Node role")
+	nodeID := fs.String("node-id", "", "Node identifier")
+	samples := fs.Int("samples", 1, "Number of samples to collect")
+	interval := fs.Duration("interval", 2*time.Second, "Interval between samples")
+	_ = fs.Parse(args)
 
-    if *samples < 1 {
-        *samples = 1
-    }
+	if *samples < 1 {
+		*samples = 1
+	}
 
-    collector := lifecycle.NewCollector(lifecycle.Options{
-        Role:   *role,
-        NodeID: *nodeID,
-    })
-    enc := json.NewEncoder(os.Stdout)
-    enc.SetIndent("", "  ")
+	collector := lifecycle.NewCollector(lifecycle.Options{
+		Role:   *role,
+		NodeID: *nodeID,
+	})
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
 
-    for i := 0; i < *samples; i++ {
-        snap, err := collector.Collect(context.Background())
-        if err != nil {
-            return err
-        }
-        if err := enc.Encode(snap.Status); err != nil {
-            return err
-        }
-        if i+1 < *samples {
-            time.Sleep(*interval)
-        }
-    }
-    return nil
+	for i := 0; i < *samples; i++ {
+		snap, err := collector.Collect(context.Background())
+		if err != nil {
+			return err
+		}
+		if err := enc.Encode(snap.Status); err != nil {
+			return err
+		}
+		if i+1 < *samples {
+			time.Sleep(*interval)
+		}
+	}
+	return nil
 }

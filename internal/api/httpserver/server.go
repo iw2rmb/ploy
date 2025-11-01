@@ -20,7 +20,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/api/admin"
 	"github.com/iw2rmb/ploy/internal/api/config"
-    "github.com/iw2rmb/ploy/internal/node/logstream"
+	"github.com/iw2rmb/ploy/internal/node/logstream"
 )
 
 // StatusProvider returns node status snapshots for the /v1/node/status endpoint.
@@ -35,29 +35,29 @@ type AdminService interface {
 
 // Options configure the HTTP server.
 type Options struct {
-    Config       config.Config
-    Streams      *logstream.Hub
-    Status       StatusProvider
-    Admin        AdminService
-    Jobs         JobProvider
-    JobControl   JobController
-    ControlPlane http.Handler
+	Config       config.Config
+	Streams      *logstream.Hub
+	Status       StatusProvider
+	Admin        AdminService
+	Jobs         JobProvider
+	JobControl   JobController
+	ControlPlane http.Handler
 }
 
 // Server exposes node and control-plane APIs.
 type Server struct {
-    mu        sync.Mutex
-    cfg       config.Config
-    streams   *logstream.Hub
-    status    StatusProvider
-    admin     AdminService
-    jobs      JobProvider
-    jobCtrl   JobController
-    control   http.Handler
-    app       *fiber.App
-    listener  net.Listener
-    serveDone chan struct{}
-    running   bool
+	mu        sync.Mutex
+	cfg       config.Config
+	streams   *logstream.Hub
+	status    StatusProvider
+	admin     AdminService
+	jobs      JobProvider
+	jobCtrl   JobController
+	control   http.Handler
+	app       *fiber.App
+	listener  net.Listener
+	serveDone chan struct{}
+	running   bool
 	startCtx  context.Context
 }
 
@@ -69,15 +69,15 @@ func New(opts Options) (*Server, error) {
 	if opts.Status == nil {
 		opts.Status = noopStatus{}
 	}
-    s := &Server{
-        cfg:     opts.Config,
-        streams: opts.Streams,
-        status:  opts.Status,
-        admin:   opts.Admin,
-        jobs:    opts.Jobs,
-        jobCtrl: opts.JobControl,
-        control: opts.ControlPlane,
-    }
+	s := &Server{
+		cfg:     opts.Config,
+		streams: opts.Streams,
+		status:  opts.Status,
+		admin:   opts.Admin,
+		jobs:    opts.Jobs,
+		jobCtrl: opts.JobControl,
+		control: opts.ControlPlane,
+	}
 	if err := s.ensureApp(); err != nil {
 		return nil, err
 	}
@@ -208,13 +208,13 @@ func (s *Server) ensureAppLocked() error {
 	if s.app != nil {
 		return nil
 	}
-    app := fiber.New(fiber.Config{
-        DisableStartupMessage: true,
-        ReadTimeout:           s.cfg.HTTP.ReadTimeout,
-        WriteTimeout:          s.cfg.HTTP.WriteTimeout,
-        IdleTimeout:           s.cfg.HTTP.IdleTimeout,
-        BodyLimit:             2 << 30, // allow up to 2GiB payloads (large OCI layers)
-    })
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: true,
+		ReadTimeout:           s.cfg.HTTP.ReadTimeout,
+		WriteTimeout:          s.cfg.HTTP.WriteTimeout,
+		IdleTimeout:           s.cfg.HTTP.IdleTimeout,
+		BodyLimit:             2 << 30, // allow up to 2GiB payloads (large OCI layers)
+	})
 	app.Use(recover.New())
 	s.mountRoutes(app)
 	s.app = app
@@ -222,22 +222,22 @@ func (s *Server) ensureAppLocked() error {
 }
 
 func (s *Server) mountRoutes(app *fiber.App) {
-    app.Get("/v1/node/status", s.handleStatus)
-    app.Get("/v1/node/health", s.handleStatus)
-    app.Get("/v1/node/jobs", s.handleNodeJobsList)
-    app.Get("/v1/node/jobs/:jobID", s.handleNodeJobsDetail)
-    app.Get("/v1/node/jobs/:jobID/logs/stream", s.handleLogStream)
-    app.Get("/v1/node/jobs/:jobID/logs/snapshot", s.handleNodeJobLogsSnapshot)
-    app.Post("/v1/node/jobs/:jobID/logs/entries", s.handleNodeJobLogsEntry)
-    app.Post("/v1/node/jobs/:jobID/cancel", s.handleNodeJobCancel)
-    app.Post("/v1/admin/nodes", s.handleAdminNodeCreate)
-    if s.control != nil {
-        handler := adaptor.HTTPHandler(s.control)
-        app.All("/v1", handler)
-        app.All("/v1/*", handler)
-        // Expose v2 aliases for control-plane (registry and artifacts) via the same handler.
-        app.All("/v2", handler)
-        app.All("/v2/*", handler)
+	app.Get("/v1/node/status", s.handleStatus)
+	app.Get("/v1/node/health", s.handleStatus)
+	app.Get("/v1/node/jobs", s.handleNodeJobsList)
+	app.Get("/v1/node/jobs/:jobID", s.handleNodeJobsDetail)
+	app.Get("/v1/node/jobs/:jobID/logs/stream", s.handleLogStream)
+	app.Get("/v1/node/jobs/:jobID/logs/snapshot", s.handleNodeJobLogsSnapshot)
+	app.Post("/v1/node/jobs/:jobID/logs/entries", s.handleNodeJobLogsEntry)
+	app.Post("/v1/node/jobs/:jobID/cancel", s.handleNodeJobCancel)
+	app.Post("/v1/admin/nodes", s.handleAdminNodeCreate)
+	if s.control != nil {
+		handler := adaptor.HTTPHandler(s.control)
+		app.All("/v1", handler)
+		app.All("/v1/*", handler)
+		// Expose v2 aliases for control-plane (registry and artifacts) via the same handler.
+		app.All("/v2", handler)
+		app.All("/v2/*", handler)
 		app.All("/metrics", handler)
 	}
 }

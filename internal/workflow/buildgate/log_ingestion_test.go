@@ -8,7 +8,7 @@ import (
 func TestLogIngestorProducesFindings(t *testing.T) {
 	retriever := &LogRetriever{
 		Primary:       &fakeFetcher{data: []byte("undefined reference to `symbol'")},
-        PrimarySource: LogSourcePrimary,
+		PrimarySource: LogSourcePrimary,
 	}
 	ingestor := &LogIngestor{Retriever: retriever, Parser: NewDefaultLogParser()}
 
@@ -30,7 +30,7 @@ func TestLogIngestorProducesFindings(t *testing.T) {
 func TestLogIngestorDefaultsParser(t *testing.T) {
 	retriever := &LogRetriever{
 		Primary:       &fakeFetcher{data: []byte("go: module example.com/foo found in multiple modules")},
-        PrimarySource: LogSourcePrimary,
+		PrimarySource: LogSourcePrimary,
 	}
 	ingestor := &LogIngestor{Retriever: retriever}
 

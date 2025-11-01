@@ -26,7 +26,7 @@ func (s *controlPlaneServer) handleModsSubpath(w http.ResponseWriter, r *http.Re
 		s.handleModsTicketStatus(w, r, ticketID)
 		return
 	}
-    switch parts[1] {
+	switch parts[1] {
 	case "resume":
 		s.handleModsResume(w, r, ticketID)
 	case "cancel":
@@ -35,9 +35,9 @@ func (s *controlPlaneServer) handleModsSubpath(w http.ResponseWriter, r *http.Re
 		s.handleModsLogs(w, r, ticketID, parts[2:])
 	case "events":
 		s.handleModsEvents(w, r, ticketID)
-    default:
-        http.NotFound(w, r)
-    }
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // handleModsTickets handles collection-level operations under /v1/mods/tickets.
@@ -74,7 +74,7 @@ func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *h
 		s.handleModsTicketStatus(w, r, ticketID)
 		return
 	}
-    switch parts[1] {
+	switch parts[1] {
 	case "cancel":
 		s.handleModsCancel(w, r, ticketID)
 	case "resume":
@@ -83,9 +83,9 @@ func (s *controlPlaneServer) handleModsTicketSubpath(w http.ResponseWriter, r *h
 		s.handleModsLogs(w, r, ticketID, parts[2:])
 	case "events":
 		s.handleModsEvents(w, r, ticketID)
-    default:
-        http.NotFound(w, r)
-    }
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // handleModsLogs dispatches log subpaths (snapshot or stream) for a ticket.

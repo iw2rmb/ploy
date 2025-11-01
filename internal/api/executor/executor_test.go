@@ -115,7 +115,7 @@ func (s stubAdapter) Metadata() workflowruntime.AdapterMetadata {
 }
 
 func (s stubAdapter) Connect(context.Context) (runner.RuntimeClient, error) {
-    return nil, s.err
+	return nil, s.err
 }
 
 func drainEvents(t *testing.T, ch <-chan logstream.Event, want int) []logstream.Event {

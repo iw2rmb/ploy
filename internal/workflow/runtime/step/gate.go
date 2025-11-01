@@ -25,20 +25,20 @@ type DiffResult struct {
 
 // GateClient invokes the Build Gate validation.
 type GateClient interface {
-    Validate(ctx context.Context, req GateRequest) (GateResult, error)
+	Validate(ctx context.Context, req GateRequest) (GateResult, error)
 }
 
 // GateRequest wraps manifest + workspace context.
 type GateRequest struct {
-    Manifest    contracts.StepManifest
-    Workspace   Workspace
-    LogArtifact *PublishedArtifact
+	Manifest    contracts.StepManifest
+	Workspace   Workspace
+	LogArtifact *PublishedArtifact
 }
 
 // GateResult contains Build Gate execution details.
 type GateResult struct {
-    Passed   bool
-    Message  string
-    Report   []byte
-    Duration time.Duration
+	Passed   bool
+	Message  string
+	Report   []byte
+	Duration time.Duration
 }

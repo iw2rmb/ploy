@@ -16,7 +16,6 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runner"
 )
 
-
 var (
 	manifestRegistryLoader manifestCompilerLoaderFunc = loadManifestCompiler
 	manifestConfigDir                                 = "configs/manifests"
@@ -64,8 +63,8 @@ func loadAsterLocator(dir string) (aster.Locator, error) {
 }
 
 func newEnvironmentService() (environmentService, error) {
-    hydrator := environments.NewInMemoryHydrator()
-    return environments.NewService(environments.ServiceOptions{Hydrator: hydrator}), nil
+	hydrator := environments.NewInMemoryHydrator()
+	return environments.NewService(environments.ServiceOptions{Hydrator: hydrator}), nil
 }
 
 type registryCompiler struct {

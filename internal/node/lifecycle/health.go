@@ -1,15 +1,15 @@
 package lifecycle
 
 import (
-    "bytes"
-    "context"
-    "fmt"
-    "io"
-    "net/http"
-    "net/url"
-    "os/exec"
-    "strings"
-    "time"
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	typesystem "github.com/docker/docker/api/types/system"
@@ -109,7 +109,7 @@ func (c *DockerChecker) Check(ctx context.Context) ComponentStatus {
 
 // commandRunner abstracts simple command execution for health checkers.
 type commandRunner interface {
-    Run(ctx context.Context, name string, args ...string) (string, string, error)
+	Run(ctx context.Context, name string, args ...string) (string, string, error)
 }
 
 // IPFSChecker validates IPFS Cluster health using the REST API.

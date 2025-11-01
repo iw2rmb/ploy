@@ -32,17 +32,17 @@ func handleMods(args []string, stderr io.Writer) error {
 }
 
 func handleModsLogs(args []string, stderr io.Writer) error {
-    fs := flag.NewFlagSet("mods logs", flag.ContinueOnError)
-    fs.SetOutput(io.Discard)
-    format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
-    maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-    retryWait := fs.Duration("retry-wait", time.Second, "wait duration between reconnect attempts")
-    idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
-    overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
-    if err := fs.Parse(args); err != nil {
-        printModsUsage(stderr)
-        return err
-    }
+	fs := flag.NewFlagSet("mods logs", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	format := fs.String("format", string(mods.FormatStructured), "output format (raw|structured)")
+	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
+	retryWait := fs.Duration("retry-wait", time.Second, "wait duration between reconnect attempts")
+	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
+	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
+	if err := fs.Parse(args); err != nil {
+		printModsUsage(stderr)
+		return err
+	}
 
 	ticketArgs := fs.Args()
 	if len(ticketArgs) == 0 {
@@ -63,29 +63,29 @@ func handleModsLogs(args []string, stderr io.Writer) error {
 		return fmt.Errorf("retry wait must be non-negative")
 	}
 
-    ctx := context.Background()
-    if *overall > 0 {
-        var cancel context.CancelFunc
-        ctx, cancel = context.WithTimeout(ctx, *overall)
-        defer cancel()
-    }
-    base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	ctx := context.Background()
+	if *overall > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *overall)
+		defer cancel()
+	}
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 
-    cmd := mods.LogsCommand{
-        Ticket: ticket,
-        Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
-        Output: stderr,
-        Client: stream.Client{
-            HTTPClient:   cloneForStream(httpClient),
-            MaxRetries:   *maxRetries,
-            RetryBackoff: *retryWait,
-            IdleTimeout:  *idle,
-        },
-        BaseURL: base,
-    }
+	cmd := mods.LogsCommand{
+		Ticket: ticket,
+		Format: mods.Format(strings.ToLower(strings.TrimSpace(*format))),
+		Output: stderr,
+		Client: stream.Client{
+			HTTPClient:   cloneForStream(httpClient),
+			MaxRetries:   *maxRetries,
+			RetryBackoff: *retryWait,
+			IdleTimeout:  *idle,
+		},
+		BaseURL: base,
+	}
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, mods.ErrInvalidFormat) {
 			printModsUsage(stderr)
@@ -116,17 +116,17 @@ func handleJobs(args []string, stderr io.Writer) error {
 }
 
 func handleJobsFollow(args []string, stderr io.Writer) error {
-    fs := flag.NewFlagSet("jobs follow", flag.ContinueOnError)
-    fs.SetOutput(io.Discard)
-    format := fs.String("format", string(jobs.FormatStructured), "output format (raw|structured)")
-    maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
-    retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait duration between reconnect attempts")
-    idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
-    overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
-    if err := fs.Parse(args); err != nil {
-        printJobsUsage(stderr)
-        return err
-    }
+	fs := flag.NewFlagSet("jobs follow", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	format := fs.String("format", string(jobs.FormatStructured), "output format (raw|structured)")
+	maxRetries := fs.Int("max-retries", 3, "max reconnect attempts (-1 for unlimited)")
+	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait duration between reconnect attempts")
+	idle := fs.Duration("idle-timeout", 45*time.Second, "cancel if no events arrive within this duration (0=off)")
+	overall := fs.Duration("timeout", 0, "overall timeout for the stream (0=off)")
+	if err := fs.Parse(args); err != nil {
+		printJobsUsage(stderr)
+		return err
+	}
 
 	jobArgs := fs.Args()
 	if len(jobArgs) == 0 {
@@ -147,29 +147,29 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
 		return fmt.Errorf("retry wait must be non-negative")
 	}
 
-    ctx := context.Background()
-    if *overall > 0 {
-        var cancel context.CancelFunc
-        ctx, cancel = context.WithTimeout(ctx, *overall)
-        defer cancel()
-    }
-    base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	ctx := context.Background()
+	if *overall > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *overall)
+		defer cancel()
+	}
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
 
-    cmd := jobs.FollowCommand{
-        JobID:  jobID,
-        Format: jobs.Format(strings.ToLower(strings.TrimSpace(*format))),
-        Output: stderr,
-        Client: stream.Client{
-            HTTPClient:   cloneForStream(httpClient),
-            MaxRetries:   *maxRetries,
-            RetryBackoff: *retryWait,
-            IdleTimeout:  *idle,
-        },
-        BaseURL: base,
-    }
+	cmd := jobs.FollowCommand{
+		JobID:  jobID,
+		Format: jobs.Format(strings.ToLower(strings.TrimSpace(*format))),
+		Output: stderr,
+		Client: stream.Client{
+			HTTPClient:   cloneForStream(httpClient),
+			MaxRetries:   *maxRetries,
+			RetryBackoff: *retryWait,
+			IdleTimeout:  *idle,
+		},
+		BaseURL: base,
+	}
 	if err := cmd.Run(ctx); err != nil {
 		if errors.Is(err, jobs.ErrInvalidFormat) {
 			printJobsUsage(stderr)
@@ -180,63 +180,69 @@ func handleJobsFollow(args []string, stderr io.Writer) error {
 }
 
 func handleJobsList(args []string, stderr io.Writer) error {
-    fs := flag.NewFlagSet("jobs ls", flag.ContinueOnError)
-    fs.SetOutput(io.Discard)
-    ticket := fs.String("ticket", "", "mods ticket id to scope the list")
-    if err := fs.Parse(args); err != nil {
-        printJobsUsage(stderr)
-        return err
-    }
-    if strings.TrimSpace(*ticket) == "" {
-        printJobsUsage(stderr)
-        return errors.New("ticket required")
-    }
-    ctx := context.Background()
-    base, httpClient, err := resolveControlPlaneHTTP(ctx)
-    if err != nil { return err }
-    cmd := jobs.ListCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), Output: stderr}
-    return cmd.Run(ctx)
+	fs := flag.NewFlagSet("jobs ls", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	ticket := fs.String("ticket", "", "mods ticket id to scope the list")
+	if err := fs.Parse(args); err != nil {
+		printJobsUsage(stderr)
+		return err
+	}
+	if strings.TrimSpace(*ticket) == "" {
+		printJobsUsage(stderr)
+		return errors.New("ticket required")
+	}
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := jobs.ListCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), Output: stderr}
+	return cmd.Run(ctx)
 }
 
 func handleJobsInspect(args []string, stderr io.Writer) error {
-    fs := flag.NewFlagSet("jobs inspect", flag.ContinueOnError)
-    fs.SetOutput(io.Discard)
-    ticket := fs.String("ticket", "", "mods ticket id that owns the job")
-    if err := fs.Parse(args); err != nil {
-        printJobsUsage(stderr)
-        return err
-    }
-    rest := fs.Args()
-    if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
-        printJobsUsage(stderr)
-        return errors.New("ticket and job id required")
-    }
-    jobID := strings.TrimSpace(rest[0])
-    ctx := context.Background()
-    base, httpClient, err := resolveControlPlaneHTTP(ctx)
-    if err != nil { return err }
-    cmd := jobs.InspectCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
-    return cmd.Run(ctx)
+	fs := flag.NewFlagSet("jobs inspect", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	ticket := fs.String("ticket", "", "mods ticket id that owns the job")
+	if err := fs.Parse(args); err != nil {
+		printJobsUsage(stderr)
+		return err
+	}
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
+		printJobsUsage(stderr)
+		return errors.New("ticket and job id required")
+	}
+	jobID := strings.TrimSpace(rest[0])
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := jobs.InspectCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
+	return cmd.Run(ctx)
 }
 
 func handleJobsRetry(args []string, stderr io.Writer) error {
-    fs := flag.NewFlagSet("jobs retry", flag.ContinueOnError)
-    fs.SetOutput(io.Discard)
-    ticket := fs.String("ticket", "", "mods ticket id that owns the job")
-    if err := fs.Parse(args); err != nil {
-        printJobsUsage(stderr)
-        return err
-    }
-    rest := fs.Args()
-    if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
-        printJobsUsage(stderr)
-        return errors.New("ticket and job id required")
-    }
-    jobID := strings.TrimSpace(rest[0])
-    ctx := context.Background()
-    
-    base, httpClient, err := resolveControlPlaneHTTP(ctx)
-    if err != nil { return err }
-    cmd := jobs.RetryCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
-    return cmd.Run(ctx)
+	fs := flag.NewFlagSet("jobs retry", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	ticket := fs.String("ticket", "", "mods ticket id that owns the job")
+	if err := fs.Parse(args); err != nil {
+		printJobsUsage(stderr)
+		return err
+	}
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(*ticket) == "" {
+		printJobsUsage(stderr)
+		return errors.New("ticket and job id required")
+	}
+	jobID := strings.TrimSpace(rest[0])
+	ctx := context.Background()
+
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := jobs.RetryCommand{BaseURL: base, Client: httpClient, Ticket: strings.TrimSpace(*ticket), JobID: jobID, Output: stderr}
+	return cmd.Run(ctx)
 }

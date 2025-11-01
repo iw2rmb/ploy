@@ -70,10 +70,10 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 		done: make(chan struct{}, 1),
 		result: controlplane.AssignmentResult{
 			State: "succeeded",
-            Artifacts: map[string]string{
-                "diff_cid":       "bafy-diff",
-                "gate_report_cid": "bafy-gate",
-            },
+			Artifacts: map[string]string{
+				"diff_cid":        "bafy-diff",
+				"gate_report_cid": "bafy-gate",
+			},
 			Bundles: map[string]scheduler.BundleRecord{
 				"logs": {
 					CID:       "bafy-logs",
@@ -83,16 +83,16 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 					TTL:       "24h",
 					ExpiresAt: "2025-10-28T12:00:00Z",
 				},
-            "gate_report": {
-                CID:    "bafy-gate",
-                Digest: "sha256:gate",
-                Size:   256,
-            },
-            },
-            Gate: &scheduler.GateMetrics{
-                Result:   scheduler.GateResultPassed,
-                Duration: 2 * time.Second,
-            },
+				"gate_report": {
+					CID:    "bafy-gate",
+					Digest: "sha256:gate",
+					Size:   256,
+				},
+			},
+			Gate: &scheduler.GateMetrics{
+				Result:   scheduler.GateResultPassed,
+				Duration: 2 * time.Second,
+			},
 			Inspection: false,
 		},
 	}
@@ -150,9 +150,9 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 	if artifacts["diff_cid"] != "bafy-diff" {
 		t.Fatalf("unexpected diff cid: %v", artifacts["diff_cid"])
 	}
-    if artifacts["gate_report_cid"] != "bafy-gate" {
-        t.Fatalf("unexpected gate report cid: %v", artifacts["gate_report_cid"])
-    }
+	if artifacts["gate_report_cid"] != "bafy-gate" {
+		t.Fatalf("unexpected gate report cid: %v", artifacts["gate_report_cid"])
+	}
 	bundles, ok := completion["bundles"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected bundles map, got %T", completion["bundles"])
@@ -167,12 +167,12 @@ func TestClientClaimsJobAndExecutes(t *testing.T) {
 	if logBundle["ttl"] != "24h" {
 		t.Fatalf("unexpected log ttl: %v", logBundle["ttl"])
 	}
-    if gateBundle, ok := bundles["gate_report"].(map[string]any); !ok || gateBundle["cid"] != "bafy-gate" {
-        t.Fatalf("expected gate report bundle, got %v", bundles["gate_report"])
-    }
-    if gate, ok := completion["gate"].(map[string]any); !ok || gate["result"] != "passed" {
-        t.Fatalf("expected gate summary result passed, got %v", completion["gate"])
-    }
+	if gateBundle, ok := bundles["gate_report"].(map[string]any); !ok || gateBundle["cid"] != "bafy-gate" {
+		t.Fatalf("expected gate report bundle, got %v", bundles["gate_report"])
+	}
+	if gate, ok := completion["gate"].(map[string]any); !ok || gate["result"] != "passed" {
+		t.Fatalf("expected gate summary result passed, got %v", completion["gate"])
+	}
 	if inspection, _ := completion["inspection"].(bool); inspection {
 		t.Fatalf("expected inspection false, got true")
 	}

@@ -11,14 +11,14 @@ import (
 )
 
 func TestRunPublishesCacheKeysInCheckpoints(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	grid := runner.NewInMemoryGrid()
 	composer := &recordingCacheComposer{}
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -57,7 +57,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPublishesStageMetadataAndArtifacts(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := &recordingCompiler{
 		compiled: manifests.Compilation{
 			Manifest:        manifests.Metadata{Name: "smoke", Version: "2025-09-26"},
@@ -67,7 +67,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-    grid := &fakeRuntime{
+	grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: {{
 				Status:    runner.StageStatusCompleted,
@@ -75,11 +75,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			}},
 		},
 	}
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -165,7 +165,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPublishesBuildGateMetadata(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	compiler := newStubCompiler()
 	buildGateMetadata := runner.StageMetadata{
 		BuildGate: &runner.StageBuildGateMetadata{
@@ -197,7 +197,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-    grid := &fakeRuntime{
+	grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage: []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
 			buildGateStage: []runner.StageOutcome{
@@ -215,11 +215,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			"test":            []runner.StageOutcome{{Status: runner.StageStatusCompleted}},
 		},
 	}
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,

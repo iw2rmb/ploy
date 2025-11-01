@@ -43,14 +43,14 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 			data, _ := io.ReadAll(stdin)
 			entry.stdin = string(data)
 		}
-	if command == "ssh" {
-		for i := 0; i+2 < len(args); i++ {
-			if args[i] == "bash" && args[i+1] == "-s" && args[i+2] == "--" {
-				scriptBody = entry.stdin
-				break
+		if command == "ssh" {
+			for i := 0; i+2 < len(args); i++ {
+				if args[i] == "bash" && args[i+1] == "-s" && args[i+2] == "--" {
+					scriptBody = entry.stdin
+					break
+				}
 			}
 		}
-	}
 		calls = append(calls, entry)
 		return nil
 	})
@@ -81,13 +81,13 @@ func TestRunBootstrapInvokesProvisioningSteps(t *testing.T) {
 					break
 				}
 			}
-	case "ssh":
-		for i := 0; i+2 < len(c.args); i++ {
-			if c.args[i] == "bash" && c.args[i+1] == "-s" && c.args[i+2] == "--" {
-				ranScript = true
-				break
+		case "ssh":
+			for i := 0; i+2 < len(c.args); i++ {
+				if c.args[i] == "bash" && c.args[i+1] == "-s" && c.args[i+2] == "--" {
+					ranScript = true
+					break
+				}
 			}
-		}
 		}
 	}
 	if !copiedBinary {

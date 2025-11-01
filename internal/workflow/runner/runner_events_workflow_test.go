@@ -13,8 +13,8 @@ import (
 
 func TestRunAutoClaimsTicketAndCleansWorkspace(t *testing.T) {
 	withCleanupDeadline(t)
-events := &recordingEvents{nextTicket: "ticket-123"}
-    grid := &fakeRuntime{
+	events := &recordingEvents{nextTicket: "ticket-123"}
+	grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			modsPlanStage:  {{Status: runner.StageStatusCompleted}},
 			buildGateStage: {{Status: runner.StageStatusCompleted}},
@@ -23,11 +23,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 	}
 	planner := runner.NewDefaultPlanner()
 	workspaceRoot := t.TempDir()
-    opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          planner,
 		WorkspaceRoot:    workspaceRoot,
 		MaxStageRetries:  1,

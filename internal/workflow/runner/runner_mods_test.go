@@ -12,7 +12,7 @@ import (
 )
 
 func TestRunPublishesModsMetadata(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-123"}
+	events := &recordingEvents{nextTicket: "ticket-123"}
 	manifest := defaultManifestCompilation()
 	plan := runner.ExecutionPlan{
 		TicketID: "ticket-123",
@@ -56,7 +56,7 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 		},
 	}
 	planner := metadataPlanner{plan: plan}
-    grid := &fakeRuntime{
+	grid := &fakeRuntime{
 		outcomes: map[string][]runner.StageOutcome{
 			mods.StageNamePlan: {
 				{Status: runner.StageStatusRunning},
@@ -67,11 +67,11 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 			},
 		},
 	}
-    opts := runner.Options{
-		Ticket:           "ticket-123",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "ticket-123",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          planner,
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -151,13 +151,13 @@ events := &recordingEvents{nextTicket: "ticket-123"}
 }
 
 func TestRunPublishesModsPlannerHints(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-hints"}
-    grid := &fakeRuntime{}
-    opts := runner.Options{
-		Ticket:           "ticket-hints",
-    // tenant removed
+	events := &recordingEvents{nextTicket: "ticket-hints"}
+	grid := &fakeRuntime{}
+	opts := runner.Options{
+		Ticket: "ticket-hints",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
 		ManifestCompiler: newStubCompiler(),
@@ -215,8 +215,8 @@ events := &recordingEvents{nextTicket: "ticket-hints"}
 }
 
 func TestRunExecutesParallelModsStages(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-parallel"}
-    grid := newParallelRecordingGrid()
+	events := &recordingEvents{nextTicket: "ticket-parallel"}
+	grid := newParallelRecordingGrid()
 	grid.addGate(mods.StageNameORWApply)
 	grid.addGate(mods.StageNameORWGenerate)
 	defer func() {
@@ -227,11 +227,11 @@ events := &recordingEvents{nextTicket: "ticket-parallel"}
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 
-    opts := runner.Options{
-		Ticket:           "ticket-parallel",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "ticket-parallel",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,
@@ -265,19 +265,19 @@ events := &recordingEvents{nextTicket: "ticket-parallel"}
 }
 
 func TestRunRetriesParallelModsStageBeforeDependents(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
-    grid := newParallelRecordingGrid()
+	events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
+	grid := newParallelRecordingGrid()
 	grid.setOutcomes(mods.StageNameORWApply, []runner.StageOutcome{
 		{Status: runner.StageStatusFailed, Retryable: true, Message: "planner detected failure"},
 		{Status: runner.StageStatusCompleted},
 	})
 	grid.setOutcomes(mods.StageNameORWGenerate, []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
 
-    opts := runner.Options{
-		Ticket:           "ticket-parallel-retry",
-    // tenant removed
+	opts := runner.Options{
+		Ticket: "ticket-parallel-retry",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlanner(),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  1,
@@ -321,8 +321,8 @@ events := &recordingEvents{nextTicket: "ticket-parallel-retry"}
 }
 
 func TestRunSchedulesHealingPlanAfterBuildGateFailure(t *testing.T) {
-events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
-    grid := &fakeRuntime{}
+	events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
+	grid := &fakeRuntime{}
 	grid.setOutcomes(buildGateStage, []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "compile failed"}})
 	grid.setOutcomes(buildGateStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
 	grid.setOutcomes(staticChecksStage+"#heal1", []runner.StageOutcome{{Status: runner.StageStatusCompleted}})
@@ -338,10 +338,10 @@ events := &recordingEvents{nextTicket: "ticket-buildgate-heal"}
 		HumanLane:       "mods-human",
 	}
 	opts := runner.Options{
-		Ticket:           "",
-    // tenant removed
+		Ticket: "",
+		// tenant removed
 		Events:           events,
-        Runtime:          grid,
+		Runtime:          grid,
 		Planner:          runner.NewDefaultPlannerWithMods(modsOpts),
 		WorkspaceRoot:    t.TempDir(),
 		MaxStageRetries:  0,

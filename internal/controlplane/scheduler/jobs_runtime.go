@@ -202,21 +202,21 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	}
 	record.Retention = deriveRetentionRecord(record.Bundles, expiry, record.State == JobStateInspectionReady)
 
-    gateDuration := time.Duration(0)
-    gateResult := ""
-    if req.Gate != nil {
-        gateDuration = req.Gate.Duration
-        if gateDuration < 0 {
-            gateDuration = 0
-        }
-        gateResult = normalizeGateResult(req.Gate.Result, record.State)
-        if gateDuration > 0 || gateResult != "" {
-            record.Gate = &gateRecord{
-                Result:          gateResult,
-                DurationSeconds: gateDuration.Seconds(),
-            }
-        }
-    }
+	gateDuration := time.Duration(0)
+	gateResult := ""
+	if req.Gate != nil {
+		gateDuration = req.Gate.Duration
+		if gateDuration < 0 {
+			gateDuration = 0
+		}
+		gateResult = normalizeGateResult(req.Gate.Result, record.State)
+		if gateDuration > 0 || gateResult != "" {
+			record.Gate = &gateRecord{
+				Result:          gateResult,
+				DurationSeconds: gateDuration.Seconds(),
+			}
+		}
+	}
 
 	if snapshot := s.captureNodeSnapshot(ctx, req.NodeID); snapshot != nil {
 		record.NodeSnapshot = snapshot
@@ -254,9 +254,9 @@ func (s *Scheduler) CompleteJob(ctx context.Context, req CompleteRequest) (*Job,
 	if !txnResp.Succeeded {
 		return nil, fmt.Errorf("scheduler: completion conflict for job %s", req.JobID)
 	}
-    if gateDuration > 0 {
-        s.metrics.ObserveGateDuration(record.StepID, gateResult, gateDuration)
-    }
+	if gateDuration > 0 {
+		s.metrics.ObserveGateDuration(record.StepID, gateResult, gateDuration)
+	}
 
 	if record.LeaseID != 0 {
 		if _, err := s.client.Revoke(ctx, clientv3.LeaseID(record.LeaseID)); err != nil {
@@ -400,24 +400,24 @@ func (s *Scheduler) tryClaimOnce(ctx context.Context, req ClaimRequest) (*ClaimR
 }
 
 func normalizeGateResult(raw string, state JobState) string {
-    value := strings.ToLower(strings.TrimSpace(raw))
-    switch value {
-    case "", "unknown":
-        switch state {
-        case JobStateSucceeded:
-            return GateResultPassed
-        case JobStateFailed, JobStateInspectionReady:
-            return GateResultFailed
-        default:
-            return ""
-        }
-    case "passed", "pass", "success", "succeeded":
-        return GateResultPassed
-    case "failed", "fail", "failure":
-        return GateResultFailed
-    default:
-        return value
-    }
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case "", "unknown":
+		switch state {
+		case JobStateSucceeded:
+			return GateResultPassed
+		case JobStateFailed, JobStateInspectionReady:
+			return GateResultFailed
+		default:
+			return ""
+		}
+	case "passed", "pass", "success", "succeeded":
+		return GateResultPassed
+	case "failed", "fail", "failure":
+		return GateResultFailed
+	default:
+		return value
+	}
 }
 
 var errRetryClaim = errors.New("scheduler: retry claim")

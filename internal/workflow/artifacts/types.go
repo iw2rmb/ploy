@@ -1,11 +1,11 @@
 package artifacts
 
 import (
-    "crypto/sha256"
-    "encoding/hex"
-    "time"
+	"crypto/sha256"
+	"encoding/hex"
+	"time"
 
-    "github.com/iw2rmb/ploy/internal/workflow/runtime/step"
+	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
 // AddRequest describes an artifact payload to pin within IPFS Cluster.
@@ -26,19 +26,19 @@ type AddRequest struct {
 
 // AddResponse summarises an artifact pin result.
 type AddResponse struct {
-    CID                  string
-    Name                 string
-    Size                 int64
-    Digest               string
-    ReplicationFactorMin int
-    ReplicationFactorMax int
+	CID                  string
+	Name                 string
+	Size                 int64
+	Digest               string
+	ReplicationFactorMin int
+	ReplicationFactorMax int
 }
 
 // SHA256Bytes returns the lowercase hex sha256 of the provided data without the prefix.
 func SHA256Bytes(data []byte) string {
-    h := sha256.New()
-    _, _ = h.Write(data)
-    return hex.EncodeToString(h.Sum(nil))
+	h := sha256.New()
+	_, _ = h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // PinOptions customises replication behaviour for re-pin attempts.

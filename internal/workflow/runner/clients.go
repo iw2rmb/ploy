@@ -1,16 +1,16 @@
 package runner
 
 import (
-    "context"
+	"context"
 
-    "github.com/iw2rmb/ploy/internal/workflow/contracts"
-    "github.com/iw2rmb/ploy/internal/workflow/manifests"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/manifests"
 )
 
 // RuntimeClient executes individual workflow stages using the active runtime.
 type RuntimeClient interface {
-    ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage Stage, workspace string) (StageOutcome, error)
-    CancelWorkflow(ctx context.Context, req CancelRequest) (CancelResult, error)
+	ExecuteStage(ctx context.Context, ticket contracts.WorkflowTicket, stage Stage, workspace string) (StageOutcome, error)
+	CancelWorkflow(ctx context.Context, req CancelRequest) (CancelResult, error)
 }
 
 // GridClient retained as an alias for backward compatibility during migration.

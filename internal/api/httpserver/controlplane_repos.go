@@ -1,14 +1,14 @@
 package httpserver
 
 import (
-    "errors"
-    "net/http"
-    "strings"
+	"errors"
+	"net/http"
+	"strings"
 
-    "github.com/jackc/pgx/v5"
-    "github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
-    "github.com/iw2rmb/ploy/internal/store"
+	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // handleRepos handles collection-level operations for /v1/repos.
@@ -129,11 +129,11 @@ func (s *controlPlaneServer) handleReposDelete(w http.ResponseWriter, r *http.Re
 
 // ensureStore checks if the store is available.
 func (s *controlPlaneServer) ensureStore(w http.ResponseWriter) bool {
-    if s.store == nil {
-        writeErrorMessage(w, http.StatusServiceUnavailable, "store unavailable")
-        return false
-    }
-    return true
+	if s.store == nil {
+		writeErrorMessage(w, http.StatusServiceUnavailable, "store unavailable")
+		return false
+	}
+	return true
 }
 
 // parseUUID parses a UUID string.

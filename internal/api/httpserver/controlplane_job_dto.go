@@ -26,7 +26,7 @@ type jobDTO struct {
 	Metadata       map[string]string                 `json:"metadata,omitempty"`
 	Artifacts      map[string]string                 `json:"artifacts,omitempty"`
 	Bundles        map[string]scheduler.BundleRecord `json:"bundles,omitempty"`
-    Gate           *gateDTO                          `json:"gate,omitempty"`
+	Gate           *gateDTO                          `json:"gate,omitempty"`
 	Retention      *scheduler.JobRetention           `json:"retention,omitempty"`
 	NodeSnapshot   *nodeSnapshotDTO                  `json:"node_snapshot,omitempty"`
 	Error          *scheduler.JobError               `json:"error,omitempty"`
@@ -53,7 +53,7 @@ func jobDTOFrom(job *scheduler.Job) jobDTO {
 		Metadata:       copyMap(job.Metadata),
 		Artifacts:      copyMap(job.Artifacts),
 		Bundles:        copyBundles(job.Bundles),
-        Gate:           copyGate(job.Gate),
+		Gate:           copyGate(job.Gate),
 		Retention:      copyRetention(job.Retention),
 		NodeSnapshot:   copyNodeSnapshot(job.NodeSnapshot),
 		Error:          job.Error,
@@ -101,20 +101,20 @@ func copyBundles(src map[string]scheduler.BundleRecord) map[string]scheduler.Bun
 
 // gateDTO reports summarized build gate metrics for the job response.
 type gateDTO struct {
-    Result          string  `json:"result"`
-    DurationSeconds float64 `json:"duration_seconds"`
+	Result          string  `json:"result"`
+	DurationSeconds float64 `json:"duration_seconds"`
 }
 
 // copyGate copies scheduler gate summaries into DTOs.
 func copyGate(src *scheduler.GateSummary) *gateDTO {
-    if src == nil {
-        return nil
-    }
-    dst := &gateDTO{Result: src.Result}
-    if src.Duration > 0 {
-        dst.DurationSeconds = src.Duration.Seconds()
-    }
-    return dst
+	if src == nil {
+		return nil
+	}
+	dst := &gateDTO{Result: src.Result}
+	if src.Duration > 0 {
+		dst.DurationSeconds = src.Duration.Seconds()
+	}
+	return dst
 }
 
 // copyRetention duplicates retention metadata for responses.

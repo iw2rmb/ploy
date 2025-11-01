@@ -10,7 +10,7 @@ import (
 )
 
 func TestInMemoryRuntimeRecordsInvocations(t *testing.T) {
-    grid := runner.NewInMemoryGrid()
+	grid := runner.NewInMemoryGrid()
 	grid.StageOutcomes[buildGateStage] = []runner.StageOutcome{{Status: runner.StageStatusFailed, Retryable: true, Message: "retry-me"}}
 	if outcome, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: modsPlanStage, Lane: "node-wasm"}, "/tmp/work"); err != nil {
 		t.Fatalf("unexpected error for default outcome: %v", err)
@@ -37,7 +37,7 @@ func TestInMemoryRuntimeRecordsInvocations(t *testing.T) {
 }
 
 func TestInMemoryRuntimeRejectsMissingLane(t *testing.T) {
-    grid := runner.NewInMemoryGrid()
+	grid := runner.NewInMemoryGrid()
 	_, err := grid.ExecuteStage(context.Background(), contracts.WorkflowTicket{TicketID: "ticket-1", Manifest: contracts.ManifestReference{Name: "smoke", Version: "2025-09-26"}}, runner.Stage{Name: modsPlanStage}, "/tmp/work")
 	if err == nil || !strings.Contains(err.Error(), "lane missing") {
 		t.Fatalf("expected lane missing error, got %v", err)

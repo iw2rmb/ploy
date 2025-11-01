@@ -63,33 +63,33 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 	outcome.Artifacts = convertPublishedArtifacts(result)
 	outcome.Evidence = buildStageEvidence(result, runner.StageStatusCompleted)
 
-    if meta := parseGateMetadata(result.GateReport.Report); meta != nil {
-        outcome.Stage.Metadata.BuildGate = meta
-    }
+	if meta := parseGateMetadata(result.GateReport.Report); meta != nil {
+		outcome.Stage.Metadata.BuildGate = meta
+	}
 
-    if execErr != nil {
-        if errors.Is(execErr, step.ErrBuildGateFailed) {
-            outcome.Status = runner.StageStatusFailed
-            outcome.Retryable = false
-            outcome.Message = strings.TrimSpace(result.GateReport.Message)
-            if outcome.Message == "" {
-                outcome.Message = strings.TrimSpace(execErr.Error())
-            }
-            outcome.Evidence = buildStageEvidence(result, outcome.Status)
-            c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
-            return outcome, nil
-        }
-        return runner.StageOutcome{}, execErr
-    }
+	if execErr != nil {
+		if errors.Is(execErr, step.ErrBuildGateFailed) {
+			outcome.Status = runner.StageStatusFailed
+			outcome.Retryable = false
+			outcome.Message = strings.TrimSpace(result.GateReport.Message)
+			if outcome.Message == "" {
+				outcome.Message = strings.TrimSpace(execErr.Error())
+			}
+			outcome.Evidence = buildStageEvidence(result, outcome.Status)
+			c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
+			return outcome, nil
+		}
+		return runner.StageOutcome{}, execErr
+	}
 
-    if !result.GateReport.Passed {
-        outcome.Status = runner.StageStatusFailed
-        outcome.Retryable = false
-        outcome.Message = strings.TrimSpace(result.GateReport.Message)
-        outcome.Evidence = buildStageEvidence(result, outcome.Status)
-        c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
-        return outcome, nil
-    }
+	if !result.GateReport.Passed {
+		outcome.Status = runner.StageStatusFailed
+		outcome.Retryable = false
+		outcome.Message = strings.TrimSpace(result.GateReport.Message)
+		outcome.Evidence = buildStageEvidence(result, outcome.Status)
+		c.recordInvocation(ticket, outcome.Stage, workspace, outcome)
+		return outcome, nil
+	}
 
 	if result.ExitCode != 0 {
 		outcome.Status = runner.StageStatusFailed
@@ -107,9 +107,9 @@ func (c *LocalStepClient) ExecuteStage(ctx context.Context, ticket contracts.Wor
 
 // CancelWorkflow currently delegates to the legacy cancellation behaviour.
 func (c *LocalStepClient) CancelWorkflow(ctx context.Context, req runner.CancelRequest) (runner.CancelResult, error) {
-    _ = ctx
-    _ = req
-    return runner.CancelResult{}, runner.ErrCancellationUnsupported
+	_ = ctx
+	_ = req
+	return runner.CancelResult{}, runner.ErrCancellationUnsupported
 }
 
 // Invocations returns a snapshot of recorded stage invocations executed via the local client.
@@ -165,14 +165,14 @@ func convertPublishedArtifacts(result step.Result) []runner.Artifact {
 			MediaType:   "text/plain",
 		})
 	}
-    if strings.TrimSpace(result.GateArtifact.CID) != "" {
-        artifacts = append(artifacts, runner.Artifact{
-            Name:        string(step.ArtifactKindGateReport),
-            ArtifactCID: strings.TrimSpace(result.GateArtifact.CID),
-            Digest:      strings.TrimSpace(result.GateArtifact.Digest),
-            MediaType:   "application/json",
-        })
-    }
+	if strings.TrimSpace(result.GateArtifact.CID) != "" {
+		artifacts = append(artifacts, runner.Artifact{
+			Name:        string(step.ArtifactKindGateReport),
+			ArtifactCID: strings.TrimSpace(result.GateArtifact.CID),
+			Digest:      strings.TrimSpace(result.GateArtifact.Digest),
+			MediaType:   "application/json",
+		})
+	}
 	if len(artifacts) == 0 {
 		return nil
 	}
@@ -181,16 +181,16 @@ func convertPublishedArtifacts(result step.Result) []runner.Artifact {
 
 func buildStageEvidence(result step.Result, status runner.StageStatus) *runner.StageEvidence {
 	exitCode := result.ExitCode
-    evidence := &runner.StageEvidence{
-        Source:   "local-step-runner",
-        Metadata: make(map[string]string),
-        Result: map[string]any{
-            "gate": map[string]any{
-                "passed":  result.GateReport.Passed,
-                "message": strings.TrimSpace(result.GateReport.Message),
-            },
-        },
-    }
+	evidence := &runner.StageEvidence{
+		Source:   "local-step-runner",
+		Metadata: make(map[string]string),
+		Result: map[string]any{
+			"gate": map[string]any{
+				"passed":  result.GateReport.Passed,
+				"message": strings.TrimSpace(result.GateReport.Message),
+			},
+		},
+	}
 	evidence.ExitCode = &exitCode
 	switch status {
 	case runner.StageStatusCompleted:
@@ -207,34 +207,34 @@ func buildStageEvidence(result step.Result, status runner.StageStatus) *runner.S
 	if strings.TrimSpace(result.RetentionTTL) != "" {
 		evidence.Metadata["retention_ttl"] = strings.TrimSpace(result.RetentionTTL)
 	}
-    if result.GateReport.Duration > 0 {
-        evidence.Result["gate"].(map[string]any)["duration_seconds"] = result.GateReport.Duration.Seconds()
-    }
-    if len(result.GateReport.Report) > 0 {
-        evidence.Result["gate"].(map[string]any)["report"] = string(result.GateReport.Report)
-    }
-    return evidence
+	if result.GateReport.Duration > 0 {
+		evidence.Result["gate"].(map[string]any)["duration_seconds"] = result.GateReport.Duration.Seconds()
+	}
+	if len(result.GateReport.Report) > 0 {
+		evidence.Result["gate"].(map[string]any)["report"] = string(result.GateReport.Report)
+	}
+	return evidence
 }
 
 func parseGateMetadata(report []byte) *runner.StageBuildGateMetadata {
-    if len(report) == 0 {
-        return nil
-    }
-    var payload struct {
-        Metadata buildgate.Metadata `json:"metadata"`
-    }
-    if err := json.Unmarshal(report, &payload); err != nil {
-        return nil
-    }
-    sanitized := buildgate.Sanitize(payload.Metadata)
-    if sanitized.LogDigest == "" && len(sanitized.StaticChecks) == 0 && len(sanitized.LogFindings) == 0 {
-        return nil
-    }
-    return &runner.StageBuildGateMetadata{
-        LogDigest:    sanitized.LogDigest,
-        StaticChecks: convertStaticChecks(sanitized.StaticChecks),
-        LogFindings:  convertLogFindings(sanitized.LogFindings),
-    }
+	if len(report) == 0 {
+		return nil
+	}
+	var payload struct {
+		Metadata buildgate.Metadata `json:"metadata"`
+	}
+	if err := json.Unmarshal(report, &payload); err != nil {
+		return nil
+	}
+	sanitized := buildgate.Sanitize(payload.Metadata)
+	if sanitized.LogDigest == "" && len(sanitized.StaticChecks) == 0 && len(sanitized.LogFindings) == 0 {
+		return nil
+	}
+	return &runner.StageBuildGateMetadata{
+		LogDigest:    sanitized.LogDigest,
+		StaticChecks: convertStaticChecks(sanitized.StaticChecks),
+		LogFindings:  convertLogFindings(sanitized.LogFindings),
+	}
 }
 
 func convertStaticChecks(reports []buildgate.StaticCheckReport) []runner.StageStaticCheck {

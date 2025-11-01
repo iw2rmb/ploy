@@ -43,7 +43,7 @@ type Options struct {
 	NodeID           string
 	Hostname         func() (string, error)
 	Docker           HealthChecker
-    Gate             HealthChecker
+	Gate             HealthChecker
 	IPFS             HealthChecker
 	Clock            func() time.Time
 	IgnoreInterfaces []string
@@ -61,7 +61,7 @@ type Collector struct {
 	nodeID           string
 	hostname         func() (string, error)
 	docker           HealthChecker
-    gate             HealthChecker
+	gate             HealthChecker
 	ipfs             HealthChecker
 	now              func() time.Time
 	resourcesFunc    func(context.Context) (resourceSnapshot, error)
@@ -89,7 +89,7 @@ func NewCollector(opts Options) *Collector {
 		nodeID:   strings.TrimSpace(opts.NodeID),
 		hostname: hostFn,
 		docker:   opts.Docker,
-        gate:     opts.Gate,
+		gate:     opts.Gate,
 		ipfs:     opts.IPFS,
 		now:      nowFn,
 		loadFunc: load.AvgWithContext,
@@ -115,11 +115,11 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 
 	resources, resErr := c.collectResources(ctx)
 
-    components := map[string]ComponentStatus{
-        "docker": c.checkComponent(ctx, c.docker),
-        "gate":   c.checkComponent(ctx, c.gate),
-        "ipfs":   c.checkComponent(ctx, c.ipfs),
-    }
+	components := map[string]ComponentStatus{
+		"docker": c.checkComponent(ctx, c.docker),
+		"gate":   c.checkComponent(ctx, c.gate),
+		"ipfs":   c.checkComponent(ctx, c.ipfs),
+	}
 
 	statusState := aggregateState(components, resErr)
 

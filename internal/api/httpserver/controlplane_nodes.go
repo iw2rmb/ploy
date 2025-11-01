@@ -1,18 +1,18 @@
 package httpserver
 
 import (
-    "context"
-    "errors"
-    "fmt"
-    "io"
-    "encoding/json"
-    "github.com/iw2rmb/ploy/internal/controlplane/registry"
-    "github.com/iw2rmb/ploy/internal/deploy"
-    gonanoid "github.com/matoous/go-nanoid/v2"
-    "log"
-    "net/http"
-    "strings"
-    "time"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/iw2rmb/ploy/internal/controlplane/registry"
+	"github.com/iw2rmb/ploy/internal/deploy"
+	gonanoid "github.com/matoous/go-nanoid/v2"
+	"io"
+	"log"
+	"net/http"
+	"strings"
+	"time"
 )
 
 func (s *controlPlaneServer) handleNodes(w http.ResponseWriter, r *http.Request) {
@@ -132,60 +132,60 @@ func (s *controlPlaneServer) handleNodeList(w http.ResponseWriter, r *http.Reque
 
 // handleNodeSubpath processes node-specific actions under /v1/nodes/{id}.
 func (s *controlPlaneServer) handleNodeSubpath(w http.ResponseWriter, r *http.Request) {
-    if !s.ensureEtcd(w) {
-        return
-    }
-    // Expect path in the form /v1/nodes/{nodeID}[/*]
-    path := strings.TrimPrefix(r.URL.Path, "/v1/nodes/")
-    if path == "" || path == "/" {
-        writeErrorMessage(w, http.StatusNotFound, "node id required")
-        return
-    }
-    // Extract the first segment as the node ID.
-    segments := strings.SplitN(path, "/", 2)
-    nodeID := strings.TrimSpace(segments[0])
-    if nodeID == "" {
-        writeErrorMessage(w, http.StatusBadRequest, "node id required")
-        return
-    }
+	if !s.ensureEtcd(w) {
+		return
+	}
+	// Expect path in the form /v1/nodes/{nodeID}[/*]
+	path := strings.TrimPrefix(r.URL.Path, "/v1/nodes/")
+	if path == "" || path == "/" {
+		writeErrorMessage(w, http.StatusNotFound, "node id required")
+		return
+	}
+	// Extract the first segment as the node ID.
+	segments := strings.SplitN(path, "/", 2)
+	nodeID := strings.TrimSpace(segments[0])
+	if nodeID == "" {
+		writeErrorMessage(w, http.StatusBadRequest, "node id required")
+		return
+	}
 
-    switch r.Method {
-    case http.MethodPatch:
-        s.handleNodeStatusPatch(w, r, nodeID)
-    default:
-        w.Header().Set("Allow", http.MethodPatch)
-        writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
-    }
+	switch r.Method {
+	case http.MethodPatch:
+		s.handleNodeStatusPatch(w, r, nodeID)
+	default:
+		w.Header().Set("Allow", http.MethodPatch)
+		writeErrorMessage(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
 // handleNodeStatusPatch stores a status snapshot for a specific node under etcd key nodes/{nodeID}/status.
 func (s *controlPlaneServer) handleNodeStatusPatch(w http.ResponseWriter, r *http.Request, nodeID string) {
-    // Read and validate JSON body (limit to a reasonable size).
-    const maxBody = 1 << 20 // 1 MiB
-    body, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
-    if err != nil {
-        writeError(w, http.StatusBadRequest, err)
-        return
-    }
-    defer r.Body.Close()
-    if len(body) == 0 {
-        writeErrorMessage(w, http.StatusBadRequest, "empty body")
-        return
-    }
-    var payload map[string]any
-    if err := json.Unmarshal(body, &payload); err != nil {
-        writeErrorMessage(w, http.StatusBadRequest, "invalid JSON body")
-        return
-    }
-    // Persist to etcd at nodes/{nodeID}/status
-    key := fmt.Sprintf("nodes/%s/status", strings.Trim(nodeID, "/"))
-    ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-    defer cancel()
-    if _, err := s.etcd.Put(ctx, key, string(body)); err != nil {
-        writeError(w, http.StatusBadGateway, err)
-        return
-    }
-    w.WriteHeader(http.StatusNoContent)
+	// Read and validate JSON body (limit to a reasonable size).
+	const maxBody = 1 << 20 // 1 MiB
+	body, err := io.ReadAll(io.LimitReader(r.Body, maxBody))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	defer r.Body.Close()
+	if len(body) == 0 {
+		writeErrorMessage(w, http.StatusBadRequest, "empty body")
+		return
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		writeErrorMessage(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	// Persist to etcd at nodes/{nodeID}/status
+	key := fmt.Sprintf("nodes/%s/status", strings.Trim(nodeID, "/"))
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	if _, err := s.etcd.Put(ctx, key, string(body)); err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *controlPlaneServer) handleNodeDelete(w http.ResponseWriter, r *http.Request) {

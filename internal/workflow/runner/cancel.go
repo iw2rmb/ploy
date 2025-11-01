@@ -2,9 +2,9 @@ package runner
 
 // CancelRequest describes the information required to cancel a workflow run.
 type CancelRequest struct {
-    WorkflowID string
-    RunID      string
-    Reason     string
+	WorkflowID string
+	RunID      string
+	Reason     string
 }
 
 // CancelResult reports the observed state after issuing a cancellation request.
