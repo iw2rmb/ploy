@@ -71,7 +71,12 @@ func main() {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	slog.Info("ployd server starting", "config", configPath, "mtls", "enforced")
+    // Reflect configured transport settings in startup logs (before listeners come up).
+    slog.Info("ployd server starting",
+        "config", configPath,
+        "tls", cfg.HTTP.TLS.Enabled,
+        "mtls", cfg.HTTP.TLS.RequireClientCert,
+    )
 
 	// Set up signal handling for graceful shutdown.
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

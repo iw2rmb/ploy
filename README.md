@@ -49,6 +49,10 @@ This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote inst
 
 Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFIG_PATH` to change the default (`/etc/ploy/ployd.yaml`). The flag overrides the environment variable when both are provided.
 
+**Listeners**
+- API: `:8443` (TLS; optionally mTLS when configured). Health at `/health`.
+- Metrics: `:9100` (plain HTTP) exposing Prometheus at `/metrics`.
+
 **Quick Start**
 - Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` not provided):
 
