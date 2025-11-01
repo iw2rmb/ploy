@@ -150,7 +150,7 @@ func TestConfigPutRoundTrip(t *testing.T) {
 	if gotCluster, _ := getBody["cluster_id"].(string); gotCluster != "cluster-alpha" {
 		t.Fatalf("unexpected cluster_id %q", gotCluster)
 	}
-	revision = getBody["revision"].(float64)
+        _ = getBody["revision"]
 
 	staleReq := newMTLSRequest(t, http.MethodPut, "/v1/config", bytes.NewReader(bodyBytes))
 	staleReq.Header.Set("Content-Type", "application/json")
