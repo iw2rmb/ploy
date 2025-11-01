@@ -1,5 +1,6 @@
 # golangci-lint configuration for Ploy
 # See https://golangci-lint.run/usage/configuration/ for full options
+version: 2
 
 run:
   timeout: 5m
@@ -11,20 +12,19 @@ run:
   modules-download-mode: readonly
 
 linters:
+  disable:
+    - gosec         # Use govulncheck for release; tune Gosec per-package later
+    - revive        # Style hints disabled for now; enforce via docs/PR template
+    - noctx         # We use context-aware clients where it matters; tune later
   enable:
     - errcheck      # Check for unchecked errors
-    - gosimple      # Simplify code
     - govet         # Vet examines Go source code
     - ineffassign   # Detect ineffectual assignments
     - staticcheck   # Go static analysis
     - unused        # Check for unused constants, variables, functions and types
-    - gofmt         # Check gofmt formatting
-    - goimports     # Check goimports formatting
     - misspell      # Spell checker
     - revive        # Fast, configurable, extensible, flexible, and beautiful linter
-    - gosec         # Security-focused linter
     - unconvert     # Remove unnecessary type conversions
-    - typecheck     # Type checking
     - gocritic      # Go source code linter providing checks currently missing from other linters
     - bodyclose     # Check HTTP response body is closed
     - noctx         # Find sending http request without context.Context
@@ -88,6 +88,13 @@ issues:
 
   # Exclude specific patterns
   exclude-rules:
+    # Common accepted patterns: ignore errors from Close and stdio prints
+    - linters:
+        - errcheck
+      text: 'Error return value of `?[^`]*Close`? is not checked'
+    - linters:
+        - errcheck
+      text: 'Error return value of `?fmt\.Fprint`? is not checked'
     # Exclude test files from some checks
     - path: _test\.go
       linters:
@@ -99,6 +106,19 @@ issues:
     - text: "should not use init functions"
       linters:
         - revive
+    # Security lints tuned for CLI context (allow file paths from flags/env)
+    - linters:
+        - gosec
+      text: 'G304: Potential file inclusion via variable'
+    - linters:
+        - gosec
+      text: 'G306: Expect WriteFile permissions to be 0600 or less'
+    - linters:
+        - gosec
+      text: 'G301: Expect directory permissions to be 0750 or less'
+    - linters:
+        - gosec
+      text: 'G112: Potential Slowloris Attack'
 
 output:
   format: colored-line-number

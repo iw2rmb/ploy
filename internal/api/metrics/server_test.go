@@ -21,7 +21,7 @@ func TestServerStartStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET /metrics: %v", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if err := srv.Stop(context.Background()); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}

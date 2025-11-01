@@ -61,7 +61,7 @@ func handleUpload(args []string, stderr io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("open payload: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	q := url.Values{}
 	q.Set("job_id", trimmedJob)
 	if k := strings.TrimSpace(*kind); k != "" {
@@ -85,16 +85,16 @@ func handleUpload(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		return controlPlaneHTTPError(resp)
 	}
-	fmt.Fprintf(stderr, "Uploaded %s (%d bytes) via HTTPS (digest %s)\n", filepath.Base(payloadPath), info.Size(), digest)
+	_, _ = fmt.Fprintf(stderr, "Uploaded %s (%d bytes) via HTTPS (digest %s)\n", filepath.Base(payloadPath), info.Size(), digest)
 	return nil
 }
 
 func printUploadUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: ploy upload --job-id <id> [--kind <kind>] [--node-id <node>] <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy upload --job-id <id> [--kind <kind>] [--node-id <node>] <path>")
 }
 
 func handleReport(args []string, stderr io.Writer) error {
@@ -150,7 +150,7 @@ func handleReport(args []string, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return controlPlaneHTTPError(resp)
 	}
@@ -165,12 +165,12 @@ func handleReport(args []string, stderr io.Writer) error {
 	if err := out.Close(); err != nil {
 		return err
 	}
-	fmt.Fprintf(stderr, "Downloaded artifact to %s\n", trimmedOutput)
+	_, _ = fmt.Fprintf(stderr, "Downloaded artifact to %s\n", trimmedOutput)
 	return nil
 }
 
 func printReportUsage(w io.Writer) {
-	fmt.Fprintln(w, "Usage: ploy report --job-id <id> [--artifact-id <slot>] [--node-id <node>] --output <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy report --job-id <id> [--artifact-id <slot>] [--node-id <node>] --output <path>")
 }
 
 func defaultNodeID() (string, error) { return "", nil }
@@ -180,7 +180,7 @@ func fileDigest(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("open %s: %w", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, f); err != nil {
 		return "", fmt.Errorf("hash %s: %w", path, err)

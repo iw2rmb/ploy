@@ -80,8 +80,8 @@ func (c FollowCommand) Run(ctx context.Context) error {
 			if err := json.Unmarshal(evt.Data, &hint); err != nil {
 				return fmt.Errorf("jobs: decode retention event: %w", err)
 			}
-			copy := hint
-			retention = &copy
+			tmp := hint
+			retention = &tmp
 		case "done", "complete", "completed":
 			return stream.ErrDone
 		default:

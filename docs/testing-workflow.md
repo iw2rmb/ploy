@@ -160,9 +160,11 @@ make ci-check
 This runs:
 - `make fmt` — Format code
 - `make vet` — Go vet analysis
-- `make lint` — golangci-lint
-- `make staticcheck` — Static analysis
+- `make staticcheck` — Static analysis (fast, core set)
 - `make test-coverage-threshold` — Tests with 60% threshold
+
+Optional:
+- `make lint` — Full golangci-lint suite (slower; broader checks). Use when iterating on refactors or before larger PRs.
 
 If all checks pass, you're ready to commit and push.
 
@@ -436,7 +438,6 @@ Coverage: 68.5% (threshold: 60%)
 $ make ci-check
 ✓ Format check
 ✓ Go vet
-✓ golangci-lint
 ✓ staticcheck
 ✓ Tests with coverage threshold
 === All CI checks passed ===

@@ -1,15 +1,15 @@
 package lifecycle
 
 import (
-    "bytes"
-    "context"
-    "os/exec"
-    "strings"
-    "time"
+	"bytes"
+	"context"
+	"os/exec"
+	"strings"
+	"time"
 
-    "github.com/docker/docker/api/types"
-    typesystem "github.com/docker/docker/api/types/system"
-    "github.com/docker/docker/client"
+	"github.com/docker/docker/api/types"
+	typesystem "github.com/docker/docker/api/types/system"
+	"github.com/docker/docker/client"
 )
 
 // DockerChecker probes the Docker Engine for availability and version info.

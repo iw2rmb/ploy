@@ -44,7 +44,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 	if err != nil {
 		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: http request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusAccepted {
 		var apiErr struct {

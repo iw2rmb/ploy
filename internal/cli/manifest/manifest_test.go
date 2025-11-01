@@ -125,10 +125,10 @@ func TestParseTargetsFlags(t *testing.T) {
 }
 
 func TestParseTargetsErrorCases(t *testing.T) {
-    if _, _, err := ParseTargets(nil); err == nil {
-        t.Fatalf("expected error for missing targets")
-    }
-    if _, _, err := ParseTargets([]string{"--unknown"}); err == nil {
-        t.Fatalf("expected error for unknown flag")
-    }
+	if _, _, err := ParseTargets(nil); err == nil {
+		t.Fatalf("expected error for missing targets")
+	}
+	if _, _, err := ParseTargets([]string{"--unknown"}); err == nil {
+		t.Fatalf("expected error for unknown flag")
+	}
 }

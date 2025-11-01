@@ -54,11 +54,19 @@ func (s *Server) Start(ctx context.Context) error {
 	if listen == "" {
 		listen = ":9100"
 	}
-	ln, err := net.Listen("tcp", listen)
+	// Use ListenConfig with context to satisfy lint/noctx and enable cancellation.
+	lc := net.ListenConfig{}
+	ln, err := lc.Listen(ctx, "tcp", listen)
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Handler: promhttp.Handler()}
+	server := &http.Server{
+		Handler:           promhttp.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	s.listener = ln
 	s.server = server
 	s.addr = ln.Addr().String()

@@ -235,12 +235,13 @@ func LoadCA(certPEM, keyPEM string) (*CABundle, error) {
 	}
 
 	var key *ecdsa.PrivateKey
-	if keyBlock.Type == "EC PRIVATE KEY" {
+	switch keyBlock.Type {
+	case "EC PRIVATE KEY":
 		key, err = x509.ParseECPrivateKey(keyBlock.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("parse EC private key: %w", err)
 		}
-	} else if keyBlock.Type == "PRIVATE KEY" {
+	case "PRIVATE KEY":
 		keyAny, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("parse PKCS8 private key: %w", err)
@@ -250,7 +251,7 @@ func LoadCA(certPEM, keyPEM string) (*CABundle, error) {
 		if !ok {
 			return nil, errors.New("CA private key must be ECDSA")
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("unsupported key type: %s", keyBlock.Type)
 	}
 
