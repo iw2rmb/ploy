@@ -30,7 +30,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
 
 ## API: Control (Repos/Mods/Runs)
-- [ ] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
+- [x] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
 - [ ] `POST /v1/mods/crud` + `GET /v1/mods/crud?repo_id=`.
 - [ ] `POST /v1/runs` (create run; status=queued) returns `{run_id}`.
 - [ ] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
