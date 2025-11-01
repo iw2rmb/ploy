@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-    "github.com/jackc/pgx/v5/pgtype"
-    "github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/api/httpserver"
@@ -474,21 +474,21 @@ func createRepoHandler(st store.Store) http.HandlerFunc {
 			Branch:    req.Branch,
 			CommitSha: req.CommitSha,
 		})
-        if err != nil {
-            // Check if this is a duplicate URL error (UNIQUE constraint violation).
-            var pgErr *pgconn.PgError
-            if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-                http.Error(w, "repository with this url already exists", http.StatusConflict)
-                return
-            }
-            if strings.Contains(err.Error(), "repos_url_unique") || strings.Contains(err.Error(), "duplicate key") {
-                http.Error(w, "repository with this url already exists", http.StatusConflict)
-                return
-            }
-            http.Error(w, fmt.Sprintf("failed to create repository: %v", err), http.StatusInternalServerError)
-            slog.Error("create repo: database error", "url", req.URL, "err", err)
-            return
-        }
+		if err != nil {
+			// Check if this is a duplicate URL error (UNIQUE constraint violation).
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+				http.Error(w, "repository with this url already exists", http.StatusConflict)
+				return
+			}
+			if strings.Contains(err.Error(), "repos_url_unique") || strings.Contains(err.Error(), "duplicate key") {
+				http.Error(w, "repository with this url already exists", http.StatusConflict)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to create repository: %v", err), http.StatusInternalServerError)
+			slog.Error("create repo: database error", "url", req.URL, "err", err)
+			return
+		}
 
 		// Build response.
 		resp := struct {
@@ -520,48 +520,48 @@ func createRepoHandler(st store.Store) http.HandlerFunc {
 
 // listReposHandler returns an HTTP handler that lists all repositories.
 func listReposHandler(st store.Store) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        // List all repositories.
-        repos, err := st.ListRepos(r.Context())
-        if err != nil {
-            http.Error(w, fmt.Sprintf("failed to list repositories: %v", err), http.StatusInternalServerError)
-            slog.Error("list repos: database error", "err", err)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		// List all repositories.
+		repos, err := st.ListRepos(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list repositories: %v", err), http.StatusInternalServerError)
+			slog.Error("list repos: database error", "err", err)
+			return
+		}
 
-        // Build response.
-        type repoResponse struct {
-            ID        string  `json:"id"`
-            URL       string  `json:"url"`
-            Branch    *string `json:"branch,omitempty"`
-            CommitSha *string `json:"commit_sha,omitempty"`
-            CreatedAt string  `json:"created_at"`
-        }
+		// Build response.
+		type repoResponse struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		}
 
-        wrapper := struct {
-            Repos []repoResponse `json:"repos"`
-        }{
-            Repos: make([]repoResponse, len(repos)),
-        }
+		wrapper := struct {
+			Repos []repoResponse `json:"repos"`
+		}{
+			Repos: make([]repoResponse, len(repos)),
+		}
 
-        for i, repo := range repos {
-            wrapper.Repos[i] = repoResponse{
-                ID:        uuid.UUID(repo.ID.Bytes).String(),
-                URL:       repo.Url,
-                Branch:    repo.Branch,
-                CommitSha: repo.CommitSha,
-                CreatedAt: repo.CreatedAt.Time.Format(time.RFC3339),
-            }
-        }
+		for i, repo := range repos {
+			wrapper.Repos[i] = repoResponse{
+				ID:        uuid.UUID(repo.ID.Bytes).String(),
+				URL:       repo.Url,
+				Branch:    repo.Branch,
+				CommitSha: repo.CommitSha,
+				CreatedAt: repo.CreatedAt.Time.Format(time.RFC3339),
+			}
+		}
 
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        if err := json.NewEncoder(w).Encode(wrapper); err != nil {
-            slog.Error("list repos: encode response failed", "err", err)
-        }
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(wrapper); err != nil {
+			slog.Error("list repos: encode response failed", "err", err)
+		}
 
-        slog.Debug("repositories listed", "count", len(repos))
-    }
+		slog.Debug("repositories listed", "count", len(repos))
+	}
 }
 
 // createModHandler returns an HTTP handler that creates a new mod.
