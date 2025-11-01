@@ -80,7 +80,7 @@ func TestShellQuote(t *testing.T) {
 
 func TestRenderBootstrapScriptMergesEnv(t *testing.T) {
 	script := renderBootstrapScript(map[string]string{"FOO": "bar", "PLOY_BOOTSTRAP_VERSION": "x"})
-	if !strings.Contains(script, "export FOO=\"bar\"") {
+	if !strings.Contains(script, "export FOO='bar'") {
 		t.Fatalf("expected FOO export in script: %q", script)
 	}
 	// Default export should remain present even if overridden in input.

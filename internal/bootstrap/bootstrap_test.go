@@ -15,11 +15,12 @@ func TestDefaultExportsAndPrefixedScript(t *testing.T) {
 		"FOO": "bar baz",
 		"QUX": "qu\"ote",
 	})
-	if !strings.Contains(script, "export FOO=\"bar baz\"") {
+	if !strings.Contains(script, "export FOO='bar baz'") {
 		t.Fatalf("missing FOO export in script: %q", script)
 	}
-	if !strings.Contains(script, "export QUX=\"qu\\\"ote\"") {
-		t.Fatalf("missing escaped QUX export in script: %q", script)
+	// Double quotes are fine inside single-quoted values (no escaping needed).
+	if !strings.Contains(script, "export QUX='qu\"ote'") {
+		t.Fatalf("missing single-quoted QUX export in script: %q", script)
 	}
 	if !strings.Contains(script, "# ploy bootstrap script") {
 		t.Fatalf("missing bootstrap script comment in script")
@@ -55,6 +56,40 @@ func TestPrefixedScript_WritesCertsFromEnv(t *testing.T) {
 	}
 	if !strings.Contains(script, "chmod 600 /etc/ploy/pki/node.key") {
 		t.Fatalf("script should set secure permissions on node key in else branch")
+	}
+}
+
+// singleQuoteTest mirrors the package's single-quote logic for expectations.
+func singleQuoteTest(s string) string {
+	if s == "" {
+		return "''"
+	}
+	if !strings.Contains(s, "'") {
+		return "'" + s + "'"
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+func TestPrefixedScript_ExportQuoting_NoExpansion(t *testing.T) {
+	val := "a$b `cmd` and 'q'"
+	script := PrefixedScript(map[string]string{"X": val})
+	expected := "export X=" + singleQuoteTest(val)
+	if !strings.Contains(script, expected) {
+		t.Fatalf("expected shell-safe single-quoted export, want %q in script: %q", expected, script)
+	}
+}
+
+func TestPrefixedScript_IgnoresEmptyOrWhitespaceKeys(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"":  "ignored",
+		" ": "ignored",
+		"A": "",
+	})
+	if strings.Contains(script, "export =") {
+		t.Fatalf("script should not contain exports for empty keys: %q", script)
+	}
+	if !strings.Contains(script, "export A=''") {
+		t.Fatalf("empty value must be exported as two single quotes: %q", script)
 	}
 }
 
