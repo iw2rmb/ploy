@@ -80,6 +80,7 @@ type Querier interface {
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
+	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) error
 }
