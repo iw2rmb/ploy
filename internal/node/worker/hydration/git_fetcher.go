@@ -3,6 +3,7 @@ package hydration
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -90,6 +91,8 @@ func runGitCommand(ctx context.Context, dir string, args ...string) error {
 	if dir != "" {
 		cmd.Dir = dir
 	}
+	// Disable any interactive credential prompts to avoid hanging in headless runs.
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
