@@ -45,7 +45,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] `POST /v1/nodes/{id}/heartbeat`: update `nodes` snapshot (cpu/mem/disk + version) and `last_heartbeat`.
 - [x] `POST /v1/nodes/{id}/events`: append structured events/log frames to DB (size cap checks) + SSE fanout.
 - [x] `POST /v1/nodes/{id}/stage/{stage}/diff`: store gzipped diff in `diffs` (≤1 MiB), reject oversize.
-- [ ] `POST /v1/nodes/{id}/stage/{stage}/artifact`: store gzipped bundle in `artifact_bundles` (≤1 MiB), reject oversize.
+- [x] `POST /v1/nodes/{id}/stage/{stage}/artifact`: store gzipped bundle in `artifact_bundles` (≤1 MiB), reject oversize.
 
 ## Scheduling & Assignment
 - [ ] Implement `ClaimRun` RPC: server assigns one queued run via `FOR UPDATE SKIP LOCKED` (sqlc: `ClaimRun`).
