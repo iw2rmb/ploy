@@ -131,21 +131,21 @@ func TestHandleRunsDiffs(t *testing.T) {
 			mockStore:      &mockIngestionStore{},
 			expectedStatus: http.StatusBadRequest,
 		},
-		{
-			name:  "payload too large",
-			runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
-			payload: CreateDiffRequest{
-				Patch: make([]byte, maxIngestionPayloadSize+1),
-			},
-			mockStore: &mockIngestionStore{
-				getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
-					return store.Run{ID: testRunUUID}, nil
-				},
-			},
-			// decodeJSON enforces 1 MiB limit at HTTP layer, returns 400
-			expectedStatus: http.StatusBadRequest,
-		},
-	}
+        {
+            name:  "payload too large",
+            runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
+            payload: CreateDiffRequest{
+                Patch: make([]byte, maxIngestionPayloadSize+1),
+            },
+            mockStore: &mockIngestionStore{
+                getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+                    return store.Run{ID: testRunUUID}, nil
+                },
+            },
+            // application layer rejects >1 MiB patch
+            expectedStatus: http.StatusRequestEntityTooLarge,
+        },
+    }
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -242,21 +242,21 @@ func TestHandleRunsLogs(t *testing.T) {
 			},
 			expectedStatus: http.StatusNotFound,
 		},
-		{
-			name:  "payload too large",
-			runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
-			payload: CreateLogRequest{
-				ChunkNo: 0,
-				Data:    make([]byte, maxIngestionPayloadSize+1),
-			},
-			mockStore: &mockIngestionStore{
-				getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
-					return store.Run{ID: testRunUUID}, nil
-				},
-			},
-			// decodeJSON enforces 1 MiB limit at HTTP layer, returns 400
-			expectedStatus: http.StatusBadRequest,
-		},
+        {
+            name:  "payload too large",
+            runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
+            payload: CreateLogRequest{
+                ChunkNo: 0,
+                Data:    make([]byte, maxIngestionPayloadSize+1),
+            },
+            mockStore: &mockIngestionStore{
+                getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+                    return store.Run{ID: testRunUUID}, nil
+                },
+            },
+            // application layer rejects >1 MiB chunk
+            expectedStatus: http.StatusRequestEntityTooLarge,
+        },
 		{
 			name:  "duplicate chunk",
 			runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
@@ -370,20 +370,20 @@ func TestHandleRunsArtifactBundles(t *testing.T) {
 			},
 			expectedStatus: http.StatusNotFound,
 		},
-		{
-			name:  "payload too large",
-			runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
-			payload: CreateArtifactBundleRequest{
-				Bundle: make([]byte, maxIngestionPayloadSize+1),
-			},
-			mockStore: &mockIngestionStore{
-				getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
-					return store.Run{ID: testRunUUID}, nil
-				},
-			},
-			// decodeJSON enforces 1 MiB limit at HTTP layer, returns 400
-			expectedStatus: http.StatusBadRequest,
-		},
+        {
+            name:  "payload too large",
+            runID: "01020304-0506-0708-090a-0b0c0d0e0f10",
+            payload: CreateArtifactBundleRequest{
+                Bundle: make([]byte, maxIngestionPayloadSize+1),
+            },
+            mockStore: &mockIngestionStore{
+                getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+                    return store.Run{ID: testRunUUID}, nil
+                },
+            },
+            // application layer rejects >1 MiB bundle
+            expectedStatus: http.StatusRequestEntityTooLarge,
+        },
 	}
 
 	for _, tt := range tests {
@@ -408,4 +408,67 @@ func TestHandleRunsArtifactBundles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIngestionAcceptsPayloadAtLimit(t *testing.T) {
+    t.Parallel()
+
+    testRunUUID := pgtype.UUID{Bytes: [16]byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10}, Valid: true}
+    stageUUID := pgtype.UUID{Bytes: [16]byte{0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30}, Valid: true}
+    buildUUID := pgtype.UUID{Bytes: [16]byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40}, Valid: true}
+
+    runIDStr := "01020304-0506-0708-090a-0b0c0d0e0f10"
+    stageIDStr := "21222324-2526-2728-292a-2b2c2d2e2f30"
+    buildIDStr := "31323334-3536-3738-393a-3b3c3d3e3f40"
+
+    // Prepare exactly 1 MiB binary blobs; after JSON base64 they exceed 1 MiB.
+    atLimit := make([]byte, maxIngestionPayloadSize)
+
+    storeOK := &mockIngestionStore{
+        getRunFunc: func(ctx context.Context, id pgtype.UUID) (store.Run, error) {
+            return store.Run{ID: testRunUUID}, nil
+        },
+        createDiffFunc: func(ctx context.Context, arg store.CreateDiffParams) (store.Diff, error) {
+            return store.Diff{ID: stageUUID, RunID: testRunUUID, StageID: stageUUID, Patch: arg.Patch, CreatedAt: pgtype.Timestamptz{Valid: true}}, nil
+        },
+        createLogFunc: func(ctx context.Context, arg store.CreateLogParams) (store.Log, error) {
+            return store.Log{ID: 1, RunID: testRunUUID, StageID: stageUUID, BuildID: buildUUID, ChunkNo: arg.ChunkNo, Data: arg.Data, CreatedAt: pgtype.Timestamptz{Valid: true}}, nil
+        },
+        createArtifactBundleFunc: func(ctx context.Context, arg store.CreateArtifactBundleParams) (store.ArtifactBundle, error) {
+            name := "bundle"
+            return store.ArtifactBundle{ID: stageUUID, RunID: testRunUUID, StageID: stageUUID, BuildID: buildUUID, Name: &name, Bundle: arg.Bundle, CreatedAt: pgtype.Timestamptz{Valid: true}}, nil
+        },
+    }
+
+    server := &controlPlaneServer{store: storeOK}
+
+    // Diff at limit
+    diffBody, _ := json.Marshal(CreateDiffRequest{StageID: stageIDStr, Patch: atLimit})
+    reqDiff := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/diffs", bytes.NewReader(diffBody))
+    reqDiff.Header.Set("Content-Type", "application/json")
+    recDiff := httptest.NewRecorder()
+    server.handleRunsDiffs(recDiff, reqDiff, runIDStr)
+    if recDiff.Code != http.StatusCreated {
+        t.Fatalf("diff at limit: expected 201, got %d: %s", recDiff.Code, recDiff.Body.String())
+    }
+
+    // Log at limit
+    logBody, _ := json.Marshal(CreateLogRequest{StageID: stageIDStr, BuildID: buildIDStr, ChunkNo: 0, Data: atLimit})
+    reqLog := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/logs", bytes.NewReader(logBody))
+    reqLog.Header.Set("Content-Type", "application/json")
+    recLog := httptest.NewRecorder()
+    server.handleRunsLogs(recLog, reqLog, runIDStr)
+    if recLog.Code != http.StatusCreated {
+        t.Fatalf("log at limit: expected 201, got %d: %s", recLog.Code, recLog.Body.String())
+    }
+
+    // Artifact bundle at limit
+    bundleBody, _ := json.Marshal(CreateArtifactBundleRequest{StageID: stageIDStr, BuildID: buildIDStr, Bundle: atLimit})
+    reqBundle := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runIDStr+"/artifact_bundles", bytes.NewReader(bundleBody))
+    reqBundle.Header.Set("Content-Type", "application/json")
+    recBundle := httptest.NewRecorder()
+    server.handleRunsArtifactBundles(recBundle, reqBundle, runIDStr)
+    if recBundle.Code != http.StatusCreated {
+        t.Fatalf("bundle at limit: expected 201, got %d: %s", recBundle.Code, recBundle.Body.String())
+    }
 }
