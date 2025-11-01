@@ -67,7 +67,10 @@ type Querier interface {
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error)
 	ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAndStageParams) ([]Log, error)
+	ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsByRunAndStageSinceParams) ([]Log, error)
+	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error)
+	ListLogsByRunStageAndBuildSince(ctx context.Context, arg ListLogsByRunStageAndBuildSinceParams) ([]Log, error)
 	ListMods(ctx context.Context) ([]Mod, error)
 	ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]Mod, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.

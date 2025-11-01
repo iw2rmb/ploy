@@ -159,6 +159,85 @@ func (q *Queries) ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAn
 	return items, nil
 }
 
+const listLogsByRunAndStageSince = `-- name: ListLogsByRunAndStageSince :many
+SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND stage_id = $2 AND id > $3
+ORDER BY chunk_no ASC
+`
+
+type ListLogsByRunAndStageSinceParams struct {
+	RunID   pgtype.UUID `json:"run_id"`
+	StageID pgtype.UUID `json:"stage_id"`
+	ID      int64       `json:"id"`
+}
+
+func (q *Queries) ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsByRunAndStageSinceParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunAndStageSince, arg.RunID, arg.StageID, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Log{}
+	for rows.Next() {
+		var i Log
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.StageID,
+			&i.BuildID,
+			&i.ChunkNo,
+			&i.Data,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsByRunSince = `-- name: ListLogsByRunSince :many
+SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND id > $2
+ORDER BY chunk_no ASC
+`
+
+type ListLogsByRunSinceParams struct {
+	RunID pgtype.UUID `json:"run_id"`
+	ID    int64       `json:"id"`
+}
+
+func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunSince, arg.RunID, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Log{}
+	for rows.Next() {
+		var i Log
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.StageID,
+			&i.BuildID,
+			&i.ChunkNo,
+			&i.Data,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLogsByRunStageAndBuild = `-- name: ListLogsByRunStageAndBuild :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND stage_id = $2 AND build_id = $3
@@ -173,6 +252,52 @@ type ListLogsByRunStageAndBuildParams struct {
 
 func (q *Queries) ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error) {
 	rows, err := q.db.Query(ctx, listLogsByRunStageAndBuild, arg.RunID, arg.StageID, arg.BuildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Log{}
+	for rows.Next() {
+		var i Log
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.StageID,
+			&i.BuildID,
+			&i.ChunkNo,
+			&i.Data,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsByRunStageAndBuildSince = `-- name: ListLogsByRunStageAndBuildSince :many
+SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND stage_id = $2 AND build_id = $3 AND id > $4
+ORDER BY chunk_no ASC
+`
+
+type ListLogsByRunStageAndBuildSinceParams struct {
+	RunID   pgtype.UUID `json:"run_id"`
+	StageID pgtype.UUID `json:"stage_id"`
+	BuildID pgtype.UUID `json:"build_id"`
+	ID      int64       `json:"id"`
+}
+
+func (q *Queries) ListLogsByRunStageAndBuildSince(ctx context.Context, arg ListLogsByRunStageAndBuildSinceParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunStageAndBuildSince,
+		arg.RunID,
+		arg.StageID,
+		arg.BuildID,
+		arg.ID,
+	)
 	if err != nil {
 		return nil, err
 	}

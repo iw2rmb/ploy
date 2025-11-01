@@ -76,7 +76,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 ## Store & Migrations
 - [x] Apply SIMPLE.sql as migrations under `internal/store/migrations/`; verify `sqlc` queries cover needed paths.
 - [x] Add migration runner (server startup) that ensures schema present; log version.
-- [ ] Expand/adjust sqlc queries as endpoints require (e.g., list-by-since for events/logs).
+- [x] Expand/adjust sqlc queries as endpoints require (e.g., list-by-since for events/logs).
 
 ## CLI Surfaces (Server/Node)
 - [ ] `ploy server deploy`: verify CA+server cert generation, DSN handling, and `deploy.ProvisionHost` call path.
