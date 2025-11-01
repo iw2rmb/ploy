@@ -42,8 +42,9 @@ func (r RepoMaterialization) Validate() error {
 	if strings.TrimSpace(r.URL) == "" {
 		return nil
 	}
-	if !strings.HasPrefix(strings.TrimSpace(r.URL), "http://") && !strings.HasPrefix(strings.TrimSpace(r.URL), "https://") && !strings.HasPrefix(strings.TrimSpace(r.URL), "git@") {
-		return fmt.Errorf("url must be http(s) or ssh")
+	url := strings.TrimSpace(r.URL)
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "git@") && !strings.HasPrefix(url, "file://") {
+		return fmt.Errorf("url must be http(s), ssh, or file://")
 	}
 	if strings.TrimSpace(r.TargetRef) == "" && strings.TrimSpace(r.Commit) == "" {
 		return fmt.Errorf("target_ref or commit is required when repo url is set")
