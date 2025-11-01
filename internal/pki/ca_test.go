@@ -54,17 +54,17 @@ func TestGenerateCA(t *testing.T) {
 }
 
 func TestIssueServerCert(t *testing.T) {
-	now := time.Now().UTC()
-	ca, err := GenerateCA("test-cluster", now)
-	if err != nil {
-		t.Fatalf("GenerateCA failed: %v", err)
-	}
+    now := time.Now().UTC()
+    ca, err := GenerateCA("test-cluster", now)
+    if err != nil {
+        t.Fatalf("GenerateCA failed: %v", err)
+    }
 
-	serverIP := "192.168.1.10"
-	cert, err := IssueServerCert(ca, "test-cluster", serverIP, now)
-	if err != nil {
-		t.Fatalf("IssueServerCert failed: %v", err)
-	}
+    serverIP := "192.168.1.10"
+    cert, err := IssueServerCert(ca, "test-cluster", serverIP, now)
+    if err != nil {
+        t.Fatalf("IssueServerCert failed: %v", err)
+    }
 
 	if cert == nil {
 		t.Fatal("expected non-nil issued certificate")
@@ -95,21 +95,37 @@ func TestIssueServerCert(t *testing.T) {
 		Roots:     roots,
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
-	if _, err := cert.Cert.Verify(opts); err != nil {
-		t.Fatalf("certificate verification failed: %v", err)
-	}
+    if _, err := cert.Cert.Verify(opts); err != nil {
+        t.Fatalf("certificate verification failed: %v", err)
+    }
 
-	// Check SANs include the server IP.
-	found := false
-	for _, ip := range cert.Cert.IPAddresses {
-		if ip.String() == serverIP {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("expected server IP %s in SANs, got: %v", serverIP, cert.Cert.IPAddresses)
-	}
+    // Check SANs include the server IP.
+    found := false
+    for _, ip := range cert.Cert.IPAddresses {
+        if ip.String() == serverIP {
+            found = true
+            break
+        }
+    }
+    if !found {
+        t.Fatalf("expected server IP %s in SANs, got: %v", serverIP, cert.Cert.IPAddresses)
+    }
+
+    // New naming: CN should be "ployd-<cluster>", DNS SAN should be "ployd.<cluster>.ploy".
+    if got, want := cert.Cert.Subject.CommonName, "ployd-test-cluster"; got != want {
+        t.Fatalf("unexpected server cert CN: got %q want %q", got, want)
+    }
+    wantDNS := "ployd.test-cluster.ploy"
+    hasDNS := false
+    for _, dns := range cert.Cert.DNSNames {
+        if dns == wantDNS {
+            hasDNS = true
+            break
+        }
+    }
+    if !hasDNS {
+        t.Fatalf("expected DNS SAN %q, got: %v", wantDNS, cert.Cert.DNSNames)
+    }
 }
 
 func TestSignNodeCSR(t *testing.T) {
