@@ -158,8 +158,8 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		return
 	}
 
-	// Create ephemeral workspace directory.
-	workspaceRoot, err := os.MkdirTemp("", "ploy-run-*")
+	// Create ephemeral workspace directory (honors PLOYD_CACHE_HOME when set).
+	workspaceRoot, err := createWorkspaceDir()
 	if err != nil {
 		slog.Error("failed to create workspace", "run_id", req.RunID, "error", err)
 		return
