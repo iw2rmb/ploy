@@ -44,7 +44,6 @@ type Options struct {
 	Hostname         func() (string, error)
 	Docker           HealthChecker
 	Gate             HealthChecker
-	IPFS             HealthChecker
 	Clock            func() time.Time
 	IgnoreInterfaces []string
 }
@@ -55,14 +54,13 @@ type Snapshot struct {
 	Capacity map[string]any
 }
 
-// Collector gathers node lifecycle data for status endpoints and etcd heartbeats.
+// Collector gathers node lifecycle data for status endpoints and heartbeats.
 type Collector struct {
 	role             string
 	nodeID           string
 	hostname         func() (string, error)
 	docker           HealthChecker
 	gate             HealthChecker
-	ipfs             HealthChecker
 	now              func() time.Time
 	resourcesFunc    func(context.Context) (resourceSnapshot, error)
 	loadFunc         func(context.Context) (*load.AvgStat, error)
@@ -90,7 +88,6 @@ func NewCollector(opts Options) *Collector {
 		hostname: hostFn,
 		docker:   opts.Docker,
 		gate:     opts.Gate,
-		ipfs:     opts.IPFS,
 		now:      nowFn,
 		loadFunc: load.AvgWithContext,
 		memFunc:  mem.VirtualMemoryWithContext,
@@ -118,7 +115,6 @@ func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	components := map[string]ComponentStatus{
 		"docker": c.checkComponent(ctx, c.docker),
 		"gate":   c.checkComponent(ctx, c.gate),
-		"ipfs":   c.checkComponent(ctx, c.ipfs),
 	}
 
 	statusState := aggregateState(components, resErr)

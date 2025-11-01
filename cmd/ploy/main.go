@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/iw2rmb/ploy/internal/clitree"
 )
 
 // main bootstraps the CLI entrypoint.
@@ -28,20 +26,14 @@ func execute(args []string, stderr io.Writer) error {
 
 	switch args[0] {
 	case "help":
-		return handleHelp(args[1:], stderr)
+		printUsage(stderr)
+		return nil
 	case "mod":
 		return handleMod(args[1:], stderr)
-	case "artifact":
-		return handleArtifact(args[1:], stderr)
 	case "upload":
 		return handleUpload(args[1:], stderr)
 	case "report":
 		return handleReport(args[1:], stderr)
-	case "config":
-		return handleConfig(args[1:], stderr)
-	case "cluster":
-		return handleCluster(args[1:], stderr)
-
 	case "environment":
 		return handleEnvironment(args[1:], stderr)
 	case "manifest":
@@ -70,50 +62,20 @@ func reportError(err error, stderr io.Writer) {
 
 // printUsage lists the available top-level commands.
 func printUsage(w io.Writer) {
-	nodes := clitree.Tree()
-	visible := make([]clitree.Node, 0, len(nodes))
-	width := 0
-	for _, node := range nodes {
-		if node.Hidden {
-			continue
-		}
-		visible = append(visible, node)
-		if l := len(node.Name); l > width {
-			width = l
-		}
-	}
-	padding := width + 2
-
-	_, _ = fmt.Fprintln(w, "Ploy CLI v2")
+	_, _ = fmt.Fprintln(w, "Ploy CLI")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Usage:")
 	_, _ = fmt.Fprintln(w, "  ploy <command> [<args>]")
 	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Core Commands:")
-	for _, node := range visible {
-		desc := node.Description
-		_, _ = fmt.Fprintf(w, "  %-*s %s\n", padding, node.Name, desc)
-	}
-	_, _ = fmt.Fprintln(w, "")
-	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
-}
-
-func handleHelp(args []string, stderr io.Writer) error {
-	if len(args) == 0 {
-		printUsage(stderr)
-		return nil
-	}
-
-	if node, ok := clitree.Lookup(args...); ok {
-		renderNodeUsage(stderr, node, args)
-		return nil
-	}
-
-	if node, ok := clitree.Lookup(args[0]); ok {
-		renderNodeUsage(stderr, node, args[:1])
-		return fmt.Errorf("unknown help topic %q", clitree.PathString(args...))
-	}
-
-	printUsage(stderr)
-	return fmt.Errorf("unknown help topic %q", args[0])
+	_, _ = fmt.Fprintln(w, "Available Commands:")
+	_, _ = fmt.Fprintln(w, "  server           Manage server deployment")
+	_, _ = fmt.Fprintln(w, "  node             Manage node deployment")
+	_, _ = fmt.Fprintln(w, "  mods             Manage mods")
+	_, _ = fmt.Fprintln(w, "  jobs             Manage jobs/runs")
+	_, _ = fmt.Fprintln(w, "  mod              Work with mod configurations")
+	_, _ = fmt.Fprintln(w, "  upload           Upload artifacts")
+	_, _ = fmt.Fprintln(w, "  report           Generate reports")
+	_, _ = fmt.Fprintln(w, "  environment      Manage environments")
+	_, _ = fmt.Fprintln(w, "  manifest         Work with manifests")
+	_, _ = fmt.Fprintln(w, "  knowledge-base   Manage knowledge base")
 }
