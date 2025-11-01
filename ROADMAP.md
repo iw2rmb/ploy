@@ -20,7 +20,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Wire Postgres store via `PLOY_SERVER_PG_DSN` or `internal/api/config` (fallback to env over file).
 - [x] Initialize Authorizer (mTLS) from `internal/controlplane/auth` with `RoleControlPlane` default.
 - [x] Add HTTP mux package `internal/api/httpserver` (new) to mount routes and middlewares.
-- [ ] Expose metrics listener `:9100` (plain HTTP) and API listener `:8443` (TLS/mTLS).
+- [x] Expose metrics listener `:9100` (plain HTTP) and API listener `:8443` (TLS/mTLS).
 - [ ] Start background Scheduler `internal/api/scheduler` and TTL workers.
 - [ ] Integrate PKI manager (renew loop) with config hot-reload stub.
 

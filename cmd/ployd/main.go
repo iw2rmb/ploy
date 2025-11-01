@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/httpserver"
+	"github.com/iw2rmb/ploy/internal/api/metrics"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -85,6 +88,40 @@ func main() {
 
 // run executes the main server loop and blocks until the context is canceled.
 func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *auth.Authorizer) error {
+	// Initialize HTTP server for API endpoints.
+	httpSrv, err := httpserver.New(httpserver.Options{
+		Config:     cfg.HTTP,
+		Authorizer: authorizer,
+	})
+	if err != nil {
+		return fmt.Errorf("create http server: %w", err)
+	}
+
+	// Register health endpoint.
+	httpSrv.HandleFunc("/health", healthHandler)
+
+	// Initialize metrics server.
+	metricsSrv := metrics.New(metrics.Options{
+		Listen: cfg.Metrics.Listen,
+	})
+
+	// Start HTTP server.
+	if err := httpSrv.Start(ctx); err != nil {
+		return fmt.Errorf("start http server: %w", err)
+	}
+
+	// Start metrics server.
+	if err := metricsSrv.Start(ctx); err != nil {
+		// Stop HTTP server on failure to start metrics.
+		_ = httpSrv.Stop(context.Background())
+		return fmt.Errorf("start metrics server: %w", err)
+	}
+
+	slog.Info("ployd servers started",
+		"api", httpSrv.Addr(),
+		"metrics", metricsSrv.Addr(),
+	)
+
 	// Wait for shutdown signal.
 	<-ctx.Done()
 
@@ -94,12 +131,24 @@ func run(ctx context.Context, cfg config.Config, st store.Store, authorizer *aut
 
 	slog.Info("graceful shutdown initiated", "timeout", "10s")
 
-	// TODO: Stop HTTP servers, background workers, etc.
-	// This will be expanded in subsequent ROADMAP tasks.
-	_ = shutdownCtx
-	_ = authorizer
+	// Stop HTTP server.
+	if err := httpSrv.Stop(shutdownCtx); err != nil {
+		slog.Error("stop http server", "err", err)
+	}
+
+	// Stop metrics server.
+	if err := metricsSrv.Stop(shutdownCtx); err != nil {
+		slog.Error("stop metrics server", "err", err)
+	}
 
 	return nil
+}
+
+// healthHandler responds to health check requests.
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}` + "\n"))
 }
 
 // resolvePgDSN returns the PostgreSQL DSN from environment or config.
