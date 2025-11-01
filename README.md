@@ -11,6 +11,8 @@ IPFS Cluster.
 
 See docs/next/README.md for the broader “Ploy Next” overview.
 
+For a proposed simplified architecture that replaces etcd with PostgreSQL and removes IPFS in favor of ephemeral repo clones, see `SIMPLE.md`.
+
 **What Changed (2025‑10)**
 - Not CLI‑only anymore: the repository ships a control plane (`cmd/ployd`) alongside the CLI.
 - Grid orchestrator removed: scheduling and queueing live in `internal/controlplane/scheduler`.

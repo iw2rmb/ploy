@@ -131,21 +131,23 @@ func (r Runner) Run(ctx context.Context, req Request) (Result, error) {
 		return Result{}, runErr
 	}
 
-	var diffArtifact PublishedArtifact
-	var logArtifact PublishedArtifact
+    var diffArtifact PublishedArtifact
+    var logArtifact PublishedArtifact
     var gateArtifact PublishedArtifact
-	if r.Artifacts != nil {
-		diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
-		if err != nil {
-			runErr = fmt.Errorf("step: publish diff: %w", err)
-			return Result{}, runErr
-		}
-		logArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindLogs, Buffer: logBytes})
-		if err != nil {
-			runErr = fmt.Errorf("step: publish logs: %w", err)
-			return Result{}, runErr
-		}
-	}
+    skipArtifacts := strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "1") ||
+        strings.EqualFold(strings.TrimSpace(manifest.Env["STEP_SKIP_ARTIFACTS"]), "true")
+    if r.Artifacts != nil && !skipArtifacts {
+        diffArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindDiff, Path: diffResult.Path})
+        if err != nil {
+            runErr = fmt.Errorf("step: publish diff: %w", err)
+            return Result{}, runErr
+        }
+        logArtifact, err = r.Artifacts.Publish(ctx, ArtifactRequest{Kind: ArtifactKindLogs, Buffer: logBytes})
+        if err != nil {
+            runErr = fmt.Errorf("step: publish logs: %w", err)
+            return Result{}, runErr
+        }
+    }
 
     gateResult := GateResult{Passed: true}
     if r.Gate != nil && selectGateSpec(manifest) != nil {

@@ -36,10 +36,13 @@ func registryImage(name string) string {
 var jobTemplates = map[string]jobTemplate{
     "mods-plan": {Spec: StageJobSpec{
         Image:   registryImage("mods-plan"),
-		Command: []string{"mods-plan", "--run"},
-		Env: map[string]string{
-			"MODS_PLAN_CACHE": "/workspace/cache",
-		},
+        Command: []string{"mods-plan", "--run"},
+        Env: map[string]string{
+            "MODS_PLAN_CACHE": "/workspace/cache",
+            // Avoid artifact uploads on the plan stage; downstream stages
+            // (e.g., orw-apply) produce the diff used for MR publication.
+            "STEP_SKIP_ARTIFACTS": "1",
+        },
 		Resources: StageJobResources{
 			CPU:    "2000m",
 			Memory: "4Gi",

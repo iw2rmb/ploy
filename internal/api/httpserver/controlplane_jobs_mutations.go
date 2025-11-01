@@ -7,6 +7,7 @@ import (
     "strings"
     "time"
 
+    controlplanemods "github.com/iw2rmb/ploy/internal/controlplane/mods"
     "github.com/iw2rmb/ploy/internal/controlplane/scheduler"
     "github.com/iw2rmb/ploy/internal/node/logstream"
 )
@@ -166,5 +167,36 @@ func (s *controlPlaneServer) handleJobComplete(w http.ResponseWriter, r *http.Re
             status = "inspection_ready"
         }
         _ = s.streams.PublishStatus(r.Context(), jobID, logstream.Status{Status: status})
+    }
+
+    // Notify Mods orchestrator about stage completion to drive dependent
+    // scheduling. This supplements background watchers and ensures timely
+    // transitions even when watchers are disabled.
+    if s.mods != nil {
+        state := controlplanemods.JobCompletionState(strings.ToLower(string(job.State)))
+        // Map completion state to orchestrator variants; ignore inspection_ready here.
+        switch job.State {
+        case scheduler.JobStateSucceeded:
+            state = controlplanemods.JobCompletionSucceeded
+        case scheduler.JobStateFailed:
+            state = controlplanemods.JobCompletionFailed
+        default:
+            // Treat unsupported states as failed to trigger retry/cancel paths if any.
+            if state == "" {
+                state = controlplanemods.JobCompletionFailed
+            }
+        }
+        var errMsg string
+        if req.Error != nil && strings.TrimSpace(req.Error.Message) != "" {
+            errMsg = req.Error.Message
+        }
+        _ = s.mods.ProcessJobCompletion(r.Context(), controlplanemods.JobCompletion{
+            TicketID:  job.Ticket,
+            StageID:   job.StepID,
+            JobID:     job.ID,
+            State:     state,
+            Error:     errMsg,
+            Artifacts: job.Artifacts,
+        })
     }
 }

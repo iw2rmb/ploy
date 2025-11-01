@@ -303,7 +303,7 @@ func (s *Service) synthesizePlanManifest(ctx context.Context, ticketID string, d
         Image: dockerImageRef("mods-plan"),
         Command: []string{"mods-plan"},
         Args:    []string{"--run"},
-        Env:     map[string]string{"MODS_PLAN_CACHE": "/workspace/cache"},
+        Env:     map[string]string{"MODS_PLAN_CACHE": "/workspace/cache", "STEP_SKIP_ARTIFACTS": "1"},
         Inputs: []contracts.StepInput{{
             Name:      defaultHydrationInput,
             MountPath: "/" + defaultHydrationInput,
@@ -396,6 +396,10 @@ func (s *Service) afterStageSuccess(ctx context.Context, ticketID, stageID strin
             return err
         }
         return nil
+    }
+    // As a safety net, attempt to enqueue any other now-ready stages.
+    if err := s.enqueueReadyStages(ctx, ticketID, graph, status.Stages); err != nil {
+        return err
     }
     return s.store.updateTicketState(ctx, ticketID, TicketStateRunning)
 }
