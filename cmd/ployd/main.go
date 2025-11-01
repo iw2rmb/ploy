@@ -1,15 +1,15 @@
 package main
 
 import (
-    "crypto/x509"
-    "context"
-    "encoding/json"
-    "encoding/pem"
-    "errors"
-    "flag"
-    "fmt"
-    "io"
-    "log/slog"
+	"context"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -176,6 +176,10 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	// Register PKI sign endpoint (admin-only).
 	httpSrv.HandleFunc("POST /v1/pki/sign", pkiSignHandler(st), auth.RoleCLIAdmin)
 
+	// Register repos endpoints (control plane).
+	httpSrv.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
+
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
 		Listen: cfg.Metrics.Listen,
@@ -253,69 +257,69 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // pkiSignHandler returns an HTTP handler that signs node CSRs with the cluster CA.
 // It requires admin role authorization and returns a PEM bundle with the signed certificate.
 func pkiSignHandler(st store.Store) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        // Decode request body.
-        var req struct {
-            NodeID string `json:"node_id"`
-            CSR    string `json:"csr"`
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Decode request body.
+		var req struct {
+			NodeID string `json:"node_id"`
+			CSR    string `json:"csr"`
+		}
 
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
-            return
-        }
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
 
-        // Validate node_id format.
-        nodeUUID, err := uuid.Parse(req.NodeID)
-        if err != nil {
-            http.Error(w, fmt.Sprintf("invalid node_id: %v", err), http.StatusBadRequest)
-            return
-        }
+		// Validate node_id format.
+		nodeUUID, err := uuid.Parse(req.NodeID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid node_id: %v", err), http.StatusBadRequest)
+			return
+		}
 
-        // Validate CSR is not empty.
-        if strings.TrimSpace(req.CSR) == "" {
-            http.Error(w, "csr field is required", http.StatusBadRequest)
-            return
-        }
+		// Validate CSR is not empty.
+		if strings.TrimSpace(req.CSR) == "" {
+			http.Error(w, "csr field is required", http.StatusBadRequest)
+			return
+		}
 
-        // Load cluster CA from environment (treat whitespace as unset), but preserve
-        // original values for downstream use to avoid altering PEM formatting.
-        rawCACert := os.Getenv("PLOY_SERVER_CA_CERT")
-        rawCAKey := os.Getenv("PLOY_SERVER_CA_KEY")
-        if strings.TrimSpace(rawCACert) == "" || strings.TrimSpace(rawCAKey) == "" {
-            http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
-            slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
-            return
-        }
+		// Load cluster CA from environment (treat whitespace as unset), but preserve
+		// original values for downstream use to avoid altering PEM formatting.
+		rawCACert := os.Getenv("PLOY_SERVER_CA_CERT")
+		rawCAKey := os.Getenv("PLOY_SERVER_CA_KEY")
+		if strings.TrimSpace(rawCACert) == "" || strings.TrimSpace(rawCAKey) == "" {
+			http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
+			slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
+			return
+		}
 
-        ca, err := internalPKI.LoadCA(rawCACert, rawCAKey)
-        if err != nil {
-            http.Error(w, "failed to load CA", http.StatusInternalServerError)
-            slog.Error("pki sign: load CA failed", "err", err)
-            return
-        }
+		ca, err := internalPKI.LoadCA(rawCACert, rawCAKey)
+		if err != nil {
+			http.Error(w, "failed to load CA", http.StatusInternalServerError)
+			slog.Error("pki sign: load CA failed", "err", err)
+			return
+		}
 
-        // Parse CSR to validate subject common name matches node_id when possible.
-        if block, _ := pem.Decode([]byte(req.CSR)); block != nil && block.Type == "CERTIFICATE REQUEST" {
-            if parsedCSR, err := x509.ParseCertificateRequest(block.Bytes); err == nil {
-                if err := parsedCSR.CheckSignature(); err == nil {
-                    expectedCN := "node:" + req.NodeID
-                    if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
-                        http.Error(w, "csr subject common name must match node:<node_id>", http.StatusBadRequest)
-                        return
-                    }
-                }
-            }
-            // If parsing/signature fails, fall through to SignNodeCSR for consistent error path.
-        }
+		// Parse CSR to validate subject common name matches node_id when possible.
+		if block, _ := pem.Decode([]byte(req.CSR)); block != nil && block.Type == "CERTIFICATE REQUEST" {
+			if parsedCSR, err := x509.ParseCertificateRequest(block.Bytes); err == nil {
+				if err := parsedCSR.CheckSignature(); err == nil {
+					expectedCN := "node:" + req.NodeID
+					if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
+						http.Error(w, "csr subject common name must match node:<node_id>", http.StatusBadRequest)
+						return
+					}
+				}
+			}
+			// If parsing/signature fails, fall through to SignNodeCSR for consistent error path.
+		}
 
-        // Sign the CSR.
-        cert, err := internalPKI.SignNodeCSR(ca, []byte(req.CSR), time.Now())
-        if err != nil {
-            http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
-            slog.Warn("pki sign: sign CSR failed", "node_id", req.NodeID, "err", err)
-            return
-        }
+		// Sign the CSR.
+		cert, err := internalPKI.SignNodeCSR(ca, []byte(req.CSR), time.Now())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
+			slog.Warn("pki sign: sign CSR failed", "node_id", req.NodeID, "err", err)
+			return
+		}
 
 		// Persist certificate metadata to the database.
 		err = st.UpdateNodeCertMetadata(r.Context(), store.UpdateNodeCertMetadataParams{
@@ -341,7 +345,7 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response according to docs/api/components/schemas/pki.yaml.
-        resp := struct {
+		resp := struct {
 			Certificate string `json:"certificate"`
 			CABundle    string `json:"ca_bundle"`
 			Serial      string `json:"serial"`
@@ -350,7 +354,7 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 			NotAfter    string `json:"not_after"`
 		}{
 			Certificate: cert.CertPEM,
-            CABundle:    rawCACert,
+			CABundle:    rawCACert,
 			Serial:      cert.Serial,
 			Fingerprint: cert.Fingerprint,
 			NotBefore:   cert.NotBefore.Format(time.RFC3339),
@@ -435,5 +439,112 @@ func parseLogLevel(levelStr string) slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+// createRepoHandler returns an HTTP handler that creates a new repository.
+func createRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Decode request body.
+		var req struct {
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate required fields.
+		if strings.TrimSpace(req.URL) == "" {
+			http.Error(w, "url field is required", http.StatusBadRequest)
+			return
+		}
+
+		// Create the repository.
+		repo, err := st.CreateRepo(r.Context(), store.CreateRepoParams{
+			Url:       req.URL,
+			Branch:    req.Branch,
+			CommitSha: req.CommitSha,
+		})
+		if err != nil {
+			// Check if this is a duplicate URL error (UNIQUE constraint violation).
+			if strings.Contains(err.Error(), "repos_url_unique") || strings.Contains(err.Error(), "duplicate key") {
+				http.Error(w, "repository with this url already exists", http.StatusConflict)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to create repository: %v", err), http.StatusInternalServerError)
+			slog.Error("create repo: database error", "url", req.URL, "err", err)
+			return
+		}
+
+		// Build response.
+		resp := struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		}{
+			ID:        uuid.UUID(repo.ID.Bytes).String(),
+			URL:       repo.Url,
+			Branch:    repo.Branch,
+			CommitSha: repo.CommitSha,
+			CreatedAt: repo.CreatedAt.Time.Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("create repo: encode response failed", "err", err)
+		}
+
+		slog.Info("repository created",
+			"id", resp.ID,
+			"url", repo.Url,
+		)
+	}
+}
+
+// listReposHandler returns an HTTP handler that lists all repositories.
+func listReposHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// List all repositories.
+		repos, err := st.ListRepos(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list repositories: %v", err), http.StatusInternalServerError)
+			slog.Error("list repos: database error", "err", err)
+			return
+		}
+
+		// Build response.
+		type repoResponse struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		}
+
+		resp := make([]repoResponse, len(repos))
+		for i, repo := range repos {
+			resp[i] = repoResponse{
+				ID:        uuid.UUID(repo.ID.Bytes).String(),
+				URL:       repo.Url,
+				Branch:    repo.Branch,
+				CommitSha: repo.CommitSha,
+				CreatedAt: repo.CreatedAt.Time.Format(time.RFC3339),
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("list repos: encode response failed", "err", err)
+		}
+
+		slog.Debug("repositories listed", "count", len(repos))
 	}
 }
