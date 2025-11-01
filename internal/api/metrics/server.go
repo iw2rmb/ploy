@@ -1,17 +1,17 @@
 package metrics
 
 import (
-    "context"
-    "errors"
-    "net"
-    "net/http"
-    "strings"
-    "sync"
-    "time"
+	"context"
+	"errors"
+	"net"
+	"net/http"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-    "github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/config"
 )
 
 // Options configure the metrics server.
@@ -60,16 +60,16 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-    // Expose Prometheus metrics strictly under /metrics.
-    mux := http.NewServeMux()
-    mux.Handle("/metrics", promhttp.Handler())
-    server := &http.Server{
-        Handler:           mux,
-        ReadHeaderTimeout: 5 * time.Second,
-        ReadTimeout:       10 * time.Second,
-        WriteTimeout:      10 * time.Second,
-        IdleTimeout:       60 * time.Second,
-    }
+	// Expose Prometheus metrics strictly under /metrics.
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	server := &http.Server{
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
 	s.listener = ln
 	s.server = server
 	s.addr = ln.Addr().String()

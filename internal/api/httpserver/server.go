@@ -61,15 +61,15 @@ func (s *Server) Start(ctx context.Context) error {
 		return err
 	}
 
-    srv := &http.Server{
-        Handler:           s.mux,
-        ReadHeaderTimeout: 10 * time.Second,
-        ReadTimeout:       s.cfg.ReadTimeout,
-        WriteTimeout:      s.cfg.WriteTimeout,
-        IdleTimeout:       s.cfg.IdleTimeout,
-        // Propagate the provided context to all connections/requests.
-        BaseContext: func(net.Listener) context.Context { return ctx },
-    }
+	srv := &http.Server{
+		Handler:           s.mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       s.cfg.ReadTimeout,
+		WriteTimeout:      s.cfg.WriteTimeout,
+		IdleTimeout:       s.cfg.IdleTimeout,
+		// Propagate the provided context to all connections/requests.
+		BaseContext: func(net.Listener) context.Context { return ctx },
+	}
 
 	// Apply sensible defaults if not configured.
 	if srv.ReadTimeout == 0 {
@@ -89,15 +89,15 @@ func (s *Server) Start(ctx context.Context) error {
 
 	slog.Info("httpserver started", "addr", listener.Addr().String(), "tls", s.cfg.TLS.Enabled)
 
-    go func() {
-        if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-            // Avoid logging noise on normal shutdown; Shutdown() causes ErrServerClosed.
-            // Some platforms may return net.ErrClosed; treat both as expected.
-            if !errors.Is(err, net.ErrClosed) {
-                slog.Error("httpserver stopped unexpectedly", "err", err)
-            }
-        }
-    }()
+	go func() {
+		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// Avoid logging noise on normal shutdown; Shutdown() causes ErrServerClosed.
+			// Some platforms may return net.ErrClosed; treat both as expected.
+			if !errors.Is(err, net.ErrClosed) {
+				slog.Error("httpserver stopped unexpectedly", "err", err)
+			}
+		}
+	}()
 
 	return nil
 }
@@ -110,19 +110,19 @@ func (s *Server) Stop(ctx context.Context) error {
 		return nil
 	}
 
-    srv := s.httpServer
+	srv := s.httpServer
 	s.httpServer = nil
-    s.listener = nil
+	s.listener = nil
 	s.running = false
 	s.mu.Unlock()
 
-    if srv != nil {
-        shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-        defer cancel()
-        if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-            return fmt.Errorf("httpserver: shutdown: %w", err)
-        }
-    }
+	if srv != nil {
+		shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("httpserver: shutdown: %w", err)
+		}
+	}
 
 	slog.Info("httpserver stopped")
 	return nil

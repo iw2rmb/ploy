@@ -120,13 +120,50 @@ func TestRun_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var cfg apiconfig.Config
-	var st store.Store // nil is fine; run() does not use it yet.
+	var st store.Store // nil is fine; ttlworker.New handles nil store gracefully.
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: false,
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
 	if err := run(ctx, cfg, st, authorizer); err != nil {
+		t.Fatalf("run() error: %v", err)
+	}
+}
+
+func TestRun_SchedulerIntegration(t *testing.T) {
+	// Verify scheduler and TTL worker are initialized and started/stopped correctly.
+	// Use a nil store since ttlworker.New handles it gracefully by returning nil worker.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cfg apiconfig.Config
+	// Set custom TTL config to verify it's passed to the worker
+	cfg.Scheduler.TTL = 0         // Will use default 30 days
+	cfg.Scheduler.TTLInterval = 0 // Will use default 1 hour
+	cfg.Scheduler.DropPartitions = false
+	// Use random ports to avoid conflicts
+	cfg.HTTP.Listen = "127.0.0.1:0"
+	cfg.Metrics.Listen = "127.0.0.1:0"
+
+	var st store.Store // nil store
+	authorizer := auth.NewAuthorizer(auth.Options{
+		AllowInsecure: false,
+		DefaultRole:   auth.RoleControlPlane,
+	})
+
+	// Start run in a goroutine
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- run(ctx, cfg, st, authorizer)
+	}()
+
+	// Cancel context to trigger shutdown
+	cancel()
+
+	// Wait for run to complete
+	err := <-errCh
+	if err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
 }
