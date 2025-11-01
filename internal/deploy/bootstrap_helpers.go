@@ -66,3 +66,13 @@ func GenerateClusterID() (string, error) {
 	}
 	return fmt.Sprintf("cluster-%s", hexPart), nil
 }
+
+// GenerateNodeID creates a new node identifier using random bytes.
+// Returns a string in the format "node-<16 hex chars>".
+func GenerateNodeID() (string, error) {
+	hexPart, err := randomHexString(16)
+	if err != nil {
+		return "", fmt.Errorf("generate node id: %w", err)
+	}
+	return fmt.Sprintf("node-%s", hexPart), nil
+}

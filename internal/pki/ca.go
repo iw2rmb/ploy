@@ -168,6 +168,55 @@ func SignNodeCSR(ca *CABundle, csrPEM []byte, now time.Time) (*IssuedCert, error
 	}, nil
 }
 
+// GenerateNodeCSR generates a private key and CSR for a node.
+// The nodeID is used in the certificate CN as "node:<nodeID>".
+// The nodeIP is included in SANs along with the DNS name.
+func GenerateNodeCSR(nodeID, clusterID, nodeIP string) (*IssuedCert, []byte, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("generate node key: %w", err)
+	}
+
+	cn := fmt.Sprintf("node:%s", nodeID)
+	dnsName := fmt.Sprintf("ploy-node-%s.%s.ploy", nodeID, clusterID)
+
+	var ipAddrs []net.IP
+	if nodeIP != "" {
+		parsed := net.ParseIP(nodeIP)
+		if parsed != nil {
+			ipAddrs = append(ipAddrs, parsed)
+		}
+	}
+
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:   cn,
+			Organization: []string{"Ploy"},
+		},
+		DNSNames:    []string{dnsName},
+		IPAddresses: ipAddrs,
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, priv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create CSR: %w", err)
+	}
+
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
+	keyDER, err := x509.MarshalECPrivateKey(priv)
+	if err != nil {
+		return nil, nil, fmt.Errorf("marshal node private key: %w", err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
+
+	keyBundle := &IssuedCert{
+		KeyPEM: string(keyPEM),
+		Key:    priv,
+	}
+
+	return keyBundle, csrPEM, nil
+}
+
 // LoadCA loads a CA bundle from PEM-encoded certificate and private key.
 func LoadCA(certPEM, keyPEM string) (*CABundle, error) {
 	certBlock, _ := pem.Decode([]byte(certPEM))

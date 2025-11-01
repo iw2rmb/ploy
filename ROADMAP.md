@@ -49,7 +49,7 @@ Guidance: follow RED → GREEN → REFACTOR. Keep steps small, verifiable, and u
 - [x] CLI commands
   - [x] `ploy server deploy --address`: install server, create CA, issue server cert, create `cluster_id`, configure `PLOY_SERVER_PG_DSN`.
     - [x] If `--postgresql-dns` is not provided, install PostgreSQL on the VPS and create DB `ploy`; derive DSN.
-  - [ ] `ploy node add --cluster-id --address`: install node, generate key+CSR, call `/v1/pki/sign`, record node IP, configure mTLS.
+  - [x] `ploy node add --cluster-id --address`: install node, generate key+CSR, call `/v1/pki/sign`, record node IP, configure mTLS.
 
 - [ ] Remove legacy systems (code + scripts + docs)
   - [ ] Purge IPFS Cluster codepaths, health checks, installers, and envs.
