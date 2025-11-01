@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -377,11 +378,49 @@ func TestWorkspaceLifecycle(t *testing.T) {
 }
 
 // createEphemeralWorkspace creates a temporary workspace directory with a unique prefix.
-func createEphemeralWorkspace() (string, error) {
-	return os.MkdirTemp("", "ploy-run-*")
-}
+func createEphemeralWorkspace() (string, error) { return createWorkspaceDir() }
 
 // cleanupWorkspace removes a workspace directory and all its contents.
 func cleanupWorkspace(path string) {
 	_ = os.RemoveAll(path)
+}
+
+func TestWorkspaceBaseEnv(t *testing.T) {
+	t.Run("respects PLOYD_CACHE_HOME base", func(t *testing.T) {
+		base := t.TempDir()
+		t.Setenv("PLOYD_CACHE_HOME", base)
+
+		ws, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create workspace: %v", err)
+		}
+		defer cleanupWorkspace(ws)
+
+		wantPrefix := filepath.Clean(base) + string(os.PathSeparator)
+		if !strings.HasPrefix(ws, wantPrefix) {
+			t.Fatalf("workspace %q not under base %q", ws, wantPrefix)
+		}
+	})
+
+	t.Run("auto-creates base when missing", func(t *testing.T) {
+		baseRoot := t.TempDir()
+		// Choose a non-existent subdir under the temp root
+		base := filepath.Join(baseRoot, "ploy-cache-subdir")
+		t.Setenv("PLOYD_CACHE_HOME", base)
+
+		ws, err := createEphemeralWorkspace()
+		if err != nil {
+			t.Fatalf("failed to create workspace with missing base: %v", err)
+		}
+		defer cleanupWorkspace(ws)
+
+		// Base should now exist and workspace should reside under it
+		if _, err := os.Stat(base); err != nil {
+			t.Fatalf("expected base %q to be created: %v", base, err)
+		}
+		wantPrefix := filepath.Clean(base) + string(os.PathSeparator)
+		if !strings.HasPrefix(ws, wantPrefix) {
+			t.Fatalf("workspace %q not under base %q", ws, wantPrefix)
+		}
+	})
 }
