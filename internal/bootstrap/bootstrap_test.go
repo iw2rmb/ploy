@@ -216,3 +216,96 @@ func TestPrefixedScript_UsesEnableNow_ForNode(t *testing.T) {
 		t.Fatalf("node branch should use 'systemctl enable --now ployd-node.service'\nscript:\n%s", script)
 	}
 }
+
+func TestPrefixedScript_EchosFinalStatusAndKeyPaths(t *testing.T) {
+	script := PrefixedScript(map[string]string{})
+
+	// Check for final status summary header
+	if !strings.Contains(script, "Bootstrap completed successfully.") {
+		t.Fatalf("script should echo bootstrap completed successfully message")
+	}
+	if !strings.Contains(script, "========================================") {
+		t.Fatalf("script should include header separator")
+	}
+
+	// Check for configuration section
+	if !strings.Contains(script, "Configuration:") {
+		t.Fatalf("script should echo Configuration section")
+	}
+	if !strings.Contains(script, "Config file: ${PLOY_CONFIG_PATH}") {
+		t.Fatalf("script should echo config file path")
+	}
+	if !strings.Contains(script, "PKI directory: /etc/ploy/pki") {
+		t.Fatalf("script should echo PKI directory path")
+	}
+
+	// Check for conditional PKI file paths
+	if !strings.Contains(script, "if [ -f /etc/ploy/pki/ca.crt ]; then") {
+		t.Fatalf("script should check for CA cert existence")
+	}
+	if !strings.Contains(script, "- CA cert: /etc/ploy/pki/ca.crt") {
+		t.Fatalf("script should echo CA cert path if it exists")
+	}
+	if !strings.Contains(script, "- Server cert: /etc/ploy/pki/server.crt") {
+		t.Fatalf("script should echo server cert path in primary branch")
+	}
+	if !strings.Contains(script, "- Server key: /etc/ploy/pki/server.key") {
+		t.Fatalf("script should echo server key path in primary branch")
+	}
+	if !strings.Contains(script, "- Node cert: /etc/ploy/pki/node.crt") {
+		t.Fatalf("script should echo node cert path in node branch")
+	}
+	if !strings.Contains(script, "- Node key: /etc/ploy/pki/node.key") {
+		t.Fatalf("script should echo node key path in node branch")
+	}
+
+	// Check for service section
+	if !strings.Contains(script, "Service:") {
+		t.Fatalf("script should echo Service section")
+	}
+	if !strings.Contains(script, "Service name: ${PLOY_SERVICE_NAME}") {
+		t.Fatalf("script should echo service name")
+	}
+	if !strings.Contains(script, "Status: $(systemctl is-active ${PLOY_SERVICE_NAME}") {
+		t.Fatalf("script should echo service status")
+	}
+	if !strings.Contains(script, "Enabled: $(systemctl is-enabled ${PLOY_SERVICE_NAME}") {
+		t.Fatalf("script should echo service enabled status")
+	}
+
+	// Check for helpful commands
+	if !strings.Contains(script, "To view logs:") {
+		t.Fatalf("script should echo logs viewing instructions")
+	}
+	if !strings.Contains(script, "journalctl -u ${PLOY_SERVICE_NAME} -f") {
+		t.Fatalf("script should echo journalctl command for logs")
+	}
+	if !strings.Contains(script, "To check status:") {
+		t.Fatalf("script should echo status check instructions")
+	}
+	if !strings.Contains(script, "systemctl status ${PLOY_SERVICE_NAME}") {
+		t.Fatalf("script should echo systemctl status command")
+	}
+}
+
+func TestPrefixedScript_SetsPLOY_CONFIG_PATH_ForServer(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY": "true",
+	})
+	if !strings.Contains(script, "PLOY_CONFIG_PATH='/etc/ploy/ployd.yaml'") {
+		t.Fatalf("server branch should set PLOY_CONFIG_PATH to server config")
+	}
+	if !strings.Contains(script, "PLOY_SERVICE_NAME='ployd.service'") {
+		t.Fatalf("server branch should set PLOY_SERVICE_NAME to ployd.service")
+	}
+}
+
+func TestPrefixedScript_SetsPLOY_CONFIG_PATH_ForNode(t *testing.T) {
+	script := PrefixedScript(map[string]string{})
+	if !strings.Contains(script, "PLOY_CONFIG_PATH='/etc/ploy/ployd-node.yaml'") {
+		t.Fatalf("node branch should set PLOY_CONFIG_PATH to node config")
+	}
+	if !strings.Contains(script, "PLOY_SERVICE_NAME='ployd-node.service'") {
+		t.Fatalf("node branch should set PLOY_SERVICE_NAME to ployd-node.service")
+	}
+}
