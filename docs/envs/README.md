@@ -30,6 +30,14 @@ defaults change, or components adopt additional configuration.
 - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
   Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
   Defaults to `maven:3-eclipse-temurin-17`.
+- `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
+  are stored. When unset, the CLI falls back to `XDG_CONFIG_HOME/ploy` or `~/.config/ploy`.
+  Priority: `PLOY_CONFIG_HOME` → `XDG_CONFIG_HOME/ploy` → `~/.config/ploy`.
+- `XDG_CONFIG_HOME` — Standard XDG Base Directory specification variable. When set
+  (and `PLOY_CONFIG_HOME` is not), the CLI uses `$XDG_CONFIG_HOME/ploy` for cluster
+  descriptor storage. Falls back to `~/.config/ploy` when both are unset.
+- `USER` — Standard Unix environment variable indicating the current user. The CLI
+  reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
 - `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to
   `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 - `DOCKERHUB_PAT` — Docker Hub Personal Access Token used for non‑interactive `docker login`
@@ -46,12 +54,21 @@ defaults change, or components adopt additional configuration.
   generates the initial configuration (default `0.0.0.0:8443`).
 - `PLOYD_METRICS_LISTEN` — Optional override for the ployd Prometheus metrics listener (defaults to
   `:9100`).
-  
+- `PLOYD_NODE_ID` — Node identifier for the ployd daemon. Set during bootstrap to a sanitized
+  version of the node name. Used by the daemon to identify itself in logs and metrics.
+- `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Defaults to `/root` when running
+  as a system service. Set during bootstrap.
+- `PLOYD_CACHE_HOME` — Cache directory for the ployd daemon. Defaults to `/var/cache/ploy`.
+  Set during bootstrap and used for ephemeral workspaces and intermediate build artifacts.
+
 
 ## Worker Nodes
 
-- `PLOY_CA_CERT_PEM` — Cluster CA presented to the node for mTLS trust (PEM-encoded).
+- `PLOY_CA_CERT_PEM` — Cluster CA certificate presented to the node for mTLS trust (PEM-encoded).
   Required for node→server and server→node mTLS connections.
+- `PLOY_CA_KEY_PEM` — Cluster CA private key (PEM-encoded). Set during bootstrap on the
+  control-plane node to enable the `/v1/pki/sign` endpoint for signing node CSRs. Should
+  only be present on the control-plane server; worker nodes do not require this variable.
 - `PLOY_SERVER_CERT_PEM` / `PLOY_SERVER_KEY_PEM` — The node's TLS certificate and key
   (CSR-signed by the control plane). Despite the name, bootstrap uses these variables
   for both server and node flows and writes to `/etc/ploy/pki/node.pem` and
