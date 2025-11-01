@@ -74,6 +74,12 @@ This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote inst
   dist/ploy jobs follow <job-id>
   ```
 
+**Tests & Coverage**
+- Run unit tests with coverage: `make test`
+- Enforce ≥60% overall coverage: `make test-coverage-threshold`
+- Enforce ≥90% on critical paths (scheduler/PKI/ingest): `make test-coverage-critical`
+- Full local CI bundle (format, vet, staticcheck if installed, coverage gates): `make ci-check`
+
 **Environment Variables**
 - Full reference: `docs/envs/README.md`
 - Key variables:
