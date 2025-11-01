@@ -1,0 +1,95 @@
+Repo:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    url: { type: string }
+    branch: { type: string, nullable: true }
+    commit_sha: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+  required: [id, url, created_at]
+
+CreateRepoRequest:
+  type: object
+  properties:
+    url: { type: string }
+    branch: { type: string, nullable: true }
+    commit_sha: { type: string, nullable: true }
+  required: [url]
+
+Mod:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    repo_id: { type: string, format: uuid }
+    spec: {}
+    created_by: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+  required: [id, repo_id, spec, created_at]
+
+CreateModRequest:
+  type: object
+  properties:
+    repo_id: { type: string, format: uuid }
+    spec: {}
+    created_by: { type: string, nullable: true }
+  required: [repo_id, spec]
+
+Run:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    mod_id: { type: string, format: uuid }
+    status: { type: string }
+    reason: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+    node_id: { type: string, format: uuid, nullable: true }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    commit_sha: { type: string, nullable: true }
+    stats: {}
+  required: [id, mod_id, status, created_at, base_ref, target_ref]
+
+CreateRunRequest:
+  type: object
+  properties:
+    mod_id: { type: string, format: uuid }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    commit_sha: { type: string, nullable: true }
+  required: [mod_id, base_ref, target_ref]
+
+CreateRunResponse:
+  type: object
+  properties:
+    run_id: { type: string, format: uuid }
+    run:
+      $ref: '#/Run'
+  required: [run_id, run]
+
+Event:
+  type: object
+  properties:
+    id: { type: integer, format: int64 }
+    run_id: { type: string, format: uuid }
+    stage_id: { type: string, format: uuid, nullable: true }
+    time: { type: string, format: date-time }
+    level: { type: string }
+    message: { type: string }
+    meta: {}
+  required: [id, run_id, time, level, message]
+
+Stage:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    run_id: { type: string, format: uuid }
+    name: { type: string }
+    status: { type: string }
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+    duration_ms: { type: integer, format: int64 }
+    meta: {}
+  required: [id, run_id, name, status, duration_ms]
+

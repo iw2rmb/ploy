@@ -1,0 +1,37 @@
+get:
+  tags: [Control]
+  summary: List mods
+  parameters:
+    - in: query
+      name: repo_id
+      schema: { type: string, format: uuid }
+      required: false
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              mods:
+                type: array
+                items:
+                  $ref: '../components/schemas/controlplane.yaml#/Mod'
+post:
+  tags: [Control]
+  summary: Create mod
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/CreateModRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/Mod'
+

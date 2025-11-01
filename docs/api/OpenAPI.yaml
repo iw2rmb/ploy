@@ -21,6 +21,8 @@ tags:
     description: HTTPS artifact upload, list, inspect, delete.
   - name: Security
     description: PKI operations (CA info, CSR signing).
+  - name: Control
+    description: Core control-plane CRUD surfaces (repos, mods, runs).
 security:
   - bearerAuth: []
 paths:
@@ -32,6 +34,20 @@ paths:
     $ref: './paths/gitlab_config.yaml'
   /v1/pki/sign:
     $ref: './paths/pki_sign.yaml'
+  /v1/repos:
+    $ref: './paths/repos.yaml'
+  /v1/repos/{id}:
+    $ref: './paths/repos_id.yaml'
+  /v1/mods/crud:
+    $ref: './paths/mods_crud.yaml'
+  /v1/mods/crud/{id}:
+    $ref: './paths/mods_crud_id.yaml'
+  /v1/runs:
+    $ref: './paths/runs.yaml'
+  /v1/runs/{id}:
+    $ref: './paths/runs_id.yaml'
+  /v1/runs/{id}/events:
+    $ref: './paths/runs_id_events.yaml'
   # Registry removed; Docker Hub is used for images.
   # v2 artifacts aliases
   /v2/artifacts/upload:
@@ -120,3 +136,21 @@ components:
     # registry schemas removed
     Error:
       $ref: './components/schemas/common.yaml#/Error'
+    Repo:
+      $ref: './components/schemas/controlplane.yaml#/Repo'
+    CreateRepoRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateRepoRequest'
+    Mod:
+      $ref: './components/schemas/controlplane.yaml#/Mod'
+    CreateModRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateModRequest'
+    Run:
+      $ref: './components/schemas/controlplane.yaml#/Run'
+    CreateRunRequest:
+      $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
+    CreateRunResponse:
+      $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
+    Event:
+      $ref: './components/schemas/controlplane.yaml#/Event'
+    Stage:
+      $ref: './components/schemas/controlplane.yaml#/Stage'
