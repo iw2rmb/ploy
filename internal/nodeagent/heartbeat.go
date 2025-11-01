@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -31,9 +32,11 @@ type HeartbeatPayload struct {
 
 // HeartbeatManager periodically sends resource snapshots to the server.
 type HeartbeatManager struct {
-	cfg       Config
-	collector *lifecycle.Collector
-	client    *http.Client
+	cfg             Config
+	collector       *lifecycle.Collector
+	client          *http.Client
+	backoffDuration time.Duration
+	maxBackoff      time.Duration
 }
 
 // NewHeartbeatManager constructs a heartbeat manager.
@@ -49,9 +52,11 @@ func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
 	}
 
 	return &HeartbeatManager{
-		cfg:       cfg,
-		collector: collector,
-		client:    client,
+		cfg:             cfg,
+		collector:       collector,
+		client:          client,
+		backoffDuration: 0,
+		maxBackoff:      5 * time.Minute,
 	}, nil
 }
 
@@ -63,15 +68,32 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 	// Send initial heartbeat.
 	if err := h.sendHeartbeat(ctx); err != nil {
 		slog.Error("initial heartbeat failed", "err", err)
+		h.applyBackoff(err)
+	} else {
+		h.resetBackoff()
 	}
 
 	for {
+		// If backoff is active, wait for it.
+		if h.backoffDuration > 0 {
+			slog.Warn("heartbeat backoff active", "duration", h.backoffDuration)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(h.backoffDuration):
+				// Backoff complete, continue.
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
 			if err := h.sendHeartbeat(ctx); err != nil {
 				slog.Error("heartbeat failed", "err", err)
+				h.applyBackoff(err)
+			} else {
+				h.resetBackoff()
 			}
 		}
 	}
@@ -126,10 +148,48 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("heartbeat failed with status %d", resp.StatusCode)
+		err := fmt.Errorf("heartbeat failed with status %d", resp.StatusCode)
+		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+			return &serverError{statusCode: resp.StatusCode, err: err}
+		}
+		return err
 	}
 
 	return nil
+}
+
+// serverError wraps a 5xx error for backoff handling.
+type serverError struct {
+	statusCode int
+	err        error
+}
+
+func (e *serverError) Error() string {
+	return e.err.Error()
+}
+
+func (e *serverError) Unwrap() error {
+	return e.err
+}
+
+// applyBackoff increases backoff duration when a 5xx error occurs.
+func (h *HeartbeatManager) applyBackoff(err error) {
+	var srvErr *serverError
+	if err != nil && errors.As(err, &srvErr) {
+		if h.backoffDuration == 0 {
+			h.backoffDuration = 5 * time.Second
+		} else {
+			h.backoffDuration = h.backoffDuration * 2
+			if h.backoffDuration > h.maxBackoff {
+				h.backoffDuration = h.maxBackoff
+			}
+		}
+	}
+}
+
+// resetBackoff clears backoff duration on successful heartbeat.
+func (h *HeartbeatManager) resetBackoff() {
+	h.backoffDuration = 0
 }
 
 // buildURL resolves a base URL and a path, preserving scheme/host.
