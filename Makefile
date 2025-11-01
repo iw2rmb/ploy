@@ -4,7 +4,7 @@ BUILD_DIR := dist
 .PHONY: build
 build: ## Build the Ploy CLI
 	@mkdir -p $(BUILD_DIR)
-	cd cmd/ploy && GOFLAGS= go build -o ../$(BUILD_DIR)/$(BINARY) .
+	GOFLAGS= go build -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
 		go build -o $(BUILD_DIR)/ployd ./cmd/ployd; \
 		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-linux ./cmd/ployd; \
