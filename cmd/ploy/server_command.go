@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
 )
@@ -201,8 +202,9 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		return fmt.Errorf("server deploy: provision host: %w", err)
 	}
 
-	// Save cluster descriptor locally
-	serverAddress := fmt.Sprintf("https://%s:8443", cfg.Address)
+	// Save cluster descriptor locally. Use the same normalization as the CLI control-plane helper
+	// to correctly handle IPv6 addresses and explicit ports.
+	serverAddress, _ := controlplane.BaseURLFromDescriptor(config.Descriptor{Address: cfg.Address, Scheme: "https"})
 	desc := config.Descriptor{
 		ClusterID:       clusterID,
 		Address:         serverAddress,
