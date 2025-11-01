@@ -22,14 +22,19 @@ type Options struct {
 	Interval time.Duration
 	// Logger is used for structured logging. If nil, a default logger is used.
 	Logger *slog.Logger
+	// DropPartitions enables dropping entire monthly partitions instead of
+	// row-by-row deletion for partitioned tables (logs, events, artifact_bundles).
+	// This is much more efficient for large datasets. Default: false.
+	DropPartitions bool
 }
 
 // Worker is a background task that purges expired data from the database.
 type Worker struct {
-	store    store.Store
-	ttl      time.Duration
-	interval time.Duration
-	logger   *slog.Logger
+	store          store.Store
+	ttl            time.Duration
+	interval       time.Duration
+	logger         *slog.Logger
+	dropPartitions bool
 }
 
 // New constructs a new TTL worker.
@@ -50,10 +55,11 @@ func New(opts Options) (*Worker, error) {
 		logger = slog.Default()
 	}
 	return &Worker{
-		store:    opts.Store,
-		ttl:      ttl,
-		interval: interval,
-		logger:   logger,
+		store:          opts.Store,
+		ttl:            ttl,
+		interval:       interval,
+		logger:         logger,
+		dropPartitions: opts.DropPartitions,
 	}, nil
 }
 
@@ -73,17 +79,24 @@ func (w *Worker) Run(ctx context.Context) error {
 		return nil
 	}
 
-    cutoff := time.Now().Add(-w.ttl)
-    // cutoffTS follows initialism casing rules (ST1003).
-    cutoffTS := pgtype.Timestamptz{
-        Time:  cutoff,
-        Valid: true,
-    }
+	cutoff := time.Now().Add(-w.ttl)
+	// cutoffTS follows initialism casing rules (ST1003).
+	cutoffTS := pgtype.Timestamptz{
+		Time:  cutoff,
+		Valid: true,
+	}
 
-	w.logger.Info("ttl-worker: starting cleanup", "cutoff", cutoff.Format(time.RFC3339))
+	w.logger.Info("ttl-worker: starting cleanup", "cutoff", cutoff.Format(time.RFC3339), "drop_partitions", w.dropPartitions)
 
-	// Delete expired logs.
-    logsDeleted, err := w.store.DeleteExpiredLogs(ctx, cutoffTS)
+	// Drop old partitions if enabled.
+	if w.dropPartitions {
+		if err := DropOldPartitions(ctx, w.store.Pool(), w.store, cutoff, w.logger); err != nil {
+			w.logger.Error("ttl-worker: partition dropper failed", "err", err)
+		}
+	}
+
+	// Delete expired logs (fallback for stray rows or if partition dropping is disabled).
+	logsDeleted, err := w.store.DeleteExpiredLogs(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired logs", "err", err)
 	} else {
@@ -91,7 +104,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired events.
-    eventsDeleted, err := w.store.DeleteExpiredEvents(ctx, cutoffTS)
+	eventsDeleted, err := w.store.DeleteExpiredEvents(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired events", "err", err)
 	} else {
@@ -99,7 +112,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired diffs.
-    diffsDeleted, err := w.store.DeleteExpiredDiffs(ctx, cutoffTS)
+	diffsDeleted, err := w.store.DeleteExpiredDiffs(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired diffs", "err", err)
 	} else {
@@ -107,7 +120,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	// Delete expired artifact bundles.
-    artifactsDeleted, err := w.store.DeleteExpiredArtifactBundles(ctx, cutoffTS)
+	artifactsDeleted, err := w.store.DeleteExpiredArtifactBundles(ctx, cutoffTS)
 	if err != nil {
 		w.logger.Error("ttl-worker: delete expired artifact bundles", "err", err)
 	} else {

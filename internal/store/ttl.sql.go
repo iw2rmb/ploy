@@ -66,3 +66,111 @@ func (q *Queries) DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timest
 	}
 	return result.RowsAffected(), nil
 }
+
+const listArtifactBundlePartitions = `-- name: ListArtifactBundlePartitions :many
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.artifact_bundles'::regclass
+`
+
+// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
+func (q *Queries) ListArtifactBundlePartitions(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlePartitions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var partition_name string
+		if err := rows.Scan(&partition_name); err != nil {
+			return nil, err
+		}
+		items = append(items, partition_name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEventPartitions = `-- name: ListEventPartitions :many
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.events'::regclass
+`
+
+// ListEventPartitions retrieves all partition names for the events table.
+func (q *Queries) ListEventPartitions(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listEventPartitions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var partition_name string
+		if err := rows.Scan(&partition_name); err != nil {
+			return nil, err
+		}
+		items = append(items, partition_name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogPartitions = `-- name: ListLogPartitions :many
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.logs'::regclass
+`
+
+// ListLogPartitions retrieves all partition names for the logs table.
+func (q *Queries) ListLogPartitions(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listLogPartitions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var partition_name string
+		if err := rows.Scan(&partition_name); err != nil {
+			return nil, err
+		}
+		items = append(items, partition_name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNodeMetricsPartitions = `-- name: ListNodeMetricsPartitions :many
+SELECT inhrelid::regclass::text AS partition_name
+FROM pg_catalog.pg_inherits
+WHERE inhparent = 'ploy.node_metrics'::regclass
+`
+
+// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
+func (q *Queries) ListNodeMetricsPartitions(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listNodeMetricsPartitions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var partition_name string
+		if err := rows.Scan(&partition_name); err != nil {
+			return nil, err
+		}
+		items = append(items, partition_name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

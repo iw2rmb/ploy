@@ -53,16 +53,24 @@ type Querier interface {
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
+	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
+	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error)
 	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
+	// ListEventPartitions retrieves all partition names for the events table.
+	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	// ListLogPartitions retrieves all partition names for the logs table.
+	ListLogPartitions(ctx context.Context) ([]string, error)
 	ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error)
 	ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAndStageParams) ([]Log, error)
 	ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error)
 	ListMods(ctx context.Context) ([]Mod, error)
 	ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]Mod, error)
+	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
+	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListRepos(ctx context.Context) ([]Repo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
