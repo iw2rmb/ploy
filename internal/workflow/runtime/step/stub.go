@@ -186,12 +186,13 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	// Stage 3: Build gate validation.
 	gateStart := time.Now()
 	gateSpec := req.Manifest.Gate
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
 	if gateSpec == nil && req.Manifest.Shift != nil {
 		// Fallback to deprecated Shift for backward compatibility.
 		gateSpec = &contracts.StepGateSpec{
-			Enabled: req.Manifest.Shift.Enabled,
-			Profile: req.Manifest.Shift.Profile,
-			Env:     req.Manifest.Shift.Env,
+			Enabled: req.Manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
+			Profile: req.Manifest.Shift.Profile, //lint:ignore SA1019 compat field access
+			Env:     req.Manifest.Shift.Env,     //lint:ignore SA1019 compat field access
 		}
 	}
 	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {

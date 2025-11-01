@@ -257,6 +257,47 @@ func TestRunner_Run_FallbackToShiftSpec(t *testing.T) {
 	}
 }
 
+func TestRunner_Run_GatePrecedenceOverShift(t *testing.T) {
+	var capturedProfile string
+	runner := Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate: &mockGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				capturedProfile = spec.Profile
+				return &contracts.BuildGateStageMetadata{}, nil
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    "test-step",
+		Name:  "Test Step",
+		Image: "test:latest",
+		Inputs: []contracts.StepInput{{
+			Name:        "source",
+			MountPath:   "/workspace",
+			Mode:        contracts.StepInputModeReadOnly,
+			SnapshotCID: "bafytest123",
+		}},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "gate-profile",
+		},
+		Shift: &contracts.StepShiftSpec{
+			Enabled: true,
+			Profile: "shift-profile",
+		},
+	}
+
+	_, err := runner.Run(context.Background(), Request{Manifest: manifest, Workspace: "/tmp/ws"})
+	if err != nil {
+		t.Fatalf("Run() unexpected error: %v", err)
+	}
+	if capturedProfile != "gate-profile" {
+		t.Errorf("Run() used profile %q, want 'gate-profile' when Gate present", capturedProfile)
+	}
+}
+
 func TestRunner_Run_HydrationFailure(t *testing.T) {
 	expectedErr := errors.New("hydration failed")
 	runner := Runner{
