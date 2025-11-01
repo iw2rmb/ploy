@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -132,6 +133,7 @@ type Runner struct {
 	Containers ContainerRuntime
 	Diffs      DiffGenerator
 	Artifacts  ArtifactPublisher
+	Gate       GateExecutor
 }
 
 // Request describes a step execution request.
@@ -145,11 +147,72 @@ type Result struct {
 	ExitCode     int
 	DiffArtifact PublishedArtifact
 	LogArtifact  PublishedArtifact
+	// Per-stage timings captured during execution.
+	Timings   StageTiming
+	BuildGate *contracts.BuildGateStageMetadata
+}
+
+// StageTiming captures duration of each execution stage.
+type StageTiming struct {
+	HydrationDuration time.Duration
+	ExecutionDuration time.Duration
+	BuildGateDuration time.Duration
+	DiffDuration      time.Duration
+	PublishDuration   time.Duration
+	TotalDuration     time.Duration
 }
 
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
-	_ = ctx
-	_ = req
-	return Result{}, errors.New("not implemented")
+	totalStart := time.Now()
+	var result Result
+
+	// Stage 1: Hydrate workspace.
+	hydrationStart := time.Now()
+	if r.Workspace != nil {
+		if err := r.Workspace.Hydrate(ctx, req.Manifest, req.Workspace); err != nil {
+			return Result{}, fmt.Errorf("workspace hydration failed: %w", err)
+		}
+	}
+	result.Timings.HydrationDuration = time.Since(hydrationStart)
+
+	// Stage 2: Execute container (placeholder for now).
+	executionStart := time.Now()
+	// Container execution is stubbed; future work will invoke Containers.
+	// For now, we simulate successful execution with exit code 0.
+	result.ExitCode = 0
+	result.Timings.ExecutionDuration = time.Since(executionStart)
+
+	// Stage 3: Build gate validation.
+	gateStart := time.Now()
+	gateSpec := req.Manifest.Gate
+	if gateSpec == nil && req.Manifest.Shift != nil {
+		// Fallback to deprecated Shift for backward compatibility.
+		gateSpec = &contracts.StepGateSpec{
+			Enabled: req.Manifest.Shift.Enabled,
+			Profile: req.Manifest.Shift.Profile,
+			Env:     req.Manifest.Shift.Env,
+		}
+	}
+	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
+		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
+		if err != nil {
+			return Result{}, fmt.Errorf("build gate execution failed: %w", err)
+		}
+		result.BuildGate = gateMetadata
+	}
+	result.Timings.BuildGateDuration = time.Since(gateStart)
+
+	// Stage 4: Generate diff (placeholder for now).
+	diffStart := time.Now()
+	// Diff generation is stubbed; future work will invoke Diffs.
+	result.Timings.DiffDuration = time.Since(diffStart)
+
+	// Stage 5: Publish artifacts (placeholder for now).
+	publishStart := time.Now()
+	// Artifact publishing is stubbed; future work will invoke Artifacts.
+	result.Timings.PublishDuration = time.Since(publishStart)
+
+	result.Timings.TotalDuration = time.Since(totalStart)
+	return result, nil
 }
