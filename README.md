@@ -47,6 +47,8 @@ See `SIMPLE.md` for the detailed architecture, deployment topology, and migratio
 
 This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote installs).
 
+Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFIG_PATH` to change the default (`/etc/ploy/ployd.yaml`). The flag overrides the environment variable when both are provided.
+
 **Quick Start**
 - Deploy the control-plane server (installs PostgreSQL if `--postgresql-dsn` not provided):
 
