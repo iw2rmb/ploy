@@ -33,7 +33,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
 - [x] `POST /v1/mods/crud` + `GET /v1/mods/crud?repo_id=`.
 - [x] `POST /v1/runs` (create run; status=queued) returns `{run_id}`.
-- [ ] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
+- [x] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
 - [ ] `GET /v1/runs?view=timing` to read from `runs_timing`.
 
 ## API: Events/SSE
