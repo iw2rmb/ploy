@@ -10,8 +10,12 @@ get:
       required: false
       description: |
         Alternate view for this collection. When set to `timing`,
-        the response body contains a `timings` array with queue/run durations
-        instead of the default `runs` array.
+        the endpoint serves run timing data from the `runs_timing` view.
+        - If no `id` is provided, the response contains a `timings` array
+          (see ListRunsTimingsResponse) honoring `limit`/`offset`.
+        - If an `id` is provided (via `/v1/runs/{id}` path or `?id=` query),
+          the response is a single timing object equivalent to
+          `GET /v1/runs/{id}/timing` (compatibility alias).
     - in: query
       name: mod_id
       schema: { type: string, format: uuid }
