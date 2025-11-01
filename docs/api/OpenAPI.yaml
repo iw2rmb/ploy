@@ -76,6 +76,9 @@ paths:
   # Node diff upload endpoint
   /v1/nodes/{id}/stage/{stage}/diff:
     $ref: './paths/nodes_id_stage_stage_diff.yaml'
+  # Node artifact bundle upload endpoint
+  /v1/nodes/{id}/stage/{stage}/artifact:
+    $ref: './paths/nodes_id_stage_stage_artifact.yaml'
   # Legacy removed:
   # - /v1/nodes (node registry now managed via server → node mTLS RPC)
   # - /v1/config/gitlab (GitLab signer removed)
