@@ -221,6 +221,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 
 	// Register node heartbeat endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
+	// Register node events endpoint (node agents).
+	httpSrv.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
@@ -1148,7 +1150,7 @@ func deleteRunHandler(st store.Store) http.HandlerFunc {
 
 // heartbeatHandler updates node heartbeat and resource snapshot.
 func heartbeatHandler(st store.Store) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
 		if strings.TrimSpace(nodeIDStr) == "" {
@@ -1164,15 +1166,15 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Decode request body.
-        var req struct {
-            CPUFreeMilli  float64 `json:"cpu_free_millis"`
-            CPUTotalMilli float64 `json:"cpu_total_millis"`
-            MemFreeMB     float64 `json:"mem_free_mb"`
-            MemTotalMB    float64 `json:"mem_total_mb"`
-            DiskFreeMB    float64 `json:"disk_free_mb"`
-            DiskTotalMB   float64 `json:"disk_total_mb"`
-            Version       string  `json:"version,omitempty"`
-        }
+		var req struct {
+			CPUFreeMilli  float64 `json:"cpu_free_millis"`
+			CPUTotalMilli float64 `json:"cpu_total_millis"`
+			MemFreeMB     float64 `json:"mem_free_mb"`
+			MemTotalMB    float64 `json:"mem_total_mb"`
+			DiskFreeMB    float64 `json:"disk_free_mb"`
+			DiskTotalMB   float64 `json:"disk_total_mb"`
+			Version       string  `json:"version,omitempty"`
+		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
@@ -1198,38 +1200,209 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		const mbToBytes = 1048576
 
 		// Update node heartbeat with resource snapshot.
-        err = st.UpdateNodeHeartbeat(r.Context(), store.UpdateNodeHeartbeatParams{
-            ID: pgtype.UUID{
-                Bytes: nodeUUID,
-                Valid: true,
-            },
-            LastHeartbeat: pgtype.Timestamptz{
-                Time:  time.Now().UTC(),
-                Valid: true,
-            },
-            CpuTotalMillis: int32(req.CPUTotalMilli),
-            CpuFreeMillis:  int32(req.CPUFreeMilli),
-            MemTotalBytes:  int64(req.MemTotalMB * mbToBytes),
-            MemFreeBytes:   int64(req.MemFreeMB * mbToBytes),
-            DiskTotalBytes: int64(req.DiskTotalMB * mbToBytes),
-            DiskFreeBytes:  int64(req.DiskFreeMB * mbToBytes),
-            Version:       strings.TrimSpace(req.Version),
-        })
-        if err != nil {
-            http.Error(w, fmt.Sprintf("failed to update heartbeat: %v", err), http.StatusInternalServerError)
-            slog.Error("heartbeat: update failed", "node_id", nodeIDStr, "err", err)
-            return
-        }
+		err = st.UpdateNodeHeartbeat(r.Context(), store.UpdateNodeHeartbeatParams{
+			ID: pgtype.UUID{
+				Bytes: nodeUUID,
+				Valid: true,
+			},
+			LastHeartbeat: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+			CpuTotalMillis: int32(req.CPUTotalMilli),
+			CpuFreeMillis:  int32(req.CPUFreeMilli),
+			MemTotalBytes:  int64(req.MemTotalMB * mbToBytes),
+			MemFreeBytes:   int64(req.MemFreeMB * mbToBytes),
+			DiskTotalBytes: int64(req.DiskTotalMB * mbToBytes),
+			DiskFreeBytes:  int64(req.DiskFreeMB * mbToBytes),
+			Version:        strings.TrimSpace(req.Version),
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to update heartbeat: %v", err), http.StatusInternalServerError)
+			slog.Error("heartbeat: update failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
 
-        w.WriteHeader(http.StatusNoContent)
-        slog.Debug("heartbeat updated",
-            "node_id", nodeIDStr,
-            "cpu_free_millis", req.CPUFreeMilli,
-            "mem_free_mb", req.MemFreeMB,
-            "disk_free_mb", req.DiskFreeMB,
-            "version", req.Version,
-        )
-    }
+		w.WriteHeader(http.StatusNoContent)
+		slog.Debug("heartbeat updated",
+			"node_id", nodeIDStr,
+			"cpu_free_millis", req.CPUFreeMilli,
+			"mem_free_mb", req.MemFreeMB,
+			"disk_free_mb", req.DiskFreeMB,
+			"version", req.Version,
+		)
+	}
+}
+
+// createNodeEventsHandler appends structured events/log frames to DB with SSE fanout.
+func createNodeEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
+	const maxRequestSize = 1 << 20 // 1 MiB
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract node id from path parameter.
+		nodeIDStr := r.PathValue("id")
+		if strings.TrimSpace(nodeIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate node_id.
+		nodeUUID, err := uuid.Parse(nodeIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Check payload size before reading body.
+		if r.ContentLength > maxRequestSize {
+			http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		// Limit request body to 1 MiB to prevent memory exhaustion.
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
+
+		// Decode request body.
+		var req struct {
+			RunID  string `json:"run_id"`
+			Events []struct {
+				StageID *string                `json:"stage_id,omitempty"`
+				Time    *string                `json:"time,omitempty"`
+				Level   string                 `json:"level"`
+				Message string                 `json:"message"`
+				Meta    map[string]interface{} `json:"meta,omitempty"`
+			} `json:"events"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate run_id is present.
+		if strings.TrimSpace(req.RunID) == "" {
+			http.Error(w, "run_id is required", http.StatusBadRequest)
+			return
+		}
+
+		// Validate run_id is a valid UUID.
+		runUUID, err := uuid.Parse(req.RunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate events array is not empty.
+		if len(req.Events) == 0 {
+			http.Error(w, "events array is required and must not be empty", http.StatusBadRequest)
+			return
+		}
+
+		// Check if the node exists before processing.
+		_, err = st.GetNode(r.Context(), pgtype.UUID{
+			Bytes: nodeUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "node not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
+			slog.Error("node events: check failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Process and persist each event.
+		count := 0
+		for i, evt := range req.Events {
+			// Validate required fields.
+			if strings.TrimSpace(evt.Level) == "" {
+				http.Error(w, fmt.Sprintf("events[%d]: level is required", i), http.StatusBadRequest)
+				return
+			}
+			if strings.TrimSpace(evt.Message) == "" {
+				http.Error(w, fmt.Sprintf("events[%d]: message is required", i), http.StatusBadRequest)
+				return
+			}
+
+			// Parse stage_id if provided.
+			var stageID pgtype.UUID
+			if evt.StageID != nil && strings.TrimSpace(*evt.StageID) != "" {
+				stageUUID, err := uuid.Parse(*evt.StageID)
+				if err != nil {
+					http.Error(w, fmt.Sprintf("events[%d]: invalid stage_id: %v", i, err), http.StatusBadRequest)
+					return
+				}
+				stageID = pgtype.UUID{
+					Bytes: stageUUID,
+					Valid: true,
+				}
+			}
+
+			// Parse event time if provided, otherwise use server time.
+			eventTime := time.Now().UTC()
+			if evt.Time != nil && strings.TrimSpace(*evt.Time) != "" {
+				parsedTime, err := time.Parse(time.RFC3339, strings.TrimSpace(*evt.Time))
+				if err != nil {
+					http.Error(w, fmt.Sprintf("events[%d]: invalid time format: %v", i, err), http.StatusBadRequest)
+					return
+				}
+				eventTime = parsedTime.UTC()
+			}
+
+			// Prepare meta field (default to empty JSON object if nil).
+			meta := evt.Meta
+			if meta == nil {
+				meta = map[string]interface{}{}
+			}
+
+			// Marshal meta to JSON.
+			metaBytes, err := json.Marshal(meta)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("events[%d]: failed to marshal meta: %v", i, err), http.StatusBadRequest)
+				return
+			}
+
+			// Create event params.
+			params := store.CreateEventParams{
+				RunID: pgtype.UUID{
+					Bytes: runUUID,
+					Valid: true,
+				},
+				StageID: stageID,
+				Time: pgtype.Timestamptz{
+					Time:  eventTime,
+					Valid: true,
+				},
+				Level:   evt.Level,
+				Message: evt.Message,
+				Meta:    metaBytes,
+			}
+
+			// Persist event to DB and fan out to SSE.
+			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to create event: %v", err), http.StatusInternalServerError)
+				slog.Error("node events: create failed", "node_id", nodeIDStr, "run_id", req.RunID, "index", i, "err", err)
+				return
+			}
+
+			count++
+		}
+
+		// Return success response with count.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"count": count,
+		})
+
+		slog.Debug("node events created",
+			"node_id", nodeIDStr,
+			"run_id", req.RunID,
+			"count", count,
+		)
+	}
 }
 
 // parseLastEventID parses the Last-Event-ID header to support SSE resumption.

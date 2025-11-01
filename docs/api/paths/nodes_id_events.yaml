@@ -1,0 +1,76 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Post structured events/log frames to DB (node → server)
+  description: |
+    Appends structured events or log frames to the database and fans out to SSE subscribers.
+    Node agents call this endpoint to report events during run execution.
+    The endpoint enforces a 1 MiB size cap on the request payload.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - run_id
+            - events
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: The run ID associated with these events
+            events:
+              type: array
+              description: Array of structured event records
+              items:
+                type: object
+                required:
+                  - level
+                  - message
+                properties:
+                  stage_id:
+                    type: string
+                    format: uuid
+                    nullable: true
+                    description: Optional stage UUID
+                  time:
+                    type: string
+                    format: date-time
+                    description: Event timestamp (defaults to server time if omitted)
+                  level:
+                    type: string
+                    description: Event level (e.g., info, warn, error, debug)
+                    example: "info"
+                  message:
+                    type: string
+                    description: Event message text
+                    example: "Build started"
+                  meta:
+                    type: object
+                    description: Optional metadata object (stored as JSONB)
+                    nullable: true
+  responses:
+    '201':
+      description: Events accepted, persisted to DB, and published to SSE hub
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+                description: Number of events successfully persisted
+    '400':
+      description: Bad Request (invalid node ID, malformed payload, or missing required fields)
+    '404':
+      description: Node not found
+    '413':
+      description: Payload Too Large (request body exceeds 1 MiB)
+    '500':
+      description: Internal server error

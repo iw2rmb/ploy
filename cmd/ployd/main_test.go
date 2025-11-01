@@ -300,6 +300,11 @@ type mockStore struct {
 	updateNodeHeartbeatCalled bool
 	updateNodeHeartbeatParams store.UpdateNodeHeartbeatParams
 	updateNodeHeartbeatErr    error
+
+	createEventCalled bool
+	createEventParams store.CreateEventParams
+	createEventResult store.Event
+	createEventErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -376,6 +381,12 @@ func (m *mockStore) UpdateNodeHeartbeat(ctx context.Context, params store.Update
 	m.updateNodeHeartbeatCalled = true
 	m.updateNodeHeartbeatParams = params
 	return m.updateNodeHeartbeatErr
+}
+
+func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventParams) (store.Event, error) {
+	m.createEventCalled = true
+	m.createEventParams = params
+	return m.createEventResult, m.createEventErr
 }
 
 // no-op
@@ -2686,7 +2697,7 @@ func TestHeartbeatHandler_Success(t *testing.T) {
 		},
 	}
 
-    payload := `{
+	payload := `{
         "cpu_free_millis": 1500.0,
         "cpu_total_millis": 4000.0,
         "mem_free_mb": 2048.0,
@@ -2732,12 +2743,12 @@ func TestHeartbeatHandler_Success(t *testing.T) {
 	if params.DiskFreeBytes != 10240*1048576 {
 		t.Errorf("expected disk_free_bytes=10737418240, got %d", params.DiskFreeBytes)
 	}
-    if params.DiskTotalBytes != 51200*1048576 {
-        t.Errorf("expected disk_total_bytes=53687091200, got %d", params.DiskTotalBytes)
-    }
-    if params.Version != "1.2.3" {
-        t.Errorf("expected version=1.2.3, got %q", params.Version)
-    }
+	if params.DiskTotalBytes != 51200*1048576 {
+		t.Errorf("expected disk_total_bytes=53687091200, got %d", params.DiskTotalBytes)
+	}
+	if params.Version != "1.2.3" {
+		t.Errorf("expected version=1.2.3, got %q", params.Version)
+	}
 }
 
 func TestHeartbeatHandler_MissingID(t *testing.T) {
@@ -2914,5 +2925,443 @@ func TestHeartbeatHandler_UpdateError(t *testing.T) {
 	}
 	if !mockSt.updateNodeHeartbeatCalled {
 		t.Fatal("expected UpdateNodeHeartbeat to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_Success(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stageID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		createEventResult: store.Event{
+			ID:      1,
+			RunID:   pgtype.UUID{Bytes: runID, Valid: true},
+			Time:    pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
+			Level:   "info",
+			Message: "Build started",
+		},
+	}
+
+	eventsService, err := events.New(events.Options{
+		BufferSize:  32,
+		HistorySize: 256,
+		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+		Store:       mockSt,
+	})
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	eventTime := time.Now().UTC().Format(time.RFC3339)
+	stageIDStr := stageID.String()
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"events": [
+			{
+				"stage_id": "` + stageIDStr + `",
+				"time": "` + eventTime + `",
+				"level": "info",
+				"message": "Build started",
+				"meta": {"foo": "bar"}
+			},
+			{
+				"level": "warn",
+				"message": "Warning message"
+			}
+		]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+
+	// Verify response.
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+
+	count, ok := resp["count"].(float64)
+	if !ok || int(count) != 2 {
+		t.Errorf("expected count=2, got %v", resp["count"])
+	}
+}
+
+func TestCreateNodeEventsHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes//events", nil)
+	req.SetPathValue("id", "")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "id path parameter is required") {
+		t.Errorf("expected error about missing id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_InvalidID(t *testing.T) {
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/not-a-uuid/events", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid id") {
+		t.Errorf("expected error about invalid id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_PayloadTooLarge(t *testing.T) {
+	nodeID := uuid.New()
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	// Create a payload larger than 1 MiB.
+	largePayload := bytes.Repeat([]byte("x"), 2*1024*1024)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", bytes.NewReader(largePayload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	req.ContentLength = int64(len(largePayload))
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("expected status 413, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "exceeds 1 MiB") {
+		t.Errorf("expected error about payload size, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_InvalidJSON(t *testing.T) {
+	nodeID := uuid.New()
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader("{invalid json"))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "invalid request") {
+		t.Errorf("expected error about invalid request, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_MissingRunID(t *testing.T) {
+	nodeID := uuid.New()
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	payload := `{
+		"events": [
+			{"level": "info", "message": "test"}
+		]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "run_id is required") {
+		t.Errorf("expected error about missing run_id, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_EmptyEvents(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	mockSt := &mockStore{}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"events": []
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "events array is required") {
+		t.Errorf("expected error about empty events, got: %s", body)
+	}
+
+	if mockSt.getNodeCalled {
+		t.Fatal("expected GetNode not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_NodeNotFound(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	mockSt := &mockStore{
+		getNodeErr: pgx.ErrNoRows,
+	}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"events": [
+			{"level": "info", "message": "test"}
+		]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "node not found") {
+		t.Errorf("expected error about node not found, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if mockSt.createEventCalled {
+		t.Fatal("expected CreateEvent not to be called after GetNode failed")
+	}
+}
+
+func TestCreateNodeEventsHandler_MissingEventLevel(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+	}
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"events": [
+			{"message": "test"}
+		]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "level is required") {
+		t.Errorf("expected error about missing level, got: %s", body)
+	}
+
+	if mockSt.createEventCalled {
+		t.Fatal("expected CreateEvent not to be called")
+	}
+}
+
+func TestCreateNodeEventsHandler_CreateEventError(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	version := "1.0.0"
+
+	mockSt := &mockStore{
+		getNodeResult: store.Node{
+			ID: pgtype.UUID{
+				Bytes: nodeID,
+				Valid: true,
+			},
+			Name:      "test-node",
+			IpAddress: netip.MustParseAddr("192.168.1.100"),
+			Version:   &version,
+			CreatedAt: pgtype.Timestamptz{
+				Time:  time.Now().UTC(),
+				Valid: true,
+			},
+		},
+		createEventErr: &pgconn.PgError{Code: "08000"},
+	}
+	eventsService, err := events.New(events.Options{
+		BufferSize:  32,
+		HistorySize: 256,
+		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+		Store:       mockSt,
+	})
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	payload := `{
+		"run_id": "` + runID.String() + `",
+		"events": [
+			{"level": "info", "message": "test"}
+		]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/events", strings.NewReader(payload))
+	req.SetPathValue("id", nodeID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := createNodeEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	body := strings.TrimSpace(rr.Body.String())
+	if !strings.Contains(body, "failed to create event") {
+		t.Errorf("expected error about create failure, got: %s", body)
+	}
+
+	if !mockSt.getNodeCalled {
+		t.Fatal("expected GetNode to be called")
+	}
+	if !mockSt.createEventCalled {
+		t.Fatal("expected CreateEvent to be called")
 	}
 }
