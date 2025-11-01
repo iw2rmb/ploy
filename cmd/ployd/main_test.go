@@ -437,6 +437,31 @@ func TestPKISignHandler_CANotConfigured(t *testing.T) {
 	}
 }
 
+func TestPKISignHandler_CANotConfigured_Whitespace(t *testing.T) {
+    // Whitespace-only env values should be treated as unset.
+    t.Setenv("PLOY_SERVER_CA_CERT", "   \n\t  ")
+    t.Setenv("PLOY_SERVER_CA_KEY", "  \t\n ")
+
+    mockSt := &mockStore{}
+    reqBody := map[string]string{
+        "node_id": uuid.New().String(),
+        "csr":     "some-csr",
+    }
+    reqJSON, _ := json.Marshal(reqBody)
+    req := httptest.NewRequest(http.MethodPost, "/v1/pki/sign", bytes.NewReader(reqJSON))
+    rr := httptest.NewRecorder()
+
+    handler := pkiSignHandler(mockSt)
+    handler.ServeHTTP(rr, req)
+
+    if rr.Code != http.StatusServiceUnavailable {
+        t.Fatalf("expected status 503, got %d", rr.Code)
+    }
+    if !strings.Contains(rr.Body.String(), "PKI not configured") {
+        t.Errorf("expected error message about PKI not configured, got: %s", rr.Body.String())
+    }
+}
+
 func TestPKISignHandler_InvalidCSR(t *testing.T) {
 	// Generate test CA.
 	ca, err := internalPKI.GenerateCA("test-cluster", time.Now())

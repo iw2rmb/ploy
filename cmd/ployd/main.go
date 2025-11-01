@@ -278,16 +278,17 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
             return
         }
 
-        // Load cluster CA from environment.
-        caCertPEM := os.Getenv("PLOY_SERVER_CA_CERT")
-        caKeyPEM := os.Getenv("PLOY_SERVER_CA_KEY")
-        if caCertPEM == "" || caKeyPEM == "" {
+        // Load cluster CA from environment (treat whitespace as unset), but preserve
+        // original values for downstream use to avoid altering PEM formatting.
+        rawCACert := os.Getenv("PLOY_SERVER_CA_CERT")
+        rawCAKey := os.Getenv("PLOY_SERVER_CA_KEY")
+        if strings.TrimSpace(rawCACert) == "" || strings.TrimSpace(rawCAKey) == "" {
             http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
             slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
             return
         }
 
-        ca, err := internalPKI.LoadCA(caCertPEM, caKeyPEM)
+        ca, err := internalPKI.LoadCA(rawCACert, rawCAKey)
         if err != nil {
             http.Error(w, "failed to load CA", http.StatusInternalServerError)
             slog.Error("pki sign: load CA failed", "err", err)
@@ -340,7 +341,7 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response according to docs/api/components/schemas/pki.yaml.
-		resp := struct {
+        resp := struct {
 			Certificate string `json:"certificate"`
 			CABundle    string `json:"ca_bundle"`
 			Serial      string `json:"serial"`
@@ -349,7 +350,7 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 			NotAfter    string `json:"not_after"`
 		}{
 			Certificate: cert.CertPEM,
-			CABundle:    ca.CertPEM,
+            CABundle:    rawCACert,
 			Serial:      cert.Serial,
 			Fingerprint: cert.Fingerprint,
 			NotBefore:   cert.NotBefore.Format(time.RFC3339),
