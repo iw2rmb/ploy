@@ -275,15 +275,15 @@ type mockStore struct {
 	getRunResult store.Run
 	getRunErr    error
 
-    getRunTimingCalled bool
-    getRunTimingParams pgtype.UUID
-    getRunTimingResult store.RunsTiming
-    getRunTimingErr    error
+	getRunTimingCalled bool
+	getRunTimingParams pgtype.UUID
+	getRunTimingResult store.RunsTiming
+	getRunTimingErr    error
 
-    listRunsTimingsCalled bool
-    listRunsTimingsParams store.ListRunsTimingsParams
-    listRunsTimingsResult []store.RunsTiming
-    listRunsTimingsErr    error
+	listRunsTimingsCalled bool
+	listRunsTimingsParams store.ListRunsTimingsParams
+	listRunsTimingsResult []store.RunsTiming
+	listRunsTimingsErr    error
 
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
@@ -337,15 +337,15 @@ func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, erro
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
-    m.getRunTimingCalled = true
-    m.getRunTimingParams = id
-    return m.getRunTimingResult, m.getRunTimingErr
+	m.getRunTimingCalled = true
+	m.getRunTimingParams = id
+	return m.getRunTimingResult, m.getRunTimingErr
 }
 
 func (m *mockStore) ListRunsTimings(ctx context.Context, arg store.ListRunsTimingsParams) ([]store.RunsTiming, error) {
-    m.listRunsTimingsCalled = true
-    m.listRunsTimingsParams = arg
-    return m.listRunsTimingsResult, m.listRunsTimingsErr
+	m.listRunsTimingsCalled = true
+	m.listRunsTimingsParams = arg
+	return m.listRunsTimingsResult, m.listRunsTimingsErr
 }
 
 func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
@@ -1719,20 +1719,20 @@ func TestGetRunHandler_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-    var resp struct {
-        ID         string          `json:"id"`
-        ModID      string          `json:"mod_id"`
-        Status     string          `json:"status"`
-        Reason     *string         `json:"reason,omitempty"`
-        CreatedAt  string          `json:"created_at"`
-        StartedAt  *string         `json:"started_at,omitempty"`
-        FinishedAt *string         `json:"finished_at,omitempty"`
-        NodeID     *string         `json:"node_id,omitempty"`
-        BaseRef    string          `json:"base_ref"`
-        TargetRef  string          `json:"target_ref"`
-        CommitSha  *string         `json:"commit_sha,omitempty"`
-        Stats      json.RawMessage `json:"stats,omitempty"`
-    }
+	var resp struct {
+		ID         string          `json:"id"`
+		ModID      string          `json:"mod_id"`
+		Status     string          `json:"status"`
+		Reason     *string         `json:"reason,omitempty"`
+		CreatedAt  string          `json:"created_at"`
+		StartedAt  *string         `json:"started_at,omitempty"`
+		FinishedAt *string         `json:"finished_at,omitempty"`
+		NodeID     *string         `json:"node_id,omitempty"`
+		BaseRef    string          `json:"base_ref"`
+		TargetRef  string          `json:"target_ref"`
+		CommitSha  *string         `json:"commit_sha,omitempty"`
+		Stats      json.RawMessage `json:"stats,omitempty"`
+	}
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -1755,9 +1755,9 @@ func TestGetRunHandler_Success(t *testing.T) {
 	if resp.NodeID == nil || *resp.NodeID != nodeID.String() {
 		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp.NodeID)
 	}
-    if len(resp.Stats) == 0 || string(resp.Stats) != stats {
-        t.Errorf("expected stats %q, got %s", stats, string(resp.Stats))
-    }
+	if len(resp.Stats) == 0 || string(resp.Stats) != stats {
+		t.Errorf("expected stats %q, got %s", stats, string(resp.Stats))
+	}
 
 	if !mockSt.getRunCalled {
 		t.Fatal("expected GetRun to be called")
@@ -1863,46 +1863,46 @@ func TestGetRunHandler_DatabaseError(t *testing.T) {
 }
 
 func TestGetRunHandler_PathParam_Success(t *testing.T) {
-    runID := uuid.New()
-    modID := uuid.New()
-    now := time.Now().UTC()
+	runID := uuid.New()
+	modID := uuid.New()
+	now := time.Now().UTC()
 
-    mockSt := &mockStore{
-        getRunResult: store.Run{
-            ID: pgtype.UUID{Bytes: runID, Valid: true},
-            ModID: pgtype.UUID{Bytes: modID, Valid: true},
-            Status:    store.RunStatusQueued,
-            BaseRef:   "main",
-            TargetRef: "feature",
-            CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-            Stats:     []byte("{}"),
-        },
-    }
+	mockSt := &mockStore{
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			Stats:     []byte("{}"),
+		},
+	}
 
-    req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
-    req.SetPathValue("id", runID.String())
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID.String(), nil)
+	req.SetPathValue("id", runID.String())
+	rr := httptest.NewRecorder()
 
-    handler := getRunHandler(mockSt)
-    handler.ServeHTTP(rr, req)
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusOK {
-        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-    }
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
 
-    var resp struct {
-        ID    string `json:"id"`
-        ModID string `json:"mod_id"`
-    }
-    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-        t.Fatalf("decode response: %v", err)
-    }
-    if resp.ID != runID.String() {
-        t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
-    }
-    if resp.ModID != modID.String() {
-        t.Errorf("expected mod_id %s, got %s", modID.String(), resp.ModID)
-    }
+	var resp struct {
+		ID    string `json:"id"`
+		ModID string `json:"mod_id"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.ID != runID.String() {
+		t.Errorf("expected id %s, got %s", runID.String(), resp.ID)
+	}
+	if resp.ModID != modID.String() {
+		t.Errorf("expected mod_id %s, got %s", modID.String(), resp.ModID)
+	}
 }
 
 func TestDeleteRunHandler_Success(t *testing.T) {
@@ -2229,98 +2229,98 @@ func TestGetRunTimingHandler_ZeroValues(t *testing.T) {
 }
 
 func TestListRunTimingsHandler_Default(t *testing.T) {
-    mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{}}
+	mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{}}
 
-    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing", nil)
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing", nil)
+	rr := httptest.NewRecorder()
 
-    handler := getRunHandler(mockSt)
-    handler.ServeHTTP(rr, req)
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusOK {
-        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-    }
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
 
-    var resp struct {
-        Timings []struct {
-            ID      string `json:"id"`
-            QueueMs int64  `json:"queue_ms"`
-            RunMs   int64  `json:"run_ms"`
-        } `json:"timings"`
-    }
-    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-        t.Fatalf("decode response: %v", err)
-    }
-    if len(resp.Timings) != 0 {
-        t.Fatalf("expected empty timings, got %d", len(resp.Timings))
-    }
-    if !mockSt.listRunsTimingsCalled {
-        t.Fatal("expected ListRunsTimings to be called")
-    }
-    if mockSt.listRunsTimingsParams.Limit != 100 || mockSt.listRunsTimingsParams.Offset != 0 {
-        t.Fatalf("expected default limit=100 offset=0, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
-    }
+	var resp struct {
+		Timings []struct {
+			ID      string `json:"id"`
+			QueueMs int64  `json:"queue_ms"`
+			RunMs   int64  `json:"run_ms"`
+		} `json:"timings"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Timings) != 0 {
+		t.Fatalf("expected empty timings, got %d", len(resp.Timings))
+	}
+	if !mockSt.listRunsTimingsCalled {
+		t.Fatal("expected ListRunsTimings to be called")
+	}
+	if mockSt.listRunsTimingsParams.Limit != 100 || mockSt.listRunsTimingsParams.Offset != 0 {
+		t.Fatalf("expected default limit=100 offset=0, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
+	}
 }
 
 func TestListRunTimingsHandler_WithPagination(t *testing.T) {
-    runA := uuid.New()
-    runB := uuid.New()
-    mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{
-        {ID: pgtype.UUID{Bytes: runA, Valid: true}, QueueMs: 10, RunMs: 20},
-        {ID: pgtype.UUID{Bytes: runB, Valid: true}, QueueMs: 30, RunMs: 40},
-    }}
+	runA := uuid.New()
+	runB := uuid.New()
+	mockSt := &mockStore{listRunsTimingsResult: []store.RunsTiming{
+		{ID: pgtype.UUID{Bytes: runA, Valid: true}, QueueMs: 10, RunMs: 20},
+		{ID: pgtype.UUID{Bytes: runB, Valid: true}, QueueMs: 30, RunMs: 40},
+	}}
 
-    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=5&offset=10", nil)
-    rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=5&offset=10", nil)
+	rr := httptest.NewRecorder()
 
-    handler := getRunHandler(mockSt)
-    handler.ServeHTTP(rr, req)
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
 
-    if rr.Code != http.StatusOK {
-        t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-    }
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
 
-    var resp struct {
-        Timings []struct {
-            ID      string `json:"id"`
-            QueueMs int64  `json:"queue_ms"`
-            RunMs   int64  `json:"run_ms"`
-        } `json:"timings"`
-    }
-    if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-        t.Fatalf("decode response: %v", err)
-    }
-    if len(resp.Timings) != 2 {
-        t.Fatalf("expected 2 timings, got %d", len(resp.Timings))
-    }
-    if resp.Timings[0].ID != runA.String() || resp.Timings[0].QueueMs != 10 || resp.Timings[0].RunMs != 20 {
-        t.Fatalf("unexpected first timing: %+v", resp.Timings[0])
-    }
-    if !mockSt.listRunsTimingsCalled {
-        t.Fatal("expected ListRunsTimings to be called")
-    }
-    if mockSt.listRunsTimingsParams.Limit != 5 || mockSt.listRunsTimingsParams.Offset != 10 {
-        t.Fatalf("expected limit=5 offset=10, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
-    }
+	var resp struct {
+		Timings []struct {
+			ID      string `json:"id"`
+			QueueMs int64  `json:"queue_ms"`
+			RunMs   int64  `json:"run_ms"`
+		} `json:"timings"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Timings) != 2 {
+		t.Fatalf("expected 2 timings, got %d", len(resp.Timings))
+	}
+	if resp.Timings[0].ID != runA.String() || resp.Timings[0].QueueMs != 10 || resp.Timings[0].RunMs != 20 {
+		t.Fatalf("unexpected first timing: %+v", resp.Timings[0])
+	}
+	if !mockSt.listRunsTimingsCalled {
+		t.Fatal("expected ListRunsTimings to be called")
+	}
+	if mockSt.listRunsTimingsParams.Limit != 5 || mockSt.listRunsTimingsParams.Offset != 10 {
+		t.Fatalf("expected limit=5 offset=10, got limit=%d offset=%d", mockSt.listRunsTimingsParams.Limit, mockSt.listRunsTimingsParams.Offset)
+	}
 }
 
 func TestListRunTimingsHandler_InvalidParams(t *testing.T) {
-    mockSt := &mockStore{}
-    // invalid limit
-    req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=zero", nil)
-    rr := httptest.NewRecorder()
-    handler := getRunHandler(mockSt)
-    handler.ServeHTTP(rr, req)
-    if rr.Code != http.StatusBadRequest {
-        t.Fatalf("expected 400 for invalid limit, got %d", rr.Code)
-    }
-    // invalid offset
-    req2 := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&offset=-1", nil)
-    rr2 := httptest.NewRecorder()
-    handler.ServeHTTP(rr2, req2)
-    if rr2.Code != http.StatusBadRequest {
-        t.Fatalf("expected 400 for invalid offset, got %d", rr2.Code)
-    }
+	mockSt := &mockStore{}
+	// invalid limit
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&limit=zero", nil)
+	rr := httptest.NewRecorder()
+	handler := getRunHandler(mockSt)
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid limit, got %d", rr.Code)
+	}
+	// invalid offset
+	req2 := httptest.NewRequest(http.MethodGet, "/v1/runs?view=timing&offset=-1", nil)
+	rr2 := httptest.NewRecorder()
+	handler.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid offset, got %d", rr2.Code)
+	}
 }
 
 func TestGetRunTimingHandler_InvalidID(t *testing.T) {

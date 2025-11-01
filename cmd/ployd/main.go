@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-    "strconv"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -206,14 +206,14 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
 
-    // Register runs endpoints (control plane).
-    httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
-    // Support both query (?id=) and RESTful path (/v1/runs/{id}) for basic run view.
-    httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
-    httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
-    // Explicit timing subresource for clarity and OpenAPI alignment.
-    httpSrv.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
-    httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
+	// Register runs endpoints (control plane).
+	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
+	// Support both query (?id=) and RESTful path (/v1/runs/{id}) for basic run view.
+	httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+	// Explicit timing subresource for clarity and OpenAPI alignment.
+	httpSrv.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
@@ -856,34 +856,34 @@ func createRunHandler(st store.Store) http.HandlerFunc {
 // If view=timing and no id is provided, returns a collection of timings
 // honoring optional limit/offset pagination.
 func getRunHandler(st store.Store) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        // Check if view=timing is requested.
-        view := strings.TrimSpace(r.URL.Query().Get("view"))
-        if view == "timing" {
-            // Accept id from path parameter first, then fallback to query parameter.
-            runIDStr := strings.TrimSpace(r.PathValue("id"))
-            if runIDStr == "" {
-                runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
-            }
-            if runIDStr != "" {
-                // Single-run timing
-                getRunTimingHandler(st).ServeHTTP(w, r)
-                return
-            }
-            // Collection view of timings
-            listRunTimingsHandler(st).ServeHTTP(w, r)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if view=timing is requested.
+		view := strings.TrimSpace(r.URL.Query().Get("view"))
+		if view == "timing" {
+			// Accept id from path parameter first, then fallback to query parameter.
+			runIDStr := strings.TrimSpace(r.PathValue("id"))
+			if runIDStr == "" {
+				runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
+			}
+			if runIDStr != "" {
+				// Single-run timing
+				getRunTimingHandler(st).ServeHTTP(w, r)
+				return
+			}
+			// Collection view of timings
+			listRunTimingsHandler(st).ServeHTTP(w, r)
+			return
+		}
 
-        // Accept id from path parameter first, then fallback to query parameter.
-        runIDStr := strings.TrimSpace(r.PathValue("id"))
-        if runIDStr == "" {
-            runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
-        }
-        if runIDStr == "" {
-            http.Error(w, "id query parameter is required", http.StatusBadRequest)
-            return
-        }
+		// Accept id from path parameter first, then fallback to query parameter.
+		runIDStr := strings.TrimSpace(r.PathValue("id"))
+		if runIDStr == "" {
+			runIDStr = strings.TrimSpace(r.URL.Query().Get("id"))
+		}
+		if runIDStr == "" {
+			http.Error(w, "id query parameter is required", http.StatusBadRequest)
+			return
+		}
 
 		// Parse and validate run_id.
 		runUUID, err := uuid.Parse(runIDStr)
@@ -908,29 +908,29 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build response.
-        resp := struct {
-            ID         string          `json:"id"`
-            ModID      string          `json:"mod_id"`
-            Status     string          `json:"status"`
-            Reason     *string         `json:"reason,omitempty"`
-            CreatedAt  string          `json:"created_at"`
-            StartedAt  *string         `json:"started_at,omitempty"`
-            FinishedAt *string         `json:"finished_at,omitempty"`
-            NodeID     *string         `json:"node_id,omitempty"`
-            BaseRef    string          `json:"base_ref"`
-            TargetRef  string          `json:"target_ref"`
-            CommitSha  *string         `json:"commit_sha,omitempty"`
-            Stats      json.RawMessage `json:"stats,omitempty"`
-        }{
-            ID:        uuid.UUID(run.ID.Bytes).String(),
-            ModID:     uuid.UUID(run.ModID.Bytes).String(),
-            Status:    string(run.Status),
-            Reason:    run.Reason,
-            CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
-            BaseRef:   run.BaseRef,
-            TargetRef: run.TargetRef,
-            CommitSha: run.CommitSha,
-        }
+		resp := struct {
+			ID         string          `json:"id"`
+			ModID      string          `json:"mod_id"`
+			Status     string          `json:"status"`
+			Reason     *string         `json:"reason,omitempty"`
+			CreatedAt  string          `json:"created_at"`
+			StartedAt  *string         `json:"started_at,omitempty"`
+			FinishedAt *string         `json:"finished_at,omitempty"`
+			NodeID     *string         `json:"node_id,omitempty"`
+			BaseRef    string          `json:"base_ref"`
+			TargetRef  string          `json:"target_ref"`
+			CommitSha  *string         `json:"commit_sha,omitempty"`
+			Stats      json.RawMessage `json:"stats,omitempty"`
+		}{
+			ID:        uuid.UUID(run.ID.Bytes).String(),
+			ModID:     uuid.UUID(run.ModID.Bytes).String(),
+			Status:    string(run.Status),
+			Reason:    run.Reason,
+			CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
+			BaseRef:   run.BaseRef,
+			TargetRef: run.TargetRef,
+			CommitSha: run.CommitSha,
+		}
 
 		// Handle optional timestamp fields.
 		if run.StartedAt.Valid {
@@ -948,10 +948,10 @@ func getRunHandler(st store.Store) http.HandlerFunc {
 			resp.NodeID = &nodeID
 		}
 
-        // Handle stats (JSONB): return as raw JSON if not empty object.
-        if len(run.Stats) > 0 && string(run.Stats) != "{}" {
-            resp.Stats = json.RawMessage(run.Stats)
-        }
+		// Handle stats (JSONB): return as raw JSON if not empty object.
+		if len(run.Stats) > 0 && string(run.Stats) != "{}" {
+			resp.Stats = json.RawMessage(run.Stats)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -1022,73 +1022,73 @@ func getRunTimingHandler(st store.Store) http.HandlerFunc {
 // listRunTimingsHandler returns an HTTP handler that lists run timings with pagination.
 // Defaults: limit=100, offset=0. Enforces maximum limit of 200.
 func listRunTimingsHandler(st store.Store) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        // Parse pagination params with sane defaults.
-        const (
-            defaultLimit = 100
-            maxLimit     = 200
-        )
-        q := r.URL.Query()
-        // limit
-        limit := defaultLimit
-        if v := strings.TrimSpace(q.Get("limit")); v != "" {
-            if n, err := strconv.Atoi(v); err != nil || n < 1 {
-                http.Error(w, "invalid limit", http.StatusBadRequest)
-                return
-            } else {
-                limit = n
-            }
-        }
-        if limit > maxLimit {
-            limit = maxLimit
-        }
-        // offset
-        offset := 0
-        if v := strings.TrimSpace(q.Get("offset")); v != "" {
-            if n, err := strconv.Atoi(v); err != nil || n < 0 {
-                http.Error(w, "invalid offset", http.StatusBadRequest)
-                return
-            } else {
-                offset = n
-            }
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse pagination params with sane defaults.
+		const (
+			defaultLimit = 100
+			maxLimit     = 200
+		)
+		q := r.URL.Query()
+		// limit
+		limit := defaultLimit
+		if v := strings.TrimSpace(q.Get("limit")); v != "" {
+			if n, err := strconv.Atoi(v); err != nil || n < 1 {
+				http.Error(w, "invalid limit", http.StatusBadRequest)
+				return
+			} else {
+				limit = n
+			}
+		}
+		if limit > maxLimit {
+			limit = maxLimit
+		}
+		// offset
+		offset := 0
+		if v := strings.TrimSpace(q.Get("offset")); v != "" {
+			if n, err := strconv.Atoi(v); err != nil || n < 0 {
+				http.Error(w, "invalid offset", http.StatusBadRequest)
+				return
+			} else {
+				offset = n
+			}
+		}
 
-        // Query store
-        items, err := st.ListRunsTimings(r.Context(), store.ListRunsTimingsParams{
-            Limit:  int32(limit),
-            Offset: int32(offset),
-        })
-        if err != nil {
-            http.Error(w, fmt.Sprintf("failed to list run timings: %v", err), http.StatusInternalServerError)
-            slog.Error("list run timings: database error", "err", err)
-            return
-        }
+		// Query store
+		items, err := st.ListRunsTimings(r.Context(), store.ListRunsTimingsParams{
+			Limit:  int32(limit),
+			Offset: int32(offset),
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list run timings: %v", err), http.StatusInternalServerError)
+			slog.Error("list run timings: database error", "err", err)
+			return
+		}
 
-        // Build response
-        type timing struct {
-            ID      string `json:"id"`
-            QueueMs int64  `json:"queue_ms"`
-            RunMs   int64  `json:"run_ms"`
-        }
-        resp := struct {
-            Timings []timing `json:"timings"`
-        }{Timings: make([]timing, len(items))}
+		// Build response
+		type timing struct {
+			ID      string `json:"id"`
+			QueueMs int64  `json:"queue_ms"`
+			RunMs   int64  `json:"run_ms"`
+		}
+		resp := struct {
+			Timings []timing `json:"timings"`
+		}{Timings: make([]timing, len(items))}
 
-        for i, it := range items {
-            resp.Timings[i] = timing{
-                ID:      uuid.UUID(it.ID.Bytes).String(),
-                QueueMs: it.QueueMs,
-                RunMs:   it.RunMs,
-            }
-        }
+		for i, it := range items {
+			resp.Timings[i] = timing{
+				ID:      uuid.UUID(it.ID.Bytes).String(),
+				QueueMs: it.QueueMs,
+				RunMs:   it.RunMs,
+			}
+		}
 
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusOK)
-        if err := json.NewEncoder(w).Encode(resp); err != nil {
-            slog.Error("list run timings: encode response failed", "err", err)
-        }
-        slog.Debug("run timings listed", "count", len(resp.Timings), "limit", limit, "offset", offset)
-    }
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("list run timings: encode response failed", "err", err)
+		}
+		slog.Debug("run timings listed", "count", len(resp.Timings), "limit", limit, "offset", offset)
+	}
 }
 
 // deleteRunHandler returns an HTTP handler that deletes a run by id.
