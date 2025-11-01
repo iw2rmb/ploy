@@ -53,10 +53,10 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		printServerDeployUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
-	if !address.set || strings.TrimSpace(address.value) == "" {
-		printServerDeployUsage(stderr)
-		return errors.New("--address is required")
-	}
+    if !address.set || strings.TrimSpace(address.value) == "" {
+        printServerDeployUsage(stderr)
+        return errors.New("address is required")
+    }
 
 	serverCfg := serverDeployConfig{
 		Address:       address.value,

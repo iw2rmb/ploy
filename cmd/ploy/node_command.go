@@ -53,14 +53,14 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 		printNodeAddUsage(stderr)
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
-	if !clusterID.set || strings.TrimSpace(clusterID.value) == "" {
-		printNodeAddUsage(stderr)
-		return errors.New("--cluster-id is required")
-	}
-	if !address.set || strings.TrimSpace(address.value) == "" {
-		printNodeAddUsage(stderr)
-		return errors.New("--address is required")
-	}
+    if !clusterID.set || strings.TrimSpace(clusterID.value) == "" {
+        printNodeAddUsage(stderr)
+        return errors.New("cluster-id is required")
+    }
+    if !address.set || strings.TrimSpace(address.value) == "" {
+        printNodeAddUsage(stderr)
+        return errors.New("address is required")
+    }
 
 	nodeCfg := nodeAddConfig{
 		ClusterID:    clusterID.value,
