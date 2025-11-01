@@ -52,26 +52,26 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	)
 	fs.Var(&clusterID, "cluster-id", "Cluster identifier to join")
 	fs.Var(&address, "address", "Node IP or hostname")
-	fs.Var(&serverURL, "server-url", "Ploy server URL (default: https://<first-server>:8443)")
+	fs.Var(&serverURL, "server-url", "Ploy server URL (required; e.g. https://<server-host>:8443)")
 	fs.Var(&identity, "identity", "SSH private key used for provisioning (default: ~/.ssh/id_rsa)")
 	fs.Var(&userFlag, "user", "SSH username used for provisioning (default: root)")
 	fs.Var(&ploydNodeBin, "ployd-node-binary", "Path to the ployd-node binary uploaded during provisioning (default: alongside the CLI)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for node provisioning (default: 22)")
 
 	if err := fs.Parse(args); err != nil {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> [--server-url <url>]")
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
 		return err
 	}
 	if fs.NArg() > 0 {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> [--server-url <url>]")
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
 		return fmt.Errorf("unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 	if !clusterID.set || strings.TrimSpace(clusterID.value) == "" {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> [--server-url <url>]")
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
 		return errors.New("cluster-id is required")
 	}
 	if !address.set || strings.TrimSpace(address.value) == "" {
-		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> [--server-url <url>]")
+		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
 		return errors.New("address is required")
 	}
 
@@ -162,14 +162,15 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 
 	// Prepare environment variables for bootstrap script
 	scriptEnv := map[string]string{
-		"CLUSTER_ID":         cfg.ClusterID,
-		"NODE_ID":            nodeID,
-		"NODE_ADDRESS":       cfg.Address,
-		"BOOTSTRAP_PRIMARY":  "false",
-		"PLOY_CA_CERT_PEM":   caCert,
-		"PLOY_NODE_CERT_PEM": signedCert,
-		"PLOY_NODE_KEY_PEM":  keyBundle.KeyPEM,
-		"PLOY_SERVER_URL":    serverURL,
+		"CLUSTER_ID":        cfg.ClusterID,
+		"NODE_ID":           nodeID,
+		"NODE_ADDRESS":      cfg.Address,
+		"BOOTSTRAP_PRIMARY": "false",
+		"PLOY_CA_CERT_PEM":  caCert,
+		// Despite the name, the bootstrap uses PLOY_SERVER_* for both server and node flows.
+		"PLOY_SERVER_CERT_PEM": signedCert,
+		"PLOY_SERVER_KEY_PEM":  keyBundle.KeyPEM,
+		"PLOY_SERVER_URL":      serverURL,
 	}
 
 	// Provision the node host

@@ -193,9 +193,9 @@ Optional pull vs push
 Certificate issuance
 - `ploy server deploy` creates a cluster CA (`<cluster-id>-ca.key/.crt`) and a
   server TLS cert with SANs for the server IP and `ployd` DNS name.
-- `ploy node add` generates the node key on the node, builds a CSR with CN
+- `ploy node add` generates the node private key and CSR locally, with CN
   `node:<node-id>` and SANs for the node IP and `ploy-node` DNS name, submits
-  it to the server’s PKI endpoint, and installs the signed cert and CA.
+  the CSR to the server’s PKI endpoint, and installs the signed cert and CA on the node.
 - The same CA is trusted by both sides for mTLS. Rotation is performed by
   re‑issuing node certs via the CSR flow.
 - Node certificates carry EKUs for both `serverAuth` and `clientAuth` so they

@@ -52,22 +52,22 @@ dist/ploy server deploy --address 203.0.113.42
 Use `ploy node add` to register worker nodes with the cluster:
 
 ```bash
-dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip>
+dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
 ```
 
 This command:
 - Installs `ployd-node` binary over SSH.
-- Generates a private key and CSR on the node.
+- Generates a node private key and CSR locally.
 - Submits the CSR to the server's `/v1/pki/sign` endpoint for signing.
-- Installs the issued node certificate and CA bundle to `/etc/ploy/pki`.
+- Installs the issued node certificate, key, and CA bundle on the node under `/etc/ploy/pki`.
 - Records the node IP in the `nodes` table.
 - Bootstraps the `ployd-node` systemd unit; node communicates with server via mTLS.
 
 Example:
 
 ```bash
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44
+dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://203.0.113.42:8443
+dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://203.0.113.42:8443
 ```
 
 ### 3. Submit a Run
