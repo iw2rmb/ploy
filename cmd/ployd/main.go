@@ -1236,8 +1236,8 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 
 // createNodeEventsHandler appends structured events/log frames to DB with SSE fanout.
 func createNodeEventsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
-	const maxRequestSize = 1 << 20 // 1 MiB
-	return func(w http.ResponseWriter, r *http.Request) {
+    const maxRequestSize = 1 << 20 // 1 MiB
+    return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
 		if strings.TrimSpace(nodeIDStr) == "" {
@@ -1261,22 +1261,28 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		// Limit request body to 1 MiB to prevent memory exhaustion.
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestSize)
 
-		// Decode request body.
-		var req struct {
-			RunID  string `json:"run_id"`
-			Events []struct {
-				StageID *string                `json:"stage_id,omitempty"`
-				Time    *string                `json:"time,omitempty"`
-				Level   string                 `json:"level"`
-				Message string                 `json:"message"`
-				Meta    map[string]interface{} `json:"meta,omitempty"`
-			} `json:"events"`
-		}
+        // Decode request body.
+        var req struct {
+            RunID  string `json:"run_id"`
+            Events []struct {
+                StageID *string                `json:"stage_id,omitempty"`
+                Time    *string                `json:"time,omitempty"`
+                Level   string                 `json:"level"`
+                Message string                 `json:"message"`
+                Meta    map[string]interface{} `json:"meta,omitempty"`
+            } `json:"events"`
+        }
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
-			return
-		}
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            // Return 413 when MaxBytesReader trips the size cap.
+            var maxErr *http.MaxBytesError
+            if errors.As(err, &maxErr) {
+                http.Error(w, "payload exceeds 1 MiB size cap", http.StatusRequestEntityTooLarge)
+                return
+            }
+            http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+            return
+        }
 
 		// Validate run_id is present.
 		if strings.TrimSpace(req.RunID) == "" {
@@ -1314,16 +1320,16 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 
 		// Process and persist each event.
 		count := 0
-		for i, evt := range req.Events {
-			// Validate required fields.
-			if strings.TrimSpace(evt.Level) == "" {
-				http.Error(w, fmt.Sprintf("events[%d]: level is required", i), http.StatusBadRequest)
-				return
-			}
-			if strings.TrimSpace(evt.Message) == "" {
-				http.Error(w, fmt.Sprintf("events[%d]: message is required", i), http.StatusBadRequest)
-				return
-			}
+        for i, evt := range req.Events {
+            // Validate required fields.
+            if strings.TrimSpace(evt.Level) == "" {
+                http.Error(w, fmt.Sprintf("events[%d]: level is required", i), http.StatusBadRequest)
+                return
+            }
+            if strings.TrimSpace(evt.Message) == "" {
+                http.Error(w, fmt.Sprintf("events[%d]: message is required", i), http.StatusBadRequest)
+                return
+            }
 
 			// Parse stage_id if provided.
 			var stageID pgtype.UUID
@@ -1364,20 +1370,23 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			}
 
 			// Create event params.
-			params := store.CreateEventParams{
-				RunID: pgtype.UUID{
-					Bytes: runUUID,
-					Valid: true,
-				},
-				StageID: stageID,
-				Time: pgtype.Timestamptz{
-					Time:  eventTime,
-					Valid: true,
-				},
-				Level:   evt.Level,
-				Message: evt.Message,
-				Meta:    metaBytes,
-			}
+            // Normalize level to lowercase for consistency in SSE streams.
+            level := strings.ToLower(strings.TrimSpace(evt.Level))
+
+            params := store.CreateEventParams{
+                RunID: pgtype.UUID{
+                    Bytes: runUUID,
+                    Valid: true,
+                },
+                StageID: stageID,
+                Time: pgtype.Timestamptz{
+                    Time:  eventTime,
+                    Valid: true,
+                },
+                Level:   level,
+                Message: evt.Message,
+                Meta:    metaBytes,
+            }
 
 			// Persist event to DB and fan out to SSE.
 			_, err = eventsService.CreateAndPublishEvent(r.Context(), params)
@@ -1390,12 +1399,12 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			count++
 		}
 
-		// Return success response with count.
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"count": count,
-		})
+        // Return success response with count.
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusCreated)
+        if err := json.NewEncoder(w).Encode(map[string]interface{}{"count": count}); err != nil {
+            slog.Error("node events: encode response failed", "err", err)
+        }
 
 		slog.Debug("node events created",
 			"node_id", nodeIDStr,
