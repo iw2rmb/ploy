@@ -89,7 +89,7 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 const listLogsByRun = `-- name: ListLogsByRun :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 func (q *Queries) ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error) {
@@ -123,7 +123,7 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, 
 const listLogsByRunAndStage = `-- name: ListLogsByRunAndStage :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND stage_id = $2
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndStageParams struct {
@@ -162,7 +162,7 @@ func (q *Queries) ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAn
 const listLogsByRunAndStageSince = `-- name: ListLogsByRunAndStageSince :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND stage_id = $2 AND id > $3
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunAndStageSinceParams struct {
@@ -202,7 +202,7 @@ func (q *Queries) ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsBy
 const listLogsByRunSince = `-- name: ListLogsByRunSince :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND id > $2
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunSinceParams struct {
@@ -241,7 +241,7 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 const listLogsByRunStageAndBuild = `-- name: ListLogsByRunStageAndBuild :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND stage_id = $2 AND build_id = $3
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunStageAndBuildParams struct {
@@ -281,7 +281,7 @@ func (q *Queries) ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsBy
 const listLogsByRunStageAndBuildSince = `-- name: ListLogsByRunStageAndBuildSince :many
 SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND stage_id = $2 AND build_id = $3 AND id > $4
-ORDER BY chunk_no ASC
+ORDER BY chunk_no ASC, id ASC
 `
 
 type ListLogsByRunStageAndBuildSinceParams struct {
