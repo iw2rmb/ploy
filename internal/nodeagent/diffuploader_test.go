@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -128,21 +129,30 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 }
 
 func TestDiffUploader_SizeLimit(t *testing.T) {
-	// Create a diff that won't compress well and will exceed 1 MiB when gzipped.
-	// Use incompressible data (crypto-random would be ideal, but we use a simpler approach).
-	// Create data that is already gzip-compressed (won't re-compress).
-	var precompressed bytes.Buffer
-	gzw := gzip.NewWriter(&precompressed)
-	largeDiff := bytes.Repeat([]byte("x"), 2<<20) // 2 MiB of data
-	_, _ = gzw.Write(largeDiff)
-	_ = gzw.Close()
+	// Create incompressible data (~2 MiB of random bytes) so gzip stays > 1 MiB.
+	// This should trigger the client-side size cap before any HTTP call.
+	rnd := make([]byte, 2<<20)
+	if _, err := io.ReadFull(bytes.NewReader(func() []byte {
+		// Fill with pseudo-random looking bytes deterministically for test speed.
+		// Avoid crypto/rand to keep tests fast and hermetic.
+		b := make([]byte, len(rnd))
+		var x uint64 = 0x9e3779b97f4a7c15
+		for i := range b {
+			// xorshift-style generator
+			x ^= x << 13
+			x ^= x >> 7
+			x ^= x << 17
+			b[i] = byte(x)
+		}
+		return b
+	}()), rnd); err != nil {
+		t.Fatalf("failed to make incompressible data: %v", err)
+	}
 
-	// Use the pre-compressed data as our "diff" - it won't compress further.
-	testDiff := precompressed.Bytes()
-
-	// Create a test server.
+	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		called = true
+		w.WriteHeader(http.StatusCreated)
 	}))
 	defer server.Close()
 
@@ -150,9 +160,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 		ServerURL: server.URL,
 		NodeID:    "test-node-id",
 		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
+			TLS: TLSConfig{Enabled: false},
 		},
 	}
 
@@ -162,10 +170,15 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", testDiff, map[string]interface{}{})
-
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, map[string]interface{}{})
 	if err == nil {
-		t.Error("expected error for oversized diff but got none")
+		t.Fatal("expected error for oversized diff but got none")
+	}
+	if !strings.Contains(err.Error(), "exceeds size cap") {
+		t.Fatalf("unexpected error, want size cap: %v", err)
+	}
+	if called {
+		t.Fatal("server should not have been called when size cap triggers")
 	}
 }
 
