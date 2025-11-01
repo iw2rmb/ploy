@@ -142,7 +142,7 @@ Timing
   - Generates a cluster Certificate Authority (CA), issues the server TLS
     certificate, and creates a `cluster_id` recorded in Postgres and on disk.
   - Bootstraps `ployd-server` systemd unit with `PLOY_SERVER_PG_DSN`.
-  - If `--postgresql-dns` is NOT provided, installs PostgreSQL on the VPS and
+  - If `--postgresql-dsn` is NOT provided, installs PostgreSQL on the VPS and
     provisions a database named `ploy`; derives the DSN for server config.
 
 - `ploy node add --cluster-id <id> --address <host-or-ip>`
@@ -261,7 +261,7 @@ TTL enforcement (example)
 ## Deployment Topology (VPS Lab)
 
 - Use the VPS lab for initial deployment and smoke:
-  - One host runs `ployd-server` and PostgreSQL (if `--postgresql-dns` is not
+  - One host runs `ployd-server` and PostgreSQL (if `--postgresql-dsn` is not
     provided during `ploy server deploy`, the installer sets up Postgres locally;
     DB name: `ploy`).
   - Two hosts run `ployd-node`.
