@@ -14,6 +14,8 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	})
 
 	assertContains := func(needle string) {
+		// mark as helper for clearer failure locations
+		t.Helper()
 		if !strings.Contains(script, needle) {
 			t.Fatalf("expected script to contain %q, got: %q", needle, script)
 		}
@@ -67,6 +69,8 @@ func TestRenderBootstrapScript_PostgreSQLInstallWithoutDSN(t *testing.T) {
 	})
 
 	assertContains := func(needle string) {
+		// mark as helper for clearer failure locations
+		t.Helper()
 		if !strings.Contains(script, needle) {
 			t.Fatalf("expected script to contain %q", needle)
 		}
@@ -114,6 +118,8 @@ func TestRenderBootstrapScript_NodeConfigAndUnitFragments(t *testing.T) {
 	})
 
 	assertContains := func(needle string) {
+		// mark as helper for clearer failure locations
+		t.Helper()
 		if !strings.Contains(script, needle) {
 			t.Fatalf("expected script to contain %q", needle)
 		}
