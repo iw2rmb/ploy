@@ -1,0 +1,34 @@
+-- name: GetNode :one
+SELECT * FROM nodes
+WHERE id = $1;
+
+-- name: ListNodes :many
+SELECT * FROM nodes
+ORDER BY created_at DESC;
+
+-- name: CreateNode :one
+INSERT INTO nodes (
+  name,
+  ip_address,
+  version,
+  concurrency
+) VALUES (
+  $1, $2, $3, $4
+)
+RETURNING *;
+
+-- name: UpdateNodeHeartbeat :exec
+UPDATE nodes
+SET
+  last_heartbeat = $2,
+  cpu_total_millis = $3,
+  cpu_free_millis = $4,
+  mem_total_bytes = $5,
+  mem_free_bytes = $6,
+  disk_total_bytes = $7,
+  disk_free_bytes = $8
+WHERE id = $1;
+
+-- name: DeleteNode :exec
+DELETE FROM nodes
+WHERE id = $1;
