@@ -126,7 +126,14 @@ func TestRun_Shutdown(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
-	if err := run(ctx, cfg, st, authorizer); err != nil {
+	// Create a temporary config file for the watcher.
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ployd.yaml")
+	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+
+	if err := run(ctx, cfg, configPath, st, authorizer); err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
 }
@@ -152,10 +159,17 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 		DefaultRole:   auth.RoleControlPlane,
 	})
 
+	// Create a temporary config file for the watcher.
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "ployd.yaml")
+	if err := os.WriteFile(configPath, []byte("# minimal config\n"), 0644); err != nil {
+		t.Fatalf("create temp config: %v", err)
+	}
+
 	// Start run in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, cfg, st, authorizer)
+		errCh <- run(ctx, cfg, configPath, st, authorizer)
 	}()
 
 	// Cancel context to trigger shutdown

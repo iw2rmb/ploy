@@ -94,6 +94,12 @@ func (m *Manager) Reload(ctx context.Context, cfg config.PKIConfig) error {
 	return nil
 }
 
+// OnConfigReload implements the config.Subscriber interface.
+// It extracts the PKI configuration and delegates to Reload.
+func (m *Manager) OnConfigReload(ctx context.Context, cfg config.Config) error {
+	return m.Reload(ctx, cfg.PKI)
+}
+
 // Config returns the active configuration snapshot.
 func (m *Manager) Config() config.PKIConfig {
 	m.mu.Lock()
