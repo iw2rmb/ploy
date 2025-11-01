@@ -110,7 +110,7 @@ Firewall notes:
 ## Architecture Overview
 
 - **ployd (server)**: Runs the control-plane API, scheduler, and PostgreSQL-backed storage. Exposes
-  endpoints like `/v1/repos`, `/v1/mods/crud`, `/v1/runs`, and `/v1/pki/sign`.
+  endpoints like `/v1/repos`, `/v1/mods/crud`, `/v1/jobs`, and `/v1/pki/sign`.
 - **ployd-node**: Lightweight worker that polls for runs, executes jobs in ephemeral workspaces,
   and streams results back to the server. Nodes use mTLS to communicate with the server.
 - **Certificates**: The cluster CA issues all certificates. Nodes submit CSRs to `/v1/pki/sign` to
@@ -134,7 +134,7 @@ See also:
 dist/ploy jobs follow <job-id>
 ```
 
-Logs stream via SSE from `/v1/runs/{id}/events`. Final logs are persisted in PostgreSQL.
+Logs stream via SSE from `/v1/jobs/{id}/logs/stream`. Final logs are persisted in PostgreSQL.
 
 ### TTL and Cleanup
 

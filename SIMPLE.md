@@ -27,7 +27,7 @@ Trade‑offs (and mitigations):
 
 ## Components
 
-- ployd-server
+- ployd (server)
   - HTTP/JSON API for CLI
   - Scheduler + job queue (in-DB, advisory locks)
   - Node registry + heartbeats
@@ -43,7 +43,7 @@ Trade‑offs (and mitigations):
   - Deletes workspace on completion; retains nothing locally
 
 - ploy CLI
-  - Talks only to ployd-server
+  - Talks only to ployd (server)
   - Submits mods, follows logs, downloads artifacts via server endpoints
 
 ## Implementation Notes
@@ -137,11 +137,11 @@ Timing
 
 ## CLI Commands (MVP)
 
-- `ploy server deploy --address <host-or-ip>`
-  - Over SSH, installs `ployd-server`.
+-- `ploy server deploy --address <host-or-ip>`
+  - Over SSH, installs `ployd`.
   - Generates a cluster Certificate Authority (CA), issues the server TLS
     certificate, and creates a `cluster_id` recorded in Postgres and on disk.
-  - Bootstraps `ployd-server` systemd unit with `PLOY_SERVER_PG_DSN`.
+  - Bootstraps `ployd` systemd unit with `PLOY_SERVER_PG_DSN`.
   - If `--postgresql-dsn` is NOT provided, installs PostgreSQL on the VPS and
     provisions a database named `ploy`; derives the DSN for server config.
 
@@ -261,7 +261,7 @@ TTL enforcement (example)
 ## Deployment Topology (VPS Lab)
 
 - Use the VPS lab for initial deployment and smoke:
-  - One host runs `ployd-server` and PostgreSQL (if `--postgresql-dsn` is not
+- One host runs `ployd` and PostgreSQL (if `--postgresql-dsn` is not
     provided during `ploy server deploy`, the installer sets up Postgres locally;
     DB name: `ploy`).
   - Two hosts run `ployd-node`.
@@ -292,7 +292,7 @@ Legacy IPFS and etcd envs become no‑ops then removed after migration.
 
 - M0 (RED): Add failing tests describing server queueing, node assignment,
   run lifecycle, and diff upload; add OpenAPI stubs.
-- M1 (GREEN): Implement ployd-server with Postgres migrations and minimal APIs;
+- M1 (GREEN): Implement ployd with Postgres migrations and minimal APIs;
   add ployd-node that executes a shell step and uploads a diff; CLI keeps
   current UX but targets new endpoints behind a feature flag.
 - M2 (REFACTOR): Remove etcd/IPFS code paths; flip the feature flag on; update

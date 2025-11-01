@@ -48,7 +48,7 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	fs.Var(&postgresqlDSN, "postgresql-dsn", "PostgreSQL connection string (if not provided, PostgreSQL will be installed locally)")
 	fs.Var(&identity, "identity", "SSH private key used for provisioning (default: ~/.ssh/id_rsa)")
 	fs.Var(&userFlag, "user", "SSH username used for provisioning (default: root)")
-	fs.Var(&ploydBin, "ployd-binary", "Path to the ployd-server binary uploaded during provisioning (default: alongside the CLI)")
+    fs.Var(&ploydBin, "ployd-binary", "Path to the ployd server binary uploaded during provisioning (default: alongside the CLI)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for server provisioning (default: 22)")
 
 	if err := fs.Parse(args); err != nil {

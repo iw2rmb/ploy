@@ -1,0 +1,20 @@
+get:
+  tags: [Control]
+  summary: List jobs
+  parameters:
+    - in: query
+      name: ticket
+      required: false
+      schema: { type: string }
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              jobs:
+                type: array
+                items:
+                  $ref: '../components/schemas/controlplane.yaml#/Run'

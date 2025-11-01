@@ -5,6 +5,8 @@ info:
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS authentication. Bearer token auth has been removed.
+    During the naming transition, endpoints are available under both `/v1/jobs/*`
+    (current CLI/tests) and `/v1/runs/*` (target naming in SIMPLE.md).
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -26,6 +28,23 @@ paths:
   /v1/pki/sign:
     $ref: './paths/pki_sign.yaml'
   # Control-plane CRUD
+  # Jobs (current CLI/tests)
+  /v1/jobs:
+    $ref: './paths/jobs.yaml'
+  /v1/jobs/{id}:
+    $ref: './paths/jobs_id.yaml'
+  /v1/jobs/{id}/logs/stream:
+    $ref: './paths/jobs_id_logs_stream.yaml'
+  /v1/jobs/{id}/retry:
+    $ref: './paths/jobs_id_retry.yaml'
+  /v1/jobs/{id}/heartbeat:
+    $ref: './paths/jobs_id_heartbeat.yaml'
+  /v1/jobs/{id}/complete:
+    $ref: './paths/jobs_id_complete.yaml'
+  # Mods ticket log stream (legacy path used by CLI)
+  /v1/mods/{ticket}/logs/stream:
+    $ref: './paths/mods_ticket_logs_stream.yaml'
+  # Future runs endpoints (target naming)
   /v1/repos:
     $ref: './paths/repos.yaml'
   /v1/repos/{id}:

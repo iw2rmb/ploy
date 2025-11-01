@@ -1,0 +1,11 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string }
+post:
+  tags: [Control]
+  summary: Request a retry for a failed job
+  responses:
+    '202': { description: Accepted }
+    '404': { description: Not Found }
