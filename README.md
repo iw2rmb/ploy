@@ -3,7 +3,7 @@
 Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflows. It consists of:
 
 - `ploy` — a CLI for submitting Mods, following logs, managing runs, and administering clusters.
-- `ployd` — the control-plane daemon with scheduler, API, and PostgreSQL-backed storage.
+- `ployd` — the control-plane daemon with scheduler, API, and PostgreSQL-backed storage. (Previously called `ployd-server`; both names refer to the same binary.)
 - `ployd-node` — lightweight worker nodes that execute jobs in ephemeral workspaces.
 
 **Architecture**: Ploy uses a server/node split with PostgreSQL for state and mTLS-only authentication.
