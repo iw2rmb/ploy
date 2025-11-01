@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	apiconfig "github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/api/events"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	internalPKI "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -2398,4 +2399,143 @@ func TestGetRunTimingHandler_DatabaseError(t *testing.T) {
 	if !mockSt.getRunTimingCalled {
 		t.Fatal("expected GetRunTiming to be called")
 	}
+}
+
+// TestParseLastEventID tests the parseLastEventID helper function.
+func TestParseLastEventID(t *testing.T) {
+	tests := []struct {
+		name   string
+		header string
+		want   int64
+	}{
+		{"empty header", "", 0},
+		{"valid id", "42", 42},
+		{"with whitespace", "  123  ", 123},
+		{"zero", "0", 0},
+		{"large number", "9223372036854775807", 9223372036854775807},
+		{"invalid string", "abc", 0},
+		{"invalid mixed", "12abc", 0},
+		{"negative", "-5", -5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseLastEventID(tt.header)
+			if got != tt.want {
+				t.Errorf("parseLastEventID(%q) = %d, want %d", tt.header, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestGetRunEventsHandler_RunNotFound tests that the handler returns 404 when the run does not exist.
+func TestGetRunEventsHandler_RunNotFound(t *testing.T) {
+	mockSt := &mockStore{
+		getRunErr: pgx.ErrNoRows,
+	}
+
+	// Create events service.
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	runID := uuid.New().String()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req.SetPathValue("id", runID)
+	rr := httptest.NewRecorder()
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getRunCalled {
+		t.Error("expected GetRun to be called")
+	}
+}
+
+// TestGetRunEventsHandler_InvalidRunID tests that the handler returns 400 for invalid run IDs.
+func TestGetRunEventsHandler_InvalidRunID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/invalid-uuid/events", nil)
+	req.SetPathValue("id", "invalid-uuid")
+	rr := httptest.NewRecorder()
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if mockSt.getRunCalled {
+		t.Error("expected GetRun not to be called with invalid UUID")
+	}
+}
+
+// TestGetRunEventsHandler_MissingID tests that the handler returns 400 when id is missing.
+func TestGetRunEventsHandler_MissingID(t *testing.T) {
+	mockSt := &mockStore{}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs//events", nil)
+	req.SetPathValue("id", "")
+	rr := httptest.NewRecorder()
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+// TestGetRunEventsHandler_DatabaseError tests that the handler returns 500 on database errors.
+func TestGetRunEventsHandler_DatabaseError(t *testing.T) {
+	mockSt := &mockStore{
+		getRunErr: &pgconn.PgError{Code: "XX000", Message: "test db error"},
+	}
+
+	eventsService, err := createTestEventsService()
+	if err != nil {
+		t.Fatalf("create events service: %v", err)
+	}
+
+	runID := uuid.New().String()
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/events", nil)
+	req.SetPathValue("id", runID)
+	rr := httptest.NewRecorder()
+
+	handler := getRunEventsHandler(mockSt, eventsService)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if !mockSt.getRunCalled {
+		t.Error("expected GetRun to be called")
+	}
+}
+
+// createTestEventsService creates an events service for testing.
+func createTestEventsService() (*events.Service, error) {
+	return events.New(events.Options{
+		BufferSize:  32,
+		HistorySize: 256,
+		Logger:      slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
+	})
 }
