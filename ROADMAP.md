@@ -114,7 +114,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Unit: Ingest caps (oversize gzipped chunks rejected with 413).
 - [x] Unit: TTL worker deletes rows older than horizon; partition dropper no-ops when none.
 - [x] Integration (local Postgres via `PLOY_TEST_PG_DSN`): happy path create repo→mod→run; simulate node appends.
-- [ ] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
+- [x] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
 - [ ] CLI: `server deploy` flag validation and path resolution; `node add` flag validation + dry-run scaffolding.
 - [ ] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
 
