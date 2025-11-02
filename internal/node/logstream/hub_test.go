@@ -294,6 +294,32 @@ func TestHubConcurrentSubscribersWithResume(t *testing.T) {
 	}
 }
 
+func TestSubscribeClosedStreamFutureSince(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
+	ctx := context.Background()
+
+	// Publish a couple of events and close the stream.
+	_ = hub.PublishLog(ctx, "job-closed", LogRecord{Timestamp: "2025-10-22T15:00:00Z", Stream: "stdout", Line: "e1"})
+	_ = hub.PublishLog(ctx, "job-closed", LogRecord{Timestamp: "2025-10-22T15:00:01Z", Stream: "stdout", Line: "e2"})
+	_ = hub.PublishStatus(ctx, "job-closed", Status{Status: "completed"})
+
+	// Subscribe with sinceID far in the future; expect immediate close and no events.
+	sub, err := hub.Subscribe(ctx, "job-closed", 999)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	select {
+	case _, ok := <-sub.Events:
+		if ok {
+			t.Fatal("expected closed channel for future since on closed stream")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("timeout waiting for closed channel")
+	}
+}
+
 type flushRecorder struct {
 	*httptest.ResponseRecorder
 }
