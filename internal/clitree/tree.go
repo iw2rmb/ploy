@@ -40,8 +40,8 @@ func Tree() []Node {
 				{Name: "retry", Synopsis: "Request a retry for a failed job"},
 			},
 		},
-		{Name: "upload", Synopsis: "Upload repository or log bundles via SSH"},
-		{Name: "report", Synopsis: "Download reports or artifacts via SSH"},
+		{Name: "upload", Synopsis: "Upload repository or log bundles via HTTPS"},
+		{Name: "report", Synopsis: "Download reports or artifacts via HTTPS"},
 		{
 			Name:     "cluster",
 			Synopsis: "Manage local cluster descriptors",
