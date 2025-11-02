@@ -103,7 +103,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Security
 - [x] Enforce TLS 1.3 and client cert verification everywhere (node→server and CLI→server).
-- [ ] Validate roles via `Authorizer` middleware; restrict PKI to `cli-admin`.
+- [x] Validate roles via `Authorizer` middleware; restrict PKI to `cli-admin`.
 - [ ] Scrub PII from logs via node-side hooks (document a placeholder; no-op first).
 
 ## Tests (Unit → Integration → Lab)
