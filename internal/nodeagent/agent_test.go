@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -433,12 +434,35 @@ func TestWorkspaceBaseEnv(t *testing.T) {
 // upload diff/artifacts, and emit terminal status successfully.
 func TestEndToEndFlow(t *testing.T) {
 	t.Run("complete flow with mock server", func(t *testing.T) {
-		// Track which endpoints were called during execution.
-		endpointsCalled := make(map[string]int)
+		// Track which endpoints were called during execution (concurrency-safe).
+		type endpointHits struct {
+			mu sync.Mutex
+			m  map[string]int
+		}
+		inc := func(eh *endpointHits, path string) {
+			eh.mu.Lock()
+			eh.m[path]++
+			eh.mu.Unlock()
+		}
+		snapshot := func(eh *endpointHits) map[string]int {
+			eh.mu.Lock()
+			defer eh.mu.Unlock()
+			cp := make(map[string]int, len(eh.m))
+			for k, v := range eh.m {
+				cp[k] = v
+			}
+			return cp
+		}
+		get := func(eh *endpointHits, path string) int {
+			eh.mu.Lock()
+			defer eh.mu.Unlock()
+			return eh.m[path]
+		}
+		endpointsCalled := &endpointHits{m: make(map[string]int)}
 
 		// Create a mock server that responds to node requests.
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			endpointsCalled[r.URL.Path]++
+			inc(endpointsCalled, r.URL.Path)
 
 			switch {
 			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.HasSuffix(r.URL.Path, "/heartbeat"):
@@ -529,8 +553,8 @@ func TestEndToEndFlow(t *testing.T) {
 
 		// Verify that at least the terminal status endpoint was called.
 		// (Other endpoints may or may not be called depending on how far execution got.)
-		t.Logf("Endpoints called: %+v", endpointsCalled)
-		if endpointsCalled["/v1/nodes/test-node-e2e/complete"] < 1 {
+		t.Logf("Endpoints called: %+v", snapshot(endpointsCalled))
+		if get(endpointsCalled, "/v1/nodes/test-node-e2e/complete") < 1 {
 			t.Errorf("terminal status endpoint was not called")
 		}
 	})
