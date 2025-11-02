@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -130,6 +131,100 @@ func listReposHandler(st store.Store) http.HandlerFunc {
 		}
 
 		slog.Debug("repositories listed", "count", len(repos))
+	}
+}
+
+// getRepoHandler returns an HTTP handler that gets a repository by ID.
+func getRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract repo id from path parameter.
+		repoIDStr := r.PathValue("id")
+		if strings.TrimSpace(repoIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate repo_id.
+		repoUUID, err := uuid.Parse(repoIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Get the repository.
+		repo, err := st.GetRepo(r.Context(), pgtype.UUID{
+			Bytes: repoUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "repository not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get repository: %v", err), http.StatusInternalServerError)
+			slog.Error("get repo: database error", "id", repoIDStr, "err", err)
+			return
+		}
+
+		// Build response.
+		resp := struct {
+			ID        string  `json:"id"`
+			URL       string  `json:"url"`
+			Branch    *string `json:"branch,omitempty"`
+			CommitSha *string `json:"commit_sha,omitempty"`
+			CreatedAt string  `json:"created_at"`
+		}{
+			ID:        uuid.UUID(repo.ID.Bytes).String(),
+			URL:       repo.Url,
+			Branch:    repo.Branch,
+			CommitSha: repo.CommitSha,
+			CreatedAt: repo.CreatedAt.Time.Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("get repo: encode response failed", "err", err)
+		}
+
+		slog.Debug("repository retrieved", "id", resp.ID)
+	}
+}
+
+// deleteRepoHandler returns an HTTP handler that deletes a repository by ID.
+func deleteRepoHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract repo id from path parameter.
+		repoIDStr := r.PathValue("id")
+		if strings.TrimSpace(repoIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate repo_id.
+		repoUUID, err := uuid.Parse(repoIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Delete the repository.
+		err = st.DeleteRepo(r.Context(), pgtype.UUID{
+			Bytes: repoUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "repository not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to delete repository: %v", err), http.StatusInternalServerError)
+			slog.Error("delete repo: database error", "id", repoIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("repository deleted", "id", repoIDStr)
 	}
 }
 
@@ -295,5 +390,99 @@ func listModsHandler(st store.Store) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(wrapper); err != nil {
 			slog.Error("list mods: encode response failed", "err", err)
 		}
+	}
+}
+
+// getModHandler returns an HTTP handler that gets a mod by ID.
+func getModHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract mod id from path parameter.
+		modIDStr := r.PathValue("id")
+		if strings.TrimSpace(modIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate mod_id.
+		modUUID, err := uuid.Parse(modIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Get the mod.
+		mod, err := st.GetMod(r.Context(), pgtype.UUID{
+			Bytes: modUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "mod not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get mod: %v", err), http.StatusInternalServerError)
+			slog.Error("get mod: database error", "id", modIDStr, "err", err)
+			return
+		}
+
+		// Build response.
+		resp := struct {
+			ID        string          `json:"id"`
+			RepoID    string          `json:"repo_id"`
+			Spec      json.RawMessage `json:"spec"`
+			CreatedBy *string         `json:"created_by,omitempty"`
+			CreatedAt string          `json:"created_at"`
+		}{
+			ID:        uuid.UUID(mod.ID.Bytes).String(),
+			RepoID:    uuid.UUID(mod.RepoID.Bytes).String(),
+			Spec:      mod.Spec,
+			CreatedBy: mod.CreatedBy,
+			CreatedAt: mod.CreatedAt.Time.Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("get mod: encode response failed", "err", err)
+		}
+
+		slog.Debug("mod retrieved", "id", resp.ID)
+	}
+}
+
+// deleteModHandler returns an HTTP handler that deletes a mod by ID.
+func deleteModHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract mod id from path parameter.
+		modIDStr := r.PathValue("id")
+		if strings.TrimSpace(modIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate mod_id.
+		modUUID, err := uuid.Parse(modIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Delete the mod.
+		err = st.DeleteMod(r.Context(), pgtype.UUID{
+			Bytes: modUUID,
+			Valid: true,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "mod not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to delete mod: %v", err), http.StatusInternalServerError)
+			slog.Error("delete mod: database error", "id", modIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("mod deleted", "id", modIDStr)
 	}
 }
