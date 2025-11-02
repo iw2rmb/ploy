@@ -126,6 +126,6 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Acceptance Checklist
 - [x] Server starts with `PLOY_SERVER_PG_DSN` and serves all documented endpoints over mTLS on `:8443`.
-- [ ] Node starts by default (no build tags) and can run the end-to-end flow: start → stream logs → upload diff/artifacts → finish.
+- [x] Node starts by default (no build tags) and can run the end-to-end flow: start → stream logs → upload diff/artifacts → finish.
 - [ ] `make test` green; coverage thresholds met; docs up to date.
 - [ ] VPS lab walkthrough in docs executes successfully with the provided IPs and commands.
