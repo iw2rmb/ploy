@@ -36,9 +36,11 @@ type LogStreamer struct {
 	flushDone chan struct{}
 	closeOnce sync.Once
 	stopCh    chan struct{}
+	hook      LogHook // Optional hook to process logs before compression.
 }
 
 // NewLogStreamer creates a new log streamer for a specific run.
+// By default, uses NoOpLogHook (no PII scrubbing).
 func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
 	ls := &LogStreamer{
 		cfg:       cfg,
@@ -47,6 +49,7 @@ func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
 		chunkNo:   0,
 		flushDone: make(chan struct{}),
 		stopCh:    make(chan struct{}),
+		hook:      &NoOpLogHook{}, // Default to no-op hook.
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
 
@@ -56,20 +59,37 @@ func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
 	return ls
 }
 
+// SetHook sets the log processing hook. Must be called before any writes.
+// This method is not safe for concurrent use with Write.
+func (ls *LogStreamer) SetHook(hook LogHook) {
+	ls.hook = hook
+}
+
 // Write implements io.Writer interface for capturing logs.
 func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 	ls.mu.Lock()
 	defer ls.mu.Unlock()
 
+	// Apply hook to process log data (e.g., scrub PII).
+	processed := p
+	if ls.hook != nil {
+		var hookErr error
+		processed, hookErr = ls.hook.Process(p)
+		if hookErr != nil {
+			slog.Warn("log hook failed, using original data", "run_id", ls.runID, "error", hookErr)
+			processed = p // Fall back to original on error.
+		}
+	}
+
 	// Write to gzip writer.
-	written, err := ls.gzWriter.Write(p)
+	_, err = ls.gzWriter.Write(processed)
 	if err != nil {
-		return written, fmt.Errorf("write to gzip: %w", err)
+		return 0, fmt.Errorf("write to gzip: %w", err)
 	}
 
 	// Check if we need to flush due to size.
 	if err := ls.gzWriter.Flush(); err != nil {
-		return written, fmt.Errorf("flush gzip: %w", err)
+		return 0, fmt.Errorf("flush gzip: %w", err)
 	}
 
 	// Use soft threshold to ensure finalized (Close) chunk stays under hard cap.
@@ -79,7 +99,8 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	return written, nil
+	// Return the number of bytes consumed from the original input.
+	return len(p), nil
 }
 
 // periodicFlush runs in the background and flushes buffered logs periodically.
