@@ -172,8 +172,8 @@ If running manually instead of using the automated script:
     - Current default cluster: `cat ~/.config/ploy/clusters/default` → `<cluster-id>`
     - Full descriptor: `~/.config/ploy/clusters/<cluster-id>.json`
 - Add nodes on B and C (replace `<cluster-id>` with the value from the previous step):
-  - `dist/ploy node add --cluster-id <cluster-id> --address 46.173.16.177`
-  - `dist/ploy node add --cluster-id <cluster-id> --address 81.200.119.187`
+  - `dist/ploy node add --cluster-id <cluster-id> --address 46.173.16.177 --server-url https://45.9.42.212:8443`
+  - `dist/ploy node add --cluster-id <cluster-id> --address 81.200.119.187 --server-url https://45.9.42.212:8443`
 - Smoke test a run (control plane at A on `:8443`):
   - `dist/ploy mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature --follow`
 
@@ -229,7 +229,7 @@ The cluster CA itself should be rotated infrequently and requires reissuing all 
 
 - **mTLS Only**: All communication uses mutual TLS. Bearer tokens have been removed.
 - **Nodes**: Use certificates issued via `/v1/pki/sign` to communicate with the server.
-- **CLI & descriptors (current state)**: The server bootstrap saves a local cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json` and marks it as default. The descriptor contains the control‑plane address and SSH identity path. The CLI resolves the control‑plane URL via environment or direct flags; it does not yet load a client certificate from the descriptor, and the descriptor does not include a CA bundle.
+- **CLI & descriptors**: The server bootstrap saves a local cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json` and marks it as default. Descriptors include `ca_path`, `cert_path`, and `key_path` when available. The CLI loads these paths to establish mTLS and enforces TLS 1.3. When a descriptor is not present or incomplete, the CLI falls back to `PLOY_CONTROL_PLANE_URL`.
 
 ## Appendix: Environment Variables
 
