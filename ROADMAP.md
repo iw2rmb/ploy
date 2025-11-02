@@ -107,7 +107,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Scrub PII from logs via node-side hooks (document a placeholder; no-op first).
 
 ## Tests (Unit → Integration → Lab)
-- [ ] Unit: PKI CSR sign success/error paths.
+- [x] Unit: PKI CSR sign success/error paths.
 - [ ] Unit: Authorizer role gates and insecure default off.
 - [ ] Unit: Repos/Mods/Runs handlers JSON and status codes.
 - [ ] Unit: SSE hub resume with Last-Event-ID and concurrent subscribers.
