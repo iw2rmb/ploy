@@ -141,7 +141,30 @@ Use the shared VPS lab nodes from `AGENTS.md`:
 - B (node):   `46.173.16.177`
 - C (node):   `81.200.119.187`
 
-Steps:
+### Automated Verification
+
+An automated verification script is available to validate the complete walkthrough:
+
+```bash
+# Validate prerequisites and SSH connectivity (no deployment)
+make vps-lab-walkthrough-dry-run
+
+# Run full deployment walkthrough
+make vps-lab-walkthrough
+```
+
+The script (`scripts/vps-lab-walkthrough.sh`) performs all steps below automatically and verifies:
+- Local binaries are built
+- SSH connectivity to all hosts
+- Server deployment and service status
+- Node provisioning and service status
+- PKI and configuration files are in place
+- API endpoints are listening
+
+### Manual Steps
+
+If running manually instead of using the automated script:
+
 - Build CLI/binaries locally: `make build` (creates `dist/ploy`, `dist/ployd`, `dist/ployd-linux`, `dist/ployd-node`, `dist/ployd-node-linux`).
 - Deploy server on A (installs PostgreSQL if DSN omitted):
   - `dist/ploy server deploy --address 45.9.42.212`
