@@ -175,29 +175,26 @@ func (s *Server) listen(ctx context.Context) (net.Listener, error) {
 		return nil, fmt.Errorf("load certificate: %w", err)
 	}
 
+	// Client certificate verification is mandatory when TLS is enabled.
+	if s.cfg.TLS.ClientCAPath == "" {
+		return nil, errors.New("httpserver: client_ca path required when TLS is enabled")
+	}
+
+	caData, err := os.ReadFile(s.cfg.TLS.ClientCAPath)
+	if err != nil {
+		return nil, fmt.Errorf("load client ca certificate: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caData) {
+		return nil, errors.New("httpserver: failed to parse client ca certificate")
+	}
+
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		MinVersion:   tls.VersionTLS13,
-	}
-
-	// Configure client certificate verification if required.
-	if s.cfg.TLS.RequireClientCert {
-		if s.cfg.TLS.ClientCAPath == "" {
-			return nil, errors.New("httpserver: client_ca path required when require_client_cert is true")
-		}
-
-		caData, err := os.ReadFile(s.cfg.TLS.ClientCAPath)
-		if err != nil {
-			return nil, fmt.Errorf("load client ca certificate: %w", err)
-		}
-
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caData) {
-			return nil, errors.New("httpserver: failed to parse client ca certificate")
-		}
-
-		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-		tlsConfig.ClientCAs = caCertPool
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    caCertPool,
 	}
 
 	ln, err := tls.Listen("tcp", address, tlsConfig)

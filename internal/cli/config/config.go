@@ -19,6 +19,9 @@ type Descriptor struct {
 	Address         string `json:"address"`
 	Scheme          string `json:"scheme,omitempty"`
 	SSHIdentityPath string `json:"ssh_identity_path,omitempty"`
+	CAPath          string `json:"ca_path,omitempty"`
+	CertPath        string `json:"cert_path,omitempty"`
+	KeyPath         string `json:"key_path,omitempty"`
 	Default         bool   `json:"default,omitempty"`
 }
 
@@ -53,6 +56,34 @@ func SetDefault(clusterID string) error {
 	}
 	marker := filepath.Join(dir, "default")
 	return os.WriteFile(marker, []byte(strings.TrimSpace(clusterID)), 0o644)
+}
+
+// LoadDefault loads the default cluster descriptor.
+func LoadDefault() (Descriptor, error) {
+	dir, err := clustersDir()
+	if err != nil {
+		return Descriptor{}, err
+	}
+	marker := filepath.Join(dir, "default")
+	data, err := os.ReadFile(marker)
+	if err != nil {
+		return Descriptor{}, fmt.Errorf("descriptor: read default marker: %w", err)
+	}
+	clusterID := strings.TrimSpace(string(data))
+	if clusterID == "" {
+		return Descriptor{}, errors.New("descriptor: default marker is empty")
+	}
+	path := filepath.Join(dir, sanitizeFilename(clusterID)+".json")
+	descData, err := os.ReadFile(path)
+	if err != nil {
+		return Descriptor{}, fmt.Errorf("descriptor: read %s: %w", clusterID, err)
+	}
+	var d Descriptor
+	if err := json.Unmarshal(descData, &d); err != nil {
+		return Descriptor{}, fmt.Errorf("descriptor: parse %s: %w", clusterID, err)
+	}
+	d.Default = true
+	return d, nil
 }
 
 // ListDescriptors returns descriptors with Default marked when matching the marker file.

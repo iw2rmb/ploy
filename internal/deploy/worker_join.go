@@ -362,11 +362,11 @@ func cloneDefaultTransport() (*http.Transport, error) {
 
 func ensureTLSConfig(cfg *tls.Config) *tls.Config {
 	if cfg == nil {
-		return &tls.Config{MinVersion: tls.VersionTLS12}
+		return &tls.Config{MinVersion: tls.VersionTLS13}
 	}
 	cloned := cfg.Clone()
 	if cloned.MinVersion == 0 {
-		cloned.MinVersion = tls.VersionTLS12
+		cloned.MinVersion = tls.VersionTLS13
 	}
 	return cloned
 }
