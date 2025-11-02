@@ -77,6 +77,100 @@ func TestHandleNodeAddRequiresServerURL(t *testing.T) {
 	}
 }
 
+func TestHandleNodeAddValidatesSSHPort(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-node-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		sshPort   int
+		expectErr bool
+	}{
+		{"valid port 22", 22, false},
+		{"valid port 2222", 2222, false},
+		{"default port 0", 0, false}, // Port 0 defaults to 22, which is valid.
+		{"invalid port -1", -1, true},
+		{"invalid port 99999", 99999, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := nodeAddConfig{
+				ClusterID:       "test-cluster",
+				Address:         "10.0.0.10",
+				ServerURL:       "https://10.0.0.5:8443",
+				User:            "testuser",
+				IdentityFile:    identityPath,
+				PloydNodeBinary: binPath,
+				SSHPort:         tt.sshPort,
+				DryRun:          true, // Use dry-run to avoid actual provisioning.
+			}
+
+			err := runNodeAdd(cfg, io.Discard)
+			if tt.expectErr {
+				if err == nil {
+					t.Fatalf("expected error for SSH port %d", tt.sshPort)
+				}
+				if !strings.Contains(err.Error(), "invalid SSH port") {
+					t.Fatalf("expected SSH port validation error, got: %v", err)
+				}
+			} else {
+				// For valid ports in dry-run mode, we expect success.
+				if err != nil {
+					t.Fatalf("unexpected error for valid port %d: %v", tt.sshPort, err)
+				}
+			}
+		})
+	}
+}
+
+func TestHandleNodeAddDryRun(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-node-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	cfg := nodeAddConfig{
+		ClusterID:       "test-cluster",
+		Address:         "10.0.0.10",
+		ServerURL:       "https://10.0.0.5:8443",
+		User:            "testuser",
+		IdentityFile:    identityPath,
+		PloydNodeBinary: binPath,
+		SSHPort:         22,
+		DryRun:          true,
+	}
+
+	buf := &bytes.Buffer{}
+	err := runNodeAdd(cfg, buf)
+	if err != nil {
+		t.Fatalf("dry-run should not error, got: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "[DRY RUN]") {
+		t.Fatalf("expected dry-run output, got: %q", output)
+	}
+	if !strings.Contains(output, "Validation complete") {
+		t.Fatalf("expected validation complete message, got: %q", output)
+	}
+	if !strings.Contains(output, "No actual provisioning performed") {
+		t.Fatalf("expected no provisioning message, got: %q", output)
+	}
+}
+
 func TestSignNodeCSR_Success(t *testing.T) {
 	t.Parallel()
 	// Arrange a fake PKI sign endpoint

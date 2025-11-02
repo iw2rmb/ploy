@@ -50,6 +50,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 		userFlag     stringValue
 		ploydNodeBin stringValue
 		sshPort      intValue
+		dryRun       bool
 	)
 	fs.Var(&clusterID, "cluster-id", "Cluster identifier to join")
 	fs.Var(&address, "address", "Node IP or hostname")
@@ -58,6 +59,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 	fs.Var(&userFlag, "user", "SSH username used for provisioning (default: root)")
 	fs.Var(&ploydNodeBin, "ployd-node-binary", "Path to the ployd-node binary uploaded during provisioning (default: alongside the CLI)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for node provisioning (default: 22)")
+	fs.BoolVar(&dryRun, "dry-run", false, "Validate inputs without performing provisioning")
 
 	if err := fs.Parse(args); err != nil {
 		_, _ = fmt.Fprintln(stderr, "Usage: ploy node add --cluster-id <id> --address <ip> --server-url <url>")
@@ -84,6 +86,7 @@ func handleNodeAdd(args []string, stderr io.Writer) error {
 		IdentityFile:    identity.value,
 		PloydNodeBinary: ploydNodeBin.value,
 		SSHPort:         sshPort.value,
+		DryRun:          dryRun,
 	}
 
 	return runNodeAdd(nodeCfg, stderr)
@@ -97,6 +100,7 @@ type nodeAddConfig struct {
 	IdentityFile    string
 	PloydNodeBinary string
 	SSHPort         int
+	DryRun          bool
 }
 
 func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
@@ -124,6 +128,13 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	sshPort := cfg.SSHPort
 	if sshPort == 0 {
 		sshPort = deploy.DefaultSSHPort
+	}
+	if err := validateSSHPort(sshPort); err != nil {
+		return fmt.Errorf("node add: %w", err)
+	}
+
+	if cfg.DryRun {
+		_, _ = fmt.Fprintln(stderr, "[DRY RUN] Validating node add configuration...")
 	}
 
 	_, _ = fmt.Fprintf(stderr, "Adding node to cluster %s\n", cfg.ClusterID)
@@ -153,6 +164,16 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	if serverURL == "" {
 		return errors.New("node add: server-url is required")
 	}
+
+	// Early exit for dry-run mode after validation.
+	if cfg.DryRun {
+		_, _ = fmt.Fprintln(stderr, "\n[DRY RUN] Validation complete. Provisioning would proceed with:")
+		_, _ = fmt.Fprintf(stderr, "  Server URL: %s\n", serverURL)
+		_, _ = fmt.Fprintf(stderr, "  Generated Node ID: %s\n", nodeID)
+		_, _ = fmt.Fprintln(stderr, "\nAll validations passed. No actual provisioning performed.")
+		return nil
+	}
+
 	_, _ = fmt.Fprintf(stderr, "Requesting certificate signing from %s\n", serverURL)
 
 	signedCert, caCert, err := signNodeCSR(ctx, serverURL, nodeID, csrPEM)
@@ -217,7 +238,11 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 // resolvePloydNodeBinaryPath locates the ployd-node binary adjacent to the CLI.
 func resolvePloydNodeBinaryPath(v stringValue) (string, error) {
 	if v.set {
-		return expandPath(v.value), nil
+		path := expandPath(v.value)
+		if err := validateFileReadable(path); err != nil {
+			return "", fmt.Errorf("ployd-node binary: %w", err)
+		}
+		return path, nil
 	}
 	execPath, err := os.Executable()
 	if err != nil {
@@ -238,7 +263,7 @@ func resolvePloydNodeBinaryPath(v stringValue) (string, error) {
 			return c, nil
 		}
 	}
-	return "", errors.New("ploy node add: ployd-node binary not found alongside CLI; provide --ployd-node-binary")
+	return "", errors.New("ployd-node binary not found alongside CLI; provide --ployd-node-binary")
 }
 
 // pkiSignRequest is the JSON request body for POST /v1/pki/sign.

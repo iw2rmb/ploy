@@ -121,6 +121,9 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	if sshPort == 0 {
 		sshPort = deploy.DefaultSSHPort
 	}
+	if err := validateSSHPort(sshPort); err != nil {
+		return fmt.Errorf("server deploy: %w", err)
+	}
 
 	_, _ = fmt.Fprintf(stderr, "Deploying Ploy server to %s\n", cfg.Address)
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
