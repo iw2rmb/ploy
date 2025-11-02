@@ -78,6 +78,11 @@ func (ls *LogStreamer) Write(p []byte) (n int, err error) {
 		if hookErr != nil {
 			slog.Warn("log hook failed, using original data", "run_id", ls.runID, "error", hookErr)
 			processed = p // Fall back to original on error.
+		} else if processed == nil {
+			// Defensive: a misbehaving hook returned nil without error; write original
+			// data to preserve io.Writer semantics (n == len(p)).
+			slog.Warn("log hook returned nil data; using original", "run_id", ls.runID)
+			processed = p
 		}
 	}
 
