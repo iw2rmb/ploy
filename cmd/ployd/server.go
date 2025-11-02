@@ -114,10 +114,14 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	// Register repos endpoints (control plane).
 	httpSrv.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
 
 	// Register mods endpoints (control plane).
 	httpSrv.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/mods/crud/{id}", getModHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("DELETE /v1/mods/crud/{id}", deleteModHandler(st), auth.RoleControlPlane)
 
 	// Register runs endpoints (control plane).
 	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
@@ -129,6 +133,18 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 	// SSE events endpoint for run log streaming.
 	httpSrv.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
+
+	// Legacy /v1/jobs endpoints (aliases for /v1/runs endpoints).
+	// These are maintained for backwards compatibility with existing CLI/tests.
+	httpSrv.HandleFunc("GET /v1/jobs", getRunHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/jobs/{id}", getRunHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("GET /v1/jobs/{id}/logs/stream", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
+	httpSrv.HandleFunc("POST /v1/jobs/{id}/retry", retryRunHandler(st), auth.RoleControlPlane)
+	// Note: /v1/jobs/{id}/heartbeat and /v1/jobs/{id}/complete are deprecated.
+	// Modern nodes use /v1/nodes/{id}/heartbeat and /v1/nodes/{id}/complete instead.
+
+	// Legacy /v1/mods/{ticket}/logs/stream endpoint (SSE stream for Mods ticket logs).
+	httpSrv.HandleFunc("GET /v1/mods/{ticket}/logs/stream", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
 
 	// Register node heartbeat endpoint (node agents).
 	httpSrv.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
