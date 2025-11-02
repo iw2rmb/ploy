@@ -130,6 +130,10 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	// Explicit timing subresource for clarity and OpenAPI alignment.
 	httpSrv.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
+	// Run-scoped ingestion endpoints documented in OpenAPI.
+	httpSrv.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
+	httpSrv.HandleFunc("POST /v1/runs/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 	// SSE events endpoint for run log streaming.
 	httpSrv.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
@@ -140,6 +144,9 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	httpSrv.HandleFunc("GET /v1/jobs/{id}", getRunHandler(st), auth.RoleControlPlane)
 	httpSrv.HandleFunc("GET /v1/jobs/{id}/logs/stream", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
 	httpSrv.HandleFunc("POST /v1/jobs/{id}/retry", retryRunHandler(st), auth.RoleControlPlane)
+	// Legacy node→server endpoints kept for compatibility with some clients.
+	httpSrv.HandleFunc("POST /v1/jobs/{id}/heartbeat", legacyJobHeartbeatHandler(st), auth.RoleWorker)
+	httpSrv.HandleFunc("POST /v1/jobs/{id}/complete", legacyJobCompleteHandler(st), auth.RoleWorker)
 	// Note: /v1/jobs/{id}/heartbeat and /v1/jobs/{id}/complete are deprecated.
 	// Modern nodes use /v1/nodes/{id}/heartbeat and /v1/nodes/{id}/complete instead.
 
