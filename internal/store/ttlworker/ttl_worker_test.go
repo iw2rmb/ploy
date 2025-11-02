@@ -242,4 +242,78 @@ func TestWorker_Run(t *testing.T) {
 			t.Error("expected DeleteExpiredArtifactBundles to be called")
 		}
 	})
+
+	t.Run("deletes rows older than horizon", func(t *testing.T) {
+		mock := &mockStore{
+			deleteLogsCount:      15,
+			deleteEventsCount:    25,
+			deleteDiffsCount:     8,
+			deleteArtifactsCount: 4,
+		}
+
+		// Use a specific TTL for predictable cutoff calculation.
+		ttl := 7 * 24 * time.Hour // 7 days
+		worker, err := New(Options{
+			Store: mock,
+			TTL:   ttl,
+		})
+		if err != nil {
+			t.Fatalf("failed to create worker: %v", err)
+		}
+
+		// Capture the execution window to verify cutoff.
+		before := time.Now().Add(-ttl)
+		if err := worker.Run(context.Background()); err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+		after := time.Now().Add(-ttl)
+
+		// Verify all delete operations were called.
+		if !mock.deleteLogsCalled {
+			t.Error("expected DeleteExpiredLogs to be called")
+		}
+		if !mock.deleteEventsCalled {
+			t.Error("expected DeleteExpiredEvents to be called")
+		}
+		if !mock.deleteDiffsCalled {
+			t.Error("expected DeleteExpiredDiffs to be called")
+		}
+		if !mock.deleteArtifactsCalled {
+			t.Error("expected DeleteExpiredArtifactBundles to be called")
+		}
+
+		// Verify cutoff timestamps are valid and within expected range.
+		// The cutoff should be approximately (now - TTL).
+		if !mock.lastLogsArg.Valid {
+			t.Error("logs cutoff timestamp is invalid")
+		} else if mock.lastLogsArg.Time.Before(before) || mock.lastLogsArg.Time.After(after) {
+			t.Errorf("logs cutoff %v outside expected window [%v, %v]",
+				mock.lastLogsArg.Time, before, after)
+		}
+
+		if !mock.lastEventsArg.Valid {
+			t.Error("events cutoff timestamp is invalid")
+		} else if mock.lastEventsArg.Time.Before(before) || mock.lastEventsArg.Time.After(after) {
+			t.Errorf("events cutoff %v outside expected window [%v, %v]",
+				mock.lastEventsArg.Time, before, after)
+		}
+
+		if !mock.lastDiffsArg.Valid {
+			t.Error("diffs cutoff timestamp is invalid")
+		} else if mock.lastDiffsArg.Time.Before(before) || mock.lastDiffsArg.Time.After(after) {
+			t.Errorf("diffs cutoff %v outside expected window [%v, %v]",
+				mock.lastDiffsArg.Time, before, after)
+		}
+
+		if !mock.lastArtifactsArg.Valid {
+			t.Error("artifacts cutoff timestamp is invalid")
+		} else if mock.lastArtifactsArg.Time.Before(before) || mock.lastArtifactsArg.Time.After(after) {
+			t.Errorf("artifacts cutoff %v outside expected window [%v, %v]",
+				mock.lastArtifactsArg.Time, before, after)
+		}
+
+		// Verify that the mock return values are being processed correctly.
+		// The actual deletion counts are logged but not returned by Run(),
+		// so we just verify the operations completed.
+	})
 }
