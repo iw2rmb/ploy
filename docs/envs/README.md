@@ -143,6 +143,8 @@ When these fields are present for the default cluster, the CLI enforces TLS 1.3 
 - `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs. Required
   alongside `PLOY_SERVER_CA_CERT` for `/v1/pki/sign`. When either value is missing (empty or
   whitespace-only), the server responds with `503 PKI not configured`.
+  If values are set but invalid (malformed PEM), the server returns `500 Internal Server Error`
+  and logs details; fix the stored CA materials.
 
 
 ## PostgreSQL
