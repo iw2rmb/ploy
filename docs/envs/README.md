@@ -36,6 +36,12 @@ defaults change, or components adopt additional configuration.
 - `XDG_CONFIG_HOME` — Standard XDG Base Directory specification variable. When set
   (and `PLOY_CONFIG_HOME` is not), the CLI uses `$XDG_CONFIG_HOME/ploy` for cluster
   descriptor storage. Falls back to `~/.config/ploy` when both are unset.
+
+Local cluster descriptors (written under `~/.config/ploy/clusters/`) now embed TLS material used by the CLI for mTLS:
+- `ca_path` — CA certificate used as root trust for the control-plane.
+- `cert_path` — Client certificate presented by the CLI.
+- `key_path` — Private key for the client certificate.
+When these fields are present for the default cluster, the CLI enforces TLS 1.3 and uses mTLS for all control‑plane calls.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
 - `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to
