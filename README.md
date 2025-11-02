@@ -60,7 +60,7 @@ This produces `dist/ploy` and `dist/ployd` (plus a Linux `ployd` for remote inst
 Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFIG_PATH` to change the default (`/etc/ploy/ployd.yaml`). The flag overrides the environment variable when both are provided.
 
 **Listeners**
-- API: `:8443` (TLS; optionally mTLS when configured). Health at `/health`.
+- API: `:8443` (TLS 1.3 with mandatory mTLS). Health at `/health`.
 - Metrics: `:9100` (plain HTTP) exposing Prometheus at `/metrics`.
 
 **Scheduler & TTL**
