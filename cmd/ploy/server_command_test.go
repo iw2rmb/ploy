@@ -52,6 +52,58 @@ func TestHandleServerDeployRejectsExtraArgs(t *testing.T) {
 	}
 }
 
+func TestHandleServerDeployValidatesSSHPort(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		sshPort   int
+		expectErr bool
+	}{
+		{"valid port 22", 22, false},
+		{"valid port 2222", 2222, false},
+		{"default port 0", 0, false}, // Port 0 defaults to 22, which is valid.
+		{"invalid port -1", -1, true},
+		{"invalid port 99999", 99999, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := serverDeployConfig{
+				Address:      "10.0.0.5",
+				User:         "testuser",
+				IdentityFile: identityPath,
+				PloydBinary:  binPath,
+				SSHPort:      tt.sshPort,
+			}
+
+			err := runServerDeploy(cfg, io.Discard)
+			if tt.expectErr {
+				if err == nil {
+					t.Fatalf("expected error for SSH port %d", tt.sshPort)
+				}
+				if !strings.Contains(err.Error(), "invalid SSH port") {
+					t.Fatalf("expected SSH port validation error, got: %v", err)
+				}
+			} else {
+				// For valid ports, we expect failure due to missing CA/server cert generation,
+				// but NOT due to port validation.
+				if err != nil && strings.Contains(err.Error(), "invalid SSH port") {
+					t.Fatalf("unexpected SSH port validation error for valid port %d: %v", tt.sshPort, err)
+				}
+			}
+		})
+	}
+}
+
 // TestServerDeployCAGeneration verifies that CA and server certificate generation works correctly.
 func TestServerDeployCAGeneration(t *testing.T) {
 	// Generate cluster ID.

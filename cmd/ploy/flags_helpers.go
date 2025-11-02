@@ -40,20 +40,31 @@ func (v *intValue) Set(s string) error {
 
 // resolveIdentityPath chooses a default SSH identity when not explicitly set.
 func resolveIdentityPath(v stringValue) (string, error) {
+	var path string
 	if v.set {
-		return expandPath(v.value), nil
+		path = expandPath(v.value)
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		path = filepath.Join(home, ".ssh", "id_rsa")
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	// Validate the file exists and is readable.
+	if err := validateFileReadable(path); err != nil {
+		return "", fmt.Errorf("identity file: %w", err)
 	}
-	return filepath.Join(home, ".ssh", "id_rsa"), nil
+	return path, nil
 }
 
 // resolvePloydBinaryPath locates the ployd binary adjacent to the CLI.
 func resolvePloydBinaryPath(v stringValue) (string, error) {
 	if v.set {
-		return expandPath(v.value), nil
+		path := expandPath(v.value)
+		if err := validateFileReadable(path); err != nil {
+			return "", fmt.Errorf("ployd binary: %w", err)
+		}
+		return path, nil
 	}
 	execPath, err := os.Executable()
 	if err != nil {
@@ -74,7 +85,7 @@ func resolvePloydBinaryPath(v stringValue) (string, error) {
 			return c, nil
 		}
 	}
-	return "", errors.New("ploy server deploy: ployd binary not found alongside CLI; provide --ployd-binary")
+	return "", errors.New("ployd binary not found alongside CLI; provide --ployd-binary")
 }
 
 func expandPath(path string) string {
@@ -93,4 +104,33 @@ func expandPath(path string) string {
 		}
 	}
 	return path
+}
+
+// validateFileReadable checks if a file exists and is readable.
+func validateFileReadable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("file does not exist: %s", path)
+		}
+		return fmt.Errorf("cannot access file %s: %w", path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("path is a directory, not a file: %s", path)
+	}
+	// Try to open for reading to verify permissions.
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("cannot read file %s: %w", path, err)
+	}
+	_ = f.Close()
+	return nil
+}
+
+// validateSSHPort checks if a port number is in a valid range.
+func validateSSHPort(port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("invalid SSH port %d: must be between 1 and 65535", port)
+	}
+	return nil
 }
