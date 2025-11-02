@@ -49,6 +49,10 @@ If a hook returns an error, the log streamer:
 
 This design ensures that hook failures do not block log delivery, which is critical for observability.
 
+Additionally, if a hook returns a `nil` slice without an error, the streamer defensively
+falls back to the original input to preserve `io.Writer` semantics (the write still
+counts as having consumed `len(p)` bytes).
+
 ## Usage
 
 ### Setting a Custom Hook

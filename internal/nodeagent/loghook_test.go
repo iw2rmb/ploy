@@ -176,6 +176,35 @@ func TestLogStreamer_HookError(t *testing.T) {
 	// We verify this indirectly by confirming Write succeeded.
 }
 
+func TestLogStreamer_HookReturnsNil(t *testing.T) {
+	t.Parallel()
+
+	// Hook returns nil slice with no error; streamer should fall back to original input.
+	nilHook := &mockHook{
+		transform: func(p []byte) ([]byte, error) {
+			return nil, nil
+		},
+	}
+
+	cfg := Config{
+		ServerURL: "http://localhost:8443",
+		NodeID:    "00000000-0000-0000-0000-000000000001",
+	}
+
+	ls := NewLogStreamer(cfg, "run-789-nil", "")
+	ls.SetHook(nilHook)
+	defer func() { _ = ls.Close() }()
+
+	input := []byte("some data that should still be written")
+	n, err := ls.Write(input)
+	if err != nil {
+		t.Fatalf("Write() returned error: %v", err)
+	}
+	if n != len(input) {
+		t.Fatalf("Write() returned %d bytes, want %d", n, len(input))
+	}
+}
+
 func TestLogStreamer_DefaultHook(t *testing.T) {
 	t.Parallel()
 
