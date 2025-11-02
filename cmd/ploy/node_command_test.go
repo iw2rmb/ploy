@@ -63,10 +63,18 @@ func TestHandleNodeAddRejectsExtraArgs(t *testing.T) {
 
 func TestHandleNodeAddRequiresServerURL(t *testing.T) {
 	buf := &bytes.Buffer{}
-	// Provide cluster-id and address but no server-url (and no binary path)
+	// Provide cluster-id and address but no server-url.
+	// Use explicit identity and binary paths to avoid relying on host defaults.
+	tmpDir := t.TempDir()
+	idPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(idPath, []byte("fake key"), 0o600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
 	err := handleNodeAdd([]string{
 		"--cluster-id", "c1",
 		"--address", "10.0.0.5",
+		"--identity", idPath,
 		"--ployd-node-binary", "/dev/null",
 	}, buf)
 	if err == nil {
