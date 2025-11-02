@@ -108,7 +108,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 
 ## Tests (Unit → Integration → Lab)
 - [x] Unit: PKI CSR sign success/error paths.
-- [ ] Unit: Authorizer role gates and insecure default off.
+- [x] Unit: Authorizer role gates and insecure default off.
 - [ ] Unit: Repos/Mods/Runs handlers JSON and status codes.
 - [ ] Unit: SSE hub resume with Last-Event-ID and concurrent subscribers.
 - [ ] Unit: Ingest caps (oversize gzipped chunks rejected with 413).

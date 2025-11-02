@@ -46,3 +46,168 @@ func TestAuthorizerRejectsForbiddenRole(t *testing.T) {
 		t.Fatalf("expected 403, got %d", rr.Code)
 	}
 }
+
+// TestAuthorizerRoleGates verifies role-based access control with multiple allowed roles.
+func TestAuthorizerRoleGates(t *testing.T) {
+	tests := []struct {
+		name         string
+		allowedRoles []string
+		defaultRole  string
+		wantCode     int
+		wantCalled   bool
+	}{
+		{
+			name:         "single allowed role matches",
+			allowedRoles: []string{RoleControlPlane},
+			defaultRole:  RoleControlPlane,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+		{
+			name:         "multiple allowed roles with match",
+			allowedRoles: []string{RoleControlPlane, RoleWorker, RoleCLIAdmin},
+			defaultRole:  RoleWorker,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+		{
+			name:         "multiple allowed roles without match",
+			allowedRoles: []string{RoleControlPlane, RoleCLIAdmin},
+			defaultRole:  RoleWorker,
+			wantCode:     http.StatusForbidden,
+			wantCalled:   false,
+		},
+		{
+			name:         "empty allowlist permits any role",
+			allowedRoles: []string{},
+			defaultRole:  RoleWorker,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+		{
+			name:         "nil allowlist permits any role",
+			allowedRoles: nil,
+			defaultRole:  RoleControlPlane,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+		{
+			name:         "case insensitive role matching",
+			allowedRoles: []string{"WORKER", "Control-Plane"},
+			defaultRole:  RoleWorker,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+		{
+			name:         "admin alias matches cli-admin",
+			allowedRoles: []string{"admin"},
+			defaultRole:  RoleCLIAdmin,
+			wantCode:     http.StatusOK,
+			wantCalled:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := NewAuthorizer(Options{
+				AllowInsecure: true,
+				DefaultRole:   tt.defaultRole,
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			rr := httptest.NewRecorder()
+			called := false
+
+			handler := a.Middleware(tt.allowedRoles...)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantCode {
+				t.Errorf("got status %d, want %d", rr.Code, tt.wantCode)
+			}
+			if called != tt.wantCalled {
+				t.Errorf("handler called=%v, want %v", called, tt.wantCalled)
+			}
+		})
+	}
+}
+
+// TestAuthorizerInsecureDefaultOff verifies that AllowInsecure=false rejects non-mTLS requests.
+func TestAuthorizerInsecureDefaultOff(t *testing.T) {
+	tests := []struct {
+		name          string
+		allowInsecure bool
+		hasTLS        bool
+		wantCode      int
+		wantCalled    bool
+		wantErrorMsg  string
+	}{
+		{
+			name:          "secure mode rejects request without mTLS",
+			allowInsecure: false,
+			hasTLS:        false,
+			wantCode:      http.StatusForbidden,
+			wantCalled:    false,
+			wantErrorMsg:  "auth: mutual TLS required",
+		},
+		{
+			name:          "insecure mode allows request without mTLS",
+			allowInsecure: true,
+			hasTLS:        false,
+			wantCode:      http.StatusOK,
+			wantCalled:    true,
+			wantErrorMsg:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := NewAuthorizer(Options{
+				AllowInsecure: tt.allowInsecure,
+				DefaultRole:   RoleControlPlane,
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			// Note: We don't set req.TLS to simulate missing mTLS.
+			rr := httptest.NewRecorder()
+			called := false
+
+			handler := a.Middleware()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				w.WriteHeader(http.StatusOK)
+			}))
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantCode {
+				t.Errorf("got status %d, want %d", rr.Code, tt.wantCode)
+			}
+			if called != tt.wantCalled {
+				t.Errorf("handler called=%v, want %v", called, tt.wantCalled)
+			}
+			if tt.wantErrorMsg != "" {
+				body := rr.Body.String()
+				if !contains(body, tt.wantErrorMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.wantErrorMsg, body)
+				}
+			}
+		})
+	}
+}
+
+// contains checks if a string contains a substring (case-sensitive).
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || indexOf(s, substr) >= 0)
+}
+
+func indexOf(s, substr string) int {
+	for i := 0; i+len(substr) <= len(s); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
