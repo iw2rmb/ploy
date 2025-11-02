@@ -112,7 +112,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Unit: Repos/Mods/Runs handlers JSON and status codes.
 - [x] Unit: SSE hub resume with Last-Event-ID and concurrent subscribers.
 - [x] Unit: Ingest caps (oversize gzipped chunks rejected with 413).
-- [ ] Unit: TTL worker deletes rows older than horizon; partition dropper no-ops when none.
+- [x] Unit: TTL worker deletes rows older than horizon; partition dropper no-ops when none.
 - [ ] Integration (local Postgres via `PLOY_TEST_PG_DSN`): happy path create repo→mod→run; simulate node appends.
 - [ ] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
 - [ ] CLI: `server deploy` flag validation and path resolution; `node add` flag validation + dry-run scaffolding.

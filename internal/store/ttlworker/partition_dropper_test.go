@@ -437,3 +437,125 @@ func TestWorker_DropPartitionsDefault(t *testing.T) {
 		}
 	})
 }
+
+func TestDropOldPartitions_NoPartitionsExist(t *testing.T) {
+	ctx := context.Background()
+	cutoff := time.Date(2025, 11, 1, 0, 0, 0, 0, time.UTC)
+	logger := slog.Default()
+
+	tests := []struct {
+		name       string
+		setupStore func(*mockStoreWithPartitions)
+	}{
+		{
+			name: "no log partitions exist",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.logPartitions = []string{}
+			},
+		},
+		{
+			name: "no event partitions exist",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.eventPartitions = []string{}
+			},
+		},
+		{
+			name: "no artifact bundle partitions exist",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.artifactBundlePartitions = []string{}
+			},
+		},
+		{
+			name: "no node metrics partitions exist",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.nodeMetricsPartitions = []string{}
+			},
+		},
+		{
+			name: "no partitions exist for any table",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.logPartitions = []string{}
+				m.eventPartitions = []string{}
+				m.artifactBundlePartitions = []string{}
+				m.nodeMetricsPartitions = []string{}
+			},
+		},
+		{
+			name: "all partitions are nil slices",
+			setupStore: func(m *mockStoreWithPartitions) {
+				m.logPartitions = nil
+				m.eventPartitions = nil
+				m.artifactBundlePartitions = nil
+				m.nodeMetricsPartitions = nil
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockStoreWithPartitions{}
+			tt.setupStore(mock)
+
+			// Pool is nil here, but that's ok - DropOldPartitions should still
+			// attempt to list partitions and find none, then no-op.
+			// Since there are no partitions to drop, no Exec calls will be made.
+			err := DropOldPartitions(ctx, nil, mock, cutoff, logger)
+
+			// Should not return error when no partitions exist.
+			if err != nil {
+				t.Errorf("expected no error when no partitions exist, got %v", err)
+			}
+		})
+	}
+}
+
+func TestDropOldPartitions_NoPartitionsOlderThanCutoff(t *testing.T) {
+	ctx := context.Background()
+	cutoff := time.Date(2025, 11, 1, 0, 0, 0, 0, time.UTC)
+	logger := slog.Default()
+
+	tests := []struct {
+		name       string
+		partitions []string
+		desc       string
+	}{
+		{
+			name: "all partitions are recent",
+			partitions: []string{
+				"ploy.logs_2025_11", // Ends 2025-12-01 > cutoff
+				"ploy.logs_2025_12", // Ends 2026-01-01 > cutoff
+			},
+			desc: "no partitions should be dropped when all are after cutoff",
+		},
+		{
+			name: "partition exactly at cutoff boundary",
+			partitions: []string{
+				"ploy.logs_2025_10", // Ends 2025-11-01 = cutoff (not before)
+			},
+			desc: "partition ending exactly at cutoff should not be dropped",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &mockStoreWithPartitions{
+				logPartitions:            tt.partitions,
+				eventPartitions:          tt.partitions,
+				artifactBundlePartitions: tt.partitions,
+				nodeMetricsPartitions:    tt.partitions,
+			}
+
+			// No pool means no actual DROP statements will execute,
+			// but we can verify the logic doesn't attempt drops.
+			err := DropOldPartitions(ctx, nil, mock, cutoff, logger)
+
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+
+			// Since we don't have a real pool to verify Exec calls,
+			// we rely on the implementation logic: partitions not before
+			// cutoff won't trigger drops. This test validates the no-op behavior.
+		})
+	}
+}
