@@ -29,10 +29,15 @@ post:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error (CA load failure or persistence error)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
     '503':
       description: PKI not configured on the server
       content:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
-
