@@ -61,10 +61,9 @@ samples, runs them through the advisor with a conservative score floor, and
 prints per-sample match results plus aggregate accuracy so operators can gauge
 classifier drift without leaving the workstation.
 
-`upload` and `report` reuse the cached SSH descriptor to move large payloads through the control-plane
-slot APIs instead of issuing ad-hoc SCP sessions. See
-[docs/next/ssh-transfer-migration.md](../../docs/next/ssh-transfer-migration.md) for rollout guidance,
-required environment variables, and operational limits (slot TTL, digest verification, cleanup).
+`upload` and `report` use the cached mTLS cluster descriptor to move large payloads through the
+control‑plane HTTPS APIs (no SSH). The client streams uploads to `/v2/artifacts/upload` and downloads
+specific artifacts via `/v2/artifacts/{id}?download=true`, verifying digests end‑to‑end.
 
 ## Flags
 
