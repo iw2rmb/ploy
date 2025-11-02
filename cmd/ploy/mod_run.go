@@ -187,7 +187,7 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return fmt.Errorf("decode ticket status: %w", err)
 	}
-	// Collect artifacts via control-plane HTTP (no IPFS)
+	// Collect artifacts via control-plane HTTP
 	type manifestItem struct {
 		Stage  string `json:"stage"`
 		Name   string `json:"name"`

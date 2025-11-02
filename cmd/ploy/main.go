@@ -85,7 +85,6 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  mod              Plan and run Mods workflows")
 	_, _ = fmt.Fprintln(w, "  mods             Observe Mods execution (logs, events)")
 	_, _ = fmt.Fprintln(w, "  jobs             Inspect and follow individual jobs")
-	_, _ = fmt.Fprintln(w, "  artifact         Manage IPFS Cluster artifacts")
 	_, _ = fmt.Fprintln(w, "  upload           Upload repository or log bundles via SSH")
 	_, _ = fmt.Fprintln(w, "  report           Download reports or artifacts via SSH")
 	_, _ = fmt.Fprintln(w, "  cluster          Manage local cluster descriptors")

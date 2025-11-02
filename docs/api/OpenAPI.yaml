@@ -94,7 +94,7 @@ paths:
   # Legacy removed:
   # - /v1/nodes (node registry now managed via server → node mTLS RPC)
   # - /v1/config/gitlab (GitLab signer removed)
-  # - /v2/artifacts/* (IPFS artifacts replaced with PostgreSQL storage)
+  # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
 components:
   securitySchemes:
     mtls:

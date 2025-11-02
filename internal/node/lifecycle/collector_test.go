@@ -31,7 +31,6 @@ func TestCollectorSnapshotAggregatesComponents(t *testing.T) {
 		NodeID: "node-1",
 		Docker: staticChecker{status: ComponentStatus{State: stateOK, Version: "25.0.0", CheckedAt: time.Now()}},
 		Gate:   staticChecker{status: ComponentStatus{State: stateError, Message: "missing image", CheckedAt: time.Now()}},
-		IPFS:   staticChecker{status: ComponentStatus{State: stateUnknown, Message: "disabled", CheckedAt: time.Now()}},
 	})
 	collector.resourcesFunc = func(context.Context) (resourceSnapshot, error) {
 		return resourceSnapshot{

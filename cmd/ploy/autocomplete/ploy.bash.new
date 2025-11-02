@@ -18,3 +18,5 @@ Core Commands:
   node             Manage worker nodes
 
 Use 'ploy help <command>' for detailed command help.
+error: unknown command "autocomplete"
+exit status 1

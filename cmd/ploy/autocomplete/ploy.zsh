@@ -13,7 +13,6 @@ _ploy() {
             commands+=("mod:Plan and run Mods workflows")
             commands+=("mods:Observe Mods execution (logs, events)")
             commands+=("jobs:Inspect and follow individual jobs")
-            commands+=("artifact:Manage IPFS Cluster artifacts")
             commands+=("upload:Upload repository or log bundles via SSH")
             commands+=("report:Download reports or artifacts via SSH")
             commands+=("cluster:Manage local cluster descriptors")
@@ -49,14 +48,6 @@ _ploy() {
                     commands+=("inspect:Show details for a job")
                     commands+=("retry:Request a retry for a failed job")
                     _describe 'jobs command' commands && ret=0
-                    ;;
-                'artifact')
-                    commands=()
-                    commands+=("push:Upload an artifact to the configured IPFS Cluster")
-                    commands+=("pull:Download an artifact by CID")
-                    commands+=("status:Inspect replication state for a CID")
-                    commands+=("rm:Unpin an artifact from the cluster")
-                    _describe 'artifact command' commands && ret=0
                     ;;
                 'cluster')
                     commands=()
