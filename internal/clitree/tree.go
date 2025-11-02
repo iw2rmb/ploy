@@ -40,16 +40,6 @@ func Tree() []Node {
 				{Name: "retry", Synopsis: "Request a retry for a failed job"},
 			},
 		},
-		{
-			Name:     "artifact",
-			Synopsis: "Manage IPFS Cluster artifacts",
-			Subcommands: []Node{
-				{Name: "push", Synopsis: "Upload an artifact to the configured IPFS Cluster"},
-				{Name: "pull", Synopsis: "Download an artifact by CID"},
-				{Name: "status", Synopsis: "Inspect replication state for a CID"},
-				{Name: "rm", Synopsis: "Unpin an artifact from the cluster"},
-			},
-		},
 		{Name: "upload", Synopsis: "Upload repository or log bundles via SSH"},
 		{Name: "report", Synopsis: "Download reports or artifacts via SSH"},
 		{

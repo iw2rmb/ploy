@@ -3,7 +3,6 @@
 **Note: Postgres/mTLS Pivot (November 2025)**
 
 As of the server/node pivot described in `SIMPLE.md`, the following legacy systems have been removed:
-- **IPFS Cluster**: All `PLOY_IPFS_*` variables are no longer consumed by the codebase.
 - **etcd**: All `PLOY_ETCD_*` variables are no longer consumed by the codebase.
 - **Token-based auth**: Bearer tokens replaced with mTLS-only authentication.
 - **Node labels**: Removed in favor of resource-snapshot scheduling.
@@ -210,16 +209,6 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - `PLOY_GITLAB_SIGNER_MAX_TTL` — Removed.
 - `PLOY_GITLAB_API_BASE_URL` — Removed.
 - `PLOY_GITLAB_ADMIN_TOKEN` — Removed.
-
-### IPFS Cluster (Removed)
-- `PLOY_IPFS_CLUSTER_API` — Replaced with PostgreSQL storage for diffs/logs/artifact bundles.
-- `PLOY_IPFS_CLUSTER_TOKEN` — Token auth removed; mTLS only.
-- `PLOY_IPFS_CLUSTER_USERNAME` / `PLOY_IPFS_CLUSTER_PASSWORD` — Removed.
-- `PLOY_IPFS_CLUSTER_REPL_MIN` / `PLOY_IPFS_CLUSTER_REPL_MAX` — No IPFS replication.
-- `PLOY_IPFS_CLUSTER_LOCAL` — Removed.
-- `PLOY_IPFS_GATEWAY` — Removed.
-- `PLOY_HYDRATION_PUBLISH_SNAPSHOT` — Removed (repos cloned shallow on-demand).
-- `PLOY_ARTIFACT_PUBLISH` — Removed.
 
 ### etcd (Removed)
 - `PLOY_ETCD_USERNAME` / `PLOY_ETCD_PASSWORD` — Replaced with PostgreSQL.

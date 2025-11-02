@@ -7,9 +7,8 @@
 **Prereqs**
 
 - Ploy cluster descriptor present (CLI auto-discovers). To override, export `PLOY_CONTROL_PLANE_URL` for this session.
-- GitLab access for the sample repo’s MRs: export `PLOY_GITLAB_PAT` (or set via cluster’s signer if configured).
-- Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm “healer” stub that does not call external APIs.
-- IPFS Cluster coordinates are handled by the control plane; workers must have `PLOY_IPFS_CLUSTER_API` set. Workstations do not need direct cluster access.
+- GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
+- Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
 **Build + Publish Mods Images (Docker Hub)**
 

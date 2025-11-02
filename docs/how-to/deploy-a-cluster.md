@@ -5,7 +5,7 @@ This guide describes how to deploy a Ploy cluster using the new server/node arch
 The deployment separates control-plane (`ployd` server) from worker execution (`ployd-node`) and
 assumes a 1x server + 2x node layout.
 
-**Note**: This replaces the legacy etcd + IPFS Cluster stack. See `SIMPLE.md` for architecture details.
+**Note**: This replaces the legacy etcd stack. See `SIMPLE.md` for architecture details.
 
 ## Prerequisites
 
