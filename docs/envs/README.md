@@ -163,8 +163,8 @@ Precedence at server startup:
   root‑run `ployd` service, e.g.: `host=127.0.0.1 port=5432 user=ploy password=ploy dbname=ploy sslmode=disable`.
 - `PLOY_POSTGRES_DSN` — Backward‑compatible alias recognized by `ployd` during the transition. Prefer
   `PLOY_SERVER_PG_DSN` going forward.
-- `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by `internal/store` integration tests. When unset, tests
-  that require a live database are skipped.
+- `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration tests (e.g., `tests/integration/*` and
+  packages that hit a real database such as `internal/store`). When unset, such tests skip automatically.
 
 `ployd` reads `PLOY_SERVER_PG_DSN` (or `PLOY_POSTGRES_DSN`) at startup; when unset,
 it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_SERVER_PG_DSN}` in
