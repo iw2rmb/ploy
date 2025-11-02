@@ -119,7 +119,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
 
 ## Legacy & Dead Code Removal
-- [ ] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
+- [x] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
 - [ ] Remove IPFS references and scripts (already mostly gone; sweep `scripts/` and docs).
 - [ ] Delete `cmd/ployd-node/stub.go` once default build is real (or keep under `-tags stub`).
 - [x] Consolidate exploration docs into README/SIMPLE; remove `ARCHITECTURE_DIAGRAM.md` and related (`CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`).
