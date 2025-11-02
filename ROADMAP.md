@@ -116,7 +116,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Integration (local Postgres via `PLOY_TEST_PG_DSN`): happy path create repo→mod→run; simulate node appends.
 - [x] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
 - [x] CLI: `server deploy` flag validation and path resolution; `node add` flag validation + dry-run scaffolding.
-- [ ] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
+- [x] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
 
 ## Legacy & Dead Code Removal
 - [ ] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).

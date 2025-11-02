@@ -1,0 +1,219 @@
+package integration
+
+import (
+	"context"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// TestLabSmoke is a minimal smoke test that simulates server + node workflow:
+// 1. Create repo → mod → run (queued status).
+// 2. Simulate node operations: append logs and diffs as if a node is executing the run.
+// 3. Assert that logs and diff rows are stored in the database.
+//
+// This test requires a test database accessible via PLOY_TEST_PG_DSN.
+func TestLabSmoke(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping lab smoke test")
+	}
+
+	ctx := context.Background()
+	db, err := store.NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Step 1: Create a test repository (public repo for smoke test).
+	repo, err := db.CreateRepo(ctx, store.CreateRepoParams{
+		Url:    "https://github.com/octocat/Hello-World",
+		Branch: ptrStr("main"),
+	})
+	if err != nil {
+		t.Fatalf("CreateRepo() failed: %v", err)
+	}
+	t.Logf("Created repo: id=%v, url=%s", repo.ID, repo.Url)
+
+	// Step 2: Create a mod for the repository.
+	modSpec := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
+	mod, err := db.CreateMod(ctx, store.CreateModParams{
+		RepoID: repo.ID,
+		Spec:   modSpec,
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+	t.Logf("Created mod: id=%v, repo_id=%v", mod.ID, mod.RepoID)
+
+	// Step 3: Create a run in queued status (simulating server receiving a run request).
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		ModID:     mod.ID,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature/smoke-test",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+	t.Logf("Created run: id=%v, mod_id=%v, status=%s", run.ID, run.ModID, run.Status)
+
+	// Step 4: Simulate node operations - Create a stage for the run.
+	stage, err := db.CreateStage(ctx, store.CreateStageParams{
+		RunID:  run.ID,
+		Name:   "build",
+		Status: store.StageStatusRunning,
+		Meta:   []byte(`{"type":"build","tool":"make"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateStage() failed: %v", err)
+	}
+	t.Logf("Created stage: id=%v, run_id=%v, name=%s", stage.ID, stage.RunID, stage.Name)
+
+	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).
+	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build stage\n")
+	log, err := db.CreateLog(ctx, store.CreateLogParams{
+		RunID:   run.ID,
+		ChunkNo: 0,
+		Data:    logData,
+	})
+	if err != nil {
+		t.Fatalf("CreateLog() failed: %v", err)
+	}
+	t.Logf("Created log: id=%d, run_id=%v, chunk_no=%d, data_len=%d", log.ID, log.RunID, log.ChunkNo, len(log.Data))
+
+	// Create a second log chunk to simulate continued streaming.
+	log2Data := []byte("INFO: Build completed successfully\nINFO: Running tests\nINFO: All tests passed\n")
+	log2, err := db.CreateLog(ctx, store.CreateLogParams{
+		RunID:   run.ID,
+		ChunkNo: 1,
+		Data:    log2Data,
+	})
+	if err != nil {
+		t.Fatalf("CreateLog() #2 failed: %v", err)
+	}
+	t.Logf("Created log #2: id=%d, chunk_no=%d", log2.ID, log2.ChunkNo)
+
+	// Step 6: Simulate node appends - Create diff (simulating diff upload from node).
+	diffPatch := []byte(`diff --git a/README.md b/README.md
+index 1234567..abcdefg 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,4 @@
+ # Hello World
+
+ This is a smoke test repository.
++Applied modifications via Ploy smoke test.
+`)
+	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
+	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:   run.ID,
+		StageID: stage.ID,
+		Patch:   diffPatch,
+		Summary: diffSummary,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff() failed: %v", err)
+	}
+	t.Logf("Created diff: id=%v, run_id=%v, stage_id=%v, patch_len=%d", diff.ID, diff.RunID, diff.StageID, len(diff.Patch))
+
+	// Step 7: Assert logs are stored - Verify logs can be listed by run.
+	logs, err := db.ListLogsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListLogsByRun() failed: %v", err)
+	}
+	if len(logs) != 2 {
+		t.Errorf("Expected 2 logs, got %d", len(logs))
+	}
+	// Verify logs are ordered by chunk_no.
+	if len(logs) >= 2 {
+		if logs[0].ChunkNo != 0 || logs[1].ChunkNo != 1 {
+			t.Errorf("Logs not ordered correctly: chunk_no[0]=%d, chunk_no[1]=%d", logs[0].ChunkNo, logs[1].ChunkNo)
+		}
+		if string(logs[0].Data) != string(logData) {
+			t.Errorf("Log chunk 0 data mismatch")
+		}
+		if string(logs[1].Data) != string(log2Data) {
+			t.Errorf("Log chunk 1 data mismatch")
+		}
+	}
+	t.Logf("✓ Verified %d log chunks stored correctly", len(logs))
+
+	// Step 8: Assert diffs are stored - Verify diffs can be listed by run.
+	diffs, err := db.ListDiffsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
+	}
+	if len(diffs) != 1 {
+		t.Errorf("Expected 1 diff, got %d", len(diffs))
+	}
+	if len(diffs) >= 1 {
+		if diffs[0].ID.Bytes != diff.ID.Bytes {
+			t.Errorf("Diff ID mismatch: expected %v, got %v", diff.ID, diffs[0].ID)
+		}
+		if diffs[0].RunID.Bytes != run.ID.Bytes {
+			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID)
+		}
+		if diffs[0].StageID.Bytes != stage.ID.Bytes {
+			t.Errorf("Diff stage_id mismatch: expected %v, got %v", stage.ID, diffs[0].StageID)
+		}
+		if string(diffs[0].Patch) != string(diffPatch) {
+			t.Errorf("Diff patch mismatch")
+		}
+		if string(diffs[0].Summary) != string(diffSummary) {
+			t.Errorf("Diff summary mismatch")
+		}
+	}
+	t.Logf("✓ Verified %d diff row(s) stored correctly", len(diffs))
+
+	// Step 9: Verify the diff can be retrieved individually.
+	fetchedDiff, err := db.GetDiff(ctx, diff.ID)
+	if err != nil {
+		t.Fatalf("GetDiff() failed: %v", err)
+	}
+	if fetchedDiff.ID.Bytes != diff.ID.Bytes {
+		t.Errorf("Fetched diff ID mismatch: expected %v, got %v", diff.ID, fetchedDiff.ID)
+	}
+	if fetchedDiff.RunID.Bytes != run.ID.Bytes {
+		t.Errorf("Fetched diff run_id mismatch: expected %v, got %v", run.ID, fetchedDiff.RunID)
+	}
+	t.Logf("✓ Individual diff retrieval successful")
+
+	// Step 10: Create an event to simulate node status updates.
+	now := time.Now().UTC()
+	eventParams := store.CreateEventParams{
+		RunID: run.ID,
+		Time: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+		Level:   "info",
+		Message: "Run completed successfully in smoke test",
+		Meta:    []byte(`{"source":"lab-smoke","status":"completed"}`),
+	}
+	event, err := db.CreateEvent(ctx, eventParams)
+	if err != nil {
+		t.Fatalf("CreateEvent() failed: %v", err)
+	}
+	t.Logf("Created event: id=%d, level=%s, message=%s", event.ID, event.Level, event.Message)
+
+	// Verify event was stored.
+	events, err := db.ListEventsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListEventsByRun() failed: %v", err)
+	}
+	if len(events) != 1 {
+		t.Errorf("Expected 1 event, got %d", len(events))
+	}
+	if len(events) >= 1 && events[0].ID != event.ID {
+		t.Errorf("Event ID mismatch: expected %d, got %d", event.ID, events[0].ID)
+	}
+	t.Logf("✓ Event stored correctly")
+
+	t.Log("✓ Lab smoke test completed successfully: logs and diffs are stored")
+}
