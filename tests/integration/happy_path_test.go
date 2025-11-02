@@ -210,6 +210,15 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 		}
 	}
 
+	// Also verify ListEventsByRunSince returns only newer events.
+	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{RunID: run.ID, ID: event.ID})
+	if err != nil {
+		t.Fatalf("ListEventsByRunSince() failed: %v", err)
+	}
+	if len(eventsSince) != 1 || eventsSince[0].ID != event2.ID {
+		t.Errorf("ListEventsByRunSince expected [event2], got len=%d firstID=%v", len(eventsSince), firstIDOrZero(eventsSince))
+	}
+
 	// Verify logs can be listed by run.
 	logs, err := db.ListLogsByRun(ctx, run.ID)
 	if err != nil {
@@ -234,10 +243,35 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 		}
 	}
 
+	// Also verify ListLogsByRunSince returns only newer chunks.
+	logsSince, err := db.ListLogsByRunSince(ctx, store.ListLogsByRunSinceParams{RunID: run.ID, ID: log.ID})
+	if err != nil {
+		t.Fatalf("ListLogsByRunSince() failed: %v", err)
+	}
+	if len(logsSince) != 1 || logsSince[0].ID != log2.ID {
+		t.Errorf("ListLogsByRunSince expected [log2], got len=%d firstID=%v", len(logsSince), firstLogIDOrZero(logsSince))
+	}
+
 	t.Log("Happy path integration test completed successfully")
 }
 
 // ptrStr is a helper to create string pointers.
 func ptrStr(s string) *string {
 	return &s
+}
+
+// firstIDOrZero helps compact test error messages.
+func firstIDOrZero(events []store.Event) int64 {
+	if len(events) == 0 {
+		return 0
+	}
+	return events[0].ID
+}
+
+// firstLogIDOrZero helps compact test error messages.
+func firstLogIDOrZero(logs []store.Log) int64 {
+	if len(logs) == 0 {
+		return 0
+	}
+	return logs[0].ID
 }
