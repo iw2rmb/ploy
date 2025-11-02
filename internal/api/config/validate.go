@@ -31,6 +31,9 @@ func validate(cfg *Config) error {
 		if strings.TrimSpace(cfg.HTTP.TLS.KeyPath) == "" {
 			return errors.New("config: http.tls.key required when TLS enabled")
 		}
+		if strings.TrimSpace(cfg.HTTP.TLS.ClientCAPath) == "" {
+			return errors.New("config: http.tls.client_ca required when TLS enabled (mTLS is mandatory)")
+		}
 	}
 
 	if strings.TrimSpace(cfg.Admin.Socket) == "" && strings.TrimSpace(cfg.Admin.Listen) == "" {

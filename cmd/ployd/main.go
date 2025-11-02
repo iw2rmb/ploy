@@ -75,7 +75,7 @@ func main() {
 	slog.Info("ployd server starting",
 		"config", configPath,
 		"tls", cfg.HTTP.TLS.Enabled,
-		"mtls", cfg.HTTP.TLS.RequireClientCert,
+		"mtls", cfg.HTTP.TLS.Enabled, // mTLS is mandatory when TLS is enabled
 	)
 
 	// Set up signal handling for graceful shutdown.

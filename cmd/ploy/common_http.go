@@ -2,18 +2,23 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
 const controlPlaneURLEnv = "PLOY_CONTROL_PLANE_URL"
 
 // resolveControlPlaneHTTP selects the base URL and HTTP client.
-// For unit tests we honour PLOY_CONTROL_PLANE_URL and use a default client.
+// Loads TLS configuration from the default cluster descriptor if available.
+// For tests, honours PLOY_CONTROL_PLANE_URL and uses a plain client.
 func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) {
 	base := os.Getenv(controlPlaneURLEnv)
 	if base == "" {
@@ -23,7 +28,45 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	return u, &http.Client{}, nil
+
+	// Load default cluster descriptor for TLS configuration.
+	desc, err := config.LoadDefault()
+	if err != nil || desc.CAPath == "" || desc.CertPath == "" || desc.KeyPath == "" {
+		// No descriptor or incomplete TLS config: use plain client (for tests or legacy setups).
+		return u, &http.Client{}, nil
+	}
+
+	// Load client certificate and key.
+	cert, err := tls.LoadX509KeyPair(desc.CertPath, desc.KeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load client certificate: %w", err)
+	}
+
+	// Load CA certificate for server verification.
+	caData, err := os.ReadFile(desc.CAPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("load ca certificate: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caData) {
+		return nil, nil, fmt.Errorf("failed to parse ca certificate")
+	}
+
+	// Create TLS config with mTLS and TLS 1.3 enforcement.
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS13,
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	return u, client, nil
 }
 
 // controlPlaneHTTPError summarises a non-2xx control-plane response.

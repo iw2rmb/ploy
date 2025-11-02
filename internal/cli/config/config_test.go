@@ -99,3 +99,54 @@ func TestListDescriptorsMissingDirOK(t *testing.T) {
 		t.Fatalf("expected empty list, got %v", list)
 	}
 }
+
+func TestLoadDefault(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	// LoadDefault should fail when no default is set.
+	if _, err := LoadDefault(); err == nil {
+		t.Fatal("LoadDefault should fail when no default is set")
+	}
+
+	// Save a descriptor and set it as default.
+	d := Descriptor{
+		ClusterID:       "test-cluster",
+		Address:         "10.0.0.1:8443",
+		SSHIdentityPath: "/root/.ssh/id_rsa",
+		CAPath:          "/etc/ploy/ca.crt",
+		CertPath:        "/etc/ploy/client.crt",
+		KeyPath:         "/etc/ploy/client.key",
+	}
+	if _, err := SaveDescriptor(d); err != nil {
+		t.Fatalf("SaveDescriptor error: %v", err)
+	}
+	if err := SetDefault("test-cluster"); err != nil {
+		t.Fatalf("SetDefault error: %v", err)
+	}
+
+	// LoadDefault should now return the descriptor.
+	loaded, err := LoadDefault()
+	if err != nil {
+		t.Fatalf("LoadDefault error: %v", err)
+	}
+	if loaded.ClusterID != "test-cluster" {
+		t.Errorf("expected cluster ID 'test-cluster', got %q", loaded.ClusterID)
+	}
+	if loaded.Address != "10.0.0.1:8443" {
+		t.Errorf("expected address '10.0.0.1:8443', got %q", loaded.Address)
+	}
+	if loaded.CAPath != "/etc/ploy/ca.crt" {
+		t.Errorf("expected CA path '/etc/ploy/ca.crt', got %q", loaded.CAPath)
+	}
+	if loaded.CertPath != "/etc/ploy/client.crt" {
+		t.Errorf("expected cert path '/etc/ploy/client.crt', got %q", loaded.CertPath)
+	}
+	if loaded.KeyPath != "/etc/ploy/client.key" {
+		t.Errorf("expected key path '/etc/ploy/client.key', got %q", loaded.KeyPath)
+	}
+	if !loaded.Default {
+		t.Error("expected Default to be true")
+	}
+}

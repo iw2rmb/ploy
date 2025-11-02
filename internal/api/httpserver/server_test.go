@@ -250,11 +250,27 @@ func TestServer_TLS(t *testing.T) {
 		// Create temporary directory for certificates.
 		tmpDir := t.TempDir()
 
-		// Generate server certificate.
-		serverCert, serverKey := generateCertificate(t, "server", nil)
+		// Get or create CA certificate.
+		ca := getTestCA(t)
+		caPath := filepath.Join(tmpDir, "ca.crt")
+		if err := os.WriteFile(caPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: ca.cert.Raw,
+		}), 0644); err != nil {
+			t.Fatalf("write CA cert: %v", err)
+		}
+
+		// Generate server certificate signed by CA.
+		serverCert, serverKey := generateCertificate(t, "server", ca.cert)
 		serverCertPath := filepath.Join(tmpDir, "server.crt")
 		serverKeyPath := filepath.Join(tmpDir, "server.key")
 		writeCertAndKey(t, serverCertPath, serverKeyPath, serverCert, serverKey)
+
+		// Generate client certificate signed by CA.
+		clientCert, clientKey := generateCertificate(t, "client", ca.cert)
+		clientCertPath := filepath.Join(tmpDir, "client.crt")
+		clientKeyPath := filepath.Join(tmpDir, "client.key")
+		writeCertAndKey(t, clientCertPath, clientKeyPath, clientCert, clientKey)
 
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
@@ -264,9 +280,10 @@ func TestServer_TLS(t *testing.T) {
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 				TLS: config.TLSConfig{
-					Enabled:  true,
-					CertPath: serverCertPath,
-					KeyPath:  serverKeyPath,
+					Enabled:      true,
+					CertPath:     serverCertPath,
+					KeyPath:      serverKeyPath,
+					ClientCAPath: caPath,
 				},
 			},
 			Authorizer: authorizer,
@@ -286,10 +303,17 @@ func TestServer_TLS(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Make a TLS request (skip verification for self-signed cert).
+		// Load client certificate for mTLS.
+		clientTLSCert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+		if err != nil {
+			t.Fatalf("load client cert: %v", err)
+		}
+
+		// Make a TLS request with client certificate.
 		client := &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
+					Certificates:       []tls.Certificate{clientTLSCert},
 					InsecureSkipVerify: true,
 				},
 			},
@@ -389,7 +413,7 @@ func TestServer_TLS(t *testing.T) {
 		}
 	})
 
-	t.Run("missing_client_ca_when_required", func(t *testing.T) {
+	t.Run("missing_client_ca_when_tls_enabled", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		serverCert, serverKey := generateCertificate(t, "server", nil)
@@ -405,11 +429,10 @@ func TestServer_TLS(t *testing.T) {
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 				TLS: config.TLSConfig{
-					Enabled:           true,
-					CertPath:          serverCertPath,
-					KeyPath:           serverKeyPath,
-					RequireClientCert: true,
-					// ClientCAPath is missing.
+					Enabled:  true,
+					CertPath: serverCertPath,
+					KeyPath:  serverKeyPath,
+					// ClientCAPath is missing - mTLS is mandatory when TLS is enabled.
 				},
 			},
 			Authorizer: authorizer,
@@ -423,7 +446,115 @@ func TestServer_TLS(t *testing.T) {
 		err = srv.Start(ctx)
 		if err == nil {
 			srv.Stop(ctx)
-			t.Fatal("Start() expected error when client CA is required but not provided")
+			t.Fatal("Start() expected error when client CA is not provided (mTLS is mandatory)")
+		}
+	})
+
+	t.Run("tls13_enforcement", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		ca := getTestCA(t)
+		caPath := filepath.Join(tmpDir, "ca.crt")
+		if err := os.WriteFile(caPath, pem.EncodeToMemory(&pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: ca.cert.Raw,
+		}), 0644); err != nil {
+			t.Fatalf("write CA cert: %v", err)
+		}
+
+		serverCert, serverKey := generateCertificate(t, "server", ca.cert)
+		serverCertPath := filepath.Join(tmpDir, "server.crt")
+		serverKeyPath := filepath.Join(tmpDir, "server.key")
+		writeCertAndKey(t, serverCertPath, serverKeyPath, serverCert, serverKey)
+
+		authorizer := auth.NewAuthorizer(auth.Options{
+			AllowInsecure: false,
+			DefaultRole:   auth.RoleControlPlane,
+		})
+		opts := Options{
+			Config: config.HTTPConfig{
+				Listen: "127.0.0.1:0",
+				TLS: config.TLSConfig{
+					Enabled:      true,
+					CertPath:     serverCertPath,
+					KeyPath:      serverKeyPath,
+					ClientCAPath: caPath,
+				},
+			},
+			Authorizer: authorizer,
+		}
+		srv, err := New(opts)
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+
+		srv.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+			// Verify TLS version in request.
+			if r.TLS == nil {
+				t.Error("expected TLS connection, got nil")
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if r.TLS.Version != tls.VersionTLS13 {
+				t.Errorf("expected TLS 1.3, got version %x", r.TLS.Version)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		})
+
+		ctx := context.Background()
+		if err := srv.Start(ctx); err != nil {
+			t.Fatalf("Start() error = %v", err)
+		}
+		defer srv.Stop(ctx)
+
+		// Generate client certificate.
+		clientCert, clientKey := generateCertificate(t, "client", ca.cert)
+		clientCertPath := filepath.Join(tmpDir, "client.crt")
+		clientKeyPath := filepath.Join(tmpDir, "client.key")
+		writeCertAndKey(t, clientCertPath, clientKeyPath, clientCert, clientKey)
+
+		clientTLSCert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+		if err != nil {
+			t.Fatalf("load client cert: %v", err)
+		}
+
+		// Make a request with TLS 1.3.
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates:       []tls.Certificate{clientTLSCert},
+					InsecureSkipVerify: true,
+					MinVersion:         tls.VersionTLS13,
+					MaxVersion:         tls.VersionTLS13,
+				},
+			},
+		}
+		resp, err := client.Get("https://" + srv.Addr() + "/health")
+		if err != nil {
+			t.Fatalf("GET /health error = %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		// Verify that TLS 1.2 is rejected.
+		clientTLS12 := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Certificates:       []tls.Certificate{clientTLSCert},
+					InsecureSkipVerify: true,
+					MinVersion:         tls.VersionTLS12,
+					MaxVersion:         tls.VersionTLS12,
+				},
+			},
+		}
+		_, err = clientTLS12.Get("https://" + srv.Addr() + "/health")
+		if err == nil {
+			t.Error("expected TLS 1.2 connection to fail, but it succeeded")
 		}
 	})
 }
