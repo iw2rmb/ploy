@@ -1,3 +1,19 @@
+// Package auth provides role-based request authorization for the server.
+//
+// It derives caller identity from the client certificate presented over mTLS
+// and enforces access via a simple role allowlist. The recognized roles are:
+//
+//   - RoleControlPlane: control-plane callers (CLI and automation)
+//   - RoleWorker: node agents pushing heartbeats/logs/diffs/artifacts
+//   - RoleCLIAdmin: privileged CLI operations (e.g., PKI endpoints)
+//
+// Identity is extracted from the client certificate Subject OU(s) or, as a
+// fallback, the Subject CN. Common aliases are normalized (e.g., "admin",
+// "cliadmin" → RoleCLIAdmin; "control", "controlplane" → RoleControlPlane).
+//
+// When AllowInsecure is enabled in Options, the middleware permits plaintext
+// requests and assigns DefaultRole. This is intended strictly for local tests
+// and insecure development flows; production should require mTLS.
 package auth
 
 import (
@@ -16,12 +32,17 @@ const (
 )
 
 // Options configure the Authorizer.
+//
+// When AllowInsecure is true, requests without TLS are allowed and DefaultRole
+// is assigned as the caller's role. In secure deployments, set AllowInsecure
+// to false so that mutual TLS is mandatory.
 type Options struct {
 	AllowInsecure bool
 	DefaultRole   string
 }
 
 // Authorizer enforces role-based access derived from client certificates.
+// Use Middleware to wrap HTTP handlers with the required role allowlist.
 type Authorizer struct {
 	allowInsecure bool
 	defaultRole   string
