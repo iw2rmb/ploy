@@ -36,7 +36,7 @@ Legend: [ ] todo, [x] done.
   - Test: `docs/api/verify_openapi_test.go` updated list of endpoints; schema sanity tests remain green.
 
 ## Phase 2 — Retire /v1/runs facade (server + CLI)
-- [ ] Remove read/stream routes under /v1/runs
+- [x] Remove read/stream routes under /v1/runs
   - Change: delete /v1/runs (POST, GET), /v1/runs/{id}, /v1/runs/{id}/events registrations; keep internal store tables (runs/stages) intact.
   - Test: update handlers tests to only use mods paths; verify SSE and status routes pass.
 
