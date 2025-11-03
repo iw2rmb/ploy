@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -166,7 +167,10 @@ func runRolloutServer(cfg rolloutServerConfig, stderr io.Writer) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
 	defer cancel()
 
-	return rolloutServerHost(ctx, rolloutServerOptions{
+	logger := initRolloutLogger()
+	metrics := NewRolloutMetrics()
+
+	err = rolloutServerHost(ctx, rolloutServerOptions{
 		Address:         cfg.Address,
 		User:            user,
 		Port:            sshPort,
@@ -174,7 +178,12 @@ func runRolloutServer(cfg rolloutServerConfig, stderr io.Writer) error {
 		PloydBinaryPath: ploydBinaryPath,
 		Stdout:          os.Stdout,
 		Stderr:          stderr,
+		Logger:          logger,
+		Metrics:         metrics,
 	})
+
+	metrics.PrintSummary(stderr)
+	return err
 }
 
 type rolloutServerOptions struct {
@@ -185,6 +194,8 @@ type rolloutServerOptions struct {
 	PloydBinaryPath string
 	Stdout          io.Writer
 	Stderr          io.Writer
+	Logger          *slog.Logger
+	Metrics         *RolloutMetrics
 }
 
 func executeRolloutServer(ctx context.Context, opts rolloutServerOptions) error {
@@ -195,6 +206,14 @@ func executeRolloutServer(ctx context.Context, opts rolloutServerOptions) error 
 	stdout := opts.Stdout
 	if stdout == nil {
 		stdout = os.Stdout
+	}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	metrics := opts.Metrics
+	if metrics == nil {
+		metrics = NewRolloutMetrics()
 	}
 
 	runner := rolloutRunner
@@ -219,40 +238,71 @@ func executeRolloutServer(ctx context.Context, opts rolloutServerOptions) error 
 
 	// Step 1: Upload the new binary via scp.
 	_, _ = fmt.Fprintln(stderr, "Uploading new ployd binary...")
+	stepStart := time.Now()
+	logRolloutStep(logger, "upload_binary", "started", "target_address", opts.Address)
 	copyBinaryArgs := append(append([]string(nil), scpArgs...), opts.PloydBinaryPath, fmt.Sprintf("%s:%s", target, remoteBinaryPath))
 	if err := runner.Run(ctx, "scp", copyBinaryArgs, nil, streams); err != nil {
+		logRolloutError(logger, "upload_binary", err, "target_address", opts.Address, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("upload_binary", "failed")
 		return fmt.Errorf("rollout server: upload binary: %w", err)
 	}
+	logRolloutStep(logger, "upload_binary", "completed", "target_address", opts.Address, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("upload_binary", "completed")
 
 	// Step 2: Install the binary.
 	_, _ = fmt.Fprintln(stderr, "Installing ployd binary...")
+	stepStart = time.Now()
+	logRolloutStep(logger, "install_binary", "started", "target_address", opts.Address)
 	installCmd := fmt.Sprintf("install -m0755 %s /usr/local/bin/ployd && rm -f %s", remoteBinaryPath, remoteBinaryPath)
 	installArgs := append(append([]string(nil), sshArgs...), target, installCmd)
 	if err := runner.Run(ctx, "ssh", installArgs, nil, streams); err != nil {
+		logRolloutError(logger, "install_binary", err, "target_address", opts.Address, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("install_binary", "failed")
 		return fmt.Errorf("rollout server: install binary: %w", err)
 	}
+	logRolloutStep(logger, "install_binary", "completed", "target_address", opts.Address, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("install_binary", "completed")
 
 	// Step 3: Restart the ployd service.
 	_, _ = fmt.Fprintln(stderr, "Restarting ployd service...")
+	stepStart = time.Now()
+	logRolloutStep(logger, "restart_service", "started", "target_address", opts.Address, "service", "ployd")
 	restartCmd := "systemctl restart ployd"
 	restartArgs := append(append([]string(nil), sshArgs...), target, restartCmd)
 	if err := runner.Run(ctx, "ssh", restartArgs, nil, streams); err != nil {
+		logRolloutError(logger, "restart_service", err, "target_address", opts.Address, "service", "ployd", "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("restart_service", "failed")
 		return fmt.Errorf("rollout server: restart service: %w", err)
 	}
+	logRolloutStep(logger, "restart_service", "completed", "target_address", opts.Address, "service", "ployd", "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("restart_service", "completed")
 
 	// Step 4: Poll for service to become active.
 	_, _ = fmt.Fprintln(stderr, "Waiting for ployd service to become active...")
-	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd", streams); err != nil {
+	stepStart = time.Now()
+	logRolloutStep(logger, "health_check", "started", "target_address", opts.Address, "service", "ployd")
+	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd", streams, logger, metrics); err != nil {
+		logRolloutError(logger, "health_check", err, "target_address", opts.Address, "service", "ployd", "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("health_check", "failed")
 		return fmt.Errorf("rollout server: service health check: %w", err)
 	}
+	logRolloutStep(logger, "health_check", "completed", "target_address", opts.Address, "service", "ployd", "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("health_check", "completed")
 
 	// Step 5: Verify the service is listening on the expected API port (8443).
 	_, _ = fmt.Fprintln(stderr, "Verifying service is listening on port 8443...")
+	stepStart = time.Now()
+	logRolloutStep(logger, "verify_port", "started", "target_address", opts.Address, "port", 8443)
 	verifyCmd := "ss -tlnp | grep :8443 || netstat -tlnp | grep :8443"
 	verifyArgs := append(append([]string(nil), sshArgs...), target, verifyCmd)
 	if err := runner.Run(ctx, "ssh", verifyArgs, nil, streams); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Warning: could not verify port 8443 is listening: %v\n", err)
 		_, _ = fmt.Fprintln(stderr, "Continuing anyway; service may still be initializing...")
+		logRolloutStep(logger, "verify_port", "warning", "target_address", opts.Address, "port", 8443, "error", err.Error(), "duration_ms", time.Since(stepStart).Milliseconds())
+		// Don't fail the rollout on port verification warning.
+	} else {
+		logRolloutStep(logger, "verify_port", "completed", "target_address", opts.Address, "port", 8443, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("verify_port", "completed")
 	}
 
 	_, _ = fmt.Fprintln(stderr, "\nRollout complete!")
@@ -262,12 +312,12 @@ func executeRolloutServer(ctx context.Context, opts rolloutServerOptions) error 
 }
 
 // pollServiceActive polls systemctl is-active until the service is active or context expires.
-func pollServiceActive(ctx context.Context, runner deploy.Runner, sshArgs []string, target, service string, streams deploy.IOStreams) error {
+func pollServiceActive(ctx context.Context, runner deploy.Runner, sshArgs []string, target, service string, streams deploy.IOStreams, logger *slog.Logger, metrics *RolloutMetrics) error {
 	checkCmd := fmt.Sprintf("systemctl is-active --quiet %s", service)
 	checkArgs := append(append([]string(nil), sshArgs...), target, checkCmd)
 
 	policy := DefaultRetryPolicy()
-	err := PollWithBackoff(ctx, policy, func() (bool, error) {
+	err := PollWithBackoff(ctx, policy, logger, metrics, "service_active_poll", func() (bool, error) {
 		err := runner.Run(ctx, "ssh", checkArgs, nil, streams)
 		return err == nil, nil
 	})
