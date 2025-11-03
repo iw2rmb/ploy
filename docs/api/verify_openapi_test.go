@@ -36,12 +36,14 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// PKI
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
+		{"/v1/pki/sign/client", "post"},
 		// Repos
 		{"/v1/repos", "post"},
 		{"/v1/repos", "get"},
-		// Mods
+		// Mods (CRUD + Ticket submit)
 		{"/v1/mods/crud", "post"},
 		{"/v1/mods/crud", "get"},
+		{"/v1/mods", "post"},
 		// Runs
 		{"/v1/runs", "post"},
 		{"/v1/runs", "get"},
@@ -128,6 +130,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"PKISignRequest",
 		"PKISignResponse",
 		"PKIAdminSignRequest",
+		"PKIClientSignRequest",
 		"Repo",
 		"CreateRepoRequest",
 		"Mod",
@@ -135,6 +138,8 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"Run",
 		"CreateRunRequest",
 		"CreateRunResponse",
+		"TicketSubmitRequest",
+		"TicketSummary",
 		"NodeClaimResponse",
 		"Event",
 		"Stage",
