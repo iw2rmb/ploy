@@ -51,6 +51,10 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs/{id}/events", "get"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
+		// Node management
+		{"/v1/nodes", "get"},
+		{"/v1/nodes/{id}/drain", "post"},
+		{"/v1/nodes/{id}/undrain", "post"},
 		// Node claim
 		{"/v1/nodes/{id}/claim", "post"},
 		// Node ack

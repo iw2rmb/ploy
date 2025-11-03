@@ -58,6 +58,13 @@ paths:
   # Node heartbeat endpoint
   /v1/nodes/{id}/heartbeat:
     $ref: './paths/nodes_id_heartbeat.yaml'
+  # Node drain/undrain and list endpoints
+  /v1/nodes:
+    $ref: './paths/nodes.yaml'
+  /v1/nodes/{id}/drain:
+    $ref: './paths/nodes_id_drain.yaml'
+  /v1/nodes/{id}/undrain:
+    $ref: './paths/nodes_id_undrain.yaml'
   # Node claim endpoint (pull-based work assignment)
   /v1/nodes/{id}/claim:
     $ref: './paths/nodes_id_claim.yaml'
@@ -80,7 +87,6 @@ paths:
   /v1/nodes/{id}/stage/{stage}/artifact:
     $ref: './paths/nodes_id_stage_stage_artifact.yaml'
   # Legacy removed:
-  # - /v1/nodes (node registry now managed via server → node mTLS RPC)
   # - /v1/config/gitlab (GitLab signer removed)
   # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
 components:
@@ -123,6 +129,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Event'
     Stage:
       $ref: './components/schemas/controlplane.yaml#/Stage'
+    Node:
+      $ref: './components/schemas/controlplane.yaml#/Node'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed
