@@ -16,24 +16,6 @@ CreateRepoRequest:
     commit_sha: { type: string, nullable: true }
   required: [url]
 
-Mod:
-  type: object
-  properties:
-    id: { type: string, format: uuid }
-    repo_id: { type: string, format: uuid }
-    spec: {}
-    created_by: { type: string, nullable: true }
-    created_at: { type: string, format: date-time }
-  required: [id, repo_id, spec, created_at]
-
-CreateModRequest:
-  type: object
-  properties:
-    repo_id: { type: string, format: uuid }
-    spec: {}
-    created_by: { type: string, nullable: true }
-  required: [repo_id, spec]
-
 Run:
   type: object
   properties:
