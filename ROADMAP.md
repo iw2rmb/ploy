@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Change: register new route wired to existing SSE hub; remove reliance on /v1/runs/{id}/events in the CLI.
   - Test: SSE unit/integration test (resume via Last-Event-ID, basic stream lifecycle) updated to the new path.
 
-- [ ] Move artifact bundle ingest — POST /v1/mods/{id}/artifact_bundles — replace /v1/runs/{id}/artifact_bundles
+- [x] Move artifact bundle ingest — POST /v1/mods/{id}/artifact_bundles — replace /v1/runs/{id}/artifact_bundles
   - Change: register new path and point to existing handler; mark old route for removal in Phase 2.
   - Test: adjust handler tests to use new path; verify size cap (≤1 MiB gzipped) maintained.
 

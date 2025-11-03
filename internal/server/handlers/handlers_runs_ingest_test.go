@@ -141,4 +141,43 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	}
 }
 
+func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
+	modID := uuid.New()
+	stageID := uuid.New()
+	ms := &mockStoreRunArtifacts{
+		stage: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: modID, Valid: true}},
+		run:   store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
+	}
+	h := createRunArtifactBundleHandler(ms)
+	payload := map[string]any{"stage_id": stageID.String(), "bundle": []byte("gz-tar")}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
+	req.SetPathValue("id", modID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
+	modID := uuid.New()
+	ms := &mockStoreRunArtifacts{
+		run: store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
+	}
+	h := createRunArtifactBundleHandler(ms)
+	big := make([]byte, 1<<20+1)
+	payload := map[string]any{"bundle": big}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
+	req.SetPathValue("id", modID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("want 413 got %d", rr.Code)
+	}
+}
+
 // legacy jobs tests removed with legacy endpoints.
