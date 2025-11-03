@@ -66,18 +66,15 @@ func DetectExisting(ctx context.Context, runner Runner, opts ProvisionOptions) (
 		return DetectionResult{Found: false}, nil
 	}
 
-	// Read the server certificate to extract cluster ID
-	readCertArgs := append(append([]string(nil), sshArgs...), target, "cat /etc/ploy/pki/server.crt")
-	var certOut bytes.Buffer
-	certStreams := IOStreams{Stdout: &certOut, Stderr: io.Discard}
-	if err := runner.Run(ctx, "ssh", readCertArgs, nil, certStreams); err != nil {
-		// Server cert does not exist; this might be a node or incomplete installation
+	// Ensure the server certificate exists; if missing, this might be a node or incomplete installation.
+	checkServerArgs := append(append([]string(nil), sshArgs...), target, "test -f /etc/ploy/pki/server.crt")
+	if err := runner.Run(ctx, "ssh", checkServerArgs, nil, streams); err != nil {
 		return DetectionResult{Found: true, ClusterID: ""}, nil
 	}
 
 	// Extract CN from certificate using openssl
 	extractCNArgs := append(append([]string(nil), sshArgs...), target,
-		"openssl x509 -noout -subject -nameopt multiline | grep 'commonName' | sed 's/.*= //'")
+		"openssl x509 -in /etc/ploy/pki/server.crt -noout -subject -nameopt multiline | grep 'commonName' | sed 's/.*= //'")
 	var cnOut bytes.Buffer
 	cnStreams := IOStreams{Stdout: &cnOut, Stderr: io.Discard}
 	if err := runner.Run(ctx, "ssh", extractCNArgs, nil, cnStreams); err != nil {

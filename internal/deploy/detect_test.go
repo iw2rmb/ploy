@@ -98,16 +98,39 @@ MIIBkTCCATegAwIBAgIQYoYxqvs=
 			},
 			runnerBehavior: func(command string, args []string) error {
 				// CA cert and config exist but server cert does not
-				if len(args) > 0 && strings.Contains(strings.Join(args, " "), "cat /etc/ploy/pki/server.crt") {
+				if len(args) > 0 && strings.Contains(strings.Join(args, " "), "test -f /etc/ploy/pki/server.crt") {
 					return errors.New("file not found")
 				}
 				return nil
 			},
+			runnerOutput:  func(command string, args []string) string { return "" },
+			wantFound:     true,
+			wantClusterID: "",
+			wantErr:       false,
+		},
+		{
+			name: "uses openssl -in with server.crt",
+			opts: ProvisionOptions{
+				Address: "192.168.1.19",
+				User:    "root",
+			},
+			runnerBehavior: func(command string, args []string) error {
+				joined := strings.Join(args, " ")
+				if command == "ssh" && strings.Contains(joined, "openssl x509") && strings.Contains(joined, "commonName") {
+					if !strings.Contains(joined, "-in /etc/ploy/pki/server.crt") {
+						return errors.New("missing -in server.crt")
+					}
+				}
+				return nil
+			},
 			runnerOutput: func(command string, args []string) string {
+				if len(args) > 0 && strings.Contains(strings.Join(args, " "), "commonName") {
+					return "ployd-checkin123"
+				}
 				return ""
 			},
 			wantFound:     true,
-			wantClusterID: "",
+			wantClusterID: "checkin123",
 			wantErr:       false,
 		},
 		{
