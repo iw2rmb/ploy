@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Test: docs lint.
 
 ## Phase 4 — Hardening & UX
-- [ ] Dry‑run probes and verbose output
+- [x] Dry‑run probes and verbose output
   - Change: `ploy server deploy --reuse --dry-run` prints detected cluster, cert subjects, and no changes applied. `ploy rollout --dry-run` prints planned actions per host.
   - Test: CLI golden tests for messages.
 - [ ] Resume & backoff tuning
