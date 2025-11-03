@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -82,32 +81,19 @@ func TestHandleServerDeployFlagParsing(t *testing.T) {
 // not call provisionHost because we intercept before needing it.
 type deployProvisionOptionsShim = struct{}
 
-// TestHandleServerDeployRefreshAdminCertWarns verifies UX message when the flag is set.
-func TestHandleServerDeployRefreshAdminCertWarns(t *testing.T) {
+// TestHandleServerDeployRefreshAdminCertRequiresDescriptor verifies that --refresh-admin-cert
+// requires an existing descriptor and fails gracefully if missing.
+func TestHandleServerDeployRefreshAdminCertRequiresDescriptor(t *testing.T) {
 	tmp := t.TempDir()
-	idPath := filepath.Join(tmp, "id_test")
-	if err := os.WriteFile(idPath, []byte("key"), 0o600); err != nil {
-		t.Fatalf("write id: %v", err)
-	}
-	binPath := filepath.Join(tmp, "ployd-test")
-	if err := os.WriteFile(binPath, []byte("bin"), 0o755); err != nil {
-		t.Fatalf("write bin: %v", err)
-	}
 	t.Setenv("PLOY_CONFIG_HOME", filepath.Join(tmp, "config"))
 
-	// Ensure detect doesn't run to keep test quick.
-	oldDetect := detectRunner
-	detectRunner = &mockDetectRunner{t: t, existingCluster: false, detectCalled: new(bool)}
-	defer func() { detectRunner = oldDetect }()
-
-	// Stub provisioning to fail fast before any remote work.
-	oldProv := provisionHost
-	provisionHost = func(_ context.Context, _ deploy.ProvisionOptions) error { return errors.New("stub") }
-	defer func() { provisionHost = oldProv }()
-
+	// No descriptor exists, so refresh should fail with appropriate error.
 	buf := &bytes.Buffer{}
-	_ = handleServerDeploy([]string{"--address", "10.0.0.5", "--identity", idPath, "--ployd-binary", binPath, "--refresh-admin-cert"}, buf)
-	if !bytes.Contains(buf.Bytes(), []byte("not implemented")) {
-		t.Fatalf("expected not-implemented warning in stderr; got: %s", buf.String())
+	err := handleServerDeploy([]string{"--address", "10.0.0.5", "--refresh-admin-cert"}, buf)
+	if err == nil {
+		t.Fatal("expected error when refreshing admin cert without descriptor")
+	}
+	if !bytes.Contains([]byte(err.Error()), []byte("load default cluster descriptor")) {
+		t.Fatalf("expected descriptor error, got: %v", err)
 	}
 }

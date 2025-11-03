@@ -3,8 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
+	"encoding/asn1"
+	"encoding/json"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -596,6 +603,274 @@ func (m *mockDetectRunner) Run(ctx context.Context, name string, args []string, 
 		}
 	}
 	return nil
+}
+
+// TestRefreshAdminCertFromServer verifies that admin cert refresh calls the server and writes files.
+func TestRefreshAdminCertFromServer(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	clusterID := "test-cluster-refresh"
+	now := time.Now()
+
+	// Generate test CA and existing admin cert for initial descriptor.
+	ca, err := pki.GenerateCA(clusterID, now)
+	if err != nil {
+		t.Fatalf("GenerateCA failed: %v", err)
+	}
+
+	adminCert, err := pki.IssueClientCert(ca, clusterID, now)
+	if err != nil {
+		t.Fatalf("IssueClientCert failed: %v", err)
+	}
+
+	// Write initial admin bundle.
+	caPath, certPath, keyPath, err := writeLocalAdminBundle(clusterID, ca.CertPEM, adminCert.CertPEM, adminCert.KeyPEM)
+	if err != nil {
+		t.Fatalf("writeLocalAdminBundle failed: %v", err)
+	}
+
+	// Save descriptor with existing cert paths.
+	desc := config.Descriptor{
+		ClusterID: clusterID,
+		Address:   "https://10.0.0.5:8443",
+		Scheme:    "https",
+		CAPath:    caPath,
+		CertPath:  certPath,
+		KeyPath:   keyPath,
+	}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		t.Fatalf("SaveDescriptor failed: %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault failed: %v", err)
+	}
+
+	// Mock HTTP server to simulate PKI endpoint.
+	mockServer := &mockPKIServer{
+		t:          t,
+		clusterID:  clusterID,
+		ca:         ca,
+		expectRole: "cli-admin",
+	}
+	server := mockServer.start()
+	defer server.Close()
+
+	// Set control plane URL to mock server.
+	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+
+	// Call handleRefreshAdminCert.
+	stderr := &bytes.Buffer{}
+	ctx := context.Background()
+	if err := handleRefreshAdminCert(ctx, stderr); err != nil {
+		t.Fatalf("handleRefreshAdminCert failed: %v", err)
+	}
+
+	output := stderr.String()
+	if !strings.Contains(output, "Refreshing admin certificate") {
+		t.Errorf("expected refresh message in output, got: %s", output)
+	}
+	if !strings.Contains(output, "Admin certificate issued successfully") {
+		t.Errorf("expected success message in output, got: %s", output)
+	}
+	if !strings.Contains(output, "Admin certificate refreshed successfully") {
+		t.Errorf("expected completion message in output, got: %s", output)
+	}
+
+	// Verify files were written.
+	if _, err := os.Stat(caPath); err != nil {
+		t.Errorf("CA file not found: %v", err)
+	}
+	if _, err := os.Stat(certPath); err != nil {
+		t.Errorf("cert file not found: %v", err)
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		t.Errorf("key file not found: %v", err)
+	}
+
+	// Verify descriptor was updated.
+	updatedDesc, err := config.LoadDefault()
+	if err != nil {
+		t.Fatalf("LoadDefault failed: %v", err)
+	}
+	if updatedDesc.CAPath != caPath {
+		t.Errorf("expected CAPath=%q, got %q", caPath, updatedDesc.CAPath)
+	}
+	if updatedDesc.CertPath != certPath {
+		t.Errorf("expected CertPath=%q, got %q", certPath, updatedDesc.CertPath)
+	}
+	if updatedDesc.KeyPath != keyPath {
+		t.Errorf("expected KeyPath=%q, got %q", keyPath, updatedDesc.KeyPath)
+	}
+
+	// Verify the mock server received a valid CSR.
+	if !mockServer.receivedCSR {
+		t.Error("expected mock server to receive CSR")
+	}
+}
+
+// mockPKIServer simulates the server PKI signing endpoint for testing.
+type mockPKIServer struct {
+	t           *testing.T
+	clusterID   string
+	ca          *pki.CABundle
+	expectRole  string
+	receivedCSR bool
+}
+
+func (m *mockPKIServer) start() *httptest.Server {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/pki/sign/admin", m.handleSignAdmin)
+
+	server := httptest.NewServer(mux)
+	return server
+}
+
+func (m *mockPKIServer) handleSignAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		CSR string `json:"csr"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Parse and validate CSR.
+	block, _ := pem.Decode([]byte(req.CSR))
+	if block == nil {
+		http.Error(w, "invalid CSR PEM", http.StatusBadRequest)
+		return
+	}
+
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		http.Error(w, "parse CSR failed", http.StatusBadRequest)
+		return
+	}
+
+	// Verify OU contains expected role.
+	hasRole := false
+	for _, ou := range csr.Subject.OrganizationalUnit {
+		if strings.Contains(ou, m.expectRole) {
+			hasRole = true
+			break
+		}
+	}
+	if !hasRole {
+		http.Error(w, "CSR missing required role", http.StatusBadRequest)
+		return
+	}
+
+	m.receivedCSR = true
+
+	// Sign CSR using test CA.
+	cert, err := pki.SignNodeCSR(m.ca, []byte(req.CSR), time.Now())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	resp := struct {
+		Certificate string `json:"certificate"`
+		CABundle    string `json:"ca_bundle"`
+		Serial      string `json:"serial"`
+		Fingerprint string `json:"fingerprint"`
+		NotBefore   string `json:"not_before"`
+		NotAfter    string `json:"not_after"`
+	}{
+		Certificate: cert.CertPEM,
+		CABundle:    m.ca.CertPEM,
+		Serial:      cert.Serial,
+		Fingerprint: cert.Fingerprint,
+		NotBefore:   cert.NotBefore.Format(time.RFC3339),
+		NotAfter:    cert.NotAfter.Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// TestGenerateAdminCSR verifies that admin CSR generation includes proper OU and ExtKeyUsage.
+func TestGenerateAdminCSR(t *testing.T) {
+	clusterID := "test-cluster-csr"
+
+	csrPEM, keyPEM, err := generateAdminCSR(clusterID)
+	if err != nil {
+		t.Fatalf("generateAdminCSR failed: %v", err)
+	}
+
+	// Verify CSR is valid PEM.
+	block, _ := pem.Decode(csrPEM)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		t.Fatal("invalid CSR PEM")
+	}
+
+	// Parse CSR.
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse CSR: %v", err)
+	}
+
+	// Verify signature.
+	if err := csr.CheckSignature(); err != nil {
+		t.Fatalf("CSR signature invalid: %v", err)
+	}
+
+	// Verify CN contains cluster ID.
+	if !strings.Contains(csr.Subject.CommonName, clusterID) {
+		t.Errorf("expected CN to contain %q, got: %s", clusterID, csr.Subject.CommonName)
+	}
+
+	// Verify OU contains role.
+	hasAdminOU := false
+	for _, ou := range csr.Subject.OrganizationalUnit {
+		if ou == "Ploy role=cli-admin" {
+			hasAdminOU = true
+			break
+		}
+	}
+	if !hasAdminOU {
+		t.Error("expected OU to contain \"Ploy role=cli-admin\"")
+	}
+
+	// Verify ExtKeyUsage extension.
+	var hasClientAuthEKU bool
+	for _, ext := range csr.Extensions {
+		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 37}) { // extKeyUsage
+			var oids []asn1.ObjectIdentifier
+			if _, err := asn1.Unmarshal(ext.Value, &oids); err != nil {
+				t.Fatalf("parse EKU extension: %v", err)
+			}
+			for _, oid := range oids {
+				if oid.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2}) { // clientAuth
+					hasClientAuthEKU = true
+					break
+				}
+			}
+			break
+		}
+	}
+	if !hasClientAuthEKU {
+		t.Error("expected CSR to have ExtKeyUsage with ClientAuth")
+	}
+
+	// Verify key is valid PEM.
+	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil || keyBlock.Type != "EC PRIVATE KEY" {
+		t.Fatal("invalid key PEM")
+	}
+
+	// Parse private key.
+	if _, err := x509.ParseECPrivateKey(keyBlock.Bytes); err != nil {
+		t.Fatalf("parse private key: %v", err)
+	}
 }
 
 // TestServerDeployDescriptorPersistence verifies that the cluster descriptor is saved after successful deployment.

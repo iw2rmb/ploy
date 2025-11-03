@@ -16,7 +16,7 @@ Legend: [ ] todo, [x] done.
 - [x] PKI: admin CSR signing endpoint (mTLS, cli-admin only)
   - Change: `internal/server/handlers/handlers_pki_admin.go` — `POST /v1/pki/sign/admin`; enforce EKU=ClientAuth and OU="Ploy role=cli-admin". Wire in `register.go`.
   - Test: handlers unit tests — accept valid CSR under cli-admin; reject missing role / wrong OU / wrong EKU.
-- [ ] CLI admin cert refresh via server
+- [x] CLI admin cert refresh via server
   - Change: `cmd/ploy/server_command.go` — when `--refresh-admin-cert` set (or default if descriptor lacks TLS), generate local CSR and call `/v1/pki/sign/admin`; write `~/.config/ploy/certs/<cluster>-{ca,admin}.{crt,key}`; update descriptor CAPath/CertPath/KeyPath.
   - Test: `cmd/ploy/server_command_test.go` — stub HTTP server; expect files written and descriptor updated.
 - [ ] Bootstrap must not clobber existing PKI on primary
