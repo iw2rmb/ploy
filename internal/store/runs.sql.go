@@ -24,9 +24,10 @@ func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
 
 const claimRun = `-- name: ClaimRun :one
 WITH cte AS (
-  SELECT id FROM runs
-  WHERE status = 'queued'
-  ORDER BY created_at
+  SELECT runs.id FROM runs
+  INNER JOIN nodes ON nodes.id = $1
+  WHERE runs.status = 'queued' AND nodes.drained = false
+  ORDER BY runs.created_at
   FOR UPDATE SKIP LOCKED
   LIMIT 1
 )
