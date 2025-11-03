@@ -11,7 +11,7 @@ Documentation:
 Legend: [ ] todo, [x] done.
 
 ## Phase 1 — Introduce ticket endpoints; remove mods catalog
-- [ ] Add ticket submission endpoint — POST /v1/mods — Accepts TicketSubmitRequest, returns TicketSummary (ticket_id == run UUID)
+- [x] Add ticket submission endpoint — POST /v1/mods — Accepts TicketSubmitRequest, returns TicketSummary (ticket_id == run UUID)
   - Change: implement handler (new file, e.g., `internal/server/handlers/handlers_mods_ticket.go`), register in `internal/server/handlers/register.go`; map request → create run row; accept repo URL/refs directly (no pre‑registered mod/repo required).
   - Test: unit tests for 200/202/4xx paths; verify JSON schema enforced; OpenAPI test updated to include /v1/mods.
 
