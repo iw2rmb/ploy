@@ -47,8 +47,8 @@ Legend: [ ] todo, [x] done.
 - [x] Rollout command for nodes (batched)
   - Change: `cmd/ploy/rollout_nodes.go` — `ploy rollout nodes [--all|--selector <pattern>] [--concurrency N] [--binary <path>] [--timeout 90s]` → drain → wait idle → update binary → restart → heartbeat OK → undrain. Write a resume file under `~/.config/ploy/rollout/state.json`.
   - Test: recording runner + fake API; ensure batch ordering, retries, resume.
-- [ ] Docs update (update guide)
-  - Change: add “Rolling update of nodes” section with examples and concurrency guidance.
+- [x] Docs update (update guide)
+  - Change: add "Rolling update of nodes" section with examples and concurrency guidance.
   - Test: docs lint.
 
 ## Phase 4 — Hardening & UX

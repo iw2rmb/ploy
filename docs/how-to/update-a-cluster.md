@@ -69,43 +69,130 @@ ssh root@45.9.42.212 'journalctl -u ployd -n 50 --no-pager'
 curl -sk https://45.9.42.212:8443/v1/version | jq .
 ```
 
-## 3) Update Worker Nodes (B, C)
+## 3) Rolling Update of Nodes
 
-Use the batched rollout command to drain nodes, update the `ployd-node` binary,
-restart the service, wait for heartbeat, and undrain.
+The `ploy rollout nodes` command performs a safe, batched update of worker
+nodes with automatic draining and health checks. Each node goes through the
+following lifecycle:
 
-Examples:
+1. **Drain** — mark the node as unavailable for new job claims
+2. **Wait idle** — wait for active runs to complete
+3. **Update binary** — upload and install the new `ployd-node` binary via SCP/SSH
+4. **Restart service** — restart the `ployd-node` systemd unit
+5. **Health check** — poll for service active and wait for heartbeat
+6. **Undrain** — restore the node to available status
+
+The command persists rollout state to `~/.config/ploy/rollout/state.json`, allowing
+resumption if interrupted.
+
+### Basic Examples
+
+**Roll all nodes sequentially (safest, one at a time):**
 
 ```bash
-# All nodes, one at a time (default batch size = 1)
 dist/ploy rollout nodes \
   --all \
   --binary dist/ployd-node-linux \
   --user root \
   --timeout 90
+```
 
-# Only worker nodes in pairs (batch size = 2)
+**Roll only nodes matching a pattern:**
+
+```bash
 dist/ploy rollout nodes \
   --selector 'worker-*' \
+  --binary dist/ployd-node-linux \
+  --user root \
+  --timeout 90
+```
+
+**Roll nodes in batches of 2 (faster, requires spare capacity):**
+
+```bash
+dist/ploy rollout nodes \
+  --all \
   --concurrency 2 \
   --binary dist/ployd-node-linux \
   --user root \
   --timeout 90
 ```
 
-Flags:
+### Flags
 
-- `--all` or `--selector '<pattern>'` — select nodes to roll
-- `--concurrency` — number of nodes to update per batch (default 1)
+- `--all` or `--selector '<pattern>'` — select nodes to roll (required,
+  mutually exclusive)
+- `--concurrency N` — number of nodes to update per batch (default: 1)
 - `--binary` — path to the `ployd-node` binary (Linux build)
-- `--user` / `--identity` / `--ssh-port` — SSH connection to nodes
-- `--timeout` — per-node timeout in seconds (default 90)
+- `--user` — SSH username for node connection (default: `root`)
+- `--identity` — SSH private key path (default: `~/.ssh/id_rsa`)
+- `--ssh-port` — SSH port for node connection (default: `22`)
+- `--timeout` — timeout in seconds per node rollout (default: `90`)
 
-Sanity checks per node:
+### Concurrency Guidance
+
+**Concurrency = 1 (default):**
+
+- Safest option: only one node is drained at a time.
+- Ensures maximum capacity remains available for active workloads.
+- Recommended for clusters with N ≤ 3 nodes or when running near capacity.
+
+**Concurrency = 2 or higher:**
+
+- Faster rollout: multiple nodes are updated in parallel batches.
+- Requires spare capacity to absorb workload from drained nodes.
+- Recommended for clusters with N ≥ 4 nodes and <50% utilization.
+- Example: with 6 nodes and concurrency=2, rollout completes in 3 batches
+  instead of 6.
+
+**Choosing concurrency:**
+
+- Ensure `concurrency < total_nodes` to maintain cluster availability.
+- Monitor active runs during rollout: `ploy runs list --status running`.
+- If runs queue or stall, reduce concurrency on next rollout.
+
+### Resume on Failure
+
+If the rollout fails mid-way (network issues, timeout, node offline), the command
+saves state to `~/.config/ploy/rollout/state.json`. Re-run the same command to
+resume from the last completed node.
+
+Example:
 
 ```bash
-ssh root@46.173.16.177 'systemctl status --no-pager ployd-node'; ssh root@46.173.16.177 'journalctl -u ployd-node -n 50 --no-pager'
-ssh root@81.200.119.187 'systemctl status --no-pager ployd-node'; ssh root@81.200.119.187 'journalctl -u ployd-node -n 50 --no-pager'
+# First attempt: fails on node 3 of 5
+dist/ploy rollout nodes --all --binary dist/ployd-node-linux
+
+# Output: Rollout summary: 2 succeeded, 1 failed
+# Resume state saved to: ~/.config/ploy/rollout/state.json
+
+# Fix the issue (e.g., bring node back online), then resume:
+dist/ploy rollout nodes --all --binary dist/ployd-node-linux
+
+# Output: [node-1] Already completed, skipping
+#         [node-2] Already completed, skipping
+#         [node-3] Starting rollout...
+```
+
+The state file is automatically removed on full success.
+
+### Sanity Checks
+
+After rollout, verify each node is healthy:
+
+```bash
+ssh root@46.173.16.177 'systemctl status --no-pager ployd-node'
+ssh root@46.173.16.177 'journalctl -u ployd-node -n 50 --no-pager'
+
+ssh root@81.200.119.187 'systemctl status --no-pager ployd-node'
+ssh root@81.200.119.187 'journalctl -u ployd-node -n 50 --no-pager'
+```
+
+Check that all nodes are undrained and reporting heartbeats via the API (future):
+
+```bash
+# Future: GET /v1/nodes will show drained=false and recent last_heartbeat
+curl -sk https://45.9.42.212:8443/v1/nodes | jq '.[] | {name, drained, last_heartbeat}'
 ```
 
 ## 4) Cluster Verification
