@@ -190,5 +190,5 @@ func defaultPloydBinaryPath(workstationOS string) (string, error) {
 		}
 		return candidate, nil
 	}
-	return "", errors.New("ploy cluster add: ployd binary not found alongside CLI; provide --ployd-binary")
+	return "", errors.New("ploy server deploy: ployd binary not found alongside CLI; provide --ployd-binary")
 }

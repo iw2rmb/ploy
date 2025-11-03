@@ -33,13 +33,26 @@ Optional: verify versions locally
 
 ## 2) Update the Control‑Plane Server (A)
 
-Do not re‑run `ploy server deploy` for an update (that regenerates PKI). Copy the new
-binary and restart the service.
+Prefer the first‑class rollout command. Do not re‑run `ploy server deploy` for an
+update (that regenerates PKI).
+
+Using the CLI (recommended):
 
 ```bash
-scp -q dist/ployd-linux root@45.9.42.212:/usr/local/bin/ployd.new
-ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin/ployd && rm -f /usr/local/bin/ployd.new && systemctl restart ployd && systemctl is-active --quiet ployd'
+dist/ploy rollout server \
+  --address 45.9.42.212 \
+  --binary dist/ployd-linux \
+  --user root \
+  --timeout 60
 ```
+
+Flags:
+- `--address` — target server IP or hostname
+- `--binary` — path to the new `ployd` binary (Linux build)
+- `--user` — SSH username (default `root`)
+- `--identity` — SSH private key path (defaults to `~/.ssh/id_rsa`)
+- `--ssh-port` — SSH port (default `22`)
+- `--timeout` — rollout timeout in seconds (default `60`)
 
 Sanity checks:
 
@@ -47,6 +60,16 @@ Sanity checks:
 ssh root@45.9.42.212 'systemctl status --no-pager ployd'
 ssh root@45.9.42.212 'journalctl -u ployd -n 50 --no-pager'
 curl -sk https://45.9.42.212:8443/v1/version | jq .
+```
+
+### Backdoor (manual commands)
+
+If you need to bypass the CLI (troubleshooting, very old environments), the
+equivalent manual steps are:
+
+```bash
+scp -q dist/ployd-linux root@45.9.42.212:/usr/local/bin/ployd.new
+ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin/ployd && rm -f /usr/local/bin/ployd.new && systemctl restart ployd && systemctl is-active --quiet ployd'
 ```
 
 ## 3) Update Worker Nodes (B, C)

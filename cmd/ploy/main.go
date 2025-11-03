@@ -36,6 +36,8 @@ func execute(args []string, stderr io.Writer) error {
 				printRunsUsage(stderr)
 			case "server":
 				printServerUsage(stderr)
+			case "rollout":
+				printRolloutUsage(stderr)
 			default:
 				printUsage(stderr)
 			}

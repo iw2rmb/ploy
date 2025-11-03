@@ -105,7 +105,7 @@ func resolvePloydBinaryPath(v stringValue) (string, error) {
 			return c, nil
 		}
 	}
-	return "", errors.New("ployd binary not found alongside CLI; provide --ployd-binary")
+	return "", errors.New("ployd binary not found alongside CLI; provide --binary")
 }
 
 func expandPath(path string) string {
