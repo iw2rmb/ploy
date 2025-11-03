@@ -38,7 +38,7 @@ Legend: [ ] todo, [x] done.
 - [x] DB: add drained flag for nodes
   - Change: `internal/store/migrations/00X_nodes_drain.sql` — `ALTER TABLE ploy.nodes ADD COLUMN drained BOOLEAN NOT NULL DEFAULT false;` + indexes.
   - Test: migration unit test passes; ensure idempotency.
-- [ ] API: drain/undrain endpoints + list nodes
+- [x] API: drain/undrain endpoints + list nodes
   - Change: `internal/server/handlers/handlers_worker_drain.go` — `POST /v1/nodes/{id}/drain` and `/undrain` (RoleControlPlane), `GET /v1/nodes` (read‑only); wire in `register.go`.
   - Test: handler tests — state toggles, bad IDs, 404/409 paths.
 - [ ] Scheduler: exclude drained nodes from claims

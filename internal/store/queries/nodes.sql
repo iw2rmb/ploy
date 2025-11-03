@@ -43,3 +43,8 @@ SET
   cert_not_before = $4,
   cert_not_after = $5
 WHERE id = $1;
+
+-- name: UpdateNodeDrained :exec
+UPDATE nodes
+SET drained = $2
+WHERE id = $1;

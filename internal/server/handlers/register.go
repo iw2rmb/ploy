@@ -39,6 +39,11 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
 
+	// Node management endpoints
+	s.HandleFunc("GET /v1/nodes", listNodesHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/nodes/{id}/drain", drainNodeHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/nodes/{id}/undrain", undrainNodeHandler(st), auth.RoleControlPlane)
+
 	// Node worker endpoints
 	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st), auth.RoleWorker)
