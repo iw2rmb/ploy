@@ -184,6 +184,68 @@ func TestHandleRolloutNodesValidatesTimeout(t *testing.T) {
 	}
 }
 
+func TestHandleRolloutNodesValidatesSSHPort(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	// Stub API client to return empty node list.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("[]"))
+	}))
+	defer mockServer.Close()
+
+	old := rolloutNodesAPIClient
+	oldURL := rolloutNodesAPIBaseURL
+	rolloutNodesAPIClient = mockServer.Client()
+	rolloutNodesAPIBaseURL = mockServer.URL
+	defer func() {
+		rolloutNodesAPIClient = old
+		rolloutNodesAPIBaseURL = oldURL
+	}()
+
+	tests := []struct {
+		name      string
+		port      int
+		expectErr bool
+	}{
+		{"valid port 22", 22, false},
+		{"valid port 2222", 2222, false},
+		{"default port 0", 0, false}, // defaults to 22
+		{"invalid port -1", -1, true},
+		{"invalid port 70000", 70000, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := rolloutNodesConfig{
+				All:          true,
+				SSHPort:      tt.port,
+				BinaryPath:   binPath,
+				IdentityFile: identityPath,
+			}
+			err := runRolloutNodes(cfg, io.Discard)
+			if tt.expectErr {
+				if err == nil {
+					t.Fatalf("expected error for ssh-port %d", tt.port)
+				}
+				if !strings.Contains(err.Error(), "invalid SSH port") {
+					t.Fatalf("expected SSH port validation error, got: %v", err)
+				}
+			} else if err != nil && strings.Contains(err.Error(), "invalid SSH port") {
+				t.Fatalf("unexpected SSH port validation error for valid port %d: %v", tt.port, err)
+			}
+		})
+	}
+}
+
 func TestFilterNodesAll(t *testing.T) {
 	nodes := []nodeInfo{
 		{ID: "1", Name: "worker-1", IPAddress: "10.0.0.1"},

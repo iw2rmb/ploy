@@ -263,7 +263,9 @@ func resolvePloydNodeBinaryPath(v stringValue) (string, error) {
 			return c, nil
 		}
 	}
-	return "", errors.New("ployd-node binary not found alongside CLI; provide --ployd-node-binary")
+	// Used by both `ploy node add` (flag: --ployd-node-binary) and
+	// `ploy rollout nodes` (flag: --binary). Keep guidance helpful for both.
+	return "", errors.New("ployd-node binary not found alongside CLI; provide --binary (rollout) or --ployd-node-binary (node add)")
 }
 
 // pkiSignRequest is the JSON request body for POST /v1/pki/sign.
