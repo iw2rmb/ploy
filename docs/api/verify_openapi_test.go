@@ -45,6 +45,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/crud", "get"},
 		{"/v1/mods", "post"},
 		{"/v1/mods/{id}", "get"},
+		{"/v1/mods/{id}/events", "get"},
 		// Runs
 		{"/v1/runs", "post"},
 		{"/v1/runs", "get"},
