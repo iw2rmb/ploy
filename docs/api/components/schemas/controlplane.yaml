@@ -215,3 +215,39 @@ CreateArtifactBundleRequest:
       description: Gzipped tar archive (≤1 MiB gzipped), base64-encoded.
       contentEncoding: base64
   required: [bundle]
+
+# Node describes a registered worker node.
+Node:
+  type: object
+  properties:
+    id: { type: string, format: uuid }
+    name: { type: string }
+    ip_address: { type: string }
+    version: { type: string, nullable: true }
+    concurrency: { type: integer, format: int32 }
+    cpu_total_millis: { type: integer, format: int32 }
+    cpu_free_millis: { type: integer, format: int32 }
+    mem_total_bytes: { type: integer, format: int64 }
+    mem_free_bytes: { type: integer, format: int64 }
+    disk_total_bytes: { type: integer, format: int64 }
+    disk_free_bytes: { type: integer, format: int64 }
+    cert_serial: { type: string, nullable: true }
+    cert_fingerprint: { type: string, nullable: true }
+    cert_not_before: { type: string, format: date-time, nullable: true }
+    cert_not_after: { type: string, format: date-time, nullable: true }
+    last_heartbeat: { type: string, format: date-time, nullable: true }
+    drained: { type: boolean }
+    created_at: { type: string, format: date-time }
+  required:
+    - id
+    - name
+    - ip_address
+    - concurrency
+    - cpu_total_millis
+    - cpu_free_millis
+    - mem_total_bytes
+    - mem_free_bytes
+    - disk_total_bytes
+    - disk_free_bytes
+    - drained
+    - created_at

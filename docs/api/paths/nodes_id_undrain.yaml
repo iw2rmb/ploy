@@ -1,0 +1,23 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Mark node as active (undrain)
+  description: |
+    Clears the drained flag for the specified node, allowing it to accept new run claims.
+  responses:
+    '204':
+      description: Node undrained
+    '400':
+      description: Bad Request (invalid node ID)
+    '404':
+      description: Node not found
+    '409':
+      description: Node is not drained
+    '500':
+      description: Internal server error
+

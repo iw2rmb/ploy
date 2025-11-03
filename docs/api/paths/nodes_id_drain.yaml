@@ -1,0 +1,23 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Node UUID
+post:
+  tags: [Control]
+  summary: Mark node as drained
+  description: |
+    Marks the specified node as drained. Drained nodes do not accept new run claims.
+  responses:
+    '204':
+      description: Node drained
+    '400':
+      description: Bad Request (invalid node ID)
+    '404':
+      description: Node not found
+    '409':
+      description: Node already drained
+    '500':
+      description: Internal server error
+
