@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
-	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 // Default catalog path for knowledge-base commands.
@@ -139,7 +139,7 @@ func handleKnowledgeBaseEvaluate(args []string, stderr io.Writer) error {
 			printKnowledgeBaseEvaluateUsage(stderr)
 			return fmt.Errorf("sample %s requires at least one error expression", name)
 		}
-		match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: errorsList}})
+		match, ok, err := advisor.Match(context.Background(), plan.AdviceRequest{Signals: plan.AdviceSignals{Errors: errorsList}})
 		if err != nil {
 			printKnowledgeBaseEvaluateUsage(stderr)
 			return fmt.Errorf("evaluate sample %s: %w", name, err)

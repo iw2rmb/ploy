@@ -1,0 +1,180 @@
+package plan_test
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
+)
+
+func TestPlannerBuildsModsStageGraph_Integration(t *testing.T) {
+	planner := plan.NewPlanner(plan.Options{
+		PlanLane:        "node-wasm",
+		OpenRewriteLane: "node-wasm",
+		LLMPlanLane:     "gpu-ml",
+		LLMExecLane:     "gpu-ml",
+		HumanLane:       "mods-human",
+	})
+	stages, err := planner.Plan(context.Background(), plan.PlanInput{
+		Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-123"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error planning mods stages: %v", err)
+	}
+	if len(stages) != 6 {
+		t.Fatalf("expected 6 stages, got %d", len(stages))
+	}
+	expect := []struct {
+		name, kind, lane string
+		deps             []string
+	}{
+		{plan.StageNamePlan, plan.StageNamePlan, "node-wasm", nil},
+		{plan.StageNameORWApply, plan.StageNameORWApply, "node-wasm", []string{plan.StageNamePlan}},
+		{plan.StageNameORWGenerate, plan.StageNameORWGenerate, "node-wasm", []string{plan.StageNamePlan}},
+		{plan.StageNameLLMPlan, plan.StageNameLLMPlan, "gpu-ml", []string{plan.StageNamePlan}},
+		{plan.StageNameLLMExec, plan.StageNameLLMExec, "gpu-ml", []string{plan.StageNameORWApply, plan.StageNameORWGenerate, plan.StageNameLLMPlan}},
+		{plan.StageNameHuman, plan.StageNameHuman, "mods-human", []string{plan.StageNameLLMExec}},
+	}
+	for i, exp := range expect {
+		s := stages[i]
+		if s.Name != exp.name || s.Kind != exp.kind || s.Lane != exp.lane || !reflect.DeepEqual(s.Dependencies, exp.deps) {
+			t.Fatalf("unexpected stage[%d]: %+v", i, s)
+		}
+	}
+}
+
+func TestPlannerAnnotatesMetadataFromAdvisor(t *testing.T) {
+	advisor := &stubAdvisor{advice: plan.Advice{
+		Plan:            plan.AdvicePlan{SelectedRecipes: []string{"recipe.alpha", "recipe.beta"}, ParallelStages: []string{plan.StageNameORWApply, plan.StageNameORWGenerate}, HumanGate: true, Summary: "expect human review after LLM execution"},
+		Human:           plan.AdviceHuman{Required: true, Playbooks: []string{"playbook.mods.review"}},
+		Recommendations: []plan.AdviceRecommendation{{Source: "knowledge-base", Message: "Apply recipe.alpha first", Confidence: 0.91}, {Source: "knowledge-base", Message: "Queue review if diff size > 500", Confidence: 1.4}, {Source: "knowledge-base", Message: " ", Confidence: -0.5}},
+	}}
+	p := plan.NewPlanner(plan.Options{Advisor: advisor})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-knowledge"}})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if !advisor.called {
+		t.Fatalf("advisor not called")
+	}
+	planStage := findStage(t, stages, plan.StageNamePlan)
+	if planStage.Metadata.Mods == nil || planStage.Metadata.Mods.Plan == nil || len(planStage.Metadata.Mods.Recommendations) != 2 {
+		t.Fatalf("missing plan metadata: %#v", planStage.Metadata)
+	}
+	humanStage := findStage(t, stages, plan.StageNameHuman)
+	if humanStage.Metadata.Mods == nil || humanStage.Metadata.Mods.Human == nil || !humanStage.Metadata.Mods.Human.Required {
+		t.Fatalf("missing human metadata")
+	}
+}
+
+func TestPlannerFallsBackWhenAdvisorErrors(t *testing.T) {
+	errAdv := &stubAdvisor{err: errors.New("advisor unavailable")}
+	p := plan.NewPlanner(plan.Options{Advisor: errAdv})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-fallback"}})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	if !errAdv.called {
+		t.Fatalf("advisor not called")
+	}
+	planStage := findStage(t, stages, plan.StageNamePlan)
+	if planStage.Metadata.Mods != nil {
+		t.Fatalf("expected no mods metadata on failure, got %#v", planStage.Metadata.Mods)
+	}
+}
+
+func TestPlannerExposesExecutionHints(t *testing.T) {
+	opts := plan.Options{}
+	setOptionsHints(t, &opts, 90*time.Second, 3)
+	p := plan.NewPlanner(opts)
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "ticket-hints"}})
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	planStage := findStage(t, stages, plan.StageNamePlan)
+	if planStage.Metadata.Mods == nil || planStage.Metadata.Mods.Plan == nil {
+		t.Fatalf("expected plan metadata present")
+	}
+	pm := *planStage.Metadata.Mods.Plan
+	if len(pm.ParallelStages) == 0 || pm.PlanTimeout != "1m30s" || pm.MaxParallel != 3 {
+		t.Fatalf("unexpected plan meta: %#v", pm)
+	}
+}
+
+func TestPlannerIntegratesKnowledgeBaseAdvisor(t *testing.T) {
+	dir := t.TempDir()
+	fixture := `{"schema_version":"2025-09-27.1","incidents":[{"id":"lint-failure","errors":["lint failed","npm ERR! lint script"],"recipes":["recipe.npm.lint"],"summary":"Run npm run lint with fixes","human_gate":true,"playbooks":["mods.npm.lint"],"recommendations":[{"source":"knowledge-base","message":"Run npm run lint -- --fix","confidence":0.9}]}]}`
+	path := filepath.Join(dir, "catalog.json")
+	if err := os.WriteFile(path, []byte(fixture), 0o600); err != nil {
+		t.Fatalf("write catalog: %v", err)
+	}
+	catalog, err := knowledgebase.LoadCatalogFile(path)
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	advisor, err := knowledgebase.NewAdvisor(knowledgebase.Options{Catalog: catalog})
+	if err != nil {
+		t.Fatalf("new advisor: %v", err)
+	}
+	p := plan.NewPlanner(plan.Options{Advisor: advisor})
+	stages, err := p.Plan(context.Background(), plan.PlanInput{Ticket: contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-1", Manifest: contracts.ManifestReference{Name: "repo", Version: "1.0.0"}}, Signals: plan.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}}})
+	if err != nil {
+		t.Fatalf("plan kb: %v", err)
+	}
+	ps := findStage(t, stages, plan.StageNamePlan)
+	if ps.Metadata.Mods == nil || ps.Metadata.Mods.Plan == nil || len(ps.Metadata.Mods.Plan.SelectedRecipes) == 0 || !ps.Metadata.Mods.Plan.HumanGate {
+		t.Fatalf("plan metadata: %#v", ps.Metadata)
+	}
+	hs := findStage(t, stages, plan.StageNameHuman)
+	if hs.Metadata.Mods == nil || hs.Metadata.Mods.Human == nil || len(hs.Metadata.Mods.Human.Playbooks) == 0 {
+		t.Fatalf("human metadata: %#v", hs.Metadata)
+	}
+}
+
+func setOptionsHints(t *testing.T, opts *plan.Options, planTimeout time.Duration, maxParallel int) {
+	t.Helper()
+	v := reflect.ValueOf(opts).Elem()
+	if f := v.FieldByName("PlanTimeout"); f.IsValid() && f.CanSet() {
+		f.Set(reflect.ValueOf(planTimeout))
+	}
+	if f := v.FieldByName("MaxParallel"); f.IsValid() && f.CanSet() {
+		f.SetInt(int64(maxParallel))
+	}
+	for k, val := range map[string]string{"PlanLane": "mods-plan", "OpenRewriteLane": "mods-java", "LLMPlanLane": "mods-llm", "LLMExecLane": "mods-llm", "HumanLane": "mods-human"} {
+		if f := v.FieldByName(k); f.IsValid() && f.CanSet() && f.Kind() == reflect.String {
+			f.SetString(val)
+		}
+	}
+}
+
+func findStage(t *testing.T, stages []plan.Stage, name string) plan.Stage {
+	t.Helper()
+	for _, s := range stages {
+		if s.Name == name {
+			return s
+		}
+	}
+	t.Fatalf("stage %s not found", name)
+	return plan.Stage{}
+}
+
+type stubAdvisor struct {
+	advice plan.Advice
+	err    error
+	called bool
+}
+
+func (s *stubAdvisor) Advise(ctx context.Context, req plan.AdviceRequest) (plan.Advice, error) {
+	s.called = true
+	if s.err != nil {
+		return plan.Advice{}, s.err
+	}
+	return s.advice, nil
+}

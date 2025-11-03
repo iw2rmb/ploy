@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 // Options configures advisor scoring behaviour and catalog selection.
@@ -27,7 +27,7 @@ type Advisor struct {
 type MatchResult struct {
 	IncidentID string
 	Score      float64
-	Advice     mods.Advice
+	Advice     plan.Advice
 }
 
 // NewAdvisor constructs an advisor from the provided options.
@@ -56,16 +56,16 @@ func NewAdvisor(opts Options) (Advisor, error) {
 }
 
 // Advise returns Mods planner recommendations for the supplied context.
-func (a Advisor) Advise(ctx context.Context, req mods.AdviceRequest) (mods.Advice, error) {
+func (a Advisor) Advise(ctx context.Context, req plan.AdviceRequest) (plan.Advice, error) {
 	incident, score, ok := a.bestMatch(req)
 	if !ok {
-		return mods.Advice{}, nil
+		return plan.Advice{}, nil
 	}
 	return incidentToAdvice(incident, score, a.maxRecommendations), nil
 }
 
 // Match returns the top incident match including score and advice payloads.
-func (a Advisor) Match(ctx context.Context, req mods.AdviceRequest) (MatchResult, bool, error) {
+func (a Advisor) Match(ctx context.Context, req plan.AdviceRequest) (MatchResult, bool, error) {
 	incident, score, ok := a.bestMatch(req)
 	if !ok {
 		return MatchResult{}, false, nil
@@ -85,4 +85,4 @@ func (o Options) Validate() error {
 	return nil
 }
 
-var _ mods.Advisor = Advisor{}
+var _ plan.Advisor = Advisor{}

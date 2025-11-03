@@ -3,7 +3,7 @@ package knowledgebase
 import (
 	"math"
 
-	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 type incidentVector struct {
@@ -44,7 +44,7 @@ func (a *Advisor) precompute() {
 }
 
 // bestMatch returns the highest scoring incident that clears the advisor score floor.
-func (a Advisor) bestMatch(req mods.AdviceRequest) (Incident, float64, bool) {
+func (a Advisor) bestMatch(req plan.AdviceRequest) (Incident, float64, bool) {
 	if len(a.incidentVectors) == 0 {
 		return Incident{}, 0, false
 	}

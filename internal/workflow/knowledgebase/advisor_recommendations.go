@@ -3,14 +3,14 @@ package knowledgebase
 import (
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 // incidentToAdvice maps a catalog incident into the Mods advice structure.
-func incidentToAdvice(incident Incident, score float64, maxRecs int) mods.Advice {
+func incidentToAdvice(incident Incident, score float64, maxRecs int) plan.Advice {
 	planRecipes := trimStrings(incident.Recipes)
 	planSummary := strings.TrimSpace(incident.Summary)
-	recs := make([]mods.AdviceRecommendation, 0, len(incident.Recommendations))
+	recs := make([]plan.AdviceRecommendation, 0, len(incident.Recommendations))
 	for _, rec := range incident.Recommendations {
 		message := strings.TrimSpace(rec.Message)
 		if message == "" {
@@ -23,7 +23,7 @@ func incidentToAdvice(incident Incident, score float64, maxRecs int) mods.Advice
 		if confidence > 1 {
 			confidence = 1
 		}
-		recs = append(recs, mods.AdviceRecommendation{
+		recs = append(recs, plan.AdviceRecommendation{
 			Source:     rec.Source,
 			Message:    message,
 			Confidence: confidence,
@@ -32,13 +32,13 @@ func incidentToAdvice(incident Incident, score float64, maxRecs int) mods.Advice
 	if len(recs) > maxRecs {
 		recs = recs[:maxRecs]
 	}
-	return mods.Advice{
-		Plan: mods.AdvicePlan{
+	return plan.Advice{
+		Plan: plan.AdvicePlan{
 			SelectedRecipes: planRecipes,
 			HumanGate:       incident.HumanGate,
 			Summary:         planSummary,
 		},
-		Human: mods.AdviceHuman{
+		Human: plan.AdviceHuman{
 			Required:  incident.HumanGate,
 			Playbooks: trimStrings(incident.Playbooks),
 		},
@@ -59,7 +59,7 @@ func aggregateIncident(incident Incident) string {
 }
 
 // aggregateSignals joins advisor signals into a classification string.
-func aggregateSignals(signals mods.AdviceSignals) string {
+func aggregateSignals(signals plan.AdviceSignals) string {
 	parts := make([]string, 0, len(signals.Errors)+2)
 	for _, err := range signals.Errors {
 		trimmed := strings.TrimSpace(err)
