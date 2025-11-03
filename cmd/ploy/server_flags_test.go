@@ -71,16 +71,6 @@ func TestHandleServerDeployFlagParsing(t *testing.T) {
 	}
 }
 
-// The above attempt to directly stub provisionHost with a mismatched type is
-// not viable across packages in this isolated test file. Instead, add a small
-// shim type matching the signature we need so we can assign a lambda, while we
-// still test the flag parsing path by calling handleServerDeploy with a writer.
-
-// deployProvisionOptionsShim mirrors the second parameter type for provisionHost
-// but is only used to satisfy the compiler in this test file. The real test does
-// not call provisionHost because we intercept before needing it.
-type deployProvisionOptionsShim = struct{}
-
 // TestHandleServerDeployRefreshAdminCertRequiresDescriptor verifies that --refresh-admin-cert
 // requires an existing descriptor and fails gracefully if missing.
 func TestHandleServerDeployRefreshAdminCertRequiresDescriptor(t *testing.T) {

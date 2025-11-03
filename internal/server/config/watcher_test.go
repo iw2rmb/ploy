@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -252,7 +251,6 @@ func TestWatcherHandlesInvalidConfigGracefully(t *testing.T) {
 }
 
 type testSubscriber struct {
-	mu sync.Mutex
 	ch chan config.Config
 }
 
