@@ -49,7 +49,7 @@ Legend: [ ] todo, [x] done.
   - Test: CLI `--artifact-dir` path succeeds; server returns 200 with correct payload and limits.
 
 ## Phase 3 — Docs sweep and E2E
-- [ ] Docs sweep: README.md, docs/how-to/deploy-a-cluster.md, tests/mod/README.md
+- [x] Docs sweep: README.md, docs/how-to/deploy-a-cluster.md, tests/mod/README.md
   - Change: replace references to /v1/runs with /v1/mods; remove /v1/mods/crud examples; clarify the simple flow (submit → events → status → artifacts).
   - Test: `rg` sweep shows no stale routes; how‑to snippets run cleanly.
 
