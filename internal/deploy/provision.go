@@ -99,7 +99,15 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 		return fmt.Errorf("provision: copy ployd binary: %w", err)
 	}
 
-	installCmd := fmt.Sprintf("install -m0755 %s %s && rm -f %s", remoteBinaryPath, remotePloydBinaryPath, remoteBinaryPath)
+	// Choose remote install path based on requested service check; default to ployd.
+	installPath := remotePloydBinaryPath
+	for _, svc := range opts.ServiceChecks {
+		if strings.TrimSpace(svc) == "ployd-node" {
+			installPath = "/usr/local/bin/ployd-node"
+			break
+		}
+	}
+	installCmd := fmt.Sprintf("install -m0755 %s %s && rm -f %s", remoteBinaryPath, installPath, remoteBinaryPath)
 	installArgs := append(append([]string(nil), sshArgs...), target, installCmd)
 	if err := runner.Run(ctx, "ssh", installArgs, nil, streams); err != nil {
 		return fmt.Errorf("provision: install ployd binary: %w", err)

@@ -1,131 +1,69 @@
-# ROADMAP — Complete the SIMPLE Architecture
+# Reuse CA/Cluster ID + Rollout
 
-This checklist breaks the migration into the smallest verifiable slices to ship a fully working Ploy aligned with SIMPLE.md. Keep RED → GREEN → REFACTOR. After each slice, run `make test` and sync docs.
+Scope: Implement an idempotent control‑plane deploy that reuses an existing cluster CA and server identity when present on the VPS, plus first‑class rollout commands for server and nodes with proper draining and health checks.
 
-References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, docs/how-to/deploy-a-cluster.md.
+Documentation: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md, docs/api/OpenAPI.yaml
 
-## Ground Rules
-- [x] Adopt RED → GREEN → REFACTOR for every slice (unit first; E2E later).
-- [x] Maintain docs parity: update README.md, docs/api, docs/envs, how-to guides per slice.
-- [x] Keep coverage ≥60% overall; ≥90% on scheduler/PKI/ingest critical paths.
-- [x] Verify required envs exist or add TODOs in docs/envs/README.md.
+Legend: [ ] todo, [x] done.
 
-## Naming & Build Surface
-- [x] Standardize server binary name to `ployd` (keep current path `cmd/ployd`).
-- [x] Sweep docs for `ployd-server` and replace with `ployd` or add a one-line alias note in README.md.
-- [x] Ensure `make build` emits `dist/ployd{,-linux}` consistently (Makefile already supports; verify).
+## Phase 1 — Reuse & Admin Cert Refresh
+- [ ] Detect existing cluster on target host — enable idempotent deploy
+  - Change: add `internal/deploy/detect.go: DetectExisting(ctx, runner, ProvisionOptions)` to probe `/etc/ploy/pki/ca.crt`, `/etc/ploy/ployd.yaml`; parse server cert CN → `ployd-<clusterID>`.
+  - Test: `internal/deploy/detect_test.go` — stub runner to return sample files; expect `found=true`, correct cluster ID.
+- [ ] Server deploy flags to control reuse vs. new CA
+  - Change: `cmd/ploy/server_command.go` — add flags `--reuse` (default true), `--force-new-ca`, `--refresh-admin-cert`; branch logic to call `DetectExisting` and skip CA/server mint & bootstrap PKI when reusing.
+  - Test: `cmd/ploy/server_command_test.go` — table tests covering reuse/new; ensure bootstrap env omits `PLOY_CA_*` when reusing.
+- [ ] PKI: admin CSR signing endpoint (mTLS, cli-admin only)
+  - Change: `internal/server/handlers/handlers_pki_admin.go` — `POST /v1/pki/sign/admin`; enforce EKU=ClientAuth and OU=“Ploy role=cli-admin”. Wire in `register.go`.
+  - Test: handlers unit tests — accept valid CSR under cli-admin; reject missing role / wrong OU / wrong EKU.
+- [ ] CLI admin cert refresh via server
+  - Change: `cmd/ploy/server_command.go` — when `--refresh-admin-cert` set (or default if descriptor lacks TLS), generate local CSR and call `/v1/pki/sign/admin`; write `~/.config/ploy/certs/<cluster>-{ca,admin}.{crt,key}`; update descriptor CAPath/CertPath/KeyPath.
+  - Test: `cmd/ploy/server_command_test.go` — stub HTTP server; expect files written and descriptor updated.
+- [ ] Bootstrap must not clobber existing PKI on primary
+  - Change: `internal/deploy/bootstrap/bootstrap.go` — if `/etc/ploy/pki/ca.key` exists, skip writing any PKI files; log reuse.
+  - Test: `internal/deploy/bootstrap_test.go` — script contains reuse branch and omits CA/server writes.
+- [ ] Docs update (deploy)
+  - Change: `docs/how-to/deploy-a-cluster.md` — add “Reuse existing cluster” section; document `--reuse/--force-new-ca/--refresh-admin-cert` and expected outputs.
+  - Test: run `markdownlint` and sanity‑read links.
 
-## Server Bootstrap (Unstub cmd/ployd)
-- [x] Replace `cmd/ployd/main.go` stub with real main: parse config/env, init logging, graceful shutdown.
-- [x] Wire Postgres store via `PLOY_SERVER_PG_DSN` or `internal/server/config` (fallback to env over file).
-- [x] Initialize Authorizer (mTLS) from `internal/server/auth` with `RoleControlPlane` default.
-- [x] Add HTTP mux package `internal/server/http` (new) to mount routes and middlewares.
-- [x] Expose metrics listener `:9100` (plain HTTP) and API listener `:8443` (TLS/mTLS).
-- [x] Start background Scheduler `internal/server/scheduler` and TTL workers.
-- [x] Integrate PKI manager (renew loop) with config hot-reload stub.
+## Phase 2 — Server Rollout
+- [ ] Rollout command for control plane
+  - Change: `cmd/ploy/rollout_server.go` — `ploy rollout server --address <A> [--binary <path>] [--timeout 60s]` → scp, restart, poll active, verify `ss -tlnp` and metrics.
+  - Test: use recording runner to assert command sequence & retries; `-short` guard for timing.
+- [ ] Docs update (update guide)
+  - Change: `docs/how-to/update-a-cluster.md` — replace ad‑hoc scp/ssh with `ploy rollout server`; keep old commands in an appendix (“Backdoor”).
+  - Test: lint docs; check cross‑references.
 
-## API: PKI
-- [x] Implement `POST /v1/pki/sign` handler (admin-only): parse CSR, sign with cluster CA, persist node cert metadata via store.
-- [x] Return PEM bundle according to docs/api/components/schemas/pki.yaml.
-- [x] Add 503 path when CA not configured (`PLOY_SERVER_CA_CERT`/`PLOY_SERVER_CA_KEY` absent).
+## Phase 3 — Node Drain + Rollout
+- [ ] DB: add drained flag for nodes
+  - Change: `internal/store/migrations/00X_nodes_drain.sql` — `ALTER TABLE ploy.nodes ADD COLUMN drained BOOLEAN NOT NULL DEFAULT false;` + indexes.
+  - Test: migration unit test passes; ensure idempotency.
+- [ ] API: drain/undrain endpoints + list nodes
+  - Change: `internal/server/handlers/handlers_worker_drain.go` — `POST /v1/nodes/{id}/drain` and `/undrain` (RoleControlPlane), `GET /v1/nodes` (read‑only); wire in `register.go`.
+  - Test: handler tests — state toggles, bad IDs, 404/409 paths.
+- [ ] Scheduler: exclude drained nodes from claims
+  - Change: store query (`internal/store/queries/*.sql` and generated code) to append `AND nodes.drained=false` in claim path.
+  - Test: unit tests to verify drained nodes don’t claim runs.
+- [ ] Rollout command for nodes (batched)
+  - Change: `cmd/ploy/rollout_nodes.go` — `ploy rollout nodes [--all|--selector <pattern>] [--concurrency N] [--binary <path>] [--timeout 90s]` → drain → wait idle → update binary → restart → heartbeat OK → undrain. Write a resume file under `~/.config/ploy/rollout/state.json`.
+  - Test: recording runner + fake API; ensure batch ordering, retries, resume.
+- [ ] Docs update (update guide)
+  - Change: add “Rolling update of nodes” section with examples and concurrency guidance.
+  - Test: docs lint.
 
-## API: Control (Repos/Mods/Runs)
-- [x] `POST /v1/repos` + `GET /v1/repos` (sqlc calls exist; wire round-trip + JSON).
-- [x] `POST /v1/mods/crud` + `GET /v1/mods/crud?repo_id=`.
-- [x] `POST /v1/runs` (create run; status=queued) returns `{run_id}`.
-- [x] `GET /v1/runs?id` (basic run view) + `DELETE /v1/runs/{id}`.
-- [x] `GET /v1/runs?view=timing` to read from `runs_timing`.
+## Phase 4 — Hardening & UX
+- [ ] Dry‑run probes and verbose output
+  - Change: `ploy server deploy --reuse --dry-run` prints detected cluster, cert subjects, and no changes applied. `ploy rollout --dry-run` prints planned actions per host.
+  - Test: CLI golden tests for messages.
+- [ ] Resume & backoff tuning
+  - Change: rollout retry policy (exponential backoff; max attempts configurable); resume file schema and integrity.
+  - Test: unit tests simulate failures, assert resume continues remaining hosts.
+- [ ] Metrics & logs
+  - Change: emit structured logs for rollout steps; add basic counters exposed via CLI (optional).
+  - Test: integration‑style smoke with `-short` guards.
 
-## API: Events/SSE
-- [x] Add in-memory log/Event hub using `internal/stream` for SSE fanout.
-- [x] `GET /v1/runs/{id}/events` (SSE) with Last-Event-ID support.
-- [x] Wrap DB append so that server both persists events and fans out to SSE.
+## Acceptance & Cutover
+- [ ] Replace “backdoor” steps in docs with first‑class `ploy rollout` flows; keep the legacy script as an appendix.
+  - Change: docs PR; link from README “Updating a cluster”.
+  - Test: manual smoke in VPS lab following the new commands end‑to‑end (server + two nodes).
 
-## API: Node Ingest/Heartbeat
-- [x] `POST /v1/nodes/{id}/heartbeat`: update `nodes` snapshot (cpu/mem/disk + version) and `last_heartbeat`.
-- [x] `POST /v1/nodes/{id}/events`: append structured events/log frames to DB (size cap checks) + SSE fanout.
-- [x] `POST /v1/nodes/{id}/stage/{stage}/diff`: store gzipped diff in `diffs` (≤1 MiB), reject oversize.
-- [x] `POST /v1/nodes/{id}/stage/{stage}/artifact`: store gzipped bundle in `artifact_bundles` (≤1 MiB), reject oversize.
-
-## Scheduling & Assignment
-- [x] Implement `ClaimRun` RPC: server assigns one queued run via `FOR UPDATE SKIP LOCKED` (sqlc: `ClaimRun`).
-- [x] Add server endpoint for claims (pull) or server→node push client (choose pull first per SIMPLE.md).
-- [x] On assign, set `started_at`, status `assigned` then `running` when node acknowledges.
-- [x] On completion callbacks, set `finished_at` and terminal status; populate `runs.stats`.
-
-## TTL & Partitions
-- [x] Mount `internal/store/ttlworker` in server: periodic deletes for `logs/events/diffs/artifact_bundles` older than retention.
-- [x] Add partition lister + dropper integration (monthly tables) guarded by feature flag.
-
-## Node Agent (Unstub default build)
-- [x] Make `cmd/ployd-node/main.go` compile by default (remove `legacy` build tag; gate stub under a `stub` tag).
-- [x] Ensure config loader `internal/nodeagent/config.go` and server start wire TLS client/server correctly.
-- [x] Implement `POST /v1/run/start` and `POST /v1/run/stop` handlers (already present under build tag; enable).
-- [x] Heartbeat manager: confirm `internal/nodeagent/heartbeat.go` posts to server endpoint with mTLS.
-- [x] Add basic backoff for server 5xx on heartbeat.
-
-## Node Execution Contract
-- [x] Ephemeral workspace create/cleanup per run (tmpdir, unique prefix).
-- [x] Shallow/sparse clone by repo URL; checkout `base_ref` then fetch `target_ref` or `commit_sha`.
-- [x] Hook Build Gate (re-use lifecycle checker interfaces); capture per-stage/build timings.
-- [x] Stream logs as gzipped chunks to server; enforce ≤1 MiB client-side cap.
-- [x] Produce unified diff and summary; gzip and POST to server.
-- [x] Upload artifact bundles (tar.gz) where configured.
-- [x] Emit terminal status + cleanup workspace.
-
-## Store & Migrations
-- [x] Apply SIMPLE.sql as migrations under `internal/store/migrations/`; verify `sqlc` queries cover needed paths.
-- [x] Add migration runner (server startup) that ensures schema present; log version.
-- [x] Expand/adjust sqlc queries as endpoints require (e.g., list-by-since for events/logs).
-
-## CLI Surfaces (Server/Node)
-- [x] `ploy server deploy`: verify CA+server cert generation, DSN handling, and `deploy.ProvisionHost` call path.
-- [x] `ploy node add`: implement full provisioning: upload `ployd-node`, CSR flow to `/v1/pki/sign`, install certs, start service.
-- [x] Save/refresh local cluster descriptor in `~/.config/ploy/clusters/` after each deploy/add.
-
-## Bootstrap Script (Replace stub)
-- [x] Teach `internal/deploy/bootstrap.PrefixedScript` to render a functional body:
-  - [x] Create `/etc/ploy` and `/etc/ploy/pki`; write CA/server certs from env.
-  - [x] When `PLOY_INSTALL_POSTGRESQL=true`, install PostgreSQL packages.
-  - [x] Create DB user/db `ploy` with password; derive DSN and export `PLOY_SERVER_PG_DSN`.
-  - [x] Write server config `/etc/ploy/ployd.yaml` (postgres.dsn + TLS paths).
-  - [x] Write node config `/etc/ploy/ployd-node.yaml` on non-primary bootstraps.
-  - [x] Install systemd unit `ployd.service` (server) or `ployd-node.service` (node) with `Restart=always`.
-  - [x] `systemctl daemon-reload && systemctl enable --now <unit>`.
-  - [x] Echo final status and key paths.
-- [x] Extend `internal/deploy/provision_test.go` to assert config/unit fragments exist in script output.
-
-## OpenAPI & Docs
-- [x] Ensure docs/api OpenAPI matches implemented endpoints (PKI, repos/mods/runs, SSE, ingest, heartbeat).
-- [x] Add examples for heartbeat payload and log/diff upload boundaries.
-- [x] Update docs/how-to/deploy-a-cluster.md to match real bootstrap behavior (what gets written where).
-- [x] Update docs/envs/README.md for final env names and defaults encountered in code.
-
-## Security
-- [x] Enforce TLS 1.3 and client cert verification everywhere (node→server and CLI→server).
-- [x] Validate roles via `Authorizer` middleware; restrict PKI to `cli-admin`.
-- [x] Scrub PII from logs via node-side hooks (document a placeholder; no-op first).
-
-## Tests (Unit → Integration → Lab)
-- [x] Unit: PKI CSR sign success/error paths.
-- [x] Unit: Authorizer role gates and insecure default off.
-- [x] Unit: Repos/Mods/Runs handlers JSON and status codes.
-- [x] Unit: SSE hub resume with Last-Event-ID and concurrent subscribers.
-- [x] Unit: Ingest caps (oversize gzipped chunks rejected with 413).
-- [x] Unit: TTL worker deletes rows older than horizon; partition dropper no-ops when none.
-- [x] Integration (local Postgres via `PLOY_TEST_PG_DSN`): happy path create repo→mod→run; simulate node appends.
-- [x] Integration: server start/stop with mTLS disabled under tests (authorizer `AllowInsecure` only in tests).
-- [x] CLI: `server deploy` flag validation and path resolution; `node add` flag validation + dry-run scaffolding.
-- [x] Lab script: minimal smoke (server + one node): submit run to public repo; assert logs/diff rows stored.
-
-## Legacy & Dead Code Removal
-- [x] Remove etcd/registry codepaths in `internal/deploy/*` and tests (or guard behind legacy build tag).
-- [x] Remove IPFS references and scripts (already mostly gone; sweep `scripts/` and docs).
-- [x] Delete `cmd/ployd-node/stub.go` once default build is real (or keep under `-tags stub`).
-- [x] Consolidate exploration docs into README/SIMPLE; remove `ARCHITECTURE_DIAGRAM.md` and related (`CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`).
-
-## Acceptance Checklist
-- [x] Server starts with `PLOY_SERVER_PG_DSN` and serves all documented endpoints over mTLS on `:8443`.
-- [x] Node starts by default (no build tags) and can run the end-to-end flow: start → stream logs → upload diff/artifacts → finish.
-- [x] `make test` green; coverage thresholds met; docs up to date.
-- [x] VPS lab walkthrough in docs executes successfully with the provided IPs and commands.
