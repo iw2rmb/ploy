@@ -40,6 +40,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 		sshPort     intValue
 		timeout     intValue
 		dryRun      boolValue
+		maxAttempts intValue
 	)
 
 	fs.Var(&all, "all", "Roll out all nodes in the cluster")
@@ -51,6 +52,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 	fs.Var(&sshPort, "ssh-port", "SSH port for node connection (default: 22)")
 	fs.Var(&timeout, "timeout", "Timeout in seconds per node rollout (default: 90)")
 	fs.Var(&dryRun, "dry-run", "Print planned rollout actions per node without making changes")
+	fs.Var(&maxAttempts, "max-attempts", "Maximum retry attempts for each node (default: 3)")
 
 	if err := fs.Parse(args); err != nil {
 		printRolloutNodesUsage(stderr)
@@ -81,6 +83,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 		SSHPort:      sshPort.value,
 		Timeout:      timeout.value,
 		DryRun:       dryRun.value,
+		MaxAttempts:  maxAttempts.value,
 	}
 
 	return runRolloutNodes(cfg, stderr)
@@ -100,6 +103,7 @@ type rolloutNodesConfig struct {
 	SSHPort      int
 	Timeout      int
 	DryRun       bool
+	MaxAttempts  int
 }
 
 func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
@@ -145,6 +149,14 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 	}
 	if concurrency < 1 {
 		return fmt.Errorf("rollout nodes: concurrency must be positive, got %d", concurrency)
+	}
+
+	maxAttempts := cfg.MaxAttempts
+	if maxAttempts == 0 {
+		maxAttempts = 3
+	}
+	if maxAttempts < 1 {
+		return fmt.Errorf("rollout nodes: max-attempts must be positive, got %d", maxAttempts)
 	}
 
 	if cfg.DryRun {
@@ -208,7 +220,14 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 	state, err := loadRolloutState(stateFile)
 	if err != nil {
 		// Initialize new state if none exists.
-		state = &rolloutState{Nodes: make(map[string]nodeRolloutStatus)}
+		now := time.Now().UTC().Format(time.RFC3339)
+		state = &rolloutState{
+			Version:      1,
+			RetryPolicy:  rolloutRetryPolicy{MaxAttempts: maxAttempts},
+			Nodes:        make(map[string]nodeRolloutStatus),
+			CreatedAt:    now,
+			LastModified: now,
+		}
 	}
 
 	// Process nodes in batches based on concurrency.
@@ -233,14 +252,25 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 				continue
 			}
 
-			_, _ = fmt.Fprintf(stderr, "\n[%s] Starting rollout\n", node.Name)
+			// Check if max attempts reached.
+			prevStatus := state.Nodes[node.ID]
+			if prevStatus.Attempts >= state.RetryPolicy.MaxAttempts {
+				_, _ = fmt.Fprintf(stderr, "\n[%s] Max attempts (%d) reached, skipping\n", node.Name, state.RetryPolicy.MaxAttempts)
+				failed++
+				continue
+			}
 
-			// Mark as in-progress.
+			attemptNum := prevStatus.Attempts + 1
+			_, _ = fmt.Fprintf(stderr, "\n[%s] Starting rollout (attempt %d/%d)\n", node.Name, attemptNum, state.RetryPolicy.MaxAttempts)
+
+			// Mark as in-progress and increment attempts.
 			state.Nodes[node.ID] = nodeRolloutStatus{
-				NodeID:     node.ID,
-				NodeName:   node.Name,
-				InProgress: true,
-				Completed:  false,
+				NodeID:      node.ID,
+				NodeName:    node.Name,
+				InProgress:  true,
+				Completed:   false,
+				Attempts:    attemptNum,
+				LastAttempt: time.Now().UTC().Format(time.RFC3339),
 			}
 			if err := saveRolloutState(stateFile, state); err != nil {
 				_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
@@ -259,11 +289,13 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "[%s] Rollout failed: %v\n", node.Name, err)
 				state.Nodes[node.ID] = nodeRolloutStatus{
-					NodeID:     node.ID,
-					NodeName:   node.Name,
-					InProgress: false,
-					Completed:  false,
-					Error:      err.Error(),
+					NodeID:      node.ID,
+					NodeName:    node.Name,
+					InProgress:  false,
+					Completed:   false,
+					Error:       err.Error(),
+					Attempts:    attemptNum,
+					LastAttempt: time.Now().UTC().Format(time.RFC3339),
 				}
 				if err := saveRolloutState(stateFile, state); err != nil {
 					_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
@@ -274,10 +306,12 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 
 			_, _ = fmt.Fprintf(stderr, "[%s] Rollout complete\n", node.Name)
 			state.Nodes[node.ID] = nodeRolloutStatus{
-				NodeID:     node.ID,
-				NodeName:   node.Name,
-				InProgress: false,
-				Completed:  true,
+				NodeID:      node.ID,
+				NodeName:    node.Name,
+				InProgress:  false,
+				Completed:   true,
+				Attempts:    attemptNum,
+				LastAttempt: time.Now().UTC().Format(time.RFC3339),
 			}
 			if err := saveRolloutState(stateFile, state); err != nil {
 				_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
@@ -314,15 +348,25 @@ type nodeInfo struct {
 }
 
 type rolloutState struct {
-	Nodes map[string]nodeRolloutStatus `json:"nodes"`
+	Version      int                          `json:"version"`
+	RetryPolicy  rolloutRetryPolicy           `json:"retry_policy"`
+	Nodes        map[string]nodeRolloutStatus `json:"nodes"`
+	CreatedAt    string                       `json:"created_at"`
+	LastModified string                       `json:"last_modified"`
+}
+
+type rolloutRetryPolicy struct {
+	MaxAttempts int `json:"max_attempts"`
 }
 
 type nodeRolloutStatus struct {
-	NodeID     string `json:"node_id"`
-	NodeName   string `json:"node_name"`
-	InProgress bool   `json:"in_progress"`
-	Completed  bool   `json:"completed"`
-	Error      string `json:"error,omitempty"`
+	NodeID      string `json:"node_id"`
+	NodeName    string `json:"node_name"`
+	InProgress  bool   `json:"in_progress"`
+	Completed   bool   `json:"completed"`
+	Error       string `json:"error,omitempty"`
+	Attempts    int    `json:"attempts"`
+	LastAttempt string `json:"last_attempt,omitempty"`
 }
 
 func selectorDescription(all bool, selector string) string {
@@ -590,36 +634,25 @@ func waitForNodeIdle(ctx context.Context, nodeID string) error {
 }
 
 func waitForNodeHeartbeat(ctx context.Context, nodeID string) error {
-	// Poll until the node sends a heartbeat after restart.
-	// For simplicity, we implement a basic polling loop.
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	// Poll until the node sends a heartbeat after restart with exponential backoff.
+	policy := DefaultRetryPolicy()
+	policy.MaxAttempts = 15
 
-	// Try for up to 30 seconds.
-	timeout := time.After(30 * time.Second)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context cancelled")
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for heartbeat")
-		case <-ticker.C:
-			// Query node status from API.
-			node, err := fetchNodeByID(ctx, nodeID)
-			if err != nil {
-				// Continue polling on transient errors.
-				continue
-			}
-			if node.LastHeartbeat != "" {
-				// Parse heartbeat timestamp and check if recent (within last 10 seconds).
-				hb, err := time.Parse(time.RFC3339, node.LastHeartbeat)
-				if err == nil && time.Since(hb) < 10*time.Second {
-					return nil
-				}
+	return PollWithBackoff(ctx, policy, func() (bool, error) {
+		node, err := fetchNodeByID(ctx, nodeID)
+		if err != nil {
+			// Continue polling on transient errors.
+			return false, nil
+		}
+		if node.LastHeartbeat != "" {
+			// Parse heartbeat timestamp and check if recent (within last 10 seconds).
+			hb, err := time.Parse(time.RFC3339, node.LastHeartbeat)
+			if err == nil && time.Since(hb) < 10*time.Second {
+				return true, nil
 			}
 		}
-	}
+		return false, nil
+	})
 }
 
 func fetchNodeByID(ctx context.Context, nodeID string) (*nodeDetail, error) {
@@ -745,10 +778,16 @@ func loadRolloutState(path string) (*rolloutState, error) {
 		state.Nodes = make(map[string]nodeRolloutStatus)
 	}
 
+	// Validate state version for integrity.
+	if state.Version != 1 {
+		return nil, fmt.Errorf("unsupported state version: %d", state.Version)
+	}
+
 	return &state, nil
 }
 
 func saveRolloutState(path string, state *rolloutState) error {
+	state.LastModified = time.Now().UTC().Format(time.RFC3339)
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal state: %w", err)

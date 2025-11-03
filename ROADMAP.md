@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
 - [x] Dry‑run probes and verbose output
   - Change: `ploy server deploy --reuse --dry-run` prints detected cluster, cert subjects, and no changes applied. `ploy rollout --dry-run` prints planned actions per host.
   - Test: CLI golden tests for messages.
-- [ ] Resume & backoff tuning
+- [x] Resume & backoff tuning
   - Change: rollout retry policy (exponential backoff; max attempts configurable); resume file schema and integrity.
   - Test: unit tests simulate failures, assert resume continues remaining hosts.
 - [ ] Metrics & logs

@@ -266,26 +266,19 @@ func pollServiceActive(ctx context.Context, runner deploy.Runner, sshArgs []stri
 	checkCmd := fmt.Sprintf("systemctl is-active --quiet %s", service)
 	checkArgs := append(append([]string(nil), sshArgs...), target, checkCmd)
 
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+	policy := DefaultRetryPolicy()
+	err := PollWithBackoff(ctx, policy, func() (bool, error) {
+		err := runner.Run(ctx, "ssh", checkArgs, nil, streams)
+		return err == nil, nil
+	})
 
-	// Try immediately first.
-	if err := runner.Run(ctx, "ssh", checkArgs, nil, streams); err == nil {
-		return nil
+	if err != nil {
+		// Dump service status for debugging.
+		statusCmd := fmt.Sprintf("systemctl status %s --no-pager", service)
+		statusArgs := append(append([]string(nil), sshArgs...), target, statusCmd)
+		_ = runner.Run(context.Background(), "ssh", statusArgs, nil, streams)
+		return fmt.Errorf("service %s did not become active: %w", service, err)
 	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			// Dump service status for debugging.
-			statusCmd := fmt.Sprintf("systemctl status %s --no-pager", service)
-			statusArgs := append(append([]string(nil), sshArgs...), target, statusCmd)
-			_ = runner.Run(context.Background(), "ssh", statusArgs, nil, streams)
-			return fmt.Errorf("service %s did not become active within timeout", service)
-		case <-ticker.C:
-			if err := runner.Run(ctx, "ssh", checkArgs, nil, streams); err == nil {
-				return nil
-			}
-		}
-	}
+	return nil
 }
