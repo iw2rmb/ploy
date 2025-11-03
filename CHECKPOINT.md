@@ -92,7 +92,7 @@ Objective: simplify internal/ by role without duplicating domain packages.
    - Leave cmd/ployd/main.go as a thin bootstrap that composes server.Run.
 
 3) Keep domain/shared packages where they are
-   - internal/store, internal/workflow/*, internal/pki, internal/controlplane/auth, …
+   - internal/store, internal/workflow/*, internal/pki, internal/server/auth, …
 
 4) Optional follow‑ups
    - Rename internal/cli/jobs package to internal/cli/runs (types still used by `runs` commands).

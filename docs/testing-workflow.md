@@ -190,7 +190,7 @@ Per `AGENTS.md` and `ROADMAP.md`:
 - **Overall coverage:** ≥60%
 - **Critical paths:** ≥90%
   - Scheduler (`internal/server/scheduler`)
-  - PKI (`internal/controlplane/auth`)
+  - PKI (`internal/server/auth`)
   - Ingest handlers (node heartbeat, events, diffs)
 
 Check per-component coverage:
