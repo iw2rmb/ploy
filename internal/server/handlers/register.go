@@ -36,6 +36,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/mods/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 
 	// Runs (control plane)
 	s.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
