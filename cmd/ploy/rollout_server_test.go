@@ -249,6 +249,19 @@ func TestExecuteRolloutServerCommandSequence(t *testing.T) {
 			t.Fatalf("expected command %d to be ssh, got: %v", i, calls[i])
 		}
 	}
+
+	// Verify the verify-port check targets 8443.
+	var sawPortCheck bool
+	for i := 3; i < len(calls); i++ {
+		joined := strings.Join(calls[i], " ")
+		if strings.Contains(joined, ":8443") && strings.Contains(joined, "grep") {
+			sawPortCheck = true
+			break
+		}
+	}
+	if !sawPortCheck {
+		t.Fatalf("expected a verify-port check for :8443 in SSH calls, got: %v", calls)
+	}
 }
 
 func TestExecuteRolloutServerWithRetry(t *testing.T) {
