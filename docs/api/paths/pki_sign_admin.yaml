@@ -1,0 +1,44 @@
+post:
+  tags: [Security]
+  summary: Sign an admin CSR
+  description: |
+    Signs a CLI admin certificate signing request (CSR) using the cluster CA.
+    Requires cli-admin scope and mutual TLS.
+    The CSR must include OU "Ploy role=cli-admin" and request ExtKeyUsage ClientAuth.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../OpenAPI.yaml#/components/schemas/PKIAdminSignRequest'
+  responses:
+    '200':
+      description: Signed certificate returned
+      content:
+        application/json:
+          schema:
+            $ref: '../OpenAPI.yaml#/components/schemas/PKISignResponse'
+    '400':
+      description: Invalid request (JSON, CSR, or parameters)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Insufficient scope
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error (CA load failure)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '503':
+      description: PKI not configured on the server
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
