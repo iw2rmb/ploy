@@ -18,9 +18,7 @@ type Querier interface {
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
-	CreateMod(ctx context.Context, arg CreateModParams) (Mod, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
-	CreateRepo(ctx context.Context, arg CreateRepoParams) (Repo, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
@@ -37,9 +35,7 @@ type Querier interface {
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
-	DeleteMod(ctx context.Context, id pgtype.UUID) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
-	DeleteRepo(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
@@ -47,13 +43,9 @@ type Querier interface {
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
-	GetMod(ctx context.Context, id pgtype.UUID) (Mod, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
-	GetRepo(ctx context.Context, id pgtype.UUID) (Repo, error)
-	GetRepoByURL(ctx context.Context, url string) (Repo, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
-	GetRunWithRepo(ctx context.Context, id pgtype.UUID) (GetRunWithRepoRow, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
@@ -73,14 +65,10 @@ type Querier interface {
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
 	ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error)
 	ListLogsByRunStageAndBuildSince(ctx context.Context, arg ListLogsByRunStageAndBuildSinceParams) ([]Log, error)
-	ListMods(ctx context.Context) ([]Mod, error)
-	ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]Mod, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
-	ListRepos(ctx context.Context) ([]Repo, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
-	ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error

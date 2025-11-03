@@ -15,43 +15,6 @@ type mockStore struct {
 	updateCertMetadataParams store.UpdateNodeCertMetadataParams
 	updateCertMetadataErr    error
 
-	createRepoCalled bool
-	createRepoParams store.CreateRepoParams
-	createRepoResult store.Repo
-	createRepoErr    error
-
-	listReposCalled bool
-	listReposResult []store.Repo
-	listReposErr    error
-
-	getRepoCalled bool
-	getRepoParams pgtype.UUID
-	getRepoResult store.Repo
-	getRepoErr    error
-
-	getRepoByURLCalled bool
-	getRepoByURLParams string
-	getRepoByURLResult store.Repo
-	getRepoByURLErr    error
-
-	deleteRepoCalled bool
-	deleteRepoParams pgtype.UUID
-	deleteRepoErr    error
-
-	createModCalled bool
-	createModParams store.CreateModParams
-	createModResult store.Mod
-	createModErr    error
-
-	listModsCalled bool
-	listModsResult []store.Mod
-	listModsErr    error
-
-	listModsByRepoCalled bool
-	listModsByRepoParams pgtype.UUID
-	listModsByRepoResult []store.Mod
-	listModsByRepoErr    error
-
 	createRunCalled bool
 	createRunParams store.CreateRunParams
 	createRunResult store.Run
@@ -61,11 +24,6 @@ type mockStore struct {
 	getRunParams pgtype.UUID
 	getRunResult store.Run
 	getRunErr    error
-
-	getRunWithRepoCalled bool
-	getRunWithRepoParams pgtype.UUID
-	getRunWithRepoResult store.GetRunWithRepoRow
-	getRunWithRepoErr    error
 
 	getRunTimingCalled bool
 	getRunTimingParams pgtype.UUID
@@ -80,15 +38,6 @@ type mockStore struct {
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
 	deleteRunErr    error
-
-	getModCalled bool
-	getModParams pgtype.UUID
-	getModResult store.Mod
-	getModErr    error
-
-	deleteModCalled bool
-	deleteModParams pgtype.UUID
-	deleteModErr    error
 
 	claimRunCalled bool
 	claimRunParams pgtype.UUID
@@ -163,52 +112,6 @@ func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.Upd
 	return m.updateCertMetadataErr
 }
 
-func (m *mockStore) CreateRepo(ctx context.Context, params store.CreateRepoParams) (store.Repo, error) {
-	m.createRepoCalled = true
-	m.createRepoParams = params
-	return m.createRepoResult, m.createRepoErr
-}
-
-func (m *mockStore) ListRepos(ctx context.Context) ([]store.Repo, error) {
-	m.listReposCalled = true
-	return m.listReposResult, m.listReposErr
-}
-
-func (m *mockStore) GetRepo(ctx context.Context, id pgtype.UUID) (store.Repo, error) {
-	m.getRepoCalled = true
-	m.getRepoParams = id
-	return m.getRepoResult, m.getRepoErr
-}
-
-func (m *mockStore) GetRepoByURL(ctx context.Context, url string) (store.Repo, error) {
-	m.getRepoByURLCalled = true
-	m.getRepoByURLParams = url
-	return m.getRepoByURLResult, m.getRepoByURLErr
-}
-
-func (m *mockStore) DeleteRepo(ctx context.Context, id pgtype.UUID) error {
-	m.deleteRepoCalled = true
-	m.deleteRepoParams = id
-	return m.deleteRepoErr
-}
-
-func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams) (store.Mod, error) {
-	m.createModCalled = true
-	m.createModParams = params
-	return m.createModResult, m.createModErr
-}
-
-func (m *mockStore) ListMods(ctx context.Context) ([]store.Mod, error) {
-	m.listModsCalled = true
-	return m.listModsResult, m.listModsErr
-}
-
-func (m *mockStore) ListModsByRepo(ctx context.Context, repoID pgtype.UUID) ([]store.Mod, error) {
-	m.listModsByRepoCalled = true
-	m.listModsByRepoParams = repoID
-	return m.listModsByRepoResult, m.listModsByRepoErr
-}
-
 func (m *mockStore) CreateRun(ctx context.Context, params store.CreateRunParams) (store.Run, error) {
 	m.createRunCalled = true
 	m.createRunParams = params
@@ -219,12 +122,6 @@ func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, erro
 	m.getRunCalled = true
 	m.getRunParams = id
 	return m.getRunResult, m.getRunErr
-}
-
-func (m *mockStore) GetRunWithRepo(ctx context.Context, id pgtype.UUID) (store.GetRunWithRepoRow, error) {
-	m.getRunWithRepoCalled = true
-	m.getRunWithRepoParams = id
-	return m.getRunWithRepoResult, m.getRunWithRepoErr
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
@@ -243,18 +140,6 @@ func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 	m.deleteRunCalled = true
 	m.deleteRunParams = id
 	return m.deleteRunErr
-}
-
-func (m *mockStore) GetMod(ctx context.Context, id pgtype.UUID) (store.Mod, error) {
-	m.getModCalled = true
-	m.getModParams = id
-	return m.getModResult, m.getModErr
-}
-
-func (m *mockStore) DeleteMod(ctx context.Context, id pgtype.UUID) error {
-	m.deleteModCalled = true
-	m.deleteModParams = id
-	return m.deleteModErr
 }
 
 func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run, error) {

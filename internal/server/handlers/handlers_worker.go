@@ -156,7 +156,7 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 		// Build response with claimed run details.
 		resp := struct {
 			ID        string  `json:"id"`
-			ModID     string  `json:"mod_id"`
+			RepoURL   string  `json:"repo_url"`
 			Status    string  `json:"status"`
 			NodeID    string  `json:"node_id"`
 			BaseRef   string  `json:"base_ref"`
@@ -166,7 +166,7 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 			CreatedAt string  `json:"created_at"`
 		}{
 			ID:        uuid.UUID(run.ID.Bytes).String(),
-			ModID:     uuid.UUID(run.ModID.Bytes).String(),
+			RepoURL:   run.RepoUrl,
 			Status:    string(run.Status),
 			NodeID:    uuid.UUID(run.NodeID.Bytes).String(),
 			BaseRef:   run.BaseRef,
@@ -186,7 +186,7 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 		slog.Info("run claimed",
 			"run_id", resp.ID,
 			"node_id", nodeIDStr,
-			"mod_id", resp.ModID,
+			"repo_url", resp.RepoURL,
 			"status", resp.Status,
 		)
 	}

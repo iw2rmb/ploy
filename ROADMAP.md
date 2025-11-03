@@ -54,7 +54,7 @@ Legend: [ ] todo, [x] done.
   - Test: `rg` sweep shows no stale routes; how‑to snippets run cleanly.
 
 ## Phase 4 — Cleanup and deprecations
-- [ ] Remove dead code and tables (optional)
+- [x] Remove dead code and tables (optional)
   - Change: if desired, inline repo/spec fields into the run submission and drop the mods table + FK; or keep tables as internal implementation details.
   - Test: migrations updated; unit/integration tests green; coverage ≥60% overall and ≥90% on critical packages per AGENTS.md.
 

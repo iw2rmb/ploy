@@ -56,30 +56,12 @@ CREATE INDEX IF NOT EXISTS nodes_last_heartbeat_idx ON nodes(last_heartbeat);
 CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained;
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
--- Repositories (metadata only)
-CREATE TABLE IF NOT EXISTS repos (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  url             TEXT NOT NULL,
-  branch          TEXT,           -- optional branch hint; default remote branch when NULL
-  commit_sha      TEXT,           -- optional exact commit; HEAD when NULL
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT repos_url_unique UNIQUE (url)
-);
-
--- Mods
-CREATE TABLE IF NOT EXISTS mods (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  repo_id     UUID NOT NULL REFERENCES repos(id) ON DELETE RESTRICT,
-  spec        JSONB NOT NULL,
-  created_by  TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS mods_repo_idx ON mods(repo_id);
-
 -- Runs (acts as a queue with SKIP LOCKED assignment)
 CREATE TABLE IF NOT EXISTS runs (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  mod_id       UUID NOT NULL REFERENCES mods(id) ON DELETE CASCADE,
+  repo_url     TEXT NOT NULL,
+  spec         JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_by   TEXT,
   status       run_status NOT NULL DEFAULT 'queued',
   reason       TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -92,7 +74,6 @@ CREATE TABLE IF NOT EXISTS runs (
   stats        JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE INDEX IF NOT EXISTS runs_status_idx ON runs(status);
-CREATE INDEX IF NOT EXISTS runs_mod_idx ON runs(mod_id);
 CREATE INDEX IF NOT EXISTS runs_node_idx ON runs(node_id);
 CREATE INDEX IF NOT EXISTS runs_created_idx ON runs(created_at);
 
