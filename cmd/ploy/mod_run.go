@@ -18,7 +18,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
-	modplan "github.com/iw2rmb/ploy/internal/mods/plan"
+	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 // handleModRun executes the Mods-specific run command.

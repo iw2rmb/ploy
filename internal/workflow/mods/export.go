@@ -1,7 +1,7 @@
 package mods
 
 import (
-	"github.com/iw2rmb/ploy/internal/mods/plan"
+	"github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 const (
