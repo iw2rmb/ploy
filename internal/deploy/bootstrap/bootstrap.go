@@ -56,11 +56,9 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("echo 'Creating ploy directories...'\n")
 	b.WriteString("mkdir -p /etc/ploy/pki\n\n")
 
-	// Write CA cert if provided via environment
-	b.WriteString("if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
-	b.WriteString("  echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
-	b.WriteString("  chmod 644 /etc/ploy/pki/ca.crt\n")
-	b.WriteString("fi\n\n")
+	// PKI writes are handled in primary/non-primary branches below to ensure
+	// we do not clobber existing PKI on the primary host when reusing.
+	// (See ROADMAP.md Phase 1: "Bootstrap must not clobber existing PKI on primary").
 
 	// Leaf certificate and key are written later in primary/non-primary branches
 	// to match correct file names (server.* vs node.*).
@@ -102,6 +100,12 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  if [ -f /etc/ploy/pki/ca.key ]; then\n")
 	b.WriteString("    echo 'Existing PKI detected (/etc/ploy/pki/ca.key found); skipping PKI writes and reusing existing certificates.'\n")
 	b.WriteString("  else\n")
+
+	// Write CA cert if provided via environment (only when creating new PKI)
+	b.WriteString("    if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("      echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
+	b.WriteString("      chmod 644 /etc/ploy/pki/ca.crt\n")
+	b.WriteString("    fi\n")
 
 	// Persist CA private key on the primary (control-plane) host when provided.
 	b.WriteString("    if [ -n \"${PLOY_CA_KEY_PEM:-}\" ]; then\n")
@@ -163,6 +167,11 @@ func PrefixedScript(env map[string]string) string {
 	// Write node config if this is NOT a primary bootstrap
 	b.WriteString("else\n")
 	b.WriteString("  echo 'Writing node certificate and configuration...'\n")
+	// For nodes, it is safe to (re)write the CA cert from env.
+	b.WriteString("  if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
+	b.WriteString("    chmod 644 /etc/ploy/pki/ca.crt\n")
+	b.WriteString("  fi\n")
 	b.WriteString("  if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
 	b.WriteString("    echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/node.crt\n")
 	b.WriteString("    chmod 644 /etc/ploy/pki/node.crt\n")
