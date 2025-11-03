@@ -163,14 +163,6 @@ type Log struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-type Mod struct {
-	ID        pgtype.UUID        `json:"id"`
-	RepoID    pgtype.UUID        `json:"repo_id"`
-	Spec      []byte             `json:"spec"`
-	CreatedBy *string            `json:"created_by"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
 type Node struct {
 	ID              pgtype.UUID        `json:"id"`
 	Name            string             `json:"name"`
@@ -183,13 +175,13 @@ type Node struct {
 	MemFreeBytes    int64              `json:"mem_free_bytes"`
 	DiskTotalBytes  int64              `json:"disk_total_bytes"`
 	DiskFreeBytes   int64              `json:"disk_free_bytes"`
+	Drained         bool               `json:"drained"`
 	CertSerial      *string            `json:"cert_serial"`
 	CertFingerprint *string            `json:"cert_fingerprint"`
 	CertNotBefore   pgtype.Timestamptz `json:"cert_not_before"`
 	CertNotAfter    pgtype.Timestamptz `json:"cert_not_after"`
 	LastHeartbeat   pgtype.Timestamptz `json:"last_heartbeat"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	Drained         bool               `json:"drained"`
 }
 
 type NodeMetric struct {
@@ -204,17 +196,11 @@ type NodeMetric struct {
 	DiskFreeBytes  int64              `json:"disk_free_bytes"`
 }
 
-type Repo struct {
-	ID        pgtype.UUID        `json:"id"`
-	Url       string             `json:"url"`
-	Branch    *string            `json:"branch"`
-	CommitSha *string            `json:"commit_sha"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
 type Run struct {
 	ID         pgtype.UUID        `json:"id"`
-	ModID      pgtype.UUID        `json:"mod_id"`
+	RepoUrl    string             `json:"repo_url"`
+	Spec       []byte             `json:"spec"`
+	CreatedBy  *string            `json:"created_by"`
 	Status     RunStatus          `json:"status"`
 	Reason     *string            `json:"reason"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`

@@ -35,7 +35,7 @@ UPDATE runs r
 SET status = 'assigned', node_id = $1, started_at = now()
 FROM cte
 WHERE r.id = cte.id
-RETURNING r.id, r.mod_id, r.status, r.reason, r.created_at, r.started_at, r.finished_at, r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats
+RETURNING r.id, r.repo_url, r.spec, r.created_by, r.status, r.reason, r.created_at, r.started_at, r.finished_at, r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats
 `
 
 func (q *Queries) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error) {
@@ -43,7 +43,9 @@ func (q *Queries) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.ModID,
+		&i.RepoUrl,
+		&i.Spec,
+		&i.CreatedBy,
 		&i.Status,
 		&i.Reason,
 		&i.CreatedAt,
@@ -59,22 +61,26 @@ func (q *Queries) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 }
 
 const createRun = `-- name: CreateRun :one
-INSERT INTO runs (mod_id, status, base_ref, target_ref, commit_sha)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
+INSERT INTO runs (repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
 `
 
 type CreateRunParams struct {
-	ModID     pgtype.UUID `json:"mod_id"`
-	Status    RunStatus   `json:"status"`
-	BaseRef   string      `json:"base_ref"`
-	TargetRef string      `json:"target_ref"`
-	CommitSha *string     `json:"commit_sha"`
+	RepoUrl   string    `json:"repo_url"`
+	Spec      []byte    `json:"spec"`
+	CreatedBy *string   `json:"created_by"`
+	Status    RunStatus `json:"status"`
+	BaseRef   string    `json:"base_ref"`
+	TargetRef string    `json:"target_ref"`
+	CommitSha *string   `json:"commit_sha"`
 }
 
 func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, error) {
 	row := q.db.QueryRow(ctx, createRun,
-		arg.ModID,
+		arg.RepoUrl,
+		arg.Spec,
+		arg.CreatedBy,
 		arg.Status,
 		arg.BaseRef,
 		arg.TargetRef,
@@ -83,7 +89,9 @@ func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, erro
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.ModID,
+		&i.RepoUrl,
+		&i.Spec,
+		&i.CreatedBy,
 		&i.Status,
 		&i.Reason,
 		&i.CreatedAt,
@@ -109,7 +117,7 @@ func (q *Queries) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 WHERE id = $1
 `
 
@@ -118,7 +126,9 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 	var i Run
 	err := row.Scan(
 		&i.ID,
-		&i.ModID,
+		&i.RepoUrl,
+		&i.Spec,
+		&i.CreatedBy,
 		&i.Status,
 		&i.Reason,
 		&i.CreatedAt,
@@ -148,55 +158,8 @@ func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming,
 	return i, err
 }
 
-const getRunWithRepo = `-- name: GetRunWithRepo :one
-SELECT r.id, r.mod_id, r.status, r.reason, r.created_at, r.started_at, r.finished_at,
-       r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats,
-       repos.url AS repo_url
-FROM runs r
-INNER JOIN mods ON mods.id = r.mod_id
-INNER JOIN repos ON repos.id = mods.repo_id
-WHERE r.id = $1
-`
-
-type GetRunWithRepoRow struct {
-	ID         pgtype.UUID        `json:"id"`
-	ModID      pgtype.UUID        `json:"mod_id"`
-	Status     RunStatus          `json:"status"`
-	Reason     *string            `json:"reason"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	NodeID     pgtype.UUID        `json:"node_id"`
-	BaseRef    string             `json:"base_ref"`
-	TargetRef  string             `json:"target_ref"`
-	CommitSha  *string            `json:"commit_sha"`
-	Stats      []byte             `json:"stats"`
-	RepoUrl    string             `json:"repo_url"`
-}
-
-func (q *Queries) GetRunWithRepo(ctx context.Context, id pgtype.UUID) (GetRunWithRepoRow, error) {
-	row := q.db.QueryRow(ctx, getRunWithRepo, id)
-	var i GetRunWithRepoRow
-	err := row.Scan(
-		&i.ID,
-		&i.ModID,
-		&i.Status,
-		&i.Reason,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.NodeID,
-		&i.BaseRef,
-		&i.TargetRef,
-		&i.CommitSha,
-		&i.Stats,
-		&i.RepoUrl,
-	)
-	return i, err
-}
-
 const listRuns = `-- name: ListRuns :many
-SELECT id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -217,46 +180,9 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 		var i Run
 		if err := rows.Scan(
 			&i.ID,
-			&i.ModID,
-			&i.Status,
-			&i.Reason,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.FinishedAt,
-			&i.NodeID,
-			&i.BaseRef,
-			&i.TargetRef,
-			&i.CommitSha,
-			&i.Stats,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listRunsByMod = `-- name: ListRunsByMod :many
-SELECT id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
-WHERE mod_id = $1
-ORDER BY created_at DESC
-`
-
-func (q *Queries) ListRunsByMod(ctx context.Context, modID pgtype.UUID) ([]Run, error) {
-	rows, err := q.db.Query(ctx, listRunsByMod, modID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Run{}
-	for rows.Next() {
-		var i Run
-		if err := rows.Scan(
-			&i.ID,
-			&i.ModID,
+			&i.RepoUrl,
+			&i.Spec,
+			&i.CreatedBy,
 			&i.Status,
 			&i.Reason,
 			&i.CreatedAt,

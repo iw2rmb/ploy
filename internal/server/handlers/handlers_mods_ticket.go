@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -50,59 +49,17 @@ func submitTicketHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Get or create repo by URL.
-		repo, err := st.GetRepoByURL(r.Context(), req.RepoURL)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				// Repo does not exist; create it.
-				repo, err = st.CreateRepo(r.Context(), store.CreateRepoParams{
-					Url:       req.RepoURL,
-					Branch:    nil, // No default branch hint for ticket-submitted repos.
-					CommitSha: nil, // No default commit for ticket-submitted repos.
-				})
-				if err != nil {
-					// Check if this is a unique constraint violation (race condition).
-					var pgErr *pgconn.PgError
-					if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-						// Retry the get; another request just created the repo.
-						repo, err = st.GetRepoByURL(r.Context(), req.RepoURL)
-						if err != nil {
-							http.Error(w, fmt.Sprintf("failed to get repo after race: %v", err), http.StatusInternalServerError)
-							slog.Error("submit ticket: get repo after race failed", "repo_url", req.RepoURL, "err", err)
-							return
-						}
-					} else {
-						http.Error(w, fmt.Sprintf("failed to create repo: %v", err), http.StatusInternalServerError)
-						slog.Error("submit ticket: create repo failed", "repo_url", req.RepoURL, "err", err)
-						return
-					}
-				}
-			} else {
-				http.Error(w, fmt.Sprintf("failed to get repo: %v", err), http.StatusInternalServerError)
-				slog.Error("submit ticket: get repo failed", "repo_url", req.RepoURL, "err", err)
-				return
-			}
-		}
-
-		// Create mod with the repo_id and spec (default to empty JSON object if not provided).
+		// Prepare spec (default to empty JSON object if not provided).
 		spec := []byte("{}")
 		if req.Spec != nil && len(*req.Spec) > 0 {
 			spec = *req.Spec
 		}
-		mod, err := st.CreateMod(r.Context(), store.CreateModParams{
-			RepoID:    repo.ID,
+
+		// Create the run directly with repo_url and spec inlined.
+		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
+			RepoUrl:   req.RepoURL,
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create mod: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create mod failed", "repo_id", uuid.UUID(repo.ID.Bytes).String(), "err", err)
-			return
-		}
-
-		// Create the run with status=queued.
-		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			ModID:     mod.ID,
 			Status:    store.RunStatusQueued,
 			BaseRef:   req.BaseRef,
 			TargetRef: req.TargetRef,
@@ -110,7 +67,7 @@ func submitTicketHandler(st store.Store) http.HandlerFunc {
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create run failed", "mod_id", uuid.UUID(mod.ID.Bytes).String(), "err", err)
+			slog.Error("submit ticket: create run failed", "repo_url", req.RepoURL, "err", err)
 			return
 		}
 
@@ -124,7 +81,7 @@ func submitTicketHandler(st store.Store) http.HandlerFunc {
 		}{
 			TicketID:  uuid.UUID(run.ID.Bytes).String(),
 			Status:    string(run.Status),
-			RepoURL:   repo.Url,
+			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
 			TargetRef: run.TargetRef,
 		}
@@ -169,8 +126,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			Valid: true,
 		}
 
-		// Fetch run with repo URL.
-		runWithRepo, err := st.GetRunWithRepo(r.Context(), pgID)
+		// Fetch run (now includes repo_url directly).
+		run, err := st.GetRun(r.Context(), pgID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "ticket not found", http.StatusNotFound)
@@ -194,25 +151,25 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			StartedAt  *string `json:"started_at,omitempty"`
 			FinishedAt *string `json:"finished_at,omitempty"`
 		}{
-			TicketID:  uuid.UUID(runWithRepo.ID.Bytes).String(),
-			Status:    string(runWithRepo.Status),
-			Reason:    runWithRepo.Reason,
-			RepoURL:   runWithRepo.RepoUrl,
-			BaseRef:   runWithRepo.BaseRef,
-			TargetRef: runWithRepo.TargetRef,
-			CommitSha: runWithRepo.CommitSha,
+			TicketID:  uuid.UUID(run.ID.Bytes).String(),
+			Status:    string(run.Status),
+			Reason:    run.Reason,
+			RepoURL:   run.RepoUrl,
+			BaseRef:   run.BaseRef,
+			TargetRef: run.TargetRef,
+			CommitSha: run.CommitSha,
 		}
 
 		// Format timestamps consistently (RFC3339).
-		if runWithRepo.CreatedAt.Valid {
-			resp.CreatedAt = runWithRepo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		if run.CreatedAt.Valid {
+			resp.CreatedAt = run.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00")
 		}
-		if runWithRepo.StartedAt.Valid {
-			formatted := runWithRepo.StartedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		if run.StartedAt.Valid {
+			formatted := run.StartedAt.Time.Format("2006-01-02T15:04:05Z07:00")
 			resp.StartedAt = &formatted
 		}
-		if runWithRepo.FinishedAt.Valid {
-			formatted := runWithRepo.FinishedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		if run.FinishedAt.Valid {
+			formatted := run.FinishedAt.Time.Format("2006-01-02T15:04:05Z07:00")
 			resp.FinishedAt = &formatted
 		}
 

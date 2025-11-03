@@ -17,12 +17,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/pki/sign/admin", pkiSignAdminHandler(), auth.RoleCLIAdmin)
 	s.HandleFunc("POST /v1/pki/sign/client", pkiSignClientHandler(), auth.RoleCLIAdmin)
 
-	// Repos CRUD
-	s.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
-
 	// Mods ticket submission (new simplified API)
 	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)

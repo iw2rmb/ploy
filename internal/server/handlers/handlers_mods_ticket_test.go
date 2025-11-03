@@ -16,28 +16,16 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestSubmitTicketHandlerSuccess verifies successful ticket submission when repo already exists.
+// TestSubmitTicketHandlerSuccess verifies successful ticket submission.
 func TestSubmitTicketHandlerSuccess(t *testing.T) {
-	repoID := uuid.New()
-	modID := uuid.New()
 	runID := uuid.New()
 	now := time.Now()
 
 	st := &mockStore{
-		getRepoByURLResult: store.Repo{
-			ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-			Url:       "https://github.com/user/repo.git",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		createModResult: store.Mod{
-			ID:        pgtype.UUID{Bytes: modID, Valid: true},
-			RepoID:    pgtype.UUID{Bytes: repoID, Valid: true},
-			Spec:      []byte("{}"),
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
 		createRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      []byte("{}"),
 			Status:    store.RunStatusQueued,
 			BaseRef:   "main",
 			TargetRef: "feature",
@@ -89,73 +77,6 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 		t.Errorf("expected target_ref feature, got %s", resp.TargetRef)
 	}
 
-	if !st.getRepoByURLCalled {
-		t.Error("expected GetRepoByURL to be called")
-	}
-	if !st.createModCalled {
-		t.Error("expected CreateMod to be called")
-	}
-	if !st.createRunCalled {
-		t.Error("expected CreateRun to be called")
-	}
-}
-
-// TestSubmitTicketHandlerRepoCreation verifies ticket submission creates repo if it doesn't exist.
-func TestSubmitTicketHandlerRepoCreation(t *testing.T) {
-	repoID := uuid.New()
-	modID := uuid.New()
-	runID := uuid.New()
-	now := time.Now()
-
-	st := &mockStore{
-		getRepoByURLErr: pgx.ErrNoRows, // Repo doesn't exist initially
-		createRepoResult: store.Repo{
-			ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-			Url:       "https://github.com/newuser/newrepo.git",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		createModResult: store.Mod{
-			ID:        pgtype.UUID{Bytes: modID, Valid: true},
-			RepoID:    pgtype.UUID{Bytes: repoID, Valid: true},
-			Spec:      []byte("{}"),
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		createRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
-			Status:    store.RunStatusQueued,
-			BaseRef:   "main",
-			TargetRef: "develop",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-	}
-
-	handler := submitTicketHandler(st)
-
-	reqBody := map[string]interface{}{
-		"repo_url":   "https://github.com/newuser/newrepo.git",
-		"base_ref":   "main",
-		"target_ref": "develop",
-	}
-	body, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	if !st.getRepoByURLCalled {
-		t.Error("expected GetRepoByURL to be called")
-	}
-	if !st.createRepoCalled {
-		t.Error("expected CreateRepo to be called (repo didn't exist)")
-	}
-	if !st.createModCalled {
-		t.Error("expected CreateMod to be called")
-	}
 	if !st.createRunCalled {
 		t.Error("expected CreateRun to be called")
 	}
@@ -220,8 +141,6 @@ func TestSubmitTicketHandlerInvalidJSON(t *testing.T) {
 
 // TestSubmitTicketHandlerWithOptionalFields verifies optional fields are handled correctly.
 func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
-	repoID := uuid.New()
-	modID := uuid.New()
 	runID := uuid.New()
 	now := time.Now()
 	commitSha := "abc1234567890"
@@ -229,21 +148,11 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 	customSpec := json.RawMessage(`{"key": "value"}`)
 
 	st := &mockStore{
-		getRepoByURLResult: store.Repo{
-			ID:        pgtype.UUID{Bytes: repoID, Valid: true},
-			Url:       "https://github.com/user/repo.git",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		createModResult: store.Mod{
-			ID:        pgtype.UUID{Bytes: modID, Valid: true},
-			RepoID:    pgtype.UUID{Bytes: repoID, Valid: true},
-			Spec:      customSpec,
-			CreatedBy: &createdBy,
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
 		createRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      customSpec,
+			CreatedBy: &createdBy,
 			Status:    store.RunStatusQueued,
 			BaseRef:   "main",
 			TargetRef: "feature",
@@ -272,19 +181,19 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify mod was created with custom spec (compare as JSON, not string).
+	// Verify run was created with custom spec (compare as JSON, not string).
 	var expectedSpec, actualSpec map[string]interface{}
 	if err := json.Unmarshal(customSpec, &expectedSpec); err != nil {
 		t.Fatalf("failed to unmarshal expected spec: %v", err)
 	}
-	if err := json.Unmarshal(st.createModParams.Spec, &actualSpec); err != nil {
+	if err := json.Unmarshal(st.createRunParams.Spec, &actualSpec); err != nil {
 		t.Fatalf("failed to unmarshal actual spec: %v", err)
 	}
 	if len(expectedSpec) != len(actualSpec) || expectedSpec["key"] != actualSpec["key"] {
-		t.Errorf("expected spec %s, got %s", string(customSpec), string(st.createModParams.Spec))
+		t.Errorf("expected spec %s, got %s", string(customSpec), string(st.createRunParams.Spec))
 	}
-	if st.createModParams.CreatedBy == nil || *st.createModParams.CreatedBy != createdBy {
-		t.Error("expected created_by to be passed to CreateMod")
+	if st.createRunParams.CreatedBy == nil || *st.createRunParams.CreatedBy != createdBy {
+		t.Error("expected created_by to be passed to CreateRun")
 	}
 
 	// Verify run was created with commit_sha.
@@ -296,17 +205,15 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 // TestGetTicketStatusHandlerSuccess verifies successful retrieval of ticket status.
 func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	ticketID := uuid.New()
-	modID := uuid.New()
 	now := time.Now()
 
 	st := &mockStore{
-		getRunWithRepoResult: store.GetRunWithRepoRow{
+		getRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
-			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
 			Status:    store.RunStatusRunning,
 			BaseRef:   "main",
 			TargetRef: "feature",
-			RepoUrl:   "https://github.com/user/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt: pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
 		},
@@ -361,8 +268,8 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 		t.Error("expected started_at to be set")
 	}
 
-	if !st.getRunWithRepoCalled {
-		t.Error("expected GetRunWithRepo to be called")
+	if !st.getRunCalled {
+		t.Error("expected GetRun to be called")
 	}
 }
 
@@ -371,7 +278,7 @@ func TestGetTicketStatusHandlerNotFound(t *testing.T) {
 	ticketID := uuid.New()
 
 	st := &mockStore{
-		getRunWithRepoErr: pgx.ErrNoRows,
+		getRunErr: pgx.ErrNoRows,
 	}
 
 	handler := getTicketStatusHandler(st)
@@ -388,8 +295,8 @@ func TestGetTicketStatusHandlerNotFound(t *testing.T) {
 		t.Errorf("expected 'ticket not found' error, got: %s", rr.Body.String())
 	}
 
-	if !st.getRunWithRepoCalled {
-		t.Error("expected GetRunWithRepo to be called")
+	if !st.getRunCalled {
+		t.Error("expected GetRun to be called")
 	}
 }
 
@@ -411,29 +318,27 @@ func TestGetTicketStatusHandlerInvalidUUID(t *testing.T) {
 		t.Errorf("expected 'invalid ticket id' error, got: %s", rr.Body.String())
 	}
 
-	if st.getRunWithRepoCalled {
-		t.Error("expected GetRunWithRepo NOT to be called for invalid UUID")
+	if st.getRunCalled {
+		t.Error("expected GetRun NOT to be called for invalid UUID")
 	}
 }
 
 // TestGetTicketStatusHandlerWithOptionalFields verifies optional fields are serialized correctly.
 func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	ticketID := uuid.New()
-	modID := uuid.New()
 	now := time.Now()
 	commitSha := "abc1234567890"
 	reason := "run failed due to timeout"
 
 	st := &mockStore{
-		getRunWithRepoResult: store.GetRunWithRepoRow{
+		getRunResult: store.Run{
 			ID:         pgtype.UUID{Bytes: ticketID, Valid: true},
-			ModID:      pgtype.UUID{Bytes: modID, Valid: true},
+			RepoUrl:    "https://github.com/user/repo.git",
 			Status:     store.RunStatusFailed,
 			Reason:     &reason,
 			BaseRef:    "main",
 			TargetRef:  "feature",
 			CommitSha:  &commitSha,
-			RepoUrl:    "https://github.com/user/repo.git",
 			CreatedAt:  pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt:  pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: now.Add(10 * time.Second), Valid: true},
