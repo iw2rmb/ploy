@@ -135,6 +135,9 @@ dist/ploy rollout nodes \
 - `--identity` — SSH private key path (default: `~/.ssh/id_rsa`)
 - `--ssh-port` — SSH port for node connection (default: `22`)
 - `--timeout` — timeout in seconds per node rollout (default: `90`)
+- `--max-attempts N` — maximum rollout attempts per node across resumes
+  (default: `3`). Attempts increment on each failed node rollout and are
+  persisted in `~/.config/ploy/rollout/state.json`.
 
 ### Concurrency Guidance
 
@@ -182,6 +185,19 @@ dist/ploy rollout nodes --all --binary dist/ployd-node-linux
 ```
 
 The state file is automatically removed on full success.
+
+### Retries & Backoff
+
+Rollout operations use exponential backoff for polling steps and a
+persistent attempt counter for each node:
+
+- Polling backoff: starts at 2s and doubles each retry up to 30s
+  (cap). Server and node service health checks use this policy.
+- Heartbeat wait: polls with the same backoff policy for up to 15
+  attempts after restarting `ployd-node`.
+- Per-node attempts: `--max-attempts` caps how many rollout attempts are
+  made for a node across repeated runs. The resume state tracks the
+  attempts and prevents further tries once the cap is reached.
 
 ### Sanity Checks
 
