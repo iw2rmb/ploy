@@ -22,6 +22,10 @@ import (
 // real scp/ssh timeouts. Default is deploy.ProvisionHost.
 var provisionHost = deploy.ProvisionHost
 
+// detectRunner allows tests to inject a mock runner for cluster detection.
+// Default is nil, which causes DetectExisting to use systemRunner.
+var detectRunner deploy.Runner
+
 func handleServer(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
 		printServerUsage(stderr)
@@ -44,12 +48,15 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 
 	var (
-		address       stringValue
-		postgresqlDSN stringValue
-		identity      stringValue
-		userFlag      stringValue
-		ploydBin      stringValue
-		sshPort       intValue
+		address          stringValue
+		postgresqlDSN    stringValue
+		identity         stringValue
+		userFlag         stringValue
+		ploydBin         stringValue
+		sshPort          intValue
+		reuse            boolValue
+		forceNewCA       boolValue
+		refreshAdminCert boolValue
 	)
 
 	fs.Var(&address, "address", "Target host or IP address for server deployment")
@@ -58,6 +65,9 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	fs.Var(&userFlag, "user", "SSH username used for provisioning (default: root)")
 	fs.Var(&ploydBin, "ployd-binary", "Path to the ployd server binary uploaded during provisioning (default: alongside the CLI)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for server provisioning (default: 22)")
+	fs.Var(&reuse, "reuse", "Reuse existing cluster CA and server certificate if present (default: true)")
+	fs.Var(&forceNewCA, "force-new-ca", "Force generation of new CA and server certificate even if cluster exists")
+	fs.Var(&refreshAdminCert, "refresh-admin-cert", "Refresh admin client certificate via server PKI endpoint")
 
 	if err := fs.Parse(args); err != nil {
 		printServerDeployUsage(stderr)
@@ -72,13 +82,24 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		return errors.New("address is required")
 	}
 
+	// Default --reuse to true unless --force-new-ca is set
+	reuseCA := true
+	if reuse.set {
+		reuseCA = reuse.value
+	}
+	if forceNewCA.set && forceNewCA.value {
+		reuseCA = false
+	}
+
 	serverCfg := serverDeployConfig{
-		Address:       address.value,
-		PostgreSQLDSN: postgresqlDSN.value,
-		User:          userFlag.value,
-		IdentityFile:  identity.value,
-		PloydBinary:   ploydBin.value,
-		SSHPort:       sshPort.value,
+		Address:          address.value,
+		PostgreSQLDSN:    postgresqlDSN.value,
+		User:             userFlag.value,
+		IdentityFile:     identity.value,
+		PloydBinary:      ploydBin.value,
+		SSHPort:          sshPort.value,
+		Reuse:            reuseCA,
+		RefreshAdminCert: refreshAdminCert.value,
 	}
 
 	return runServerDeploy(serverCfg, stderr)
@@ -93,12 +114,14 @@ func printServerDeployUsage(w io.Writer) {
 }
 
 type serverDeployConfig struct {
-	Address       string
-	PostgreSQLDSN string
-	User          string
-	IdentityFile  string
-	PloydBinary   string
-	SSHPort       int
+	Address          string
+	PostgreSQLDSN    string
+	User             string
+	IdentityFile     string
+	PloydBinary      string
+	SSHPort          int
+	Reuse            bool
+	RefreshAdminCert bool
 }
 
 func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
@@ -137,31 +160,65 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  Identity: %s\n", identityPath)
 	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydBinaryPath)
 
-	// Generate cluster ID
-	clusterID, err := deploy.GenerateClusterID()
-	if err != nil {
-		return fmt.Errorf("server deploy: %w", err)
-	}
-	_, _ = fmt.Fprintf(stderr, "Generated cluster ID: %s\n", clusterID)
+	// Detect existing cluster if --reuse is enabled
+	var clusterID string
+	var ca *pki.CABundle
+	var serverCert *pki.IssuedCert
+	var adminCert *pki.IssuedCert
+	var reusingCluster bool
 
-	// Generate cluster CA and server certificate
-	_, _ = fmt.Fprintln(stderr, "Generating cluster CA and server certificate...")
-	now := time.Now()
-	ca, err := pki.GenerateCA(clusterID, now)
-	if err != nil {
-		return fmt.Errorf("server deploy: generate CA: %w", err)
+	if cfg.Reuse {
+		_, _ = fmt.Fprintln(stderr, "Checking for existing cluster...")
+		detectOpts := deploy.ProvisionOptions{
+			Address:      cfg.Address,
+			User:         user,
+			Port:         sshPort,
+			IdentityFile: identityPath,
+		}
+		detection, err := deploy.DetectExisting(ctx, detectRunner, detectOpts)
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "Warning: failed to detect existing cluster: %v\n", err)
+		} else if detection.Found {
+			if detection.ClusterID != "" {
+				clusterID = detection.ClusterID
+				reusingCluster = true
+				_, _ = fmt.Fprintf(stderr, "Found existing cluster: %s (reusing CA and server certificate)\n", clusterID)
+			} else {
+				_, _ = fmt.Fprintln(stderr, "Found existing PKI files but could not extract cluster ID; will generate new CA")
+			}
+		} else {
+			_, _ = fmt.Fprintln(stderr, "No existing cluster found; will generate new CA")
+		}
 	}
 
-	serverCert, err := pki.IssueServerCert(ca, clusterID, cfg.Address, now)
-	if err != nil {
-		return fmt.Errorf("server deploy: issue server cert: %w", err)
-	}
-	_, _ = fmt.Fprintln(stderr, "CA and server certificate generated")
+	// Generate cluster ID and PKI if not reusing
+	if !reusingCluster {
+		var err error
+		clusterID, err = deploy.GenerateClusterID()
+		if err != nil {
+			return fmt.Errorf("server deploy: %w", err)
+		}
+		_, _ = fmt.Fprintf(stderr, "Generated cluster ID: %s\n", clusterID)
 
-	// Generate a CLI-admin client certificate for local descriptor/mTLS
-	adminCert, err := pki.IssueClientCert(ca, clusterID, now)
-	if err != nil {
-		return fmt.Errorf("server deploy: issue cli-admin cert: %w", err)
+		// Generate cluster CA and server certificate
+		_, _ = fmt.Fprintln(stderr, "Generating cluster CA and server certificate...")
+		now := time.Now()
+		ca, err = pki.GenerateCA(clusterID, now)
+		if err != nil {
+			return fmt.Errorf("server deploy: generate CA: %w", err)
+		}
+
+		serverCert, err = pki.IssueServerCert(ca, clusterID, cfg.Address, now)
+		if err != nil {
+			return fmt.Errorf("server deploy: issue server cert: %w", err)
+		}
+		_, _ = fmt.Fprintln(stderr, "CA and server certificate generated")
+
+		// Generate a CLI-admin client certificate for local descriptor/mTLS
+		adminCert, err = pki.IssueClientCert(ca, clusterID, now)
+		if err != nil {
+			return fmt.Errorf("server deploy: issue cli-admin cert: %w", err)
+		}
 	}
 
 	// Determine PostgreSQL DSN
@@ -185,10 +242,14 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		"NODE_ADDRESS":            cfg.Address,
 		"BOOTSTRAP_PRIMARY":       "true",
 		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
-		"PLOY_CA_CERT_PEM":        ca.CertPEM,
-		"PLOY_CA_KEY_PEM":         ca.KeyPEM,
-		"PLOY_SERVER_CERT_PEM":    serverCert.CertPEM,
-		"PLOY_SERVER_KEY_PEM":     serverCert.KeyPEM,
+	}
+
+	// Only include PKI environment variables when NOT reusing
+	if !reusingCluster {
+		scriptEnv["PLOY_CA_CERT_PEM"] = ca.CertPEM
+		scriptEnv["PLOY_CA_KEY_PEM"] = ca.KeyPEM
+		scriptEnv["PLOY_SERVER_CERT_PEM"] = serverCert.CertPEM
+		scriptEnv["PLOY_SERVER_KEY_PEM"] = serverCert.KeyPEM
 	}
 
 	// Only set PLOY_SERVER_PG_DSN if the user provided one.
@@ -226,14 +287,19 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		Scheme:          "https",
 		SSHIdentityPath: identityPath,
 	}
-	// Write local mTLS bundle for the default descriptor
-	caPath, certPath, keyPath, err := writeLocalAdminBundle(clusterID, ca.CertPEM, adminCert.CertPEM, adminCert.KeyPEM)
-	if err == nil {
-		desc.CAPath = caPath
-		desc.CertPath = certPath
-		desc.KeyPath = keyPath
-	} else {
-		_, _ = fmt.Fprintf(stderr, "Warning: failed to write local admin mTLS bundle: %v\n", err)
+	// Write local mTLS bundle for the default descriptor (only if not reusing, as we don't have admin cert)
+	if !reusingCluster && adminCert != nil {
+		caPath, certPath, keyPath, err := writeLocalAdminBundle(clusterID, ca.CertPEM, adminCert.CertPEM, adminCert.KeyPEM)
+		if err == nil {
+			desc.CAPath = caPath
+			desc.CertPath = certPath
+			desc.KeyPath = keyPath
+		} else {
+			_, _ = fmt.Fprintf(stderr, "Warning: failed to write local admin mTLS bundle: %v\n", err)
+		}
+	} else if reusingCluster {
+		_, _ = fmt.Fprintln(stderr, "Skipped admin certificate generation (reusing existing cluster)")
+		_, _ = fmt.Fprintln(stderr, "Note: Use --refresh-admin-cert to obtain a new admin certificate from the server (future feature)")
 	}
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Warning: failed to save cluster descriptor: %v\n", err)

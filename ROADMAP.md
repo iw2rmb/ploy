@@ -10,7 +10,7 @@ Legend: [ ] todo, [x] done.
 - [x] Detect existing cluster on target host — enable idempotent deploy
   - Change: add `internal/deploy/detect.go: DetectExisting(ctx, runner, ProvisionOptions)` to probe `/etc/ploy/pki/ca.crt`, `/etc/ploy/ployd.yaml`; parse server cert CN → `ployd-<clusterID>`.
   - Test: `internal/deploy/detect_test.go` — stub runner to return sample files; expect `found=true`, correct cluster ID.
-- [ ] Server deploy flags to control reuse vs. new CA
+- [x] Server deploy flags to control reuse vs. new CA
   - Change: `cmd/ploy/server_command.go` — add flags `--reuse` (default true), `--force-new-ca`, `--refresh-admin-cert`; branch logic to call `DetectExisting` and skip CA/server mint & bootstrap PKI when reusing.
   - Test: `cmd/ploy/server_command_test.go` — table tests covering reuse/new; ensure bootstrap env omits `PLOY_CA_*` when reusing.
 - [ ] PKI: admin CSR signing endpoint (mTLS, cli-admin only)

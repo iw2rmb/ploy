@@ -38,6 +38,26 @@ func (v *intValue) Set(s string) error {
 	return nil
 }
 
+// boolValue implements flag.Value for booleans.
+type boolValue struct {
+	set   bool
+	value bool
+}
+
+func (v *boolValue) String() string { return fmt.Sprintf("%t", v.value) }
+func (v *boolValue) Set(s string) error {
+	var tmp flag.FlagSet
+	var parsed bool
+	tmp.BoolVar(&parsed, "v", false, "")
+	if err := tmp.Parse([]string{"-v", s}); err != nil {
+		return err
+	}
+	v.value = parsed
+	v.set = true
+	return nil
+}
+func (v *boolValue) IsBoolFlag() bool { return true }
+
 // resolveIdentityPath chooses a default SSH identity when not explicitly set.
 func resolveIdentityPath(v stringValue) (string, error) {
 	var path string
