@@ -82,12 +82,27 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		return errors.New("address is required")
 	}
 
-	// Default --reuse to true unless --force-new-ca is set
+	// Work around Go flag behavior with custom boolean values: when a Value
+	// implements IsBoolFlag, "--reuse=false" may still be parsed as present=true
+	// depending on the stdlib behavior. Detect an explicit "=false" token to
+	// ensure we honor it.
+	var reuseExplicitFalse bool
+	for _, a := range args {
+		if a == "--reuse=false" || a == "-reuse=false" {
+			reuseExplicitFalse = true
+			break
+		}
+	}
+
+	// Default --reuse to true unless explicit disable or --force-new-ca.
 	reuseCA := true
 	if reuse.set {
 		reuseCA = reuse.value
 	}
 	if forceNewCA.set && forceNewCA.value {
+		reuseCA = false
+	}
+	if reuseExplicitFalse {
 		reuseCA = false
 	}
 
@@ -129,6 +144,11 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		stderr = os.Stderr
 	}
 	ctx := context.Background()
+
+	// Temporary UX: the flag exists but functionality lands in a later slice.
+	if cfg.RefreshAdminCert {
+		_, _ = fmt.Fprintln(stderr, "Warning: --refresh-admin-cert is not implemented yet; ignoring this flag for now.")
+	}
 
 	// Resolve default paths
 	identityPath, err := resolveIdentityPath(stringValue{set: cfg.IdentityFile != "", value: cfg.IdentityFile})
