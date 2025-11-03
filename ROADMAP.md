@@ -7,7 +7,7 @@ Documentation: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md,
 Legend: [ ] todo, [x] done.
 
 ## Phase 1 — Reuse & Admin Cert Refresh
-- [ ] Detect existing cluster on target host — enable idempotent deploy
+- [x] Detect existing cluster on target host — enable idempotent deploy
   - Change: add `internal/deploy/detect.go: DetectExisting(ctx, runner, ProvisionOptions)` to probe `/etc/ploy/pki/ca.crt`, `/etc/ploy/ployd.yaml`; parse server cert CN → `ployd-<clusterID>`.
   - Test: `internal/deploy/detect_test.go` — stub runner to return sample files; expect `found=true`, correct cluster ID.
 - [ ] Server deploy flags to control reuse vs. new CA
