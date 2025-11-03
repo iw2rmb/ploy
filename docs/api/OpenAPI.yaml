@@ -40,13 +40,6 @@ paths:
     $ref: './paths/repos.yaml'
   /v1/repos/{id}:
     $ref: './paths/repos_id.yaml'
-  /v1/mods/crud:
-    $ref: './paths/mods_crud.yaml'
-  # /v1/mods/crud/{id}:
-  #   $ref: './paths/mods_crud_id.yaml'
-  # NOTE: GET and DELETE /v1/mods/crud/{id} temporarily disabled due to route
-  # conflict with /v1/mods/{id}/events (Go 1.22+ routing). Will be removed
-  # entirely per ROADMAP.md Phase 1.
   /v1/mods:
     $ref: './paths/mods.yaml'
   /v1/mods/{id}:
@@ -129,10 +122,6 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Repo'
     CreateRepoRequest:
       $ref: './components/schemas/controlplane.yaml#/CreateRepoRequest'
-    Mod:
-      $ref: './components/schemas/controlplane.yaml#/Mod'
-    CreateModRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateModRequest'
     Run:
       $ref: './components/schemas/controlplane.yaml#/Run'
     CreateRunRequest:

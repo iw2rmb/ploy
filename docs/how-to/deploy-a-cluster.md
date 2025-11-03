@@ -323,7 +323,7 @@ Firewall notes:
 ## Architecture Overview
 
 - **ployd (server)**: Runs the control-plane API, scheduler, and PostgreSQL-backed storage. Exposes
-  endpoints like `/v1/repos`, `/v1/mods/crud`, `/v1/runs`, and `/v1/pki/sign`.
+  endpoints like `/v1/repos`, `/v1/mods`, `/v1/runs`, and `/v1/pki/sign`.
 - **ployd-node**: Lightweight worker that polls for runs, executes jobs in ephemeral workspaces,
   and streams results back to the server. Nodes use mTLS to communicate with the server.
 - **Certificates**: The cluster CA issues all certificates. Nodes submit CSRs to `/v1/pki/sign` to
