@@ -112,6 +112,8 @@ type ArtifactBundle struct {
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Cid       *string            `json:"cid"`
+	Digest    *string            `json:"digest"`
 }
 
 type Build struct {

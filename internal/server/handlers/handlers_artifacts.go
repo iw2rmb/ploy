@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,18 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// computeArtifactCIDAndDigest computes a content identifier and SHA256 digest for an artifact bundle.
+// CID uses a simple "bafy-" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
+// Digest is the full SHA256 hex string with "sha256:" prefix.
+func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
+	hash := sha256.Sum256(bundle)
+	hexHash := hex.EncodeToString(hash[:])
+	// Use bafy prefix (like IPFS CIDv1) followed by first 32 chars of hash for readability
+	cid = "bafy" + hexHash[:32]
+	digest = "sha256:" + hexHash
+	return cid, digest
+}
 
 // createDiffHandler stores gzipped diff in diffs table (≤1 MiB), rejects oversize.
 func createDiffHandler(st store.Store) http.HandlerFunc {
@@ -355,6 +369,9 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
+		// Compute CID and digest for content-addressable storage.
+		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
+
 		// Create artifact bundle params.
 		params := store.CreateArtifactBundleParams{
 			RunID: pgtype.UUID{
@@ -371,6 +388,8 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			},
 			Name:   req.Name,
 			Bundle: req.Bundle,
+			Cid:    &cid,
+			Digest: &digest,
 		}
 
 		// Persist artifact bundle to DB.

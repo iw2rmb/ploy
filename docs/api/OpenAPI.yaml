@@ -51,6 +51,10 @@ paths:
     $ref: './paths/mods_id_events.yaml'
   /v1/mods/{id}/artifact_bundles:
     $ref: './paths/mods_id_artifact_bundles.yaml'
+  /v1/artifacts:
+    $ref: './paths/artifacts.yaml'
+  /v1/artifacts/{id}:
+    $ref: './paths/artifacts_id.yaml'
   /v1/runs/{id}:
     $ref: './paths/runs_id.yaml'
   /v1/runs/{id}/timing:

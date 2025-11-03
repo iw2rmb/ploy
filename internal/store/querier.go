@@ -57,6 +57,7 @@ type Querier interface {
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
+	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error)
 	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)

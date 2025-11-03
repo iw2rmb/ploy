@@ -12,9 +12,9 @@ import (
 )
 
 const createArtifactBundle = `-- name: CreateArtifactBundle :one
-INSERT INTO artifact_bundles (run_id, stage_id, build_id, name, bundle)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, run_id, stage_id, build_id, name, bundle, created_at
+INSERT INTO artifact_bundles (run_id, stage_id, build_id, name, bundle, cid, digest)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest
 `
 
 type CreateArtifactBundleParams struct {
@@ -23,6 +23,8 @@ type CreateArtifactBundleParams struct {
 	BuildID pgtype.UUID `json:"build_id"`
 	Name    *string     `json:"name"`
 	Bundle  []byte      `json:"bundle"`
+	Cid     *string     `json:"cid"`
+	Digest  *string     `json:"digest"`
 }
 
 func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error) {
@@ -32,6 +34,8 @@ func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBu
 		arg.BuildID,
 		arg.Name,
 		arg.Bundle,
+		arg.Cid,
+		arg.Digest,
 	)
 	var i ArtifactBundle
 	err := row.Scan(
@@ -42,6 +46,8 @@ func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBu
 		&i.Name,
 		&i.Bundle,
 		&i.CreatedAt,
+		&i.Cid,
+		&i.Digest,
 	)
 	return i, err
 }
@@ -67,7 +73,7 @@ func (q *Queries) DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt 
 }
 
 const getArtifactBundle = `-- name: GetArtifactBundle :one
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at FROM artifact_bundles
+SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE id = $1
 `
 
@@ -82,12 +88,50 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 		&i.Name,
 		&i.Bundle,
 		&i.CreatedAt,
+		&i.Cid,
+		&i.Digest,
 	)
 	return i, err
 }
 
+const listArtifactBundlesByCID = `-- name: ListArtifactBundlesByCID :many
+SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+WHERE cid = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlesByCID, cid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ArtifactBundle{}
+	for rows.Next() {
+		var i ArtifactBundle
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.StageID,
+			&i.BuildID,
+			&i.Name,
+			&i.Bundle,
+			&i.CreatedAt,
+			&i.Cid,
+			&i.Digest,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at FROM artifact_bundles
+SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE run_id = $1
 ORDER BY created_at DESC
 `
@@ -109,6 +153,8 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 			&i.Name,
 			&i.Bundle,
 			&i.CreatedAt,
+			&i.Cid,
+			&i.Digest,
 		); err != nil {
 			return nil, err
 		}
@@ -121,7 +167,7 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 }
 
 const listArtifactBundlesByRunAndStage = `-- name: ListArtifactBundlesByRunAndStage :many
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at FROM artifact_bundles
+SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE run_id = $1 AND stage_id = $2
 ORDER BY created_at DESC
 `
@@ -148,6 +194,8 @@ func (q *Queries) ListArtifactBundlesByRunAndStage(ctx context.Context, arg List
 			&i.Name,
 			&i.Bundle,
 			&i.CreatedAt,
+			&i.Cid,
+			&i.Digest,
 		); err != nil {
 			return nil, err
 		}

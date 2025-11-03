@@ -44,7 +44,7 @@ Legend: [ ] todo, [x] done.
   - Change: `cmd/ploy/mod_run.go` and `internal/cli/mods/*`: change submission to POST /v1/mods; change follow to GET /v1/mods/{id}/events; adjust status/inspect/cancel/resume to /v1/mods/{id}[/*].
   - Test: CLI unit tests updated; manual smoke: `dist/ploy mod run --repo-url <repo> --repo-base-ref main --repo-target-ref mods-upgrade-java17 --follow` succeeds against the lab.
 
-- [ ] Artifact download surface (optional but recommended)
+- [x] Artifact download surface (optional but recommended)
   - Change: implement GET /v1/artifacts?cid=… and GET /v1/artifacts/{id} for CLI downloads (currently referenced by CLI); or switch CLI to fetch via a simpler ticket artifacts listing under /v1/mods/{id}/artifacts.
   - Test: CLI `--artifact-dir` path succeeds; server returns 200 with correct payload and limits.
 
