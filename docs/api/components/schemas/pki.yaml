@@ -46,3 +46,13 @@ PKIAdminSignRequest:
       description: |
         PEM-encoded PKCS#10 certificate signing request.
         Must include OU "Ploy role=cli-admin" and request ExtKeyUsage ClientAuth.
+
+PKIClientSignRequest:
+  type: object
+  required: [csr]
+  properties:
+    csr:
+      type: string
+      description: |
+        PEM-encoded PKCS#10 certificate signing request.
+        Must include OU "Ploy role=client" and request ExtKeyUsage ClientAuth.

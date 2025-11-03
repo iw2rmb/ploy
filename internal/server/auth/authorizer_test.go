@@ -29,6 +29,41 @@ func TestAuthorizerAllowsInsecureDefaultRole(t *testing.T) {
 	}
 }
 
+func TestAdminAllowedForControlPlaneEndpoints(t *testing.T) {
+	// In insecure mode with default role set to cli-admin, requests to a
+	// handler that allows control-plane should be permitted.
+	a := NewAuthorizer(Options{
+		AllowInsecure: true,
+		DefaultRole:   RoleCLIAdmin,
+	})
+	rr := httptest.NewRecorder()
+	h := a.Middleware(RoleControlPlane)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/v1/runs", nil)
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+}
+
+func TestAdminNotAllowedForWorkerEndpoints(t *testing.T) {
+	// Even as cli-admin, endpoints restricted to worker role should reject.
+	a := NewAuthorizer(Options{
+		AllowInsecure: true,
+		DefaultRole:   RoleCLIAdmin,
+	})
+	rr := httptest.NewRecorder()
+	h := a.Middleware(RoleWorker)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/x/heartbeat", nil)
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden, got %d", rr.Code)
+	}
+}
+
 func TestAuthorizerRejectsForbiddenRole(t *testing.T) {
 	a := NewAuthorizer(Options{
 		AllowInsecure: true,

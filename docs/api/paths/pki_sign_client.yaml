@@ -1,0 +1,39 @@
+post:
+  tags: [Security]
+  summary: Sign a client CSR (admin only)
+  description: |
+    Signs a client certificate signing request using the cluster CA. The CSR must
+    include OU "Ploy role=client" and request ExtKeyUsage ClientAuth.
+    Requires a client certificate with `cli-admin` role.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/pki.yaml#/PKIClientSignRequest'
+  responses:
+    '200':
+      description: Certificate issued
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/pki.yaml#/PKISignResponse'
+    '400':
+      description: Invalid CSR
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '403':
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '503':
+      description: PKI not configured
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+

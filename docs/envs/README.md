@@ -41,6 +41,17 @@ Local cluster descriptors (written under `~/.config/ploy/clusters/`) now embed T
 - `cert_path` — Client certificate presented by the CLI.
 - `key_path` — Private key for the client certificate.
 When these fields are present for the default cluster, the CLI enforces TLS 1.3 and uses mTLS for all control‑plane calls.
+
+Role model (mTLS certificate OUs / CNs):
+
+- `cli-admin` — administrative CLI role. Allowed to perform admin operations (e.g., PKI sign, server/node rollout) and all
+  standard client operations. For authorization, `cli-admin` is treated as a superset of `control-plane`.
+- `client` (alias: `control`, `control-plane`, `controlplane`) — standard CLI role. Allowed to run Mods workflows and use
+  control-plane APIs that do not require administrative privileges. Not allowed to hit admin-only endpoints like PKI sign.
+- `worker` (alias: `node`) — node agent role. Used by `ployd-node` only to post heartbeats, logs, events, and claim runs.
+
+Certificates can express role either in Subject OU `Ploy role=<role>` or via the CN prefix `<role>:` (e.g., nodes use `node:<uuid>`).
+The server’s authorizer recognizes both forms.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
 - `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to

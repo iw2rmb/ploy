@@ -28,6 +28,8 @@ paths:
     $ref: './paths/pki_sign.yaml'
   /v1/pki/sign/admin:
     $ref: './paths/pki_sign_admin.yaml'
+  /v1/pki/sign/client:
+    $ref: './paths/pki_sign_client.yaml'
   # Control-plane CRUD
   # Jobs endpoints removed; use /v1/runs/*.
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
@@ -106,6 +108,8 @@ components:
       $ref: './components/schemas/pki.yaml#/PKISignResponse'
     PKIAdminSignRequest:
       $ref: './components/schemas/pki.yaml#/PKIAdminSignRequest'
+    PKIClientSignRequest:
+      $ref: './components/schemas/pki.yaml#/PKIClientSignRequest'
     # Control-plane schemas
     Error:
       $ref: './components/schemas/common.yaml#/Error'

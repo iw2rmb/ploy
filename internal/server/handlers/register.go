@@ -15,6 +15,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// PKI
 	s.HandleFunc("POST /v1/pki/sign", pkiSignHandler(st), auth.RoleCLIAdmin)
 	s.HandleFunc("POST /v1/pki/sign/admin", pkiSignAdminHandler(), auth.RoleCLIAdmin)
+	s.HandleFunc("POST /v1/pki/sign/client", pkiSignClientHandler(), auth.RoleCLIAdmin)
 
 	// Repos CRUD
 	s.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
