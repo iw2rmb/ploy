@@ -85,6 +85,13 @@ func IdentityFromContext(ctx context.Context) (Identity, bool) {
 // Middleware enforces the provided role allowlist (empty slice permits any role while still requiring TLS).
 func (a *Authorizer) Middleware(allowed ...string) func(http.Handler) http.Handler {
 	normalized := allowlist(allowed)
+	// Treat cli-admin as a superset of control-plane for authorization purposes.
+	// If a route allows control-plane, cli-admin should also be allowed.
+	if normalized != nil {
+		if _, ok := normalized[RoleControlPlane]; ok {
+			normalized[RoleCLIAdmin] = struct{}{}
+		}
+	}
 	return func(next http.Handler) http.Handler {
 		if next == nil {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -145,7 +152,11 @@ func extractRole(cert *x509.Certificate) string {
 	}
 	if cn := strings.TrimSpace(cert.Subject.CommonName); cn != "" {
 		role := cn
-		if idx := strings.Index(cn, "-"); idx > 0 {
+		// Prefer colon used by nodes (e.g., "node:<uuid>")
+		if idx := strings.Index(cn, ":"); idx > 0 {
+			role = cn[:idx]
+		} else if idx := strings.Index(cn, "-"); idx > 0 {
+			// Fallback to hyphen delimiter (e.g., "control-xyz").
 			role = cn[:idx]
 		}
 		if candidate := normalizeRole(role); candidate != "" {
@@ -157,9 +168,9 @@ func extractRole(cert *x509.Certificate) string {
 
 func normalizeRole(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "beacon", "control", "control-plane", "controlplane":
+	case "beacon", "control", "control-plane", "controlplane", "client":
 		return RoleControlPlane
-	case "worker":
+	case "worker", "node":
 		return RoleWorker
 	case "cli-admin", "cliadmin", "admin":
 		return RoleCLIAdmin
