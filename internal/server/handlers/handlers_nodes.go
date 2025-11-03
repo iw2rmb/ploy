@@ -1,0 +1,194 @@
+package handlers
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// drainNodeHandler marks a node as drained.
+func drainNodeHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nodeIDStr := r.PathValue("id")
+		if strings.TrimSpace(nodeIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		nodeUUID, err := uuid.Parse(nodeIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		nodeID := pgtype.UUID{Bytes: nodeUUID, Valid: true}
+
+		// Verify node exists.
+		node, err := st.GetNode(r.Context(), nodeID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "node not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get node: %v", err), http.StatusInternalServerError)
+			slog.Error("drain node: lookup failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Check if already drained (409 Conflict).
+		if node.Drained {
+			http.Error(w, "node is already drained", http.StatusConflict)
+			return
+		}
+
+		// Update drained flag.
+		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{
+			ID:      nodeID,
+			Drained: true,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to drain node: %v", err), http.StatusInternalServerError)
+			slog.Error("drain node: update failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("node drained", "node_id", nodeIDStr, "name", node.Name)
+	}
+}
+
+// undrainNodeHandler marks a node as undrained (active).
+func undrainNodeHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nodeIDStr := r.PathValue("id")
+		if strings.TrimSpace(nodeIDStr) == "" {
+			http.Error(w, "id path parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		nodeUUID, err := uuid.Parse(nodeIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		nodeID := pgtype.UUID{Bytes: nodeUUID, Valid: true}
+
+		// Verify node exists.
+		node, err := st.GetNode(r.Context(), nodeID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "node not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get node: %v", err), http.StatusInternalServerError)
+			slog.Error("undrain node: lookup failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		// Check if already undrained (409 Conflict).
+		if !node.Drained {
+			http.Error(w, "node is not drained", http.StatusConflict)
+			return
+		}
+
+		// Update drained flag.
+		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{
+			ID:      nodeID,
+			Drained: false,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to undrain node: %v", err), http.StatusInternalServerError)
+			slog.Error("undrain node: update failed", "node_id", nodeIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("node undrained", "node_id", nodeIDStr, "name", node.Name)
+	}
+}
+
+// listNodesHandler returns all nodes.
+func listNodesHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		nodes, err := st.ListNodes(r.Context())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list nodes: %v", err), http.StatusInternalServerError)
+			slog.Error("list nodes: query failed", "err", err)
+			return
+		}
+
+		// Build response slice.
+		type nodeResponse struct {
+			ID              string  `json:"id"`
+			Name            string  `json:"name"`
+			IPAddress       string  `json:"ip_address"`
+			Version         *string `json:"version,omitempty"`
+			Concurrency     int32   `json:"concurrency"`
+			CPUTotalMillis  int32   `json:"cpu_total_millis"`
+			CPUFreeMillis   int32   `json:"cpu_free_millis"`
+			MemTotalBytes   int64   `json:"mem_total_bytes"`
+			MemFreeBytes    int64   `json:"mem_free_bytes"`
+			DiskTotalBytes  int64   `json:"disk_total_bytes"`
+			DiskFreeBytes   int64   `json:"disk_free_bytes"`
+			CertSerial      *string `json:"cert_serial,omitempty"`
+			CertFingerprint *string `json:"cert_fingerprint,omitempty"`
+			CertNotBefore   *string `json:"cert_not_before,omitempty"`
+			CertNotAfter    *string `json:"cert_not_after,omitempty"`
+			LastHeartbeat   *string `json:"last_heartbeat,omitempty"`
+			Drained         bool    `json:"drained"`
+			CreatedAt       string  `json:"created_at"`
+		}
+
+		resp := make([]nodeResponse, 0, len(nodes))
+		for _, node := range nodes {
+			nr := nodeResponse{
+				ID:              uuid.UUID(node.ID.Bytes).String(),
+				Name:            node.Name,
+				IPAddress:       node.IpAddress.String(),
+				Version:         node.Version,
+				Concurrency:     node.Concurrency,
+				CPUTotalMillis:  node.CpuTotalMillis,
+				CPUFreeMillis:   node.CpuFreeMillis,
+				MemTotalBytes:   node.MemTotalBytes,
+				MemFreeBytes:    node.MemFreeBytes,
+				DiskTotalBytes:  node.DiskTotalBytes,
+				DiskFreeBytes:   node.DiskFreeBytes,
+				CertSerial:      node.CertSerial,
+				CertFingerprint: node.CertFingerprint,
+				Drained:         node.Drained,
+				CreatedAt:       node.CreatedAt.Time.Format(time.RFC3339),
+			}
+
+			if node.CertNotBefore.Valid {
+				s := node.CertNotBefore.Time.Format(time.RFC3339)
+				nr.CertNotBefore = &s
+			}
+			if node.CertNotAfter.Valid {
+				s := node.CertNotAfter.Time.Format(time.RFC3339)
+				nr.CertNotAfter = &s
+			}
+			if node.LastHeartbeat.Valid {
+				s := node.LastHeartbeat.Time.Format(time.RFC3339)
+				nr.LastHeartbeat = &s
+			}
+
+			resp = append(resp, nr)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("list nodes: encode response failed", "err", err)
+		}
+	}
+}

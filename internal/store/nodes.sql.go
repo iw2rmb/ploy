@@ -176,6 +176,22 @@ func (q *Queries) UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCert
 	return err
 }
 
+const updateNodeDrained = `-- name: UpdateNodeDrained :exec
+UPDATE nodes
+SET drained = $2
+WHERE id = $1
+`
+
+type UpdateNodeDrainedParams struct {
+	ID      pgtype.UUID `json:"id"`
+	Drained bool        `json:"drained"`
+}
+
+func (q *Queries) UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error {
+	_, err := q.db.Exec(ctx, updateNodeDrained, arg.ID, arg.Drained)
+	return err
+}
+
 const updateNodeHeartbeat = `-- name: UpdateNodeHeartbeat :exec
 UPDATE nodes
 SET
