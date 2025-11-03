@@ -58,7 +58,7 @@ Legend: [ ] todo, [x] done.
 - [x] Resume & backoff tuning
   - Change: rollout retry policy (exponential backoff; max attempts configurable); resume file schema and integrity.
   - Test: unit tests simulate failures, assert resume continues remaining hosts.
-- [ ] Metrics & logs
+- [x] Metrics & logs
   - Change: emit structured logs for rollout steps; add basic counters exposed via CLI (optional).
   - Test: integration‑style smoke with `-short` guards.
 

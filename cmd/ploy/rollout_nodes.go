@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -233,6 +234,9 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 	// Process nodes in batches based on concurrency.
 	_, _ = fmt.Fprintf(stderr, "\nStarting rollout...\n")
 
+	logger := initRolloutLogger()
+	metrics := NewRolloutMetrics()
+
 	success := 0
 	failed := 0
 
@@ -262,6 +266,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 
 			attemptNum := prevStatus.Attempts + 1
 			_, _ = fmt.Fprintf(stderr, "\n[%s] Starting rollout (attempt %d/%d)\n", node.Name, attemptNum, state.RetryPolicy.MaxAttempts)
+			logRolloutStep(logger, "node_rollout", "started", "node_id", node.ID, "node_name", node.Name, "attempt", attemptNum, "max_attempts", state.RetryPolicy.MaxAttempts)
 
 			// Mark as in-progress and increment attempts.
 			state.Nodes[node.ID] = nodeRolloutStatus{
@@ -276,6 +281,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 				_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
 			}
 
+			nodeStart := time.Now()
 			nodeCtx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSecs)*time.Second)
 			err := rolloutSingleNode(nodeCtx, node, rolloutNodeOptions{
 				User:            user,
@@ -283,11 +289,14 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 				IdentityFile:    identityPath,
 				PloydBinaryPath: ploydBinaryPath,
 				Stderr:          stderr,
+				Logger:          logger,
+				Metrics:         metrics,
 			})
 			cancel()
 
 			if err != nil {
 				_, _ = fmt.Fprintf(stderr, "[%s] Rollout failed: %v\n", node.Name, err)
+				logRolloutError(logger, "node_rollout", err, "node_id", node.ID, "node_name", node.Name, "attempt", attemptNum, "duration_ms", time.Since(nodeStart).Milliseconds())
 				state.Nodes[node.ID] = nodeRolloutStatus{
 					NodeID:      node.ID,
 					NodeName:    node.Name,
@@ -300,11 +309,13 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 				if err := saveRolloutState(stateFile, state); err != nil {
 					_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
 				}
+				metrics.RecordNode(false)
 				failed++
 				continue
 			}
 
 			_, _ = fmt.Fprintf(stderr, "[%s] Rollout complete\n", node.Name)
+			logRolloutStep(logger, "node_rollout", "completed", "node_id", node.ID, "node_name", node.Name, "attempt", attemptNum, "duration_ms", time.Since(nodeStart).Milliseconds())
 			state.Nodes[node.ID] = nodeRolloutStatus{
 				NodeID:      node.ID,
 				NodeName:    node.Name,
@@ -316,11 +327,14 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 			if err := saveRolloutState(stateFile, state); err != nil {
 				_, _ = fmt.Fprintf(stderr, "[%s] Warning: failed to save state: %v\n", node.Name, err)
 			}
+			metrics.RecordNode(true)
 			success++
 		}
 	}
 
 	_, _ = fmt.Fprintf(stderr, "\nRollout summary: %d succeeded, %d failed\n", success, failed)
+	metrics.PrintSummary(stderr)
+
 	if failed > 0 {
 		_, _ = fmt.Fprintf(stderr, "Resume state saved to: %s\n", stateFile)
 		return fmt.Errorf("rollout nodes: %d node(s) failed", failed)
@@ -338,6 +352,8 @@ type rolloutNodeOptions struct {
 	IdentityFile    string
 	PloydBinaryPath string
 	Stderr          io.Writer
+	Logger          *slog.Logger
+	Metrics         *RolloutMetrics
 }
 
 type nodeInfo struct {
@@ -475,34 +491,66 @@ func rolloutSingleNode(ctx context.Context, node nodeInfo, opts rolloutNodeOptio
 	if stderr == nil {
 		stderr = os.Stderr
 	}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	metrics := opts.Metrics
+	if metrics == nil {
+		metrics = NewRolloutMetrics()
+	}
 
 	// Step 1: Drain the node.
 	_, _ = fmt.Fprintf(stderr, "[%s]   Draining node...\n", node.Name)
+	stepStart := time.Now()
+	logRolloutStep(logger, "drain_node", "started", "node_id", node.ID, "node_name", node.Name)
 	if !node.Drained {
 		if err := drainNode(ctx, node.ID); err != nil {
+			logRolloutError(logger, "drain_node", err, "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+			metrics.RecordStep("drain_node", "failed")
 			return fmt.Errorf("drain: %w", err)
 		}
 	} else {
 		_, _ = fmt.Fprintf(stderr, "[%s]   Node already drained\n", node.Name)
 	}
+	logRolloutStep(logger, "drain_node", "completed", "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("drain_node", "completed")
 
 	// Step 2: Wait for node to be idle (no active runs).
 	_, _ = fmt.Fprintf(stderr, "[%s]   Waiting for node to be idle...\n", node.Name)
+	stepStart = time.Now()
+	logRolloutStep(logger, "wait_idle", "started", "node_id", node.ID, "node_name", node.Name)
 	if err := waitForNodeIdle(ctx, node.ID); err != nil {
+		logRolloutError(logger, "wait_idle", err, "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("wait_idle", "failed")
 		return fmt.Errorf("wait idle: %w", err)
 	}
+	logRolloutStep(logger, "wait_idle", "completed", "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("wait_idle", "completed")
 
 	// Step 3: Update the binary on the node.
 	_, _ = fmt.Fprintf(stderr, "[%s]   Updating binary...\n", node.Name)
+	stepStart = time.Now()
+	logRolloutStep(logger, "update_binary", "started", "node_id", node.ID, "node_name", node.Name)
 	if err := rolloutNodesHost(ctx, node, opts); err != nil {
+		logRolloutError(logger, "update_binary", err, "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("update_binary", "failed")
 		return fmt.Errorf("update binary: %w", err)
 	}
+	logRolloutStep(logger, "update_binary", "completed", "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("update_binary", "completed")
 
 	// Step 4: Undrain the node.
 	_, _ = fmt.Fprintf(stderr, "[%s]   Undraining node...\n", node.Name)
+	stepStart = time.Now()
+	logRolloutStep(logger, "undrain_node", "started", "node_id", node.ID, "node_name", node.Name)
 	if err := undrainNode(ctx, node.ID); err != nil {
+		logRolloutError(logger, "undrain_node", err, "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+		metrics.RecordStep("undrain_node", "failed")
 		return fmt.Errorf("undrain: %w", err)
 	}
+	logRolloutStep(logger, "undrain_node", "completed", "node_id", node.ID, "node_name", node.Name, "duration_ms", time.Since(stepStart).Milliseconds())
+	metrics.RecordStep("undrain_node", "completed")
 
 	return nil
 }
@@ -554,13 +602,21 @@ func executeRolloutNode(ctx context.Context, node nodeInfo, opts rolloutNodeOpti
 	}
 
 	// Poll for service to become active.
-	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd-node", streams); err != nil {
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	metrics := opts.Metrics
+	if metrics == nil {
+		metrics = NewRolloutMetrics()
+	}
+	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd-node", streams, logger, metrics); err != nil {
 		return fmt.Errorf("service health check: %w", err)
 	}
 
 	// Wait for heartbeat to confirm node is back online.
 	_, _ = fmt.Fprintf(stderr, "[%s]   Waiting for heartbeat...\n", node.Name)
-	if err := waitForNodeHeartbeat(ctx, node.ID); err != nil {
+	if err := waitForNodeHeartbeat(ctx, node.ID, logger, metrics); err != nil {
 		return fmt.Errorf("heartbeat check: %w", err)
 	}
 
@@ -633,12 +689,12 @@ func waitForNodeIdle(ctx context.Context, nodeID string) error {
 	}
 }
 
-func waitForNodeHeartbeat(ctx context.Context, nodeID string) error {
+func waitForNodeHeartbeat(ctx context.Context, nodeID string, logger *slog.Logger, metrics *RolloutMetrics) error {
 	// Poll until the node sends a heartbeat after restart with exponential backoff.
 	policy := DefaultRetryPolicy()
 	policy.MaxAttempts = 15
 
-	return PollWithBackoff(ctx, policy, func() (bool, error) {
+	return PollWithBackoff(ctx, policy, logger, metrics, "node_heartbeat_poll", func() (bool, error) {
 		node, err := fetchNodeByID(ctx, nodeID)
 		if err != nil {
 			// Continue polling on transient errors.

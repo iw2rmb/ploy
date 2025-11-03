@@ -138,7 +138,7 @@ func TestPollWithBackoffConditionMet(t *testing.T) {
 	}
 
 	attempts := 0
-	err := PollWithBackoff(ctx, policy, func() (bool, error) {
+	err := PollWithBackoff(ctx, policy, nil, nil, "test_poll", func() (bool, error) {
 		attempts++
 		if attempts < 2 {
 			return false, nil
@@ -164,7 +164,7 @@ func TestPollWithBackoffConditionNeverMet(t *testing.T) {
 	}
 
 	attempts := 0
-	err := PollWithBackoff(ctx, policy, func() (bool, error) {
+	err := PollWithBackoff(ctx, policy, nil, nil, "test_poll", func() (bool, error) {
 		attempts++
 		return false, nil
 	})
@@ -188,7 +188,7 @@ func TestPollWithBackoffConditionError(t *testing.T) {
 
 	attempts := 0
 	testErr := errors.New("condition error")
-	err := PollWithBackoff(ctx, policy, func() (bool, error) {
+	err := PollWithBackoff(ctx, policy, nil, nil, "test_poll", func() (bool, error) {
 		attempts++
 		return false, testErr
 	})
