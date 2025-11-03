@@ -63,7 +63,7 @@ Legend: [ ] todo, [x] done.
   - Test: integration‑style smoke with `-short` guards.
 
 ## Acceptance & Cutover
-- [ ] Replace “backdoor” steps in docs with first‑class `ploy rollout` flows; keep the legacy script as an appendix.
-  - Change: docs PR; link from README “Updating a cluster”.
+- [x] Replace "backdoor" steps in docs with first‑class `ploy rollout` flows; keep the legacy script as an appendix.
+  - Change: docs PR; link from README "Updating a cluster".
   - Test: manual smoke in VPS lab following the new commands end‑to‑end (server + two nodes).
 

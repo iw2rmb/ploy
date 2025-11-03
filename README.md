@@ -39,6 +39,7 @@ Architecture packages (boundaries)
 **Docs You'll Want**
 - Architecture: `SIMPLE.md` (server/node pivot, PostgreSQL, mTLS)
 - Deployment: `docs/how-to/deploy-a-cluster.md`
+- Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy rollout`)
 - Roadmap: `ROADMAP.md` (migration checklist)
 - Control‑plane APIs: `docs/api/OpenAPI.yaml`
 - Environment variables: `docs/envs/README.md`
