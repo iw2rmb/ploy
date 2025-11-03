@@ -42,12 +42,17 @@ paths:
     $ref: './paths/repos_id.yaml'
   /v1/mods/crud:
     $ref: './paths/mods_crud.yaml'
+  # /v1/mods/crud/{id}:
+  #   $ref: './paths/mods_crud_id.yaml'
+  # NOTE: GET and DELETE /v1/mods/crud/{id} temporarily disabled due to route
+  # conflict with /v1/mods/{id}/events (Go 1.22+ routing). Will be removed
+  # entirely per ROADMAP.md Phase 1.
   /v1/mods:
     $ref: './paths/mods.yaml'
   /v1/mods/{id}:
     $ref: './paths/mods_id.yaml'
-  /v1/mods/crud/{id}:
-    $ref: './paths/mods_crud_id.yaml'
+  /v1/mods/{id}/events:
+    $ref: './paths/mods_id_events.yaml'
   /v1/runs:
     $ref: './paths/runs.yaml'
   /v1/runs/{id}:

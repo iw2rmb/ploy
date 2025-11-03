@@ -23,15 +23,19 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
 
-	// Mods ticket submission (new simplified API)
-	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
-
-	// Mods CRUD
+	// Mods CRUD (partially disabled due to route conflict with /v1/mods/{id}/events per ROADMAP.md Phase 1)
 	s.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/mods/crud/{id}", getModHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("DELETE /v1/mods/crud/{id}", deleteModHandler(st), auth.RoleControlPlane)
+	// NOTE: GET /v1/mods/crud/{id} and DELETE /v1/mods/crud/{id} temporarily disabled
+	// due to route conflict with GET /v1/mods/{id}/events. These will be removed
+	// entirely in ROADMAP.md Phase 1 task: "Remove the mods catalog surface".
+	// s.HandleFunc("GET /v1/mods/crud/{id}", getModHandler(st), auth.RoleControlPlane)
+	// s.HandleFunc("DELETE /v1/mods/crud/{id}", deleteModHandler(st), auth.RoleControlPlane)
+
+	// Mods ticket submission (new simplified API)
+	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
 
 	// Runs (control plane)
 	s.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
