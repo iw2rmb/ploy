@@ -539,6 +539,180 @@ func TestAckRunStart_WrongStatus(t *testing.T) {
 	}
 }
 
+// TestClaimRun_DrainedNode tests that drained nodes cannot claim runs.
+func TestClaimRun_DrainedNode(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test repo.
+	repo, err := db.CreateRepo(ctx, CreateRepoParams{
+		Url:    "https://github.com/test/drained",
+		Branch: ptrStr("main"),
+	})
+	if err != nil {
+		t.Fatalf("CreateRepo() failed: %v", err)
+	}
+
+	// Create a test mod.
+	mod, err := db.CreateMod(ctx, CreateModParams{
+		RepoID: repo.ID,
+		Spec:   []byte(`{"type":"draintest"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	// Create a queued run.
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ModID:     mod.ID,
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create a test node.
+	node, err := db.CreateNode(ctx, CreateNodeParams{
+		Name:      "test-node-drained",
+		IpAddress: mustParseAddr(t, "192.168.6.100"),
+	})
+	if err != nil {
+		t.Fatalf("CreateNode() failed: %v", err)
+	}
+
+	// Drain the node.
+	err = db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{
+		ID:      node.ID,
+		Drained: true,
+	})
+	if err != nil {
+		t.Fatalf("UpdateNodeDrained() failed: %v", err)
+	}
+
+	// Try to claim a run with the drained node.
+	_, err = db.ClaimRun(ctx, node.ID)
+	if err == nil {
+		t.Error("Expected ClaimRun to fail for drained node")
+	}
+
+	// Verify the run is still queued.
+	fetchedRun, err := db.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+	if fetchedRun.Status != RunStatusQueued {
+		t.Errorf("Expected run to remain queued, got %s", fetchedRun.Status)
+	}
+	if fetchedRun.NodeID.Valid {
+		t.Error("Expected run node_id to remain unset")
+	}
+}
+
+// TestClaimRun_UndrainedNodeClaims tests that undrained nodes can claim runs.
+func TestClaimRun_UndrainedNodeClaims(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a test repo.
+	repo, err := db.CreateRepo(ctx, CreateRepoParams{
+		Url:    "https://github.com/test/undrained",
+		Branch: ptrStr("main"),
+	})
+	if err != nil {
+		t.Fatalf("CreateRepo() failed: %v", err)
+	}
+
+	// Create a test mod.
+	mod, err := db.CreateMod(ctx, CreateModParams{
+		RepoID: repo.ID,
+		Spec:   []byte(`{"type":"undraintest"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateMod() failed: %v", err)
+	}
+
+	// Create a queued run.
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		ModID:     mod.ID,
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create a test node.
+	node, err := db.CreateNode(ctx, CreateNodeParams{
+		Name:      "test-node-undrained",
+		IpAddress: mustParseAddr(t, "192.168.7.100"),
+	})
+	if err != nil {
+		t.Fatalf("CreateNode() failed: %v", err)
+	}
+
+	// Drain the node first.
+	err = db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{
+		ID:      node.ID,
+		Drained: true,
+	})
+	if err != nil {
+		t.Fatalf("UpdateNodeDrained() failed: %v", err)
+	}
+
+	// Verify drained node cannot claim.
+	_, err = db.ClaimRun(ctx, node.ID)
+	if err == nil {
+		t.Error("Expected ClaimRun to fail for drained node")
+	}
+
+	// Undrain the node.
+	err = db.UpdateNodeDrained(ctx, UpdateNodeDrainedParams{
+		ID:      node.ID,
+		Drained: false,
+	})
+	if err != nil {
+		t.Fatalf("UpdateNodeDrained() to undrain failed: %v", err)
+	}
+
+	// Now the undrained node should be able to claim the run.
+	claimedRun, err := db.ClaimRun(ctx, node.ID)
+	if err != nil {
+		t.Fatalf("ClaimRun() failed for undrained node: %v", err)
+	}
+
+	// Verify the run is assigned.
+	if claimedRun.ID != run.ID {
+		t.Errorf("Expected run ID %v, got %v", run.ID, claimedRun.ID)
+	}
+	if claimedRun.Status != RunStatusAssigned {
+		t.Errorf("Expected status assigned, got %s", claimedRun.Status)
+	}
+	if !claimedRun.NodeID.Valid || claimedRun.NodeID.Bytes != node.ID.Bytes {
+		t.Errorf("Expected node_id %v, got %v", node.ID, claimedRun.NodeID)
+	}
+}
+
 // Helper functions.
 
 func ptrStr(s string) *string {
