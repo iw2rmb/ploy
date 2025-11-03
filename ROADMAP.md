@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Change: register new path and point to existing handler; mark old route for removal in Phase 2.
   - Test: adjust handler tests to use new path; verify size cap (≤1 MiB gzipped) maintained.
 
-- [ ] Remove the mods catalog surface — delete /v1/mods/crud and related code
+- [x] Remove the mods catalog surface — delete /v1/mods/crud and related code
   - Change: drop handlers in `internal/server/handlers/handlers_repos_mods.go` for mods CRUD; keep repos CRUD (if still useful) or gate for future removal.
   - Test: delete/adjust unit tests; sweep OpenAPI to remove /v1/mods/crud and related schemas/paths.
 
