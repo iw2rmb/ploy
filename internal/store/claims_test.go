@@ -220,28 +220,12 @@ func TestClaimRun_SkipLocked(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test repo and mod.
-	repo, err := db.CreateRepo(ctx, CreateRepoParams{
-		Url:    "https://github.com/test/skip-locked",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-
-	mod, err := db.CreateMod(ctx, CreateModParams{
-		RepoID: repo.ID,
-		Spec:   []byte(`{"type":"concurrent"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-
 	// Create multiple queued runs for concurrent claiming.
 	const numRuns = 10
 	for i := 0; i < numRuns; i++ {
 		_, err := db.CreateRun(ctx, CreateRunParams{
-			ModID:     mod.ID,
+			RepoUrl:   "https://github.com/test/skip-locked",
+			Spec:      []byte(`{"type":"concurrent"}`),
 			Status:    RunStatusQueued,
 			BaseRef:   "main",
 			TargetRef: "concurrent",
@@ -353,7 +337,7 @@ func TestClaimRun_NoQueuedRuns(t *testing.T) {
 }
 
 // TestAckRunStart_Basic tests the acknowledgement of run start:
-// - Creates a repo, mod, and run in queued status
+// - Creates a run in queued status
 // - Claims the run for a node (transitions to assigned)
 // - Acknowledges run start (transitions to running)
 // - Verifies the run status is updated correctly
@@ -370,27 +354,10 @@ func TestAckRunStart_Basic(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test repo.
-	repo, err := db.CreateRepo(ctx, CreateRepoParams{
-		Url:    "https://github.com/test/ackstart",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-
-	// Create a test mod.
-	mod, err := db.CreateMod(ctx, CreateModParams{
-		RepoID: repo.ID,
-		Spec:   []byte(`{"type":"acktest"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-
-	// Create a queued run.
+	// Create a queued run directly.
 	run, err := db.CreateRun(ctx, CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/test/ackstart",
+		Spec:      []byte(`{"type":"acktest"}`),
 		Status:    RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature",
@@ -461,27 +428,10 @@ func TestAckRunStart_WrongStatus(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test repo.
-	repo, err := db.CreateRepo(ctx, CreateRepoParams{
-		Url:    "https://github.com/test/wrongstatus",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-
-	// Create a test mod.
-	mod, err := db.CreateMod(ctx, CreateModParams{
-		RepoID: repo.ID,
-		Spec:   []byte(`{"type":"wrongstatustest"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-
 	// Create a queued run (not assigned).
 	run, err := db.CreateRun(ctx, CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/test/wrongstatus",
+		Spec:      []byte(`{"type":"wrongstatustest"}`),
 		Status:    RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature",
@@ -522,27 +472,10 @@ func TestClaimRun_DrainedNode(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test repo.
-	repo, err := db.CreateRepo(ctx, CreateRepoParams{
-		Url:    "https://github.com/test/drained",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-
-	// Create a test mod.
-	mod, err := db.CreateMod(ctx, CreateModParams{
-		RepoID: repo.ID,
-		Spec:   []byte(`{"type":"draintest"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/test/drained",
+		Spec:      []byte(`{"type":"draintest"}`),
 		Status:    RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature",
@@ -602,27 +535,10 @@ func TestClaimRun_UndrainedNodeClaims(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Create a test repo.
-	repo, err := db.CreateRepo(ctx, CreateRepoParams{
-		Url:    "https://github.com/test/undrained",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-
-	// Create a test mod.
-	mod, err := db.CreateMod(ctx, CreateModParams{
-		RepoID: repo.ID,
-		Spec:   []byte(`{"type":"undraintest"}`),
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-
 	// Create a queued run.
 	run, err := db.CreateRun(ctx, CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/test/undrained",
+		Spec:      []byte(`{"type":"undraintest"}`),
 		Status:    RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature",

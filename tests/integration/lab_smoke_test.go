@@ -12,7 +12,7 @@ import (
 )
 
 // TestLabSmoke is a minimal smoke test that simulates server + node workflow:
-// 1. Create repo → mod → run (queued status).
+// 1. Create run (queued status).
 // 2. Simulate node operations: append logs and diffs as if a node is executing the run.
 // 3. Assert that logs and diff rows are stored in the database.
 //
@@ -30,30 +30,11 @@ func TestLabSmoke(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a test repository (public repo for smoke test).
-	repo, err := db.CreateRepo(ctx, store.CreateRepoParams{
-		Url:    "https://github.com/octocat/Hello-World",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-	t.Logf("Created repo: id=%v, url=%s", repo.ID, repo.Url)
-
-	// Step 2: Create a mod for the repository.
+	// Step 1: Create a run in queued status (simulating server receiving a run request).
 	modSpec := []byte(`{"type":"smoke-test","description":"Lab smoke test"}`)
-	mod, err := db.CreateMod(ctx, store.CreateModParams{
-		RepoID: repo.ID,
-		Spec:   modSpec,
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-	t.Logf("Created mod: id=%v, repo_id=%v", mod.ID, mod.RepoID)
-
-	// Step 3: Create a run in queued status (simulating server receiving a run request).
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/octocat/Hello-World",
+		Spec:      modSpec,
 		Status:    store.RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature/smoke-test",
@@ -61,7 +42,7 @@ func TestLabSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%v, status=%s", run.ID, run.ModID, run.Status)
+	t.Logf("Created run: id=%v, repo_url=%s, status=%s", run.ID, run.RepoUrl, run.Status)
 
 	// Step 4: Simulate node operations - Create a stage for the run.
 	stage, err := db.CreateStage(ctx, store.CreateStageParams{

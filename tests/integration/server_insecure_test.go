@@ -84,15 +84,15 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Register a basic repos list handler (requires control-plane role).
-	httpSrv.HandleFunc("GET /v1/repos", func(w http.ResponseWriter, r *http.Request) {
-		repos, err := db.ListRepos(r.Context())
+	// Register a basic runs list handler (requires control-plane role).
+	httpSrv.HandleFunc("GET /v1/runs", func(w http.ResponseWriter, r *http.Request) {
+		runs, err := db.ListRuns(r.Context(), store.ListRunsParams{Limit: 10, Offset: 0})
 		if err != nil {
-			http.Error(w, fmt.Sprintf("list repos failed: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("list runs failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"repos": repos})
+		_ = json.NewEncoder(w).Encode(map[string]any{"runs": runs})
 	}, auth.RoleControlPlane)
 
 	// Start the server.
@@ -126,26 +126,26 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	}
 	t.Logf("Health check response: %s", bodyBytes)
 
-	// Step 6: Make an HTTP request to a protected endpoint (repos list).
+	// Step 6: Make an HTTP request to a protected endpoint (runs list).
 	// Since AllowInsecure is true with DefaultRole=RoleControlPlane,
 	// requests without TLS should be allowed and assigned the control-plane role.
-	reposURL := fmt.Sprintf("http://%s/v1/repos", serverAddr)
-	resp2, err := http.Get(reposURL)
+	runsURL := fmt.Sprintf("http://%s/v1/runs", serverAddr)
+	resp2, err := http.Get(runsURL)
 	if err != nil {
-		t.Fatalf("GET %s failed: %v", reposURL, err)
+		t.Fatalf("GET %s failed: %v", runsURL, err)
 	}
 	defer resp2.Body.Close()
 
 	if resp2.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp2.Body)
-		t.Fatalf("Expected status 200 for repos endpoint, got %d: %s", resp2.StatusCode, body)
+		t.Fatalf("Expected status 200 for runs endpoint, got %d: %s", resp2.StatusCode, body)
 	}
 
-	var reposResp map[string]any
-	if err := json.NewDecoder(resp2.Body).Decode(&reposResp); err != nil {
-		t.Fatalf("Failed to decode repos response: %v", err)
+	var runsResp map[string]any
+	if err := json.NewDecoder(resp2.Body).Decode(&runsResp); err != nil {
+		t.Fatalf("Failed to decode runs response: %v", err)
 	}
-	t.Logf("Repos list response: %v", reposResp)
+	t.Logf("Runs list response: %v", runsResp)
 
 	// Step 7: Stop the server gracefully.
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
