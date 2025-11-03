@@ -40,10 +40,13 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// Repos
 		{"/v1/repos", "post"},
 		{"/v1/repos", "get"},
+		{"/v1/repos/{id}", "get"},
+		{"/v1/repos/{id}", "delete"},
 		// Mods (Ticket submit + status/events)
 		{"/v1/mods", "post"},
 		{"/v1/mods/{id}", "get"},
 		{"/v1/mods/{id}/events", "get"},
+		{"/v1/mods/{id}/artifact_bundles", "post"},
 		// Runs
 		{"/v1/runs", "post"},
 		{"/v1/runs", "get"},
@@ -51,6 +54,9 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/runs/{id}", "delete"},
 		{"/v1/runs/{id}/timing", "get"},
 		{"/v1/runs/{id}/events", "get"},
+		{"/v1/runs/{id}/logs", "post"},
+		{"/v1/runs/{id}/diffs", "post"},
+		{"/v1/runs/{id}/artifact_bundles", "post"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management
