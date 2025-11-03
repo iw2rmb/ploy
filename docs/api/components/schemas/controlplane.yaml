@@ -20,7 +20,9 @@ Run:
   type: object
   properties:
     id: { type: string, format: uuid }
-    mod_id: { type: string, format: uuid }
+    repo_url: { type: string }
+    spec: {}
+    created_by: { type: string, nullable: true }
     status: { type: string }
     reason: { type: string, nullable: true }
     created_at: { type: string, format: date-time }
@@ -31,16 +33,17 @@ Run:
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
     stats: {}
-  required: [id, mod_id, status, created_at, base_ref, target_ref]
+  required: [id, repo_url, status, created_at, base_ref, target_ref]
 
 CreateRunRequest:
   type: object
   properties:
-    mod_id: { type: string, format: uuid }
+    repo_url: { type: string }
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
-  required: [mod_id, base_ref, target_ref]
+    spec: {}
+  required: [repo_url, base_ref, target_ref]
 
 CreateRunResponse:
   type: object
@@ -91,7 +94,7 @@ NodeClaimResponse:
   type: object
   properties:
     id: { type: string, format: uuid }
-    mod_id: { type: string, format: uuid }
+    repo_url: { type: string }
     status: { type: string }
     node_id: { type: string, format: uuid }
     base_ref: { type: string }
@@ -99,7 +102,7 @@ NodeClaimResponse:
     commit_sha: { type: string, nullable: true }
     started_at: { type: string, format: date-time }
     created_at: { type: string, format: date-time }
-  required: [id, mod_id, status, node_id, base_ref, target_ref, started_at, created_at]
+  required: [id, repo_url, status, node_id, base_ref, target_ref, started_at, created_at]
 
 Event:
   type: object

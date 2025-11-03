@@ -11,8 +11,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestHappyPath_CreateRepoModRun tests the happy path integration flow:
-// create repo → create mod → create run → simulate node appends (events/logs).
+// TestHappyPath_CreateRun tests the happy path integration flow:
+// create run → simulate node appends (events/logs).
 // This test requires a test database accessible via PLOY_TEST_PG_DSN.
 func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
@@ -27,46 +27,11 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 	defer db.Close()
 
-	// Step 1: Create a test repository.
-	repo, err := db.CreateRepo(ctx, store.CreateRepoParams{
-		Url:    "https://github.com/example/happy-path-test",
-		Branch: ptrStr("main"),
-	})
-	if err != nil {
-		t.Fatalf("CreateRepo() failed: %v", err)
-	}
-	t.Logf("Created repo: id=%v, url=%s", repo.ID, repo.Url)
-
-	// Verify the repo was created with expected values.
-	if repo.Url != "https://github.com/example/happy-path-test" {
-		t.Errorf("Expected repo URL 'https://github.com/example/happy-path-test', got %s", repo.Url)
-	}
-	if repo.Branch == nil || *repo.Branch != "main" {
-		t.Errorf("Expected branch 'main', got %v", repo.Branch)
-	}
-
-	// Step 2: Create a mod for the repository.
+	// Step 1: Create a run in queued status.
 	modSpec := []byte(`{"type":"integration-test","description":"Happy path test"}`)
-	mod, err := db.CreateMod(ctx, store.CreateModParams{
-		RepoID: repo.ID,
-		Spec:   modSpec,
-	})
-	if err != nil {
-		t.Fatalf("CreateMod() failed: %v", err)
-	}
-	t.Logf("Created mod: id=%v, repo_id=%v", mod.ID, mod.RepoID)
-
-	// Verify the mod was created with expected values.
-	if mod.RepoID.Bytes != repo.ID.Bytes {
-		t.Errorf("Expected mod repo_id %v, got %v", repo.ID, mod.RepoID)
-	}
-	if string(mod.Spec) != string(modSpec) {
-		t.Errorf("Expected spec %s, got %s", modSpec, mod.Spec)
-	}
-
-	// Step 3: Create a run in queued status.
 	run, err := db.CreateRun(ctx, store.CreateRunParams{
-		ModID:     mod.ID,
+		RepoUrl:   "https://github.com/example/happy-path-test",
+		Spec:      modSpec,
 		Status:    store.RunStatusQueued,
 		BaseRef:   "main",
 		TargetRef: "feature/happy-path",
@@ -74,11 +39,11 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRun() failed: %v", err)
 	}
-	t.Logf("Created run: id=%v, mod_id=%v, status=%s", run.ID, run.ModID, run.Status)
+	t.Logf("Created run: id=%v, repo_url=%s, status=%s", run.ID, run.RepoUrl, run.Status)
 
 	// Verify the run was created with expected values.
-	if run.ModID.Bytes != mod.ID.Bytes {
-		t.Errorf("Expected run mod_id %v, got %v", mod.ID, run.ModID)
+	if run.RepoUrl != "https://github.com/example/happy-path-test" {
+		t.Errorf("Expected run repo_url https://github.com/example/happy-path-test, got %s", run.RepoUrl)
 	}
 	if run.Status != store.RunStatusQueued {
 		t.Errorf("Expected status queued, got %s", run.Status)
@@ -253,11 +218,6 @@ func TestHappyPath_CreateRepoModRun(t *testing.T) {
 	}
 
 	t.Log("Happy path integration test completed successfully")
-}
-
-// ptrStr is a helper to create string pointers.
-func ptrStr(s string) *string {
-	return &s
 }
 
 // firstIDOrZero helps compact test error messages.

@@ -39,10 +39,6 @@ paths:
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
   # Legacy mods logs stream removed; use /v1/mods/{id}/events.
   # Future runs endpoints (target naming)
-  /v1/repos:
-    $ref: './paths/repos.yaml'
-  /v1/repos/{id}:
-    $ref: './paths/repos_id.yaml'
   /v1/mods:
     $ref: './paths/mods.yaml'
   /v1/mods/{id}:
@@ -121,10 +117,6 @@ components:
     # Control-plane schemas
     Error:
       $ref: './components/schemas/common.yaml#/Error'
-    Repo:
-      $ref: './components/schemas/controlplane.yaml#/Repo'
-    CreateRepoRequest:
-      $ref: './components/schemas/controlplane.yaml#/CreateRepoRequest'
     Run:
       $ref: './components/schemas/controlplane.yaml#/Run'
     CreateRunRequest:
