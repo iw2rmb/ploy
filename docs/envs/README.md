@@ -196,6 +196,12 @@ usage but are documented here for completeness.
   This variable is consumed only by the bootstrap script; the CLI separately exposes a
   `--server-url` flag and `PLOY_CONTROL_PLANE_URL` override for client operations.
 
+Primary reuse behavior:
+- On control‑plane (primary) hosts, when `/etc/ploy/pki/ca.key` already exists, the bootstrap
+  script treats the host as an existing cluster and skips all PKI writes (CA cert/key and
+  server cert/key). It logs a reuse message and proceeds to (re)write configs and systemd units
+  only. This prevents accidental clobbering of an existing cluster PKI.
+
 Alternatively, you can specify the DSN in the config file under `postgres.dsn`. Environment variables take
 precedence over the config file when both are present.
 

@@ -413,3 +413,37 @@ func TestPrefixedScript_ReuseBranchStructure(t *testing.T) {
 		t.Fatalf("PKI reuse check must be closed with fi before config write")
 	}
 }
+
+func TestPrefixedScript_ReuseSkipsCACertWrite_OnPrimary(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY":    "true",
+		"PLOY_CA_CERT_PEM":     "ca-cert-content",
+		"PLOY_SERVER_CERT_PEM": "server-cert-content",
+		"PLOY_SERVER_KEY_PEM":  "server-key-content",
+	})
+
+	// The CA cert write must not appear before the reuse check; it must be inside the else branch.
+	caKeyCheckIdx := strings.Index(script, "if [ -f /etc/ploy/pki/ca.key ]; then")
+	if caKeyCheckIdx == -1 {
+		t.Fatalf("script must check for ca.key existence")
+	}
+	caCertWriteIdx := strings.Index(script, "echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt")
+	if caCertWriteIdx == -1 {
+		t.Fatalf("script must contain CA cert write when material provided")
+	}
+
+	// Ensure the first CA cert write comes after the else of the ca.key check (nested primary branch)
+	elseIdxRel := strings.Index(script[caKeyCheckIdx:], "  else\n")
+	if elseIdxRel == -1 {
+		t.Fatalf("script must have else branch after reuse check")
+	}
+	elseIdx := caKeyCheckIdx + elseIdxRel
+	if caCertWriteIdx < elseIdx {
+		t.Fatalf("CA cert write must occur after the else branch in primary reuse logic")
+	}
+
+	// And should be indented for the nested block (four spaces)
+	if !strings.Contains(script, "    echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt") {
+		t.Fatalf("CA cert write should be nested inside else block with indentation")
+	}
+}
