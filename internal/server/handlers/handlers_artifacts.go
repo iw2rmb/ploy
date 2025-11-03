@@ -19,7 +19,7 @@ import (
 )
 
 // computeArtifactCIDAndDigest computes a content identifier and SHA256 digest for an artifact bundle.
-// CID uses a simple "bafy-" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
+// CID uses a simple "bafy" prefix with hex-encoded SHA256 for compatibility with existing test fixtures.
 // Digest is the full SHA256 hex string with "sha256:" prefix.
 func computeArtifactCIDAndDigest(bundle []byte) (cid, digest string) {
 	hash := sha256.Sum256(bundle)
