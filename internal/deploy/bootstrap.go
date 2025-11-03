@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/iw2rmb/ploy/internal/bootstrap"
 	"github.com/iw2rmb/ploy/internal/cli/config"
+	"github.com/iw2rmb/ploy/internal/deploy/bootstrap"
 )
 
 // RunBootstrap orchestrates remote installation via SSH and finalises PKI metadata locally.

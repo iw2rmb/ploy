@@ -84,7 +84,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] Save/refresh local cluster descriptor in `~/.config/ploy/clusters/` after each deploy/add.
 
 ## Bootstrap Script (Replace stub)
-- [x] Teach `internal/bootstrap.PrefixedScript` to render a functional body:
+- [x] Teach `internal/deploy/bootstrap.PrefixedScript` to render a functional body:
   - [x] Create `/etc/ploy` and `/etc/ploy/pki`; write CA/server certs from env.
   - [x] When `PLOY_INSTALL_POSTGRESQL=true`, install PostgreSQL packages.
   - [x] Create DB user/db `ploy` with password; derive DSN and export `PLOY_SERVER_PG_DSN`.
