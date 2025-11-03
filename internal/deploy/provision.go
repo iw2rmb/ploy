@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/bootstrap"
+	"github.com/iw2rmb/ploy/internal/deploy/bootstrap"
 )
 
 // ProvisionOptions configure remote host preparation using the embedded bootstrap script.
