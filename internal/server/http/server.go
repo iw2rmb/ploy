@@ -157,6 +157,15 @@ func (s *Server) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles 
 	s.Handle(pattern, handlerFunc, roles...)
 }
 
+// Handler returns the underlying HTTP handler (ServeMux) used by the server.
+// This is primarily intended for tests that need to exercise the registered
+// routes without starting a real listener.
+func (s *Server) Handler() http.Handler {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mux
+}
+
 // listen creates a TCP or TLS listener based on configuration.
 func (s *Server) listen(ctx context.Context) (net.Listener, error) {
 	address := s.cfg.Listen
