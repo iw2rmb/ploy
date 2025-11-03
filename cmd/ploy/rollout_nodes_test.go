@@ -617,13 +617,13 @@ func TestExecuteRolloutNodeCommandSequence(t *testing.T) {
 		t.Fatalf("expected second command to contain 'install', got: %v", calls[1])
 	}
 
-	// Check third command is ssh with systemctl restart.
+	// Check third command is ssh with systemctl restart ployd-node.
 	if calls[2][0] != "ssh" {
 		t.Fatalf("expected third command to be ssh, got: %v", calls[2])
 	}
 	restartCmd := strings.Join(calls[2], " ")
-	if !strings.Contains(restartCmd, "systemctl restart") {
-		t.Fatalf("expected third command to contain 'systemctl restart', got: %v", calls[2])
+	if !strings.Contains(restartCmd, "systemctl restart ployd-node") {
+		t.Fatalf("expected third command to restart 'ployd-node', got: %v", calls[2])
 	}
 
 	// Check subsequent commands are ssh (health checks).

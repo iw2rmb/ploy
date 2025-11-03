@@ -71,14 +71,35 @@ curl -sk https://45.9.42.212:8443/v1/version | jq .
 
 ## 3) Update Worker Nodes (B, C)
 
-Copy the new node agent binary to each worker and restart its service.
+Use the batched rollout command to drain nodes, update the `ployd-node` binary,
+restart the service, wait for heartbeat, and undrain.
+
+Examples:
 
 ```bash
-for ip in 46.173.16.177 81.200.119.187; do
-  scp -q dist/ployd-node-linux root@"$ip":/usr/local/bin/ployd-node.new
-  ssh -q root@"$ip" 'install -m 0755 /usr/local/bin/ployd-node.new /usr/local/bin/ployd-node && rm -f /usr/local/bin/ployd-node.new && systemctl restart ployd-node && systemctl is-active --quiet ployd-node'
-done
+# All nodes, one at a time (default batch size = 1)
+dist/ploy rollout nodes \
+  --all \
+  --binary dist/ployd-node-linux \
+  --user root \
+  --timeout 90
+
+# Only worker nodes in pairs (batch size = 2)
+dist/ploy rollout nodes \
+  --selector 'worker-*' \
+  --concurrency 2 \
+  --binary dist/ployd-node-linux \
+  --user root \
+  --timeout 90
 ```
+
+Flags:
+
+- `--all` or `--selector '<pattern>'` — select nodes to roll
+- `--concurrency` — number of nodes to update per batch (default 1)
+- `--binary` — path to the `ployd-node` binary (Linux build)
+- `--user` / `--identity` / `--ssh-port` — SSH connection to nodes
+- `--timeout` — per-node timeout in seconds (default 90)
 
 Sanity checks per node:
 
