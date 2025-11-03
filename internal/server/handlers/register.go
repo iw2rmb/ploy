@@ -25,6 +25,7 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Mods ticket submission (new simplified API)
 	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
 
 	// Mods CRUD
 	s.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)

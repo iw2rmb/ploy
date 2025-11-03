@@ -292,3 +292,188 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 		t.Error("expected commit_sha to be passed to CreateRun")
 	}
 }
+
+// TestGetTicketStatusHandlerSuccess verifies successful retrieval of ticket status.
+func TestGetTicketStatusHandlerSuccess(t *testing.T) {
+	ticketID := uuid.New()
+	modID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		getRunWithRepoResult: store.GetRunWithRepoRow{
+			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
+			ModID:     pgtype.UUID{Bytes: modID, Valid: true},
+			Status:    store.RunStatusRunning,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt: pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
+		},
+	}
+
+	handler := getTicketStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
+	req.SetPathValue("id", ticketID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		TicketID   string  `json:"ticket_id"`
+		Status     string  `json:"status"`
+		Reason     *string `json:"reason,omitempty"`
+		RepoURL    string  `json:"repo_url"`
+		BaseRef    string  `json:"base_ref"`
+		TargetRef  string  `json:"target_ref"`
+		CommitSha  *string `json:"commit_sha,omitempty"`
+		CreatedAt  string  `json:"created_at"`
+		StartedAt  *string `json:"started_at,omitempty"`
+		FinishedAt *string `json:"finished_at,omitempty"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.TicketID != ticketID.String() {
+		t.Errorf("expected ticket_id %s, got %s", ticketID.String(), resp.TicketID)
+	}
+	if resp.Status != "running" {
+		t.Errorf("expected status running, got %s", resp.Status)
+	}
+	if resp.RepoURL != "https://github.com/user/repo.git" {
+		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.RepoURL)
+	}
+	if resp.BaseRef != "main" {
+		t.Errorf("expected base_ref main, got %s", resp.BaseRef)
+	}
+	if resp.TargetRef != "feature" {
+		t.Errorf("expected target_ref feature, got %s", resp.TargetRef)
+	}
+	if resp.CreatedAt == "" {
+		t.Error("expected created_at to be set")
+	}
+	if resp.StartedAt == nil || *resp.StartedAt == "" {
+		t.Error("expected started_at to be set")
+	}
+
+	if !st.getRunWithRepoCalled {
+		t.Error("expected GetRunWithRepo to be called")
+	}
+}
+
+// TestGetTicketStatusHandlerNotFound verifies 404 when ticket doesn't exist.
+func TestGetTicketStatusHandlerNotFound(t *testing.T) {
+	ticketID := uuid.New()
+
+	st := &mockStore{
+		getRunWithRepoErr: pgx.ErrNoRows,
+	}
+
+	handler := getTicketStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
+	req.SetPathValue("id", ticketID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "ticket not found") {
+		t.Errorf("expected 'ticket not found' error, got: %s", rr.Body.String())
+	}
+
+	if !st.getRunWithRepoCalled {
+		t.Error("expected GetRunWithRepo to be called")
+	}
+}
+
+// TestGetTicketStatusHandlerInvalidUUID verifies 400 when ticket ID is invalid.
+func TestGetTicketStatusHandlerInvalidUUID(t *testing.T) {
+	st := &mockStore{}
+	handler := getTicketStatusHandler(st)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/not-a-uuid", nil)
+	req.SetPathValue("id", "not-a-uuid")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid ticket id") {
+		t.Errorf("expected 'invalid ticket id' error, got: %s", rr.Body.String())
+	}
+
+	if st.getRunWithRepoCalled {
+		t.Error("expected GetRunWithRepo NOT to be called for invalid UUID")
+	}
+}
+
+// TestGetTicketStatusHandlerWithOptionalFields verifies optional fields are serialized correctly.
+func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
+	ticketID := uuid.New()
+	modID := uuid.New()
+	now := time.Now()
+	commitSha := "abc1234567890"
+	reason := "run failed due to timeout"
+
+	st := &mockStore{
+		getRunWithRepoResult: store.GetRunWithRepoRow{
+			ID:         pgtype.UUID{Bytes: ticketID, Valid: true},
+			ModID:      pgtype.UUID{Bytes: modID, Valid: true},
+			Status:     store.RunStatusFailed,
+			Reason:     &reason,
+			BaseRef:    "main",
+			TargetRef:  "feature",
+			CommitSha:  &commitSha,
+			RepoUrl:    "https://github.com/user/repo.git",
+			CreatedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+			StartedAt:  pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
+			FinishedAt: pgtype.Timestamptz{Time: now.Add(10 * time.Second), Valid: true},
+		},
+	}
+
+	handler := getTicketStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
+	req.SetPathValue("id", ticketID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp struct {
+		TicketID   string  `json:"ticket_id"`
+		Status     string  `json:"status"`
+		Reason     *string `json:"reason,omitempty"`
+		RepoURL    string  `json:"repo_url"`
+		BaseRef    string  `json:"base_ref"`
+		TargetRef  string  `json:"target_ref"`
+		CommitSha  *string `json:"commit_sha,omitempty"`
+		CreatedAt  string  `json:"created_at"`
+		StartedAt  *string `json:"started_at,omitempty"`
+		FinishedAt *string `json:"finished_at,omitempty"`
+	}
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if resp.Reason == nil || *resp.Reason != reason {
+		t.Errorf("expected reason %q, got %v", reason, resp.Reason)
+	}
+	if resp.CommitSha == nil || *resp.CommitSha != commitSha {
+		t.Errorf("expected commit_sha %q, got %v", commitSha, resp.CommitSha)
+	}
+	if resp.FinishedAt == nil || *resp.FinishedAt == "" {
+		t.Error("expected finished_at to be set")
+	}
+}

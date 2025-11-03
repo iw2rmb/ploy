@@ -62,6 +62,11 @@ type mockStore struct {
 	getRunResult store.Run
 	getRunErr    error
 
+	getRunWithRepoCalled bool
+	getRunWithRepoParams pgtype.UUID
+	getRunWithRepoResult store.GetRunWithRepoRow
+	getRunWithRepoErr    error
+
 	getRunTimingCalled bool
 	getRunTimingParams pgtype.UUID
 	getRunTimingResult store.RunsTiming
@@ -202,6 +207,12 @@ func (m *mockStore) GetRun(ctx context.Context, id pgtype.UUID) (store.Run, erro
 	m.getRunCalled = true
 	m.getRunParams = id
 	return m.getRunResult, m.getRunErr
+}
+
+func (m *mockStore) GetRunWithRepo(ctx context.Context, id pgtype.UUID) (store.GetRunWithRepoRow, error) {
+	m.getRunWithRepoCalled = true
+	m.getRunWithRepoParams = id
+	return m.getRunWithRepoResult, m.getRunWithRepoErr
 }
 
 func (m *mockStore) GetRunTiming(ctx context.Context, id pgtype.UUID) (store.RunsTiming, error) {
