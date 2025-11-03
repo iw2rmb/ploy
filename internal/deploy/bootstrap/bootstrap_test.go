@@ -309,3 +309,107 @@ func TestPrefixedScript_SetsPLOY_CONFIG_PATH_ForNode(t *testing.T) {
 		t.Fatalf("node branch should set PLOY_SERVICE_NAME to ployd-node.service")
 	}
 }
+
+func TestPrefixedScript_ReuseExistingPKI(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY": "true",
+	})
+
+	// Check for existence check of ca.key
+	if !strings.Contains(script, "if [ -f /etc/ploy/pki/ca.key ]; then") {
+		t.Fatalf("script should check for existing /etc/ploy/pki/ca.key")
+	}
+
+	// Check for reuse message
+	if !strings.Contains(script, "Existing PKI detected") {
+		t.Fatalf("script should log message about existing PKI detection")
+	}
+	if !strings.Contains(script, "skipping PKI writes and reusing existing certificates") {
+		t.Fatalf("script should log message about skipping PKI writes")
+	}
+
+	// Check that the else branch exists for writing new PKI
+	if !strings.Contains(script, "  else\n") {
+		t.Fatalf("script should have else branch for writing new PKI when ca.key does not exist")
+	}
+}
+
+func TestPrefixedScript_ReuseSkipsPKIWrites(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY":    "true",
+		"PLOY_CA_KEY_PEM":      "ca-key-content",
+		"PLOY_SERVER_CERT_PEM": "server-cert-content",
+		"PLOY_SERVER_KEY_PEM":  "server-key-content",
+	})
+
+	// Verify the reuse check comes before any PKI writes
+	caKeyCheckIdx := strings.Index(script, "if [ -f /etc/ploy/pki/ca.key ]; then")
+	if caKeyCheckIdx == -1 {
+		t.Fatalf("script must check for ca.key existence")
+	}
+
+	// Verify PKI writes are inside the else block (indented with 4 spaces for nested if)
+	if !strings.Contains(script, "    if [ -n \"${PLOY_CA_KEY_PEM:-}\" ]; then") {
+		t.Fatalf("CA key write should be nested inside else block")
+	}
+	if !strings.Contains(script, "      echo \"$PLOY_CA_KEY_PEM\" > /etc/ploy/pki/ca.key") {
+		t.Fatalf("CA key write command should be nested inside else block")
+	}
+	if !strings.Contains(script, "      echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt") {
+		t.Fatalf("server cert write should be nested inside else block")
+	}
+	if !strings.Contains(script, "      echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/server.key") {
+		t.Fatalf("server key write should be nested inside else block")
+	}
+
+	// Verify the structure: ca.key check → reuse message → else → PKI writes → fi
+	reuseMsg := "Existing PKI detected"
+	reuseIdx := strings.Index(script, reuseMsg)
+	if reuseIdx == -1 {
+		t.Fatalf("script must contain reuse message")
+	}
+	if reuseIdx < caKeyCheckIdx {
+		t.Fatalf("reuse message should come after ca.key check")
+	}
+
+	elseIdx := strings.Index(script[caKeyCheckIdx:], "  else\n")
+	if elseIdx == -1 {
+		t.Fatalf("script must have else branch after reuse check")
+	}
+
+	caWriteIdx := strings.Index(script, "echo \"$PLOY_CA_KEY_PEM\" > /etc/ploy/pki/ca.key")
+	if caWriteIdx == -1 {
+		t.Fatalf("script must contain CA key write")
+	}
+	if caWriteIdx < caKeyCheckIdx+elseIdx {
+		t.Fatalf("CA key write must come after the else branch")
+	}
+}
+
+func TestPrefixedScript_ReuseBranchStructure(t *testing.T) {
+	script := PrefixedScript(map[string]string{
+		"BOOTSTRAP_PRIMARY": "true",
+	})
+
+	// Verify proper nesting: the PKI reuse check must be inside BOOTSTRAP_PRIMARY block
+	primaryCheckIdx := strings.Index(script, "if [ \"${BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then")
+	if primaryCheckIdx == -1 {
+		t.Fatalf("script must check BOOTSTRAP_PRIMARY")
+	}
+
+	pkiCheckIdx := strings.Index(script, "if [ -f /etc/ploy/pki/ca.key ]; then")
+	if pkiCheckIdx == -1 {
+		t.Fatalf("script must check for ca.key")
+	}
+
+	if pkiCheckIdx < primaryCheckIdx {
+		t.Fatalf("PKI reuse check must be inside BOOTSTRAP_PRIMARY block")
+	}
+
+	// Verify closing fi for the PKI check before the config write
+	configWriteIdx := strings.Index(script, "cat > /etc/ploy/ployd.yaml")
+	fiForPKICheck := strings.Index(script[pkiCheckIdx:configWriteIdx], "  fi\n")
+	if fiForPKICheck == -1 {
+		t.Fatalf("PKI reuse check must be closed with fi before config write")
+	}
+}
