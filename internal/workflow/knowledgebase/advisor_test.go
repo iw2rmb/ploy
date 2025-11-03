@@ -9,7 +9,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/knowledgebase"
-	"github.com/iw2rmb/ploy/internal/workflow/mods"
+	plan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
 
 func TestAdvisorReturnsTopIncidentAdvice(t *testing.T) {
@@ -73,7 +73,7 @@ func TestAdvisorReturnsTopIncidentAdvice(t *testing.T) {
 		t.Fatalf("build advisor: %v", err)
 	}
 
-	advice, err := advisor.Advise(context.Background(), mods.AdviceRequest{
+	advice, err := advisor.Advise(context.Background(), plan.AdviceRequest{
 		Ticket: contracts.WorkflowTicket{
 			SchemaVersion: contracts.SchemaVersion,
 			TicketID:      "TICKET-123",
@@ -82,7 +82,7 @@ func TestAdvisorReturnsTopIncidentAdvice(t *testing.T) {
 				Version: "1.0.0",
 			},
 		},
-		Signals: mods.AdviceSignals{
+		Signals: plan.AdviceSignals{
 			Errors: []string{
 				"npm ERR! Missing script: start",
 				"npm ERR! "},
@@ -118,7 +118,7 @@ func TestAdvisorGracefullyHandlesEmptyCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build advisor with empty options: %v", err)
 	}
-	advice, err := advisor.Advise(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: []string{"unknown failure"}}})
+	advice, err := advisor.Advise(context.Background(), plan.AdviceRequest{Signals: plan.AdviceSignals{Errors: []string{"unknown failure"}}})
 	if err != nil {
 		t.Fatalf("advise empty catalog: %v", err)
 	}
@@ -162,9 +162,9 @@ func TestAdvisorMatchReturnsIncidentIDAndScore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new advisor: %v", err)
 	}
-	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{
+	match, ok, err := advisor.Match(context.Background(), plan.AdviceRequest{
 		Ticket:  contracts.WorkflowTicket{SchemaVersion: contracts.SchemaVersion, TicketID: "KB-123"},
-		Signals: mods.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
+		Signals: plan.AdviceSignals{Errors: []string{"npm ERR! lint script failed"}},
 	})
 	if err != nil {
 		t.Fatalf("match: %v", err)
@@ -191,7 +191,7 @@ func TestAdvisorMatchHandlesNoMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new advisor: %v", err)
 	}
-	match, ok, err := advisor.Match(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: []string{"completely unknown error"}}})
+	match, ok, err := advisor.Match(context.Background(), plan.AdviceRequest{Signals: plan.AdviceSignals{Errors: []string{"completely unknown error"}}})
 	if err != nil {
 		t.Fatalf("match empty catalog: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestAdvisorHonoursScoreFloor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new advisor: %v", err)
 	}
-	advice, err := advisor.Advise(context.Background(), mods.AdviceRequest{Signals: mods.AdviceSignals{Errors: []string{"completely unrelated error"}}})
+	advice, err := advisor.Advise(context.Background(), plan.AdviceRequest{Signals: plan.AdviceSignals{Errors: []string{"completely unrelated error"}}})
 	if err != nil {
 		t.Fatalf("advise score floor: %v", err)
 	}
