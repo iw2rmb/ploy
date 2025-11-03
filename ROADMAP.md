@@ -37,7 +37,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 - [x] `GET /v1/runs?view=timing` to read from `runs_timing`.
 
 ## API: Events/SSE
-- [x] Add in-memory log/Event hub using `internal/node/logstream` for SSE fanout.
+- [x] Add in-memory log/Event hub using `internal/stream` for SSE fanout.
 - [x] `GET /v1/runs/{id}/events` (SSE) with Last-Event-ID support.
 - [x] Wrap DB append so that server both persists events and fans out to SSE.
 

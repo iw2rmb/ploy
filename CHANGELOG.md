@@ -6,9 +6,9 @@
   (`internal/workflow/buildgate/javaexec`). The executor prefers Gradle/Maven wrappers and
   falls back to a Dockerised Maven image when wrappers are absent.
 - Worker and CLI now wire the BuildGate runner with the Java executor
-  (`internal/node/worker/step/executor.go`, `cmd/ploy/dependencies_runtime_local.go`).
+  (step runner under `internal/workflow/runtime/step`, `cmd/ploy/dependencies_runtime_local.go`).
 - Added a lifecycle checker that probes the configured Maven image presence
-  (`internal/node/lifecycle/health_buildgate.go`); removed the SHIFT binary env ref from docs.
+  (`internal/worker/lifecycle/health_buildgate.go`); removed the SHIFT binary env ref from docs.
 - Documentation updated: build gate overview and environment variables
   (`docs/workflow/README.md`, `docs/envs/README.md`).
 - Verification (2025-10-30):
