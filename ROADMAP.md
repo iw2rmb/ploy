@@ -40,7 +40,7 @@ Legend: [ ] todo, [x] done.
   - Change: delete /v1/runs (POST, GET), /v1/runs/{id}, /v1/runs/{id}/events registrations; keep internal store tables (runs/stages) intact.
   - Test: update handlers tests to only use mods paths; verify SSE and status routes pass.
 
-- [ ] CLI alignment — point Mods commands to /v1/mods
+- [x] CLI alignment — point Mods commands to /v1/mods
   - Change: `cmd/ploy/mod_run.go` and `internal/cli/mods/*`: change submission to POST /v1/mods; change follow to GET /v1/mods/{id}/events; adjust status/inspect/cancel/resume to /v1/mods/{id}[/*].
   - Test: CLI unit tests updated; manual smoke: `dist/ploy mod run --repo-url <repo> --repo-base-ref main --repo-target-ref mods-upgrade-java17 --follow` succeeds against the lab.
 
