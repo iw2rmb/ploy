@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
@@ -144,10 +145,7 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydNodeBinaryPath)
 
 	// Generate node ID
-	nodeID, err := deploy.GenerateNodeID()
-	if err != nil {
-		return fmt.Errorf("node add: %w", err)
-	}
+	nodeID := uuid.New().String()
 	_, _ = fmt.Fprintf(stderr, "Generated node ID: %s\n", nodeID)
 
 	// Generate node CSR and private key
@@ -214,16 +212,19 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		return fmt.Errorf("node add: provision host: %w", err)
 	}
 
-	// Refresh cluster descriptor to ensure it exists
-	// (It should have been created by 'ploy server deploy', but we verify/update here)
+	// Refresh cluster descriptor without clobbering TLS fields if present.
+	// Prefer existing descriptor CA/client cert for future mTLS operations.
+	existing, loadErr := config.LoadDefault()
 	desc := config.Descriptor{
 		ClusterID:       cfg.ClusterID,
 		Address:         serverURL,
 		Scheme:          "https",
 		SSHIdentityPath: identityPath,
 	}
-	if _, err := config.SaveDescriptor(desc); err != nil {
-		_, _ = fmt.Fprintf(stderr, "Warning: failed to save/refresh cluster descriptor: %v\n", err)
+	if loadErr != nil || strings.TrimSpace(existing.ClusterID) == "" {
+		if _, err := config.SaveDescriptor(desc); err != nil {
+			_, _ = fmt.Fprintf(stderr, "Warning: failed to save/refresh cluster descriptor: %v\n", err)
+		}
 	}
 
 	_, _ = fmt.Fprintln(stderr, "\nNode provisioning complete!")
