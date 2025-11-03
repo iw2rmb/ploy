@@ -341,10 +341,10 @@ See also:
 - **Logs**: Structured logs (slog) on stdout; capture with journalctl or systemd.
 - **Database**: Monitor PostgreSQL disk usage, connection pool, and query performance.
 
-### Follow Run Logs
+### Follow Ticket Events
 
 ```bash
-dist/ploy mods follow <run-id>
+dist/ploy mods logs <ticket-id>
 ```
 
 Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in PostgreSQL.
