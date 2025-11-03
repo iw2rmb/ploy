@@ -66,6 +66,28 @@ CreateRunResponse:
     run_id: { type: string, format: uuid }
   required: [run_id]
 
+# Ticket submission (simplified Mods facade)
+TicketSubmitRequest:
+  type: object
+  properties:
+    repo_url: { type: string }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    commit_sha: { type: string, nullable: true }
+    spec: {}
+    created_by: { type: string, nullable: true }
+  required: [repo_url, base_ref, target_ref]
+
+TicketSummary:
+  type: object
+  properties:
+    ticket_id: { type: string, format: uuid }
+    status: { type: string }
+    repo_url: { type: string }
+    base_ref: { type: string }
+    target_ref: { type: string }
+  required: [ticket_id, status, repo_url, base_ref, target_ref]
+
 # Response returned by POST /v1/nodes/{id}/claim
 NodeClaimResponse:
   type: object

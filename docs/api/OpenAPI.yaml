@@ -41,6 +41,8 @@ paths:
     $ref: './paths/repos_id.yaml'
   /v1/mods/crud:
     $ref: './paths/mods_crud.yaml'
+  /v1/mods:
+    $ref: './paths/mods.yaml'
   /v1/mods/crud/{id}:
     $ref: './paths/mods_crud_id.yaml'
   /v1/runs:
@@ -127,6 +129,10 @@ components:
       $ref: './components/schemas/controlplane.yaml#/CreateRunRequest'
     CreateRunResponse:
       $ref: './components/schemas/controlplane.yaml#/CreateRunResponse'
+    TicketSubmitRequest:
+      $ref: './components/schemas/controlplane.yaml#/TicketSubmitRequest'
+    TicketSummary:
+      $ref: './components/schemas/controlplane.yaml#/TicketSummary'
     NodeClaimResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
     Event:
