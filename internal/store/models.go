@@ -187,6 +187,7 @@ type Node struct {
 	CertNotAfter    pgtype.Timestamptz `json:"cert_not_after"`
 	LastHeartbeat   pgtype.Timestamptz `json:"last_heartbeat"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	Drained         bool               `json:"drained"`
 }
 
 type NodeMetric struct {

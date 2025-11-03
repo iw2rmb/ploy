@@ -21,7 +21,7 @@ INSERT INTO nodes (
 ) VALUES (
   $1, $2, $3, $4
 )
-RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
+RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at, drained
 `
 
 type CreateNodeParams struct {
@@ -57,6 +57,7 @@ func (q *Queries) CreateNode(ctx context.Context, arg CreateNodeParams) (Node, e
 		&i.CertNotAfter,
 		&i.LastHeartbeat,
 		&i.CreatedAt,
+		&i.Drained,
 	)
 	return i, err
 }
@@ -72,7 +73,7 @@ func (q *Queries) DeleteNode(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getNode = `-- name: GetNode :one
-SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
+SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at, drained FROM nodes
 WHERE id = $1
 `
 
@@ -97,12 +98,13 @@ func (q *Queries) GetNode(ctx context.Context, id pgtype.UUID) (Node, error) {
 		&i.CertNotAfter,
 		&i.LastHeartbeat,
 		&i.CreatedAt,
+		&i.Drained,
 	)
 	return i, err
 }
 
 const listNodes = `-- name: ListNodes :many
-SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
+SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at, drained FROM nodes
 ORDER BY created_at DESC
 `
 
@@ -133,6 +135,7 @@ func (q *Queries) ListNodes(ctx context.Context) ([]Node, error) {
 			&i.CertNotAfter,
 			&i.LastHeartbeat,
 			&i.CreatedAt,
+			&i.Drained,
 		); err != nil {
 			return nil, err
 		}

@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   mem_free_bytes   BIGINT  NOT NULL DEFAULT 0 CHECK (mem_free_bytes >= 0 AND mem_free_bytes <= mem_total_bytes),
   disk_total_bytes BIGINT  NOT NULL DEFAULT 0 CHECK (disk_total_bytes >= 0),
   disk_free_bytes  BIGINT  NOT NULL DEFAULT 0 CHECK (disk_free_bytes >= 0 AND disk_free_bytes <= disk_total_bytes),
+  -- Node rollout control: when true, scheduler must not assign new runs
+  drained          BOOLEAN NOT NULL DEFAULT false,
   -- mTLS certificate metadata for audit/rotation
   cert_serial       TEXT,
   cert_fingerprint  TEXT,
@@ -50,6 +52,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   UNIQUE (ip_address)
 );
 CREATE INDEX IF NOT EXISTS nodes_last_heartbeat_idx ON nodes(last_heartbeat);
+-- Query non-drained nodes efficiently for claim paths
+CREATE INDEX IF NOT EXISTS nodes_drained_idx ON nodes(drained) WHERE NOT drained;
 -- One server responds for one cluster only; nodes implicitly belong to this server's cluster.
 
 -- Repositories (metadata only)

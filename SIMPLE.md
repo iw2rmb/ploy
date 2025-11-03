@@ -71,7 +71,8 @@ Trade‑offs (and mitigations):
 - nodes(id, name, ip_address, version, concurrency, last_heartbeat,
         cpu_total_millis, cpu_free_millis,
         mem_total_bytes, mem_free_bytes,
-        disk_total_bytes, disk_free_bytes)
+        disk_total_bytes, disk_free_bytes,
+        drained BOOLEAN DEFAULT false)
 - repos(id, url, branch, commit_sha, created_at)  -- metadata only; branch/commit are optional hints
 - mods(id, repo_id, spec jsonb, created_by, created_at)
 - runs(id, mod_id, status, reason, created_at, started_at, finished_at,
@@ -86,7 +87,8 @@ Notes:
 - Use `jsonb` for flexible metadata, with GIN indexes where needed.
 - Partition `events`, `logs`, `artifact_bundles`, and `diffs` monthly; add TTL jobs to purge old data.
 - Use advisory locks to assign runs to nodes atomically.
- - Indexes: add `runs(created_at)` for dashboards and `nodes(last_heartbeat)` for pruning. See `SIMPLE.sql`.
+- Indexes: add `runs(created_at)` for dashboards and `nodes(last_heartbeat)` for pruning. See `SIMPLE.sql`.
+ - Draining: a `nodes.drained` flag prevents new run assignments while true (scheduler enforcement in a later phase). See `SIMPLE.sql`.
  - Convenience: `runs_timing` view provides `queue_ms` and `run_ms` per run.
 
 ## API Surface (MVP)
