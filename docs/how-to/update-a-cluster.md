@@ -58,8 +58,8 @@ The rollout command will:
 1. Copy the binary to the target server via SCP
 2. Atomically replace the running binary
 3. Restart the `ployd` service
-4. Poll for health and verify the server is active
-5. Check that the API endpoint responds
+4. Poll for health and verify the service is active
+5. Verify the API port (8443) is listening
 
 Sanity checks:
 

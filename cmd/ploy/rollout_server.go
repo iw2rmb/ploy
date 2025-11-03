@@ -225,12 +225,12 @@ func executeRolloutServer(ctx context.Context, opts rolloutServerOptions) error 
 		return fmt.Errorf("rollout server: service health check: %w", err)
 	}
 
-	// Step 5: Verify the service is listening on the expected port.
-	_, _ = fmt.Fprintln(stderr, "Verifying service is listening on port 9094...")
-	verifyCmd := "ss -tlnp | grep :9094 || netstat -tlnp | grep :9094"
+	// Step 5: Verify the service is listening on the expected API port (8443).
+	_, _ = fmt.Fprintln(stderr, "Verifying service is listening on port 8443...")
+	verifyCmd := "ss -tlnp | grep :8443 || netstat -tlnp | grep :8443"
 	verifyArgs := append(append([]string(nil), sshArgs...), target, verifyCmd)
 	if err := runner.Run(ctx, "ssh", verifyArgs, nil, streams); err != nil {
-		_, _ = fmt.Fprintf(stderr, "Warning: could not verify port 9094 is listening: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "Warning: could not verify port 8443 is listening: %v\n", err)
 		_, _ = fmt.Fprintln(stderr, "Continuing anyway; service may still be initializing...")
 	}
 
