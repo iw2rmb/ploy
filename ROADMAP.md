@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Test: lint docs; check cross‑references.
 
 ## Phase 3 — Node Drain + Rollout
-- [ ] DB: add drained flag for nodes
+- [x] DB: add drained flag for nodes
   - Change: `internal/store/migrations/00X_nodes_drain.sql` — `ALTER TABLE ploy.nodes ADD COLUMN drained BOOLEAN NOT NULL DEFAULT false;` + indexes.
   - Test: migration unit test passes; ensure idempotency.
 - [ ] API: drain/undrain endpoints + list nodes
