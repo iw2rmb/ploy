@@ -12,7 +12,7 @@ CRITICAL_THRESHOLD=90
 CRITICAL_PATHS=(
     "github.com/iw2rmb/ploy/internal/server/scheduler"
     "github.com/iw2rmb/ploy/internal/server/pki"
-    "github.com/iw2rmb/ploy/internal/node/jobs"
+    "github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
 if [ ! -f "$COVERAGE_FILE" ]; then

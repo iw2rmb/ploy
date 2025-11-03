@@ -13,9 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // parseLastEventID parses the Last-Event-ID header to support SSE resumption.

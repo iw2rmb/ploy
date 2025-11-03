@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/store"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 func TestGetRunEventsHandler_RunNotFound(t *testing.T) {
