@@ -24,6 +24,15 @@ type mockStore struct {
 	listReposResult []store.Repo
 	listReposErr    error
 
+	getRepoCalled bool
+	getRepoParams pgtype.UUID
+	getRepoResult store.Repo
+	getRepoErr    error
+
+	deleteRepoCalled bool
+	deleteRepoParams pgtype.UUID
+	deleteRepoErr    error
+
 	createModCalled bool
 	createModParams store.CreateModParams
 	createModResult store.Mod
@@ -61,6 +70,15 @@ type mockStore struct {
 	deleteRunCalled bool
 	deleteRunParams pgtype.UUID
 	deleteRunErr    error
+
+	getModCalled bool
+	getModParams pgtype.UUID
+	getModResult store.Mod
+	getModErr    error
+
+	deleteModCalled bool
+	deleteModParams pgtype.UUID
+	deleteModErr    error
 
 	claimRunCalled bool
 	claimRunParams pgtype.UUID
@@ -124,6 +142,18 @@ func (m *mockStore) ListRepos(ctx context.Context) ([]store.Repo, error) {
 	return m.listReposResult, m.listReposErr
 }
 
+func (m *mockStore) GetRepo(ctx context.Context, id pgtype.UUID) (store.Repo, error) {
+	m.getRepoCalled = true
+	m.getRepoParams = id
+	return m.getRepoResult, m.getRepoErr
+}
+
+func (m *mockStore) DeleteRepo(ctx context.Context, id pgtype.UUID) error {
+	m.deleteRepoCalled = true
+	m.deleteRepoParams = id
+	return m.deleteRepoErr
+}
+
 func (m *mockStore) CreateMod(ctx context.Context, params store.CreateModParams) (store.Mod, error) {
 	m.createModCalled = true
 	m.createModParams = params
@@ -169,6 +199,18 @@ func (m *mockStore) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 	m.deleteRunCalled = true
 	m.deleteRunParams = id
 	return m.deleteRunErr
+}
+
+func (m *mockStore) GetMod(ctx context.Context, id pgtype.UUID) (store.Mod, error) {
+	m.getModCalled = true
+	m.getModParams = id
+	return m.getModResult, m.getModErr
+}
+
+func (m *mockStore) DeleteMod(ctx context.Context, id pgtype.UUID) error {
+	m.deleteModCalled = true
+	m.deleteModParams = id
+	return m.deleteModErr
 }
 
 func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run, error) {
