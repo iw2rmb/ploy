@@ -1,0 +1,27 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+  - in: header
+    name: Last-Event-ID
+    required: false
+    description: Optional SSE resume token. Server replays events with id greater than this value.
+    schema:
+      type: string
+      example: "42"
+get:
+  tags: [Control]
+  summary: Stream ticket events (SSE)
+  description: |
+    Server-Sent Events stream of ticket (mods run) events. Supports `Last-Event-ID` header for resume.
+  responses:
+    '200':
+      description: OK
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    '400': { description: Bad Request }
+    '404': { description: Not Found }
+    '500': { description: Internal Server Error }

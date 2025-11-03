@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
   - Change: implement handler; fetch run and shape TicketSummary (stages map may be stubbed initially from existing run/stage rows).
   - Test: unit tests for happy/missing/invalid UUID; ensure timestamps and optional fields serialized consistently.
 
-- [ ] Add events streaming — GET /v1/mods/{id}/events — Native SSE under mods (no proxy)
+- [x] Add events streaming — GET /v1/mods/{id}/events — Native SSE under mods (no proxy)
   - Change: register new route wired to existing SSE hub; remove reliance on /v1/runs/{id}/events in the CLI.
   - Test: SSE unit/integration test (resume via Last-Event-ID, basic stream lifecycle) updated to the new path.
 
