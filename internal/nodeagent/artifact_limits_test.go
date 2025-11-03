@@ -15,7 +15,6 @@ import (
 
 type capturePublisher struct {
 	lastReq step.ArtifactRequest
-	resp    step.PublishedArtifact
 	err     error
 }
 

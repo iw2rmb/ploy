@@ -143,14 +143,6 @@ func fileDigest(path string) (string, error) {
 	return "sha256:" + hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func fileSize(path string) int64 {
-	info, err := os.Stat(path)
-	if err != nil {
-		return 0
-	}
-	return info.Size()
-}
-
 func gzipFile(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {

@@ -273,9 +273,3 @@ ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin
 
 **Warning:** The manual approach lacks the health checks and retries that the rollout
 command provides. Use the CLI command when possible.
-Dry‑run the nodes rollout to preview matched nodes, batching, and per‑node steps:
-
-```bash
-dist/ploy rollout nodes --all --binary dist/ployd-node-linux --dry-run
-```
-The dry‑run prints a `DRY RUN` header, the selected nodes, batching size, and the planned actions for each node (drain → idle wait → upload/install → restart → heartbeat → undrain). No changes are made.
