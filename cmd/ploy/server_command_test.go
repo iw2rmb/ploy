@@ -446,6 +446,158 @@ func (m *mockProvisionRunner) Run(ctx context.Context, name string, args []strin
 	return nil
 }
 
+// TestServerDeployReuseFlags verifies the --reuse and --force-new-ca flags control CA generation.
+func TestServerDeployReuseFlags(t *testing.T) {
+	tests := []struct {
+		name               string
+		reuse              bool
+		existingCluster    bool
+		expectDetect       bool
+		expectPKIInEnv     bool
+		expectedClusterMsg string
+	}{
+		{
+			name:               "reuse enabled, cluster exists",
+			reuse:              true,
+			existingCluster:    true,
+			expectDetect:       true,
+			expectPKIInEnv:     false,
+			expectedClusterMsg: "reusing CA and server certificate",
+		},
+		{
+			name:               "reuse enabled, no existing cluster",
+			reuse:              true,
+			existingCluster:    false,
+			expectDetect:       true,
+			expectPKIInEnv:     true,
+			expectedClusterMsg: "No existing cluster found",
+		},
+		{
+			name:               "reuse disabled (force new CA)",
+			reuse:              false,
+			existingCluster:    true,
+			expectDetect:       false,
+			expectPKIInEnv:     true,
+			expectedClusterMsg: "Generated cluster ID",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			binaryPath := filepath.Join(tmpDir, "ployd-test")
+			if err := os.WriteFile(binaryPath, []byte("fake binary"), 0755); err != nil {
+				t.Fatalf("create test binary: %v", err)
+			}
+			identityPath := filepath.Join(tmpDir, "id_test")
+			if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+				t.Fatalf("create test identity: %v", err)
+			}
+
+			cfg := serverDeployConfig{
+				Address:      "10.0.0.5",
+				User:         "testuser",
+				IdentityFile: identityPath,
+				PloydBinary:  binaryPath,
+				SSHPort:      22,
+				Reuse:        tt.reuse,
+			}
+
+			// Mock the detection result
+			var detectCalled bool
+			oldProvision := provisionHost
+			oldDetectRunner := detectRunner
+			defer func() {
+				provisionHost = oldProvision
+				detectRunner = oldDetectRunner
+			}()
+
+			// Create a mock runner that simulates detection
+			mockRunner := &mockDetectRunner{
+				t:               t,
+				existingCluster: tt.existingCluster,
+				detectCalled:    &detectCalled,
+			}
+			detectRunner = mockRunner
+
+			// Stub provisioning
+			provisionHost = func(ctx context.Context, opts deploy.ProvisionOptions) error {
+				// Check if PKI env vars are present/absent as expected
+				_, hasCACert := opts.ScriptEnv["PLOY_CA_CERT_PEM"]
+				_, hasCAKey := opts.ScriptEnv["PLOY_CA_KEY_PEM"]
+				_, hasServerCert := opts.ScriptEnv["PLOY_SERVER_CERT_PEM"]
+				_, hasServerKey := opts.ScriptEnv["PLOY_SERVER_KEY_PEM"]
+
+				hasPKI := hasCACert && hasCAKey && hasServerCert && hasServerKey
+
+				if hasPKI != tt.expectPKIInEnv {
+					t.Errorf("expected PKI in env=%v, got: %v", tt.expectPKIInEnv, hasPKI)
+				}
+
+				return nil
+			}
+
+			stderr := &bytes.Buffer{}
+			_ = runServerDeploy(cfg, stderr)
+
+			output := stderr.String()
+
+			// Verify detection was called if expected
+			if tt.expectDetect {
+				if !detectCalled {
+					t.Error("expected DetectExisting to be called")
+				}
+			}
+
+			// Verify the correct message appears in output
+			if tt.expectedClusterMsg != "" && !strings.Contains(output, tt.expectedClusterMsg) {
+				t.Errorf("expected output to contain %q, got: %s", tt.expectedClusterMsg, output)
+			}
+		})
+	}
+}
+
+// mockDetectRunner simulates detection responses for testing.
+type mockDetectRunner struct {
+	t               *testing.T
+	existingCluster bool
+	detectCalled    *bool
+}
+
+func (m *mockDetectRunner) Run(ctx context.Context, name string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+	if name == "ssh" {
+		argsStr := strings.Join(args, " ")
+		if strings.Contains(argsStr, "test -f /etc/ploy/pki/ca.crt") {
+			*m.detectCalled = true
+			if m.existingCluster {
+				return nil // File exists
+			}
+			return errors.New("file not found") // File doesn't exist
+		}
+		if strings.Contains(argsStr, "test -f /etc/ploy/ployd.yaml") {
+			if m.existingCluster {
+				return nil
+			}
+			return errors.New("file not found")
+		}
+		if strings.Contains(argsStr, "test -f /etc/ploy/pki/server.crt") {
+			if m.existingCluster {
+				return nil
+			}
+			return errors.New("file not found")
+		}
+		if strings.Contains(argsStr, "openssl x509") && strings.Contains(argsStr, "commonName") {
+			if m.existingCluster && streams.Stdout != nil {
+				// Simulate extracting cluster ID from cert CN - match the exact format
+				_, _ = streams.Stdout.Write([]byte("ployd-abc123\n"))
+				return nil
+			}
+			return errors.New("cert not found")
+		}
+	}
+	return nil
+}
+
 // TestServerDeployDescriptorPersistence verifies that the cluster descriptor is saved after successful deployment.
 func TestServerDeployDescriptorPersistence(t *testing.T) {
 	// Set up temporary config directory.

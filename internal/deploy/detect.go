@@ -22,7 +22,7 @@ type DetectionResult struct {
 // The server certificate CN follows the pattern "ployd-<clusterID>".
 func DetectExisting(ctx context.Context, runner Runner, opts ProvisionOptions) (DetectionResult, error) {
 	if runner == nil {
-		return DetectionResult{}, fmt.Errorf("detect: runner required")
+		runner = systemRunner{}
 	}
 
 	user := strings.TrimSpace(opts.User)

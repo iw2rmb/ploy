@@ -201,7 +201,7 @@ MIIBkTCCATegAwIBAgIQYoYxqvs=
 			wantErr:       false,
 		},
 		{
-			name: "nil runner returns error",
+			name: "nil runner uses systemRunner (no cluster)",
 			opts: ProvisionOptions{
 				Address: "192.168.1.17",
 			},
@@ -209,7 +209,7 @@ MIIBkTCCATegAwIBAgIQYoYxqvs=
 			runnerOutput:   nil,
 			wantFound:      false,
 			wantClusterID:  "",
-			wantErr:        true,
+			wantErr:        false,
 		},
 		{
 			name: "empty address returns error",
