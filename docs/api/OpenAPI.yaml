@@ -35,7 +35,7 @@ paths:
   /v1/pki/sign/client:
     $ref: './paths/pki_sign_client.yaml'
   # Control-plane CRUD
-  # Jobs endpoints removed; use /v1/runs/*.
+  # Jobs endpoints removed; use /v1/mods/* for read/stream, legacy ingest under /v1/runs/{id}/*.
   # Legacy job write endpoints removed; nodes must use /v1/nodes/* equivalents.
   # Legacy mods logs stream removed; use /v1/mods/{id}/events.
   # Future runs endpoints (target naming)

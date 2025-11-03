@@ -163,10 +163,10 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 	)
 	streamPath := ""
 	if cfg.modTicket != "" {
-		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.modTicket)
+		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.modTicket)
 	}
 	if cfg.jobID != "" {
-		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.jobID)
+		streamPath = fmt.Sprintf("/v1/mods/%s/events", cfg.jobID)
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
