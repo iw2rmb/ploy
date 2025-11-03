@@ -18,7 +18,7 @@ References: SIMPLE.md, SIMPLE.sql, docs/api/OpenAPI.yaml, docs/envs/README.md, d
 ## Server Bootstrap (Unstub cmd/ployd)
 - [x] Replace `cmd/ployd/main.go` stub with real main: parse config/env, init logging, graceful shutdown.
 - [x] Wire Postgres store via `PLOY_SERVER_PG_DSN` or `internal/server/config` (fallback to env over file).
-- [x] Initialize Authorizer (mTLS) from `internal/controlplane/auth` with `RoleControlPlane` default.
+- [x] Initialize Authorizer (mTLS) from `internal/server/auth` with `RoleControlPlane` default.
 - [x] Add HTTP mux package `internal/server/http` (new) to mount routes and middlewares.
 - [x] Expose metrics listener `:9100` (plain HTTP) and API listener `:8443` (TLS/mTLS).
 - [x] Start background Scheduler `internal/server/scheduler` and TTL workers.

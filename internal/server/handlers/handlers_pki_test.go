@@ -19,8 +19,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/controlplane/auth"
 	"github.com/iw2rmb/ploy/internal/pki"
+	"github.com/iw2rmb/ploy/internal/server/auth"
 )
 
 // TestPKISignHandlerRequiresAdminRole verifies that the PKI sign endpoint
