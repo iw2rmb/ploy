@@ -88,6 +88,22 @@ TicketSummary:
     target_ref: { type: string }
   required: [ticket_id, status, repo_url, base_ref, target_ref]
 
+# Detailed status returned by GET /v1/mods/{id}
+TicketStatus:
+  type: object
+  properties:
+    ticket_id: { type: string, format: uuid }
+    status: { type: string }
+    reason: { type: string, nullable: true }
+    repo_url: { type: string }
+    base_ref: { type: string }
+    target_ref: { type: string }
+    commit_sha: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+  required: [ticket_id, status, repo_url, base_ref, target_ref, created_at]
+
 # Response returned by POST /v1/nodes/{id}/claim
 NodeClaimResponse:
   type: object

@@ -44,6 +44,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/crud", "post"},
 		{"/v1/mods/crud", "get"},
 		{"/v1/mods", "post"},
+		{"/v1/mods/{id}", "get"},
 		// Runs
 		{"/v1/runs", "post"},
 		{"/v1/runs", "get"},
@@ -140,6 +141,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		"CreateRunResponse",
 		"TicketSubmitRequest",
 		"TicketSummary",
+		"TicketStatus",
 		"NodeClaimResponse",
 		"Event",
 		"Stage",
