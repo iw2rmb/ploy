@@ -33,10 +33,8 @@ Optional: verify versions locally
 
 ## 2) Update the Control‑Plane Server (A)
 
-Prefer the first‑class rollout command. Do not re‑run `ploy server deploy` for an
+Use the first‑class rollout command. Do not re‑run `ploy server deploy` for an
 update (that regenerates PKI).
-
-Using the CLI (recommended):
 
 ```bash
 dist/ploy rollout server \
@@ -47,6 +45,7 @@ dist/ploy rollout server \
 ```
 
 Flags:
+
 - `--address` — target server IP or hostname
 - `--binary` — path to the new `ployd` binary (Linux build)
 - `--user` — SSH username (default `root`)
@@ -54,22 +53,20 @@ Flags:
 - `--ssh-port` — SSH port (default `22`)
 - `--timeout` — rollout timeout in seconds (default `60`)
 
+The rollout command will:
+
+1. Copy the binary to the target server via SCP
+2. Atomically replace the running binary
+3. Restart the `ployd` service
+4. Poll for health and verify the server is active
+5. Check that the API endpoint responds
+
 Sanity checks:
 
 ```bash
 ssh root@45.9.42.212 'systemctl status --no-pager ployd'
 ssh root@45.9.42.212 'journalctl -u ployd -n 50 --no-pager'
 curl -sk https://45.9.42.212:8443/v1/version | jq .
-```
-
-### Backdoor (manual commands)
-
-If you need to bypass the CLI (troubleshooting, very old environments), the
-equivalent manual steps are:
-
-```bash
-scp -q dist/ployd-linux root@45.9.42.212:/usr/local/bin/ployd.new
-ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin/ployd && rm -f /usr/local/bin/ployd.new && systemctl restart ployd && systemctl is-active --quiet ployd'
 ```
 
 ## 3) Update Worker Nodes (B, C)
@@ -128,3 +125,20 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
 - PostgreSQL remains untouched during a binary update. If your server uses a local Postgres installed by
   the bootstrap, ensure the service is healthy before restarting `ployd`.
 - Prefer rolling nodes one at a time to keep capacity available during updates.
+
+---
+
+## Appendix: Backdoor (Manual Commands)
+
+If you need to bypass the CLI for troubleshooting or in very old environments, the
+following manual commands replicate what `ploy rollout server` does:
+
+### Server Update (Manual)
+
+```bash
+scp -q dist/ployd-linux root@45.9.42.212:/usr/local/bin/ployd.new
+ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin/ployd && rm -f /usr/local/bin/ployd.new && systemctl restart ployd && systemctl is-active --quiet ployd'
+```
+
+**Warning:** The manual approach lacks the health checks and retries that the rollout
+command provides. Use the CLI command when possible.
