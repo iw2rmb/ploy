@@ -39,6 +39,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 		userFlag    stringValue
 		sshPort     intValue
 		timeout     intValue
+		dryRun      boolValue
 	)
 
 	fs.Var(&all, "all", "Roll out all nodes in the cluster")
@@ -49,6 +50,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 	fs.Var(&userFlag, "user", "SSH username for node connection (default: root)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for node connection (default: 22)")
 	fs.Var(&timeout, "timeout", "Timeout in seconds per node rollout (default: 90)")
+	fs.Var(&dryRun, "dry-run", "Print planned rollout actions per node without making changes")
 
 	if err := fs.Parse(args); err != nil {
 		printRolloutNodesUsage(stderr)
@@ -78,6 +80,7 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 		IdentityFile: identity.value,
 		SSHPort:      sshPort.value,
 		Timeout:      timeout.value,
+		DryRun:       dryRun.value,
 	}
 
 	return runRolloutNodes(cfg, stderr)
@@ -96,6 +99,7 @@ type rolloutNodesConfig struct {
 	IdentityFile string
 	SSHPort      int
 	Timeout      int
+	DryRun       bool
 }
 
 func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
@@ -143,7 +147,11 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 		return fmt.Errorf("rollout nodes: concurrency must be positive, got %d", concurrency)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Rolling out Ploy nodes\n")
+	if cfg.DryRun {
+		_, _ = fmt.Fprintf(stderr, "DRY RUN: Rollout Ploy nodes\n")
+	} else {
+		_, _ = fmt.Fprintf(stderr, "Rolling out Ploy nodes\n")
+	}
 	_, _ = fmt.Fprintf(stderr, "  Selector: %s\n", selectorDescription(cfg.All, cfg.Selector))
 	_, _ = fmt.Fprintf(stderr, "  Batch size: %d\n", concurrency)
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
@@ -170,6 +178,21 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "\nMatched %d node(s):\n", len(filtered))
 	for _, n := range filtered {
 		_, _ = fmt.Fprintf(stderr, "  - %s (%s)\n", n.Name, n.IPAddress)
+	}
+
+	if cfg.DryRun {
+		_, _ = fmt.Fprintln(stderr, "\nPlanned actions per node:")
+		_, _ = fmt.Fprintln(stderr, "  1. Drain node via API (POST /v1/nodes/{id}/drain)")
+		_, _ = fmt.Fprintln(stderr, "  2. Wait for node to be idle (no active runs)")
+		_, _ = fmt.Fprintln(stderr, "  3. Upload new ployd-node binary to <node>:/tmp/ployd-<random>")
+		_, _ = fmt.Fprintln(stderr, "  4. Install binary to <node>:/usr/local/bin/ployd-node")
+		_, _ = fmt.Fprintln(stderr, "  5. Restart ployd-node service via systemctl")
+		_, _ = fmt.Fprintln(stderr, "  6. Wait for service to become active")
+		_, _ = fmt.Fprintln(stderr, "  7. Wait for heartbeat confirmation")
+		_, _ = fmt.Fprintln(stderr, "  8. Undrain node via API (POST /v1/nodes/{id}/undrain)")
+		_, _ = fmt.Fprintf(stderr, "\nBatching: nodes will be updated in batches of %d\n", concurrency)
+		_, _ = fmt.Fprintln(stderr, "\nDry run complete. No changes have been made.")
+		return nil
 	}
 
 	// Load or initialize resume state.

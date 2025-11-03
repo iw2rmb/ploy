@@ -319,3 +319,58 @@ func TestExecuteRolloutServerWithRetry(t *testing.T) {
 		t.Fatalf("expected retry for service check, got %d calls", callCount)
 	}
 }
+
+// TestRolloutServerDryRun verifies dry-run output for server rollout.
+func TestRolloutServerDryRun(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	var stderr bytes.Buffer
+	cfg := rolloutServerConfig{
+		Address:      "10.0.0.3",
+		User:         "root",
+		IdentityFile: identityPath,
+		BinaryPath:   binPath,
+		SSHPort:      22,
+		Timeout:      60,
+		DryRun:       true,
+	}
+
+	err := runRolloutServer(cfg, &stderr)
+	if err != nil {
+		t.Fatalf("dry-run should not error: %v", err)
+	}
+
+	out := stderr.String()
+	if !strings.Contains(out, "DRY RUN: Rollout Ploy server") {
+		t.Errorf("expected 'DRY RUN' header, got: %q", out)
+	}
+	if !strings.Contains(out, "Planned actions:") {
+		t.Errorf("expected planned actions header, got: %q", out)
+	}
+	if !strings.Contains(out, "Upload new ployd binary") {
+		t.Errorf("expected upload message, got: %q", out)
+	}
+	if !strings.Contains(out, "Install binary to") {
+		t.Errorf("expected install message, got: %q", out)
+	}
+	if !strings.Contains(out, "Restart ployd service") {
+		t.Errorf("expected restart message, got: %q", out)
+	}
+	if !strings.Contains(out, "Wait for service to become active") {
+		t.Errorf("expected health check message, got: %q", out)
+	}
+	if !strings.Contains(out, "Verify service is listening on port 8443") {
+		t.Errorf("expected port verification message, got: %q", out)
+	}
+	if !strings.Contains(out, "Dry run complete. No changes have been made.") {
+		t.Errorf("expected completion message, got: %q", out)
+	}
+}

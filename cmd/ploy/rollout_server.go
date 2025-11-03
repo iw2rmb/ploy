@@ -49,6 +49,7 @@ func handleRolloutServer(args []string, stderr io.Writer) error {
 		userFlag stringValue
 		sshPort  intValue
 		timeout  intValue
+		dryRun   boolValue
 	)
 
 	fs.Var(&address, "address", "Target server host or IP address")
@@ -57,6 +58,7 @@ func handleRolloutServer(args []string, stderr io.Writer) error {
 	fs.Var(&userFlag, "user", "SSH username for server connection (default: root)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for server connection (default: 22)")
 	fs.Var(&timeout, "timeout", "Timeout in seconds for the rollout operation (default: 60)")
+	fs.Var(&dryRun, "dry-run", "Print planned rollout actions without making changes")
 
 	if err := fs.Parse(args); err != nil {
 		printRolloutServerUsage(stderr)
@@ -78,6 +80,7 @@ func handleRolloutServer(args []string, stderr io.Writer) error {
 		IdentityFile: identity.value,
 		SSHPort:      sshPort.value,
 		Timeout:      timeout.value,
+		DryRun:       dryRun.value,
 	}
 
 	return runRolloutServer(cfg, stderr)
@@ -98,6 +101,7 @@ type rolloutServerConfig struct {
 	IdentityFile string
 	SSHPort      int
 	Timeout      int
+	DryRun       bool
 }
 
 func runRolloutServer(cfg rolloutServerConfig, stderr io.Writer) error {
@@ -137,12 +141,27 @@ func runRolloutServer(cfg rolloutServerConfig, stderr io.Writer) error {
 		return fmt.Errorf("rollout server: timeout must be positive, got %d", timeoutSecs)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Rolling out Ploy server to %s\n", cfg.Address)
+	if cfg.DryRun {
+		_, _ = fmt.Fprintf(stderr, "DRY RUN: Rollout Ploy server to %s\n", cfg.Address)
+	} else {
+		_, _ = fmt.Fprintf(stderr, "Rolling out Ploy server to %s\n", cfg.Address)
+	}
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
 	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
 	_, _ = fmt.Fprintf(stderr, "  Identity: %s\n", identityPath)
 	_, _ = fmt.Fprintf(stderr, "  Binary: %s\n", ploydBinaryPath)
 	_, _ = fmt.Fprintf(stderr, "  Timeout: %ds\n", timeoutSecs)
+
+	if cfg.DryRun {
+		_, _ = fmt.Fprintln(stderr, "\nPlanned actions:")
+		_, _ = fmt.Fprintf(stderr, "  1. Upload new ployd binary to %s:/tmp/ployd-<random>\n", cfg.Address)
+		_, _ = fmt.Fprintf(stderr, "  2. Install binary to %s:/usr/local/bin/ployd\n", cfg.Address)
+		_, _ = fmt.Fprintf(stderr, "  3. Restart ployd service via systemctl\n")
+		_, _ = fmt.Fprintf(stderr, "  4. Wait for service to become active (poll systemctl is-active)\n")
+		_, _ = fmt.Fprintf(stderr, "  5. Verify service is listening on port 8443\n")
+		_, _ = fmt.Fprintln(stderr, "\nDry run complete. No changes have been made.")
+		return nil
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSecs)*time.Second)
 	defer cancel()

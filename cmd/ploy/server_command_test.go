@@ -1111,3 +1111,156 @@ func TestServerDeployDescriptorPersistence(t *testing.T) {
 		t.Fatal("expected descriptor to be marked as default")
 	}
 }
+
+// TestServerDeployDryRunNewCluster verifies dry-run output for a new cluster deployment.
+func TestServerDeployDryRunNewCluster(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	// Stub detectRunner to return no existing cluster.
+	oldRunner := detectRunner
+	detectRunner = &mockRunner{
+		runFunc: func(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+			return errors.New("no cluster found")
+		},
+	}
+	defer func() { detectRunner = oldRunner }()
+
+	var stderr bytes.Buffer
+	cfg := serverDeployConfig{
+		Address:      "10.0.0.1",
+		User:         "root",
+		IdentityFile: identityPath,
+		PloydBinary:  binPath,
+		SSHPort:      22,
+		Reuse:        true,
+		DryRun:       true,
+	}
+
+	err := runServerDeploy(cfg, &stderr)
+	if err != nil {
+		t.Fatalf("dry-run should not error: %v", err)
+	}
+
+	out := stderr.String()
+	if !strings.Contains(out, "DRY RUN: Server deployment") {
+		t.Errorf("expected 'DRY RUN' header, got: %q", out)
+	}
+	if !strings.Contains(out, "No existing cluster found") {
+		t.Errorf("expected detection message, got: %q", out)
+	}
+	if !strings.Contains(out, "Planned actions:") {
+		t.Errorf("expected planned actions header, got: %q", out)
+	}
+	if !strings.Contains(out, "Generate new cluster ID") {
+		t.Errorf("expected cluster ID generation message, got: %q", out)
+	}
+	if !strings.Contains(out, "Generate new CA certificate") {
+		t.Errorf("expected CA generation message, got: %q", out)
+	}
+	if !strings.Contains(out, "Issue server certificate") {
+		t.Errorf("expected server cert message, got: %q", out)
+	}
+	if !strings.Contains(out, "CN=ployd-<cluster-id>") {
+		t.Errorf("expected server cert subject, got: %q", out)
+	}
+	if !strings.Contains(out, "Issue admin client certificate") {
+		t.Errorf("expected admin cert message, got: %q", out)
+	}
+	if !strings.Contains(out, "OU=Ploy role=cli-admin") {
+		t.Errorf("expected admin cert subject, got: %q", out)
+	}
+	if !strings.Contains(out, "Upload ployd binary") {
+		t.Errorf("expected binary upload message, got: %q", out)
+	}
+	if !strings.Contains(out, "Bootstrap server") {
+		t.Errorf("expected bootstrap message, got: %q", out)
+	}
+	if !strings.Contains(out, "Dry run complete. No changes have been made.") {
+		t.Errorf("expected completion message, got: %q", out)
+	}
+}
+
+// TestServerDeployDryRunReuseCluster verifies dry-run output when reusing an existing cluster.
+func TestServerDeployDryRunReuseCluster(t *testing.T) {
+	tmpDir := t.TempDir()
+	binPath := filepath.Join(tmpDir, "ployd-test")
+	if err := os.WriteFile(binPath, []byte("fake binary"), 0755); err != nil {
+		t.Fatalf("create test binary: %v", err)
+	}
+	identityPath := filepath.Join(tmpDir, "id_test")
+	if err := os.WriteFile(identityPath, []byte("fake key"), 0600); err != nil {
+		t.Fatalf("create test identity: %v", err)
+	}
+
+	// Stub detectRunner to return an existing cluster.
+	oldRunner := detectRunner
+	detectRunner = &mockRunner{
+		runFunc: func(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+			// Simulate successful checks and CN extraction.
+			if len(args) > 0 && strings.Contains(args[len(args)-1], "openssl") {
+				_, _ = streams.Stdout.Write([]byte("ployd-abcd1234\n"))
+			}
+			return nil
+		},
+	}
+	defer func() { detectRunner = oldRunner }()
+
+	var stderr bytes.Buffer
+	cfg := serverDeployConfig{
+		Address:      "10.0.0.2",
+		User:         "root",
+		IdentityFile: identityPath,
+		PloydBinary:  binPath,
+		SSHPort:      22,
+		Reuse:        true,
+		DryRun:       true,
+	}
+
+	err := runServerDeploy(cfg, &stderr)
+	if err != nil {
+		t.Fatalf("dry-run should not error: %v", err)
+	}
+
+	out := stderr.String()
+	if !strings.Contains(out, "DRY RUN: Server deployment") {
+		t.Errorf("expected 'DRY RUN' header, got: %q", out)
+	}
+	if !strings.Contains(out, "Found existing cluster") {
+		t.Errorf("expected detection message, got: %q", out)
+	}
+	if !strings.Contains(out, "Planned actions:") {
+		t.Errorf("expected planned actions header, got: %q", out)
+	}
+	if !strings.Contains(out, "Reuse existing cluster ID") {
+		t.Errorf("expected reuse cluster ID message, got: %q", out)
+	}
+	if !strings.Contains(out, "Reuse existing CA and server certificate") {
+		t.Errorf("expected reuse CA message, got: %q", out)
+	}
+	if !strings.Contains(out, "Skip PKI generation") {
+		t.Errorf("expected skip PKI message, got: %q", out)
+	}
+	if !strings.Contains(out, "Dry run complete. No changes have been made.") {
+		t.Errorf("expected completion message, got: %q", out)
+	}
+}
+
+// mockRunner is a simple mock for deploy.Runner.
+type mockRunner struct {
+	runFunc func(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error
+}
+
+func (m *mockRunner) Run(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+	if m.runFunc != nil {
+		return m.runFunc(ctx, cmd, args, stdin, streams)
+	}
+	return nil
+}

@@ -67,6 +67,7 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		reuse            boolValue
 		forceNewCA       boolValue
 		refreshAdminCert boolValue
+		dryRun           boolValue
 	)
 
 	fs.Var(&address, "address", "Target host or IP address for server deployment")
@@ -78,6 +79,7 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 	fs.Var(&reuse, "reuse", "Reuse existing cluster CA and server certificate if present (default: true)")
 	fs.Var(&forceNewCA, "force-new-ca", "Force generation of new CA and server certificate even if cluster exists")
 	fs.Var(&refreshAdminCert, "refresh-admin-cert", "Refresh admin client certificate via server PKI endpoint")
+	fs.Var(&dryRun, "dry-run", "Print detected cluster and planned actions without making changes")
 
 	if err := fs.Parse(args); err != nil {
 		printServerDeployUsage(stderr)
@@ -125,6 +127,7 @@ func handleServerDeploy(args []string, stderr io.Writer) error {
 		SSHPort:          sshPort.value,
 		Reuse:            reuseCA,
 		RefreshAdminCert: refreshAdminCert.value,
+		DryRun:           dryRun.value,
 	}
 
 	return runServerDeploy(serverCfg, stderr)
@@ -147,6 +150,7 @@ type serverDeployConfig struct {
 	SSHPort          int
 	Reuse            bool
 	RefreshAdminCert bool
+	DryRun           bool
 }
 
 func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
@@ -184,7 +188,11 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		return fmt.Errorf("server deploy: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Deploying Ploy server to %s\n", cfg.Address)
+	if cfg.DryRun {
+		_, _ = fmt.Fprintf(stderr, "DRY RUN: Server deployment to %s\n", cfg.Address)
+	} else {
+		_, _ = fmt.Fprintf(stderr, "Deploying Ploy server to %s\n", cfg.Address)
+	}
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
 	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
 	_, _ = fmt.Fprintf(stderr, "  Identity: %s\n", identityPath)
@@ -219,6 +227,36 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		} else {
 			_, _ = fmt.Fprintln(stderr, "No existing cluster found; will generate new CA")
 		}
+	}
+
+	// In dry-run mode, print planned actions and exit before making changes.
+	if cfg.DryRun {
+		_, _ = fmt.Fprintln(stderr, "\nPlanned actions:")
+		if reusingCluster {
+			_, _ = fmt.Fprintf(stderr, "  - Reuse existing cluster ID: %s\n", clusterID)
+			_, _ = fmt.Fprintln(stderr, "  - Reuse existing CA and server certificate")
+			_, _ = fmt.Fprintln(stderr, "  - Skip PKI generation")
+		} else {
+			_, _ = fmt.Fprintln(stderr, "  - Generate new cluster ID")
+			_, _ = fmt.Fprintln(stderr, "  - Generate new CA certificate")
+			_, _ = fmt.Fprintln(stderr, "  - Issue server certificate")
+			_, _ = fmt.Fprintf(stderr, "    Subject: CN=ployd-<cluster-id>, O=Ploy\n")
+			_, _ = fmt.Fprintln(stderr, "  - Issue admin client certificate")
+			_, _ = fmt.Fprintf(stderr, "    Subject: CN=cli-admin-<cluster-id>, OU=Ploy role=cli-admin, O=Ploy\n")
+		}
+		if cfg.PostgreSQLDSN == "" {
+			_, _ = fmt.Fprintln(stderr, "  - Install PostgreSQL on target host")
+		} else {
+			_, _ = fmt.Fprintln(stderr, "  - Use provided PostgreSQL DSN")
+		}
+		_, _ = fmt.Fprintln(stderr, "  - Upload ployd binary to target host")
+		_, _ = fmt.Fprintln(stderr, "  - Bootstrap server (install systemd service, configure firewall)")
+		_, _ = fmt.Fprintln(stderr, "  - Start ployd service")
+		if !reusingCluster {
+			_, _ = fmt.Fprintln(stderr, "  - Save cluster descriptor and admin certificates locally")
+		}
+		_, _ = fmt.Fprintln(stderr, "\nDry run complete. No changes have been made.")
+		return nil
 	}
 
 	// Generate cluster ID and PKI if not reusing
