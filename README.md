@@ -31,6 +31,11 @@ Note on docs consolidation (2025‑11‑01): prior exploration files (ARCHITECTU
 - Storage: PostgreSQL migrations in `internal/store/migrations/`, queries in `internal/store/queries/`.
 - PKI: Cluster CA issues certificates; nodes submit CSRs via `/v1/pki/sign`.
 
+Architecture packages (boundaries)
+- `internal/stream`: shared SSE hub and HTTP helpers for streaming run events/logs. Used by both server and node agent; no control-plane dependencies.
+- `internal/worker`: node-side execution primitives (e.g., `jobs`, `lifecycle`, `hydration`). Library-only; imported by the node agent.
+- `internal/nodeagent`: the node daemon (what `cmd/ployd-node` runs). Composes `worker` and pushes heartbeats, logs, diffs, and artifacts to the server.
+
 **Docs You'll Want**
 - Architecture: `SIMPLE.md` (server/node pivot, PostgreSQL, mTLS)
 - Deployment: `docs/how-to/deploy-a-cluster.md`
