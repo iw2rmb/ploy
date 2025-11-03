@@ -63,11 +63,16 @@ func (fn RunnerFunc) Run(ctx context.Context, command string, args []string, std
 	return fn(ctx, command, args, stdin, streams)
 }
 
-// systemRunner executes shell commands using the host environment streams.
-type systemRunner struct{}
+// SystemRunner executes shell commands using the host environment streams.
+type SystemRunner struct{}
+
+// NewSystemRunner creates a new system runner that executes commands via exec.
+func NewSystemRunner() Runner {
+	return SystemRunner{}
+}
 
 // Run invokes the command with inherited stdio defaults when streams are nil.
-func (systemRunner) Run(ctx context.Context, command string, args []string, stdin io.Reader, streams IOStreams) error {
+func (SystemRunner) Run(ctx context.Context, command string, args []string, stdin io.Reader, streams IOStreams) error {
 	cmd := exec.CommandContext(ctx, command, args...)
 	if streams.Stdout != nil {
 		cmd.Stdout = streams.Stdout
@@ -82,3 +87,6 @@ func (systemRunner) Run(ctx context.Context, command string, args []string, stdi
 	}
 	return cmd.Run()
 }
+
+// systemRunner is an internal alias for backward compatibility.
+type systemRunner = SystemRunner

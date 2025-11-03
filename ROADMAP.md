@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Test: run `markdownlint` and sanity‑read links.
 
 ## Phase 2 — Server Rollout
-- [ ] Rollout command for control plane
+- [x] Rollout command for control plane
   - Change: `cmd/ploy/rollout_server.go` — `ploy rollout server --address <A> [--binary <path>] [--timeout 60s]` → scp, restart, poll active, verify `ss -tlnp` and metrics.
   - Test: use recording runner to assert command sequence & retries; `-short` guard for timing.
 - [ ] Docs update (update guide)

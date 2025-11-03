@@ -85,14 +85,14 @@ func ProvisionHost(ctx context.Context, opts ProvisionOptions) error {
 
 	streams := IOStreams{Stdout: stdout, Stderr: stderr}
 
-	binarySuffix, err := randomHexString(8)
+	binarySuffix, err := RandomHexString(8)
 	if err != nil {
 		return fmt.Errorf("provision: generate remote binary suffix: %w", err)
 	}
 	remoteBinaryPath := fmt.Sprintf("/tmp/ployd-%s", binarySuffix)
 
-	sshArgs := buildSSHArgs(opts.IdentityFile, port)
-	scpArgs := buildScpArgs(opts.IdentityFile, port)
+	sshArgs := BuildSSHArgs(opts.IdentityFile, port)
+	scpArgs := BuildScpArgs(opts.IdentityFile, port)
 
 	copyBinaryArgs := append(append([]string(nil), scpArgs...), binaryPath, fmt.Sprintf("%s:%s", target, remoteBinaryPath))
 	if err := runner.Run(ctx, "scp", copyBinaryArgs, nil, streams); err != nil {

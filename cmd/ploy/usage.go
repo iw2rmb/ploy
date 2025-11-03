@@ -29,6 +29,10 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")
 			_, _ = fmt.Fprintln(w, "  deploy      Deploy and configure a control plane server")
+		case "rollout":
+			_, _ = fmt.Fprintln(w, "")
+			_, _ = fmt.Fprintln(w, "Commands:")
+			_, _ = fmt.Fprintln(w, "  server      Roll out a new binary to a control plane server")
 		case "knowledge-base":
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Commands:")

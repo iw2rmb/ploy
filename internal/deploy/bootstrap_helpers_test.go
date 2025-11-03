@@ -134,9 +134,9 @@ func TestRandomHexString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := randomHexString(tt.length)
+			got, err := RandomHexString(tt.length)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("randomHexString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("RandomHexString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if tt.wantErr {
@@ -144,7 +144,7 @@ func TestRandomHexString(t *testing.T) {
 			}
 
 			if len(got) != tt.length {
-				t.Errorf("randomHexString(%d) length = %d, want %d", tt.length, len(got), tt.length)
+				t.Errorf("RandomHexString(%d) length = %d, want %d", tt.length, len(got), tt.length)
 			}
 
 			// Validate all characters are hex
