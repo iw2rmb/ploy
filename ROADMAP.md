@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
 - [x] CLI admin cert refresh via server
   - Change: `cmd/ploy/server_command.go` — when `--refresh-admin-cert` set (or default if descriptor lacks TLS), generate local CSR and call `/v1/pki/sign/admin`; write `~/.config/ploy/certs/<cluster>-{ca,admin}.{crt,key}`; update descriptor CAPath/CertPath/KeyPath.
   - Test: `cmd/ploy/server_command_test.go` — stub HTTP server; expect files written and descriptor updated.
-- [ ] Bootstrap must not clobber existing PKI on primary
+- [x] Bootstrap must not clobber existing PKI on primary
   - Change: `internal/deploy/bootstrap/bootstrap.go` — if `/etc/ploy/pki/ca.key` exists, skip writing any PKI files; log reuse.
   - Test: `internal/deploy/bootstrap_test.go` — script contains reuse branch and omits CA/server writes.
 - [ ] Docs update (deploy)
