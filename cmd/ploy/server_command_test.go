@@ -710,6 +710,108 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 	}
 }
 
+// TestRefreshAdminCertFromServerServerError verifies that server-side errors
+// during refresh are surfaced to the user.
+func TestRefreshAdminCertFromServerServerError(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	// Minimal descriptor with cluster ID set and no TLS paths.
+	clusterID := "test-cluster-error"
+	desc := config.Descriptor{ClusterID: clusterID, Address: "https://127.0.0.1:8443", Scheme: "https"}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		t.Fatalf("SaveDescriptor failed: %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault failed: %v", err)
+	}
+
+	// Mock server that returns 400 with a short message.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/pki/sign/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "bad csr", http.StatusBadRequest)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+
+	// Run the refresh entrypoint which loads descriptor and calls the endpoint.
+	err := handleRefreshAdminCert(context.Background(), bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("expected error from server 400 response")
+	}
+	if !strings.Contains(err.Error(), "server returned status 400") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestRefreshAdminCertFromServerInvalidJSON verifies invalid JSON responses are handled.
+func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	clusterID := "test-cluster-invalid-json"
+	desc := config.Descriptor{ClusterID: clusterID, Address: "https://127.0.0.1:8443", Scheme: "https"}
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		t.Fatalf("SaveDescriptor failed: %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault failed: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/pki/sign/admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{not json}"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+
+	err := handleRefreshAdminCert(context.Background(), bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("expected decode error from invalid JSON")
+	}
+	if !strings.Contains(err.Error(), "decode response") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestHandleRefreshAdminCertMissingClusterID verifies a descriptor lacking ClusterID is rejected.
+func TestHandleRefreshAdminCertMissingClusterID(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
+
+	// Manually craft a malformed descriptor with empty cluster_id and set as default.
+	clusters := filepath.Join(tmpDir, "clusters")
+	if err := os.MkdirAll(clusters, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	// File name is the cluster ID; JSON contains empty cluster_id to simulate bad data.
+	id := "malformed"
+	data := []byte(`{"cluster_id":"","address":"https://127.0.0.1:8443","scheme":"https"}`)
+	if err := os.WriteFile(filepath.Join(clusters, id+".json"), data, 0o644); err != nil {
+		t.Fatalf("write descriptor: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(clusters, "default"), []byte(id), 0o644); err != nil {
+		t.Fatalf("write default marker: %v", err)
+	}
+
+	err := handleRefreshAdminCert(context.Background(), bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("expected error for missing cluster ID in descriptor")
+	}
+	if !strings.Contains(err.Error(), "cluster ID not found in descriptor") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 // mockPKIServer simulates the server PKI signing endpoint for testing.
 type mockPKIServer struct {
 	t           *testing.T
