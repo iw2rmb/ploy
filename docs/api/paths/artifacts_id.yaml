@@ -1,0 +1,45 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+get:
+  tags: [Artifacts]
+  summary: Retrieve artifact metadata or download artifact bundle by ID
+  description: |
+    Get artifact bundle by UUID. If `download=true` query parameter is present,
+    returns raw bundle bytes (gzipped tar archive). Otherwise, returns artifact
+    metadata in JSON including CID, digest, size, and timestamps.
+  parameters:
+    - in: query
+      name: download
+      required: false
+      schema: { type: boolean }
+      description: Set to "true" to download raw bundle bytes instead of metadata
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Artifact metadata (returned when download=false or omitted)
+            properties:
+              id: { type: string, format: uuid }
+              run_id: { type: string, format: uuid }
+              stage_id: { type: string, format: uuid, nullable: true }
+              build_id: { type: string, format: uuid, nullable: true }
+              name: { type: string, nullable: true }
+              cid: { type: string }
+              digest: { type: string }
+              size: { type: integer, format: int64 }
+              created_at: { type: string, format: date-time }
+            required: [id, run_id, cid, digest, size, created_at]
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+            description: Raw gzipped tar archive bytes (returned when download=true)
+    '400': { description: Bad Request (invalid UUID) }
+    '404': { description: Artifact Not Found }
+    '500': { description: Internal Server Error }

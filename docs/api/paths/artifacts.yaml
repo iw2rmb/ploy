@@ -1,0 +1,35 @@
+get:
+  tags: [Artifacts]
+  summary: List artifacts by content identifier (CID)
+  description: |
+    Query artifacts by CID for content-addressable retrieval. Returns metadata
+    for all matching artifact bundles (excluding bundle bytes). Typically returns
+    one artifact per CID unless duplicates exist from multiple uploads.
+  parameters:
+    - in: query
+      name: cid
+      required: true
+      schema: { type: string }
+      description: Content identifier (e.g., "bafy123abc...")
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              artifacts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string, format: uuid }
+                    cid: { type: string }
+                    digest: { type: string }
+                    name: { type: string, nullable: true }
+                    size: { type: integer, format: int64 }
+                  required: [id, cid, digest, size]
+            required: [artifacts]
+    '400': { description: Bad Request (missing cid parameter) }
+    '500': { description: Internal Server Error }

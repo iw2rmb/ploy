@@ -143,6 +143,18 @@ type mockStore struct {
 	listNodesCalled bool
 	listNodesResult []store.Node
 	listNodesErr    error
+
+	// ListArtifactBundlesByCID tracking
+	listArtifactBundlesByCIDCalled bool
+	listArtifactBundlesByCIDParams *string
+	listArtifactBundlesByCIDResult []store.ArtifactBundle
+	listArtifactBundlesByCIDErr    error
+
+	// GetArtifactBundle tracking
+	getArtifactBundleCalled bool
+	getArtifactBundleParams pgtype.UUID
+	getArtifactBundleResult store.ArtifactBundle
+	getArtifactBundleErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -308,4 +320,16 @@ func (m *mockStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNo
 func (m *mockStore) ListNodes(ctx context.Context) ([]store.Node, error) {
 	m.listNodesCalled = true
 	return m.listNodesResult, m.listNodesErr
+}
+
+func (m *mockStore) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]store.ArtifactBundle, error) {
+	m.listArtifactBundlesByCIDCalled = true
+	m.listArtifactBundlesByCIDParams = cid
+	return m.listArtifactBundlesByCIDResult, m.listArtifactBundlesByCIDErr
+}
+
+func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (store.ArtifactBundle, error) {
+	m.getArtifactBundleCalled = true
+	m.getArtifactBundleParams = id
+	return m.getArtifactBundleResult, m.getArtifactBundleErr
 }

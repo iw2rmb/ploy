@@ -314,12 +314,16 @@ func createRunArtifactBundleHandler(st store.Store) http.HandlerFunc {
 			buildID = pgtype.UUID{Bytes: buildUUID, Valid: true}
 		}
 
+		// Compute CID and digest for content-addressable storage.
+		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 		params := store.CreateArtifactBundleParams{
 			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
 			StageID: stageID,
 			BuildID: buildID,
 			Name:    req.Name,
 			Bundle:  req.Bundle,
+			Cid:     &cid,
+			Digest:  &digest,
 		}
 		artifact, err := st.CreateArtifactBundle(r.Context(), params)
 		if err != nil {
