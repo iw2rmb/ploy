@@ -106,7 +106,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
  - Follow run logs via SSE:
 
   ```bash
-  dist/ploy runs follow <run-id>
+  dist/ploy mods follow <run-id>
   ```
 
 **Tests & Coverage**

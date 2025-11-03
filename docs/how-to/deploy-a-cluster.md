@@ -323,7 +323,7 @@ Firewall notes:
 ## Architecture Overview
 
 - **ployd (server)**: Runs the control-plane API, scheduler, and PostgreSQL-backed storage. Exposes
-  endpoints like `/v1/repos`, `/v1/mods`, `/v1/runs`, and `/v1/pki/sign`.
+  endpoints like `/v1/repos`, `/v1/mods`, and `/v1/pki/sign`.
 - **ployd-node**: Lightweight worker that polls for runs, executes jobs in ephemeral workspaces,
   and streams results back to the server. Nodes use mTLS to communicate with the server.
 - **Certificates**: The cluster CA issues all certificates. Nodes submit CSRs to `/v1/pki/sign` to
@@ -344,7 +344,7 @@ See also:
 ### Follow Run Logs
 
 ```bash
-dist/ploy runs follow <run-id>
+dist/ploy mods follow <run-id>
 ```
 
 Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in PostgreSQL.
@@ -384,7 +384,7 @@ If the CA variables are not present, rotation is skipped and a warning is logged
 renew via your external process.
 
 Legacy endpoint notice:
-- All `/v1/jobs*` endpoints and `/v1/mods/{ticket}/logs/stream` have been removed. Use `/v1/runs/*` and `/v1/nodes/*` equivalents:
+- All `/v1/jobs*` endpoints and `/v1/mods/{ticket}/logs/stream` have been removed. Use `/v1/mods/*` and `/v1/nodes/*` equivalents:
   - Logs: `GET /v1/mods/{id}/events`
   - Heartbeat/complete: `POST /v1/nodes/{id}/heartbeat` and `POST /v1/nodes/{id}/complete`
 
