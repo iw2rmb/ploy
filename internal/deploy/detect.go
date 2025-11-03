@@ -47,7 +47,7 @@ func DetectExisting(ctx context.Context, runner Runner, opts ProvisionOptions) (
 		target = fmt.Sprintf("%s@%s", user, connectHost)
 	}
 
-	sshArgs := buildSSHArgs(opts.IdentityFile, port)
+	sshArgs := BuildSSHArgs(opts.IdentityFile, port)
 
 	// Check if CA certificate exists
 	checkCACertArgs := append(append([]string(nil), sshArgs...), target, "test -f /etc/ploy/pki/ca.crt")

@@ -11,8 +11,8 @@ import (
 
 // This file contains bootstrap helper utilities shared across provisioning flows.
 
-// buildSSHArgs constructs SSH args with non-interactive defaults suitable for bootstrap.
-func buildSSHArgs(identity string, port int) []string {
+// BuildSSHArgs constructs SSH args with non-interactive defaults suitable for bootstrap.
+func BuildSSHArgs(identity string, port int) []string {
 	args := []string{
 		"-o", "BatchMode=yes",
 		"-o", "StrictHostKeyChecking=accept-new",
@@ -26,8 +26,8 @@ func buildSSHArgs(identity string, port int) []string {
 	return args
 }
 
-// buildScpArgs constructs scp args with strict host key defaults.
-func buildScpArgs(identity string, port int) []string {
+// BuildScpArgs constructs scp args with strict host key defaults.
+func BuildScpArgs(identity string, port int) []string {
 	args := []string{
 		"-o", "BatchMode=yes",
 		"-o", "StrictHostKeyChecking=accept-new",
@@ -41,8 +41,8 @@ func buildScpArgs(identity string, port int) []string {
 	return args
 }
 
-// randomHexString returns a random hex string of the requested length.
-func randomHexString(length int) (string, error) {
+// RandomHexString returns a random hex string of the requested length.
+func RandomHexString(length int) (string, error) {
 	if length <= 0 {
 		return "", errors.New("bootstrap: random length must be positive")
 	}
@@ -60,7 +60,7 @@ func randomHexString(length int) (string, error) {
 // GenerateClusterID creates a new cluster identifier using random bytes.
 // Returns a string in the format "cluster-<16 hex chars>".
 func GenerateClusterID() (string, error) {
-	hexPart, err := randomHexString(16)
+	hexPart, err := RandomHexString(16)
 	if err != nil {
 		return "", fmt.Errorf("generate cluster id: %w", err)
 	}
@@ -70,7 +70,7 @@ func GenerateClusterID() (string, error) {
 // GenerateNodeID creates a new node identifier using random bytes.
 // Returns a string in the format "node-<16 hex chars>".
 func GenerateNodeID() (string, error) {
-	hexPart, err := randomHexString(16)
+	hexPart, err := RandomHexString(16)
 	if err != nil {
 		return "", fmt.Errorf("generate node id: %w", err)
 	}

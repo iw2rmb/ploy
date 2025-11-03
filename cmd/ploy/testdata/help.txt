@@ -14,5 +14,6 @@ Core Commands:
   knowledge-base   Curate knowledge base fixtures
   server           Manage control plane server
   node             Manage worker nodes
+  rollout          Rolling updates for servers and nodes
 
 Use 'ploy help <command>' for detailed command help.

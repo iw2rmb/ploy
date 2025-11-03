@@ -60,6 +60,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleServer(args[1:], stderr)
 	case "node":
 		return handleNode(args[1:], stderr)
+	case "rollout":
+		return handleRollout(args[1:], stderr)
 
 	default:
 		printUsage(stderr)
@@ -90,6 +92,7 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  knowledge-base   Curate knowledge base fixtures")
 	_, _ = fmt.Fprintln(w, "  server           Manage control plane server")
 	_, _ = fmt.Fprintln(w, "  node             Manage worker nodes")
+	_, _ = fmt.Fprintln(w, "  rollout          Rolling updates for servers and nodes")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
 }
