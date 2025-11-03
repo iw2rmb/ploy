@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
@@ -300,7 +299,11 @@ func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	// Use descriptor-backed mTLS client when available
+	_, client, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve control-plane client: %w", err)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", "", fmt.Errorf("send request: %w", err)

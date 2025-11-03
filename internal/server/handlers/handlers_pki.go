@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -46,19 +47,14 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Load cluster CA from environment (treat whitespace as unset), but preserve
-		// original values for downstream use to avoid altering PEM formatting.
-		rawCACert := os.Getenv("PLOY_SERVER_CA_CERT")
-		rawCAKey := os.Getenv("PLOY_SERVER_CA_KEY")
-		if strings.TrimSpace(rawCACert) == "" || strings.TrimSpace(rawCAKey) == "" {
-			http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
-			slog.Error("pki sign: CA not configured", "hint", "set PLOY_SERVER_CA_CERT and PLOY_SERVER_CA_KEY")
-			return
-		}
-
-		ca, err := internalPKI.LoadCA(rawCACert, rawCAKey)
+		// Load cluster CA from environment or well-known file paths
+		ca, rawCACert, err := loadClusterCA()
 		if err != nil {
-			http.Error(w, "failed to load CA", http.StatusInternalServerError)
+			if errors.Is(err, errCANotConfigured) {
+				http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
+			} else {
+				http.Error(w, "failed to load CA", http.StatusInternalServerError)
+			}
 			slog.Error("pki sign: load CA failed", "err", err)
 			return
 		}
@@ -139,4 +135,46 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 			"not_after", cert.NotAfter.Format(time.RFC3339),
 		)
 	}
+}
+
+// loadClusterCA loads the CA from env PEM, env file paths, or default filesystem paths.
+// Returns the parsed CA bundle and the raw CA certificate PEM for inclusion in responses.
+var errCANotConfigured = errors.New("pki: ca not configured")
+
+func loadClusterCA() (*internalPKI.CABundle, string, error) {
+	// 1) Direct PEMs via env
+	rawCACert := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
+	rawCAKey := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
+	if rawCACert != "" && rawCAKey != "" {
+		ca, err := internalPKI.LoadCA(rawCACert, rawCAKey)
+		return ca, rawCACert, err
+	}
+
+	// 2) File paths via env
+	certPath := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT_PATH"))
+	keyPath := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY_PATH"))
+	if certPath != "" && keyPath != "" {
+		certPEM, err1 := os.ReadFile(certPath)
+		keyPEM, err2 := os.ReadFile(keyPath)
+		if err1 != nil {
+			return nil, "", err1
+		}
+		if err2 != nil {
+			return nil, "", err2
+		}
+		ca, err := internalPKI.LoadCA(string(certPEM), string(keyPEM))
+		return ca, string(certPEM), err
+	}
+
+	// 3) Default paths
+	const defaultCert = "/etc/ploy/pki/ca.crt"
+	const defaultKey = "/etc/ploy/pki/ca.key"
+	if data, err := os.ReadFile(defaultCert); err == nil {
+		if key, err2 := os.ReadFile(defaultKey); err2 == nil {
+			ca, err := internalPKI.LoadCA(string(data), string(key))
+			return ca, string(data), err
+		}
+	}
+
+	return nil, "", errCANotConfigured
 }

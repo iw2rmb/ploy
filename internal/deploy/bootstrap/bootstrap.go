@@ -97,6 +97,12 @@ func PrefixedScript(env map[string]string) string {
 	// Write server config if this is a primary bootstrap
 	// Note: BOOTSTRAP_PRIMARY (without PLOY_ prefix) is the canonical toggle per docs/envs.
 	b.WriteString("if [ \"${BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then\n")
+
+	// Persist CA private key on the primary (control-plane) host when provided.
+	b.WriteString("  if [ -n \"${PLOY_CA_KEY_PEM:-}\" ]; then\n")
+	b.WriteString("    echo \"$PLOY_CA_KEY_PEM\" > /etc/ploy/pki/ca.key\n")
+	b.WriteString("    chmod 600 /etc/ploy/pki/ca.key\n")
+	b.WriteString("  fi\n")
 	b.WriteString("  echo 'Writing server certificate and configuration...'\n")
 	b.WriteString("  if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
 	b.WriteString("    echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt\n")
