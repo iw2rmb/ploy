@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Change: drop handlers in `internal/server/handlers/handlers_repos_mods.go` for mods CRUD; keep repos CRUD (if still useful) or gate for future removal.
   - Test: delete/adjust unit tests; sweep OpenAPI to remove /v1/mods/crud and related schemas/paths.
 
-- [ ] OpenAPI and docs update
+- [x] OpenAPI and docs update
   - Change: docs/api/OpenAPI.yaml — remove /v1/mods/crud; add /v1/mods (POST, GET), /v1/mods/{id}/events, /v1/mods/{id}/artifact_bundles. Update security/roles notes.
   - Test: `docs/api/verify_openapi_test.go` updated list of endpoints; schema sanity tests remain green.
 

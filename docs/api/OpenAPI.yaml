@@ -5,8 +5,10 @@ info:
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS authentication. Bearer token auth has been removed.
-    Primary endpoints include the simplified Mods facade under `/v1/mods` and
-    run-centric surfaces under `/v1/runs/*`.
+    Primary endpoints include the simplified Mods facade under `/v1/mods` (ticket
+    submission, status, events, and artifact uploads). The `/v1/mods/crud` surface
+    has been removed; clients submit tickets directly via POST /v1/mods. Legacy
+    run-centric surfaces remain under `/v1/runs/*` and will be retired in Phase 2.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -18,7 +20,7 @@ tags:
   - name: Security
     description: PKI operations (CA info, CSR signing).
   - name: Control
-    description: Core control-plane CRUD surfaces (repos, mods, runs).
+    description: Core control-plane surfaces (repos, mods ticket lifecycle, runs).
   - name: Artifacts
     description: Artifact bundles, diffs, and logs stored in PostgreSQL.
 security:
