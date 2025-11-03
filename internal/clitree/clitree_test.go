@@ -8,7 +8,7 @@ func TestTreeBasicShape(t *testing.T) {
 		t.Fatalf("expected non-empty CLI tree")
 	}
 	// Expect some well-known top-level commands to exist.
-	want := map[string]bool{"mod": false, "mods": false, "jobs": false, "server": false, "node": false}
+	want := map[string]bool{"mod": false, "mods": false, "runs": false, "server": false, "node": false}
 	for _, n := range nodes {
 		if _, ok := want[n.Name]; ok {
 			want[n.Name] = true

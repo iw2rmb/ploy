@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/api/config"
-	"github.com/iw2rmb/ploy/internal/api/events"
-	"github.com/iw2rmb/ploy/internal/api/httpserver"
-	"github.com/iw2rmb/ploy/internal/api/metrics"
-	"github.com/iw2rmb/ploy/internal/api/pki"
-	"github.com/iw2rmb/ploy/internal/api/scheduler"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	"github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/server/handlers"
+	httpserver "github.com/iw2rmb/ploy/internal/server/http"
+	"github.com/iw2rmb/ploy/internal/server/metrics"
+	"github.com/iw2rmb/ploy/internal/server/pki"
+	"github.com/iw2rmb/ploy/internal/server/scheduler"
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/iw2rmb/ploy/internal/store/ttlworker"
 )
@@ -105,70 +106,8 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("create http server: %w", err)
 	}
 
-	// Register health endpoint.
-	httpSrv.HandleFunc("/health", healthHandler)
-
-	// Register PKI sign endpoint (admin-only).
-	httpSrv.HandleFunc("POST /v1/pki/sign", pkiSignHandler(st), auth.RoleCLIAdmin)
-
-	// Register repos endpoints (control plane).
-	httpSrv.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
-
-	// Register mods endpoints (control plane).
-	httpSrv.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/mods/crud/{id}", getModHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("DELETE /v1/mods/crud/{id}", deleteModHandler(st), auth.RoleControlPlane)
-
-	// Register runs endpoints (control plane).
-	httpSrv.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
-	// Support both query (?id=) and RESTful path (/v1/runs/{id}) for basic run view.
-	httpSrv.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
-	// Explicit timing subresource for clarity and OpenAPI alignment.
-	httpSrv.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
-	// Run-scoped ingestion endpoints documented in OpenAPI.
-	httpSrv.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("POST /v1/runs/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
-	// SSE events endpoint for run log streaming.
-	httpSrv.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
-
-	// Legacy /v1/jobs endpoints (aliases for /v1/runs endpoints).
-	// These are maintained for backwards compatibility with existing CLI/tests.
-	httpSrv.HandleFunc("GET /v1/jobs", getRunHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/jobs/{id}", getRunHandler(st), auth.RoleControlPlane)
-	httpSrv.HandleFunc("GET /v1/jobs/{id}/logs/stream", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
-	httpSrv.HandleFunc("POST /v1/jobs/{id}/retry", retryRunHandler(st), auth.RoleControlPlane)
-	// Legacy node→server endpoints kept for compatibility with some clients.
-	httpSrv.HandleFunc("POST /v1/jobs/{id}/heartbeat", legacyJobHeartbeatHandler(st), auth.RoleWorker)
-	httpSrv.HandleFunc("POST /v1/jobs/{id}/complete", legacyJobCompleteHandler(st), auth.RoleWorker)
-	// Note: /v1/jobs/{id}/heartbeat and /v1/jobs/{id}/complete are deprecated.
-	// Modern nodes use /v1/nodes/{id}/heartbeat and /v1/nodes/{id}/complete instead.
-
-	// Legacy /v1/mods/{ticket}/logs/stream endpoint (SSE stream for Mods ticket logs).
-	httpSrv.HandleFunc("GET /v1/mods/{ticket}/logs/stream", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
-
-	// Register node heartbeat endpoint (node agents).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
-	// Register node claim endpoint (node agents pull work).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st), auth.RoleWorker)
-	// Register node acknowledgement endpoint (node agents acknowledge run start).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st), auth.RoleWorker)
-	// Register node completion endpoint (node agents mark run as finished).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st), auth.RoleWorker)
-	// Register node events endpoint (node agents).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
-	// Register node logs endpoint (node agents stream gzipped log chunks).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st), auth.RoleWorker)
-	// Register node diff upload endpoint (node agents).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/diff", createDiffHandler(st), auth.RoleWorker)
-	// Register node artifact bundle upload endpoint (node agents).
-	httpSrv.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/artifact", createArtifactBundleHandler(st), auth.RoleWorker)
+	// Register HTTP routes.
+	handlers.RegisterRoutes(httpSrv, st, eventsService)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{

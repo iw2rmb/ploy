@@ -35,7 +35,7 @@ make pre-commit-install
 Create or update a test file with a test that captures your requirement:
 
 ```go
-// Example: internal/api/handlers/repos_test.go
+// Example: internal/server/handlers/repos_test.go
 func TestCreateRepo_ValidInput_ReturnsCreated(t *testing.T) {
     // Arrange
     handler := NewRepoHandler(mockStore)
@@ -55,7 +55,7 @@ func TestCreateRepo_ValidInput_ReturnsCreated(t *testing.T) {
 **Run the test — it MUST fail:**
 
 ```bash
-go test ./internal/api/handlers -v -run TestCreateRepo_ValidInput
+go test ./internal/server/handlers -v -run TestCreateRepo_ValidInput
 ```
 
 Expected output:
@@ -72,7 +72,7 @@ This confirms you're testing something that doesn't exist yet.
 Write the minimal implementation to pass the test:
 
 ```go
-// internal/api/handlers/repos.go
+// internal/server/handlers/repos.go
 func (h *RepoHandler) CreateRepo(w http.ResponseWriter, r *http.Request) {
     var req CreateRepoRequest
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -94,14 +94,14 @@ func (h *RepoHandler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 **Run the test again — it MUST pass:**
 
 ```bash
-go test ./internal/api/handlers -v -run TestCreateRepo_ValidInput
+go test ./internal/server/handlers -v -run TestCreateRepo_ValidInput
 ```
 
 Expected output:
 ```
 --- PASS: TestCreateRepo_ValidInput_ReturnsCreated (0.00s)
 PASS
-ok      github.com/replicate/ploy/internal/api/handlers  0.123s
+ok      github.com/replicate/ploy/internal/server/handlers  0.123s
 ```
 
 ### 4. REFACTOR Phase — Clean Up
@@ -115,7 +115,7 @@ Now that the test is green, improve the code:
 **Run tests after each refactoring step:**
 
 ```bash
-go test ./internal/api/handlers -v
+go test ./internal/server/handlers -v
 ```
 
 Tests should remain green. If they fail, undo the refactoring.
@@ -189,7 +189,7 @@ Per `AGENTS.md` and `ROADMAP.md`:
 
 - **Overall coverage:** ≥60%
 - **Critical paths:** ≥90%
-  - Scheduler (`internal/api/scheduler`)
+  - Scheduler (`internal/server/scheduler`)
   - PKI (`internal/controlplane/auth`)
   - Ingest handlers (node heartbeat, events, diffs)
 
@@ -200,7 +200,7 @@ Check per-component coverage:
 make test-coverage
 
 # Specific component
-go test -coverprofile=coverage.out ./internal/api/scheduler/...
+go test -coverprofile=coverage.out ./internal/server/scheduler/...
 go tool cover -func=coverage.out
 ```
 
@@ -333,7 +333,7 @@ func TestStoreCreateRepo(t *testing.T) {
 Always run with `-race` on tests involving concurrency:
 
 ```bash
-go test -race ./internal/api/scheduler/...
+go test -race ./internal/server/scheduler/...
 ```
 
 ## Debugging Test Failures
@@ -341,25 +341,25 @@ go test -race ./internal/api/scheduler/...
 ### Verbose Output
 
 ```bash
-go test -v ./internal/api/handlers
+go test -v ./internal/server/handlers
 ```
 
 ### Run Specific Test
 
 ```bash
-go test ./internal/api/handlers -run TestCreateRepo_ValidInput
+go test ./internal/server/handlers -run TestCreateRepo_ValidInput
 ```
 
 ### Show Coverage
 
 ```bash
-go test -cover ./internal/api/handlers
+go test -cover ./internal/server/handlers
 ```
 
 ### Generate HTML Coverage Report
 
 ```bash
-go test -coverprofile=coverage.out ./internal/api/handlers
+go test -coverprofile=coverage.out ./internal/server/handlers
 go tool cover -html=coverage.out
 ```
 
@@ -408,25 +408,25 @@ See `.github/pull_request_template.md` for the full checklist that enforces this
 
 ```bash
 # 1. Start with RED
-$ vim internal/api/handlers/repos_test.go  # Write failing test
-$ go test ./internal/api/handlers -run TestCreateRepo
+$ vim internal/server/handlers/repos_test.go  # Write failing test
+$ go test ./internal/server/handlers -run TestCreateRepo
 --- FAIL: TestCreateRepo (0.00s)
 FAIL
 
 # 2. Make it GREEN
-$ vim internal/api/handlers/repos.go  # Implement minimal code
-$ go test ./internal/api/handlers -run TestCreateRepo
+$ vim internal/server/handlers/repos.go  # Implement minimal code
+$ go test ./internal/server/handlers -run TestCreateRepo
 --- PASS: TestCreateRepo (0.00s)
 PASS
 
 # 3. REFACTOR
-$ vim internal/api/handlers/repos.go  # Clean up code
-$ go test ./internal/api/handlers
+$ vim internal/server/handlers/repos.go  # Clean up code
+$ go test ./internal/server/handlers
 PASS
 
 # 4. Add more tests (repeat RED → GREEN → REFACTOR)
-$ vim internal/api/handlers/repos_test.go
-$ go test ./internal/api/handlers
+$ vim internal/server/handlers/repos_test.go
+$ go test ./internal/server/handlers
 PASS
 
 # 5. Verify coverage

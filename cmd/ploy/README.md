@@ -22,8 +22,7 @@ ploy environment materialize <commit-sha> --app <app> \
   [--dry-run] [--manifest <name@version>] [--aster <toggle,...>]
 ploy knowledge-base ingest --from <fixture.json>
 ploy knowledge-base evaluate --fixture <samples.json>
-ploy upload --job-id <ticket-id> [--kind repo|logs|report] <path>
-ploy report --job-id <ticket-id> [--artifact-id <slot>] --output <path>
+ploy upload --run-id <uuid> [--stage-id <uuid>] [--build-id <uuid>] [--name <string>] <path>
 ```
 
 `lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
@@ -61,9 +60,9 @@ samples, runs them through the advisor with a conservative score floor, and
 prints per-sample match results plus aggregate accuracy so operators can gauge
 classifier drift without leaving the workstation.
 
-`upload` and `report` use the cached mTLS cluster descriptor to move large payloads through the
-control‑plane HTTPS APIs (no SSH). The client streams uploads to `/v2/artifacts/upload` and downloads
-specific artifacts via `/v2/artifacts/{id}?download=true`, verifying digests end‑to‑end.
+`upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH).
+It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.
+The deprecated `--job-id` flag remains as an alias for `--run-id` for backward compatibility.
 
 ## Flags
 
@@ -95,7 +94,7 @@ specific artifacts via `/v2/artifacts/{id}?download=true`, verifying digests end
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
 - Streaming guards (long-lived SSE):
-  - `mods logs` and `jobs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
+  - `mods logs` and `runs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Exit Codes

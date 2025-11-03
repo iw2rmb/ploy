@@ -64,4 +64,4 @@ func join(parts []string, sep string) string {
 
 // Minimal helpers for mods/jobs usage output paths.
 func printModsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy mods <command>") }
-func printJobsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy jobs <command>") }
+func printRunsUsage(w io.Writer) { _, _ = fmt.Fprintln(w, "Usage: ploy runs <command>") }

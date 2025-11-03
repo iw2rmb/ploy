@@ -29,8 +29,20 @@ linters:
     - bodyclose     # Check HTTP response body is closed
     - noctx         # Find sending http request without context.Context
     - sqlclosecheck # Check sql.Rows and sql.Stmt are closed
+    - depguard      # Enforce import boundaries
 
 linters-settings:
+  depguard:
+    rules:
+      no-server-from-cli-node:
+        # Apply to CLI and node code only; allow tests.
+        files:
+          - "internal/cli/**"
+          - "internal/node/**"
+          - "internal/nodeagent/**"
+        deny:
+          - pkg: "^github.com/iw2rmb/ploy/internal/server($|/)"
+            desc: "CLI/Node must not import internal/server; depend on stable interfaces"
   errcheck:
     check-type-assertions: true
     check-blank: true

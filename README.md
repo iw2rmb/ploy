@@ -25,7 +25,7 @@ Note on docs consolidation (2025‑11‑01): prior exploration files (ARCHITECTU
 - CLI entrypoint: `cmd/ploy` (commands: `server`, `node`, `mod`, `mods`, `runs`, `knowledge-base`).
 - Server daemon: `cmd/ployd` with PostgreSQL (`pgx/v5` + `sqlc`), scheduler, and PKI.
 - Node daemon: `cmd/ployd-node` with ephemeral workspaces, Build Gate, and mTLS client.
-- Control‑plane HTTP/SSE: handlers in `internal/api/httpserver/*` and OpenAPI in `docs/api/OpenAPI.yaml`.
+- Control‑plane HTTP/SSE: handlers in `internal/server/http/*` and OpenAPI in `docs/api/OpenAPI.yaml`.
 - Scheduler: In-DB queue using `FOR UPDATE SKIP LOCKED` on `runs.status='queued'`.
 - Build Gate: `internal/workflow/buildgate/*` (sandbox runner, static checks, Java executor).
 - Storage: PostgreSQL migrations in `internal/store/migrations/`, queries in `internal/store/queries/`.
@@ -64,7 +64,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Metrics: `:9100` (plain HTTP) exposing Prometheus at `/metrics`.
 
 **Scheduler & TTL**
-- Background tasks run under `internal/api/scheduler`.
+- Background tasks run under `internal/server/scheduler`.
 - TTL cleanup (`internal/store/ttlworker`) purges old rows and can drop monthly partitions.
 - YAML (`scheduler` section):
   - `ttl`: retention for logs/events/diffs/artifact_bundles (default 30d if unset)
@@ -92,10 +92,10 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
     --follow
   ```
 
- - Follow job logs via SSE:
+ - Follow run logs via SSE:
 
   ```bash
-  dist/ploy jobs follow <job-id>
+  dist/ploy runs follow <run-id>
   ```
 
 **Tests & Coverage**

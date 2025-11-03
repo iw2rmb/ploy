@@ -30,9 +30,9 @@ Verification
 # Health
 curl -sSI --cacert ca.pem https://api.alpha.ploy/v1/status | head -n1
 
-# CLI artifact upload (HTTPS path)
-echo test > /tmp/test.bin
-dist/ploy upload --job-id quickstart --kind report /tmp/test.bin
+# Optional: submit a run and attach an artifact bundle
+# (Requires a valid run UUID created via 'ploy mod run').
+# dist/ploy upload --run-id <run-uuid> /path/to/bundle.tar.gz
 ```
 
 Rollback

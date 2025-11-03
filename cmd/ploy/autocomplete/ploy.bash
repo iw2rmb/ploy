@@ -6,7 +6,7 @@ _ploy_completions() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ $COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "mod mods jobs upload report cluster config environment manifest knowledge-base server node help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "mod mods runs upload cluster config manifest knowledge-base server node help" -- "$cur") )
         return 0
     fi
 
@@ -23,15 +23,13 @@ _ploy_completions() {
             return 0
         fi
         ;;
-    "jobs")
+    "runs")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "follow ls inspect retry" -- "$cur") )
+            COMPREPLY=( $(compgen -W "follow inspect" -- "$cur") )
             return 0
         fi
         ;;
     "upload")
-        ;;
-    "report")
         ;;
     "cluster")
         if [[ $COMP_CWORD -eq 2 ]]; then
@@ -50,12 +48,6 @@ _ploy_completions() {
         fi
         if [[ $COMP_CWORD -eq 3 && "${COMP_WORDS[2]}" == "gitlab" ]]; then
             COMPREPLY=( $(compgen -W "show set validate status rotate" -- "$cur") )
-            return 0
-        fi
-        ;;
-    "environment")
-        if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "materialize" -- "$cur") )
             return 0
         fi
         ;;

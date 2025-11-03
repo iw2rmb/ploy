@@ -32,8 +32,8 @@ func execute(args []string, stderr io.Writer) error {
 				printModUsage(stderr)
 			case "mods":
 				printModsUsage(stderr)
-			case "jobs":
-				printJobsUsage(stderr)
+			case "runs":
+				printRunsUsage(stderr)
 			case "server":
 				printServerUsage(stderr)
 			default:
@@ -47,8 +47,6 @@ func execute(args []string, stderr io.Writer) error {
 		return handleMod(args[1:], stderr)
 	case "upload":
 		return handleUpload(args[1:], stderr)
-	case "report":
-		return handleReport(args[1:], stderr)
 		// environment command is not dispatched in this build; help lists it.
 	case "manifest":
 		return handleManifest(args[1:], stderr)
@@ -56,8 +54,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleKnowledgeBase(args[1:], stderr)
 	case "mods":
 		return handleMods(args[1:], stderr)
-	case "jobs":
-		return handleJobs(args[1:], stderr)
+	case "runs":
+		return handleRuns(args[1:], stderr)
 	case "server":
 		return handleServer(args[1:], stderr)
 	case "node":
@@ -84,12 +82,10 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Core Commands:")
 	_, _ = fmt.Fprintln(w, "  mod              Plan and run Mods workflows")
 	_, _ = fmt.Fprintln(w, "  mods             Observe Mods execution (logs, events)")
-	_, _ = fmt.Fprintln(w, "  jobs             Inspect and follow individual jobs")
-	_, _ = fmt.Fprintln(w, "  upload           Upload repository or log bundles via HTTPS")
-	_, _ = fmt.Fprintln(w, "  report           Download reports or artifacts via HTTPS")
+	_, _ = fmt.Fprintln(w, "  runs             Inspect and follow individual runs")
+	_, _ = fmt.Fprintln(w, "  upload           Upload artifact bundle to a run (HTTPS)")
 	_, _ = fmt.Fprintln(w, "  cluster          Manage local cluster descriptors")
 	_, _ = fmt.Fprintln(w, "  config           Inspect or update cluster configuration")
-	_, _ = fmt.Fprintln(w, "  environment      Materialize integration environments")
 	_, _ = fmt.Fprintln(w, "  manifest         Inspect and validate integration manifests")
 	_, _ = fmt.Fprintln(w, "  knowledge-base   Curate knowledge base fixtures")
 	_, _ = fmt.Fprintln(w, "  server           Manage control plane server")

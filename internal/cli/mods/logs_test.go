@@ -59,7 +59,7 @@ type testEvent struct {
 func newModsStreamServer(t *testing.T, events []testEvent) *httptest.Server {
 	t.Helper()
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/mods/test/logs/stream" {
+		if r.URL.Path != "/v1/runs/test/events" {
 			http.NotFound(w, r)
 			return
 		}

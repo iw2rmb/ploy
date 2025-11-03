@@ -128,13 +128,13 @@ func TestJobsFollowReconnects(t *testing.T) {
 	withEnv(t, "PLOY_CONTROL_PLANE_URL", server.URL)
 
 	buf := &bytes.Buffer{}
-	err := execute([]string{"jobs", "follow", "job-42"}, buf)
+	err := execute([]string{"runs", "follow", "job-42"}, buf)
 	if err != nil {
-		t.Fatalf("jobs follow: %v", err)
+		t.Fatalf("runs follow: %v", err)
 	}
 	expect := loadGolden(t, "jobs_follow_structured.txt")
 	if diff := diffStrings(expect, buf.String()); diff != "" {
-		t.Fatalf("jobs follow output mismatch:\n%s", diff)
+		t.Fatalf("runs follow output mismatch:\n%s", diff)
 	}
 }
 
@@ -163,10 +163,10 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 	)
 	streamPath := ""
 	if cfg.modTicket != "" {
-		streamPath = fmt.Sprintf("/v1/mods/%s/logs/stream", cfg.modTicket)
+		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.modTicket)
 	}
 	if cfg.jobID != "" {
-		streamPath = fmt.Sprintf("/v1/jobs/%s/logs/stream", cfg.jobID)
+		streamPath = fmt.Sprintf("/v1/runs/%s/events", cfg.jobID)
 	}
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
