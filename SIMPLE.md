@@ -95,9 +95,9 @@ Notes:
 
 - POST /v1/mods: declare a mod (repo URL, base/target, options)
 - POST /v1/runs: create a run from a mod (returns run_id)
-- GET  /v1/runs/{id}: status summary
-- GET  /v1/runs/{id}/events: server‑sent events stream
-- GET  /v1/runs/{id}/diff: compressed unified diff for the run
+- GET  /v1/mods/{id}: ticket status summary
+- GET  /v1/mods/{id}/events: server‑sent events stream
+- POST /v1/runs/{id}/diffs: upload compressed unified diff for the run
 - POST /v1/pki/sign: sign a CSR for a node certificate (admin‑only)
 - POST /v1/nodes/{id}/events: stream/append events and logs
 - POST /v1/nodes/{id}/stage/{stage}/diff: upload gzipped diff

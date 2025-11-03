@@ -7,7 +7,7 @@ Summary
 Key Decisions
 - Artifacts/logs/diffs now live behind the runs API; the old /v2 and legacy jobs endpoints are gone.
 - CLI “jobs” namespace is renamed to “runs” (behavior unchanged; only the command name changed).
-- The server exposes only /v1/runs/* and /v1/nodes/*; all /v1/jobs* and /v1/mods/{ticket}/logs/stream have been removed.
+- The server exposes /v1/mods/* for read/stream and legacy write endpoints at /v1/runs/{id}/*, plus /v1/nodes/*; all /v1/jobs* and /v1/mods/{ticket}/logs/stream have been removed.
 - PKI: implemented a working certificate renewal (rotator) using the server CA from env.
 - Config: removed obsolete ControlPlane job endpoints and other legacy per‑path knobs.
 
@@ -21,7 +21,7 @@ Completed Changes (code + docs)
    - Removed: `ploy report` (no GET artifact endpoint exists).
 
 3) Runs/logs API and CLI rename
-   - Streaming: CLI now hits GET /v1/runs/{id}/events for both:
+   - Streaming: CLI now hits GET /v1/mods/{id}/events for both:
      - `ploy runs follow <run-id>` (was: jobs follow)
      - `ploy mods logs <run-id>` (was: /v1/mods/{ticket}/logs/stream)
    - Inspect: `ploy runs inspect <run-id>` (was: jobs inspect)
@@ -29,13 +29,13 @@ Completed Changes (code + docs)
    - Updated auto‑completions and help goldens.
 
 4) Server endpoints (cmd/ployd)
-   - Present: /v1/runs, /v1/runs/{id}, /v1/runs/{id}/events, /v1/runs/{id}/timing, /v1/runs/{id}/logs|diffs|artifact_bundles, /v1/pki/sign,
+   - Present: /v1/mods, /v1/mods/{id}, /v1/mods/{id}/events, /v1/runs/{id}/timing, /v1/runs/{id}/logs|diffs|artifact_bundles, /v1/pki/sign,
               /v1/nodes/{id}/heartbeat|claim|ack|complete|events|logs|stage/{stage}/diff|stage/{stage}/artifact.
    - Removed: all /v1/jobs*, and /v1/mods/{ticket}/logs/stream.
 
 5) OpenAPI + docs
    - OpenAPI now runs‑only; deleted obsolete path files (jobs.yaml, jobs_id.yaml, jobs_id_logs_stream.yaml, jobs_id_retry.yaml, mods_ticket_logs_stream.yaml).
-   - Docs updated: deployment and update guides use /v1/runs/* and `runs` CLI; README examples use `runs`.
+   - Docs updated: deployment and update guides use /v1/mods/* for streaming/status and /v1/runs/{id}/* for ingest; README examples use `runs`/`mods` accordingly.
 
 6) PKI rotation TODO completed
    - internal/server/pki/rotator.go: implements on‑disk renewal when cert expiry enters `pki.renew_before`, issuing a new cert with the same Subject/SANs, using CA from env:
@@ -59,7 +59,7 @@ Current CLI Surface (top‑level)
 - cluster, config, manifest, knowledge‑base, server, node
 
 Current API Highlights
-- Logs/Events: `GET /v1/runs/{id}/events` (SSE)
+- Logs/Events: `GET /v1/mods/{id}/events` (SSE)
 - Artifacts: `POST /v1/runs/{id}/artifact_bundles`
 - Diffs/Logs ingest: `POST /v1/runs/{id}/diffs|logs`
 - Node control: `POST /v1/nodes/{id}/heartbeat|claim|ack|complete`, plus node logs/diffs/artifact routes.

@@ -12,8 +12,8 @@ import (
 
 func TestInspectCommand(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/v1/runs/j1", func(w http.ResponseWriter, r *http.Request) {
-		_ = json.NewEncoder(w).Encode(map[string]any{"id": "j1", "status": "failed", "step_id": "build"})
+	mux.HandleFunc("/v1/mods/j1", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"ticket_id": "j1", "status": "failed"})
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()

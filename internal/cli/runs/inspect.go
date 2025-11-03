@@ -19,7 +19,7 @@ type InspectCommand struct {
 	Output  io.Writer
 }
 
-// Run performs GET /v1/runs/{id}
+// Run performs GET /v1/mods/{id}
 func (c InspectCommand) Run(ctx context.Context) error {
 	if c.Client == nil {
 		return errors.New("runs inspect: http client required")
@@ -35,7 +35,7 @@ func (c InspectCommand) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	endpoint.Path = strings.TrimSuffix(endpoint.Path, "/") + "/v1/runs/" + url.PathEscape(job)
+	endpoint.Path = strings.TrimSuffix(endpoint.Path, "/") + "/v1/mods/" + url.PathEscape(job)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
@@ -59,13 +59,15 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		return err
 	}
 	if c.Output != nil {
-		id := toString(payload["id"])
-		status := toString(payload["status"]) // runs use 'status'
-		if status == "" {
-			status = toString(payload["state"]) // fallback if server returns 'state'
+		// Prefer mods TicketSummary shape; fall back to legacy keys if present.
+		id := toString(payload["ticket_id"])
+		if id == "" {
+			id = toString(payload["id"]) // legacy fallback
 		}
-		step := toString(payload["step_id"]) // best‑effort
-		_, _ = fmt.Fprintf(c.Output, "Job %s: %s step=%s\n", id, status, step)
+		status := toString(payload["status"]) // common in both
+		step := toString(payload["step_id"])  // may be empty
+		// Keep message format stable enough for tests while reflecting new facade.
+		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s step=%s\n", id, status, step)
 	}
 	return nil
 }

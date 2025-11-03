@@ -347,7 +347,7 @@ See also:
 dist/ploy runs follow <run-id>
 ```
 
-Logs stream via SSE from `/v1/runs/{id}/events`. Final logs are persisted in PostgreSQL.
+Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in PostgreSQL.
 
 ### TTL and Cleanup
 
@@ -385,7 +385,7 @@ renew via your external process.
 
 Legacy endpoint notice:
 - All `/v1/jobs*` endpoints and `/v1/mods/{ticket}/logs/stream` have been removed. Use `/v1/runs/*` and `/v1/nodes/*` equivalents:
-  - Logs: `GET /v1/runs/{id}/events`
+  - Logs: `GET /v1/mods/{id}/events`
   - Heartbeat/complete: `POST /v1/nodes/{id}/heartbeat` and `POST /v1/nodes/{id}/complete`
 
 ## Connectivity and Authentication
