@@ -79,6 +79,9 @@ To check status:
 - `--postgresql-dsn <dsn>` — Use an external PostgreSQL instance instead of installing locally.
 - `--user <name>` / `--ssh-port <port>` / `--identity <path>` — Override SSH connection parameters.
 - `--ployd-binary <path>` — Explicit path to the `ployd` server binary to upload (defaults to alongside the CLI).
+ - `--reuse[=true|false]` — When true (default), attempts to detect an existing cluster on the host and reuse its CA and server certificate. When false, skips detection.
+ - `--force-new-ca` — Force generation of a new cluster CA and server certificate, even if a cluster is detected (overrides `--reuse`).
+ - `--refresh-admin-cert` — Placeholder; planned to request a new CLI admin certificate from the server in a later slice. Currently ignored with a warning.
 
 Example:
 

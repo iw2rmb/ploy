@@ -83,6 +83,11 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
   dist/ploy server deploy --address <host-or-ip>
   ```
 
+  Notes:
+  - By default, the command attempts to detect and reuse an existing cluster CA/server certificate on the host (`--reuse=true`).
+  - To force a fresh PKI, pass `--force-new-ca` (or `--reuse=false`).
+  - `--refresh-admin-cert` is reserved for a follow-up slice and is currently ignored with a warning.
+
 - Add worker nodes to the cluster:
 
   ```bash
