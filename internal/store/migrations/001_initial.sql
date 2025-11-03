@@ -168,18 +168,21 @@ CREATE TABLE IF NOT EXISTS logs (
 -- CREATE TABLE IF NOT EXISTS logs_2025_10 PARTITION OF logs
 --   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
 
-CREATE UNIQUE INDEX IF NOT EXISTS logs_run_stage_build_chunk_uniq ON logs(run_id, stage_id, build_id, chunk_no);
+-- Uniqueness across chunk numbers must include the partition key (created_at)
+-- to satisfy Postgres partitioned-table constraints.
+CREATE UNIQUE INDEX IF NOT EXISTS logs_run_stage_build_chunk_uniq ON logs(run_id, stage_id, build_id, chunk_no, created_at);
 CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
 
 -- Artifact bundles (zipped tar of changed files or outputs)
 CREATE TABLE IF NOT EXISTS artifact_bundles (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id         UUID NOT NULL DEFAULT gen_random_uuid(),
   run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
   build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
   name       TEXT,                -- optional logical name
   bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
 -- Example partition stub
@@ -191,7 +194,7 @@ CREATE INDEX IF NOT EXISTS artifact_bundles_stage_idx ON artifact_bundles(stage_
 
 -- Node metrics history (optional, TTL purged; latest snapshot lives in nodes)
 CREATE TABLE IF NOT EXISTS node_metrics (
-  id               BIGSERIAL PRIMARY KEY,
+  id               BIGSERIAL NOT NULL,
   node_id          UUID NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
   cpu_total_millis INTEGER NOT NULL DEFAULT 0,
@@ -199,7 +202,8 @@ CREATE TABLE IF NOT EXISTS node_metrics (
   mem_total_bytes  BIGINT  NOT NULL DEFAULT 0,
   mem_free_bytes   BIGINT  NOT NULL DEFAULT 0,
   disk_total_bytes BIGINT  NOT NULL DEFAULT 0,
-  disk_free_bytes  BIGINT  NOT NULL DEFAULT 0
+  disk_free_bytes  BIGINT  NOT NULL DEFAULT 0,
+  PRIMARY KEY (id, created_at)
 ) PARTITION BY RANGE (created_at);
 
 -- Example partition stub
