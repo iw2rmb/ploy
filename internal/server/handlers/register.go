@@ -23,6 +23,9 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
 
+	// Mods ticket submission (new simplified API)
+	s.HandleFunc("POST /v1/mods", submitTicketHandler(st), auth.RoleControlPlane)
+
 	// Mods CRUD
 	s.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)

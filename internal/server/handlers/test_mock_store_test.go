@@ -29,6 +29,11 @@ type mockStore struct {
 	getRepoResult store.Repo
 	getRepoErr    error
 
+	getRepoByURLCalled bool
+	getRepoByURLParams string
+	getRepoByURLResult store.Repo
+	getRepoByURLErr    error
+
 	deleteRepoCalled bool
 	deleteRepoParams pgtype.UUID
 	deleteRepoErr    error
@@ -156,6 +161,12 @@ func (m *mockStore) GetRepo(ctx context.Context, id pgtype.UUID) (store.Repo, er
 	m.getRepoCalled = true
 	m.getRepoParams = id
 	return m.getRepoResult, m.getRepoErr
+}
+
+func (m *mockStore) GetRepoByURL(ctx context.Context, url string) (store.Repo, error) {
+	m.getRepoByURLCalled = true
+	m.getRepoByURLParams = url
+	return m.getRepoByURLResult, m.getRepoByURLErr
 }
 
 func (m *mockStore) DeleteRepo(ctx context.Context, id pgtype.UUID) error {
