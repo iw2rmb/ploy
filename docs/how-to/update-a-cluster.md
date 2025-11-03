@@ -61,6 +61,13 @@ The rollout command will:
 4. Poll for health and verify the service is active
 5. Verify the API port (8443) is listening
 
+Dry‑run the server rollout to preview actions without changes:
+
+```bash
+dist/ploy rollout server --address 45.9.42.212 --binary dist/ployd-linux --dry-run
+```
+Output lists the upload, install, restart, health checks, and port verification steps and ends with a "Dry run complete" notice.
+
 Sanity checks:
 
 ```bash
@@ -250,3 +257,9 @@ ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin
 
 **Warning:** The manual approach lacks the health checks and retries that the rollout
 command provides. Use the CLI command when possible.
+Dry‑run the nodes rollout to preview matched nodes, batching, and per‑node steps:
+
+```bash
+dist/ploy rollout nodes --all --binary dist/ployd-node-linux --dry-run
+```
+The dry‑run prints a `DRY RUN` header, the selected nodes, batching size, and the planned actions for each node (drain → idle wait → upload/install → restart → heartbeat → undrain). No changes are made.
