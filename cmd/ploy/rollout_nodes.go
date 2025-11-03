@@ -43,8 +43,8 @@ func handleRolloutNodes(args []string, stderr io.Writer) error {
 
 	fs.Var(&all, "all", "Roll out all nodes in the cluster")
 	fs.Var(&selector, "selector", "Node name pattern (e.g., 'worker-*')")
-	fs.Var(&concurrency, "concurrency", "Number of nodes to update concurrently (default: 1)")
-	fs.Var(&binary, "binary", "Path to the ployd binary for upload (default: alongside the CLI)")
+	fs.Var(&concurrency, "concurrency", "Number of nodes to update per batch (default: 1)")
+	fs.Var(&binary, "binary", "Path to the ployd-node binary for upload (default: alongside the CLI)")
 	fs.Var(&identity, "identity", "SSH private key used for node connection (default: ~/.ssh/id_rsa)")
 	fs.Var(&userFlag, "user", "SSH username for node connection (default: root)")
 	fs.Var(&sshPort, "ssh-port", "SSH port for node connection (default: 22)")
@@ -109,7 +109,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 		return fmt.Errorf("rollout nodes: %w", err)
 	}
 
-	ploydBinaryPath, err := resolvePloydBinaryPath(stringValue{set: cfg.BinaryPath != "", value: cfg.BinaryPath})
+	ploydBinaryPath, err := resolvePloydNodeBinaryPath(stringValue{set: cfg.BinaryPath != "", value: cfg.BinaryPath})
 	if err != nil {
 		return fmt.Errorf("rollout nodes: %w", err)
 	}
@@ -145,7 +145,7 @@ func runRolloutNodes(cfg rolloutNodesConfig, stderr io.Writer) error {
 
 	_, _ = fmt.Fprintf(stderr, "Rolling out Ploy nodes\n")
 	_, _ = fmt.Fprintf(stderr, "  Selector: %s\n", selectorDescription(cfg.All, cfg.Selector))
-	_, _ = fmt.Fprintf(stderr, "  Concurrency: %d\n", concurrency)
+	_, _ = fmt.Fprintf(stderr, "  Batch size: %d\n", concurrency)
 	_, _ = fmt.Fprintf(stderr, "  SSH User: %s\n", user)
 	_, _ = fmt.Fprintf(stderr, "  SSH Port: %d\n", sshPort)
 	_, _ = fmt.Fprintf(stderr, "  Identity: %s\n", identityPath)
@@ -472,22 +472,22 @@ func executeRolloutNode(ctx context.Context, node nodeInfo, opts rolloutNodeOpti
 		return fmt.Errorf("upload binary: %w", err)
 	}
 
-	// Install the binary.
-	installCmd := fmt.Sprintf("install -m0755 %s /usr/local/bin/ployd && rm -f %s", remoteBinaryPath, remoteBinaryPath)
+	// Install the ployd-node binary.
+	installCmd := fmt.Sprintf("install -m0755 %s /usr/local/bin/ployd-node && rm -f %s", remoteBinaryPath, remoteBinaryPath)
 	installArgs := append(append([]string(nil), sshArgs...), target, installCmd)
 	if err := runner.Run(ctx, "ssh", installArgs, nil, streams); err != nil {
 		return fmt.Errorf("install binary: %w", err)
 	}
 
-	// Restart the ployd service.
-	restartCmd := "systemctl restart ployd"
+	// Restart the ployd-node service.
+	restartCmd := "systemctl restart ployd-node"
 	restartArgs := append(append([]string(nil), sshArgs...), target, restartCmd)
 	if err := runner.Run(ctx, "ssh", restartArgs, nil, streams); err != nil {
 		return fmt.Errorf("restart service: %w", err)
 	}
 
 	// Poll for service to become active.
-	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd", streams); err != nil {
+	if err := pollServiceActive(ctx, runner, sshArgs, target, "ployd-node", streams); err != nil {
 		return fmt.Errorf("service health check: %w", err)
 	}
 
