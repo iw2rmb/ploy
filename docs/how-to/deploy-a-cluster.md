@@ -81,7 +81,7 @@ To check status:
 - `--ployd-binary <path>` — Explicit path to the `ployd` server binary to upload (defaults to alongside the CLI).
  - `--reuse[=true|false]` — When true (default), attempts to detect an existing cluster on the host and reuse its CA and server certificate. When false, skips detection.
  - `--force-new-ca` — Force generation of a new cluster CA and server certificate, even if a cluster is detected (overrides `--reuse`).
- - `--refresh-admin-cert` — Placeholder; planned to request a new CLI admin certificate from the server in a later slice. Currently ignored with a warning.
+ - `--refresh-admin-cert` — Refresh the local CLI admin mTLS bundle for the default cluster by generating a CSR and calling the server's `/v1/pki/sign/admin` endpoint. Writes `~/.config/ploy/certs/<cluster>-{ca,admin}.{crt,key}` and updates the default descriptor's `ca_path/cert_path/key_path`. Intended for reuse flows where the server already has a CA, and your workstation needs a fresh admin certificate. Note: the server must permit the request (mTLS in production; tests may run with an insecure authorizer).
 
 Example:
 
