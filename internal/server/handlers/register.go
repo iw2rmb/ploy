@@ -29,16 +29,12 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 
-	// Runs (control plane)
-	s.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+	// Runs (control plane) — legacy write/management endpoints
 	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/runs/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
 
 	// Node management endpoints
 	s.HandleFunc("GET /v1/nodes", listNodesHandler(st), auth.RoleControlPlane)

@@ -7,8 +7,9 @@ info:
     require mutual TLS authentication. Bearer token auth has been removed.
     Primary endpoints include the simplified Mods facade under `/v1/mods` (ticket
     submission, status, events, and artifact uploads). The `/v1/mods/crud` surface
-    has been removed; clients submit tickets directly via POST /v1/mods. Legacy
-    run-centric surfaces remain under `/v1/runs/*` and will be retired in Phase 2.
+    has been removed; clients submit tickets directly via POST /v1/mods. Read and
+    stream routes under `/v1/runs` have been retired; use `/v1/mods/*` instead.
+    Legacy write endpoints remain under `/v1/runs/{id}/*` for internal use.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -50,12 +51,8 @@ paths:
     $ref: './paths/mods_id_events.yaml'
   /v1/mods/{id}/artifact_bundles:
     $ref: './paths/mods_id_artifact_bundles.yaml'
-  /v1/runs:
-    $ref: './paths/runs.yaml'
   /v1/runs/{id}:
     $ref: './paths/runs_id.yaml'
-  /v1/runs/{id}/events:
-    $ref: './paths/runs_id_events.yaml'
   /v1/runs/{id}/timing:
     $ref: './paths/runs_id_timing.yaml'
   /v1/runs/{id}/diffs:

@@ -3,20 +3,10 @@ parameters:
     name: id
     required: true
     schema: { type: string, format: uuid }
-get:
-  tags: [Control]
-  summary: Get run by ID
-  responses:
-    '200':
-      description: OK
-      content:
-        application/json:
-          schema:
-            $ref: '../components/schemas/controlplane.yaml#/Run'
-    '404': { description: Not Found }
 delete:
   tags: [Control]
   summary: Delete run
+  description: Legacy management endpoint for deleting runs.
   responses:
     '204': { description: No Content }
     '404': { description: Not Found }

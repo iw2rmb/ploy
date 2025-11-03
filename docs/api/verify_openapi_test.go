@@ -47,13 +47,9 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/{id}", "get"},
 		{"/v1/mods/{id}/events", "get"},
 		{"/v1/mods/{id}/artifact_bundles", "post"},
-		// Runs
-		{"/v1/runs", "post"},
-		{"/v1/runs", "get"},
-		{"/v1/runs/{id}", "get"},
+		// Runs (legacy write/management endpoints only; read/stream moved to /v1/mods)
 		{"/v1/runs/{id}", "delete"},
 		{"/v1/runs/{id}/timing", "get"},
-		{"/v1/runs/{id}/events", "get"},
 		{"/v1/runs/{id}/logs", "post"},
 		{"/v1/runs/{id}/diffs", "post"},
 		{"/v1/runs/{id}/artifact_bundles", "post"},
