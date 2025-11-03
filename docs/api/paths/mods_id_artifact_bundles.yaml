@@ -1,0 +1,25 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+post:
+  tags: [Artifacts]
+  summary: Ingest a gzipped artifact bundle for a ticket (mods facade)
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/CreateArtifactBundleRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/ArtifactBundle'
+    '400': { description: Bad Request }
+    '404': { description: Ticket Not Found }
+    '413': { description: Payload Too Large }
+

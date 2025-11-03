@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -177,6 +178,31 @@ func TestCreateModArtifactBundleHandler_TooLarge(t *testing.T) {
 	h.ServeHTTP(rr, req)
 	if rr.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("want 413 got %d", rr.Code)
+	}
+}
+
+// Ensure 404 is returned when the ticket (run) does not exist.
+type mockStoreRunArtifactsNotFound struct {
+	store.Store
+}
+
+func (m *mockStoreRunArtifactsNotFound) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
+	return store.Run{}, pgx.ErrNoRows
+}
+
+func TestCreateModArtifactBundleHandler_RunNotFound(t *testing.T) {
+	modID := uuid.New()
+	ms := &mockStoreRunArtifactsNotFound{}
+	h := createRunArtifactBundleHandler(ms)
+	payload := map[string]any{"bundle": []byte("gz-tar")}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
+	req.SetPathValue("id", modID.String())
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("want 404 got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 

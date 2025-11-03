@@ -53,6 +53,8 @@ paths:
     $ref: './paths/mods_id.yaml'
   /v1/mods/{id}/events:
     $ref: './paths/mods_id_events.yaml'
+  /v1/mods/{id}/artifact_bundles:
+    $ref: './paths/mods_id_artifact_bundles.yaml'
   /v1/runs:
     $ref: './paths/runs.yaml'
   /v1/runs/{id}:
