@@ -53,6 +53,7 @@ type Querier interface {
 	GetRepoByURL(ctx context.Context, url string) (Repo, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
+	GetRunWithRepo(ctx context.Context, id pgtype.UUID) (GetRunWithRepoRow, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)

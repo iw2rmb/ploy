@@ -148,6 +148,53 @@ func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming,
 	return i, err
 }
 
+const getRunWithRepo = `-- name: GetRunWithRepo :one
+SELECT r.id, r.mod_id, r.status, r.reason, r.created_at, r.started_at, r.finished_at,
+       r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats,
+       repos.url AS repo_url
+FROM runs r
+INNER JOIN mods ON mods.id = r.mod_id
+INNER JOIN repos ON repos.id = mods.repo_id
+WHERE r.id = $1
+`
+
+type GetRunWithRepoRow struct {
+	ID         pgtype.UUID        `json:"id"`
+	ModID      pgtype.UUID        `json:"mod_id"`
+	Status     RunStatus          `json:"status"`
+	Reason     *string            `json:"reason"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	NodeID     pgtype.UUID        `json:"node_id"`
+	BaseRef    string             `json:"base_ref"`
+	TargetRef  string             `json:"target_ref"`
+	CommitSha  *string            `json:"commit_sha"`
+	Stats      []byte             `json:"stats"`
+	RepoUrl    string             `json:"repo_url"`
+}
+
+func (q *Queries) GetRunWithRepo(ctx context.Context, id pgtype.UUID) (GetRunWithRepoRow, error) {
+	row := q.db.QueryRow(ctx, getRunWithRepo, id)
+	var i GetRunWithRepoRow
+	err := row.Scan(
+		&i.ID,
+		&i.ModID,
+		&i.Status,
+		&i.Reason,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.NodeID,
+		&i.BaseRef,
+		&i.TargetRef,
+		&i.CommitSha,
+		&i.Stats,
+		&i.RepoUrl,
+	)
+	return i, err
+}
+
 const listRuns = `-- name: ListRuns :many
 SELECT id, mod_id, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 ORDER BY created_at DESC

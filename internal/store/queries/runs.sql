@@ -65,3 +65,12 @@ SELECT id,
 FROM runs_timing
 ORDER BY id DESC
 LIMIT $1 OFFSET $2;
+
+-- name: GetRunWithRepo :one
+SELECT r.id, r.mod_id, r.status, r.reason, r.created_at, r.started_at, r.finished_at,
+       r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats,
+       repos.url AS repo_url
+FROM runs r
+INNER JOIN mods ON mods.id = r.mod_id
+INNER JOIN repos ON repos.id = mods.repo_id
+WHERE r.id = $1;

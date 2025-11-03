@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -141,5 +142,84 @@ func submitTicketHandler(st store.Store) http.HandlerFunc {
 			"target_ref", req.TargetRef,
 			"status", "queued",
 		)
+	}
+}
+
+// getTicketStatusHandler returns an HTTP handler that fetches ticket (run) status by ID.
+// GET /v1/mods/{id} — Returns TicketSummary by run UUID.
+func getTicketStatusHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse the ticket ID from the URL path parameter.
+		ticketIDStr := r.PathValue("id")
+		if ticketIDStr == "" {
+			http.Error(w, "ticket id is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse UUID.
+		ticketID, err := uuid.Parse(ticketIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid ticket id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Convert to pgtype.UUID.
+		pgID := pgtype.UUID{
+			Bytes: ticketID,
+			Valid: true,
+		}
+
+		// Fetch run with repo URL.
+		runWithRepo, err := st.GetRunWithRepo(r.Context(), pgID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "ticket not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, fmt.Sprintf("failed to get ticket: %v", err), http.StatusInternalServerError)
+			slog.Error("get ticket status: fetch run failed", "ticket_id", ticketIDStr, "err", err)
+			return
+		}
+
+		// Build TicketSummary response.
+		resp := struct {
+			TicketID   string  `json:"ticket_id"`
+			Status     string  `json:"status"`
+			Reason     *string `json:"reason,omitempty"`
+			RepoURL    string  `json:"repo_url"`
+			BaseRef    string  `json:"base_ref"`
+			TargetRef  string  `json:"target_ref"`
+			CommitSha  *string `json:"commit_sha,omitempty"`
+			CreatedAt  string  `json:"created_at"`
+			StartedAt  *string `json:"started_at,omitempty"`
+			FinishedAt *string `json:"finished_at,omitempty"`
+		}{
+			TicketID:  uuid.UUID(runWithRepo.ID.Bytes).String(),
+			Status:    string(runWithRepo.Status),
+			Reason:    runWithRepo.Reason,
+			RepoURL:   runWithRepo.RepoUrl,
+			BaseRef:   runWithRepo.BaseRef,
+			TargetRef: runWithRepo.TargetRef,
+			CommitSha: runWithRepo.CommitSha,
+		}
+
+		// Format timestamps consistently (RFC3339).
+		if runWithRepo.CreatedAt.Valid {
+			resp.CreatedAt = runWithRepo.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		}
+		if runWithRepo.StartedAt.Valid {
+			formatted := runWithRepo.StartedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+			resp.StartedAt = &formatted
+		}
+		if runWithRepo.FinishedAt.Valid {
+			formatted := runWithRepo.FinishedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+			resp.FinishedAt = &formatted
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("get ticket status: encode response failed", "err", err)
+		}
 	}
 }
