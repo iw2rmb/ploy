@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/worker/worker/hydration"
+	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
