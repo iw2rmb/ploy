@@ -5,7 +5,8 @@ info:
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS authentication. Bearer token auth has been removed.
-    Endpoints are available under `/v1/runs/*`.
+    Primary endpoints include the simplified Mods facade under `/v1/mods` and
+    run-centric surfaces under `/v1/runs/*`.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -43,6 +44,8 @@ paths:
     $ref: './paths/mods_crud.yaml'
   /v1/mods:
     $ref: './paths/mods.yaml'
+  /v1/mods/{id}:
+    $ref: './paths/mods_id.yaml'
   /v1/mods/crud/{id}:
     $ref: './paths/mods_crud_id.yaml'
   /v1/runs:
@@ -133,6 +136,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/TicketSubmitRequest'
     TicketSummary:
       $ref: './components/schemas/controlplane.yaml#/TicketSummary'
+    TicketStatus:
+      $ref: './components/schemas/controlplane.yaml#/TicketStatus'
     NodeClaimResponse:
       $ref: './components/schemas/controlplane.yaml#/NodeClaimResponse'
     Event:
