@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iw2rmb/ploy/internal/node/logstream"
 	"github.com/iw2rmb/ploy/internal/store"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

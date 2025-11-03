@@ -15,7 +15,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/node/lifecycle"
+	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
 )
 
 // HeartbeatPayload contains resource snapshot data sent to the server.

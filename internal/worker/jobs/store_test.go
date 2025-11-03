@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/node/jobs"
+	"github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
 // TestStore_StartListComplete_Bounds verifies ordering and retention bounds.
