@@ -27,6 +27,8 @@ func handleRollout(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "server":
 		return handleRolloutServer(args[1:], stderr)
+	case "nodes":
+		return handleRolloutNodes(args[1:], stderr)
 	default:
 		printRolloutUsage(stderr)
 		return fmt.Errorf("unknown rollout subcommand %q", args[0])
