@@ -30,8 +30,8 @@ Legend: [ ] todo, [x] done.
 - [x] Rollout command for control plane
   - Change: `cmd/ploy/rollout_server.go` — `ploy rollout server --address <A> [--binary <path>] [--timeout 60s]` → scp, restart, poll active, verify `ss -tlnp` and metrics.
   - Test: use recording runner to assert command sequence & retries; `-short` guard for timing.
-- [ ] Docs update (update guide)
-  - Change: `docs/how-to/update-a-cluster.md` — replace ad‑hoc scp/ssh with `ploy rollout server`; keep old commands in an appendix (“Backdoor”).
+- [x] Docs update (update guide)
+  - Change: `docs/how-to/update-a-cluster.md` — replace ad‑hoc scp/ssh with `ploy rollout server`; keep old commands in an appendix ("Backdoor").
   - Test: lint docs; check cross‑references.
 
 ## Phase 3 — Node Drain + Rollout
