@@ -137,6 +137,131 @@ dist/ploy mod run --repo-url https://github.com/example/repo.git \
 The server schedules the run, and a node claims it, clones the repository shallow, executes the build gate,
 and uploads logs/diffs/artifacts to PostgreSQL.
 
+## Reuse Existing Cluster
+
+When redeploying a Ploy server to a host that already contains a cluster, the deploy command automatically detects and reuses the existing cluster CA and server identity. This enables **idempotent** deployments: running `ploy server deploy` multiple times against the same host will not clobber PKI material or cluster identity.
+
+### How Detection Works
+
+The deploy command probes the target host for:
+- `/etc/ploy/pki/ca.crt` — Existing cluster CA certificate
+- `/etc/ploy/ployd.yaml` — Existing server configuration
+
+When both are found, the command:
+1. Parses the server certificate subject (CN: `ployd-<clusterID>`) to extract the cluster ID.
+2. Skips CA generation and server certificate issuance.
+3. Skips writing PKI files to `/etc/ploy/pki/` (bootstrap script detects `/etc/ploy/pki/ca.key` and omits CA/server writes).
+4. Uses the existing cluster ID for local descriptor updates.
+5. Restarts the `ployd.service` with the existing configuration.
+
+### Flags
+
+- **`--reuse`** (default: `true`) — Enable detection and reuse of an existing cluster. When detection succeeds, the CA and server certificate are preserved.
+- **`--force-new-ca`** — Force generation of a new cluster CA and server certificate, even if an existing cluster is detected. This overrides `--reuse` and is useful for cluster reinitialization. **Warning**: This invalidates all existing node certificates; nodes must be re-added.
+- **`--refresh-admin-cert`** — Generate a new admin mTLS certificate bundle for the CLI. This flag is intended for reuse scenarios where the server already has a CA, but your local workstation needs a fresh admin certificate. The command generates a CSR locally and submits it to the server's `/v1/pki/sign/admin` endpoint. The resulting certificate and CA are written to `~/.config/ploy/certs/<cluster>-{ca,admin}.{crt,key}`, and the default descriptor's `ca_path`, `cert_path`, and `key_path` are updated.
+
+### Expected Outputs
+
+#### Reuse (Default Behavior)
+
+When deploying to a host with an existing cluster (with `--reuse=true` or omitted):
+
+```
+Detecting existing cluster on 203.0.113.42...
+Found existing cluster: alpha-cluster
+Reusing CA and server certificate.
+
+Updating server binary...
+Restarting ployd.service...
+
+========================================
+Bootstrap completed successfully.
+========================================
+
+Configuration:
+  Config file: /etc/ploy/ployd.yaml
+  PKI directory: /etc/ploy/pki
+    - CA cert: /etc/ploy/pki/ca.crt (reused)
+    - Server cert: /etc/ploy/pki/server.crt (reused)
+    - Server key: /etc/ploy/pki/server.key (reused)
+
+Service:
+  Service name: ployd.service
+  Status: active
+  Enabled: enabled
+
+To view logs:
+  journalctl -u ployd.service -f
+
+To check status:
+  systemctl status ployd.service
+```
+
+#### Force New CA
+
+When deploying with `--force-new-ca`:
+
+```
+Forcing new cluster CA and server certificate.
+Generating new cluster CA...
+Issuing new server certificate...
+
+Installing server binary...
+Writing PKI files to /etc/ploy/pki...
+Creating systemd service...
+
+========================================
+Bootstrap completed successfully.
+========================================
+
+Configuration:
+  Config file: /etc/ploy/ployd.yaml
+  PKI directory: /etc/ploy/pki
+    - CA cert: /etc/ploy/pki/ca.crt
+    - Server cert: /etc/ploy/pki/server.crt
+    - Server key: /etc/ploy/pki/server.key
+
+Service:
+  Service name: ployd.service
+  Status: active
+  Enabled: enabled
+
+Warning: All existing node certificates are now invalid and must be re-issued.
+
+To view logs:
+  journalctl -u ployd.service -f
+```
+
+#### Refresh Admin Certificate
+
+When deploying with `--refresh-admin-cert`:
+
+```
+Detecting existing cluster on 203.0.113.42...
+Found existing cluster: alpha-cluster
+Reusing CA and server certificate.
+
+Refreshing admin certificate...
+Generating admin CSR...
+Submitting CSR to /v1/pki/sign/admin...
+Writing admin certificate to ~/.config/ploy/certs/alpha-cluster-admin.crt
+Writing admin key to ~/.config/ploy/certs/alpha-cluster-admin.key
+Writing CA to ~/.config/ploy/certs/alpha-cluster-ca.crt
+Updating descriptor at ~/.config/ploy/clusters/alpha-cluster.json
+
+Admin certificate refreshed successfully.
+
+========================================
+Bootstrap completed successfully.
+========================================
+```
+
+### Use Cases
+
+- **Idempotent deployment**: Redeploy a server (e.g., after a binary upgrade) without changing cluster identity or invalidating node certificates.
+- **Workstation refresh**: Use `--refresh-admin-cert` to obtain a new admin certificate when moving to a new machine or after your local certificate expires.
+- **Cluster reinitialization**: Use `--force-new-ca` to start fresh (requires re-adding all nodes).
+
 ## VPS Lab Walkthrough (1× Server, 2× Nodes)
 
 Use the shared VPS lab nodes from `AGENTS.md`:

@@ -22,8 +22,8 @@ Legend: [ ] todo, [x] done.
 - [x] Bootstrap must not clobber existing PKI on primary
   - Change: `internal/deploy/bootstrap/bootstrap.go` — if `/etc/ploy/pki/ca.key` exists, skip writing any PKI files; log reuse.
   - Test: `internal/deploy/bootstrap_test.go` — script contains reuse branch and omits CA/server writes.
-- [ ] Docs update (deploy)
-  - Change: `docs/how-to/deploy-a-cluster.md` — add “Reuse existing cluster” section; document `--reuse/--force-new-ca/--refresh-admin-cert` and expected outputs.
+- [x] Docs update (deploy)
+  - Change: `docs/how-to/deploy-a-cluster.md` — add "Reuse existing cluster" section; document `--reuse/--force-new-ca/--refresh-admin-cert` and expected outputs.
   - Test: run `markdownlint` and sanity‑read links.
 
 ## Phase 2 — Server Rollout
