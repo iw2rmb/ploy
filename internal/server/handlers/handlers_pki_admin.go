@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -126,17 +127,22 @@ func validateAdminCSR(csrPEM []byte) error {
 	}
 
 	// Validate ExtKeyUsage requests ClientAuth.
-	// In x509.CertificateRequest, extended key usages are stored in ExtraExtensions
-	// since CSRs don't have a dedicated ExtKeyUsage field.
-	// We check for the presence of the ExtKeyUsage extension (OID 2.5.29.37).
-	hasClientAuthEKU := false
+	// In CSRs, requested extensions are carried in the extensionRequest
+	// attribute and exposed via csr.Extensions by the x509 parser. The
+	// ExtKeyUsage OID is 2.5.29.37; its value is a SEQUENCE of OIDs.
+	var hasClientAuthEKU bool
 	for _, ext := range csr.Extensions {
-		// OID for ExtKeyUsage is 2.5.29.37
-		if ext.Id.Equal([]int{2, 5, 29, 37}) {
-			// Parse the extension value to check for ClientAuth (1.3.6.1.5.5.7.3.2)
-			// For simplicity, we'll accept any ExtKeyUsage extension as valid
-			// and rely on the PKI package's SignNodeCSR to set the correct EKU.
-			hasClientAuthEKU = true
+		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 37}) { // extKeyUsage
+			var oids []asn1.ObjectIdentifier
+			if _, err := asn1.Unmarshal(ext.Value, &oids); err != nil {
+				return fmt.Errorf("parse EKU extension: %w", err)
+			}
+			for _, oid := range oids {
+				if oid.Equal(asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 2}) { // clientAuth
+					hasClientAuthEKU = true
+					break
+				}
+			}
 			break
 		}
 	}

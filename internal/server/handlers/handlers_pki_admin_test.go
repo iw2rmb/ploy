@@ -197,6 +197,12 @@ func TestPKISignAdminHandlerValidatesCSR(t *testing.T) {
 			want:    http.StatusBadRequest,
 			wantErr: "invalid admin CSR",
 		},
+		{
+			name:    "EKU present without ClientAuth",
+			csr:     generateCSRWithEKUWithoutClientAuth(t),
+			want:    http.StatusBadRequest,
+			wantErr: "invalid admin CSR",
+		},
 	}
 
 	for _, tc := range cases {
@@ -552,6 +558,50 @@ func generateCSRWithoutEKU(t *testing.T) string {
 			OrganizationalUnit: []string{"Ploy role=cli-admin"},
 		},
 		// No ExtraExtensions - missing EKU extension
+	}
+
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, privKey)
+	if err != nil {
+		t.Fatalf("create CSR: %v", err)
+	}
+
+	csrPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE REQUEST",
+		Bytes: csrDER,
+	})
+
+	return string(csrPEM)
+}
+
+// generateCSRWithEKUWithoutClientAuth generates a CSR that requests EKUs but
+// omits ClientAuth (includes only ServerAuth) to ensure validation fails.
+func generateCSRWithEKUWithoutClientAuth(t *testing.T) string {
+	t.Helper()
+
+	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{
+			CommonName:         "cli-admin-test",
+			Organization:       []string{"Ploy"},
+			OrganizationalUnit: []string{"Ploy role=cli-admin"},
+		},
+	}
+
+	// Add ExtKeyUsage extension for ServerAuth only (1.3.6.1.5.5.7.3.1)
+	serverAuthOID := asn1.ObjectIdentifier{1, 3, 6, 1, 5, 5, 7, 3, 1}
+	ekuValue, err := asn1.Marshal([]asn1.ObjectIdentifier{serverAuthOID})
+	if err != nil {
+		t.Fatalf("marshal EKU: %v", err)
+	}
+	template.ExtraExtensions = []pkix.Extension{
+		{
+			Id:    asn1.ObjectIdentifier{2, 5, 29, 37},
+			Value: ekuValue,
+		},
 	}
 
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, template, privKey)

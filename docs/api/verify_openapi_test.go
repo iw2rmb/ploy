@@ -35,6 +35,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 	}{
 		// PKI
 		{"/v1/pki/sign", "post"},
+		{"/v1/pki/sign/admin", "post"},
 		// Repos
 		{"/v1/repos", "post"},
 		{"/v1/repos", "get"},
@@ -122,6 +123,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 	requiredSchemas := []string{
 		"PKISignRequest",
 		"PKISignResponse",
+		"PKIAdminSignRequest",
 		"Repo",
 		"CreateRepoRequest",
 		"Mod",
