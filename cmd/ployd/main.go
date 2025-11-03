@@ -10,8 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/iw2rmb/ploy/internal/api/config"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 

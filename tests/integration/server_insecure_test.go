@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/iw2rmb/ploy/internal/api/config"
-	"github.com/iw2rmb/ploy/internal/api/events"
-	"github.com/iw2rmb/ploy/internal/api/httpserver"
 	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	"github.com/iw2rmb/ploy/internal/server/config"
+	"github.com/iw2rmb/ploy/internal/server/events"
+	httpserver "github.com/iw2rmb/ploy/internal/server/http"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 

@@ -12,12 +12,10 @@ _ploy() {
             commands=()
             commands+=("mod:Plan and run Mods workflows")
             commands+=("mods:Observe Mods execution (logs, events)")
-            commands+=("jobs:Inspect and follow individual jobs")
-            commands+=("upload:Upload repository or log bundles via HTTPS")
-            commands+=("report:Download reports or artifacts via HTTPS")
+            commands+=("runs:Inspect and follow individual runs")
+            commands+=("upload:Upload artifact bundle to a run (HTTPS)")
             commands+=("cluster:Manage local cluster descriptors")
             commands+=("config:Inspect or update cluster configuration")
-            commands+=("environment:Materialize integration environments")
             commands+=("manifest:Inspect and validate integration manifests")
             commands+=("knowledge-base:Curate knowledge base fixtures")
             commands+=("server:Manage control plane server")
@@ -41,13 +39,11 @@ _ploy() {
                     commands+=("logs:logs <ticket> - Stream Mods logs via SSE (raw|structured formats, auto-retry)")
                     _describe 'mods command' commands && ret=0
                     ;;
-                'jobs')
+                'runs')
                     commands=()
-                    commands+=("follow:follow <job-id> - Follow job logs via SSE with retry semantics")
-                    commands+=("ls:List jobs for a Mods ticket")
-                    commands+=("inspect:Show details for a job")
-                    commands+=("retry:Request a retry for a failed job")
-                    _describe 'jobs command' commands && ret=0
+                    commands+=("follow:follow <run-id> - Follow run logs via SSE with retry semantics")
+                    commands+=("inspect:Show details for a run")
+                    _describe 'runs command' commands && ret=0
                     ;;
                 'cluster')
                     commands=()
@@ -62,11 +58,6 @@ _ploy() {
                     commands=()
                     commands+=("gitlab:Manage GitLab integration credentials")
                     _describe 'config command' commands && ret=0
-                    ;;
-                'environment')
-                    commands=()
-                    commands+=("materialize:Materialize integration environments from manifests")
-                    _describe 'environment command' commands && ret=0
                     ;;
                 'manifest')
                     commands=()

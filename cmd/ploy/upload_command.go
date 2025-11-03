@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,9 +24,15 @@ func handleUpload(args []string, stderr io.Writer) error {
 	}
 	fs := flag.NewFlagSet("upload", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	jobID := fs.String("job-id", "", "Job or ticket identifier associated with the payload")
-	kind := fs.String("kind", "repo", "Transfer kind (repo|logs|report)")
-	nodeOverride := fs.String("node-id", "", "Override node identifier for the transfer (optional)")
+	// New flags
+	runID := fs.String("run-id", "", "Run identifier to attach the artifact bundle to (UUID)")
+	stageID := fs.String("stage-id", "", "Optional stage identifier (UUID)")
+	buildID := fs.String("build-id", "", "Optional build identifier (UUID)")
+	name := fs.String("name", "", "Optional artifact name override (defaults to filename)")
+	// Backward-compat: accept --job-id as an alias for --run-id
+	jobIDCompat := fs.String("job-id", "", "(deprecated) alias for --run-id")
+	// Deprecated/ignored flags retained for compatibility; no-ops
+	_ = fs.String("kind", "", "(deprecated; ignored)")
 	if err := fs.Parse(args); err != nil {
 		printUploadUsage(stderr)
 		return err
@@ -33,54 +42,66 @@ func handleUpload(args []string, stderr io.Writer) error {
 		printUploadUsage(stderr)
 		return errors.New("upload path required")
 	}
-	trimmedJob := strings.TrimSpace(*jobID)
-	if trimmedJob == "" {
+	trimmedRun := strings.TrimSpace(*runID)
+	if trimmedRun == "" {
+		trimmedRun = strings.TrimSpace(*jobIDCompat)
+	}
+	if trimmedRun == "" {
 		printUploadUsage(stderr)
-		return errors.New("--job-id is required")
+		return errors.New("--run-id is required")
 	}
 	payloadPath := remaining[0]
 	info, err := os.Stat(payloadPath)
 	if err != nil {
 		return fmt.Errorf("stat payload %s: %w", payloadPath, err)
 	}
-	digest, err := fileDigest(payloadPath)
+	// Prepare gzipped bundle according to server contract; enforce ≤1 MiB bundle size.
+	gz, err := gzipFile(payloadPath)
 	if err != nil {
 		return err
 	}
+	if len(gz) > 1<<20 { // 1 MiB
+		return fmt.Errorf("gzipped bundle exceeds 1 MiB cap: %d bytes", len(gz))
+	}
+
 	ctx := context.Background()
 	baseURL, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
 		return err
 	}
-	// Stream payload directly to /v2/artifacts/upload
-	endpoint, err := url.JoinPath(baseURL.String(), "v2", "artifacts", "upload")
+	endpoint, err := url.JoinPath(baseURL.String(), "v1", "runs", trimmedRun, "artifact_bundles")
 	if err != nil {
 		return err
 	}
-	f, err := os.Open(payloadPath)
-	if err != nil {
-		return fmt.Errorf("open payload: %w", err)
+
+	var reqBody struct {
+		StageID *string `json:"stage_id,omitempty"`
+		BuildID *string `json:"build_id,omitempty"`
+		Name    *string `json:"name,omitempty"`
+		Bundle  []byte  `json:"bundle"`
 	}
-	defer func() { _ = f.Close() }()
-	q := url.Values{}
-	q.Set("job_id", trimmedJob)
-	if k := strings.TrimSpace(*kind); k != "" {
-		q.Set("kind", k)
+	if v := strings.TrimSpace(*stageID); v != "" {
+		reqBody.StageID = &v
 	}
-	if n := strings.TrimSpace(*nodeOverride); n != "" {
-		q.Set("node_id", n)
+	if v := strings.TrimSpace(*buildID); v != "" {
+		reqBody.BuildID = &v
 	}
-	q.Set("digest", digest)
-	u, err := url.Parse(endpoint)
+	n := strings.TrimSpace(*name)
+	if n == "" {
+		n = filepath.Base(payloadPath)
+	}
+	reqBody.Name = &n
+	reqBody.Bundle = gz
+
+	buf := &bytes.Buffer{}
+	if err := json.NewEncoder(buf).Encode(&reqBody); err != nil {
+		return fmt.Errorf("encode request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, buf)
 	if err != nil {
 		return err
 	}
-	u.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), f)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
@@ -89,91 +110,25 @@ func handleUpload(args []string, stderr io.Writer) error {
 	if resp.StatusCode != http.StatusCreated {
 		return controlPlaneHTTPError(resp)
 	}
-	_, _ = fmt.Fprintf(stderr, "Uploaded %s (%d bytes) via HTTPS (digest %s)\n", filepath.Base(payloadPath), info.Size(), digest)
+	// Best-effort parse of response to surface the created ID.
+	var created struct {
+		ArtifactBundleID string `json:"artifact_bundle_id"`
+	}
+	_ = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&created)
+	digest, _ := fileDigest(payloadPath)
+	if created.ArtifactBundleID != "" {
+		_, _ = fmt.Fprintf(stderr, "Uploaded %s (%d bytes raw, %d bytes gz) to run %s (artifact_bundle_id %s, digest %s)\n", filepath.Base(payloadPath), info.Size(), len(gz), trimmedRun, created.ArtifactBundleID, digest)
+	} else {
+		_, _ = fmt.Fprintf(stderr, "Uploaded %s (%d bytes raw, %d bytes gz) to run %s (digest %s)\n", filepath.Base(payloadPath), info.Size(), len(gz), trimmedRun, digest)
+	}
 	return nil
 }
 
 func printUploadUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy upload --job-id <id> [--kind <kind>] [--node-id <node>] <path>")
+	_, _ = fmt.Fprintln(w, "Usage: ploy upload --run-id <uuid> [--stage-id <uuid>] [--build-id <uuid>] [--name <string>] <path>")
 }
 
-func handleReport(args []string, stderr io.Writer) error {
-	if stderr == nil {
-		stderr = io.Discard
-	}
-	fs := flag.NewFlagSet("report", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	jobID := fs.String("job-id", "", "Job or ticket identifier to download from")
-	artifactID := fs.String("artifact-id", "", "Specific artifact/slot identifier to download")
-	nodeOverride := fs.String("node-id", "", "(unused in HTTPS mode)")
-	output := fs.String("output", "", "Path to write the downloaded file")
-	if err := fs.Parse(args); err != nil {
-		printReportUsage(stderr)
-		return err
-	}
-	_ = nodeOverride
-	trimmedJob := strings.TrimSpace(*jobID)
-	if trimmedJob == "" {
-		printReportUsage(stderr)
-		return errors.New("--job-id is required")
-	}
-	trimmedOutput := strings.TrimSpace(*output)
-	if trimmedOutput == "" {
-		printReportUsage(stderr)
-		return errors.New("--output is required")
-	}
-	if err := os.MkdirAll(filepath.Dir(trimmedOutput), 0o755); err != nil {
-		return fmt.Errorf("ensure output dir: %w", err)
-	}
-	ctx := context.Background()
-	baseURL, httpClient, err := resolveControlPlaneHTTP(ctx)
-	if err != nil {
-		return err
-	}
-	// If an artifact ID is provided, hit /v2/artifacts/{id}?download=true
-	if strings.TrimSpace(*artifactID) == "" {
-		return errors.New("--artifact-id required for HTTPS report")
-	}
-	endpoint, err := url.JoinPath(baseURL.String(), "v2", "artifacts", url.PathEscape(strings.TrimSpace(*artifactID)))
-	if err != nil {
-		return err
-	}
-	u, _ := url.Parse(endpoint)
-	q := u.Query()
-	q.Set("download", "true")
-	u.RawQuery = q.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-	if err != nil {
-		return err
-	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return controlPlaneHTTPError(resp)
-	}
-	out, err := os.Create(trimmedOutput)
-	if err != nil {
-		return fmt.Errorf("open output: %w", err)
-	}
-	if _, err := io.Copy(out, resp.Body); err != nil {
-		_ = out.Close()
-		return fmt.Errorf("write output: %w", err)
-	}
-	if err := out.Close(); err != nil {
-		return err
-	}
-	_, _ = fmt.Fprintf(stderr, "Downloaded artifact to %s\n", trimmedOutput)
-	return nil
-}
-
-func printReportUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy report --job-id <id> [--artifact-id <slot>] [--node-id <node>] --output <path>")
-}
-
-func defaultNodeID() (string, error) { return "", nil }
+// report command removed: server provides no GET route for artifact bundles.
 
 func fileDigest(path string) (string, error) {
 	f, err := os.Open(path)
@@ -194,4 +149,22 @@ func fileSize(path string) int64 {
 		return 0
 	}
 	return info.Size()
+}
+
+func gzipFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open %s: %w", path, err)
+	}
+	defer func() { _ = f.Close() }()
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := io.Copy(gz, f); err != nil {
+		_ = gz.Close()
+		return nil, fmt.Errorf("gzip %s: %w", path, err)
+	}
+	if err := gz.Close(); err != nil {
+		return nil, fmt.Errorf("gzip close %s: %w", path, err)
+	}
+	return b.Bytes(), nil
 }

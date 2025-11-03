@@ -86,11 +86,11 @@ cat ~/.config/ploy/clusters/<cluster-id>.json
   --follow
 ```
 
-- Check jobs/events if needed:
+- Check runs/events if needed:
 
 ```bash
-./dist/ploy jobs ls --ticket <ticket-id>
-./dist/ploy jobs follow <job-id>
+./dist/ploy runs inspect <run-id>
+./dist/ploy runs follow <run-id>
 ```
 
 ## Rollback Tips

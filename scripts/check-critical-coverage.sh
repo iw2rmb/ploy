@@ -10,8 +10,8 @@ CRITICAL_THRESHOLD=90
 
 # Critical paths as defined in ROADMAP.md line 10
 CRITICAL_PATHS=(
-    "github.com/iw2rmb/ploy/internal/api/scheduler"
-    "github.com/iw2rmb/ploy/internal/api/pki"
+    "github.com/iw2rmb/ploy/internal/server/scheduler"
+    "github.com/iw2rmb/ploy/internal/server/pki"
     "github.com/iw2rmb/ploy/internal/node/jobs"
 )
 

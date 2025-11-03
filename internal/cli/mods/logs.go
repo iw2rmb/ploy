@@ -55,7 +55,7 @@ func (c LogsCommand) Run(ctx context.Context) error {
 		writer = io.Discard
 	}
 
-	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(c.Ticket)), "logs", "stream")
+	endpoint, err := url.JoinPath(c.BaseURL.String(), "v1", "runs", url.PathEscape(strings.TrimSpace(c.Ticket)), "events")
 	if err != nil {
 		return fmt.Errorf("mods: build endpoint: %w", err)
 	}

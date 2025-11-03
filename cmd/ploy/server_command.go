@@ -16,6 +16,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/pki"
 )
 
+// provisionHost indirection allows tests to stub remote provisioning to avoid
+// real scp/ssh timeouts. Default is deploy.ProvisionHost.
+var provisionHost = deploy.ProvisionHost
+
 func handleServer(args []string, stderr io.Writer) error {
 	if len(args) == 0 {
 		printServerUsage(stderr)
@@ -201,7 +205,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		ServiceChecks:   []string{"ployd"},
 	}
 
-	if err := deploy.ProvisionHost(ctx, provisionOpts); err != nil {
+	if err := provisionHost(ctx, provisionOpts); err != nil {
 		return fmt.Errorf("server deploy: provision host: %w", err)
 	}
 

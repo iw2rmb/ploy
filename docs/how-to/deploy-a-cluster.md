@@ -184,7 +184,7 @@ Firewall notes:
 ## Architecture Overview
 
 - **ployd (server)**: Runs the control-plane API, scheduler, and PostgreSQL-backed storage. Exposes
-  endpoints like `/v1/repos`, `/v1/mods/crud`, `/v1/jobs`, and `/v1/pki/sign`.
+  endpoints like `/v1/repos`, `/v1/mods/crud`, `/v1/runs`, and `/v1/pki/sign`.
 - **ployd-node**: Lightweight worker that polls for runs, executes jobs in ephemeral workspaces,
   and streams results back to the server. Nodes use mTLS to communicate with the server.
 - **Certificates**: The cluster CA issues all certificates. Nodes submit CSRs to `/v1/pki/sign` to
@@ -205,10 +205,10 @@ See also:
 ### Follow Run Logs
 
 ```bash
-dist/ploy jobs follow <job-id>
+dist/ploy runs follow <run-id>
 ```
 
-Logs stream via SSE from `/v1/jobs/{id}/logs/stream`. Final logs are persisted in PostgreSQL.
+Logs stream via SSE from `/v1/runs/{id}/events`. Final logs are persisted in PostgreSQL.
 
 ### TTL and Cleanup
 
@@ -224,6 +224,30 @@ To rotate node certificates:
 3. Install the new certificate and restart `ployd-node`.
 
 The cluster CA itself should be rotated infrequently and requires reissuing all node certificates.
+
+Server certificate auto‑renewal:
+- The control plane server includes a lightweight PKI rotator. When the active
+  certificate pointed to by `pki.certificate` is within the `pki.renew_before`
+  window, the rotator attempts to re‑issue a new certificate with the same Subject
+  and SANs, reusing the existing private key from `pki.key`.
+- The rotator requires the cluster CA material via environment variables on the server:
+  - `PLOY_SERVER_CA_CERT` — PEM CA certificate
+  - `PLOY_SERVER_CA_KEY` — PEM CA private key
+- Example `ployd.yaml` excerpt:
+
+  pki:
+    bundle_dir: /etc/ploy/pki
+    certificate: /etc/ploy/pki/server.crt
+    key: /etc/ploy/pki/server.key
+    renew_before: 720h   # renew when <30d remain
+
+If the CA variables are not present, rotation is skipped and a warning is logged so you can
+renew via your external process.
+
+Legacy endpoint notice:
+- All `/v1/jobs*` endpoints and `/v1/mods/{ticket}/logs/stream` have been removed. Use `/v1/runs/*` and `/v1/nodes/*` equivalents:
+  - Logs: `GET /v1/runs/{id}/events`
+  - Heartbeat/complete: `POST /v1/nodes/{id}/heartbeat` and `POST /v1/nodes/{id}/complete`
 
 ## Connectivity and Authentication
 

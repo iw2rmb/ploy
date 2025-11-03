@@ -1,0 +1,50 @@
+package handlers
+
+import (
+	"github.com/iw2rmb/ploy/internal/controlplane/auth"
+	"github.com/iw2rmb/ploy/internal/server/events"
+	httpapi "github.com/iw2rmb/ploy/internal/server/http"
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// RegisterRoutes mounts all HTTP endpoints on the given server.
+func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Service) {
+	// Health
+	s.HandleFunc("/health", healthHandler)
+
+	// PKI
+	s.HandleFunc("POST /v1/pki/sign", pkiSignHandler(st), auth.RoleCLIAdmin)
+
+	// Repos CRUD
+	s.HandleFunc("POST /v1/repos", createRepoHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/repos", listReposHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/repos/{id}", getRepoHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/repos/{id}", deleteRepoHandler(st), auth.RoleControlPlane)
+
+	// Mods CRUD
+	s.HandleFunc("POST /v1/mods/crud", createModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/crud", listModsHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/mods/crud/{id}", getModHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/mods/crud/{id}", deleteModHandler(st), auth.RoleControlPlane)
+
+	// Runs (control plane)
+	s.HandleFunc("POST /v1/runs", createRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs", getRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs/{id}", getRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs/{id}/timing", getRunTimingHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/logs", createRunLogHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("POST /v1/runs/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("DELETE /v1/runs/{id}", deleteRunHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/runs/{id}/events", getRunEventsHandler(st, eventsService), auth.RoleControlPlane)
+
+	// Node worker endpoints
+	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/diff", createDiffHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/artifact", createArtifactBundleHandler(st), auth.RoleWorker)
+}

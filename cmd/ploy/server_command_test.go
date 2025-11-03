@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -77,6 +78,12 @@ func TestHandleServerDeployValidatesSSHPort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Stub provisioning to avoid real scp/ssh attempts during tests.
+			old := provisionHost
+			provisionHost = func(ctx context.Context, opts deploy.ProvisionOptions) error {
+				return errors.New("provision stubbed: skip remote calls")
+			}
+			defer func() { provisionHost = old }()
 			cfg := serverDeployConfig{
 				Address:      "10.0.0.5",
 				User:         "testuser",

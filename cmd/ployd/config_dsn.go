@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/iw2rmb/ploy/internal/api/config"
+	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
 // resolvePgDSN returns the PostgreSQL DSN from environment or config.
