@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Test: verify 200 paths and retry on transient 5xx (basic backoff).
 
 ## Phase 2 — Ticket SSE events (submit/ack/complete)
-- [ ] Add PublishTicket API to events service — Fan‑out `event: ticket` with modsapi.TicketSummary/Status payload. — Lets CLI follow see lifecycle
+- [x] Add PublishTicket API to events service — Fan‑out `event: ticket` with modsapi.TicketSummary/Status payload. — Lets CLI follow see lifecycle
   - Change: internal/server/events/service.go — add `PublishTicket(ctx, runID, payload)` that emits type "ticket" on stream `<run-uuid>`.
   - Test: unit test builds TicketSummary and asserts hub snapshot contains `event:ticket` frames.
 

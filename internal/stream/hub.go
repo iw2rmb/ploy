@@ -108,6 +108,11 @@ func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status)
 	return nil
 }
 
+// PublishTicket appends a ticket event to a stream.
+func (h *Hub) PublishTicket(ctx context.Context, streamID string, ticket any) error {
+	return h.publish(ctx, streamID, "ticket", ticket)
+}
+
 func (h *Hub) publish(ctx context.Context, streamID, eventType string, payload any) error {
 	if strings.TrimSpace(streamID) == "" {
 		return nil

@@ -2,10 +2,12 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -436,5 +438,164 @@ func TestCreateAndPublishWithoutStore(t *testing.T) {
 	_, err = svc.CreateAndPublishLog(ctx, store.CreateLogParams{})
 	if err == nil {
 		t.Fatal("expected error when store not configured, got nil")
+	}
+}
+
+func TestPublishTicket(t *testing.T) {
+	tests := []struct {
+		name        string
+		runID       string
+		state       modsapi.TicketState
+		wantErr     bool
+		checkEvents bool
+	}{
+		{
+			name:        "publish queued ticket",
+			runID:       uuid.New().String(),
+			state:       modsapi.TicketStatePending,
+			wantErr:     false,
+			checkEvents: true,
+		},
+		{
+			name:        "publish running ticket",
+			runID:       uuid.New().String(),
+			state:       modsapi.TicketStateRunning,
+			wantErr:     false,
+			checkEvents: true,
+		},
+		{
+			name:        "publish succeeded ticket",
+			runID:       uuid.New().String(),
+			state:       modsapi.TicketStateSucceeded,
+			wantErr:     false,
+			checkEvents: true,
+		},
+		{
+			name:        "publish failed ticket",
+			runID:       uuid.New().String(),
+			state:       modsapi.TicketStateFailed,
+			wantErr:     false,
+			checkEvents: true,
+		},
+		{
+			name:        "publish cancelled ticket",
+			runID:       uuid.New().String(),
+			state:       modsapi.TicketStateCancelled,
+			wantErr:     false,
+			checkEvents: true,
+		},
+		{
+			name:        "empty runID returns error",
+			runID:       "",
+			state:       modsapi.TicketStatePending,
+			wantErr:     true,
+			checkEvents: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, err := New(Options{
+				BufferSize:  4,
+				HistorySize: 8,
+			})
+			if err != nil {
+				t.Fatalf("failed to create service: %v", err)
+			}
+
+			ctx := context.Background()
+			now := time.Now()
+
+			payload := modsapi.TicketSummary{
+				TicketID:   "test-ticket-123",
+				State:      tt.state,
+				Submitter:  "test-user",
+				Repository: "test-repo",
+				Metadata: map[string]string{
+					"key": "value",
+				},
+				CreatedAt: now,
+				UpdatedAt: now,
+				Stages: map[string]modsapi.StageStatus{
+					"stage-1": {
+						StageID:     "stage-1",
+						State:       modsapi.StageStateQueued,
+						Attempts:    0,
+						MaxAttempts: 3,
+					},
+				},
+			}
+
+			err = svc.PublishTicket(ctx, tt.runID, payload)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// Check if ticket event was published to hub.
+			if tt.checkEvents {
+				snapshot := svc.Hub().Snapshot(tt.runID)
+				if len(snapshot) == 0 {
+					t.Fatal("expected ticket event in hub snapshot, got none")
+				}
+				if snapshot[0].Type != "ticket" {
+					t.Fatalf("expected event type 'ticket', got %s", snapshot[0].Type)
+				}
+
+				// Verify the payload is correctly marshaled.
+				var decodedPayload modsapi.TicketSummary
+				if err := json.Unmarshal(snapshot[0].Data, &decodedPayload); err != nil {
+					t.Fatalf("failed to unmarshal ticket payload: %v", err)
+				}
+
+				if decodedPayload.TicketID != payload.TicketID {
+					t.Fatalf("expected ticket ID %s, got %s", payload.TicketID, decodedPayload.TicketID)
+				}
+				if decodedPayload.State != payload.State {
+					t.Fatalf("expected state %s, got %s", payload.State, decodedPayload.State)
+				}
+				if decodedPayload.Submitter != payload.Submitter {
+					t.Fatalf("expected submitter %s, got %s", payload.Submitter, decodedPayload.Submitter)
+				}
+			}
+		})
+	}
+}
+
+func TestPublishTicketWithContext(t *testing.T) {
+	svc, err := New(Options{
+		BufferSize:  4,
+		HistorySize: 8,
+	})
+	if err != nil {
+		t.Fatalf("failed to create service: %v", err)
+	}
+
+	runID := uuid.New().String()
+	payload := modsapi.TicketSummary{
+		TicketID:  "test-ticket",
+		State:     modsapi.TicketStateRunning,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Stages:    map[string]modsapi.StageStatus{},
+	}
+
+	// Test with cancelled context.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err = svc.PublishTicket(ctx, runID, payload)
+	if err == nil {
+		t.Fatal("expected error with cancelled context, got nil")
+	}
+	if err != context.Canceled {
+		t.Fatalf("expected context.Canceled error, got: %v", err)
 	}
 }
