@@ -88,7 +88,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  sudo -u postgres psql -c \"GRANT ALL PRIVILEGES ON DATABASE ploy TO ploy;\" || true\n\n")
 
 	// Derive DSN
-	b.WriteString("  export PLOY_SERVER_PG_DSN=\"postgres://ploy:${PLOY_DB_PASSWORD}@localhost:5432/ploy?sslmode=disable\"\n")
+	b.WriteString("  export PLOY_POSTGRES_DSN=\"postgres://ploy:${PLOY_DB_PASSWORD}@localhost:5432/ploy?sslmode=disable\"\n")
 	b.WriteString("  echo 'PostgreSQL configured successfully.'\n")
 	b.WriteString("fi\n\n")
 
@@ -122,7 +122,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("      chmod 600 /etc/ploy/pki/server.key\n")
 	b.WriteString("    fi\n")
 	b.WriteString("  fi\n")
-	b.WriteString("  cat > /etc/ploy/ployd.yaml <<'EOF'\n")
+	b.WriteString("  cat > /etc/ploy/ployd.yaml <<EOF\n")
 	b.WriteString("http:\n")
 	b.WriteString("  listen: :8443\n")
 	b.WriteString("  tls:\n")
@@ -139,7 +139,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  certificate: /etc/ploy/pki/server.crt\n")
 	b.WriteString("  key: /etc/ploy/pki/server.key\n")
 	b.WriteString("postgres:\n")
-	b.WriteString("  dsn: ${PLOY_SERVER_PG_DSN}\n")
+	b.WriteString("  dsn: ${PLOY_POSTGRES_DSN:-}\n")
 	b.WriteString("EOF\n\n")
 
 	// Install systemd unit for server
@@ -180,7 +180,26 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("    echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/node.key\n")
 	b.WriteString("    chmod 600 /etc/ploy/pki/node.key\n")
 	b.WriteString("  fi\n")
-	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<'EOF'\n")
+	// Ensure Docker is installed for containerized execution
+	b.WriteString("  echo 'Ensuring Docker is installed...'\n")
+	b.WriteString("  if command -v apt-get >/dev/null 2>&1; then\n")
+	b.WriteString("    export DEBIAN_FRONTEND=noninteractive\n")
+	b.WriteString("    apt-get update -qq\n")
+	b.WriteString("    apt-get install -y -qq docker.io || true\n")
+	b.WriteString("    systemctl enable --now docker || true\n")
+	b.WriteString("  elif command -v yum >/dev/null 2>&1 || command -v dnf >/dev/null 2>&1; then\n")
+	b.WriteString("    (command -v yum && yum install -y -q docker) || (command -v dnf && dnf install -y -q docker) || true\n")
+	b.WriteString("    systemctl enable --now docker || true\n")
+	b.WriteString("    if ! command -v docker >/dev/null 2>&1; then\n")
+	b.WriteString("      curl -fsSL https://get.docker.com | sh\n")
+	b.WriteString("      systemctl enable --now docker || true\n")
+	b.WriteString("    fi\n")
+	b.WriteString("  else\n")
+	b.WriteString("    curl -fsSL https://get.docker.com | sh\n")
+	b.WriteString("    systemctl enable --now docker || true\n")
+	b.WriteString("  fi\n")
+	// Write node config with literal values expanded from environment
+	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<EOF\n")
 	b.WriteString("server_url: ${PLOY_SERVER_URL:-}\n")
 	b.WriteString("node_id: ${NODE_ID:-}\n")
 	b.WriteString("http:\n")

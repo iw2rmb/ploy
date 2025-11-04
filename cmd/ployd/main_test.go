@@ -15,32 +15,18 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-func TestResolvePgDSN_Precedence(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", "postgres://primary-env")
-	t.Setenv("PLOY_POSTGRES_DSN", "postgres://alias-env")
+func TestResolvePgDSN_EnvBeatsConfig(t *testing.T) {
+	t.Setenv("PLOY_POSTGRES_DSN", "postgres://env")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "postgres://from-config"
 
 	got := resolvePgDSN(cfg)
-	if got != "postgres://primary-env" {
-		t.Fatalf("resolvePgDSN()=%q want primary env", got)
-	}
-}
-
-func TestResolvePgDSN_Alias(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", "")
-	t.Setenv("PLOY_POSTGRES_DSN", "postgres://alias-env")
-	cfg := apiconfig.Config{}
-	cfg.Postgres.DSN = "postgres://from-config"
-
-	got := resolvePgDSN(cfg)
-	if got != "postgres://alias-env" {
-		t.Fatalf("resolvePgDSN()=%q want alias env", got)
+	if got != "postgres://env" {
+		t.Fatalf("resolvePgDSN()=%q want env", got)
 	}
 }
 
 func TestResolvePgDSN_FromConfig(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", "")
 	t.Setenv("PLOY_POSTGRES_DSN", "")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "  postgres://from-config  "
@@ -51,35 +37,21 @@ func TestResolvePgDSN_FromConfig(t *testing.T) {
 	}
 }
 
-func TestResolvePgDSN_TrimEnvPrimary(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", "  postgres://trimmed-primary  ")
-	t.Setenv("PLOY_POSTGRES_DSN", "postgres://alias-env")
+func TestResolvePgDSN_TrimEnv(t *testing.T) {
+	t.Setenv("PLOY_POSTGRES_DSN", "  postgres://trimmed  ")
 	cfg := apiconfig.Config{}
 	cfg.Postgres.DSN = "postgres://from-config"
 
 	got := resolvePgDSN(cfg)
-	if got != "postgres://trimmed-primary" {
-		t.Fatalf("resolvePgDSN()=%q want trimmed primary env", got)
-	}
-}
-
-func TestResolvePgDSN_TrimEnvAlias(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", " ")
-	t.Setenv("PLOY_POSTGRES_DSN", "  postgres://trimmed-alias  ")
-	cfg := apiconfig.Config{}
-	cfg.Postgres.DSN = "postgres://from-config"
-
-	got := resolvePgDSN(cfg)
-	if got != "postgres://trimmed-alias" {
-		t.Fatalf("resolvePgDSN()=%q want trimmed alias env", got)
+	if got != "postgres://trimmed" {
+		t.Fatalf("resolvePgDSN()=%q want trimmed env", got)
 	}
 }
 
 func TestResolvePgDSN_PlaceholderIgnored(t *testing.T) {
-	t.Setenv("PLOY_SERVER_PG_DSN", "")
 	t.Setenv("PLOY_POSTGRES_DSN", "")
 	cfg := apiconfig.Config{}
-	cfg.Postgres.DSN = "${PLOY_SERVER_PG_DSN}"
+	cfg.Postgres.DSN = "${PLOY_POSTGRES_DSN}"
 
 	got := resolvePgDSN(cfg)
 	if got != "" {

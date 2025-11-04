@@ -162,22 +162,19 @@ The server’s authorizer recognizes both forms.
 The control plane can use PostgreSQL via `pgx/v5` and `pgxpool`.
 
 Precedence at server startup:
-- `PLOY_SERVER_PG_DSN` (preferred)
-- `PLOY_POSTGRES_DSN` (alias)
+- `PLOY_POSTGRES_DSN` (preferred)
 - `postgres.dsn` in the config file
 
-- `PLOY_SERVER_PG_DSN` — Primary DSN the server reads at startup to open a PostgreSQL pool.
+- `PLOY_POSTGRES_DSN` — DSN the server reads at startup to open a PostgreSQL pool.
   Example: `postgres://user:pass@localhost:5432/ploy?sslmode=disable`.
   When `ploy server deploy` runs without `--postgresql-dsn`, the bootstrap installs
   PostgreSQL on the VPS and derives a password‑based TCP DSN suitable for the
   root‑run `ployd` service, e.g.: `host=127.0.0.1 port=5432 user=ploy password=ploy dbname=ploy sslmode=disable`.
-- `PLOY_POSTGRES_DSN` — Backward‑compatible alias recognized by `ployd` during the transition. Prefer
-  `PLOY_SERVER_PG_DSN` going forward.
+  The server no longer recognizes `PLOY_SERVER_PG_DSN`.
 - `PLOY_TEST_PG_DSN` — Optional Postgres DSN used by integration tests (e.g., `tests/integration/*` and
   packages that hit a real database such as `internal/store`). When unset, such tests skip automatically.
 
-`ployd` reads `PLOY_SERVER_PG_DSN` (or `PLOY_POSTGRES_DSN`) at startup; when unset,
-it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_SERVER_PG_DSN}` in
+`ployd` reads `PLOY_POSTGRES_DSN` at startup; when unset, it falls back to `postgres.dsn` in the config file. Placeholders like `${PLOY_POSTGRES_DSN}` in
 the config file are treated as unset unless the environment variable is actually present.
 
 ## Bootstrap Script
@@ -189,7 +186,7 @@ usage but are documented here for completeness.
 - `PLOY_BOOTSTRAP_VERSION` — Version string exported at the top of generated bootstrap scripts
   (default: `dev` in source, overridden at build time).
 - `PLOY_INSTALL_POSTGRESQL` — When `true`, the bootstrap script installs PostgreSQL on the
-  target host and derives `PLOY_SERVER_PG_DSN`; when `false`, the provided DSN is used as-is.
+  target host and derives `PLOY_POSTGRES_DSN`; when `false`, the provided DSN is used as-is.
   Not exported as an environment variable; checked inline within the script body.
 - `PLOY_DB_PASSWORD` — Ephemeral password generated during PostgreSQL install flows and used
   to create the `ploy` database role and DSN. Set only within the bootstrap script scope.

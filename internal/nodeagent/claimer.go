@@ -23,15 +23,16 @@ type ClaimManager struct {
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
 type ClaimResponse struct {
-	ID        string  `json:"id"`
-	RepoURL   string  `json:"repo_url"`
-	Status    string  `json:"status"`
-	NodeID    string  `json:"node_id"`
-	BaseRef   string  `json:"base_ref"`
-	TargetRef string  `json:"target_ref"`
-	CommitSha *string `json:"commit_sha,omitempty"`
-	StartedAt string  `json:"started_at"`
-	CreatedAt string  `json:"created_at"`
+	ID        string          `json:"id"`
+	RepoURL   string          `json:"repo_url"`
+	Status    string          `json:"status"`
+	NodeID    string          `json:"node_id"`
+	BaseRef   string          `json:"base_ref"`
+	TargetRef string          `json:"target_ref"`
+	CommitSha *string         `json:"commit_sha,omitempty"`
+	StartedAt string          `json:"started_at"`
+	CreatedAt string          `json:"created_at"`
+	Spec      json.RawMessage `json:"spec,omitempty"`
 }
 
 // NewClaimManager constructs a claim manager.
@@ -125,14 +126,17 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Map claim response to StartRunRequest.
+	// Parse spec into options/env
+	optsFromSpec, envFromSpec := parseSpec(claim.Spec)
+
 	startReq := StartRunRequest{
 		RunID:     claim.ID,
 		RepoURL:   claim.RepoURL,
 		BaseRef:   claim.BaseRef,
 		TargetRef: claim.TargetRef,
 		CommitSHA: stringValue(claim.CommitSha),
-		Options:   make(map[string]any),
-		Env:       make(map[string]string),
+		Options:   optsFromSpec,
+		Env:       envFromSpec,
 	}
 
 	// Invoke controller.StartRun to execute the run.
@@ -210,4 +214,53 @@ func stringValue(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// decodeSpecToOptions tries to decode a JSON spec payload into a flat options map.
+// If spec is empty or invalid, returns an empty map.
+// parseSpec splits a simplified spec into options and env maps.
+func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
+	opts := map[string]any{}
+	env := map[string]string{}
+	if len(spec) == 0 {
+		return opts, env
+	}
+	var root any
+	if err := json.Unmarshal(spec, &root); err != nil {
+		return opts, env
+	}
+	m, ok := root.(map[string]any)
+	if !ok {
+		return map[string]any{"spec": root}, env
+	}
+	// Extract known fields
+	if v, ok := m["image"].(string); ok && v != "" {
+		opts["image"] = v
+	}
+	if v, ok := m["command"].(string); ok && v != "" {
+		opts["command"] = v
+	}
+	if arr, ok := m["command"].([]any); ok && len(arr) > 0 {
+		out := make([]string, 0, len(arr))
+		for _, e := range arr {
+			if s, ok := e.(string); ok {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			opts["command"] = out
+		}
+	}
+	if e, ok := m["env"].(map[string]any); ok {
+		for k, v := range e {
+			if s, ok := v.(string); ok {
+				env[k] = s
+			}
+		}
+	}
+	// Pass through stage_id if present (server injects it on claim)
+	if sid, ok := m["stage_id"].(string); ok && sid != "" {
+		opts["stage_id"] = sid
+	}
+	return opts, env
 }

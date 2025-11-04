@@ -178,8 +178,8 @@ After core functionality is stable and unit-tested:
    - Require external services (Postgres, etc.)
 
 2. **E2E Tests** — Test full system with real deployment
-   - Location: `tests/mod/`
-   - Documented in: `tests/mod/README.md`
+  - Location: `tests/e2e/mods/`
+  - Documented in: `tests/e2e/mods/README.md`
    - Run in VPS lab environment
    - Examples: `scenario-orw-pass.sh`
 

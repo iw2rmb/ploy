@@ -122,7 +122,7 @@ func TestPrefixedScript_PostgreSQLInstallation(t *testing.T) {
 	if !strings.Contains(script, "CREATE DATABASE ploy OWNER ploy") {
 		t.Fatalf("script should create ploy database")
 	}
-	if !strings.Contains(script, "export PLOY_SERVER_PG_DSN=") {
+	if !strings.Contains(script, "export PLOY_POSTGRES_DSN=") {
 		t.Fatalf("script should export derived DSN")
 	}
 }
@@ -184,6 +184,17 @@ func TestPrefixedScript_NodeConfig(t *testing.T) {
 	}
 	if !strings.Contains(script, "Restart=always") {
 		t.Fatalf("ployd-node.service should have Restart=always")
+	}
+}
+
+func TestPrefixedScript_NodeInstallsDocker(t *testing.T) {
+	script := PrefixedScript(map[string]string{})
+	// Should contain a Docker installation step and service enablement
+	if !strings.Contains(script, "Ensuring Docker is installed") {
+		t.Fatalf("node branch should announce Docker installation")
+	}
+	if !strings.Contains(script, "systemctl enable --now docker") {
+		t.Fatalf("node branch should enable docker service\nscript:\n%s", script)
 	}
 }
 
