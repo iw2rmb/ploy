@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/server/events/service.go — add `PublishTicket(ctx, runID, payload)` that emits type "ticket" on stream `<run-uuid>`.
   - Test: unit test builds TicketSummary and asserts hub snapshot contains `event:ticket` frames.
 
-- [ ] Emit queued event on submit — Immediately after run creation. — Follow shows “queued”
+- [x] Emit queued event on submit — Immediately after run creation. — Follow shows "queued"
   - Change: internal/server/handlers/handlers_mods_ticket.go — after success, build minimal TicketSummary and call events.PublishTicket.
   - Test: handler unit test with a fake service; ensure one `ticket` event emitted.
 

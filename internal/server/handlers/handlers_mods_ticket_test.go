@@ -13,8 +13,18 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
+
+// newTestEventsService creates a minimal events service for testing.
+func newTestEventsService() *events.Service {
+	svc, _ := events.New(events.Options{
+		BufferSize:  10,
+		HistorySize: 100,
+	})
+	return svc
+}
 
 // TestSubmitTicketHandlerSuccess verifies successful ticket submission.
 func TestSubmitTicketHandlerSuccess(t *testing.T) {
@@ -33,7 +43,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st)
+	handler := submitTicketHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -85,7 +95,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 // TestSubmitTicketHandlerMissingFields verifies validation of required fields.
 func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 	st := &mockStore{}
-	handler := submitTicketHandler(st)
+	handler := submitTicketHandler(st, nil)
 
 	cases := []struct {
 		name string
@@ -124,7 +134,7 @@ func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 // TestSubmitTicketHandlerInvalidJSON verifies rejection of malformed JSON.
 func TestSubmitTicketHandlerInvalidJSON(t *testing.T) {
 	st := &mockStore{}
-	handler := submitTicketHandler(st)
+	handler := submitTicketHandler(st, nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods", strings.NewReader("{invalid json"))
 	rr := httptest.NewRecorder()
@@ -161,7 +171,7 @@ func TestSubmitTicketHandlerWithOptionalFields(t *testing.T) {
 		},
 	}
 
-	handler := submitTicketHandler(st)
+	handler := submitTicketHandler(st, nil)
 
 	reqBody := map[string]interface{}{
 		"repo_url":   "https://github.com/user/repo.git",
@@ -380,5 +390,63 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	}
 	if resp.FinishedAt == nil || *resp.FinishedAt == "" {
 		t.Error("expected finished_at to be set")
+	}
+}
+
+// TestSubmitTicketHandlerPublishesEvent verifies that submitting a ticket publishes a queued event.
+func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
+	runID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		createRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      []byte("{}"),
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	eventsService := newTestEventsService()
+	handler := submitTicketHandler(st, eventsService)
+
+	reqBody := map[string]interface{}{
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify a ticket event was published to the hub by checking the snapshot.
+	snapshot := eventsService.Hub().Snapshot(runID.String())
+	if len(snapshot) == 0 {
+		t.Fatal("expected at least one ticket event to be published")
+	}
+
+	// Verify the event type is "ticket".
+	foundTicketEvent := false
+	for _, evt := range snapshot {
+		if evt.Type == "ticket" {
+			foundTicketEvent = true
+			// Verify the event contains ticket state information.
+			if !strings.Contains(string(evt.Data), "queued") {
+				t.Errorf("expected ticket event data to contain 'queued', got: %s", string(evt.Data))
+			}
+			break
+		}
+	}
+	if !foundTicketEvent {
+		t.Error("expected to find a 'ticket' event in the snapshot")
 	}
 }
