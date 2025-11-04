@@ -15,6 +15,11 @@ get:
   summary: Stream ticket events (SSE)
   description: |
     Server-Sent Events stream of ticket (mods run) events. Supports `Last-Event-ID` header for resume.
+
+    Event types emitted on the stream:
+    - `ticket` — ticket lifecycle snapshots (queued → running → {succeeded|failed|cancelled}).
+    - `log` — structured log frames from the run (JSON: timestamp/stream/line).
+    - `done` — terminal sentinel; stream closes immediately after this frame.
   responses:
     '200':
       description: OK
