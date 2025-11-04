@@ -18,10 +18,6 @@
    - `docs/how-to/deploy-a-cluster.md` — Deploy a cluster from scratch.
    - `docs/how-to/update-a-cluster.md` — Update `ployd` across VPS nodes.
    - `docs/envs/README.md` — Canonical environment variables.
- 4. Consolidation policy: the former exploration docs (`ARCHITECTURE_DIAGRAM.md`,
-    `CODEBASE_EXPLORATION.md`, `EXPLORATION_INDEX.md`, `EXPLORATION_README.md`) were
-    removed on 2025‑11‑01. Keep architecture material in `README.md` only
-    (overview + deep dive). Do not reintroduce parallel sources.
 
 ## Development
 
