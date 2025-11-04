@@ -102,7 +102,6 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 
 	// Handle 204 No Content (no work available).
 	if resp.StatusCode == http.StatusNoContent {
-		slog.Debug("no work available")
 		return false, nil
 	}
 
