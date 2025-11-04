@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -194,7 +195,7 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 
 // ackRunStartHandler acknowledges that a node has started executing a run.
 // Transitions run status from 'assigned' to 'running'.
-func ackRunStartHandler(st store.Store) http.HandlerFunc {
+func ackRunStartHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -284,6 +285,21 @@ func ackRunStartHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("failed to acknowledge run start: %v", err), http.StatusInternalServerError)
 			slog.Error("ack run start: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
 			return
+		}
+
+		// Publish running event to SSE hub.
+		if eventsService != nil {
+			ticketSummary := modsapi.TicketSummary{
+				TicketID:   req.RunID,
+				State:      modsapi.TicketStateRunning,
+				Repository: run.RepoUrl,
+				CreatedAt:  run.CreatedAt.Time,
+				UpdatedAt:  time.Now().UTC(),
+				Stages:     make(map[string]modsapi.StageStatus),
+			}
+			if err := eventsService.PublishTicket(r.Context(), req.RunID, ticketSummary); err != nil {
+				slog.Error("ack run start: publish ticket event failed", "ticket_id", req.RunID, "err", err)
+			}
 		}
 
 		w.WriteHeader(http.StatusNoContent)

@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/server/handlers/handlers_mods_ticket.go — after success, build minimal TicketSummary and call events.PublishTicket.
   - Test: handler unit test with a fake service; ensure one `ticket` event emitted.
 
-- [ ] Emit running event on ack — After Update status to running. — Follow shows “running”
+- [x] Emit running event on ack — After Update status to running. — Follow shows "running"
   - Change: internal/server/handlers/handlers_worker.go (ackRunStartHandler) — publish TicketSummary(status=running).
   - Test: handler test verifies PublishTicket called.
 
