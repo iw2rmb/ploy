@@ -1,4 +1,4 @@
--- SIMPLE.sql — Initial Postgres schema outline for the simplified Ploy server
+-- SCHEMA.sql — Postgres schema outline for the simplified Ploy server
 -- Notes
 -- - Uses pgcrypto for UUID generation via gen_random_uuid().
 -- - Stores only metadata and run artifacts (diffs/logs/events). No repository

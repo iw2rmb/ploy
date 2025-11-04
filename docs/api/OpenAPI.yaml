@@ -5,11 +5,9 @@ info:
   description: |
     REST surface exposed by the Ploy control-plane `ployd` deployment. All routes
     require mutual TLS authentication. Bearer token auth has been removed.
-    Primary endpoints include the simplified Mods facade under `/v1/mods` (ticket
-    submission, status, events, and artifact uploads). The `/v1/mods/crud` surface
-    has been removed; clients submit tickets directly via POST /v1/mods. Read and
-    stream routes under `/v1/runs` have been retired; use `/v1/mods/*` instead.
-    Legacy write endpoints remain under `/v1/runs/{id}/*` for internal use.
+    Primary endpoints expose the Mods facade under `/v1/mods` (ticket submission,
+    status, events, and artifact/log/diff uploads). The old `/v1/mods/crud` and
+    `/v1/runs/*` read/stream endpoints have been removed.
 servers:
   - url: https://{control_host}
     description: Control-plane endpoint (direct HTTPS; SSH tunnels removed)
@@ -47,20 +45,14 @@ paths:
     $ref: './paths/mods_id_events.yaml'
   /v1/mods/{id}/artifact_bundles:
     $ref: './paths/mods_id_artifact_bundles.yaml'
+  /v1/mods/{id}/logs:
+    $ref: './paths/mods_id_logs.yaml'
+  /v1/mods/{id}/diffs:
+    $ref: './paths/mods_id_diffs.yaml'
   /v1/artifacts:
     $ref: './paths/artifacts.yaml'
   /v1/artifacts/{id}:
     $ref: './paths/artifacts_id.yaml'
-  /v1/runs/{id}:
-    $ref: './paths/runs_id.yaml'
-  /v1/runs/{id}/timing:
-    $ref: './paths/runs_id_timing.yaml'
-  /v1/runs/{id}/diffs:
-    $ref: './paths/runs_id_diffs.yaml'
-  /v1/runs/{id}/logs:
-    $ref: './paths/runs_id_logs.yaml'
-  /v1/runs/{id}/artifact_bundles:
-    $ref: './paths/runs_id_artifact_bundles.yaml'
   # Node heartbeat endpoint
   /v1/nodes/{id}/heartbeat:
     $ref: './paths/nodes_id_heartbeat.yaml'

@@ -1,0 +1,28 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+post:
+  tags: [Artifacts]
+  summary: Ingest a gzipped diff for a ticket (mods facade)
+  description: |
+    Store a gzipped unified diff for a ticket stage. The server enforces a 1 MiB
+    cap on the gzipped patch. Intended for node/agent ingestion.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '../components/schemas/controlplane.yaml#/CreateDiffRequest'
+  responses:
+    '201':
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/controlplane.yaml#/Diff'
+    '400': { description: Bad Request }
+    '404': { description: Ticket Not Found }
+    '413': { description: Payload Too Large }
+

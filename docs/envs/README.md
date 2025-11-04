@@ -2,7 +2,7 @@
 
 **Note: Postgres/mTLS Pivot (November 2025)**
 
-As of the server/node pivot described in `SIMPLE.md`, the following legacy systems have been removed:
+As of the server/node pivot described in `README.md`, the following legacy systems have been removed:
 - **etcd**: All `PLOY_ETCD_*` variables are no longer consumed by the codebase.
 - **Token-based auth**: Bearer tokens replaced with mTLS-only authentication.
 - **Node labels**: Removed in favor of resource-snapshot scheduling.
@@ -244,6 +244,6 @@ The following variables are **no longer consumed** by the codebase after the Pos
 
 ## Related Docs
 
-- [SIMPLE.md](../../SIMPLE.md) — Server/node pivot architecture
+- [README.md](../../README.md) — Server/node pivot architecture
 - [ROADMAP.md](../../ROADMAP.md) — Migration checklist
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
