@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/server/handlers/handlers_worker.go (ackRunStartHandler) — publish TicketSummary(status=running).
   - Test: handler test verifies PublishTicket called.
 
-- [ ] Emit terminal + done on complete — After UpdateRunCompletion. — Follow stops (final ticket state) and consumers see `done`
+- [x] Emit terminal + done on complete — After UpdateRunCompletion. — Follow stops (final ticket state) and consumers see `done`
   - Change: handlers_worker.go (completeRunHandler) — publish TicketSummary with final status; also events.Hub().PublishStatus(streamID, done).
   - Test: handler test checks both calls.
 
