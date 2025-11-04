@@ -52,11 +52,7 @@ Legend: [ ] todo, [x] done.
   - Change: claimer loop backoff (250ms→5s exponential with cap).
   - Test: loop test observes sleep growth and reset on success.
 
-- [ ] CLI follow smoke — scenario-orw-pass.sh — Demonstrate queued→running→terminal
-  - Test: manual smoke on VPS lab; capture Ticket ID and confirm transitions; logs optional for minimal.
-
 ## Acceptance Criteria
 - Node claims runs and posts ack/complete; server DB reflects status transitions.
 - Events stream `/v1/mods/{id}/events` shows `ticket` events (queued→running→{succeeded|failed|cancelled}) and ends with `done`.
 - `dist/ploy mod run … --follow` exits with the final ticket state.
-
