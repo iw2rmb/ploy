@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -137,6 +138,21 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 	}
 
 	return log, nil
+}
+
+// PublishTicket publishes a ticket lifecycle event (queued/running/succeeded/failed/cancelled)
+// to the SSE hub. The runID is used as the streamID for SSE fanout.
+// The payload should contain a modsapi.TicketSummary with current ticket state.
+// Returns an error if the fanout fails.
+func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.TicketSummary) error {
+	if runID == "" {
+		return errors.New("events: runID required for ticket publish")
+	}
+	if ctx != nil && ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	return s.hub.PublishTicket(ctx, runID, payload)
 }
 
 // publishEventToHub converts a database event to a logstream event and publishes it.
