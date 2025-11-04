@@ -13,7 +13,7 @@ Documentation:
 Legend: [ ] todo, [x] done.
 
 ## Phase 1 — Node Claim→Ack→Complete loop (pull‑based)
-- [ ] Add claim loop to node agent — Poll POST /v1/nodes/{id}/claim; on 200, ack, execute, complete. — Enables execution without server‑push
+- [x] Add claim loop to node agent — Poll POST /v1/nodes/{id}/claim; on 200, ack, execute, complete. — Enables execution without server‑push
   - Change: internal/nodeagent/agent.go (start background `claimLoop` alongside heartbeat); add new file internal/nodeagent/claimer.go with backoff, 204 handling, and JSON decode of claim response (fields from handlers_worker.go).
   - Change: internal/nodeagent/agent.go — After ack, invoke controller.StartRun with StartRunRequest mapped from claim response (repo_url/base_ref/target_ref/commit_sha). On return, use StatusUploader to POST terminal status.
   - Test: unit test with httptest server stubbing /claim→/ack→/complete; verify loop posts in order and transitions once per claim.
