@@ -185,7 +185,7 @@ After core functionality is stable and unit-tested:
 
 ## Coverage Targets
 
-Per `AGENTS.md` and `CHECKPOINT.md`:
+Per `AGENTS.md` and CHANGELOG notes:
 
 - **Overall coverage:** ≥60%
 - **Critical paths:** ≥90%
@@ -388,7 +388,7 @@ See `.github/pull_request_template.md` for the full checklist that enforces this
 
 - **AGENTS.md** — RED → GREEN → REFACTOR philosophy and coverage targets
 - **GOLANG.md** — Go engineering standards (table-driven tests, race detector, fuzzing)
-- **CHECKPOINT.md** — Current status and acceptance summary
+- **CHANGELOG.md** — Status and acceptance summary for recent slices
 - **tests/guards/docs_guard_test.go** — Example of enforcing design doc coverage
 - **Go Code Review Comments** — https://go.dev/wiki/CodeReviewComments
 

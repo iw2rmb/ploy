@@ -331,7 +331,7 @@ Firewall notes:
 
 See also:
 - `README.md` — Pivot architecture and current API surface.
-- `CHECKPOINT.md` — Status and acceptance summary.
+- See `CHANGELOG.md` for status and acceptance summary.
 
 ## Operations
 
