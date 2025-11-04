@@ -15,7 +15,7 @@ import (
 type ClaimManager struct {
 	cfg             Config
 	client          *http.Client
-	controller      *runController
+	controller      RunController
 	backoffDuration time.Duration
 	minBackoff      time.Duration
 	maxBackoff      time.Duration
@@ -35,7 +35,7 @@ type ClaimResponse struct {
 }
 
 // NewClaimManager constructs a claim manager.
-func NewClaimManager(cfg Config, controller *runController) (*ClaimManager, error) {
+func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error) {
 	client, err := createHTTPClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create http client: %w", err)
