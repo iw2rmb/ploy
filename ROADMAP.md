@@ -22,7 +22,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/nodeagent/claimer.go — call ack before StartRun;
   - Test: claim loop test asserts ack call made prior to StartRun invocation.
 
-- [ ] Implement complete on node — POST /v1/nodes/{id}/complete with status, optional reason/stats. — Terminates run on server
+- [x] Implement complete on node — POST /v1/nodes/{id}/complete with status, optional reason/stats. — Terminates run on server
   - Change: reuse internal/nodeagent/statusuploader.go (UploadStatus) from controller outcome; map success/failure.
   - Test: verify 200 paths and retry on transient 5xx (basic backoff).
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestStatusUploader_UploadStatus(t *testing.T) {
@@ -220,4 +221,201 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 // Helper function to create string pointers.
 func stringPtr(s string) *string {
 	return &s
+}
+
+// TestStatusUploader_RetryOn5xx verifies retry behavior on transient 5xx errors.
+func TestStatusUploader_RetryOn5xx(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		responses    []int // sequence of status codes to return
+		wantErr      bool
+		wantAttempts int
+		wantSucceed  bool
+	}{
+		{
+			name:         "eventual success after 503",
+			responses:    []int{http.StatusServiceUnavailable, http.StatusNoContent},
+			wantErr:      false,
+			wantAttempts: 2,
+			wantSucceed:  true,
+		},
+		{
+			name:         "eventual success after multiple 5xx",
+			responses:    []int{http.StatusInternalServerError, http.StatusBadGateway, http.StatusNoContent},
+			wantErr:      false,
+			wantAttempts: 3,
+			wantSucceed:  true,
+		},
+		{
+			name:         "all retries exhausted with 500",
+			responses:    []int{http.StatusInternalServerError, http.StatusInternalServerError, http.StatusInternalServerError, http.StatusInternalServerError},
+			wantErr:      true,
+			wantAttempts: 4, // initial + 3 retries
+			wantSucceed:  false,
+		},
+		{
+			name:         "immediate 4xx error no retry",
+			responses:    []int{http.StatusBadRequest},
+			wantErr:      true,
+			wantAttempts: 1,
+			wantSucceed:  false,
+		},
+		{
+			name:         "4xx after 5xx retry",
+			responses:    []int{http.StatusServiceUnavailable, http.StatusBadRequest},
+			wantErr:      true,
+			wantAttempts: 2,
+			wantSucceed:  false,
+		},
+		{
+			name:         "200 OK accepted as success",
+			responses:    []int{http.StatusOK},
+			wantErr:      false,
+			wantAttempts: 1,
+			wantSucceed:  true,
+		},
+		{
+			name:         "204 No Content accepted as success",
+			responses:    []int{http.StatusNoContent},
+			wantErr:      false,
+			wantAttempts: 1,
+			wantSucceed:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			attemptCount := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if attemptCount < len(tt.responses) {
+					w.WriteHeader(tt.responses[attemptCount])
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+				attemptCount++
+			}))
+			defer server.Close()
+
+			cfg := Config{
+				ServerURL: server.URL,
+				NodeID:    "test-node-id",
+				HTTP: HTTPConfig{
+					TLS: TLSConfig{
+						Enabled: false,
+					},
+				},
+			}
+
+			uploader, err := NewStatusUploader(cfg)
+			if err != nil {
+				t.Fatalf("failed to create uploader: %v", err)
+			}
+
+			ctx := context.Background()
+			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+
+			if tt.wantErr && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if attemptCount != tt.wantAttempts {
+				t.Errorf("expected %d attempts, got %d", tt.wantAttempts, attemptCount)
+			}
+		})
+	}
+}
+
+// TestStatusUploader_RetryBackoff verifies exponential backoff on retries.
+func TestStatusUploader_RetryBackoff(t *testing.T) {
+	t.Parallel()
+
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		if attemptCount < 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	uploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		t.Fatalf("failed to create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	start := time.Now()
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// With 100ms initial backoff and 2x exponential, expect at least 300ms total.
+	// First retry: 100ms, second retry: 200ms.
+	expectedMinDuration := 300 * time.Millisecond
+	if elapsed < expectedMinDuration {
+		t.Errorf("expected backoff duration >= %v, got %v", expectedMinDuration, elapsed)
+	}
+}
+
+// TestStatusUploader_ContextCancellation verifies context cancellation during retry.
+func TestStatusUploader_ContextCancellation(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Always return 500 to trigger retry.
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	uploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		t.Fatalf("failed to create uploader: %v", err)
+	}
+
+	// Create context with short timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+
+	if err == nil {
+		t.Error("expected context cancellation error")
+	}
+
+	// Verify it's a context error.
+	if ctx.Err() == nil {
+		t.Error("expected context to be cancelled")
+	}
 }
