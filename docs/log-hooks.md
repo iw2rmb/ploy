@@ -131,4 +131,4 @@ See `internal/nodeagent/loghook_test.go` for examples of testing hook implementa
 
 - `internal/nodeagent/loghook.go`: Interface and `NoOpLogHook`
 - `internal/nodeagent/logstreamer.go`: Integration in `Write()` method
-- ROADMAP.md line 107: "Scrub PII from logs via node-side hooks"
+- CHECKPOINT.md — planned enhancement: "Scrub PII from logs via node-side hooks"

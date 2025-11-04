@@ -39,16 +39,15 @@ Prior exploration docs remain removed.
   - `worker` (alias: node) — node agent; allowed on worker ingest endpoints.
 - Extracted from cert OU or CN. CNs like `node:<uuid>` are treated as `worker`. Admin is a superset of control‑plane for authorization.
 
-**API Overview (current implementation)**
+**API Overview (current)**
 - PKI: `POST /v1/pki/sign`, `POST /v1/pki/sign/admin`, `POST /v1/pki/sign/client`.
 - Repos: `POST /v1/repos`, `GET /v1/repos`, `GET /v1/repos/{id}`, `DELETE /v1/repos/{id}`.
-- Mods (catalog): `POST /v1/mods/crud`, `GET /v1/mods/crud[?repo_id=]`, `GET /v1/mods/crud/{id}`, `DELETE /v1/mods/crud/{id}`.
-- Runs: `POST /v1/runs`, `GET /v1/runs` (collection/timings), `GET /v1/runs/{id}` (status), `GET /v1/runs/{id}/events` (SSE), `GET /v1/runs/{id}/timing`.
-- Ingest (worker): `POST /v1/runs/{id}/diffs`, `POST /v1/runs/{id}/logs`, `POST /v1/runs/{id}/artifact_bundles`.
+- Mods facade: `POST /v1/mods` (submit), `GET /v1/mods/{id}` (status), `GET /v1/mods/{id}/events` (SSE), `POST /v1/mods/{id}/artifact_bundles`, `POST /v1/mods/{id}/logs`, `POST /v1/mods/{id}/diffs`.
+- Artifacts: `GET /v1/artifacts?cid=…`, `GET /v1/artifacts/{id}` (optional `?download=true`).
 - Nodes (control): `GET /v1/nodes`, `POST /v1/nodes/{id}/drain`, `POST /v1/nodes/{id}/undrain`.
 - Nodes (worker): `POST /v1/nodes/{id}/heartbeat`, `POST /v1/nodes/{id}/claim`, `POST /v1/nodes/{id}/ack`, `POST /v1/nodes/{id}/complete`, `POST /v1/nodes/{id}/events`, `POST /v1/nodes/{id}/logs`, `POST /v1/nodes/{id}/stage/{stage}/diff`, `POST /v1/nodes/{id}/stage/{stage}/artifact`.
 
-Note: An API simplification to a `/v1/mods`‑only facade (submit/status/events/artifacts) is planned; see `ROADMAP.md`. Until that lands, the server exposes the routes above.
+Note: As of November 2025 the API is simplified to a `/v1/mods` facade for submit/status/events and uploads. Legacy reads/streams under `/v1/runs` and all `/v1/mods/crud` endpoints have been removed.
 
 **Architecture packages (boundaries)**
 - `internal/stream`: shared SSE hub and HTTP helpers (server + node agent use it).
@@ -59,8 +58,8 @@ Note: An API simplification to a `/v1/mods`‑only facade (submit/status/events/
 - Architecture: this `README.md` (pivot summary and current API)
 - Deployment: `docs/how-to/deploy-a-cluster.md`
 - Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy rollout`)
-- Roadmap: `ROADMAP.md` (current plan and latest slices)
-- Control‑plane APIs: `docs/api/OpenAPI.yaml` (will be updated alongside the `/v1/mods` simplification)
+- Checkpoint: `CHECKPOINT.md` (current status and latest slices)
+- Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas)
 - Environment variables: `docs/envs/README.md`
 - Engineering rules: `GOLANG.md`
 
@@ -144,7 +143,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 
 **Contributing**
 - Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).
-- Keep docs in sync; update `README.md`, `ROADMAP.md`, and `docs/` as needed.
+- Keep docs in sync; update `README.md` and `docs/` as needed.
 
 **Legacy Removed (November 2025)**
 - **etcd**: Replaced with PostgreSQL for all state.
