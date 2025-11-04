@@ -1,6 +1,6 @@
 # Update a Ploy Cluster (Server/Node Architecture)
 
-This guide aligns with the SIMPLE.md pivot: a single control‑plane server binary (`ployd`) and
+This guide aligns with the architecture pivot in README.md: a single control‑plane server binary (`ployd`) and
 one or more worker nodes (`ployd-node`). The server hosts the API/scheduler/PostgreSQL; nodes
 execute jobs and communicate with the server over mTLS. The VPS lab layout we use:
 

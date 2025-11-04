@@ -37,17 +37,13 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/pki/sign", "post"},
 		{"/v1/pki/sign/admin", "post"},
 		{"/v1/pki/sign/client", "post"},
-		// Mods (Ticket submit + status/events)
+		// Mods (Ticket submit + status/events + ingest)
 		{"/v1/mods", "post"},
 		{"/v1/mods/{id}", "get"},
 		{"/v1/mods/{id}/events", "get"},
 		{"/v1/mods/{id}/artifact_bundles", "post"},
-		// Runs (legacy write/management endpoints only; read/stream moved to /v1/mods)
-		{"/v1/runs/{id}", "delete"},
-		{"/v1/runs/{id}/timing", "get"},
-		{"/v1/runs/{id}/logs", "post"},
-		{"/v1/runs/{id}/diffs", "post"},
-		{"/v1/runs/{id}/artifact_bundles", "post"},
+		{"/v1/mods/{id}/logs", "post"},
+		{"/v1/mods/{id}/diffs", "post"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management

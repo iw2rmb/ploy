@@ -3,7 +3,7 @@
 Scope: Consolidate the external control‑plane API under the "mods" facade. Eliminate the mods catalog CRUD surface and the separate "/v1/runs" read/stream paths. Users submit a Mods run via POST /v1/mods and then interact at /v1/mods/{id}[/*] for status, events, and uploads. No backward compatibility is required; the only deployment is the VPS lab.
 
 Documentation:
-- Design context: SIMPLE.md (server/node pivot), README.md (API overview)
+- Design context: README.md (server/node pivot + API overview)
 - Current API: docs/api/OpenAPI.yaml (to be updated in this slice)
 - How‑tos: docs/how-to/deploy-a-cluster.md, docs/how-to/update-a-cluster.md
 - Template used: ../auto/ROADMAP.md

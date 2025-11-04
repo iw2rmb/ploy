@@ -66,7 +66,7 @@ Note: An API simplification to a `/v1/mods`‑only facade (submit/status/events/
 
 **Docs Map**
 - Overview & quick start: this `README.md` (canonical entry).
-- Deep architecture: `SIMPLE.md` (source of truth for diagrams/flows).
+- Deep architecture: this `README.md` (source of truth for diagrams/flows).
 - APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas).
 - How‑tos: `docs/how-to/*.md` (deploy/update guides).
 - Envs: `docs/envs/README.md` (canonical env reference).

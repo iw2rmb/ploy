@@ -3,7 +3,7 @@
 This document codifies Go engineering rules for this repository. It complements `docs/GOLANG.md` (tooling quickstart) and aligns with our RED → GREEN → REFACTOR cadence from `AGENTS.md`.
 
 - Primary references
-  - docs: `docs/GOLANG.md` (tooling), `AGENTS.md` (TDD + coverage), `SIMPLE.md` (server/node pivot), `ROADMAP.md` (delivery steps)
+  - docs: `docs/GOLANG.md` (tooling), `AGENTS.md` (TDD + coverage), `README.md` (architecture), `ROADMAP.md` (delivery steps)
   - externals (authoritative): Go Code Review Comments, Effective Go, fuzzing and security/govulncheck guidance, and the Uber Go Style Guide. See References.
 
 ## Versions & Layout
@@ -47,7 +47,7 @@ This document codifies Go engineering rules for this repository. It complements 
 - For servers, set timeouts: `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`. Always close response bodies; use `http.Client{Timeout: ...}` and per‑request contexts.
 
 ## Database (PostgreSQL) — pgx + sqlc
-- Use `pgx/v5` with `pgxpool` and typed `sqlc` queries as the default data layer (schema in `SIMPLE.sql`).
+- Use `pgx/v5` with `pgxpool` and typed `sqlc` queries as the default data layer (schema in `SCHEMA.sql`).
 - Transactions: check errors on `Commit`; rollback on error with `defer tx.Rollback(ctx)`.
 - Contexts: every query accepts a `ctx` with deadlines where appropriate.
 - Migrations in `internal/store/migrations/`; queries in `internal/store/queries/`; generate code via `sqlc` and commit generated artifacts only if our CI does not run generators.

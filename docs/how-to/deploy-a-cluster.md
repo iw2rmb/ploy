@@ -1,11 +1,11 @@
 # Deploy a Ploy Cluster (Server/Node Architecture)
 
 This guide describes how to deploy a Ploy cluster using the new server/node architecture
-(Postgres + mTLS) as outlined in `SIMPLE.md` and implemented per the slices in `ROADMAP.md`.
+(Postgres + mTLS) as outlined in `README.md` and implemented per the slices in `ROADMAP.md`.
 The deployment separates control-plane (`ployd` server) from worker execution (`ployd-node`) and
 assumes a 1x server + 2x node layout.
 
-**Note**: This replaces the legacy etcd stack. See `SIMPLE.md` for architecture details.
+**Note**: This replaces the legacy etcd stack. See `README.md` for architecture details.
 
 ## Prerequisites
 
@@ -330,7 +330,7 @@ Firewall notes:
   obtain signed certificates with both `serverAuth` and `clientAuth` EKUs for bidirectional mTLS.
 
 See also:
-- `SIMPLE.md` — Pivot architecture and API surface.
+- `README.md` — Pivot architecture and current API surface.
 - `ROADMAP.md` — Implementation checklist and acceptance criteria.
 
 ## Operations
@@ -353,7 +353,7 @@ Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in Pos
 
 - The server runs a TTL worker to purge old `logs`, `diffs`, `events`, and `artifact_bundles` (default: 30 days).
 - Prefer time-based partitioning and drop whole partitions daily for performance.
-- See `SIMPLE.md` for partition management examples.
+- See `README.md` for partition management examples.
 
 ### Certificate Rotation
 
