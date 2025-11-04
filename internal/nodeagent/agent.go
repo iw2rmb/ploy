@@ -380,8 +380,11 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 			stats["log_cid"] = result.LogArtifact.CID
 		}
 
-		// Upload terminal status to server.
-		if uploadErr := statusUploader.UploadStatus(ctx, req.RunID, terminalStatus, reason, stats); uploadErr != nil {
+		// Upload terminal status to server with a short, detached context so
+		// we still attempt to report completion even if the run context is cancelled.
+		statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if uploadErr := statusUploader.UploadStatus(statusCtx, req.RunID, terminalStatus, reason, stats); uploadErr != nil {
 			slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
 		} else {
 			slog.Info("terminal status uploaded successfully", "run_id", req.RunID, "status", terminalStatus)
