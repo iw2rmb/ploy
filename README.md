@@ -58,7 +58,7 @@ Note: As of November 2025 the API is simplified to a `/v1/mods` facade for submi
 - Architecture: this `README.md` (pivot summary and current API)
 - Deployment: `docs/how-to/deploy-a-cluster.md`
 - Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy rollout`)
-- Checkpoint: `CHECKPOINT.md` (current status and latest slices)
+- Release notes: `CHANGELOG.md` (recent changes and slice status)
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas)
 - Environment variables: `docs/envs/README.md`
 - Engineering rules: `GOLANG.md`

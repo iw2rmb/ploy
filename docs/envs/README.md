@@ -245,5 +245,5 @@ The following variables are **no longer consumed** by the codebase after the Pos
 ## Related Docs
 
 - [README.md](../../README.md) — Server/node pivot architecture
-- [CHECKPOINT.md](../../CHECKPOINT.md) — Migration status
+- See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
