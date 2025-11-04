@@ -273,3 +273,15 @@ ssh -q root@45.9.42.212 'install -m 0755 /usr/local/bin/ployd.new /usr/local/bin
 
 **Warning:** The manual approach lacks the health checks and retries that the rollout
 command provides. Use the CLI command when possible.
+Tip: wrapper for lab
+
+If you prefer not to type the lab URL each time, use the wrapper:
+
+```bash
+scripts/ploy-lab.sh rollout server --address 45.9.42.212 --binary dist/ployd-linux --user root
+scripts/ploy-lab.sh rollout nodes --all --binary dist/ployd-node-linux --user root
+scripts/ploy-lab.sh mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature/x --follow
+```
+
+The wrapper sets `PLOY_CONTROL_PLANE_URL` to the lab endpoint and delegates to `dist/ploy`.
+TLS credentials are still read from the active descriptor under `~/.config/ploy/clusters/`.
