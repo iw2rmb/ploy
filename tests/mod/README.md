@@ -21,7 +21,7 @@
 
 Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match runner templates.
-- The OpenRewrite image executes Maven plugin `org.openrewrite.maven:rewrite-maven-plugin` and expects a recipe JSON with keys: `group`, `artifact`, `version`, `name`. See `docs/next/manifest/examples/orw-apply.json`.
+- The OpenRewrite image executes Maven plugin `org.openrewrite.maven:rewrite-maven-plugin` and expects a recipe JSON with keys: `group`, `artifact`, `version`, `name`. The current runner wires this automatically for the demo scenarios; no external manifest file is required.
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
 
 See also:
@@ -102,7 +102,7 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 **References**
 
 - Historic E2E assets (legacy Nomad-based) found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
-  - `docs/next/manifest/examples/orw-apply.json` — OpenRewrite step manifest example (Java 11→17 recipe).
-  - `docs/next/manifest/examples/llm-plan.json` — LLM step manifest example.
+  - `internal/workflow/mods/plan/` — Stage graph construction and lane bindings.
+  - `internal/workflow/contracts/` — Step manifest shapes and validation.
   - `internal/workflow/runner/job_templates.go` — Mods image bindings for lanes.
   - `internal/workflow/runner/healing.go` — Healing flow appended after Build Gate failures.
