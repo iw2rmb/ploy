@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -104,6 +105,23 @@ type mockStore struct {
 	getArtifactBundleParams pgtype.UUID
 	getArtifactBundleResult store.ArtifactBundle
 	getArtifactBundleErr    error
+
+	// CreateStage tracking
+	createStageCalled bool
+	createStageParams store.CreateStageParams
+	createStageResult store.Stage
+	createStageErr    error
+
+	// ListStagesByRun tracking
+	listStagesByRunCalled bool
+	listStagesByRunParam  pgtype.UUID
+	listStagesByRunResult []store.Stage
+	listStagesByRunErr    error
+
+	// UpdateStageStatus tracking
+	updateStageStatusCalled bool
+	updateStageStatusParams store.UpdateStageStatusParams
+	updateStageStatusErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -217,4 +235,30 @@ func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (stor
 	m.getArtifactBundleCalled = true
 	m.getArtifactBundleParams = id
 	return m.getArtifactBundleResult, m.getArtifactBundleErr
+}
+
+func (m *mockStore) CreateStage(ctx context.Context, params store.CreateStageParams) (store.Stage, error) {
+	m.createStageCalled = true
+	m.createStageParams = params
+	if !m.createStageResult.ID.Valid {
+		// Provide a default stage id when not preset by the test.
+		m.createStageResult.ID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
+	}
+	m.createStageResult.RunID = params.RunID
+	m.createStageResult.Name = params.Name
+	m.createStageResult.Status = params.Status
+	m.createStageResult.Meta = params.Meta
+	return m.createStageResult, m.createStageErr
+}
+
+func (m *mockStore) ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]store.Stage, error) {
+	m.listStagesByRunCalled = true
+	m.listStagesByRunParam = runID
+	return m.listStagesByRunResult, m.listStagesByRunErr
+}
+
+func (m *mockStore) UpdateStageStatus(ctx context.Context, params store.UpdateStageStatusParams) error {
+	m.updateStageStatusCalled = true
+	m.updateStageStatusParams = params
+	return m.updateStageStatusErr
 }

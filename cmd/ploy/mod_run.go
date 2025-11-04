@@ -26,6 +26,21 @@ func handleModRun(args []string, stderr io.Writer) error {
 	return executeModRun(args, stderr)
 }
 
+// stringSlice is a simple flag.Value for collecting repeated values.
+type stringSlice []string
+
+func (s *stringSlice) String() string {
+	if s == nil {
+		return ""
+	}
+	return strings.Join(*s, ",")
+}
+
+func (s *stringSlice) Set(v string) error {
+	*s = append(*s, v)
+	return nil
+}
+
 func executeModRun(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -40,6 +55,12 @@ func executeModRun(args []string, stderr io.Writer) error {
 	artifactDir := fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
 	maxRetries := fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
 	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
+	// Allow passing Mod env via repeated --mod-env KEY=VALUE
+	var modEnvs stringSlice
+	fs.Var(&modEnvs, "mod-env", "Mod environment KEY=VALUE (repeatable)")
+	// Allow specifying the mod container image (paths fixed; image entrypoint runs)
+	modImage := fs.String("mod-image", "", "Container image for the mod step (optional)")
+
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
 		return err
@@ -93,10 +114,44 @@ func executeModRun(args []string, stderr io.Writer) error {
 		request.Metadata["repo_workspace_hint"] = repoSpec.WorkspaceHint
 	}
 
+	// Prepare optional Spec when --mod-env / --mod-image are provided
+	var specPayload []byte
+	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" {
+		env := make(map[string]string)
+		for _, kv := range modEnvs {
+			kv = strings.TrimSpace(kv)
+			if kv == "" {
+				continue
+			}
+			var k, v string
+			if idx := strings.IndexByte(kv, '='); idx >= 0 {
+				k = strings.TrimSpace(kv[:idx])
+				v = kv[idx+1:]
+			} else {
+				k = kv
+				v = ""
+			}
+			if k != "" {
+				env[k] = v
+			}
+		}
+		payload := map[string]any{}
+		if len(env) > 0 {
+			payload["env"] = env
+		}
+		if img := strings.TrimSpace(*modImage); img != "" {
+			payload["image"] = img
+		}
+		if len(payload) > 0 {
+			specPayload, _ = json.Marshal(payload)
+		}
+	}
+
 	cmd := mods.SubmitCommand{
 		Client:  httpClient,
 		BaseURL: base,
 		Request: request,
+		Spec:    specPayload,
 	}
 	summary, err := cmd.Run(ctx)
 	if err != nil {
@@ -148,8 +203,10 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
 }
+
+// (stringSlice implements flag.Value above)
 
 func defaultStageDefinitions() []modsapi.StageDefinition {
 	return []modsapi.StageDefinition{

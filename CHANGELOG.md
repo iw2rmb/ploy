@@ -314,6 +314,12 @@
   behaviour.
 - Verification: `go test ./...` on 2025-09-29.
 
+## Nov 4, 2025
+
+- Node Agent:
+  - Always bundle and upload the `/out` directory as an artifact bundle named `mod-out` when it contains files, regardless of `artifact_paths` option.
+  - Added unit tests for `uploadOutDirIfPresent` to verify upload behavior and endpoint contract.
+
 ## [2025-09-27] Build Gate Log Retrieval & Parsing
 
 - Added `internal/workflow/buildgate.LogRetriever` and `LogIngestor` to download

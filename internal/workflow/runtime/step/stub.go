@@ -103,18 +103,18 @@ func (h *filesystemWorkspaceHydrator) Hydrate(ctx context.Context, manifest cont
 
 // DockerContainerRuntimeOptions holds configuration for Docker runtime.
 type DockerContainerRuntimeOptions struct {
+	// PullImage controls whether the runtime pulls the image before start.
 	PullImage bool
+	// Network is optional Docker network name (empty => default bridge).
+	Network string
 }
 
 // ContainerRuntime executes containers.
-type ContainerRuntime interface{}
-
-type dockerContainerRuntime struct{}
-
-// NewDockerContainerRuntime creates a new Docker container runtime.
-func NewDockerContainerRuntime(opts DockerContainerRuntimeOptions) (ContainerRuntime, error) {
-	_ = opts
-	return &dockerContainerRuntime{}, nil
+type ContainerRuntime interface {
+	Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error)
+	Start(ctx context.Context, handle ContainerHandle) error
+	Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
+	Logs(ctx context.Context, handle ContainerHandle) ([]byte, error)
 }
 
 // FilesystemDiffGeneratorOptions holds configuration for diff generator.
@@ -178,6 +178,7 @@ type Runner struct {
 type Request struct {
 	Manifest  contracts.StepManifest
 	Workspace string
+	OutDir    string
 }
 
 // Result contains the outcome of a step execution.
@@ -214,20 +215,41 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.HydrationDuration = time.Since(hydrationStart)
 
-	// Stage 2: Execute container (placeholder for now).
+	// Stage 2: Execute container via configured runtime (real execution when available).
 	executionStart := time.Now()
-	// Container execution is stubbed; future work will invoke Containers.
-	// For now, we simulate successful execution with exit code 0.
-	// When container execution is implemented, stdout/stderr will be written to LogWriter.
-	if r.LogWriter != nil {
-		// Placeholder log message to demonstrate streaming works.
-		_, _ = fmt.Fprintf(r.LogWriter, "Starting execution for manifest %s\n", req.Manifest.ID)
-		_, _ = fmt.Fprintf(r.LogWriter, "Workspace: %s\n", req.Workspace)
-		_, _ = fmt.Fprintf(r.LogWriter, "Image: %s\n", req.Manifest.Image)
-		_, _ = fmt.Fprintf(r.LogWriter, "Command: %v\n", req.Manifest.Command)
+	if r.Containers == nil {
+		// Backward-compatible fallback: simulate execution when no runtime is configured
+		if r.LogWriter != nil {
+			_, _ = fmt.Fprintf(r.LogWriter, "Starting execution for manifest %s\n", req.Manifest.ID)
+		}
+		result.ExitCode = 0
+		result.Timings.ExecutionDuration = time.Since(executionStart)
+	} else {
+		// Build container spec from manifest and workspace path plus optional /out mount.
+		spec, err := buildContainerSpec(req.Manifest, req.Workspace, req.OutDir)
+		if err != nil {
+			return Result{}, fmt.Errorf("build container spec: %w", err)
+		}
+		handle, err := r.Containers.Create(ctx, spec)
+		if err != nil {
+			return Result{}, fmt.Errorf("container create failed: %w", err)
+		}
+		if err := r.Containers.Start(ctx, handle); err != nil {
+			return Result{}, fmt.Errorf("container start failed: %w", err)
+		}
+		cRes, err := r.Containers.Wait(ctx, handle)
+		if err != nil {
+			return Result{}, fmt.Errorf("container wait failed: %w", err)
+		}
+		// Fetch logs and forward to LogWriter if present.
+		if r.LogWriter != nil {
+			if logs, err := r.Containers.Logs(ctx, handle); err == nil && len(logs) > 0 {
+				_, _ = r.LogWriter.Write(logs)
+			}
+		}
+		result.ExitCode = cRes.ExitCode
+		result.Timings.ExecutionDuration = time.Since(executionStart)
 	}
-	result.ExitCode = 0
-	result.Timings.ExecutionDuration = time.Since(executionStart)
 
 	// Stage 3: Build gate validation.
 	gateStart := time.Now()
@@ -250,24 +272,14 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.BuildGateDuration = time.Since(gateStart)
 
-	// Stage 4: Generate diff.
+	// Stage 4: Generate diff (best-effort; publishing handled by node agent).
 	diffStart := time.Now()
 	if r.Diffs != nil {
 		diffBytes, err := r.Diffs.Generate(ctx, req.Workspace)
 		if err != nil {
 			return Result{}, fmt.Errorf("diff generation failed: %w", err)
 		}
-		// Publish diff as an artifact if there are changes.
-		if len(diffBytes) > 0 && r.Artifacts != nil {
-			diffArtifact, err := r.Artifacts.Publish(ctx, ArtifactRequest{
-				Kind:   ArtifactKindDiff,
-				Buffer: diffBytes,
-			})
-			if err != nil {
-				return Result{}, fmt.Errorf("diff publish failed: %w", err)
-			}
-			result.DiffArtifact = diffArtifact
-		}
+		_ = diffBytes // Node agent independently uploads diffs; avoid duplicate publish with stubbed publisher.
 	}
 	result.Timings.DiffDuration = time.Since(diffStart)
 

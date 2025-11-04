@@ -245,7 +245,7 @@ func TestServerDeployDSNHandling(t *testing.T) {
 			}
 
 			if pgDSN != "" {
-				scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+				scriptEnv["PLOY_POSTGRES_DSN"] = pgDSN
 			}
 
 			// Verify PLOY_INSTALL_POSTGRESQL flag.
@@ -253,15 +253,15 @@ func TestServerDeployDSNHandling(t *testing.T) {
 				t.Fatalf("expected PLOY_INSTALL_POSTGRESQL=%q, got: %q", tt.expectedInstallFlagVal, got)
 			}
 
-			// Verify PLOY_SERVER_PG_DSN presence.
-			_, hasDSN := scriptEnv["PLOY_SERVER_PG_DSN"]
+			// Verify PLOY_POSTGRES_DSN presence.
+			_, hasDSN := scriptEnv["PLOY_POSTGRES_DSN"]
 			if hasDSN != tt.expectDSNInEnvironment {
-				t.Fatalf("expected PLOY_SERVER_PG_DSN present=%v, got: %v", tt.expectDSNInEnvironment, hasDSN)
+				t.Fatalf("expected PLOY_POSTGRES_DSN present=%v, got: %v", tt.expectDSNInEnvironment, hasDSN)
 			}
 
 			// When user provides DSN, verify it matches.
 			if tt.expectDSNInEnvironment {
-				if got := scriptEnv["PLOY_SERVER_PG_DSN"]; got != tt.postgresqlDSN {
+				if got := scriptEnv["PLOY_POSTGRES_DSN"]; got != tt.postgresqlDSN {
 					t.Fatalf("expected DSN %q, got: %q", tt.postgresqlDSN, got)
 				}
 			}
@@ -320,7 +320,7 @@ func TestServerDeployProvisionHostCallPath(t *testing.T) {
 	}
 
 	if pgDSN != "" {
-		scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+		scriptEnv["PLOY_POSTGRES_DSN"] = pgDSN
 	}
 
 	// Build ProvisionOptions.
@@ -381,8 +381,8 @@ func TestServerDeployProvisionHostCallPath(t *testing.T) {
 	if val := provisionOpts.ScriptEnv["PLOY_SERVER_KEY_PEM"]; val == "" {
 		t.Fatal("expected PLOY_SERVER_KEY_PEM to be set")
 	}
-	if val := provisionOpts.ScriptEnv["PLOY_SERVER_PG_DSN"]; val != cfg.PostgreSQLDSN {
-		t.Fatalf("expected PLOY_SERVER_PG_DSN=%q, got: %q", cfg.PostgreSQLDSN, val)
+	if val := provisionOpts.ScriptEnv["PLOY_POSTGRES_DSN"]; val != cfg.PostgreSQLDSN {
+		t.Fatalf("expected PLOY_POSTGRES_DSN=%q, got: %q", cfg.PostgreSQLDSN, val)
 	}
 
 	// Verify ServiceChecks includes ployd.
@@ -1032,7 +1032,7 @@ func TestServerDeployDescriptorPersistence(t *testing.T) {
 	}
 
 	if pgDSN != "" {
-		scriptEnv["PLOY_SERVER_PG_DSN"] = pgDSN
+		scriptEnv["PLOY_POSTGRES_DSN"] = pgDSN
 	}
 
 	user := cfg.User

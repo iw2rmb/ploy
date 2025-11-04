@@ -17,6 +17,9 @@ type SubmitCommand struct {
 	Client  *http.Client
 	BaseURL *url.URL
 	Request modsapi.TicketSubmitRequest
+	// Spec, when non-empty, is forwarded to the simplified submit payload
+	// for servers that accept repo_url/base_ref/target_ref (+optional spec).
+	Spec []byte
 }
 
 // Run executes the submission against the control plane endpoint.
@@ -81,8 +84,9 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 		return submitResp.Ticket, nil
 	default:
 		// Fallback: some servers expect a simplified payload (repo_url/base_ref/target_ref).
-		// If the first attempt failed with a client error, try the simplified shape once.
-		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		// If the first attempt failed with a client error OR when a Spec is present,
+		// try the simplified shape once including Spec when provided.
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 || len(c.Spec) > 0 {
 			// Drain body to allow connection reuse.
 			_ = json.NewDecoder(resp.Body).Decode(&struct{}{})
 
@@ -91,12 +95,17 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 			baseRef := strings.TrimSpace(c.Request.Metadata["repo_base_ref"])
 			targetRef := strings.TrimSpace(c.Request.Metadata["repo_target_ref"])
 			if repoURL != "" && baseRef != "" && targetRef != "" {
+				var specPtr *json.RawMessage
+				if len(c.Spec) > 0 {
+					jr := json.RawMessage(append([]byte(nil), c.Spec...))
+					specPtr = &jr
+				}
 				simple := struct {
 					RepoURL   string           `json:"repo_url"`
 					BaseRef   string           `json:"base_ref"`
 					TargetRef string           `json:"target_ref"`
 					Spec      *json.RawMessage `json:"spec,omitempty"`
-				}{RepoURL: repoURL, BaseRef: baseRef, TargetRef: targetRef}
+				}{RepoURL: repoURL, BaseRef: baseRef, TargetRef: targetRef, Spec: specPtr}
 				payload2, err2 := json.Marshal(simple)
 				if err2 == nil {
 					req2, err2 := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload2))

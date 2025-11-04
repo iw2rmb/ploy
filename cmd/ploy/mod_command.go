@@ -16,6 +16,8 @@ func handleMod(args []string, stderr io.Writer) error {
 	switch args[0] {
 	case "run":
 		return handleModRun(args[1:], stderr)
+	case "fetch":
+		return handleModFetch(args[1:], stderr)
 	case "cancel":
 		return handleModCancel(args[1:], stderr)
 	case "resume":

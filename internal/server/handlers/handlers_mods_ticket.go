@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -70,6 +71,20 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)
 			slog.Error("submit ticket: create run failed", "repo_url", req.RepoURL, "err", err)
+			return
+		}
+
+		// Create initial stage for the run (single-stage model: mods-openrewrite).
+		// Future: derive stage name from spec if provided.
+		_, err = st.CreateStage(r.Context(), store.CreateStageParams{
+			RunID:  storePgUUID(run.ID),
+			Name:   "mods-openrewrite",
+			Status: store.StageStatusPending,
+			Meta:   []byte("{}"),
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to create stage: %v", err), http.StatusInternalServerError)
+			slog.Error("submit ticket: create stage failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
 
@@ -155,45 +170,98 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Build TicketSummary response.
-		resp := struct {
-			TicketID   string  `json:"ticket_id"`
-			Status     string  `json:"status"`
-			Reason     *string `json:"reason,omitempty"`
-			RepoURL    string  `json:"repo_url"`
-			BaseRef    string  `json:"base_ref"`
-			TargetRef  string  `json:"target_ref"`
-			CommitSha  *string `json:"commit_sha,omitempty"`
-			CreatedAt  string  `json:"created_at"`
-			StartedAt  *string `json:"started_at,omitempty"`
-			FinishedAt *string `json:"finished_at,omitempty"`
-		}{
-			TicketID:  uuid.UUID(run.ID.Bytes).String(),
-			Status:    string(run.Status),
-			Reason:    run.Reason,
-			RepoURL:   run.RepoUrl,
-			BaseRef:   run.BaseRef,
-			TargetRef: run.TargetRef,
-			CommitSha: run.CommitSha,
+		// Build mods-style TicketStatusResponse with Stages and Artifacts.
+		// Map run status to mods state.
+		var ticketState modsapi.TicketState
+		switch run.Status {
+		case store.RunStatusQueued:
+			ticketState = modsapi.TicketStatePending
+		case store.RunStatusAssigned, store.RunStatusRunning:
+			ticketState = modsapi.TicketStateRunning
+		case store.RunStatusSucceeded:
+			ticketState = modsapi.TicketStateSucceeded
+		case store.RunStatusFailed:
+			ticketState = modsapi.TicketStateFailed
+		case store.RunStatusCanceled:
+			ticketState = modsapi.TicketStateCancelled
+		default:
+			ticketState = modsapi.TicketStatePending
 		}
 
-		// Format timestamps consistently (RFC3339).
-		if run.CreatedAt.Valid {
-			resp.CreatedAt = run.CreatedAt.Time.Format("2006-01-02T15:04:05Z07:00")
+		summary := modsapi.TicketSummary{
+			TicketID:   uuid.UUID(run.ID.Bytes).String(),
+			State:      ticketState,
+			Submitter:  "",
+			Repository: run.RepoUrl,
+			Metadata:   map[string]string{"repo_base_ref": run.BaseRef, "repo_target_ref": run.TargetRef},
+			CreatedAt:  timeOrZero(run.CreatedAt),
+			UpdatedAt:  time.Now().UTC(),
+			Stages:     make(map[string]modsapi.StageStatus),
 		}
-		if run.StartedAt.Valid {
-			formatted := run.StartedAt.Time.Format("2006-01-02T15:04:05Z07:00")
-			resp.StartedAt = &formatted
+
+		// Load stages and their artifacts.
+		stages, err := st.ListStagesByRun(r.Context(), storePgUUID(run.ID))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to list stages: %v", err), http.StatusInternalServerError)
+			slog.Error("get ticket status: list stages failed", "ticket_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			return
 		}
-		if run.FinishedAt.Valid {
-			formatted := run.FinishedAt.Time.Format("2006-01-02T15:04:05Z07:00")
-			resp.FinishedAt = &formatted
+		for _, stg := range stages {
+			// Map store.StageStatus -> modsapi.StageState
+			var s modsapi.StageState
+			switch stg.Status {
+			case store.StageStatusPending:
+				s = modsapi.StageStateQueued
+			case store.StageStatusRunning:
+				s = modsapi.StageStateRunning
+			case store.StageStatusSucceeded:
+				s = modsapi.StageStateSucceeded
+			case store.StageStatusFailed:
+				s = modsapi.StageStateFailed
+			case store.StageStatusCanceled:
+				s = modsapi.StageStateCancelled
+			default:
+				s = modsapi.StageStateQueued
+			}
+			artMap := make(map[string]string)
+			bundles, err := st.ListArtifactBundlesByRunAndStage(r.Context(), store.ListArtifactBundlesByRunAndStageParams{RunID: storePgUUID(run.ID), StageID: stg.ID})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
+				slog.Error("get ticket status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "stage_id", uuid.UUID(stg.ID.Bytes).String(), "err", err)
+				return
+			}
+			for _, b := range bundles {
+				name := "artifact"
+				if b.Name != nil && strings.TrimSpace(*b.Name) != "" {
+					name = strings.TrimSpace(*b.Name)
+				}
+				if b.Cid != nil && strings.TrimSpace(*b.Cid) != "" {
+					artMap[name] = strings.TrimSpace(*b.Cid)
+				}
+			}
+			summary.Stages[uuid.UUID(stg.ID.Bytes).String()] = modsapi.StageStatus{
+				StageID:     uuid.UUID(stg.ID.Bytes).String(),
+				State:       s,
+				Attempts:    1,
+				MaxAttempts: 1,
+				Artifacts:   artMap,
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
+		if err := json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: summary}); err != nil {
 			slog.Error("get ticket status: encode response failed", "err", err)
 		}
 	}
 }
+
+// helpers
+func timeOrZero(ts pgtype.Timestamptz) time.Time {
+	if ts.Valid {
+		return ts.Time
+	}
+	return time.Unix(0, 0).UTC()
+}
+
+func storePgUUID(id pgtype.UUID) pgtype.UUID { return id }

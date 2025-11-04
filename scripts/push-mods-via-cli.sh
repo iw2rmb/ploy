@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
-#!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 
 # Build and push Mods Docker images to Docker Hub.
 # Requires: docker buildx
 
 PLATFORM=${PLATFORM:-linux/amd64}
+PUSH_TIMEOUT=${PUSH_TIMEOUT:-900}        # seconds (default 15m)
+PUSH_RETRIES=${PUSH_RETRIES:-1}          # number of retries on failure
 DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME:-}
 IMAGE_PREFIX=${MODS_IMAGE_PREFIX:-}
 
@@ -17,10 +16,18 @@ if [[ -z "$DOCKERHUB_USERNAME" && -z "$IMAGE_PREFIX" ]]; then
   exit 2
 fi
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "error: docker CLI not found" >&2; exit 2
+fi
+if ! docker buildx version >/dev/null 2>&1; then
+  echo "error: docker buildx not available (install docker buildx plugin)" >&2; exit 2
+fi
+
 if [[ -n "${DOCKERHUB_PAT:-}" && -n "$DOCKERHUB_USERNAME" ]]; then
   echo "Logging in to Docker Hub as $DOCKERHUB_USERNAME"
   if ! printf '%s' "$DOCKERHUB_PAT" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin >/dev/null 2>&1; then
-    echo "warning: docker login failed; continuing (images may be public)" >&2
+    echo "error: docker login failed; aborting push" >&2
+    exit 2
   fi
 fi
 
@@ -29,7 +36,7 @@ if [[ -z "$IMAGE_PREFIX" ]]; then
 fi
 
 discover_images() {
-  local root="docker/mods"
+  local root="mods"
   [[ -d "$root" ]] || return 0
   find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
 }
@@ -37,14 +44,33 @@ discover_images() {
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 
+with_timeout() {
+  # usage: with_timeout <seconds> <command...>
+  local secs=$1; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "${secs}s" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "${secs}s" "$@"
+  else
+    # portable fallback using perl alarm; works on macOS/Linux
+    perl -e 'alarm shift @ARGV; exec @ARGV' "$secs" "$@"
+  fi
+}
+
+discover_images() {
+  local root="mods"
+  [[ -d "$root" ]] || return 0
+  find "$root" -mindepth 1 -maxdepth 1 -type d -print | while read -r d; do basename "$d"; done | sort
+}
+
 images=( $(discover_images) )
 if [[ ${#images[@]} -eq 0 ]]; then
-  echo "no images discovered under docker/mods" >&2
+  echo "no images discovered under mods" >&2
   exit 1
 fi
 
 for name in "${images[@]}"; do
-  context="docker/mods/${name}"
+  context="mods/${name}"
   # Map directory name to repo image name
   image_name="$name"
   if [[ "$image_name" == mod-* ]]; then
@@ -55,8 +81,21 @@ for name in "${images[@]}"; do
   fi
   ref="${IMAGE_PREFIX}/${image_name}:latest"
   echo "==> Building and pushing ${ref}"
-  docker buildx build --platform "$PLATFORM" -t "$ref" --push "$context"
-  echo "OK: ${ref}"
+  attempt=0
+  while :; do
+    attempt=$((attempt+1))
+    echo "[attempt ${attempt}/${PUSH_RETRIES}] docker buildx build --platform $PLATFORM -t $ref --push $context"
+    if with_timeout "$PUSH_TIMEOUT" docker buildx build --platform "$PLATFORM" --provenance=false --sbom=false --pull -t "$ref" --push "$context" --progress=plain; then
+      echo "OK: ${ref}"
+      break
+    fi
+    if (( attempt >= PUSH_RETRIES )); then
+      echo "error: push failed for ${ref} after ${attempt} attempt(s) within ${PUSH_TIMEOUT}s timeout" >&2
+      exit 1
+    fi
+    echo "warn: push failed for ${ref}; retrying..." >&2
+    sleep 3
+  done
 done
 
 echo "All Mods images pushed to ${IMAGE_PREFIX}"

@@ -11,7 +11,7 @@ assumes a 1x server + 2x node layout.
 
 - SSH access to all hosts with sudo privileges (default user `root`, port `22`).
 - Go 1.25+ installed locally for building binaries.
-- Docker Engine 28.0+ on worker nodes for job execution.
+- Docker Engine 28.0+ on worker nodes for job execution (installed automatically during `ploy node add`).
 - PostgreSQL 14+ (installed automatically on the server host when `--postgresql-dsn` is omitted).
 - Build the CLI and binaries locally: `make build` (CLI placed at `dist/ploy`).
 
@@ -35,13 +35,13 @@ This command:
 - Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
 - Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
 - Writes server certificate to `/etc/ploy/pki/server.crt` (mode 644) and private key to `/etc/ploy/pki/server.key` (mode 600).
-- If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS, creates database `ploy` and user `ploy` with a randomly generated 32-character hex password, and exports `PLOY_SERVER_PG_DSN` in the format `postgres://ploy:{PASSWORD}@localhost:5432/ploy?sslmode=disable`.
+- If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS, creates database `ploy` and user `ploy` with a randomly generated 32-character hex password, and exports `PLOY_POSTGRES_DSN` in the format `postgres://ploy:{PASSWORD}@localhost:5432/ploy?sslmode=disable`. The bootstrap writes this DSN as a literal value into `/etc/ploy/ployd.yaml`.
 - Writes server configuration to `/etc/ploy/ployd.yaml` with the following structure:
   - `http.listen: :8443` with TLS enabled, mTLS required
   - `http.tls.cert/key/client_ca` pointing to `/etc/ploy/pki/server.{crt,key}` and `ca.crt`
   - `metrics.listen: :9100`
   - `control_plane.endpoint: https://127.0.0.1:8443` with local mTLS paths
-  - `postgres.dsn: ${PLOY_SERVER_PG_DSN}` (environment variable expansion at runtime)
+  - `postgres.dsn: ${PLOY_POSTGRES_DSN:-}` (expanded at bootstrap time to a literal DSN in the file)
 - Installs systemd unit `/etc/systemd/system/ployd.service` with:
   - `ExecStart=/usr/local/bin/ployd`
   - `Restart=always`, `RestartSec=5`
@@ -134,6 +134,9 @@ Example:
 dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://203.0.113.42:8443
 dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://203.0.113.42:8443
 ```
+
+This step installs Docker on each node (via apt/yum or get.docker.com), writes `/etc/ploy/ployd-node.yaml` with the
+literal `server_url` and `node_id`, installs and starts `ployd-node.service`, and enables the Docker daemon.
 
 ### 3. Submit a Run
 
@@ -397,5 +400,5 @@ Legacy endpoint notice:
 ## Appendix: Environment Variables
 
 Operator‑facing variables are listed in `docs/envs/README.md` (control plane URL override, PostgreSQL DSN, metrics ports,
-optional DockerHub creds and OpenAI keys). During server bootstrap, `PLOY_SERVER_PG_DSN` is set automatically when
+optional DockerHub creds and OpenAI keys). During server bootstrap, `PLOY_POSTGRES_DSN` is set automatically when
 PostgreSQL is installed on the host.
