@@ -80,6 +80,58 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 		}
 		return submitResp.Ticket, nil
 	default:
+		// Fallback: some servers expect a simplified payload (repo_url/base_ref/target_ref).
+		// If the first attempt failed with a client error, try the simplified shape once.
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+			// Drain body to allow connection reuse.
+			_ = json.NewDecoder(resp.Body).Decode(&struct{}{})
+
+			// Build simplified payload from the canonical request fields if available.
+			repoURL := strings.TrimSpace(c.Request.Repository)
+			baseRef := strings.TrimSpace(c.Request.Metadata["repo_base_ref"])
+			targetRef := strings.TrimSpace(c.Request.Metadata["repo_target_ref"])
+			if repoURL != "" && baseRef != "" && targetRef != "" {
+				simple := struct {
+					RepoURL   string           `json:"repo_url"`
+					BaseRef   string           `json:"base_ref"`
+					TargetRef string           `json:"target_ref"`
+					Spec      *json.RawMessage `json:"spec,omitempty"`
+				}{RepoURL: repoURL, BaseRef: baseRef, TargetRef: targetRef}
+				payload2, err2 := json.Marshal(simple)
+				if err2 == nil {
+					req2, err2 := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(payload2))
+					if err2 == nil {
+						req2.Header.Set("Content-Type", "application/json")
+						if resp2, err2 := c.Client.Do(req2); err2 == nil {
+							defer func() { _ = resp2.Body.Close() }()
+							if resp2.StatusCode == http.StatusCreated {
+								var srvResp struct {
+									TicketID  string `json:"ticket_id"`
+									Status    string `json:"status"`
+									RepoURL   string `json:"repo_url"`
+									BaseRef   string `json:"base_ref"`
+									TargetRef string `json:"target_ref"`
+								}
+								if err := json.NewDecoder(resp2.Body).Decode(&srvResp); err != nil {
+									return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+								}
+								return modsapi.TicketSummary{
+									TicketID:   srvResp.TicketID,
+									State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
+									Repository: srvResp.RepoURL,
+									Metadata: map[string]string{
+										"repo_base_ref":   srvResp.BaseRef,
+										"repo_target_ref": srvResp.TargetRef,
+									},
+									Stages: make(map[string]modsapi.StageStatus),
+								}, nil
+							}
+						}
+					}
+				}
+			}
+		}
+
 		var apiErr struct {
 			Error string `json:"error"`
 		}
