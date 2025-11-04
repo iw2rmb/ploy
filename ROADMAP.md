@@ -58,10 +58,6 @@ Legend: [ ] todo, [x] done.
   - Change: if desired, inline repo/spec fields into the run submission and drop the mods table + FK; or keep tables as internal implementation details.
   - Test: migrations updated; unit/integration tests green; coverage ≥60% overall and ≥90% on critical packages per AGENTS.md.
 
-- [ ] VPS lab rollout
-  - Change: build binaries; `dist/ploy rollout server --address 45.9.42.212 --binary dist/ployd-linux`; roll nodes if required.
-  - Test: smoke: submit a Mods run; stream events; verify DB rows (runs, stages, events, diffs, artifacts).
-
 ## Acceptance Criteria
 - CLI “mod run … --follow” works end‑to‑end against VPS lab with only /v1/mods/* routes.
 - No /v1/mods/crud or /v1/runs reads/streams exposed in OpenAPI or server router.
