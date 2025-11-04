@@ -10,9 +10,10 @@ Ploy is a workstation‑first orchestration stack for code‑mod (Mods) workflow
 etcd and IPFS Cluster have been removed. Nodes clone repositories shallow on-demand and upload
 diffs/logs/artifacts to the server's PostgreSQL database.
 
-See `SIMPLE.md` for the detailed architecture, deployment topology, and migration notes.
-
-Note on docs consolidation (2025‑11‑01): prior exploration files (ARCHITECTURE_DIAGRAM.md, CODEBASE_EXPLORATION.md, EXPLORATION_INDEX.md, EXPLORATION_README.md) were folded into this README and SIMPLE.md to reduce duplication and confusion.
+Note on architecture pivot (November 2025): the project moved to a server/node
+split with PostgreSQL and mTLS, removed etcd/IPFS, and adopted a simpler
+control‑plane API. This README is now the canonical architecture overview.
+Prior exploration docs remain removed.
 
 **What Changed (2025‑11 — Postgres/mTLS Pivot)**
 - **Server/Node Split**: Separate `ployd` (control-plane) and `ployd-node` (worker) binaries.
@@ -22,26 +23,44 @@ Note on docs consolidation (2025‑11‑01): prior exploration files (ARCHITECTU
 - **Simplified Deployment**: `ploy server deploy` and `ploy node add` CLI commands.
 
 **Core Components**
-- CLI entrypoint: `cmd/ploy` (commands: `server`, `node`, `mod`, `mods`, `runs`, `knowledge-base`).
+- CLI entrypoint: `cmd/ploy` (notable commands: `server`, `node`, `rollout`, `mod`, `mods`, `runs`, `upload`).
 - Server daemon: `cmd/ployd` with PostgreSQL (`pgx/v5` + `sqlc`), scheduler, and PKI.
-- Node daemon: `cmd/ployd-node` with ephemeral workspaces, Build Gate, and mTLS client.
-- Control‑plane HTTP/SSE: handlers in `internal/server/http/*` and OpenAPI in `docs/api/OpenAPI.yaml`.
-- Scheduler: In-DB queue using `FOR UPDATE SKIP LOCKED` on `runs.status='queued'`.
-- Build Gate: `internal/workflow/buildgate/*` (sandbox runner, static checks, Java executor).
-- Storage: PostgreSQL migrations in `internal/store/migrations/`, queries in `internal/store/queries/`.
-- PKI: Cluster CA issues certificates; nodes submit CSRs via `/v1/pki/sign`.
+- Node daemon: `cmd/ployd-node` with ephemeral workspaces and mTLS client; streams logs/diffs/artifacts.
+- Control‑plane HTTP/SSE: handlers in `internal/server/handlers/*`, HTTP server in `internal/server/http/*`, SSE hub in `internal/stream`.
+- Scheduler: In‑DB queue; nodes claim runs with advisory‑lock semantics (see `internal/store/*`).
+- Build Gate + execution: execution scaffolding lives under `internal/workflow/runtime/step`; Java build‑gate health check in `internal/worker/lifecycle/health_buildgate.go`.
+- Storage: migrations in `internal/store/migrations/`, queries in `internal/store/queries/`.
+- PKI: Cluster CA issues certificates; nodes and admins submit CSRs via `/v1/pki/sign*` endpoints.
 
-Architecture packages (boundaries)
-- `internal/stream`: shared SSE hub and HTTP helpers for streaming run events/logs. Used by both server and node agent; no control-plane dependencies.
-- `internal/worker`: node-side execution primitives (e.g., `jobs`, `lifecycle`, `hydration`). Library-only; imported by the node agent.
-- `internal/nodeagent`: the node daemon (what `cmd/ployd-node` runs). Composes `worker` and pushes heartbeats, logs, diffs, and artifacts to the server.
+**Authentication & Roles (mTLS)**
+- Certificates carry role in Subject OU (`Ploy role=<role>`) or via CN prefix. Implemented roles:
+  - `cli-admin` — administrative CLI; allowed on admin endpoints and standard control‑plane.
+  - `client` (alias: control‑plane) — non‑admin CLI; allowed on standard control‑plane.
+  - `worker` (alias: node) — node agent; allowed on worker ingest endpoints.
+- Extracted from cert OU or CN. CNs like `node:<uuid>` are treated as `worker`. Admin is a superset of control‑plane for authorization.
+
+**API Overview (current implementation)**
+- PKI: `POST /v1/pki/sign`, `POST /v1/pki/sign/admin`, `POST /v1/pki/sign/client`.
+- Repos: `POST /v1/repos`, `GET /v1/repos`, `GET /v1/repos/{id}`, `DELETE /v1/repos/{id}`.
+- Mods (catalog): `POST /v1/mods/crud`, `GET /v1/mods/crud[?repo_id=]`, `GET /v1/mods/crud/{id}`, `DELETE /v1/mods/crud/{id}`.
+- Runs: `POST /v1/runs`, `GET /v1/runs` (collection/timings), `GET /v1/runs/{id}` (status), `GET /v1/runs/{id}/events` (SSE), `GET /v1/runs/{id}/timing`.
+- Ingest (worker): `POST /v1/runs/{id}/diffs`, `POST /v1/runs/{id}/logs`, `POST /v1/runs/{id}/artifact_bundles`.
+- Nodes (control): `GET /v1/nodes`, `POST /v1/nodes/{id}/drain`, `POST /v1/nodes/{id}/undrain`.
+- Nodes (worker): `POST /v1/nodes/{id}/heartbeat`, `POST /v1/nodes/{id}/claim`, `POST /v1/nodes/{id}/ack`, `POST /v1/nodes/{id}/complete`, `POST /v1/nodes/{id}/events`, `POST /v1/nodes/{id}/logs`, `POST /v1/nodes/{id}/stage/{stage}/diff`, `POST /v1/nodes/{id}/stage/{stage}/artifact`.
+
+Note: An API simplification to a `/v1/mods`‑only facade (submit/status/events/artifacts) is planned; see `ROADMAP.md`. Until that lands, the server exposes the routes above.
+
+**Architecture packages (boundaries)**
+- `internal/stream`: shared SSE hub and HTTP helpers (server + node agent use it).
+- `internal/worker`: node‑side execution primitives (`jobs`, `lifecycle`, `hydration`).
+- `internal/nodeagent`: node daemon composition and HTTP server/handlers.
 
 **Docs You'll Want**
-- Architecture: `SIMPLE.md` (server/node pivot, PostgreSQL, mTLS)
+- Architecture: this `README.md` (pivot summary and current API)
 - Deployment: `docs/how-to/deploy-a-cluster.md`
 - Updating a cluster: `docs/how-to/update-a-cluster.md` (rolling updates via `ploy rollout`)
-- Roadmap: `ROADMAP.md` (migration checklist)
-- Control‑plane APIs: `docs/api/OpenAPI.yaml`
+- Roadmap: `ROADMAP.md` (current plan and latest slices)
+- Control‑plane APIs: `docs/api/OpenAPI.yaml` (will be updated alongside the `/v1/mods` simplification)
 - Environment variables: `docs/envs/README.md`
 - Engineering rules: `GOLANG.md`
 
@@ -54,7 +73,7 @@ Architecture packages (boundaries)
 - Contributor process: `AGENTS.md` (TDD, coverage, docs policy).
 
 **Build**
-- Requirements: Go 1.25+, Docker 28.x for local step execution.
+- Requirements: Go 1.25+. Docker is optional for local step execution; node container execution is scaffolded in this slice.
 - Build binaries into `dist/`:
   
   ```bash
@@ -125,7 +144,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 
 **Contributing**
 - Follow `GOLANG.md` and `AGENTS.md` (RED→GREEN→REFACTOR cadence; `make test` runs `go test -cover ./...`).
-- Keep docs in sync; update `SIMPLE.md`, `ROADMAP.md`, and `docs/` as needed.
+- Keep docs in sync; update `README.md`, `ROADMAP.md`, and `docs/` as needed.
 
 **Legacy Removed (November 2025)**
 - **etcd**: Replaced with PostgreSQL for all state.
