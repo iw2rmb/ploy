@@ -44,7 +44,7 @@ Legend: [ ] todo, [x] done.
   - Test: handler test checks both calls.
 
 ## Phase 3 — Glue and guards
-- [ ] Map claim response → StartRunRequest — Ensure StartRun uses repo + base/target refs. — Execution succeeds with current runner
+- [x] Map claim response → StartRunRequest — Ensure StartRun uses repo + base/target refs. — Execution succeeds with current runner
   - Change: internal/nodeagent/agent.go buildManifestFromRequest inputs
   - Test: agent test validates manifest URL/refs.
 
