@@ -12,7 +12,7 @@ import (
 // path with a nil-backed mock store; success is not required.
 func FuzzSubmitTicketHandler(f *testing.F) {
 	st := &mockStore{}
-	h := submitTicketHandler(st)
+	h := submitTicketHandler(st, nil)
 
 	// Seed with a few typical cases.
 	seeds := [][]byte{

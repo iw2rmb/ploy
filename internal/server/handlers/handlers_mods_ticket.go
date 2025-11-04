@@ -12,13 +12,15 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // submitTicketHandler returns an HTTP handler that submits a new ticket (mods run).
 // POST /v1/mods — Accepts TicketSubmitRequest, returns TicketSummary (ticket_id == run UUID).
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
-func submitTicketHandler(st store.Store) http.HandlerFunc {
+func submitTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Decode request body.
 		var req struct {
@@ -84,6 +86,21 @@ func submitTicketHandler(st store.Store) http.HandlerFunc {
 			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
 			TargetRef: run.TargetRef,
+		}
+
+		// Publish queued event to SSE hub.
+		if eventsService != nil {
+			ticketSummary := modsapi.TicketSummary{
+				TicketID:   resp.TicketID,
+				State:      modsapi.TicketState(run.Status),
+				Repository: run.RepoUrl,
+				CreatedAt:  run.CreatedAt.Time,
+				UpdatedAt:  run.CreatedAt.Time,
+				Stages:     make(map[string]modsapi.StageStatus),
+			}
+			if err := eventsService.PublishTicket(r.Context(), resp.TicketID, ticketSummary); err != nil {
+				slog.Error("submit ticket: publish ticket event failed", "ticket_id", resp.TicketID, "err", err)
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
