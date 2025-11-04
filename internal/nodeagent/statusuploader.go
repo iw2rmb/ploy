@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"time"
 )
 
 // StatusUploader uploads terminal status and stats to the control-plane server.
@@ -28,7 +30,7 @@ func NewStatusUploader(cfg Config) (*StatusUploader, error) {
 	}, nil
 }
 
-// UploadStatus uploads terminal status and stats to the server.
+// UploadStatus uploads terminal status and stats to the server with retry on transient 5xx errors.
 func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, reason *string, stats map[string]interface{}) error {
 	// Build request payload.
 	payload := map[string]interface{}{
@@ -52,25 +54,66 @@ func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string,
 	// Construct URL.
 	url := fmt.Sprintf("%s/v1/nodes/%s/complete", u.cfg.ServerURL, u.cfg.NodeID)
 
-	// Create HTTP request.
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
+	// Retry parameters: exponential backoff for transient 5xx errors.
+	maxRetries := 3
+	backoff := 100 * time.Millisecond
 
-	// Send request.
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Create HTTP request.
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	// Check response status.
-	if resp.StatusCode != http.StatusNoContent {
+		// Send request.
+		resp, err := u.client.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("send request: %w", err)
+			// Network errors are retryable.
+			if attempt < maxRetries {
+				slog.Warn("upload status request failed, retrying", "run_id", runID, "attempt", attempt+1, "error", err)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(backoff):
+					backoff *= 2
+					continue
+				}
+			}
+			return lastErr
+		}
+
+		// Read response body for error messages.
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+
+		// Check response status.
+		// Accept both 200 and 204 as success per ROADMAP requirement.
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+			return nil
+		}
+
+		// Retry on transient 5xx errors.
+		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+			lastErr = fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+			if attempt < maxRetries {
+				slog.Warn("upload status received 5xx, retrying", "run_id", runID, "status_code", resp.StatusCode, "attempt", attempt+1)
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(backoff):
+					backoff *= 2
+					continue
+				}
+			}
+			return lastErr
+		}
+
+		// Non-retryable error (4xx or other).
 		return fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	return nil
+	return lastErr
 }
