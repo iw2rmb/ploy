@@ -16,6 +16,7 @@ import (
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
+	logstream "github.com/iw2rmb/ploy/internal/stream"
 )
 
 // heartbeatHandler updates node heartbeat and resource snapshot.
@@ -313,7 +314,7 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 
 // completeRunHandler marks a run as completed with terminal status and stats.
 // Sets finished_at timestamp and populates runs.stats field.
-func completeRunHandler(st store.Store) http.HandlerFunc {
+func completeRunHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -449,6 +450,41 @@ func completeRunHandler(st store.Store) http.HandlerFunc {
 			http.Error(w, fmt.Sprintf("failed to complete run: %v", err), http.StatusInternalServerError)
 			slog.Error("complete run: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
 			return
+		}
+
+		// Publish terminal ticket event and done status to SSE hub.
+		if eventsService != nil {
+			// Map store.RunStatus to modsapi.TicketState.
+			var ticketState modsapi.TicketState
+			switch normalizedStatus {
+			case store.RunStatusSucceeded:
+				ticketState = modsapi.TicketStateSucceeded
+			case store.RunStatusFailed:
+				ticketState = modsapi.TicketStateFailed
+			case store.RunStatusCanceled:
+				ticketState = modsapi.TicketStateCancelled
+			default:
+				// Should not happen given validation above, but default to failed for safety.
+				ticketState = modsapi.TicketStateFailed
+			}
+
+			ticketSummary := modsapi.TicketSummary{
+				TicketID:   req.RunID,
+				State:      ticketState,
+				Repository: run.RepoUrl,
+				CreatedAt:  run.CreatedAt.Time,
+				UpdatedAt:  time.Now().UTC(),
+				Stages:     make(map[string]modsapi.StageStatus),
+			}
+			if err := eventsService.PublishTicket(r.Context(), req.RunID, ticketSummary); err != nil {
+				slog.Error("complete run: publish ticket event failed", "ticket_id", req.RunID, "err", err)
+			}
+
+			// Publish done event to signal stream completion.
+			doneStatus := logstream.Status{Status: "done"}
+			if err := eventsService.Hub().PublishStatus(r.Context(), req.RunID, doneStatus); err != nil {
+				slog.Error("complete run: publish done status failed", "run_id", req.RunID, "err", err)
+			}
 		}
 
 		w.WriteHeader(http.StatusNoContent)

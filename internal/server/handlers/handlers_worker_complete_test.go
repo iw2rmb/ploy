@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -29,7 +32,7 @@ func TestCompleteRun_Success(t *testing.T) {
 		},
 	}
 
-	handler := completeRunHandler(st)
+	handler := completeRunHandler(st, nil)
 
 	payload := map[string]any{
 		"run_id": runID.String(),
@@ -81,7 +84,7 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 		},
 	}
 
-	handler := completeRunHandler(st)
+	handler := completeRunHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed", "reason": "boom"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
@@ -112,7 +115,7 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 		},
 	}
 
-	handler := completeRunHandler(st)
+	handler := completeRunHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
@@ -143,7 +146,7 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 		},
 	}
 
-	handler := completeRunHandler(st)
+	handler := completeRunHandler(st, nil)
 
 	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "running"})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
@@ -174,7 +177,7 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 		},
 	}
 
-	handler := completeRunHandler(st)
+	handler := completeRunHandler(st, nil)
 
 	// stats provided as a string, which is valid JSON but not an object.
 	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed", "stats": "oops"})
@@ -199,7 +202,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 
 	// Node not found
 	st1 := &mockStore{getNodeErr: pgx.ErrNoRows}
-	handler1 := completeRunHandler(st1)
+	handler1 := completeRunHandler(st1, nil)
 	b1, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
 	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b1))
 	req1.SetPathValue("id", nodeID.String())
@@ -214,7 +217,7 @@ func TestCompleteRun_NotFound(t *testing.T) {
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunErr:     pgx.ErrNoRows,
 	}
-	handler2 := completeRunHandler(st2)
+	handler2 := completeRunHandler(st2, nil)
 	b2, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b2))
 	req2.SetPathValue("id", nodeID.String())
@@ -222,5 +225,78 @@ func TestCompleteRun_NotFound(t *testing.T) {
 	handler2.ServeHTTP(rr2, req2)
 	if rr2.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for missing run, got %d", rr2.Code)
+	}
+}
+
+// TestCompleteRun_PublishesEvents verifies that completing a run publishes both
+// a terminal ticket event and a done status event.
+func TestCompleteRun_PublishesEvents(t *testing.T) {
+	nodeID := uuid.New()
+	runID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	eventsService, _ := events.New(events.Options{
+		BufferSize:  10,
+		HistorySize: 100,
+	})
+	handler := completeRunHandler(st, eventsService)
+
+	payload := map[string]any{
+		"run_id": runID.String(),
+		"status": "succeeded",
+		"stats":  map[string]any{"exit_code": 0},
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify events were published to the hub by checking the snapshot.
+	snapshot := eventsService.Hub().Snapshot(runID.String())
+	if len(snapshot) < 2 {
+		t.Fatalf("expected at least 2 events (ticket + done), got %d", len(snapshot))
+	}
+
+	// Verify we have both a ticket event and a done event.
+	foundTicketEvent := false
+	foundDoneEvent := false
+	for _, evt := range snapshot {
+		if evt.Type == "ticket" {
+			foundTicketEvent = true
+			// Verify the event contains "succeeded" status.
+			if !strings.Contains(string(evt.Data), "succeeded") {
+				t.Errorf("expected ticket event data to contain 'succeeded', got: %s", string(evt.Data))
+			}
+		}
+		if evt.Type == "done" {
+			foundDoneEvent = true
+			// Verify the event contains done status.
+			if !strings.Contains(string(evt.Data), "done") {
+				t.Errorf("expected done event data to contain 'done', got: %s", string(evt.Data))
+			}
+		}
+	}
+	if !foundTicketEvent {
+		t.Error("expected to find a 'ticket' event in the snapshot")
+	}
+	if !foundDoneEvent {
+		t.Error("expected to find a 'done' event in the snapshot")
 	}
 }
