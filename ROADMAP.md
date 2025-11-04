@@ -18,7 +18,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/nodeagent/agent.go — After ack, invoke controller.StartRun with StartRunRequest mapped from claim response (repo_url/base_ref/target_ref/commit_sha). On return, use StatusUploader to POST terminal status.
   - Test: unit test with httptest server stubbing /claim→/ack→/complete; verify loop posts in order and transitions once per claim.
 
-- [ ] Implement ack on node — POST /v1/nodes/{id}/ack with run_id before execution. — Moves run to running per server contract
+- [x] Implement ack on node — POST /v1/nodes/{id}/ack with run_id before execution. — Moves run to running per server contract
   - Change: internal/nodeagent/claimer.go — call ack before StartRun;
   - Test: claim loop test asserts ack call made prior to StartRun invocation.
 
