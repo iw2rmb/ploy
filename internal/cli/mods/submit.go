@@ -27,10 +27,34 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 	if c.BaseURL == nil {
 		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: base url required")
 	}
-	// New control-plane submission endpoint (3.1): POST /v1/mods
+	// New control-plane submission endpoint: POST /v1/mods (server expects simplified payload)
 	endpoint := c.BaseURL.ResolveReference(&url.URL{Path: "/v1/mods"})
 
-	payload, err := json.Marshal(c.Request)
+	// Transform the CLI request into server's simplified shape.
+	type serverSubmit struct {
+		RepoURL   string                 `json:"repo_url"`
+		BaseRef   string                 `json:"base_ref"`
+		TargetRef string                 `json:"target_ref"`
+		CommitSha *string                `json:"commit_sha,omitempty"`
+		Spec      map[string]interface{} `json:"spec,omitempty"`
+		CreatedBy string                 `json:"created_by,omitempty"`
+	}
+	// Extract base/target refs and optional commit from metadata.
+	baseRef := strings.TrimSpace(c.Request.Metadata["repo_base_ref"])
+	targetRef := strings.TrimSpace(c.Request.Metadata["repo_target_ref"])
+	var commit *string
+	if v := strings.TrimSpace(c.Request.Metadata["repo_commit_sha"]); v != "" {
+		commit = &v
+	}
+	srv := serverSubmit{
+		RepoURL:   strings.TrimSpace(c.Request.Repository),
+		BaseRef:   baseRef,
+		TargetRef: targetRef,
+		CommitSha: commit,
+		Spec:      map[string]interface{}{},
+		CreatedBy: strings.TrimSpace(c.Request.Submitter),
+	}
+	payload, err := json.Marshal(srv)
 	if err != nil {
 		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: marshal request: %w", err)
 	}
@@ -46,7 +70,36 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusAccepted {
+	switch resp.StatusCode {
+	case http.StatusCreated: // 201 — server simplified summary
+		var srvResp struct {
+			TicketID  string `json:"ticket_id"`
+			Status    string `json:"status"`
+			RepoURL   string `json:"repo_url"`
+			BaseRef   string `json:"base_ref"`
+			TargetRef string `json:"target_ref"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&srvResp); err != nil {
+			return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+		}
+		// Map to modsapi summary type.
+		return modsapi.TicketSummary{
+			TicketID:   srvResp.TicketID,
+			State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
+			Repository: srvResp.RepoURL,
+			Metadata: map[string]string{
+				"repo_base_ref":   srvResp.BaseRef,
+				"repo_target_ref": srvResp.TargetRef,
+			},
+			Stages: make(map[string]modsapi.StageStatus),
+		}, nil
+	case http.StatusAccepted: // 202 — legacy/alternate response shape still supported
+		var submitResp modsapi.TicketSubmitResponse
+		if err := json.NewDecoder(resp.Body).Decode(&submitResp); err != nil {
+			return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
+		}
+		return submitResp.Ticket, nil
+	default:
 		var apiErr struct {
 			Error string `json:"error"`
 		}
@@ -57,10 +110,4 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 		}
 		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: %s", message)
 	}
-
-	var submitResp modsapi.TicketSubmitResponse
-	if err := json.NewDecoder(resp.Body).Decode(&submitResp); err != nil {
-		return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
-	}
-	return submitResp.Ticket, nil
 }
