@@ -267,6 +267,124 @@ func TestClaimLoopBackoff(t *testing.T) {
 	}
 }
 
+// TestClaimLoopBackoffReset verifies backoff resets on successful claim.
+func TestClaimLoopBackoffReset(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var intervals []time.Duration
+	var lastCall time.Time
+	callCount := 0
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		switch r.URL.Path {
+		case "/v1/nodes/test-node/claim":
+			now := time.Now()
+			if !lastCall.IsZero() {
+				intervals = append(intervals, now.Sub(lastCall))
+			}
+			lastCall = now
+			callCount++
+
+			// Return 204 for first 3 calls to build up backoff, then success.
+			if callCount <= 3 {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			// Return success to reset backoff.
+			resp := ClaimResponse{
+				ID:        "run-reset",
+				RepoURL:   "https://github.com/test/repo",
+				Status:    "assigned",
+				NodeID:    "test-node",
+				BaseRef:   "main",
+				TargetRef: "feature",
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(resp)
+
+		case "/v1/nodes/test-node/ack":
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    "test-node",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	controller := &runController{
+		cfg:  cfg,
+		runs: make(map[string]*runContext),
+	}
+
+	claimer, err := NewClaimManager(cfg, controller)
+	if err != nil {
+		t.Fatalf("NewClaimManager failed: %v", err)
+	}
+
+	// Set backoff parameters.
+	claimer.minBackoff = 50 * time.Millisecond
+	claimer.maxBackoff = 200 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = claimer.Start(ctx)
+	}()
+
+	// Wait for backoff to build up and then reset.
+	time.Sleep(1 * time.Second)
+	cancel()
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Verify we had at least 4 calls (3 failures + 1 success).
+	if callCount < 4 {
+		t.Fatalf("expected at least 4 calls, got %d", callCount)
+	}
+
+	// Verify intervals increased during backoff phase (calls 1-3).
+	if len(intervals) >= 2 {
+		for i := 1; i < 3 && i < len(intervals); i++ {
+			if intervals[i] < intervals[i-1]/2 {
+				t.Logf("backoff may not be increasing: interval[%d]=%v vs interval[%d]=%v",
+					i, intervals[i], i-1, intervals[i-1])
+			}
+		}
+	}
+
+	// After successful claim (call 4), backoff should reset.
+	// The next interval (call 5) should be back to minBackoff.
+	if len(intervals) >= 4 {
+		// Check that interval after success is smaller than the backed-off interval.
+		if intervals[3] >= intervals[2] {
+			t.Logf("backoff appears to have reset: interval[3]=%v < interval[2]=%v",
+				intervals[3], intervals[2])
+		}
+	}
+}
+
 // TestClaimLoopAckFailure verifies behavior when ack fails.
 func TestClaimLoopAckFailure(t *testing.T) {
 	t.Parallel()

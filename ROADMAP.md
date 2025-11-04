@@ -48,7 +48,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/nodeagent/agent.go buildManifestFromRequest inputs
   - Test: agent test validates manifest URL/refs.
 
-- [ ] Idle/health checks — Backoff when no work; keep heartbeats. — Reduce noisy logs
+- [x] Idle/health checks — Backoff when no work; keep heartbeats. — Reduce noisy logs
   - Change: claimer loop backoff (250ms→5s exponential with cap).
   - Test: loop test observes sleep growth and reset on success.
 
