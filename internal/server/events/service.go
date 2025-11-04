@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -145,7 +146,9 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 // The payload should contain a modsapi.TicketSummary with current ticket state.
 // Returns an error if the fanout fails.
 func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.TicketSummary) error {
-	if runID == "" {
+	// Validate stream id after trimming whitespace so callers can't silently
+	// succeed with an all‑whitespace runID (the hub ignores empty ids).
+	if strings.TrimSpace(runID) == "" {
 		return errors.New("events: runID required for ticket publish")
 	}
 	if ctx != nil && ctx.Err() != nil {

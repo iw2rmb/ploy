@@ -491,6 +491,13 @@ func TestPublishTicket(t *testing.T) {
 			wantErr:     true,
 			checkEvents: false,
 		},
+		{
+			name:        "whitespace runID returns error",
+			runID:       "  \t  ",
+			state:       modsapi.TicketStatePending,
+			wantErr:     true,
+			checkEvents: false,
+		},
 	}
 
 	for _, tt := range tests {
