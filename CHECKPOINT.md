@@ -1,8 +1,8 @@
-CHECKPOINT — Ploy refactor status (2025‑11‑03)
+CHECKPOINT — Ploy refactor status (2025‑11‑04)
 
 Summary
 - Goal: align code and docs with the Postgres/mTLS pivot; remove legacy APIs; make CLI+server+node surfaces consistent; prepare for submodule regrouping.
-- Status: legacy removed, CLI and API updated, tests passing, next step is internal/ folder regrouping.
+- Status: ROADMAP.md implemented in full; simplified `/v1/mods` facade live; docs updated; next step is internal/ folder regrouping.
 
 Key Decisions
 - Artifacts/logs/diffs now live behind the runs API; the old /v2 and legacy jobs endpoints are gone.
@@ -34,8 +34,8 @@ Completed Changes (code + docs)
    - Removed: all /v1/jobs*, and /v1/mods/{ticket}/logs/stream.
 
 5) OpenAPI + docs
-   - OpenAPI now runs‑only; deleted obsolete path files (jobs.yaml, jobs_id.yaml, jobs_id_logs_stream.yaml, jobs_id_retry.yaml, mods_ticket_logs_stream.yaml).
-   - Docs updated: deployment and update guides use /v1/mods/* for streaming/status and /v1/runs/{id}/* for ingest; README examples use `runs`/`mods` accordingly.
+   - OpenAPI reflects `/v1/mods` facade; removed `/v1/mods/crud` and `/v1/runs/*` reads/streams.
+   - Docs updated: deployment guide uses /v1/mods/* for submit/status/events; README API overview lists `/v1/mods` + artifacts endpoints.
 
 6) PKI rotation TODO completed
    - internal/server/pki/rotator.go: implements on‑disk renewal when cert expiry enters `pki.renew_before`, issuing a new cert with the same Subject/SANs, using CA from env:
@@ -109,13 +109,16 @@ Quick Commands
 - Run tests: `make test`
 
 Ready for Next Slice
-- Completed on 2025-11-03:
+- Completed on 2025-11-04:
   - internal/api → internal/server rename (httpserver → http).
   - Moved HTTP handlers out of cmd/ployd into internal/server/handlers and added RegisterRoutes.
   - Adjusted imports across repo; updated docs and coverage scripts.
   - Moved handler tests under `internal/server/handlers`; pruned handler tests from `cmd/ployd` and added minimal test helpers in `internal/server/handlers/`.
   - Removed temporary back‑compat aliases and deleted exported handler shims; tests now use in‑package (unexported) handlers.
   - make build, make test: green.
+
+- Housekeeping:
+  - Removed `ROADMAP.md` after final verification; replaced references with `CHECKPOINT.md` across docs.
 
 - Next proposals:
   1) Rename internal/cli/jobs → internal/cli/runs (types preserved; keep command names aligned with runs).

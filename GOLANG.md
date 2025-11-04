@@ -3,7 +3,7 @@
 This document codifies Go engineering rules for this repository. It complements `docs/GOLANG.md` (tooling quickstart) and aligns with our RED → GREEN → REFACTOR cadence from `AGENTS.md`.
 
 - Primary references
-  - docs: `docs/GOLANG.md` (tooling), `AGENTS.md` (TDD + coverage), `README.md` (architecture), `ROADMAP.md` (delivery steps)
+  - docs: `docs/GOLANG.md` (tooling), `AGENTS.md` (TDD + coverage), `README.md` (architecture), `CHECKPOINT.md` (status)
   - externals (authoritative): Go Code Review Comments, Effective Go, fuzzing and security/govulncheck guidance, and the Uber Go Style Guide. See References.
 
 ## Versions & Layout

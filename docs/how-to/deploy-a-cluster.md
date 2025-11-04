@@ -1,7 +1,7 @@
 # Deploy a Ploy Cluster (Server/Node Architecture)
 
 This guide describes how to deploy a Ploy cluster using the new server/node architecture
-(Postgres + mTLS) as outlined in `README.md` and implemented per the slices in `ROADMAP.md`.
+(Postgres + mTLS) as outlined in `README.md` and implemented as of November 2025.
 The deployment separates control-plane (`ployd` server) from worker execution (`ployd-node`) and
 assumes a 1x server + 2x node layout.
 
@@ -331,7 +331,7 @@ Firewall notes:
 
 See also:
 - `README.md` — Pivot architecture and current API surface.
-- `ROADMAP.md` — Implementation checklist and acceptance criteria.
+- `CHECKPOINT.md` — Status and acceptance summary.
 
 ## Operations
 
