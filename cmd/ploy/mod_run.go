@@ -100,11 +100,8 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("repo target ref required when repo url is set")
 	}
 
-	// Validate GitLab flags: if mr flags are set, domain is required (PAT may come from server)
-	if (*mrSuccess || *mrFail) && strings.TrimSpace(*gitlabDomain) == "" && strings.TrimSpace(*gitlabPAT) != "" {
-		// If PAT is provided but domain is not, warn but allow (server may have default domain)
-		// This is not an error, just a potential misconfiguration
-	}
+	// Note: validation of GitLab flags is deferred to the server/node.
+	// Avoid empty branches and keep CLI permissive for per-run overrides.
 
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
@@ -249,7 +246,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
 }
 
 // (stringSlice implements flag.Value above)
