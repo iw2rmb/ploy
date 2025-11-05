@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCreateMR(t *testing.T) {
@@ -398,6 +399,310 @@ func TestCreateMR_ValidationRedaction(t *testing.T) {
 	// Verify that the PAT is not in the error message.
 	if strings.Contains(errMsg, "glpat-secret-validation-token") {
 		t.Errorf("PAT leaked in validation error: %s", errMsg)
+	}
+}
+
+func TestCreateMR_Retries(t *testing.T) {
+	tests := []struct {
+		name            string
+		req             MRCreateRequest
+		serverResponses []struct {
+			statusCode int
+			body       string
+		}
+		wantURL      string
+		wantErr      bool
+		wantAttempts int
+	}{
+		{
+			name: "retry_on_429_then_success",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
+				{statusCode: http.StatusCreated, body: `{"iid":123,"web_url":"http://test-server/org/project/-/merge_requests/123"}`},
+			},
+			wantURL:      "http://test-server/org/project/-/merge_requests/123",
+			wantErr:      false,
+			wantAttempts: 2,
+		},
+		{
+			name: "retry_on_500_then_success",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusInternalServerError, body: `{"message":"Internal server error"}`},
+				{statusCode: http.StatusCreated, body: `{"iid":456,"web_url":"http://test-server/org/project/-/merge_requests/456"}`},
+			},
+			wantURL:      "http://test-server/org/project/-/merge_requests/456",
+			wantErr:      false,
+			wantAttempts: 2,
+		},
+		{
+			name: "retry_on_502_then_success",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusBadGateway, body: `{"message":"Bad gateway"}`},
+				{statusCode: http.StatusCreated, body: `{"iid":789,"web_url":"http://test-server/org/project/-/merge_requests/789"}`},
+			},
+			wantURL:      "http://test-server/org/project/-/merge_requests/789",
+			wantErr:      false,
+			wantAttempts: 2,
+		},
+		{
+			name: "retry_exhausted_429",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
+				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
+				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
+			},
+			wantURL:      "",
+			wantErr:      true,
+			wantAttempts: 3,
+		},
+		{
+			name: "retry_exhausted_500",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusInternalServerError, body: `{"message":"Internal server error"}`},
+				{statusCode: http.StatusServiceUnavailable, body: `{"message":"Service unavailable"}`},
+				{statusCode: http.StatusGatewayTimeout, body: `{"message":"Gateway timeout"}`},
+			},
+			wantURL:      "",
+			wantErr:      true,
+			wantAttempts: 3,
+		},
+		{
+			name: "no_retry_on_401",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusUnauthorized, body: `{"message":"401 Unauthorized"}`},
+			},
+			wantURL:      "",
+			wantErr:      true,
+			wantAttempts: 1,
+		},
+		{
+			name: "no_retry_on_400",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-retry-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverResponses: []struct {
+				statusCode int
+				body       string
+			}{
+				{statusCode: http.StatusBadRequest, body: `{"message":"Bad request"}`},
+			},
+			wantURL:      "",
+			wantErr:      true,
+			wantAttempts: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attemptCount := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if attemptCount >= len(tt.serverResponses) {
+					t.Errorf("unexpected extra request (attempt %d)", attemptCount+1)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				resp := tt.serverResponses[attemptCount]
+				attemptCount++
+				w.WriteHeader(resp.statusCode)
+				_, _ = w.Write([]byte(resp.body))
+			}))
+			defer server.Close()
+
+			// Update domain to point to test server.
+			serverHost := strings.TrimPrefix(server.URL, "http://")
+			tt.req.Domain = serverHost
+
+			// Create client.
+			client := NewMRClient()
+
+			// Call CreateMR.
+			ctx := context.Background()
+			gotURL, err := client.CreateMR(ctx, tt.req)
+
+			// Check error.
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateMR() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Check URL.
+			if !tt.wantErr && gotURL != tt.wantURL {
+				t.Errorf("CreateMR() url = %v, want %v", gotURL, tt.wantURL)
+			}
+
+			// Check attempt count.
+			if attemptCount != tt.wantAttempts {
+				t.Errorf("expected %d attempts, got %d", tt.wantAttempts, attemptCount)
+			}
+		})
+	}
+}
+
+func TestCreateMR_RetryBackoff(t *testing.T) {
+	// Test that backoff increases exponentially.
+	attemptCount := 0
+	var attemptTimes []time.Time
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptTimes = append(attemptTimes, time.Now())
+		attemptCount++
+		if attemptCount < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"message":"Rate limit exceeded"}`))
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		response := map[string]interface{}{
+			"iid":     123,
+			"web_url": "http://test-server/org/project/-/merge_requests/123",
+		}
+		_ = json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	client := NewMRClient()
+	ctx := context.Background()
+
+	req := MRCreateRequest{
+		Domain:       strings.TrimPrefix(server.URL, "http://"),
+		ProjectID:    "org%2Fproject",
+		PAT:          "glpat-token",
+		Title:        "Test MR",
+		SourceBranch: "feature",
+		TargetBranch: "main",
+	}
+
+	_, err := client.CreateMR(ctx, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(attemptTimes) != 3 {
+		t.Fatalf("expected 3 attempts, got %d", len(attemptTimes))
+	}
+
+	// Check that delays roughly follow exponential backoff (1s, 2s).
+	// Allow some tolerance for test execution time (±200ms).
+	delay1 := attemptTimes[1].Sub(attemptTimes[0])
+	delay2 := attemptTimes[2].Sub(attemptTimes[1])
+
+	const tolerance = 200 * time.Millisecond
+	if delay1 < 1*time.Second-tolerance || delay1 > 1*time.Second+tolerance {
+		t.Errorf("first retry delay = %v, expected ~1s", delay1)
+	}
+
+	if delay2 < 2*time.Second-tolerance || delay2 > 2*time.Second+tolerance {
+		t.Errorf("second retry delay = %v, expected ~2s", delay2)
+	}
+}
+
+func TestCreateMR_ContextCancellation(t *testing.T) {
+	attemptCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attemptCount++
+		// Always return 429 to force retries.
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"message":"Rate limit exceeded"}`))
+	}))
+	defer server.Close()
+
+	client := NewMRClient()
+
+	// Create a context that will be cancelled after first attempt.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Cancel context immediately to prevent retries.
+	cancel()
+
+	req := MRCreateRequest{
+		Domain:       strings.TrimPrefix(server.URL, "http://"),
+		ProjectID:    "org%2Fproject",
+		PAT:          "glpat-token",
+		Title:        "Test MR",
+		SourceBranch: "feature",
+		TargetBranch: "main",
+	}
+
+	_, err := client.CreateMR(ctx, req)
+	if err == nil {
+		t.Fatal("expected error due to context cancellation, got nil")
+	}
+
+	// Should not retry when context is cancelled.
+	if attemptCount > 1 {
+		t.Errorf("expected at most 1 attempt with cancelled context, got %d", attemptCount)
 	}
 }
 
