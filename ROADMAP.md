@@ -100,8 +100,8 @@ Phase H — Validation (E2E)
 - [x] Scenario: MR on success (pass)
     - Script: tests/e2e/mods/scenario-orw-pass.sh add flags --mr-success true
     - Expected: ticket succeeded; MR URL printed; diff matches Java 17 upgrade; Build Gate passed
-- [ ] Scenario: MR on fail (heal path off)
-    - Script: tests/e2e/mods/scenario-orw-heal.sh with --mr-fail true and disable heal
+- [x] Scenario: MR on fail (heal path off)
+    - Script: tests/e2e/mods/scenario-orw-fail.sh with --mr-fail true and disable heal
     - Expected: ticket failed; MR URL printed with failing branch
 
 Notes and references
