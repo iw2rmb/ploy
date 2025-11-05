@@ -61,8 +61,6 @@ func Tree() []Node {
 					{Name: "show", Synopsis: "show [--cluster-id <id>]", Description: "Display the current GitLab configuration"},
 					{Name: "set", Synopsis: "set --file <path> [--cluster-id <id>]", Description: "Apply a GitLab configuration JSON file"},
 					{Name: "validate", Synopsis: "validate --file <path>", Description: "Validate a GitLab configuration without saving"},
-					{Name: "status", Synopsis: "status [--limit <n>] [--cluster-id <id>]", Description: "Inspect signer health and recent rotation audit entries"},
-					{Name: "rotate", Synopsis: "rotate --secret <name> --api-key <token> [--cluster-id <id>]", Description: "Rotate a GitLab secret and trigger node refresh"},
 				}},
 			},
 		},

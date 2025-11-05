@@ -118,10 +118,10 @@ func handleConfigGitLabShow(args []string, stderr io.Writer) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 
-	// Redact token for display.
+	// Redact token for display. Never print short tokens.
 	redacted := "***"
-	if cfg.Token != "" {
-		redacted = cfg.Token[:min(8, len(cfg.Token))] + "..."
+	if l := len(cfg.Token); l >= 8 {
+		redacted = cfg.Token[:8] + "..."
 	}
 
 	fmt.Printf("Domain: %s\n", cfg.Domain)
@@ -269,9 +269,16 @@ func validateGitLabConfig(cfg *gitLabConfigPayload) error {
 	if strings.TrimSpace(cfg.Domain) == "" {
 		return errors.New("domain is required")
 	}
-	// Validate domain is a valid URL.
-	if _, err := url.Parse(cfg.Domain); err != nil {
+	// Validate domain is a valid absolute URL with http/https scheme and non-empty host.
+	u, err := url.Parse(cfg.Domain)
+	if err != nil {
 		return fmt.Errorf("invalid domain URL: %w", err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return errors.New("domain must use http or https scheme")
+	}
+	if strings.TrimSpace(u.Host) == "" {
+		return errors.New("domain host is required")
 	}
 	if strings.TrimSpace(cfg.Token) == "" {
 		return errors.New("token is required")
