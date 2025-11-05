@@ -91,7 +91,7 @@ Phase G — Hardening and UX
     - File: internal/nodeagent/gitlab/mr_client.go; internal/nodeagent/git/git_push.go (wrap errors)
 - [x] Timeouts and retries
     - Backoff on GitLab API 429/5xx; bounded retries (max 3)
-- [ ] Docs and examples
+- [x] Docs and examples
     - docs/how-to/create-mr.md (usage: ploy config gitlab set; mod run with --mr-success)
     - docs/envs/README.md (PAT env for quick test; recommend config route)
 

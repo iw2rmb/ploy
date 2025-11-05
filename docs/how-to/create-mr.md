@@ -1,0 +1,186 @@
+# Create GitLab Merge Requests with Ploy
+
+Overview
+- Ploy can automatically create GitLab merge requests (MRs) when Mods runs complete
+- MRs can be triggered on success, failure, or both
+- GitLab credentials can be configured globally on the control plane or overridden per run
+
+Prerequisites
+- A GitLab instance (self-hosted or gitlab.com)
+- A Personal Access Token (PAT) with `api` scope
+- A Ploy cluster deployed and accessible via `ploy` CLI
+
+## Method 1: Configure Global GitLab Credentials (Recommended)
+
+Configure GitLab credentials once on the control plane, and all Mods runs can use them automatically.
+
+### Step 1: Create a GitLab configuration file
+
+Create a JSON file with your GitLab domain and PAT:
+
+```bash
+cat > gitlab-config.json <<'EOF'
+{
+  "domain": "https://gitlab.com",
+  "token": "glpat-xxxxxxxxxxxxxxxxxxxx"
+}
+EOF
+chmod 600 gitlab-config.json
+```
+
+For self-hosted GitLab:
+```json
+{
+  "domain": "https://gitlab.example.com",
+  "token": "glpat-xxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+### Step 2: Apply the configuration to the control plane
+
+```bash
+ploy config gitlab set --file gitlab-config.json
+```
+
+Verify the configuration (token will be redacted):
+```bash
+ploy config gitlab show
+# Output:
+# Domain: https://gitlab.com
+# Token:  glpat-xx...
+```
+
+### Step 3: Run a Mod with MR creation
+
+Create an MR on success:
+```bash
+ploy mod run \
+  --ticket auto \
+  --repo-url https://gitlab.com/yourorg/yourproject.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/upgrade-java-17 \
+  --mr-success
+```
+
+Create an MR on failure (useful for debugging):
+```bash
+ploy mod run \
+  --ticket auto \
+  --repo-url https://gitlab.com/yourorg/yourproject.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/debug-build-failure \
+  --mr-fail
+```
+
+Create an MR in both success and failure cases:
+```bash
+ploy mod run \
+  --ticket auto \
+  --repo-url https://gitlab.com/yourorg/yourproject.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/experiment \
+  --mr-success \
+  --mr-fail
+```
+
+### Step 4: View the MR URL
+
+After the run completes, inspect the ticket to see the MR URL:
+```bash
+ploy mod inspect <ticket-id>
+# Output includes:
+# MR: https://gitlab.com/yourorg/yourproject/-/merge_requests/123
+```
+
+## Method 2: Per-Run GitLab Credentials
+
+Override the global GitLab configuration for a single run using flags.
+
+```bash
+ploy mod run \
+  --ticket auto \
+  --repo-url https://gitlab.com/yourorg/yourproject.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/upgrade \
+  --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
+  --gitlab-domain https://gitlab.com \
+  --mr-success
+```
+
+This is useful for:
+- Testing with a different GitLab instance
+- Using a project-specific PAT with restricted permissions
+- Overriding temporarily without changing the global config
+
+Precedence: per-run flags always override the control plane global config.
+
+## Security Notes
+
+- PATs are never logged or written to disk on worker nodes
+- The CLI redacts tokens in all output
+- Tokens are transmitted securely via mTLS from control plane to nodes
+- Store your `gitlab-config.json` file securely with `chmod 600`
+- Consider using `gitlab.token_file` in the control plane config for additional security (see docs/envs/README.md)
+
+## Validate Configuration Without Saving
+
+Test your JSON configuration file before applying it:
+
+```bash
+ploy config gitlab validate --file gitlab-config.json
+# Output:
+# GitLab configuration is valid
+```
+
+## Troubleshooting
+
+**MR not created:**
+- Verify GitLab credentials with `ploy config gitlab show`
+- Check that the PAT has `api` scope
+- Ensure the repository URL is accessible and the PAT has write access
+- Inspect the run logs for GitLab API errors
+
+**Authentication errors:**
+- Verify the domain URL includes the scheme (https:// or http://)
+- For self-hosted GitLab, ensure the domain is reachable from worker nodes
+- Check that the PAT is not expired
+
+**Push errors:**
+- Ensure the target branch does not already exist or is pushable
+- Verify the repository URL is correct and accessible
+- Check that the PAT has `write_repository` permissions
+
+## Example Workflow: OpenRewrite Java Upgrade
+
+```bash
+# 1. Configure GitLab once
+cat > gitlab-config.json <<'EOF'
+{
+  "domain": "https://gitlab.com",
+  "token": "glpat-your-token-here"
+}
+EOF
+ploy config gitlab set --file gitlab-config.json
+
+# 2. Run OpenRewrite to upgrade Java 17
+ploy mod run \
+  --ticket auto \
+  --repo-url https://gitlab.com/yourorg/spring-petclinic.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/java-17-upgrade \
+  --mr-success \
+  --follow
+
+# 3. View the MR
+ploy mod inspect <ticket-id>
+# Copy the MR URL and review in GitLab
+
+# 4. If tests pass, merge the MR
+# Otherwise, iterate with additional Mods runs
+```
+
+## Related Documentation
+
+- [docs/envs/README.md](../envs/README.md) — Environment variables and control plane config options
+- [docs/how-to/publish-mods.md](publish-mods.md) — Publishing custom Mods images
+- ROADMAP.md Phase G — Implementation details for GitLab MR support

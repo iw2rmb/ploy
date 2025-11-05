@@ -123,10 +123,55 @@ The server’s authorizer recognizes both forms.
 - `PLOY_E2E_LIVE_SCENARIOS` — Optional comma-separated scenario IDs that the
   live Mods smoke test should execute (defaults to `simple-openrewrite`).
 
-- `PLOY_GITLAB_PAT` — Optional GitLab Personal Access Token used by the Mods E2E
-  walkthroughs and MR creation notes in `STATE.md`. TODO: server-side GitLab wiring pending.
+## GitLab Merge Request Integration
 
- 
+Ploy can automatically create GitLab merge requests when Mods runs complete.
+
+**Recommended approach:** Use `ploy config gitlab set` to store credentials on the control plane
+(see [docs/how-to/create-mr.md](../how-to/create-mr.md) for usage examples).
+
+Control plane configuration (set via CLI or YAML):
+- `gitlab.domain` (config YAML) — GitLab base URL (e.g., `https://gitlab.com`). Optional.
+- `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
+  memory at runtime, not persisted back to disk.
+- `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. See details below.
+
+Per-run overrides (CLI flags on `ploy mod run`):
+- `--gitlab-pat` — Override the control plane PAT for this run only
+- `--gitlab-domain` — Override the control plane domain for this run only
+- `--mr-success` — Create an MR when the run succeeds
+- `--mr-fail` — Create an MR when the run fails
+
+Quick test (PAT via environment):
+For local testing or CI environments, you can set the PAT via control plane config or per-run flags.
+The recommended production approach is to use the control plane config with `gitlab.token_file`.
+
+Example control plane config snippet (`/etc/ploy/ployd.yaml`):
+```yaml
+gitlab:
+  domain: https://gitlab.com
+  token_file: /etc/ploy/secrets/gitlab-pat.txt
+```
+
+Example usage:
+```bash
+# Configure once on control plane
+ploy config gitlab set --file gitlab-config.json
+
+# Run with MR on success
+ploy mod run --ticket auto --mr-success \
+  --repo-url https://gitlab.com/org/repo.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/upgrade
+
+# Per-run override
+ploy mod run --ticket auto --mr-success \
+  --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
+  --gitlab-domain https://gitlab.example.com \
+  --repo-url https://gitlab.example.com/org/repo.git
+```
+
+
 
 ## gapi
 
@@ -153,6 +198,7 @@ The server’s authorizer recognizes both forms.
   `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
   config: `http.tls.cert`, `http.tls.key`, and `http.tls.client_ca`.
 
+GitLab integration for automatic MR creation:
 - `gitlab.domain` (config YAML) — GitLab base URL (e.g., `https://gitlab.com`). Optional.
 - `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
   memory at runtime, not persisted back to disk.
@@ -164,6 +210,7 @@ The server’s authorizer recognizes both forms.
   - Relative paths resolve relative to the config file location (e.g., `/etc/ploy/ployd.yaml`).
   - Absolute paths are accepted as-is. Symlink handling is platform-default (`os.Stat`).
   Precedence: `gitlab.token` (inline) wins over `gitlab.token_file` when both are set.
+See the **GitLab Merge Request Integration** section above for usage examples and recommended configuration approach.
 
 ### PKI
 
