@@ -26,17 +26,18 @@ const (
 
 // LogStreamer buffers logs and streams them as gzipped chunks to the server.
 type LogStreamer struct {
-	cfg       Config
-	runID     string
-	stageID   string
-	chunkNo   int32
-	buffer    bytes.Buffer
-	gzWriter  *gzip.Writer
-	mu        sync.Mutex
-	flushDone chan struct{}
-	closeOnce sync.Once
-	stopCh    chan struct{}
-	hook      LogHook // Optional hook to process logs before compression.
+	cfg        Config
+	runID      string
+	stageID    string
+	chunkNo    int32
+	buffer     bytes.Buffer
+	gzWriter   *gzip.Writer
+	mu         sync.Mutex
+	flushDone  chan struct{}
+	closeOnce  sync.Once
+	stopCh     chan struct{}
+	hook       LogHook // Optional hook to process logs before compression.
+	httpClient *http.Client
 }
 
 // NewLogStreamer creates a new log streamer for a specific run.
@@ -52,6 +53,14 @@ func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
 		hook:      &NoOpLogHook{}, // Default to no-op hook.
 	}
 	ls.gzWriter = gzip.NewWriter(&ls.buffer)
+
+	// Initialize HTTP client (honors mTLS when enabled in cfg).
+	if c, err := createHTTPClient(cfg); err == nil {
+		ls.httpClient = c
+	} else {
+		slog.Warn("log streamer: create HTTP client failed; using default", "run_id", runID, "error", err)
+		ls.httpClient = &http.Client{Timeout: 10 * time.Second}
+	}
 
 	// Start background flusher.
 	go ls.periodicFlush()
@@ -212,7 +221,10 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := ls.httpClient
+	if client == nil {
+		client = &http.Client{Timeout: 10 * time.Second}
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)

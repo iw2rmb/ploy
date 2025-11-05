@@ -39,16 +39,8 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}()
 
 	// Initialize runtime components.
-	artifactPublisher, err := step.NewFilesystemArtifactPublisher(step.FilesystemArtifactPublisherOptions{})
-	if err != nil {
-		slog.Error("failed to create artifact publisher", "run_id", req.RunID, "error", err)
-		return
-	}
 
-	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
-		Publisher:       artifactPublisher,
-		PublishSnapshot: false,
-	})
+	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{PublishSnapshot: false})
 	if err != nil {
 		slog.Error("failed to create git fetcher", "run_id", req.RunID, "error", err)
 		return
@@ -88,7 +80,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		Workspace:  workspaceHydrator,
 		Containers: containerRuntime,
 		Diffs:      diffGenerator,
-		Artifacts:  newSizeLimitedPublisher(artifactPublisher, maxArtifactSize),
 		Gate:       gateExecutor,
 		LogWriter:  logStreamer,
 	}
@@ -139,7 +130,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 						"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
 						"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
 						"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-						"publish_duration_ms":    result.Timings.PublishDuration.Milliseconds(),
 						"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 					},
 				}
@@ -247,18 +237,11 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
 				"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
 				"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-				"publish_duration_ms":    result.Timings.PublishDuration.Milliseconds(),
 				"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 			},
 		}
 
-		// Add artifact CIDs if available.
-		if result.DiffArtifact.CID != "" {
-			stats["diff_cid"] = result.DiffArtifact.CID
-		}
-		if result.LogArtifact.CID != "" {
-			stats["log_cid"] = result.LogArtifact.CID
-		}
+		// No runner-provided artifact CIDs (node agent uploads artifacts directly).
 
 		// Upload terminal status to server with a short, detached context so
 		// we still attempt to report completion even if the run context is cancelled.
@@ -275,7 +258,5 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		"run_id", req.RunID,
 		"duration", duration,
 		"exit_code", result.ExitCode,
-		"diff_cid", result.DiffArtifact.CID,
-		"log_cid", result.LogArtifact.CID,
 	)
 }

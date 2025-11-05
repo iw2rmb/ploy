@@ -18,7 +18,7 @@ func FuzzCreateNodeLogsHandler(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte, chunkNo int32) {
 		mockStore := &mockStoreForLogs{nodeExists: true}
-		handler := createNodeLogsHandler(mockStore)
+		handler := createNodeLogsHandler(mockStore, nil)
 
 		payload := map[string]any{
 			"run_id":   uuid.New().String(),

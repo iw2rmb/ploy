@@ -16,48 +16,7 @@ import (
 // Stub implementations for workflow runtime step package.
 // These are minimal placeholders to allow compilation until full implementation.
 
-// Artifact kind constants.
-const (
-	ArtifactKindLogs = "logs"
-	ArtifactKindDiff = "diff"
-)
-
-// FilesystemArtifactPublisherOptions holds configuration for the filesystem artifact publisher.
-type FilesystemArtifactPublisherOptions struct{}
-
-// ArtifactPublisher publishes build artifacts.
-type ArtifactPublisher interface {
-	Publish(ctx context.Context, req ArtifactRequest) (PublishedArtifact, error)
-}
-
-// ArtifactRequest describes an artifact to publish.
-type ArtifactRequest struct {
-	Kind   string
-	Path   string
-	Buffer []byte
-}
-
-// PublishedArtifact represents a successfully published artifact.
-type PublishedArtifact struct {
-	CID    string
-	Kind   string
-	Digest string
-	Size   int64
-}
-
-type filesystemArtifactPublisher struct{}
-
-// NewFilesystemArtifactPublisher creates a new filesystem artifact publisher.
-func NewFilesystemArtifactPublisher(opts FilesystemArtifactPublisherOptions) (ArtifactPublisher, error) {
-	_ = opts
-	return &filesystemArtifactPublisher{}, nil
-}
-
-func (p *filesystemArtifactPublisher) Publish(ctx context.Context, req ArtifactRequest) (PublishedArtifact, error) {
-	_ = ctx
-	_ = req
-	return PublishedArtifact{}, errors.New("not implemented")
-}
+// (artifact publisher removed — artifacts are uploaded by the node agent)
 
 // GitFetcher is the interface for fetching git repositories.
 type GitFetcher interface {
@@ -115,6 +74,7 @@ type ContainerRuntime interface {
 	Start(ctx context.Context, handle ContainerHandle) error
 	Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error)
 	Logs(ctx context.Context, handle ContainerHandle) ([]byte, error)
+	Remove(ctx context.Context, handle ContainerHandle) error
 }
 
 // FilesystemDiffGeneratorOptions holds configuration for diff generator.
@@ -169,7 +129,6 @@ type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
 	Diffs      DiffGenerator
-	Artifacts  ArtifactPublisher
 	Gate       GateExecutor
 	LogWriter  io.Writer // Optional: streams logs to server as gzipped chunks.
 }
@@ -183,9 +142,7 @@ type Request struct {
 
 // Result contains the outcome of a step execution.
 type Result struct {
-	ExitCode     int
-	DiffArtifact PublishedArtifact
-	LogArtifact  PublishedArtifact
+	ExitCode int
 	// Per-stage timings captured during execution.
 	Timings   StageTiming
 	BuildGate *contracts.BuildGateStageMetadata
@@ -249,6 +206,13 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		}
 		result.ExitCode = cRes.ExitCode
 		result.Timings.ExecutionDuration = time.Since(executionStart)
+
+		// Explicitly remove the container unless retention is requested.
+		if !req.Manifest.Retention.RetainContainer {
+			if err := r.Containers.Remove(ctx, handle); err != nil {
+				// Non-fatal; continue with gate/diff.
+			}
+		}
 	}
 
 	// Stage 3: Build gate validation.
@@ -283,10 +247,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.DiffDuration = time.Since(diffStart)
 
-	// Stage 5: Publish artifacts (placeholder for now).
-	publishStart := time.Now()
-	// Artifact publishing is stubbed; future work will invoke Artifacts.
-	result.Timings.PublishDuration = time.Since(publishStart)
+	// Stage 5: (removed) Artifact publishing is performed by the node agent.
 
 	result.Timings.TotalDuration = time.Since(totalStart)
 	return result, nil

@@ -97,3 +97,27 @@ func handleModArtifacts(args []string, stderr io.Writer) error {
 	cmd := mods.ArtifactsCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr}
 	return cmd.Run(ctx)
 }
+
+func handleModDiffs(args []string, stderr io.Writer) error {
+	fs := flag.NewFlagSet("mod diffs", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	download := fs.Bool("download", false, "download newest diff and print to stdout (gunzipped)")
+	savePath := fs.String("output", "", "save newest diff to file (gunzipped)")
+	if err := fs.Parse(args); err != nil {
+		printModUsage(stderr)
+		return err
+	}
+	rest := fs.Args()
+	if len(rest) == 0 || strings.TrimSpace(rest[0]) == "" {
+		printModUsage(stderr)
+		return errors.New("ticket required")
+	}
+	ticket := strings.TrimSpace(rest[0])
+	ctx := context.Background()
+	base, httpClient, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := mods.DiffsCommand{BaseURL: base, Client: httpClient, Ticket: ticket, Output: stderr, Download: *download, SavePath: strings.TrimSpace(*savePath)}
+	return cmd.Run(ctx)
+}

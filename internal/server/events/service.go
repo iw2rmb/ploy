@@ -1,6 +1,9 @@
 package events
 
 import (
+	"bufio"
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -173,16 +176,36 @@ func (s *Service) publishEventToHub(ctx context.Context, streamID string, event 
 
 // publishLogToHub converts a database log to a logstream event and publishes it.
 func (s *Service) publishLogToHub(ctx context.Context, streamID string, log store.Log) error {
-	// Convert log data to string. The data is expected to be text content.
-	line := string(log.Data)
-
-	record := logstream.LogRecord{
-		Timestamp: timestampToString(log.CreatedAt),
-		Stream:    "log",
-		Line:      line,
+	ts := timestampToString(log.CreatedAt)
+	// Attempt to gunzip; if it fails, fall back to raw-as-string single frame.
+	zr, err := gzip.NewReader(bytes.NewReader(log.Data))
+	if err == nil {
+		defer zr.Close()
+		scanner := bufio.NewScanner(zr)
+		// Set a reasonable max token size (256 KiB per line) to avoid memory blowups.
+		const maxLine = 256 * 1024
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, maxLine)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			rec := logstream.LogRecord{Timestamp: ts, Stream: "stdout", Line: line}
+			if err := s.hub.PublishLog(ctx, streamID, rec); err != nil {
+				return err
+			}
+		}
+		if scanErr := scanner.Err(); scanErr != nil {
+			// On scanner error, emit a fallback lump to avoid total loss.
+			rec := logstream.LogRecord{Timestamp: ts, Stream: "stdout", Line: "[log decode error]"}
+			_ = s.hub.PublishLog(ctx, streamID, rec)
+		}
+		return nil
 	}
-
-	return s.hub.PublishLog(ctx, streamID, record)
+	// Fallback: publish raw bytes as a single frame (may look garbled to clients).
+	rec := logstream.LogRecord{Timestamp: ts, Stream: "log", Line: string(log.Data)}
+	return s.hub.PublishLog(ctx, streamID, rec)
 }
 
 // uuidToString converts a pgtype.UUID to its string representation.

@@ -283,6 +283,49 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			}
 		}
 	})
+
+	// New behavior: only inject placeholder command when using default image.
+	// If a custom image is provided and no command is set, leave command empty
+	// so the image's own CMD/ENTRYPOINT drives execution.
+	t.Run("no command injected when custom image provided", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-123",
+			RepoURL: "https://github.com/example/repo.git",
+			Options: map[string]any{
+				"image": "docker.io/example/mods-openrewrite:latest",
+			},
+		}
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+		if got, want := manifest.Image, "docker.io/example/mods-openrewrite:latest"; got != want {
+			t.Fatalf("image=%q, want %q", got, want)
+		}
+		if len(manifest.Command) != 0 {
+			t.Fatalf("expected no command to be injected for custom image, got len=%d", len(manifest.Command))
+		}
+	})
+
+	t.Run("placeholder command injected only for default ubuntu image", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-456",
+			RepoURL: "https://github.com/example/repo.git",
+		}
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+		want := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
+		if len(manifest.Command) != len(want) {
+			t.Fatalf("command len=%d, want %d", len(manifest.Command), len(want))
+		}
+		for i := range want {
+			if manifest.Command[i] != want[i] {
+				t.Fatalf("command[%d]=%q, want %q", i, manifest.Command[i], want[i])
+			}
+		}
+	})
 }
 
 func TestWorkspaceLifecycle(t *testing.T) {

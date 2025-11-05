@@ -3,6 +3,8 @@ Publish Mods Images to Docker Hub
 Overview
 - Mods images live under `mods/`:
   - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
+    - Coordinates are passed via environment only (no JSON spec for coords):
+      set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`
   - (Human gate image removed for now.)

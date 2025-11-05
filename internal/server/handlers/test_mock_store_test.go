@@ -122,6 +122,18 @@ type mockStore struct {
 	updateStageStatusCalled bool
 	updateStageStatusParams store.UpdateStageStatusParams
 	updateStageStatusErr    error
+
+	// ListDiffsByRun tracking
+	listDiffsByRunCalled bool
+	listDiffsByRunParam  pgtype.UUID
+	listDiffsByRunResult []store.Diff
+	listDiffsByRunErr    error
+
+	// GetDiff tracking
+	getDiffCalled bool
+	getDiffParam  pgtype.UUID
+	getDiffResult store.Diff
+	getDiffErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -261,4 +273,16 @@ func (m *mockStore) UpdateStageStatus(ctx context.Context, params store.UpdateSt
 	m.updateStageStatusCalled = true
 	m.updateStageStatusParams = params
 	return m.updateStageStatusErr
+}
+
+func (m *mockStore) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Diff, error) {
+	m.listDiffsByRunCalled = true
+	m.listDiffsByRunParam = runID
+	return m.listDiffsByRunResult, m.listDiffsByRunErr
+}
+
+func (m *mockStore) GetDiff(ctx context.Context, id pgtype.UUID) (store.Diff, error) {
+	m.getDiffCalled = true
+	m.getDiffParam = id
+	return m.getDiffResult, m.getDiffErr
 }

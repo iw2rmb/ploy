@@ -28,7 +28,7 @@ func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParam
 
 func TestCreateRunLogsHandler_Success(t *testing.T) {
 	ms := &mockStoreRunLogs{}
-	h := createRunLogHandler(ms)
+	h := createRunLogHandler(ms, nil)
 	runID := uuid.New().String()
 	stageID := uuid.New().String()
 	buildID := uuid.New().String()
@@ -49,7 +49,7 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 
 func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 	ms := &mockStoreRunLogs{}
-	h := createRunLogHandler(ms)
+	h := createRunLogHandler(ms, nil)
 	runID := uuid.New().String()
 	big := make([]byte, 1<<20+1)
 	payload := map[string]any{"chunk_no": 0, "data": big}

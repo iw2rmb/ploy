@@ -12,11 +12,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createNodeLogsHandler handles POST /v1/nodes/{id}/logs for receiving gzipped log chunks.
-func createNodeLogsHandler(st store.Store) http.HandlerFunc {
+func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
 	const maxBodySize = 2 << 20  // 2 MiB
@@ -145,7 +146,14 @@ func createNodeLogsHandler(st store.Store) http.HandlerFunc {
 			Data:    req.Data,
 		}
 
-		log, err := st.CreateLog(r.Context(), params)
+		// Persist and publish to SSE when events service is available; otherwise
+		// fall back to direct store write for backward compatibility.
+		var log store.Log
+		if eventsService != nil {
+			log, err = eventsService.CreateAndPublishLog(r.Context(), params)
+		} else {
+			log, err = st.CreateLog(r.Context(), params)
+		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
 			slog.Error("node logs: create failed", "node_id", nodeIDStr, "run_id", req.RunID, "chunk_no", req.ChunkNo, "err", err)

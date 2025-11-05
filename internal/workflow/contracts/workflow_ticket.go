@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+// WorkflowTicket is the envelope used when submitting or claiming a workflow
+// run. It carries the schema version, the opaque ticket identifier, the
+// manifest reference (name/version), and optional repository materialization
+// details for nodes to hydrate workspaces.
 type WorkflowTicket struct {
 	SchemaVersion string              `json:"schema_version"`
 	TicketID      string              `json:"ticket_id"`
@@ -12,6 +16,9 @@ type WorkflowTicket struct {
 	Repo          RepoMaterialization `json:"repo,omitempty"`
 }
 
+// Validate checks that required fields are present and that embedded
+// structures are valid. It requires a non‑empty schema version and ticket ID,
+// a valid `Manifest`, and (when provided) a valid `Repo`.
 func (t WorkflowTicket) Validate() error {
 	if t.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")

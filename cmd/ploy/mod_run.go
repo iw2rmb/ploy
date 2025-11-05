@@ -60,6 +60,10 @@ func executeModRun(args []string, stderr io.Writer) error {
 	fs.Var(&modEnvs, "mod-env", "Mod environment KEY=VALUE (repeatable)")
 	// Allow specifying the mod container image (paths fixed; image entrypoint runs)
 	modImage := fs.String("mod-image", "", "Container image for the mod step (optional)")
+	// Optional: retain container after run for inspection
+	retain := fs.Bool("retain-container", false, "Retain the mod container after execution (for debugging)")
+	// Optional: override container command (string, executed via sh -c on the node)
+	modCommand := fs.String("mod-command", "", "Container command override (string or JSON array)")
 
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
@@ -116,7 +120,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 	// Prepare optional Spec when --mod-env / --mod-image are provided
 	var specPayload []byte
-	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" {
+	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" || *retain || strings.TrimSpace(*modCommand) != "" {
 		env := make(map[string]string)
 		for _, kv := range modEnvs {
 			kv = strings.TrimSpace(kv)
@@ -141,6 +145,23 @@ func executeModRun(args []string, stderr io.Writer) error {
 		}
 		if img := strings.TrimSpace(*modImage); img != "" {
 			payload["image"] = img
+		}
+		if *retain {
+			payload["retain_container"] = true
+		}
+		if cmd := strings.TrimSpace(*modCommand); cmd != "" {
+			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
+			// Fallback to shell string (wrapped as ["/bin/sh","-c",cmd]) when not a JSON array.
+			var asArray []string
+			if strings.HasPrefix(cmd, "[") && strings.HasSuffix(cmd, "]") {
+				if err := json.Unmarshal([]byte(cmd), &asArray); err == nil && len(asArray) > 0 {
+					payload["command"] = asArray
+				} else {
+					payload["command"] = cmd
+				}
+			} else {
+				payload["command"] = cmd
+			}
 		}
 		if len(payload) > 0 {
 			specPayload, _ = json.Marshal(payload)

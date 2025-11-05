@@ -218,6 +218,7 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	ticketID := uuid.New()
 	now := time.Now()
 
+	nodeID := uuid.New()
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
@@ -227,6 +228,7 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 			TargetRef: "feature",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt: pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 		},
 	}
 
@@ -260,6 +262,9 @@ func TestGetTicketStatusHandlerSuccess(t *testing.T) {
 	}
 	if resp.Ticket.Metadata["repo_target_ref"] != "feature" {
 		t.Errorf("expected target_ref feature, got %s", resp.Ticket.Metadata["repo_target_ref"])
+	}
+	if got := resp.Ticket.Metadata["node_id"]; got != nodeID.String() {
+		t.Errorf("expected node_id %s, got %s", nodeID.String(), got)
 	}
 
 	if !st.getRunCalled {
@@ -355,7 +360,10 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	// Reason currently not surfaced in mods response; skip.
+	// Reason should be surfaced under metadata.reason
+	if resp.Ticket.Metadata["reason"] != reason {
+		t.Errorf("expected reason %q, got %q", reason, resp.Ticket.Metadata["reason"])
+	}
 	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
 		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Ticket.Repository)
 	}

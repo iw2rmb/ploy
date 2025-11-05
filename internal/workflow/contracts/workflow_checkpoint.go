@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// CheckpointStatus enumerates lifecycle states for a workflow stage as it
+// progresses through execution. Typical values: pending, claimed, running,
+// retrying, completed, failed.
 type CheckpointStatus string
 
 const (
@@ -16,6 +19,9 @@ const (
 	CheckpointStatusFailed    CheckpointStatus = "failed"
 )
 
+// WorkflowCheckpoint is the envelope published to the per‑ticket checkpoint
+// subject for each stage transition. Optional `StageMetadata` can include
+// timing and metadata; `Artifacts` may be attached and require metadata.
 type WorkflowCheckpoint struct {
 	SchemaVersion string               `json:"schema_version"`
 	TicketID      string               `json:"ticket_id"`
@@ -26,6 +32,10 @@ type WorkflowCheckpoint struct {
 	Artifacts     []CheckpointArtifact `json:"artifacts,omitempty"`
 }
 
+// Validate ensures the checkpoint envelope is self‑consistent:
+// required fields must be set; `StageMetadata`, when present, must validate
+// and its `Name` must match `Stage`; any attached artifacts must validate and
+// require metadata to be present.
 func (c WorkflowCheckpoint) Validate() error {
 	if c.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")
@@ -60,6 +70,8 @@ func (c WorkflowCheckpoint) Validate() error {
 	return nil
 }
 
+// Subject returns the per‑ticket checkpoint subject or an empty string when
+// the ticket ID is blank to allow callers to short‑circuit publishing.
 func (c WorkflowCheckpoint) Subject() string {
 	ticket := strings.TrimSpace(c.TicketID)
 	if ticket == "" {

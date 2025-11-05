@@ -25,7 +25,7 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 		nodeExists: true,
 	}
 
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
@@ -84,7 +84,7 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 		nodeExists: true,
 	}
 
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Prepare gzipped test data.
 	var buf bytes.Buffer
@@ -147,7 +147,7 @@ func TestCreateNodeLogsHandler_InvalidNodeID(t *testing.T) {
 	t.Parallel()
 
 	mockStore := &mockStoreForLogs{}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Create request with invalid node ID.
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid/logs", strings.NewReader("{}"))
@@ -168,7 +168,7 @@ func TestCreateNodeLogsHandler_PayloadTooLarge(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Create decoded payload larger than 1 MiB (will trigger 413 after decode).
 	largeData := make([]byte, 1<<20+1)
@@ -201,7 +201,7 @@ func TestCreateNodeLogsHandler_BodyTooLarge(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Craft a request whose JSON body exceeds 2 MiB due to base64 overhead.
 	// 2 MiB raw → ~2.66 MiB base64 → trips MaxBytesReader body cap.
@@ -235,7 +235,7 @@ func TestCreateNodeLogsHandler_MissingRunID(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Create payload without run_id.
 	payload := map[string]interface{}{
@@ -266,7 +266,7 @@ func TestCreateNodeLogsHandler_EmptyData(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: true,
 	}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Create payload with empty data.
 	payload := map[string]interface{}{
@@ -298,7 +298,7 @@ func TestCreateNodeLogsHandler_NodeNotFound(t *testing.T) {
 	mockStore := &mockStoreForLogs{
 		nodeExists: false,
 	}
-	handler := createNodeLogsHandler(mockStore)
+	handler := createNodeLogsHandler(mockStore, nil)
 
 	// Create valid payload.
 	payload := map[string]interface{}{

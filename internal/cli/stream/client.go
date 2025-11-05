@@ -95,17 +95,22 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			idle = time.AfterFunc(c.IdleTimeout, func() { cancelConn() })
 		}
 		var sawEvent bool
+		var connectionFailed bool
 		for {
 			event, err := readEvent(reader)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					break
 				}
+				// Treat read errors as transient and trigger a reconnect loop
+				// instead of failing the entire stream immediately. This
+				// improves resilience on flaky TLS/HTTP/2 links.
 				_ = resp.Body.Close()
 				if connCtx.Err() != nil && c.IdleTimeout > 0 {
 					return fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
 				}
-				return fmt.Errorf("stream: read event: %w", err)
+				connectionFailed = true
+				break
 			}
 			sawEvent = true
 			if idle != nil {
@@ -135,6 +140,17 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 		}
 		if sawEvent {
 			retries = 0
+		}
+		if connectionFailed {
+			// Apply retry/backoff after read failure and attempt reconnect.
+			if maxRetries >= 0 && retries >= maxRetries {
+				return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
+			}
+			retries++
+			if err := c.wait(ctx, backoff); err != nil {
+				return err
+			}
+			continue
 		}
 		if maxRetries >= 0 && retries >= maxRetries {
 			return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
