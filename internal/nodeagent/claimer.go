@@ -258,6 +258,10 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
 			}
 		}
 	}
+	// Optional retain flag for container lifecycle
+	if b, ok := m["retain_container"].(bool); ok {
+		opts["retain_container"] = b
+	}
 	// Pass through stage_id if present (server injects it on claim)
 	if sid, ok := m["stage_id"].(string); ok && sid != "" {
 		opts["stage_id"] = sid

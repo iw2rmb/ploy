@@ -22,6 +22,7 @@ func printCommandUsage(w io.Writer, parts ...string) {
 			_, _ = fmt.Fprintln(w, "  resume      Resume a paused Mods ticket")
 			_, _ = fmt.Fprintln(w, "  inspect     Show summary for a Mods ticket")
 			_, _ = fmt.Fprintln(w, "  artifacts   List ticket artifacts by stage")
+			_, _ = fmt.Fprintln(w, "  diffs       List diffs or download newest patch")
 			_, _ = fmt.Fprintln(w, "")
 			_, _ = fmt.Fprintln(w, "Use 'ploy mod run --help' for flag details.")
 		case "server":

@@ -17,9 +17,11 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		return contracts.StepManifest{}, errors.New("repo_url required")
 	}
 
-	// Default image/command when Options do not override (keeps unit tests stable).
-	image := "ubuntu:latest"
-	command := []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
+	// Default image; command is only injected for the default image to
+	// preserve image-provided CMD/ENTRYPOINT for custom mods containers.
+	const defaultImage = "ubuntu:latest"
+	image := defaultImage
+	var command []string
 	if imgOpt, ok := req.Options["image"].(string); ok && strings.TrimSpace(imgOpt) != "" {
 		image = strings.TrimSpace(imgOpt)
 	}
@@ -33,6 +35,14 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		if s := strings.TrimSpace(v); s != "" {
 			command = []string{"/bin/sh", "-c", s}
 		}
+	}
+
+	// If no explicit command was provided, inject a harmless placeholder only
+	// when running the default ubuntu image. For custom images (e.g., mods
+	// containers with ENTRYPOINT+CMD), leaving command empty allows Docker to
+	// use the image's own defaults.
+	if len(command) == 0 && image == defaultImage {
+		command = []string{"/bin/sh", "-c", "echo 'Build gate placeholder'"}
 	}
 
 	// Determine the ref to clone.
@@ -56,6 +66,12 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		env[k] = v
 	}
 
+	// Optional: allow spec to request container retention for post-run inspection.
+	retain := false
+	if b, ok := req.Options["retain_container"].(bool); ok {
+		retain = b
+	}
+
 	manifest := contracts.StepManifest{
 		ID:         req.RunID,
 		Name:       fmt.Sprintf("Run %s", req.RunID),
@@ -75,7 +91,7 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 			},
 		},
 		Retention: contracts.StepRetentionSpec{
-			RetainContainer: false,
+			RetainContainer: retain,
 			TTL:             "1h",
 		},
 	}

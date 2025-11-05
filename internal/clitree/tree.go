@@ -21,6 +21,7 @@ func Tree() []Node {
 				{Name: "resume", Synopsis: "Resume a paused Mods ticket"},
 				{Name: "inspect", Synopsis: "Show summary for a Mods ticket"},
 				{Name: "artifacts", Synopsis: "List ticket artifacts by stage"},
+				{Name: "diffs", Synopsis: "List diffs or download newest patch"},
 			},
 		},
 		{

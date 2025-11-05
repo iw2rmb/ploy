@@ -199,6 +199,16 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			Stages:     make(map[string]modsapi.StageStatus),
 		}
 
+		// Include claiming node id when available for easier diagnostics.
+		if run.NodeID.Valid {
+			summary.Metadata["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
+		}
+
+		// Include terminal reason if available for quick diagnostics.
+		if run.Reason != nil && strings.TrimSpace(*run.Reason) != "" {
+			summary.Metadata["reason"] = strings.TrimSpace(*run.Reason)
+		}
+
 		// Load stages and their artifacts.
 		stages, err := st.ListStagesByRun(r.Context(), storePgUUID(run.ID))
 		if err != nil {

@@ -42,8 +42,11 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 			return ContainerHandle{}, err
 		}
 	}
-	config := &container.Config{Image: spec.Image, Cmd: append([]string{}, spec.Command...), WorkingDir: spec.WorkingDir, Env: flattenEnv(spec.Env)}
-	hostCfg := &container.HostConfig{AutoRemove: !spec.Retain, Mounts: convertMounts(spec.Mounts)}
+	config := &container.Config{Image: spec.Image, Cmd: append([]string{}, spec.Command...), WorkingDir: spec.WorkingDir, Env: flattenEnv(spec.Env), Labels: spec.Labels}
+	// Disable AutoRemove to ensure we can reliably fetch logs after the
+	// container exits. We handle explicit deletion in the runner based on
+	// manifest retention settings.
+	hostCfg := &container.HostConfig{AutoRemove: false, Mounts: convertMounts(spec.Mounts)}
 	created, err := r.client.ContainerCreate(ctx, config, hostCfg, nil, nil, "")
 	if err != nil {
 		return ContainerHandle{}, fmt.Errorf("step: create container: %w", err)
@@ -93,6 +96,15 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 	}
 	defer func() { _ = reader.Close() }()
 	return io.ReadAll(reader)
+}
+
+// Remove deletes the container.
+func (r *DockerContainerRuntime) Remove(ctx context.Context, handle ContainerHandle) error {
+	if r == nil || r.client == nil {
+		return errors.New("step: docker runtime not configured")
+	}
+	// Force remove to ensure cleanup even if some resources linger.
+	return r.client.ContainerRemove(ctx, handle.ID, container.RemoveOptions{Force: true})
 }
 
 func (r *DockerContainerRuntime) pullImage(ctx context.Context, imageRef string) error {

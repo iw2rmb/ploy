@@ -22,6 +22,18 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 	return &dockerGateExecutor{rt: rt}
 }
 
+// Execute runs the Build Gate inside a container image and returns
+// normalized metadata about the outcome. Detection rules:
+//   - Java (Maven): if pom.xml exists → run `mvn -B -q test` in
+//     `PLOY_BUILDGATE_JAVA_IMAGE` or default `maven:3-eclipse-temurin-17`.
+//   - Java (Gradle): if build.gradle(.kts) exists → run `gradle -q test`
+//     in `PLOY_BUILDGATE_GRADLE_IMAGE` or default `gradle:8.8-jdk17`.
+//
+// The workspace is mounted at /workspace and used as the working directory.
+// Unknown/unsupported projects return an empty metadata object without error.
+// When the container runtime is nil, execution is skipped and empty metadata
+// is returned. A non‑zero exit code is reported as a static check failure and
+// a single log finding containing the captured logs or a synthesized message.
 func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()

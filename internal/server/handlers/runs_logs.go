@@ -11,12 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // createRunLogHandler handles POST /v1/runs/{id}/logs for receiving gzipped log chunks.
 // This variant does not require a node path parameter; it ingests logs scoped to a run.
-func createRunLogHandler(st store.Store) http.HandlerFunc {
+func createRunLogHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
 	// while still enforcing a strict 1 MiB cap on the decoded gzipped bytes.
 	const maxBodySize = 2 << 20  // 2 MiB
@@ -87,7 +88,14 @@ func createRunLogHandler(st store.Store) http.HandlerFunc {
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,
 		}
-		logRow, err := st.CreateLog(r.Context(), params)
+		// Persist and publish to SSE when events service is available; otherwise
+		// fall back to direct store write for backward compatibility.
+		var logRow store.Log
+		if eventsService != nil {
+			logRow, err = eventsService.CreateAndPublishLog(r.Context(), params)
+		} else {
+			logRow, err = st.CreateLog(r.Context(), params)
+		}
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create log: %v", err), http.StatusInternalServerError)
 			slog.Error("run logs: create failed", "run_id", runIDStr, "chunk_no", req.ChunkNo, "err", err)

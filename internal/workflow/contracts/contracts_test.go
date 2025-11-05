@@ -12,11 +12,8 @@ const (
 	buildGateStage = "build-gate"
 )
 
-func TestSubjectsForTenant(t *testing.T) {
-	subjects := SubjectsForTenant("", "ticket-123")
-	if subjects.TicketInbox != "" {
-		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
-	}
+func TestSubjectsForTicket(t *testing.T) {
+	subjects := SubjectsForTicket("ticket-123")
 	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
@@ -28,11 +25,8 @@ func TestSubjectsForTenant(t *testing.T) {
 	}
 }
 
-func TestSubjectsForTenantTrimsInputs(t *testing.T) {
-	subjects := SubjectsForTenant(" acme ", "  ticket-123  ")
-	if subjects.TicketInbox != "webhook.acme.ploy.workflow-ticket" {
-		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
-	}
+func TestSubjectsForTicketTrimsInput(t *testing.T) {
+	subjects := SubjectsForTicket("  ticket-123  ")
 	if subjects.CheckpointStream != "ploy.workflow.ticket-123.checkpoints" {
 		t.Fatalf("CheckpointStream mismatch: %s", subjects.CheckpointStream)
 	}
@@ -44,11 +38,8 @@ func TestSubjectsForTenantTrimsInputs(t *testing.T) {
 	}
 }
 
-func TestSubjectsForTenantEmptyTicket(t *testing.T) {
-	subjects := SubjectsForTenant("acme", "")
-	if subjects.TicketInbox != "webhook.acme.ploy.workflow-ticket" {
-		t.Fatalf("TicketInbox mismatch: %s", subjects.TicketInbox)
-	}
+func TestSubjectsForTicketEmptyTicket(t *testing.T) {
+	subjects := SubjectsForTicket("")
 	if subjects.CheckpointStream != "" {
 		t.Fatalf("expected empty checkpoint stream, got %s", subjects.CheckpointStream)
 	}
