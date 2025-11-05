@@ -130,3 +130,9 @@ type TransfersConfig struct {
 type PostgresConfig struct {
 	DSN string `yaml:"dsn"`
 }
+
+// GitLabConfig configures GitLab integration.
+type GitLabConfig struct {
+	Domain string `yaml:"domain"`
+	Token  string `yaml:"token"`
+}

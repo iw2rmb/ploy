@@ -173,3 +173,84 @@ control_plane:
 		t.Fatal("Load() error = nil, want validation failure for missing endpoint")
 	}
 }
+
+func TestLoadConfigGitLab(t *testing.T) {
+	t.Helper()
+
+	tests := []struct {
+		name       string
+		yaml       string
+		wantDomain string
+		wantToken  string
+	}{
+		{
+			name: "gitlab_with_domain_and_token",
+			yaml: `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+gitlab:
+  domain: https://gitlab.example.com
+  token: glpat-test-token-123
+`,
+			wantDomain: "https://gitlab.example.com",
+			wantToken:  "glpat-test-token-123",
+		},
+		{
+			name: "gitlab_with_domain_only",
+			yaml: `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+gitlab:
+  domain: https://gitlab.example.com
+`,
+			wantDomain: "https://gitlab.example.com",
+			wantToken:  "",
+		},
+		{
+			name: "gitlab_empty",
+			yaml: `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+`,
+			wantDomain: "",
+			wantToken:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "ployd.yaml")
+			if err := os.WriteFile(path, []byte(tt.yaml), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, err := config.Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+
+			if cfg.GitLab.Domain != tt.wantDomain {
+				t.Errorf("GitLab.Domain = %q, want %q", cfg.GitLab.Domain, tt.wantDomain)
+			}
+			if cfg.GitLab.Token != tt.wantToken {
+				t.Errorf("GitLab.Token = %q, want %q", cfg.GitLab.Token, tt.wantToken)
+			}
+		})
+	}
+}
