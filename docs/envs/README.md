@@ -153,6 +153,18 @@ The server’s authorizer recognizes both forms.
   `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
   config: `http.tls.cert`, `http.tls.key`, and `http.tls.client_ca`.
 
+- `gitlab.domain` (config YAML) — GitLab base URL (e.g., `https://gitlab.com`). Optional.
+- `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
+  memory at runtime, not persisted back to disk.
+- `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. When set and
+  `gitlab.token` is not provided, the server reads the token from this file at startup.
+  Requirements:
+  - File permissions must not grant group/other access (≤ `0600`).
+  - Empty/whitespace-only files are rejected.
+  - Relative paths resolve relative to the config file location (e.g., `/etc/ploy/ployd.yaml`).
+  - Absolute paths are accepted as-is. Symlink handling is platform-default (`os.Stat`).
+  Precedence: `gitlab.token` (inline) wins over `gitlab.token_file` when both are set.
+
 ### PKI
 
 - `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate presented to nodes. Required for
