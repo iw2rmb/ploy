@@ -28,7 +28,7 @@ Phase B — Server config surface (store PAT Ploy‑wide)
     - Files: internal/server/handlers/config_gitlab.go (new); cmd/ployd/server.go hook
     - OpenAPI: docs/api/paths/config_gitlab.yaml (new)
     - Tests: cmd/ploy/server_deploy_*_test.go (round-trip encode/decode stubs)
-- [ ] Persistence: secure-at-rest (minimal)
+- [x] Persistence: secure-at-rest (minimal)
     - Store token in memory by default; optional file secret path via ployd.yaml gitlab.token_file (0600)
     - Files: internal/server/config/secure.go (read token from file); docs/envs/README.md update
 

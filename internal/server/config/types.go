@@ -133,6 +133,7 @@ type PostgresConfig struct {
 
 // GitLabConfig configures GitLab integration.
 type GitLabConfig struct {
-	Domain string `yaml:"domain"`
-	Token  string `yaml:"token"`
+	Domain    string `yaml:"domain"`
+	Token     string `yaml:"token"`
+	TokenFile string `yaml:"token_file"`
 }
