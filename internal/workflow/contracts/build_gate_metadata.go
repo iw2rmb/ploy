@@ -10,6 +10,12 @@ type BuildGateStageMetadata struct {
 	LogDigest    string                       `json:"log_digest,omitempty"`
 	StaticChecks []BuildGateStaticCheckReport `json:"static_checks,omitempty"`
 	LogFindings  []BuildGateLogFinding        `json:"log_findings,omitempty"`
+	// LogsText carries the raw build logs text for node-local processing.
+	// Not serialized in JSON APIs.
+	LogsText string `json:"-"`
+	// Resources summarizes container limits and observed usage for the gate run.
+	// Not serialized in JSON APIs.
+	Resources *BuildGateResourceUsage `json:"-"`
 }
 
 // Validate ensures build gate metadata entries are well formed.
@@ -25,6 +31,22 @@ func (m BuildGateStageMetadata) Validate() error {
 		}
 	}
 	return nil
+}
+
+// BuildGateResourceUsage captures container limits and observed usage metrics
+// from the gate execution container.
+type BuildGateResourceUsage struct {
+	// Limits configured for the container (0 means unlimited/not set).
+	LimitNanoCPUs    int64 `json:"limit_nano_cpus"`
+	LimitMemoryBytes int64 `json:"limit_memory_bytes"`
+
+	// Observed usage during the container lifetime.
+	CPUTotalNs      uint64 `json:"cpu_total_ns"`
+	MemUsageBytes   uint64 `json:"mem_usage_bytes"`
+	MemMaxBytes     uint64 `json:"mem_max_bytes"`
+	BlkioReadBytes  uint64 `json:"blkio_read_bytes"`
+	BlkioWriteBytes uint64 `json:"blkio_write_bytes"`
+	SizeRwBytes     *int64 `json:"size_rw_bytes,omitempty"`
 }
 
 // BuildGateStaticCheckReport summarises an individual static analysis invocation.

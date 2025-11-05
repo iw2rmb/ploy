@@ -187,7 +187,7 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		// Return success response with artifact_bundle_id.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"artifact_bundle_id": uuid.UUID(artifact.ID.Bytes).String()}); err != nil {
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{"artifact_bundle_id": uuid.UUID(artifact.ID.Bytes).String(), "cid": strings.TrimSpace(*artifact.Cid), "digest": strings.TrimSpace(*artifact.Digest)}); err != nil {
 			slog.Error("artifact: encode response failed", "err", err)
 		}
 

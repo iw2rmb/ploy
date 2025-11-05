@@ -17,6 +17,9 @@ type ContainerSpec struct {
 	Mounts     []ContainerMount
 	Retain     bool
 	Labels     map[string]string
+	// Optional resource limits (0 => unlimited)
+	LimitNanoCPUs    int64
+	LimitMemoryBytes int64
 }
 
 // ContainerMount describes a host path mount.

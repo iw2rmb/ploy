@@ -15,7 +15,7 @@ func uploadOutDirIfPresent(ctx context.Context, cfg Config, runID, stageID, outD
 		if err != nil {
 			return fmt.Errorf("create artifact uploader: %w", err)
 		}
-		if err := artifactUploader.UploadArtifact(ctx, runID, stageID, files, "mod-out"); err != nil {
+		if _, _, err := artifactUploader.UploadArtifact(ctx, runID, stageID, files, "mod-out"); err != nil {
 			return fmt.Errorf("upload /out bundle: %w", err)
 		}
 	}
