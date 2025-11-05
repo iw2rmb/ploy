@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -50,16 +49,17 @@ func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 		return fmt.Errorf("configure git user: %w", err)
 	}
 
-	// Create a temporary GIT_ASKPASS script that echoes the PAT.
-	// This script will be deleted after use.
-	askpassScript, cleanup, err := createAskpassScript(opts.PAT)
+	// Create a temporary GIT_ASKPASS script that echoes a PAT provided via
+	// environment variable (PLOY_GIT_PAT). The token itself is never written
+	// to disk. The script will be deleted after use.
+	askpassScript, cleanup, err := createAskpassScript()
 	if err != nil {
 		return fmt.Errorf("create askpass script: %w", err)
 	}
 	defer cleanup()
 
 	// Push the branch using GIT_ASKPASS for authentication.
-	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, askpassScript); err != nil {
+	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, askpassScript, opts.PAT); err != nil {
 		return redactError(err, opts.PAT)
 	}
 
@@ -98,10 +98,12 @@ func (p *pusher) configureGitUser(ctx context.Context, repoDir, userName, userEm
 }
 
 // pushBranch performs the git push operation using the provided askpass script.
-func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, askpassScript string) error {
+func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, askpassScript, pat string) error {
 	env := []string{
 		"GIT_TERMINAL_PROMPT=0",
+		"GIT_ASKPASS_REQUIRE=force",
 		"GIT_ASKPASS=" + askpassScript,
+		"PLOY_GIT_PAT=" + pat,
 	}
 	if err := runGitCommand(ctx, repoDir, env, "push", "origin", targetRef); err != nil {
 		return fmt.Errorf("git push origin %s: %w", targetRef, err)
@@ -111,21 +113,29 @@ func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, askpassScri
 
 // createAskpassScript creates a temporary shell script that echoes the PAT.
 // Returns the script path and a cleanup function.
-func createAskpassScript(pat string) (string, func(), error) {
-	tmpDir := os.TempDir()
-	scriptPath := filepath.Join(tmpDir, fmt.Sprintf("git-askpass-%d.sh", os.Getpid()))
-
-	// Script content: echo the PAT when invoked.
-	scriptContent := fmt.Sprintf("#!/bin/sh\necho '%s'\n", strings.ReplaceAll(pat, "'", "'\\''"))
-
-	if err := os.WriteFile(scriptPath, []byte(scriptContent), 0700); err != nil {
+func createAskpassScript() (string, func(), error) {
+	f, err := os.CreateTemp("", "git-askpass-*.sh")
+	if err != nil {
+		return "", nil, fmt.Errorf("create askpass script: %w", err)
+	}
+	scriptPath := f.Name()
+	// Script content: echo PAT from environment variable; never embed PAT in file.
+	scriptContent := "#!/bin/sh\n: \"${PLOY_GIT_PAT:?missing PAT}\"\necho \"$PLOY_GIT_PAT\"\n"
+	if _, err := f.WriteString(scriptContent); err != nil {
+		_ = f.Close()
+		_ = os.Remove(scriptPath)
 		return "", nil, fmt.Errorf("write askpass script: %w", err)
 	}
-
-	cleanup := func() {
+	if err := f.Close(); err != nil {
 		_ = os.Remove(scriptPath)
+		return "", nil, fmt.Errorf("close askpass script: %w", err)
+	}
+	if err := os.Chmod(scriptPath, 0700); err != nil {
+		_ = os.Remove(scriptPath)
+		return "", nil, fmt.Errorf("chmod askpass script: %w", err)
 	}
 
+	cleanup := func() { _ = os.Remove(scriptPath) }
 	return scriptPath, cleanup, nil
 }
 

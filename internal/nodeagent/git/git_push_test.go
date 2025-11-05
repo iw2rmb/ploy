@@ -137,7 +137,7 @@ func TestCreateAskpassScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			scriptPath, cleanup, err := createAskpassScript(tt.pat)
+			scriptPath, cleanup, err := createAskpassScript()
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got nil")
@@ -166,7 +166,15 @@ func TestCreateAskpassScript(t *testing.T) {
 
 			// Execute the script and verify it outputs the PAT.
 			cmd := exec.Command(scriptPath)
+			cmd.Env = append(os.Environ(), "PLOY_GIT_PAT="+tt.pat)
 			output, err := cmd.Output()
+			if tt.pat == "" {
+				if err == nil {
+					t.Fatalf("expected script to fail with empty PAT, got success")
+				}
+				// Ensure the script content on disk still avoids PAT (empty), then return.
+				return
+			}
 			if err != nil {
 				t.Fatalf("failed to execute askpass script: %v", err)
 			}
@@ -174,6 +182,15 @@ func TestCreateAskpassScript(t *testing.T) {
 			outputStr := strings.TrimSpace(string(output))
 			if outputStr != tt.pat {
 				t.Errorf("askpass script output = %q, want %q", outputStr, tt.pat)
+			}
+
+			// Verify the script file does not contain the PAT on disk.
+			b, err := os.ReadFile(scriptPath)
+			if err != nil {
+				t.Fatalf("failed to read script: %v", err)
+			}
+			if strings.Contains(string(b), tt.pat) && tt.pat != "" {
+				t.Errorf("script content contains the PAT; must not persist token to disk")
 			}
 
 			// Verify cleanup removes the script.
