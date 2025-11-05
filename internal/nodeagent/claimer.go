@@ -266,5 +266,19 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
 	if sid, ok := m["stage_id"].(string); ok && sid != "" {
 		opts["stage_id"] = sid
 	}
+	// Pass through GitLab config (PAT and domain) if present (server injects defaults on claim)
+	if pat, ok := m["gitlab_pat"].(string); ok && pat != "" {
+		opts["gitlab_pat"] = pat
+	}
+	if domain, ok := m["gitlab_domain"].(string); ok && domain != "" {
+		opts["gitlab_domain"] = domain
+	}
+	// Pass through MR creation flags if present
+	if mrSuccess, ok := m["mr_on_success"].(bool); ok {
+		opts["mr_on_success"] = mrSuccess
+	}
+	if mrFail, ok := m["mr_on_fail"].(bool); ok {
+		opts["mr_on_fail"] = mrFail
+	}
 	return opts, env
 }

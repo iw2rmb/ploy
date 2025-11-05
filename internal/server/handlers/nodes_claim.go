@@ -18,7 +18,7 @@ import (
 
 // claimRunHandler allows nodes to claim a queued run for execution.
 // Returns the assigned run or 204 No Content if no runs are available.
-func claimRunHandler(st store.Store) http.HandlerFunc {
+func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -86,6 +86,11 @@ func claimRunHandler(st store.Store) http.HandlerFunc {
 			stageIDStr = uuid.UUID(stg.ID.Bytes).String()
 		}
 		mergedSpec := mergeStageIDIntoSpec(run.Spec, stageIDStr)
+
+		// Merge server default GitLab config (token/domain) into spec if configured.
+		// Per-run overrides (already in spec) take precedence over server defaults.
+		gitlabCfg := configHolder.GetGitLab()
+		mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
 
 		// Build response with claimed run details.
 		resp := struct {
