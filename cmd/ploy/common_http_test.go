@@ -30,9 +30,12 @@ func TestResolveControlPlaneHTTP_PlainWhenNoDescriptor(t *testing.T) {
 	if got, want := u.Scheme, "http"; got != want {
 		t.Fatalf("scheme=%s want %s", got, want)
 	}
-	// Plain client path uses zero-value http.Client without a custom Transport.
+	// Plain client path uses a basic client with default Timeout and nil Transport.
 	if client == nil || client.Transport != nil {
 		t.Fatalf("expected plain client with nil Transport; got %#v", client)
+	}
+	if client.Timeout <= 0 {
+		t.Fatalf("expected default Timeout to be set, got %v", client.Timeout)
 	}
 }
 
@@ -91,6 +94,20 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	}
 	if tr.TLSClientConfig.RootCAs == nil {
 		t.Fatalf("expected RootCAs to be populated")
+	}
+	if client.Timeout <= 0 {
+		t.Fatalf("expected default Timeout to be set for TLS client, got %v", client.Timeout)
+	}
+}
+
+func TestCloneForStreamDisablesTimeout(t *testing.T) {
+	c := &http.Client{Timeout: 5 * time.Second}
+	clone := cloneForStream(c)
+	if clone.Timeout != 0 {
+		t.Fatalf("expected stream clone Timeout=0, got %v", clone.Timeout)
+	}
+	if clone == c {
+		t.Fatal("expected a distinct client clone instance")
 	}
 }
 

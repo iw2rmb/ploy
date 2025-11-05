@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/config"
 )
@@ -33,7 +34,7 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	desc, err := config.LoadDefault()
 	if err != nil || desc.CAPath == "" || desc.CertPath == "" || desc.KeyPath == "" {
 		// No descriptor or incomplete TLS config: use plain client (for tests or legacy setups).
-		return u, &http.Client{}, nil
+		return u, &http.Client{Timeout: 10 * time.Second}, nil
 	}
 
 	// Load client certificate and key.
@@ -61,9 +62,8 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	}
 
 	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
+		Transport: &http.Transport{TLSClientConfig: tlsConfig},
+		Timeout:   10 * time.Second,
 	}
 
 	return u, client, nil
