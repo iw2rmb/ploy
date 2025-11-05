@@ -97,7 +97,7 @@ Phase G — Hardening and UX
 
 Phase H — Validation (E2E)
 
-- [ ] Scenario: MR on success (pass)
+- [x] Scenario: MR on success (pass)
     - Script: tests/e2e/mods/scenario-orw-pass.sh add flags --mr-success true
     - Expected: ticket succeeded; MR URL printed; diff matches Java 17 upgrade; Build Gate passed
 - [ ] Scenario: MR on fail (heal path off)

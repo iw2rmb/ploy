@@ -31,6 +31,7 @@ dist/ploy mod run \
   --mod-env RECIPE_VERSION="$RECIPE_VERSION" \
   --mod-env RECIPE_CLASSNAME="$RECIPE_CLASSNAME" \
   --mod-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
+  --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}"
 
