@@ -81,8 +81,8 @@ Phase F — Control-plane default and precedence
 - [x] Server default token: supply PAT/domain to node at claim time when a global token is configured
     - File: internal/server/handlers/claims.go adds config hint in StartRun payload (always include when global token is set and per-run is absent)
     - Precedence: per-run PAT (if set) wins; otherwise use the server global token. If neither exists, skip MR.
-- [ ] CLI inspect shows MR URL
-    - File: internal/cli/mods/inspect.go (new or extend) parses TicketStatusResponse.Ticket.Metadata["mr_url"]; prints “MR: <url>”
+- [x] CLI inspect shows MR URL
+    - File: internal/cli/mods/inspect.go (new or extend) parses TicketStatusResponse.Ticket.Metadata["mr_url"]; prints "MR: <url>"
 
 Phase G — Hardening and UX
 
