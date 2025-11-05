@@ -1,6 +1,7 @@
 package step
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	imageapi "github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 // DockerContainerRuntime executes containers using the local Docker daemon.
@@ -51,6 +53,13 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 	if spec.LimitNanoCPUs > 0 || spec.LimitMemoryBytes > 0 {
 		hostCfg.Resources.NanoCPUs = spec.LimitNanoCPUs
 		hostCfg.Resources.Memory = spec.LimitMemoryBytes
+	}
+	// Optional disk size limit (driver dependent; e.g., overlay2 with xfs project quota).
+	if strings.TrimSpace(spec.StorageSizeOpt) != "" {
+		if hostCfg.StorageOpt == nil {
+			hostCfg.StorageOpt = map[string]string{}
+		}
+		hostCfg.StorageOpt["size"] = strings.TrimSpace(spec.StorageSizeOpt)
 	}
 	created, err := r.client.ContainerCreate(ctx, config, hostCfg, nil, nil, "")
 	if err != nil {
@@ -100,7 +109,15 @@ func (r *DockerContainerRuntime) Logs(ctx context.Context, handle ContainerHandl
 		return nil, fmt.Errorf("step: fetch container logs: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
-	return io.ReadAll(reader)
+	// Docker returns a multiplexed stream when TTY is not enabled. Demultiplex
+	// into combined stdout+stderr for consumers that expect plain text.
+	var stdoutBuf, stderrBuf bytes.Buffer
+	if _, err := stdcopy.StdCopy(&stdoutBuf, &stderrBuf, reader); err != nil {
+		// Fall back to raw bytes on demux errors to avoid losing logs entirely.
+		raw, _ := io.ReadAll(reader)
+		return raw, nil
+	}
+	return append(stdoutBuf.Bytes(), stderrBuf.Bytes()...), nil
 }
 
 // Remove deletes the container.

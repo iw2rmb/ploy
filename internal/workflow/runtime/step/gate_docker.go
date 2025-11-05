@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	units "github.com/docker/go-units"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -44,36 +45,93 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 	if spec == nil || !spec.Enabled {
 		return nil, nil
 	}
-	// Detect Java build system.
-	// Prefer Maven when pom.xml exists, otherwise Gradle when build.gradle(.kts) exists.
+	// Detect or force profile.
+	// Supported explicit profiles: "java", "java-maven", "java-gradle".
+	// When empty or unknown, auto-detect: pom.xml -> maven; build.gradle(.kts) -> gradle; else plain java.
+	desiredProfile := strings.ToLower(strings.TrimSpace(spec.Profile))
+	if desiredProfile == "" {
+		desiredProfile = strings.ToLower(strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_PROFILE")))
+	}
+
 	hasMaven := fileExists(filepath.Join(workspace, "pom.xml"))
 	hasGradle := fileExists(filepath.Join(workspace, "build.gradle")) || fileExists(filepath.Join(workspace, "build.gradle.kts"))
 
 	var image string
 	var cmd []string
 	var tool string
-	switch {
-	case hasMaven:
-		image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "maven:3-eclipse-temurin-17")
+	// Unified image override takes precedence for all stacks.
+	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_IMAGE")); v != "" {
+		image = v
+	}
+
+	chooseMaven := func() {
+		if image == "" {
+			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "maven:3-eclipse-temurin-17")
+		}
 		tool = "maven"
 		cmd = []string{"/bin/sh", "-lc", "mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test"}
-	case hasGradle:
-		image = defaultString(os.Getenv("PLOY_BUILDGATE_GRADLE_IMAGE"), "gradle:8.8-jdk17")
+	}
+	chooseGradle := func() {
+		if image == "" {
+			image = defaultString(os.Getenv("PLOY_BUILDGATE_GRADLE_IMAGE"), "gradle:8.8-jdk17")
+		}
 		tool = "gradle"
 		cmd = []string{"/bin/sh", "-lc", "gradle -q test -p /workspace"}
-	default:
-		// Unknown project; return empty metadata rather than failing gate.
-		return &contracts.BuildGateStageMetadata{}, nil
+	}
+	chooseJava := func() {
+		if image == "" {
+			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "eclipse-temurin:17-jdk")
+		}
+		tool = "java"
+		// Compile all Java sources if present; succeed if none found.
+		script := `set -e
+tmpdir=$(mktemp -d)
+find /workspace -type f -name "*.java" > "$tmpdir/sources.list" || true
+if [ -s "$tmpdir/sources.list" ]; then
+  mkdir -p "$tmpdir/classes"
+  javac --release 17 -d "$tmpdir/classes" @"$tmpdir/sources.list"
+  echo "javac compile OK"
+else
+  echo "No Java sources under /workspace"
+fi`
+		cmd = []string{"/bin/sh", "-lc", script}
+	}
+
+	switch desiredProfile {
+	case "java-maven":
+		chooseMaven()
+	case "java-gradle":
+		chooseGradle()
+	case "java":
+		chooseJava()
+	default: // auto
+		switch {
+		case hasMaven:
+			chooseMaven()
+		case hasGradle:
+			chooseGradle()
+		default:
+			// Fall back to plain Java compilation.
+			chooseJava()
+		}
 	}
 
 	// Build container spec with workspace mount.
 	mounts := []ContainerMount{{Source: workspace, Target: "/workspace", ReadOnly: false}}
-	// Optional limits via env (bytes and millis). 0 => unlimited.
-	var limitMem int64
-	var limitCPUMillis int64
+	// Optional limits via env (human suffixes supported for memory/disk). 0 => unlimited.
+	var (
+		limitMem       int64
+		limitCPUMillis int64
+		limitDisk      int64
+		storageSizeOpt string
+	)
 	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_MEMORY_BYTES")); v != "" {
-		if n, err := parseInt64(v); err == nil {
+		if n, err := units.RAMInBytes(v); err == nil {
 			limitMem = n
+		} else if n2, err2 := units.FromHumanSize(v); err2 == nil {
+			limitMem = n2
+		} else if n3, err3 := parseInt64(v); err3 == nil {
+			limitMem = n3
 		}
 	}
 	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_CPU_MILLIS")); v != "" {
@@ -81,9 +139,21 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			limitCPUMillis = n
 		}
 	}
+	if v := strings.TrimSpace(os.Getenv("PLOY_BUILDGATE_LIMIT_DISK_SPACE")); v != "" {
+		storageSizeOpt = v
+		if n, err := units.RAMInBytes(v); err == nil {
+			limitDisk = n
+		} else if n2, err2 := units.FromHumanSize(v); err2 == nil {
+			limitDisk = n2
+		} else if n3, err3 := parseInt64(v); err3 == nil {
+			limitDisk = n3
+		}
+	}
 	specC := ContainerSpec{Image: image, Command: cmd, WorkingDir: "/workspace", Mounts: mounts,
 		LimitMemoryBytes: limitMem,
 		LimitNanoCPUs:    limitCPUMillis * 1_000_000, // millis → nanos
+		LimitDiskBytes:   limitDisk,
+		StorageSizeOpt:   strings.TrimSpace(storageSizeOpt),
 	}
 	if e.rt == nil {
 		return &contracts.BuildGateStageMetadata{}, nil

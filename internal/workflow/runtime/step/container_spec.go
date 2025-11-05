@@ -20,6 +20,12 @@ type ContainerSpec struct {
 	// Optional resource limits (0 => unlimited)
 	LimitNanoCPUs    int64
 	LimitMemoryBytes int64
+	// Optional disk limit for writable layer (bytes; 0 => unlimited).
+	// When set, Docker runtime may pass a storage option (driver dependent).
+	LimitDiskBytes int64
+	// Optional raw storage size option string passed to Docker (e.g., "10G").
+	// Set only when the operator provided PLOY_BUILDGATE_LIMIT_DISK_SPACE.
+	StorageSizeOpt string
 }
 
 // ContainerMount describes a host path mount.
