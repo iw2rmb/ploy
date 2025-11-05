@@ -21,7 +21,7 @@ Phase A — Discovery (Nomad-era prior art)
 
 Phase B — Server config surface (store PAT Ploy‑wide)
 
-- [ ] Types: GitLab config model
+- [x] Types: GitLab config model
     - File: internal/server/config/types.go → add type GitLabConfig { Domain string; Token string } (Token in-memory only; serves as the global default)
     - File: internal/server/config/load.go → load from ployd.yaml gitlab: { domain, token? } (token optional)
 - [ ] API: GET/PUT /v1/config/gitlab (mTLS admin only)
