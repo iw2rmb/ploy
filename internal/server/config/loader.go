@@ -24,6 +24,15 @@ func Load(path string) (Config, error) {
 	}
 	cfg.FilePath = path
 	applyDefaults(&cfg)
+	// Load GitLab token from file if token_file is specified
+	if cfg.GitLab.TokenFile != "" && cfg.GitLab.Token == "" {
+		tokenPath := cfg.ResolveRelative(cfg.GitLab.TokenFile)
+		token, err := loadTokenFromFile(tokenPath)
+		if err != nil {
+			return Config{}, fmt.Errorf("config: load gitlab token: %w", err)
+		}
+		cfg.GitLab.Token = token
+	}
 	if err := validate(&cfg); err != nil {
 		return Config{}, err
 	}

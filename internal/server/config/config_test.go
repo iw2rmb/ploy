@@ -280,3 +280,154 @@ gitlab:
 		t.Fatal("Load() succeeded, want error for unknown gitlab.extra field")
 	}
 }
+
+func TestLoadConfigGitLabTokenFile(t *testing.T) {
+	t.Helper()
+
+	tests := []struct {
+		name        string
+		tokenFile   string
+		tokenPerm   os.FileMode
+		tokenData   string
+		wantToken   string
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:      "token_file_absolute_path",
+			tokenFile: "", // will be set to absolute path
+			tokenPerm: 0600,
+			tokenData: "glpat-from-file-123",
+			wantToken: "glpat-from-file-123",
+			wantErr:   false,
+		},
+		{
+			name:      "token_file_relative_path",
+			tokenFile: "gitlab-token.txt",
+			tokenPerm: 0600,
+			tokenData: "glpat-relative-path",
+			wantToken: "glpat-relative-path",
+			wantErr:   false,
+		},
+		{
+			name:        "token_file_insecure_permissions",
+			tokenFile:   "",
+			tokenPerm:   0644,
+			tokenData:   "glpat-insecure",
+			wantErr:     true,
+			errContains: "insecure permissions",
+		},
+		{
+			name:        "token_file_empty",
+			tokenFile:   "",
+			tokenPerm:   0600,
+			tokenData:   "",
+			wantErr:     true,
+			errContains: "is empty",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			configPath := filepath.Join(dir, "ployd.yaml")
+
+			var tokenFilePath string
+			if tt.tokenFile == "" {
+				tokenFilePath = filepath.Join(dir, "token")
+			} else {
+				tokenFilePath = tt.tokenFile
+			}
+
+			// Create token file
+			actualTokenPath := filepath.Join(dir, filepath.Base(tokenFilePath))
+			if err := os.WriteFile(actualTokenPath, []byte(tt.tokenData), tt.tokenPerm); err != nil {
+				t.Fatalf("write token file: %v", err)
+			}
+
+			// Create config with token_file
+			configYAML := `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+gitlab:
+  domain: https://gitlab.example.com
+  token_file: ` + filepath.Base(tokenFilePath)
+			if err := os.WriteFile(configPath, []byte(configYAML), 0o600); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+
+			cfg, err := config.Load(configPath)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Load() expected error containing %q, got nil", tt.errContains)
+				}
+				if tt.errContains != "" && !contains(err.Error(), tt.errContains) {
+					t.Errorf("Load() error = %v, want error containing %q", err, tt.errContains)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() unexpected error: %v", err)
+			}
+
+			if cfg.GitLab.Token != tt.wantToken {
+				t.Errorf("GitLab.Token = %q, want %q", cfg.GitLab.Token, tt.wantToken)
+			}
+		})
+	}
+}
+
+func TestLoadConfigGitLabTokenPrecedence(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "ployd.yaml")
+	tokenPath := filepath.Join(dir, "token")
+
+	// Create token file
+	if err := os.WriteFile(tokenPath, []byte("glpat-from-file"), 0600); err != nil {
+		t.Fatalf("write token file: %v", err)
+	}
+
+	// Config with both token and token_file: token should take precedence
+	configYAML := `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+gitlab:
+  domain: https://gitlab.example.com
+  token: glpat-inline
+  token_file: token
+`
+	if err := os.WriteFile(configPath, []byte(configYAML), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Inline token should take precedence over token_file
+	if cfg.GitLab.Token != "glpat-inline" {
+		t.Errorf("GitLab.Token = %q, want %q (inline token should take precedence)", cfg.GitLab.Token, "glpat-inline")
+	}
+}
+
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
