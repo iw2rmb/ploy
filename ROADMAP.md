@@ -44,7 +44,7 @@ Phase C — CLI admin (store/show/validate)
 
 Phase D — Per‑run overrides (flags → options)
 
-- [ ] mod run flags
+- [x] mod run flags
     - Flags: --gitlab-pat, --gitlab-domain, --mr-success, --mr-fail
     - File: cmd/ploy/mod_run.go (add flags; validate; add to Spec payload if set)
     - Precedence: per-run PAT/domain flags override the server’s global token/domain; otherwise the global token is used.

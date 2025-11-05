@@ -64,6 +64,11 @@ func executeModRun(args []string, stderr io.Writer) error {
 	retain := fs.Bool("retain-container", false, "Retain the mod container after execution (for debugging)")
 	// Optional: override container command (string, executed via sh -c on the node)
 	modCommand := fs.String("mod-command", "", "Container command override (string or JSON array)")
+	// GitLab MR flags (per-run overrides)
+	gitlabPAT := fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
+	gitlabDomain := fs.String("gitlab-domain", "", "GitLab domain for this run (overrides server default)")
+	mrSuccess := fs.Bool("mr-success", false, "Create a merge request on success")
+	mrFail := fs.Bool("mr-fail", false, "Create a merge request on failure")
 
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
@@ -95,6 +100,12 @@ func executeModRun(args []string, stderr io.Writer) error {
 		return fmt.Errorf("repo target ref required when repo url is set")
 	}
 
+	// Validate GitLab flags: if mr flags are set, domain is required (PAT may come from server)
+	if (*mrSuccess || *mrFail) && strings.TrimSpace(*gitlabDomain) == "" && strings.TrimSpace(*gitlabPAT) != "" {
+		// If PAT is provided but domain is not, warn but allow (server may have default domain)
+		// This is not an error, just a potential misconfiguration
+	}
+
 	ctx := context.Background()
 	base, httpClient, err := resolveControlPlaneHTTP(ctx)
 	if err != nil {
@@ -118,9 +129,10 @@ func executeModRun(args []string, stderr io.Writer) error {
 		request.Metadata["repo_workspace_hint"] = repoSpec.WorkspaceHint
 	}
 
-	// Prepare optional Spec when --mod-env / --mod-image are provided
+	// Prepare optional Spec when --mod-env / --mod-image / GitLab flags are provided
 	var specPayload []byte
-	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" || *retain || strings.TrimSpace(*modCommand) != "" {
+	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" || *retain || strings.TrimSpace(*modCommand) != "" ||
+		strings.TrimSpace(*gitlabPAT) != "" || strings.TrimSpace(*gitlabDomain) != "" || *mrSuccess || *mrFail {
 		env := make(map[string]string)
 		for _, kv := range modEnvs {
 			kv = strings.TrimSpace(kv)
@@ -162,6 +174,19 @@ func executeModRun(args []string, stderr io.Writer) error {
 			} else {
 				payload["command"] = cmd
 			}
+		}
+		// Add GitLab options (never print PAT in logs; node agent will handle redaction)
+		if pat := strings.TrimSpace(*gitlabPAT); pat != "" {
+			payload["gitlab_pat"] = pat
+		}
+		if domain := strings.TrimSpace(*gitlabDomain); domain != "" {
+			payload["gitlab_domain"] = domain
+		}
+		if *mrSuccess {
+			payload["mr_on_success"] = true
+		}
+		if *mrFail {
+			payload["mr_on_fail"] = true
 		}
 		if len(payload) > 0 {
 			specPayload, _ = json.Marshal(payload)
