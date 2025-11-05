@@ -102,6 +102,13 @@ NodeClaimResponse:
     commit_sha: { type: string, nullable: true }
     started_at: { type: string, format: date-time }
     created_at: { type: string, format: date-time }
+    spec:
+      description: |
+        Opaque run specification JSON merged by the server at claim time.
+        May include fields like `stage_id`, `gitlab_pat`, `gitlab_domain`,
+        `mr_on_success`, and `mr_on_fail`.
+      type: object
+      additionalProperties: true
   required: [id, repo_url, status, node_id, base_ref, target_ref, started_at, created_at]
 
 Event:
