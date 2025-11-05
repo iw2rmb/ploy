@@ -89,7 +89,7 @@ Phase G — Hardening and UX
 - [x] PAT redaction
     - Ensure any error output excludes token (both CLI and node logs)
     - File: internal/nodeagent/gitlab/mr_client.go; internal/nodeagent/git/git_push.go (wrap errors)
-- [ ] Timeouts and retries
+- [x] Timeouts and retries
     - Backoff on GitLab API 429/5xx; bounded retries (max 3)
 - [ ] Docs and examples
     - docs/how-to/create-mr.md (usage: ploy config gitlab set; mod run with --mr-success)

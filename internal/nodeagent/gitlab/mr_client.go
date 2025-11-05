@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strings"
@@ -56,6 +57,7 @@ type MRCreateResponse struct {
 
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
+// Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 3 attempts).
 func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, error) {
 	if err := validateMRCreateRequest(req); err != nil {
 		return "", redactError(fmt.Errorf("invalid request: %w", err), req.PAT)
@@ -90,47 +92,68 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		return "", redactError(fmt.Errorf("marshal request: %w", err), req.PAT)
 	}
 
-	// Create HTTP request.
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
-	if err != nil {
-		return "", redactError(fmt.Errorf("create request: %w", err), req.PAT)
+	// Retry logic with exponential backoff for 429 and 5xx errors (max 3 attempts).
+	const maxRetries = 3
+	const baseDelay = 1 * time.Second
+
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Create HTTP request.
+		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+		if err != nil {
+			return "", redactError(fmt.Errorf("create request: %w", err), req.PAT)
+		}
+
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Authorization", "Bearer "+req.PAT)
+
+		// Send request.
+		resp, err := c.client.Do(httpReq)
+		if err != nil {
+			lastErr = err
+			if attempt < maxRetries-1 && c.shouldRetry(ctx, err, 0) {
+				c.backoff(ctx, attempt, baseDelay)
+				continue
+			}
+			return "", redactError(fmt.Errorf("send request: %w", err), req.PAT)
+		}
+
+		// Read response body.
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return "", redactError(fmt.Errorf("read response: %w", err), req.PAT)
+		}
+
+		// Check response status.
+		if resp.StatusCode == http.StatusCreated {
+			// Success: parse response to extract web_url.
+			var result map[string]interface{}
+			if err := json.Unmarshal(bodyBytes, &result); err != nil {
+				return "", redactError(fmt.Errorf("parse response: %w", err), req.PAT)
+			}
+
+			webURL, ok := result["web_url"].(string)
+			if !ok || webURL == "" {
+				return "", redactError(fmt.Errorf("no web_url in response"), req.PAT)
+			}
+
+			return webURL, nil
+		}
+
+		// Check if we should retry (429 or 5xx).
+		lastErr = fmt.Errorf("gitlab api error: status %d: %s", resp.StatusCode, string(bodyBytes))
+		if attempt < maxRetries-1 && c.shouldRetry(ctx, nil, resp.StatusCode) {
+			c.backoff(ctx, attempt, baseDelay)
+			continue
+		}
+
+		// Non-retryable error or final attempt.
+		return "", redactError(lastErr, req.PAT)
 	}
 
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+req.PAT)
-
-	// Send request.
-	resp, err := c.client.Do(httpReq)
-	if err != nil {
-		return "", redactError(fmt.Errorf("send request: %w", err), req.PAT)
-	}
-	defer resp.Body.Close()
-
-	// Read response body.
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", redactError(fmt.Errorf("read response: %w", err), req.PAT)
-	}
-
-	// Check response status.
-	if resp.StatusCode != http.StatusCreated {
-		return "", redactError(
-			fmt.Errorf("gitlab api error: status %d: %s", resp.StatusCode, string(bodyBytes)),
-			req.PAT)
-	}
-
-	// Parse response to extract web_url.
-	var result map[string]interface{}
-	if err := json.Unmarshal(bodyBytes, &result); err != nil {
-		return "", redactError(fmt.Errorf("parse response: %w", err), req.PAT)
-	}
-
-	webURL, ok := result["web_url"].(string)
-	if !ok || webURL == "" {
-		return "", redactError(fmt.Errorf("no web_url in response"), req.PAT)
-	}
-
-	return webURL, nil
+	// All retries exhausted.
+	return "", redactError(fmt.Errorf("max retries exhausted: %w", lastErr), req.PAT)
 }
 
 // validateMRCreateRequest checks that required fields are provided.
@@ -154,6 +177,41 @@ func validateMRCreateRequest(req MRCreateRequest) error {
 		return fmt.Errorf("target_branch is required")
 	}
 	return nil
+}
+
+// shouldRetry determines if a request should be retried based on the error or HTTP status code.
+// Retries on 429 (Too Many Requests) and 5xx (server errors).
+func (c *MRClient) shouldRetry(ctx context.Context, err error, statusCode int) bool {
+	// Check context cancellation.
+	if ctx.Err() != nil {
+		return false
+	}
+
+	// Retry on network errors (except context cancellation).
+	if err != nil {
+		return true
+	}
+
+	// Retry on 429 (rate limit) or 5xx (server errors).
+	return statusCode == http.StatusTooManyRequests || (statusCode >= 500 && statusCode < 600)
+}
+
+// backoff sleeps for an exponentially increasing duration before retrying.
+// Base delay is 1 second; each retry doubles the delay (1s, 2s, 4s).
+func (c *MRClient) backoff(ctx context.Context, attempt int, baseDelay time.Duration) {
+	// Calculate delay: baseDelay * 2^attempt.
+	delay := time.Duration(float64(baseDelay) * math.Pow(2, float64(attempt)))
+
+	// Sleep with context awareness.
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-timer.C:
+		return
+	}
 }
 
 // redactError replaces any occurrence of the PAT in error messages with [REDACTED].
