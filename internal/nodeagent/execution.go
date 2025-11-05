@@ -9,7 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/nodeagent/git"
+	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
@@ -229,6 +232,18 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 			reason = &failureMsg
 		}
 
+		// Phase E: Create MR via GitLab API when conditions are met.
+		// Hook runs after terminal status is determined but before uploading status.
+		mrURL := ""
+		if shouldCreateMR(terminalStatus, manifest.Options) {
+			if url, mrErr := r.createMR(ctx, req, manifest, workspaceRoot); mrErr != nil {
+				slog.Error("failed to create MR", "run_id", req.RunID, "error", mrErr)
+			} else {
+				mrURL = url
+				slog.Info("MR created successfully", "run_id", req.RunID, "mr_url", mrURL)
+			}
+		}
+
 		// Build stats with execution metrics.
 		stats := map[string]interface{}{
 			"exit_code":   result.ExitCode,
@@ -240,6 +255,13 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
 				"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 			},
+		}
+
+		// Attach MR URL to metadata if created.
+		if mrURL != "" {
+			stats["metadata"] = map[string]interface{}{
+				"mr_url": mrURL,
+			}
 		}
 
 		// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
@@ -298,4 +320,82 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		"duration", duration,
 		"exit_code", result.ExitCode,
 	)
+}
+
+// shouldCreateMR determines if an MR should be created based on terminal status and options.
+func shouldCreateMR(terminalStatus string, options map[string]any) bool {
+	if terminalStatus == "succeeded" {
+		if mrOnSuccess, ok := options["mr_on_success"].(bool); ok && mrOnSuccess {
+			return true
+		}
+	}
+	if terminalStatus == "failed" {
+		if mrOnFail, ok := options["mr_on_fail"].(bool); ok && mrOnFail {
+			return true
+		}
+	}
+	return false
+}
+
+// createMR pushes the branch and creates a GitLab merge request.
+func (r *runController) createMR(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, workspaceRoot string) (string, error) {
+	// Extract GitLab options.
+	gitlabPAT, _ := manifest.Options["gitlab_pat"].(string)
+	gitlabDomain, _ := manifest.Options["gitlab_domain"].(string)
+
+	// Validate required fields.
+	if strings.TrimSpace(gitlabPAT) == "" {
+		return "", fmt.Errorf("gitlab_pat is required for MR creation")
+	}
+	if strings.TrimSpace(gitlabDomain) == "" {
+		// Default to gitlab.com if not specified.
+		gitlabDomain = "gitlab.com"
+	}
+
+	// Extract project ID from repo URL.
+	projectID, err := extractProjectIDFromRepoURL(req.RepoURL)
+	if err != nil {
+		return "", fmt.Errorf("extract project id: %w", err)
+	}
+
+	// Push branch to origin using git push (Phase E).
+	pusher := git.NewPusher()
+	pushOpts := git.PushOptions{
+		RepoDir:   workspaceRoot,
+		TargetRef: req.TargetRef,
+		PAT:       gitlabPAT,
+		UserName:  "ploy-bot",
+		UserEmail: "ploy-bot@ploy.local",
+	}
+
+	slog.Info("pushing branch to origin", "run_id", req.RunID, "target_ref", req.TargetRef)
+	if err := pusher.Push(ctx, pushOpts); err != nil {
+		return "", fmt.Errorf("git push: %w", err)
+	}
+
+	// Create MR via GitLab API.
+	mrClient := gitlab.NewMRClient()
+	mrReq := gitlab.MRCreateRequest{
+		Domain:       gitlabDomain,
+		ProjectID:    projectID,
+		PAT:          gitlabPAT,
+		Title:        fmt.Sprintf("Ploy: %s", req.RunID),
+		SourceBranch: req.TargetRef,
+		TargetBranch: req.BaseRef,
+		Description:  fmt.Sprintf("Automated changes from Ploy run %s", req.RunID),
+		Labels:       "ploy",
+	}
+
+	slog.Info("creating merge request", "run_id", req.RunID, "source", req.TargetRef, "target", req.BaseRef)
+	mrURL, err := mrClient.CreateMR(ctx, mrReq)
+	if err != nil {
+		return "", fmt.Errorf("create mr: %w", err)
+	}
+
+	return mrURL, nil
+}
+
+// extractProjectIDFromRepoURL extracts the URL-encoded project ID from a GitLab repo URL.
+func extractProjectIDFromRepoURL(repoURL string) (string, error) {
+	return gitlab.ExtractProjectIDFromURL(repoURL)
 }

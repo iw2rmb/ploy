@@ -65,7 +65,7 @@ Phase E — Node push + MR on terminal
         - git config user.name/user.email; git push origin <target_ref>
         - Do not persist PAT to disk; ensure tokens never appear in logs
     - Tests: internal/nodeagent/git/git_push_test.go (use local git daemon or mock exec)
-- [ ] Create MR via GitLab API (server‑side preferred; minimal: node)
+- [x] Create MR via GitLab API (server‑side preferred; minimal: node)
     - Minimal (node): internal/nodeagent/gitlab/mr_client.go (new)
         - POST /projects/:id/merge_requests with title, source=target_ref, target=base_ref
         - Domain from option or server config fallback (exposed to node via StartRunRequest.Options when server holds config)

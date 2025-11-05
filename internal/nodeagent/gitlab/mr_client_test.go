@@ -1,0 +1,392 @@
+package gitlab
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestCreateMR(t *testing.T) {
+	tests := []struct {
+		name       string
+		req        MRCreateRequest
+		serverFunc func(w http.ResponseWriter, r *http.Request)
+		wantURL    string
+		wantErr    bool
+	}{
+		{
+			name: "success",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-test-token",
+				Title:        "Test MR",
+				SourceBranch: "feature-branch",
+				TargetBranch: "main",
+				Description:  "Test description",
+				Labels:       "ploy,test",
+			},
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				// Verify method.
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST, got %s", r.Method)
+				}
+
+				// Verify path (URL encoding is preserved in URL.Path by http server).
+				expectedPath := "/api/v4/projects/org%2Fproject/merge_requests"
+				actualPath := r.URL.EscapedPath()
+				if actualPath != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, actualPath)
+				}
+
+				// Verify Authorization header.
+				auth := r.Header.Get("Authorization")
+				if auth != "Bearer glpat-test-token" {
+					t.Errorf("expected Bearer token, got %s", auth)
+				}
+
+				// Verify Content-Type.
+				contentType := r.Header.Get("Content-Type")
+				if contentType != "application/json" {
+					t.Errorf("expected application/json, got %s", contentType)
+				}
+
+				// Decode and verify payload.
+				var payload map[string]interface{}
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Errorf("failed to decode payload: %v", err)
+				}
+
+				if payload["title"] != "Test MR" {
+					t.Errorf("expected title 'Test MR', got %v", payload["title"])
+				}
+				if payload["source_branch"] != "feature-branch" {
+					t.Errorf("expected source_branch 'feature-branch', got %v", payload["source_branch"])
+				}
+				if payload["target_branch"] != "main" {
+					t.Errorf("expected target_branch 'main', got %v", payload["target_branch"])
+				}
+				if payload["description"] != "Test description" {
+					t.Errorf("expected description 'Test description', got %v", payload["description"])
+				}
+				if payload["labels"] != "ploy,test" {
+					t.Errorf("expected labels 'ploy,test', got %v", payload["labels"])
+				}
+
+				// Return success response with test server URL.
+				w.WriteHeader(http.StatusCreated)
+				// Use a mock web_url that doesn't rely on the test server.
+				response := map[string]interface{}{
+					"iid":     123,
+					"web_url": "http://test-server/org/project/-/merge_requests/123",
+				}
+				_ = json.NewEncoder(w).Encode(response)
+			},
+			wantURL: "http://test-server/org/project/-/merge_requests/123",
+			wantErr: false,
+		},
+		{
+			name: "success_minimal",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				ProjectID:    "test%2Frepo",
+				PAT:          "glpat-minimal",
+				Title:        "Minimal MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				// Verify minimal payload (no description or labels).
+				var payload map[string]interface{}
+				if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+					t.Errorf("failed to decode payload: %v", err)
+				}
+
+				if _, ok := payload["description"]; ok {
+					t.Errorf("expected no description field, but got one")
+				}
+				if _, ok := payload["labels"]; ok {
+					t.Errorf("expected no labels field, but got one")
+				}
+
+				w.WriteHeader(http.StatusCreated)
+				response := map[string]interface{}{
+					"iid":     456,
+					"web_url": "http://test-server/test/repo/-/merge_requests/456",
+				}
+				_ = json.NewEncoder(w).Encode(response)
+			},
+			wantURL: "http://test-server/test/repo/-/merge_requests/456",
+			wantErr: false,
+		},
+		{
+			name: "gitlab_api_error",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-bad-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"message":"401 Unauthorized"}`))
+			},
+			wantURL: "",
+			wantErr: true,
+		},
+		{
+			name: "missing_web_url",
+			req: MRCreateRequest{
+				Domain:       "gitlab.example.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-token",
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusCreated)
+				response := map[string]interface{}{
+					"iid": 789,
+					// Missing web_url field.
+				}
+				_ = json.NewEncoder(w).Encode(response)
+			},
+			wantURL: "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test server.
+			server := httptest.NewServer(http.HandlerFunc(tt.serverFunc))
+			defer server.Close()
+
+			// Update domain to point to test server.
+			// Extract host from server URL (remove http://).
+			serverHost := strings.TrimPrefix(server.URL, "http://")
+			tt.req.Domain = serverHost
+
+			// Create client.
+			client := NewMRClient()
+
+			// Call CreateMR.
+			ctx := context.Background()
+			gotURL, err := client.CreateMR(ctx, tt.req)
+
+			// Check error.
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CreateMR() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			// Check URL - the web_url returned from the mock server is used as-is.
+			if !tt.wantErr {
+				if gotURL != tt.wantURL {
+					t.Errorf("CreateMR() url = %v, want %v", gotURL, tt.wantURL)
+				}
+			}
+		})
+	}
+}
+
+func TestCreateMR_Validation(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     MRCreateRequest
+		wantErr string
+	}{
+		{
+			name: "missing_domain",
+			req: MRCreateRequest{
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-token",
+				Title:        "Test",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			wantErr: "domain is required",
+		},
+		{
+			name: "missing_project_id",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				PAT:          "glpat-token",
+				Title:        "Test",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			wantErr: "project_id is required",
+		},
+		{
+			name: "missing_pat",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				ProjectID:    "org%2Fproject",
+				Title:        "Test",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			wantErr: "pat is required",
+		},
+		{
+			name: "missing_title",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-token",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			},
+			wantErr: "title is required",
+		},
+		{
+			name: "missing_source_branch",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-token",
+				Title:        "Test",
+				TargetBranch: "main",
+			},
+			wantErr: "source_branch is required",
+		},
+		{
+			name: "missing_target_branch",
+			req: MRCreateRequest{
+				Domain:       "gitlab.com",
+				ProjectID:    "org%2Fproject",
+				PAT:          "glpat-token",
+				Title:        "Test",
+				SourceBranch: "feature",
+			},
+			wantErr: "target_branch is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := NewMRClient()
+			ctx := context.Background()
+			_, err := client.CreateMR(ctx, tt.req)
+
+			if err == nil {
+				t.Errorf("expected error, got nil")
+				return
+			}
+
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestCreateMR_PATRedaction(t *testing.T) {
+	// Test that PAT is redacted from error messages.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		// Echo the auth header in the error (simulating a real API that might leak tokens).
+		auth := r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(fmt.Sprintf(`{"message":"Invalid token: %s"}`, auth)))
+	}))
+	defer server.Close()
+
+	client := NewMRClient()
+	ctx := context.Background()
+
+	req := MRCreateRequest{
+		Domain:       strings.TrimPrefix(server.URL, "http://"),
+		ProjectID:    "test%2Fproject",
+		PAT:          "glpat-secret-token-12345",
+		Title:        "Test",
+		SourceBranch: "feature",
+		TargetBranch: "main",
+	}
+
+	_, err := client.CreateMR(ctx, req)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	errMsg := err.Error()
+
+	// Verify that the secret token is redacted.
+	if strings.Contains(errMsg, "glpat-secret-token-12345") {
+		t.Errorf("PAT not redacted in error message: %s", errMsg)
+	}
+
+	// Verify that [REDACTED] appears instead.
+	if !strings.Contains(errMsg, "[REDACTED]") {
+		t.Errorf("expected [REDACTED] in error message, got: %s", errMsg)
+	}
+}
+
+func TestExtractProjectIDFromURL(t *testing.T) {
+	tests := []struct {
+		name    string
+		repoURL string
+		wantID  string
+		wantErr bool
+	}{
+		{
+			name:    "standard_https_url",
+			repoURL: "https://gitlab.com/org/project.git",
+			wantID:  "org%2Fproject",
+			wantErr: false,
+		},
+		{
+			name:    "without_git_suffix",
+			repoURL: "https://gitlab.com/org/project",
+			wantID:  "org%2Fproject",
+			wantErr: false,
+		},
+		{
+			name:    "nested_path",
+			repoURL: "https://gitlab.example.com/group/subgroup/project.git",
+			wantID:  "group%2Fsubgroup%2Fproject",
+			wantErr: false,
+		},
+		{
+			name:    "self_hosted",
+			repoURL: "https://gitlab.internal.net/team/repo.git",
+			wantID:  "team%2Frepo",
+			wantErr: false,
+		},
+		{
+			name:    "empty_path",
+			repoURL: "https://gitlab.com/",
+			wantID:  "",
+			wantErr: true,
+		},
+		{
+			name:    "invalid_url",
+			repoURL: "not a valid url",
+			wantID:  "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotID, err := ExtractProjectIDFromURL(tt.repoURL)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractProjectIDFromURL() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if gotID != tt.wantID {
+				t.Errorf("ExtractProjectIDFromURL() = %v, want %v", gotID, tt.wantID)
+			}
+		})
+	}
+}
