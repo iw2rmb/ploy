@@ -239,6 +239,24 @@ func TestRedactError(t *testing.T) {
 			pat:     "",
 			wantMsg: "git push failed",
 		},
+		{
+			name:    "error with url-encoded pat",
+			err:     &execError{msg: "git push failed: url contains token%40special"},
+			pat:     "token@special",
+			wantMsg: "git push failed: url contains [REDACTED]",
+		},
+		{
+			name:    "error with space-encoded pat",
+			err:     &execError{msg: "authentication failed with token%20value"},
+			pat:     "token value",
+			wantMsg: "authentication failed with [REDACTED]",
+		},
+		{
+			name:    "error with literal and encoded pat",
+			err:     &execError{msg: "failed with token@special and token%40special"},
+			pat:     "token@special",
+			wantMsg: "failed with [REDACTED] and [REDACTED]",
+		},
 	}
 
 	for _, tt := range tests {
@@ -270,6 +288,33 @@ type execError struct {
 
 func (e *execError) Error() string {
 	return e.msg
+}
+
+func TestPush_ValidationRedaction(t *testing.T) {
+	// Test that validation errors don't leak PAT.
+	p := NewPusher()
+	ctx := context.Background()
+
+	opts := PushOptions{
+		RepoDir:   "",
+		TargetRef: "test-branch",
+		PAT:       "glpat-secret-validation-pat",
+		UserName:  "Test User",
+		UserEmail: "test@example.com",
+	}
+
+	err := p.Push(ctx, opts)
+
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+
+	errMsg := err.Error()
+
+	// Verify that the PAT is not in the error message.
+	if strings.Contains(errMsg, "glpat-secret-validation-pat") {
+		t.Errorf("PAT leaked in validation error: %s", errMsg)
+	}
 }
 
 func TestPush_Integration(t *testing.T) {

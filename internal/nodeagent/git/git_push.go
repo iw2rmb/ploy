@@ -41,12 +41,12 @@ func NewPusher() Pusher {
 // The PAT is never persisted to disk or embedded in the remote URL.
 func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 	if err := validatePushOptions(opts); err != nil {
-		return fmt.Errorf("invalid push options: %w", err)
+		return redactError(fmt.Errorf("invalid push options: %w", err), opts.PAT)
 	}
 
 	// Configure git user identity.
 	if err := p.configureGitUser(ctx, opts.RepoDir, opts.UserName, opts.UserEmail); err != nil {
-		return fmt.Errorf("configure git user: %w", err)
+		return redactError(fmt.Errorf("configure git user: %w", err), opts.PAT)
 	}
 
 	// Create a temporary GIT_ASKPASS script that echoes a PAT provided via
@@ -54,7 +54,7 @@ func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 	// to disk. The script will be deleted after use.
 	askpassScript, cleanup, err := createAskpassScript()
 	if err != nil {
-		return fmt.Errorf("create askpass script: %w", err)
+		return redactError(fmt.Errorf("create askpass script: %w", err), opts.PAT)
 	}
 	defer cleanup()
 
@@ -150,20 +150,50 @@ func runGitCommand(ctx context.Context, dir string, env []string, args ...string
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))
+		// Redact any PAT from env variables before including output in error.
+		// Look for PLOY_GIT_PAT in the provided env.
+		pat := ""
+		for _, e := range env {
+			if strings.HasPrefix(e, "PLOY_GIT_PAT=") {
+				pat = strings.TrimPrefix(e, "PLOY_GIT_PAT=")
+				break
+			}
+		}
+		baseErr := fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))
+		return redactError(baseErr, pat)
 	}
 
 	return nil
 }
 
 // redactError replaces any occurrence of the PAT in error messages with [REDACTED].
+// It handles both literal PAT and URL-encoded variants.
 func redactError(err error, pat string) error {
 	if err == nil {
 		return nil
 	}
+	if pat == "" {
+		return err
+	}
+
 	msg := err.Error()
-	if pat != "" && strings.Contains(msg, pat) {
+	modified := false
+
+	// Redact literal PAT.
+	if strings.Contains(msg, pat) {
 		msg = strings.ReplaceAll(msg, pat, "[REDACTED]")
+		modified = true
+	}
+
+	// Redact URL-encoded PAT (e.g., in URLs or query strings).
+	// Common URL encoding characters that might appear: space->%20, @->%40, etc.
+	encodedPAT := strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")
+	if encodedPAT != pat && strings.Contains(msg, encodedPAT) {
+		msg = strings.ReplaceAll(msg, encodedPAT, "[REDACTED]")
+		modified = true
+	}
+
+	if modified {
 		return fmt.Errorf("%s", msg)
 	}
 	return err

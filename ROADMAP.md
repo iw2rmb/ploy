@@ -86,7 +86,7 @@ Phase F — Control-plane default and precedence
 
 Phase G — Hardening and UX
 
-- [ ] PAT redaction
+- [x] PAT redaction
     - Ensure any error output excludes token (both CLI and node logs)
     - File: internal/nodeagent/gitlab/mr_client.go; internal/nodeagent/git/git_push.go (wrap errors)
 - [ ] Timeouts and retries

@@ -58,7 +58,7 @@ type MRCreateResponse struct {
 // Returns the MR URL on success.
 func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, error) {
 	if err := validateMRCreateRequest(req); err != nil {
-		return "", fmt.Errorf("invalid request: %w", err)
+		return "", redactError(fmt.Errorf("invalid request: %w", err), req.PAT)
 	}
 
 	// Construct GitLab API URL.
@@ -87,13 +87,13 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal request: %w", err)
+		return "", redactError(fmt.Errorf("marshal request: %w", err), req.PAT)
 	}
 
 	// Create HTTP request.
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("create request: %w", err)
+		return "", redactError(fmt.Errorf("create request: %w", err), req.PAT)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
@@ -157,13 +157,33 @@ func validateMRCreateRequest(req MRCreateRequest) error {
 }
 
 // redactError replaces any occurrence of the PAT in error messages with [REDACTED].
+// It handles both literal PAT and URL-encoded variants.
 func redactError(err error, pat string) error {
 	if err == nil {
 		return nil
 	}
+	if pat == "" {
+		return err
+	}
+
 	msg := err.Error()
-	if pat != "" && strings.Contains(msg, pat) {
+	modified := false
+
+	// Redact literal PAT.
+	if strings.Contains(msg, pat) {
 		msg = strings.ReplaceAll(msg, pat, "[REDACTED]")
+		modified = true
+	}
+
+	// Redact URL-encoded PAT (e.g., in URLs or query strings).
+	// Common URL encoding characters that might appear: space->%20, @->%40, etc.
+	encodedPAT := strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")
+	if encodedPAT != pat && strings.Contains(msg, encodedPAT) {
+		msg = strings.ReplaceAll(msg, encodedPAT, "[REDACTED]")
+		modified = true
+	}
+
+	if modified {
 		return fmt.Errorf("%s", msg)
 	}
 	return err
