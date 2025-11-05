@@ -34,7 +34,7 @@ Phase B — Server config surface (store PAT Ploy‑wide)
 
 Phase C — CLI admin (store/show/validate)
 
-- [ ] CLI: ploy config gitlab set/show/validate
+- [x] CLI: ploy config gitlab set/show/validate
     - Files: cmd/ploy/config_gitlab.go (new)
         - set: reads JSON {domain, token}, calls PUT /v1/config/gitlab
         - show: GET /v1/config/gitlab (redact token)

@@ -38,6 +38,8 @@ func execute(args []string, stderr io.Writer) error {
 				printServerUsage(stderr)
 			case "rollout":
 				printRolloutUsage(stderr)
+			case "config":
+				printConfigUsage(stderr)
 			default:
 				printUsage(stderr)
 			}
@@ -64,6 +66,8 @@ func execute(args []string, stderr io.Writer) error {
 		return handleNode(args[1:], stderr)
 	case "rollout":
 		return handleRollout(args[1:], stderr)
+	case "config":
+		return handleConfig(args[1:], stderr)
 
 	default:
 		printUsage(stderr)
