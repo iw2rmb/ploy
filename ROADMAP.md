@@ -59,7 +59,7 @@ Phase E — Node push + MR on terminal
         - gitlab_domain (string, optional)
         - mr_on_success (bool), mr_on_fail (bool)
     - File: internal/nodeagent/manifest.go → keep options (no log)
-- [ ] Push branch from node (minimal)
+- [x] Push branch from node (minimal)
     - File: internal/nodeagent/git/git_push.go (new)
         - Prefer GIT_ASKPASS for PAT; do not embed token in remote URL
         - git config user.name/user.email; git push origin <target_ref>
