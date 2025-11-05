@@ -109,6 +109,46 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	}
 }
 
+func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
+	// Arrange a fake config endpoint with a short token.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" || r.URL.Path != "/v1/config/gitlab" {
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"domain": "https://gitlab.example.com",
+			"token":  "short",
+		})
+	}))
+	defer srv.Close()
+
+	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+
+	buf := &bytes.Buffer{}
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = oldStdout }()
+
+	err := handleConfigGitLabShow(nil, buf)
+
+	w.Close()
+	var capturedOutput bytes.Buffer
+	_, _ = io.Copy(&capturedOutput, r)
+
+	if err != nil {
+		t.Fatalf("handleConfigGitLabShow error: %v", err)
+	}
+	out := capturedOutput.String()
+	if strings.Contains(out, "short") {
+		t.Fatalf("token must be redacted for short tokens, got: %q", out)
+	}
+	if !strings.Contains(out, "Token:  ***") {
+		t.Fatalf("expected redaction marker, got: %q", out)
+	}
+}
+
 func TestHandleConfigGitLabShowRejectsExtraArgs(t *testing.T) {
 	buf := &bytes.Buffer{}
 	err := handleConfigGitLabShow([]string{"extra"}, buf)
@@ -376,6 +416,56 @@ func TestHandleConfigGitLabValidateFailure(t *testing.T) {
 				t.Fatalf("expected %q in error, got: %v", tt.expectedErr, err)
 			}
 		})
+	}
+}
+
+func TestValidateGitLabConfigURLRules(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     *gitLabConfigPayload
+		wantErr string
+	}{
+		{name: "no scheme", cfg: &gitLabConfigPayload{Domain: "gitlab.com", Token: "x"}, wantErr: "domain must use http or https scheme"},
+		{name: "ftp scheme", cfg: &gitLabConfigPayload{Domain: "ftp://gitlab.com", Token: "x"}, wantErr: "domain must use http or https scheme"},
+		{name: "empty host", cfg: &gitLabConfigPayload{Domain: "https://", Token: "x"}, wantErr: "domain host is required"},
+		{name: "http allowed", cfg: &gitLabConfigPayload{Domain: "http://gitlab.local", Token: "x"}, wantErr: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateGitLabConfig(tt.cfg)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			} else {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+				}
+			}
+		})
+	}
+}
+
+func TestHandleConfigGitLabSetServerError(t *testing.T) {
+	// Valid config file
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "gitlab.json")
+	configJSON := []byte(`{"domain":"https://gitlab.example.com","token":"glpat-err"}`)
+	if err := os.WriteFile(configPath, configJSON, 0o600); err != nil {
+		t.Fatalf("write test config: %v", err)
+	}
+
+	// Server responds with error
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "bad", http.StatusBadRequest)
+	}))
+	defer srv.Close()
+	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+
+	buf := &bytes.Buffer{}
+	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)
+	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad") {
+		t.Fatalf("expected server error, got: %v", err)
 	}
 }
 

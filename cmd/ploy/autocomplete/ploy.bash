@@ -47,7 +47,7 @@ _ploy_completions() {
             return 0
         fi
         if [[ $COMP_CWORD -eq 3 && "${COMP_WORDS[2]}" == "gitlab" ]]; then
-            COMPREPLY=( $(compgen -W "show set validate status rotate" -- "$cur") )
+            COMPREPLY=( $(compgen -W "show set validate" -- "$cur") )
             return 0
         fi
         ;;

@@ -102,8 +102,6 @@ _ploy() {
                             commands+=("show:show [--cluster-id <id>] - Display the current GitLab configuration")
                             commands+=("set:set --file <path> [--cluster-id <id>] - Apply a GitLab configuration JSON file")
                             commands+=("validate:validate --file <path> - Validate a GitLab configuration without saving")
-                            commands+=("status:status [--limit <n>] [--cluster-id <id>] - Inspect signer health and recent rotation audit entries")
-                            commands+=("rotate:rotate --secret <name> --api-key <token> [--cluster-id <id>] - Rotate a GitLab secret and trigger node refresh")
                             _describe 'config gitlab command' commands && ret=0
                             ;;
                     esac
