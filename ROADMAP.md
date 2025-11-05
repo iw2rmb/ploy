@@ -24,7 +24,7 @@ Phase B — Server config surface (store PAT Ploy‑wide)
 - [x] Types: GitLab config model
     - File: internal/server/config/types.go → add type GitLabConfig { Domain string; Token string } (Token in-memory only; serves as the global default)
     - File: internal/server/config/load.go → load from ployd.yaml gitlab: { domain, token? } (token optional)
-- [ ] API: GET/PUT /v1/config/gitlab (mTLS admin only)
+- [x] API: GET/PUT /v1/config/gitlab (mTLS admin only)
     - Files: internal/server/handlers/config_gitlab.go (new); cmd/ployd/server.go hook
     - OpenAPI: docs/api/paths/config_gitlab.yaml (new)
     - Tests: cmd/ploy/server_deploy_*_test.go (round-trip encode/decode stubs)
