@@ -16,6 +16,7 @@ complete -c ploy -n "__fish_seen_subcommand_from mod" -a 'cancel' -d 'Cancel a M
 complete -c ploy -n "__fish_seen_subcommand_from mod" -a 'resume' -d 'Resume a paused Mods ticket'
 complete -c ploy -n "__fish_seen_subcommand_from mod" -a 'inspect' -d 'Show summary for a Mods ticket'
 complete -c ploy -n "__fish_seen_subcommand_from mod" -a 'artifacts' -d 'List ticket artifacts by stage'
+complete -c ploy -n "__fish_seen_subcommand_from mod" -a 'diffs' -d 'List diffs or download newest patch'
 complete -c ploy -n "__fish_seen_subcommand_from mods" -a 'logs' -d 'logs <ticket> - Stream Mods logs via SSE (raw|structured formats, auto-retry)'
 complete -c ploy -n "__fish_seen_subcommand_from runs" -a 'follow' -d 'follow <run-id> - Follow run logs via SSE with retry semantics'
 complete -c ploy -n "__fish_seen_subcommand_from runs" -a 'inspect' -d 'Show details for a run'

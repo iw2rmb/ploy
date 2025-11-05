@@ -32,6 +32,7 @@ _ploy() {
                     commands+=("resume:Resume a paused Mods ticket")
                     commands+=("inspect:Show summary for a Mods ticket")
                     commands+=("artifacts:List ticket artifacts by stage")
+                    commands+=("diffs:List diffs or download newest patch")
                     _describe 'mod command' commands && ret=0
                     ;;
                 'mods')

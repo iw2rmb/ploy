@@ -13,7 +13,7 @@ _ploy_completions() {
     case "${COMP_WORDS[1]}" in
     "mod")
         if [[ $COMP_CWORD -eq 2 ]]; then
-            COMPREPLY=( $(compgen -W "run cancel resume inspect artifacts" -- "$cur") )
+            COMPREPLY=( $(compgen -W "run cancel resume inspect artifacts diffs" -- "$cur") )
             return 0
         fi
         ;;

@@ -254,3 +254,29 @@ pki:
 		})
 	}
 }
+
+func TestLoadConfigGitLabUnknownFieldFails(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ployd.yaml")
+	raw := `
+control_plane:
+  endpoint: https://control.example.com
+  ca: /etc/ploy/pki/ca.pem
+  certificate: /etc/ploy/pki/node.pem
+  key: /etc/ploy/pki/node-key.pem
+pki:
+  bundle_dir: /etc/ploy/pki
+gitlab:
+  domain: https://gitlab.example.com
+  extra: should_fail
+`
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("Load() succeeded, want error for unknown gitlab.extra field")
+	}
+}
