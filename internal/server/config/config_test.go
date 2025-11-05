@@ -423,6 +423,33 @@ gitlab:
 	}
 }
 
+// Absolute path resolution for gitlab.token_file should be accepted as-is.
+func TestLoadConfigGitLabTokenFile_AbsolutePath(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "ployd.yaml")
+	tokenPath := filepath.Join(dir, "token-abs")
+
+	if err := os.WriteFile(tokenPath, []byte("glpat-abs-path"), 0o600); err != nil {
+		t.Fatalf("write token file: %v", err)
+	}
+
+	configYAML := "\ncontrol_plane:\n  endpoint: https://control.example.com\n  ca: /etc/ploy/pki/ca.pem\n  certificate: /etc/ploy/pki/node.pem\n  key: /etc/ploy/pki/node-key.pem\npki:\n  bundle_dir: /etc/ploy/pki\ngitlab:\n  domain: https://gitlab.example.com\n  token_file: " + tokenPath + "\n"
+	if err := os.WriteFile(configPath, []byte(configYAML), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if got, want := cfg.GitLab.Token, "glpat-abs-path"; got != want {
+		t.Errorf("GitLab.Token = %q, want %q (absolute path)", got, want)
+	}
+}
+
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
