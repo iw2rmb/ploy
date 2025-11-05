@@ -72,6 +72,23 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		retain = b
 	}
 
+	// Extract GitLab-related options that will be consumed by later phases.
+	// These options are: gitlab_pat, gitlab_domain, mr_on_success, mr_on_fail.
+	// We store them in the manifest Options field without logging them.
+	gitlabOpts := make(map[string]any)
+	if pat, ok := req.Options["gitlab_pat"].(string); ok && strings.TrimSpace(pat) != "" {
+		gitlabOpts["gitlab_pat"] = strings.TrimSpace(pat)
+	}
+	if domain, ok := req.Options["gitlab_domain"].(string); ok && strings.TrimSpace(domain) != "" {
+		gitlabOpts["gitlab_domain"] = strings.TrimSpace(domain)
+	}
+	if mrSuccess, ok := req.Options["mr_on_success"].(bool); ok {
+		gitlabOpts["mr_on_success"] = mrSuccess
+	}
+	if mrFail, ok := req.Options["mr_on_fail"].(bool); ok {
+		gitlabOpts["mr_on_fail"] = mrFail
+	}
+
 	manifest := contracts.StepManifest{
 		ID:         req.RunID,
 		Name:       fmt.Sprintf("Run %s", req.RunID),
@@ -94,6 +111,7 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 			RetainContainer: retain,
 			TTL:             "1h",
 		},
+		Options: gitlabOpts,
 	}
 
 	return manifest, nil

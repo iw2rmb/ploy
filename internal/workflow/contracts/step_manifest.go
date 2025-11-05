@@ -35,6 +35,9 @@ type StepManifest struct {
 	Shift     *StepShiftSpec
 	Resources StepResourceSpec
 	Retention StepRetentionSpec
+	// Options holds arbitrary run-specific options (e.g., GitLab PAT, MR flags).
+	// This field is not validated and values are never logged.
+	Options map[string]any
 }
 
 // StepInputMode describes how the input is mounted into the container.

@@ -326,6 +326,96 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("gitlab options are extracted and stored in manifest", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-789",
+			RepoURL: "https://github.com/example/repo.git",
+			Options: map[string]any{
+				"gitlab_pat":       "glpat-secret-token",
+				"gitlab_domain":    "gitlab.example.com",
+				"mr_on_success":    true,
+				"mr_on_fail":       false,
+				"retain_container": true,
+			},
+		}
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Verify GitLab options are stored in manifest.Options.
+		if manifest.Options == nil {
+			t.Fatal("expected Options to be set")
+		}
+		if pat, ok := manifest.Options["gitlab_pat"].(string); !ok || pat != "glpat-secret-token" {
+			t.Errorf("expected gitlab_pat=glpat-secret-token, got %v", manifest.Options["gitlab_pat"])
+		}
+		if domain, ok := manifest.Options["gitlab_domain"].(string); !ok || domain != "gitlab.example.com" {
+			t.Errorf("expected gitlab_domain=gitlab.example.com, got %v", manifest.Options["gitlab_domain"])
+		}
+		if mrSuccess, ok := manifest.Options["mr_on_success"].(bool); !ok || !mrSuccess {
+			t.Errorf("expected mr_on_success=true, got %v", manifest.Options["mr_on_success"])
+		}
+		if mrFail, ok := manifest.Options["mr_on_fail"].(bool); !ok || mrFail {
+			t.Errorf("expected mr_on_fail=false, got %v", manifest.Options["mr_on_fail"])
+		}
+	})
+
+	t.Run("gitlab options are trimmed and only included when non-empty", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-890",
+			RepoURL: "https://github.com/example/repo.git",
+			Options: map[string]any{
+				"gitlab_pat":    "  trimmed-token  ",
+				"gitlab_domain": "",
+				"mr_on_success": true,
+			},
+		}
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		if manifest.Options == nil {
+			t.Fatal("expected Options to be set")
+		}
+		// PAT should be trimmed.
+		if pat, ok := manifest.Options["gitlab_pat"].(string); !ok || pat != "trimmed-token" {
+			t.Errorf("expected gitlab_pat=trimmed-token (trimmed), got %v", manifest.Options["gitlab_pat"])
+		}
+		// Empty domain should not be stored.
+		if _, exists := manifest.Options["gitlab_domain"]; exists {
+			t.Errorf("expected gitlab_domain to be omitted when empty")
+		}
+		// mr_on_success should be stored.
+		if mrSuccess, ok := manifest.Options["mr_on_success"].(bool); !ok || !mrSuccess {
+			t.Errorf("expected mr_on_success=true, got %v", manifest.Options["mr_on_success"])
+		}
+		// mr_on_fail should not be stored if not provided.
+		if _, exists := manifest.Options["mr_on_fail"]; exists {
+			t.Errorf("expected mr_on_fail to be omitted when not provided")
+		}
+	})
+
+	t.Run("no gitlab options results in empty Options map", func(t *testing.T) {
+		req := StartRunRequest{
+			RunID:   "run-901",
+			RepoURL: "https://github.com/example/repo.git",
+			Options: map[string]any{
+				"image": "alpine:latest",
+			},
+		}
+		manifest, err := buildManifestFromRequest(req)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Options should be empty when no GitLab options are provided.
+		if len(manifest.Options) != 0 {
+			t.Errorf("expected empty Options when no GitLab options provided, got %v", manifest.Options)
+		}
+	})
 }
 
 func TestWorkspaceLifecycle(t *testing.T) {
