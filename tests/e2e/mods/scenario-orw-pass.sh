@@ -21,7 +21,11 @@ ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/mod-orw}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
+# Use a deterministic ticket to allow post-run inspection.
+TICKET="mods-mr-pass-${TS}"
+
 dist/ploy mod run \
+  --ticket "$TICKET" \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
@@ -34,6 +38,9 @@ dist/ploy mod run \
   --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}"
+
+# Print MR URL if present in ticket metadata.
+dist/ploy mod inspect "$TICKET" || true
 
 echo "OK: orw-pass scenario"
 echo "Artifacts saved to: ${ARTIFACT_DIR}"
