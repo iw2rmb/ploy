@@ -8,6 +8,17 @@ import (
 )
 
 // StartRunRequest describes a run start request from the server.
+//
+// Options keys (slice E — per-run GitLab/MR wiring):
+//   - "gitlab_pat" (string, optional) — PAT override for this run (never log).
+//   - "gitlab_domain" (string, optional) — GitLab domain override.
+//   - "mr_on_success" (bool) — create MR on success when true.
+//   - "mr_on_fail" (bool) — create MR on failure when true.
+//
+// Other options currently honoured by the node for execution shaping:
+//   - "image" (string) — container image to run (optional; default ubuntu:latest).
+//   - "command" (string|[]string) — container command override.
+//   - "retain_container" (bool) — retain container after run for debugging.
 type StartRunRequest struct {
 	RunID     string            `json:"run_id"`
 	RepoURL   string            `json:"repo_url"`
