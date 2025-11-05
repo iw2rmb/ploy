@@ -33,21 +33,21 @@ func NewArtifactUploader(cfg Config) (*ArtifactUploader, error) {
 }
 
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID string, paths []string, name string) error {
+func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID string, paths []string, name string) (string, string, error) {
 	if len(paths) == 0 {
-		return nil // Nothing to upload.
+		return "", "", nil // Nothing to upload.
 	}
 
 	// Create tar.gz bundle from the specified paths.
 	bundleBytes, err := createTarGzBundle(paths)
 	if err != nil {
-		return fmt.Errorf("create tar.gz bundle: %w", err)
+		return "", "", fmt.Errorf("create tar.gz bundle: %w", err)
 	}
 
 	// Check size cap (≤ 1 MiB gzipped).
 	const maxBundleSize = 1 << 20 // 1 MiB
 	if len(bundleBytes) > maxBundleSize {
-		return fmt.Errorf("gzipped artifact bundle exceeds size cap: %d > %d bytes", len(bundleBytes), maxBundleSize)
+		return "", "", fmt.Errorf("gzipped artifact bundle exceeds size cap: %d > %d bytes", len(bundleBytes), maxBundleSize)
 	}
 
 	// Build request payload.
@@ -61,7 +61,7 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID st
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal request: %w", err)
+		return "", "", fmt.Errorf("marshal request: %w", err)
 	}
 
 	// Construct URL.
@@ -70,24 +70,28 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID st
 	// Create HTTP request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return "", "", fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	// Send request.
 	resp, err := u.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("send request: %w", err)
+		return "", "", fmt.Errorf("send request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Check response status.
 	if resp.StatusCode != http.StatusCreated {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+		return "", "", fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
-
-	return nil
+	var out struct {
+		ArtifactBundleID string `json:"artifact_bundle_id"`
+		CID              string `json:"cid"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	return out.ArtifactBundleID, out.CID, nil
 }
 
 // createTarGzBundle creates a gzipped tar archive from the given file paths.

@@ -139,11 +139,15 @@ Follow‑up runs and confirmations:
   - `GET /v1/mods/{id}/diffs` — list per‑run diffs; `GET /v1/diffs/{id}?download=true` — download gzipped patch.
   - CLI: `ploy mod diffs <ticket> [--download] [--output <file>]`.
 
-Current gaps vs test goals:
+Decision — Build Gate metrics collection:
+- Chosen approach: in‑process collection in node agent (Docker stats/inspect) rather than cAdvisor.
+- Rationale: per‑run, low‑overhead, tight correlation to `run_id`, no extra daemon.
+- If we expand to fleet/continuous metrics later, revisit cAdvisor/Prometheus.
+
+Current gaps vs test goals (with latest collector changes):
 1) Build Gate confirmation — We execute the Java build gate (`mvn test`) inside the node runner (Docker). Timings are persisted in run `stats` (`build_gate_duration_ms`), but `GET /v1/mods/{id}` does not expose `stats` yet.
-   - Evidence now: runs that succeed did not report gate errors; container exited 0; end‑to‑end timings uploaded (DB `runs.stats`).
-   - To make this testable via API/CLI, expose `stats` in `GET /v1/mods/{id}` (or add `GET /v1/mods/{id}/stats`) and print "Gate: passed in X ms" in CLI.
-   - Optional: attach a small `build-gate.log` artifact or emit SSE lines from gate executor.
+   - Implemented on node side: collect build logs, pass/fail, duration, resource limits and usage; upload `build-gate.log` as artifact (≤256 KiB) tied to `run_id`/`stage_id`; record all metrics under `runs.stats.gate` (limits+usage+duration+passed).
+   - Remaining: expose `runs.stats` (or just `runs.stats.gate`) via `GET /v1/mods/{id}` or a new `GET /v1/mods/{id}/stats`; print in CLI.
 2) GitLab MR — Branch push + MR creation not wired yet (PAT handling is TODO per docs).
    - Minimal path: accept PAT (CLI flag `--gitlab-pat` or env `PLOY_GITLAB_PAT`), propagate securely to the node runner, then:
      - `git config user.*`, ensure branch exists (create or reuse target ref), `git push` with PAT, call GitLab REST to open MR (store MR URL in ticket `metadata` and print in CLI).
@@ -165,6 +169,14 @@ Current gaps vs test goals:
   - Update server binary on 45.9.42.212 and restart.
   - Then: `dist/ploy mod diffs <ticket> --download > changes.patch` to fetch the patch.
 - Mod coords usage clarified in docs: env‑only (no JSON spec for coords).
+
+Next commits landing in lab (already rolled for server endpoints):
+- Server: diffs list/download handlers; artifact upload response now includes `cid`.
+- CLI: `mod diffs` command; `--mod-command` accepts JSON array.
+
+Open items to close the test:
+- Expose `runs.stats.gate` in status API and print in CLI (`mod inspect`).
+- GitLab MR path (PAT ingestion + push + `merge_requests` create; surface MR URL).
 
 Proposal (required to proceed):
 - Undrain at least worker‑b to allow claims, then re‑run the retained ORW probe.

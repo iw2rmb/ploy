@@ -47,6 +47,11 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 	// container exits. We handle explicit deletion in the runner based on
 	// manifest retention settings.
 	hostCfg := &container.HostConfig{AutoRemove: false, Mounts: convertMounts(spec.Mounts)}
+	// Apply optional resource limits when provided (0 => unlimited).
+	if spec.LimitNanoCPUs > 0 || spec.LimitMemoryBytes > 0 {
+		hostCfg.Resources.NanoCPUs = spec.LimitNanoCPUs
+		hostCfg.Resources.Memory = spec.LimitMemoryBytes
+	}
 	created, err := r.client.ContainerCreate(ctx, config, hostCfg, nil, nil, "")
 	if err != nil {
 		return ContainerHandle{}, fmt.Errorf("step: create container: %w", err)

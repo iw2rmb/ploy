@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -150,7 +151,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					_, _ = diffFile.Write(diffBytes)
 					_ = diffFile.Close()
 					if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
-						if errU := artUploader.UploadArtifact(ctx, req.RunID, stageID, []string{diffFile.Name()}, "diff"); errU != nil {
+						if _, _, errU := artUploader.UploadArtifact(ctx, req.RunID, stageID, []string{diffFile.Name()}, "diff"); errU != nil {
 							slog.Warn("failed to upload diff artifact bundle", "run_id", req.RunID, "error", errU)
 						} else {
 							slog.Info("diff artifact bundle uploaded", "run_id", req.RunID)
@@ -196,7 +197,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				}
 
 				// Upload the artifact bundle to the server.
-				if err := artifactUploader.UploadArtifact(ctx, req.RunID, stageID, paths, artifactName); err != nil {
+				if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID, stageID, paths, artifactName); err != nil {
 					slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "error", err)
 				} else {
 					slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "paths", len(paths))
@@ -239,6 +240,44 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
 				"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
 			},
+		}
+
+		// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
+		if result.BuildGate != nil {
+			gate := map[string]any{
+				"duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
+			}
+			// Determine pass/fail
+			passed := false
+			if len(result.BuildGate.StaticChecks) > 0 {
+				passed = result.BuildGate.StaticChecks[0].Passed
+			}
+			gate["passed"] = passed
+			if ru := result.BuildGate.Resources; ru != nil {
+				gate["resources"] = map[string]any{
+					"limits": map[string]any{"nano_cpus": ru.LimitNanoCPUs, "memory_bytes": ru.LimitMemoryBytes},
+					"usage":  map[string]any{"cpu_total_ns": ru.CPUTotalNs, "mem_usage_bytes": ru.MemUsageBytes, "mem_max_bytes": ru.MemMaxBytes, "blkio_read_bytes": ru.BlkioReadBytes, "blkio_write_bytes": ru.BlkioWriteBytes, "size_rw_bytes": ru.SizeRwBytes},
+				}
+			}
+			// Upload build logs as artifact when present.
+			if s := strings.TrimSpace(result.BuildGate.LogsText); s != "" {
+				logFile, err := os.CreateTemp("", "ploy-gate-*.log")
+				if err == nil {
+					_, _ = logFile.WriteString(s)
+					_ = logFile.Close()
+					if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
+						stageID, _ := req.Options["stage_id"].(string)
+						if id, cid, uerr := artUploader.UploadArtifact(ctx, req.RunID, stageID, []string{logFile.Name()}, "build-gate.log"); uerr == nil {
+							gate["logs_artifact_id"] = id
+							gate["logs_bundle_cid"] = cid
+						} else {
+							slog.Warn("failed to upload build-gate.log", "run_id", req.RunID, "error", uerr)
+						}
+					}
+					_ = os.Remove(logFile.Name())
+				}
+			}
+			stats["gate"] = gate
 		}
 
 		// No runner-provided artifact CIDs (node agent uploads artifacts directly).
