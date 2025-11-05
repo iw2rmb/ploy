@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -177,20 +178,32 @@ func redactError(err error, pat string) error {
 	}
 
 	msg := err.Error()
-	modified := false
 
-	// Redact literal PAT.
-	if strings.Contains(msg, pat) {
-		msg = strings.ReplaceAll(msg, pat, "[REDACTED]")
-		modified = true
+	// Build a set of variants to redact: literal, query-escaped, path-escaped,
+	// and a minimal legacy replacement used in early code paths.
+	variants := map[string]struct{}{
+		pat: {},
 	}
+	if q := url.QueryEscape(pat); q != pat {
+		variants[q] = struct{}{}
+		// Some logs render spaces as %20 not "+"; include that form.
+		variants[strings.ReplaceAll(q, "+", "%20")] = struct{}{}
+	}
+	if p := url.PathEscape(pat); p != pat {
+		variants[p] = struct{}{}
+	}
+	// Legacy minimal encoding coverage.
+	variants[strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")] = struct{}{}
 
-	// Redact URL-encoded PAT (e.g., in URLs or query strings).
-	// Common URL encoding characters that might appear: space->%20, @->%40, etc.
-	encodedPAT := strings.ReplaceAll(strings.ReplaceAll(pat, " ", "%20"), "@", "%40")
-	if encodedPAT != pat && strings.Contains(msg, encodedPAT) {
-		msg = strings.ReplaceAll(msg, encodedPAT, "[REDACTED]")
-		modified = true
+	modified := false
+	for v := range variants {
+		if v == "" || v == msg {
+			continue
+		}
+		if strings.Contains(msg, v) {
+			msg = strings.ReplaceAll(msg, v, "[REDACTED]")
+			modified = true
+		}
 	}
 
 	if modified {
