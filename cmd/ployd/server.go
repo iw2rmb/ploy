@@ -106,8 +106,11 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 		return fmt.Errorf("create http server: %w", err)
 	}
 
+	// Initialize config holder for runtime configuration access.
+	configHolder := handlers.NewConfigHolder(cfg.GitLab)
+
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, eventsService)
+	handlers.RegisterRoutes(httpSrv, st, eventsService, configHolder)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{

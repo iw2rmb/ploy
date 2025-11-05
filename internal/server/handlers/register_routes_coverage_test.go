@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	httpapi "github.com/iw2rmb/ploy/internal/server/http"
 )
@@ -55,7 +56,8 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 			t.Fatalf("events: %v", err)
 		}
 		st := &mockStore{} // minimal store; handlers may still return 4xx
-		RegisterRoutes(srv, st, ev)
+		cfg := NewConfigHolder(config.GitLabConfig{})
+		RegisterRoutes(srv, st, ev, cfg)
 		return srv, ev
 	}
 
