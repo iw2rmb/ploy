@@ -62,7 +62,7 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 
 	// Upload artifact.
 	ctx := context.Background()
-	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1, file2}, "test-bundle")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1, file2}, "test-bundle")
 	if err != nil {
 		t.Fatalf("upload artifact: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestArtifactUploader_UploadArtifact_EmptyPaths(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{}, "test-bundle")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{}, "test-bundle")
 	if err != nil {
 		t.Errorf("expected no error for empty paths, got %v", err)
 	}
@@ -124,7 +124,7 @@ func TestArtifactUploader_UploadArtifact_ServerError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1}, "")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1}, "")
 	if err == nil {
 		t.Error("expected error when server returns 500")
 	}
@@ -314,7 +314,7 @@ func TestArtifactUploader_SizeCap(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{largeFile}, "")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{largeFile}, "")
 	if err == nil {
 		t.Error("expected error for oversized bundle")
 	}

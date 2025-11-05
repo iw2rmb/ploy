@@ -209,9 +209,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 
 		// Explicitly remove the container unless retention is requested.
 		if !req.Manifest.Retention.RetainContainer {
-			if err := r.Containers.Remove(ctx, handle); err != nil {
-				// Non-fatal; continue with gate/diff.
-			}
+			// Best-effort cleanup; ignore remove errors.
+			_ = r.Containers.Remove(ctx, handle)
 		}
 	}
 

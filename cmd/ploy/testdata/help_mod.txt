@@ -6,5 +6,6 @@ Commands:
   resume      Resume a paused Mods ticket
   inspect     Show summary for a Mods ticket
   artifacts   List ticket artifacts by stage
+  diffs       List diffs or download newest patch
 
 Use 'ploy mod run --help' for flag details.
