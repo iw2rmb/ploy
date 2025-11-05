@@ -46,6 +46,38 @@ Update this document as you go.
 
 ---
 
+## GitLab MR — Discovery (Phase A / Step 1)
+
+What I mined from repo history (prior MR paths):
+
+- Provider and HTTP shapes (commit e087bc49, 2025‑09‑05)
+  - File: `internal/git/provider/gitlab.go` (removed in da348c89).
+  - Endpoints used:
+    - GET `/_api/v4/projects/{project}/merge_requests?source_branch={branch}&state=opened` (check existing MR).
+    - POST `/_api/v4/projects/{project}/merge_requests` body `{title, description, source_branch, target_branch, labels}` (create MR).
+    - PUT  `/_api/v4/projects/{project}/merge_requests/{iid}` body `{title, description, target_branch, labels}` (update MR).
+  - Auth: `Authorization: Bearer <token>`; base URL from `GITLAB_URL` (default `https://gitlab.com`); token from `GITLAB_TOKEN`.
+  - Project path extraction: parsed repo HTTPS URL; trimmed leading `/` and `.git`.
+
+- Runner integration (same commit series)
+  - File: `internal/cli/transflow/runner.go` — after push, called `CreateOrUpdateMR`.
+  - MR title: `"Transflow: <workflow ID>"`.
+  - MR labels: `ploy, tfl` (CSV in request payload).
+  - MR description: rendered from template in `internal/mods/mr_template.go` (also existed under `internal/cli/transflow/mr_template.go`).
+  - Branch name template: `workflow/<id>/<timestamp>`.
+
+- Per‑run auth mapping (commit 48f4500f, 2025‑09‑20)
+  - File: `internal/mods/mr_auth.go` — mapped mod config `mr.token_env` to process env; set `PLOY_GITLAB_PAT` and `GITLAB_URL` for provider/git ops.
+
+- Control‑plane signer (removed)
+  - Files: `internal/config/gitlab/*`, `internal/api/httpserver/controlplane_signer.go`, docs under `docs/design/gitlab-*`.
+  - Provided AES‑key‑backed signer/rotation/revocation; deleted in pivot (docs/envs: "GitLab Signer (Removed)").
+
+Implications for current plan:
+- Request shapes and field names match GitLab v4; safe to reuse.
+- Title/description templates exist; can port minimal versions (rename Transflow → Ploy Mods).
+- Env names diverged historically (`GITLAB_TOKEN` vs `PLOY_GITLAB_PAT`). Plan should standardize on server‑stored PAT with per‑run override flag and map to provider without leaking to logs.
+
 ## Updates — 2025‑11‑04
 
 What I attempted (literal to Next Actions):
