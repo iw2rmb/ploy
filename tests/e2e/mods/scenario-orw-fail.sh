@@ -35,7 +35,10 @@ dist/ploy mod run \
   --mod-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
   --mr-fail \
   --follow \
-  --artifact-dir "${ARTIFACT_DIR}"
+  --artifact-dir "${ARTIFACT_DIR}" || true
+
+# Fetch artifacts explicitly (works regardless of success/failure).
+dist/ploy mod fetch --ticket "$TICKET" --artifact-dir "${ARTIFACT_DIR}" || true
 
 # Print MR URL if present in ticket metadata.
 dist/ploy mod inspect "$TICKET" || true
