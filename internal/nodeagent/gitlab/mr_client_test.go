@@ -323,6 +323,15 @@ func TestCreateMR_PATRedaction(t *testing.T) {
 				_, _ = w.Write([]byte(`{"message":"Invalid: token%40value"}`))
 			},
 		},
+		{
+			name: "url_encoded_slash_in_error",
+			pat:  "tok/en",
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusBadRequest)
+				// Simulate error where PAT slash is percent-encoded.
+				_, _ = w.Write([]byte(`{"message":"Invalid: tok%2Fen"}`))
+			},
+		},
 	}
 
 	for _, tt := range tests {

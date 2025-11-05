@@ -257,6 +257,12 @@ func TestRedactError(t *testing.T) {
 			pat:     "token@special",
 			wantMsg: "failed with [REDACTED] and [REDACTED]",
 		},
+		{
+			name:    "error with slash-encoded pat",
+			err:     &execError{msg: "failed: token%2Fvalue not allowed"},
+			pat:     "token/value",
+			wantMsg: "failed: [REDACTED] not allowed",
+		},
 	}
 
 	for _, tt := range tests {
