@@ -65,3 +65,34 @@ func TestModInspectShowsMRURL(t *testing.T) {
 		t.Fatalf("expected output to include MR URL; got %q", out)
 	}
 }
+
+func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
+	t.Helper()
+	ticket := "ticket-no-mr"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+			resp := modsapi.TicketStatusResponse{
+				Ticket: modsapi.TicketSummary{
+					TicketID: ticket,
+					State:    modsapi.TicketStateSucceeded,
+					// No metadata or empty metadata.
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+	buf := &bytes.Buffer{}
+	err := execute([]string{"mod", "inspect", ticket}, buf)
+	if err != nil {
+		t.Fatalf("mod inspect error: %v", err)
+	}
+	out := buf.String()
+	if bytes.Contains([]byte(out), []byte("MR:")) {
+		t.Fatalf("did not expect MR line when metadata missing; got %q", out)
+	}
+}
