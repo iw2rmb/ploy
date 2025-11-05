@@ -60,6 +60,9 @@ func (c InspectCommand) Run(ctx context.Context) error {
 	}
 	if c.Output != nil {
 		_, _ = fmt.Fprintf(c.Output, "Ticket %s: %s\n", strings.TrimSpace(payload.Ticket.TicketID), strings.ToLower(string(payload.Ticket.State)))
+		if mrURL, ok := payload.Ticket.Metadata["mr_url"]; ok && mrURL != "" {
+			_, _ = fmt.Fprintf(c.Output, "MR: %s\n", mrURL)
+		}
 	}
 	return nil
 }

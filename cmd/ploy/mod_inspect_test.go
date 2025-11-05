@@ -33,3 +33,35 @@ func TestModInspectPrintsSummary(t *testing.T) {
 		t.Fatalf("expected summary output to include ticket id; got %q", out)
 	}
 }
+
+func TestModInspectShowsMRURL(t *testing.T) {
+	t.Helper()
+	ticket := "ticket-mr-123"
+	mrURL := "https://gitlab.com/example/repo/-/merge_requests/42"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
+			resp := modsapi.TicketStatusResponse{
+				Ticket: modsapi.TicketSummary{
+					TicketID: ticket,
+					State:    modsapi.TicketStateSucceeded,
+					Metadata: map[string]string{"mr_url": mrURL},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+	buf := &bytes.Buffer{}
+	err := execute([]string{"mod", "inspect", ticket}, buf)
+	if err != nil {
+		t.Fatalf("mod inspect error: %v", err)
+	}
+	out := buf.String()
+	if !bytes.Contains([]byte(out), []byte("MR: "+mrURL)) {
+		t.Fatalf("expected output to include MR URL; got %q", out)
+	}
+}
