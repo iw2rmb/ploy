@@ -1,21 +1,28 @@
 GitLab MR Support (PAT storage + per-run overrides)
 
-Template: ../auto/ROADMAP.md
+Documents: CHECKPOINT.md
+
 Legend: [ ] todo, [x] done. Keep each step minimal and testable.
 
 Phase A — Discovery (Nomad-era prior art)
 
-- [ ] Mine history for prior MR code paths
-    - Commands (for reference): git log -S 'merge_requests' --all; git log -S 'gitlab' --all; git log --grep='GitLab|MR|merge' -p
-    - Artifact: short note in CHECKPOINT.md: file paths, request shapes, MR title templates
-- [ ] Confirm current sample repo/project ID and required API scopes
-    - File: tests/e2e/mods/README.md (repo URL)
-    - Output: list of endpoints used: projects/:id/merge_requests, pushes to https remotes
+- [x] Mine history for prior MR code paths
+    - Commands (used): git log -S 'merge_requests' --all; git log -S 'gitlab' --all; git log --grep='GitLab|MR|merge' -p
+    - Artifact: CHECKPOINT.md → “GitLab MR — Discovery (Phase A / Step 1)” (file paths, request shapes, MR templates)
+    - Summary:
+      - Endpoints: GET /api/v4/projects/{project}/merge_requests?source_branch=…&state=opened; POST /api/v4/projects/{project}/merge_requests; PUT /api/v4/projects/{project}/merge_requests/{iid}
+      - Auth: Authorization: Bearer <token>; base from env GITLAB_URL (default https://gitlab.com)
+      - Templates: MR title “Transflow: <id>”, labels ploy,tfl, description template present; branch pattern workflow/<id>/<ts>
+      - Env drift: historical GITLAB_TOKEN vs current PLOY_GITLAB_PAT override
+- [x] Confirm sample repo/project path and token policy
+    - Repo: tests/e2e/mods/README.md canonical URL.
+    - Token policy: use a single global PAT stored on the control plane by default for any ploy mod run; per-run PAT (flag) is optional and overrides the global token when provided. No project-scoped tokens or scope minimization in this slice.
+    - Output: list of endpoints used (merge_requests, https push) and the precedence note above.
 
 Phase B — Server config surface (store PAT Ploy‑wide)
 
 - [ ] Types: GitLab config model
-    - File: internal/server/config/types.go → add type GitLabConfig { Domain string; Token string } (Token in-memory only)
+    - File: internal/server/config/types.go → add type GitLabConfig { Domain string; Token string } (Token in-memory only; serves as the global default)
     - File: internal/server/config/load.go → load from ployd.yaml gitlab: { domain, token? } (token optional)
 - [ ] API: GET/PUT /v1/config/gitlab (mTLS admin only)
     - Files: internal/server/handlers/config_gitlab.go (new); cmd/ployd/server.go hook
@@ -32,7 +39,7 @@ Phase C — CLI admin (store/show/validate)
         - set: reads JSON {domain, token}, calls PUT /v1/config/gitlab
         - show: GET /v1/config/gitlab (redact token)
         - validate: local JSON schema only (no network)
-    - Autocomplete already lists “config gitlab”; wire handlers
+    - Autocomplete already lists “config gitlab”; wire handlers (exclude legacy status/rotate for now)
     - Tests: cmd/ploy/testdata/config_gitlab_usage.txt; unit tests in cmd/ploy
 
 Phase D — Per‑run overrides (flags → options)
@@ -40,6 +47,7 @@ Phase D — Per‑run overrides (flags → options)
 - [ ] mod run flags
     - Flags: --gitlab-pat, --gitlab-domain, --mr-success, --mr-fail
     - File: cmd/ploy/mod_run.go (add flags; validate; add to Spec payload if set)
+    - Precedence: per-run PAT/domain flags override the server’s global token/domain; otherwise the global token is used.
     - Security: never print PAT; ensure not written to artifact manifests
     - Tests: cmd/ploy/mod_run_new_test.go extend to assert flags in Spec (redacted in logs)
 
@@ -53,9 +61,9 @@ Phase E — Node push + MR on terminal
     - File: internal/nodeagent/manifest.go → keep options (no log)
 - [ ] Push branch from node (minimal)
     - File: internal/nodeagent/git/git_push.go (new)
-        - Build https remote with PAT: https://oauth2:<token>@<domain>/<path>.git
+        - Prefer GIT_ASKPASS for PAT; do not embed token in remote URL
         - git config user.name/user.email; git push origin <target_ref>
-        - Do not persist PAT to disk; use env GIT_ASKPASS wrapper that echoes token from env
+        - Do not persist PAT to disk; ensure tokens never appear in logs
     - Tests: internal/nodeagent/git/git_push_test.go (use local git daemon or mock exec)
 - [ ] Create MR via GitLab API (server‑side preferred; minimal: node)
     - Minimal (node): internal/nodeagent/gitlab/mr_client.go (new)
@@ -68,11 +76,11 @@ Phase E — Node push + MR on terminal
             - redact token; clear env before return
     - Tests: internal/nodeagent/agent_test.go add MR path happy/error cases (httptest)
 
-Phase F — Control-plane fallback and policy
+Phase F — Control-plane default and precedence
 
-- [ ] Server fallback: supply PAT/domain to node at claim time
-    - File: internal/server/handlers/claims.go adds config hint in StartRun payload when user didn’t pass PAT
-    - Security: only when server config has token; else MR step is skipped unless per-run PAT supplied
+- [ ] Server default token: supply PAT/domain to node at claim time when a global token is configured
+    - File: internal/server/handlers/claims.go adds config hint in StartRun payload (always include when global token is set and per-run is absent)
+    - Precedence: per-run PAT (if set) wins; otherwise use the server global token. If neither exists, skip MR.
 - [ ] CLI inspect shows MR URL
     - File: internal/cli/mods/inspect.go (new or extend) parses TicketStatusResponse.Ticket.Metadata["mr_url"]; prints “MR: <url>”
 
@@ -103,6 +111,7 @@ Notes and references
 - Uploaders: reuse internal/nodeagent/statusuploader.go to attach MR URL to ticket metadata (opaque map).
 - CLI flags living examples: cmd/ploy/mod_run.go (add parsers near existing mod-env, mod-image).
 - Security: never persist PAT to /etc/ploy; prefer token_file or control-plane memory; never echo PAT in logs.
+- Discovery details: see CHECKPOINT.md → “GitLab MR — Discovery (Phase A / Step 1)”.
 
 Acceptance (minimal slice)
 
