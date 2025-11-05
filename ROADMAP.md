@@ -53,7 +53,7 @@ Phase D — Per‑run overrides (flags → options)
 
 Phase E — Node push + MR on terminal
 
-- [ ] Wire run options → manifest → node
+- [x] Wire run options → manifest → node
     - File: internal/nodeagent/handlers.go StartRunRequest.Options expects:
         - gitlab_pat (string, optional)
         - gitlab_domain (string, optional)
