@@ -26,9 +26,16 @@ defaults change, or components adopt additional configuration.
 - `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL when cached descriptors do not yet
   embed the endpoint (new workstation) or you need to target a secondary cluster explicitly. Descriptors discovered via
   `ploy server deploy` or `ploy node add` remain the default for CLI calls.
-- `PLOY_BUILDGATE_JAVA_IMAGE` — Optional override for the Docker image used by the
-  Java build gate executor when Gradle/Maven wrappers are not present in the workspace.
-  Defaults to `maven:3-eclipse-temurin-17`.
+- `PLOY_BUILDGATE_IMAGE` — Optional unified override for the Docker image used by the
+  Build Gate executor for any stack. When set, it takes precedence over language‑specific
+  defaults. Commands still auto‑select by workspace (Maven vs Gradle).
+- `PLOY_BUILDGATE_PROFILE` — Optional gate profile selector. Allowed explicit values:
+  `java`, `java-maven`, `java-gradle`. When unset/unknown, auto-detects: pom.xml → maven,
+  build.gradle(.kts) → gradle, else plain `java`.
+- `PLOY_BUILDGATE_JAVA_IMAGE` — Deprecated legacy override for Maven projects. Defaults to
+  `maven:3-eclipse-temurin-17` when neither `PLOY_BUILDGATE_IMAGE` nor this value is set.
+- `PLOY_BUILDGATE_GRADLE_IMAGE` — Deprecated legacy override for Gradle projects. Defaults to
+  `gradle:8.8-jdk17` when neither `PLOY_BUILDGATE_IMAGE` nor this value is set.
 - `PLOY_CONFIG_HOME` — Optional override for the base directory where cluster descriptors
   are stored. When unset, the CLI falls back to `XDG_CONFIG_HOME/ploy` or `~/.config/ploy`.
   Priority: `PLOY_CONFIG_HOME` → `XDG_CONFIG_HOME/ploy` → `~/.config/ploy`.
@@ -244,3 +251,18 @@ The following variables are **no longer consumed** by the codebase after the Pos
 - [README.md](../../README.md) — Server/node pivot architecture
 - See `CHANGELOG.md` for migration status and recent slices
 - [docs/how-to/deploy-a-cluster.md](../how-to/deploy-a-cluster.md) — Deployment guide
+
+## Build Gate Limits
+
+The Build Gate executor supports optional resource limits via environment variables on worker nodes:
+
+- `PLOY_BUILDGATE_LIMIT_MEMORY_BYTES` — Memory limit for the gate container. Supports human suffixes
+  such as `768MiB`, `1G`, or plain bytes. Parsed with Docker's units parser.
+- `PLOY_BUILDGATE_LIMIT_DISK_SPACE` — Disk/quota limit for the gate container's writable layer. Supports
+  human suffixes (e.g., `2G`). Passed to Docker as the storage option `size` (driver dependent; requires
+  overlay2 with xfs project quotas or equivalent). When unsupported by the driver, container creation may fail.
+- `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU limit in millicores (e.g., `500` = 0.5 CPU, `1500` = 1.5 CPU).
+
+Notes:
+- When both `PLOY_BUILDGATE_IMAGE` and a language default apply, `PLOY_BUILDGATE_IMAGE` wins.
+- Memory and disk limits accept human‑friendly suffixes; CPU uses numeric millicores only.
