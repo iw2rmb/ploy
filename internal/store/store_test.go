@@ -22,12 +22,7 @@ func TestNewStore(t *testing.T) {
 	}
 	defer store.Close()
 
-	// Verify we can call a basic query.
-	_, err = store.GetCluster(ctx)
-	if err != nil {
-		// It's okay if the cluster doesn't exist yet; we're just testing connectivity.
-		t.Logf("GetCluster returned error (expected if DB is empty): %v", err)
-	}
+	// Connectivity verified by running migrations in NewStore; no cluster table anymore.
 }
 
 // TestNewStore_InvalidDSN verifies that Store creation fails gracefully with an invalid DSN.

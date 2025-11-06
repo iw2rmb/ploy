@@ -610,6 +610,7 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	clusterID := "test-cluster-refresh"
 	now := time.Now()
@@ -716,6 +717,7 @@ func TestRefreshAdminCertFromServerServerError(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	// Minimal descriptor with cluster ID set and no TLS paths.
 	clusterID := "test-cluster-error"
@@ -752,6 +754,7 @@ func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	clusterID := "test-cluster-invalid-json"
 	desc := config.Descriptor{ClusterID: clusterID, Address: "https://127.0.0.1:8443", Scheme: "https"}
@@ -787,6 +790,7 @@ func TestHandleRefreshAdminCertMissingClusterID(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	// Manually craft a malformed descriptor with empty cluster_id and set as default.
 	clusters := filepath.Join(tmpDir, "clusters")

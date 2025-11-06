@@ -217,11 +217,10 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	}
 
 	// Save cluster descriptor locally.
-	serverAddress, _ := controlplane.BaseURLFromDescriptor(config.Descriptor{Address: cfg.Address, Scheme: "https"})
+	serverAddress, _ := controlplane.BaseURLFromDescriptor(config.Descriptor{Address: cfg.Address})
 	desc := config.Descriptor{
 		ClusterID:       clusterID,
 		Address:         serverAddress,
-		Scheme:          "https",
 		SSHIdentityPath: identityPath,
 	}
 	// Write local mTLS bundle for the default descriptor (only if not reusing)

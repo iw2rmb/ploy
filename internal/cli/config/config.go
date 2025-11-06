@@ -47,6 +47,12 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 
 // SetDefault records the default cluster id.
 func SetDefault(clusterID string) error {
+	// Optional guard to avoid mutating the real default in shared environments
+	// (e.g., during higher-level test suites). When set to a non-empty value,
+	// this function becomes a no-op.
+	if os.Getenv("PLOY_NO_DEFAULT_MUTATION") != "" {
+		return nil
+	}
 	dir, err := clustersDir()
 	if err != nil {
 		return err
@@ -55,6 +61,21 @@ func SetDefault(clusterID string) error {
 		return fmt.Errorf("descriptor: ensure dir: %w", err)
 	}
 	marker := filepath.Join(dir, "default")
+	// Remove existing marker (file or symlink)
+	if fi, err := os.Lstat(marker); err == nil {
+		// If it's a symlink or file, remove it; ignore directories.
+		if fi.Mode()&os.ModeSymlink != 0 || fi.Mode().IsRegular() {
+			_ = os.Remove(marker)
+		}
+	}
+	// Prefer symlink only when target json exists; otherwise, write legacy marker content.
+	target := sanitizeFilename(strings.TrimSpace(clusterID)) + ".json"
+	if _, err := os.Stat(filepath.Join(dir, target)); err == nil {
+		if err := os.Symlink(target, marker); err == nil {
+			return nil
+		}
+		// If symlink creation failed, fall through to legacy marker content.
+	}
 	return os.WriteFile(marker, []byte(strings.TrimSpace(clusterID)), 0o644)
 }
 
@@ -65,22 +86,41 @@ func LoadDefault() (Descriptor, error) {
 		return Descriptor{}, err
 	}
 	marker := filepath.Join(dir, "default")
-	data, err := os.ReadFile(marker)
+	// If marker is a symlink, resolve it to the descriptor path.
+	fi, err := os.Lstat(marker)
 	if err != nil {
 		return Descriptor{}, fmt.Errorf("descriptor: read default marker: %w", err)
 	}
-	clusterID := strings.TrimSpace(string(data))
-	if clusterID == "" {
-		return Descriptor{}, errors.New("descriptor: default marker is empty")
+	var path string
+	if fi.Mode()&os.ModeSymlink != 0 {
+		if target, err := os.Readlink(marker); err == nil {
+			if filepath.IsAbs(target) {
+				path = target
+			} else {
+				path = filepath.Join(dir, target)
+			}
+		} else {
+			return Descriptor{}, fmt.Errorf("descriptor: readlink default: %w", err)
+		}
+	} else {
+		// Legacy format: file contains cluster ID string
+		data, err := os.ReadFile(marker)
+		if err != nil {
+			return Descriptor{}, fmt.Errorf("descriptor: read default marker: %w", err)
+		}
+		clusterID := strings.TrimSpace(string(data))
+		if clusterID == "" {
+			return Descriptor{}, errors.New("descriptor: default marker is empty")
+		}
+		path = filepath.Join(dir, sanitizeFilename(clusterID)+".json")
 	}
-	path := filepath.Join(dir, sanitizeFilename(clusterID)+".json")
 	descData, err := os.ReadFile(path)
 	if err != nil {
-		return Descriptor{}, fmt.Errorf("descriptor: read %s: %w", clusterID, err)
+		return Descriptor{}, fmt.Errorf("descriptor: read %s: %w", path, err)
 	}
 	var d Descriptor
 	if err := json.Unmarshal(descData, &d); err != nil {
-		return Descriptor{}, fmt.Errorf("descriptor: parse %s: %w", clusterID, err)
+		return Descriptor{}, fmt.Errorf("descriptor: parse %s: %w", path, err)
 	}
 	d.Default = true
 	return d, nil
@@ -94,8 +134,14 @@ func ListDescriptors() ([]Descriptor, error) {
 	}
 	marker := filepath.Join(dir, "default")
 	var def string
-	if data, err := os.ReadFile(marker); err == nil {
-		def = strings.TrimSpace(string(data))
+	if fi, err := os.Lstat(marker); err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			if target, err := os.Readlink(marker); err == nil {
+				def = strings.TrimSuffix(filepath.Base(target), ".json")
+			}
+		} else if data, err := os.ReadFile(marker); err == nil {
+			def = strings.TrimSpace(string(data))
+		}
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

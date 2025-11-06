@@ -87,6 +87,11 @@ TicketStatus:
     created_at: { type: string, format: date-time }
     started_at: { type: string, format: date-time, nullable: true }
     finished_at: { type: string, format: date-time, nullable: true }
+    metadata:
+      description: Additional ticket metadata (e.g., mr_url)
+      type: object
+      additionalProperties:
+        type: string
   required: [ticket_id, status, repo_url, base_ref, target_ref, created_at]
 
 # Response returned by POST /v1/nodes/{id}/claim

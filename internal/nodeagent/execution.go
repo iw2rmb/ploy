@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"net/url"
+
 	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -347,9 +349,18 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	if strings.TrimSpace(gitlabPAT) == "" {
 		return "", fmt.Errorf("gitlab_pat is required for MR creation")
 	}
-	if strings.TrimSpace(gitlabDomain) == "" {
-		// Default to gitlab.com if not specified.
+	// Normalize domain: accept either host or full URL; coerce to host for MR client.
+	gitlabDomain = strings.TrimSpace(gitlabDomain)
+	if gitlabDomain == "" {
 		gitlabDomain = "gitlab.com"
+	} else {
+		if strings.HasPrefix(gitlabDomain, "http://") || strings.HasPrefix(gitlabDomain, "https://") {
+			if u, err := url.Parse(gitlabDomain); err == nil && u.Host != "" {
+				gitlabDomain = u.Host
+			}
+		}
+		// Remove any trailing slash artifacts.
+		gitlabDomain = strings.TrimSuffix(gitlabDomain, "/")
 	}
 
 	// Extract project ID from repo URL.
