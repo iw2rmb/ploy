@@ -2,7 +2,6 @@ package git
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -107,100 +106,8 @@ func TestPushOptions_Validation(t *testing.T) {
 	}
 }
 
-func TestCreateAskpassScript(t *testing.T) {
-	tests := []struct {
-		name    string
-		pat     string
-		wantErr bool
-	}{
-		{
-			name:    "simple pat",
-			pat:     "ghp_1234567890abcdef",
-			wantErr: false,
-		},
-		{
-			name:    "pat with special chars",
-			pat:     "token-with-special!@#$%",
-			wantErr: false,
-		},
-		{
-			name:    "pat with single quote",
-			pat:     "token'with'quotes",
-			wantErr: false,
-		},
-		{
-			name:    "empty pat",
-			pat:     "",
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			scriptPath, cleanup, err := createAskpassScript()
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			defer cleanup()
-
-			// Verify script file exists.
-			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-				t.Errorf("askpass script not created at %s", scriptPath)
-			}
-
-			// Verify script is executable.
-			info, err := os.Stat(scriptPath)
-			if err != nil {
-				t.Fatalf("failed to stat script: %v", err)
-			}
-			if info.Mode()&0100 == 0 {
-				t.Errorf("script is not executable: mode %v", info.Mode())
-			}
-
-			// Execute the script and verify it outputs the PAT.
-			cmd := exec.Command(scriptPath)
-			cmd.Env = append(os.Environ(), "PLOY_GIT_PAT="+tt.pat)
-			output, err := cmd.Output()
-			if tt.pat == "" {
-				if err == nil {
-					t.Fatalf("expected script to fail with empty PAT, got success")
-				}
-				// Ensure the script content on disk still avoids PAT (empty), then return.
-				return
-			}
-			if err != nil {
-				t.Fatalf("failed to execute askpass script: %v", err)
-			}
-
-			outputStr := strings.TrimSpace(string(output))
-			if outputStr != tt.pat {
-				t.Errorf("askpass script output = %q, want %q", outputStr, tt.pat)
-			}
-
-			// Verify the script file does not contain the PAT on disk.
-			b, err := os.ReadFile(scriptPath)
-			if err != nil {
-				t.Fatalf("failed to read script: %v", err)
-			}
-			if strings.Contains(string(b), tt.pat) && tt.pat != "" {
-				t.Errorf("script content contains the PAT; must not persist token to disk")
-			}
-
-			// Verify cleanup removes the script.
-			cleanup()
-			if _, err := os.Stat(scriptPath); !os.IsNotExist(err) {
-				t.Errorf("askpass script still exists after cleanup")
-			}
-		})
-	}
-}
+// Note: askpass helper removed in favor of GIT_HTTP_EXTRAHEADER for
+// non-persistent Authorization. Redaction and validation tests remain below.
 
 func TestRedactError(t *testing.T) {
 	tests := []struct {

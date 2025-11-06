@@ -19,11 +19,7 @@ CREATE TYPE stage_status AS ENUM (
   'pending', 'running', 'succeeded', 'failed', 'skipped', 'canceled'
 );
 
--- Cluster (singleton; exactly one row expected)
-CREATE TABLE IF NOT EXISTS cluster (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+
 
 -- Nodes (no labels; each node must have an IP address).
 CREATE TABLE IF NOT EXISTS nodes (

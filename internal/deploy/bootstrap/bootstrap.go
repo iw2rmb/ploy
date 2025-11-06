@@ -96,6 +96,16 @@ func PrefixedScript(env map[string]string) string {
 	// Note: BOOTSTRAP_PRIMARY (without PLOY_ prefix) is the canonical toggle per docs/envs.
 	b.WriteString("if [ \"${BOOTSTRAP_PRIMARY:-false}\" = \"true\" ]; then\n")
 
+	// Persist cluster id to an env file and systemd drop-in when provided.
+	b.WriteString("  if [ -n \"${CLUSTER_ID:-}\" ]; then\n")
+	b.WriteString("    echo \"PLOY_CLUSTER_ID='${CLUSTER_ID}'\" > /etc/ploy/cluster.env\n")
+	b.WriteString("    mkdir -p /etc/systemd/system/ployd.service.d\n")
+	b.WriteString("    cat > /etc/systemd/system/ployd.service.d/cluster.conf <<'ENV'\n")
+	b.WriteString("[Service]\n")
+	b.WriteString("Environment=PLOY_CLUSTER_ID=${CLUSTER_ID}\n")
+	b.WriteString("ENV\n")
+	b.WriteString("  fi\n")
+
 	// Check for existing PKI to avoid clobbering during reuse scenarios
 	b.WriteString("  if [ -f /etc/ploy/pki/ca.key ]; then\n")
 	b.WriteString("    echo 'Existing PKI detected (/etc/ploy/pki/ca.key found); skipping PKI writes and reusing existing certificates.'\n")
@@ -160,6 +170,8 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("EOF\n\n")
 
 	b.WriteString("  systemctl daemon-reload\n")
+	b.WriteString("  # Restart to apply any drop-in env (cluster id)\n")
+	b.WriteString("  systemctl restart ployd.service || true\n")
 	b.WriteString("  systemctl enable --now ployd.service\n")
 	b.WriteString("  PLOY_CONFIG_PATH='/etc/ploy/ployd.yaml'\n")
 	b.WriteString("  PLOY_SERVICE_NAME='ployd.service'\n")

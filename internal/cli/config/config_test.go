@@ -11,6 +11,11 @@ func TestSaveListAndDefaultDescriptor(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmp)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() {
+		if dir, err := clustersDir(); err == nil {
+			_ = os.RemoveAll(dir)
+		}
+	})
 
 	// Saving without cluster id should fail.
 	if _, err := SaveDescriptor(Descriptor{}); err == nil {

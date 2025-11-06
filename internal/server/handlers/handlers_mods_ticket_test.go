@@ -329,6 +329,9 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	commitSha := "abc1234567890"
 	reason := "run failed due to timeout"
 
+	// Include MR URL under runs.stats.metadata to verify surfacing in response metadata.
+	stats := []byte(`{"metadata":{"mr_url":"https://gitlab.com/org/repo/-/merge_requests/99"}}`)
+
 	st := &mockStore{
 		getRunResult: store.Run{
 			ID:         pgtype.UUID{Bytes: ticketID, Valid: true},
@@ -341,6 +344,7 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 			CreatedAt:  pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt:  pgtype.Timestamptz{Time: now.Add(5 * time.Second), Valid: true},
 			FinishedAt: pgtype.Timestamptz{Time: now.Add(10 * time.Second), Valid: true},
+			Stats:      stats,
 		},
 	}
 
@@ -366,6 +370,10 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	}
 	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
 		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Ticket.Repository)
+	}
+	// MR URL should be propagated from stats.metadata.mr_url
+	if resp.Ticket.Metadata["mr_url"] != "https://gitlab.com/org/repo/-/merge_requests/99" {
+		t.Errorf("expected mr_url to be present, got %q", resp.Ticket.Metadata["mr_url"])
 	}
 	// FinishedAt not exposed directly; rely on state only.
 }

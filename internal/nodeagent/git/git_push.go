@@ -50,17 +50,9 @@ func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 		return redactError(fmt.Errorf("configure git user: %w", err), opts.PAT)
 	}
 
-	// Create a temporary GIT_ASKPASS script that echoes a PAT provided via
-	// environment variable (PLOY_GIT_PAT). The token itself is never written
-	// to disk. The script will be deleted after use.
-	askpassScript, cleanup, err := createAskpassScript()
-	if err != nil {
-		return redactError(fmt.Errorf("create askpass script: %w", err), opts.PAT)
-	}
-	defer cleanup()
-
-	// Push the branch using GIT_ASKPASS for authentication.
-	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, askpassScript, opts.PAT); err != nil {
+	// Push the branch using HTTP extra header for authentication to avoid prompts and
+	// prevent writing secrets to disk. We pass the header via environment only.
+	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, opts.PAT); err != nil {
 		return redactError(err, opts.PAT)
 	}
 
@@ -99,45 +91,16 @@ func (p *pusher) configureGitUser(ctx context.Context, repoDir, userName, userEm
 }
 
 // pushBranch performs the git push operation using the provided askpass script.
-func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, askpassScript, pat string) error {
+func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat string) error {
 	env := []string{
 		"GIT_TERMINAL_PROMPT=0",
-		"GIT_ASKPASS_REQUIRE=force",
-		"GIT_ASKPASS=" + askpassScript,
-		"PLOY_GIT_PAT=" + pat,
+		// Supply Authorization header only for this command; nothing persisted.
+		"GIT_HTTP_EXTRAHEADER=Authorization: Bearer " + pat,
 	}
 	if err := runGitCommand(ctx, repoDir, env, "push", "origin", targetRef); err != nil {
 		return fmt.Errorf("git push origin %s: %w", targetRef, err)
 	}
 	return nil
-}
-
-// createAskpassScript creates a temporary shell script that echoes the PAT.
-// Returns the script path and a cleanup function.
-func createAskpassScript() (string, func(), error) {
-	f, err := os.CreateTemp("", "git-askpass-*.sh")
-	if err != nil {
-		return "", nil, fmt.Errorf("create askpass script: %w", err)
-	}
-	scriptPath := f.Name()
-	// Script content: echo PAT from environment variable; never embed PAT in file.
-	scriptContent := "#!/bin/sh\n: \"${PLOY_GIT_PAT:?missing PAT}\"\necho \"$PLOY_GIT_PAT\"\n"
-	if _, err := f.WriteString(scriptContent); err != nil {
-		_ = f.Close()
-		_ = os.Remove(scriptPath)
-		return "", nil, fmt.Errorf("write askpass script: %w", err)
-	}
-	if err := f.Close(); err != nil {
-		_ = os.Remove(scriptPath)
-		return "", nil, fmt.Errorf("close askpass script: %w", err)
-	}
-	if err := os.Chmod(scriptPath, 0700); err != nil {
-		_ = os.Remove(scriptPath)
-		return "", nil, fmt.Errorf("chmod askpass script: %w", err)
-	}
-
-	cleanup := func() { _ = os.Remove(scriptPath) }
-	return scriptPath, cleanup, nil
 }
 
 // runGitCommand executes a git command in the specified directory with custom environment.
@@ -152,12 +115,15 @@ func runGitCommand(ctx context.Context, dir string, env []string, args ...string
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Redact any PAT from env variables before including output in error.
-		// Look for PLOY_GIT_PAT in the provided env.
+		// Look for GIT_HTTP_EXTRAHEADER Authorization bearer token.
 		pat := ""
 		for _, e := range env {
-			if strings.HasPrefix(e, "PLOY_GIT_PAT=") {
-				pat = strings.TrimPrefix(e, "PLOY_GIT_PAT=")
-				break
+			if strings.HasPrefix(e, "GIT_HTTP_EXTRAHEADER=") {
+				// e.g., GIT_HTTP_EXTRAHEADER=Authorization: Bearer <token>
+				if i := strings.Index(e, "Bearer "); i >= 0 {
+					pat = e[i+len("Bearer "):]
+					break
+				}
 			}
 		}
 		baseErr := fmt.Errorf("git %s: %w (output: %s)", strings.Join(args, " "), err, string(output))

@@ -25,10 +25,7 @@ func TestRunClaim(t *testing.T) {
 	defer db.Close()
 
 	// Verify store is functional (connectivity test).
-	_, err = db.GetCluster(ctx)
-	if err != nil {
-		t.Logf("GetCluster() returned error (expected if DB is empty): %v", err)
-	}
+	// cluster table removed; no GetCluster check
 
 	t.Log("Store integration test infrastructure is working")
 	t.Log("Full integration tests require database setup - see tests/integration/")

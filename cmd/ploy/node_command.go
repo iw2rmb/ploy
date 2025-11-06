@@ -218,7 +218,6 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	desc := config.Descriptor{
 		ClusterID:       cfg.ClusterID,
 		Address:         serverURL,
-		Scheme:          "https",
 		SSHIdentityPath: identityPath,
 	}
 	if loadErr != nil || strings.TrimSpace(existing.ClusterID) == "" {

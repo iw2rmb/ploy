@@ -19,8 +19,10 @@ import (
 )
 
 func TestResolveControlPlaneHTTP_PlainWhenNoDescriptor(t *testing.T) {
-	t.Setenv("PLOY_CONFIG_HOME", t.TempDir())
+	tmp := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", tmp)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmp, "clusters")) })
 	t.Setenv(controlPlaneURLEnv, "http://127.0.0.1:9094")
 
 	u, client, err := resolveControlPlaneHTTP(context.TODO())
@@ -45,6 +47,7 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv(controlPlaneURLEnv, "https://127.0.0.1:8443")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
 
 	caCertPEM, caKeyPEM := generateCACert(t)
 	clientCertPEM, clientKeyPEM := generateClientCert(t, caCertPEM, caKeyPEM)

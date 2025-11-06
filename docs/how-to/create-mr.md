@@ -85,7 +85,7 @@ ploy mod run \
 
 ### Step 4: View the MR URL
 
-After the run completes, inspect the ticket to see the MR URL:
+After the run completes, inspect the ticket to see the MR URL (now surfaced from server status):
 ```bash
 ploy mod inspect <ticket-id>
 # Output includes:

@@ -14,7 +14,6 @@ type Querier interface {
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
-	CreateCluster(ctx context.Context, arg CreateClusterParams) (Cluster, error)
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
@@ -39,7 +38,6 @@ type Querier interface {
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
-	GetCluster(ctx context.Context) (Cluster, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetLog(ctx context.Context, id int64) (Log, error)

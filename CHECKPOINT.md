@@ -180,11 +180,8 @@ Current gaps vs test goals (with latest collector changes):
 1) Build Gate confirmation — We execute the Java build gate (`mvn test`) inside the node runner (Docker). Timings are persisted in run `stats` (`build_gate_duration_ms`), but `GET /v1/mods/{id}` does not expose `stats` yet.
    - Implemented on node side: collect build logs, pass/fail, duration, resource limits and usage; upload `build-gate.log` as artifact (≤256 KiB) tied to `run_id`/`stage_id`; record all metrics under `runs.stats.gate` (limits+usage+duration+passed).
    - Remaining: expose `runs.stats` (or just `runs.stats.gate`) via `GET /v1/mods/{id}` or a new `GET /v1/mods/{id}/stats`; print in CLI.
-2) GitLab MR — Branch push + MR creation not wired yet (PAT handling is TODO per docs).
-   - Minimal path: accept PAT (CLI flag `--gitlab-pat` or env `PLOY_GITLAB_PAT`), propagate securely to the node runner, then:
-     - `git config user.*`, ensure branch exists (create or reuse target ref), `git push` with PAT, call GitLab REST to open MR (store MR URL in ticket `metadata` and print in CLI).
-   - Preferred path: store PAT on control plane (mTLS‑guarded config) and call GitLab API server‑side to avoid PAT on nodes; node pushes via deploy key or PAT injected only for git remote.
-   - Both require small code changes; see plan below.
+2) GitLab MR — Branch push + MR creation wired
+   - Implemented path: global PAT/domain via control plane config with optional per‑run overrides; node pushes branch using a non‑persistent HTTP Authorization header and creates the MR via GitLab API with bounded retries; MR URL is attached under `runs.stats.metadata.mr_url` and surfaced by `GET /v1/mods/{id}` so `ploy mod inspect` prints it.
 
 ## What’s Left (Test Exit Criteria)
 1) Build Gate — API/CLI verifiable

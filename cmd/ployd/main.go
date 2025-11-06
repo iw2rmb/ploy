@@ -64,6 +64,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// No cluster table initialization; cluster-id is provided via environment.
+
 	// Initialize Authorizer for mTLS-based authentication.
 	// Default role is RoleControlPlane; AllowInsecure is false for production.
 	authorizer := auth.NewAuthorizer(auth.Options{
