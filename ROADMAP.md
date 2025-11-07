@@ -130,7 +130,7 @@ Legend: [ ] todo, [x] done.
   - Test: compile-only plus basic unit tests.
 
 ## Documentation and Guard Rails
-- [ ] Update docs for new type semantics and label fix.
+- [x] Update docs for new type semantics and label fix.
   - Change: `CHECKPOINT.md`, `PIPES.md`, docs/api notes.
   - Test: `tests/guards/docs_guard_test.go` passes; links valid.
 
