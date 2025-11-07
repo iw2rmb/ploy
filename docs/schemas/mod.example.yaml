@@ -37,7 +37,7 @@ build_gate_healing:
       # The container must have Docker socket access (-v /var/run/docker.sock)
       # and PLOY_HOST_WORKSPACE pointing to the host path for build verification.
       command: >-
-        mod-codex --input /workspace --out /out --prompt-file /workspace/prompt.txt
+        mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
         CODEX_PROMPT: |-
           Rules:
@@ -63,4 +63,3 @@ mr_on_fail: true
 #   gitlab_domain, gitlab_pat, mr_on_success, mr_on_fail, and build_gate.* (profile).
 #   The build_gate_healing block represents the agreed format for the healing loop
 #   and will be consumed in the next implementation slice.
-
