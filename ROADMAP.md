@@ -64,7 +64,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/workflow/contracts/workflow_checkpoint.go`, `workflow_artifact.go`.
   - Test: validate stage/ticket typed values; artifact metadata required.
 
-- [ ] BuildGate metadata: no field type changes; keep numeric; ensure compile stays green.
+ - [x] BuildGate metadata: no field type changes; keep numeric; ensure compile stays green.
   - Change: none beyond imports if needed.
   - Test: existing.
 
