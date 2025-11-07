@@ -99,8 +99,8 @@ _ploy() {
                     case $words[3] in
                         'gitlab')
                             commands=()
-                            commands+=("show:show [--cluster-id <id>] - Display the current GitLab configuration")
-                            commands+=("set:set --file <path> [--cluster-id <id>] - Apply a GitLab configuration JSON file")
+                            commands+=("show:show - Display the current GitLab configuration")
+                            commands+=("set:set --file <path> - Apply a GitLab configuration JSON file")
                             commands+=("validate:validate --file <path> - Validate a GitLab configuration without saving")
                             _describe 'config gitlab command' commands && ret=0
                             ;;

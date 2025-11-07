@@ -1,6 +1,6 @@
 Usage: ploy config gitlab <command>
 
 Commands:
-  show [--cluster-id <id>]                                       Display the current GitLab configuration
-  set --file <path> [--cluster-id <id>]                          Apply a GitLab configuration JSON file
+  show                                                           Display the current GitLab configuration
+  set --file <path>                                              Apply a GitLab configuration JSON file
   validate --file <path>                                         Validate a GitLab configuration without saving

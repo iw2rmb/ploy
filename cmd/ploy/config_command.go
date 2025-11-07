@@ -59,8 +59,8 @@ func printConfigGitLabUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy config gitlab <command>")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Commands:")
-	_, _ = fmt.Fprintln(w, "  show [--cluster-id <id>]        Display the current GitLab configuration")
-	_, _ = fmt.Fprintln(w, "  set --file <path> [--cluster-id <id>]")
+	_, _ = fmt.Fprintln(w, "  show                            Display the current GitLab configuration")
+	_, _ = fmt.Fprintln(w, "  set --file <path>")
 	_, _ = fmt.Fprintln(w, "                                  Apply a GitLab configuration JSON file")
 	_, _ = fmt.Fprintln(w, "  validate --file <path>          Validate a GitLab configuration without saving")
 }
@@ -78,8 +78,6 @@ func handleConfigGitLabShow(args []string, stderr io.Writer) error {
 	}
 	fs := flag.NewFlagSet("config gitlab show", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	var clusterID stringValue
-	fs.Var(&clusterID, "cluster-id", "Cluster identifier (unused in this implementation)")
 
 	if err := fs.Parse(args); err != nil {
 		printConfigGitLabShowUsage(stderr)
@@ -130,7 +128,7 @@ func handleConfigGitLabShow(args []string, stderr io.Writer) error {
 }
 
 func printConfigGitLabShowUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config gitlab show [--cluster-id <id>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config gitlab show")
 }
 
 // handleConfigGitLabSet applies a GitLab configuration from a JSON file.
@@ -141,11 +139,9 @@ func handleConfigGitLabSet(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("config gitlab set", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	var (
-		filePath  stringValue
-		clusterID stringValue
+		filePath stringValue
 	)
 	fs.Var(&filePath, "file", "Path to JSON file containing GitLab configuration")
-	fs.Var(&clusterID, "cluster-id", "Cluster identifier (unused in this implementation)")
 
 	if err := fs.Parse(args); err != nil {
 		printConfigGitLabSetUsage(stderr)
@@ -211,7 +207,7 @@ func handleConfigGitLabSet(args []string, stderr io.Writer) error {
 }
 
 func printConfigGitLabSetUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy config gitlab set --file <path> [--cluster-id <id>]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy config gitlab set --file <path>")
 }
 
 // handleConfigGitLabValidate validates a GitLab configuration file without saving.
