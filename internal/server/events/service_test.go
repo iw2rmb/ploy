@@ -300,6 +300,89 @@ func TestCreateAndPublishEvent(t *testing.T) {
 	}
 }
 
+func TestCreateAndPublishEvent_LevelNormalization(t *testing.T) {
+	runID := pgtype.UUID{
+		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+		Valid: true,
+	}
+
+	type testCase struct {
+		inLevel   string
+		wantLevel string
+	}
+
+	cases := []testCase{
+		{inLevel: "INFO", wantLevel: "info"},
+		{inLevel: " warn ", wantLevel: "warn"},
+		{inLevel: "error", wantLevel: "error"},
+		// Unknown or empty map to info
+		{inLevel: "warning", wantLevel: "info"},
+		{inLevel: "", wantLevel: "info"},
+		{inLevel: "verbose", wantLevel: "info"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.inLevel, func(t *testing.T) {
+			// Capture the params passed to the store and assert normalization happened
+			mock := &mockStore{createEventFunc: func(ctx context.Context, arg store.CreateEventParams) (store.Event, error) {
+				if arg.Level != tc.wantLevel {
+					t.Fatalf("CreateEvent received level=%q; want %q", arg.Level, tc.wantLevel)
+				}
+				return store.Event{
+					ID:      123,
+					RunID:   arg.RunID,
+					StageID: arg.StageID,
+					Time:    arg.Time,
+					Level:   arg.Level,
+					Message: arg.Message,
+					Meta:    arg.Meta,
+				}, nil
+			}}
+
+			svc, err := New(Options{BufferSize: 4, HistorySize: 8, Store: mock})
+			if err != nil {
+				t.Fatalf("failed to create service: %v", err)
+			}
+
+			ctx := context.Background()
+			params := store.CreateEventParams{
+				RunID:   runID,
+				StageID: pgtype.UUID{Valid: false},
+				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
+				Level:   tc.inLevel,
+				Message: "msg",
+				Meta:    []byte(`{}`),
+			}
+
+			evt, err := svc.CreateAndPublishEvent(ctx, params)
+			if err != nil {
+				t.Fatalf("CreateAndPublishEvent error: %v", err)
+			}
+
+			if evt.Level != tc.wantLevel {
+				t.Fatalf("event.Level=%q; want %q", evt.Level, tc.wantLevel)
+			}
+
+			// Verify SSE stream used normalized level in LogRecord.Stream
+			streamID := uuid.UUID(params.RunID.Bytes).String()
+			snapshot := svc.Hub().Snapshot(streamID)
+			if len(snapshot) == 0 {
+				t.Fatal("expected SSE event published")
+			}
+			if snapshot[0].Type != "log" {
+				t.Fatalf("expected event type 'log', got %s", snapshot[0].Type)
+			}
+			var rec logstream.LogRecord
+			if err := json.Unmarshal(snapshot[0].Data, &rec); err != nil {
+				t.Fatalf("unmarshal log record: %v", err)
+			}
+			if rec.Stream != tc.wantLevel {
+				t.Fatalf("SSE stream=%q; want %q", rec.Stream, tc.wantLevel)
+			}
+		})
+	}
+}
+
 func TestCreateAndPublishLog(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},

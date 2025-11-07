@@ -111,7 +111,7 @@ Legend: [ ] todo, [x] done.
   - Test: good/bad addresses; defaults preserved.
 
 ## Logging: Event Level Guard
-- [ ] Validate `Event.Level` at creation using `LogLevel` (map unknown to `info` or reject).
+- [x] Validate `Event.Level` at creation using `LogLevel` (map unknown to `info` or reject).
   - Change: `internal/server/events/service.go` before `CreateEvent`; normalize `params.Level`.
   - Test: service test persists only allowed levels; SSE stream uses normalized level.
 
