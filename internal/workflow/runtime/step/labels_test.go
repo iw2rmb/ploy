@@ -34,7 +34,7 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 	runID := types.RunID("run-123")
 
 	manifest := contracts.StepManifest{
-		ID:    types.StepID(runID),
+		ID:    types.StepID("step-xyz"),
 		Name:  "Test Run",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -42,7 +42,7 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 		},
 	}
 
-	req := Request{Manifest: manifest, Workspace: "/tmp/workspace"}
+	req := Request{TicketID: types.TicketID(runID), Manifest: manifest, Workspace: "/tmp/workspace"}
 
 	if _, err := runner.Run(context.Background(), req); err != nil {
 		t.Fatalf("Run() unexpected error: %v", err)
@@ -53,5 +53,35 @@ func TestRunner_Run_SetsRunIDLabel(t *testing.T) {
 	}
 	if got := rt.captured.Labels[types.LabelRunID]; got != runID.String() {
 		t.Fatalf("label %q=%q, want %q", types.LabelRunID, got, runID.String())
+	}
+}
+
+func TestRunner_Run_OmitsRunIDLabelWhenEmpty(t *testing.T) {
+	rt := &mockRuntime{}
+	runner := Runner{Containers: rt}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("step-xyz"),
+		Name:  "Test Run",
+		Image: "test:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite, Hydration: &contracts.StepInputHydration{}},
+		},
+	}
+
+	// No TicketID provided
+	req := Request{Manifest: manifest, Workspace: "/tmp/workspace"}
+
+	if _, err := runner.Run(context.Background(), req); err != nil {
+		t.Fatalf("Run() unexpected error: %v", err)
+	}
+
+	if rt.captured.Labels != nil {
+		if _, ok := rt.captured.Labels[types.LabelRunID]; ok {
+			t.Fatalf("expected no %q label when TicketID empty", types.LabelRunID)
+		}
+		if len(rt.captured.Labels) != 0 {
+			t.Fatalf("expected labels to be empty when TicketID empty, got %v", rt.captured.Labels)
+		}
 	}
 }

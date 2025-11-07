@@ -186,7 +186,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.Timings.ExecutionDuration = time.Since(executionStart)
 	} else {
 		// Build container spec from manifest and workspace path plus optional /out mount.
-		spec, err := buildContainerSpec(req.Manifest, req.Workspace, req.OutDir)
+		spec, err := buildContainerSpec(req.TicketID, req.Manifest, req.Workspace, req.OutDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}
