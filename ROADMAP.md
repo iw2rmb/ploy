@@ -1,81 +1,81 @@
-# Build Gate + Healing (pre‑mod gate, optional LLM heal, MR on failure)
+# Build Gate + Healing — Spec‑Driven (Codex + ploy‑buildgate)
 
-Scope: Implement pre‑mod Build Gate; on failure and when `--heal-on-build` is set, trigger `mod-llm` healing and re‑run the gate; on pass, proceed to OpenRewrite as planned. Ensure `tests/e2e/mods/scenario-orw-fail.sh` passes: MR is created on failure without healing.
+Scope: Ship a spec‑driven healing loop around the existing Build Gate. On initial gate failure, execute configured healing mods (Codex by default), re‑run the Gate, and proceed on pass. Keep MR on failure behaviour. Align E2E with YAML spec and a single runner script.
 
-Documentation: README.md, docs/envs/README.md, tests/e2e/mods/README.md; design notes in CHECKPOINT.md; code refs below.
+Documentation: README.md, docs/envs/README.md, tests/e2e/mods/README.md, docs/schemas/mod.example.yaml; design notes in CHECKPOINT.md.
 
 Legend: [ ] todo, [x] done.
 
 ## Constraints
 - RED → GREEN → REFACTOR for each slice.
 - Coverage ≥60% overall; ≥90% for runner/orchestration touched code.
-- Minimal blast radius: CLI flag plumbing; nodeagent execution orchestration; no schema changes.
+- Minimal blast radius: add `--spec` to CLI; nodeagent execution orchestration reads spec; no DB schema changes.
 
-## CLI: flag + spec plumbing
-- [ ] `--heal-on-build` flag; plumb into submit spec as `heal_on_build` — Enables healing branch when the first Build Gate fails.
-  - Change: cmd/ploy/mod_run.go (parse flag; include `payload["heal_on_build"]=true`; update usage string).
-  - Test: cmd/ploy/testdata/help_mod.txt — help output includes `--heal-on-build`.
+## Canonical Inputs: migrate to /in (drop /.ploy)
+- [ ] Make `/in` the sole, read‑only mount for cross‑phase inputs.
+  - Node: after the first Gate fails, persist the log to a temp host file and mount it at `/in/build-gate.log` for healing steps; do not write into the repository.
+  - Remove any writes to `/workspace/.ploy`; treat previous `/.ploy` usage as deprecated and eliminate to avoid accidental inclusion in diffs.
+- [ ] mod-codex: prefer `/in` as context.
+  - Always include `--add-dir /in` when present; stop referencing `/.ploy`.
+  - Examples/prompts should reference `/in/build-gate.log`.
+- [ ] Tests/docs/spec:
+  - Update `docs/schemas/mod.example.yaml`, E2E specs, and README to reference `/in/build-gate.log` and `/in/prompt.txt` exclusively.
+  - Update integration/E2E runners to mount `/in` and stop creating `/.ploy`.
+  - Default prompt location: `/in/prompt.txt` (node mounts it R/O when provided in spec); mod-codex should accept `--prompt-file /in/prompt.txt` by default when present.
 
-## Node Agent: pre‑mod Build Gate (Phase A)
-- [ ] Run Build Gate before any mod container execution.
-  - Change: internal/nodeagent/execution.go — split current single `runner.Run` into phases:
-    1) Gate‑only pass: manifest with noop command, `Gate.Enabled=true`.
-    2) Conditional LLM heal + re‑gate when enabled.
-    3) Proceed to ORW only if a gate has passed.
-  - Change: internal/nodeagent/manifest.go — helper builder(s) for: gate‑only, llm‑exec, orw‑apply.
-  - Test: unit — inject stub `GateExecutor` to force fail; expect terminal status=failed and reason="build-gate" when healing disabled.
+## Current Status (DONE)
+- [x] Build Gate log quality: Maven `-e`; Gradle `--stacktrace`. (internal/workflow/runtime/step/gate_docker.go)
+- [x] Introduced `mod-codex` image with Codex CLI and `ploy-buildgate` (same Gate as workers) embedded. (mods/mod-codex/*, internal/cmd/ploy-buildgate)
+- [x] Codex logs and stdin prompt handling (`-`) captured in `/out/codex.log`.
+- [x] Spec example and E2E spec: `docs/schemas/mod.example.yaml`; `tests/e2e/mods/scenario-orw-fail/mod.yaml`.
+- [x] E2E runner script: `tests/e2e/mods/scenario-orw-fail/run.sh`.
+- [x] Mods E2E README updated for spec‑driven flow.
 
-## Healing (Phase B): `mod-llm` on gate fail when enabled
-- [ ] Accept `options.heal_on_build` and optional `options.heal_llm_image` (default `docker.io/${DOCKERHUB_USERNAME}/mods-llm:latest` or `mods-llm:latest`).
-  - Change: internal/nodeagent/handlers.go comment + option docs; internal/nodeagent/execution.go reads options.
-  - [ ] Emit prompt for LLM: write first gate’s logs to `/workspace/.ploy/build-gate.log`.
-    - Change: internal/nodeagent/execution.go — persist `result.BuildGate.LogsText` into workspace.
-  - [ ] Run LLM container once: command `mods-llm --execute --input /workspace --out /out/plan.json`.
-    - Change: internal/nodeagent/execution.go — second `runner.Run` with llm manifest; keep `Gate.Enabled=false`.
-  - Test: mods/mod-llm stub already heals failing sample; unit — verify second gate reads healed workspace and passes.
+## CLI: `--spec` support
+- [ ] Add `--spec <file>` (YAML/JSON) to `ploy mod run` and include raw JSON into submit payload `Spec`.
+  - Change: cmd/ploy/mod_run.go (parse file; YAML→JSON; merge with `--mod-*` overrides if both present; document precedence).
+  - Test: cmd/ploy/testdata/help_mod.txt; unit to assert payload contains `build_gate_healing`.
+- [ ] Back‑compat shim: `--heal-on-build` (deprecated) injects a default `build_gate_healing` when spec lacks it.
+  - Change: cmd/ploy/mod_run.go usage text; keep for one release.
 
-## Re‑gate then ORW (Phase C)
-- [ ] Re‑run Build Gate after LLM; proceed only on pass.
-  - Change: internal/nodeagent/execution.go — third `runner.Run` with gate‑only manifest.
-  - [ ] Run ORW mod when a gate has passed at least once.
-    - Change: internal/nodeagent/execution.go — fourth `runner.Run` with ORW manifest (image/env from spec).
-    - Note: keep post‑ORW gate out for this slice; add as follow‑up if needed.
-  - Test: e2e (heal scenario) — Build Gate fails → LLM heals → re‑gate passes → ORW runs → final success.
-
-## Terminal status + MR on failure
-- [ ] Treat Build Gate failure as terminal when healing disabled or unsuccessful.
-  - Change: internal/nodeagent/execution.go — set `terminalStatus="failed"`, `reason="build-gate"`.
-  - Test: unit — with `mr_on_fail=true` ensure MR creation attempted; with success branch ensure `mr_on_success` path unchanged.
+## Node Agent: Gate‑Heal‑Re‑Gate orchestration
+- [ ] Pre‑mod Gate: run the Build Gate before the first mod container.
+  - Change: internal/nodeagent/execution.go — split execution into phases (gate → maybe heal → re‑gate → mod).
+  - Test: unit — stub Gate to fail; final status=failed (no healing block) with `reason="build-gate"`.
+- [ ] Healing loop (spec‑driven): consume `build_gate_healing` from `req.Options`.
+  - Execute each `mods[]` entry (image/command/env/retain) in order under `/workspace`, publish `/out` artifacts, re‑run Gate after the sequence; repeat up to `retries`.
+  - Change: internal/nodeagent/execution.go (loop + re‑gate); internal/nodeagent/manifest.go helpers to build container manifests from entries.
+  - Test: integration (local) with `mods-codex` as healer and failing sample; verify first gate fail, healer runs, re‑gate pass.
+- [ ] Proceed to main mod only after a passing Gate.
+  - Change: execution.go — skip ORW when re‑gate still fails; exit failed.
 
 ## Artifacts + metadata
-- [ ] Upload `build-gate.log` artifact (already wired) and attach gate JSON in stats.
-  - Change: internal/nodeagent/execution.go — ensure artifact upload from Phase A/B gate runs; include `stats["gate"].passed=false|true`.
-  - Test: server handlers list artifacts for stage; CLI `mod inspect` shows reason `build-gate`.
+- [ ] Persist first‑gate logs to `/workspace/.ploy/build-gate.log` (input to codex prompt) and upload logs as artifact bundle.
+  - Change: internal/nodeagent/execution.go — write, then upload via ArtifactUploader.
+- [ ] Include gate stats in run `stats.gate` (passed/resources/logs_artifact_id) — already partially present for post‑mod gate; ensure present for pre‑gate and re‑gate runs.
+
+## Terminal status + MR on failure
+- [ ] Treat Build Gate failure as terminal when no healing is configured or after retries exhausted; keep MR on failure behaviour.
+  - Change: internal/nodeagent/execution.go — set `terminalStatus="failed"`, `reason="build-gate"`.
+  - Test: unit — with `mr_on_fail=true` ensure MR path still executes; success branch with `mr_on_success` unchanged.
 
 ## CLI/docs updates
-- [ ] Update docs with new flag and flow.
-  - Change: cmd/ploy/README.md — include `--heal-on-build` and examples.
-  - Change: docs/envs/README.md — describe per‑run flag.
-  - Change: tests/e2e/mods/README.md — document fail→heal flow and no‑heal behavior (scenario‑orw‑fail).
-  - Test: lint/docs check, spot read.
+- [ ] Update docs to describe `--spec` and `build_gate_healing`.
+  - Change: cmd/ploy/README.md, docs/envs/README.md, tests/e2e/mods/README.md.
+  - Test: lint/docs check.
 
 ## E2E coverage
-- [ ] No‑heal failure path (this ticket): ensure MR on failure.
-  - Change: none; script uses `tests/e2e/mods/scenario-orw-fail.sh`.
-  - Expect: ticket final=failed; MR URL present; artifacts downloaded.
-- [ ] Heal path (new): add `tests/e2e/mods/scenario-orw-heal.sh`.
-  - Change: new script enabling `--heal-on-build`; target ref `mods-upgrade-java17-heal`.
-  - Expect: first gate fail → llm heal → gate pass → ORW → final succeeded.
+- [x] Spec‑driven fail→heal scenario: `tests/e2e/mods/scenario-orw-fail/run.sh` using `mod.yaml`.
+- [ ] Add a “pass” scenario spec (optional) mirroring the older passing path.
 
 ## Risks / rollback
-- Risk: pre‑gate adds latency; mitigated by noop container before gate.
-- Risk: regression in passing scenario; validate with `tests/e2e/mods/scenario-orw-pass.sh`.
-- Rollback: feature‑flag via `--heal-on-build`; pre‑gate is safe (does not alter repo).
+- Risk: pre‑gate adds latency; mitigate by fast detection/no‑op when trivial.
+- Risk: regression in passing scenario; validate with passing spec scenario.
+- Rollback: feature‑gate healing by presence of `build_gate_healing` block.
 
 ## Estimates
-- CLI flag + docs: 0.5d
-- Node multi‑phase orchestration: 1.5d
-- Tests (unit + new e2e): 1.0d
+- CLI `--spec` + docs: 0.5d
+- Node Gate‑Heal‑Re‑Gate orchestration: 1.0–1.5d
+- Tests (unit + integration): 1.0d
 - Buffer/refactor: 0.5d
-- Total: ~3.5d
-
+- Total: ~3.0–3.5d

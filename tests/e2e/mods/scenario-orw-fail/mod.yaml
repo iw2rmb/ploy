@@ -28,7 +28,7 @@ build_gate_healing:
   mods:
     - image: docker.io/${DOCKERHUB_USERNAME}/mods-codex:latest
       command: >-
-        mod-codex --input /workspace --out /out --prompt-file /workspace/prompt.txt
+        mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
         CODEX_PROMPT: |-
           Rules:
