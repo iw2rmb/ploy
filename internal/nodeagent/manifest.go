@@ -12,10 +12,10 @@ import (
 
 // buildManifestFromRequest converts a StartRunRequest into a StepManifest.
 func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, error) {
-	if strings.TrimSpace(req.RunID) == "" {
+	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
-	if strings.TrimSpace(req.RepoURL) == "" {
+	if strings.TrimSpace(req.RepoURL.String()) == "" {
 		return contracts.StepManifest{}, errors.New("repo_url required")
 	}
 
@@ -48,17 +48,17 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	}
 
 	// Determine the ref to clone.
-	targetRef := strings.TrimSpace(req.TargetRef)
-	if targetRef == "" && strings.TrimSpace(req.BaseRef) != "" {
-		targetRef = strings.TrimSpace(req.BaseRef)
+	targetRef := strings.TrimSpace(req.TargetRef.String())
+	if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
+		targetRef = strings.TrimSpace(req.BaseRef.String())
 	}
 
 	// Build the repo materialization.
 	repo := contracts.RepoMaterialization{
-		URL:       types.RepoURL(req.RepoURL),
-		BaseRef:   types.GitRef(req.BaseRef),
+		URL:       req.RepoURL,
+		BaseRef:   req.BaseRef,
 		TargetRef: types.GitRef(targetRef),
-		Commit:    types.CommitSHA(req.CommitSHA),
+		Commit:    req.CommitSHA,
 	}
 
 	// Create a single read-write input that will be hydrated from the repository.

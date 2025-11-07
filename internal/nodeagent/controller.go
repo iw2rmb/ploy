@@ -23,14 +23,14 @@ func (r *runController) StartRun(ctx context.Context, req StartRunRequest) error
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.runs[req.RunID]; exists {
+	if _, exists := r.runs[req.RunID.String()]; exists {
 		return fmt.Errorf("run %s already exists", req.RunID)
 	}
 
 	// Create a cancellable context for this run, derived from caller.
 	runCtx, cancel := context.WithCancel(ctx)
-	r.runs[req.RunID] = &runContext{
-		runID:  req.RunID,
+	r.runs[req.RunID.String()] = &runContext{
+		runID:  req.RunID.String(),
 		cancel: cancel,
 	}
 

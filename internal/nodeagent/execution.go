@@ -21,7 +21,7 @@ import (
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	defer func() {
 		r.mu.Lock()
-		delete(r.runs, req.RunID)
+		delete(r.runs, req.RunID.String())
 		r.mu.Unlock()
 	}()
 
@@ -74,7 +74,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	gateExecutor := step.NewDockerGateExecutor(containerRuntime)
 
 	// Create log streamer to stream logs as gzipped chunks to the server.
-	logStreamer := NewLogStreamer(r.cfg, req.RunID, "")
+	logStreamer := NewLogStreamer(r.cfg, req.RunID.String(), "")
 	defer func() {
 		if closeErr := logStreamer.Close(); closeErr != nil {
 			slog.Warn("failed to close log streamer", "run_id", req.RunID, "error", closeErr)
@@ -144,7 +144,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				stageID, _ := req.Options["stage_id"].(string)
 
 				// Upload the diff to the server.
-				if err := diffUploader.UploadDiff(ctx, req.RunID, stageID, diffBytes, summary); err != nil {
+				if err := diffUploader.UploadDiff(ctx, req.RunID.String(), stageID, diffBytes, summary); err != nil {
 					slog.Error("failed to upload diff", "run_id", req.RunID, "error", err)
 				} else {
 					slog.Info("diff uploaded successfully", "run_id", req.RunID, "size", len(diffBytes))
@@ -156,7 +156,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					_, _ = diffFile.Write(diffBytes)
 					_ = diffFile.Close()
 					if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
-						if _, _, errU := artUploader.UploadArtifact(ctx, req.RunID, stageID, []string{diffFile.Name()}, "diff"); errU != nil {
+						if _, _, errU := artUploader.UploadArtifact(ctx, req.RunID.String(), stageID, []string{diffFile.Name()}, "diff"); errU != nil {
 							slog.Warn("failed to upload diff artifact bundle", "run_id", req.RunID, "error", errU)
 						} else {
 							slog.Info("diff artifact bundle uploaded", "run_id", req.RunID)
@@ -202,7 +202,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				}
 
 				// Upload the artifact bundle to the server.
-				if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID, stageID, paths, artifactName); err != nil {
+				if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID.String(), stageID, paths, artifactName); err != nil {
 					slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "error", err)
 				} else {
 					slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "paths", len(paths))
@@ -212,7 +212,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}
 
 	// Always attempt to bundle and upload /out regardless of artifact_paths.
-	if err := uploadOutDirIfPresent(ctx, r.cfg, req.RunID, stageIDFromOptions(req.Options), outDir); err != nil {
+	if err := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageIDFromOptions(req.Options), outDir); err != nil {
 		slog.Error("/out artifact upload failed", "run_id", req.RunID, "error", err)
 	}
 
@@ -291,7 +291,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					_ = logFile.Close()
 					if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
 						stageID, _ := req.Options["stage_id"].(string)
-						if id, cid, uerr := artUploader.UploadArtifact(ctx, req.RunID, stageID, []string{logFile.Name()}, "build-gate.log"); uerr == nil {
+						if id, cid, uerr := artUploader.UploadArtifact(ctx, req.RunID.String(), stageID, []string{logFile.Name()}, "build-gate.log"); uerr == nil {
 							gate["logs_artifact_id"] = id
 							gate["logs_bundle_cid"] = cid
 						} else {
@@ -310,7 +310,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		// we still attempt to report completion even if the run context is cancelled.
 		statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if uploadErr := statusUploader.UploadStatus(statusCtx, req.RunID, terminalStatus, reason, stats); uploadErr != nil {
+		if uploadErr := statusUploader.UploadStatus(statusCtx, req.RunID.String(), terminalStatus, reason, stats); uploadErr != nil {
 			slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
 		} else {
 			slog.Info("terminal status uploaded successfully", "run_id", req.RunID, "status", terminalStatus)
@@ -364,7 +364,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	// Extract project ID from repo URL.
-	projectID, err := extractProjectIDFromRepoURL(req.RepoURL)
+	projectID, err := extractProjectIDFromRepoURL(req.RepoURL.String())
 	if err != nil {
 		return "", fmt.Errorf("extract project id: %w", err)
 	}
@@ -388,7 +388,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		PAT:       gitlabPAT,
 		UserName:  "ploy-bot",
 		UserEmail: "ploy-bot@ploy.local",
-		RemoteURL: req.RepoURL,
+		RemoteURL: req.RepoURL.String(),
 	}
 
 	slog.Info("pushing branch to origin", "run_id", req.RunID, "source_branch", sourceBranch, "submitted_target", req.TargetRef)
@@ -404,7 +404,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		PAT:          gitlabPAT,
 		Title:        fmt.Sprintf("Ploy: %s", req.RunID),
 		SourceBranch: sourceBranch,
-		TargetBranch: req.BaseRef,
+		TargetBranch: req.BaseRef.String(),
 		Description:  fmt.Sprintf("Automated changes from Ploy run %s", req.RunID),
 		Labels:       "ploy",
 	}

@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ClaimManager periodically polls the server for work and executes claimed runs.
@@ -130,11 +132,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	optsFromSpec, envFromSpec := parseSpec(claim.Spec)
 
 	startReq := StartRunRequest{
-		RunID:     claim.ID,
-		RepoURL:   claim.RepoURL,
-		BaseRef:   claim.BaseRef,
-		TargetRef: claim.TargetRef,
-		CommitSHA: stringValue(claim.CommitSha),
+		RunID:     types.RunID(claim.ID),
+		RepoURL:   types.RepoURL(claim.RepoURL),
+		BaseRef:   types.GitRef(claim.BaseRef),
+		TargetRef: types.GitRef(claim.TargetRef),
+		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}

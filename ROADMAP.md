@@ -69,7 +69,7 @@ Legend: [ ] todo, [x] done.
   - Test: existing.
 
 ## Node Agent: Requests and Execution
-- [ ] StartRunRequest: swap to `RunID`, `RepoURL`, `GitRef`, `CommitSHA`; keep JSON as strings.
+- [x] StartRunRequest: swap to `RunID`, `RepoURL`, `GitRef`, `CommitSHA`; keep JSON as strings.
   - Change: `internal/nodeagent/handlers.go` struct; custom JSON (or TextMarshaler on types) ensures compatibility.
   - Test: handler request decode/encode; existing tests adjusted for types.
 
