@@ -68,19 +68,19 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		t.Fatalf("controller.StartRun not called")
 	}
 	got := mock.lastStart
-	if got.RunID != claim.ID {
+	if got.RunID.String() != claim.ID {
 		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
 	}
-	if got.RepoURL != claim.RepoURL {
+	if got.RepoURL.String() != claim.RepoURL {
 		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
 	}
-	if got.BaseRef != claim.BaseRef {
+	if got.BaseRef.String() != claim.BaseRef {
 		t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
 	}
-	if got.TargetRef != claim.TargetRef {
+	if got.TargetRef.String() != claim.TargetRef {
 		t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
 	}
-	if got.CommitSHA != *claim.CommitSha {
+	if got.CommitSHA.String() != *claim.CommitSha {
 		t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
 	}
 }

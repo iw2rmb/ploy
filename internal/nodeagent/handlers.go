@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // StartRunRequest describes a run start request from the server.
@@ -20,11 +22,11 @@ import (
 //   - "command" (string|[]string) — container command override.
 //   - "retain_container" (bool) — retain container after run for debugging.
 type StartRunRequest struct {
-	RunID     string            `json:"run_id"`
-	RepoURL   string            `json:"repo_url"`
-	BaseRef   string            `json:"base_ref"`
-	TargetRef string            `json:"target_ref"`
-	CommitSHA string            `json:"commit_sha"`
+	RunID     types.RunID       `json:"run_id,omitempty"`
+	RepoURL   types.RepoURL     `json:"repo_url,omitempty"`
+	BaseRef   types.GitRef      `json:"base_ref,omitempty"`
+	TargetRef types.GitRef      `json:"target_ref,omitempty"`
+	CommitSHA types.CommitSHA   `json:"commit_sha,omitempty"`
 	Options   map[string]any    `json:"options"`
 	Env       map[string]string `json:"env"`
 }
@@ -71,7 +73,7 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := StartRunResponse{
-		RunID:  req.RunID,
+		RunID:  req.RunID.String(),
 		Status: "accepted",
 	}
 
@@ -114,10 +116,10 @@ func (s *Server) handleRunStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func validateStartRunRequest(req StartRunRequest) error {
-	if strings.TrimSpace(req.RunID) == "" {
+	if req.RunID.IsZero() {
 		return fmt.Errorf("run_id is required")
 	}
-	if strings.TrimSpace(req.RepoURL) == "" {
+	if strings.TrimSpace(req.RepoURL.String()) == "" {
 		return fmt.Errorf("repo_url is required")
 	}
 	return nil

@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestRunControllerStartRun(t *testing.T) {
@@ -23,9 +25,9 @@ func TestRunControllerStartRun(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:   "run-001",
-		RepoURL: "https://github.com/example/repo.git",
-		BaseRef: "main",
+		RunID:   types.RunID("run-001"),
+		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+		BaseRef: types.GitRef("main"),
 	}
 
 	ctx := context.Background()
@@ -36,7 +38,7 @@ func TestRunControllerStartRun(t *testing.T) {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	if _, exists := rc.runs[req.RunID]; !exists {
+	if _, exists := rc.runs[req.RunID.String()]; !exists {
 		t.Errorf("run %s not found in controller", req.RunID)
 	}
 }
@@ -49,9 +51,9 @@ func TestRunControllerStartRunDuplicate(t *testing.T) {
 	}
 
 	req := StartRunRequest{
-		RunID:   "run-001",
-		RepoURL: "https://github.com/example/repo.git",
-		BaseRef: "main",
+		RunID:   types.RunID("run-001"),
+		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+		BaseRef: types.GitRef("main"),
 	}
 
 	ctx := context.Background()
@@ -77,9 +79,9 @@ func TestRunControllerStopRun(t *testing.T) {
 
 	// Start a run first.
 	startReq := StartRunRequest{
-		RunID:   "run-001",
-		RepoURL: "https://github.com/example/repo.git",
-		BaseRef: "main",
+		RunID:   types.RunID("run-001"),
+		RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+		BaseRef: types.GitRef("main"),
 	}
 
 	ctx := context.Background()
@@ -130,11 +132,11 @@ func TestRunControllerStopNonExistent(t *testing.T) {
 func TestBuildManifestFromRequest(t *testing.T) {
 	t.Run("valid request with all fields", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:     "run-123",
-			RepoURL:   "https://github.com/example/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature-branch",
-			CommitSHA: "abc123",
+			RunID:     types.RunID("run-123"),
+			RepoURL:   types.RepoURL("https://github.com/example/repo.git"),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("feature-branch"),
+			CommitSHA: types.CommitSHA("abc123"),
 			Env: map[string]string{
 				"FOO": "bar",
 			},
@@ -145,7 +147,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		if manifest.ID.String() != req.RunID {
+		if manifest.ID.String() != req.RunID.String() {
 			t.Errorf("expected ID %q, got %q", req.RunID, manifest.ID.String())
 		}
 		if manifest.Image != "ubuntu:latest" {
@@ -176,16 +178,16 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		repo := input.Hydration.Repo
-		if string(repo.URL) != req.RepoURL {
+		if string(repo.URL) != req.RepoURL.String() {
 			t.Errorf("expected repo URL %q, got %q", req.RepoURL, string(repo.URL))
 		}
-		if repo.BaseRef.String() != req.BaseRef {
+		if repo.BaseRef.String() != req.BaseRef.String() {
 			t.Errorf("expected base ref %q, got %q", req.BaseRef, repo.BaseRef.String())
 		}
-		if repo.TargetRef.String() != req.TargetRef {
+		if repo.TargetRef.String() != req.TargetRef.String() {
 			t.Errorf("expected target ref %q, got %q", req.TargetRef, repo.TargetRef.String())
 		}
-		if repo.Commit.String() != req.CommitSHA {
+		if repo.Commit.String() != req.CommitSHA.String() {
 			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
@@ -199,7 +201,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("missing run_id", func(t *testing.T) {
 		req := StartRunRequest{
-			RepoURL: "https://github.com/example/repo.git",
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
 
 		_, err := buildManifestFromRequest(req)
@@ -213,7 +215,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("missing repo_url", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID: "run-123",
+			RunID: types.RunID("run-123"),
 		}
 
 		_, err := buildManifestFromRequest(req)
@@ -227,9 +229,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("defaults target_ref from base_ref", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-123",
-			RepoURL: "https://github.com/example/repo.git",
-			BaseRef: "main",
+			RunID:   types.RunID("run-123"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+			BaseRef: types.GitRef("main"),
 		}
 
 		manifest, err := buildManifestFromRequest(req)
@@ -244,9 +246,9 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("validates manifest", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:     "run-123",
-			RepoURL:   "https://github.com/example/repo.git",
-			TargetRef: "main",
+			RunID:     types.RunID("run-123"),
+			RepoURL:   types.RepoURL("https://github.com/example/repo.git"),
+			TargetRef: types.GitRef("main"),
 		}
 
 		manifest, err := buildManifestFromRequest(req)
@@ -262,8 +264,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	// Accept command as either []string or single string.
 	t.Run("command option string maps to shell", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-123",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-123"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Options: map[string]any{
 				"command": "echo hi",
 			},
@@ -289,8 +291,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 	// so the image's own CMD/ENTRYPOINT drives execution.
 	t.Run("no command injected when custom image provided", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-123",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-123"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Options: map[string]any{
 				"image": "docker.io/example/mods-openrewrite:latest",
 			},
@@ -309,8 +311,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("placeholder command injected only for default ubuntu image", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-456",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-456"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
 		manifest, err := buildManifestFromRequest(req)
 		if err != nil {
@@ -329,8 +331,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("gitlab options are extracted and stored in manifest", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-789",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-789"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Options: map[string]any{
 				"gitlab_pat":       "glpat-secret-token",
 				"gitlab_domain":    "gitlab.example.com",
@@ -364,8 +366,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("gitlab options are trimmed and only included when non-empty", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-890",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-890"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Options: map[string]any{
 				"gitlab_pat":    "  trimmed-token  ",
 				"gitlab_domain": "",
@@ -400,8 +402,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 
 	t.Run("no gitlab options results in empty Options map", func(t *testing.T) {
 		req := StartRunRequest{
-			RunID:   "run-901",
-			RepoURL: "https://github.com/example/repo.git",
+			RunID:   types.RunID("run-901"),
+			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			Options: map[string]any{
 				"image": "alpine:latest",
 			},
@@ -643,9 +645,9 @@ func TestEndToEndFlow(t *testing.T) {
 		// Create a simple StartRunRequest that will execute quickly.
 		// We use a tiny command that exits immediately to avoid long test runs.
 		req := StartRunRequest{
-			RunID:   "test-run-e2e",
-			RepoURL: "https://github.com/example/test-repo.git",
-			BaseRef: "main",
+			RunID:   types.RunID("test-run-e2e"),
+			RepoURL: types.RepoURL("https://github.com/example/test-repo.git"),
+			BaseRef: types.GitRef("main"),
 			Options: map[string]any{
 				"image":   "alpine:latest",
 				"command": "echo 'test execution'",
@@ -662,7 +664,7 @@ func TestEndToEndFlow(t *testing.T) {
 
 		// Verify the run was registered.
 		rc.mu.Lock()
-		if _, exists := rc.runs[req.RunID]; !exists {
+		if _, exists := rc.runs[req.RunID.String()]; !exists {
 			t.Errorf("run %s not found after StartRun", req.RunID)
 		}
 		rc.mu.Unlock()
@@ -679,7 +681,7 @@ func TestEndToEndFlow(t *testing.T) {
 
 		// Verify the run was cleaned up from the controller.
 		rc.mu.Lock()
-		if _, exists := rc.runs[req.RunID]; exists {
+		if _, exists := rc.runs[req.RunID.String()]; exists {
 			t.Errorf("run %s still exists after completion", req.RunID)
 		}
 		rc.mu.Unlock()

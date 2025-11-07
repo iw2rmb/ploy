@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type mockRunController struct {
@@ -42,9 +44,9 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "valid request",
 			request: StartRunRequest{
-				RunID:   "run-123",
-				RepoURL: "https://github.com/example/repo.git",
-				BaseRef: "main",
+				RunID:   types.RunID("run-123"),
+				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
+				BaseRef: types.GitRef("main"),
 			},
 			wantStatus: http.StatusAccepted,
 			wantCalled: true,
@@ -52,7 +54,7 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "missing run_id",
 			request: StartRunRequest{
-				RepoURL: "https://github.com/example/repo.git",
+				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			wantStatus: http.StatusBadRequest,
 			wantCalled: false,
@@ -60,7 +62,7 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "missing repo_url",
 			request: StartRunRequest{
-				RunID: "run-123",
+				RunID: types.RunID("run-123"),
 			},
 			wantStatus: http.StatusBadRequest,
 			wantCalled: false,
@@ -68,8 +70,8 @@ func TestHandleRunStart(t *testing.T) {
 		{
 			name: "controller error",
 			request: StartRunRequest{
-				RunID:   "run-123",
-				RepoURL: "https://github.com/example/repo.git",
+				RunID:   types.RunID("run-123"),
+				RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			controllerErr: fmt.Errorf("execution failed"),
 			wantStatus:    http.StatusInternalServerError,
@@ -102,7 +104,7 @@ func TestHandleRunStart(t *testing.T) {
 				t.Errorf("controller.StartRun called = %v, want %v", mock.startCalled, tt.wantCalled)
 			}
 
-			if tt.wantCalled && mock.lastStart.RunID != tt.request.RunID {
+			if tt.wantCalled && mock.lastStart.RunID.String() != tt.request.RunID.String() {
 				t.Errorf("controller received RunID = %q, want %q", mock.lastStart.RunID, tt.request.RunID)
 			}
 		})
