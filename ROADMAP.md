@@ -134,6 +134,6 @@ Legend: [ ] todo, [x] done.
   - Change: `CHECKPOINT.md`, `PIPES.md`, docs/api notes.
   - Test: `tests/guards/docs_guard_test.go` passes; links valid.
 
-- [ ] Add lints: forbid hard-coded label keys and free-form protocols.
+- [x] Add lints: forbid hard-coded label keys and free-form protocols.
   - Change: small staticcheck or regex guard in tests (if guard suite exists).
   - Test: guard test trips on regressions.
