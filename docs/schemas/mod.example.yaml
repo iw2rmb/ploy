@@ -1,0 +1,66 @@
+# apiVersion and kind are informational; the current control plane forwards this
+# spec as an opaque JSON object. Keep keys stable and snake_case to align with
+# existing CLI/agent options.
+apiVersion: ploy.mod/v1alpha1
+kind: ModRunSpec
+
+# Main mod container to run against the hydrated repository at /workspace.
+mod:
+  # Required: image that performs the transformation (e.g., OpenRewrite)
+  image: docker.io/your-dh-user/mods-openrewrite:latest
+  # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
+  # command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
+  # Environment variables passed into the mod container
+  env:
+    RECIPE_GROUP: org.openrewrite.recipe
+    RECIPE_ARTIFACT: rewrite-migrate-java
+    RECIPE_VERSION: "3.20.0"
+    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+    MAVEN_PLUGIN_VERSION: "6.18.0"
+  # Retain container for debugging (disabled by default)
+  retain_container: false
+
+# Build Gate settings. The node agent reuses the same Java gate for Maven/Gradle
+# (maven: -e; gradle: --stacktrace). Profile "auto" detects pom.xml/gradle files.
+build_gate:
+  enabled: true
+  profile: auto # auto | java | java-maven | java-gradle
+
+# Healing sequence executed when the initial Build Gate fails. Each item is a
+# container step that can modify /workspace and emit artifacts to /out. After
+# running all steps, the gate is re-run; on pass, the main mod proceeds.
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/your-dh-user/mods-codex:latest
+      # Codex prompt can be provided via env or a prompt file under /workspace.
+      # The container must have Docker socket access (-v /var/run/docker.sock)
+      # and PLOY_HOST_WORKSPACE pointing to the host path for build verification.
+      command: >-
+        mod-codex --input /workspace --out /out --prompt-file /workspace/prompt.txt
+      env:
+        CODEX_PROMPT: |-
+          Rules:
+          - After making any change, verify the build.
+          - Run: ploy-buildgate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - If it fails, iterate and try again until it passes.
+          - Only finalize once the gate passes; then print "BUILD PASSED".
+          
+          Task:
+          Fix the compilation error described in /in/build-gate.log.
+      retain_container: false
+
+# Optional GitLab integration (control plane/node redact PAT in logs).
+gitlab_domain: gitlab.com
+# gitlab_pat: "<TOKEN>"           # prefer providing via environment in runtime
+mr_on_success: true
+mr_on_fail: true
+
+# Notes
+# - This YAML is submitted via: `ploy mod run --spec mod.yaml` along with
+#   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
+# - The current agent honors: mod.image, mod.command, mod.env, mod.retain_container,
+#   gitlab_domain, gitlab_pat, mr_on_success, mr_on_fail, and build_gate.* (profile).
+#   The build_gate_healing block represents the agreed format for the healing loop
+#   and will be consumed in the next implementation slice.
+
