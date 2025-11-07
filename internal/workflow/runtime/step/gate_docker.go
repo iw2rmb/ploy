@@ -69,14 +69,17 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 			image = defaultString(os.Getenv("PLOY_BUILDGATE_JAVA_IMAGE"), "maven:3-eclipse-temurin-17")
 		}
 		tool = "maven"
-		cmd = []string{"/bin/sh", "-lc", "mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test"}
+		// Always include -e for full ERROR-level stack traces. Keep -q to reduce noise.
+		// Diagnostic guidance: switch to -X (drop -q) only for deep investigations.
+		cmd = []string{"/bin/sh", "-lc", "mvn -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test"}
 	}
 	chooseGradle := func() {
 		if image == "" {
 			image = defaultString(os.Getenv("PLOY_BUILDGATE_GRADLE_IMAGE"), "gradle:8.8-jdk17")
 		}
 		tool = "gradle"
-		cmd = []string{"/bin/sh", "-lc", "gradle -q test -p /workspace"}
+		// Include --stacktrace for error stack traces (similar to Maven -e). Keep -q to reduce noise.
+		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace test -p /workspace"}
 	}
 	chooseJava := func() {
 		if image == "" {
