@@ -77,7 +77,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/nodeagent/execution.go` (helper function location as implemented in repo).
   - Test: `TestBuildManifestFromRequest` updated to assert typed values; existing behavior preserved.
 
-- [ ] Runner request threading: add `TicketID` on `step.Request`; pass from controller to runner; used for labels.
+- [x] Runner request threading: add `TicketID` on `step.Request`; pass from controller to runner; used for labels.
   - Change: `internal/workflow/runtime/step/stub.go` (Request struct), `internal/nodeagent/execution.go` (call sites).
   - Test: runner unit test asserts label carries correct run id when runtime set.
 

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -135,6 +136,8 @@ type Runner struct {
 
 // Request describes a step execution request.
 type Request struct {
+	// TicketID threads the workflow ticket identifier for correlation/labels.
+	TicketID  types.TicketID
 	Manifest  contracts.StepManifest
 	Workspace string
 	OutDir    string

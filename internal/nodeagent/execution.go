@@ -11,6 +11,7 @@ import (
 
 	"net/url"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/nodeagent/git"
 	"github.com/iw2rmb/ploy/internal/nodeagent/gitlab"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -101,6 +102,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	// Execute the step.
 	startTime := time.Now()
 	result, execErr := runner.Run(ctx, step.Request{
+		TicketID:  types.TicketID(req.RunID),
 		Manifest:  manifest,
 		Workspace: workspaceRoot,
 		OutDir:    outDir,
