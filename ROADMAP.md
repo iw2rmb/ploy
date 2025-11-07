@@ -11,7 +11,7 @@ Legend: [ ] todo, [x] done.
   - Change: add files `ids.go`, `vcs.go`, `artifacts.go`, `duration.go`, `resources.go`, `network.go`, `logging.go`.
   - Test: unit tests per file covering JSON/Text marshal/unmarshal and validation.
 
-- [ ] IDs — `TicketID`, `RunID`, `StageID`, `StepID`, `ClusterID` with `String()` and `IsZero()`.
+- [x] IDs — `TicketID`, `RunID`, `StageID`, `StepID`, `ClusterID` with `String()` and `IsZero()`.
   - Change: `internal/domain/types/ids.go`.
   - Test: construct/compare; reject empty; ensure JSON roundtrip yields strings.
 

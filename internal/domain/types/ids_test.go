@@ -6,69 +6,127 @@ import (
 	"testing"
 )
 
-// sampleID is a stub string-based value type proving the JSON/Text pattern.
-type sampleID string
+func TestIDs_Basics(t *testing.T) {
+	t.Run("zero", func(t *testing.T) {
+		var (
+			a TicketID
+			b RunID
+			c StageID
+			d StepID
+			e ClusterID
+		)
+		if !a.IsZero() || a.String() != "" {
+			t.Fatalf("TicketID zero failed")
+		}
+		if !b.IsZero() || b.String() != "" {
+			t.Fatalf("RunID zero failed")
+		}
+		if !c.IsZero() || c.String() != "" {
+			t.Fatalf("StageID zero failed")
+		}
+		if !d.IsZero() || d.String() != "" {
+			t.Fatalf("StepID zero failed")
+		}
+		if !e.IsZero() || e.String() != "" {
+			t.Fatalf("ClusterID zero failed")
+		}
+	})
 
-func (v sampleID) MarshalText() ([]byte, error) {
-	s := Normalize(string(v))
-	if IsEmpty(s) {
-		return nil, ErrEmpty
-	}
-	return []byte(s), nil
-}
-
-func (v *sampleID) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
-	if IsEmpty(s) {
-		return ErrEmpty
-	}
-	*v = sampleID(s)
-	return nil
-}
-
-func (v sampleID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *sampleID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-func (v sampleID) Validate() error {
-	if IsEmpty(string(v)) {
-		return ErrEmpty
-	}
-	return nil
+	t.Run("construct_compare", func(t *testing.T) {
+		a1, a2 := TicketID("t1"), TicketID("t1")
+		if a1 != a2 || a1.String() != "t1" {
+			t.Fatalf("TicketID compare/string failed")
+		}
+		r1, r2 := RunID("r1"), RunID("r1")
+		if r1 != r2 || r1.String() != "r1" {
+			t.Fatalf("RunID compare/string failed")
+		}
+		s1, s2 := StageID("s1"), StageID("s1")
+		if s1 != s2 || s1.String() != "s1" {
+			t.Fatalf("StageID compare/string failed")
+		}
+		st1, st2 := StepID("st1"), StepID("st1")
+		if st1 != st2 || st1.String() != "st1" {
+			t.Fatalf("StepID compare/string failed")
+		}
+		c1, c2 := ClusterID("c1"), ClusterID("c1")
+		if c1 != c2 || c1.String() != "c1" {
+			t.Fatalf("ClusterID compare/string failed")
+		}
+	})
 }
 
 func TestIDs_TextAndJSONRoundTrip(t *testing.T) {
-	var v sampleID
+	// Use one representative value for each type.
+	var (
+		tid  TicketID
+		rid  RunID
+		sid  StageID
+		step StepID
+		cid  ClusterID
+	)
 
-	if err := v.UnmarshalText([]byte("  run-42  ")); err != nil {
-		t.Fatalf("unmarshal text: %v", err)
+	if err := tid.UnmarshalText([]byte("  T-42  ")); err != nil {
+		t.Fatalf("ticket UnmarshalText: %v", err)
 	}
-	if string(v) != "run-42" {
-		t.Fatalf("normalize failed: got %q", string(v))
+	if tid.String() != "T-42" {
+		t.Fatalf("ticket normalize: %q", tid.String())
 	}
-
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(tid)
 	if err != nil {
-		t.Fatalf("marshal json: %v", err)
+		t.Fatalf("ticket marshal: %v", err)
 	}
-	if string(b) != "\"run-42\"" {
-		t.Fatalf("marshal json mismatch: %s", string(b))
+	if string(b) != "\"T-42\"" {
+		t.Fatalf("ticket json string expected, got %s", string(b))
+	}
+	var tid2 TicketID
+	if err := json.Unmarshal(b, &tid2); err != nil {
+		t.Fatalf("ticket unmarshal json: %v", err)
+	}
+	if tid2 != tid {
+		t.Fatalf("ticket roundtrip mismatch: %v != %v", tid2, tid)
 	}
 
-	var v2 sampleID
-	if err := json.Unmarshal(b, &v2); err != nil {
-		t.Fatalf("unmarshal json: %v", err)
+	if err := rid.UnmarshalText([]byte(" r-1 ")); err != nil {
+		t.Fatalf("run UnmarshalText: %v", err)
 	}
-	if v2 != v {
-		t.Fatalf("roundtrip mismatch: %q != %q", v2, v)
+	if err := sid.UnmarshalText([]byte(" s-1 ")); err != nil {
+		t.Fatalf("stage UnmarshalText: %v", err)
+	}
+	if err := step.UnmarshalText([]byte(" step-1 ")); err != nil {
+		t.Fatalf("step UnmarshalText: %v", err)
+	}
+	if err := cid.UnmarshalText([]byte(" c-1 ")); err != nil {
+		t.Fatalf("cluster UnmarshalText: %v", err)
+	}
+
+	for name, v := range map[string]any{"run": rid, "stage": sid, "step": step, "cluster": cid} {
+		bb, err := json.Marshal(v)
+		if err != nil {
+			t.Fatalf("%s marshal: %v", name, err)
+		}
+		if len(bb) == 0 || bb[0] != '"' {
+			t.Fatalf("%s json must be string: %s", name, string(bb))
+		}
 	}
 }
 
-func TestIDs_Validation(t *testing.T) {
-	var v sampleID
-	if err := v.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
-		t.Fatalf("expected ErrEmpty, got %v", err)
+func TestIDs_RejectEmpty(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func([]byte) error
+	}{
+		{"ticket", func(b []byte) error { var v TicketID; return v.UnmarshalText(b) }},
+		{"run", func(b []byte) error { var v RunID; return v.UnmarshalText(b) }},
+		{"stage", func(b []byte) error { var v StageID; return v.UnmarshalText(b) }},
+		{"step", func(b []byte) error { var v StepID; return v.UnmarshalText(b) }},
+		{"cluster", func(b []byte) error { var v ClusterID; return v.UnmarshalText(b) }},
 	}
-	v = sampleID("ok")
-	if err := v.Validate(); err != nil {
-		t.Fatalf("validate ok: %v", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := tt.fn([]byte("   ")); !errors.Is(err, ErrEmpty) {
+				t.Fatalf("expected ErrEmpty, got %v", err)
+			}
+		})
 	}
 }
