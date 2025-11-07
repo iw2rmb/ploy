@@ -121,7 +121,7 @@ Legend: [ ] todo, [x] done.
   - Test: roundtrip of IDs through DB writes in handler tests stays green.
 
 ## Compatibility and Migrations
-- [ ] JSON compatibility — ensure all new types marshal as original strings; no API break.
+ - [x] JSON compatibility — ensure all new types marshal as original strings; no API break.
   - Change: rely on `encoding.TextMarshaler`/`TextUnmarshaler` on types.
   - Test: golden JSON fixtures for tickets, checkpoints, artifacts.
 

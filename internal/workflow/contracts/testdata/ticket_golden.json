@@ -1,0 +1,16 @@
+{
+  "schema_version": "2025-09-27.1",
+  "ticket_id": "ticket-123",
+  "manifest": {
+    "name": "smoke",
+    "version": "2025-09-26"
+  },
+  "repo": {
+    "url": "https://gitlab.com/iw2rmb/sample.git",
+    "base_ref": "main",
+    "target_ref": "mods/shift-grid",
+    "commit": "abcdef1234567890",
+    "workspace_hint": "ws"
+  }
+}
+
