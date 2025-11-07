@@ -5,7 +5,7 @@ set -euo pipefail
 # Flow:
 #  1) Create a tiny Maven project that fails to compile (missing symbol).
 #  2) Run the Build Gate container (maven:3-eclipse-temurin-17) and capture logs.
-#  3) Save logs to /workspace/.ploy/build-gate.log (artifact to pass to LLM).
+#  3) Save logs to /in/build-gate.log (artifact to pass to LLM; /in is read-only cross-phase input).
 #  4) Run mods/mod-llm stub to heal the missing symbol.
 #  5) Re-run the Build Gate and expect success.
 
@@ -17,7 +17,8 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 WORKDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-buildgate)
-cleanup() { rm -rf "$WORKDIR" || true; }
+INDIR=$(mktemp -d 2>/dev/null || mktemp -d -t ploy-buildgate-in)
+cleanup() { rm -rf "$WORKDIR" "$INDIR" || true; }
 trap cleanup EXIT
 
 mkdir -p "$WORKDIR/src/main/java/e2e"
@@ -60,15 +61,15 @@ if [[ $STATUS -eq 0 ]]; then
   exit 1
 fi
 
-mkdir -p "$WORKDIR/.ploy"
-echo "$LOGS" >"$WORKDIR/.ploy/build-gate.log"
+mkdir -p "$INDIR"
+echo "$LOGS" >"$INDIR/build-gate.log"
 
-if ! grep -E -q 'COMPILATION ERROR|cannot find symbol' "$WORKDIR/.ploy/build-gate.log"; then
+if ! grep -E -q 'COMPILATION ERROR|cannot find symbol' "$INDIR/build-gate.log"; then
   echo "FAIL: build-gate.log does not contain a compilation error"
   exit 1
 fi
 
-echo "[scenario] Build Gate failed as expected; artifact saved to .ploy/build-gate.log"
+echo "[scenario] Build Gate failed as expected; artifact saved to /in/build-gate.log"
 
 # Run LLM healer stub (mods/mod-llm) to create e2e/UnknownClass.java
 OUTDIR="$WORKDIR/out"

@@ -62,6 +62,10 @@ What to verify:
 
 When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `ploy-buildgate` and requires Docker socket access and `PLOY_HOST_WORKSPACE` to point to the host path.
 
+Cross-phase inputs are mounted at `/in` (read-only):
+- `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
+- `/in/prompt.txt` — Default prompt location (when provided in spec; node mounts it R/O)
+
 What to expect with the provided E2E images:
 - Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the ticket and can be downloaded via `--artifact-dir`.
 

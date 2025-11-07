@@ -38,7 +38,8 @@ build_gate_healing:
   retries: 1
   mods:
     - image: docker.io/your-dh-user/mods-codex:latest
-      # Codex prompt can be provided via env or a prompt file under /workspace.
+      # Codex prompt can be provided via env (CODEX_PROMPT) or a prompt file.
+      # Default prompt location: /in/prompt.txt (node mounts it R/O when provided in spec).
       # The container must have Docker socket access (-v /var/run/docker.sock)
       # and PLOY_HOST_WORKSPACE pointing to the host path for build verification.
       command: >-
