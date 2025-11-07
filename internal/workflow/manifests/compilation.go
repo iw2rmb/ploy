@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+
+	dtypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Compilation represents the normalized manifest payload consumed by the runner/control plane.
@@ -80,9 +82,9 @@ type ServiceIdentity struct {
 
 // ServicePort captures an exposed network port for a service.
 type ServicePort struct {
-	Name     string `json:"name"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocol"`
+	Name     string          `json:"name"`
+	Port     int             `json:"port"`
+	Protocol dtypes.Protocol `json:"protocol"`
 }
 
 // ServiceRequirement documents dependencies required by the service.
@@ -93,10 +95,10 @@ type ServiceRequirement struct {
 
 // Edge codifies connectivity expectations between services.
 type Edge struct {
-	Source    string   `json:"source"`
-	Target    string   `json:"target"`
-	Ports     []string `json:"ports"`
-	Protocols []string `json:"protocols"`
+	Source    string            `json:"source"`
+	Target    string            `json:"target"`
+	Ports     []string          `json:"ports"`
+	Protocols []dtypes.Protocol `json:"protocols"`
 }
 
 // Exposure captures public or internal exposure intents for a service port.
@@ -227,10 +229,12 @@ func normalizeServices(rawServices []rawService) []Service {
 	for _, svc := range rawServices {
 		ports := make([]ServicePort, 0, len(svc.Ports))
 		for _, port := range svc.Ports {
+			// normalize protocol string to canonical lowercase enum
+			proto := dtypes.Protocol(strings.ToLower(strings.TrimSpace(port.Protocol)))
 			ports = append(ports, ServicePort{
 				Name:     strings.TrimSpace(port.Name),
 				Port:     port.Port,
-				Protocol: strings.TrimSpace(port.Protocol),
+				Protocol: proto,
 			})
 		}
 		sort.Slice(ports, func(i, j int) bool {
@@ -272,11 +276,13 @@ func normalizeEdges(rawEdges []rawEdge) []Edge {
 	}
 	edges := make([]Edge, 0, len(rawEdges))
 	for _, edge := range rawEdges {
+		// normalize protocols into canonical enum slice
+		protos := normalizeProtocols(edge.Protocols)
 		edges = append(edges, Edge{
 			Source:    strings.TrimSpace(edge.Source),
 			Target:    strings.TrimSpace(edge.Target),
 			Ports:     normalizeStringSet(edge.Ports),
-			Protocols: normalizeStringSet(edge.Protocols),
+			Protocols: protos,
 		})
 	}
 	sort.Slice(edges, func(i, j int) bool {
@@ -332,5 +338,31 @@ func normalizeStringSet(values []string) []string {
 		result = append(result, value)
 	}
 	sort.Strings(result)
+	return result
+}
+
+// normalizeProtocols trims, deduplicates, sorts, and canonicalizes protocol values.
+func normalizeProtocols(values []string) []dtypes.Protocol {
+	if len(values) == 0 {
+		return nil
+	}
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if trimmed := strings.ToLower(strings.TrimSpace(value)); trimmed != "" {
+			set[trimmed] = struct{}{}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	tmp := make([]string, 0, len(set))
+	for value := range set {
+		tmp = append(tmp, value)
+	}
+	sort.Strings(tmp)
+	result := make([]dtypes.Protocol, 0, len(tmp))
+	for _, s := range tmp {
+		result = append(result, dtypes.Protocol(s))
+	}
 	return result
 }

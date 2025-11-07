@@ -101,7 +101,7 @@ Legend: [ ] todo, [x] done.
   - Test: update tests to use `ClusterID`; default marker logic unchanged.
 
 ## Manifests: Protocol Enum
-- [ ] Replace free-form protocol strings with `Protocol` enum; validate on compile normalization.
+- [x] Replace free-form protocol strings with `Protocol` enum; validate on compile normalization.
   - Change: `internal/workflow/manifests/compilation.go` types for `ServicePort.Protocol` and `Edge.Protocols`.
   - Test: existing manifest tests updated; add rejection for invalid protocol.
 
