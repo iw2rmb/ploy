@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -31,9 +31,9 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -73,9 +73,9 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		// Validate run_id is a valid UUID.
-		runUUID, err := uuid.Parse(req.RunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+		runID := domaintypes.ToPGUUID(req.RunID)
+		if !runID.Valid {
+			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -92,10 +92,8 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		}
 
 		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -109,37 +107,26 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		// Parse stage_id if provided.
 		var stageID pgtype.UUID
 		if req.StageID != nil && strings.TrimSpace(*req.StageID) != "" {
-			stageUUID, err := uuid.Parse(*req.StageID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid stage_id: %v", err), http.StatusBadRequest)
+			stageID = domaintypes.ToPGUUID(*req.StageID)
+			if !stageID.Valid {
+				http.Error(w, "invalid stage_id: invalid uuid", http.StatusBadRequest)
 				return
-			}
-			stageID = pgtype.UUID{
-				Bytes: stageUUID,
-				Valid: true,
 			}
 		}
 
 		// Parse build_id if provided.
 		var buildID pgtype.UUID
 		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
-			buildUUID, err := uuid.Parse(*req.BuildID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid build_id: %v", err), http.StatusBadRequest)
+			buildID = domaintypes.ToPGUUID(*req.BuildID)
+			if !buildID.Valid {
+				http.Error(w, "invalid build_id: invalid uuid", http.StatusBadRequest)
 				return
-			}
-			buildID = pgtype.UUID{
-				Bytes: buildUUID,
-				Valid: true,
 			}
 		}
 
 		// Store the gzipped log chunk in the database.
 		params := store.CreateLogParams{
-			RunID: pgtype.UUID{
-				Bytes: runUUID,
-				Valid: true,
-			},
+			RunID:   runID,
 			StageID: stageID,
 			BuildID: buildID,
 			ChunkNo: req.ChunkNo,

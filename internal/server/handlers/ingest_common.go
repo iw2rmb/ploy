@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // parseOptionalUUID parses an optional UUID string pointer into pgtype.UUID.
@@ -13,9 +15,9 @@ func parseOptionalUUID(s *string) (pgtype.UUID, error) {
 	if s == nil || strings.TrimSpace(*s) == "" {
 		return pgtype.UUID{}, nil
 	}
-	id, err := uuid.Parse(*s)
-	if err != nil {
-		return pgtype.UUID{}, err
+	id := domaintypes.ToPGUUID(*s)
+	if !id.Valid {
+		return pgtype.UUID{}, fmt.Errorf("invalid uuid")
 	}
-	return pgtype.UUID{Bytes: id, Valid: true}, nil
+	return id, nil
 }

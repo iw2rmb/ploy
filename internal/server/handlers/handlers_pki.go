@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	internalPKI "github.com/iw2rmb/ploy/internal/pki"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -35,9 +35,9 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate node_id format.
-		nodeUUID, err := uuid.Parse(req.NodeID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid node_id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(req.NodeID)
+		if !nodeID.Valid {
+			http.Error(w, "invalid node_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -83,10 +83,7 @@ func pkiSignHandler(st store.Store) http.HandlerFunc {
 
 		// Persist certificate metadata to the database.
 		err = st.UpdateNodeCertMetadata(r.Context(), store.UpdateNodeCertMetadataParams{
-			ID: pgtype.UUID{
-				Bytes: nodeUUID,
-				Valid: true,
-			},
+			ID:              nodeID,
 			CertSerial:      &cert.Serial,
 			CertFingerprint: &cert.Fingerprint,
 			CertNotBefore: pgtype.Timestamptz{

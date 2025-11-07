@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -31,9 +31,9 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -45,9 +45,9 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Parse and validate stage_id.
-		stageUUID, err := uuid.Parse(stageIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid stage: %v", err), http.StatusBadRequest)
+		stageID := domaintypes.ToPGUUID(stageIDStr)
+		if !stageID.Valid {
+			http.Error(w, "invalid stage: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -85,9 +85,9 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate run_id is a valid UUID.
-		runUUID, err := uuid.Parse(req.RunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+		runID := domaintypes.ToPGUUID(req.RunID)
+		if !runID.Valid {
+			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -104,7 +104,8 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{Bytes: nodeUUID, Valid: true})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -116,7 +117,7 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the run exists.
-		_, err = st.GetRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true})
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -128,7 +129,7 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the stage exists.
-		stage, err := st.GetStage(r.Context(), pgtype.UUID{Bytes: stageUUID, Valid: true})
+		stage, err := st.GetStage(r.Context(), stageID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "stage not found", http.StatusNotFound)
@@ -140,7 +141,7 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the stage belongs to the provided run.
-		if uuid.UUID(stage.RunID.Bytes) != runUUID {
+		if stage.RunID != runID {
 			http.Error(w, "stage does not belong to run", http.StatusBadRequest)
 			return
 		}
@@ -152,12 +153,7 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		params := store.CreateDiffParams{
-			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
-			StageID: pgtype.UUID{Bytes: stageUUID, Valid: true},
-			Patch:   req.Patch,
-			Summary: summaryBytes,
-		}
+		params := store.CreateDiffParams{RunID: runID, StageID: stageID, Patch: req.Patch, Summary: summaryBytes}
 
 		// Persist diff to DB.
 		diff, err := st.CreateDiff(r.Context(), params)

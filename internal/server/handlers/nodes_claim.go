@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -28,17 +28,15 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
+		var err error
 		// Verify node exists before attempting to claim a run.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -50,10 +48,7 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 		}
 
 		// Attempt to claim a run using FOR UPDATE SKIP LOCKED.
-		run, err := st.ClaimRun(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		run, err := st.ClaimRun(r.Context(), nodeID)
 		if err != nil {
 			// No queued runs available is a valid state; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {

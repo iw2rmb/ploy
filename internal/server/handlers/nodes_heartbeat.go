@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -27,9 +27,9 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -50,10 +50,8 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the node exists before attempting to update.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -69,10 +67,7 @@ func heartbeatHandler(st store.Store) http.HandlerFunc {
 
 		// Update node heartbeat with resource snapshot.
 		err = st.UpdateNodeHeartbeat(r.Context(), store.UpdateNodeHeartbeatParams{
-			ID: pgtype.UUID{
-				Bytes: nodeUUID,
-				Valid: true,
-			},
+			ID: nodeID,
 			LastHeartbeat: pgtype.Timestamptz{
 				Time:  time.Now().UTC(),
 				Valid: true,
