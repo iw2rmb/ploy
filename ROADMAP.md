@@ -43,7 +43,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/labels.go` with `LabelsForRun(RunID)` and `LabelsForStep(StepID)`.
   - Test: map contains expected keys/values; empty input yields empty map.
 
-- [ ] UUID Bridge — helpers to convert domain IDs ↔ `pgtype.UUID`.
+- [x] UUID Bridge — helpers to convert domain IDs ↔ `pgtype.UUID`.
   - Change: `internal/domain/types/uuid.go`.
   - Test: roundtrip conversion; invalid UUID returns zero-value.
 
