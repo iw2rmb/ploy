@@ -634,7 +634,7 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 
 	// Save descriptor with existing cert paths.
 	desc := config.Descriptor{
-		ClusterID: clusterID,
+		ClusterID: config.ClusterID(clusterID),
 		Address:   "https://10.0.0.5:8443",
 		Scheme:    "https",
 		CAPath:    caPath,
@@ -644,7 +644,7 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		t.Fatalf("SaveDescriptor failed: %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault failed: %v", err)
 	}
 
@@ -664,7 +664,7 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		t.Fatalf("SaveDescriptor(update address): %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault(update) failed: %v", err)
 	}
 
@@ -728,11 +728,11 @@ func TestRefreshAdminCertFromServerServerError(t *testing.T) {
 
 	// Minimal descriptor with cluster ID set and no TLS paths.
 	clusterID := "test-cluster-error"
-	desc := config.Descriptor{ClusterID: clusterID, Address: "https://127.0.0.1:8443", Scheme: "https"}
+	desc := config.Descriptor{ClusterID: config.ClusterID(clusterID), Address: "https://127.0.0.1:8443", Scheme: "https"}
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		t.Fatalf("SaveDescriptor failed: %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault failed: %v", err)
 	}
 
@@ -745,10 +745,10 @@ func TestRefreshAdminCertFromServerServerError(t *testing.T) {
 	defer srv.Close()
 
 	// Update descriptor to point to test server.
-	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: clusterID, Address: srv.URL}); err != nil {
+	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: config.ClusterID(clusterID), Address: srv.URL}); err != nil {
 		t.Fatalf("SaveDescriptor(update): %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault(update): %v", err)
 	}
 
@@ -770,11 +770,11 @@ func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	clusterID := "test-cluster-invalid-json"
-	desc := config.Descriptor{ClusterID: clusterID, Address: "https://127.0.0.1:8443", Scheme: "https"}
+	desc := config.Descriptor{ClusterID: config.ClusterID(clusterID), Address: "https://127.0.0.1:8443", Scheme: "https"}
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		t.Fatalf("SaveDescriptor failed: %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault failed: %v", err)
 	}
 
@@ -788,10 +788,10 @@ func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
 	defer srv.Close()
 
 	// Update descriptor to point to test server.
-	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: clusterID, Address: srv.URL}); err != nil {
+	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: config.ClusterID(clusterID), Address: srv.URL}); err != nil {
 		t.Fatalf("SaveDescriptor(update): %v", err)
 	}
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault(update): %v", err)
 	}
 
@@ -1094,7 +1094,7 @@ func TestServerDeployDescriptorPersistence(t *testing.T) {
 	// Simulate the descriptor save logic from runServerDeploy.
 	serverAddress := "https://10.0.0.5:8443"
 	desc := config.Descriptor{
-		ClusterID:       clusterID,
+		ClusterID:       config.ClusterID(clusterID),
 		Address:         serverAddress,
 		Scheme:          "https",
 		SSHIdentityPath: identityPath,
@@ -1104,7 +1104,7 @@ func TestServerDeployDescriptorPersistence(t *testing.T) {
 	}
 
 	// Set as default.
-	if err := config.SetDefault(clusterID); err != nil {
+	if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 		t.Fatalf("SetDefault failed: %v", err)
 	}
 
@@ -1118,7 +1118,7 @@ func TestServerDeployDescriptorPersistence(t *testing.T) {
 	}
 
 	saved := list[0]
-	if saved.ClusterID != clusterID {
+	if string(saved.ClusterID) != clusterID {
 		t.Fatalf("expected ClusterID=%q, got %q", clusterID, saved.ClusterID)
 	}
 	if saved.Address != serverAddress {

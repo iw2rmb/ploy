@@ -216,11 +216,11 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	// Prefer existing descriptor CA/client cert for future mTLS operations.
 	existing, loadErr := config.LoadDefault()
 	desc := config.Descriptor{
-		ClusterID:       cfg.ClusterID,
+		ClusterID:       config.ClusterID(cfg.ClusterID),
 		Address:         serverURL,
 		SSHIdentityPath: identityPath,
 	}
-	if loadErr != nil || strings.TrimSpace(existing.ClusterID) == "" {
+	if loadErr != nil || strings.TrimSpace(string(existing.ClusterID)) == "" {
 		if _, err := config.SaveDescriptor(desc); err != nil {
 			_, _ = fmt.Fprintf(stderr, "Warning: failed to save/refresh cluster descriptor: %v\n", err)
 		}

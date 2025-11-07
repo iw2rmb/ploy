@@ -96,7 +96,7 @@ Legend: [ ] todo, [x] done.
   - Test: compile of handlers using these types; JSON roundtrip.
 
 ## CLI Config: ClusterID Type
-- [ ] Introduce `ClusterID`; migrate `Descriptor.ClusterID` and helpers (`SaveDescriptor`, `SetDefault`, `LoadDefault`, `ListDescriptors`).
+- [x] Introduce `ClusterID`; migrate `Descriptor.ClusterID` and helpers (`SaveDescriptor`, `SetDefault`, `LoadDefault`, `ListDescriptors`).
   - Change: `internal/cli/config/config.go`.
   - Test: update tests to use `ClusterID`; default marker logic unchanged.
 

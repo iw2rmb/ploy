@@ -22,13 +22,13 @@ func TestSaveListAndDefaultDescriptor(t *testing.T) {
 		t.Fatalf("expected error when saving without cluster id")
 	}
 
-	d := Descriptor{ClusterID: "cluster-1", Address: "10.0.0.1:8443", SSHIdentityPath: "/root/.ssh/id_rsa"}
+	d := Descriptor{ClusterID: ClusterID("cluster-1"), Address: "10.0.0.1:8443", SSHIdentityPath: "/root/.ssh/id_rsa"}
 	if _, err := SaveDescriptor(d); err != nil {
 		t.Fatalf("SaveDescriptor error: %v", err)
 	}
 
 	// Mark default and verify ListDescriptors marks Default=true.
-	if err := SetDefault("cluster-1"); err != nil {
+	if err := SetDefault(ClusterID("cluster-1")); err != nil {
 		t.Fatalf("SetDefault error: %v", err)
 	}
 	list, err := ListDescriptors()
@@ -84,7 +84,7 @@ func TestClustersDirEnvPrecedenceAndSanitize(t *testing.T) {
 	}
 
 	// Ensure SetDefault creates marker file under clusters dir.
-	if err := SetDefault("abc"); err != nil {
+	if err := SetDefault(ClusterID("abc")); err != nil {
 		t.Fatalf("SetDefault error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "default")); err != nil {
@@ -117,7 +117,7 @@ func TestLoadDefault(t *testing.T) {
 
 	// Save a descriptor and set it as default.
 	d := Descriptor{
-		ClusterID:       "test-cluster",
+		ClusterID:       ClusterID("test-cluster"),
 		Address:         "10.0.0.1:8443",
 		SSHIdentityPath: "/root/.ssh/id_rsa",
 		CAPath:          "/etc/ploy/ca.crt",
@@ -127,7 +127,7 @@ func TestLoadDefault(t *testing.T) {
 	if _, err := SaveDescriptor(d); err != nil {
 		t.Fatalf("SaveDescriptor error: %v", err)
 	}
-	if err := SetDefault("test-cluster"); err != nil {
+	if err := SetDefault(ClusterID("test-cluster")); err != nil {
 		t.Fatalf("SetDefault error: %v", err)
 	}
 

@@ -38,13 +38,13 @@ func handleRefreshAdminCert(ctx context.Context, stderr io.Writer) error {
 	_, _ = fmt.Fprintf(stderr, "Refreshing admin certificate for cluster: %s\n", desc.ClusterID)
 
 	// Call server to sign new admin cert.
-	caPEM, certPEM, keyPEM, err := refreshAdminCertFromServer(ctx, desc.ClusterID, stderr)
+	caPEM, certPEM, keyPEM, err := refreshAdminCertFromServer(ctx, string(desc.ClusterID), stderr)
 	if err != nil {
 		return fmt.Errorf("refresh admin cert: %w", err)
 	}
 
 	// Write local admin bundle.
-	caPath, certPath, keyPath, err := writeLocalAdminBundle(desc.ClusterID, caPEM, certPEM, keyPEM)
+	caPath, certPath, keyPath, err := writeLocalAdminBundle(string(desc.ClusterID), caPEM, certPEM, keyPEM)
 	if err != nil {
 		return fmt.Errorf("refresh admin cert: write local bundle: %w", err)
 	}

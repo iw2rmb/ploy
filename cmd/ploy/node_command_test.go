@@ -332,7 +332,7 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 
 	// Simulate the descriptor refresh logic from runNodeAdd.
 	desc := config.Descriptor{
-		ClusterID:       clusterID,
+		ClusterID:       config.ClusterID(clusterID),
 		Address:         serverURL,
 		Scheme:          "https",
 		SSHIdentityPath: identityPath,
@@ -351,7 +351,7 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 	}
 
 	saved := list[0]
-	if saved.ClusterID != clusterID {
+	if string(saved.ClusterID) != clusterID {
 		t.Fatalf("expected ClusterID=%q, got %q", clusterID, saved.ClusterID)
 	}
 	if saved.Address != serverURL {

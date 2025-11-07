@@ -13,16 +13,22 @@ import (
 	"strings"
 )
 
+// ClusterID identifies a Ploy cluster.
+//
+// It is a distinct type to harden APIs that accept or return cluster
+// identifiers while remaining JSON-compatible with a plain string.
+type ClusterID string
+
 // Descriptor represents a local cluster descriptor written by bootstrap.
 type Descriptor struct {
-	ClusterID       string `json:"cluster_id"`
-	Address         string `json:"address"`
-	Scheme          string `json:"scheme,omitempty"`
-	SSHIdentityPath string `json:"ssh_identity_path,omitempty"`
-	CAPath          string `json:"ca_path,omitempty"`
-	CertPath        string `json:"cert_path,omitempty"`
-	KeyPath         string `json:"key_path,omitempty"`
-	Default         bool   `json:"default,omitempty"`
+	ClusterID       ClusterID `json:"cluster_id"`
+	Address         string    `json:"address"`
+	Scheme          string    `json:"scheme,omitempty"`
+	SSHIdentityPath string    `json:"ssh_identity_path,omitempty"`
+	CAPath          string    `json:"ca_path,omitempty"`
+	CertPath        string    `json:"cert_path,omitempty"`
+	KeyPath         string    `json:"key_path,omitempty"`
+	Default         bool      `json:"default,omitempty"`
 }
 
 // SaveDescriptor persists the descriptor under the clusters directory.
@@ -31,13 +37,13 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 	if err != nil {
 		return Descriptor{}, err
 	}
-	if strings.TrimSpace(desc.ClusterID) == "" {
+	if strings.TrimSpace(string(desc.ClusterID)) == "" {
 		return Descriptor{}, errors.New("descriptor: cluster id required")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return Descriptor{}, fmt.Errorf("descriptor: ensure dir: %w", err)
 	}
-	path := filepath.Join(dir, sanitizeFilename(desc.ClusterID)+".json")
+	path := filepath.Join(dir, sanitizeFilename(string(desc.ClusterID))+".json")
 	data, _ := json.MarshalIndent(desc, "", "  ")
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return Descriptor{}, fmt.Errorf("descriptor: write %s: %w", path, err)
@@ -46,7 +52,7 @@ func SaveDescriptor(desc Descriptor) (Descriptor, error) {
 }
 
 // SetDefault records the default cluster id.
-func SetDefault(clusterID string) error {
+func SetDefault(clusterID ClusterID) error {
 	// Optional guard to avoid mutating the real default in shared environments
 	// (e.g., during higher-level test suites). When set to a non-empty value,
 	// this function becomes a no-op.
@@ -69,14 +75,14 @@ func SetDefault(clusterID string) error {
 		}
 	}
 	// Prefer symlink only when target json exists; otherwise, write legacy marker content.
-	target := sanitizeFilename(strings.TrimSpace(clusterID)) + ".json"
+	target := sanitizeFilename(strings.TrimSpace(string(clusterID))) + ".json"
 	if _, err := os.Stat(filepath.Join(dir, target)); err == nil {
 		if err := os.Symlink(target, marker); err == nil {
 			return nil
 		}
 		// If symlink creation failed, fall through to legacy marker content.
 	}
-	return os.WriteFile(marker, []byte(strings.TrimSpace(clusterID)), 0o644)
+	return os.WriteFile(marker, []byte(strings.TrimSpace(string(clusterID))), 0o644)
 }
 
 // LoadDefault loads the default cluster descriptor.
@@ -161,7 +167,7 @@ func ListDescriptors() ([]Descriptor, error) {
 		if err := json.Unmarshal(data, &d); err != nil {
 			return nil, fmt.Errorf("descriptor: parse %s: %w", name, err)
 		}
-		if strings.TrimSpace(d.ClusterID) == strings.TrimSpace(def) {
+		if strings.TrimSpace(string(d.ClusterID)) == strings.TrimSpace(def) {
 			d.Default = true
 		}
 		out = append(out, d)

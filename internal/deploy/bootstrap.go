@@ -116,7 +116,7 @@ func RunBootstrap(ctx context.Context, opts Options) error {
 		descriptorID = address
 	}
 	desc := config.Descriptor{
-		ClusterID:       descriptorID,
+		ClusterID:       config.ClusterID(descriptorID),
 		Address:         strings.TrimSpace(opts.DescriptorAddress),
 		SSHIdentityPath: strings.TrimSpace(opts.DescriptorIdentityPath),
 	}
