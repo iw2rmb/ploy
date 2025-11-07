@@ -40,55 +40,30 @@ See also:
   - `make build`
   - Smoke tests locally: `make test` (unit + guardrails). E2E runs target the cluster.
 
-**Scenario A — ORW Apply (Java 11→17) + Passing Build Gate**
+**Spec‑Driven Flow (recommended)**
 
-- Run mods using the control plane defaults (planner → orw-apply → orw-gen → llm-plan → llm-exec → human → build-gate → static-checks → test):
-  - Capture the server ticket via JSON for scripting:
-    ```bash
-    TICKET=$(dist/ploy mod run --json \
-      --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
-      --repo-base-ref main \
-      --repo-target-ref e2e/success \
-      --mod-image docker.io/$DOCKERHUB_USERNAME/mods-openrewrite:latest \
-      --mod-env RECIPE_GROUP=org.openrewrite.recipe \
-      --mod-env RECIPE_ARTIFACT=rewrite-java-17 \
-      --mod-env RECIPE_VERSION=2.6.0 \
-      --mod-env RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17 \
-      --mod-env MAVEN_PLUGIN_VERSION=6.18.0 \
-      --follow | jq -r '.ticket_id')
-    ```
+Use the YAML spec to define mod parameters, Build Gate, and healing.
+Example spec:
+  - `tests/e2e/mods/scenario-orw-fail/mod.yaml`
 
-Notes:
-- The passing scenario uses `e2e/success` as the target ref to ensure
-the remote reference exists. If you prefer creating a new branch (e.g.,
-`mods-upgrade-java17`) for the ORW output, push that branch to GitLab first
-or use a fork and set `PLOY_E2E_REPO_OVERRIDE`.
-- Provide mod envs via CLI, not process env. Example:
-  `dist/ploy mod run ... --mod-env RECIPE_GROUP=org.openrewrite.recipe --mod-env RECIPE_ARTIFACT=rewrite-java-17 --mod-env RECIPE_VERSION=2.6.0 --mod-env RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17`
-  The ORW mod requires these envs; no JSON manifest is supported.
+Run the failing→healing scenario with a single script:
+  - `bash tests/e2e/mods/scenario-orw-fail/run.sh`
+  - It submits:
+    - `--repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
+    - `--repo-base-ref e2e/fail-missing-symbol`
+    - `--repo-target-ref mods-upgrade-java17-heal`
+    - `--spec tests/e2e/mods/scenario-orw-fail/mod.yaml`
+    - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
 
 What to verify:
-- Final state is Succeeded.
-- Artifacts include diffs and logs for the ORW stage and a passing Build Gate report.
-- Optional: Download artifacts into a directory (manifest is generated):
-  - `dist/ploy mod run ... --follow --artifact-dir ./artifacts/java17-pass`
+- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with an embedded verification rule to call the exact Build Gate via `ploy-buildgate`, re‑gate passes, ORW proceeds.
 
-**Scenario B — ORW Apply + First Build Gate Fails → Healing (llm-plan + llm-exec) → Gate Re-run**
+**Notes**
 
-- Use the failing baseline branch to force the initial compile to fail. The runner will append a healing sequence (#healN) and re-run gates afterwards:
-  - Capture ticket and MR URL (when surfaced) via JSON:
-    ```bash
-    read TICKET MR_URL < <(dist/ploy mod run --json \
-      --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
-      --repo-base-ref e2e/fail-missing-symbol \
-      --repo-target-ref mods-upgrade-java17-heal \
-      --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
-    ```
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `ploy-buildgate` and requires Docker socket access and `PLOY_HOST_WORKSPACE` to point to the host path.
 
 What to expect with the provided E2E images:
-- Initial Build Gate failure triggers healing. You should see additional stages suffixed with `#heal1` scheduled after the failure (mods-plan, orw-apply, llm-plan, llm-exec, human, then build-gate/static-checks/test again). The stub `mods-llm` creates a small class to resolve the compile error, allowing the subsequent Build Gate to pass.
-- On success, artifacts across stages are attached to the ticket. Download them as needed:
-  - `dist/ploy mod run ... --follow --artifact-dir ./artifacts/java17-heal`
+- Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the ticket and can be downloaded via `--artifact-dir`.
 
 Tip: The control plane exposes streaming events and per-stage artifacts. The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 
@@ -96,18 +71,12 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 
 - Cluster targeting:
   - CLI reads the default descriptor at `~/.config/ploy/clusters/` (no env override).
-- LLM:
-  - The stub `mods-llm` does not require `PLOY_OPENAI_API_KEY`. If you swap the image for a real implementation, export your API key and any MCP endpoints as needed.
 - Build Gate image override:
   - To change the Java build executor container (e.g., custom Maven image), use `PLOY_BUILDGATE_JAVA_IMAGE` on worker nodes.
 
 **How This Maps From the Legacy Nomad E2E**
 
-- The legacy suite (Nomad jobs) used two flows:
-  1) Apply OpenRewrite Java 11→17 and compile successfully (MR created on success).
-  2) Same apply, but force an initial compile failure; runner reacts with llm-plan + llm-healing, then retries compile.
-- In Ploy Next:
-  - The runner plans a deterministic stage graph; Build Gate is integrated and its failures are recognized as retryable. On a retryable failure, the runner appends a healing branch (`#healN`) with Mods planner stages (including LLM) and replays gates afterwards. See `internal/workflow/runner/healing.go` for the healing logic and `internal/workflow/runner/job_templates.go` for image bindings.
+- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The same Build Gate is reused for verification via `ploy-buildgate`.
 
 **Troubleshooting**
 
