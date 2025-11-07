@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/ids.go`.
   - Test: construct/compare; reject empty; ensure JSON roundtrip yields strings.
 
-- [ ] VCS — `RepoURL`, `GitRef`, `CommitSHA` with basic normalization.
+- [x] VCS — `RepoURL`, `GitRef`, `CommitSHA` with basic normalization.
   - Change: `internal/domain/types/vcs.go`.
   - Test: accept https/ssh/file; preserve value in JSON; trim spaces.
 
