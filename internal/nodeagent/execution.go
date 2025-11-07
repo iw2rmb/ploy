@@ -369,17 +369,29 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		return "", fmt.Errorf("extract project id: %w", err)
 	}
 
+	// Use a unique source branch per run: ploy-<ticket-id>.
+	// This avoids MR conflicts on repeated runs regardless of the submitted target ref.
+	sourceBranch := fmt.Sprintf("ploy-%s", req.RunID)
+
+	// Create a commit with any workspace changes before pushing.
+	if committed, cerr := git.EnsureCommit(ctx, workspaceRoot, "ploy-bot", "ploy-bot@ploy.local", fmt.Sprintf("Ploy: apply changes for run %s", req.RunID)); cerr != nil {
+		slog.Error("git commit failed", "run_id", req.RunID, "error", cerr)
+	} else if !committed {
+		slog.Info("no changes detected; proceeding to push branch without commit", "run_id", req.RunID)
+	}
+
 	// Push branch to origin using git push (Phase E).
 	pusher := git.NewPusher()
 	pushOpts := git.PushOptions{
 		RepoDir:   workspaceRoot,
-		TargetRef: req.TargetRef,
+		TargetRef: sourceBranch,
 		PAT:       gitlabPAT,
 		UserName:  "ploy-bot",
 		UserEmail: "ploy-bot@ploy.local",
+		RemoteURL: req.RepoURL,
 	}
 
-	slog.Info("pushing branch to origin", "run_id", req.RunID, "target_ref", req.TargetRef)
+	slog.Info("pushing branch to origin", "run_id", req.RunID, "source_branch", sourceBranch, "submitted_target", req.TargetRef)
 	if err := pusher.Push(ctx, pushOpts); err != nil {
 		return "", fmt.Errorf("git push: %w", err)
 	}
@@ -391,13 +403,13 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		ProjectID:    projectID,
 		PAT:          gitlabPAT,
 		Title:        fmt.Sprintf("Ploy: %s", req.RunID),
-		SourceBranch: req.TargetRef,
+		SourceBranch: sourceBranch,
 		TargetBranch: req.BaseRef,
 		Description:  fmt.Sprintf("Automated changes from Ploy run %s", req.RunID),
 		Labels:       "ploy",
 	}
 
-	slog.Info("creating merge request", "run_id", req.RunID, "source", req.TargetRef, "target", req.BaseRef)
+	slog.Info("creating merge request", "run_id", req.RunID, "source", sourceBranch, "target", req.BaseRef)
 	mrURL, err := mrClient.CreateMR(ctx, mrReq)
 	if err != nil {
 		return "", fmt.Errorf("create mr: %w", err)

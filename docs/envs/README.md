@@ -142,6 +142,11 @@ Per-run overrides (CLI flags on `ploy mod run`):
 - `--mr-success` — Create an MR when the run succeeds
 - `--mr-fail` — Create an MR when the run fails
 
+Branch naming semantics:
+- The MR source branch is always `ploy-<ticket-id>` to guarantee uniqueness across retries and repeated runs.
+- The base branch is whatever you pass via `--repo-base-ref` (commonly `main`).
+- The `--repo-target-ref` value is accepted for workspace context but is not used as the MR source branch.
+
 Quick test (PAT via config or flags):
 For local testing or CI environments, set the PAT via control plane config or per‑run flags.
 The recommended production approach is to use the control plane config with `gitlab.token_file`.

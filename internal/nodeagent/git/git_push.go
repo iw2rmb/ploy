@@ -22,6 +22,8 @@ type PushOptions struct {
 	UserName string
 	// UserEmail is the git user.email config value.
 	UserEmail string
+	// RemoteURL is the HTTPS URL of the origin repository.
+	RemoteURL string
 }
 
 // Pusher provides git push functionality.
@@ -52,7 +54,7 @@ func (p *pusher) Push(ctx context.Context, opts PushOptions) error {
 
 	// Push the branch using HTTP extra header for authentication to avoid prompts and
 	// prevent writing secrets to disk. We pass the header via environment only.
-	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, opts.PAT); err != nil {
+	if err := p.pushBranch(ctx, opts.RepoDir, opts.TargetRef, opts.PAT, opts.RemoteURL); err != nil {
 		return redactError(err, opts.PAT)
 	}
 
@@ -91,14 +93,19 @@ func (p *pusher) configureGitUser(ctx context.Context, repoDir, userName, userEm
 }
 
 // pushBranch performs the git push operation using the provided askpass script.
-func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat string) error {
-	env := []string{
-		"GIT_TERMINAL_PROMPT=0",
-		// Supply Authorization header only for this command; nothing persisted.
-		"GIT_HTTP_EXTRAHEADER=Authorization: Bearer " + pat,
+func (p *pusher) pushBranch(ctx context.Context, repoDir, targetRef, pat, remoteURL string) error {
+	// Build a remote URL with embedded token using the oauth2 user (GitLab pattern).
+	u, err := url.Parse(remoteURL)
+	if err != nil {
+		return fmt.Errorf("parse remote url: %w", err)
 	}
-	if err := runGitCommand(ctx, repoDir, env, "push", "origin", targetRef); err != nil {
-		return fmt.Errorf("git push origin %s: %w", targetRef, err)
+	u.User = url.UserPassword("oauth2", pat)
+
+	// Push the current HEAD to the remote branch name, creating it if needed.
+	// Equivalent to: git push https://oauth2:<token>@host/path.git HEAD:refs/heads/<targetRef>
+	refspec := "HEAD:refs/heads/" + targetRef
+	if err := runGitCommand(ctx, repoDir, nil, "push", u.String(), refspec); err != nil {
+		return redactError(fmt.Errorf("git push %s: %w", u.Host, err), pat)
 	}
 	return nil
 }
