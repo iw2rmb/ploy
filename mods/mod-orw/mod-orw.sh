@@ -114,4 +114,7 @@ cat > "$outdir/report.json" <<JSON
 }
 JSON
 
+# Cleanup: remove build output directories to keep workspace clean
+find "$workspace" -type d -name target -prune -exec rm -rf {} + || true
+
 echo "[mod-orw] Completed successfully"

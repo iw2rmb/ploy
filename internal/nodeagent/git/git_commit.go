@@ -23,8 +23,10 @@ func EnsureCommit(ctx context.Context, repoDir, userName, userEmail, message str
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.name", userName)
 	_ = runGitCommand(ctx, repoDir, nil, "config", "user.email", userEmail)
 
-	// Stage all changes and commit.
-	if err := runGitCommand(ctx, repoDir, nil, "add", "-A"); err != nil {
+	// Stage all changes except build outputs like Maven 'target/'.
+	// Use pathspec excludes so we don't rely on repo .gitignore.
+	if err := runGitCommand(ctx, repoDir, nil, "add", "-A", "--", ".",
+		":(exclude)**/target/**", ":(exclude)target/"); err != nil {
 		return false, fmt.Errorf("git add: %w", err)
 	}
 	if err := runGitCommand(ctx, repoDir, nil, "commit", "-m", message); err != nil {
