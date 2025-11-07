@@ -23,8 +23,12 @@ func TestHandleServerDeployFlagParsing(t *testing.T) {
 		t.Fatalf("write bin: %v", err)
 	}
 
-	// Avoid touching real config home.
-	t.Setenv("PLOY_CONFIG_HOME", filepath.Join(tmp, "config"))
+	// Avoid touching real config home and default marker.
+	cfgHome := filepath.Join(tmp, "config")
+	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
+	// Extra guard: disable default marker mutation in case a code path escapes cfgHome.
+	t.Setenv("PLOY_NO_DEFAULT_MUTATION", "1")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
 
 	cases := []struct {
 		name         string
@@ -75,7 +79,10 @@ func TestHandleServerDeployFlagParsing(t *testing.T) {
 // requires an existing descriptor and fails gracefully if missing.
 func TestHandleServerDeployRefreshAdminCertRequiresDescriptor(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", filepath.Join(tmp, "config"))
+	cfgHome := filepath.Join(tmp, "config")
+	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
+	t.Setenv("PLOY_NO_DEFAULT_MUTATION", "1")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
 
 	// No descriptor exists, so refresh should fail with appropriate error.
 	buf := &bytes.Buffer{}
