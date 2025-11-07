@@ -27,8 +27,6 @@ build_gate_healing:
   retries: 1
   mods:
     - image: docker.io/${DOCKERHUB_USERNAME}/mods-codex:latest
-      command: >-
-        mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
         CODEX_PROMPT: |-
           Rules:
@@ -39,6 +37,8 @@ build_gate_healing:
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
+      env_from_file:
+        CODEX_AUTH_JSON: ~/.codex/auth.json
 
 gitlab_domain: gitlab.com
 mr_on_fail: true

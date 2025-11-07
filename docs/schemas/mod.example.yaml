@@ -11,12 +11,17 @@ mod:
   # Optional: override command; when omitted, image CMD/ENTRYPOINT is used
   # command: ["/bin/sh", "-lc", "mods-orw --apply --dir /workspace --out /out"]
   # Environment variables passed into the mod container
+  #   - use `env` for literal values
+  #   - use `env_from_file` to inline the content of a file (CLI reads and embeds)
   env:
     RECIPE_GROUP: org.openrewrite.recipe
     RECIPE_ARTIFACT: rewrite-migrate-java
     RECIPE_VERSION: "3.20.0"
     RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
     MAVEN_PLUGIN_VERSION: "6.18.0"
+  env_from_file:
+    # Example: read Codex auth JSON from local file; CLI expands ~ and inlines the content
+    # CODEX_AUTH_JSON: ~/.codex/auth.json
   # Retain container for debugging (disabled by default)
   retain_container: false
 
@@ -48,6 +53,9 @@ build_gate_healing:
           
           Task:
           Fix the compilation error described in /in/build-gate.log.
+      env_from_file:
+        # Inline Codex auth as env from file content (resolved by CLI)
+        # CODEX_AUTH_JSON: ~/.codex/auth.json
       retain_container: false
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
