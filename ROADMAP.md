@@ -12,7 +12,7 @@ Legend: [ ] todo, [x] done.
 - Minimal blast radius: add `--spec` to CLI; nodeagent execution orchestration reads spec; no DB schema changes.
 
 ## Canonical Inputs: migrate to /in (drop /.ploy)
-- [ ] Make `/in` the sole, read‑only mount for cross‑phase inputs.
+- [x] Make `/in` the sole, read‑only mount for cross‑phase inputs.
   - Node: after the first Gate fails, persist the log to a temp host file and mount it at `/in/build-gate.log` for healing steps; do not write into the repository.
   - Remove any writes to `/workspace/.ploy`; treat previous `/.ploy` usage as deprecated and eliminate to avoid accidental inclusion in diffs.
 - [ ] mod-codex: prefer `/in` as context.

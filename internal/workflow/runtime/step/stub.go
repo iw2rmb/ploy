@@ -141,6 +141,8 @@ type Request struct {
 	Manifest  contracts.StepManifest
 	Workspace string
 	OutDir    string
+	// InDir is an optional read-only directory mounted at /in for cross-phase inputs.
+	InDir string
 }
 
 // Result contains the outcome of a step execution.
@@ -185,8 +187,8 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 		result.ExitCode = 0
 		result.Timings.ExecutionDuration = time.Since(executionStart)
 	} else {
-		// Build container spec from manifest and workspace path plus optional /out mount.
-		spec, err := buildContainerSpec(req.TicketID, req.Manifest, req.Workspace, req.OutDir)
+		// Build container spec from manifest and workspace path plus optional /out and /in mounts.
+		spec, err := buildContainerSpec(req.TicketID, req.Manifest, req.Workspace, req.OutDir, req.InDir)
 		if err != nil {
 			return Result{}, fmt.Errorf("build container spec: %w", err)
 		}

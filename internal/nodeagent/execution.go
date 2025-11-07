@@ -99,6 +99,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}
 	defer func() { _ = os.RemoveAll(outDir) }()
 
+	// Prepare /in directory for cross-phase inputs (created only when needed).
+	var inDir string
+
 	// Execute the step.
 	startTime := time.Now()
 	result, execErr := runner.Run(ctx, step.Request{
@@ -106,6 +109,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		Manifest:  manifest,
 		Workspace: workspaceRoot,
 		OutDir:    outDir,
+		InDir:     inDir,
 	})
 	duration := time.Since(startTime)
 
@@ -301,6 +305,25 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 						}
 					}
 					_ = os.Remove(logFile.Name())
+				}
+				// When gate fails, persist logs to /in/build-gate.log for healing phases.
+				// Note: this task implements /in mount setup; healing loop is a separate ROADMAP item.
+				if !passed && inDir == "" {
+					// Create /in directory on first gate failure.
+					tmpInDir, err := os.MkdirTemp("", "ploy-mod-in-*")
+					if err == nil {
+						inDir = tmpInDir
+						defer func() { _ = os.RemoveAll(inDir) }()
+						// Write build-gate.log to /in for healing containers.
+						inLogPath := filepath.Join(inDir, "build-gate.log")
+						if err := os.WriteFile(inLogPath, []byte(s), 0o644); err != nil {
+							slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", err)
+						} else {
+							slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
+						}
+					} else {
+						slog.Warn("failed to create /in directory", "run_id", req.RunID, "error", err)
+					}
 				}
 			}
 			stats["gate"] = gate
