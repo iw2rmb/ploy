@@ -52,7 +52,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/workflow/contracts/workflow_ticket.go` structs + `Validate()` updates.
   - Test: existing tests updated; add cases for invalid URL scheme and missing target/commit.
 
-- [ ] ManifestReference: introduce `type StageName string` used where applicable.
+- [x] ManifestReference: introduce `type StageName string` used where applicable.
   - Change: `internal/workflow/contracts/manifest_reference.go` (types only; keep JSON fields).
   - Test: name/version non-empty; JSON stable.
 
