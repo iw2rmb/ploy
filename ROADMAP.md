@@ -82,7 +82,7 @@ Legend: [ ] todo, [x] done.
   - Test: runner unit test asserts label carries correct run id when runtime set.
 
 ## Runtime/Step: Limits and Labels
-- [ ] ContainerSpec label fix: stop writing step ID into `com.ploy.run_id`; either thread `TicketID` or rename label.
+- [x] ContainerSpec label fix: stop writing step ID into `com.ploy.run_id`; either thread `TicketID` or rename label.
   - Change: `internal/workflow/runtime/step/container_spec.go` — use `types.LabelRunID` and `req.TicketID`.
   - Test: unit test asserts label value equals run ID; no label when empty.
 

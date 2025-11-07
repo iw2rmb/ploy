@@ -5,6 +5,7 @@ import (
 
 	"strings"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -48,7 +49,7 @@ type ContainerResult struct {
 }
 
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
-func buildContainerSpec(manifest contracts.StepManifest, workspace string, outDir string) (ContainerSpec, error) {
+func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest, workspace string, outDir string) (ContainerSpec, error) {
 	// Mount the first RW input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared RW mount (first RW input)
@@ -66,6 +67,12 @@ func buildContainerSpec(manifest contracts.StepManifest, workspace string, outDi
 	if wd == "" && len(manifest.Inputs) > 0 {
 		wd = manifest.Inputs[0].MountPath
 	}
+	// Prepare labels: thread run identifier when provided.
+	var labels map[string]string
+	if !ticketID.IsZero() {
+		labels = map[string]string{types.LabelRunID: ticketID.String()}
+	}
+
 	return ContainerSpec{
 		Image:      manifest.Image,
 		Command:    append([]string{}, manifest.Command...),
@@ -73,6 +80,6 @@ func buildContainerSpec(manifest contracts.StepManifest, workspace string, outDi
 		Env:        manifest.Env,
 		Mounts:     mounts,
 		Retain:     manifest.Retention.RetainContainer,
-		Labels:     map[string]string{"com.ploy.run_id": manifest.ID.String()},
+		Labels:     labels,
 	}, nil
 }
