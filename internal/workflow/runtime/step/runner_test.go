@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -43,7 +44,7 @@ func TestRunner_Run_BasicExecution(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -109,7 +110,7 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "maven:3-eclipse-temurin-17",
 		Inputs: []contracts.StepInput{
@@ -117,7 +118,7 @@ func TestRunner_Run_WithBuildGateEnabled(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 		Gate: &contracts.StepGateSpec{
@@ -164,7 +165,7 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "maven:3-eclipse-temurin-17",
 		Inputs: []contracts.StepInput{
@@ -172,7 +173,7 @@ func TestRunner_Run_WithBuildGateDisabled(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 		Gate: &contracts.StepGateSpec{
@@ -217,7 +218,7 @@ func TestRunner_Run_FallbackToShiftSpec(t *testing.T) {
 
 	// Use deprecated Shift spec instead of Gate
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "maven:3-eclipse-temurin-17",
 		Inputs: []contracts.StepInput{
@@ -225,7 +226,7 @@ func TestRunner_Run_FallbackToShiftSpec(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 		Shift: &contracts.StepShiftSpec{
@@ -270,14 +271,14 @@ func TestRunner_Run_GatePrecedenceOverShift(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{{
 			Name:        "source",
 			MountPath:   "/workspace",
 			Mode:        contracts.StepInputModeReadOnly,
-			SnapshotCID: "bafytest123",
+			SnapshotCID: types.CID("bafytest123"),
 		}},
 		Gate: &contracts.StepGateSpec{
 			Enabled: true,
@@ -310,7 +311,7 @@ func TestRunner_Run_HydrationFailure(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -318,7 +319,7 @@ func TestRunner_Run_HydrationFailure(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 	}
@@ -350,7 +351,7 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -358,7 +359,7 @@ func TestRunner_Run_GateExecutionFailure(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 		Gate: &contracts.StepGateSpec{
@@ -402,7 +403,7 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -410,7 +411,7 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 		Gate: &contracts.StepGateSpec{
@@ -458,7 +459,7 @@ func TestRunner_Run_NilComponents(t *testing.T) {
 	}
 
 	manifest := contracts.StepManifest{
-		ID:    "test-step",
+		ID:    types.StepID("test-step"),
 		Name:  "Test Step",
 		Image: "test:latest",
 		Inputs: []contracts.StepInput{
@@ -466,7 +467,7 @@ func TestRunner_Run_NilComponents(t *testing.T) {
 				Name:        "source",
 				MountPath:   "/workspace",
 				Mode:        contracts.StepInputModeReadOnly,
-				SnapshotCID: "bafytest123",
+				SnapshotCID: types.CID("bafytest123"),
 			},
 		},
 	}

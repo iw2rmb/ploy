@@ -41,10 +41,10 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		return fmt.Errorf("invalid repo: %w", err)
 	}
 
-	url := strings.TrimSpace(repo.URL)
-	baseRef := strings.TrimSpace(repo.BaseRef)
-	_ = strings.TrimSpace(repo.TargetRef) // targetRef is intentionally unused during hydration
-	commitSHA := strings.TrimSpace(repo.Commit)
+	url := strings.TrimSpace(string(repo.URL))
+	baseRef := strings.TrimSpace(string(repo.BaseRef))
+	_ = strings.TrimSpace(string(repo.TargetRef)) // targetRef is intentionally unused during hydration
+	commitSHA := strings.TrimSpace(string(repo.Commit))
 
 	// Step 1: Shallow clone with base_ref (if provided) or default branch.
 	// Use --depth 1 for shallow clone, --single-branch for efficiency.

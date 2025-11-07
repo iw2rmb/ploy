@@ -145,8 +145,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		if manifest.ID != req.RunID {
-			t.Errorf("expected ID %q, got %q", req.RunID, manifest.ID)
+		if manifest.ID.String() != req.RunID {
+			t.Errorf("expected ID %q, got %q", req.RunID, manifest.ID.String())
 		}
 		if manifest.Image != "ubuntu:latest" {
 			t.Errorf("expected default image ubuntu:latest, got %q", manifest.Image)
@@ -176,17 +176,17 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 
 		repo := input.Hydration.Repo
-		if repo.URL != req.RepoURL {
-			t.Errorf("expected repo URL %q, got %q", req.RepoURL, repo.URL)
+		if string(repo.URL) != req.RepoURL {
+			t.Errorf("expected repo URL %q, got %q", req.RepoURL, string(repo.URL))
 		}
-		if repo.BaseRef != req.BaseRef {
-			t.Errorf("expected base ref %q, got %q", req.BaseRef, repo.BaseRef)
+		if repo.BaseRef.String() != req.BaseRef {
+			t.Errorf("expected base ref %q, got %q", req.BaseRef, repo.BaseRef.String())
 		}
-		if repo.TargetRef != req.TargetRef {
-			t.Errorf("expected target ref %q, got %q", req.TargetRef, repo.TargetRef)
+		if repo.TargetRef.String() != req.TargetRef {
+			t.Errorf("expected target ref %q, got %q", req.TargetRef, repo.TargetRef.String())
 		}
-		if repo.Commit != req.CommitSHA {
-			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit)
+		if repo.Commit.String() != req.CommitSHA {
+			t.Errorf("expected commit %q, got %q", req.CommitSHA, repo.Commit.String())
 		}
 
 		if len(manifest.Env) != 1 {
@@ -237,8 +237,8 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
 
-		if manifest.Inputs[0].Hydration.Repo.TargetRef != "main" {
-			t.Errorf("expected target_ref to default to main, got %q", manifest.Inputs[0].Hydration.Repo.TargetRef)
+		if manifest.Inputs[0].Hydration.Repo.TargetRef.String() != "main" {
+			t.Errorf("expected target_ref to default to main, got %q", manifest.Inputs[0].Hydration.Repo.TargetRef.String())
 		}
 	})
 

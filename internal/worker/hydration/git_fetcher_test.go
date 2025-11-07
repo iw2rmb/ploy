@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -34,8 +35,8 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "invalid repo URL",
 			repo: &contracts.RepoMaterialization{
-				URL:       "invalid-url",
-				TargetRef: "main",
+				URL:       types.RepoURL("invalid-url"),
+				TargetRef: types.GitRef("main"),
 			},
 			setup:     func(t *testing.T) string { return t.TempDir() },
 			wantErr:   true,
@@ -44,7 +45,7 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "missing target_ref and commit",
 			repo: &contracts.RepoMaterialization{
-				URL: "https://github.com/example/repo.git",
+				URL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			setup:     func(t *testing.T) string { return t.TempDir() },
 			wantErr:   true,
@@ -53,9 +54,9 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "valid repo with base_ref only",
 			repo: &contracts.RepoMaterialization{
-				URL:       "file://" + setupTestGitRepo(t, "base"),
-				BaseRef:   "main",
-				TargetRef: "main",
+				URL:       types.RepoURL("file://" + setupTestGitRepo(t, "base")),
+				BaseRef:   types.GitRef("main"),
+				TargetRef: types.GitRef("main"),
 			},
 			setup:   func(t *testing.T) string { return t.TempDir() },
 			wantErr: false,
@@ -63,9 +64,9 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "valid repo with different target_ref",
 			repo: &contracts.RepoMaterialization{
-				URL:       "file://" + setupTestGitRepo(t, "target"),
-				BaseRef:   "main",
-				TargetRef: "feature",
+				URL:       types.RepoURL("file://" + setupTestGitRepo(t, "target")),
+				BaseRef:   types.GitRef("main"),
+				TargetRef: types.GitRef("feature"),
 			},
 			setup:   func(t *testing.T) string { return t.TempDir() },
 			wantErr: false,
@@ -73,10 +74,10 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "valid repo with commit_sha",
 			repo: &contracts.RepoMaterialization{
-				URL:       "file://" + setupTestGitRepo(t, "commit"),
-				BaseRef:   "main",
-				TargetRef: "main",
-				Commit:    "HEAD",
+				URL:       types.RepoURL("file://" + setupTestGitRepo(t, "commit")),
+				BaseRef:   types.GitRef("main"),
+				TargetRef: types.GitRef("main"),
+				Commit:    types.CommitSHA("HEAD"),
 			},
 			setup:   func(t *testing.T) string { return t.TempDir() },
 			wantErr: false,

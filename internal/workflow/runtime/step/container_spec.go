@@ -73,6 +73,6 @@ func buildContainerSpec(manifest contracts.StepManifest, workspace string, outDi
 		Env:        manifest.Env,
 		Mounts:     mounts,
 		Retain:     manifest.Retention.RetainContainer,
-		Labels:     map[string]string{"com.ploy.run_id": manifest.ID},
+		Labels:     map[string]string{"com.ploy.run_id": manifest.ID.String()},
 	}, nil
 }
