@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -89,6 +90,9 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 	if s.store == nil {
 		return store.Event{}, errors.New("events: store not configured")
 	}
+
+	// Normalize/validate level using domain LogLevel; default unknown/empty to "info".
+	params.Level = normalizeEventLevel(params.Level)
 
 	// Persist to database first.
 	event, err := s.store.CreateEvent(ctx, params)
@@ -224,4 +228,18 @@ func timestampToString(ts pgtype.Timestamptz) string {
 		return ""
 	}
 	return ts.Time.Format(time.RFC3339)
+}
+
+// normalizeEventLevel canonicalizes and validates event level using domain LogLevel.
+// It maps unknown or empty values to "info" to keep storage/SSE streams consistent.
+func normalizeEventLevel(level string) string {
+	s := strings.ToLower(domaintypes.Normalize(level))
+	if domaintypes.IsEmpty(s) {
+		return domaintypes.LogLevelInfo.String()
+	}
+	l := domaintypes.LogLevel(s)
+	if err := l.Validate(); err != nil {
+		return domaintypes.LogLevelInfo.String()
+	}
+	return l.String()
 }
