@@ -18,7 +18,7 @@ func TestJobsInspectRequiresArgsAndPrintsSummary(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+	useServerDescriptor(t, server.URL)
 
 	// Missing args
 	if err := execute([]string{"runs", "inspect"}, &bytes.Buffer{}); err == nil {

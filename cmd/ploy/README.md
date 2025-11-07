@@ -12,7 +12,6 @@ ploy lanes describe --lane <lane-name> \
   [--commit <sha>] [--manifest <version>] \
   [--aster <toggle,...>]
 ploy mod run \
-  [--ticket <ticket-id>|--ticket auto] \
   [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> \
    --repo-workspace-hint <dir>] \
   [--mods-plan-timeout <duration>] [--mods-max-parallel <n>] [--cap <duration>] [--cancel-on-cap] \
@@ -25,6 +24,19 @@ ploy knowledge-base evaluate --fixture <samples.json>
 ploy upload --run-id <uuid> [--stage-id <uuid>] [--build-id <uuid>] [--name <string>] <path>
 ```
 
+Note on `--json` output:
+- When `--json` is supplied (e.g., `ploy mod run --json`), stdout emits a compact JSON summary (fields include `ticket_id`, `final_state`, optional `artifact_dir`, `mr_url`).
+- Human‑readable progress and logs continue to print to stderr, so scripts can safely pipe stdout to `jq` without mixing formats.
+
+Quick capture example:
+```bash
+TICKET=$(ploy mod run --json \
+  --repo-url https://gitlab.com/org/repo.git \
+  --repo-base-ref main \
+  --repo-target-ref workflow/upgrade \
+  --follow | jq -r '.ticket_id')
+```
+
 `lanes describe` inspects the bundled TOML lane specs under `configs/lanes`,
 displays the runtime family, build/test commands, surfaced job defaults (image,
 command, env, resources), and shows a deterministic cache-key preview that incorporates
@@ -33,7 +45,7 @@ commit/manifest/Aster toggles. Aster inputs are only included when
 behind a feature flag. The preview mirrors what the workflow runner supplies to
 the runtime when dispatching stages.
 
-`mod run` claims a ticket (auto-generating one if `--ticket auto`),
+`mod run` submits a run to the control plane (server assigns the ticket id),
 materialises the repository passed via `--repo-*` flags (when provided),
 compiles the referenced integration manifest from `configs/manifests/`,
 publishes checkpoints for every stage transition (including lane cache keys),
@@ -60,7 +72,7 @@ samples, runs them through the advisor with a conservative score floor, and
 prints per-sample match results plus aggregate accuracy so operators can gauge
 classifier drift without leaving the workstation.
 
-`upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH).
+`upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH). The CLI always targets the default descriptor at `~/.config/ploy/clusters/default`.
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.
 The deprecated `--job-id` flag remains as an alias for `--run-id` for backward compatibility.
 
@@ -70,7 +82,6 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   `lanes describe`).
 - `--commit` / `--manifest` / `--aster` — Optional cache-key
   preview inputs consumed by the lane engine.
-- `--ticket` — Ticket identifier to claim (`mod run`). Defaults to `auto` for workflows.
 - `--app` — Application identifier resolved to an integration manifest (required
   for `environment materialize`).
 - `--dry-run` — Skip cache hydration while still reporting

@@ -23,9 +23,9 @@ defaults change, or components adopt additional configuration.
   fails fast when an unknown adapter name is provided.
 - `PLOY_ASTER_ENABLE` — Opt-in switch for the experimental Aster bundle
   integration. Current default: `unset` (Aster toggles stay disabled).
-- `PLOY_CONTROL_PLANE_URL` — Optional override for the control-plane base URL when cached descriptors do not yet
-  embed the endpoint (new workstation) or you need to target a secondary cluster explicitly. Descriptors discovered via
-  `ploy server deploy` or `ploy node add` remain the default for CLI calls.
+- (removed) `PLOY_CONTROL_PLANE_URL` — The CLI no longer supports overriding the control‑plane URL. It always uses the
+  default descriptor at `~/.config/ploy/clusters/default` (or `PLOY_CONFIG_HOME`/XDG path) and negotiates mTLS when the
+  descriptor specifies HTTPS.
 - `PLOY_BUILDGATE_IMAGE` — Optional unified override for the Docker image used by the
   Build Gate executor for any stack. When set, it takes precedence over language‑specific
   defaults. Commands still auto‑select by workspace (Maven vs Gradle).
@@ -158,14 +158,14 @@ Example usage:
 # Configure once on control plane
 ploy config gitlab set --file gitlab-config.json
 
-# Run with MR on success
-ploy mod run --ticket auto --mr-success \
+# Run with MR on success (server assigns ticket)
+ploy mod run --mr-success \
   --repo-url https://gitlab.com/org/repo.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade
 
 # Per-run override
-ploy mod run --ticket auto --mr-success \
+ploy mod run --mr-success \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.example.com \
   --repo-url https://gitlab.example.com/org/repo.git
@@ -180,10 +180,8 @@ ploy mod run --ticket auto --mr-success \
 
 ## Control Plane
 
-- `PLOY_CONTROL_PLANE_URL` — Optional control-plane base URL override used by
-  the CLI and node bootstrap commands. When unset, the CLI derives the endpoint
-  and CA bundle from the cached cluster descriptor created during
-  `ploy server deploy`.
+- (removed) `PLOY_CONTROL_PLANE_URL` — Legacy override removed. Components derive the endpoint and mTLS materials from
+  the cached cluster descriptor created during `ploy server deploy`.
 
 ### Server (Control Plane)
 

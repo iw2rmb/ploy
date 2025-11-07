@@ -6,7 +6,7 @@
 
 **Prereqs**
 
-- Ploy cluster descriptor present (CLI auto-discovers). To override, export `PLOY_CONTROL_PLANE_URL` for this session.
+- Ploy cluster descriptor present (CLI auto-discovers from `~/.config/ploy/clusters/default`).
 - GitLab access for the sample repo's MRs: export `PLOY_GITLAB_PAT` (or set via cluster's signer if configured).
 - Optional: `PLOY_OPENAI_API_KEY` if you bring a real LLM; the provided E2E images include a deterministic llm "healer" stub that does not call external APIs.
 
@@ -43,7 +43,9 @@ See also:
 **Scenario A — ORW Apply (Java 11→17) + Passing Build Gate**
 
 - Run mods using the control plane defaults (planner → orw-apply → orw-gen → llm-plan → llm-exec → human → build-gate → static-checks → test):
-  - `dist/ploy mod run \
+  - Capture the server ticket via JSON for scripting:
+    ```bash
+    TICKET=$(dist/ploy mod run --json \
       --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
       --repo-base-ref main \
       --repo-target-ref e2e/success \
@@ -53,7 +55,8 @@ See also:
       --mod-env RECIPE_VERSION=2.6.0 \
       --mod-env RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17 \
       --mod-env MAVEN_PLUGIN_VERSION=6.18.0 \
-      --follow`
+      --follow | jq -r '.ticket_id')
+    ```
 
 Notes:
 - The passing scenario uses `e2e/success` as the target ref to ensure
@@ -73,11 +76,14 @@ What to verify:
 **Scenario B — ORW Apply + First Build Gate Fails → Healing (llm-plan + llm-exec) → Gate Re-run**
 
 - Use the failing baseline branch to force the initial compile to fail. The runner will append a healing sequence (#healN) and re-run gates afterwards:
-  - `dist/ploy mod run \
+  - Capture ticket and MR URL (when surfaced) via JSON:
+    ```bash
+    read TICKET MR_URL < <(dist/ploy mod run --json \
       --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
       --repo-base-ref e2e/fail-missing-symbol \
       --repo-target-ref mods-upgrade-java17-heal \
-      --follow`
+      --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
+    ```
 
 What to expect with the provided E2E images:
 - Initial Build Gate failure triggers healing. You should see additional stages suffixed with `#heal1` scheduled after the failure (mods-plan, orw-apply, llm-plan, llm-exec, human, then build-gate/static-checks/test again). The stub `mods-llm` creates a small class to resolve the compile error, allowing the subsequent Build Gate to pass.
@@ -89,7 +95,7 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 **Environment Considerations**
 
 - Cluster targeting:
-  - Prefer your cached cluster descriptor under `~/.config/ploy/clusters/`. To override, set `PLOY_CONTROL_PLANE_URL`.
+  - CLI reads the default descriptor at `~/.config/ploy/clusters/` (no env override).
 - LLM:
   - The stub `mods-llm` does not require `PLOY_OPENAI_API_KEY`. If you swap the image for a real implementation, export your API key and any MCP endpoints as needed.
 - Build Gate image override:

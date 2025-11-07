@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -37,7 +36,7 @@ func TestModsLogsStructuredOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	withEnv(t, "PLOY_CONTROL_PLANE_URL", server.URL)
+	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mods", "logs", "--format", "structured", "ticket-123"}, buf)
@@ -63,7 +62,7 @@ func TestModsLogsRawOutput(t *testing.T) {
 	})
 	defer server.Close()
 
-	withEnv(t, "PLOY_CONTROL_PLANE_URL", server.URL)
+	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mods", "logs", "--format", "raw", "ticket-raw"}, buf)
@@ -78,7 +77,7 @@ func TestModsLogsRawOutput(t *testing.T) {
 
 func TestModsLogsRequiresTicket(t *testing.T) {
 	t.Helper()
-	withEnv(t, "PLOY_CONTROL_PLANE_URL", "https://example.invalid")
+	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mods", "logs"}, buf)
@@ -92,7 +91,7 @@ func TestModsLogsRequiresTicket(t *testing.T) {
 
 func TestModsLogsInvalidFormat(t *testing.T) {
 	t.Helper()
-	withEnv(t, "PLOY_CONTROL_PLANE_URL", "https://example.invalid")
+	useServerDescriptor(t, "http://example.invalid")
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mods", "logs", "--format", "yaml", "ticket-123"}, buf)
@@ -125,7 +124,7 @@ func TestJobsFollowReconnects(t *testing.T) {
 	})
 	defer server.Close()
 
-	withEnv(t, "PLOY_CONTROL_PLANE_URL", server.URL)
+	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	err := execute([]string{"runs", "follow", "job-42"}, buf)
@@ -218,19 +217,4 @@ func newStreamingServer(t *testing.T, cfg streamingServerConfig) *httptest.Serve
 	return server
 }
 
-func withEnv(t *testing.T, key, value string) {
-	t.Helper()
-	prev, had := os.LookupEnv(key)
-	if err := os.Setenv(key, value); err != nil {
-		t.Fatalf("set env %s: %v", key, err)
-	}
-	t.Cleanup(func() {
-		if !had {
-			_ = os.Unsetenv(key)
-			return
-		}
-		if err := os.Setenv(key, prev); err != nil {
-			t.Fatalf("restore env %s: %v", key, err)
-		}
-	})
-}
+// env helper removed; tests now use useServerDescriptor to point CLI to the test server.

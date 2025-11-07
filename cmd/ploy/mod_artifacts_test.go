@@ -29,7 +29,7 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+	useServerDescriptor(t, server.URL)
 	buf := &bytes.Buffer{}
 	err := execute([]string{"mod", "artifacts", ticket}, buf)
 	if err != nil {

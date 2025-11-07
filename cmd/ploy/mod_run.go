@@ -13,8 +13,6 @@ import (
 	"strings"
 	"time"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
-
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
@@ -44,7 +42,6 @@ func (s *stringSlice) Set(v string) error {
 func executeModRun(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	ticket := fs.String("ticket", "auto", "ticket identifier to consume or 'auto'")
 	repoURL := fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
 	repoBaseRef := fs.String("repo-base-ref", "", "Git base ref used for materialisation")
 	repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
@@ -53,6 +50,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 	capDuration := fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
 	cancelOnCap := fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the ticket if the cap is exceeded")
 	artifactDir := fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
+	jsonOut := fs.Bool("json", false, "print machine-readable JSON summary to stdout")
 	maxRetries := fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
 	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
 	// Allow passing Mod env via repeated --mod-env KEY=VALUE
@@ -73,15 +71,6 @@ func executeModRun(args []string, stderr io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
 		return err
-	}
-
-	ticketValue := strings.TrimSpace(*ticket)
-	if ticketValue == "" || strings.EqualFold(ticketValue, "auto") {
-		generated, err := gonanoid.Generate("abcdefghijklmnopqrstuvwxyz0123456789", 12)
-		if err != nil {
-			return fmt.Errorf("generate ticket id: %w", err)
-		}
-		ticketValue = fmt.Sprintf("mods-%s", generated)
 	}
 
 	repoSpec := struct {
@@ -110,7 +99,6 @@ func executeModRun(args []string, stderr io.Writer) error {
 	}
 
 	request := modsapi.TicketSubmitRequest{
-		TicketID:   ticketValue,
 		Submitter:  strings.TrimSpace(os.Getenv("USER")),
 		Repository: repoSpec.URL,
 		Metadata:   make(map[string]string),
@@ -202,6 +190,9 @@ func executeModRun(args []string, stderr io.Writer) error {
 	}
 	_, _ = fmt.Fprintf(stderr, "Mods ticket %s submitted (state: %s)\n", summary.TicketID, summary.State)
 
+	initialState := strings.ToLower(string(summary.State))
+	finalState := ""
+
 	if *follow {
 		followCtx := ctx
 		var cancel context.CancelFunc
@@ -236,17 +227,39 @@ func executeModRun(args []string, stderr io.Writer) error {
 		if final != modsapi.TicketStateSucceeded {
 			return fmt.Errorf("mod run ended in %s", strings.ToLower(string(final)))
 		}
+		finalState = strings.ToLower(string(final))
 		if strings.TrimSpace(*artifactDir) != "" {
 			if err := downloadTicketArtifacts(ctx, base, httpClient, summary.TicketID, strings.TrimSpace(*artifactDir), stderr); err != nil {
 				return err
 			}
 		}
 	}
+
+	if *jsonOut {
+		// Optional: probe MR URL from ticket status metadata.
+		mrURL, _ := fetchMRURL(ctx, base, httpClient, summary.TicketID)
+		type runJSON struct {
+			TicketID    string `json:"ticket_id"`
+			Initial     string `json:"initial_state,omitempty"`
+			Final       string `json:"final_state,omitempty"`
+			ArtifactDir string `json:"artifact_dir,omitempty"`
+			MRURL       string `json:"mr_url,omitempty"`
+		}
+		out := runJSON{TicketID: summary.TicketID, Initial: initialState, Final: finalState}
+		if s := strings.TrimSpace(*artifactDir); s != "" {
+			out.ArtifactDir = s
+		}
+		if mrURL != "" {
+			out.MRURL = mrURL
+		}
+		b, _ := json.Marshal(out)
+		fmt.Println(string(b))
+	}
 	return nil
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--ticket <ticket-id>|--ticket auto] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }
 
 // (stringSlice implements flag.Value above)
@@ -404,4 +417,34 @@ func buildArtifactFilename(stage, name, cid, digest string) string {
 		return fmt.Sprintf("%s_%s_%s.bin", d, stage, name)
 	}
 	return fmt.Sprintf("%s_%s_%s.bin", cid, stage, name)
+}
+
+// fetchMRURL loads the ticket status and extracts the MR URL from metadata when present.
+func fetchMRURL(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID string) (string, error) {
+	statusURL, err := url.JoinPath(base.String(), "v1", "mods", url.PathEscape(strings.TrimSpace(ticketID)))
+	if err != nil {
+		return "", err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, statusURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "", controlPlaneHTTPError(resp)
+	}
+	var payload modsapi.TicketStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", err
+	}
+	if payload.Ticket.Metadata != nil {
+		if v, ok := payload.Ticket.Metadata["mr_url"]; ok && strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v), nil
+		}
+	}
+	return "", nil
 }

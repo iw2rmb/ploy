@@ -18,12 +18,19 @@ import (
 	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-func TestResolveControlPlaneHTTP_PlainWhenNoDescriptor(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", tmp)
+func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
+	// Descriptor with http scheme should yield a plain client.
+	cfgHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
 	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmp, "clusters")) })
-	t.Setenv(controlPlaneURLEnv, "http://127.0.0.1:9094")
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
+
+	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: "c1", Address: "http://127.0.0.1:9094"}); err != nil {
+		t.Fatalf("SaveDescriptor: %v", err)
+	}
+	if err := cliconfig.SetDefault("c1"); err != nil {
+		t.Fatalf("SetDefault: %v", err)
+	}
 
 	u, client, err := resolveControlPlaneHTTP(context.TODO())
 	if err != nil {
@@ -32,7 +39,6 @@ func TestResolveControlPlaneHTTP_PlainWhenNoDescriptor(t *testing.T) {
 	if got, want := u.Scheme, "http"; got != want {
 		t.Fatalf("scheme=%s want %s", got, want)
 	}
-	// Plain client path uses a basic client with default Timeout and nil Transport.
 	if client == nil || client.Transport != nil {
 		t.Fatalf("expected plain client with nil Transport; got %#v", client)
 	}
@@ -46,7 +52,6 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	cfgHome := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
 	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Setenv(controlPlaneURLEnv, "https://127.0.0.1:8443")
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
 
 	caCertPEM, caKeyPEM := generateCACert(t)
@@ -67,7 +72,7 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	// Save descriptor and mark default.
 	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{
 		ClusterID: "test-cluster",
-		Address:   "127.0.0.1:8443",
+		Address:   "https://127.0.0.1:8443",
 		CAPath:    caPath,
 		CertPath:  certPath,
 		KeyPath:   keyPath,
