@@ -44,6 +44,11 @@ Legend: [ ] todo, [x] done.
   - Optional shorthand: accept `env: NAME: {from_file: "~/.codex/auth.json"}` for YAML users who prefer inline objects.
   - Tests: unit for resolver; integration with a temporary file path.
 
+- [ ] GitLab domain defaulting
+  - If `gitlab_pat` is provided in the spec (or overrides) and `gitlab_domain` is omitted/empty, set `gitlab_domain = "gitlab.com"` on submit.
+  - Precedence: per‑run spec/overrides > server defaults injected on claim.
+  - Tests: unit for CLI normalization; integration to verify MR creation still works without explicitly specifying domain.
+
 ## Node Agent: Gate‑Heal‑Re‑Gate orchestration
 - [ ] Pre‑mod Gate: run the Build Gate before the first mod container.
   - Change: internal/nodeagent/execution.go — split execution into phases (gate → maybe heal → re‑gate → mod).
@@ -72,7 +77,6 @@ Legend: [ ] todo, [x] done.
 
 ## E2E coverage
 - [x] Spec‑driven fail→heal scenario: `tests/e2e/mods/scenario-orw-fail/run.sh` using `mod.yaml`.
-- [ ] Add a “pass” scenario spec (optional) mirroring the older passing path.
 
 ## Risks / rollback
 - Risk: pre‑gate adds latency; mitigate by fast detection/no‑op when trivial.
