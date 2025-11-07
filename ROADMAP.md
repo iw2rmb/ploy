@@ -60,7 +60,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/workflow/contracts/step_manifest.go` type substitutions + validators use new methods.
   - Test: adapt existing manifest tests; add failure on bad digest/unit.
 
-- [ ] WorkflowCheckpoint/Artifact: `TicketID`, `Stage StageName`, `CacheKey` stays string; artifacts reuse strong types.
+- [x] WorkflowCheckpoint/Artifact: `TicketID`, `Stage StageName`, `CacheKey` stays string; artifacts reuse strong types.
   - Change: `internal/workflow/contracts/workflow_checkpoint.go`, `workflow_artifact.go`.
   - Test: validate stage/ticket typed values; artifact metadata required.
 
