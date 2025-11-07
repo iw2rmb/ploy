@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -67,7 +68,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 		}
 		// Map to modsapi summary type.
 		return modsapi.TicketSummary{
-			TicketID:   srvResp.TicketID,
+			TicketID:   domaintypes.TicketID(srvResp.TicketID),
 			State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 			Repository: srvResp.RepoURL,
 			Metadata: map[string]string{
@@ -125,7 +126,7 @@ func (c SubmitCommand) Run(ctx context.Context) (modsapi.TicketSummary, error) {
 									return modsapi.TicketSummary{}, fmt.Errorf("mods submit: decode response: %w", err)
 								}
 								return modsapi.TicketSummary{
-									TicketID:   srvResp.TicketID,
+									TicketID:   domaintypes.TicketID(srvResp.TicketID),
 									State:      modsapi.TicketState(strings.ToLower(strings.TrimSpace(srvResp.Status))),
 									Repository: srvResp.RepoURL,
 									Metadata: map[string]string{

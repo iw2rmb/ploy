@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
@@ -514,7 +515,7 @@ func TestPublishTicket(t *testing.T) {
 			now := time.Now()
 
 			payload := modsapi.TicketSummary{
-				TicketID:   "test-ticket-123",
+				TicketID:   domaintypes.TicketID("test-ticket-123"),
 				State:      tt.state,
 				Submitter:  "test-user",
 				Repository: "test-repo",
@@ -525,7 +526,7 @@ func TestPublishTicket(t *testing.T) {
 				UpdatedAt: now,
 				Stages: map[string]modsapi.StageStatus{
 					"stage-1": {
-						StageID:     "stage-1",
+						StageID:     domaintypes.StageID("stage-1"),
 						State:       modsapi.StageStateQueued,
 						Attempts:    0,
 						MaxAttempts: 3,
@@ -587,7 +588,7 @@ func TestPublishTicketWithContext(t *testing.T) {
 
 	runID := uuid.New().String()
 	payload := modsapi.TicketSummary{
-		TicketID:  "test-ticket",
+		TicketID:  domaintypes.TicketID("test-ticket"),
 		State:     modsapi.TicketStateRunning,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),

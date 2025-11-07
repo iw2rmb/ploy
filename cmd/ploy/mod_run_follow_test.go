@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -29,7 +30,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			var req modsapi.TicketSubmitRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
 			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: ticketID, State: modsapi.TicketStateRunning}})
+			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateRunning}})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
 			// SSE stream: ticket running -> ticket succeeded
@@ -40,7 +41,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			}
 			// running
 			_, _ = w.Write([]byte("event: ticket\n"))
-			data, _ := json.Marshal(modsapi.TicketSummary{TicketID: ticketID, State: modsapi.TicketStateRunning})
+			data, _ := json.Marshal(modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateRunning})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data)
 			_, _ = w.Write([]byte("\n\n"))
@@ -48,7 +49,7 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 			time.Sleep(5 * time.Millisecond)
 			// succeeded
 			_, _ = w.Write([]byte("event: ticket\n"))
-			data2, _ := json.Marshal(modsapi.TicketSummary{TicketID: ticketID, State: modsapi.TicketStateSucceeded})
+			data2, _ := json.Marshal(modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: modsapi.TicketStateSucceeded})
 			_, _ = w.Write([]byte("data: "))
 			_, _ = w.Write(data2)
 			_, _ = w.Write([]byte("\n\n"))
@@ -57,10 +58,10 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s", ticketID):
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{
-				TicketID: ticketID,
+				TicketID: domaintypes.TicketID(ticketID),
 				State:    modsapi.TicketStateSucceeded,
 				Stages: map[string]modsapi.StageStatus{
-					"plan": {StageID: "plan", State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
+					"plan": {StageID: domaintypes.StageID("plan"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": artifactCID}},
 				},
 			}})
 

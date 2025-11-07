@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -106,7 +107,7 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		// Publish queued event to SSE hub.
 		if eventsService != nil {
 			ticketSummary := modsapi.TicketSummary{
-				TicketID:   resp.TicketID,
+				TicketID:   domaintypes.TicketID(resp.TicketID),
 				State:      modsapi.TicketState(run.Status),
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
@@ -189,7 +190,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		summary := modsapi.TicketSummary{
-			TicketID:   uuid.UUID(run.ID.Bytes).String(),
+			TicketID:   domaintypes.TicketID(uuid.UUID(run.ID.Bytes).String()),
 			State:      ticketState,
 			Submitter:  "",
 			Repository: run.RepoUrl,
@@ -270,7 +271,7 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 			summary.Stages[uuid.UUID(stg.ID.Bytes).String()] = modsapi.StageStatus{
-				StageID:     uuid.UUID(stg.ID.Bytes).String(),
+				StageID:     domaintypes.StageID(uuid.UUID(stg.ID.Bytes).String()),
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,

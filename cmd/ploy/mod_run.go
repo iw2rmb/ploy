@@ -15,6 +15,7 @@ import (
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
 )
@@ -207,7 +208,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 				RetryBackoff: *retryWait,
 			},
 			BaseURL: base,
-			Ticket:  summary.TicketID,
+			Ticket:  string(summary.TicketID),
 			Output:  stderr,
 		}
 		final, err := ev.Run(followCtx)
@@ -215,7 +216,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 			if *capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
 				if *cancelOnCap {
 					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
-					_ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: summary.TicketID, Reason: "cap exceeded", Output: stderr}.Run(context.Background())
+					_ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: string(summary.TicketID), Reason: "cap exceeded", Output: stderr}.Run(context.Background())
 				} else {
 					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", capDuration.String(), summary.TicketID)
 				}
@@ -229,7 +230,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 		}
 		finalState = strings.ToLower(string(final))
 		if strings.TrimSpace(*artifactDir) != "" {
-			if err := downloadTicketArtifacts(ctx, base, httpClient, summary.TicketID, strings.TrimSpace(*artifactDir), stderr); err != nil {
+			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.TicketID), strings.TrimSpace(*artifactDir), stderr); err != nil {
 				return err
 			}
 		}
@@ -237,7 +238,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 
 	if *jsonOut {
 		// Optional: probe MR URL from ticket status metadata.
-		mrURL, _ := fetchMRURL(ctx, base, httpClient, summary.TicketID)
+		mrURL, _ := fetchMRURL(ctx, base, httpClient, string(summary.TicketID))
 		type runJSON struct {
 			TicketID    string `json:"ticket_id"`
 			Initial     string `json:"initial_state,omitempty"`
@@ -245,7 +246,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 			ArtifactDir string `json:"artifact_dir,omitempty"`
 			MRURL       string `json:"mr_url,omitempty"`
 		}
-		out := runJSON{TicketID: summary.TicketID, Initial: initialState, Final: finalState}
+		out := runJSON{TicketID: string(summary.TicketID), Initial: initialState, Final: finalState}
 		if s := strings.TrimSpace(*artifactDir); s != "" {
 			out.ArtifactDir = s
 		}
@@ -266,11 +267,11 @@ func printModRunUsage(w io.Writer) {
 
 func defaultStageDefinitions() []modsapi.StageDefinition {
 	return []modsapi.StageDefinition{
-		{ID: modplan.StageNamePlan, Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
-		{ID: modplan.StageNameORWApply, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameORWGenerate, Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameLLMPlan, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNamePlan}},
-		{ID: modplan.StageNameLLMExec, Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []string{modplan.StageNameORWApply, modplan.StageNameORWGenerate, modplan.StageNameLLMPlan}},
+		{ID: domaintypes.StageID(modplan.StageNamePlan), Lane: "mods-plan", Priority: "default", MaxAttempts: 1},
+		{ID: domaintypes.StageID(modplan.StageNameORWApply), Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
+		{ID: domaintypes.StageID(modplan.StageNameORWGenerate), Lane: "mods-java", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
+		{ID: domaintypes.StageID(modplan.StageNameLLMPlan), Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNamePlan)}},
+		{ID: domaintypes.StageID(modplan.StageNameLLMExec), Lane: "mods-llm", Priority: "default", MaxAttempts: 1, Dependencies: []domaintypes.StageID{domaintypes.StageID(modplan.StageNameORWApply), domaintypes.StageID(modplan.StageNameORWGenerate), domaintypes.StageID(modplan.StageNameLLMPlan)}},
 	}
 }
 

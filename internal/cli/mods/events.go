@@ -23,14 +23,14 @@ type EventsPrinter interface {
 type SimplePrinter struct{ out io.Writer }
 
 func (p SimplePrinter) Ticket(t modsapi.TicketSummary) {
-	_, _ = fmt.Fprintf(p.out, "Ticket %s: %s\n", strings.TrimSpace(t.TicketID), strings.ToLower(string(t.State)))
+	_, _ = fmt.Fprintf(p.out, "Ticket %s: %s\n", strings.TrimSpace(string(t.TicketID)), strings.ToLower(string(t.State)))
 }
 func (p SimplePrinter) Stage(s modsapi.StageStatus) {
-	line := fmt.Sprintf("  %s -> %s", strings.TrimSpace(s.StageID), strings.ToLower(string(s.State)))
+	line := fmt.Sprintf("  %s -> %s", strings.TrimSpace(string(s.StageID)), strings.ToLower(string(s.State)))
 	if s.Attempts > 0 {
 		line += fmt.Sprintf(" attempts=%d", s.Attempts)
 	}
-	if id := strings.TrimSpace(s.CurrentJobID); id != "" {
+	if id := strings.TrimSpace(string(s.CurrentJobID)); id != "" {
 		line += fmt.Sprintf(" job=%s", id)
 	}
 	if msg := strings.TrimSpace(s.LastError); msg != "" {

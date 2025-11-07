@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -16,11 +17,11 @@ func TestModArtifactsListsStageArtifacts(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{
-				TicketID: ticket,
+				TicketID: domaintypes.TicketID(ticket),
 				State:    modsapi.TicketStateSucceeded,
 				Stages: map[string]modsapi.StageStatus{
-					"plan": {StageID: "plan", State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
-					"exec": {StageID: "exec", State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
+					"plan": {StageID: domaintypes.StageID("plan"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"diff": "bafy-diff"}},
+					"exec": {StageID: domaintypes.StageID("exec"), State: modsapi.StageStateSucceeded, Artifacts: map[string]string{"logs": "bafy-logs"}},
 				},
 			}})
 			return
