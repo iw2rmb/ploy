@@ -7,7 +7,7 @@ Documentation: CHECKPOINT.md, PIPES.md, docs/api, internal/workflow/contracts/*,
 Legend: [ ] todo, [x] done.
 
 ## Foundation: Domain Types Package
-- [ ] Create `internal/domain/types` — Central, testable single source for new types.
+- [x] Create `internal/domain/types` — Central, testable single source for new types.
   - Change: add files `ids.go`, `vcs.go`, `artifacts.go`, `duration.go`, `resources.go`, `network.go`, `logging.go`.
   - Test: unit tests per file covering JSON/Text marshal/unmarshal and validation.
 
@@ -137,4 +137,3 @@ Legend: [ ] todo, [x] done.
 - [ ] Add lints: forbid hard-coded label keys and free-form protocols.
   - Change: small staticcheck or regex guard in tests (if guard suite exists).
   - Test: guard test trips on regressions.
-

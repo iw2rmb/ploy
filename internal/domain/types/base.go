@@ -1,0 +1,42 @@
+package types
+
+import (
+	"encoding"
+	"encoding/json"
+	"errors"
+	"strings"
+)
+
+// Validatable is implemented by value types that can validate themselves.
+type Validatable interface {
+	Validate() error
+}
+
+// ErrEmpty indicates an empty or whitespace-only value.
+var ErrEmpty = errors.New("empty")
+
+// Normalize trims surrounding whitespace from s.
+func Normalize(s string) string { return strings.TrimSpace(s) }
+
+// IsEmpty reports whether s is empty after Normalize.
+func IsEmpty(s string) bool { return Normalize(s) == "" }
+
+// MarshalJSONFromText marshals a TextMarshaler value as a JSON string.
+// Intended for use by domain types that represent string values.
+func MarshalJSONFromText(v encoding.TextMarshaler) ([]byte, error) {
+	b, err := v.MarshalText()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(string(b))
+}
+
+// UnmarshalJSONToText unmarshals a JSON string into a TextUnmarshaler.
+// It rejects non-string JSON values.
+func UnmarshalJSONToText(data []byte, v encoding.TextUnmarshaler) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	return v.UnmarshalText([]byte(s))
+}
