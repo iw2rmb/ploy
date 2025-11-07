@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // InMemoryBus is a non-persistent test/local stub of the workflow
@@ -49,7 +51,7 @@ func (b *InMemoryBus) ClaimTicket(ctx context.Context, ticketID string) (Workflo
 	if manifest.Name == "" || manifest.Version == "" {
 		manifest = ManifestReference{Name: "smoke", Version: "2025-09-26"}
 	}
-	return WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: trimmed, Manifest: manifest, Repo: b.Repo}, nil
+	return WorkflowTicket{SchemaVersion: SchemaVersion, TicketID: types.TicketID(trimmed), Manifest: manifest, Repo: b.Repo}, nil
 }
 
 // PublishCheckpoint records a checkpoint in memory only.

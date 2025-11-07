@@ -48,7 +48,7 @@ Legend: [ ] todo, [x] done.
   - Test: roundtrip conversion; invalid UUID returns zero-value.
 
 ## Contracts: Apply Strong Types
-- [ ] WorkflowTicket: `TicketID`, `RepoMaterialization.URL RepoURL`, `BaseRef/TargetRef GitRef`, `Commit CommitSHA`.
+ - [x] WorkflowTicket: `TicketID`, `RepoMaterialization.URL RepoURL`, `BaseRef/TargetRef GitRef`, `Commit CommitSHA`.
   - Change: `internal/workflow/contracts/workflow_ticket.go` structs + `Validate()` updates.
   - Test: existing tests updated; add cases for invalid URL scheme and missing target/commit.
 
