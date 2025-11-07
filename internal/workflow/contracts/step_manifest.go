@@ -110,6 +110,29 @@ type StepResourceSpec struct {
 	GPU    string
 }
 
+// ToLimits converts the resource hints into concrete container limit values.
+//
+// Returns Docker‑compatible quantities:
+//   - nanoCPUs: 1e9 per CPU (millis → nanos via CPUmilli.DockerNanoCPUs).
+//   - memoryBytes: raw bytes for memory limit (0 means unlimited).
+//   - diskBytes: raw bytes for writable layer limit (best‑effort; 0 means unlimited).
+//   - storageSizeOpt: string form for Docker storage option "size" when supported
+//     by the storage driver (empty when unlimited).
+func (s StepResourceSpec) ToLimits() (nanoCPUs int64, memoryBytes int64, diskBytes int64, storageSizeOpt string) {
+	if s.CPU > 0 {
+		nanoCPUs = s.CPU.DockerNanoCPUs()
+	}
+	if s.Memory > 0 {
+		memoryBytes = s.Memory.DockerMemoryBytes()
+	}
+	if s.Disk > 0 {
+		diskBytes = s.Disk.DockerMemoryBytes()
+		// Docker expects a string for the storage size option. Use raw bytes.
+		storageSizeOpt = fmt.Sprintf("%d", diskBytes)
+	}
+	return
+}
+
 // StepRetentionSpec controls container and workspace retention.
 type StepRetentionSpec struct {
 	RetainContainer bool
