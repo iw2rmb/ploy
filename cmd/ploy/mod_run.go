@@ -18,6 +18,7 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	modplan "github.com/iw2rmb/ploy/internal/workflow/mods/plan"
+	"gopkg.in/yaml.v3"
 )
 
 // handleModRun executes the Mods-specific run command.
@@ -43,6 +44,7 @@ func (s *stringSlice) Set(v string) error {
 func executeModRun(args []string, stderr io.Writer) error {
 	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
+	specFile := fs.String("spec", "", "Path to YAML/JSON spec file")
 	repoURL := fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
 	repoBaseRef := fs.String("repo-base-ref", "", "Git base ref used for materialisation")
 	repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
@@ -115,68 +117,21 @@ func executeModRun(args []string, stderr io.Writer) error {
 		request.Metadata["repo_workspace_hint"] = repoSpec.WorkspaceHint
 	}
 
-	// Prepare optional Spec when --mod-env / --mod-image / GitLab flags are provided
-	var specPayload []byte
-	if len(modEnvs) > 0 || strings.TrimSpace(*modImage) != "" || *retain || strings.TrimSpace(*modCommand) != "" ||
-		strings.TrimSpace(*gitlabPAT) != "" || strings.TrimSpace(*gitlabDomain) != "" || *mrSuccess || *mrFail {
-		env := make(map[string]string)
-		for _, kv := range modEnvs {
-			kv = strings.TrimSpace(kv)
-			if kv == "" {
-				continue
-			}
-			var k, v string
-			if idx := strings.IndexByte(kv, '='); idx >= 0 {
-				k = strings.TrimSpace(kv[:idx])
-				v = kv[idx+1:]
-			} else {
-				k = kv
-				v = ""
-			}
-			if k != "" {
-				env[k] = v
-			}
-		}
-		payload := map[string]any{}
-		if len(env) > 0 {
-			payload["env"] = env
-		}
-		if img := strings.TrimSpace(*modImage); img != "" {
-			payload["image"] = img
-		}
-		if *retain {
-			payload["retain_container"] = true
-		}
-		if cmd := strings.TrimSpace(*modCommand); cmd != "" {
-			// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
-			// Fallback to shell string (wrapped as ["/bin/sh","-c",cmd]) when not a JSON array.
-			var asArray []string
-			if strings.HasPrefix(cmd, "[") && strings.HasSuffix(cmd, "]") {
-				if err := json.Unmarshal([]byte(cmd), &asArray); err == nil && len(asArray) > 0 {
-					payload["command"] = asArray
-				} else {
-					payload["command"] = cmd
-				}
-			} else {
-				payload["command"] = cmd
-			}
-		}
-		// Add GitLab options (never print PAT in logs; node agent will handle redaction)
-		if pat := strings.TrimSpace(*gitlabPAT); pat != "" {
-			payload["gitlab_pat"] = pat
-		}
-		if domain := strings.TrimSpace(*gitlabDomain); domain != "" {
-			payload["gitlab_domain"] = domain
-		}
-		if *mrSuccess {
-			payload["mr_on_success"] = true
-		}
-		if *mrFail {
-			payload["mr_on_fail"] = true
-		}
-		if len(payload) > 0 {
-			specPayload, _ = json.Marshal(payload)
-		}
+	// Load spec from file (if provided) and merge with CLI overrides.
+	// CLI flags take precedence over spec file values.
+	specPayload, err := buildSpecPayload(
+		strings.TrimSpace(*specFile),
+		modEnvs,
+		strings.TrimSpace(*modImage),
+		*retain,
+		strings.TrimSpace(*modCommand),
+		strings.TrimSpace(*gitlabPAT),
+		strings.TrimSpace(*gitlabDomain),
+		*mrSuccess,
+		*mrFail,
+	)
+	if err != nil {
+		return fmt.Errorf("build spec: %w", err)
 	}
 
 	cmd := mods.SubmitCommand{
@@ -260,7 +215,126 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+}
+
+// buildSpecPayload loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.
+// CLI flags take precedence over spec file values. Returns raw JSON bytes.
+func buildSpecPayload(
+	specFile string,
+	modEnvs []string,
+	modImage string,
+	retain bool,
+	modCommand string,
+	gitlabPAT string,
+	gitlabDomain string,
+	mrSuccess bool,
+	mrFail bool,
+) ([]byte, error) {
+	// Start with spec from file (if provided)
+	var base map[string]any
+	if specFile != "" {
+		data, err := os.ReadFile(specFile)
+		if err != nil {
+			return nil, fmt.Errorf("read spec file %s: %w", specFile, err)
+		}
+		// Try JSON first, fallback to YAML
+		if err := json.Unmarshal(data, &base); err != nil {
+			// Not JSON; try YAML
+			if err := yaml.Unmarshal(data, &base); err != nil {
+				return nil, fmt.Errorf("parse spec file %s (not valid JSON or YAML): %w", specFile, err)
+			}
+		}
+	} else {
+		base = make(map[string]any)
+	}
+
+	// Merge CLI flag overrides (CLI flags take precedence)
+	hasOverrides := len(modEnvs) > 0 || modImage != "" || retain || modCommand != "" ||
+		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
+
+	// Only proceed if we have a spec file or CLI overrides
+	if len(base) == 0 && !hasOverrides {
+		return nil, nil
+	}
+
+	// Apply CLI overrides to the base spec
+	if len(modEnvs) > 0 {
+		env := make(map[string]string)
+		// Preserve existing env from spec file if present
+		if existingEnv, ok := base["env"].(map[string]any); ok {
+			for k, v := range existingEnv {
+				if s, ok := v.(string); ok {
+					env[k] = s
+				}
+			}
+		}
+		// Apply CLI overrides
+		for _, kv := range modEnvs {
+			kv = strings.TrimSpace(kv)
+			if kv == "" {
+				continue
+			}
+			var k, v string
+			if idx := strings.IndexByte(kv, '='); idx >= 0 {
+				k = strings.TrimSpace(kv[:idx])
+				v = kv[idx+1:]
+			} else {
+				k = kv
+				v = ""
+			}
+			if k != "" {
+				env[k] = v
+			}
+		}
+		if len(env) > 0 {
+			base["env"] = env
+		}
+	}
+
+	if modImage != "" {
+		base["image"] = modImage
+	}
+
+	if retain {
+		base["retain_container"] = true
+	}
+
+	if modCommand != "" {
+		// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
+		// Fallback to shell string (wrapped as ["/bin/sh","-c",cmd]) when not a JSON array.
+		var asArray []string
+		if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
+			if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
+				base["command"] = asArray
+			} else {
+				base["command"] = modCommand
+			}
+		} else {
+			base["command"] = modCommand
+		}
+	}
+
+	// Add GitLab options (never print PAT in logs; node agent will handle redaction)
+	if gitlabPAT != "" {
+		base["gitlab_pat"] = gitlabPAT
+	}
+	if gitlabDomain != "" {
+		base["gitlab_domain"] = gitlabDomain
+	}
+	if mrSuccess {
+		base["mr_on_success"] = true
+	}
+	if mrFail {
+		base["mr_on_fail"] = true
+	}
+
+	if len(base) == 0 {
+		return nil, nil
+	}
+
+	// Marshal to JSON for submission
+	return json.Marshal(base)
 }
 
 // (stringSlice implements flag.Value above)

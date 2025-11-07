@@ -32,7 +32,7 @@ Legend: [ ] todo, [x] done.
 - [x] Mods E2E README updated for spec‑driven flow.
 
 ## CLI: `--spec` support
-- [ ] Add `--spec <file>` (YAML/JSON) to `ploy mod run` and include raw JSON into submit payload `Spec`.
+- [x] Add `--spec <file>` (YAML/JSON) to `ploy mod run` and include raw JSON into submit payload `Spec`.
   - Change: cmd/ploy/mod_run.go (parse file; YAML→JSON; merge with `--mod-*` overrides if both present; document precedence).
   - Test: cmd/ploy/testdata/help_mod.txt; unit to assert payload contains `build_gate_healing`.
 - [ ] Back‑compat shim: `--heal-on-build` (deprecated) injects a default `build_gate_healing` when spec lacks it.
