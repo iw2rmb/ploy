@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
 - [x] Make `/in` the sole, read‑only mount for cross‑phase inputs.
   - Node: after the first Gate fails, persist the log to a temp host file and mount it at `/in/build-gate.log` for healing steps; do not write into the repository.
   - Remove any writes to `/workspace/.ploy`; treat previous `/.ploy` usage as deprecated and eliminate to avoid accidental inclusion in diffs.
-- [ ] mod-codex: prefer `/in` as context.
+- [x] mod-codex: prefer `/in` as context.
   - Always include `--add-dir /in` when present; stop referencing `/.ploy`.
   - Examples/prompts should reference `/in/build-gate.log`.
 - [ ] Tests/docs/spec:
