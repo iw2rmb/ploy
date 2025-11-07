@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/resources.go`.
   - Test: parse `500m`, `2`, `2Gi`, `10G`; overflow/invalid cases.
 
-- [ ] Network — `Protocol` enum (`tcp`, `udp`) with validation; string marshal.
+- [x] Network — `Protocol` enum (`tcp`, `udp`) with validation; string marshal.
   - Change: `internal/domain/types/network.go`.
   - Test: accept `tcp|udp`; reject others.
 
