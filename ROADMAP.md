@@ -125,7 +125,7 @@ Legend: [ ] todo, [x] done.
   - Change: rely on `encoding.TextMarshaler`/`TextUnmarshaler` on types.
   - Test: golden JSON fixtures for tickets, checkpoints, artifacts.
 
-- [ ] Wire adapters — add helper funcs to convert strong types to existing usage where refactors are deferred.
+- [x] Wire adapters — add helper funcs to convert strong types to existing usage where refactors are deferred.
   - Change: `internal/domain/types/*` small shims.
   - Test: compile-only plus basic unit tests.
 
