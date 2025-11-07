@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/vcs.go`.
   - Test: accept https/ssh/file; preserve value in JSON; trim spaces.
 
-- [ ] Artifacts — `CID`, `Sha256Digest` with `Validate()`; `Sha256Digest` enforces `sha256:`.
+- [x] Artifacts — `CID`, `Sha256Digest` with `Validate()`; `Sha256Digest` enforces `sha256:`.
   - Change: `internal/domain/types/artifacts.go`.
   - Test: valid/invalid digests; CID non-empty; JSON roundtrip.
 
