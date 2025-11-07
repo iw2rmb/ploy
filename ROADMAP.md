@@ -56,7 +56,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/workflow/contracts/manifest_reference.go` (types only; keep JSON fields).
   - Test: name/version non-empty; JSON stable.
 
-- [ ] StepManifest: `ID StepID`, `Inputs[].SnapshotCID CID`, `Inputs[].DiffCID CID`, `StepInputArtifactRef.Digest Sha256Digest`, `StepResourceSpec` uses `CPUmilli`/`Bytes`, `StepRetentionSpec.TTL Duration`.
+- [x] StepManifest: `ID StepID`, `Inputs[].SnapshotCID CID`, `Inputs[].DiffCID CID`, `StepInputArtifactRef.Digest Sha256Digest`, `StepResourceSpec` uses `CPUmilli`/`Bytes`, `StepRetentionSpec.TTL Duration`.
   - Change: `internal/workflow/contracts/step_manifest.go` type substitutions + validators use new methods.
   - Test: adapt existing manifest tests; add failure on bad digest/unit.
 

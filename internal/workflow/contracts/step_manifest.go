@@ -7,7 +7,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 var (
@@ -19,7 +20,7 @@ var (
 
 // StepManifest defines the execution contract for a single Mod step.
 type StepManifest struct {
-	ID         string
+	ID         types.StepID
 	Name       string
 	Image      string
 	Command    []string
@@ -55,8 +56,8 @@ type StepInput struct {
 	Name        string
 	MountPath   string
 	Mode        StepInputMode
-	SnapshotCID string
-	DiffCID     string
+	SnapshotCID types.CID
+	DiffCID     types.CID
 	Hydration   *StepInputHydration
 }
 
@@ -96,31 +97,31 @@ type StepInputHydration struct {
 
 // StepInputArtifactRef references a snapshot or diff artifact.
 type StepInputArtifactRef struct {
-	CID    string `json:"cid"`
-	Digest string `json:"digest,omitempty"`
-	Size   int64  `json:"size,omitempty"`
+	CID    types.CID          `json:"cid"`
+	Digest types.Sha256Digest `json:"digest,omitempty"`
+	Size   int64              `json:"size,omitempty"`
 }
 
 // StepResourceSpec captures runtime resource hints.
 type StepResourceSpec struct {
-	CPU    string
-	Memory string
-	Disk   string
+	CPU    types.CPUmilli
+	Memory types.Bytes
+	Disk   types.Bytes
 	GPU    string
 }
 
 // StepRetentionSpec controls container and workspace retention.
 type StepRetentionSpec struct {
 	RetainContainer bool
-	TTL             string
+	TTL             types.Duration
 }
 
 // Validate ensures the manifest is well-formed.
 func (m StepManifest) Validate() error {
-	if strings.TrimSpace(m.ID) == "" {
+	if m.ID.IsZero() {
 		return errors.New("step manifest id required")
 	}
-	if !stepIDPattern.MatchString(m.ID) {
+	if !stepIDPattern.MatchString(m.ID.String()) {
 		return fmt.Errorf("step manifest id invalid: %q", m.ID)
 	}
 	if strings.TrimSpace(m.Name) == "" {
@@ -178,8 +179,8 @@ func (m StepManifest) Validate() error {
 		default:
 			return fmt.Errorf("%s mount mode invalid: %q", position, input.Mode)
 		}
-		hasSnapshot := strings.TrimSpace(input.SnapshotCID) != ""
-		hasDiff := strings.TrimSpace(input.DiffCID) != ""
+		hasSnapshot := strings.TrimSpace(string(input.SnapshotCID)) != ""
+		hasDiff := strings.TrimSpace(string(input.DiffCID)) != ""
 		if input.Hydration != nil {
 			if err := input.Hydration.validate(fmt.Sprintf("%s hydration", position)); err != nil {
 				return err
@@ -221,16 +222,21 @@ func (m StepManifest) Validate() error {
 			}
 		}
 	}
+	// Resources: ensure non-negative values using type validators.
+	if err := m.Resources.CPU.Validate(); err != nil {
+		return fmt.Errorf("resources cpu invalid: %w", err)
+	}
+	if err := m.Resources.Memory.Validate(); err != nil {
+		return fmt.Errorf("resources memory invalid: %w", err)
+	}
+	if err := m.Resources.Disk.Validate(); err != nil {
+		return fmt.Errorf("resources disk invalid: %w", err)
+	}
+
+	// Retention: when retaining container, TTL must be set to a positive duration.
 	if m.Retention.RetainContainer {
-		if strings.TrimSpace(m.Retention.TTL) == "" {
+		if timeDur := int64(m.Retention.TTL); timeDur <= 0 {
 			return errors.New("retention ttl required when retaining container")
-		}
-		if _, err := time.ParseDuration(strings.TrimSpace(m.Retention.TTL)); err != nil {
-			return fmt.Errorf("retention ttl invalid: %w", err)
-		}
-	} else if strings.TrimSpace(m.Retention.TTL) != "" {
-		if _, err := time.ParseDuration(strings.TrimSpace(m.Retention.TTL)); err != nil {
-			return fmt.Errorf("retention ttl invalid: %w", err)
 		}
 	}
 
@@ -238,7 +244,7 @@ func (m StepManifest) Validate() error {
 }
 
 func (h StepInputHydration) hasSource() bool {
-	if strings.TrimSpace(h.BaseSnapshot.CID) != "" {
+	if strings.TrimSpace(string(h.BaseSnapshot.CID)) != "" {
 		return true
 	}
 	if len(h.Diffs) > 0 {
@@ -251,18 +257,22 @@ func (h StepInputHydration) hasSource() bool {
 }
 
 func (h StepInputHydration) validate(position string) error {
-	hasBase := strings.TrimSpace(h.BaseSnapshot.CID) != ""
+	hasBase := strings.TrimSpace(string(h.BaseSnapshot.CID)) != ""
 	for idx, diff := range h.Diffs {
-		if strings.TrimSpace(diff.CID) == "" {
+		if strings.TrimSpace(string(diff.CID)) == "" {
 			return fmt.Errorf("%s diff[%d] cid required", position, idx)
 		}
-		if diffDigest := strings.TrimSpace(diff.Digest); diffDigest != "" && !strings.HasPrefix(diffDigest, "sha256:") {
-			return fmt.Errorf("%s diff[%d] digest must be sha256", position, idx)
+		if strings.TrimSpace(string(diff.Digest)) != "" {
+			if err := diff.Digest.Validate(); err != nil {
+				return fmt.Errorf("%s diff[%d] digest invalid: %v", position, idx, err)
+			}
 		}
 	}
 	if hasBase {
-		if strings.TrimSpace(h.BaseSnapshot.Digest) != "" && !strings.HasPrefix(strings.TrimSpace(h.BaseSnapshot.Digest), "sha256:") {
-			return fmt.Errorf("%s base snapshot digest must be sha256", position)
+		if strings.TrimSpace(string(h.BaseSnapshot.Digest)) != "" {
+			if err := h.BaseSnapshot.Digest.Validate(); err != nil {
+				return fmt.Errorf("%s base snapshot digest invalid: %v", position, err)
+			}
 		}
 	} else if len(h.Diffs) > 0 && (h.Repo == nil || strings.TrimSpace(string(h.Repo.URL)) == "") {
 		return fmt.Errorf("%s base snapshot cid required when diffs are provided", position)

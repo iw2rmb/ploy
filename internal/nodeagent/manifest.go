@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -53,10 +55,10 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 
 	// Build the repo materialization.
 	repo := contracts.RepoMaterialization{
-		URL:       req.RepoURL,
-		BaseRef:   req.BaseRef,
-		TargetRef: targetRef,
-		Commit:    req.CommitSHA,
+		URL:       types.RepoURL(req.RepoURL),
+		BaseRef:   types.GitRef(req.BaseRef),
+		TargetRef: types.GitRef(targetRef),
+		Commit:    types.CommitSHA(req.CommitSHA),
 	}
 
 	// Create a single read-write input that will be hydrated from the repository.
@@ -90,7 +92,7 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	}
 
 	manifest := contracts.StepManifest{
-		ID:         req.RunID,
+		ID:         types.StepID(req.RunID),
 		Name:       fmt.Sprintf("Run %s", req.RunID),
 		Image:      image,
 		Command:    command,
@@ -109,7 +111,7 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		},
 		Retention: contracts.StepRetentionSpec{
 			RetainContainer: retain,
-			TTL:             "1h",
+			TTL:             types.Duration(time.Hour),
 		},
 		Options: gitlabOpts,
 	}

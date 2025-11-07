@@ -3,11 +3,14 @@ package contracts
 import (
 	"strings"
 	"testing"
+	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestStepManifestValidate(t *testing.T) {
 	valid := StepManifest{
-		ID:         "mods-orw-apply",
+		ID:         types.StepID("mods-orw-apply"),
 		Name:       "ORW Apply",
 		Image:      "ghcr.io/ploy/mods/openrewrite:latest",
 		Command:    []string{"/bin/run"},
@@ -21,11 +24,11 @@ func TestStepManifestValidate(t *testing.T) {
 				Name:        "baseline",
 				MountPath:   "/workspace",
 				Mode:        StepInputModeReadOnly,
-				SnapshotCID: "bafybaseline",
+				SnapshotCID: types.CID("bafybaseline"),
 				Hydration: &StepInputHydration{
 					BaseSnapshot: StepInputArtifactRef{
-						CID:    "bafybaseline",
-						Digest: "sha256:baseline",
+						CID:    types.CID("bafybaseline"),
+						Digest: types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 					},
 				},
 			},
@@ -33,7 +36,7 @@ func TestStepManifestValidate(t *testing.T) {
 				Name:      "overlay",
 				MountPath: "/workspace",
 				Mode:      StepInputModeReadWrite,
-				DiffCID:   "bafyoverlay",
+				DiffCID:   types.CID("bafyoverlay"),
 			},
 		},
 		Shift: &StepShiftSpec{
@@ -44,7 +47,7 @@ func TestStepManifestValidate(t *testing.T) {
 		},
 		Retention: StepRetentionSpec{
 			RetainContainer: true,
-			TTL:             "24h",
+			TTL:             types.Duration(24 * time.Hour),
 		},
 	}
 
@@ -94,9 +97,7 @@ func TestStepManifestValidate(t *testing.T) {
 			mutate: func(m *StepManifest) {
 				m.Inputs[0].SnapshotCID = ""
 				m.Inputs[0].Hydration = &StepInputHydration{
-					Diffs: []StepInputArtifactRef{
-						{CID: "bafy-diff-1"},
-					},
+					Diffs: []StepInputArtifactRef{{CID: types.CID("bafy-diff-1")}},
 				}
 			},
 			wantErr: "inputs[0]",
@@ -106,16 +107,16 @@ func TestStepManifestValidate(t *testing.T) {
 			mutate: func(m *StepManifest) {
 				m.Inputs[0].Hydration = &StepInputHydration{
 					BaseSnapshot: StepInputArtifactRef{
-						CID:    "bafybaseline",
-						Digest: "sha256:baseline",
+						CID:    types.CID("bafybaseline"),
+						Digest: types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 					},
 					Diffs: []StepInputArtifactRef{
-						{CID: "bafy-diff-1", Digest: "sha256:diff1"},
-						{CID: "bafy-diff-2", Digest: "sha256:diff2"},
+						{CID: types.CID("bafy-diff-1"), Digest: types.Sha256Digest("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")},
+						{CID: types.CID("bafy-diff-2"), Digest: types.Sha256Digest("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")},
 					},
 					Repo: &RepoMaterialization{
-						URL:       "https://gitlab.example.com/group/project.git",
-						TargetRef: "refs/heads/main",
+						URL:       types.RepoURL("https://gitlab.example.com/group/project.git"),
+						TargetRef: types.GitRef("refs/heads/main"),
 					},
 				}
 			},
@@ -143,17 +144,32 @@ func TestStepManifestValidate(t *testing.T) {
 			wantErr: "shift",
 		},
 		{
-			name: "invalid retention ttl",
+			name: "invalid digest in hydration diff",
 			mutate: func(m *StepManifest) {
-				m.Retention.TTL = "invalid"
+				m.Inputs[0].Hydration = &StepInputHydration{
+					BaseSnapshot: StepInputArtifactRef{
+						CID:    types.CID("bafybaseline"),
+						Digest: types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+					},
+					Diffs: []StepInputArtifactRef{
+						{CID: types.CID("bafy-diff-1"), Digest: types.Sha256Digest("bad-digest")},
+					},
+				}
 			},
-			wantErr: "retention",
+			wantErr: "digest",
+		},
+		{
+			name: "invalid resources cpu (negative)",
+			mutate: func(m *StepManifest) {
+				m.Resources.CPU = types.CPUmilli(-1)
+			},
+			wantErr: "resources",
 		},
 		{
 			name: "retention ttl required when retaining container",
 			mutate: func(m *StepManifest) {
 				m.Retention.RetainContainer = true
-				m.Retention.TTL = ""
+				m.Retention.TTL = 0
 			},
 			wantErr: "retention",
 		},

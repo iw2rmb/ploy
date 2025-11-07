@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -77,7 +78,7 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Name:        "workspace",
 						MountPath:   "/workspace",
 						Mode:        contracts.StepInputModeReadWrite,
-						SnapshotCID: "snapshot123",
+						SnapshotCID: types.CID("snapshot123"),
 					},
 				},
 			},
@@ -164,7 +165,7 @@ func TestFilesystemWorkspaceHydrator_Hydrate(t *testing.T) {
 						Name:        "snapshot-input",
 						MountPath:   "/snapshot",
 						Mode:        contracts.StepInputModeReadOnly,
-						SnapshotCID: "snapshot123",
+						SnapshotCID: types.CID("snapshot123"),
 					},
 					{
 						Name:      "another-repo",
