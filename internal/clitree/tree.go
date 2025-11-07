@@ -58,8 +58,8 @@ func Tree() []Node {
 			Synopsis: "Inspect or update cluster configuration",
 			Subcommands: []Node{
 				{Name: "gitlab", Synopsis: "Manage GitLab integration credentials", Subcommands: []Node{
-					{Name: "show", Synopsis: "show [--cluster-id <id>]", Description: "Display the current GitLab configuration"},
-					{Name: "set", Synopsis: "set --file <path> [--cluster-id <id>]", Description: "Apply a GitLab configuration JSON file"},
+					{Name: "show", Synopsis: "show", Description: "Display the current GitLab configuration"},
+					{Name: "set", Synopsis: "set --file <path>", Description: "Apply a GitLab configuration JSON file"},
 					{Name: "validate", Synopsis: "validate --file <path>", Description: "Validate a GitLab configuration without saving"},
 				}},
 			},
