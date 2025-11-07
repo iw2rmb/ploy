@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 const (
@@ -59,7 +61,7 @@ func TestWorkflowTicketValidate(t *testing.T) {
 
 	valid := WorkflowTicket{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
+		TicketID:      types.TicketID("ticket-123"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 	}
 	if err := valid.Validate(); err != nil {
@@ -68,12 +70,12 @@ func TestWorkflowTicketValidate(t *testing.T) {
 
 	withRepo := WorkflowTicket{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-456",
+		TicketID:      types.TicketID("ticket-456"),
 		Manifest:      ManifestReference{Name: "smoke", Version: "2025-09-26"},
 		Repo: RepoMaterialization{
-			URL:       "https://gitlab.com/iw2rmb/sample.git",
-			BaseRef:   "main",
-			TargetRef: "mods/shift-grid",
+			URL:       types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("mods/shift-grid"),
 		},
 	}
 	if err := withRepo.Validate(); err != nil {
@@ -81,18 +83,27 @@ func TestWorkflowTicketValidate(t *testing.T) {
 	}
 
 	badRepo := valid
-	badRepo.Repo = RepoMaterialization{URL: "https://example.com/repo.git"}
+	badRepo.Repo = RepoMaterialization{URL: types.RepoURL("https://example.com/repo.git")}
 	if err := badRepo.Validate(); err == nil {
 		t.Fatal("expected repo validation error when target ref missing")
 	}
 
 	commitOnly := valid
 	commitOnly.Repo = RepoMaterialization{
-		URL:    "https://gitlab.com/iw2rmb/sample.git",
-		Commit: "abcdef1234567890",
+		URL:    types.RepoURL("https://gitlab.com/iw2rmb/sample.git"),
+		Commit: types.CommitSHA("abcdef1234567890"),
 	}
 	if err := commitOnly.Validate(); err != nil {
 		t.Fatalf("expected repo with commit to validate, got %v", err)
+	}
+
+	invalidScheme := valid
+	invalidScheme.Repo = RepoMaterialization{
+		URL:       types.RepoURL("http://example.com/repo.git"),
+		TargetRef: types.GitRef("main"),
+	}
+	if err := invalidScheme.Validate(); err == nil {
+		t.Fatal("expected validation error for invalid repo url scheme")
 	}
 }
 

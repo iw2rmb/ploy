@@ -2,7 +2,8 @@ package contracts
 
 import (
 	"fmt"
-	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // WorkflowTicket is the envelope used when submitting or claiming a workflow
@@ -11,7 +12,7 @@ import (
 // details for nodes to hydrate workspaces.
 type WorkflowTicket struct {
 	SchemaVersion string              `json:"schema_version"`
-	TicketID      string              `json:"ticket_id"`
+	TicketID      types.TicketID      `json:"ticket_id"`
 	Manifest      ManifestReference   `json:"manifest"`
 	Repo          RepoMaterialization `json:"repo,omitempty"`
 }
@@ -23,7 +24,7 @@ func (t WorkflowTicket) Validate() error {
 	if t.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")
 	}
-	if t.TicketID == "" {
+	if t.TicketID.IsZero() {
 		return fmt.Errorf("ticket_id is required")
 	}
 	if err := t.Manifest.Validate(); err != nil {
@@ -37,24 +38,39 @@ func (t WorkflowTicket) Validate() error {
 
 // RepoMaterialization describes repository inputs required for a workflow run.
 type RepoMaterialization struct {
-	URL           string `json:"url"`
-	BaseRef       string `json:"base_ref"`
-	TargetRef     string `json:"target_ref"`
-	Commit        string `json:"commit,omitempty"`
-	WorkspaceHint string `json:"workspace_hint,omitempty"`
+	URL           types.RepoURL   `json:"url,omitempty"`
+	BaseRef       types.GitRef    `json:"base_ref,omitempty"`
+	TargetRef     types.GitRef    `json:"target_ref,omitempty"`
+	Commit        types.CommitSHA `json:"commit,omitempty"`
+	WorkspaceHint string          `json:"workspace_hint,omitempty"`
 }
 
 // Validate ensures repo metadata is well formed when provided.
 func (r RepoMaterialization) Validate() error {
-	if strings.TrimSpace(r.URL) == "" {
-		return nil
+	// URL is optional; when set, validate and require either target ref or commit.
+	if r.URL != "" {
+		if err := r.URL.Validate(); err != nil {
+			return fmt.Errorf("url: %w", err)
+		}
+		if r.TargetRef == "" && r.Commit == "" {
+			return fmt.Errorf("target_ref or commit is required when repo url is set")
+		}
 	}
-	url := strings.TrimSpace(r.URL)
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "git@") && !strings.HasPrefix(url, "file://") {
-		return fmt.Errorf("url must be http(s), ssh, or file://")
+	// Validate optional refs/commit when provided.
+	if r.BaseRef != "" {
+		if err := r.BaseRef.Validate(); err != nil {
+			return fmt.Errorf("base_ref: %w", err)
+		}
 	}
-	if strings.TrimSpace(r.TargetRef) == "" && strings.TrimSpace(r.Commit) == "" {
-		return fmt.Errorf("target_ref or commit is required when repo url is set")
+	if r.TargetRef != "" {
+		if err := r.TargetRef.Validate(); err != nil {
+			return fmt.Errorf("target_ref: %w", err)
+		}
+	}
+	if r.Commit != "" {
+		if err := r.Commit.Validate(); err != nil {
+			return fmt.Errorf("commit: %w", err)
+		}
 	}
 	return nil
 }

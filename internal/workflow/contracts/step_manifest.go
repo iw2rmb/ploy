@@ -244,7 +244,7 @@ func (h StepInputHydration) hasSource() bool {
 	if len(h.Diffs) > 0 {
 		return true
 	}
-	if h.Repo != nil && strings.TrimSpace(h.Repo.URL) != "" {
+	if h.Repo != nil && strings.TrimSpace(string(h.Repo.URL)) != "" {
 		return true
 	}
 	return false
@@ -264,7 +264,7 @@ func (h StepInputHydration) validate(position string) error {
 		if strings.TrimSpace(h.BaseSnapshot.Digest) != "" && !strings.HasPrefix(strings.TrimSpace(h.BaseSnapshot.Digest), "sha256:") {
 			return fmt.Errorf("%s base snapshot digest must be sha256", position)
 		}
-	} else if len(h.Diffs) > 0 && (h.Repo == nil || strings.TrimSpace(h.Repo.URL) == "") {
+	} else if len(h.Diffs) > 0 && (h.Repo == nil || strings.TrimSpace(string(h.Repo.URL)) == "") {
 		return fmt.Errorf("%s base snapshot cid required when diffs are provided", position)
 	}
 	if h.Repo != nil {
@@ -272,7 +272,7 @@ func (h StepInputHydration) validate(position string) error {
 			return fmt.Errorf("%s repo invalid: %w", position, err)
 		}
 	}
-	if !hasBase && len(h.Diffs) == 0 && (h.Repo == nil || strings.TrimSpace(h.Repo.URL) == "") {
+	if !hasBase && len(h.Diffs) == 0 && (h.Repo == nil || strings.TrimSpace(string(h.Repo.URL)) == "") {
 		return fmt.Errorf("%s requires base snapshot, diffs, or repo metadata", position)
 	}
 	return nil
