@@ -106,7 +106,7 @@ Legend: [ ] todo, [x] done.
   - Test: existing manifest tests updated; add rejection for invalid protocol.
 
 ## Server Config: Address Validation (Optional Type)
-- [ ] Add `ValidateAddress(string) (netip.AddrPort, error)` and use in config validation.
+- [x] Add `ValidateAddress(string) (netip.AddrPort, error)` and use in config validation.
   - Change: `internal/server/config/validate.go` plus helper in a new small file.
   - Test: good/bad addresses; defaults preserved.
 
