@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/network.go`.
   - Test: accept `tcp|udp`; reject others.
 
-- [ ] Logging — `LogLevel` enum (`debug|info|warn|error`) with validation.
+- [x] Logging — `LogLevel` enum (`debug|info|warn|error`) with validation.
   - Change: `internal/domain/types/logging.go`.
   - Test: accept known; reject unknown; JSON roundtrip.
 

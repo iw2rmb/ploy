@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +59,43 @@ func TestLogging_Validation(t *testing.T) {
 	var v sampleLevel
 	if err := v.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
 		t.Fatalf("expected ErrEmpty, got %v", err)
+	}
+}
+
+func TestLogLevel_AcceptKnown(t *testing.T) {
+	cases := []string{"debug", "info", "warn", "error", "DEBUG", "Warn", " Error "}
+	for _, in := range cases {
+		var lvl LogLevel
+		if err := lvl.UnmarshalText([]byte(in)); err != nil {
+			t.Fatalf("UnmarshalText(%q) error: %v", in, err)
+		}
+		if s := string(lvl); s != strings.ToLower(strings.TrimSpace(in)) {
+			t.Fatalf("canonical form mismatch: got %q for %q", s, in)
+		}
+
+		b, err := json.Marshal(lvl)
+		if err != nil {
+			t.Fatalf("marshal json: %v", err)
+		}
+		var lvl2 LogLevel
+		if err := json.Unmarshal(b, &lvl2); err != nil {
+			t.Fatalf("unmarshal json: %v", err)
+		}
+		if lvl2 != lvl {
+			t.Fatalf("roundtrip mismatch: %v != %v", lvl2, lvl)
+		}
+		if err := lvl2.Validate(); err != nil {
+			t.Fatalf("validate known level: %v", err)
+		}
+	}
+}
+
+func TestLogLevel_RejectUnknown(t *testing.T) {
+	bad := []string{"", " ", "trace", "fatal", "warning", "notice", "err"}
+	for _, in := range bad {
+		var lvl LogLevel
+		if err := lvl.UnmarshalText([]byte(in)); err == nil {
+			t.Fatalf("expected error for %q", in)
+		}
 	}
 }
