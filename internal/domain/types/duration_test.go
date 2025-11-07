@@ -4,59 +4,83 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
-// sampleDuration is a stub proving JSON/Text and validation behavior.
-type sampleDuration string
-
-func (v sampleDuration) MarshalText() ([]byte, error) {
-	s := Normalize(string(v))
-	if IsEmpty(s) {
-		return nil, ErrEmpty
-	}
-	return []byte(s), nil
-}
-func (v *sampleDuration) UnmarshalText(b []byte) error {
-	s := Normalize(string(b))
-	if IsEmpty(s) {
-		return ErrEmpty
-	}
-	*v = sampleDuration(s)
-	return nil
-}
-func (v sampleDuration) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
-func (v *sampleDuration) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
-func (v sampleDuration) Validate() error {
-	if IsEmpty(string(v)) {
-		return ErrEmpty
-	}
-	return nil
-}
-
 func TestDuration_TextAndJSONRoundTrip(t *testing.T) {
-	var v sampleDuration
-	if err := v.UnmarshalText([]byte("  5m  ")); err != nil {
+	var d Duration
+	if err := d.UnmarshalText([]byte("  5m  ")); err != nil {
 		t.Fatalf("unmarshal text: %v", err)
 	}
-	if string(v) != "5m" {
-		t.Fatalf("normalize failed: %q", string(v))
+	if time.Duration(d) != 5*time.Minute {
+		t.Fatalf("parsed value = %v, want %v", time.Duration(d), 5*time.Minute)
 	}
-	b, err := json.Marshal(v)
+	// Text form is canonicalized by time.Duration.String().
+	if b, err := d.MarshalText(); err != nil {
+		t.Fatalf("marshal text: %v", err)
+	} else if string(b) != "5m0s" { // canonical form
+		t.Fatalf("text form = %q, want %q", string(b), "5m0s")
+	}
+
+	// JSON string roundtrip.
+	data, err := json.Marshal(d)
 	if err != nil {
 		t.Fatalf("marshal json: %v", err)
 	}
-	var v2 sampleDuration
-	if err := json.Unmarshal(b, &v2); err != nil {
+	var d2 Duration
+	if err := json.Unmarshal(data, &d2); err != nil {
 		t.Fatalf("unmarshal json: %v", err)
 	}
-	if v2 != v {
-		t.Fatalf("roundtrip mismatch")
+	if time.Duration(d2) != time.Duration(d) {
+		t.Fatalf("roundtrip mismatch: %v != %v", d2, d)
 	}
 }
 
-func TestDuration_Validation(t *testing.T) {
-	var v sampleDuration
-	if err := v.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
+func TestDuration_JSONRejectsNonString(t *testing.T) {
+	var d Duration
+	if err := json.Unmarshal([]byte("12345"), &d); err == nil {
+		t.Fatalf("expected error for non-string JSON value")
+	}
+}
+
+func TestDuration_InvalidString(t *testing.T) {
+	var d Duration
+	if err := d.UnmarshalText([]byte("not-a-duration")); !errors.Is(err, ErrInvalidDuration) {
+		t.Fatalf("expected ErrInvalidDuration, got %v", err)
+	}
+	if err := d.UnmarshalText([]byte("   ")); !errors.Is(err, ErrEmpty) {
 		t.Fatalf("expected ErrEmpty, got %v", err)
+	}
+}
+
+func TestDuration_YAML(t *testing.T) {
+	// Unmarshal from YAML string.
+	type cfg struct {
+		Value Duration `yaml:"value"`
+	}
+	var c cfg
+	y := "value: 90s\n"
+	if err := yaml.Unmarshal([]byte(y), &c); err != nil {
+		t.Fatalf("yaml unmarshal: %v", err)
+	}
+	if time.Duration(c.Value) != 90*time.Second {
+		t.Fatalf("yaml parsed = %v, want %v", time.Duration(c.Value), 90*time.Second)
+	}
+
+	// Marshal to YAML string.
+	out, err := yaml.Marshal(cfg{Value: Duration(90 * time.Second)})
+	if err != nil {
+		t.Fatalf("yaml marshal: %v", err)
+	}
+	// Expect a scalar string with canonical form.
+	if string(out) != "value: 1m30s\n" {
+		t.Fatalf("yaml out = %q", string(out))
+	}
+
+	// Invalid YAML value type (e.g., number) should error via our unmarshaler.
+	if err := yaml.Unmarshal([]byte("value: 123\n"), &c); err == nil {
+		t.Fatalf("expected error for non-string YAML scalar")
 	}
 }

@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/artifacts.go`.
   - Test: valid/invalid digests; CID non-empty; JSON roundtrip.
 
-- [ ] Duration — wrapper that marshals as duration string; parses via `time.ParseDuration`.
+- [x] Duration — wrapper that marshals as duration string; parses via `time.ParseDuration`.
   - Change: `internal/domain/types/duration.go`.
   - Test: valid/invalid inputs; JSON/YAML strings map to `time.Duration`.
 
