@@ -9,3 +9,25 @@ Commands:
   diffs       List diffs or download newest patch
 
 Use 'ploy mod run --help' for flag details.
+
+Flags for 'ploy mod run':
+  --spec <file>              Path to YAML/JSON spec file (CLI flags override spec values)
+  --repo-url <url>           Git repository URL
+  --repo-base-ref <branch>   Git base ref
+  --repo-target-ref <branch> Git target ref
+  --repo-workspace-hint <dir> Optional subdirectory hint
+  --mod-env KEY=VALUE        Mod environment (repeatable)
+  --mod-image <image>        Container image for mod step
+  --mod-command <cmd>        Container command override
+  --retain-container         Retain container after execution
+  --gitlab-pat <token>       GitLab Personal Access Token
+  --gitlab-domain <domain>   GitLab domain
+  --mr-success               Create merge request on success
+  --mr-fail                  Create merge request on failure
+  --follow                   Follow ticket events until completion
+  --cap <duration>           Time cap for --follow
+  --cancel-on-cap            Cancel ticket if cap exceeded
+  --artifact-dir <dir>       Download final artifacts
+  --json                     Print JSON summary
+  --max-retries N            Max reconnect attempts for event stream
+  --retry-wait D             Wait between event stream reconnects
