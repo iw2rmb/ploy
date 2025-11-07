@@ -59,8 +59,8 @@ build_gate_healing:
       retain_container: false
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
-gitlab_domain: gitlab.com
-# gitlab_pat: "<TOKEN>"           # prefer providing via environment in runtime
+gitlab_domain: gitlab.com          # optional; defaults to gitlab.com when gitlab_pat is provided
+# gitlab_pat: "<TOKEN>"           # optional; can be provided via env_from_file in CLI; avoid committing to VCS
 mr_on_success: true
 mr_on_fail: true
 
