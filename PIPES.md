@@ -52,6 +52,11 @@ Rules:
 - `depends_on` is optional in MVP; if provided, only linear dependencies are honored.
 - The server records one Stage row per step and includes the mapping in ticket status.
 
+## Type Semantics (Code vs JSON)
+- In code, identifiers are strong types: `TicketID/RunID`, `StageID`, and `StageName`. Repo coordinates use `RepoURL`, `GitRef`, and `CommitSHA` types.
+- Over the API, these values remain JSON strings with the same formats (UUIDs for IDs, strings for refs/URLs), so clients are unchanged.
+- Runtime labels: containers are labeled with `com.ploy.run_id=<ticket UUID>` for correlation; stage identifiers are not stored under this key.
+
 ## Stage ID Semantics
 - Generation: server creates a Stage per step at submit time and returns a UUID for each.
 - Propagation: when a node claims work for a step, the handler merges `stage_id` into `spec` so the agent can echo it in uploads.
@@ -122,4 +127,3 @@ OpenAPI TODOs (when implemented):
 ## Related
 - Mods happy path: `docs/mod-simple-happy-path.md`.
 - API spec: `docs/api/OpenAPI.yaml` and components under `docs/api/components/`.
-

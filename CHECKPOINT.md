@@ -42,7 +42,8 @@ Update this document as you go.
 
 ## Notes
 - All retention and log‑fanout changes are unit‑tested; control plane and node binaries have been rebuilt and deployed.
-- Containers created by steps carry `com.ploy.run_id=<TICKET>` for easy discovery; removal is explicit and skipped when retained.
+- Containers created by steps carry `com.ploy.run_id=<TICKET>` (run/ticket UUID) for discovery; removal is explicit and skipped when retained. The historic mislabeling with a step identifier has been fixed.
+- Type semantics are hardened in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, `StageID`, resource units). JSON over the wire remains unchanged (strings with the same shapes), preserving API compatibility.
 
 ---
 
