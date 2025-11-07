@@ -18,7 +18,7 @@ Legend: [ ] todo, [x] done.
 - [x] mod-codex: prefer `/in` as context.
   - Always include `--add-dir /in` when present; stop referencing `/.ploy`.
   - Examples/prompts should reference `/in/build-gate.log`.
-- [ ] Tests/docs/spec:
+- [x] Tests/docs/spec:
   - Update `docs/schemas/mod.example.yaml`, E2E specs, and README to reference `/in/build-gate.log` and `/in/prompt.txt` exclusively.
   - Update integration/E2E runners to mount `/in` and stop creating `/.ploy`.
   - Default prompt location: `/in/prompt.txt` (node mounts it R/O when provided in spec); mod-codex should accept `--prompt-file /in/prompt.txt` by default when present.

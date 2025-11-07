@@ -71,6 +71,9 @@ The server’s authorizer recognizes both forms.
 - `PLOY_OPENAI_API_KEY` — Optional OpenAI API key propagated to Mods LLM lanes. When set on the control
   plane, the runner injects it into the `mods-llm` container as `OPENAI_API_KEY`. You can also set it on
   worker nodes via a systemd drop-in to make it available cluster-wide.
+- Cross-phase input directory: `/in` is mounted read-only for healing mods (e.g., `mods-codex`).
+  - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
+  - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
