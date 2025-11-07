@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -32,7 +33,7 @@ func FuzzPublishTicketRoundTrip(f *testing.F) {
 		}
 		state := states[int(stateByte)%len(states)]
 
-		payload := modsapi.TicketSummary{TicketID: ticketID, State: state}
+		payload := modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticketID), State: state}
 		ctx := context.Background()
 
 		err := svc.PublishTicket(ctx, runID, payload)

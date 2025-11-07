@@ -11,16 +11,17 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/stream"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
 func TestInspectAndArtifactsCommands(t *testing.T) {
 	ticket := modsapi.TicketSummary{
-		TicketID: "t1",
+		TicketID: domaintypes.TicketID("t1"),
 		State:    modsapi.TicketStateSucceeded,
 		Stages: map[string]modsapi.StageStatus{
-			"build": {StageID: "build", Artifacts: map[string]string{"bin": "cid1"}},
-			"test":  {StageID: "test"},
+			"build": {StageID: domaintypes.StageID("build"), Artifacts: map[string]string{"bin": "cid1"}},
+			"test":  {StageID: domaintypes.StageID("test")},
 		},
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +57,7 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
-		_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: "t2", State: modsapi.TicketStatePending}})
+		_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("t2"), State: modsapi.TicketStatePending}})
 	})
 	mux.HandleFunc("/v1/mods/t2/cancel", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
@@ -69,8 +70,8 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 	base, _ := url.Parse(srv.URL)
 
 	// Submit
-	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.TicketSubmitRequest{TicketID: "t2"}}).Run(context.Background())
-	if err != nil || sum.TicketID != "t2" {
+	sum, err := (SubmitCommand{Client: srv.Client(), BaseURL: base, Request: modsapi.TicketSubmitRequest{TicketID: domaintypes.TicketID("t2")}}).Run(context.Background())
+	if err != nil || string(sum.TicketID) != "t2" {
 		t.Fatalf("submit err=%v ticket=%+v", err, sum)
 	}
 	// Cancel
@@ -92,7 +93,7 @@ func TestEventsCommandStreamsToTerminal(t *testing.T) {
 		}
 		evt := struct {
 			Ticket modsapi.TicketSummary `json:"ticket"`
-		}{Ticket: modsapi.TicketSummary{TicketID: "t3", State: modsapi.TicketStateSucceeded}}
+		}{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("t3"), State: modsapi.TicketStateSucceeded}}
 		b, _ := json.Marshal(evt.Ticket)
 		_, _ = w.Write([]byte("event: ticket\n"))
 		_, _ = w.Write([]byte("data: "))
@@ -149,8 +150,8 @@ func TestModsCommandsErrorPaths(t *testing.T) {
 func TestSimplePrinterFormats(t *testing.T) {
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
-	p.Ticket(modsapi.TicketSummary{TicketID: "t1", State: modsapi.TicketStateRunning})
-	p.Stage(modsapi.StageStatus{StageID: "build", State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: "j1", LastError: "boom"})
+	p.Ticket(modsapi.TicketSummary{TicketID: domaintypes.TicketID("t1"), State: modsapi.TicketStateRunning})
+	p.Stage(modsapi.StageStatus{StageID: domaintypes.StageID("build"), State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: modsapi.JobID("j1"), LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
 	}

@@ -91,7 +91,7 @@ Legend: [ ] todo, [x] done.
   - Test: runtime test covers limit application; zero means unlimited.
 
 ## Mods API: Type Hardening
-- [ ] Ticket/Stage IDs: switch to `TicketID`, `StageID`, `JobID` where present; keep JSON strings.
+- [x] Ticket/Stage IDs: switch to `TicketID`, `StageID`, `JobID` where present; keep JSON strings.
   - Change: `internal/mods/api/types.go`.
   - Test: compile of handlers using these types; JSON roundtrip.
 

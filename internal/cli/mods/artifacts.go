@@ -70,7 +70,7 @@ func (c ArtifactsCommand) Run(ctx context.Context) error {
 	sort.Strings(stages)
 	for _, id := range stages {
 		st := payload.Ticket.Stages[id]
-		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(st.StageID))
+		_, _ = fmt.Fprintf(c.Output, "%s:\n", strings.TrimSpace(string(st.StageID)))
 		if len(st.Artifacts) == 0 {
 			continue
 		}

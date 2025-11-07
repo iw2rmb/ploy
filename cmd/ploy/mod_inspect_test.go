@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -15,7 +16,7 @@ func TestModInspectPrintsSummary(t *testing.T) {
 	ticket := "ticket-11"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
-			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{TicketID: ticket, State: modsapi.TicketStateRunning}})
+			_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID(ticket), State: modsapi.TicketStateRunning}})
 			return
 		}
 		http.NotFound(w, r)
@@ -42,7 +43,7 @@ func TestModInspectShowsMRURL(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			resp := modsapi.TicketStatusResponse{
 				Ticket: modsapi.TicketSummary{
-					TicketID: ticket,
+					TicketID: domaintypes.TicketID(ticket),
 					State:    modsapi.TicketStateSucceeded,
 					Metadata: map[string]string{"mr_url": mrURL},
 				},
@@ -73,7 +74,7 @@ func TestModInspectOmitsMRURLWhenMissing(t *testing.T) {
 		if r.Method == http.MethodGet && r.URL.Path == "/v1/mods/"+ticket {
 			resp := modsapi.TicketStatusResponse{
 				Ticket: modsapi.TicketSummary{
-					TicketID: ticket,
+					TicketID: domaintypes.TicketID(ticket),
 					State:    modsapi.TicketStateSucceeded,
 					// No metadata or empty metadata.
 				},

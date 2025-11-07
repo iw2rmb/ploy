@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
@@ -25,7 +26,7 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 			t.Fatalf("decode request: %v", err)
 		}
 		// Server assigns the ticket id.
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: "mods-server-123", State: modsapi.TicketStatePending}}
+		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("mods-server-123"), State: modsapi.TicketStatePending}}
 		w.WriteHeader(http.StatusAccepted)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			t.Fatalf("encode response: %v", err)
@@ -59,7 +60,7 @@ func TestExecuteModRunServerAssignsTicket(t *testing.T) {
 	var received modsapi.TicketSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: "mods-abc123", State: modsapi.TicketStatePending}}
+		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("mods-abc123"), State: modsapi.TicketStatePending}}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))

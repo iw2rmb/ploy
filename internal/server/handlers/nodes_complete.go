@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
@@ -205,7 +206,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			}
 
 			ticketSummary := modsapi.TicketSummary{
-				TicketID:   req.RunID,
+				TicketID:   domaintypes.TicketID(req.RunID),
 				State:      ticketState,
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,

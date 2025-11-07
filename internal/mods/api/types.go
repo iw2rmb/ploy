@@ -1,6 +1,10 @@
 package api
 
-import "time"
+import (
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+)
 
 // StageState mirrors Mods stage lifecycle states exposed over the API.
 type StageState string
@@ -29,21 +33,21 @@ const (
 
 // StageDefinition defines a stage within the Mods ticket graph.
 type StageDefinition struct {
-	ID           string            `json:"id"`
-	Dependencies []string          `json:"dependencies,omitempty"`
-	Lane         string            `json:"lane,omitempty"`
-	Priority     string            `json:"priority,omitempty"`
-	MaxAttempts  int               `json:"max_attempts,omitempty"`
-	Metadata     map[string]string `json:"metadata,omitempty"`
+	ID           domaintypes.StageID   `json:"id"`
+	Dependencies []domaintypes.StageID `json:"dependencies,omitempty"`
+	Lane         string                `json:"lane,omitempty"`
+	Priority     string                `json:"priority,omitempty"`
+	MaxAttempts  int                   `json:"max_attempts,omitempty"`
+	Metadata     map[string]string     `json:"metadata,omitempty"`
 }
 
 // TicketSubmitRequest represents a ticket submission payload.
 type TicketSubmitRequest struct {
-	TicketID   string            `json:"ticket_id"`
-	Submitter  string            `json:"submitter,omitempty"`
-	Repository string            `json:"repository,omitempty"`
-	Metadata   map[string]string `json:"metadata,omitempty"`
-	Stages     []StageDefinition `json:"stages"`
+	TicketID   domaintypes.TicketID `json:"ticket_id,omitempty"`
+	Submitter  string               `json:"submitter,omitempty"`
+	Repository string               `json:"repository,omitempty"`
+	Metadata   map[string]string    `json:"metadata,omitempty"`
+	Stages     []StageDefinition    `json:"stages"`
 }
 
 // TicketSubmitResponse returns the persisted ticket summary after submission.
@@ -58,7 +62,7 @@ type TicketStatusResponse struct {
 
 // TicketSummary summarises ticket lifecycle state and associated stages.
 type TicketSummary struct {
-	TicketID   string                 `json:"ticket_id"`
+	TicketID   domaintypes.TicketID   `json:"ticket_id"`
 	State      TicketState            `json:"state"`
 	Submitter  string                 `json:"submitter,omitempty"`
 	Repository string                 `json:"repository,omitempty"`
@@ -70,11 +74,17 @@ type TicketSummary struct {
 
 // StageStatus summarises the execution state for a ticket stage.
 type StageStatus struct {
-	StageID      string            `json:"stage_id"`
-	State        StageState        `json:"state"`
-	Attempts     int               `json:"attempts"`
-	MaxAttempts  int               `json:"max_attempts"`
-	CurrentJobID string            `json:"current_job_id,omitempty"`
+	StageID     domaintypes.StageID `json:"stage_id"`
+	State       StageState          `json:"state"`
+	Attempts    int                 `json:"attempts"`
+	MaxAttempts int                 `json:"max_attempts"`
+	// JobID is a simple string-typed identifier for execution jobs.
+	// JSON representation remains a plain string for compatibility.
+	CurrentJobID JobID             `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`
 	LastError    string            `json:"last_error,omitempty"`
 }
+
+// JobID identifies a job within the Mods execution context.
+// Kept as a plain string type; JSON remains a string for compatibility.
+type JobID string
