@@ -3,6 +3,8 @@ package contracts
 import (
 	"fmt"
 	"strings"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // CheckpointStatus enumerates lifecycle states for a workflow stage as it
@@ -24,8 +26,8 @@ const (
 // timing and metadata; `Artifacts` may be attached and require metadata.
 type WorkflowCheckpoint struct {
 	SchemaVersion string               `json:"schema_version"`
-	TicketID      string               `json:"ticket_id"`
-	Stage         string               `json:"stage"`
+	TicketID      types.TicketID       `json:"ticket_id"`
+	Stage         StageName            `json:"stage"`
 	Status        CheckpointStatus     `json:"status"`
 	CacheKey      string               `json:"cache_key,omitempty"`
 	StageMetadata *CheckpointStage     `json:"stage_metadata,omitempty"`
@@ -40,10 +42,10 @@ func (c WorkflowCheckpoint) Validate() error {
 	if c.SchemaVersion == "" {
 		return fmt.Errorf("schema_version is required")
 	}
-	if c.TicketID == "" {
+	if c.TicketID.IsZero() {
 		return fmt.Errorf("ticket_id is required")
 	}
-	if c.Stage == "" {
+	if strings.TrimSpace(string(c.Stage)) == "" {
 		return fmt.Errorf("stage is required")
 	}
 	if c.Status == "" {
@@ -53,7 +55,7 @@ func (c WorkflowCheckpoint) Validate() error {
 		if err := c.StageMetadata.Validate(); err != nil {
 			return fmt.Errorf("stage metadata invalid: %w", err)
 		}
-		if c.Stage != "" && strings.TrimSpace(c.StageMetadata.Name) != strings.TrimSpace(c.Stage) {
+		if strings.TrimSpace(string(c.Stage)) != "" && strings.TrimSpace(c.StageMetadata.Name) != strings.TrimSpace(string(c.Stage)) {
 			return fmt.Errorf("stage metadata name mismatch")
 		}
 	}
@@ -73,7 +75,7 @@ func (c WorkflowCheckpoint) Validate() error {
 // Subject returns the per‑ticket checkpoint subject or an empty string when
 // the ticket ID is blank to allow callers to short‑circuit publishing.
 func (c WorkflowCheckpoint) Subject() string {
-	ticket := strings.TrimSpace(c.TicketID)
+	ticket := strings.TrimSpace(c.TicketID.String())
 	if ticket == "" {
 		return ""
 	}

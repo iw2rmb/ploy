@@ -115,8 +115,8 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 
 	cp := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
-		Stage:         modsStage,
+		TicketID:      types.TicketID("ticket-123"),
+		Stage:         StageName(modsStage),
 		Status:        CheckpointStatusPending,
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
@@ -132,7 +132,7 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 					Stage:       modsStage,
 					Toggle:      "plan",
 					BundleID:    "mods-plan",
-					Digest:      "sha256:modsplan",
+					Digest:      "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					ArtifactCID: "cid-mods-plan",
 				}},
 			},
@@ -158,8 +158,8 @@ func TestWorkflowCheckpointValidateAndMarshal(t *testing.T) {
 		},
 		Artifacts: []CheckpointArtifact{{
 			Name:        "mods-plan-bundle",
-			ArtifactCID: "cid-mods-plan",
-			Digest:      "sha256:modsplan",
+			ArtifactCID: types.CID("cid-mods-plan"),
+			Digest:      types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 			MediaType:   "application/tar+zst",
 		}},
 	}
@@ -265,8 +265,8 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 
 	envelope := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
-		Stage:         modsStage,
+		TicketID:      types.TicketID("ticket-123"),
+		Stage:         StageName(modsStage),
 		CacheKey:      "node-wasm/cache@manifest=2025-09-26@aster=plan",
 		StageMetadata: &CheckpointStage{
 			Name:     modsStage,
@@ -276,8 +276,8 @@ func TestWorkflowArtifactValidate(t *testing.T) {
 		},
 		Artifact: CheckpointArtifact{
 			Name:        "mods-plan",
-			ArtifactCID: "cid-mods-plan",
-			Digest:      "sha256:modsplan",
+			ArtifactCID: types.CID("cid-mods-plan"),
+			Digest:      types.Sha256Digest("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
 			MediaType:   "application/tar+zst",
 		},
 	}
@@ -323,8 +323,8 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 
 	checkpoint := WorkflowCheckpoint{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
-		Stage:         "ticket-claimed",
+		TicketID:      types.TicketID("ticket-123"),
+		Stage:         StageName("ticket-claimed"),
 		Status:        CheckpointStatusClaimed,
 	}
 	if err := bus.PublishCheckpoint(context.Background(), checkpoint); err != nil {
@@ -336,11 +336,11 @@ func TestInMemoryBusRecordsMessages(t *testing.T) {
 
 	artifact := WorkflowArtifact{
 		SchemaVersion: SchemaVersion,
-		TicketID:      "ticket-123",
-		Stage:         modsStage,
+		TicketID:      types.TicketID("ticket-123"),
+		Stage:         StageName(modsStage),
 		Artifact: CheckpointArtifact{
 			Name:        "mods-plan",
-			ArtifactCID: "cid-mods-plan",
+			ArtifactCID: types.CID("cid-mods-plan"),
 		},
 	}
 	if err := bus.PublishArtifact(context.Background(), artifact); err != nil {
