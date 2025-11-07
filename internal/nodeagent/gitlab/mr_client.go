@@ -105,7 +105,9 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		}
 
 		httpReq.Header.Set("Content-Type", "application/json")
+		// Send both Authorization and PRIVATE-TOKEN for compatibility across GitLab setups.
 		httpReq.Header.Set("Authorization", "Bearer "+req.PAT)
+		httpReq.Header.Set("PRIVATE-TOKEN", req.PAT)
 
 		// Send request.
 		resp, err := c.client.Do(httpReq)

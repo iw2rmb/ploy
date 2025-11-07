@@ -43,7 +43,7 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 
 	url := strings.TrimSpace(repo.URL)
 	baseRef := strings.TrimSpace(repo.BaseRef)
-	targetRef := strings.TrimSpace(repo.TargetRef)
+	_ = strings.TrimSpace(repo.TargetRef) // targetRef is intentionally unused during hydration
 	commitSHA := strings.TrimSpace(repo.Commit)
 
 	// Step 1: Shallow clone with base_ref (if provided) or default branch.
@@ -58,27 +58,16 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		return fmt.Errorf("git clone failed: %w", err)
 	}
 
-	// Step 2: If target_ref or commit_sha differs from base_ref, fetch and checkout.
-	// Determine the target to fetch and checkout.
-	var target string
+	// Step 2: Stay on base_ref for modification runs; do not checkout target_ref here.
+	// If a specific commit is requested (rare), checkout that commit.
 	if commitSHA != "" {
-		target = commitSHA
-	} else if targetRef != "" && targetRef != baseRef {
-		target = targetRef
-	}
-
-	if target != "" {
-		// Fetch the specific target (commit or ref).
-		// For sparse fetching, we fetch the specific ref/commit only.
-		fetchArgs := []string{"fetch", "origin", target, "--depth", "1"}
+		fetchArgs := []string{"fetch", "origin", commitSHA, "--depth", "1"}
 		if err := runGitCommand(ctx, dest, fetchArgs...); err != nil {
-			return fmt.Errorf("git fetch %s failed: %w", target, err)
+			return fmt.Errorf("git fetch %s failed: %w", commitSHA, err)
 		}
-
-		// Checkout the fetched target using FETCH_HEAD to handle both branches and commits.
 		checkoutArgs := []string{"checkout", "FETCH_HEAD"}
 		if err := runGitCommand(ctx, dest, checkoutArgs...); err != nil {
-			return fmt.Errorf("git checkout %s failed: %w", target, err)
+			return fmt.Errorf("git checkout %s failed: %w", commitSHA, err)
 		}
 	}
 

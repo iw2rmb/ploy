@@ -52,6 +52,10 @@ ploy config gitlab show
 
 ### Step 3: Run a Mod with MR creation
 
+Source branch naming
+- Ploy now always uses a unique source branch per run named `ploy-<ticket-id>` when creating the MR.
+- The `--repo-target-ref` you pass is still accepted for workspace context, but the MR’s source branch is derived from the ticket id to avoid collisions.
+
 Create an MR on success (capture server-assigned ticket via JSON):
 ```bash
 TICKET=$(ploy mod run --json \
@@ -172,7 +176,7 @@ read TICKET MR_URL < <(ploy mod run --json \
   --mr-success \
   --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
 
-# 3. View the MR
+# 3. View the MR (source branch will be ploy-$TICKET)
 echo "Ticket: $TICKET"; echo "MR: ${MR_URL:-<none>}"
 # Copy the MR URL and review in GitLab
 
