@@ -25,10 +25,10 @@ func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
 
-	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: "c1", Address: "http://127.0.0.1:9094"}); err != nil {
+	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: cliconfig.ClusterID("c1"), Address: "http://127.0.0.1:9094"}); err != nil {
 		t.Fatalf("SaveDescriptor: %v", err)
 	}
-	if err := cliconfig.SetDefault("c1"); err != nil {
+	if err := cliconfig.SetDefault(cliconfig.ClusterID("c1")); err != nil {
 		t.Fatalf("SetDefault: %v", err)
 	}
 
@@ -71,7 +71,7 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 
 	// Save descriptor and mark default.
 	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{
-		ClusterID: "test-cluster",
+		ClusterID: cliconfig.ClusterID("test-cluster"),
 		Address:   "https://127.0.0.1:8443",
 		CAPath:    caPath,
 		CertPath:  certPath,
@@ -79,7 +79,7 @@ func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SaveDescriptor: %v", err)
 	}
-	if err := cliconfig.SetDefault("test-cluster"); err != nil {
+	if err := cliconfig.SetDefault(cliconfig.ClusterID("test-cluster")); err != nil {
 		t.Fatalf("SetDefault: %v", err)
 	}
 

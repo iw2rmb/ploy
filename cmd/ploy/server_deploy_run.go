@@ -219,7 +219,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	// Save cluster descriptor locally.
 	serverAddress, _ := controlplane.BaseURLFromDescriptor(config.Descriptor{Address: cfg.Address})
 	desc := config.Descriptor{
-		ClusterID:       clusterID,
+		ClusterID:       config.ClusterID(clusterID),
 		Address:         serverAddress,
 		SSHIdentityPath: identityPath,
 	}
@@ -241,7 +241,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		_, _ = fmt.Fprintf(stderr, "Warning: failed to save cluster descriptor: %v\n", err)
 	} else {
 		// Set this cluster as the default
-		if err := config.SetDefault(clusterID); err != nil {
+		if err := config.SetDefault(config.ClusterID(clusterID)); err != nil {
 			_, _ = fmt.Fprintf(stderr, "Warning: failed to set default cluster: %v\n", err)
 		} else {
 			_, _ = fmt.Fprintf(stderr, "Cluster descriptor saved to ~/.config/ploy/clusters/%s.json\n", clusterID)

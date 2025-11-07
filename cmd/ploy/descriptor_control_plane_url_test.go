@@ -8,7 +8,7 @@ import (
 )
 
 func TestDescriptorControlPlaneURL(t *testing.T) {
-	desc := config.Descriptor{ClusterID: "lab", Address: "203.0.113.10"}
+	desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "203.0.113.10"}
 
 	url, err := controlplane.BaseURLFromDescriptor(desc)
 	if err != nil {
@@ -19,7 +19,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 	}
 
 	t.Run("scheme override", func(t *testing.T) {
-		desc := config.Descriptor{ClusterID: "lab", Address: "203.0.113.10", Scheme: "http"}
+		desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "203.0.113.10", Scheme: "http"}
 		url, err := controlplane.BaseURLFromDescriptor(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL scheme override failed: %v", err)
@@ -30,7 +30,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 	})
 
 	t.Run("address with port", func(t *testing.T) {
-		desc := config.Descriptor{ClusterID: "lab", Address: "control.example.com:9000"}
+		desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "control.example.com:9000"}
 		url, err := controlplane.BaseURLFromDescriptor(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL host:port failed: %v", err)
@@ -41,7 +41,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 	})
 
 	t.Run("full url preserved", func(t *testing.T) {
-		desc := config.Descriptor{ClusterID: "lab", Address: "https://control.example.com:9000"}
+		desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "https://control.example.com:9000"}
 		url, err := controlplane.BaseURLFromDescriptor(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL full URL failed: %v", err)
@@ -53,7 +53,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 
 	// IPv6 address without port should be bracketed and default to 8443.
 	t.Run("ipv6 default port", func(t *testing.T) {
-		desc := config.Descriptor{ClusterID: "lab", Address: "2001:db8::1"}
+		desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "2001:db8::1"}
 		url, err := controlplane.BaseURLFromDescriptor(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL ipv6 failed: %v", err)
