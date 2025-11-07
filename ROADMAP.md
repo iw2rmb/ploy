@@ -73,7 +73,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/nodeagent/handlers.go` struct; custom JSON (or TextMarshaler on types) ensures compatibility.
   - Test: handler request decode/encode; existing tests adjusted for types.
 
-- [ ] buildManifestFromRequest: map typed fields to `StepManifest` with new types; normalize target ref default.
+- [x] buildManifestFromRequest: map typed fields to `StepManifest` with new types; normalize target ref default.
   - Change: `internal/nodeagent/execution.go` (helper function location as implemented in repo).
   - Test: `TestBuildManifestFromRequest` updated to assert typed values; existing behavior preserved.
 
