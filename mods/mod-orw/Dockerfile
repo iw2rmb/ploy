@@ -20,4 +20,4 @@ RUN ln -s /usr/local/bin/mod-orw /usr/local/bin/mods-orw
 ENTRYPOINT ["mods-orw"]
 CMD ["--apply", "--dir", "/workspace", "--out", "/out"]
 
-# The runner invokes: mods-orw --apply --recipe-json /in/recipe.json --dir /workspace --out /workspace/.ploy/out
+# The runner invokes: mods-orw --apply --recipe-json /in/recipe.json --dir /workspace --out /out
