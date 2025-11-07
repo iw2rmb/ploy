@@ -28,11 +28,8 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/mods":
 			var req modsapi.TicketSubmitRequest
 			_ = json.NewDecoder(r.Body).Decode(&req)
-			if req.TicketID != ticketID {
-				t.Fatalf("unexpected ticket id %q", req.TicketID)
-			}
 			w.WriteHeader(http.StatusAccepted)
-			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: req.TicketID, State: modsapi.TicketStateRunning}})
+			_ = json.NewEncoder(w).Encode(modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: ticketID, State: modsapi.TicketStateRunning}})
 
 		case r.Method == http.MethodGet && r.URL.Path == fmt.Sprintf("/v1/mods/%s/events", ticketID):
 			// SSE stream: ticket running -> ticket succeeded
@@ -84,11 +81,11 @@ func TestModRunFollowStreamsAndDownloadsArtifacts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv(controlPlaneURLEnv, server.URL)
+	useServerDescriptor(t, server.URL)
 
 	dir := t.TempDir()
 	buf := &bytes.Buffer{}
-	args := []string{"--ticket", ticketID, "--follow", "--artifact-dir", dir}
+	args := []string{"--follow", "--artifact-dir", dir}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
 	}

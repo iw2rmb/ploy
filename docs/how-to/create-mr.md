@@ -52,59 +52,61 @@ ploy config gitlab show
 
 ### Step 3: Run a Mod with MR creation
 
-Create an MR on success:
+Create an MR on success (capture server-assigned ticket via JSON):
 ```bash
-ploy mod run \
-  --ticket auto \
+TICKET=$(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade-java-17 \
-  --mr-success
+  --mr-success \
+  --follow | jq -r '.ticket_id')
 ```
 
 Create an MR on failure (useful for debugging):
 ```bash
-ploy mod run \
-  --ticket auto \
+TICKET=$(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/debug-build-failure \
-  --mr-fail
+  --mr-fail \
+  --follow | jq -r '.ticket_id')
 ```
 
-Create an MR in both success and failure cases:
+Create an MR in both success and failure cases and capture MR URL too:
 ```bash
-ploy mod run \
-  --ticket auto \
+read TICKET MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/experiment \
   --mr-success \
-  --mr-fail
+  --mr-fail \
+  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
+echo "Ticket: $TICKET"
+echo "MR:     ${MR_URL:-<none>}"
 ```
 
 ### Step 4: View the MR URL
 
-After the run completes, inspect the ticket to see the MR URL (now surfaced from server status):
+If you only captured the ticket, you can inspect to retrieve MR URL later:
 ```bash
-ploy mod inspect <ticket-id>
+ploy mod inspect "$TICKET"
 # Output includes:
 # MR: https://gitlab.com/yourorg/yourproject/-/merge_requests/123
 ```
 
 ## Method 2: Per-Run GitLab Credentials
 
-Override the global GitLab configuration for a single run using flags.
+Override the global GitLab configuration for a single run using flags, capture ticket+MR via JSON:
 
 ```bash
-ploy mod run \
-  --ticket auto \
+read TICKET MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/yourproject.git \
   --repo-base-ref main \
   --repo-target-ref workflow/upgrade \
   --gitlab-pat glpat-xxxxxxxxxxxxxxxxxxxx \
   --gitlab-domain https://gitlab.com \
-  --mr-success
+  --mr-success \
+  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
 ```
 
 This is useful for:
@@ -163,16 +165,15 @@ EOF
 ploy config gitlab set --file gitlab-config.json
 
 # 2. Run OpenRewrite to upgrade Java 17
-ploy mod run \
-  --ticket auto \
+read TICKET MR_URL < <(ploy mod run --json \
   --repo-url https://gitlab.com/yourorg/spring-petclinic.git \
   --repo-base-ref main \
   --repo-target-ref workflow/java-17-upgrade \
   --mr-success \
-  --follow
+  --follow | jq -r '[.ticket_id, .mr_url] | @tsv')
 
 # 3. View the MR
-ploy mod inspect <ticket-id>
+echo "Ticket: $TICKET"; echo "MR: ${MR_URL:-<none>}"
 # Copy the MR URL and review in GitLab
 
 # 4. If tests pass, merge the MR

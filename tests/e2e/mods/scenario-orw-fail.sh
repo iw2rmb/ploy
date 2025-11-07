@@ -19,11 +19,7 @@ ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/mod-orw-fail}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
-# Use a deterministic ticket to allow post-run inspection.
-TICKET="mods-mr-fail-${TS}"
-
-dist/ploy mod run \
-  --ticket "$TICKET" \
+TICKET=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref e2e/fail-missing-symbol \
   --repo-target-ref "$TARGET_REF" \
@@ -35,13 +31,17 @@ dist/ploy mod run \
   --mod-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
   --mr-fail \
   --follow \
-  --artifact-dir "${ARTIFACT_DIR}" || true
+  --artifact-dir "${ARTIFACT_DIR}" | jq -r '.ticket_id') || true
 
 # Fetch artifacts explicitly (works regardless of success/failure).
-dist/ploy mod fetch --ticket "$TICKET" --artifact-dir "${ARTIFACT_DIR}" || true
+if [[ -n "${TICKET:-}" ]]; then
+  dist/ploy mod fetch --ticket "$TICKET" --artifact-dir "${ARTIFACT_DIR}" || true
+fi
 
 # Print MR URL if present in ticket metadata.
-dist/ploy mod inspect "$TICKET" || true
+if [[ -n "${TICKET:-}" ]]; then
+  dist/ploy mod inspect "$TICKET" || true
+fi
 
 echo "OK: orw-fail scenario (MR on failure, no healing)"
 echo "Artifacts saved to: ${ARTIFACT_DIR}"

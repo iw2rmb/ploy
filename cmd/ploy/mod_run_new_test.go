@@ -24,7 +24,8 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: received.TicketID, State: modsapi.TicketStatePending}}
+		// Server assigns the ticket id.
+		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: "mods-server-123", State: modsapi.TicketStatePending}}
 		w.WriteHeader(http.StatusAccepted)
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			t.Fatalf("encode response: %v", err)
@@ -32,16 +33,12 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv(controlPlaneURLEnv, server.URL)
+	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
-	args := []string{"--ticket", "mods-test", "--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
+	args := []string{"--repo-url", "https://example.com/repo.git", "--repo-target-ref", "feature"}
 	if err := executeModRun(args, buf); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
-	}
-
-	if received.TicketID != "mods-test" {
-		t.Fatalf("expected ticket id mods-test, got %s", received.TicketID)
 	}
 	if received.Repository != "https://example.com/repo.git" {
 		t.Fatalf("unexpected repository: %s", received.Repository)
@@ -53,31 +50,25 @@ func TestExecuteModRunSubmitsTicket(t *testing.T) {
 		t.Fatalf("expected 5 stages, got %d", len(received.Stages))
 	}
 	output := buf.String()
-	if !strings.Contains(output, "Mods ticket mods-test submitted") {
+	if !strings.Contains(output, "Mods ticket mods-server-123 submitted") {
 		t.Fatalf("unexpected output: %s", output)
 	}
 }
 
-func TestExecuteModRunGeneratesTicket(t *testing.T) {
+func TestExecuteModRunServerAssignsTicket(t *testing.T) {
 	var received modsapi.TicketSubmitRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&received)
-		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: received.TicketID, State: modsapi.TicketStatePending}}
+		resp := modsapi.TicketSubmitResponse{Ticket: modsapi.TicketSummary{TicketID: "mods-abc123", State: modsapi.TicketStatePending}}
 		w.WriteHeader(http.StatusAccepted)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
-	t.Setenv(controlPlaneURLEnv, server.URL)
+	useServerDescriptor(t, server.URL)
 
 	if err := executeModRun([]string{}, io.Discard); err != nil {
 		t.Fatalf("executeModRun error: %v", err)
-	}
-	if received.TicketID == "" {
-		t.Fatalf("expected generated ticket id")
-	}
-	if !strings.HasPrefix(received.TicketID, "mods-") {
-		t.Fatalf("expected mods- prefix, got %s", received.TicketID)
 	}
 }
 
@@ -125,11 +116,10 @@ func TestExecuteModRunGitLabFlags(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Setenv(controlPlaneURLEnv, server.URL)
+	useServerDescriptor(t, server.URL)
 
 	buf := &bytes.Buffer{}
 	args := []string{
-		"--ticket", "mods-gitlab-test",
 		"--repo-url", "https://example.com/repo.git",
 		"--repo-base-ref", "main",
 		"--repo-target-ref", "feature",

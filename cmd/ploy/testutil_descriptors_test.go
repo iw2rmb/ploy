@@ -1,0 +1,23 @@
+package main
+
+import (
+	"testing"
+
+	cliconfig "github.com/iw2rmb/ploy/internal/cli/config"
+)
+
+// useServerDescriptor configures a temporary default cluster descriptor that points
+// to the provided base URL. Tests should call this instead of setting legacy
+// environment overrides.
+func useServerDescriptor(t testing.TB, baseURL string) {
+	t.Helper()
+	cfgHome := t.TempDir()
+	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
+	t.Setenv("XDG_CONFIG_HOME", "")
+	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: "test-cluster", Address: baseURL}); err != nil {
+		t.Fatalf("SaveDescriptor: %v", err)
+	}
+	if err := cliconfig.SetDefault("test-cluster"); err != nil {
+		t.Fatalf("SetDefault: %v", err)
+	}
+}

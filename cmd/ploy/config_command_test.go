@@ -75,8 +75,8 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Set up environment to use the test server.
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	// Use a temporary default descriptor pointing to the test server.
+	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	// Redirect stdout to capture output.
@@ -123,7 +123,7 @@ func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	oldStdout := os.Stdout
@@ -209,8 +209,7 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Set up environment to use the test server.
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	// Redirect stdout to capture output.
@@ -460,7 +459,7 @@ func TestHandleConfigGitLabSetServerError(t *testing.T) {
 		http.Error(w, "bad", http.StatusBadRequest)
 	}))
 	defer srv.Close()
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	useServerDescriptor(t, srv.URL)
 
 	buf := &bytes.Buffer{}
 	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)

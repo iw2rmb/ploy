@@ -21,8 +21,6 @@ ARTIFACT_BASE=${PLOY_E2E_ARTIFACT_BASE:-./tmp/mods/mod-orw}
 ARTIFACT_DIR=${PLOY_E2E_ARTIFACT_DIR:-${ARTIFACT_BASE}/${TS}}
 mkdir -p "${ARTIFACT_DIR}"
 
-# Use a deterministic ticket to allow post-run inspection.
-TICKET="mods-mr-pass-${TS}"
 
 # Optional per-run GitLab PAT/domain flags
 EXTRA_FLAGS=()
@@ -33,8 +31,7 @@ if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
   EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
 fi
 
-dist/ploy mod run \
-  --ticket "$TICKET" \
+TICKET=$(dist/ploy mod run --json \
   --repo-url "$REPO" \
   --repo-base-ref main \
   --repo-target-ref "$TARGET_REF" \
@@ -47,10 +44,12 @@ dist/ploy mod run \
   --mr-success \
   --follow \
   --artifact-dir "${ARTIFACT_DIR}" \
-  "${EXTRA_FLAGS[@]}"
+  "${EXTRA_FLAGS[@]}" | jq -r '.ticket_id')
 
 # Print MR URL if present in ticket metadata.
-dist/ploy mod inspect "$TICKET" || true
+if [[ -n "${TICKET:-}" ]]; then
+  dist/ploy mod inspect "$TICKET" || true
+fi
 
 echo "OK: orw-pass scenario"
 echo "Artifacts saved to: ${ARTIFACT_DIR}"

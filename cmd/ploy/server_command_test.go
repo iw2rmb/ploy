@@ -658,8 +658,15 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 	server := mockServer.start()
 	defer server.Close()
 
-	// Set control plane URL to mock server.
-	t.Setenv("PLOY_CONTROL_PLANE_URL", server.URL)
+	// Point the default descriptor to the mock server base URL.
+	// Keep previously saved paths; only update Address.
+	desc.Address = server.URL
+	if _, err := config.SaveDescriptor(desc); err != nil {
+		t.Fatalf("SaveDescriptor(update address): %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault(update) failed: %v", err)
+	}
 
 	// Call handleRefreshAdminCert.
 	stderr := &bytes.Buffer{}
@@ -737,7 +744,13 @@ func TestRefreshAdminCertFromServerServerError(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	// Update descriptor to point to test server.
+	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: clusterID, Address: srv.URL}); err != nil {
+		t.Fatalf("SaveDescriptor(update): %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault(update): %v", err)
+	}
 
 	// Run the refresh entrypoint which loads descriptor and calls the endpoint.
 	err := handleRefreshAdminCert(context.Background(), bytes.NewBuffer(nil))
@@ -774,7 +787,13 @@ func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	t.Setenv("PLOY_CONTROL_PLANE_URL", srv.URL)
+	// Update descriptor to point to test server.
+	if _, err := config.SaveDescriptor(config.Descriptor{ClusterID: clusterID, Address: srv.URL}); err != nil {
+		t.Fatalf("SaveDescriptor(update): %v", err)
+	}
+	if err := config.SetDefault(clusterID); err != nil {
+		t.Fatalf("SetDefault(update): %v", err)
+	}
 
 	err := handleRefreshAdminCert(context.Background(), bytes.NewBuffer(nil))
 	if err == nil {

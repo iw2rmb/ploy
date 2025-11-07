@@ -139,7 +139,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - Full reference: `docs/envs/README.md`
 - Key variables:
   - `PLOY_POSTGRES_DSN` — PostgreSQL DSN for the server (e.g., `postgres://user:pass@localhost:5432/ploy`).
-  - `PLOY_CONTROL_PLANE_URL` — Override control-plane URL (descriptors preferred).
+  - (removed) `PLOY_CONTROL_PLANE_URL` — The CLI now always uses the default descriptor at `~/.config/ploy/clusters/default`.
   - `PLOY_SERVER_CA_CERT` / `PLOY_SERVER_CA_KEY` — Cluster CA for PKI operations.
   - `PLOY_BUILDGATE_JAVA_IMAGE` — Optional Java image for the Build Gate.
 

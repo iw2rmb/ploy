@@ -758,7 +758,7 @@
   propagation for Grid interactions.
 - Added an in-memory Grid client, stage invocation tracking, and extensive unit
   tests lifting runner package coverage to 94.5%.
-- Updated `cmd/ploy` to support `--ticket auto`, inject JetStream/Grid stubs via
+- Removed client-provided ticket support in `cmd/ploy` (`--ticket` flag). Tickets are now always server-assigned.
   testable factories, and emit usage/help output across new error paths.
 - Extended CLI tests to cover command dispatch, usage printers, and runner
   wiring; repository-wide `go test -cover ./...` now satisfies ≥60% overall

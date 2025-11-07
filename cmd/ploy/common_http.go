@@ -15,57 +15,53 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-const controlPlaneURLEnv = "PLOY_CONTROL_PLANE_URL"
-
-// resolveControlPlaneHTTP selects the base URL and HTTP client.
-// Loads TLS configuration from the default cluster descriptor if available.
-// For tests, honours PLOY_CONTROL_PLANE_URL and uses a plain client.
+// resolveControlPlaneHTTP selects the base URL and HTTP client using the
+// default cluster descriptor at ~/.config/ploy/clusters/default. No
+// environment variable overrides are supported.
 func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) {
-	base := os.Getenv(controlPlaneURLEnv)
-	if base == "" {
-		base = "http://127.0.0.1:9094"
-	}
-	u, err := url.Parse(base)
+	// Load default cluster descriptor (required).
+	desc, err := config.LoadDefault()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("load default cluster descriptor: %w", err)
+	}
+	if strings.TrimSpace(desc.Address) == "" {
+		return nil, nil, fmt.Errorf("default cluster descriptor missing address")
 	}
 
-	// Load default cluster descriptor for TLS configuration.
-	desc, err := config.LoadDefault()
-	if err != nil || desc.CAPath == "" || desc.CertPath == "" || desc.KeyPath == "" {
-		// No descriptor or incomplete TLS config: use plain client (for tests or legacy setups).
+	u, err := url.Parse(desc.Address)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parse cluster address: %w", err)
+	}
+
+	// Plain HTTP (no mTLS) if scheme is http.
+	if strings.EqualFold(u.Scheme, "http") {
 		return u, &http.Client{Timeout: 10 * time.Second}, nil
 	}
 
-	// Load client certificate and key.
+	// HTTPS requires mTLS materials to be present in the descriptor.
+	if strings.TrimSpace(desc.CAPath) == "" || strings.TrimSpace(desc.CertPath) == "" || strings.TrimSpace(desc.KeyPath) == "" {
+		return nil, nil, fmt.Errorf("incomplete TLS config in cluster descriptor (ca, cert, key required)")
+	}
+
 	cert, err := tls.LoadX509KeyPair(desc.CertPath, desc.KeyPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load client certificate: %w", err)
 	}
-
-	// Load CA certificate for server verification.
 	caData, err := os.ReadFile(desc.CAPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("load ca certificate: %w", err)
 	}
-
 	caCertPool := x509.NewCertPool()
 	if !caCertPool.AppendCertsFromPEM(caData) {
 		return nil, nil, fmt.Errorf("failed to parse ca certificate")
 	}
 
-	// Create TLS config with mTLS and TLS 1.3 enforcement.
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      caCertPool,
 		MinVersion:   tls.VersionTLS13,
 	}
-
-	client := &http.Client{
-		Transport: &http.Transport{TLSClientConfig: tlsConfig},
-		Timeout:   10 * time.Second,
-	}
-
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}, Timeout: 10 * time.Second}
 	return u, client, nil
 }
 
