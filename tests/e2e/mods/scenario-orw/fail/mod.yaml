@@ -1,0 +1,46 @@
+# Minimal spec for the failing Build Gate → Codex heal → re-gate → ORW apply scenario.
+# Submit with:
+#   dist/ploy mod run \
+#     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
+#     --repo-base-ref e2e/fail-missing-symbol \
+#     --repo-target-ref mods-upgrade-java17-heal \
+#     --spec tests/e2e/mods/scenario-orw/fail/mod.yaml \
+#     --follow
+
+apiVersion: ploy.mod/v1alpha1
+kind: ModRunSpec
+
+mod:
+  image: docker.io/${DOCKERHUB_USERNAME}/mods-openrewrite:latest
+  env:
+    RECIPE_GROUP: org.openrewrite.recipe
+    RECIPE_ARTIFACT: rewrite-migrate-java
+    RECIPE_VERSION: "3.20.0"
+    RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+    MAVEN_PLUGIN_VERSION: "6.18.0"
+
+build_gate:
+  enabled: true
+  profile: auto
+
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/${DOCKERHUB_USERNAME}/mods-codex:latest
+      command: >-
+        mod-codex --input /workspace --out /out --prompt-file /workspace/prompt.txt
+      env:
+        CODEX_PROMPT: |-
+          Rules:
+          - After making any change, verify the build.
+          - Run: ploy-buildgate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - If it fails, iterate and try again until it passes.
+          - Only finalize once the gate passes; then print "BUILD PASSED".
+
+          Task:
+          Fix the compilation error described in /in/build-gate.log.
+
+gitlab_domain: gitlab.com
+mr_on_fail: true
+mr_on_success: false
+
