@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/logging.go`.
   - Test: accept known; reject unknown; JSON roundtrip.
 
-- [ ] Labels — constants `LabelRunID`, `LabelStageID` and helpers.
+ - [x] Labels — constants `LabelRunID`, `LabelStageID` and helpers.
   - Change: `internal/domain/types/labels.go` with `LabelsForRun(RunID)` and `LabelsForStep(StepID)`.
   - Test: map contains expected keys/values; empty input yields empty map.
 
