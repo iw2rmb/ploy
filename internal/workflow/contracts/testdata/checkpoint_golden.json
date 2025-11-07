@@ -1,0 +1,36 @@
+{
+  "schema_version": "2025-09-27.1",
+  "ticket_id": "ticket-123",
+  "stage": "mods-plan",
+  "status": "pending",
+  "cache_key": "node-wasm/cache@manifest=2025-09-26@aster=plan",
+  "stage_metadata": {
+    "name": "mods-plan",
+    "kind": "mods-plan",
+    "lane": "node-wasm",
+    "dependencies": ["compile"],
+    "manifest": {"name": "smoke", "version": "2025-09-26"},
+    "aster": {
+      "enabled": true,
+      "toggles": ["plan"],
+      "bundles": [
+        {
+          "stage": "mods-plan",
+          "toggle": "plan",
+          "bundle_id": "mods-plan",
+          "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifact_cid": "cid-mods-plan"
+        }
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "name": "mods-plan-bundle",
+      "artifact_cid": "cid-mods-plan",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "media_type": "application/tar+zst"
+    }
+  ]
+}
+
