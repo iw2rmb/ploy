@@ -258,6 +258,8 @@ func TestNodeAddDescriptorRefresh(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
 	t.Setenv("XDG_CONFIG_HOME", "")
+	// Ensure any test-created descriptors are removed.
+	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
 
 	// Create a temporary test binary file.
 	binaryPath := filepath.Join(tmpDir, "ployd-node-test")

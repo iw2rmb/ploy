@@ -24,6 +24,15 @@ mkdir -p "${ARTIFACT_DIR}"
 # Use a deterministic ticket to allow post-run inspection.
 TICKET="mods-mr-pass-${TS}"
 
+# Optional per-run GitLab PAT/domain flags
+EXTRA_FLAGS=()
+if [[ -n "${PLOY_GITLAB_PAT:-}" ]]; then
+  EXTRA_FLAGS+=(--gitlab-pat "${PLOY_GITLAB_PAT}")
+fi
+if [[ -n "${PLOY_GITLAB_DOMAIN:-}" ]]; then
+  EXTRA_FLAGS+=(--gitlab-domain "${PLOY_GITLAB_DOMAIN}")
+fi
+
 dist/ploy mod run \
   --ticket "$TICKET" \
   --repo-url "$REPO" \
@@ -37,7 +46,8 @@ dist/ploy mod run \
   --mod-env MAVEN_PLUGIN_VERSION="$MAVEN_PLUGIN_VERSION" \
   --mr-success \
   --follow \
-  --artifact-dir "${ARTIFACT_DIR}"
+  --artifact-dir "${ARTIFACT_DIR}" \
+  "${EXTRA_FLAGS[@]}"
 
 # Print MR URL if present in ticket metadata.
 dist/ploy mod inspect "$TICKET" || true
