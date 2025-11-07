@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	dtypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -209,7 +210,11 @@ func toTomlServicePorts(ports []ServicePort) []tomlServicePort {
 	}
 	result := make([]tomlServicePort, len(ports))
 	for i, port := range ports {
-		result[i] = tomlServicePort(port)
+		result[i] = tomlServicePort{
+			Name:     port.Name,
+			Port:     port.Port,
+			Protocol: port.Protocol.String(),
+		}
 	}
 	return result
 }
@@ -231,7 +236,12 @@ func toTomlEdges(edges []Edge) []tomlEdge {
 	}
 	result := make([]tomlEdge, len(edges))
 	for i, edge := range edges {
-		result[i] = tomlEdge(edge)
+		result[i] = tomlEdge{
+			Source:    edge.Source,
+			Target:    edge.Target,
+			Ports:     edge.Ports,
+			Protocols: protocolsToStrings(edge.Protocols),
+		}
 	}
 	return result
 }
@@ -245,4 +255,15 @@ func toTomlExposures(exposures []Exposure) []tomlExposure {
 		result[i] = tomlExposure(exposure)
 	}
 	return result
+}
+
+func protocolsToStrings(in []dtypes.Protocol) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, len(in))
+	for i, p := range in {
+		out[i] = p.String()
+	}
+	return out
 }

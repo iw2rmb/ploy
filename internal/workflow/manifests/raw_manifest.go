@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	dtypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 type rawManifest struct {
@@ -210,8 +212,12 @@ func validateRawManifest(m rawManifest) error {
 			if port.Port <= 0 {
 				return fmt.Errorf("services[%d].ports[%d].port must be positive", i, j)
 			}
-			if strings.TrimSpace(port.Protocol) == "" {
+			proto := strings.ToLower(strings.TrimSpace(port.Protocol))
+			if proto == "" {
 				return fmt.Errorf("services[%d].ports[%d].protocol is required", i, j)
+			}
+			if err := dtypes.Protocol(proto).Validate(); err != nil {
+				return fmt.Errorf("services[%d].ports[%d].protocol %q is not supported", i, j, proto)
 			}
 			ports[name] = struct{}{}
 		}
@@ -261,8 +267,12 @@ func validateRawManifest(m rawManifest) error {
 			return fmt.Errorf("edges[%d].protocols requires at least one entry", i)
 		}
 		for j, protocol := range edge.Protocols {
-			if strings.TrimSpace(protocol) == "" {
+			proto := strings.ToLower(strings.TrimSpace(protocol))
+			if proto == "" {
 				return fmt.Errorf("edges[%d].protocols[%d] is required", i, j)
+			}
+			if err := dtypes.Protocol(proto).Validate(); err != nil {
+				return fmt.Errorf("edges[%d].protocols[%d] %q is not supported", i, j, proto)
 			}
 		}
 	}
