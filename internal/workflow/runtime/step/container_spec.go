@@ -49,7 +49,7 @@ type ContainerResult struct {
 }
 
 // buildContainerSpec assembles a ContainerSpec from the manifest and workspace path.
-func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest, workspace string, outDir string) (ContainerSpec, error) {
+func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest, workspace string, outDir string, inDir string) (ContainerSpec, error) {
 	// Mount the first RW input at its mount path; fallback to working dir.
 	mounts := make([]ContainerMount, 0, len(manifest.Inputs))
 	// Always mount the hydrated workspace to the declared RW mount (first RW input)
@@ -62,6 +62,10 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 	// Optional /out mount for additional artifacts
 	if strings.TrimSpace(outDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: outDir, Target: "/out", ReadOnly: false})
+	}
+	// Optional /in mount for cross-phase inputs (read-only)
+	if strings.TrimSpace(inDir) != "" {
+		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
 	}
 	wd := manifest.WorkingDir
 	if wd == "" && len(manifest.Inputs) > 0 {

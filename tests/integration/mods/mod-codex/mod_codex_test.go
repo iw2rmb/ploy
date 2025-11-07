@@ -47,16 +47,14 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("git clone: %v\n%s", err, string(out))
 	}
 
-	// Ensure .ploy exists
-	if err := os.MkdirAll(filepath.Join(ws, ".ploy"), 0o755); err != nil {
-		t.Fatalf("mkdir .ploy: %v", err)
-	}
+	// Create /in directory for cross-phase inputs
+	inDir := t.TempDir()
 
 	// Prefer a pre-captured Build Gate log placed alongside this test.
 	repoRoot, _ := mustRun(t, "git", "rev-parse", "--show-toplevel")
 	repoRoot = strings.TrimSpace(repoRoot)
 	testLog := filepath.Join(repoRoot, "tests", "integration", "mods", "mod-codex", "build-gate.log")
-	logPath := filepath.Join(ws, ".ploy", "build-gate.log")
+	logPath := filepath.Join(inDir, "build-gate.log")
 	if data, err := os.ReadFile(testLog); err == nil && len(data) > 0 {
 		if err := os.WriteFile(logPath, data, 0o644); err != nil {
 			t.Fatalf("write build-gate.log from test fixture: %v", err)
@@ -108,7 +106,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		"-v", ws+":"+ws,
 		"-w", ws,
 		"-v", outDir+":/out",
-		"-v", filepath.Join(ws, ".ploy")+":/in:ro",
+		"-v", inDir+":/in:ro",
 		"-v", "/var/run/docker.sock:/var/run/docker.sock",
 		"mods-codex:latest",
 		"--input", ws, "--out", "/out", "--prompt-file", filepath.Join(ws, "prompt.txt"),

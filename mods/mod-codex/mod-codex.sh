@@ -84,9 +84,9 @@ if [[ -n "$model" ]]; then
   cmd+=(--model "$model")
 fi
 
-# If Build Gate log exists, prefer to add its directory context too
-if [[ "$supports_add_dir" == true && -f "$input_dir/.ploy/build-gate.log" ]]; then
-  cmd+=(--add-dir "$input_dir/.ploy")
+# If Build Gate log exists at /in, prefer to add its directory context too
+if [[ "$supports_add_dir" == true && -f "/in/build-gate.log" ]]; then
+  cmd+=(--add-dir "/in")
 fi
 cmd+=( - )
 
