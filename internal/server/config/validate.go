@@ -40,6 +40,19 @@ func validate(cfg *Config) error {
 		return errors.New("config: admin.socket or admin.listen must be configured")
 	}
 
+	// Validate listen addresses.
+	if _, err := ValidateAddress(cfg.HTTP.Listen); err != nil {
+		return fmt.Errorf("config: http.listen: %w", err)
+	}
+	if _, err := ValidateAddress(cfg.Metrics.Listen); err != nil {
+		return fmt.Errorf("config: metrics.listen: %w", err)
+	}
+	if strings.TrimSpace(cfg.Admin.Listen) != "" {
+		if _, err := ValidateAddress(cfg.Admin.Listen); err != nil {
+			return fmt.Errorf("config: admin.listen: %w", err)
+		}
+	}
+
 	// Validate runtime plugins.
 	names := make(map[string]struct{}, len(cfg.Runtime.Plugins))
 	for _, plugin := range cfg.Runtime.Plugins {
