@@ -73,13 +73,20 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 		labels = map[string]string{types.LabelRunID: ticketID.String()}
 	}
 
+	// Convert resource hints to runtime limits.
+	nanoCPUs, memBytes, diskBytes, storageSizeOpt := manifest.Resources.ToLimits()
+
 	return ContainerSpec{
-		Image:      manifest.Image,
-		Command:    append([]string{}, manifest.Command...),
-		WorkingDir: wd,
-		Env:        manifest.Env,
-		Mounts:     mounts,
-		Retain:     manifest.Retention.RetainContainer,
-		Labels:     labels,
+		Image:            manifest.Image,
+		Command:          append([]string{}, manifest.Command...),
+		WorkingDir:       wd,
+		Env:              manifest.Env,
+		Mounts:           mounts,
+		Retain:           manifest.Retention.RetainContainer,
+		Labels:           labels,
+		LimitNanoCPUs:    nanoCPUs,
+		LimitMemoryBytes: memBytes,
+		LimitDiskBytes:   diskBytes,
+		StorageSizeOpt:   storageSizeOpt,
 	}, nil
 }

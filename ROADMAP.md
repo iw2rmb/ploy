@@ -86,7 +86,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/workflow/runtime/step/container_spec.go` — use `types.LabelRunID` and `req.TicketID`.
   - Test: unit test asserts label value equals run ID; no label when empty.
 
-- [ ] Resource limits conversion: add `StepResourceSpec.ToLimits()` using `CPUmilli`/`Bytes`.
+ - [x] Resource limits conversion: add `StepResourceSpec.ToLimits()` using `CPUmilli`/`Bytes`.
   - Change: `internal/workflow/contracts/step_manifest.go` (method) and `internal/workflow/runtime/step/container_docker.go` apply limits via returned values.
   - Test: runtime test covers limit application; zero means unlimited.
 
