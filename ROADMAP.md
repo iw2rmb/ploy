@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Change: `internal/domain/types/duration.go`.
   - Test: valid/invalid inputs; JSON/YAML strings map to `time.Duration`.
 
-- [ ] Resources — `CPUmilli`, `Bytes` with parsers for common units; helpers to Docker limits.
+- [x] Resources — `CPUmilli`, `Bytes` with parsers for common units; helpers to Docker limits.
   - Change: `internal/domain/types/resources.go`.
   - Test: parse `500m`, `2`, `2Gi`, `10G`; overflow/invalid cases.
 
