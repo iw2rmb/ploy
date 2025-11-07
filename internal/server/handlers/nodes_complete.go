@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -32,9 +31,9 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -58,9 +57,9 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Parse and validate run_id.
-		runUUID, err := uuid.Parse(req.RunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+		runID := domaintypes.ToPGUUID(req.RunID)
+		if !runID.Valid {
+			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -82,10 +81,8 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify node exists before attempting to complete the run.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -97,10 +94,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify run exists and is assigned to this node.
-		run, err := st.GetRun(r.Context(), pgtype.UUID{
-			Bytes: runUUID,
-			Valid: true,
-		})
+		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -112,7 +106,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify the run is assigned to the requesting node.
-		if !run.NodeID.Valid || uuid.UUID(run.NodeID.Bytes) != nodeUUID {
+		if !run.NodeID.Valid || run.NodeID != nodeID {
 			http.Error(w, "run not assigned to this node", http.StatusForbidden)
 			return
 		}
@@ -146,10 +140,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// Update run completion: set status, reason, finished_at (server-side now()), and stats.
 		err = st.UpdateRunCompletion(r.Context(), store.UpdateRunCompletionParams{
-			ID: pgtype.UUID{
-				Bytes: runUUID,
-				Valid: true,
-			},
+			ID:     runID,
 			Status: normalizedStatus,
 			Reason: req.Reason,
 			Stats:  statsBytes,
@@ -161,7 +152,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Update stage status to terminal and set finished_at/duration.
-		if stages, err := st.ListStagesByRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true}); err == nil && len(stages) > 0 {
+		if stages, err := st.ListStagesByRun(r.Context(), runID); err == nil && len(stages) > 0 {
 			now := time.Now().UTC()
 			var stStatus store.StageStatus
 			switch normalizedStatus {

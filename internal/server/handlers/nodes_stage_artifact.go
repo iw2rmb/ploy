@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -31,9 +32,9 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -45,9 +46,9 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Parse and validate stage_id.
-		stageUUID, err := uuid.Parse(stageIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid stage: %v", err), http.StatusBadRequest)
+		stageID := domaintypes.ToPGUUID(stageIDStr)
+		if !stageID.Valid {
+			http.Error(w, "invalid stage: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -86,18 +87,18 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Validate run_id is a valid UUID.
-		runUUID, err := uuid.Parse(req.RunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+		runID := domaintypes.ToPGUUID(req.RunID)
+		if !runID.Valid {
+			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
 		// Validate build_id if provided.
-		var buildUUID uuid.UUID
+		var buildID pgtype.UUID
 		if req.BuildID != nil && strings.TrimSpace(*req.BuildID) != "" {
-			buildUUID, err = uuid.Parse(*req.BuildID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid build_id: %v", err), http.StatusBadRequest)
+			buildID = domaintypes.ToPGUUID(*req.BuildID)
+			if !buildID.Valid {
+				http.Error(w, "invalid build_id: invalid uuid", http.StatusBadRequest)
 				return
 			}
 		}
@@ -115,7 +116,8 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{Bytes: nodeUUID, Valid: true})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -127,7 +129,7 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the run exists.
-		_, err = st.GetRun(r.Context(), pgtype.UUID{Bytes: runUUID, Valid: true})
+		_, err = st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "run not found", http.StatusNotFound)
@@ -139,7 +141,7 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Check if the stage exists.
-		stage, err := st.GetStage(r.Context(), pgtype.UUID{Bytes: stageUUID, Valid: true})
+		stage, err := st.GetStage(r.Context(), stageID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "stage not found", http.StatusNotFound)
@@ -151,7 +153,7 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Ensure the stage belongs to the provided run.
-		if uuid.UUID(stage.RunID.Bytes) != runUUID {
+		if stage.RunID != runID {
 			http.Error(w, "stage does not belong to run", http.StatusBadRequest)
 			return
 		}
@@ -160,15 +162,7 @@ func createArtifactBundleHandler(st store.Store) http.HandlerFunc {
 		cid, digest := computeArtifactCIDAndDigest(req.Bundle)
 
 		// Create artifact bundle params.
-		params := store.CreateArtifactBundleParams{
-			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
-			StageID: pgtype.UUID{Bytes: stageUUID, Valid: true},
-			BuildID: pgtype.UUID{Bytes: buildUUID, Valid: req.BuildID != nil && strings.TrimSpace(*req.BuildID) != ""},
-			Name:    req.Name,
-			Bundle:  req.Bundle,
-			Cid:     &cid,
-			Digest:  &digest,
-		}
+		params := store.CreateArtifactBundleParams{RunID: runID, StageID: stageID, BuildID: buildID, Name: req.Name, Bundle: req.Bundle, Cid: &cid, Digest: &digest}
 
 		// Persist artifact bundle to DB.
 		artifact, err := st.CreateArtifactBundle(r.Context(), params)

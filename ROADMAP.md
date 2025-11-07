@@ -116,7 +116,7 @@ Legend: [ ] todo, [x] done.
   - Test: service test persists only allowed levels; SSE stream uses normalized level.
 
 ## DB Boundary: UUID Adaptation (Non-invasive)
-- [ ] Use UUID bridge in server/node edges where converting between domain IDs and `pgtype.UUID`.
+ - [x] Use UUID bridge in server/node edges where converting between domain IDs and `pgtype.UUID`.
   - Change: minimal wrappers in handlers that construct store params; no changes to sqlc.
   - Test: roundtrip of IDs through DB writes in handler tests stays green.
 

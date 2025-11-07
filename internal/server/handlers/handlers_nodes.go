@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -25,13 +25,11 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
-
-		nodeID := pgtype.UUID{Bytes: nodeUUID, Valid: true}
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)
@@ -52,10 +50,7 @@ func drainNodeHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Update drained flag.
-		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{
-			ID:      nodeID,
-			Drained: true,
-		})
+		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: true})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to drain node: %v", err), http.StatusInternalServerError)
 			slog.Error("drain node: update failed", "node_id", nodeIDStr, "err", err)
@@ -76,13 +71,11 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
-
-		nodeID := pgtype.UUID{Bytes: nodeUUID, Valid: true}
 
 		// Verify node exists.
 		node, err := st.GetNode(r.Context(), nodeID)
@@ -103,10 +96,7 @@ func undrainNodeHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Update drained flag.
-		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{
-			ID:      nodeID,
-			Drained: false,
-		})
+		err = st.UpdateNodeDrained(r.Context(), store.UpdateNodeDrainedParams{ID: nodeID, Drained: false})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to undrain node: %v", err), http.StatusInternalServerError)
 			slog.Error("undrain node: update failed", "node_id", nodeIDStr, "err", err)

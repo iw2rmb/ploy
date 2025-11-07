@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/server/events"
 	"github.com/iw2rmb/ploy/internal/store"
 )
@@ -29,9 +29,9 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		// Parse and validate node_id.
-		nodeUUID, err := uuid.Parse(nodeIDStr)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid id: %v", err), http.StatusBadRequest)
+		nodeID := domaintypes.ToPGUUID(nodeIDStr)
+		if !nodeID.Valid {
+			http.Error(w, "invalid id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -74,9 +74,9 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		// Validate run_id is a valid UUID.
-		runUUID, err := uuid.Parse(req.RunID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid run_id: %v", err), http.StatusBadRequest)
+		runID := domaintypes.ToPGUUID(req.RunID)
+		if !runID.Valid {
+			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -87,10 +87,8 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		}
 
 		// Check if the node exists before processing.
-		_, err = st.GetNode(r.Context(), pgtype.UUID{
-			Bytes: nodeUUID,
-			Valid: true,
-		})
+		var err error
+		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "node not found", http.StatusNotFound)
@@ -117,14 +115,10 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			// Parse stage_id if provided.
 			var stageID pgtype.UUID
 			if evt.StageID != nil && strings.TrimSpace(*evt.StageID) != "" {
-				stageUUID, err := uuid.Parse(*evt.StageID)
-				if err != nil {
-					http.Error(w, fmt.Sprintf("events[%d]: invalid stage_id: %v", i, err), http.StatusBadRequest)
+				stageID = domaintypes.ToPGUUID(*evt.StageID)
+				if !stageID.Valid {
+					http.Error(w, fmt.Sprintf("events[%d]: invalid stage_id: invalid uuid", i), http.StatusBadRequest)
 					return
-				}
-				stageID = pgtype.UUID{
-					Bytes: stageUUID,
-					Valid: true,
 				}
 			}
 
@@ -157,10 +151,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID: pgtype.UUID{
-					Bytes: runUUID,
-					Valid: true,
-				},
+				RunID:   runID,
 				StageID: stageID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,
