@@ -18,6 +18,7 @@ func TestShouldCreateMR(t *testing.T) {
 		{name: "non_bool_values_ignored_success", terminalStatus: "succeeded", options: map[string]any{"mr_on_success": "true"}, want: false},
 		{name: "non_bool_values_ignored_fail", terminalStatus: "failed", options: map[string]any{"mr_on_fail": "true"}, want: false},
 		{name: "other_status_never_triggers", terminalStatus: "cancelled", options: map[string]any{"mr_on_success": true, "mr_on_fail": true}, want: false},
+		{name: "gate_failure_with_mr_on_fail", terminalStatus: "failed", options: map[string]any{"mr_on_fail": true}, want: true},
 	}
 
 	for _, tt := range tests {

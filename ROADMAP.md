@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
 - [x] Include gate stats in run `stats.gate` (passed/resources/logs_artifact_id) — already partially present for post‑mod gate; ensure present for pre‑gate and re‑gate runs.
 
 ## Terminal status + MR on failure
-- [ ] Treat Build Gate failure as terminal when no healing is configured or after retries exhausted; keep MR on failure behaviour.
+- [x] Treat Build Gate failure as terminal when no healing is configured or after retries exhausted; keep MR on failure behaviour.
   - Change: internal/nodeagent/execution.go — set `terminalStatus="failed"`, `reason="build-gate"`.
   - Test: unit — with `mr_on_fail=true` ensure MR path still executes; success branch with `mr_on_success` unchanged.
 

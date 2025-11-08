@@ -347,6 +347,90 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	}
 }
 
+// TestExecuteWithHealing_NoHealingConfigured verifies that when the gate fails and no
+// healing is configured, the function returns a terminal build gate error.
+func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
+	// Mock gate executor that fails.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: false},
+				},
+				LogsText: "[ERROR] Build failure\n",
+			}, nil
+		},
+	}
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			t.Errorf("no containers should be created when gate fails without healing")
+			return step.ContainerHandle{ID: "mock-container"}, nil
+		},
+	}
+
+	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
+	defer os.RemoveAll(workspace)
+
+	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("test-run-no-healing"),
+		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("test-branch"),
+		Options:   map[string]any{
+			// No build_gate_healing configured
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "test/main-mod:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "workspace",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadWrite,
+				SnapshotCID: types.CID("bafy123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir)
+
+	// Should return build gate failure error.
+	if err == nil {
+		t.Fatalf("executeWithHealing() expected error, got nil")
+	}
+
+	if !errors.Is(err, step.ErrBuildGateFailed) {
+		t.Errorf("executeWithHealing() error should be ErrBuildGateFailed, got: %v", err)
+	}
+}
+
 // TestExecuteWithHealing_RetriesExhausted verifies that when healing retries are exhausted
 // and the gate still fails, the function returns an appropriate error.
 func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
