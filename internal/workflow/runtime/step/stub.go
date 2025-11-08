@@ -163,6 +163,10 @@ type StageTiming struct {
 	TotalDuration     time.Duration
 }
 
+// ErrBuildGateFailed is returned when the pre-mod Build Gate fails
+// and no healing is configured to continue.
+var ErrBuildGateFailed = errors.New("build gate failed")
+
 // Run executes a step and returns the result.
 func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	totalStart := time.Now()
@@ -210,7 +214,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 				// No healing configured; fail immediately with build-gate reason.
 				result.Timings.BuildGateDuration = time.Since(gateStart)
 				result.Timings.TotalDuration = time.Since(totalStart)
-				return result, fmt.Errorf("build gate failed: %s", "pre-mod validation failed")
+				return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mod validation failed")
 			}
 			// If healing is configured, it will be handled by the node agent orchestration layer.
 			// For now, proceed to let the higher layer handle healing logic.

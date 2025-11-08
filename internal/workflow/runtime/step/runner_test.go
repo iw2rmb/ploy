@@ -564,8 +564,8 @@ func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
 		t.Fatalf("Run() expected error for failed pre-mod gate, got nil")
 	}
 
-	// Error message should indicate build gate failure
-	if !errors.Is(err, errors.New("build gate failed: pre-mod validation failed")) {
+	// Error should wrap the sentinel ErrBuildGateFailed
+	if !errors.Is(err, ErrBuildGateFailed) {
 		// Check error string contains expected message
 		errStr := err.Error()
 		if errStr != "build gate failed: pre-mod validation failed" {

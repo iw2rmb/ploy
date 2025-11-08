@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -234,7 +235,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 			terminalStatus = "failed"
 			errMsg := execErr.Error()
 			// Check if this is a build gate failure.
-			if strings.Contains(errMsg, "build gate failed") {
+			if errors.Is(execErr, step.ErrBuildGateFailed) {
 				// Set reason to "build-gate" for pre-mod gate failures.
 				gateReason := "build-gate"
 				reason = &gateReason
