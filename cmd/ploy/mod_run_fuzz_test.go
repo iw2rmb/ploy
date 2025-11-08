@@ -1,0 +1,43 @@
+package main
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+// FuzzBuildSpecPayload_NoPanic fuzzes CLI override inputs to ensure
+// buildSpecPayload never panics and always returns valid JSON when non-nil.
+func FuzzBuildSpecPayload_NoPanic(f *testing.F) {
+	// Seeds cover command-as-array, plain string, and empty values.
+	f.Add("[/bin/sh,-c,echo]", "", "gitlab.example.com", true, true, false, false)
+	f.Add("echo hello", "glpat-123", "", false, false, true, true)
+	f.Add("", "", "", false, false, false, false)
+
+	f.Fuzz(func(t *testing.T, modCommand, gitlabPAT, gitlabDomain string, retain, mrSuccess, mrFail, healOnBuild bool) {
+		// Provide a small variety of env shapes, including malformed entries.
+		modEnvs := []string{"KEY=VALUE", "A=B=C", "EMPTY=", "ONLYKEY"}
+
+		payload, err := buildSpecPayload(
+			"",           // no spec file
+			modEnvs,      // env overrides
+			"",           // no image override
+			retain,       // retain flag
+			modCommand,   // command (may be JSON array or string)
+			gitlabPAT,    // gitlab PAT (may be empty)
+			gitlabDomain, // gitlab domain (may be empty)
+			mrSuccess,    // MR on success
+			mrFail,       // MR on fail
+			healOnBuild,  // deprecated back-compat flag
+		)
+		if err != nil {
+			// On parse/merge error just return; fuzzer will expand inputs.
+			return
+		}
+		if payload != nil {
+			var out map[string]any
+			if err := json.Unmarshal(payload, &out); err != nil {
+				t.Fatalf("payload must unmarshal as JSON: %v", err)
+			}
+		}
+	})
+}
