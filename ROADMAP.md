@@ -44,7 +44,7 @@ Legend: [ ] todo, [x] done.
   - Optional shorthand: accept `env: NAME: {from_file: "~/.codex/auth.json"}` for YAML users who prefer inline objects.
   - Tests: unit for resolver; integration with a temporary file path.
 
-- [ ] GitLab domain defaulting
+- [x] GitLab domain defaulting
   - If `gitlab_pat` is provided in the spec (or overrides) and `gitlab_domain` is omitted/empty, set `gitlab_domain = "gitlab.com"` on submit.
   - Precedence: per‑run spec/overrides > server defaults injected on claim.
   - Tests: unit for CLI normalization; integration to verify MR creation still works without explicitly specifying domain.

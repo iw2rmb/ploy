@@ -434,6 +434,14 @@ func buildSpecPayload(
 		base["mr_on_fail"] = true
 	}
 
+	// Default gitlab_domain to "gitlab.com" when gitlab_pat is provided but gitlab_domain is empty.
+	// This runs after all CLI overrides to check the final state.
+	if _, hasPAT := base["gitlab_pat"]; hasPAT {
+		if _, hasDomain := base["gitlab_domain"]; !hasDomain {
+			base["gitlab_domain"] = "gitlab.com"
+		}
+	}
+
 	// DEPRECATED: --heal-on-build injects a default build_gate_healing when spec lacks it.
 	// This is a back-compat shim kept for one release cycle.
 	if healOnBuild {
