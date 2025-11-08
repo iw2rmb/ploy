@@ -61,7 +61,7 @@ Legend: [ ] todo, [x] done.
   - Change: execution.go — skip ORW when re‑gate still fails; exit failed.
 
 ## Artifacts + metadata
-- [ ] Persist first‑gate logs to `/workspace/.ploy/build-gate.log` (input to codex prompt) and upload logs as artifact bundle.
+- [x] Persist first‑gate logs to `/workspace/.ploy/build-gate.log` (input to codex prompt) and upload logs as artifact bundle.
   - Change: internal/nodeagent/execution.go — write, then upload via ArtifactUploader.
 - [ ] Include gate stats in run `stats.gate` (passed/resources/logs_artifact_id) — already partially present for post‑mod gate; ensure present for pre‑gate and re‑gate runs.
 
