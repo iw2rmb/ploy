@@ -221,6 +221,81 @@ func printModRunUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--heal-on-build (deprecated)] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }
 
+// resolveEnvFromFile reads a file path (expanding ~), returns its content as a string.
+// Redacts the content in any returned error messages for security.
+func resolveEnvFromFile(path string) (string, error) {
+	// Expand ~ to user home directory
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home dir for path %s: %w", path, err)
+		}
+		path = filepath.Join(home, path[2:])
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		// Redact file path to avoid leaking sensitive locations
+		return "", fmt.Errorf("read env file (path redacted): %w", err)
+	}
+	return string(data), nil
+}
+
+// resolveEnvFromFileInPlace processes env and env_from_file from a spec section,
+// resolving file references and merging them into the env map in-place.
+// Removes env_from_file after resolution. Supports both env_from_file map and inline {from_file: path} syntax.
+func resolveEnvFromFileInPlace(spec map[string]any) error {
+	// Prepare the merged env map
+	mergedEnv := make(map[string]any)
+
+	// First, process env_from_file if present
+	if envFromFile, ok := spec["env_from_file"].(map[string]any); ok {
+		for k, v := range envFromFile {
+			path, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("env_from_file[%s]: expected string path, got %T", k, v)
+			}
+			content, err := resolveEnvFromFile(path)
+			if err != nil {
+				return fmt.Errorf("env_from_file[%s]: %w", k, err)
+			}
+			mergedEnv[k] = content
+		}
+		// Remove env_from_file after processing
+		delete(spec, "env_from_file")
+	}
+
+	// Then, process env (including inline {from_file: path} syntax)
+	if env, ok := spec["env"].(map[string]any); ok {
+		for k, v := range env {
+			switch val := v.(type) {
+			case string:
+				// Direct string value
+				mergedEnv[k] = val
+			case map[string]any:
+				// Check for {from_file: "path"} syntax
+				if fromFile, ok := val["from_file"].(string); ok {
+					content, err := resolveEnvFromFile(fromFile)
+					if err != nil {
+						return fmt.Errorf("env[%s].from_file: %w", k, err)
+					}
+					mergedEnv[k] = content
+				} else {
+					return fmt.Errorf("env[%s]: expected string or {from_file: path}, got unsupported map structure", k)
+				}
+			default:
+				return fmt.Errorf("env[%s]: expected string or {from_file: path}, got %T", k, v)
+			}
+		}
+	}
+
+	// Update spec with merged env (only if we have any env values)
+	if len(mergedEnv) > 0 {
+		spec["env"] = mergedEnv
+	}
+
+	return nil
+}
+
 // buildSpecPayload loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.
 // CLI flags take precedence over spec file values. Returns raw JSON bytes.
 func buildSpecPayload(
@@ -251,6 +326,24 @@ func buildSpecPayload(
 		}
 	} else {
 		base = make(map[string]any)
+	}
+
+	// Resolve env_from_file references in the top-level spec (mod section)
+	if err := resolveEnvFromFileInPlace(base); err != nil {
+		return nil, fmt.Errorf("resolve env from file (mod): %w", err)
+	}
+
+	// Resolve env_from_file references in build_gate_healing.mods[] if present
+	if healing, ok := base["build_gate_healing"].(map[string]any); ok {
+		if mods, ok := healing["mods"].([]any); ok {
+			for i, m := range mods {
+				if modEntry, ok := m.(map[string]any); ok {
+					if err := resolveEnvFromFileInPlace(modEntry); err != nil {
+						return nil, fmt.Errorf("resolve env from file (build_gate_healing.mods[%d]): %w", i, err)
+					}
+				}
+			}
+		}
 	}
 
 	// Merge CLI flag overrides (CLI flags take precedence)
