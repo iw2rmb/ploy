@@ -57,7 +57,7 @@ Legend: [ ] todo, [x] done.
   - Execute each `mods[]` entry (image/command/env/retain) in order under `/workspace`, publish `/out` artifacts, re‑run Gate after the sequence; repeat up to `retries`.
   - Change: internal/nodeagent/execution.go (loop + re‑gate); internal/nodeagent/manifest.go helpers to build container manifests from entries.
   - Test: integration (local) with `mods-codex` as healer and failing sample; verify first gate fail, healer runs, re‑gate pass.
-- [ ] Proceed to main mod only after a passing Gate.
+- [x] Proceed to main mod only after a passing Gate.
   - Change: execution.go — skip ORW when re‑gate still fails; exit failed.
 
 ## Artifacts + metadata
