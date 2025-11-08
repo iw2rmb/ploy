@@ -53,7 +53,7 @@ Legend: [ ] todo, [x] done.
 - [x] Pre‑mod Gate: run the Build Gate before the first mod container.
   - Change: internal/nodeagent/execution.go — split execution into phases (gate → maybe heal → re‑gate → mod).
   - Test: unit — stub Gate to fail; final status=failed (no healing block) with `reason="build-gate"`.
-- [ ] Healing loop (spec‑driven): consume `build_gate_healing` from `req.Options`.
+- [x] Healing loop (spec‑driven): consume `build_gate_healing` from `req.Options`.
   - Execute each `mods[]` entry (image/command/env/retain) in order under `/workspace`, publish `/out` artifacts, re‑run Gate after the sequence; repeat up to `retries`.
   - Change: internal/nodeagent/execution.go (loop + re‑gate); internal/nodeagent/manifest.go helpers to build container manifests from entries.
   - Test: integration (local) with `mods-codex` as healer and failing sample; verify first gate fail, healer runs, re‑gate pass.
