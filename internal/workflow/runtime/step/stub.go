@@ -177,7 +177,48 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	}
 	result.Timings.HydrationDuration = time.Since(hydrationStart)
 
-	// Stage 2: Execute container via configured runtime (real execution when available).
+	// Stage 2: Pre-mod Build Gate validation.
+	// Run the Build Gate before executing the mod container to fail fast if the codebase doesn't build.
+	gateStart := time.Now()
+	gateSpec := req.Manifest.Gate
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
+	if gateSpec == nil && req.Manifest.Shift != nil {
+		// Fallback to deprecated Shift for backward compatibility.
+		gateSpec = &contracts.StepGateSpec{
+			Enabled: req.Manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
+			Profile: req.Manifest.Shift.Profile, //lint:ignore SA1019 compat field access
+			Env:     req.Manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+		}
+	}
+	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
+		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
+		if err != nil {
+			return Result{}, fmt.Errorf("build gate execution failed: %w", err)
+		}
+		result.BuildGate = gateMetadata
+
+		// If the pre-mod gate fails and no healing is configured, fail immediately.
+		// Check if gate passed by inspecting StaticChecks.
+		gatePassed := false
+		if len(gateMetadata.StaticChecks) > 0 {
+			gatePassed = gateMetadata.StaticChecks[0].Passed
+		}
+		if !gatePassed {
+			// Check if healing is configured in options.
+			_, hasHealing := req.Manifest.Options["build_gate_healing"]
+			if !hasHealing {
+				// No healing configured; fail immediately with build-gate reason.
+				result.Timings.BuildGateDuration = time.Since(gateStart)
+				result.Timings.TotalDuration = time.Since(totalStart)
+				return result, fmt.Errorf("build gate failed: %s", "pre-mod validation failed")
+			}
+			// If healing is configured, it will be handled by the node agent orchestration layer.
+			// For now, proceed to let the higher layer handle healing logic.
+		}
+	}
+	result.Timings.BuildGateDuration = time.Since(gateStart)
+
+	// Stage 3: Execute container via configured runtime (real execution when available).
 	executionStart := time.Now()
 	if r.Containers == nil {
 		// Backward-compatible fallback: simulate execution when no runtime is configured
@@ -218,27 +259,6 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			_ = r.Containers.Remove(ctx, handle)
 		}
 	}
-
-	// Stage 3: Build gate validation.
-	gateStart := time.Now()
-	gateSpec := req.Manifest.Gate
-	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
-	if gateSpec == nil && req.Manifest.Shift != nil {
-		// Fallback to deprecated Shift for backward compatibility.
-		gateSpec = &contracts.StepGateSpec{
-			Enabled: req.Manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
-			Profile: req.Manifest.Shift.Profile, //lint:ignore SA1019 compat field access
-			Env:     req.Manifest.Shift.Env,     //lint:ignore SA1019 compat field access
-		}
-	}
-	if r.Gate != nil && gateSpec != nil && gateSpec.Enabled {
-		gateMetadata, err := r.Gate.Execute(ctx, gateSpec, req.Workspace)
-		if err != nil {
-			return Result{}, fmt.Errorf("build gate execution failed: %w", err)
-		}
-		result.BuildGate = gateMetadata
-	}
-	result.Timings.BuildGateDuration = time.Since(gateStart)
 
 	// Stage 4: Generate diff (best-effort; publishing handled by node agent).
 	diffStart := time.Now()

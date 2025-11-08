@@ -31,9 +31,15 @@ func (m *mockGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 	if m.executeFn != nil {
 		return m.executeFn(ctx, spec, workspace)
 	}
+	// Default: return a passing gate check
 	return &contracts.BuildGateStageMetadata{
-		StaticChecks: []contracts.BuildGateStaticCheckReport{},
-		LogFindings:  []contracts.BuildGateLogFinding{},
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{
+				Tool:   "default",
+				Passed: true,
+			},
+		},
+		LogFindings: []contracts.BuildGateLogFinding{},
 	}, nil
 }
 
@@ -211,7 +217,11 @@ func TestRunner_Run_FallbackToShiftSpec(t *testing.T) {
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				gateExecuted = true
 				capturedProfile = spec.Profile
-				return &contracts.BuildGateStageMetadata{}, nil
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "test", Passed: true},
+					},
+				}, nil
 			},
 		},
 	}
@@ -265,7 +275,11 @@ func TestRunner_Run_GatePrecedenceOverShift(t *testing.T) {
 		Gate: &mockGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				capturedProfile = spec.Profile
-				return &contracts.BuildGateStageMetadata{}, nil
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "test", Passed: true},
+					},
+				}, nil
 			},
 		},
 	}
@@ -397,7 +411,11 @@ func TestRunner_Run_TimingCapture(t *testing.T) {
 		Gate: &mockGateExecutor{
 			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 				time.Sleep(gateDelay)
-				return &contracts.BuildGateStageMetadata{}, nil
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "test", Passed: true},
+					},
+				}, nil
 			},
 		},
 	}
@@ -489,5 +507,89 @@ func TestRunner_Run_NilComponents(t *testing.T) {
 	// Timing should still be captured even with nil components
 	if result.Timings.TotalDuration == 0 {
 		t.Errorf("Run() TotalDuration not captured with nil components")
+	}
+}
+
+func TestRunner_Run_PreModGateFailureWithoutHealing(t *testing.T) {
+	// Test that when the pre-mod gate fails and no healing is configured,
+	// the runner returns an error with "build-gate" reason without executing the mod.
+	runner := Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate: &mockGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				// Simulate gate failure
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{
+							Tool:   "maven",
+							Passed: false,
+						},
+					},
+					LogsText: "[ERROR] BUILD FAILURE\n[ERROR] Failed to compile",
+				}, nil
+			},
+		},
+		Containers: nil, // No container runtime; should not execute mod when gate fails
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "maven:3-eclipse-temurin-17",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		// No build_gate_healing configured
+		Options: map[string]any{},
+	}
+
+	req := Request{
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+	}
+
+	result, err := runner.Run(context.Background(), req)
+
+	// Should return error when gate fails without healing
+	if err == nil {
+		t.Fatalf("Run() expected error for failed pre-mod gate, got nil")
+	}
+
+	// Error message should indicate build gate failure
+	if !errors.Is(err, errors.New("build gate failed: pre-mod validation failed")) {
+		// Check error string contains expected message
+		errStr := err.Error()
+		if errStr != "build gate failed: pre-mod validation failed" {
+			t.Errorf("Run() error = %q, want error containing 'build gate failed'", errStr)
+		}
+	}
+
+	// BuildGate metadata should be populated
+	if result.BuildGate == nil {
+		t.Errorf("Run() BuildGate metadata should be populated on gate failure")
+	} else {
+		if len(result.BuildGate.StaticChecks) != 1 {
+			t.Errorf("Run() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+		}
+		if result.BuildGate.StaticChecks[0].Passed {
+			t.Errorf("Run() BuildGate.StaticChecks[0].Passed = true, want false")
+		}
+	}
+
+	// Timings should be populated even on early failure
+	if result.Timings.BuildGateDuration == 0 {
+		t.Errorf("Run() BuildGateDuration should be captured on gate failure")
+	}
+	if result.Timings.TotalDuration == 0 {
+		t.Errorf("Run() TotalDuration should be captured on gate failure")
 	}
 }

@@ -233,7 +233,14 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		if execErr != nil {
 			terminalStatus = "failed"
 			errMsg := execErr.Error()
-			reason = &errMsg
+			// Check if this is a build gate failure.
+			if strings.Contains(errMsg, "build gate failed") {
+				// Set reason to "build-gate" for pre-mod gate failures.
+				gateReason := "build-gate"
+				reason = &gateReason
+			} else {
+				reason = &errMsg
+			}
 		} else if result.ExitCode != 0 {
 			terminalStatus = "failed"
 			failureMsg := fmt.Sprintf("exit code %d", result.ExitCode)

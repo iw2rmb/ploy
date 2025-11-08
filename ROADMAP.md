@@ -50,7 +50,7 @@ Legend: [ ] todo, [x] done.
   - Tests: unit for CLI normalization; integration to verify MR creation still works without explicitly specifying domain.
 
 ## Node Agent: Gate‑Heal‑Re‑Gate orchestration
-- [ ] Pre‑mod Gate: run the Build Gate before the first mod container.
+- [x] Pre‑mod Gate: run the Build Gate before the first mod container.
   - Change: internal/nodeagent/execution.go — split execution into phases (gate → maybe heal → re‑gate → mod).
   - Test: unit — stub Gate to fail; final status=failed (no healing block) with `reason="build-gate"`.
 - [ ] Healing loop (spec‑driven): consume `build_gate_healing` from `req.Options`.
