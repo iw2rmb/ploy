@@ -95,6 +95,12 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   workflows (`mod run`). Use `stage=toggle1,toggle2` to enable additional
   toggles or `stage=off` to disable Aster for that stage. Overrides are ignored
   unless `PLOY_ASTER_ENABLE` is set.
+- `--spec` — Path to a YAML/JSON spec file defining mod parameters, Build Gate settings,
+  and healing configuration for `mod run`. CLI flags (e.g., `--mod-image`, `--gitlab-pat`)
+  override corresponding spec values when both are present. The spec supports inline
+  environment variables (`env`), file-based secrets (`env_from_file`), Build Gate healing
+  (`build_gate_healing`), and GitLab MR settings. See `docs/schemas/mod.example.yaml`
+  for the full schema and `tests/e2e/mods/README.md` for usage examples.
 - `--repo-url` / `--repo-base-ref` / `--repo-target-ref` / `--repo-workspace-hint`
   — Repository materialisation inputs consumed by `mod run`. When `--repo-url` is provided, `--repo-target-ref` is
   required; `--repo-base-ref` defaults to the repository's default branch. The
@@ -107,6 +113,42 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
 - Streaming guards (long-lived SSE):
   - `mods logs` and `runs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
+
+## Build Gate Healing
+
+When a Build Gate fails before the main mod runs, the node agent can execute a healing
+sequence configured via the `build_gate_healing` block in the spec. This enables automated
+repair of build failures using tools like Codex or other LLM-based workflows.
+
+**How it works:**
+1. The node runs the Build Gate before the main mod container.
+2. If the gate fails and `build_gate_healing` is configured, the node executes each healing
+   step in sequence (mods under `build_gate_healing.mods[]`).
+3. After all healing steps complete, the gate is re-run. If it passes, the main mod proceeds.
+4. The healing loop can retry up to `build_gate_healing.retries` times (default: 1).
+5. If the gate still fails after exhausting retries, the run terminates with status `failed`
+   and reason `build-gate`. When `mr_on_fail` is enabled, an MR is still created.
+
+**Spec format:**
+```yaml
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/you/mods-codex:latest
+      command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
+      env:
+        CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
+      env_from_file:
+        CODEX_AUTH_JSON: ~/.codex/auth.json
+      retain_container: false
+```
+
+**Cross-phase inputs:**
+- `/in/build-gate.log` — First Build Gate failure log (mounted read-only for healing mods).
+- `/in/prompt.txt` — Optional prompt file (mounted when provided in spec).
+
+See `docs/schemas/mod.example.yaml` for a complete example and `tests/e2e/mods/README.md`
+for end-to-end usage with `mods-codex`.
 
 ## Exit Codes
 
