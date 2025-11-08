@@ -151,9 +151,9 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		t.Errorf("executeWithHealing() exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify call sequence: gate (fail) → healing container → gate (pass) → gate (re-check) → main container
-	// The final gate re-check happens because we run the full manifest again, which is correct.
-	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "gate", "container:test/main-mod:latest"}
+	// Verify call sequence: gate (fail) → healing container → gate (pass) → main container
+	// After gate passes, we run the main mod without re-checking the gate.
+	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "container:test/main-mod:latest"}
 	if len(callSequence) != len(expectedSequence) {
 		t.Fatalf("call sequence length = %d, want %d. Got: %v", len(callSequence), len(expectedSequence), callSequence)
 	}

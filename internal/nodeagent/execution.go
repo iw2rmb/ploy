@@ -573,10 +573,16 @@ func (r *runController) executeWithHealing(
 			if gatePassed {
 				slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt)
 				// Gate passed; proceed to main mod execution.
-				// Execute the main mod now.
+				// Disable the gate in the manifest since we've already validated the codebase.
+				manifestForMainMod := manifest
+				manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
+				//lint:ignore SA1019 Backward compatibility: also disable deprecated Shift field.
+				manifestForMainMod.Shift = nil
+
+				// Execute the main mod without re-running the gate.
 				mainResult, mainErr := runner.Run(ctx, step.Request{
 					TicketID:  types.TicketID(req.RunID),
-					Manifest:  manifest,
+					Manifest:  manifestForMainMod,
 					Workspace: workspace,
 					OutDir:    outDir,
 					InDir:     *inDir,
@@ -584,6 +590,7 @@ func (r *runController) executeWithHealing(
 				return mainResult, mainErr
 			}
 
+			// Re-gate failed; continue to next retry or exit when exhausted.
 			slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt)
 		}
 	}
