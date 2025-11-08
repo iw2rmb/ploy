@@ -38,7 +38,7 @@ Legend: [ ] todo, [x] done.
 - [x] Back‑compat shim: `--heal-on-build` (deprecated) injects a default `build_gate_healing` when spec lacks it.
   - Change: cmd/ploy/mod_run.go usage text; keep for one release.
 
-- [ ] Spec env file resolution (secrets UX):
+- [x] Spec env file resolution (secrets UX):
   - Support `env_from_file` (map name→path) alongside `env` (name→value) in both `mod` and each `build_gate_healing.mods[]` entry.
   - CLI resolves `~`, reads the file content, and inlines it as the env value before submit; do not log contents; redact in debug/JSON output.
   - Optional shorthand: accept `env: NAME: {from_file: "~/.codex/auth.json"}` for YAML users who prefer inline objects.
