@@ -70,6 +70,8 @@ func executeModRun(args []string, stderr io.Writer) error {
 	gitlabDomain := fs.String("gitlab-domain", "", "GitLab domain for this run (overrides server default)")
 	mrSuccess := fs.Bool("mr-success", false, "Create a merge request on success")
 	mrFail := fs.Bool("mr-fail", false, "Create a merge request on failure")
+	// DEPRECATED: --heal-on-build injects a default build_gate_healing when spec lacks it
+	healOnBuild := fs.Bool("heal-on-build", false, "DEPRECATED: inject default build_gate_healing (use --spec with build_gate_healing instead)")
 
 	if err := fs.Parse(args); err != nil {
 		printModRunUsage(stderr)
@@ -129,6 +131,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 		strings.TrimSpace(*gitlabDomain),
 		*mrSuccess,
 		*mrFail,
+		*healOnBuild,
 	)
 	if err != nil {
 		return fmt.Errorf("build spec: %w", err)
@@ -215,7 +218,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 }
 
 func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
+	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--heal-on-build (deprecated)] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }
 
 // buildSpecPayload loads a spec from file (YAML or JSON) and merges it with CLI flag overrides.
@@ -230,6 +233,7 @@ func buildSpecPayload(
 	gitlabDomain string,
 	mrSuccess bool,
 	mrFail bool,
+	healOnBuild bool,
 ) ([]byte, error) {
 	// Start with spec from file (if provided)
 	var base map[string]any
@@ -251,7 +255,7 @@ func buildSpecPayload(
 
 	// Merge CLI flag overrides (CLI flags take precedence)
 	hasOverrides := len(modEnvs) > 0 || modImage != "" || retain || modCommand != "" ||
-		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail
+		gitlabPAT != "" || gitlabDomain != "" || mrSuccess || mrFail || healOnBuild
 
 	// Only proceed if we have a spec file or CLI overrides
 	if len(base) == 0 && !hasOverrides {
@@ -327,6 +331,17 @@ func buildSpecPayload(
 	}
 	if mrFail {
 		base["mr_on_fail"] = true
+	}
+
+	// DEPRECATED: --heal-on-build injects a default build_gate_healing when spec lacks it.
+	// This is a back-compat shim kept for one release cycle.
+	if healOnBuild {
+		if _, exists := base["build_gate_healing"]; !exists {
+			base["build_gate_healing"] = map[string]any{
+				"retries": 1,
+				"mods":    []any{},
+			}
+		}
 	}
 
 	if len(base) == 0 {

@@ -29,7 +29,7 @@ mr_on_success: true
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -128,7 +128,8 @@ gitlab_domain: gitlab.com
 		"glpat-test",         // gitlab_pat
 		"gitlab.example.com", // override domain
 		true,                 // mr_success
-		false,
+		false,                // mr_fail
+		false,                // healOnBuild
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -192,6 +193,7 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 		"",
 		false,
 		false,
+		false,
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -218,7 +220,7 @@ func TestBuildSpecPayloadNoSpec(t *testing.T) {
 
 func TestBuildSpecPayloadEmpty(t *testing.T) {
 	// No spec file and no CLI overrides
-	payload, err := buildSpecPayload("", nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload("", nil, "", false, "", "", "", false, false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -230,7 +232,7 @@ func TestBuildSpecPayloadEmpty(t *testing.T) {
 
 func TestBuildSpecPayloadInvalidFile(t *testing.T) {
 	// Non-existent file should error
-	_, err := buildSpecPayload("/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload("/nonexistent/path/spec.yaml", nil, "", false, "", "", "", false, false, false)
 	if err == nil {
 		t.Errorf("expected error for non-existent file")
 	}
@@ -244,7 +246,7 @@ func TestBuildSpecPayloadInvalidFormat(t *testing.T) {
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	_, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
 	if err == nil {
 		t.Errorf("expected error for invalid YAML/JSON")
 	}
@@ -260,6 +262,7 @@ func TestBuildSpecPayloadCommandJSONArray(t *testing.T) {
 		`["/bin/sh", "-c", "echo test"]`,
 		"",
 		"",
+		false,
 		false,
 		false,
 	)
@@ -296,6 +299,7 @@ func TestBuildSpecPayloadCommandString(t *testing.T) {
 		"",
 		false,
 		false,
+		false,
 	)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
@@ -329,7 +333,7 @@ build_gate_healing:
 		t.Fatalf("write spec file: %v", err)
 	}
 
-	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false)
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
 	if err != nil {
 		t.Fatalf("buildSpecPayload error: %v", err)
 	}
@@ -364,5 +368,134 @@ build_gate_healing:
 
 	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/healer:latest" {
 		t.Errorf("expected first mod.image=docker.io/test/healer:latest, got %v", mod0["image"])
+	}
+}
+
+func TestBuildSpecPayloadHealOnBuildInjectsDefault(t *testing.T) {
+	// Test that --heal-on-build injects default build_gate_healing when absent
+	payload, err := buildSpecPayload(
+		"",    // no spec file
+		nil,   // no env
+		"",    // no image
+		false, // no retain
+		"",    // no command
+		"",    // no gitlab_pat
+		"",    // no gitlab_domain
+		false, // no mr_success
+		false, // no mr_fail
+		true,  // healOnBuild=true
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify build_gate_healing was injected
+	healing, ok := result["build_gate_healing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate_healing in payload when healOnBuild=true")
+	}
+
+	// Verify default retries
+	if retries, ok := healing["retries"].(float64); !ok || retries != 1 {
+		t.Errorf("expected build_gate_healing.retries=1, got %v", healing["retries"])
+	}
+
+	// Verify default mods array (empty)
+	mods, ok := healing["mods"].([]any)
+	if !ok || len(mods) != 0 {
+		t.Errorf("expected build_gate_healing.mods to be empty array, got %v", healing["mods"])
+	}
+}
+
+func TestBuildSpecPayloadHealOnBuildPreservesExisting(t *testing.T) {
+	// Test that --heal-on-build does NOT override existing build_gate_healing from spec
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "test.yaml")
+	specContent := `
+build_gate_healing:
+  retries: 3
+  mods:
+    - image: docker.io/custom/healer:v1
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, true)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify existing build_gate_healing is preserved (not overwritten)
+	healing, ok := result["build_gate_healing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected build_gate_healing in payload")
+	}
+
+	// Verify original retries value is preserved
+	if retries, ok := healing["retries"].(float64); !ok || retries != 3 {
+		t.Errorf("expected build_gate_healing.retries=3 (from spec), got %v", healing["retries"])
+	}
+
+	// Verify mods array from spec is preserved
+	mods, ok := healing["mods"].([]any)
+	if !ok || len(mods) != 1 {
+		t.Fatalf("expected build_gate_healing.mods array with 1 element (from spec), got %v", healing["mods"])
+	}
+}
+
+func TestBuildSpecPayloadHealOnBuildWithOtherFlags(t *testing.T) {
+	// Test that --heal-on-build works alongside other CLI flags
+	payload, err := buildSpecPayload(
+		"",                          // no spec file
+		[]string{"KEY1=value1"},     // env
+		"docker.io/test/mod:latest", // image
+		true,                        // retain
+		"",                          // no command
+		"",                          // no gitlab_pat
+		"",                          // no gitlab_domain
+		false,                       // no mr_success
+		false,                       // no mr_fail
+		true,                        // healOnBuild=true
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify build_gate_healing was injected
+	if _, ok := result["build_gate_healing"]; !ok {
+		t.Errorf("expected build_gate_healing in payload when healOnBuild=true")
+	}
+
+	// Verify other flags are still present
+	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected image=docker.io/test/mod:latest, got %v", result["image"])
+	}
+
+	if retain, ok := result["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected retain_container=true, got %v", result["retain_container"])
+	}
+
+	if env, ok := result["env"].(map[string]any); ok {
+		if v, ok := env["KEY1"].(string); !ok || v != "value1" {
+			t.Errorf("expected env.KEY1=value1, got %v", env["KEY1"])
+		}
+	} else {
+		t.Errorf("expected env in payload")
 	}
 }
