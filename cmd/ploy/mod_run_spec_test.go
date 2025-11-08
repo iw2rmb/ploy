@@ -499,3 +499,179 @@ func TestBuildSpecPayloadHealOnBuildWithOtherFlags(t *testing.T) {
 		t.Errorf("expected env in payload")
 	}
 }
+
+func TestBuildSpecPayloadGitLabDomainDefaulting(t *testing.T) {
+	tests := []struct {
+		name          string
+		specContent   string
+		gitlabPAT     string
+		gitlabDomain  string
+		wantDomain    string
+		wantDomainSet bool
+	}{
+		{
+			name:          "PAT provided, no domain in CLI or spec - defaults to gitlab.com",
+			specContent:   "",
+			gitlabPAT:     "glpat-test",
+			gitlabDomain:  "",
+			wantDomain:    "gitlab.com",
+			wantDomainSet: true,
+		},
+		{
+			name:          "PAT and domain both provided in CLI - uses CLI domain",
+			specContent:   "",
+			gitlabPAT:     "glpat-test",
+			gitlabDomain:  "gitlab.example.com",
+			wantDomain:    "gitlab.example.com",
+			wantDomainSet: true,
+		},
+		{
+			name:          "PAT in CLI, domain in spec - CLI domain empty, spec preserved",
+			specContent:   "gitlab_domain: gitlab.spec.com\n",
+			gitlabPAT:     "glpat-test",
+			gitlabDomain:  "",
+			wantDomain:    "gitlab.spec.com",
+			wantDomainSet: true,
+		},
+		{
+			name:          "PAT in CLI, domain in spec - CLI domain overrides spec",
+			specContent:   "gitlab_domain: gitlab.spec.com\n",
+			gitlabPAT:     "glpat-test",
+			gitlabDomain:  "gitlab.cli.com",
+			wantDomain:    "gitlab.cli.com",
+			wantDomainSet: true,
+		},
+		{
+			name:          "No PAT provided - domain not set even if empty",
+			specContent:   "",
+			gitlabPAT:     "",
+			gitlabDomain:  "",
+			wantDomain:    "",
+			wantDomainSet: false,
+		},
+		{
+			name: "PAT in spec, no CLI override - defaults to gitlab.com",
+			specContent: `gitlab_pat: glpat-from-spec
+`,
+			gitlabPAT:     "",
+			gitlabDomain:  "",
+			wantDomain:    "gitlab.com",
+			wantDomainSet: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var specFile string
+			if tt.specContent != "" {
+				tmpDir := t.TempDir()
+				specFile = filepath.Join(tmpDir, "test.yaml")
+				if err := os.WriteFile(specFile, []byte(tt.specContent), 0o644); err != nil {
+					t.Fatalf("write spec file: %v", err)
+				}
+			}
+
+			payload, err := buildSpecPayload(
+				specFile,
+				nil,
+				"",
+				false,
+				"",
+				tt.gitlabPAT,
+				tt.gitlabDomain,
+				false,
+				false,
+				false,
+			)
+			if err != nil {
+				t.Fatalf("buildSpecPayload error: %v", err)
+			}
+
+			// When no PAT and no domain, payload might be nil
+			if payload == nil && !tt.wantDomainSet {
+				return
+			}
+
+			var result map[string]any
+			if err := json.Unmarshal(payload, &result); err != nil {
+				t.Fatalf("unmarshal payload: %v", err)
+			}
+
+			domain, exists := result["gitlab_domain"].(string)
+			if tt.wantDomainSet {
+				if !exists {
+					t.Errorf("expected gitlab_domain to be set, but it was not present")
+				} else if domain != tt.wantDomain {
+					t.Errorf("expected gitlab_domain=%s, got %s", tt.wantDomain, domain)
+				}
+			} else {
+				if exists {
+					t.Errorf("expected gitlab_domain not to be set, but got %s", domain)
+				}
+			}
+		})
+	}
+}
+
+func TestBuildSpecPayloadGitLabDomainDefaultingWithMRFlags(t *testing.T) {
+	// Integration test: verify MR creation flags work correctly with domain defaulting.
+	// This simulates a real-world scenario where a user provides a PAT and MR flags
+	// without explicitly specifying the domain, expecting it to default to gitlab.com.
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "test.yaml")
+	specContent := `
+image: docker.io/test/mod:latest
+env:
+  KEY1: value1
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	// Simulate user running: ploy mod run --spec test.yaml --gitlab-pat glpat-xxx --mr-fail
+	payload, err := buildSpecPayload(
+		specPath,
+		nil,              // no additional env
+		"",               // no image override
+		false,            // no retain
+		"",               // no command
+		"glpat-test-123", // PAT provided
+		"",               // domain NOT specified - should default to gitlab.com
+		false,            // mr_on_success=false
+		true,             // mr_on_fail=true
+		false,            // no healOnBuild
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify gitlab_pat is present
+	if pat, ok := result["gitlab_pat"].(string); !ok || pat != "glpat-test-123" {
+		t.Errorf("expected gitlab_pat=glpat-test-123, got %v", result["gitlab_pat"])
+	}
+
+	// Verify gitlab_domain defaults to gitlab.com
+	if domain, ok := result["gitlab_domain"].(string); !ok || domain != "gitlab.com" {
+		t.Errorf("expected gitlab_domain=gitlab.com (defaulted), got %v", result["gitlab_domain"])
+	}
+
+	// Verify mr_on_fail is set
+	if mrFail, ok := result["mr_on_fail"].(bool); !ok || !mrFail {
+		t.Errorf("expected mr_on_fail=true, got %v", result["mr_on_fail"])
+	}
+
+	// Verify mr_on_success is NOT set (should not be present or false)
+	if mrSuccess, ok := result["mr_on_success"].(bool); ok && mrSuccess {
+		t.Errorf("expected mr_on_success=false or not present, got true")
+	}
+
+	// Verify other spec values are preserved
+	if img, ok := result["image"].(string); !ok || img != "docker.io/test/mod:latest" {
+		t.Errorf("expected image from spec to be preserved, got %v", result["image"])
+	}
+}
