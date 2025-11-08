@@ -74,6 +74,19 @@ The server’s authorizer recognizes both forms.
 - Cross-phase input directory: `/in` is mounted read-only for healing mods (e.g., `mods-codex`).
   - `/in/build-gate.log` — First Build Gate failure log (node persists to temp host file and mounts)
   - `/in/prompt.txt` — Default prompt location when provided in spec (node mounts it R/O)
+- `--spec` — Path to a YAML/JSON spec file for `ploy mod run` defining mod parameters,
+  Build Gate settings, and healing configuration. The spec supports:
+  - `mod.env` — Inline environment variables for the main mod container
+  - `mod.env_from_file` — File-based secrets (CLI reads and inlines content before submit)
+  - `build_gate_healing` — Automated repair sequence executed when Build Gate fails
+  - GitLab MR settings (`mr_on_success`, `mr_on_fail`, `gitlab_domain`, `gitlab_pat`)
+  - See `docs/schemas/mod.example.yaml` for the full schema
+- `build_gate_healing` — Spec block defining the healing loop when Build Gate fails:
+  - `retries` — Maximum number of healing attempts (default: 1)
+  - `mods[]` — Array of healing steps (each is a container with image/command/env/retain)
+  - After each healing attempt, the Build Gate is re-run; on pass, the main mod proceeds
+  - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
+  - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.

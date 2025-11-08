@@ -46,6 +46,48 @@ Use the YAML spec to define mod parameters, Build Gate, and healing.
 Example spec:
   - `tests/e2e/mods/scenario-orw-fail/mod.yaml`
 
+**Using `--spec`:**
+
+The `--spec` flag accepts a YAML or JSON file defining:
+- **Main mod configuration** (`mod.image`, `mod.command`, `mod.env`, `mod.env_from_file`)
+- **Build Gate settings** (`build_gate.enabled`, `build_gate.profile`)
+- **Healing sequence** (`build_gate_healing.retries`, `build_gate_healing.mods[]`)
+- **GitLab MR integration** (`gitlab_domain`, `gitlab_pat`, `mr_on_success`, `mr_on_fail`)
+
+CLI flags override spec values when both are present. For example:
+```bash
+ploy mod run --spec mod.yaml --mod-image custom:tag --gitlab-pat "$TOKEN"
+```
+This uses `mod.yaml` as the base but overrides the image and PAT.
+
+**Build Gate Healing:**
+
+When `build_gate_healing` is configured in the spec:
+1. The node runs the Build Gate before the main mod.
+2. If the gate fails, each healing mod in `build_gate_healing.mods[]` runs in sequence.
+3. After all healing steps, the gate is re-run. If it passes, the main mod proceeds.
+4. The loop retries up to `build_gate_healing.retries` times (default: 1).
+5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
+
+**Cross-phase inputs available to healing mods:**
+- `/in/build-gate.log` — First Build Gate failure log (read-only mount)
+- `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
+
+Example healing spec block:
+```yaml
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/you/mods-codex:latest
+      command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
+      env:
+        CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
+      env_from_file:
+        CODEX_AUTH_JSON: ~/.codex/auth.json
+```
+
+See `docs/schemas/mod.example.yaml` for the full spec schema.
+
 Run the failing→healing scenario with a single script:
   - `bash tests/e2e/mods/scenario-orw-fail/run.sh`
   - It submits:

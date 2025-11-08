@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
   - Test: unit — with `mr_on_fail=true` ensure MR path still executes; success branch with `mr_on_success` unchanged.
 
 ## CLI/docs updates
-- [ ] Update docs to describe `--spec` and `build_gate_healing`.
+- [x] Update docs to describe `--spec` and `build_gate_healing`.
   - Change: cmd/ploy/README.md, docs/envs/README.md, tests/e2e/mods/README.md.
   - Test: lint/docs check.
 
