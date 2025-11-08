@@ -69,6 +69,6 @@ mr_on_fail: true
 # - This YAML is submitted via: `ploy mod run --spec mod.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
 # - The current agent honors: mod.image, mod.command, mod.env, mod.retain_container,
-#   gitlab_domain, gitlab_pat, mr_on_success, mr_on_fail, and build_gate.* (profile).
-#   The build_gate_healing block represents the agreed format for the healing loop
-#   and will be consumed in the next implementation slice.
+#   gitlab_domain, gitlab_pat, mr_on_success, mr_on_fail, build_gate.* (profile),
+#   and build_gate_healing.* (e.g., retries, mods). The node agent consumes
+#   build_gate_healing to run the heal → re-gate loop after the first gate fail.
