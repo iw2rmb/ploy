@@ -189,9 +189,11 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		},
 	}
 
-	// Mock container runtime.
+	// Mock container runtime with counter to ensure main mod isn't executed.
+	containerCreates := 0
 	mockContainer := &mockContainerRuntime{
 		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			containerCreates++
 			return step.ContainerHandle{ID: "mock-container"}, nil
 		},
 		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
@@ -279,6 +281,11 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 	// Error should mention retries exhausted.
 	if err.Error() != "build gate failed: healing retries exhausted" {
 		t.Errorf("executeWithHealing() error = %q, want 'build gate failed: healing retries exhausted'", err.Error())
+	}
+
+	// With 1 healing mod and retries=2, only 2 healer containers should run; main mod should not run.
+	if containerCreates != 2 {
+		t.Errorf("healing containers created = %d, want 2 (main mod must be skipped)", containerCreates)
 	}
 }
 
