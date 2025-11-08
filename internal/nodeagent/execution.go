@@ -110,8 +110,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Execute the step with possible healing loop.
 	startTime := time.Now()
-	result, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir)
+	execResult, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir)
 	duration := time.Since(startTime)
+	result := execResult.Result
 
 	if execErr != nil {
 		slog.Error("run execution failed",
@@ -280,40 +281,76 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		}
 
 		// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
-		if result.BuildGate != nil {
-			gate := map[string]any{
-				"duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			}
-			// Determine pass/fail
-			passed := false
-			if len(result.BuildGate.StaticChecks) > 0 {
-				passed = result.BuildGate.StaticChecks[0].Passed
-			}
-			gate["passed"] = passed
-			if ru := result.BuildGate.Resources; ru != nil {
-				gate["resources"] = map[string]any{
-					"limits": map[string]any{"nano_cpus": ru.LimitNanoCPUs, "memory_bytes": ru.LimitMemoryBytes},
-					"usage":  map[string]any{"cpu_total_ns": ru.CPUTotalNs, "mem_usage_bytes": ru.MemUsageBytes, "mem_max_bytes": ru.MemMaxBytes, "blkio_read_bytes": ru.BlkioReadBytes, "blkio_write_bytes": ru.BlkioWriteBytes, "size_rw_bytes": ru.SizeRwBytes},
+		// Include pre-gate and re-gate runs when healing was attempted.
+		if execResult.PreGate != nil || len(execResult.ReGates) > 0 || result.BuildGate != nil {
+			gate := map[string]any{}
+
+			// Build gate metadata helper function.
+			buildGateStats := func(meta *contracts.BuildGateStageMetadata, durationMs int64, artifactNameSuffix string) map[string]any {
+				gateStats := map[string]any{
+					"duration_ms": durationMs,
 				}
-			}
-			// Upload build logs as artifact when present.
-			if s := strings.TrimSpace(result.BuildGate.LogsText); s != "" {
-				logFile, err := os.CreateTemp("", "ploy-gate-*.log")
-				if err == nil {
-					_, _ = logFile.WriteString(s)
-					_ = logFile.Close()
-					if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
-						stageID, _ := req.Options["stage_id"].(string)
-						if id, cid, uerr := artUploader.UploadArtifact(ctx, req.RunID.String(), stageID, []string{logFile.Name()}, "build-gate.log"); uerr == nil {
-							gate["logs_artifact_id"] = id
-							gate["logs_bundle_cid"] = cid
-						} else {
-							slog.Warn("failed to upload build-gate.log", "run_id", req.RunID, "error", uerr)
+				// Determine pass/fail.
+				passed := false
+				if meta != nil && len(meta.StaticChecks) > 0 {
+					passed = meta.StaticChecks[0].Passed
+				}
+				gateStats["passed"] = passed
+				if meta != nil && meta.Resources != nil {
+					ru := meta.Resources
+					gateStats["resources"] = map[string]any{
+						"limits": map[string]any{"nano_cpus": ru.LimitNanoCPUs, "memory_bytes": ru.LimitMemoryBytes},
+						"usage":  map[string]any{"cpu_total_ns": ru.CPUTotalNs, "mem_usage_bytes": ru.MemUsageBytes, "mem_max_bytes": ru.MemMaxBytes, "blkio_read_bytes": ru.BlkioReadBytes, "blkio_write_bytes": ru.BlkioWriteBytes, "size_rw_bytes": ru.SizeRwBytes},
+					}
+				}
+				// Upload build logs as artifact when present.
+				if meta != nil {
+					if s := strings.TrimSpace(meta.LogsText); s != "" {
+						logFile, err := os.CreateTemp("", "ploy-gate-*.log")
+						if err == nil {
+							_, _ = logFile.WriteString(s)
+							_ = logFile.Close()
+							if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
+								stageID, _ := req.Options["stage_id"].(string)
+								artifactName := "build-gate.log"
+								if artifactNameSuffix != "" {
+									artifactName = "build-gate-" + artifactNameSuffix + ".log"
+								}
+								if id, cid, uerr := artUploader.UploadArtifact(ctx, req.RunID.String(), stageID, []string{logFile.Name()}, artifactName); uerr == nil {
+									gateStats["logs_artifact_id"] = id
+									gateStats["logs_bundle_cid"] = cid
+								} else {
+									slog.Warn("failed to upload "+artifactName, "run_id", req.RunID, "error", uerr)
+								}
+							}
+							_ = os.Remove(logFile.Name())
 						}
 					}
-					_ = os.Remove(logFile.Name())
 				}
+				return gateStats
 			}
+
+			// Include pre-gate stats if present.
+			if execResult.PreGate != nil {
+				gate["pre_gate"] = buildGateStats(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre")
+			}
+
+			// Include re-gate stats if present.
+			if len(execResult.ReGates) > 0 {
+				reGatesList := make([]map[string]any, 0, len(execResult.ReGates))
+				for i, rg := range execResult.ReGates {
+					suffix := fmt.Sprintf("re%d", i+1)
+					reGatesList = append(reGatesList, buildGateStats(rg.Metadata, rg.DurationMs, suffix))
+				}
+				gate["re_gates"] = reGatesList
+			}
+
+			// Include final/post-mod gate stats if present and not already captured in pre-gate.
+			// This handles the case where no healing occurred and the gate ran after the mod.
+			if result.BuildGate != nil && execResult.PreGate == nil && len(execResult.ReGates) == 0 {
+				gate = buildGateStats(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
+			}
+
 			stats["gate"] = gate
 		}
 
@@ -436,6 +473,21 @@ func extractProjectIDFromRepoURL(repoURL string) (string, error) {
 	return gitlab.ExtractProjectIDFromURL(repoURL)
 }
 
+// gateRunMetadata captures gate execution metadata and timing for stats reporting.
+type gateRunMetadata struct {
+	Metadata   *contracts.BuildGateStageMetadata
+	DurationMs int64
+}
+
+// executionResult wraps step.Result with additional gate run history for stats.
+type executionResult struct {
+	step.Result
+	// PreGate captures the initial gate run metadata (if gate was executed).
+	PreGate *gateRunMetadata
+	// ReGates captures re-gate attempts after healing (if healing was attempted).
+	ReGates []gateRunMetadata
+}
+
 // executeWithHealing runs the main step with optional healing loop when the build gate fails.
 // It handles the gate-heal-regate orchestration as specified in build_gate_healing options.
 func (r *runController) executeWithHealing(
@@ -446,7 +498,7 @@ func (r *runController) executeWithHealing(
 	workspace string,
 	outDir string,
 	inDir *string,
-) (step.Result, error) {
+) (executionResult, error) {
 	// First execution attempt (includes pre-mod gate check).
 	result, err := runner.Run(ctx, step.Request{
 		TicketID:  types.TicketID(req.RunID),
@@ -456,16 +508,25 @@ func (r *runController) executeWithHealing(
 		InDir:     *inDir,
 	})
 
+	// Capture pre-gate metadata for stats (if gate was executed).
+	var preGate *gateRunMetadata
+	if result.BuildGate != nil {
+		preGate = &gateRunMetadata{
+			Metadata:   result.BuildGate,
+			DurationMs: result.Timings.BuildGateDuration.Milliseconds(),
+		}
+	}
+
 	// If execution succeeded or error is not a build gate failure, return immediately.
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
-		return result, err
+		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
 	// Build gate failed. Check if healing is configured.
 	healingConfig, hasHealing := req.Options["build_gate_healing"].(map[string]any)
 	if !hasHealing {
 		// No healing configured; return the gate failure.
-		return result, err
+		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
 	// Extract healing parameters.
@@ -479,7 +540,7 @@ func (r *runController) executeWithHealing(
 	healingMods, ok := healingConfig["mods"].([]any)
 	if !ok || len(healingMods) == 0 {
 		slog.Warn("build_gate_healing configured but no mods provided", "run_id", req.RunID)
-		return result, err
+		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
 	// Create /in directory if not already created (for build-gate.log).
@@ -487,7 +548,7 @@ func (r *runController) executeWithHealing(
 		tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
 		if dirErr != nil {
 			slog.Error("failed to create /in directory for healing", "run_id", req.RunID, "error", dirErr)
-			return result, err
+			return executionResult{Result: result, PreGate: preGate}, err
 		}
 		*inDir = tmpInDir
 		// Caller handles cleanup via defer.
@@ -503,6 +564,9 @@ func (r *runController) executeWithHealing(
 		}
 	}
 
+	// Track re-gate runs for stats.
+	var reGates []gateRunMetadata
+
 	// Attempt healing loop.
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries)
@@ -512,7 +576,7 @@ func (r *runController) executeWithHealing(
 			healManifest, buildErr := buildHealingManifest(req, modEntry, idx)
 			if buildErr != nil {
 				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
-				return result, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
+				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
 			}
 
 			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image)
@@ -528,7 +592,7 @@ func (r *runController) executeWithHealing(
 
 			if healErr != nil {
 				slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", idx, "error", healErr)
-				return result, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
+				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
 			}
 
 			if healResult.ExitCode != 0 {
@@ -556,13 +620,22 @@ func (r *runController) executeWithHealing(
 		}
 
 		if runner.Gate != nil && gateSpec != nil && gateSpec.Enabled {
+			regateStart := time.Now()
 			gateMetadata, gateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+			regateDuration := time.Since(regateStart)
+
 			if gateErr != nil {
 				slog.Error("re-gate execution failed", "run_id", req.RunID, "error", gateErr)
-				return result, fmt.Errorf("re-gate execution failed: %w", gateErr)
+				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("re-gate execution failed: %w", gateErr)
 			}
 
 			result.BuildGate = gateMetadata
+
+			// Capture re-gate metadata for stats.
+			reGates = append(reGates, gateRunMetadata{
+				Metadata:   gateMetadata,
+				DurationMs: regateDuration.Milliseconds(),
+			})
 
 			// Check if gate passed.
 			gatePassed := false
@@ -587,7 +660,8 @@ func (r *runController) executeWithHealing(
 					OutDir:    outDir,
 					InDir:     *inDir,
 				})
-				return mainResult, mainErr
+				// Return with all gate history.
+				return executionResult{Result: mainResult, PreGate: preGate, ReGates: reGates}, mainErr
 			}
 
 			// Re-gate failed; continue to next retry or exit when exhausted.
@@ -597,5 +671,5 @@ func (r *runController) executeWithHealing(
 
 	// Retries exhausted; return the gate failure.
 	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID)
-	return result, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
+	return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
 }
