@@ -208,16 +208,11 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 			gatePassed = gateMetadata.StaticChecks[0].Passed
 		}
 		if !gatePassed {
-			// Check if healing is configured in options.
-			_, hasHealing := req.Manifest.Options["build_gate_healing"]
-			if !hasHealing {
-				// No healing configured; fail immediately with build-gate reason.
-				result.Timings.BuildGateDuration = time.Since(gateStart)
-				result.Timings.TotalDuration = time.Since(totalStart)
-				return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mod validation failed")
-			}
-			// If healing is configured, it will be handled by the node agent orchestration layer.
-			// For now, proceed to let the higher layer handle healing logic.
+			// Gate failed. Always return error; node agent orchestration layer
+			// will handle healing if configured.
+			result.Timings.BuildGateDuration = time.Since(gateStart)
+			result.Timings.TotalDuration = time.Since(totalStart)
+			return result, fmt.Errorf("%w: %s", ErrBuildGateFailed, "pre-mod validation failed")
 		}
 	}
 	result.Timings.BuildGateDuration = time.Since(gateStart)

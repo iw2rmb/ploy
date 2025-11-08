@@ -118,3 +118,92 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 
 	return manifest, nil
 }
+
+// buildHealingManifest constructs a StepManifest from a healing mod entry.
+// The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
+func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contracts.StepManifest, error) {
+	entry, ok := modEntry.(map[string]any)
+	if !ok {
+		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: expected map, got %T", index, modEntry)
+	}
+
+	// Extract image (required).
+	image, ok := entry["image"].(string)
+	if !ok || strings.TrimSpace(image) == "" {
+		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: image required", index)
+	}
+	image = strings.TrimSpace(image)
+
+	// Extract command (optional).
+	var command []string
+	switch v := entry["command"].(type) {
+	case []any:
+		for _, c := range v {
+			if s, ok := c.(string); ok {
+				command = append(command, s)
+			}
+		}
+	case string:
+		if s := strings.TrimSpace(v); s != "" {
+			command = []string{"/bin/sh", "-c", s}
+		}
+	}
+
+	// Extract env (optional).
+	env := make(map[string]string)
+	if envMap, ok := entry["env"].(map[string]any); ok {
+		for k, v := range envMap {
+			if s, ok := v.(string); ok {
+				env[k] = s
+			}
+		}
+	}
+
+	// Extract retain_container (optional).
+	retain := false
+	if b, ok := entry["retain_container"].(bool); ok {
+		retain = b
+	}
+
+	// Build the repo materialization (same as main mod).
+	targetRef := strings.TrimSpace(req.TargetRef.String())
+	if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
+		targetRef = strings.TrimSpace(req.BaseRef.String())
+	}
+
+	repo := contracts.RepoMaterialization{
+		URL:       req.RepoURL,
+		BaseRef:   req.BaseRef,
+		TargetRef: types.GitRef(targetRef),
+		Commit:    req.CommitSHA,
+	}
+
+	// Create the healing manifest.
+	// Healing mods do not run the build gate themselves; they only modify the workspace.
+	manifest := contracts.StepManifest{
+		ID:         types.StepID(fmt.Sprintf("%s-heal-%d", req.RunID, index)),
+		Name:       fmt.Sprintf("Healing mod %d for run %s", index, req.RunID),
+		Image:      image,
+		Command:    command,
+		WorkingDir: "/workspace",
+		Env:        env,
+		Gate:       &contracts.StepGateSpec{Enabled: false}, // Healing mods do not run gates.
+		Inputs: []contracts.StepInput{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+				Mode:      contracts.StepInputModeReadWrite,
+				Hydration: &contracts.StepInputHydration{
+					Repo: &repo,
+				},
+			},
+		},
+		Retention: contracts.StepRetentionSpec{
+			RetainContainer: retain,
+			TTL:             types.Duration(time.Hour),
+		},
+		Options: make(map[string]any), // No options for healing mods.
+	}
+
+	return manifest, nil
+}

@@ -102,16 +102,15 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Prepare /in directory for cross-phase inputs (created only when needed).
 	var inDir string
+	defer func() {
+		if inDir != "" {
+			_ = os.RemoveAll(inDir)
+		}
+	}()
 
-	// Execute the step.
+	// Execute the step with possible healing loop.
 	startTime := time.Now()
-	result, execErr := runner.Run(ctx, step.Request{
-		TicketID:  types.TicketID(req.RunID),
-		Manifest:  manifest,
-		Workspace: workspaceRoot,
-		OutDir:    outDir,
-		InDir:     inDir,
-	})
+	result, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir)
 	duration := time.Since(startTime)
 
 	if execErr != nil {
@@ -314,25 +313,6 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 					}
 					_ = os.Remove(logFile.Name())
 				}
-				// When gate fails, persist logs to /in/build-gate.log for healing phases.
-				// Note: this task implements /in mount setup; healing loop is a separate ROADMAP item.
-				if !passed && inDir == "" {
-					// Create /in directory on first gate failure.
-					tmpInDir, err := os.MkdirTemp("", "ploy-mod-in-*")
-					if err == nil {
-						inDir = tmpInDir
-						defer func() { _ = os.RemoveAll(inDir) }()
-						// Write build-gate.log to /in for healing containers.
-						inLogPath := filepath.Join(inDir, "build-gate.log")
-						if err := os.WriteFile(inLogPath, []byte(s), 0o644); err != nil {
-							slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", err)
-						} else {
-							slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
-						}
-					} else {
-						slog.Warn("failed to create /in directory", "run_id", req.RunID, "error", err)
-					}
-				}
 			}
 			stats["gate"] = gate
 		}
@@ -454,4 +434,161 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 // extractProjectIDFromRepoURL extracts the URL-encoded project ID from a GitLab repo URL.
 func extractProjectIDFromRepoURL(repoURL string) (string, error) {
 	return gitlab.ExtractProjectIDFromURL(repoURL)
+}
+
+// executeWithHealing runs the main step with optional healing loop when the build gate fails.
+// It handles the gate-heal-regate orchestration as specified in build_gate_healing options.
+func (r *runController) executeWithHealing(
+	ctx context.Context,
+	runner step.Runner,
+	req StartRunRequest,
+	manifest contracts.StepManifest,
+	workspace string,
+	outDir string,
+	inDir *string,
+) (step.Result, error) {
+	// First execution attempt (includes pre-mod gate check).
+	result, err := runner.Run(ctx, step.Request{
+		TicketID:  types.TicketID(req.RunID),
+		Manifest:  manifest,
+		Workspace: workspace,
+		OutDir:    outDir,
+		InDir:     *inDir,
+	})
+
+	// If execution succeeded or error is not a build gate failure, return immediately.
+	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
+		return result, err
+	}
+
+	// Build gate failed. Check if healing is configured.
+	healingConfig, hasHealing := req.Options["build_gate_healing"].(map[string]any)
+	if !hasHealing {
+		// No healing configured; return the gate failure.
+		return result, err
+	}
+
+	// Extract healing parameters.
+	retries := 1 // Default to 1 retry
+	if r, ok := healingConfig["retries"].(int); ok && r > 0 {
+		retries = r
+	} else if rf, ok := healingConfig["retries"].(float64); ok && rf > 0 {
+		retries = int(rf)
+	}
+
+	healingMods, ok := healingConfig["mods"].([]any)
+	if !ok || len(healingMods) == 0 {
+		slog.Warn("build_gate_healing configured but no mods provided", "run_id", req.RunID)
+		return result, err
+	}
+
+	// Create /in directory if not already created (for build-gate.log).
+	if *inDir == "" {
+		tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
+		if dirErr != nil {
+			slog.Error("failed to create /in directory for healing", "run_id", req.RunID, "error", dirErr)
+			return result, err
+		}
+		*inDir = tmpInDir
+		// Caller handles cleanup via defer.
+
+		// Write build-gate.log to /in for healing containers.
+		if result.BuildGate != nil && result.BuildGate.LogsText != "" {
+			inLogPath := filepath.Join(*inDir, "build-gate.log")
+			if writeErr := os.WriteFile(inLogPath, []byte(result.BuildGate.LogsText), 0o644); writeErr != nil {
+				slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
+			} else {
+				slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
+			}
+		}
+	}
+
+	// Attempt healing loop.
+	for attempt := 1; attempt <= retries; attempt++ {
+		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries)
+
+		// Execute each healing mod in sequence.
+		for idx, modEntry := range healingMods {
+			healManifest, buildErr := buildHealingManifest(req, modEntry, idx)
+			if buildErr != nil {
+				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
+				return result, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
+			}
+
+			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image)
+
+			// Run the healing mod container.
+			healResult, healErr := runner.Run(ctx, step.Request{
+				TicketID:  types.TicketID(req.RunID),
+				Manifest:  healManifest,
+				Workspace: workspace,
+				OutDir:    outDir,
+				InDir:     *inDir,
+			})
+
+			if healErr != nil {
+				slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", idx, "error", healErr)
+				return result, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
+			}
+
+			if healResult.ExitCode != 0 {
+				slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", idx, "exit_code", healResult.ExitCode)
+				// Continue with remaining mods; we'll check gate after all mods run.
+			}
+
+			// Upload /out artifacts for this healing mod if present.
+			if uploadErr := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageIDFromOptions(req.Options), outDir); uploadErr != nil {
+				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
+			}
+		}
+
+		// Re-run the gate after healing mods.
+		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt)
+
+		gateSpec := manifest.Gate
+		//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
+		if gateSpec == nil && manifest.Shift != nil {
+			gateSpec = &contracts.StepGateSpec{
+				Enabled: manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
+				Profile: manifest.Shift.Profile, //lint:ignore SA1019 compat field access
+				Env:     manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+			}
+		}
+
+		if runner.Gate != nil && gateSpec != nil && gateSpec.Enabled {
+			gateMetadata, gateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+			if gateErr != nil {
+				slog.Error("re-gate execution failed", "run_id", req.RunID, "error", gateErr)
+				return result, fmt.Errorf("re-gate execution failed: %w", gateErr)
+			}
+
+			result.BuildGate = gateMetadata
+
+			// Check if gate passed.
+			gatePassed := false
+			if len(gateMetadata.StaticChecks) > 0 {
+				gatePassed = gateMetadata.StaticChecks[0].Passed
+			}
+
+			if gatePassed {
+				slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt)
+				// Gate passed; proceed to main mod execution.
+				// Execute the main mod now.
+				mainResult, mainErr := runner.Run(ctx, step.Request{
+					TicketID:  types.TicketID(req.RunID),
+					Manifest:  manifest,
+					Workspace: workspace,
+					OutDir:    outDir,
+					InDir:     *inDir,
+				})
+				return mainResult, mainErr
+			}
+
+			slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt)
+		}
+	}
+
+	// Retries exhausted; return the gate failure.
+	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID)
+	return result, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
 }
