@@ -155,10 +155,31 @@ main() {
     log_info "Server deployment completed"
     echo ""
 
-    # Extract cluster_id from local descriptor
-    CLUSTER_ID=$(cat ~/.config/ploy/clusters/default 2>/dev/null || echo "")
-    if [[ -z "$CLUSTER_ID" ]]; then
-        log_error "Failed to read cluster_id from ~/.config/ploy/clusters/default"
+    # Extract cluster_id from local descriptor (supports symlink marker or legacy file)
+    CLUSTERS_DIR="$HOME/.config/ploy/clusters"
+    MARKER="$CLUSTERS_DIR/default"
+    if [[ -L "$MARKER" ]]; then
+        # Symlink to a JSON descriptor
+        TARGET=$(readlink "$MARKER")
+        [[ "$TARGET" != /* ]] && TARGET="$CLUSTERS_DIR/$TARGET"
+        if ! CLUSTER_ID=$(jq -r '.cluster_id' "$TARGET" 2>/dev/null); then
+            log_error "Failed to parse cluster_id from $TARGET"
+            exit 1
+        fi
+    else
+        # Legacy file: may contain plain cluster id or JSON
+        CONTENT=$(cat "$MARKER" 2>/dev/null || true)
+        if [[ "$CONTENT" == \{* ]]; then
+            if ! CLUSTER_ID=$(printf '%s' "$CONTENT" | jq -r '.cluster_id' 2>/dev/null); then
+                log_error "Failed to parse cluster_id from legacy marker content"
+                exit 1
+            fi
+        else
+            CLUSTER_ID=$(echo "$CONTENT" | tr -d '\n\r')
+        fi
+    fi
+    if [[ -z "$CLUSTER_ID" || "$CLUSTER_ID" == "null" ]]; then
+        log_error "cluster_id not found in descriptor"
         exit 1
     fi
     log_info "Cluster ID: $CLUSTER_ID"

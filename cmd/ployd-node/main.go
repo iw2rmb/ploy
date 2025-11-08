@@ -12,15 +12,23 @@ import (
 	"syscall"
 
 	"github.com/iw2rmb/ploy/internal/nodeagent"
+	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
 func main() {
 	var configPath string
+	var showVersion bool
 	flag.StringVar(&configPath, "config", "/etc/ploy/ployd-node.yaml", "Path to ployd-node configuration")
+	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.Parse()
 
 	// Configure structured logger early.
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))
+
+	if showVersion {
+		slog.Info("ployd-node", "version", iversion.Version, "commit", iversion.Commit, "built_at", iversion.BuiltAt)
+		return
+	}
 
 	cfg, err := nodeagent.LoadConfig(configPath)
 	if err != nil {

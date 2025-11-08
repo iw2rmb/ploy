@@ -20,10 +20,8 @@ import (
 
 func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
 	// Descriptor with http scheme should yield a plain client.
-	cfgHome := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
+	// Isolate config home to ensure tests never touch the real default.
+	IsolatePloyConfigHomeAllowDefault(t)
 
 	if _, err := cliconfig.SaveDescriptor(cliconfig.Descriptor{ClusterID: cliconfig.ClusterID("c1"), Address: "http://127.0.0.1:9094"}); err != nil {
 		t.Fatalf("SaveDescriptor: %v", err)
@@ -49,10 +47,7 @@ func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
 
 func TestResolveControlPlaneHTTP_WithMTLSDescriptorTLS13(t *testing.T) {
 	// Prepare a temp config home and descriptor with CA + client cert/key.
-	cfgHome := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", cfgHome)
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(cfgHome, "clusters")) })
+	cfgHome := IsolatePloyConfigHomeAllowDefault(t)
 
 	caCertPEM, caKeyPEM := generateCACert(t)
 	clientCertPEM, clientKeyPEM := generateClientCert(t, caCertPEM, caKeyPEM)

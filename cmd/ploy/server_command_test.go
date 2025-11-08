@@ -607,10 +607,7 @@ func (m *mockDetectRunner) Run(ctx context.Context, name string, args []string, 
 
 // TestRefreshAdminCertFromServer verifies that admin cert refresh calls the server and writes files.
 func TestRefreshAdminCertFromServer(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
+	IsolatePloyConfigHomeAllowDefault(t)
 
 	clusterID := "test-cluster-refresh"
 	now := time.Now()
@@ -721,10 +718,7 @@ func TestRefreshAdminCertFromServer(t *testing.T) {
 // TestRefreshAdminCertFromServerServerError verifies that server-side errors
 // during refresh are surfaced to the user.
 func TestRefreshAdminCertFromServerServerError(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
+	IsolatePloyConfigHomeAllowDefault(t)
 
 	// Minimal descriptor with cluster ID set and no TLS paths.
 	clusterID := "test-cluster-error"
@@ -764,10 +758,7 @@ func TestRefreshAdminCertFromServerServerError(t *testing.T) {
 
 // TestRefreshAdminCertFromServerInvalidJSON verifies invalid JSON responses are handled.
 func TestRefreshAdminCertFromServerInvalidJSON(t *testing.T) {
-	tmpDir := t.TempDir()
-	t.Setenv("PLOY_CONFIG_HOME", tmpDir)
-	t.Setenv("XDG_CONFIG_HOME", "")
-	t.Cleanup(func() { _ = os.RemoveAll(filepath.Join(tmpDir, "clusters")) })
+	IsolatePloyConfigHomeAllowDefault(t)
 
 	clusterID := "test-cluster-invalid-json"
 	desc := config.Descriptor{ClusterID: config.ClusterID(clusterID), Address: "https://127.0.0.1:8443", Scheme: "https"}

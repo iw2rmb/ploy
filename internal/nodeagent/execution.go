@@ -581,6 +581,12 @@ func (r *runController) executeWithHealing(
 
 			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image)
 
+			// Provide host workspace path for in-container build verification tools.
+			if healManifest.Env == nil {
+				healManifest.Env = map[string]string{}
+			}
+			healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
+
 			// Run the healing mod container.
 			healResult, healErr := runner.Run(ctx, step.Request{
 				TicketID:  types.TicketID(req.RunID),

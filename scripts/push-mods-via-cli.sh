@@ -70,7 +70,6 @@ if [[ ${#images[@]} -eq 0 ]]; then
 fi
 
 for name in "${images[@]}"; do
-  context="mods/${name}"
   # Map directory name to repo image name
   image_name="$name"
   if [[ "$image_name" == mod-* ]]; then
@@ -79,13 +78,27 @@ for name in "${images[@]}"; do
   if [[ "$name" == "mod-orw" ]]; then
     image_name="mods-openrewrite"
   fi
+
   ref="${IMAGE_PREFIX}/${image_name}:latest"
-  echo "==> Building and pushing ${ref}"
+
+  # Build context rules:
+  # - Default: use "mods/<dir>"
+  # - Special-case mod-codex: Dockerfile expects repo-root context (COPY go.mod, internal/ ...)
+  build_args=("docker" "buildx" "build" "--platform" "$PLATFORM" "--provenance=false" "--sbom=false" "--pull" "-t" "$ref" "--push")
+  if [[ "$name" == "mod-codex" ]]; then
+    context="."
+    build_args+=("-f" "mods/mod-codex/Dockerfile" "$context")
+  else
+    context="mods/${name}"
+    build_args+=("$context")
+  fi
+
+  echo "==> Building and pushing ${ref} (context: ${context})"
   attempt=0
   while :; do
     attempt=$((attempt+1))
-    echo "[attempt ${attempt}/${PUSH_RETRIES}] docker buildx build --platform $PLATFORM -t $ref --push $context"
-    if with_timeout "$PUSH_TIMEOUT" docker buildx build --platform "$PLATFORM" --provenance=false --sbom=false --pull -t "$ref" --push "$context" --progress=plain; then
+    echo "[attempt ${attempt}/${PUSH_RETRIES}] ${build_args[*]}"
+    if with_timeout "$PUSH_TIMEOUT" "${build_args[@]}" --progress=plain; then
       echo "OK: ${ref}"
       break
     fi
