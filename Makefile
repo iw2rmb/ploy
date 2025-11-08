@@ -1,17 +1,24 @@
 BINARY := ploy
 BUILD_DIR := dist
 
+# Version stamping
+GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
+BUILD_DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+GIT_TAG := $(shell git describe --tags --dirty --always 2>/dev/null || echo dev)
+LDV := github.com/iw2rmb/ploy/internal/version
+LDFLAGS := -X $(LDV).Version=$(GIT_TAG) -X $(LDV).Commit=$(GIT_COMMIT) -X $(LDV).BuiltAt=$(BUILD_DATE)
+
 .PHONY: build
 build: ## Build the Ploy CLI
 	@mkdir -p $(BUILD_DIR)
-	GOFLAGS= go build -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
+	GOFLAGS= go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/ploy
 	@if [ -d ./cmd/ployd ]; then \
-		go build -o $(BUILD_DIR)/ployd ./cmd/ployd; \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-linux ./cmd/ployd; \
+		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd ./cmd/ployd; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-linux ./cmd/ployd; \
 	fi
 	@if [ -d ./cmd/ployd-node ]; then \
-		go build -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node; \
-		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node; \
+		go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node ./cmd/ployd-node; \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/ployd-node-linux ./cmd/ployd-node; \
 	fi
 
 .PHONY: fmt
@@ -28,16 +35,22 @@ lanes-validate: ## Validate bundled lane catalog
 
 .PHONY: test
 test: ## Run all unit tests with coverage output
-	go test -cover ./...
+	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
+	PLOY_CONFIG_HOME="$$TMP" go test -cover ./...; \
+	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-race
 test-race: ## Run all unit tests with race detector
-	go test -race -cover ./...
+	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
+	PLOY_CONFIG_HOME="$$TMP" go test -race -cover ./...; \
+	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-coverage
 test-coverage: ## Run tests and generate coverage report
 	@mkdir -p $(BUILD_DIR)
-	go test -coverprofile=$(BUILD_DIR)/coverage.out -covermode=atomic ./...
+	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
+	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(BUILD_DIR)/coverage.out -covermode=atomic ./...; \
+	rc=$$?; rm -rf "$$TMP"; exit $$rc
 	@echo "\n=== Coverage Summary ==="
 	@go tool cover -func=$(BUILD_DIR)/coverage.out | grep total:
 

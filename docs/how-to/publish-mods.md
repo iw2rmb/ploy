@@ -5,6 +5,8 @@ Overview
   - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
     - Coordinates are passed via environment only (no JSON spec for coords):
       set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
+  - `mod-codex` — Codex CLI wrapper + embedded `ploy-buildgate` → `mods-codex`
+    - IMPORTANT: build from the repository root with `-f mods/mod-codex/Dockerfile` because the Dockerfile copies `go.mod` and `internal/`.
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`
   - (Human gate image removed for now.)
@@ -20,6 +22,7 @@ Publish all Mods images
 ```bash
 scripts/push-mods-via-cli.sh
 # Discovers mods subfolders, builds for linux/amd64, and pushes :latest to Docker Hub.
+# Special-cases mod-codex to use repo-root context automatically.
 ```
 
 Publish a single Mods image
@@ -27,6 +30,16 @@ Publish a single Mods image
 name=mod-orw
 IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}" \
   docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-openrewrite:latest" --push mods/${name}
+```
+
+Publish mods-codex (manual one-off)
+```bash
+IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}"
+docker buildx build \
+  --platform linux/amd64 \
+  -f mods/mod-codex/Dockerfile \
+  -t "${IMAGE_PREFIX}/mods-codex:latest" \
+  --push .
 ```
 
 Configure node pulls (private repos)
@@ -62,3 +75,9 @@ Multi‑arch (Mac + Linux) push
   ```bash
   docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-plan:latest
   ```
+
+Verification for required images
+```bash
+docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-openrewrite:latest
+docker buildx imagetools inspect docker.io/$DOCKERHUB_USERNAME/mods-codex:latest
+```

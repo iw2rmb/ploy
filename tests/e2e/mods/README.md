@@ -12,17 +12,20 @@
 
 **Build + Publish Mods Images (Docker Hub)**
 
-- Build Docker contexts under `mods/...` locally (requires Docker):
-  - `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e mods/mod-orw`
-- Repeat for `mods-llm` and `mods-plan` (contexts: `mod-llm`, `mod-plan`).
+- Build Mods images (requires Docker):
+  - OpenRewrite: `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e mods/mod-orw`
+  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f mods/mod-codex/Dockerfile -t mods-codex:e2e .`
+  - Optional: `mods-llm`, `mods-plan` as needed.
 - Push to Docker Hub using the helper script:
   - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/push-mods-via-cli.sh`
+  - The script special‑cases `mod-codex` to use repo‑root context automatically.
   - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 
 Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match examples.
 - Coordinates are passed via environment only (no JSON manifest support in mod-orw): set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
+- The Codex healer image includes `ploy-buildgate`; when run inside healing, it can self‑verify using `PLOY_HOST_WORKSPACE` (injected by the node agent). The system re‑runs the Build Gate regardless.
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.

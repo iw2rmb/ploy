@@ -13,6 +13,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/auth"
 	"github.com/iw2rmb/ploy/internal/server/config"
 	"github.com/iw2rmb/ploy/internal/store"
+	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
 func main() {
@@ -23,8 +24,16 @@ func main() {
 	}
 
 	var configPath string
+	var showVersion bool
 	flag.StringVar(&configPath, "config", defaultConfigPath, "Path to ployd configuration (flag overrides $PLOYD_CONFIG_PATH)")
+	flag.BoolVar(&showVersion, "version", false, "Print version and exit")
 	flag.Parse()
+
+	if showVersion {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})))
+		slog.Info("ployd", "version", iversion.Version, "commit", iversion.Commit, "built_at", iversion.BuiltAt)
+		return
+	}
 
 	// Configure structured logger early (will be reconfigured after loading config).
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{})))

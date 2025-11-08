@@ -202,7 +202,10 @@ func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contrac
 			RetainContainer: retain,
 			TTL:             types.Duration(time.Hour),
 		},
-		Options: make(map[string]any), // No options for healing mods.
+		Options: map[string]any{
+			// Allow in-container verification via ploy-buildgate by mounting the host Docker socket.
+			"mount_docker_socket": true,
+		},
 	}
 
 	return manifest, nil

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+
+	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
 // main bootstraps the CLI entrypoint.
@@ -25,6 +28,9 @@ func execute(args []string, stderr io.Writer) error {
 	// Legacy command aliases removed; treat unknown names uniformly.
 
 	switch args[0] {
+	case "version", "--version", "-version":
+		printVersion(stderr)
+		return nil
 	case "help":
 		if len(args) > 1 {
 			switch args[1] {
@@ -101,4 +107,18 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "  rollout          Rolling updates for servers and nodes")
 	_, _ = fmt.Fprintln(w, "")
 	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
+}
+
+func printVersion(w io.Writer) {
+	v := iversion.Version
+	if strings.TrimSpace(v) == "" {
+		v = "dev"
+	}
+	_, _ = fmt.Fprintf(w, "ploy version %s\n", v)
+	if iversion.Commit != "" || iversion.BuiltAt != "" {
+		_, _ = fmt.Fprintf(w, "commit %s\n", iversion.Commit)
+		if iversion.BuiltAt != "" {
+			_, _ = fmt.Fprintf(w, "built  %s\n", iversion.BuiltAt)
+		}
+	}
 }

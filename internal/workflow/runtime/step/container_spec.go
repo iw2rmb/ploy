@@ -3,6 +3,7 @@ package step
 import (
 	"time"
 
+	"os"
 	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -66,6 +67,25 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 	// Optional /in mount for cross-phase inputs (read-only)
 	if strings.TrimSpace(inDir) != "" {
 		mounts = append(mounts, ContainerMount{Source: inDir, Target: "/in", ReadOnly: true})
+	}
+
+	// Optional: mount host Docker socket for containers that request it via manifest options
+	if manifest.Options != nil {
+		if v, ok := manifest.Options["mount_docker_socket"]; ok {
+			want := false
+			switch b := v.(type) {
+			case bool:
+				want = b
+			case string:
+				want = strings.EqualFold(strings.TrimSpace(b), "true")
+			}
+			if want {
+				const sock = "/var/run/docker.sock"
+				if fi, err := os.Stat(sock); err == nil && !fi.IsDir() {
+					mounts = append(mounts, ContainerMount{Source: sock, Target: sock, ReadOnly: false})
+				}
+			}
+		}
 	}
 	wd := manifest.WorkingDir
 	if wd == "" && len(manifest.Inputs) > 0 {
