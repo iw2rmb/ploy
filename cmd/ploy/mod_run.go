@@ -328,9 +328,17 @@ func buildSpecPayload(
 		base = make(map[string]any)
 	}
 
-	// Resolve env_from_file references in the top-level spec (mod section)
-	if err := resolveEnvFromFileInPlace(base); err != nil {
-		return nil, fmt.Errorf("resolve env from file (mod): %w", err)
+	// Resolve env_from_file references:
+	// 1) In the nested mod section when present (canonical schema)
+	if mod, ok := base["mod"].(map[string]any); ok {
+		if err := resolveEnvFromFileInPlace(mod); err != nil {
+			return nil, fmt.Errorf("resolve env from file (mod): %w", err)
+		}
+	} else {
+		// 2) Back-compat: resolve in top-level when users omit mod block
+		if err := resolveEnvFromFileInPlace(base); err != nil {
+			return nil, fmt.Errorf("resolve env from file (top-level): %w", err)
+		}
 	}
 
 	// Resolve env_from_file references in build_gate_healing.mods[] if present
