@@ -9,7 +9,7 @@ Update this document as you go.
 - Container lifecycle: disabled Docker AutoRemove and added explicit delete after logs are fetched; added `--retain-container` to keep containers for inspection.
 - SSE logs: node uploads gzipped chunks; server gunzips and publishes per‑line SSE; log ingest routes now publish to SSE.
 - Diagnostics in status: `GET /v1/mods/{id}` now includes `metadata.node_id` (which worker claimed the run) and `metadata.reason` (e.g., `exit code 1`).
-- Workers re‑added: re‑provisioned worker‑b (46.173.16.177) and worker‑c (81.200.119.187) with correct mTLS config; claims work again.
+- Workers re‑added: re‑provisioned worker‑b (193.242.109.13) and worker‑c (45.130.213.91) with correct mTLS config; claims work again.
 - Self‑test: a retained run with `alpine:3.20` and a simple command succeeds on worker‑c, validating Docker and claims path.
 
 ## What’s Observed (but not yet explained)
@@ -36,8 +36,8 @@ Update this document as you go.
 ## Ground Truth (as of this checkpoint)
 - Control plane: `https://45.9.42.212:8443` (mTLS). Ticket status returns mods‑style summary with `node_id`/`reason`.
 - Workers:
-  - worker‑b (46.173.16.177): claims ORW; recent runs end `exit code 1`; Docker reachable interactively.
-  - worker‑c (81.200.119.187): self‑test succeeded; Docker reachable.
+  - worker‑b (193.242.109.13): claims ORW; recent runs end `exit code 1`; Docker reachable interactively.
+  - worker‑c (45.130.213.91): self‑test succeeded; Docker reachable.
 - Logging: SSE pipeline is enabled end‑to‑end; absence of logs on ORW indicates the container likely isn’t producing (or step fails before start), not a transport issue.
 
 ## Notes
@@ -89,16 +89,16 @@ What I attempted (literal to Next Actions):
 
 Observed blockers (initial):
 - Both workers reported drained=true via `GET /v1/nodes`.
-  - worker‑c 81.200.119.187 (drained=true)
-  - worker‑b 46.173.16.177 (drained=true)
+  - worker‑c 45.130.213.91 (drained=true)
+  - worker‑b 193.242.109.13 (drained=true)
 - Result: new tickets remained `pending/queued`; no node claims, no SSE logs.
 
 Actions taken after approval:
 - Undrained worker‑b via API; then attempted `ploy rollout nodes --selector worker-b` to refresh `ployd-node`.
 - Rollout failed at the heartbeat confirmation step, but worker‑b resumed heartbeating (hb updated to ~23:24Z).
 - Undrained both worker‑b and worker‑c; current state:
-  - worker‑b 46.173.16.177 — drained=false, last_heartbeat recent (23:24Z)
-  - worker‑c 81.200.119.187 — drained=false, last_heartbeat stale (22:28Z)
+  - worker‑b 193.242.109.13 — drained=false, last_heartbeat recent (23:24Z)
+  - worker‑c 45.130.213.91 — drained=false, last_heartbeat stale (22:28Z)
 
 Current status:
 - Despite worker‑b being undrained and heartbeating, the submitted tickets (including fresh `22886220-332d-46ca-8215-2368e6e74f3f`) remain `pending` with stage `queued`; no `node_id` assigned yet and no SSE logs.
@@ -124,7 +124,7 @@ Fix applied:
 
 Probe (retained) — details:
 - Ticket: `35ecc92e-c305-400e-8b05-291f03923530`
-- node_id: `28587647-682f-4ab1-b5a4-a2d036a35a20` (worker‑b 46.173.16.177)
+- node_id: `28587647-682f-4ab1-b5a4-a2d036a35a20` (worker‑b 193.242.109.13)
 - Image: `docker.io/iwtormb/mods-openrewrite:latest`
 - Command (argv): `["--apply","--dir","/workspace","--out","/out"]`
 - Retained container: `fe3caaee478d`

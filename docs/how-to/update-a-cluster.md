@@ -5,8 +5,8 @@ one or more worker nodes (`ployd-node`). The server hosts the API/scheduler/Post
 execute jobs and communicate with the server over mTLS. The VPS lab layout we use:
 
 - Server (A): 45.9.42.212
-- Node (B):   46.173.16.177
-- Node (C):   81.200.119.187
+- Node (B):   193.242.109.13
+- Node (C):   45.130.213.91
 
 Update order: update the control‑plane server first, then roll the worker nodes.
 
@@ -204,11 +204,11 @@ persistent attempt counter for each node:
 After rollout, verify each node is healthy:
 
 ```bash
-ssh root@46.173.16.177 'systemctl status --no-pager ployd-node'
-ssh root@46.173.16.177 'journalctl -u ployd-node -n 50 --no-pager'
+ssh root@193.242.109.13 'systemctl status --no-pager ployd-node'
+ssh root@193.242.109.13 'journalctl -u ployd-node -n 50 --no-pager'
 
-ssh root@81.200.119.187 'systemctl status --no-pager ployd-node'
-ssh root@81.200.119.187 'journalctl -u ployd-node -n 50 --no-pager'
+ssh root@45.130.213.91 'systemctl status --no-pager ployd-node'
+ssh root@45.130.213.91 'journalctl -u ployd-node -n 50 --no-pager'
 ```
 
 Check that all nodes are undrained and reporting heartbeats via the API (future):

@@ -91,6 +91,14 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		gitlabOpts["mr_on_fail"] = mrFail
 	}
 
+	// Start Options with a shallow copy of req.Options so downstream logic
+	// (e.g., healing, runtime hints) can see spec-provided values. We'll merge
+	// GitLab overrides on top below.
+	mergedOpts := make(map[string]any)
+	for k, v := range req.Options {
+		mergedOpts[k] = v
+	}
+
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.RunID),
 		Name:       fmt.Sprintf("Run %s", req.RunID),
@@ -113,7 +121,20 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 			RetainContainer: retain,
 			TTL:             types.Duration(time.Hour),
 		},
-		Options: gitlabOpts,
+		Options: mergedOpts,
+	}
+
+	// Merge GitLab options on top of existing options.
+	for k, v := range gitlabOpts {
+		manifest.Options[k] = v
+	}
+
+	// Override Gate from options when provided (flattened in parseSpec).
+	if b, ok := req.Options["build_gate_enabled"].(bool); ok {
+		manifest.Gate.Enabled = b
+	}
+	if p, ok := req.Options["build_gate_profile"].(string); ok && strings.TrimSpace(p) != "" {
+		manifest.Gate.Profile = strings.TrimSpace(p)
 	}
 
 	return manifest, nil
@@ -165,18 +186,7 @@ func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contrac
 		retain = b
 	}
 
-	// Build the repo materialization (same as main mod).
-	targetRef := strings.TrimSpace(req.TargetRef.String())
-	if targetRef == "" && strings.TrimSpace(req.BaseRef.String()) != "" {
-		targetRef = strings.TrimSpace(req.BaseRef.String())
-	}
-
-	repo := contracts.RepoMaterialization{
-		URL:       req.RepoURL,
-		BaseRef:   req.BaseRef,
-		TargetRef: types.GitRef(targetRef),
-		Commit:    req.CommitSHA,
-	}
+	// For healing, reuse the existing workspace; do not re-hydrate the repo.
 
 	// Create the healing manifest.
 	// Healing mods do not run the build gate themselves; they only modify the workspace.
@@ -193,9 +203,9 @@ func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contrac
 				Name:      "workspace",
 				MountPath: "/workspace",
 				Mode:      contracts.StepInputModeReadWrite,
-				Hydration: &contracts.StepInputHydration{
-					Repo: &repo,
-				},
+				// Do not re-hydrate the repository for healing mods; they
+				// operate on the existing workspace produced by the initial
+				// preparation to avoid clone collisions.
 			},
 		},
 		Retention: contracts.StepRetentionSpec{

@@ -11,7 +11,7 @@ apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
 mod:
-  image: docker.io/${DOCKERHUB_USERNAME}/mods-openrewrite:latest
+  image: docker.io/iwtormb/mods-openrewrite:latest
   env:
     RECIPE_GROUP: org.openrewrite.recipe
     RECIPE_ARTIFACT: rewrite-migrate-java
@@ -26,7 +26,7 @@ build_gate:
 build_gate_healing:
   retries: 1
   mods:
-    - image: docker.io/${DOCKERHUB_USERNAME}/mods-codex:latest
+    - image: docker.io/iwtormb/mods-codex:latest
       env:
         CODEX_PROMPT: |-
           Rules:
