@@ -49,7 +49,7 @@ Legend: [ ] todo, [x] done.
   - Test: PR review gate runs `go test ./docs/api` (no code), manual lint if configured
 
 ## TDD/Quality
-- [ ] RED → GREEN → REFACTOR — Cover handler and edge cases
+- [x] RED → GREEN → REFACTOR — Cover handler and edge cases
   - Component: internal/server/handlers
   - Change: add tests: (1) happy path 202; (2) idempotent 200 when already terminal; (3) 404 missing run; (4) bad id 400; (5) stages transitioned
   - Test: aim ≥60% overall and ≥90% on handler package slices per AGENTS.md
