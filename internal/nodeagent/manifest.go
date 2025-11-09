@@ -91,13 +91,11 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		gitlabOpts["mr_on_fail"] = mrFail
 	}
 
-	// Start Options with a shallow copy of req.Options so downstream logic
-	// (e.g., healing, runtime hints) can see spec-provided values. We'll merge
-	// GitLab overrides on top below.
+	// Options are intentionally restricted to GitLab-related keys only.
+	// Do NOT propagate generic request options (e.g., image, command,
+	// retain_container, build_gate_*) into manifest.Options to keep it
+	// narrowly scoped for later phases that consume GitLab metadata.
 	mergedOpts := make(map[string]any)
-	for k, v := range req.Options {
-		mergedOpts[k] = v
-	}
 
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.RunID),

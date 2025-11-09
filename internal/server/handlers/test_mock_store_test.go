@@ -84,6 +84,11 @@ type mockStore struct {
 	updateRunCompletionParams store.UpdateRunCompletionParams
 	updateRunCompletionErr    error
 
+	// UpdateRunStatus tracking
+	updateRunStatusCalled bool
+	updateRunStatusParams store.UpdateRunStatusParams
+	updateRunStatusErr    error
+
 	// Node drain/undrain tracking
 	updateNodeDrainedCalled bool
 	updateNodeDrainedParams store.UpdateNodeDrainedParams
@@ -224,6 +229,12 @@ func (m *mockStore) UpdateRunCompletion(ctx context.Context, params store.Update
 	m.updateRunCompletionCalled = true
 	m.updateRunCompletionParams = params
 	return m.updateRunCompletionErr
+}
+
+func (m *mockStore) UpdateRunStatus(ctx context.Context, params store.UpdateRunStatusParams) error {
+	m.updateRunStatusCalled = true
+	m.updateRunStatusParams = params
+	return m.updateRunStatusErr
 }
 
 func (m *mockStore) UpdateNodeDrained(ctx context.Context, params store.UpdateNodeDrainedParams) error {
