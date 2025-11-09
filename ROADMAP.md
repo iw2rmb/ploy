@@ -25,7 +25,7 @@ Legend: [ ] todo, [x] done.
   - Test: verify DB mutations, `TicketStateCancelled` event present via `eventsService.Hub().Snapshot(runID)`
 
 ## Store Usage (Minimal)
-- [ ] Use existing queries — Avoid migrations
+- [x] Use existing queries — Avoid migrations
   - Component: internal/store
   - Change: reuse `UpdateRunStatus`, `ListStagesByRun`, `UpdateStageStatus`; no schema changes; optional TODO for a bulk `CancelStagesByRun` query if needed for performance
   - Test: handler test asserts affected stages are updated to `canceled`
