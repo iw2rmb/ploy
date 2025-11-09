@@ -28,7 +28,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		t.Fatal("paths not found in OpenAPI.yaml")
 	}
 
-	// List of endpoints implemented in cmd/ployd/server.go (as of ROADMAP line 99)
+	// List of endpoints as registered in internal/server/handlers/register.go
 	implementedEndpoints := []struct {
 		path   string
 		method string
