@@ -85,35 +85,48 @@ func TestCancelResumeSubmitCommands(t *testing.T) {
 }
 
 func TestEventsCommandStreamsToTerminal(t *testing.T) {
-	// SSE server emits a terminal ticket event.
-	sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
-		evt := struct {
-			Ticket modsapi.TicketSummary `json:"ticket"`
-		}{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("t3"), State: modsapi.TicketStateSucceeded}}
-		b, _ := json.Marshal(evt.Ticket)
-		_, _ = w.Write([]byte("event: ticket\n"))
-		_, _ = w.Write([]byte("data: "))
-		_, _ = w.Write(b)
-		_, _ = w.Write([]byte("\n\n"))
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
-		}
-		time.Sleep(10 * time.Millisecond)
-	}))
-	defer sse.Close()
-	base, _ := url.Parse(sse.URL)
-
-	cli := stream.Client{HTTPClient: sse.Client(), MaxRetries: 0}
-	state, err := (EventsCommand{Client: cli, BaseURL: base, Ticket: "t3"}).Run(context.Background())
-	if err != nil {
-		t.Fatalf("events run err=%v", err)
+	tests := []struct {
+		name          string
+		terminalState modsapi.TicketState
+	}{
+		{"succeeded", modsapi.TicketStateSucceeded},
+		{"cancelled", modsapi.TicketStateCancelled},
+		{"failed", modsapi.TicketStateFailed},
 	}
-	if state != modsapi.TicketStateSucceeded {
-		t.Fatalf("events final state=%s", state)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SSE server emits a terminal ticket event.
+			sse := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				evt := struct {
+					Ticket modsapi.TicketSummary `json:"ticket"`
+				}{Ticket: modsapi.TicketSummary{TicketID: domaintypes.TicketID("t3"), State: tt.terminalState}}
+				b, _ := json.Marshal(evt.Ticket)
+				_, _ = w.Write([]byte("event: ticket\n"))
+				_, _ = w.Write([]byte("data: "))
+				_, _ = w.Write(b)
+				_, _ = w.Write([]byte("\n\n"))
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+				time.Sleep(10 * time.Millisecond)
+			}))
+			defer sse.Close()
+			base, _ := url.Parse(sse.URL)
+
+			cli := stream.Client{HTTPClient: sse.Client(), MaxRetries: 0}
+			state, err := (EventsCommand{Client: cli, BaseURL: base, Ticket: "t3"}).Run(context.Background())
+			if err != nil {
+				t.Fatalf("events run err=%v", err)
+			}
+			if state != tt.terminalState {
+				t.Fatalf("events final state=%s, want %s", state, tt.terminalState)
+			}
+		})
 	}
 }
 
