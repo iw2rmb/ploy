@@ -194,7 +194,7 @@ Before deploying to production:
 ## References
 
 - API Spec: `docs/api/paths/mods_id_cancel.yaml`
-- Handler Implementation: `internal/server/handlers/mods_cancel.go`
+- Handler Implementation: `internal/server/handlers/handlers_mods_cancel.go`
 - CLI Command: `internal/cli/mods/cancel.go`
 - CLI Flag: `ploy mod run --help` → `--cap` and `--cancel-on-cap`
 - Deployment Guide: `docs/how-to/deploy-a-cluster.md`
