@@ -37,7 +37,7 @@ Legend: [ ] todo, [x] done.
   - Test: existing `cmd/ploy/mod_cancel_test.go` and `internal/cli/mods/commands_test.go`
 
 ## SSE Integration
-- [ ] Ensure terminal event visible to followers — Client exits
+- [x] Ensure terminal event visible to followers — Client exits
   - Component: internal/server/events
   - Change: use `PublishTicket(... state=cancelled ...)` on success; optional: also emit `PublishStatus(done)` for stream completion
   - Test: `mods events` client test observes `cancelled` and returns terminal state
