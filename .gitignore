@@ -66,3 +66,4 @@ tests/e2e/deploy/e2e-logs/
 .claude/loop
 .bin/
 .codex/
+.tmp/
