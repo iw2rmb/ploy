@@ -126,6 +126,7 @@ type mockStore struct {
 	// UpdateStageStatus tracking
 	updateStageStatusCalled bool
 	updateStageStatusParams store.UpdateStageStatusParams
+	updateStageStatusCalls  []store.UpdateStageStatusParams
 	updateStageStatusErr    error
 
 	// ListDiffsByRun tracking
@@ -283,6 +284,7 @@ func (m *mockStore) ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]s
 func (m *mockStore) UpdateStageStatus(ctx context.Context, params store.UpdateStageStatusParams) error {
 	m.updateStageStatusCalled = true
 	m.updateStageStatusParams = params
+	m.updateStageStatusCalls = append(m.updateStageStatusCalls, params)
 	return m.updateStageStatusErr
 }
 

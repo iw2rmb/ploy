@@ -26,7 +26,7 @@ func TestCancelTicket_Success(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
 		listStagesByRunResult: []store.Stage{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
+			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
 		},
 	}
 
@@ -175,5 +175,54 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	}
 	if !foundDone {
 		t.Fatal("expected done status event in snapshot")
+	}
+}
+
+// TestCancelTicket_OnlyPendingRunningStagesUpdated ensures only pending|running stages
+// are transitioned to canceled and terminal stages are left untouched.
+func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
+	id := uuid.New()
+	now := time.Now()
+	stgPending := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusPending}
+	stgRunning := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
+	stgSucceeded := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusSucceeded}
+	stgFailed := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusFailed}
+	stgCanceled := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusCanceled}
+
+	st := &mockStore{
+		getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: store.RunStatusRunning},
+		listStagesByRunResult: []store.Stage{
+			stgPending, stgRunning, stgSucceeded, stgFailed, stgCanceled,
+		},
+	}
+	handler := cancelTicketHandler(st, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+id.String()+"/cancel", nil)
+	req.SetPathValue("id", id.String())
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d", rr.Code)
+	}
+	if !st.updateRunStatusCalled {
+		t.Fatalf("expected UpdateRunStatus to be called")
+	}
+	// Only pending and running stages should be updated.
+	if len(st.updateStageStatusCalls) != 2 {
+		t.Fatalf("expected 2 stage updates, got %d", len(st.updateStageStatusCalls))
+	}
+	updated := map[string]bool{}
+	for _, c := range st.updateStageStatusCalls {
+		updated[uuid.UUID(c.ID.Bytes).String()] = true
+		if c.Status != store.StageStatusCanceled {
+			t.Fatalf("expected stage status canceled, got %s", c.Status)
+		}
+	}
+	if !updated[uuid.UUID(stgPending.ID.Bytes).String()] || !updated[uuid.UUID(stgRunning.ID.Bytes).String()] {
+		t.Fatalf("expected pending and running stages to be updated; got %+v", updated)
+	}
+	if updated[uuid.UUID(stgSucceeded.ID.Bytes).String()] || updated[uuid.UUID(stgFailed.ID.Bytes).String()] || updated[uuid.UUID(stgCanceled.ID.Bytes).String()] {
+		t.Fatalf("did not expect terminal stages to be updated; got %+v", updated)
 	}
 }
