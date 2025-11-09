@@ -51,6 +51,8 @@ paths:
     $ref: './paths/mods.yaml'
   /v1/mods/{id}:
     $ref: './paths/mods_id.yaml'
+  /v1/mods/{id}/cancel:
+    $ref: './paths/mods_id_cancel.yaml'
   /v1/mods/{id}/events:
     $ref: './paths/mods_id_events.yaml'
   /v1/mods/{id}/artifact_bundles:
