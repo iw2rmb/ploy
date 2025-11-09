@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
   - Test: aim ≥60% overall and ≥90% on handler package slices per AGENTS.md
 
 ## Rollout & Risks
-- [ ] Rollout notes
+- [x] Rollout notes
   - Component: docs
   - Change: note idempotency, no DB migrations, symmetric `resume` tracked separately; ensure mTLS RoleControlPlane
   - Test: smoke with `ploy mod run --follow --cap 1s --cancel-on-cap` against lab; expect immediate cancellation
