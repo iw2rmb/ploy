@@ -25,7 +25,7 @@
 
 - Unit tests and CLI builds (RED/GREEN phases) run locally.
 - VPS lab is reserved for integration/E2E tests and manual smoke:
-  - Nodes: 45.9.42.212 (A), 46.173.16.177 (B), 81.200.119.187 (C).
+  - Nodes: 45.9.42.212 (A), 193.242.109.13 (B), 45.130.213.91 (C).
   - Reuse the current cluster descriptor from `~/.config/ploy/clusters/` to connect.
     If multiple descriptors exist, prefer the default marker (`~/.config/ploy/clusters/default`) or
     pick the one matching the lab’s cluster ID.

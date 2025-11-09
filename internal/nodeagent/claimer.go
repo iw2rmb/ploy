@@ -282,5 +282,83 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
 	if mrFail, ok := m["mr_on_fail"].(bool); ok {
 		opts["mr_on_fail"] = mrFail
 	}
+
+	// Pass through build_gate_healing block if present so the agent can
+	// execute the heal → re‑gate loop when the initial gate fails.
+	// Accept either a map (decoded object) or arbitrary JSON; store as-is.
+	if healing, ok := m["build_gate_healing"]; ok {
+		// Only include non-empty objects/arrays to avoid confusing downstream logic.
+		switch h := healing.(type) {
+		case map[string]any:
+			if len(h) > 0 {
+				opts["build_gate_healing"] = h
+			}
+		case []any:
+			// Unlikely, but preserve if provided (defensive).
+			if len(h) > 0 {
+				opts["build_gate_healing"] = h
+			}
+		default:
+			// Preserve scalar values only when not empty
+			if healing != nil {
+				opts["build_gate_healing"] = healing
+			}
+		}
+	}
+
+	// Flatten nested mod.* into options/env (top-level values take precedence).
+	if mod, ok := m["mod"].(map[string]any); ok {
+		// image
+		if _, present := opts["image"]; !present {
+			if v, ok := mod["image"].(string); ok && v != "" {
+				opts["image"] = v
+			}
+		}
+		// command (string or array)
+		if _, present := opts["command"]; !present {
+			switch v := mod["command"].(type) {
+			case []any:
+				out := make([]string, 0, len(v))
+				for _, e := range v {
+					if s, ok := e.(string); ok {
+						out = append(out, s)
+					}
+				}
+				if len(out) > 0 {
+					opts["command"] = out
+				}
+			case string:
+				if s := v; s != "" {
+					opts["command"] = s
+				}
+			}
+		}
+		// retain_container
+		if _, present := opts["retain_container"]; !present {
+			if b, ok := mod["retain_container"].(bool); ok {
+				opts["retain_container"] = b
+			}
+		}
+		// env merge (top-level env wins on conflict)
+		if em, ok := mod["env"].(map[string]any); ok {
+			for k, v := range em {
+				if s, ok := v.(string); ok {
+					if _, exists := env[k]; !exists {
+						env[k] = s
+					}
+				}
+			}
+		}
+	}
+
+	// Flatten build_gate.enabled/profile for manifest builder to honor.
+	if bg, ok := m["build_gate"].(map[string]any); ok {
+		if b, ok := bg["enabled"].(bool); ok {
+			opts["build_gate_enabled"] = b
+		}
+		if p, ok := bg["profile"].(string); ok && p != "" {
+			opts["build_gate_profile"] = p
+		}
+	}
 	return opts, env
 }

@@ -280,8 +280,8 @@ Bootstrap completed successfully.
 
 Use the shared VPS lab nodes from `AGENTS.md`:
 - A (server): `45.9.42.212`
-- B (node):   `46.173.16.177`
-- C (node):   `81.200.119.187`
+- B (node):   `193.242.109.13`
+- C (node):   `45.130.213.91`
 
 ### Automated Verification
 
@@ -314,8 +314,8 @@ If running manually instead of using the automated script:
     - Current default cluster: `cat ~/.config/ploy/clusters/default` → `<cluster-id>`
     - Full descriptor: `~/.config/ploy/clusters/<cluster-id>.json`
 - Add nodes on B and C (replace `<cluster-id>` with the value from the previous step):
-  - `dist/ploy node add --cluster-id <cluster-id> --address 46.173.16.177 --server-url https://45.9.42.212:8443`
-  - `dist/ploy node add --cluster-id <cluster-id> --address 81.200.119.187 --server-url https://45.9.42.212:8443`
+  - `dist/ploy node add --cluster-id <cluster-id> --address 193.242.109.13 --server-url https://45.9.42.212:8443`
+  - `dist/ploy node add --cluster-id <cluster-id> --address 45.130.213.91 --server-url https://45.9.42.212:8443`
 - Smoke test a run (control plane at A on `:8443`):
   - `dist/ploy mod run --repo-url https://github.com/example/repo.git --repo-base-ref main --repo-target-ref feature --follow`
 

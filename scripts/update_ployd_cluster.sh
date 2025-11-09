@@ -7,9 +7,9 @@ set -euo pipefail
 # - Restarts systemd unit and verifies it is active
 #
 # Usage:
-#   NODES="45.9.42.212 46.173.16.177 81.200.119.187" scripts/update_ployd_cluster.sh
+#   NODES="45.9.42.212 193.242.109.13 45.130.213.91" scripts/update_ployd_cluster.sh
 #   # or pass nodes as args
-#   scripts/update_ployd_cluster.sh 45.9.42.212 46.173.16.177 81.200.119.187
+#   scripts/update_ployd_cluster.sh 45.9.42.212 193.242.109.13 45.130.213.91
 #
 # Env:
 #   SSH_USER        SSH username (default: root)
@@ -46,4 +46,3 @@ for ip in "${nodes[@]}"; do
 done
 
 echo "All nodes updated"
-

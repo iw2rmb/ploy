@@ -5,7 +5,7 @@
 # docs/how-to/deploy-a-cluster.md (lines 137-160).
 #
 # Prerequisites:
-# - SSH access to VPS lab hosts (45.9.42.212, 46.173.16.177, 81.200.119.187)
+# - SSH access to VPS lab hosts (45.9.42.212, 193.242.109.13, 45.130.213.91)
 # - make build has been run (dist/ploy, dist/ployd-linux, dist/ployd-node-linux exist)
 # - SSH key configured for root@<host> access
 #
@@ -19,8 +19,8 @@ set -euo pipefail
 
 # VPS lab nodes from AGENTS.md and docs/how-to/deploy-a-cluster.md
 SERVER_IP="45.9.42.212"
-NODE_B_IP="46.173.16.177"
-NODE_C_IP="81.200.119.187"
+NODE_B_IP="193.242.109.13"
+NODE_C_IP="45.130.213.91"
 
 SSH_USER="${PLOY_SSH_USER:-root}"
 SSH_OPTS="-o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"

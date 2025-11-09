@@ -652,13 +652,22 @@ func (r *runController) executeWithHealing(
 			if gatePassed {
 				slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt)
 				// Gate passed; proceed to main mod execution.
-				// Disable the gate in the manifest since we've already validated the codebase.
+				// Disable the gate and hydration for the follow-up main mod run to
+				// avoid cloning the repository a second time in the same workspace.
 				manifestForMainMod := manifest
 				manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
 				//lint:ignore SA1019 Backward compatibility: also disable deprecated Shift field.
 				manifestForMainMod.Shift = nil
+				if len(manifestForMainMod.Inputs) > 0 {
+					inputs := make([]contracts.StepInput, len(manifestForMainMod.Inputs))
+					copy(inputs, manifestForMainMod.Inputs)
+					for i := range inputs {
+						inputs[i].Hydration = nil
+					}
+					manifestForMainMod.Inputs = inputs
+				}
 
-				// Execute the main mod without re-running the gate.
+				// Execute the main mod without re-running gate or hydration.
 				mainResult, mainErr := runner.Run(ctx, step.Request{
 					TicketID:  types.TicketID(req.RunID),
 					Manifest:  manifestForMainMod,
