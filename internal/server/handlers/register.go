@@ -25,6 +25,8 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/mods", submitTicketHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
+	// Mods ticket cancellation
+	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelTicketHandler(st, eventsService), auth.RoleControlPlane)
 	// Diffs listing and download
 	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane)
