@@ -7,7 +7,7 @@ Documentation: docs/api/OpenAPI.yaml; docs/api/paths/mods_id.yaml; new docs/api/
 Legend: [ ] todo, [x] done.
 
 ## API Definition
-- [ ] Define `POST /v1/mods/{id}/cancel` — Control-plane cancel request
+- [x] Define `POST /v1/mods/{id}/cancel` — Control-plane cancel request
   - Component: ploy (server, docs)
   - Change: add `docs/api/paths/mods_id_cancel.yaml` with `id` (uuid) and optional JSON body `{ reason?: string }`; responses `202 Accepted` on state transition, `200 OK` when already terminal, `404` when not found, `400` invalid id
   - Test: docs compile/validation (existing docs/api package), route exercised by handler tests — verify status codes

@@ -1,0 +1,51 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema:
+      type: string
+      format: uuid
+    description: Ticket ID (run UUID)
+post:
+  tags: [Control]
+  summary: Cancel a Mods ticket
+  description: |
+    Control-plane cancel request for a Mods ticket identified by its `id`.
+    Transitions the run and any in-flight or pending stages to `canceled` status.
+    The request is idempotent: if the run is already in a terminal state, returns
+    `200 OK`; otherwise, transitions to `canceled` and returns `202 Accepted`.
+    An optional `reason` may be provided in the request body to explain the cancellation.
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          type: object
+          properties:
+            reason:
+              type: string
+              nullable: true
+              description: Optional human-readable cancellation reason
+  responses:
+    '202':
+      description: Accepted; ticket and stages transitioned to canceled
+    '200':
+      description: OK; ticket was already in a terminal state (idempotent)
+    '400':
+      description: Bad request (invalid UUID)
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '404':
+      description: Ticket not found
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
+    '500':
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '../components/schemas/common.yaml#/Error'
