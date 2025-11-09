@@ -40,6 +40,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		// Mods (Ticket submit + status/events + ingest)
 		{"/v1/mods", "post"},
 		{"/v1/mods/{id}", "get"},
+		{"/v1/mods/{id}/cancel", "post"},
 		{"/v1/mods/{id}/events", "get"},
 		{"/v1/mods/{id}/artifact_bundles", "post"},
 		{"/v1/mods/{id}/logs", "post"},

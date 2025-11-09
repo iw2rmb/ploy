@@ -43,7 +43,7 @@ Legend: [ ] todo, [x] done.
   - Test: `mods events` client test observes `cancelled` and returns terminal state
 
 ## OpenAPI Wiring
-- [ ] Reference path in spec — Keep docs in sync
+- [x] Reference path in spec — Keep docs in sync
   - Component: docs/api/OpenAPI.yaml
   - Change: add `/v1/mods/{id}/cancel` under paths; link to `paths/mods_id_cancel.yaml`
   - Test: PR review gate runs `go test ./docs/api` (no code), manual lint if configured
