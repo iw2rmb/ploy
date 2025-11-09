@@ -40,6 +40,5 @@ build_gate_healing:
       env_from_file:
         CODEX_AUTH_JSON: ~/.codex/auth.json
 
-gitlab_domain: gitlab.com
-mr_on_fail: true
-mr_on_success: false
+mr_on_fail: false
+mr_on_success: true
