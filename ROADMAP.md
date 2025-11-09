@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
   - Test: docs compile/validation (existing docs/api package), route exercised by handler tests — verify status codes
 
 ## Route Registration
-- [ ] Register cancel endpoint — Wire HTTP handler and auth
+- [x] Register cancel endpoint — Wire HTTP handler and auth
   - Component: internal/server/handlers
   - Change: add `cancelTicketHandler(st, eventsService)`; mount in `register.go` as `POST /v1/mods/{id}/cancel` with `auth.RoleControlPlane`
   - Test: unit test mounts handler on `httptest` server and asserts 202/200/404 paths
