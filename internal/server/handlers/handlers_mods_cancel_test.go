@@ -135,12 +135,18 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 		t.Fatalf("expected at least 2 events (ticket + done status), got %d", len(snapshot))
 	}
 
-	// First event should be the ticket event.
+	// Ticket should be observed before the terminal done event to ensure
+	// followers see the terminal state before the stream closes.
+	ticketIdx := -1
+	doneIdx := -1
 	foundTicket := false
 	foundDone := false
-	for _, evt := range snapshot {
+	for i, evt := range snapshot {
 		if evt.Type == "ticket" {
 			foundTicket = true
+			if ticketIdx < 0 {
+				ticketIdx = i
+			}
 			// Verify ticket state is canceled and reason is present.
 			var ticketData map[string]interface{}
 			if err := json.Unmarshal(evt.Data, &ticketData); err != nil {
@@ -159,6 +165,9 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 		}
 		if evt.Type == "done" {
 			foundDone = true
+			if doneIdx < 0 {
+				doneIdx = i
+			}
 			// Verify done status.
 			var statusData map[string]interface{}
 			if err := json.Unmarshal(evt.Data, &statusData); err != nil {
@@ -175,6 +184,9 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	}
 	if !foundDone {
 		t.Fatal("expected done status event in snapshot")
+	}
+	if !(ticketIdx >= 0 && doneIdx > ticketIdx) {
+		t.Fatalf("expected ticket to precede done (ticketIdx=%d, doneIdx=%d)", ticketIdx, doneIdx)
 	}
 }
 
