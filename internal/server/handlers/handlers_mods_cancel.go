@@ -81,9 +81,12 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Best-effort stage updates to canceled
+		// Best-effort stage updates to canceled — only for pending|running stages
 		if stages, err := st.ListStagesByRun(r.Context(), pgID); err == nil && len(stages) > 0 {
 			for _, stg := range stages {
+				if stg.Status != store.StageStatusPending && stg.Status != store.StageStatusRunning {
+					continue
+				}
 				// Compute duration if started
 				dur := int64(0)
 				if stg.StartedAt.Valid {
