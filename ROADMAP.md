@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
   - Test: unit test mounts handler on `httptest` server and asserts 202/200/404 paths
 
 ## Handler Logic
-- [ ] Implement cancel handler — Persist state, publish SSE
+- [x] Implement cancel handler — Persist state, publish SSE
   - Component: internal/server/handlers
   - Change: in `cancelTicketHandler`: parse `{id}`, decode optional `{reason}`; load run; if terminal → `200 OK`; else `UpdateRunStatus(id, 'canceled', reason, now())`; for each stage with `pending|running` call `UpdateStageStatus(stage_id, 'canceled', started_at?, finished_at=now(), duration)`; publish `events.PublishTicket(ctx, runID, TicketSummary{state=cancelled, metadata.reason})`
   - Test: verify DB mutations, `TicketStateCancelled` event present via `eventsService.Hub().Snapshot(runID)`
