@@ -86,6 +86,23 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 				}
 			}
 		}
+
+		// Optional: mount TLS certificates for buildgate API access
+		if caCertPath, ok := manifest.Options["ploy_ca_cert_path"].(string); ok && caCertPath != "" {
+			if fi, err := os.Stat(caCertPath); err == nil && !fi.IsDir() {
+				mounts = append(mounts, ContainerMount{Source: caCertPath, Target: "/etc/ploy/certs/ca.crt", ReadOnly: true})
+			}
+		}
+		if clientCertPath, ok := manifest.Options["ploy_client_cert_path"].(string); ok && clientCertPath != "" {
+			if fi, err := os.Stat(clientCertPath); err == nil && !fi.IsDir() {
+				mounts = append(mounts, ContainerMount{Source: clientCertPath, Target: "/etc/ploy/certs/client.crt", ReadOnly: true})
+			}
+		}
+		if clientKeyPath, ok := manifest.Options["ploy_client_key_path"].(string); ok && clientKeyPath != "" {
+			if fi, err := os.Stat(clientKeyPath); err == nil && !fi.IsDir() {
+				mounts = append(mounts, ContainerMount{Source: clientKeyPath, Target: "/etc/ploy/certs/client.key", ReadOnly: true})
+			}
+		}
 	}
 	wd := manifest.WorkingDir
 	if wd == "" && len(manifest.Inputs) > 0 {

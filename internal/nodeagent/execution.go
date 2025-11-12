@@ -587,6 +587,20 @@ func (r *runController) executeWithHealing(
 			}
 			healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
 
+			// Inject server connection details for buildgate API access from healing containers.
+			healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+			healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
+			healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+			healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+
+			// Mount node's TLS certificates into healing container for buildgate API access.
+			if healManifest.Options == nil {
+				healManifest.Options = make(map[string]any)
+			}
+			healManifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
+			healManifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
+			healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
+
 			// Run the healing mod container.
 			healResult, healErr := runner.Run(ctx, step.Request{
 				TicketID:  types.TicketID(req.RunID),

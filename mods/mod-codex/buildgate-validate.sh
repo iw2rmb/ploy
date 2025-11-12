@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# buildgate-validate.sh - Wrapper for calling ploy buildgate HTTP API
+#
+# Usage: buildgate-validate [--workspace <path>] [--profile <profile>]
+#
+# Environment:
+#   PLOY_SERVER_URL         - Required: ploy server URL (e.g., https://server:8443)
+#   PLOY_CA_CERT_PATH       - Optional: path to CA certificate for mTLS
+#   PLOY_CLIENT_CERT_PATH   - Optional: path to client certificate for mTLS
+#   PLOY_CLIENT_KEY_PATH    - Optional: path to client key for mTLS
+#
+# Exit codes:
+#   0: Build gate passed
+#   1: Build gate failed or execution error
+#   2: Invalid arguments
+
+set -euo pipefail
+
+workspace="."
+profile="auto"
+timeout="5m"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --workspace) workspace="$2"; shift 2 ;;
+    --profile) profile="$2"; shift 2 ;;
+    --timeout) timeout="$2"; shift 2 ;;
+    -h|--help)
+      echo "Usage: buildgate-validate [--workspace <path>] [--profile <profile>] [--timeout <duration>]"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Validate required environment variables
+if [[ -z "${PLOY_SERVER_URL:-}" ]]; then
+  echo "ERROR: PLOY_SERVER_URL environment variable is required" >&2
+  exit 2
+fi
+
+# Create a tarball of the workspace
+workspace_tar=$(mktemp)
+trap "rm -f '$workspace_tar'" EXIT
+
+cd "$workspace"
+tar czf "$workspace_tar" .
+cd - >/dev/null
+
+# Encode tarball as base64 for JSON
+content_archive=$(base64 < "$workspace_tar" | tr -d '\n')
+
+# Build request payload
+request_json=$(cat <<EOF
+{
+  "content_archive": "$content_archive",
+  "profile": "$profile",
+  "timeout": "$timeout"
+}
+EOF
+)
+
+# Prepare curl arguments
+curl_args=(
+  -X POST
+  -H "Content-Type: application/json"
+  --data "$request_json"
+  --silent
+  --show-error
+  --fail-with-body
+)
+
+# Add mTLS certificates if provided
+if [[ -n "${PLOY_CA_CERT_PATH:-}" && -f "$PLOY_CA_CERT_PATH" ]]; then
+  curl_args+=(--cacert "$PLOY_CA_CERT_PATH")
+fi
+if [[ -n "${PLOY_CLIENT_CERT_PATH:-}" && -f "$PLOY_CLIENT_CERT_PATH" ]]; then
+  curl_args+=(--cert "$PLOY_CLIENT_CERT_PATH")
+fi
+if [[ -n "${PLOY_CLIENT_KEY_PATH:-}" && -f "$PLOY_CLIENT_KEY_PATH" ]]; then
+  curl_args+=(--key "$PLOY_CLIENT_KEY_PATH")
+fi
+
+# Call the API
+echo "[buildgate] Validating build via $PLOY_SERVER_URL/v1/buildgate/validate" >&2
+response=$(curl "${curl_args[@]}" "${PLOY_SERVER_URL}/v1/buildgate/validate")
+
+# Parse response
+job_id=$(echo "$response" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+
+echo "[buildgate] Job submitted: $job_id (status: $status)" >&2
+
+# Check if result is available (sync completion)
+if echo "$response" | grep -q '"result"'; then
+  # Result available - extract and format
+  result=$(echo "$response" | grep -o '"result":\{[^}]*\}' | cut -d':' -f2-)
+
+  # Check if build passed
+  passed=$(echo "$result" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+
+  # Output result summary
+  echo "$response" | python3 -m json.tool
+
+  if [[ "$passed" == "true" ]]; then
+    echo "[buildgate] ✓ Build gate PASSED" >&2
+    exit 0
+  else
+    echo "[buildgate] ✗ Build gate FAILED" >&2
+    exit 1
+  fi
+else
+  # Async - need to poll
+  echo "[buildgate] Job processing asynchronously, polling for result..." >&2
+
+  while true; do
+    sleep 2
+
+    poll_response=$(curl "${curl_args[@]}" "${PLOY_SERVER_URL}/v1/buildgate/jobs/${job_id}")
+    poll_status=$(echo "$poll_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+
+    if [[ "$poll_status" == "completed" || "$poll_status" == "failed" ]]; then
+      # Output final result
+      echo "$poll_response" | python3 -m json.tool
+
+      # Check if build passed
+      if echo "$poll_response" | grep -q '"result"'; then
+        passed=$(echo "$poll_response" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+
+        if [[ "$passed" == "true" ]]; then
+          echo "[buildgate] ✓ Build gate PASSED" >&2
+          exit 0
+        else
+          echo "[buildgate] ✗ Build gate FAILED" >&2
+          exit 1
+        fi
+      else
+        echo "[buildgate] ✗ Build gate execution failed" >&2
+        exit 1
+      fi
+    fi
+
+    echo "[buildgate] Status: $poll_status, waiting..." >&2
+  done
+fi

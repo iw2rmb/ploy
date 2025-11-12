@@ -31,7 +31,7 @@ build_gate_healing:
         CODEX_PROMPT: |-
           Rules:
           - After making any change, verify the build.
-          - Run: ploy-buildgate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - Run: buildgate-validate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
           - If it fails, iterate and try again until it passes.
           - Only finalize once the gate passes; then print "BUILD PASSED".
 

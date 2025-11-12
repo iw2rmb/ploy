@@ -11,6 +11,7 @@ import (
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // ClaimManager periodically polls the server for work and executes claimed runs.
@@ -18,6 +19,7 @@ type ClaimManager struct {
 	cfg             Config
 	client          *http.Client
 	controller      RunController
+	buildgateExec   *BuildGateExecutor
 	backoffDuration time.Duration
 	minBackoff      time.Duration
 	maxBackoff      time.Duration
@@ -44,10 +46,13 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 		return nil, fmt.Errorf("create http client: %w", err)
 	}
 
+	buildgateExec := NewBuildGateExecutor(cfg)
+
 	return &ClaimManager{
 		cfg:             cfg,
 		client:          client,
 		controller:      controller,
+		buildgateExec:   buildgateExec,
 		backoffDuration: 0,
 		minBackoff:      250 * time.Millisecond,
 		maxBackoff:      5 * time.Second,
@@ -64,8 +69,8 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			// Attempt to claim and execute a run.
-			claimed, err := c.claimAndExecute(ctx)
+			// Attempt to claim and execute work (runs or buildgate jobs).
+			claimed, err := c.claimWork(ctx)
 			if err != nil {
 				slog.Error("claim loop error", "err", err)
 				c.applyBackoff()
@@ -149,6 +154,143 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// claimWork attempts to claim either a run or a buildgate job.
+// Tries buildgate jobs first (lighter weight), then falls back to runs.
+// Returns true if work was claimed, false if no work is available.
+func (c *ClaimManager) claimWork(ctx context.Context) (bool, error) {
+	// Try claiming a buildgate job first.
+	claimedBuildGate, err := c.claimAndExecuteBuildGateJob(ctx)
+	if err != nil {
+		return false, fmt.Errorf("claim buildgate job: %w", err)
+	}
+	if claimedBuildGate {
+		return true, nil
+	}
+
+	// If no buildgate job available, try claiming a run.
+	claimedRun, err := c.claimAndExecute(ctx)
+	if err != nil {
+		return false, fmt.Errorf("claim run: %w", err)
+	}
+
+	return claimedRun, nil
+}
+
+// claimAndExecuteBuildGateJob attempts to claim a buildgate job and execute it.
+// Returns true if a job was claimed, false if no work is available.
+func (c *ClaimManager) claimAndExecuteBuildGateJob(ctx context.Context) (bool, error) {
+	// POST /v1/nodes/{id}/buildgate/claim
+	claimURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/claim", c.cfg.ServerURL, c.cfg.NodeID)
+
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, claimURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("create claim request: %w", err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("send claim request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	// Handle 204 No Content (no work available).
+	if resp.StatusCode == http.StatusNoContent {
+		return false, nil
+	}
+
+	// Handle non-200 responses.
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return false, fmt.Errorf("claim failed: status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Decode claim response.
+	var claimResp struct {
+		JobID   string `json:"job_id"`
+		Request any    `json:"request"`
+		Status  string `json:"status"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&claimResp); err != nil {
+		return false, fmt.Errorf("decode claim response: %w", err)
+	}
+
+	slog.Info("claimed buildgate job", "job_id", claimResp.JobID)
+
+	// Re-encode request to proper type.
+	reqBytes, err := json.Marshal(claimResp.Request)
+	if err != nil {
+		return true, fmt.Errorf("re-marshal request: %w", err)
+	}
+
+	var validateReq contracts.BuildGateValidateRequest
+	if err := json.Unmarshal(reqBytes, &validateReq); err != nil {
+		return true, fmt.Errorf("unmarshal validate request: %w", err)
+	}
+
+	// Execute the buildgate job.
+	execCtx := context.Background() // Don't cancel execution on claim loop timeout.
+	result, execErr := c.buildgateExec.Execute(execCtx, claimResp.JobID, validateReq)
+
+	// Upload result to server.
+	if err := c.completeBuildGateJob(execCtx, claimResp.JobID, result, execErr); err != nil {
+		return true, fmt.Errorf("complete buildgate job: %w", err)
+	}
+
+	return true, nil
+}
+
+// completeBuildGateJob sends the result of a buildgate job to the server.
+func (c *ClaimManager) completeBuildGateJob(ctx context.Context, jobID string, result *contracts.BuildGateStageMetadata, execErr error) error {
+	completeURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/complete", c.cfg.ServerURL, c.cfg.NodeID, jobID)
+
+	payload := struct {
+		Status string                            `json:"status"`
+		Result *contracts.BuildGateStageMetadata `json:"result,omitempty"`
+		Error  *string                           `json:"error,omitempty"`
+	}{
+		Result: result,
+	}
+
+	if execErr != nil {
+		payload.Status = "failed"
+		errMsg := execErr.Error()
+		payload.Error = &errMsg
+	} else {
+		payload.Status = "completed"
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal completion payload: %w", err)
+	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, completeURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create complete request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send complete request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("complete failed: status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	slog.Info("buildgate job result uploaded", "job_id", jobID, "status", payload.Status)
+	return nil
 }
 
 // ackRun sends POST /v1/nodes/{id}/ack to acknowledge run start.
