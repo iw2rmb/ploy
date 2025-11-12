@@ -59,4 +59,10 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/diff", createDiffHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/artifact", createArtifactBundleHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/buildgate/claim", claimBuildGateJobHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/complete", completeBuildGateJobHandler(st), auth.RoleWorker)
+
+	// Build gate endpoints
+	s.HandleFunc("POST /v1/buildgate/validate", validateBuildGateHandler(st), auth.RoleControlPlane)
+	s.HandleFunc("GET /v1/buildgate/jobs/{id}", getBuildGateJobStatusHandler(st), auth.RoleControlPlane)
 }

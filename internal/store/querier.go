@@ -11,9 +11,12 @@ import (
 )
 
 type Querier interface {
+	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
+	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
+	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
@@ -38,6 +41,7 @@ type Querier interface {
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
+	GetBuildGateJob(ctx context.Context, id pgtype.UUID) (BuildgateJob, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
@@ -66,9 +70,11 @@ type Querier interface {
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
+	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
+	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error

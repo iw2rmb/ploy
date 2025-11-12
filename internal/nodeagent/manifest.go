@@ -211,7 +211,7 @@ func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contrac
 			TTL:             types.Duration(time.Hour),
 		},
 		Options: map[string]any{
-			// Allow in-container verification via ploy-buildgate by mounting the host Docker socket.
+			// Allow in-container verification via buildgate API by mounting the host Docker socket.
 			"mount_docker_socket": true,
 		},
 	}

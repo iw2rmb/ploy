@@ -25,7 +25,7 @@ Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match examples.
 - Coordinates are passed via environment only (no JSON manifest support in mod-orw): set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
-- The Codex healer image includes `ploy-buildgate`; when run inside healing, it can self‑verify using `PLOY_HOST_WORKSPACE` (injected by the node agent). The system re‑runs the Build Gate regardless.
+- The Codex healer image includes `buildgate-validate`; when run inside healing, it can self‑verify by calling the buildgate API using credentials injected by the node agent. The system re‑runs the Build Gate regardless.
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
@@ -101,11 +101,11 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with an embedded verification rule to call the exact Build Gate via `ploy-buildgate`, re‑gate passes, ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with an embedded verification rule to call the Build Gate API via `buildgate-validate`, re‑gate passes, ORW proceeds.
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `ploy-buildgate` and requires Docker socket access and `PLOY_HOST_WORKSPACE` to point to the host path.
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `buildgate-validate` which calls the ploy server's buildgate API with the workspace content.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
@@ -125,7 +125,7 @@ Tip: The control plane exposes streaming events and per-stage artifacts. The CLI
 
 **How This Maps From the Legacy Nomad E2E**
 
-- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The same Build Gate is reused for verification via `ploy-buildgate`.
+- The legacy suite used two flows. With the spec, the fail→heal path is explicit under `build_gate_healing.mods` (here `mods-codex`). The same Build Gate is reused for verification via the buildgate API.
 
 **Troubleshooting**
 
