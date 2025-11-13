@@ -28,7 +28,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/server/handlers/handlers_diffs.go — add typed metadata struct used when `download!=true`
   - Test: internal/server/handlers/handlers_diffs_test.go — metadata case; expect stable keys and types
 
-- [ ] Node logs create uses DTO — Typed ack payload
+- [x] Node logs create uses DTO — Typed ack payload
   - Component: server
   - Change: internal/server/handlers/nodes_logs.go — define `nodeLogCreateResponse{ ID int64, ChunkNo int32 }`; replace `map[string]interface{}`
   - Test: internal/server/handlers/nodes_logs_test.go — success path; expect created JSON matches schema
