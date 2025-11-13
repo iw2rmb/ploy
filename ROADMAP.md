@@ -51,6 +51,7 @@ Legend: [ ] todo, [x] done.
   - Component: `cmd/ploy/mod_run_exec.go`
   - Change: Keep `executeModRun()` with calls to extracted functions; move `defaultStageDefinitions()`
   - Test: Run full CLI integration test suite — Verify end-to-end mod run flow
+  - Fix (follow-up): Gate artifact download behind success only. In `executeModRun`, download artifacts only when final state is `succeeded`; skip when capped or failed to match README semantics and avoid erroneous fetches after `--cap`.
 
 ## Node Agent: Claim Manager (538 LOC → 3 files)
 
