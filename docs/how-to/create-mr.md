@@ -122,6 +122,9 @@ Precedence: per-run flags always override the control plane global config.
 
 Note: `--gitlab-domain` accepts either a bare host (e.g., `gitlab.com`) or a full URL (e.g., `https://gitlab.com`). Ploy normalizes either form for API calls.
 
+Repo URL schemes
+- For pushing the MR branch, Ploy uses PAT-based HTTPS. If your `repo_url` is `https://...`, it is used as-is. If it is `ssh://git@host/...`, Ploy synthesizes an HTTPS remote using the configured GitLab domain and project path. `file://` repositories are not supported for MR creation.
+
 ## Security Notes
 
 - PATs are never logged or written to disk on worker nodes
