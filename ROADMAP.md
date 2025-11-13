@@ -117,7 +117,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extract claim request, ack, backoff, and spec parsing tests
   - Test: Run `go test ./internal/nodeagent -run Claim` — Verify claim priority and retry logic
 
-- [ ] Keep integration tests in `agent_test.go` — Retain end-to-end agent lifecycle tests
+- [x] Keep integration tests in `agent_test.go` — Retain end-to-end agent lifecycle tests
   - Component: `internal/nodeagent/agent_test.go`
   - Change: Keep agent Start/Stop, heartbeat, and cross-component integration tests
   - Test: Run full agent test suite — Verify no test regressions
