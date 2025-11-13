@@ -18,7 +18,7 @@ Legend: [ ] todo, [x] done.
   - Test: internal/cli/transfer/client_test.go — table tests against `httptest.Server`; expect slot decode, error paths preserved
 
 ## Phase 2 — Typed handler responses (DTOs)
-- [ ] Diffs list endpoint uses DTOs — Stable JSON schema, no map literals
+- [x] Diffs list endpoint uses DTOs — Stable JSON schema, no map literals
   - Component: server
   - Change: internal/server/handlers/handlers_diffs.go — introduce `diffItem`, `diffListResponse{ Diffs []diffItem }`; replace `map[string]any` encodes
   - Test: internal/server/handlers/handlers_diffs_test.go — handler unit tests; expect identical JSON fields/values
