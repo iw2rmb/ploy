@@ -15,7 +15,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move `executeRun()` main flow, workspace setup, defer cleanup logic
   - Test: Run existing `execution_test.go` suite — Verify all run lifecycle tests pass
 
-- [ ] Extract healing loop into `execution_healing.go` — Isolate gate-heal-regate complexity
+- [x] Extract healing loop into `execution_healing.go` — Isolate gate-heal-regate complexity
   - Component: `internal/nodeagent/execution_healing.go`
   - Change: Move `executeWithHealing()`, `buildHealingManifest()`, `executionResult` type, `gateRunMetadata`
   - Test: Run `execution_healing_test.go` — Verify healing retry logic and re-gate scenarios
