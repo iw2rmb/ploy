@@ -55,6 +55,21 @@ type MRCreateResponse struct {
 	IID int
 }
 
+// mrCreatePayload is the request body for creating a merge request via GitLab API.
+type mrCreatePayload struct {
+	Title        string `json:"title"`
+	SourceBranch string `json:"source_branch"`
+	TargetBranch string `json:"target_branch"`
+	Description  string `json:"description,omitempty"`
+	Labels       string `json:"labels,omitempty"`
+}
+
+// mrCreateResponse is the response body from GitLab API when creating a merge request.
+type mrCreateResponse struct {
+	WebURL string `json:"web_url"`
+	IID    int    `json:"iid"`
+}
+
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 3 attempts).
@@ -72,19 +87,19 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	apiURL := fmt.Sprintf("%s://%s/api/v4/projects/%s/merge_requests",
 		scheme, req.Domain, req.ProjectID)
 
-	// Build request payload.
-	payload := map[string]interface{}{
-		"title":         req.Title,
-		"source_branch": req.SourceBranch,
-		"target_branch": req.TargetBranch,
+	// Build request payload using DTO.
+	payload := mrCreatePayload{
+		Title:        req.Title,
+		SourceBranch: req.SourceBranch,
+		TargetBranch: req.TargetBranch,
 	}
 
 	if strings.TrimSpace(req.Description) != "" {
-		payload["description"] = req.Description
+		payload.Description = req.Description
 	}
 
 	if strings.TrimSpace(req.Labels) != "" {
-		payload["labels"] = req.Labels
+		payload.Labels = req.Labels
 	}
 
 	body, err := json.Marshal(payload)
@@ -129,18 +144,17 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 
 		// Check response status.
 		if resp.StatusCode == http.StatusCreated {
-			// Success: parse response to extract web_url.
-			var result map[string]interface{}
+			// Success: parse response using DTO.
+			var result mrCreateResponse
 			if err := json.Unmarshal(bodyBytes, &result); err != nil {
 				return "", redactError(fmt.Errorf("parse response: %w", err), req.PAT)
 			}
 
-			webURL, ok := result["web_url"].(string)
-			if !ok || webURL == "" {
+			if result.WebURL == "" {
 				return "", redactError(fmt.Errorf("no web_url in response"), req.PAT)
 			}
 
-			return webURL, nil
+			return result.WebURL, nil
 		}
 
 		// Check if we should retry (429 or 5xx).
