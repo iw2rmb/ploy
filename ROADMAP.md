@@ -32,7 +32,7 @@ Legend: [ ] todo, [x] done.
 
 ## CLI: Mod Run Command (649 LOC → 4 files)
 
-- [ ] Extract spec parsing into `mod_run_spec.go` — Separate spec file handling from execution
+- [x] Extract spec parsing into `mod_run_spec.go` — Separate spec file handling from execution
   - Component: `cmd/ploy/mod_run_spec.go`
   - Change: Move `buildSpecPayload()`, `resolveEnvFromFileInPlace()`, `resolveEnvFromFile()` (lines 224-462)
   - Test: Run `mod_run_spec_test.go` — Verify YAML/JSON parsing and env_from_file resolution
