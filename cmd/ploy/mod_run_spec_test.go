@@ -102,6 +102,65 @@ func TestBuildSpecPayloadFromJSON(t *testing.T) {
 	}
 }
 
+func TestBuildSpecPayloadCommand_MergesWithoutCLI(t *testing.T) {
+	// Spec defines mod.command; CLI does not pass --mod-command.
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+mod:
+  image: docker.io/test/mod:latest
+  command: ["/bin/sh", "-lc", "echo hi"]
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(payload, &out); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	mod, ok := out["mod"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod section")
+	}
+	cmd, ok := mod["command"].([]any)
+	if !ok || len(cmd) != 3 || cmd[0] != "/bin/sh" || cmd[1] != "-lc" || cmd[2] != "echo hi" {
+		t.Fatalf("expected command array preserved, got %v", mod["command"])
+	}
+}
+
+func TestBuildSpecPayloadCommand_CLIOverridesJSON(t *testing.T) {
+	// Spec defines command; CLI provides JSON array to override.
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	spec := `
+mod:
+  command: ["echo", "spec"]
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+	payload, err := buildSpecPayload(specPath, nil, "", false, `["echo","cli"]`, "", "", false, false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload: %v", err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(payload, &out); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	mod, ok := out["mod"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod section")
+	}
+	cmd, ok := mod["command"].([]any)
+	if !ok || len(cmd) != 2 || cmd[0] != "echo" || cmd[1] != "cli" {
+		t.Fatalf("expected command overridden to [echo cli], got %v", mod["command"])
+	}
+}
+
 func TestBuildSpecPayloadCLIOverrides(t *testing.T) {
 	// Create a temporary YAML spec file with some defaults
 	tmpDir := t.TempDir()
