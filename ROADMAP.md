@@ -37,7 +37,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move `buildSpecPayload()`, `resolveEnvFromFileInPlace()`, `resolveEnvFromFile()` (lines 224-462)
   - Test: Run `mod_run_spec_test.go` — Verify YAML/JSON parsing and env_from_file resolution
 
-- [ ] Extract artifact download into `mod_run_artifact.go` — Isolate artifact fetching logic
+- [x] Extract artifact download into `mod_run_artifact.go` — Isolate artifact fetching logic
   - Component: `cmd/ploy/mod_run_artifact.go`
   - Change: Move `downloadTicketArtifacts()`, `buildArtifactFilename()`, `fetchMRURL()` (lines 476-649)
   - Test: Add `mod_run_artifact_test.go` with mock HTTP — Verify manifest.json generation
