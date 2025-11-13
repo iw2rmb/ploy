@@ -55,7 +55,7 @@ Legend: [ ] todo, [x] done.
 
 ## Node Agent: Claim Manager (538 LOC → 3 files)
 
-- [ ] Extract buildgate claiming into `claimer_buildgate.go` — Separate buildgate job execution
+- [x] Extract buildgate claiming into `claimer_buildgate.go` — Separate buildgate job execution
   - Component: `internal/nodeagent/claimer_buildgate.go`
   - Change: Move `claimAndExecuteBuildGateJob()`, `completeBuildGateJob()`, `ackBuildGateJobStart()` (lines 183-326)
   - Test: Run `claimer_test.go` buildgate scenarios — Verify job claim/ack/complete flow
