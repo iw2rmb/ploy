@@ -165,6 +165,12 @@ type mockStore struct {
 	updateBGCompleteCalled bool
 	updateBGCompleteParams store.UpdateBuildGateJobCompletionParams
 	updateBGCompleteErr    error
+
+	// CreateLog tracking
+	createLogCalled bool
+	createLogParams store.CreateLogParams
+	createLogResult store.Log
+	createLogErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -370,4 +376,10 @@ func (m *mockStore) UpdateBuildGateJobCompletion(ctx context.Context, params sto
 	m.updateBGCompleteCalled = true
 	m.updateBGCompleteParams = params
 	return m.updateBGCompleteErr
+}
+
+func (m *mockStore) CreateLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
+	m.createLogCalled = true
+	m.createLogParams = params
+	return m.createLogResult, m.createLogErr
 }
