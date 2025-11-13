@@ -47,7 +47,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move flag definitions and `printModRunUsage()` into reusable struct
   - Test: Run existing `mod_run_test.go` integration tests — Verify flag precedence
 
-- [ ] Refactor core execution into `mod_run_exec.go` — Keep only orchestration flow
+- [x] Refactor core execution into `mod_run_exec.go` — Keep only orchestration flow
   - Component: `cmd/ploy/mod_run_exec.go`
   - Change: Keep `executeModRun()` with calls to extracted functions; move `defaultStageDefinitions()`
   - Test: Run full CLI integration test suite — Verify end-to-end mod run flow
