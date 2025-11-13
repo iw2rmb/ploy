@@ -88,7 +88,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extract run submission, claim, status tests from handlers scope
   - Test: Run `go test ./internal/server/handlers -run Run` — Verify run state transitions
 
-- [ ] Keep server infra tests in `server_test.go` — Retain start/stop, TLS, mux API, and timeouts
+- [x] Keep server infra tests in `server_test.go` — Retain start/stop, TLS, mux API, and timeouts
   - Component: `internal/server/http/server_test.go`
   - Change: Keep infrastructure-only coverage; no endpoint behavior here
   - Test: Run `go test ./internal/server/http` — Infra tests remain green
