@@ -53,8 +53,9 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 	defer server.Close()
 
 	cfg := Config{ServerURL: server.URL, NodeID: "test-node"}
-	if err := uploadOutDirIfPresent(context.Background(), cfg, "run-1", "stage-1", outDir); err != nil {
-		t.Fatalf("uploadOutDirIfPresent error: %v", err)
+	controller := &runController{cfg: cfg}
+	if err := controller.uploadOutDir(context.Background(), "run-1", "stage-1", outDir); err != nil {
+		t.Fatalf("uploadOutDir error: %v", err)
 	}
 	if !seen {
 		t.Fatalf("expected artifact upload to be sent")
@@ -70,7 +71,8 @@ func TestUploadOutDirIfPresent_SkipsWhenEmpty(t *testing.T) {
 	defer server.Close()
 
 	cfg := Config{ServerURL: server.URL, NodeID: "n"}
-	if err := uploadOutDirIfPresent(context.Background(), cfg, "run-1", "stage-1", outDir); err != nil {
-		t.Fatalf("uploadOutDirIfPresent error: %v", err)
+	controller := &runController{cfg: cfg}
+	if err := controller.uploadOutDir(context.Background(), "run-1", "stage-1", outDir); err != nil {
+		t.Fatalf("uploadOutDir error: %v", err)
 	}
 }

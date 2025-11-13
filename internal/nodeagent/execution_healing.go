@@ -193,7 +193,7 @@ func (r *runController) executeWithHealing(
 			// Upload /out artifacts for this healing mod if present.
 			// Use centralized options accessor for stage_id when re-gating.
 			stageID, _ := manifest.OptionString("stage_id")
-			if uploadErr := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageID, outDir); uploadErr != nil {
+			if uploadErr := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); uploadErr != nil {
 				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
 			}
 		}
