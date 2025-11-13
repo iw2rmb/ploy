@@ -147,7 +147,7 @@ Ploy can automatically create GitLab merge requests when Mods runs complete.
 (see [docs/how-to/create-mr.md](../how-to/create-mr.md) for usage examples).
 
 Control plane configuration (set via CLI or YAML):
-- `gitlab.domain` (config YAML) — GitLab base URL (e.g., `https://gitlab.com`). Optional.
+- `gitlab.domain` (config YAML) — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
 - `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
   memory at runtime, not persisted back to disk.
 - `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. See details below.
@@ -218,7 +218,7 @@ ploy mod run --mr-success \
   config: `http.tls.cert`, `http.tls.key`, and `http.tls.client_ca`.
 
 GitLab integration for automatic MR creation:
-- `gitlab.domain` (config YAML) — GitLab base URL (e.g., `https://gitlab.com`). Optional.
+- `gitlab.domain` (config YAML) — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
 - `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
   memory at runtime, not persisted back to disk.
 - `gitlab.token_file` (config YAML) — Path to a file containing the PAT. Optional. When set and

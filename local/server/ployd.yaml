@@ -1,0 +1,23 @@
+http:
+  listen: ":8443"
+  tls:
+    enabled: true
+    cert: "/etc/ploy/pki/server.crt"
+    key: "/etc/ploy/pki/server.key"
+    client_ca: "/etc/ploy/pki/ca.crt"
+
+metrics:
+  listen: ":9100"
+
+admin:
+  socket: "/run/ployd.sock"
+
+control_plane:
+  endpoint: "https://localhost:8443"
+  ca: "/etc/ploy/pki/ca.crt"
+  certificate: "/etc/ploy/pki/admin.crt"
+  key: "/etc/ploy/pki/admin.key"
+
+postgres:
+  dsn: ""
+

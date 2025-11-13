@@ -45,6 +45,7 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/mods/{id}/artifact_bundles", "post"},
 		{"/v1/mods/{id}/logs", "post"},
 		{"/v1/mods/{id}/diffs", "post"},
+		{"/v1/diffs/{id}", "get"},
 		// Node heartbeat
 		{"/v1/nodes/{id}/heartbeat", "post"},
 		// Node management

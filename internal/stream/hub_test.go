@@ -2,11 +2,14 @@ package logstream
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/mods/api"
 )
 
 func TestHubPublishAndResume(t *testing.T) {
@@ -326,4 +329,50 @@ type flushRecorder struct {
 
 func (f *flushRecorder) Flush() {
 	// ResponseRecorder buffers writes; nothing else required.
+}
+
+// TestPublishTicketTypedPayload verifies that PublishTicket accepts only api.TicketSummary
+// and that the payload marshals correctly through publish/subscribe round-trip.
+func TestPublishTicketTypedPayload(t *testing.T) {
+	hub := NewHub(Options{BufferSize: 4, HistorySize: 8})
+	ctx := context.Background()
+
+	// Construct a typed TicketSummary payload.
+	ticket := api.TicketSummary{
+		TicketID: "ticket-123",
+		State:    api.TicketStateRunning,
+		Stages:   make(map[string]api.StageStatus),
+	}
+
+	// Publish the ticket event.
+	if err := hub.PublishTicket(ctx, "run-1", ticket); err != nil {
+		t.Fatalf("publish ticket: %v", err)
+	}
+
+	// Subscribe and receive the event.
+	sub, err := hub.Subscribe(ctx, "run-1", 0)
+	if err != nil {
+		t.Fatalf("subscribe: %v", err)
+	}
+	defer sub.Cancel()
+
+	select {
+	case evt := <-sub.Events:
+		if evt.Type != "ticket" {
+			t.Fatalf("expected event type 'ticket', got %s", evt.Type)
+		}
+		// Unmarshal and verify the payload.
+		var received api.TicketSummary
+		if err := json.Unmarshal(evt.Data, &received); err != nil {
+			t.Fatalf("unmarshal ticket payload: %v", err)
+		}
+		if received.TicketID != ticket.TicketID {
+			t.Fatalf("expected ticket_id %s, got %s", ticket.TicketID, received.TicketID)
+		}
+		if received.State != ticket.State {
+			t.Fatalf("expected state %s, got %s", ticket.State, received.State)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for ticket event")
+	}
 }

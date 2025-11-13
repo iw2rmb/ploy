@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,22 +10,39 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// diffItem represents a single diff in a list response.
+type diffItem struct {
+	ID        string         `json:"id"`
+	StageID   string         `json:"stage_id"`
+	CreatedAt time.Time      `json:"created_at"`
+	Size      int            `json:"gzipped_size"`
+	Summary   map[string]any `json:"summary,omitempty"`
+}
+
+// diffListResponse is the typed response for listing diffs.
+type diffListResponse struct {
+	Diffs []diffItem `json:"diffs"`
+}
+
+// diffGetResponse is the typed response for getting a single diff's metadata.
+type diffGetResponse struct {
+	ID          string         `json:"id"`
+	RunID       string         `json:"run_id"`
+	StageID     *string        `json:"stage_id,omitempty"`
+	CreatedAt   time.Time      `json:"created_at"`
+	GzippedSize int            `json:"gzipped_size"`
+	Summary     map[string]any `json:"summary,omitempty"`
+}
+
 // listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
 // GET /v1/mods/{id}/diffs
 func listRunDiffsHandler(st store.Store) http.HandlerFunc {
-	type diffItem struct {
-		ID        string         `json:"id"`
-		StageID   string         `json:"stage_id"`
-		CreatedAt time.Time      `json:"created_at"`
-		Size      int            `json:"gzipped_size"`
-		Summary   map[string]any `json:"summary,omitempty"`
-	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := strings.TrimSpace(r.PathValue("id"))
 		if idStr == "" {
@@ -60,7 +78,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"diffs": items})
+		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
 	}
 }
 
@@ -81,8 +99,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		}
 		d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
 		if err != nil {
-			var pgErr *pgconn.PgError
-			if strings.Contains(strings.ToLower(err.Error()), "no rows") || pgErr != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "diff not found", http.StatusNotFound)
 				return
 			}
@@ -103,13 +120,16 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		if len(d.Summary) > 0 {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
-		resp := map[string]any{
-			"id":           uuid.UUID(d.ID.Bytes).String(),
-			"run_id":       uuid.UUID(d.RunID.Bytes).String(),
-			"stage_id":     uuid.UUID(d.StageID.Bytes).String(),
-			"created_at":   d.CreatedAt.Time,
-			"gzipped_size": len(d.Patch),
-			"summary":      summary,
+		resp := diffGetResponse{
+			ID:          uuid.UUID(d.ID.Bytes).String(),
+			RunID:       uuid.UUID(d.RunID.Bytes).String(),
+			CreatedAt:   d.CreatedAt.Time,
+			GzippedSize: len(d.Patch),
+			Summary:     summary,
+		}
+		if d.StageID.Valid {
+			sid := uuid.UUID(d.StageID.Bytes).String()
+			resp.StageID = &sid
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

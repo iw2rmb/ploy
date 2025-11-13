@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=ploy
+      - POSTGRES_USER=ploy
+      - POSTGRES_PASSWORD=ploy
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ploy -d ploy"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    image: alpine:3.20
+    platform: linux/amd64
+    depends_on:
+      - db
+    environment:
+      - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
+    volumes:
+      - ./dist/ployd-linux:/usr/local/bin/ployd:ro
+      - ./local/server/ployd.yaml:/etc/ploy/ployd.yaml:ro
+      - ./local/pki:/etc/ploy/pki:ro
+    command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
+    ports:
+      - "8443:8443"
+      - "9100:9100"
+    healthcheck:
+      # Use metrics (plain HTTP) for health since API requires mTLS
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9100/metrics >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  node:
+    image: alpine:3.20
+    platform: linux/amd64
+    depends_on:
+      - server
+    volumes:
+      - ./dist/ployd-node-linux:/usr/local/bin/ployd-node:ro
+      - ./local/node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
+      - ./local/pki:/etc/ploy/pki:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
+
