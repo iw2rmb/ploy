@@ -42,7 +42,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move `downloadTicketArtifacts()`, `buildArtifactFilename()`, `fetchMRURL()` (lines 476-649)
   - Test: Add `mod_run_artifact_test.go` with mock HTTP — Verify manifest.json generation
 
-- [ ] Extract CLI flag handling into `mod_run_flags.go` — Separate flag definitions from execution
+- [x] Extract CLI flag handling into `mod_run_flags.go` — Separate flag definitions from execution
   - Component: `cmd/ploy/mod_run_flags.go`
   - Change: Move flag definitions and `printModRunUsage()` into reusable struct
   - Test: Run existing `mod_run_test.go` integration tests — Verify flag precedence
