@@ -23,7 +23,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/server/handlers/handlers_diffs.go — introduce `diffItem`, `diffListResponse{ Diffs []diffItem }`; replace `map[string]any` encodes
   - Test: internal/server/handlers/handlers_diffs_test.go — handler unit tests; expect identical JSON fields/values
 
-- [ ] Diff get endpoint uses DTOs — Typed response metadata
+- [x] Diff get endpoint uses DTOs — Typed response metadata
   - Component: server
   - Change: internal/server/handlers/handlers_diffs.go — add typed metadata struct used when `download!=true`
   - Test: internal/server/handlers/handlers_diffs_test.go — metadata case; expect stable keys and types
