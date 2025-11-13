@@ -1,3 +1,16 @@
+// Package httpserver_test contains infrastructure tests for the HTTP server.
+//
+// This file focuses on server lifecycle, TLS configuration, multiplexer API,
+// and timeout behavior. Endpoint-specific tests (e.g., PKI, runs) are located
+// in the handlers package (server_pki_test.go, server_runs_test.go).
+//
+// Test coverage:
+//   - Server construction and validation (New)
+//   - Start/Stop lifecycle and error cases
+//   - Handler registration (HandleFunc, Handle)
+//   - TLS/mTLS configuration and enforcement
+//   - HTTP timeout settings (Read, Write, Idle)
+//   - Address resolution and graceful shutdown
 package httpserver
 
 import (
@@ -20,8 +33,11 @@ import (
 	"github.com/iw2rmb/ploy/internal/server/config"
 )
 
+// TestNew verifies server construction with valid and invalid options.
+// It ensures the authorizer is required and properly assigned.
 func TestNew(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
+		// Create authorizer for testing (insecure mode allows requests without certs).
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -45,6 +61,7 @@ func TestNew(t *testing.T) {
 	})
 
 	t.Run("error_missing_authorizer", func(t *testing.T) {
+		// New() requires an authorizer; omitting it should fail fast.
 		opts := Options{
 			Config: config.HTTPConfig{
 				Listen: ":0",
@@ -60,15 +77,18 @@ func TestNew(t *testing.T) {
 	})
 }
 
+// TestServer_StartStop validates server lifecycle management.
+// It covers normal start/stop, double-start prevention, and idempotent stop.
 func TestServer_StartStop(t *testing.T) {
 	t.Run("plain_http", func(t *testing.T) {
+		// Verify basic HTTP server startup and shutdown without TLS.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
 		opts := Options{
 			Config: config.HTTPConfig{
-				Listen: "127.0.0.1:0",
+				Listen: "127.0.0.1:0", // OS-assigned port for parallel tests.
 				TLS: config.TLSConfig{
 					Enabled: false,
 				},
@@ -85,24 +105,25 @@ func TestServer_StartStop(t *testing.T) {
 			t.Fatalf("Start() error = %v", err)
 		}
 
-		// Verify server is running.
+		// Verify server is running and address is resolved.
 		addr := srv.Addr()
 		if addr == "" {
 			t.Fatal("Addr() returned empty string")
 		}
 
-		// Stop the server.
+		// Stop the server gracefully.
 		if err := srv.Stop(ctx); err != nil {
 			t.Fatalf("Stop() error = %v", err)
 		}
 
-		// Verify server is stopped.
+		// Verify server state is updated after stop.
 		if srv.running {
 			t.Error("server still marked as running after Stop()")
 		}
 	})
 
 	t.Run("already_running", func(t *testing.T) {
+		// Verify Start() fails when called on a running server.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -127,13 +148,14 @@ func TestServer_StartStop(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Try to start again.
+		// Attempt to start again should fail.
 		if err := srv.Start(ctx); err == nil {
 			t.Fatal("Start() expected error when already running")
 		}
 	})
 
 	t.Run("stop_when_not_running", func(t *testing.T) {
+		// Verify Stop() is idempotent and safe to call when not running.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -150,15 +172,18 @@ func TestServer_StartStop(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		// Stop without starting should not error.
+		// Stop without starting should not error (idempotent behavior).
 		if err := srv.Stop(ctx); err != nil {
 			t.Fatalf("Stop() error = %v", err)
 		}
 	})
 }
 
+// TestServer_HandleFunc verifies the multiplexer API for handler registration.
+// It validates both direct registration and role-based middleware enforcement.
 func TestServer_HandleFunc(t *testing.T) {
 	t.Run("without_middleware", func(t *testing.T) {
+		// Verify basic handler registration without middleware.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -177,7 +202,7 @@ func TestServer_HandleFunc(t *testing.T) {
 			t.Fatalf("New() error = %v", err)
 		}
 
-		// Register a test handler.
+		// Register a test handler without role restrictions.
 		srv.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("ok"))
@@ -189,7 +214,7 @@ func TestServer_HandleFunc(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Make a request.
+		// Make a request to verify handler is registered.
 		resp, err := http.Get("http://" + srv.Addr() + "/test")
 		if err != nil {
 			t.Fatalf("GET /test error = %v", err)
@@ -202,9 +227,10 @@ func TestServer_HandleFunc(t *testing.T) {
 	})
 
 	t.Run("with_role_middleware", func(t *testing.T) {
+		// Verify role-based access control via optional middleware.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
-			DefaultRole:   auth.RoleControlPlane,
+			DefaultRole:   auth.RoleControlPlane, // Insecure requests get ControlPlane role.
 		})
 		opts := Options{
 			Config: config.HTTPConfig{
@@ -220,7 +246,7 @@ func TestServer_HandleFunc(t *testing.T) {
 			t.Fatalf("New() error = %v", err)
 		}
 
-		// Register a test handler with role restriction.
+		// Register handler requiring CLIAdmin role (higher than default).
 		srv.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("admin"))
@@ -232,7 +258,7 @@ func TestServer_HandleFunc(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Make a request (should be forbidden since AllowInsecure gives RoleControlPlane).
+		// Request should be forbidden (ControlPlane < CLIAdmin).
 		resp, err := http.Get("http://" + srv.Addr() + "/admin")
 		if err != nil {
 			t.Fatalf("GET /admin error = %v", err)
@@ -245,9 +271,11 @@ func TestServer_HandleFunc(t *testing.T) {
 	})
 }
 
+// TestServer_TLS validates TLS/mTLS configuration and enforcement.
+// It verifies certificate loading, client CA validation, and TLS 1.3 enforcement.
 func TestServer_TLS(t *testing.T) {
 	t.Run("tls_enabled", func(t *testing.T) {
-		// Create temporary directory for certificates.
+		// Verify server accepts TLS connections with valid client certificates.
 		tmpDir := t.TempDir()
 
 		// Get or create CA certificate.
@@ -330,7 +358,7 @@ func TestServer_TLS(t *testing.T) {
 	})
 
 	t.Run("mtls_enabled", func(t *testing.T) {
-		// Create temporary directory for certificates.
+		// Verify mTLS enforcement with RequireClientCert option.
 		tmpDir := t.TempDir()
 
 		// Get or create CA certificate.
@@ -414,6 +442,8 @@ func TestServer_TLS(t *testing.T) {
 	})
 
 	t.Run("missing_client_ca_when_tls_enabled", func(t *testing.T) {
+		// Verify Start() fails when TLS is enabled but ClientCAPath is missing.
+		// mTLS is mandatory when TLS is enabled for security.
 		tmpDir := t.TempDir()
 
 		serverCert, serverKey := generateCertificate(t, "server", nil)
@@ -451,6 +481,7 @@ func TestServer_TLS(t *testing.T) {
 	})
 
 	t.Run("tls13_enforcement", func(t *testing.T) {
+		// Verify server enforces TLS 1.3 and rejects older versions.
 		tmpDir := t.TempDir()
 
 		ca := getTestCA(t)
@@ -559,8 +590,12 @@ func TestServer_TLS(t *testing.T) {
 	})
 }
 
+// TestServer_Timeouts validates HTTP timeout configuration.
+// It verifies default timeout application and custom timeout override behavior.
 func TestServer_Timeouts(t *testing.T) {
 	t.Run("default_timeouts", func(t *testing.T) {
+		// Verify server applies safe default timeouts when not configured.
+		// Per GOLANG.md, timeouts are mandatory for production servers.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -571,7 +606,7 @@ func TestServer_Timeouts(t *testing.T) {
 				TLS: config.TLSConfig{
 					Enabled: false,
 				},
-				// No timeouts set.
+				// No timeouts set - defaults should be applied.
 			},
 			Authorizer: authorizer,
 		}
@@ -586,7 +621,7 @@ func TestServer_Timeouts(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Check that defaults were applied.
+		// Verify default timeouts were applied.
 		srv.mu.Lock()
 		httpSrv := srv.httpServer
 		srv.mu.Unlock()
@@ -603,6 +638,7 @@ func TestServer_Timeouts(t *testing.T) {
 	})
 
 	t.Run("custom_timeouts", func(t *testing.T) {
+		// Verify server respects custom timeout configuration.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -630,7 +666,7 @@ func TestServer_Timeouts(t *testing.T) {
 		}
 		defer srv.Stop(ctx)
 
-		// Check that custom timeouts were applied.
+		// Verify custom timeouts were applied.
 		srv.mu.Lock()
 		httpSrv := srv.httpServer
 		srv.mu.Unlock()
@@ -649,27 +685,32 @@ func TestServer_Timeouts(t *testing.T) {
 
 // Helper functions for generating test certificates.
 
+// generateCACertificate creates a self-signed CA certificate for testing.
+// The CA is used to sign server and client certificates in TLS tests.
 func generateCACertificate(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 
+	// Generate RSA private key for the CA.
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate CA key: %v", err)
 	}
 
+	// Create CA certificate template with cert signing capability.
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
 			Organization: []string{"Test CA"},
 			CommonName:   "Test CA",
 		},
-		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotBefore:             time.Now().Add(-1 * time.Hour), // Allow for clock skew.
 		NotAfter:              time.Now().Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 	}
 
+	// Self-sign the CA certificate.
 	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &priv.PublicKey, priv)
 	if err != nil {
 		t.Fatalf("create CA certificate: %v", err)
@@ -689,8 +730,12 @@ type certPair struct {
 	key  *rsa.PrivateKey
 }
 
+// testCACache caches a single CA for reuse across all TLS tests.
+// This improves test performance by avoiding repeated CA generation.
 var testCACache *certPair
 
+// getTestCA returns a cached test CA, creating it on first call.
+// Reusing the CA across tests is safe since tests run in isolated temp directories.
 func getTestCA(t *testing.T) *certPair {
 	t.Helper()
 	if testCACache != nil {
@@ -701,39 +746,47 @@ func getTestCA(t *testing.T) *certPair {
 	return testCACache
 }
 
+// generateCertificate creates a certificate signed by the provided CA.
+// If ca is nil, the certificate is self-signed. The certificate is valid
+// for both server and client authentication (mTLS support).
 func generateCertificate(t *testing.T, cn string, ca *x509.Certificate) (*x509.Certificate, *rsa.PrivateKey) {
 	t.Helper()
 
+	// Generate private key for this certificate.
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
 
+	// Generate random serial number (required for x509 validity).
 	serialNumber, err := rand.Int(rand.Reader, big.NewInt(1<<62))
 	if err != nil {
 		t.Fatalf("generate serial number: %v", err)
 	}
 
+	// Create certificate template for server/client use.
 	template := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			Organization: []string{"Test Org"},
 			CommonName:   cn,
 		},
-		NotBefore:   time.Now().Add(-1 * time.Hour),
+		NotBefore:   time.Now().Add(-1 * time.Hour), // Allow for clock skew.
 		NotAfter:    time.Now().Add(24 * time.Hour),
 		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 	}
 
+	// Determine parent certificate and signing key.
 	parent := template
 	signerKey := priv
 	if ca != nil {
 		parent = ca
-		// Use cached CA key for signing.
+		// Use cached CA key for signing (CA-signed certificate).
 		signerKey = getTestCA(t).key
 	}
 
+	// Sign the certificate.
 	certDER, err := x509.CreateCertificate(rand.Reader, template, parent, &priv.PublicKey, signerKey)
 	if err != nil {
 		t.Fatalf("create certificate: %v", err)
@@ -747,9 +800,12 @@ func generateCertificate(t *testing.T, cn string, ca *x509.Certificate) (*x509.C
 	return cert, priv
 }
 
+// writeCertAndKey writes a certificate and private key to disk in PEM format.
+// The certificate is world-readable (0644); the key is owner-only (0600).
 func writeCertAndKey(t *testing.T, certPath, keyPath string, cert *x509.Certificate, key *rsa.PrivateKey) {
 	t.Helper()
 
+	// Encode and write certificate.
 	certPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: cert.Raw,
@@ -758,6 +814,7 @@ func writeCertAndKey(t *testing.T, certPath, keyPath string, cert *x509.Certific
 		t.Fatalf("write cert: %v", err)
 	}
 
+	// Encode and write private key (restricted permissions).
 	keyPEM := pem.EncodeToMemory(&pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
@@ -767,8 +824,12 @@ func writeCertAndKey(t *testing.T, certPath, keyPath string, cert *x509.Certific
 	}
 }
 
+// TestServer_Addr validates address resolution behavior.
+// It verifies the server returns the configured address before start
+// and the resolved address (with actual port) after start.
 func TestServer_Addr(t *testing.T) {
 	t.Run("before_start", func(t *testing.T) {
+		// Before Start(), Addr() returns the configured listen address.
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
@@ -791,13 +852,14 @@ func TestServer_Addr(t *testing.T) {
 	})
 
 	t.Run("after_start", func(t *testing.T) {
+		// After Start(), Addr() returns the resolved address (port 0 becomes actual port).
 		authorizer := auth.NewAuthorizer(auth.Options{
 			AllowInsecure: true,
 			DefaultRole:   auth.RoleControlPlane,
 		})
 		opts := Options{
 			Config: config.HTTPConfig{
-				Listen: "127.0.0.1:0",
+				Listen: "127.0.0.1:0", // Port 0 requests OS-assigned port.
 				TLS: config.TLSConfig{
 					Enabled: false,
 				},
@@ -822,7 +884,8 @@ func TestServer_Addr(t *testing.T) {
 	})
 }
 
-// TestServer_Handle verifies the Handle method works correctly.
+// TestServer_Handle verifies the Handle method for registering http.Handler.
+// This complements HandleFunc by supporting the full http.Handler interface.
 func TestServer_Handle(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
@@ -842,7 +905,7 @@ func TestServer_Handle(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	// Register a handler using Handle.
+	// Register a handler using Handle (http.Handler interface).
 	srv.Handle("/test", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("test"))
@@ -865,7 +928,8 @@ func TestServer_Handle(t *testing.T) {
 	}
 }
 
-// TestServer_GracefulShutdown verifies that the server shuts down gracefully.
+// TestServer_GracefulShutdown verifies graceful shutdown behavior.
+// It ensures in-flight requests complete before the server stops.
 func TestServer_GracefulShutdown(t *testing.T) {
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: true,
@@ -885,7 +949,7 @@ func TestServer_GracefulShutdown(t *testing.T) {
 		t.Fatalf("New() error = %v", err)
 	}
 
-	// Register a slow handler.
+	// Register a slow handler to simulate in-flight request.
 	srv.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -896,7 +960,7 @@ func TestServer_GracefulShutdown(t *testing.T) {
 		t.Fatalf("Start() error = %v", err)
 	}
 
-	// Start a request in the background.
+	// Start a request in the background before shutdown.
 	errChan := make(chan error, 1)
 	go func() {
 		resp, err := http.Get("http://" + srv.Addr() + "/slow")
@@ -908,15 +972,15 @@ func TestServer_GracefulShutdown(t *testing.T) {
 		errChan <- nil
 	}()
 
-	// Give the request time to start.
+	// Give the request time to start processing.
 	time.Sleep(10 * time.Millisecond)
 
-	// Stop the server.
+	// Stop the server (should wait for in-flight request).
 	if err := srv.Stop(ctx); err != nil {
 		t.Fatalf("Stop() error = %v", err)
 	}
 
-	// Wait for the request to complete.
+	// Verify in-flight request completed or got expected error.
 	select {
 	case err := <-errChan:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
