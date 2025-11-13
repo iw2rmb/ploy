@@ -61,7 +61,7 @@ Legend: [ ] todo, [x] done.
   - Test: Run `claimer_test.go` buildgate scenarios — Verify job claim/ack/complete flow
   - Fix (follow-up): On transient ACK failure, still execute and attempt `complete`; server accepts completion without `running` status. Current code returns early and can strand `claimed` jobs.
 
-- [ ] Extract spec parsing into `claimer_spec.go` — Isolate spec decoding from claim logic
+- [x] Extract spec parsing into `claimer_spec.go` — Isolate spec decoding from claim logic
   - Component: `internal/nodeagent/claimer_spec.go`
   - Change: Move `parseSpec()` and helper `stringValue()` (lines 387-539)
   - Test: Add `claimer_spec_test.go` — Test mod/build_gate flattening and env merging
