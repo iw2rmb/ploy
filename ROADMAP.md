@@ -63,8 +63,10 @@ Legend: [ ] todo, [x] done.
 
 - [x] Extract spec parsing into `claimer_spec.go` — Isolate spec decoding from claim logic
   - Component: `internal/nodeagent/claimer_spec.go`
-  - Change: Move `parseSpec()` and helper `stringValue()` (lines 387-539)
-  - Test: Add `claimer_spec_test.go` — Test mod/build_gate flattening and env merging
+  - Change: Move `parseSpec()` and helper `stringValue()` from `claimer.go`; call site updated
+  - Test: `claimer_spec_test.go`, `claimer_gitlab_config_test.go` — env merge, build_gate flattening, healing, MR flags
+  - Commit: 79392032e0f5f67a0a795c49565d451cd3781be3
+  - Review: Verified `claimer.go` uses `parseSpec` and `stringValue`; tests present and targeted
 
 - [ ] Refactor claim loop into `claimer_loop.go` — Keep only orchestration and backoff
   - Component: `internal/nodeagent/claimer.go` (rename/slim down)
