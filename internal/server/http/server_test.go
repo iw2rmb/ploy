@@ -1,4 +1,4 @@
-// Package httpserver_test contains infrastructure tests for the HTTP server.
+// Package httpserver contains infrastructure tests for the HTTP server.
 //
 // This file focuses on server lifecycle, TLS configuration, multiplexer API,
 // and timeout behavior. Endpoint-specific tests (e.g., PKI, runs) are located
