@@ -44,10 +44,14 @@ func TestCreateMR(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, actualPath)
 				}
 
-				// Verify Authorization header.
+				// Verify Authorization and PRIVATE-TOKEN headers.
 				auth := r.Header.Get("Authorization")
 				if auth != "Bearer glpat-test-token" {
 					t.Errorf("expected Bearer token, got %s", auth)
+				}
+				priv := r.Header.Get("PRIVATE-TOKEN")
+				if priv != "glpat-test-token" {
+					t.Errorf("expected PRIVATE-TOKEN header, got %q", priv)
 				}
 
 				// Verify Content-Type.
