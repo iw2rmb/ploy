@@ -78,7 +78,7 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Server Tests
 
-- [ ] Split PKI endpoint tests into `server_pki_test.go` — Separate certificate management tests
+- [x] Split PKI endpoint tests into `server_pki_test.go` — Separate certificate management tests
   - Component: `internal/server/handlers/server_pki_test.go`
   - Change: Extract PKI-specific endpoint cases and fixtures from handlers scope
   - Test: Run `go test ./internal/server/handlers -run PKI` — Verify certificate lifecycle tests
