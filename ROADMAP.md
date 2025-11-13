@@ -73,6 +73,8 @@ Legend: [ ] todo, [x] done.
   - Change: Move `Start()`, `claimWork()`, `claimAndExecute()`, `ackRun()`, backoff methods to new file
   - Test: Run `claimer_test.go` suite — Verify backoff timing and work claiming priority
   - Note: `claimer.go` now contains only `ClaimManager` struct, `ClaimResponse` type, and `NewClaimManager()`
+  - Commit: 7d34ba32e9fe34ac07f788cab40d83f98ce47496
+  - Review: Confirmed loop/orchestration/backoff isolated in `claimer_loop.go`. Follow-up remains to execute buildgate job even if ACK fails (see item at line 62).
 
 ## Test Files: Server Tests
 
