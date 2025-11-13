@@ -34,7 +34,7 @@ Legend: [ ] todo, [x] done.
   - Test: internal/server/handlers/nodes_logs_test.go — success path; expect created JSON matches schema
 
 ## Phase 3 — Event typing + Options helpers
-- [ ] Type ticket event payload at hub boundary — Prevent accidental non‑JSON payloads
+- [x] Type ticket event payload at hub boundary — Prevent accidental non‑JSON payloads
   - Component: server (events/stream)
   - Change: internal/stream/hub.go — change `PublishTicket(ctx, id string, ticket modsapi.TicketSummary)`; internal marshal stays generic; adjust call sites if needed
   - Test: internal/stream/hub_test.go — compile‑time usage; publish/subscribe round‑trip with typed payload
