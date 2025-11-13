@@ -110,7 +110,7 @@ Legend: [ ] todo, [x] done.
 - [x] Split execution tests into `agent_execution_test.go` — Focus on run execution scenarios
   - Component: `internal/nodeagent/agent_execution_test.go`
   - Change: Extract run execution, workspace hydration, container runtime tests
-  - Test: Run `go test ./internal/nodeagent -run Execution` — Verify happy path and error scenarios
+  - Test: Run `go test ./internal/nodeagent -run '(RunController|BuildManifestFromRequest|Workspace|EndToEndFlow)'` — Verify run lifecycle, manifest, workspace, and E2E flow
 
 - [ ] Split claim tests into `agent_claim_test.go` — Focus on work claiming scenarios
   - Component: `internal/nodeagent/agent_claim_test.go`
