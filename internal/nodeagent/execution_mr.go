@@ -32,6 +32,26 @@ func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool
 	return false
 }
 
+// Abstraction seams for testing. These are narrow wrappers we can swap in tests.
+type (
+	// pusherIface aliases the git.Pusher interface for local indirection in tests.
+	pusherIface = git.Pusher
+	// pushOptions aliases git.PushOptions for test fakes without importing git.
+	pushOptions = git.PushOptions
+
+	// mrCreateReq is an alias for the GitLab MR create DTO.
+	mrCreateReq = gitlab.MRCreateRequest
+	// mrCreator captures just the CreateMR method used by this file.
+	mrCreator interface {
+		CreateMR(ctx context.Context, req gitlab.MRCreateRequest) (string, error)
+	}
+)
+
+var (
+	newPusher   = func() pusherIface { return git.NewPusher() }
+	newMRClient = func() mrCreator { return gitlab.NewMRClient() }
+)
+
 // createMR pushes the branch and creates a GitLab merge request.
 // This method performs the following steps:
 // 1. Validates GitLab credentials and normalizes the domain
@@ -82,15 +102,23 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 		slog.Info("no changes detected; proceeding to push branch without commit", "run_id", req.RunID)
 	}
 
+	// Determine the remote URL used for the push. For SSH/file remotes we
+	// synthesize an HTTPS remote using the normalized domain and project path
+	// because PAT-based auth only works over HTTPS.
+	remoteURL, err := buildPushRemoteURL(req.RepoURL.String(), gitlabDomain, projectID)
+	if err != nil {
+		return "", fmt.Errorf("resolve push remote: %w", err)
+	}
+
 	// Push branch to origin using git push (Phase E).
-	pusher := git.NewPusher()
+	pusher := newPusher()
 	pushOpts := git.PushOptions{
 		RepoDir:   workspaceRoot,
 		TargetRef: sourceBranch,
 		PAT:       gitlabPAT,
 		UserName:  "ploy-bot",
 		UserEmail: "ploy-bot@ploy.local",
-		RemoteURL: req.RepoURL.String(),
+		RemoteURL: remoteURL,
 	}
 
 	slog.Info("pushing branch to origin", "run_id", req.RunID, "source_branch", sourceBranch, "submitted_target", req.TargetRef)
@@ -99,7 +127,7 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 	}
 
 	// Create MR via GitLab API.
-	mrClient := gitlab.NewMRClient()
+	mrClient := newMRClient()
 	mrReq := gitlab.MRCreateRequest{
 		Domain:       gitlabDomain,
 		ProjectID:    projectID,
@@ -124,4 +152,36 @@ func (r *runController) createMR(ctx context.Context, req StartRunRequest, manif
 // This delegates to the gitlab package's URL parsing logic to maintain consistency.
 func extractProjectIDFromRepoURL(repoURL string) (string, error) {
 	return gitlab.ExtractProjectIDFromURL(repoURL)
+}
+
+// buildPushRemoteURL returns the HTTPS remote used for pushing branches with PAT auth.
+//
+// Rules:
+//   - If repoURL is already https, return as-is.
+//   - If repoURL is ssh, synthesize https://{domain}/{projectPath}.git where
+//     projectPath is the unescaped projectID (e.g., org%2Fproj -> org/proj).
+//   - Any other scheme (e.g., file) is unsupported for MR push and returns error.
+func buildPushRemoteURL(repoURL, gitlabDomain, projectID string) (string, error) {
+	u, err := url.Parse(repoURL)
+	if err != nil {
+		return "", fmt.Errorf("parse repo url: %w", err)
+	}
+	scheme := strings.ToLower(u.Scheme)
+	switch scheme {
+	case "https":
+		return repoURL, nil
+	case "ssh":
+		// Use provided domain (already normalized to host) and unescaped project path.
+		projPath, uerr := url.PathUnescape(projectID)
+		if uerr != nil {
+			return "", fmt.Errorf("unescape project id: %w", uerr)
+		}
+		host := strings.TrimSpace(gitlabDomain)
+		if host == "" {
+			host = "gitlab.com"
+		}
+		return "https://" + host + "/" + strings.TrimSuffix(projPath, ".git") + ".git", nil
+	default:
+		return "", fmt.Errorf("unsupported repo scheme for MR push: %s", scheme)
+	}
 }
