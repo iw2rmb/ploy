@@ -173,3 +173,43 @@ func TestCommitSuccess(t *testing.T) {
 		t.Fatalf("Commit error: %v", err)
 	}
 }
+
+func TestCommitNoContentAndEmptyIDValidation(t *testing.T) {
+	// Empty slot id should be rejected client-side.
+	baseURL, _ := url.Parse("http://127.0.0.1") // base is irrelevant; validation triggers before HTTP
+	c := transfer.Client{BaseURL: baseURL, HTTPClient: http.DefaultClient}
+	if err := c.Commit(context.Background(), "", transfer.CommitRequest{Size: 1, Digest: "d"}); err == nil || err.Error() != "transfer: slot id required" {
+		t.Fatalf("expected slot id validation error, got: %v", err)
+	}
+
+	// 204 No Content is a valid success for commit endpoints.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/transfers/ok/commit", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	base, _ := url.Parse(srv.URL)
+	client := transfer.Client{BaseURL: base, HTTPClient: srv.Client()}
+	if err := client.Commit(context.Background(), "ok", transfer.CommitRequest{Size: 1, Digest: "d"}); err != nil {
+		t.Fatalf("Commit 204 No Content unexpected error: %v", err)
+	}
+}
+
+func TestUploadSlotDecodeError(t *testing.T) {
+	// Server returns invalid JSON; client should surface a decode error.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/transfers/upload" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{not-json}"))
+	}))
+	defer server.Close()
+
+	base, _ := url.Parse(server.URL)
+	client := transfer.Client{BaseURL: base, HTTPClient: server.Client()}
+	if _, err := client.UploadSlot(context.Background(), transfer.UploadSlotRequest{JobID: "j"}); err == nil {
+		t.Fatalf("expected JSON decode error")
+	}
+}
