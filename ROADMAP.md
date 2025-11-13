@@ -68,10 +68,11 @@ Legend: [ ] todo, [x] done.
   - Commit: 79392032e0f5f67a0a795c49565d451cd3781be3
   - Review: Verified `claimer.go` uses `parseSpec` and `stringValue`; tests present and targeted
 
-- [ ] Refactor claim loop into `claimer_loop.go` — Keep only orchestration and backoff
-  - Component: `internal/nodeagent/claimer.go` (rename/slim down)
-  - Change: Keep `ClaimManager`, `Start()`, `claimWork()`, `claimAndExecute()`, backoff methods
+- [x] Refactor claim loop into `claimer_loop.go` — Keep only orchestration and backoff
+  - Component: `internal/nodeagent/claimer_loop.go`
+  - Change: Move `Start()`, `claimWork()`, `claimAndExecute()`, `ackRun()`, backoff methods to new file
   - Test: Run `claimer_test.go` suite — Verify backoff timing and work claiming priority
+  - Note: `claimer.go` now contains only `ClaimManager` struct, `ClaimResponse` type, and `NewClaimManager()`
 
 ## Test Files: Server Tests
 
