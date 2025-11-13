@@ -1,7 +1,9 @@
 package contracts
 
-// OptionString retrieves a string option by key. Returns the value and true if
-// present and convertible to string, otherwise returns empty string and false.
+// OptionString returns the option value for key when it is of type string.
+// It returns the string and true on exact type match; otherwise it returns
+// an empty string and false. The lookup is safe on a zero-value manifest
+// or when Options is nil.
 func (m StepManifest) OptionString(key string) (string, bool) {
 	if m.Options == nil {
 		return "", false
@@ -14,8 +16,10 @@ func (m StepManifest) OptionString(key string) (string, bool) {
 	return s, ok
 }
 
-// OptionBool retrieves a boolean option by key. Returns the value and true if
-// present and convertible to bool, otherwise returns false and false.
+// OptionBool returns the option value for key when it is of type bool.
+// It returns the bool and true on exact type match; otherwise it returns
+// false and false. The lookup is safe on a zero-value manifest or when
+// Options is nil.
 func (m StepManifest) OptionBool(key string) (bool, bool) {
 	if m.Options == nil {
 		return false, false
