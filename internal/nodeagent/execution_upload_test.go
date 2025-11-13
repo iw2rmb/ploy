@@ -428,7 +428,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 
 			// Mock server.
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/nodes/test-node/stage//artifact" {
+				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
 					w.WriteHeader(tt.serverStatus)
 					if tt.serverStatus == http.StatusCreated {
 						_ = json.NewEncoder(w).Encode(map[string]string{
@@ -453,7 +453,7 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 			gateStats := map[string]any{}
 
 			// Execute upload.
-			controller.uploadGateLogsArtifact("test-run", tt.logsText, tt.artifactSuffix, gateStats)
+			controller.uploadGateLogsArtifact("test-run", "test-stage", tt.logsText, tt.artifactSuffix, gateStats)
 
 			// Verify artifact ID attachment.
 			if tt.wantArtifactID {

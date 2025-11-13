@@ -203,7 +203,9 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	}
 
 	// Build stats with execution metrics and gate history.
-	stats := r.buildExecutionStats(req.RunID.String(), result, execResult, duration, mrURL)
+	// Stage ID is used to associate gate log artifacts with the current stage.
+	stageID, _ := manifest.OptionString("stage_id")
+	stats := r.buildExecutionStats(req.RunID.String(), stageID, result, execResult, duration, mrURL)
 
 	// Phase 8: Upload terminal status to server.
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats); uploadErr != nil {
@@ -213,7 +215,7 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 
 // buildExecutionStats constructs the stats payload for terminal status upload.
 // Includes execution timings, exit code, gate history (pre-gate, re-gates), and MR URL.
-func (r *runController) buildExecutionStats(runID string, result step.Result, execResult executionResult, duration time.Duration, mrURL string) map[string]interface{} {
+func (r *runController) buildExecutionStats(runID, stageID string, result step.Result, execResult executionResult, duration time.Duration, mrURL string) map[string]interface{} {
 	stats := map[string]interface{}{
 		"exit_code":   result.ExitCode,
 		"duration_ms": duration.Milliseconds(),
@@ -236,7 +238,7 @@ func (r *runController) buildExecutionStats(runID string, result step.Result, ex
 	// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
 	// Include pre-gate and re-gate runs when healing was attempted.
 	if execResult.PreGate != nil || len(execResult.ReGates) > 0 || result.BuildGate != nil {
-		gate := r.buildGateStats(runID, result, execResult)
+		gate := r.buildGateStats(runID, stageID, result, execResult)
 		stats["gate"] = gate
 	}
 
@@ -245,7 +247,7 @@ func (r *runController) buildExecutionStats(runID string, result step.Result, ex
 
 // buildGateStats constructs gate statistics including pre-gate, re-gates, and final gate runs.
 // Uploads gate logs as artifact bundles for debugging.
-func (r *runController) buildGateStats(runID string, result step.Result, execResult executionResult) map[string]any {
+func (r *runController) buildGateStats(runID, stageID string, result step.Result, execResult executionResult) map[string]any {
 	gate := map[string]any{}
 
 	// Helper function to build gate metadata and upload logs.
@@ -272,7 +274,7 @@ func (r *runController) buildGateStats(runID string, result step.Result, execRes
 
 		// Upload build logs as artifact when present.
 		if meta != nil && strings.TrimSpace(meta.LogsText) != "" {
-			r.uploadGateLogsArtifact(runID, meta.LogsText, artifactNameSuffix, gateStats)
+			r.uploadGateLogsArtifact(runID, stageID, meta.LogsText, artifactNameSuffix, gateStats)
 		}
 
 		return gateStats

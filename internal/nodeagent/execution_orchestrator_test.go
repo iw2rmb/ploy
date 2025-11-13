@@ -17,7 +17,7 @@ func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
 	}
 	execRes := executionResult{}
 
-	got := rc.buildGateStats("run-x", result, execRes)
+	got := rc.buildGateStats("run-x", "stage-y", result, execRes)
 
 	if _, has := got["duration_ms"]; has {
 		t.Fatalf("unexpected flat stats at root; want nested 'final_gate'")
