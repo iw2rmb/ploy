@@ -97,13 +97,13 @@ Legend: [ ] todo, [x] done.
 
 - [x] Extract MR API tests into `mr_client_api_test.go` — Separate API interaction tests
   - Component: `internal/nodeagent/gitlab/mr_client_api_test.go`
-  - Change: Extract MR creation, update, comment tests with mock HTTP fixtures
-  - Test: Run `go test ./internal/nodeagent/gitlab -run API` — Verify API contract coverage
+  - Change: Extract MR creation tests with mock HTTP fixtures
+  - Test: Run `go test ./internal/nodeagent/gitlab -run CreateMR` — Verify API contract coverage
 
-- [ ] Keep parsing tests in `mr_client_test.go` — Retain URL/project ID parsing tests
+- [x] Keep parsing tests in `mr_client_test.go` — Retain URL/project ID parsing tests
   - Component: `internal/nodeagent/gitlab/mr_client_test.go`
-  - Change: Keep `ExtractProjectIDFromURL()` and domain normalization tests
-  - Test: Run `go test ./internal/nodeagent/gitlab -run Parse` — Verify URL parsing edge cases
+  - Change: Keep `ExtractProjectIDFromURL()` tests
+  - Test: Run `go test ./internal/nodeagent/gitlab -run Extract` — Verify URL parsing edge cases
 
 ## Test Files: Node Agent Tests (696 LOC → 3 files)
 
