@@ -98,6 +98,8 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 // 1. Load spec file (YAML or JSON format) if provided
 // 2. Resolve env_from_file references in mod, build_gate_healing.mods[], and top-level
 // 3. Apply CLI flag overrides (higher precedence than spec file)
+//   - When a canonical `mod` section exists, apply overrides inside `mod` (env/image/command/retain).
+//
 // 4. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
 //
 // Returns nil payload when neither spec file nor CLI overrides are provided.
@@ -166,17 +168,32 @@ func buildSpecPayload(
 		return nil, nil
 	}
 
-	// Apply CLI overrides to the base spec
+	// Apply CLI overrides to the base spec. When a canonical `mod` section is present,
+	// apply overrides inside that section to avoid producing split top-level/mod keys.
+	var modRef map[string]any
+	if m, ok := base["mod"].(map[string]any); ok {
+		modRef = m
+	}
+
 	if len(modEnvs) > 0 {
-		env := make(map[string]string)
-		// Preserve existing env from spec file if present
-		if existingEnv, ok := base["env"].(map[string]any); ok {
+		// Start from existing env (prefer mod.env when mod exists)
+		current := make(map[string]any)
+		if modRef != nil {
+			if existingEnv, ok := modRef["env"].(map[string]any); ok {
+				for k, v := range existingEnv {
+					if s, ok := v.(string); ok {
+						current[k] = s
+					}
+				}
+			}
+		} else if existingEnv, ok := base["env"].(map[string]any); ok {
 			for k, v := range existingEnv {
 				if s, ok := v.(string); ok {
-					env[k] = s
+					current[k] = s
 				}
 			}
 		}
+
 		// Apply CLI overrides (higher precedence than spec file)
 		for _, kv := range modEnvs {
 			kv = strings.TrimSpace(kv)
@@ -192,34 +209,58 @@ func buildSpecPayload(
 				v = ""
 			}
 			if k != "" {
-				env[k] = v
+				current[k] = v
 			}
 		}
-		if len(env) > 0 {
-			base["env"] = env
+		if len(current) > 0 {
+			if modRef != nil {
+				modRef["env"] = current
+			} else {
+				base["env"] = current
+			}
 		}
 	}
 
 	if modImage != "" {
-		base["image"] = modImage
+		if modRef != nil {
+			modRef["image"] = modImage
+		} else {
+			base["image"] = modImage
+		}
 	}
 
 	if retain {
-		base["retain_container"] = true
+		if modRef != nil {
+			modRef["retain_container"] = true
+		} else {
+			base["retain_container"] = true
+		}
 	}
 
 	if modCommand != "" {
 		// Allow JSON array for command to pass argv directly to containers with ENTRYPOINT.
-		// Fallback to shell string (wrapped as ["/bin/sh","-c",cmd]) when not a JSON array.
+		// Fallback to plain string when not a JSON array.
 		var asArray []string
 		if strings.HasPrefix(modCommand, "[") && strings.HasSuffix(modCommand, "]") {
 			if err := json.Unmarshal([]byte(modCommand), &asArray); err == nil && len(asArray) > 0 {
-				base["command"] = asArray
+				if modRef != nil {
+					modRef["command"] = asArray
+				} else {
+					base["command"] = asArray
+				}
+			} else {
+				if modRef != nil {
+					modRef["command"] = modCommand
+				} else {
+					base["command"] = modCommand
+				}
+			}
+		} else {
+			if modRef != nil {
+				modRef["command"] = modCommand
 			} else {
 				base["command"] = modCommand
 			}
-		} else {
-			base["command"] = modCommand
 		}
 	}
 

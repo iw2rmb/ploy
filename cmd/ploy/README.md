@@ -97,7 +97,9 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   unless `PLOY_ASTER_ENABLE` is set.
 - `--spec` — Path to a YAML/JSON spec file defining mod parameters, Build Gate settings,
   and healing configuration for `mod run`. CLI flags (e.g., `--mod-image`, `--gitlab-pat`)
-  override corresponding spec values when both are present. The spec supports inline
+  override corresponding spec values when both are present. When a canonical `mod`
+  section exists, overrides apply inside `mod` (e.g., `mod.env`, `mod.image`, `mod.command`).
+  The spec supports inline
   environment variables (`env`), file-based secrets (`env_from_file`), Build Gate healing
   (`build_gate_healing`), and GitLab MR settings. See `docs/schemas/mod.example.yaml`
   for the full schema and `tests/e2e/mods/README.md` for usage examples.
