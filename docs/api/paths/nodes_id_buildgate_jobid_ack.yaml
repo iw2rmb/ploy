@@ -1,0 +1,16 @@
+post:
+  tags: [Control]
+  summary: Node acknowledges start of a claimed build gate job (running)
+  parameters:
+    - in: path
+      name: id
+      required: true
+      schema: { type: string, format: uuid }
+    - in: path
+      name: job_id
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    '204': { description: Acknowledged }
+    '400': { description: Invalid job id }
+    '500': { description: Server error }

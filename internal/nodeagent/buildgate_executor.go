@@ -2,6 +2,7 @@ package nodeagent
 
 import (
 	"archive/tar"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
@@ -117,23 +119,13 @@ func (e *BuildGateExecutor) cloneRepo(ctx context.Context, repoURL, ref, workspa
 // extractArchive extracts a gzipped tar archive into the workspace.
 func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []byte, workspace string) error {
 	slog.Info("extracting archive", "size", len(archiveData), "workspace", workspace)
-
-	// Create a gzip reader.
-	gzReader, err := gzip.NewReader(io.NopCloser(io.Reader(nil)))
-	if err == nil {
-		// Try gzip first.
-		gzReader, err = gzip.NewReader(io.NopCloser(io.Reader(nil)))
-	}
-
-	// Try to decompress (gzip or plain tar).
+	// Try gzip first, fallback to plain tar
 	var tarReader *tar.Reader
-	gzReader, err = gzip.NewReader(io.NopCloser(&byteReaderWrapper{data: archiveData}))
-	if err == nil {
-		defer gzReader.Close()
-		tarReader = tar.NewReader(gzReader)
+	if gz, err := gzip.NewReader(bytes.NewReader(archiveData)); err == nil {
+		defer gz.Close()
+		tarReader = tar.NewReader(gz)
 	} else {
-		// Not gzipped, try plain tar.
-		tarReader = tar.NewReader(&byteReaderWrapper{data: archiveData})
+		tarReader = tar.NewReader(bytes.NewReader(archiveData))
 	}
 
 	// Extract tar contents.
@@ -146,12 +138,14 @@ func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []by
 			return fmt.Errorf("read tar header: %w", err)
 		}
 
-		// Construct target path.
-		target := filepath.Join(workspace, header.Name)
-
-		// Ensure target is within workspace (prevent path traversal).
-		if !filepath.HasPrefix(target, workspace) {
-			return fmt.Errorf("invalid tar entry: %s", header.Name)
+		// Sanitise header name and construct target path.
+		name := strings.TrimPrefix(header.Name, "/")
+		clean := filepath.Clean(name)
+		target := filepath.Join(workspace, clean)
+		// Ensure target resides within workspace (prevent path traversal).
+		ws := filepath.Clean(workspace)
+		if !(strings.HasPrefix(filepath.Clean(target), ws+string(os.PathSeparator)) || filepath.Clean(target) == ws) {
+			return fmt.Errorf("invalid tar entry path: %s", header.Name)
 		}
 
 		switch header.Typeflag {
@@ -180,8 +174,11 @@ func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []by
 			}
 			file.Close()
 
+		case tar.TypeSymlink, tar.TypeLink:
+			// Disallow links for safety.
+			slog.Warn("skipping link entry in archive", "name", header.Name)
 		default:
-			// Skip other types (symlinks, etc.).
+			// Skip other unsupported types.
 			slog.Warn("skipping unsupported tar entry type", "name", header.Name, "type", header.Typeflag)
 		}
 	}

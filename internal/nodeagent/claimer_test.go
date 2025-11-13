@@ -23,6 +23,10 @@ func TestClaimLoop(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			// No buildgate jobs available in this test.
+			w.WriteHeader(http.StatusNoContent)
+			return
 		case "/v1/nodes/test-node/claim":
 			calls = append(calls, "claim")
 			// Return a run to claim.
@@ -130,6 +134,11 @@ func TestClaimLoopNoWork(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		if r.URL.Path == "/v1/nodes/test-node/buildgate/claim" {
+			// Always no buildgate jobs for this test.
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		t.Errorf("unexpected path: %s", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -198,6 +207,10 @@ func TestClaimLoopBackoff(t *testing.T) {
 			lastCall = now
 
 			// Return 204 No Content to trigger backoff.
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.URL.Path == "/v1/nodes/test-node/buildgate/claim" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -281,6 +294,10 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			// First few loops: no buildgate jobs; let run claim proceed.
+			w.WriteHeader(http.StatusNoContent)
+			return
 		case "/v1/nodes/test-node/claim":
 			now := time.Now()
 			if !lastCall.IsZero() {
@@ -397,6 +414,9 @@ func TestClaimLoopAckFailure(t *testing.T) {
 		defer mu.Unlock()
 
 		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			w.WriteHeader(http.StatusNoContent)
+			return
 		case "/v1/nodes/test-node/claim":
 			resp := ClaimResponse{
 				ID:        "run-456",

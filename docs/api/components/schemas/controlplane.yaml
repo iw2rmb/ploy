@@ -94,6 +94,72 @@ TicketStatus:
         type: string
   required: [ticket_id, status, repo_url, base_ref, target_ref, created_at]
 
+# Build Gate — client requests and responses
+BuildGateValidateRequest:
+  type: object
+  description: Submit a build validation job via ref or content archive.
+  properties:
+    repo_url: { type: string, description: Git repository URL, nullable: true }
+    ref: { type: string, description: Git ref to validate, nullable: true }
+    content_archive:
+      type: string
+      description: Tar or tar.gz archive bytes, base64-encoded.
+      contentEncoding: base64
+      nullable: true
+    profile: { type: string, description: Gate profile (e.g., auto, java), nullable: true }
+    timeout: { type: string, description: Duration string (e.g., 5m), nullable: true }
+    limit_memory_bytes: { type: integer, format: int64, nullable: true }
+    limit_cpu_millis: { type: integer, format: int64, nullable: true }
+    limit_disk_space: { type: integer, format: int64, nullable: true }
+  oneOf:
+    - required: [repo_url, ref]
+    - required: [content_archive]
+
+BuildGateValidateResponse:
+  type: object
+  description: Returns result when ready; otherwise JobID for polling.
+  properties:
+    job_id: { type: string, format: uuid }
+    status: { type: string, enum: [pending, claimed, running, completed, failed] }
+    result:
+      description: Present only for completed jobs.
+      type: object
+      additionalProperties: true
+      nullable: true
+  required: [job_id, status]
+
+BuildGateJobStatusResponse:
+  type: object
+  properties:
+    job_id: { type: string, format: uuid }
+    status: { type: string, enum: [pending, claimed, running, completed, failed] }
+    result:
+      type: object
+      additionalProperties: true
+      nullable: true
+    error: { type: string, nullable: true }
+    created_at: { type: string, format: date-time }
+    started_at: { type: string, format: date-time, nullable: true }
+    finished_at: { type: string, format: date-time, nullable: true }
+  required: [job_id, status, created_at]
+
+BuildGateJobCompleteRequest:
+  type: object
+  properties:
+    status: { type: string, enum: [completed, failed] }
+    result: { type: object, additionalProperties: true, nullable: true }
+    error: { type: string, nullable: true }
+  required: [status]
+
+NodeBuildGateClaimResponse:
+  type: object
+  properties:
+    job_id: { type: string, format: uuid }
+    request:
+      $ref: '#/BuildGateValidateRequest'
+    status: { type: string, enum: [claimed] }
+  required: [job_id, request, status]
+
 # Response returned by POST /v1/nodes/{id}/claim
 NodeClaimResponse:
   type: object

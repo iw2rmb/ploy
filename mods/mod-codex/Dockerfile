@@ -8,7 +8,7 @@ LABEL org.opencontainers.image.title="mod-codex" \
       org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
       org.opencontainers.image.licenses="Apache-2.0"
 
-RUN apk add --no-cache bash git ca-certificates curl && \
+RUN apk add --no-cache bash git ca-certificates curl jq && \
     npm install -g @openai/codex && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
     chmod 700 /root/.codex && \

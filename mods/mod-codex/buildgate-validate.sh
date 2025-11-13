@@ -89,8 +89,13 @@ echo "[buildgate] Validating build via $PLOY_SERVER_URL/v1/buildgate/validate" >
 response=$(curl "${curl_args[@]}" "${PLOY_SERVER_URL}/v1/buildgate/validate")
 
 # Parse response
-job_id=$(echo "$response" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+if command -v jq >/dev/null 2>&1; then
+  job_id=$(echo "$response" | jq -r '.job_id // empty')
+  status=$(echo "$response" | jq -r '.status // empty')
+else
+  job_id=$(echo "$response" | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
+  status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+fi
 
 echo "[buildgate] Job submitted: $job_id (status: $status)" >&2
 
@@ -103,7 +108,11 @@ if echo "$response" | grep -q '"result"'; then
   passed=$(echo "$result" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
 
   # Output result summary
-  echo "$response" | python3 -m json.tool
+  if command -v jq >/dev/null 2>&1; then
+    echo "$response" | jq .
+  else
+    echo "$response"
+  fi
 
   if [[ "$passed" == "true" ]]; then
     echo "[buildgate] ✓ Build gate PASSED" >&2
@@ -120,15 +129,27 @@ else
     sleep 2
 
     poll_response=$(curl "${curl_args[@]}" "${PLOY_SERVER_URL}/v1/buildgate/jobs/${job_id}")
-    poll_status=$(echo "$poll_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    if command -v jq >/dev/null 2>&1; then
+      poll_status=$(echo "$poll_response" | jq -r '.status // empty')
+    else
+      poll_status=$(echo "$poll_response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    fi
 
     if [[ "$poll_status" == "completed" || "$poll_status" == "failed" ]]; then
       # Output final result
-      echo "$poll_response" | python3 -m json.tool
+      if command -v jq >/dev/null 2>&1; then
+        echo "$poll_response" | jq .
+      else
+        echo "$poll_response"
+      fi
 
       # Check if build passed
       if echo "$poll_response" | grep -q '"result"'; then
-        passed=$(echo "$poll_response" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+        if command -v jq >/dev/null 2>&1; then
+          passed=$(echo "$poll_response" | jq -r '.result.static_checks[0].passed // false')
+        else
+          passed=$(echo "$poll_response" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
+        fi
 
         if [[ "$passed" == "true" ]]; then
           echo "[buildgate] ✓ Build gate PASSED" >&2

@@ -232,6 +232,11 @@ func (c *ClaimManager) claimAndExecuteBuildGateJob(ctx context.Context) (bool, e
 		return true, fmt.Errorf("unmarshal validate request: %w", err)
 	}
 
+	// Ack job start → running
+	if err := c.ackBuildGateJobStart(ctx, claimResp.JobID); err != nil {
+		return true, fmt.Errorf("ack buildgate job: %w", err)
+	}
+
 	// Execute the buildgate job.
 	execCtx := context.Background() // Don't cancel execution on claim loop timeout.
 	result, execErr := c.buildgateExec.Execute(execCtx, claimResp.JobID, validateReq)
@@ -290,6 +295,33 @@ func (c *ClaimManager) completeBuildGateJob(ctx context.Context, jobID string, r
 	}
 
 	slog.Info("buildgate job result uploaded", "job_id", jobID, "status", payload.Status)
+	return nil
+}
+
+// ackBuildGateJobStart sends POST /v1/nodes/{id}/buildgate/{job_id}/ack to mark job as running.
+func (c *ClaimManager) ackBuildGateJobStart(ctx context.Context, jobID string) error {
+	ackURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/ack", c.cfg.ServerURL, c.cfg.NodeID, jobID)
+
+	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, ackURL, nil)
+	if err != nil {
+		return fmt.Errorf("create ack request: %w", err)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send ack request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ack failed: status %d: %s", resp.StatusCode, string(body))
+	}
+
+	slog.Info("buildgate job acknowledged", "job_id", jobID)
 	return nil
 }
 
