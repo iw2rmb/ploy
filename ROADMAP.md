@@ -124,7 +124,7 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Server Events Service Tests (692 LOC → 2 files)
 
-- [ ] Split SSE stream tests into `service_stream_test.go` — Focus on streaming behavior
+- [x] Split SSE stream tests into `service_stream_test.go` — Focus on streaming behavior
   - Component: `internal/server/events/service_stream_test.go`
   - Change: Extract SSE connection, reconnect, timeout tests
   - Test: Run `go test ./internal/server/events -run Stream` — Verify event delivery and reconnection
