@@ -471,6 +471,7 @@ func TestAgentHeartbeatFailure(t *testing.T) {
 }
 
 // extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
+// extractPort extracts the port from an address string like "[::]:64032" or "127.0.0.1:8080".
 func extractPort(addr string) string {
 	// Handle IPv6 format [::]:port
 	if idx := strings.LastIndex(addr, ":"); idx != -1 {
