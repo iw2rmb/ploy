@@ -74,9 +74,14 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		retain = b
 	}
 
-	// Extract GitLab-related options that will be consumed by later phases.
-	// These options are: gitlab_pat, gitlab_domain, mr_on_success, mr_on_fail.
-	// We store them in the manifest Options field without logging them.
+	// Extract options required by later phases in the node agent. Only select
+	// keys are propagated to manifest.Options to keep scope tight and avoid
+	// accidentally logging/transmitting unrelated values.
+	//
+	// Allowed keys:
+	//   - gitlab_pat, gitlab_domain, mr_on_success, mr_on_fail (MR wiring)
+	//   - stage_id (server-provided stage identifier for uploads)
+	//   - artifact_name (optional bundle name override)
 	gitlabOpts := make(map[string]any)
 	if pat, ok := req.Options["gitlab_pat"].(string); ok && strings.TrimSpace(pat) != "" {
 		gitlabOpts["gitlab_pat"] = strings.TrimSpace(pat)
@@ -90,11 +95,16 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	if mrFail, ok := req.Options["mr_on_fail"].(bool); ok {
 		gitlabOpts["mr_on_fail"] = mrFail
 	}
+	if sid, ok := req.Options["stage_id"].(string); ok && strings.TrimSpace(sid) != "" {
+		gitlabOpts["stage_id"] = strings.TrimSpace(sid)
+	}
+	if aname, ok := req.Options["artifact_name"].(string); ok && strings.TrimSpace(aname) != "" {
+		gitlabOpts["artifact_name"] = strings.TrimSpace(aname)
+	}
 
-	// Options are intentionally restricted to GitLab-related keys only.
-	// Do NOT propagate generic request options (e.g., image, command,
-	// retain_container, build_gate_*) into manifest.Options to keep it
-	// narrowly scoped for later phases that consume GitLab metadata.
+	// Options are intentionally restricted to the allowed keys above. Do NOT
+	// propagate generic request options (e.g., image, command, retain_container,
+	// build_gate_*, artifact_paths) into manifest.Options.
 	mergedOpts := make(map[string]any)
 
 	manifest := contracts.StepManifest{

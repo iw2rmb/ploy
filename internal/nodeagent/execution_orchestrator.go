@@ -233,24 +233,31 @@ func (r *runController) uploadDiff(ctx context.Context, runID, stageID string, d
 
 // uploadConfiguredArtifacts uploads artifact bundles specified in the artifact_paths option.
 func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, workspace string) {
-	artifactPaths, ok := req.Options["artifact_paths"].([]interface{})
-	if !ok || len(artifactPaths) == 0 {
-		return
-	}
-
-	// Convert to string slice and resolve relative to workspace.
+	// Accept either []any (from JSON) or []string (programmatic callers).
 	var paths []string
-	for _, p := range artifactPaths {
-		pathStr, ok := p.(string)
-		if !ok || pathStr == "" {
-			continue
+	switch v := req.Options["artifact_paths"].(type) {
+	case []any:
+		for _, p := range v {
+			if s, ok := p.(string); ok && s != "" {
+				fullPath := filepath.Join(workspace, s)
+				if _, err := os.Stat(fullPath); err == nil {
+					paths = append(paths, fullPath)
+				} else {
+					slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
+				}
+			}
 		}
-
-		fullPath := filepath.Join(workspace, pathStr)
-		if _, err := os.Stat(fullPath); err == nil {
-			paths = append(paths, fullPath)
-		} else {
-			slog.Warn("artifact path not found", "run_id", req.RunID, "path", pathStr)
+	case []string:
+		for _, s := range v {
+			if strings.TrimSpace(s) == "" {
+				continue
+			}
+			fullPath := filepath.Join(workspace, s)
+			if _, err := os.Stat(fullPath); err == nil {
+				paths = append(paths, fullPath)
+			} else {
+				slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
+			}
 		}
 	}
 
@@ -412,10 +419,9 @@ func (r *runController) buildGateStats(runID string, result step.Result, execRes
 		gate["re_gates"] = reGatesList
 	}
 
-	// Include final/post-mod gate stats if present and not already captured in pre-gate.
-	// This handles the case where no healing occurred and the gate ran after the mod.
-	if result.BuildGate != nil && execResult.PreGate == nil && len(execResult.ReGates) == 0 {
-		gate = buildGateMetadata(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
+	// Always include final/post-mod gate stats under an explicit key when present.
+	if result.BuildGate != nil {
+		gate["final_gate"] = buildGateMetadata(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
 	}
 
 	return gate
