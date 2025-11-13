@@ -7,7 +7,7 @@ Documentation: docs/api/OpenAPI.yaml; internal/domain/types/*; internal/server/h
 Legend: [ ] todo, [x] done.
 
 ## Phase 1 — GitLab client + Transfer generics
-- [ ] Replace GitLab request/response maps with DTOs — Remove runtime asserts, ensure schema safety
+- [x] Replace GitLab request/response maps with DTOs — Remove runtime asserts, ensure schema safety
   - Component: node agent
   - Change: internal/nodeagent/gitlab/mr_client.go — add `mrCreatePayload` and `mrCreateResponse{ WebURL string \`json:"web_url"\` }`; update `CreateMR` to encode/decode DTOs
   - Test: internal/nodeagent/gitlab/mr_client_test.go — `httptest.Server` fixtures (201, 429, 5xx); expect correct URL extraction and backoff behavior
