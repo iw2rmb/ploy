@@ -216,7 +216,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	}
 
 	// Always attempt to bundle and upload /out regardless of artifact_paths.
-	if err := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageIDFromOptions(req.Options), outDir); err != nil {
+	// Use centralized options accessor for stage_id.
+	stageID, _ := manifest.OptionString("stage_id")
+	if err := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageID, outDir); err != nil {
 		slog.Error("/out artifact upload failed", "run_id", req.RunID, "error", err)
 	}
 
@@ -618,7 +620,9 @@ func (r *runController) executeWithHealing(
 			}
 
 			// Upload /out artifacts for this healing mod if present.
-			if uploadErr := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageIDFromOptions(req.Options), outDir); uploadErr != nil {
+			// Use centralized options accessor for stage_id when re-gating.
+			stageID, _ := manifest.OptionString("stage_id")
+			if uploadErr := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageID, outDir); uploadErr != nil {
 				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
 			}
 		}
