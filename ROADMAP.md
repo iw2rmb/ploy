@@ -39,7 +39,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/stream/hub.go — change `PublishTicket(ctx, id string, ticket modsapi.TicketSummary)`; internal marshal stays generic; adjust call sites if needed
   - Test: internal/stream/hub_test.go — compile‑time usage; publish/subscribe round‑trip with typed payload
 
-- [ ] Add `StepManifest` option accessors — Centralize `Options` map handling
+- [x] Add `StepManifest` option accessors — Centralize `Options` map handling
   - Component: workflow contracts, node agent, CLI
   - Change: internal/workflow/contracts/manifest_options.go — add `OptionString`, `OptionBool` methods on `StepManifest`; use in `internal/nodeagent/execution.go` (MR flow) and `cmd/ploy/mod_run.go` where reading options
   - Test: internal/workflow/contracts/manifest_options_test.go — unit tests; adjust `execution` tests to use accessors; expect same behavior
