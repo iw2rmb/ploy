@@ -59,6 +59,7 @@ Legend: [ ] todo, [x] done.
   - Component: `internal/nodeagent/claimer_buildgate.go`
   - Change: Move `claimAndExecuteBuildGateJob()`, `completeBuildGateJob()`, `ackBuildGateJobStart()` (lines 183-326)
   - Test: Run `claimer_test.go` buildgate scenarios — Verify job claim/ack/complete flow
+  - Fix (follow-up): On transient ACK failure, still execute and attempt `complete`; server accepts completion without `running` status. Current code returns early and can strand `claimed` jobs.
 
 - [ ] Extract spec parsing into `claimer_spec.go` — Isolate spec decoding from claim logic
   - Component: `internal/nodeagent/claimer_spec.go`
