@@ -112,7 +112,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extract run execution, workspace hydration, container runtime tests
   - Test: Run `go test ./internal/nodeagent -run '(RunController|BuildManifestFromRequest|Workspace|EndToEndFlow)'` — Verify run lifecycle, manifest, workspace, and E2E flow
 
-- [ ] Split claim tests into `agent_claim_test.go` — Focus on work claiming scenarios
+- [x] Split claim tests into `agent_claim_test.go` — Focus on work claiming scenarios
   - Component: `internal/nodeagent/agent_claim_test.go`
   - Change: Extract claim request, ack, backoff, and spec parsing tests
   - Test: Run `go test ./internal/nodeagent -run Claim` — Verify claim priority and retry logic
