@@ -96,6 +96,17 @@ paths:
   # Node artifact bundle upload endpoint
   /v1/nodes/{id}/stage/{stage}/artifact:
     $ref: './paths/nodes_id_stage_stage_artifact.yaml'
+  # Build Gate service
+  /v1/buildgate/validate:
+    $ref: './paths/buildgate_validate.yaml'
+  /v1/buildgate/jobs/{id}:
+    $ref: './paths/buildgate_jobs_id.yaml'
+  /v1/nodes/{id}/buildgate/claim:
+    $ref: './paths/nodes_id_buildgate_claim.yaml'
+  /v1/nodes/{id}/buildgate/{job_id}/ack:
+    $ref: './paths/nodes_id_buildgate_jobid_ack.yaml'
+  /v1/nodes/{id}/buildgate/{job_id}/complete:
+    $ref: './paths/nodes_id_buildgate_jobid_complete.yaml'
   # Legacy removed:
   # - /v1/config/gitlab (GitLab signer removed)
   # - /v2/artifacts/* (artifacts replaced with PostgreSQL storage)
@@ -141,6 +152,17 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Stage'
     Node:
       $ref: './components/schemas/controlplane.yaml#/Node'
+    # Build Gate schemas
+    BuildGateValidateRequest:
+      $ref: './components/schemas/controlplane.yaml#/BuildGateValidateRequest'
+    BuildGateValidateResponse:
+      $ref: './components/schemas/controlplane.yaml#/BuildGateValidateResponse'
+    BuildGateJobStatusResponse:
+      $ref: './components/schemas/controlplane.yaml#/BuildGateJobStatusResponse'
+    BuildGateJobCompleteRequest:
+      $ref: './components/schemas/controlplane.yaml#/BuildGateJobCompleteRequest'
+    NodeBuildGateClaimResponse:
+      $ref: './components/schemas/controlplane.yaml#/NodeBuildGateClaimResponse'
     # Legacy removed:
     # - Node schemas (nodes.yaml) — node registry handled via mTLS RPC
     # - GitLab schemas (gitlab.yaml) — GitLab signer removed

@@ -29,6 +29,10 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	// HTTP test server that returns a single claim and accepts ack.
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			// No buildgate jobs for this mapping test.
+			w.WriteHeader(http.StatusNoContent)
+			return
 		case "/v1/nodes/test-node/claim":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)

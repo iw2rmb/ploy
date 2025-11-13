@@ -140,6 +140,9 @@ func getBuildGateJobStatusHandler(st store.Store) http.HandlerFunc {
 		// Parse job ID from URL path parameter.
 		jobIDStr := r.PathValue("id")
 		if jobIDStr == "" {
+			jobIDStr = r.PathValue("job_id")
+		}
+		if jobIDStr == "" {
 			http.Error(w, "job id is required", http.StatusBadRequest)
 			return
 		}
@@ -246,7 +249,7 @@ func claimBuildGateJobHandler(st store.Store) http.HandlerFunc {
 		job, err := st.ClaimBuildGateJob(r.Context(), pgNodeID)
 		if err != nil {
 			// Check if it's "no rows" (no work available).
-			if err.Error() == "no rows in result set" {
+			if errors.Is(err, pgx.ErrNoRows) {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
@@ -358,5 +361,34 @@ func completeBuildGateJobHandler(st store.Store) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 		slog.Info("buildgate job completed", "job_id", jobIDStr, "status", reqBody.Status)
+	}
+}
+
+// ackBuildGateJobStartHandler returns an HTTP handler for
+// POST /v1/nodes/{id}/buildgate/{job_id}/ack which transitions a claimed
+// job into running state.
+func ackBuildGateJobStartHandler(st store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		jobIDStr := r.PathValue("job_id")
+		if jobIDStr == "" {
+			http.Error(w, "job id is required", http.StatusBadRequest)
+			return
+		}
+
+		jobID, err := uuid.Parse(jobIDStr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid job id: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		pgJobID := pgtype.UUID{Bytes: jobID, Valid: true}
+		if err := st.AckBuildGateJobStart(r.Context(), pgJobID); err != nil {
+			http.Error(w, fmt.Sprintf("failed to ack job start: %v", err), http.StatusInternalServerError)
+			slog.Error("ack buildgate job: update failed", "job_id", jobIDStr, "err", err)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		slog.Info("buildgate job running", "job_id", jobIDStr)
 	}
 }

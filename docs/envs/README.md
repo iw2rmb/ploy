@@ -286,8 +286,10 @@ usage but are documented here for completeness.
   argument.
 - `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
   `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
-  This variable is consumed only by the bootstrap script; the CLI separately exposes a
-  `--server-url` flag and `PLOY_CONTROL_PLANE_URL` override for client operations.
+  Additionally, healing containers (e.g., `mods-codex`) consume this variable to call
+  the Build Gate HTTP API via the bundled `buildgate-validate` helper during the
+  fail→heal→re‑gate workflow. The CLI separately exposes a `--server-url` flag and
+  `PLOY_CONTROL_PLANE_URL` override for client operations.
 
 Primary reuse behavior:
 - On control‑plane (primary) hosts, when `/etc/ploy/pki/ca.key` already exists, the bootstrap
