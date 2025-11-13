@@ -12,7 +12,7 @@ Legend: [ ] todo, [x] done.
   - Change: internal/nodeagent/gitlab/mr_client.go — add `mrCreatePayload` and `mrCreateResponse{ WebURL string \`json:"web_url"\` }`; update `CreateMR` to encode/decode DTOs
   - Test: internal/nodeagent/gitlab/mr_client_test.go — `httptest.Server` fixtures (201, 429, 5xx); expect correct URL extraction and backoff behavior
 
-- [ ] Introduce generic HTTP helper for transfer client — Compile‑time request/response typing
+- [x] Introduce generic HTTP helper for transfer client — Compile‑time request/response typing
   - Component: CLI
   - Change: internal/cli/transfer/client.go — add `doReq[TReq any, TRes any]`; refactor `requestSlot`, `Commit`, `Abort` to use typed DTOs
   - Test: internal/cli/transfer/client_test.go — table tests against `httptest.Server`; expect slot decode, error paths preserved
