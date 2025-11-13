@@ -61,6 +61,8 @@ paths:
     $ref: './paths/mods_id_logs.yaml'
   /v1/mods/{id}/diffs:
     $ref: './paths/mods_id_diffs.yaml'
+  /v1/diffs/{id}:
+    $ref: './paths/diffs_id.yaml'
   /v1/artifacts:
     $ref: './paths/artifacts.yaml'
   /v1/artifacts/{id}:

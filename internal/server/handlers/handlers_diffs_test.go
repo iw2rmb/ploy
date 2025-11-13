@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -121,8 +122,8 @@ func TestGetDiff_Metadata(t *testing.T) {
 	if resp.RunID != runID.String() {
 		t.Errorf("run_id=%q, want %q", resp.RunID, runID.String())
 	}
-	if resp.StageID != stageID.String() {
-		t.Errorf("stage_id=%q, want %q", resp.StageID, stageID.String())
+	if resp.StageID == nil || *resp.StageID != stageID.String() {
+		t.Errorf("stage_id=%v, want %q", resp.StageID, stageID.String())
 	}
 	if !resp.CreatedAt.Equal(createdAt) {
 		t.Errorf("created_at=%v, want %v", resp.CreatedAt, createdAt)
@@ -135,5 +136,74 @@ func TestGetDiff_Metadata(t *testing.T) {
 	}
 	if filesChanged, ok := resp.Summary["files_changed"].(float64); !ok || filesChanged != 3 {
 		t.Errorf("summary[files_changed]=%v, want 3", resp.Summary["files_changed"])
+	}
+}
+
+func TestGetDiff_InvalidID(t *testing.T) {
+	st := &mockStore{}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/bad-id", nil)
+	req.SetPathValue("id", "bad-id")
+	getDiffHandler(st).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", rr.Code)
+	}
+}
+
+func TestGetDiff_MissingID(t *testing.T) {
+	st := &mockStore{}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/", nil)
+	req.SetPathValue("id", "")
+	getDiffHandler(st).ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, want 400", rr.Code)
+	}
+}
+
+func TestGetDiff_NotFound(t *testing.T) {
+	st := &mockStore{}
+	runID := uuid.New()
+	stageID := uuid.New()
+	diffID := uuid.New()
+	_ = runID
+	_ = stageID
+	st.getDiffErr = pgx.ErrNoRows
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
+	req.SetPathValue("id", diffID.String())
+	getDiffHandler(st).ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status %d, want 404", rr.Code)
+	}
+}
+
+func TestGetDiff_Metadata_StageIDNull(t *testing.T) {
+	st := &mockStore{}
+	runID := uuid.New()
+	diffID := uuid.New()
+	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
+	st.getDiffResult = store.Diff{
+		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		StageID:   pgtype.UUID{Valid: false},
+		Patch:     []byte{0x1f, 0x8b},
+		Summary:   []byte(`{}`),
+		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
+	}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
+	req.SetPathValue("id", diffID.String())
+	getDiffHandler(st).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d", rr.Code)
+	}
+	var resp diffGetResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.StageID != nil {
+		t.Errorf("stage_id=%v, want nil", *resp.StageID)
 	}
 }

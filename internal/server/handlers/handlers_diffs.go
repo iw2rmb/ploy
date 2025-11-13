@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/iw2rmb/ploy/internal/store"
@@ -33,7 +34,7 @@ type diffListResponse struct {
 type diffGetResponse struct {
 	ID          string         `json:"id"`
 	RunID       string         `json:"run_id"`
-	StageID     string         `json:"stage_id"`
+	StageID     *string        `json:"stage_id,omitempty"`
 	CreatedAt   time.Time      `json:"created_at"`
 	GzippedSize int            `json:"gzipped_size"`
 	Summary     map[string]any `json:"summary,omitempty"`
@@ -98,8 +99,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		}
 		d, err := st.GetDiff(r.Context(), pgtype.UUID{Bytes: diffUUID, Valid: true})
 		if err != nil {
-			var pgErr *pgconn.PgError
-			if strings.Contains(strings.ToLower(err.Error()), "no rows") || pgErr != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "diff not found", http.StatusNotFound)
 				return
 			}
@@ -123,10 +123,13 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
 			RunID:       uuid.UUID(d.RunID.Bytes).String(),
-			StageID:     uuid.UUID(d.StageID.Bytes).String(),
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,
+		}
+		if d.StageID.Valid {
+			sid := uuid.UUID(d.StageID.Bytes).String()
+			resp.StageID = &sid
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
