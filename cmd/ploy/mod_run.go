@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/iw2rmb/ploy/internal/cli/mods"
 	"github.com/iw2rmb/ploy/internal/cli/stream"
@@ -22,68 +20,25 @@ func handleModRun(args []string, stderr io.Writer) error {
 	return executeModRun(args, stderr)
 }
 
-// stringSlice is a simple flag.Value for collecting repeated values.
-type stringSlice []string
-
-func (s *stringSlice) String() string {
-	if s == nil {
-		return ""
-	}
-	return strings.Join(*s, ",")
-}
-
-func (s *stringSlice) Set(v string) error {
-	*s = append(*s, v)
-	return nil
-}
-
 func executeModRun(args []string, stderr io.Writer) error {
-	fs := flag.NewFlagSet("mod run", flag.ContinueOnError)
-	fs.SetOutput(io.Discard)
-	specFile := fs.String("spec", "", "Path to YAML/JSON spec file")
-	repoURL := fs.String("repo-url", "", "Git repository URL to materialise for Mods execution")
-	repoBaseRef := fs.String("repo-base-ref", "", "Git base ref used for materialisation")
-	repoTargetRef := fs.String("repo-target-ref", "", "Git target ref created for the run")
-	repoWorkspace := fs.String("repo-workspace-hint", "", "Optional subdirectory hint when preparing the workspace")
-	follow := fs.Bool("follow", false, "follow ticket events until completion")
-	capDuration := fs.Duration("cap", 0, "optional overall time cap for --follow (e.g., 5m)")
-	cancelOnCap := fs.Bool("cancel-on-cap", false, "when set with --cap, cancel the ticket if the cap is exceeded")
-	artifactDir := fs.String("artifact-dir", "", "directory to download final artifacts into (with manifest.json)")
-	jsonOut := fs.Bool("json", false, "print machine-readable JSON summary to stdout")
-	maxRetries := fs.Int("max-retries", 5, "max reconnect attempts for event stream (-1 for unlimited)")
-	retryWait := fs.Duration("retry-wait", 500*time.Millisecond, "wait between event stream reconnects")
-	// Allow passing Mod env via repeated --mod-env KEY=VALUE
-	var modEnvs stringSlice
-	fs.Var(&modEnvs, "mod-env", "Mod environment KEY=VALUE (repeatable)")
-	// Allow specifying the mod container image (paths fixed; image entrypoint runs)
-	modImage := fs.String("mod-image", "", "Container image for the mod step (optional)")
-	// Optional: retain container after run for inspection
-	retain := fs.Bool("retain-container", false, "Retain the mod container after execution (for debugging)")
-	// Optional: override container command (string, executed via sh -c on the node)
-	modCommand := fs.String("mod-command", "", "Container command override (string or JSON array)")
-	// GitLab MR flags (per-run overrides)
-	gitlabPAT := fs.String("gitlab-pat", "", "GitLab Personal Access Token for this run (overrides server default)")
-	gitlabDomain := fs.String("gitlab-domain", "", "GitLab domain for this run (overrides server default)")
-	mrSuccess := fs.Bool("mr-success", false, "Create a merge request on success")
-	mrFail := fs.Bool("mr-fail", false, "Create a merge request on failure")
-	// DEPRECATED: --heal-on-build injects a default build_gate_healing when spec lacks it
-	healOnBuild := fs.Bool("heal-on-build", false, "DEPRECATED: inject default build_gate_healing (use --spec with build_gate_healing instead)")
-
-	if err := fs.Parse(args); err != nil {
+	// Parse CLI flags using extracted flag handling
+	flags, err := parseModRunFlags(args)
+	if err != nil {
 		printModRunUsage(stderr)
 		return err
 	}
 
+	// Build repository specification from parsed flags
 	repoSpec := struct {
 		URL           string
 		BaseRef       string
 		TargetRef     string
 		WorkspaceHint string
 	}{
-		URL:           strings.TrimSpace(*repoURL),
-		BaseRef:       strings.TrimSpace(*repoBaseRef),
-		TargetRef:     strings.TrimSpace(*repoTargetRef),
-		WorkspaceHint: strings.TrimSpace(*repoWorkspace),
+		URL:           strings.TrimSpace(*flags.RepoURL),
+		BaseRef:       strings.TrimSpace(*flags.RepoBaseRef),
+		TargetRef:     strings.TrimSpace(*flags.RepoTargetRef),
+		WorkspaceHint: strings.TrimSpace(*flags.RepoWorkspaceHint),
 	}
 	if repoSpec.URL != "" && repoSpec.TargetRef == "" {
 		printModRunUsage(stderr)
@@ -118,16 +73,16 @@ func executeModRun(args []string, stderr io.Writer) error {
 	// Load spec from file (if provided) and merge with CLI overrides.
 	// CLI flags take precedence over spec file values.
 	specPayload, err := buildSpecPayload(
-		strings.TrimSpace(*specFile),
-		modEnvs,
-		strings.TrimSpace(*modImage),
-		*retain,
-		strings.TrimSpace(*modCommand),
-		strings.TrimSpace(*gitlabPAT),
-		strings.TrimSpace(*gitlabDomain),
-		*mrSuccess,
-		*mrFail,
-		*healOnBuild,
+		strings.TrimSpace(*flags.SpecFile),
+		*flags.ModEnvs,
+		strings.TrimSpace(*flags.ModImage),
+		*flags.Retain,
+		strings.TrimSpace(*flags.ModCommand),
+		strings.TrimSpace(*flags.GitLabPAT),
+		strings.TrimSpace(*flags.GitLabDomain),
+		*flags.MRSuccess,
+		*flags.MRFail,
+		*flags.HealOnBuild,
 	)
 	if err != nil {
 		return fmt.Errorf("build spec: %w", err)
@@ -148,18 +103,19 @@ func executeModRun(args []string, stderr io.Writer) error {
 	initialState := strings.ToLower(string(summary.State))
 	finalState := ""
 
-	if *follow {
+	// Follow ticket events if requested
+	if *flags.Follow {
 		followCtx := ctx
 		var cancel context.CancelFunc
-		if *capDuration > 0 {
-			followCtx, cancel = context.WithTimeout(ctx, *capDuration)
+		if *flags.CapDuration > 0 {
+			followCtx, cancel = context.WithTimeout(ctx, *flags.CapDuration)
 			defer cancel()
 		}
 		ev := mods.EventsCommand{
 			Client: stream.Client{
 				HTTPClient:   cloneForStream(httpClient),
-				MaxRetries:   *maxRetries,
-				RetryBackoff: *retryWait,
+				MaxRetries:   *flags.MaxRetries,
+				RetryBackoff: *flags.RetryWait,
 			},
 			BaseURL: base,
 			Ticket:  string(summary.TicketID),
@@ -167,12 +123,12 @@ func executeModRun(args []string, stderr io.Writer) error {
 		}
 		final, err := ev.Run(followCtx)
 		if err != nil {
-			if *capDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
-				if *cancelOnCap {
+			if *flags.CapDuration > 0 && followCtx.Err() == context.DeadlineExceeded {
+				if *flags.CancelOnCap {
 					_, _ = fmt.Fprintln(stderr, "Follow timed out; requesting ticket cancellation...")
 					_ = mods.CancelCommand{BaseURL: base, Client: httpClient, Ticket: string(summary.TicketID), Reason: "cap exceeded", Output: stderr}.Run(context.Background())
 				} else {
-					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", capDuration.String(), summary.TicketID)
+					_, _ = fmt.Fprintf(stderr, "Follow capped after %s; ticket %s continues running in the background.\n", flags.CapDuration.String(), summary.TicketID)
 				}
 				return nil
 			}
@@ -183,14 +139,15 @@ func executeModRun(args []string, stderr io.Writer) error {
 			return fmt.Errorf("mod run ended in %s", strings.ToLower(string(final)))
 		}
 		finalState = strings.ToLower(string(final))
-		if strings.TrimSpace(*artifactDir) != "" {
-			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.TicketID), strings.TrimSpace(*artifactDir), stderr); err != nil {
+		if strings.TrimSpace(*flags.ArtifactDir) != "" {
+			if err := downloadTicketArtifacts(ctx, base, httpClient, string(summary.TicketID), strings.TrimSpace(*flags.ArtifactDir), stderr); err != nil {
 				return err
 			}
 		}
 	}
 
-	if *jsonOut {
+	// Output JSON summary if requested
+	if *flags.JSONOut {
 		// Optional: probe MR URL from ticket status metadata.
 		mrURL, _ := fetchMRURL(ctx, base, httpClient, string(summary.TicketID))
 		type runJSON struct {
@@ -201,7 +158,7 @@ func executeModRun(args []string, stderr io.Writer) error {
 			MRURL       string `json:"mr_url,omitempty"`
 		}
 		out := runJSON{TicketID: string(summary.TicketID), Initial: initialState, Final: finalState}
-		if s := strings.TrimSpace(*artifactDir); s != "" {
+		if s := strings.TrimSpace(*flags.ArtifactDir); s != "" {
 			out.ArtifactDir = s
 		}
 		if mrURL != "" {
@@ -211,10 +168,6 @@ func executeModRun(args []string, stderr io.Writer) error {
 		fmt.Println(string(b))
 	}
 	return nil
-}
-
-func printModRunUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "Usage: ploy mod run [--spec <file>] [--repo-url <url> --repo-base-ref <branch> --repo-target-ref <branch> --repo-workspace-hint <dir>] [--mod-env KEY=VALUE ...] [--mod-image <image>] [--mod-command <cmd>] [--retain-container] [--gitlab-pat <token>] [--gitlab-domain <domain>] [--mr-success] [--mr-fail] [--heal-on-build (deprecated)] [--follow] [--cap <duration>] [--artifact-dir <dir>] [--json] [--max-retries N] [--retry-wait D]")
 }
 
 func defaultStageDefinitions() []modsapi.StageDefinition {
