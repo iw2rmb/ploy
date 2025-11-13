@@ -148,7 +148,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				}
 
 				// Use stage_id provided by control plane (no backward-compat fallback).
-				stageID, _ := req.Options["stage_id"].(string)
+				stageID, _ := manifest.OptionString("stage_id")
 
 				// Upload the diff to the server.
 				if err := diffUploader.UploadDiff(ctx, req.RunID.String(), stageID, diffBytes, summary); err != nil {
@@ -200,13 +200,10 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				slog.Error("failed to create artifact uploader", "run_id", req.RunID, "error", err)
 			} else {
 				// Use stage_id provided by control plane.
-				stageID, _ := req.Options["stage_id"].(string)
+				stageID, _ := manifest.OptionString("stage_id")
 
 				// Optional: get artifact name from options.
-				artifactName := ""
-				if name, ok := req.Options["artifact_name"].(string); ok {
-					artifactName = name
-				}
+				artifactName, _ := manifest.OptionString("artifact_name")
 
 				// Upload the artifact bundle to the server.
 				if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID.String(), stageID, paths, artifactName); err != nil {
@@ -251,7 +248,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		// Phase E: Create MR via GitLab API when conditions are met.
 		// Hook runs after terminal status is determined but before uploading status.
 		mrURL := ""
-		if shouldCreateMR(terminalStatus, manifest.Options) {
+		if shouldCreateMR(terminalStatus, manifest) {
 			if url, mrErr := r.createMR(ctx, req, manifest, workspaceRoot); mrErr != nil {
 				slog.Error("failed to create MR", "run_id", req.RunID, "error", mrErr)
 			} else {
@@ -311,7 +308,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 							_, _ = logFile.WriteString(s)
 							_ = logFile.Close()
 							if artUploader, err2 := NewArtifactUploader(r.cfg); err2 == nil {
-								stageID, _ := req.Options["stage_id"].(string)
+								stageID, _ := manifest.OptionString("stage_id")
 								artifactName := "build-gate.log"
 								if artifactNameSuffix != "" {
 									artifactName = "build-gate-" + artifactNameSuffix + ".log"
@@ -374,15 +371,15 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	)
 }
 
-// shouldCreateMR determines if an MR should be created based on terminal status and options.
-func shouldCreateMR(terminalStatus string, options map[string]any) bool {
+// shouldCreateMR determines if an MR should be created based on terminal status and manifest options.
+func shouldCreateMR(terminalStatus string, manifest contracts.StepManifest) bool {
 	if terminalStatus == "succeeded" {
-		if mrOnSuccess, ok := options["mr_on_success"].(bool); ok && mrOnSuccess {
+		if mrOnSuccess, ok := manifest.OptionBool("mr_on_success"); ok && mrOnSuccess {
 			return true
 		}
 	}
 	if terminalStatus == "failed" {
-		if mrOnFail, ok := options["mr_on_fail"].(bool); ok && mrOnFail {
+		if mrOnFail, ok := manifest.OptionBool("mr_on_fail"); ok && mrOnFail {
 			return true
 		}
 	}
@@ -392,8 +389,8 @@ func shouldCreateMR(terminalStatus string, options map[string]any) bool {
 // createMR pushes the branch and creates a GitLab merge request.
 func (r *runController) createMR(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, workspaceRoot string) (string, error) {
 	// Extract GitLab options.
-	gitlabPAT, _ := manifest.Options["gitlab_pat"].(string)
-	gitlabDomain, _ := manifest.Options["gitlab_domain"].(string)
+	gitlabPAT, _ := manifest.OptionString("gitlab_pat")
+	gitlabDomain, _ := manifest.OptionString("gitlab_domain")
 
 	// Validate required fields.
 	if strings.TrimSpace(gitlabPAT) == "" {
