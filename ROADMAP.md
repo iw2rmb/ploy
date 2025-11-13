@@ -107,7 +107,7 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Node Agent Tests (696 LOC → 3 files)
 
-- [ ] Split execution tests into `agent_execution_test.go` — Focus on run execution scenarios
+- [x] Split execution tests into `agent_execution_test.go` — Focus on run execution scenarios
   - Component: `internal/nodeagent/agent_execution_test.go`
   - Change: Extract run execution, workspace hydration, container runtime tests
   - Test: Run `go test ./internal/nodeagent -run Execution` — Verify happy path and error scenarios
