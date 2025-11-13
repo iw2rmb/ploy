@@ -675,3 +675,87 @@ env:
 		t.Errorf("expected image from spec to be preserved, got %v", result["image"])
 	}
 }
+
+func TestBuildSpecPayloadCLIOverridesWithModSection(t *testing.T) {
+	// Spec uses canonical `mod` section. CLI overrides must apply inside `mod`.
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "mod-overrides.yaml")
+	spec := `
+mod:
+  image: docker.io/test/mod:v1
+  env:
+    KEY1: from_spec
+    KEY2: value2
+  retain_container: false
+`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatalf("write spec: %v", err)
+	}
+
+	payload, err := buildSpecPayload(
+		specPath,
+		[]string{"KEY1=from_cli", "KEY3=new_value"}, // env overrides
+		"docker.io/test/mod:v2",                     // image override
+		true,                                        // retain
+		`["/bin/sh","-c","echo hi"]`,                // command override (JSON array)
+		"",
+		"",
+		false,
+		false,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	mod, ok := result["mod"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod section in payload")
+	}
+
+	// Image override inside mod
+	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/mod:v2" {
+		t.Errorf("expected mod.image override, got %v", mod["image"])
+	}
+
+	// Env merged inside mod
+	env, ok := mod["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod.env map")
+	}
+	if v := env["KEY1"]; v != "from_cli" {
+		t.Errorf("expected mod.env.KEY1=from_cli, got %v", v)
+	}
+	if v := env["KEY2"]; v != "value2" {
+		t.Errorf("expected mod.env.KEY2=value2, got %v", v)
+	}
+	if v := env["KEY3"]; v != "new_value" {
+		t.Errorf("expected mod.env.KEY3=new_value, got %v", v)
+	}
+
+	// Retain inside mod
+	if retain, ok := mod["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected mod.retain_container=true, got %v", mod["retain_container"])
+	}
+
+	// Command override inside mod as array
+	if cmd, ok := mod["command"].([]any); !ok || len(cmd) != 3 {
+		t.Errorf("expected mod.command array len 3, got %T (%v)", mod["command"], mod["command"])
+	}
+
+	// Ensure no duplicate top-level keys when mod section exists
+	if _, ok := result["image"]; ok {
+		t.Errorf("did not expect top-level image when mod is present")
+	}
+	if _, ok := result["env"]; ok {
+		t.Errorf("did not expect top-level env when mod is present")
+	}
+	if _, ok := result["retain_container"]; ok {
+		t.Errorf("did not expect top-level retain_container when mod is present")
+	}
+}
