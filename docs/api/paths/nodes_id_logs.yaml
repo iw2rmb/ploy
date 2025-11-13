@@ -45,12 +45,16 @@ post:
               Server returns 413 if decoded data exceeds 1 MiB or body exceeds 2 MiB.
   responses:
     '201':
-      description: Created
+      description: Created — returns acknowledgement payload
       content:
         application/json:
           schema:
-            $ref: '../components/schemas/controlplane.yaml#/Log'
+            $ref: '../components/schemas/controlplane.yaml#/NodeCreateLogResponse'
+          examples:
+            ack:
+              value:
+                id: 12345
+                chunk_no: 5
     '400': { description: Bad Request }
     '404': { description: Node or run not found }
     '413': { description: Payload Too Large (body or decoded data) }
-

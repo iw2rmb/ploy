@@ -154,6 +154,8 @@ components:
       $ref: './components/schemas/controlplane.yaml#/Stage'
     Node:
       $ref: './components/schemas/controlplane.yaml#/Node'
+    NodeCreateLogResponse:
+      $ref: './components/schemas/controlplane.yaml#/NodeCreateLogResponse'
     # Build Gate schemas
     BuildGateValidateRequest:
       $ref: './components/schemas/controlplane.yaml#/BuildGateValidateRequest'
