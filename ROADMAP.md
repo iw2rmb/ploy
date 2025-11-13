@@ -95,7 +95,7 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: GitLab MR Client Tests (772 LOC → 2 files)
 
-- [ ] Extract MR API tests into `mr_client_api_test.go` — Separate API interaction tests
+- [x] Extract MR API tests into `mr_client_api_test.go` — Separate API interaction tests
   - Component: `internal/nodeagent/gitlab/mr_client_api_test.go`
   - Change: Extract MR creation, update, comment tests with mock HTTP fixtures
   - Test: Run `go test ./internal/nodeagent/gitlab -run API` — Verify API contract coverage
