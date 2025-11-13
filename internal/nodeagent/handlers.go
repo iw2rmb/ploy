@@ -11,16 +11,20 @@ import (
 
 // StartRunRequest describes a run start request from the server.
 //
-// Options keys (slice E — per-run GitLab/MR wiring):
+// Options keys (slice E — per-run wiring):
 //   - "gitlab_pat" (string, optional) — PAT override for this run (never log).
 //   - "gitlab_domain" (string, optional) — GitLab domain override.
 //   - "mr_on_success" (bool) — create MR on success when true.
 //   - "mr_on_fail" (bool) — create MR on failure when true.
+//   - "stage_id" (string, optional) — server-provided stage identifier for uploads.
+//   - "artifact_name" (string, optional) — custom name for uploaded artifact bundle(s).
 //
 // Other options currently honoured by the node for execution shaping:
 //   - "image" (string) — container image to run (optional; default ubuntu:latest).
 //   - "command" (string|[]string) — container command override.
 //   - "retain_container" (bool) — retain container after run for debugging.
+//   - "artifact_paths" ([]string|[]any) — list of workspace‑relative files/dirs to upload as a bundle.
+//   - "build_gate_healing" (object) — healing policy: {retries:int, mods:[{image,command,env,...}]}.
 type StartRunRequest struct {
 	RunID     types.RunID       `json:"run_id,omitempty"`
 	RepoURL   types.RepoURL     `json:"repo_url,omitempty"`
