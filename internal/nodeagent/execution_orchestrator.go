@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -109,7 +108,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	r.uploadConfiguredArtifacts(ctx, req, manifest, workspaceRoot)
 
 	// Phase 6b: Always attempt to bundle and upload /out directory.
-	if err := uploadOutDirIfPresent(ctx, r.cfg, req.RunID.String(), stageID, outDir); err != nil {
+	if err := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); err != nil {
 		slog.Error("/out artifact upload failed", "run_id", req.RunID, "error", err)
 	}
 
@@ -167,128 +166,8 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 	return runner, diffGenerator, logStreamer, nil
 }
 
-// uploadDiff generates and uploads the workspace diff to the control plane.
-// Also uploads diff as an artifact bundle for client download.
-func (r *runController) uploadDiff(ctx context.Context, runID, stageID string, diffGenerator step.DiffGenerator, workspace string, result step.Result) {
-	if diffGenerator == nil {
-		return
-	}
-
-	diffBytes, err := diffGenerator.Generate(ctx, workspace)
-	if err != nil {
-		slog.Error("failed to generate diff", "run_id", runID, "error", err)
-		return
-	}
-
-	if len(diffBytes) == 0 {
-		return
-	}
-
-	// Upload diff with execution summary metadata.
-	diffUploader, err := NewDiffUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create diff uploader", "run_id", runID, "error", err)
-		return
-	}
-
-	summary := map[string]interface{}{
-		"exit_code": result.ExitCode,
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
-			"execution_duration_ms":  result.Timings.ExecutionDuration.Milliseconds(),
-			"build_gate_duration_ms": result.Timings.BuildGateDuration.Milliseconds(),
-			"diff_duration_ms":       result.Timings.DiffDuration.Milliseconds(),
-			"total_duration_ms":      result.Timings.TotalDuration.Milliseconds(),
-		},
-	}
-
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary); err != nil {
-		slog.Error("failed to upload diff", "run_id", runID, "error", err)
-		return
-	}
-
-	slog.Info("diff uploaded successfully", "run_id", runID, "size", len(diffBytes))
-
-	// Also upload diff as artifact bundle named "diff" for client download.
-	diffFile, err := os.CreateTemp("", "ploy-diff-*.patch")
-	if err != nil {
-		return
-	}
-	defer func() { _ = os.Remove(diffFile.Name()) }()
-
-	_, _ = diffFile.Write(diffBytes)
-	_ = diffFile.Close()
-
-	artUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		return
-	}
-
-	if _, _, errU := artUploader.UploadArtifact(ctx, runID, stageID, []string{diffFile.Name()}, "diff"); errU != nil {
-		slog.Warn("failed to upload diff artifact bundle", "run_id", runID, "error", errU)
-	} else {
-		slog.Info("diff artifact bundle uploaded", "run_id", runID)
-	}
-}
-
-// uploadConfiguredArtifacts uploads artifact bundles specified in the artifact_paths option.
-func (r *runController) uploadConfiguredArtifacts(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, workspace string) {
-	// Accept either []any (from JSON) or []string (programmatic callers).
-	var paths []string
-	switch v := req.Options["artifact_paths"].(type) {
-	case []any:
-		for _, p := range v {
-			if s, ok := p.(string); ok && s != "" {
-				fullPath := filepath.Join(workspace, s)
-				if _, err := os.Stat(fullPath); err == nil {
-					paths = append(paths, fullPath)
-				} else {
-					slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
-				}
-			}
-		}
-	case []string:
-		for _, s := range v {
-			if strings.TrimSpace(s) == "" {
-				continue
-			}
-			fullPath := filepath.Join(workspace, s)
-			if _, err := os.Stat(fullPath); err == nil {
-				paths = append(paths, fullPath)
-			} else {
-				slog.Warn("artifact path not found", "run_id", req.RunID, "path", s)
-			}
-		}
-	}
-
-	if len(paths) == 0 {
-		return
-	}
-
-	artifactUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create artifact uploader", "run_id", req.RunID, "error", err)
-		return
-	}
-
-	stageID, _ := manifest.OptionString("stage_id")
-	artifactName, _ := manifest.OptionString("artifact_name")
-
-	if _, _, err := artifactUploader.UploadArtifact(ctx, req.RunID.String(), stageID, paths, artifactName); err != nil {
-		slog.Error("failed to upload artifact bundle", "run_id", req.RunID, "error", err)
-	} else {
-		slog.Info("artifact bundle uploaded successfully", "run_id", req.RunID, "paths", len(paths))
-	}
-}
-
 // finalizeRun handles terminal status determination, merge request creation, and status upload.
 func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, execResult executionResult, execErr error, workspace string, duration time.Duration) {
-	statusUploader, err := NewStatusUploader(r.cfg)
-	if err != nil {
-		slog.Error("failed to create status uploader", "run_id", req.RunID, "error", err)
-		return
-	}
-
 	result := execResult.Result
 
 	// Determine terminal status based on execution result.
@@ -326,14 +205,9 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	// Build stats with execution metrics and gate history.
 	stats := r.buildExecutionStats(req.RunID.String(), result, execResult, duration, mrURL)
 
-	// Phase 8: Upload terminal status to server with a short, detached context so
-	// we still attempt to report completion even if the run context is cancelled.
-	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if uploadErr := statusUploader.UploadStatus(statusCtx, req.RunID.String(), terminalStatus, reason, stats); uploadErr != nil {
+	// Phase 8: Upload terminal status to server.
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
-	} else {
-		slog.Info("terminal status uploaded successfully", "run_id", req.RunID, "status", terminalStatus)
 	}
 }
 
@@ -425,34 +299,4 @@ func (r *runController) buildGateStats(runID string, result step.Result, execRes
 	}
 
 	return gate
-}
-
-// uploadGateLogsArtifact uploads gate logs as an artifact bundle and attaches IDs to stats.
-func (r *runController) uploadGateLogsArtifact(runID, logsText, artifactNameSuffix string, gateStats map[string]any) {
-	logFile, err := os.CreateTemp("", "ploy-gate-*.log")
-	if err != nil {
-		return
-	}
-	defer func() { _ = os.Remove(logFile.Name()) }()
-
-	_, _ = logFile.WriteString(logsText)
-	_ = logFile.Close()
-
-	artUploader, err := NewArtifactUploader(r.cfg)
-	if err != nil {
-		return
-	}
-
-	// Stage ID is not available here; use empty string (server will handle).
-	artifactName := "build-gate.log"
-	if artifactNameSuffix != "" {
-		artifactName = "build-gate-" + artifactNameSuffix + ".log"
-	}
-
-	if id, cid, uerr := artUploader.UploadArtifact(context.Background(), runID, "", []string{logFile.Name()}, artifactName); uerr == nil {
-		gateStats["logs_artifact_id"] = id
-		gateStats["logs_bundle_cid"] = cid
-	} else {
-		slog.Warn("failed to upload "+artifactName, "run_id", runID, "error", uerr)
-	}
 }
