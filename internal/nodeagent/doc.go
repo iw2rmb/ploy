@@ -11,6 +11,7 @@
 // Key files:
 //   - execution_orchestrator.go — high level run lifecycle and status upload.
 //   - execution_healing.go — Build Gate healing loop (gate → heal → re-gate → main).
+//   - execution_upload.go — centralized diff/status/artifact upload helpers.
 //   - execution.go — runtime factories and GitLab MR wiring helpers.
 //   - manifest.go — request→manifest translation and helpers for healing manifests.
 package nodeagent

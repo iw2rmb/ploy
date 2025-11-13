@@ -54,6 +54,12 @@ func TestRunController_uploadDiff(t *testing.T) {
 				} else if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
 					artUploadCalled = true
 					w.WriteHeader(http.StatusCreated)
+					// Verify artifact name is "diff" for diff bundle.
+					var payload map[string]any
+					_ = json.NewDecoder(r.Body).Decode(&payload)
+					if name, ok := payload["name"].(string); !ok || name != "diff" {
+						t.Errorf("artifact name = %v, want diff", payload["name"])
+					}
 					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
 				} else {
 					t.Errorf("unexpected endpoint: %s", r.URL.Path)
@@ -160,6 +166,12 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
 					uploadCalled = true
+					// Verify name matches manifest OptionString("artifact_name").
+					var payload map[string]any
+					_ = json.NewDecoder(r.Body).Decode(&payload)
+					if name, ok := payload["name"].(string); !ok || name != "test-artifact" {
+						t.Errorf("artifact name = %v, want test-artifact", payload["name"])
+					}
 					w.WriteHeader(http.StatusCreated)
 					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
 				}
