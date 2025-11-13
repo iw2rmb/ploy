@@ -1,0 +1,46 @@
+parameters:
+  - in: path
+    name: id
+    required: true
+    schema: { type: string, format: uuid }
+get:
+  tags: [Artifacts]
+  summary: Retrieve diff metadata or download gzipped patch by ID
+  description: |
+    Get a diff by UUID. If the `download=true` query parameter is present,
+    returns raw gzipped patch bytes (`application/gzip`). Otherwise, returns
+    JSON metadata including IDs, gzipped size, creation time, and optional
+    summary fields.
+  parameters:
+    - in: query
+      name: download
+      required: false
+      schema: { type: boolean }
+      description: Set to "true" to download raw gzipped patch instead of metadata
+  responses:
+    '200':
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            description: Diff metadata (returned when download=false or omitted)
+            properties:
+              id: { type: string, format: uuid }
+              run_id: { type: string, format: uuid }
+              stage_id: { type: string, format: uuid, nullable: true }
+              created_at: { type: string, format: date-time }
+              gzipped_size: { type: integer, format: int32 }
+              summary:
+                type: object
+                additionalProperties: true
+                nullable: true
+            required: [id, run_id, created_at, gzipped_size]
+        application/gzip:
+          schema:
+            type: string
+            format: binary
+            description: Raw gzipped patch bytes (returned when download=true)
+    '400': { description: Bad Request (invalid or missing UUID) }
+    '404': { description: Diff Not Found }
+    '500': { description: Internal Server Error }

@@ -66,26 +66,66 @@ func (c Client) DownloadSlot(ctx context.Context, req DownloadSlotRequest) (Slot
 	return c.requestSlot(ctx, "/v1/transfers/download", req)
 }
 
+// emptyRequest is used for endpoints that accept an empty JSON body.
+type emptyRequest struct{}
+
+// emptyResponse is used for endpoints that return no meaningful JSON body.
+type emptyResponse struct{}
+
 // Commit notifies the control plane that the slot finished transferring successfully.
 func (c Client) Commit(ctx context.Context, slotID string, req CommitRequest) error {
-	endpoint := fmt.Sprintf("/v1/transfers/%s/commit", strings.TrimSpace(slotID))
-	return c.do(ctx, http.MethodPost, endpoint, req, nil)
+	slotID = strings.TrimSpace(slotID)
+	if slotID == "" {
+		return errors.New("transfer: slot id required")
+	}
+	endpoint := fmt.Sprintf("/v1/transfers/%s/commit", slotID)
+	_, err := doReq[CommitRequest, emptyResponse](ctx, c, http.MethodPost, endpoint, req)
+	return err
 }
 
 // Abort releases the slot without committing the transfer.
 func (c Client) Abort(ctx context.Context, slotID string) error {
-	endpoint := fmt.Sprintf("/v1/transfers/%s/abort", strings.TrimSpace(slotID))
-	return c.do(ctx, http.MethodPost, endpoint, map[string]any{}, nil)
+	slotID = strings.TrimSpace(slotID)
+	if slotID == "" {
+		return errors.New("transfer: slot id required")
+	}
+	endpoint := fmt.Sprintf("/v1/transfers/%s/abort", slotID)
+	_, err := doReq[emptyRequest, emptyResponse](ctx, c, http.MethodPost, endpoint, emptyRequest{})
+	return err
 }
 
 func (c Client) requestSlot(ctx context.Context, endpoint string, payload any) (Slot, error) {
-	var slot Slot
-	if err := c.do(ctx, http.MethodPost, endpoint, payload, &slot); err != nil {
-		return Slot{}, err
+	switch p := payload.(type) {
+	case UploadSlotRequest:
+		return doReq[UploadSlotRequest, Slot](ctx, c, http.MethodPost, endpoint, p)
+	case DownloadSlotRequest:
+		return doReq[DownloadSlotRequest, Slot](ctx, c, http.MethodPost, endpoint, p)
+	default:
+		return Slot{}, fmt.Errorf("transfer: unsupported request type: %T", payload)
 	}
-	return slot, nil
 }
 
+// doReq is a generic HTTP helper that provides compile-time request/response typing.
+// TReq is JSON-encoded as the request body (if non-nil). TRes is JSON-decoded
+// from a successful 2xx response. When TRes is the internal emptyResponse type,
+// response decoding is skipped to support 200/204 No Content responses.
+func doReq[TReq any, TRes any](ctx context.Context, c Client, method, endpoint string, payload TReq) (TRes, error) {
+	var zero TRes
+	var out any = &zero
+	// Skip decoding for empty responses.
+	if _, ok := any(zero).(emptyResponse); ok {
+		out = nil
+	}
+	if err := c.do(ctx, method, endpoint, payload, out); err != nil {
+		return zero, err
+	}
+	return zero, nil
+}
+
+// do constructs and executes an HTTP request relative to the client's BaseURL.
+// It encodes payload as JSON when non-nil and, on 2xx status codes, decodes the
+// JSON response into out when out is not nil. Error responses (>=300) include
+// the response body (if any) to ease debugging.
 func (c Client) do(ctx context.Context, method, endpoint string, payload any, out any) error {
 	base := c.BaseURL
 	if base == nil {

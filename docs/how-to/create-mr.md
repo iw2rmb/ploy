@@ -120,6 +120,8 @@ This is useful for:
 
 Precedence: per-run flags always override the control plane global config.
 
+Note: `--gitlab-domain` accepts either a bare host (e.g., `gitlab.com`) or a full URL (e.g., `https://gitlab.com`). Ploy normalizes either form for API calls.
+
 ## Security Notes
 
 - PATs are never logged or written to disk on worker nodes

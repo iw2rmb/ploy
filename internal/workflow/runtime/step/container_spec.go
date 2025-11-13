@@ -70,38 +70,27 @@ func buildContainerSpec(ticketID types.TicketID, manifest contracts.StepManifest
 	}
 
 	// Optional: mount host Docker socket for containers that request it via manifest options
-	if manifest.Options != nil {
-		if v, ok := manifest.Options["mount_docker_socket"]; ok {
-			want := false
-			switch b := v.(type) {
-			case bool:
-				want = b
-			case string:
-				want = strings.EqualFold(strings.TrimSpace(b), "true")
-			}
-			if want {
-				const sock = "/var/run/docker.sock"
-				if fi, err := os.Stat(sock); err == nil && !fi.IsDir() {
-					mounts = append(mounts, ContainerMount{Source: sock, Target: sock, ReadOnly: false})
-				}
-			}
+	if mountDockerSocket, ok := manifest.OptionBool("mount_docker_socket"); ok && mountDockerSocket {
+		const sock = "/var/run/docker.sock"
+		if fi, err := os.Stat(sock); err == nil && !fi.IsDir() {
+			mounts = append(mounts, ContainerMount{Source: sock, Target: sock, ReadOnly: false})
 		}
+	}
 
-		// Optional: mount TLS certificates for buildgate API access
-		if caCertPath, ok := manifest.Options["ploy_ca_cert_path"].(string); ok && caCertPath != "" {
-			if fi, err := os.Stat(caCertPath); err == nil && !fi.IsDir() {
-				mounts = append(mounts, ContainerMount{Source: caCertPath, Target: "/etc/ploy/certs/ca.crt", ReadOnly: true})
-			}
+	// Optional: mount TLS certificates for buildgate API access
+	if caCertPath, ok := manifest.OptionString("ploy_ca_cert_path"); ok && caCertPath != "" {
+		if fi, err := os.Stat(caCertPath); err == nil && !fi.IsDir() {
+			mounts = append(mounts, ContainerMount{Source: caCertPath, Target: "/etc/ploy/certs/ca.crt", ReadOnly: true})
 		}
-		if clientCertPath, ok := manifest.Options["ploy_client_cert_path"].(string); ok && clientCertPath != "" {
-			if fi, err := os.Stat(clientCertPath); err == nil && !fi.IsDir() {
-				mounts = append(mounts, ContainerMount{Source: clientCertPath, Target: "/etc/ploy/certs/client.crt", ReadOnly: true})
-			}
+	}
+	if clientCertPath, ok := manifest.OptionString("ploy_client_cert_path"); ok && clientCertPath != "" {
+		if fi, err := os.Stat(clientCertPath); err == nil && !fi.IsDir() {
+			mounts = append(mounts, ContainerMount{Source: clientCertPath, Target: "/etc/ploy/certs/client.crt", ReadOnly: true})
 		}
-		if clientKeyPath, ok := manifest.Options["ploy_client_key_path"].(string); ok && clientKeyPath != "" {
-			if fi, err := os.Stat(clientKeyPath); err == nil && !fi.IsDir() {
-				mounts = append(mounts, ContainerMount{Source: clientKeyPath, Target: "/etc/ploy/certs/client.key", ReadOnly: true})
-			}
+	}
+	if clientKeyPath, ok := manifest.OptionString("ploy_client_key_path"); ok && clientKeyPath != "" {
+		if fi, err := os.Stat(clientKeyPath); err == nil && !fi.IsDir() {
+			mounts = append(mounts, ContainerMount{Source: clientKeyPath, Target: "/etc/ploy/certs/client.key", ReadOnly: true})
 		}
 	}
 	wd := manifest.WorkingDir

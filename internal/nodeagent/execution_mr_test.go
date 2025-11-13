@@ -1,6 +1,11 @@
 package nodeagent
 
-import "testing"
+import (
+	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
 
 func TestShouldCreateMR(t *testing.T) {
 	tests := []struct {
@@ -23,7 +28,14 @@ func TestShouldCreateMR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldCreateMR(tt.terminalStatus, tt.options)
+			manifest := contracts.StepManifest{
+				ID:      types.StepID("test-step"),
+				Name:    "Test Step",
+				Image:   "test:latest",
+				Inputs:  []contracts.StepInput{{Name: "test", MountPath: "/test", Mode: contracts.StepInputModeReadOnly, SnapshotCID: "cid"}},
+				Options: tt.options,
+			}
+			got := shouldCreateMR(tt.terminalStatus, manifest)
 			if got != tt.want {
 				t.Fatalf("shouldCreateMR(%q, %v) = %v, want %v", tt.terminalStatus, tt.options, got, tt.want)
 			}

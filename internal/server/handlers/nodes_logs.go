@@ -16,6 +16,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// nodeLogCreateResponse is the response for POST /v1/nodes/{id}/logs.
+type nodeLogCreateResponse struct {
+	ID      int64 `json:"id"`
+	ChunkNo int32 `json:"chunk_no"`
+}
+
 // createNodeLogsHandler handles POST /v1/nodes/{id}/logs for receiving gzipped log chunks.
 func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	// Accept up to 2 MiB for the JSON body to accommodate base64 overhead
@@ -150,10 +156,11 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		// Return success response.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"id":       log.ID,
-			"chunk_no": log.ChunkNo,
-		}); err != nil {
+		resp := nodeLogCreateResponse{
+			ID:      log.ID,
+			ChunkNo: log.ChunkNo,
+		}
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			slog.Error("node logs: encode response failed", "err", err)
 		}
 
