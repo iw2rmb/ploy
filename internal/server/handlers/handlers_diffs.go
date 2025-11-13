@@ -15,16 +15,23 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// diffItem represents a single diff in a list response.
+type diffItem struct {
+	ID        string         `json:"id"`
+	StageID   string         `json:"stage_id"`
+	CreatedAt time.Time      `json:"created_at"`
+	Size      int            `json:"gzipped_size"`
+	Summary   map[string]any `json:"summary,omitempty"`
+}
+
+// diffListResponse is the typed response for listing diffs.
+type diffListResponse struct {
+	Diffs []diffItem `json:"diffs"`
+}
+
 // listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
 // GET /v1/mods/{id}/diffs
 func listRunDiffsHandler(st store.Store) http.HandlerFunc {
-	type diffItem struct {
-		ID        string         `json:"id"`
-		StageID   string         `json:"stage_id"`
-		CreatedAt time.Time      `json:"created_at"`
-		Size      int            `json:"gzipped_size"`
-		Summary   map[string]any `json:"summary,omitempty"`
-	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		idStr := strings.TrimSpace(r.PathValue("id"))
 		if idStr == "" {
@@ -60,7 +67,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"diffs": items})
+		_ = json.NewEncoder(w).Encode(diffListResponse{Diffs: items})
 	}
 }
 
