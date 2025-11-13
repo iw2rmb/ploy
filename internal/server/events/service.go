@@ -150,8 +150,10 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 
 // PublishTicket publishes a ticket lifecycle event (queued/running/succeeded/failed/cancelled)
 // to the SSE hub. The runID is used as the streamID for SSE fanout.
-// The payload should contain a modsapi.TicketSummary with current ticket state.
-// Returns an error if the fanout fails.
+//
+// The payload is intentionally typed as modsapi.TicketSummary to enforce a
+// JSON‑serializable contract at the service boundary and prevent accidental
+// non‑JSON payloads from being published. Returns an error if the fanout fails.
 func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.TicketSummary) error {
 	// Validate stream id after trimming whitespace so callers can't silently
 	// succeed with an all‑whitespace runID (the hub ignores empty ids).
