@@ -1,0 +1,15 @@
+server_url: "https://server:8443"
+node_id: "node-1"
+
+http:
+  listen: ":8444"
+  tls:
+    enabled: true
+    ca_path: "/etc/ploy/pki/ca.crt"
+    cert_path: "/etc/ploy/pki/node.crt"
+    key_path: "/etc/ploy/pki/node.key"
+
+heartbeat:
+  interval: 30s
+  timeout: 10s
+
