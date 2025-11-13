@@ -10,7 +10,7 @@ Legend: [ ] todo, [x] done.
 
 ## Node Agent: Execution Domain (705 LOC → 4 files)
 
-- [ ] Extract run orchestration into `execution_orchestrator.go` — Separate high-level run lifecycle from detail
+- [x] Extract run orchestration into `execution_orchestrator.go` — Separate high-level run lifecycle from detail
   - Component: `internal/nodeagent/execution_orchestrator.go`
   - Change: Move `executeRun()` main flow, workspace setup, defer cleanup logic
   - Test: Run existing `execution_test.go` suite — Verify all run lifecycle tests pass
