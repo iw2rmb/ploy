@@ -14,7 +14,7 @@ Assumptions:
   - Body: `{ repo_url, base_ref, target_ref, commit_sha? (optional), spec? (optional), created_by? }`
 - Server:
   - Insert run row: `status=queued`, `created_at=now()`
-  - Publish SSE “ticket” event: `{ ticket_id, status: "queued", repo_url, base_ref, target_ref }`
+  - Publish SSE “ticket” event: `{ ticket_id, state: "queued", repo_url, base_ref, target_ref }`
 - Response: `201 Created { ticket_id, status, repo_url, base_ref, target_ref }`
 
 ## 2) Start Following (CLI ⇄ Server)
@@ -34,7 +34,7 @@ Assumptions:
   - Body: `{ run_id }`
 - Server:
   - Update run: `status=running`
-  - Publish SSE “ticket” event: `{ ticket_id, status: "running" }`
+  - Publish SSE “ticket” event: `{ ticket_id, state: "running" }`
 - Response: `204 No Content`
 
 ## 5) Execute on Node (Node local work)
@@ -67,7 +67,7 @@ Assumptions:
   - Body: `{ run_id, status: "succeeded"|"failed"|"cancelled", reason?, stats? (JSON) }`
 - Server:
   - Update run: `status=<terminal>`, `finished_at=now()`, `stats=<payload>`
-  - Publish SSE “ticket” event with final status
+  - Publish SSE “ticket” event with final state
   - Publish SSE “done” status to terminate the stream cleanly
 - Response: `204 No Content`
 
@@ -84,4 +84,3 @@ Assumptions:
 - CLI → Server: submit, follow (SSE), optional artifact download
 - Node → Server: claim → ack → logs/diffs/artifacts → complete
 - Server → CLI (SSE): ticket events (queued, running, terminal) + done
-
