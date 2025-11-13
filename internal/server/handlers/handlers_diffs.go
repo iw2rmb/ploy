@@ -29,6 +29,16 @@ type diffListResponse struct {
 	Diffs []diffItem `json:"diffs"`
 }
 
+// diffGetResponse is the typed response for getting a single diff's metadata.
+type diffGetResponse struct {
+	ID          string         `json:"id"`
+	RunID       string         `json:"run_id"`
+	StageID     string         `json:"stage_id"`
+	CreatedAt   time.Time      `json:"created_at"`
+	GzippedSize int            `json:"gzipped_size"`
+	Summary     map[string]any `json:"summary,omitempty"`
+}
+
 // listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
 // GET /v1/mods/{id}/diffs
 func listRunDiffsHandler(st store.Store) http.HandlerFunc {
@@ -110,13 +120,13 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		if len(d.Summary) > 0 {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
-		resp := map[string]any{
-			"id":           uuid.UUID(d.ID.Bytes).String(),
-			"run_id":       uuid.UUID(d.RunID.Bytes).String(),
-			"stage_id":     uuid.UUID(d.StageID.Bytes).String(),
-			"created_at":   d.CreatedAt.Time,
-			"gzipped_size": len(d.Patch),
-			"summary":      summary,
+		resp := diffGetResponse{
+			ID:          uuid.UUID(d.ID.Bytes).String(),
+			RunID:       uuid.UUID(d.RunID.Bytes).String(),
+			StageID:     uuid.UUID(d.StageID.Bytes).String(),
+			CreatedAt:   d.CreatedAt.Time,
+			GzippedSize: len(d.Patch),
+			Summary:     summary,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

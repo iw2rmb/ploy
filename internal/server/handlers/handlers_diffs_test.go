@@ -86,3 +86,54 @@ func TestGetDiff_Download(t *testing.T) {
 		t.Fatal("empty body")
 	}
 }
+
+func TestGetDiff_Metadata(t *testing.T) {
+	st := &mockStore{}
+	runID := uuid.New()
+	stageID := uuid.New()
+	diffID := uuid.New()
+	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
+	st.getDiffResult = store.Diff{
+		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
+		Patch:     []byte{0x1f, 0x8b, 0x08},
+		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
+		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
+	}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
+	req.SetPathValue("id", diffID.String())
+	getDiffHandler(st).ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/json" {
+		t.Fatalf("content-type=%s, want application/json", ct)
+	}
+	var resp diffGetResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.ID != diffID.String() {
+		t.Errorf("id=%q, want %q", resp.ID, diffID.String())
+	}
+	if resp.RunID != runID.String() {
+		t.Errorf("run_id=%q, want %q", resp.RunID, runID.String())
+	}
+	if resp.StageID != stageID.String() {
+		t.Errorf("stage_id=%q, want %q", resp.StageID, stageID.String())
+	}
+	if !resp.CreatedAt.Equal(createdAt) {
+		t.Errorf("created_at=%v, want %v", resp.CreatedAt, createdAt)
+	}
+	if resp.GzippedSize != 3 {
+		t.Errorf("gzipped_size=%d, want 3", resp.GzippedSize)
+	}
+	if exitCode, ok := resp.Summary["exit_code"].(float64); !ok || exitCode != 0 {
+		t.Errorf("summary[exit_code]=%v, want 0", resp.Summary["exit_code"])
+	}
+	if filesChanged, ok := resp.Summary["files_changed"].(float64); !ok || filesChanged != 3 {
+		t.Errorf("summary[files_changed]=%v, want 3", resp.Summary["files_changed"])
+	}
+}
