@@ -83,7 +83,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extract PKI-specific endpoint cases and fixtures from handlers scope
   - Test: Run `go test ./internal/server/handlers -run PKI` — Verify certificate lifecycle tests
 
-- [ ] Split run/claim endpoint tests into `server_runs_test.go` — Isolate run orchestration tests
+- [x] Split run/claim endpoint tests into `server_runs_test.go` — Isolate run orchestration tests
   - Component: `internal/server/handlers/server_runs_test.go`
   - Change: Extract run submission, claim, status tests from handlers scope
   - Test: Run `go test ./internal/server/handlers -run Run` — Verify run state transitions
