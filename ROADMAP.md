@@ -20,7 +20,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move `executeWithHealing()`, `buildHealingManifest()`, `executionResult` type, `gateRunMetadata`
   - Test: Run `execution_healing_test.go` — Verify healing retry logic and re-gate scenarios
 
-- [ ] Extract MR creation into `execution_mr.go` — Separate GitLab MR workflow from core execution
+- [x] Extract MR creation into `execution_mr.go` — Separate GitLab MR workflow from core execution
   - Component: `internal/nodeagent/execution_mr.go`
   - Change: Move `createMR()`, `shouldCreateMR()`, `extractProjectIDFromRepoURL()`
   - Test: Mock GitLab API calls in `execution_mr_test.go` — Verify branch push and MR creation
