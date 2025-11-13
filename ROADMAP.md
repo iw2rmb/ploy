@@ -25,7 +25,7 @@ Legend: [ ] todo, [x] done.
   - Change: Move `createMR()`, `shouldCreateMR()`, `extractProjectIDFromRepoURL()`
   - Test: Mock GitLab API calls in `execution_mr_test.go` — Verify branch push and MR creation
 
-- [ ] Extract artifact/status upload into `execution_upload.go` — Centralize upload operations
+- [x] Extract artifact/status upload into `execution_upload.go` — Centralize upload operations
   - Component: `internal/nodeagent/execution_upload.go`
   - Change: Move diff upload, artifact bundling, `/out` upload, status upload logic (lines 128-367)
   - Test: Mock HTTP clients in `execution_upload_test.go` — Verify upload retry and error handling
