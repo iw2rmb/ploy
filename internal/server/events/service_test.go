@@ -1,5 +1,8 @@
 package events
 
+// This file contains tests for event storage and persistence behavior.
+// SSE streaming tests are in service_stream_test.go.
+
 import (
 	"context"
 	"encoding/json"
@@ -7,14 +10,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
-	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 	"github.com/iw2rmb/ploy/internal/store"
 	logstream "github.com/iw2rmb/ploy/internal/stream"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// TestNew verifies that the service constructor validates options and
+// initializes the service with proper defaults for buffer and history sizes.
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -77,6 +80,8 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestServiceStartStop verifies the service lifecycle, ensuring the service
+// can be started and stopped cleanly without errors.
 func TestServiceStartStop(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
@@ -96,62 +101,6 @@ func TestServiceStartStop(t *testing.T) {
 	// Stop the service.
 	if err := svc.Stop(ctx); err != nil {
 		t.Fatalf("failed to stop service: %v", err)
-	}
-}
-
-func TestServiceHubIntegration(t *testing.T) {
-	svc, err := New(Options{
-		BufferSize:  4,
-		HistorySize: 8,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
-
-	ctx := context.Background()
-	hub := svc.Hub()
-
-	// Publish a log event.
-	if err := hub.PublishLog(ctx, "test-stream", logstream.LogRecord{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Stream:    "stdout",
-		Line:      "test log line",
-	}); err != nil {
-		t.Fatalf("failed to publish log: %v", err)
-	}
-
-	// Subscribe to the stream.
-	sub, err := hub.Subscribe(ctx, "test-stream", 0)
-	if err != nil {
-		t.Fatalf("failed to subscribe: %v", err)
-	}
-	defer sub.Cancel()
-
-	// Publish a status event to close the stream.
-	if err := hub.PublishStatus(ctx, "test-stream", logstream.Status{
-		Status: "completed",
-	}); err != nil {
-		t.Fatalf("failed to publish status: %v", err)
-	}
-
-	// Read events from the subscription.
-	events := make([]logstream.Event, 0)
-	for evt := range sub.Events {
-		events = append(events, evt)
-		if evt.Type == "done" {
-			break
-		}
-	}
-
-	// Verify we received both events.
-	if len(events) != 2 {
-		t.Fatalf("expected 2 events, got %d", len(events))
-	}
-	if events[0].Type != "log" {
-		t.Fatalf("expected first event type 'log', got %s", events[0].Type)
-	}
-	if events[1].Type != "done" {
-		t.Fatalf("expected second event type 'done', got %s", events[1].Type)
 	}
 }
 
@@ -182,6 +131,9 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 	return nil
 }
 
+// TestCreateAndPublishEvent verifies that events are correctly persisted to the
+// database and published to the SSE hub. It tests successful creation, database
+// errors, and invalid UUID handling.
 func TestCreateAndPublishEvent(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
@@ -300,6 +252,10 @@ func TestCreateAndPublishEvent(t *testing.T) {
 	}
 }
 
+// TestCreateAndPublishEvent_LevelNormalization verifies that event log levels
+// are normalized to lowercase standard levels (info, warn, error). Unknown or
+// empty levels default to "info". This ensures consistent level representation
+// in both database storage and SSE streams.
 func TestCreateAndPublishEvent_LevelNormalization(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
@@ -383,6 +339,9 @@ func TestCreateAndPublishEvent_LevelNormalization(t *testing.T) {
 	}
 }
 
+// TestCreateAndPublishLog verifies that log chunks are correctly persisted to
+// the database and published to the SSE hub. It tests successful creation,
+// database errors, and invalid UUID handling for log records.
 func TestCreateAndPublishLog(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
@@ -500,6 +459,9 @@ func TestCreateAndPublishLog(t *testing.T) {
 	}
 }
 
+// TestCreateAndPublishWithoutStore verifies that the service correctly returns
+// errors when attempting to persist events or logs without a configured store.
+// This ensures proper error handling for services created without database backing.
 func TestCreateAndPublishWithoutStore(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
@@ -522,171 +484,5 @@ func TestCreateAndPublishWithoutStore(t *testing.T) {
 	_, err = svc.CreateAndPublishLog(ctx, store.CreateLogParams{})
 	if err == nil {
 		t.Fatal("expected error when store not configured, got nil")
-	}
-}
-
-func TestPublishTicket(t *testing.T) {
-	tests := []struct {
-		name        string
-		runID       string
-		state       modsapi.TicketState
-		wantErr     bool
-		checkEvents bool
-	}{
-		{
-			name:        "publish queued ticket",
-			runID:       uuid.New().String(),
-			state:       modsapi.TicketStatePending,
-			wantErr:     false,
-			checkEvents: true,
-		},
-		{
-			name:        "publish running ticket",
-			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateRunning,
-			wantErr:     false,
-			checkEvents: true,
-		},
-		{
-			name:        "publish succeeded ticket",
-			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateSucceeded,
-			wantErr:     false,
-			checkEvents: true,
-		},
-		{
-			name:        "publish failed ticket",
-			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateFailed,
-			wantErr:     false,
-			checkEvents: true,
-		},
-		{
-			name:        "publish cancelled ticket",
-			runID:       uuid.New().String(),
-			state:       modsapi.TicketStateCancelled,
-			wantErr:     false,
-			checkEvents: true,
-		},
-		{
-			name:        "empty runID returns error",
-			runID:       "",
-			state:       modsapi.TicketStatePending,
-			wantErr:     true,
-			checkEvents: false,
-		},
-		{
-			name:        "whitespace runID returns error",
-			runID:       "  \t  ",
-			state:       modsapi.TicketStatePending,
-			wantErr:     true,
-			checkEvents: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			svc, err := New(Options{
-				BufferSize:  4,
-				HistorySize: 8,
-			})
-			if err != nil {
-				t.Fatalf("failed to create service: %v", err)
-			}
-
-			ctx := context.Background()
-			now := time.Now()
-
-			payload := modsapi.TicketSummary{
-				TicketID:   domaintypes.TicketID("test-ticket-123"),
-				State:      tt.state,
-				Submitter:  "test-user",
-				Repository: "test-repo",
-				Metadata: map[string]string{
-					"key": "value",
-				},
-				CreatedAt: now,
-				UpdatedAt: now,
-				Stages: map[string]modsapi.StageStatus{
-					"stage-1": {
-						StageID:     domaintypes.StageID("stage-1"),
-						State:       modsapi.StageStateQueued,
-						Attempts:    0,
-						MaxAttempts: 3,
-					},
-				},
-			}
-
-			err = svc.PublishTicket(ctx, tt.runID, payload)
-
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			// Check if ticket event was published to hub.
-			if tt.checkEvents {
-				snapshot := svc.Hub().Snapshot(tt.runID)
-				if len(snapshot) == 0 {
-					t.Fatal("expected ticket event in hub snapshot, got none")
-				}
-				if snapshot[0].Type != "ticket" {
-					t.Fatalf("expected event type 'ticket', got %s", snapshot[0].Type)
-				}
-
-				// Verify the payload is correctly marshaled.
-				var decodedPayload modsapi.TicketSummary
-				if err := json.Unmarshal(snapshot[0].Data, &decodedPayload); err != nil {
-					t.Fatalf("failed to unmarshal ticket payload: %v", err)
-				}
-
-				if decodedPayload.TicketID != payload.TicketID {
-					t.Fatalf("expected ticket ID %s, got %s", payload.TicketID, decodedPayload.TicketID)
-				}
-				if decodedPayload.State != payload.State {
-					t.Fatalf("expected state %s, got %s", payload.State, decodedPayload.State)
-				}
-				if decodedPayload.Submitter != payload.Submitter {
-					t.Fatalf("expected submitter %s, got %s", payload.Submitter, decodedPayload.Submitter)
-				}
-			}
-		})
-	}
-}
-
-func TestPublishTicketWithContext(t *testing.T) {
-	svc, err := New(Options{
-		BufferSize:  4,
-		HistorySize: 8,
-	})
-	if err != nil {
-		t.Fatalf("failed to create service: %v", err)
-	}
-
-	runID := uuid.New().String()
-	payload := modsapi.TicketSummary{
-		TicketID:  domaintypes.TicketID("test-ticket"),
-		State:     modsapi.TicketStateRunning,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Stages:    map[string]modsapi.StageStatus{},
-	}
-
-	// Test with cancelled context.
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	err = svc.PublishTicket(ctx, runID, payload)
-	if err == nil {
-		t.Fatal("expected error with cancelled context, got nil")
-	}
-	if err != context.Canceled {
-		t.Fatalf("expected context.Canceled error, got: %v", err)
 	}
 }
