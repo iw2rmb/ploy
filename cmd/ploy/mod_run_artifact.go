@@ -3,19 +3,22 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
 )
 
 // downloadTicketArtifacts fetches ticket status and downloads referenced artifacts into dir.
-// It creates a manifest.json file listing all downloaded artifacts with their metadata.
+// It streams bytes to disk (no in‑memory buffering), produces deterministic filenames,
+// and writes a manifest.json with stable, sorted entries for reproducible output.
 func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *http.Client, ticketID, dir string, out io.Writer) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create artifact dir %s: %w", dir, err)
@@ -39,9 +42,15 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 	}
 	var payload modsapi.TicketStatusResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return fmt.Errorf("decode ticket status: %w", err)
+		if errors.Is(err, io.EOF) {
+			// Treat empty body as an empty status (no artifacts).
+			payload = modsapi.TicketStatusResponse{}
+		} else {
+			return fmt.Errorf("decode ticket status: %w", err)
+		}
 	}
 	// Collect artifacts via control-plane HTTP endpoint lookups.
+	// Note: keep in sync with mod_run_artifact_test.go manifest shape.
 	type manifestItem struct {
 		Stage  string `json:"stage"`
 		Name   string `json:"name"`
@@ -52,8 +61,22 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 	}
 	items := make([]manifestItem, 0)
 	var downloaded int
-	for stageID, st := range payload.Ticket.Stages {
-		for name, cid := range st.Artifacts {
+
+	// Deterministic iteration: sort stages and artifact names for stable manifests.
+	stageIDs := make([]string, 0, len(payload.Ticket.Stages))
+	for id := range payload.Ticket.Stages {
+		stageIDs = append(stageIDs, id)
+	}
+	sort.Strings(stageIDs)
+	for _, stageID := range stageIDs {
+		st := payload.Ticket.Stages[stageID]
+		names := make([]string, 0, len(st.Artifacts))
+		for n := range st.Artifacts {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			cid := st.Artifacts[name]
 			// Lookup artifact metadata by CID via /v1/artifacts?cid=<cid>.
 			lookupURL, err := url.Parse(base.String())
 			if err != nil {
@@ -119,12 +142,23 @@ func downloadTicketArtifacts(ctx context.Context, base *url.URL, httpClient *htt
 			}
 			filename := buildArtifactFilename(stageID, name, cid, art.Digest)
 			path := filepath.Join(dir, filename)
-			data, _ := io.ReadAll(dresp.Body)
-			_ = dresp.Body.Close()
-			if err := os.WriteFile(path, data, 0o644); err != nil {
-				return fmt.Errorf("write artifact %s: %w", filename, err)
+
+			// Stream download to disk to avoid buffering large artifacts in memory.
+			f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				_ = dresp.Body.Close()
+				return fmt.Errorf("open artifact %s: %w", filename, err)
 			}
-			items = append(items, manifestItem{Stage: stageID, Name: name, CID: cid, Digest: art.Digest, Size: int64(len(data)), Path: path})
+			n, copyErr := io.Copy(f, dresp.Body)
+			closeErr := f.Close()
+			_ = dresp.Body.Close()
+			if copyErr != nil {
+				return fmt.Errorf("download artifact %s: %w", filename, copyErr)
+			}
+			if closeErr != nil {
+				return fmt.Errorf("close artifact %s: %w", filename, closeErr)
+			}
+			items = append(items, manifestItem{Stage: stageID, Name: name, CID: cid, Digest: art.Digest, Size: n, Path: path})
 			downloaded++
 		}
 	}
@@ -147,6 +181,7 @@ func buildArtifactFilename(stage, name, cid, digest string) string {
 		s = strings.TrimSpace(s)
 		s = strings.ReplaceAll(s, "/", "_")
 		s = strings.ReplaceAll(s, "\\", "_")
+		s = strings.ReplaceAll(s, ":", "_")
 		return s
 	}
 	stage = clean(stage)

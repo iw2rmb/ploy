@@ -60,6 +60,12 @@ stages before continuing to static checks and tests. When
 successful run so developers can confirm which toggles/bundles were attached to
 each stage.
 
+When a followed run completes successfully, pass `--artifact-dir <dir>` to
+download referenced artifacts and generate `<dir>/manifest.json`. The manifest
+lists artifacts with `stage`, `name`, `cid`, `digest`, `size` (bytes written),
+and the local `path`. Filenames are sanitized and deterministic; when a content
+digest is available it prefixes the name, otherwise the artifact CID is used.
+
 `environment materialize` evaluates the integration manifest for a given
 app/commit pair, composes deterministic cache keys for each required lane, and
 hydrates those caches through an in-memory hydrator. Dry-run mode avoids
@@ -112,6 +118,9 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   plan evaluation (`mod run`).
 - `--mods-max-parallel` — Upper bound on concurrent Mods stages emitted by the
   planner (`mod run`).
+- `--artifact-dir` — Download final artifacts to the given directory after a
+  successful run (`mod run --follow`). A `manifest.json` file is created with
+  artifact metadata.
 - Streaming guards (long-lived SSE):
   - `mods logs` and `runs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).

@@ -450,3 +450,47 @@ func TestFetchMRURLErrorHandling(t *testing.T) {
 		t.Errorf("error %q does not contain status code 500", err.Error())
 	}
 }
+
+// TestDownloadTicketArtifactsZeroArtifacts writes an empty manifest when no artifacts exist.
+func TestDownloadTicketArtifactsZeroArtifacts(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v1/mods/") {
+			resp := modsapi.TicketStatusResponse{
+				Ticket: modsapi.TicketSummary{Stages: map[string]modsapi.StageStatus{
+					"stage0": {Artifacts: map[string]string{}},
+				}},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	baseURL, _ := url.Parse(server.URL)
+	out := &bytes.Buffer{}
+	ctx := context.Background()
+	if err := downloadTicketArtifacts(ctx, baseURL, server.Client(), "t0", tmpDir, out); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(tmpDir, "manifest.json"))
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+	var manifest struct {
+		Artifacts []any `json:"artifacts"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+	if len(manifest.Artifacts) != 0 {
+		t.Fatalf("expected 0 artifacts, got %d", len(manifest.Artifacts))
+	}
+	if !strings.Contains(out.String(), "Downloaded 0 artifacts") {
+		t.Fatalf("expected \"Downloaded 0 artifacts\" in output, got: %s", out.String())
+	}
+}
