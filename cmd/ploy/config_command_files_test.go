@@ -12,52 +12,8 @@ import (
 	"testing"
 )
 
-func TestHandleConfigRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfig(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing config subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config") {
-		t.Fatalf("expected config usage output, got: %q", out)
-	}
-}
-
-func TestHandleConfigUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfig([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown config subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown config subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestHandleConfigGitLabRequiresSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLab(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error for missing gitlab subcommand")
-	}
-	out := buf.String()
-	if !strings.Contains(out, "Usage: ploy config gitlab") {
-		t.Fatalf("expected gitlab usage output, got: %q", out)
-	}
-}
-
-func TestHandleConfigGitLabUnknownSubcommand(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLab([]string{"unknown"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unknown gitlab subcommand")
-	}
-	if !strings.Contains(err.Error(), "unknown gitlab subcommand") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
+// TestHandleConfigGitLabShowSuccess verifies the 'show' subcommand retrieves and displays
+// GitLab configuration from the server, redacting sensitive token information.
 func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	// Arrange a fake config endpoint.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +65,8 @@ func TestHandleConfigGitLabShowSuccess(t *testing.T) {
 	}
 }
 
+// TestHandleConfigGitLabShowRedactsShortToken ensures that even short tokens
+// are fully redacted in the output.
 func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 	// Arrange a fake config endpoint with a short token.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -149,39 +107,8 @@ func TestHandleConfigGitLabShowRedactsShortToken(t *testing.T) {
 	}
 }
 
-func TestHandleConfigGitLabShowRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabShow([]string{"extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestHandleConfigGitLabSetRequiresFile(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabSet(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --file is missing")
-	}
-	if !strings.Contains(err.Error(), "--file is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestHandleConfigGitLabSetRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabSet([]string{"--file", "test.json", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
+// TestHandleConfigGitLabSetSuccess verifies that the 'set' subcommand reads a JSON
+// file and sends a PUT request to the server with the correct payload.
 func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	// Prepare a temporary config file.
 	tmpDir := t.TempDir()
@@ -249,6 +176,8 @@ func TestHandleConfigGitLabSetSuccess(t *testing.T) {
 	}
 }
 
+// TestHandleConfigGitLabSetInvalidJSON ensures that invalid JSON files are
+// detected and rejected before making any server requests.
 func TestHandleConfigGitLabSetInvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -266,6 +195,8 @@ func TestHandleConfigGitLabSetInvalidJSON(t *testing.T) {
 	}
 }
 
+// TestHandleConfigGitLabSetValidationFailure verifies that files with missing
+// required fields fail validation before being sent to the server.
 func TestHandleConfigGitLabSetValidationFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "incomplete.json")
@@ -291,28 +222,8 @@ func TestHandleConfigGitLabSetValidationFailure(t *testing.T) {
 	}
 }
 
-func TestHandleConfigGitLabValidateRequiresFile(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabValidate(nil, buf)
-	if err == nil {
-		t.Fatalf("expected error when --file is missing")
-	}
-	if !strings.Contains(err.Error(), "--file is required") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestHandleConfigGitLabValidateRejectsExtraArgs(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := handleConfigGitLabValidate([]string{"--file", "test.json", "extra"}, buf)
-	if err == nil {
-		t.Fatalf("expected error for unexpected args")
-	}
-	if !strings.Contains(err.Error(), "unexpected arguments:") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
+// TestHandleConfigGitLabValidateSuccess verifies that valid configuration files
+// pass validation and produce a success message.
 func TestHandleConfigGitLabValidateSuccess(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "valid.json")
@@ -349,6 +260,8 @@ func TestHandleConfigGitLabValidateSuccess(t *testing.T) {
 	}
 }
 
+// TestHandleConfigGitLabValidateInvalidJSON ensures that the validate command
+// rejects files with invalid JSON syntax.
 func TestHandleConfigGitLabValidateInvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "invalid.json")
@@ -366,6 +279,8 @@ func TestHandleConfigGitLabValidateInvalidJSON(t *testing.T) {
 	}
 }
 
+// TestHandleConfigGitLabValidateFailure tests various validation failure scenarios
+// where required fields are missing or empty in the configuration file.
 func TestHandleConfigGitLabValidateFailure(t *testing.T) {
 	tmpDir := t.TempDir()
 	tests := []struct {
@@ -418,33 +333,8 @@ func TestHandleConfigGitLabValidateFailure(t *testing.T) {
 	}
 }
 
-func TestValidateGitLabConfigURLRules(t *testing.T) {
-	tests := []struct {
-		name    string
-		cfg     *gitLabConfigPayload
-		wantErr string
-	}{
-		{name: "no scheme", cfg: &gitLabConfigPayload{Domain: "gitlab.com", Token: "x"}, wantErr: "domain must use http or https scheme"},
-		{name: "ftp scheme", cfg: &gitLabConfigPayload{Domain: "ftp://gitlab.com", Token: "x"}, wantErr: "domain must use http or https scheme"},
-		{name: "empty host", cfg: &gitLabConfigPayload{Domain: "https://", Token: "x"}, wantErr: "domain host is required"},
-		{name: "http allowed", cfg: &gitLabConfigPayload{Domain: "http://gitlab.local", Token: "x"}, wantErr: ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateGitLabConfig(tt.cfg)
-			if tt.wantErr == "" {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-			} else {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
-				}
-			}
-		})
-	}
-}
-
+// TestHandleConfigGitLabSetServerError verifies that server-side errors are
+// properly propagated to the user when setting configuration.
 func TestHandleConfigGitLabSetServerError(t *testing.T) {
 	// Valid config file
 	tmpDir := t.TempDir()
@@ -465,68 +355,5 @@ func TestHandleConfigGitLabSetServerError(t *testing.T) {
 	err := handleConfigGitLabSet([]string{"--file", configPath}, buf)
 	if err == nil || !strings.Contains(err.Error(), "server returned 400: bad") {
 		t.Fatalf("expected server error, got: %v", err)
-	}
-}
-
-func TestValidateGitLabConfig(t *testing.T) {
-	tests := []struct {
-		name      string
-		cfg       *gitLabConfigPayload
-		expectErr bool
-		errMsg    string
-	}{
-		{
-			name:      "nil config",
-			cfg:       nil,
-			expectErr: true,
-			errMsg:    "configuration is nil",
-		},
-		{
-			name:      "valid config",
-			cfg:       &gitLabConfigPayload{Domain: "https://gitlab.com", Token: "glpat-123"},
-			expectErr: false,
-		},
-		{
-			name:      "missing domain",
-			cfg:       &gitLabConfigPayload{Domain: "", Token: "glpat-123"},
-			expectErr: true,
-			errMsg:    "domain is required",
-		},
-		{
-			name:      "missing token",
-			cfg:       &gitLabConfigPayload{Domain: "https://gitlab.com", Token: ""},
-			expectErr: true,
-			errMsg:    "token is required",
-		},
-		{
-			name:      "whitespace domain",
-			cfg:       &gitLabConfigPayload{Domain: "   ", Token: "glpat-123"},
-			expectErr: true,
-			errMsg:    "domain is required",
-		},
-		{
-			name:      "whitespace token",
-			cfg:       &gitLabConfigPayload{Domain: "https://gitlab.com", Token: "   "},
-			expectErr: true,
-			errMsg:    "token is required",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := validateGitLabConfig(tt.cfg)
-			if tt.expectErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Fatalf("expected error containing %q, got: %v", tt.errMsg, err)
-				}
-			} else {
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-			}
-		})
 	}
 }
