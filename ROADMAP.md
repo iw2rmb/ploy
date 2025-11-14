@@ -216,6 +216,7 @@ Legend: [ ] todo, [x] done.
   - Component: All modified packages
   - Change: N/A
   - Test: `golangci-lint run` — No new linting issues introduced
+  - Verification (2025-11-14): `go vet github.com/iw2rmb/ploy`, `staticcheck github.com/iw2rmb/ploy` — OK (root has no Go files; constraints prevented broader package scan)
 
 - [ ] Build CLI — Ensure binary output exists
   - Component: CLI
