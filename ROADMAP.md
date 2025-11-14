@@ -136,15 +136,15 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Execution Healing Tests (684 LOC → 2 files)
 
-- [x] Split retry tests into `execution_healing_retry_test.go` — Focus on retry/backoff scenarios
+ - [x] Split retry tests into `execution_healing_retry_test.go` — Focus on retry boundaries and env/TLS injection
   - Component: `internal/nodeagent/execution_healing_retry_test.go`
-  - Change: Extract retry exhaustion, backoff timing, error propagation tests
-  - Test: Run `go test ./internal/nodeagent -run HealingRetry` — Verify retry boundaries
+  - Change: Extract retry exhaustion, env injection, error propagation tests
+  - Test: Run `go test -count=1 ./internal/nodeagent -run 'ExecuteWithHealing_(Retries|Injects|HealingConfiguredNoMods|ModNonZeroExit)'` — Verify retry boundaries
 
-- [ ] Keep gate tests in `execution_healing_test.go` — Retain gate validation logic tests
+ - [x] Keep gate tests in `execution_healing_test.go` — Retain gate validation logic tests
   - Component: `internal/nodeagent/execution_healing_test.go`
   - Change: Keep pre-gate, re-gate, healing mod execution tests
-  - Test: Run `go test ./internal/nodeagent -run HealingGate` — Verify gate pass/fail scenarios
+  - Test: Run `go test -count=1 ./internal/nodeagent -run 'ExecuteWithHealing_(Gate|NoHealing)'` — Verify gate pass/fail scenarios
 
 ## Test Files: PKI Handler Tests (677 LOC → 2 files)
 
