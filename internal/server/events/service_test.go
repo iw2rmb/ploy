@@ -16,9 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TestNew verifies that the service constructor validates options and
+// TestStorage_New verifies that the service constructor validates options and
 // initializes the service with proper defaults for buffer and history sizes.
-func TestNew(t *testing.T) {
+func TestStorage_New(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    Options
@@ -80,9 +80,9 @@ func TestNew(t *testing.T) {
 	}
 }
 
-// TestServiceStartStop verifies the service lifecycle, ensuring the service
+// TestStorage_ServiceStartStop verifies the service lifecycle, ensuring the service
 // can be started and stopped cleanly without errors.
-func TestServiceStartStop(t *testing.T) {
+func TestStorage_ServiceStartStop(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
 		HistorySize: 8,
@@ -131,10 +131,10 @@ func (m *mockStore) Pool() *pgxpool.Pool {
 	return nil
 }
 
-// TestCreateAndPublishEvent verifies that events are correctly persisted to the
+// TestStorage_CreateAndPublishEvent verifies that events are correctly persisted to the
 // database and published to the SSE hub. It tests successful creation, database
 // errors, and invalid UUID handling.
-func TestCreateAndPublishEvent(t *testing.T) {
+func TestStorage_CreateAndPublishEvent(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 		Valid: true,
@@ -252,11 +252,11 @@ func TestCreateAndPublishEvent(t *testing.T) {
 	}
 }
 
-// TestCreateAndPublishEvent_LevelNormalization verifies that event log levels
+// TestStorage_LevelNormalization verifies that event log levels
 // are normalized to lowercase standard levels (info, warn, error). Unknown or
 // empty levels default to "info". This ensures consistent level representation
 // in both database storage and SSE streams.
-func TestCreateAndPublishEvent_LevelNormalization(t *testing.T) {
+func TestStorage_LevelNormalization(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 		Valid: true,
@@ -339,10 +339,10 @@ func TestCreateAndPublishEvent_LevelNormalization(t *testing.T) {
 	}
 }
 
-// TestCreateAndPublishLog verifies that log chunks are correctly persisted to
+// TestStorage_CreateAndPublishLog verifies that log chunks are correctly persisted to
 // the database and published to the SSE hub. It tests successful creation,
 // database errors, and invalid UUID handling for log records.
-func TestCreateAndPublishLog(t *testing.T) {
+func TestStorage_CreateAndPublishLog(t *testing.T) {
 	runID := pgtype.UUID{
 		Bytes: [16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
 		Valid: true,
@@ -459,10 +459,10 @@ func TestCreateAndPublishLog(t *testing.T) {
 	}
 }
 
-// TestCreateAndPublishWithoutStore verifies that the service correctly returns
+// TestStorage_WithoutStore verifies that the service correctly returns
 // errors when attempting to persist events or logs without a configured store.
 // This ensures proper error handling for services created without database backing.
-func TestCreateAndPublishWithoutStore(t *testing.T) {
+func TestStorage_WithoutStore(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
 		HistorySize: 8,
