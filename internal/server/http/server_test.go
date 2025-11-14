@@ -2,7 +2,7 @@
 //
 // This file focuses on server lifecycle, TLS configuration, multiplexer API,
 // and timeout behavior. Endpoint-specific tests (e.g., PKI, runs) are located
-// in the handlers package (server_pki_test.go, server_runs_test.go).
+// in the handlers package (handlers_pki_test.go, server_runs_test.go).
 //
 // Test coverage:
 //   - Server construction and validation (New)
