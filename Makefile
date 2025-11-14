@@ -1,5 +1,6 @@
 BINARY := ploy
 BUILD_DIR := dist
+COVERAGE_FILE := $(BUILD_DIR)/coverage.out
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -43,27 +44,29 @@ test-race: ## Run all unit tests with race detector
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
 
 .PHONY: test-coverage
-test-coverage: ## Run tests and generate coverage report
+test-coverage: $(COVERAGE_FILE) ## Run tests and generate coverage report
+	@echo "\n=== Coverage Summary ==="
+	@go tool cover -func=$(COVERAGE_FILE) | grep '^total:'
+
+$(COVERAGE_FILE):
 	@mkdir -p $(BUILD_DIR)
 	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
-	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(BUILD_DIR)/coverage.out -covermode=atomic ./...; \
+	PLOY_CONFIG_HOME="$$TMP" go test -coverprofile=$(COVERAGE_FILE) -covermode=atomic ./...; \
 	rc=$$?; rm -rf "$$TMP"; exit $$rc
-	@echo "\n=== Coverage Summary ==="
-	@go tool cover -func=$(BUILD_DIR)/coverage.out | grep total:
 
 .PHONY: test-coverage-threshold
-test-coverage-threshold: test-coverage ## Run tests and enforce 60% coverage threshold
-	@COVERAGE=$$(go tool cover -func=$(BUILD_DIR)/coverage.out | grep total: | awk '{print $$3}' | sed 's/%//'); \
+test-coverage-threshold: $(COVERAGE_FILE) ## Enforce 60% overall coverage threshold
+	@COVERAGE=$$(go tool cover -func=$(COVERAGE_FILE) | grep '^total:' | awk '{print $$3}' | sed 's/%//'); \
 	THRESHOLD=60; \
 	echo "Coverage: $$COVERAGE% (threshold: $$THRESHOLD%)"; \
-	if [ $$(echo "$$COVERAGE < $$THRESHOLD" | bc -l) -eq 1 ]; then \
+	if awk -v c="$$COVERAGE" -v t="$$THRESHOLD" 'BEGIN{exit(c>=t)}'; then \
 		echo "ERROR: Coverage $$COVERAGE% is below threshold $$THRESHOLD%"; \
 		exit 1; \
 	fi
 
 .PHONY: test-coverage-critical
-test-coverage-critical: test-coverage ## Enforce 90% coverage on scheduler/PKI/ingest critical paths
-	@./scripts/check-critical-coverage.sh $(BUILD_DIR)/coverage.out
+test-coverage-critical: $(COVERAGE_FILE) ## Enforce 90% coverage on scheduler/PKI/ingest critical paths
+	@./scripts/check-critical-coverage.sh $(COVERAGE_FILE)
 
 .PHONY: vet
 vet: ## Run go vet
@@ -129,10 +132,10 @@ help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build                      # Build the CLI and server binaries"
 	@echo "  make fmt                        # Run gofmt over Go source"
-	@echo "  make test                       # Run go test ./... with coverage"
+	@echo "  make test                       # Run unit tests with coverage thresholds"
 	@echo "  make test-race                  # Run tests with race detector"
 	@echo "  make test-coverage              # Run tests and generate coverage report"
-	@echo "  make test-coverage-threshold    # Run tests and enforce 60% coverage threshold"
+	@echo "  make test-coverage-threshold    # Enforce 60% overall coverage threshold"
 	@echo "  make test-coverage-critical     # Enforce 90% coverage on scheduler/PKI/ingest critical paths"
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
