@@ -101,6 +101,13 @@ func TestServerDeployDryRunReuseCluster(t *testing.T) {
 	}
 	oldRunner := detectRunner
 	detectRunner = &mockRunner{runFunc: func(ctx context.Context, cmd string, args []string, stdin io.Reader, streams deploy.IOStreams) error {
+		// Simulate existing cluster detection: all SSH commands succeed, and CN extraction returns a cluster ID.
+		if len(args) > 0 && strings.Contains(strings.Join(args, " "), "commonName") {
+			// Return the cluster ID in CN format (ployd-<clusterID>).
+			if streams.Stdout != nil {
+				_, _ = io.WriteString(streams.Stdout, "ployd-testcluster123")
+			}
+		}
 		return nil
 	}}
 	defer func() { detectRunner = oldRunner }()

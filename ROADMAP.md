@@ -197,7 +197,7 @@ Legend: [ ] todo, [x] done.
 
 ## Validation Phase
 
-- [ ] Run full test suite after all splits — Ensure no regressions introduced
+- [x] Run full test suite after all splits — Ensure no regressions introduced
   - Component: All packages
   - Change: N/A
   - Test: `make test` or `go test ./...` — All tests pass with same coverage percentage
