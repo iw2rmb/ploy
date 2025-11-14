@@ -140,7 +140,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("    cert: /etc/ploy/pki/server.crt\n")
 	b.WriteString("    key: /etc/ploy/pki/server.key\n")
 	b.WriteString("    client_ca: /etc/ploy/pki/ca.crt\n")
-	b.WriteString("    require_client_cert: true\n")
+	// mTLS is mandatory by server policy; no separate require flag.
 	b.WriteString("metrics:\n")
 	b.WriteString("  listen: :9100\n")
 	b.WriteString("control_plane:\n")

@@ -39,7 +39,6 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	assertContains("cert: /etc/ploy/pki/server.crt")
 	assertContains("key: /etc/ploy/pki/server.key")
 	assertContains("client_ca: /etc/ploy/pki/ca.crt")
-	assertContains("require_client_cert: true")
 	assertContains("metrics:")
 	assertContains("listen: :9100")
 	assertContains("postgres:")

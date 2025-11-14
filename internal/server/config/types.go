@@ -13,11 +13,10 @@ type HTTPConfig struct {
 
 // TLSConfig configures TLS for HTTP servers.
 type TLSConfig struct {
-	Enabled           bool   `yaml:"enabled"`
-	CertPath          string `yaml:"cert"`
-	KeyPath           string `yaml:"key"`
-	ClientCAPath      string `yaml:"client_ca"`
-	RequireClientCert bool   `yaml:"require_client_cert"`
+	Enabled      bool   `yaml:"enabled"`
+	CertPath     string `yaml:"cert"`
+	KeyPath      string `yaml:"key"`
+	ClientCAPath string `yaml:"client_ca"`
 }
 
 // MetricsConfig configures the Prometheus metrics endpoint.

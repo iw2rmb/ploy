@@ -154,4 +154,7 @@ Configuration: run `dist/ployd --config /path/to/ployd.yaml` or set `PLOYD_CONFI
 - **Node labels**: Replaced with resource-snapshot scheduling.
 - **SSH tunnels**: CLI uses direct HTTPS/mTLS to control-plane.
 
+**Schema Changes (November 2025)**
+- `http.tls.require_client_cert` (config YAML) was removed. When `http.tls.enabled` is true, the server always requires mTLS with client certificates verified against `http.tls.client_ca`. TLS is pinned to 1.3. Example configs and bootstrap have been updated accordingly.
+
 License: see `LICENSE` when present.

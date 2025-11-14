@@ -358,7 +358,7 @@ func TestServer_TLS(t *testing.T) {
 	})
 
 	t.Run("mtls_enabled", func(t *testing.T) {
-		// Verify mTLS enforcement with RequireClientCert option.
+		// Verify mTLS enforcement when TLS is enabled (mTLS is mandatory).
 		tmpDir := t.TempDir()
 
 		// Get or create CA certificate.
@@ -391,11 +391,10 @@ func TestServer_TLS(t *testing.T) {
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
 				TLS: config.TLSConfig{
-					Enabled:           true,
-					CertPath:          serverCertPath,
-					KeyPath:           serverKeyPath,
-					ClientCAPath:      caPath,
-					RequireClientCert: true,
+					Enabled:      true,
+					CertPath:     serverCertPath,
+					KeyPath:      serverKeyPath,
+					ClientCAPath: caPath,
 				},
 			},
 			Authorizer: authorizer,
@@ -588,6 +587,76 @@ func TestServer_TLS(t *testing.T) {
 			t.Error("expected TLS 1.2 connection to fail, but it succeeded")
 		}
 	})
+
+	t.Run("invalid_server_cert_path", func(t *testing.T) {
+		// Start should fail if server certificate path is invalid.
+		tmpDir := t.TempDir()
+		ca := getTestCA(t)
+		caPath := filepath.Join(tmpDir, "ca.crt")
+		if err := os.WriteFile(caPath, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.cert.Raw}), 0644); err != nil {
+			t.Fatalf("write CA cert: %v", err)
+		}
+
+		authorizer := auth.NewAuthorizer(auth.Options{AllowInsecure: false, DefaultRole: auth.RoleControlPlane})
+		opts := Options{Config: config.HTTPConfig{Listen: "127.0.0.1:0", TLS: config.TLSConfig{Enabled: true, CertPath: filepath.Join(tmpDir, "nope.crt"), KeyPath: filepath.Join(tmpDir, "nope.key"), ClientCAPath: caPath}}, Authorizer: authorizer}
+		srv, err := New(opts)
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if err := srv.Start(context.Background()); err == nil {
+			srv.Stop(context.Background())
+			t.Fatal("Start() expected error for invalid server certificate/key paths")
+		}
+	})
+
+	t.Run("invalid_client_ca_path", func(t *testing.T) {
+		// Start should fail if client CA path does not exist.
+		tmpDir := t.TempDir()
+		// Create a valid server cert/key so we hit the CA path branch next.
+		serverCert, serverKey := generateCertificate(t, "server", nil)
+		serverCertPath := filepath.Join(tmpDir, "server.crt")
+		serverKeyPath := filepath.Join(tmpDir, "server.key")
+		writeCertAndKey(t, serverCertPath, serverKeyPath, serverCert, serverKey)
+
+		authorizer := auth.NewAuthorizer(auth.Options{AllowInsecure: false, DefaultRole: auth.RoleControlPlane})
+		opts := Options{Config: config.HTTPConfig{Listen: "127.0.0.1:0", TLS: config.TLSConfig{Enabled: true, CertPath: serverCertPath, KeyPath: serverKeyPath, ClientCAPath: filepath.Join(tmpDir, "missing-ca.crt")}}, Authorizer: authorizer}
+		srv, err := New(opts)
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if err := srv.Start(context.Background()); err == nil {
+			srv.Stop(context.Background())
+			t.Fatal("Start() expected error for missing client CA path")
+		}
+	})
+
+	t.Run("invalid_client_ca_parse", func(t *testing.T) {
+		// Start should fail if client CA file cannot be parsed as PEM.
+		tmpDir := t.TempDir()
+
+		// Write valid server cert/key.
+		serverCert, serverKey := generateCertificate(t, "server", nil)
+		serverCertPath := filepath.Join(tmpDir, "server.crt")
+		serverKeyPath := filepath.Join(tmpDir, "server.key")
+		writeCertAndKey(t, serverCertPath, serverKeyPath, serverCert, serverKey)
+
+		// Write invalid CA file
+		badCAPath := filepath.Join(tmpDir, "bad-ca.crt")
+		if err := os.WriteFile(badCAPath, []byte("not-a-pem"), 0644); err != nil {
+			t.Fatalf("write bad CA: %v", err)
+		}
+
+		authorizer := auth.NewAuthorizer(auth.Options{AllowInsecure: false, DefaultRole: auth.RoleControlPlane})
+		opts := Options{Config: config.HTTPConfig{Listen: "127.0.0.1:0", TLS: config.TLSConfig{Enabled: true, CertPath: serverCertPath, KeyPath: serverKeyPath, ClientCAPath: badCAPath}}, Authorizer: authorizer}
+		srv, err := New(opts)
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		if err := srv.Start(context.Background()); err == nil {
+			srv.Stop(context.Background())
+			t.Fatal("Start() expected error for unparsable client CA certificate")
+		}
+	})
 }
 
 // TestServer_Timeouts validates HTTP timeout configuration.
@@ -626,6 +695,10 @@ func TestServer_Timeouts(t *testing.T) {
 		httpSrv := srv.httpServer
 		srv.mu.Unlock()
 
+		// ReadHeaderTimeout default is 10s per server implementation.
+		if httpSrv.ReadHeaderTimeout != 10*time.Second {
+			t.Errorf("expected ReadHeaderTimeout 10s, got %v", httpSrv.ReadHeaderTimeout)
+		}
 		if httpSrv.ReadTimeout != 30*time.Second {
 			t.Errorf("expected ReadTimeout 30s, got %v", httpSrv.ReadTimeout)
 		}
