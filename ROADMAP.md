@@ -168,7 +168,7 @@ Legend: [ ] todo, [x] done.
 - [x] Split `cmd/ploy/mod_run_spec_test.go` (677 LOC) — Extract env file and JSON/YAML tests
   - Component: `cmd/ploy/mod_run_env_file_test.go` (556 LOC already exists), create `mod_run_spec_parsing_test.go`
   - Change: Keep precedence tests in main file, extract format-specific tests
-  - Test: Run `go test ./cmd/ploy -run ModRunSpec` — Verify spec parsing coverage
+  - Test: Run `go test -count=1 ./cmd/ploy -run BuildSpecPayload` — Verify spec parsing coverage
 
 - [ ] Split `internal/store/claims_test.go` (625 LOC) — Separate by claim state transitions
   - Component: Create `claims_state_test.go`, `claims_query_test.go`
