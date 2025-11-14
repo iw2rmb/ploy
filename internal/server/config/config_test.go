@@ -77,7 +77,6 @@ http:
     cert: /etc/ploy/pki/ployd.pem
     key: /etc/ploy/pki/ployd-key.pem
     client_ca: /etc/ploy/pki/clients.pem
-    require_client_cert: true
 metrics:
   listen: 127.0.0.1:19100
 admin:
@@ -116,9 +115,6 @@ runtime:
 	}
 	if cfg.HTTP.TLS.CertPath != "/etc/ploy/pki/ployd.pem" {
 		t.Fatalf("HTTP.TLS.CertPath = %q", cfg.HTTP.TLS.CertPath)
-	}
-	if cfg.HTTP.TLS.RequireClientCert != true {
-		t.Fatal("HTTP.TLS.RequireClientCert expected true")
 	}
 	if cfg.Metrics.Listen != "127.0.0.1:19100" {
 		t.Fatalf("Metrics.Listen = %q", cfg.Metrics.Listen)

@@ -42,6 +42,7 @@ This command:
   - `metrics.listen: :9100`
   - `control_plane.endpoint: https://127.0.0.1:8443` with local mTLS paths
   - `postgres.dsn: ${PLOY_POSTGRES_DSN:-}` (expanded at bootstrap time to a literal DSN in the file)
+  - Note: There is no `http.tls.require_client_cert` knob; mTLS is mandatory whenever TLS is enabled.
 - Installs systemd unit `/etc/systemd/system/ployd.service` with:
   - `ExecStart=/usr/local/bin/ployd`
   - `Restart=always`, `RestartSec=5`

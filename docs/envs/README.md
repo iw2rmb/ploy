@@ -217,6 +217,13 @@ ploy mod run --mr-success \
   `/etc/ploy/pki/server.key` for the HTTPS API. At runtime the server reads file paths from
   config: `http.tls.cert`, `http.tls.key`, and `http.tls.client_ca`.
 
+TLS/mTLS (config YAML):
+- `http.tls.enabled` — Enable TLS. When true, the server enforces mutual TLS (mTLS) for all HTTPS connections.
+- `http.tls.cert` / `http.tls.key` — Server certificate/key paths.
+- `http.tls.client_ca` — CA certificate used to verify client certificates.
+- TLS version is pinned to 1.3.
+- Schema change (Nov 2025): `http.tls.require_client_cert` was removed. mTLS is always required when `http.tls.enabled` is true; there is no opt-out flag.
+
 GitLab integration for automatic MR creation:
 - `gitlab.domain` (config YAML) — GitLab base URL or host (e.g., `https://gitlab.com` or `gitlab.com`). Optional; Ploy normalizes either form.
 - `gitlab.token` (config YAML) — Inline GitLab Personal Access Token. Optional; stored only in
