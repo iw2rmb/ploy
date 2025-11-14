@@ -78,8 +78,8 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Server Tests
 
-- [x] Split PKI endpoint tests into `server_pki_test.go` — Separate certificate management tests
-  - Component: `internal/server/handlers/server_pki_test.go`
+- [x] Split PKI endpoint tests into `handlers_pki_test.go` — Separate certificate management tests
+  - Component: `internal/server/handlers/handlers_pki_test.go`
   - Change: Extract PKI-specific endpoint cases and fixtures from handlers scope
   - Test: Run `go test ./internal/server/handlers -run PKI` — Verify certificate lifecycle tests
 
@@ -148,20 +148,20 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: PKI Handler Tests (677 LOC → 2 files)
 
-- [ ] Split admin PKI tests into `handlers_pki_admin_test.go` (already exists - 618 LOC)
+- [x] Split admin PKI tests into `handlers_pki_admin_test.go` (already exists - 618 LOC)
   - Component: Already refactored
   - Change: N/A - file already split
   - Test: N/A
 
-- [ ] Keep node PKI tests in `handlers_pki_test.go` — Node certificate issuance/renewal
+- [x] Keep node PKI tests in `handlers_pki_test.go` — Node certificate issuance/renewal
   - Component: `internal/server/handlers/handlers_pki_test.go`
-  - Change: Keep node cert request, validation, expiry tests
-  - Test: Run `go test ./internal/server/handlers -run PKI` — Verify node cert lifecycle
+  - Change: Renamed from `server_pki_test.go` to match naming convention
+  - Test: Run `go test -count=1 ./internal/server/handlers -run PKI` — Verify node cert lifecycle
 
-- [ ] Keep client PKI tests in `handlers_pki_client_test.go` — Client issuance/renewal
+- [x] Keep client PKI tests in `handlers_pki_client_test.go` — Client issuance/renewal
   - Component: `internal/server/handlers/handlers_pki_client_test.go`
   - Change: No split; acknowledge existing client coverage
-  - Test: Run `go test ./internal/server/handlers -run ClientPKI`
+  - Test: Run `go test -count=1 ./internal/server/handlers -run ClientPKI`
 
 ## Additional Large Files: Priority Tier 2
 
