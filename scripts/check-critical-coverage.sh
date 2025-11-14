@@ -8,10 +8,10 @@ COVERAGE_FILE="${1:-dist/coverage.out}"
 OVERALL_THRESHOLD=60
 CRITICAL_THRESHOLD=90
 
-# Critical paths as defined in ROADMAP.md line 10
+# Critical workflow runner packages as defined in ROADMAP.md line 228
+# These are the core packages responsible for scheduling and executing workflow runs
 CRITICAL_PATHS=(
     "github.com/iw2rmb/ploy/internal/server/scheduler"
-    "github.com/iw2rmb/ploy/internal/server/pki"
     "github.com/iw2rmb/ploy/internal/worker/jobs"
 )
 
