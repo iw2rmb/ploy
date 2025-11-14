@@ -55,7 +55,9 @@ type (
 )
 
 var (
-	newPusher   = func() pusherIface { return git.NewPusher() }
+	// newPusher is a factory function for creating git pushers.
+	// Indirection allows test mocking of git.NewPusher.
+	newPusher   = git.NewPusher
 	newMRClient = func() mrCreator { return gitlab.NewMRClient() }
 )
 

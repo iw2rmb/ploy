@@ -34,13 +34,15 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 		case <-ticker.C:
 			// Attempt to claim and execute work (runs or buildgate jobs).
 			claimed, err := c.claimWork(ctx)
-			if err != nil {
+			// Handle claim result: error, success, or no work available.
+			switch {
+			case err != nil:
 				slog.Error("claim loop error", "err", err)
 				c.applyBackoff()
-			} else if claimed {
+			case claimed:
 				// Work was claimed and executed; reset backoff.
 				c.resetBackoff()
-			} else {
+			default:
 				// No work available (204); apply backoff.
 				c.applyBackoff()
 			}
@@ -193,7 +195,7 @@ func (c *ClaimManager) applyBackoff() {
 	if c.backoffDuration == 0 {
 		c.backoffDuration = c.minBackoff
 	} else {
-		c.backoffDuration = c.backoffDuration * 2
+		c.backoffDuration *= 2
 		if c.backoffDuration > c.maxBackoff {
 			c.backoffDuration = c.maxBackoff
 		}

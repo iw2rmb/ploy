@@ -179,7 +179,7 @@ func (h *HeartbeatManager) applyBackoff(err error) {
 		if h.backoffDuration == 0 {
 			h.backoffDuration = 5 * time.Second
 		} else {
-			h.backoffDuration = h.backoffDuration * 2
+			h.backoffDuration *= 2
 			if h.backoffDuration > h.maxBackoff {
 				h.backoffDuration = h.maxBackoff
 			}

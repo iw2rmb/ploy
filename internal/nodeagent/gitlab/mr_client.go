@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 	"net/url"
@@ -137,7 +138,10 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 
 		// Read response body.
 		bodyBytes, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log close error but don't fail the request if body was read successfully.
+			slog.Warn("failed to close response body", "error", closeErr)
+		}
 		if err != nil {
 			return "", redactError(fmt.Errorf("read response: %w", err), req.PAT)
 		}
