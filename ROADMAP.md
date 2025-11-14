@@ -129,7 +129,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extract SSE connection, reconnect, timeout tests
   - Test: Run `go test ./internal/server/events -run Stream` — Verify event delivery and reconnection
 
-- [ ] Keep event storage tests in `service_test.go` — Retain event persistence tests
+- [x] Keep event storage tests in `service_test.go` — Retain event persistence tests
   - Component: `internal/server/events/service_test.go`
   - Change: Keep event storage, filtering, retention tests
   - Test: Run `go test ./internal/server/events -run Storage` — Verify event ordering and cleanup
