@@ -180,7 +180,7 @@ Legend: [ ] todo, [x] done.
   - Change: Extracted hydration phase tests, gate phase tests (enabled/disabled/precedence/failure/timing), and execution timing tests; kept basic infrastructure and nil component tests in main file
   - Test: Run `go test ./internal/workflow/runtime/step -run Runner` — Verify phase isolation
 
-- [ ] Split `internal/nodeagent/heartbeat_test.go` (578 LOC) — Separate connection vs timing tests
+- [x] Split `internal/nodeagent/heartbeat_test.go` (578 LOC) — Separate connection vs timing tests
   - Component: Create `heartbeat_connection_test.go`, `heartbeat_timing_test.go`
   - Change: Extract connection/retry vs interval/backoff tests
   - Test: Run `go test ./internal/nodeagent -run Heartbeat` — Verify heartbeat reliability
