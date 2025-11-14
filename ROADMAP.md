@@ -185,10 +185,10 @@ Legend: [ ] todo, [x] done.
   - Change: Extract connection/retry vs interval/backoff tests
   - Test: Run `go test ./internal/nodeagent -run Heartbeat` — Verify heartbeat reliability
 
-- [ ] Split `internal/store/ttlworker/partition_dropper_test.go` (561 LOC) — Partition listing vs drop execution
+- [x] Split `internal/store/ttlworker/partition_dropper_test.go` (561 LOC) — Partition listing vs drop execution
   - Component: Create `partition_dropper_list_test.go`, `partition_dropper_drop_test.go`
   - Change: Separate list-partitions paths from drop/error paths
-  - Test: Run `go test ./internal/store/ttlworker -run PartitionDropper` — Verify behavior parity
+  - Test: Run `go test ./internal/store/ttlworker -run 'Partition|Worker.*Drop'` — Verify behavior parity
 
 - [ ] Split `cmd/ploy/config_command_test.go` (532 LOC) — File I/O vs flag/validation
   - Component: Create `config_command_files_test.go`, `config_command_flags_test.go`
