@@ -224,7 +224,8 @@ Legend: [ ] todo, [x] done.
   - Test: `make build` — Produces `dist/ploy`
   - Verification (2025-11-14): `go test -count=1 ./tests/integration -run TestBuildCLI` — PASS; confirms `dist/ploy` exists, is executable, and `ploy version` runs
 
-- [ ] Enforce coverage thresholds (per AGENTS.md)
+- [x] Enforce coverage thresholds (per AGENTS.md)
   - Component: All packages; critical workflow runner packages
   - Change: N/A
   - Test: `make test` — ≥60% overall, ≥90% on critical workflow runner packages
+  - Verification (2025-11-14): `make test` — PASS; enforces 66.5% overall (≥60%), 97.9% scheduler (≥90%), 95.7% worker/jobs (≥90%)

@@ -34,10 +34,7 @@ lanes-validate: ## Validate bundled lane catalog
 	go run ./tools/lanesvalidate --dir configs/lanes
 
 .PHONY: test
-test: ## Run all unit tests with coverage output
-	@TMP=$$(mktemp -d 2>/dev/null || mktemp -d -t ploytest); \
-	PLOY_CONFIG_HOME="$$TMP" go test -cover ./...; \
-	rc=$$?; rm -rf "$$TMP"; exit $$rc
+test: test-coverage-threshold test-coverage-critical ## Run all unit tests with coverage enforcement (≥60% overall, ≥90% critical)
 
 .PHONY: test-race
 test-race: ## Run all unit tests with race detector
