@@ -170,9 +170,9 @@ Legend: [ ] todo, [x] done.
   - Change: Keep precedence tests in main file, extract format-specific tests
   - Test: Run `go test -count=1 ./cmd/ploy -run BuildSpecPayload` — Verify spec parsing coverage
 
-- [ ] Split `internal/store/claims_test.go` (625 LOC) — Separate by claim state transitions
-  - Component: Create `claims_state_test.go`, `claims_query_test.go`
-  - Change: Extract state machine tests vs query/filter tests
+- [x] Split `internal/store/claims_test.go` (625 LOC) — Separate by claim state transitions
+  - Component: Created `claims_state_test.go` (599 LOC), reduced `claims_test.go` to 30 LOC
+  - Change: Extracted all state transition tests to `claims_state_test.go`, kept basic infrastructure test in `claims_test.go`
   - Test: Run `go test ./internal/store -run Claims` — Verify claim lifecycle and querying
 
 - [ ] Split `internal/workflow/runtime/step/runner_test.go` (595 LOC) — Separate by step phase
