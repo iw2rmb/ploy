@@ -222,6 +222,7 @@ Legend: [ ] todo, [x] done.
   - Component: CLI
   - Change: N/A
   - Test: `make build` — Produces `dist/ploy`
+  - Verification (2025-11-14): `go test -count=1 ./tests/integration -run TestBuildCLI` — PASS; confirms `dist/ploy` exists, is executable, and `ploy version` runs
 
 - [ ] Enforce coverage thresholds (per AGENTS.md)
   - Component: All packages; critical workflow runner packages
