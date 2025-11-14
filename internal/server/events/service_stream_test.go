@@ -19,7 +19,7 @@ import (
 // SSE event subscription, publishing, and stream closure. It tests the full
 // lifecycle: publish log event, subscribe to stream, publish status to close
 // stream, and verify all events are received in order.
-func TestServiceHubIntegration(t *testing.T) {
+func TestStream_ServiceHubIntegration(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
 		HistorySize: 8,
@@ -79,7 +79,7 @@ func TestServiceHubIntegration(t *testing.T) {
 // as SSE events to the stream. It tests various ticket states (pending, running,
 // succeeded, failed, cancelled) and validates that the event payload is correctly
 // marshaled and delivered.
-func TestPublishTicket(t *testing.T) {
+func TestStream_PublishTicket(t *testing.T) {
 	tests := []struct {
 		name        string
 		runID       string
@@ -217,7 +217,7 @@ func TestPublishTicket(t *testing.T) {
 // TestPublishTicketWithContext verifies that the PublishTicket method correctly
 // handles context cancellation and returns appropriate errors when the context
 // is already cancelled before the publish operation begins.
-func TestPublishTicketWithContext(t *testing.T) {
+func TestStream_PublishTicketWithContext(t *testing.T) {
 	svc, err := New(Options{
 		BufferSize:  4,
 		HistorySize: 8,
