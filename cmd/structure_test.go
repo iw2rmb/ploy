@@ -2,9 +2,52 @@ package cmd_test
 
 import (
 	"os"
+	"os/exec"
 	"sort"
+	"strings"
 	"testing"
 )
+
+// TestNoCircularDependencies verifies that the import graph remains acyclic.
+// Circular dependencies prevent compilation and indicate architectural issues.
+// This test runs `go list` to enumerate all packages and detect import cycles.
+func TestNoCircularDependencies(t *testing.T) {
+	// Use `go list` to check all packages under ./...
+	// The -e flag allows listing packages with errors (like import cycles)
+	// so we can detect and report them instead of failing silently.
+	cmd := exec.Command("go", "list", "-e", "-f", "{{if .Error}}{{.ImportPath}}: {{.Error.Err}}{{end}}", "./...")
+	cmd.Dir = ".." // Run from repo root (one level up from cmd/)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Non-zero exit is expected if there are errors in packages
+		// We'll check the output content for import cycle messages
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	if outputStr == "" {
+		// No errors found - all packages are clean
+		return
+	}
+
+	// Check if any line contains "import cycle" or "circular" dependency errors
+	lines := strings.Split(outputStr, "\n")
+	var cycleErrors []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// Go reports import cycles with specific error text
+		if strings.Contains(line, "import cycle") || strings.Contains(line, "circular") {
+			cycleErrors = append(cycleErrors, line)
+		}
+	}
+
+	if len(cycleErrors) > 0 {
+		t.Errorf("circular dependencies detected:\n%s", strings.Join(cycleErrors, "\n"))
+	}
+}
 
 func TestOnlyWorkflowBinaryRemains(t *testing.T) {
 	entries, err := os.ReadDir(".")
