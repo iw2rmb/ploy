@@ -207,7 +207,7 @@ Legend: [ ] todo, [x] done.
   - Change: N/A
   - Test: Build specific packages (no './...') — `go build github.com/iw2rmb/ploy/cmd/ploy`, `go build github.com/iw2rmb/ploy/cmd/ployd`, `go build github.com/iw2rmb/ploy/cmd/ployd-node`, and `go build` for each of: `github.com/iw2rmb/ploy/internal/workflow/aster`, `.../contracts`, `.../knowledgebase`, `.../manifests`, `.../mods/plan`, `.../runtime/step`. Expect no "import cycle" errors.
 
-- [ ] Update package documentation — Add package-level godoc for new files
+- [x] Update package documentation — Add package-level godoc for new files
   - Component: All new files
   - Change: Add package comments explaining each file's domain responsibility
   - Test: `go doc <package>` — Readable documentation generated
