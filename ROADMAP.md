@@ -175,9 +175,9 @@ Legend: [ ] todo, [x] done.
   - Change: Extracted all state transition tests to `claims_state_test.go`, kept basic infrastructure test in `claims_test.go`
   - Test: Run `go test ./internal/store -run Claims` — Verify claim lifecycle and querying
 
-- [ ] Split `internal/workflow/runtime/step/runner_test.go` (595 LOC) — Separate by step phase
-  - Component: Create `runner_hydration_test.go`, `runner_gate_test.go`, `runner_exec_test.go`
-  - Change: Extract hydration, gate, execution, diff tests by phase
+- [x] Split `internal/workflow/runtime/step/runner_test.go` (595 LOC) — Separate by step phase
+  - Component: Created `runner_hydration_test.go` (52 LOC), `runner_gate_test.go` (422 LOC), `runner_exec_test.go` (85 LOC), reduced `runner_test.go` to 142 LOC
+  - Change: Extracted hydration phase tests, gate phase tests (enabled/disabled/precedence/failure/timing), and execution timing tests; kept basic infrastructure and nil component tests in main file
   - Test: Run `go test ./internal/workflow/runtime/step -run Runner` — Verify phase isolation
 
 - [ ] Split `internal/nodeagent/heartbeat_test.go` (578 LOC) — Separate connection vs timing tests
