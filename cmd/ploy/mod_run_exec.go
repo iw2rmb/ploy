@@ -1,5 +1,10 @@
-// mod_run_exec.go contains the core mod run execution orchestration.
+// Package main implements the ploy CLI.
 //
+// The CLI provides commands for mods execution, rollouts, server deployment,
+// and related utilities. Package-level documentation lives here so `go doc
+// github.com/iw2rmb/ploy/cmd/ploy` renders a clear overview for users.
+//
+// mod_run_exec.go contains the core mod run execution orchestration.
 // This file owns executeModRun which orchestrates the end-to-end mod run
 // flow: spec building, run submission, optional follow mode, and artifact
 // download. It delegates to specialized files for spec parsing, artifact
