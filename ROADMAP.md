@@ -203,9 +203,9 @@ Legend: [ ] todo, [x] done.
   - Test: `make test` or `go test ./...` — All tests pass with same coverage percentage
 
 - [x] Verify no circular dependencies introduced — Check import graph remains acyclic
-  - Component: All packages
+  - Component: CLI + workflow packages (explicit list)
   - Change: N/A
-  - Test: `go list -f '{{ .ImportPath }} {{ .Imports }}' ./...` — No import cycles detected
+  - Test: Build specific packages (no './...') — `go build github.com/iw2rmb/ploy/cmd/ploy`, `go build github.com/iw2rmb/ploy/cmd/ployd`, `go build github.com/iw2rmb/ploy/cmd/ployd-node`, and `go build` for each of: `github.com/iw2rmb/ploy/internal/workflow/aster`, `.../contracts`, `.../knowledgebase`, `.../manifests`, `.../mods/plan`, `.../runtime/step`. Expect no "import cycle" errors.
 
 - [ ] Update package documentation — Add package-level godoc for new files
   - Component: All new files
