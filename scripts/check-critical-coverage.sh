@@ -25,10 +25,11 @@ echo ""
 
 # Check overall coverage
 echo "Checking overall coverage (threshold: ${OVERALL_THRESHOLD}%)..."
-OVERALL_COV=$(go tool cover -func="$COVERAGE_FILE" | grep total: | awk '{print $3}' | sed 's/%//')
+OVERALL_COV=$(go tool cover -func="$COVERAGE_FILE" | grep '^total:' | awk '{print $3}' | sed 's/%//')
 echo "Overall coverage: ${OVERALL_COV}%"
 
-if (( $(echo "$OVERALL_COV < $OVERALL_THRESHOLD" | bc -l) )); then
+# Compare without relying on bc
+if awk -v c="$OVERALL_COV" -v t="$OVERALL_THRESHOLD" 'BEGIN{exit(c>=t)}'; then
     echo "ERROR: Overall coverage ${OVERALL_COV}% is below threshold ${OVERALL_THRESHOLD}%"
     exit 1
 fi
@@ -71,7 +72,7 @@ for path in "${CRITICAL_PATHS[@]}"; do
     fi
 
     printf "  %s: %s%% ... " "$path" "$COVERAGE"
-    if (( $(echo "$COVERAGE < $CRITICAL_THRESHOLD" | bc -l) )); then
+    if awk -v c="$COVERAGE" -v t="$CRITICAL_THRESHOLD" 'BEGIN{exit(c>=t)}'; then
         echo "FAIL (below ${CRITICAL_THRESHOLD}%)"
         FAILED=1
     else
