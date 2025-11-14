@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -194,7 +195,11 @@ func addPathToTar(tw *tar.Writer, fsPath, name string, info os.FileInfo) error {
 		if err != nil {
 			return fmt.Errorf("open file: %w", err)
 		}
-		defer file.Close()
+		defer func() {
+			if closeErr := file.Close(); closeErr != nil {
+				slog.Warn("failed to close file during tar write", "path", fsPath, "error", closeErr)
+			}
+		}()
 
 		if _, err := io.Copy(tw, file); err != nil {
 			return fmt.Errorf("copy file: %w", err)

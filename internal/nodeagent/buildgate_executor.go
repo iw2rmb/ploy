@@ -44,17 +44,19 @@ func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contr
 	}()
 
 	// Populate workspace based on request type.
-	if req.RepoURL != "" && req.Ref != "" {
+	// Use switch to handle mutually exclusive workspace population strategies.
+	switch {
+	case req.RepoURL != "" && req.Ref != "":
 		// Ref-based: clone repository.
 		if err := e.cloneRepo(ctx, req.RepoURL, req.Ref, workspaceRoot); err != nil {
 			return nil, fmt.Errorf("clone repo: %w", err)
 		}
-	} else if len(req.ContentArchive) > 0 {
+	case len(req.ContentArchive) > 0:
 		// Content-based: extract tarball.
 		if err := e.extractArchive(ctx, req.ContentArchive, workspaceRoot); err != nil {
 			return nil, fmt.Errorf("extract archive: %w", err)
 		}
-	} else {
+	default:
 		return nil, fmt.Errorf("invalid request: neither repo_url nor content_archive provided")
 	}
 
@@ -122,7 +124,11 @@ func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []by
 	// Try gzip first, fallback to plain tar
 	var tarReader *tar.Reader
 	if gz, err := gzip.NewReader(bytes.NewReader(archiveData)); err == nil {
-		defer gz.Close()
+		defer func() {
+			if closeErr := gz.Close(); closeErr != nil {
+				slog.Warn("failed to close gzip reader", "error", closeErr)
+			}
+		}()
 		tarReader = tar.NewReader(gz)
 	} else {
 		tarReader = tar.NewReader(bytes.NewReader(archiveData))
@@ -169,10 +175,13 @@ func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []by
 
 			// Copy contents.
 			if _, err := io.Copy(file, tarReader); err != nil {
-				file.Close()
+				_ = file.Close() // Best-effort close on error path
 				return fmt.Errorf("write file %s: %w", target, err)
 			}
-			file.Close()
+			// Close file and check error.
+			if err := file.Close(); err != nil {
+				return fmt.Errorf("close file %s: %w", target, err)
+			}
 
 		case tar.TypeSymlink, tar.TypeLink:
 			// Disallow links for safety.
@@ -185,19 +194,4 @@ func (e *BuildGateExecutor) extractArchive(ctx context.Context, archiveData []by
 
 	slog.Info("archive extracted successfully", "workspace", workspace)
 	return nil
-}
-
-// byteReaderWrapper wraps a byte slice to implement io.Reader.
-type byteReaderWrapper struct {
-	data   []byte
-	offset int
-}
-
-func (b *byteReaderWrapper) Read(p []byte) (n int, err error) {
-	if b.offset >= len(b.data) {
-		return 0, io.EOF
-	}
-	n = copy(p, b.data[b.offset:])
-	b.offset += n
-	return n, nil
 }
