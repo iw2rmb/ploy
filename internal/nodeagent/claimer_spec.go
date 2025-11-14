@@ -1,3 +1,10 @@
+// claimer_spec.go isolates spec JSON payload parsing from claim orchestration.
+//
+// This file contains parseSpec which decodes run specifications from the
+// control plane claim response. It flattens nested structures (build_gate,
+// env, options) and extracts configuration for healing, MR creation, and
+// mod execution. Separating spec parsing from claim logic enables focused
+// testing of the decoding contract without coupling to HTTP claim mechanics.
 package nodeagent
 
 import (

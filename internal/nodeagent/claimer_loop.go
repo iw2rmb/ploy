@@ -1,3 +1,10 @@
+// claimer_loop.go contains the claim loop orchestration and backoff logic.
+//
+// This file owns the Start method that continuously polls for work (runs or
+// buildgate jobs) with exponential backoff. Backoff increases when no work
+// is available or on errors, and resets when work is successfully claimed.
+// Work claiming prioritizes buildgate jobs before regular runs. Isolating
+// loop mechanics from claim/execution details simplifies backoff testing.
 package nodeagent
 
 import (

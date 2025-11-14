@@ -1,3 +1,10 @@
+// execution_upload.go centralizes artifact and status upload operations.
+//
+// This file handles diff upload, artifact bundling, /out directory upload,
+// and final status reporting to the control plane. Upload operations include
+// retry logic and error handling. Isolating uploads from execution orchestration
+// keeps the orchestrator focused on run lifecycle while this file owns all
+// HTTP interactions for result persistence.
 package nodeagent
 
 import (
