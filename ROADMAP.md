@@ -136,7 +136,7 @@ Legend: [ ] todo, [x] done.
 
 ## Test Files: Execution Healing Tests (684 LOC → 2 files)
 
-- [ ] Split retry tests into `execution_healing_retry_test.go` — Focus on retry/backoff scenarios
+- [x] Split retry tests into `execution_healing_retry_test.go` — Focus on retry/backoff scenarios
   - Component: `internal/nodeagent/execution_healing_retry_test.go`
   - Change: Extract retry exhaustion, backoff timing, error propagation tests
   - Test: Run `go test ./internal/nodeagent -run HealingRetry` — Verify retry boundaries
