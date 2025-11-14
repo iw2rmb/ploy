@@ -193,7 +193,7 @@ Legend: [ ] todo, [x] done.
 - [x] Split `cmd/ploy/config_command_test.go` (532 LOC) — File I/O vs flag/validation
   - Component: Create `config_command_files_test.go`, `config_command_flags_test.go`
   - Change: Isolate filesystem/env interactions from flag/validation logic
-  - Test: Run `go test ./cmd/ploy -run ConfigCommand` — Verify CLI behavior parity
+  - Test: Run `go test ./cmd/ploy -run Config` — Verify CLI behavior parity
 
 ## Validation Phase
 
