@@ -1,3 +1,10 @@
+// claimer_buildgate.go separates buildgate job claiming and execution.
+//
+// This file contains buildgate-specific claim logic including job claiming,
+// ACK (acknowledge) to transition job to running state, job execution, and
+// completion reporting. Buildgate jobs are pre-flight validations that run
+// before actual workflow execution. Isolating buildgate logic from general
+// run claiming maintains separation between job types and simplifies testing.
 package nodeagent
 
 import (

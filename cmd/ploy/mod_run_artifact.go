@@ -1,3 +1,10 @@
+// mod_run_artifact.go isolates artifact download and fetching logic.
+//
+// This file contains downloadTicketArtifacts which fetches ticket status
+// and downloads referenced artifacts to disk. It generates deterministic
+// filenames, streams bytes without in-memory buffering, and produces a
+// manifest.json for artifact metadata. Artifact download is separated from
+// execution flow to enable independent testing of HTTP fetching and retry.
 package main
 
 import (

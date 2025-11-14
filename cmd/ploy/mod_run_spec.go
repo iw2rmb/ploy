@@ -1,3 +1,10 @@
+// mod_run_spec.go separates spec file handling from mod run execution.
+//
+// This file contains buildSpecPayload which parses YAML/JSON spec files
+// and resolves env_from_file references to inject file content as environment
+// variables. Spec parsing includes validation and error handling for missing
+// files. Isolating spec handling from execution flow enables focused testing
+// of file I/O and parsing logic without coupling to HTTP submission.
 package main
 
 import (

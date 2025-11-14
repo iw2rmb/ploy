@@ -1,3 +1,9 @@
+// mod_run_flags.go separates CLI flag definitions from execution logic.
+//
+// This file defines flag parsing for mod run command including --follow,
+// --cap, --download, --spec, and various manifest options. Flag definitions
+// are isolated from execution to enable reusability and focused testing of
+// flag precedence and validation without coupling to HTTP submission flow.
 package main
 
 import (

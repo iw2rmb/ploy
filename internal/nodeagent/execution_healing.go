@@ -1,3 +1,10 @@
+// execution_healing.go isolates gate-heal-regate execution complexity.
+//
+// This file contains executeWithHealing, which implements the retry loop for
+// healing mods when gate validation fails. It orchestrates pre-gate execution,
+// healing mod execution on gate failure, and re-gate validation. The healing
+// logic is separated from core orchestration to maintain clear boundaries
+// between run lifecycle (orchestrator) and healing retry mechanics.
 package nodeagent
 
 import (

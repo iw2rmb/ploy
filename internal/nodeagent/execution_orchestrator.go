@@ -1,3 +1,10 @@
+// execution_orchestrator.go contains the high-level run lifecycle orchestration.
+//
+// This file owns executeRun, the main entry point for executing a single run.
+// It coordinates workspace setup, runtime initialization, healing execution,
+// artifact collection, and terminal status reporting. The orchestrator ensures
+// cleanup of ephemeral resources and delegates domain-specific concerns to
+// specialized execution files (healing, MR creation, uploads).
 package nodeagent
 
 import (

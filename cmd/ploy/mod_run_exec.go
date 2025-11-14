@@ -1,3 +1,10 @@
+// mod_run_exec.go contains the core mod run execution orchestration.
+//
+// This file owns executeModRun which orchestrates the end-to-end mod run
+// flow: spec building, run submission, optional follow mode, and artifact
+// download. It delegates to specialized files for spec parsing, artifact
+// fetching, and flag handling. The orchestrator maintains the high-level
+// execution flow while keeping domain-specific logic in separate files.
 package main
 
 import (
