@@ -73,10 +73,38 @@ Note: As of November 2025 the API is simplified to a `/v1/mods` facade for submi
 - Mods E2E minimal path: `docs/mod-simple-happy-path.md` (claim→ack→complete + ticket SSE).
 - Contributor process: `AGENTS.md` (TDD, coverage, docs policy).
 
+**Installation**
+
+For end users, install the Ploy CLI using one of these methods:
+
+**Homebrew (macOS/Linux)**
+```bash
+brew install iw2rmb/ploy/ploy
+```
+
+**Install Script (macOS/Linux/Windows)**
+```bash
+curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
+```
+
+You can customize the installation directory:
+```bash
+INSTALL_DIR=$HOME/.local/bin curl -fsSL https://raw.githubusercontent.com/iw2rmb/ploy/main/scripts/install.sh | bash
+```
+
+**Direct Download**
+
+Download pre-built binaries from the [latest release](https://github.com/iw2rmb/ploy/releases/latest):
+- `ploy` — CLI for workstations (Linux, macOS, Windows)
+- `ployd` — Server daemon (Linux, macOS)
+- `ployd-node` — Worker node daemon (Linux, macOS)
+
+Extract and move the binary to a directory in your `PATH` (e.g., `/usr/local/bin`).
+
 **Build**
 - Requirements: Go 1.25+. Docker is optional for local step execution; node container execution is scaffolded in this slice.
-- Build binaries into `dist/`:
-  
+- Build binaries from source into `dist/`:
+
   ```bash
   make build
   ```
