@@ -72,7 +72,7 @@ func repoRoot(t *testing.T) string {
 	return strings.TrimSpace(out)
 }
 
-// Test that running mods/mod-orw/mod-orw.sh with real recipe coordinates from
+// Test that running docker/mods/mod-orw/mod-orw.sh with real recipe coordinates from
 // the scenario script produces a git diff in the workspace. We stub mvn so the
 // test is hermetic and fast, but we preserve the real recipe args.
 func TestModORW_ProducesDiff_WithScenarioData(t *testing.T) {
@@ -102,7 +102,7 @@ func TestModORW_ProducesDiff_WithScenarioData(t *testing.T) {
 	outdir := t.TempDir()
 
 	// Run the mod-orw script with real coordinates from scenario
-	modScript := filepath.Join(repoRoot(t), "mods", "mod-orw", "mod-orw.sh")
+	modScript := filepath.Join(repoRoot(t), "docker", "mods", "mod-orw", "mod-orw.sh")
 	cmd := exec.Command("bash", modScript, "--apply", "--dir", workspace, "--out", outdir)
 	cmd.Env = append(os.Environ(),
 		"RECIPE_GROUP="+group,

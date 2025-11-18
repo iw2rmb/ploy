@@ -13,11 +13,11 @@
 **Build + Publish Mods Images (Docker Hub)**
 
 - Build Mods images (requires Docker):
-  - OpenRewrite: `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e mods/mod-orw`
-  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f mods/mod-codex/Dockerfile -t mods-codex:e2e .`
+  - OpenRewrite: `docker buildx build --platform linux/amd64 -t mods-openrewrite:e2e docker/mods/mod-orw`
+  - Codex healer: build from repo root: `docker buildx build --platform linux/amd64 -f docker/mods/mod-codex/Dockerfile -t mods-codex:e2e .`
   - Optional: `mods-llm`, `mods-plan` as needed.
 - Push to Docker Hub using the helper script:
-  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/push-mods-via-cli.sh`
+  - `DOCKERHUB_USERNAME=<you> DOCKERHUB_PAT=*** scripts/docker/build-and-push-mods.sh`
   - The script special‑cases `mod-codex` to use repo‑root context automatically.
   - Images publish as `docker.io/$DOCKERHUB_USERNAME/<name>:latest`.
 

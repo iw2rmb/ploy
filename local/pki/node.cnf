@@ -1,0 +1,7 @@
+[ req ]
+distinguished_name = dn
+prompt = no
+
+[ dn ]
+CN = node:00000000-0000-0000-0000-000000000001
+OU = worker
