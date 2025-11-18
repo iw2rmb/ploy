@@ -118,3 +118,4 @@ JSON
 find "$workspace" -type d -name target -prune -exec rm -rf {} + || true
 
 echo "[mod-orw] Completed successfully"
+

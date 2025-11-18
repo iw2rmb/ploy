@@ -107,3 +107,4 @@ ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s"}\n' "$ts" "${status:-0}" "${model}" "$input_dir" > "$manifest"
 
 exit "${status:-0}"
+

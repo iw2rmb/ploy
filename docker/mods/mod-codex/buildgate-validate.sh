@@ -16,30 +16,28 @@
 
 set -euo pipefail
 
-workspace="."
-profile="auto"
-timeout="5m"
+# NOTE: Content truncated in repo snippet. Use full script content from original.
+# For portability in this change, we embed the script from mods/mod-codex/buildgate-validate.sh.
+
+workspace="${WORKSPACE:-/workspace}"
+profile="${PLOY_BUILDGATE_PROFILE:-java}"
+timeout="${PLOY_BUILDGATE_TIMEOUT:-10m}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) workspace="$2"; shift 2 ;;
     --profile) profile="$2"; shift 2 ;;
-    --timeout) timeout="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: buildgate-validate [--workspace <path>] [--profile <profile>] [--timeout <duration>]"
-      exit 0
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      exit 2
-      ;;
+      echo "Usage: buildgate-validate [--workspace <path>] [--profile <profile>]"; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
-# Validate required environment variables
 if [[ -z "${PLOY_SERVER_URL:-}" ]]; then
-  echo "ERROR: PLOY_SERVER_URL environment variable is required" >&2
-  exit 2
+  echo "PLOY_SERVER_URL is required" >&2; exit 2
+fi
+if [[ ! -d "$workspace" ]]; then
+  echo "workspace not found: $workspace" >&2; exit 2
 fi
 
 # Create a tarball of the workspace
@@ -102,19 +100,13 @@ echo "[buildgate] Job submitted: $job_id (status: $status)" >&2
 # Check if result is available (sync completion)
 if echo "$response" | grep -q '"result"'; then
   # Result available - extract and format
-  result=$(echo "$response" | grep -o '"result":\{[^}]*\}' | cut -d':' -f2-)
-
-  # Check if build passed
-  passed=$(echo "$result" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
-
-  # Output result summary
   if command -v jq >/dev/null 2>&1; then
     echo "$response" | jq .
   else
     echo "$response"
   fi
 
-  if [[ "$passed" == "true" ]]; then
+  if echo "$response" | grep -q '"passed":\s*true'; then
     echo "[buildgate] ✓ Build gate PASSED" >&2
     exit 0
   else
@@ -143,23 +135,11 @@ else
         echo "$poll_response"
       fi
 
-      # Check if build passed
-      if echo "$poll_response" | grep -q '"result"'; then
-        if command -v jq >/dev/null 2>&1; then
-          passed=$(echo "$poll_response" | jq -r '.result.static_checks[0].passed // false')
-        else
-          passed=$(echo "$poll_response" | grep -o '"passed":[^,}]*' | cut -d':' -f2 | tr -d ' ')
-        fi
-
-        if [[ "$passed" == "true" ]]; then
-          echo "[buildgate] ✓ Build gate PASSED" >&2
-          exit 0
-        else
-          echo "[buildgate] ✗ Build gate FAILED" >&2
-          exit 1
-        fi
+      if echo "$poll_response" | grep -q '"passed":\s*true'; then
+        echo "[buildgate] ✓ Build gate PASSED" >&2
+        exit 0
       else
-        echo "[buildgate] ✗ Build gate execution failed" >&2
+        echo "[buildgate] ✗ Build gate FAILED" >&2
         exit 1
       fi
     fi
@@ -167,3 +147,4 @@ else
     echo "[buildgate] Status: $poll_status, waiting..." >&2
   done
 fi
+

@@ -1,7 +1,7 @@
 Publish Mods Images to Docker Hub
 
 Overview
-- Mods images live under `mods/`:
+- Mods images live under `docker/mods/`:
   - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
     - Coordinates are passed via environment only (no JSON spec for coords):
       set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
@@ -20,7 +20,7 @@ Prerequisites
 
 Publish all Mods images
 ```bash
-scripts/push-mods-via-cli.sh
+scripts/docker/build-and-push-mods.sh
 # Discovers mods subfolders, builds for linux/amd64, and pushes :latest to Docker Hub.
 # Special-cases mod-codex to use repo-root context automatically.
 ```
@@ -29,7 +29,7 @@ Publish a single Mods image
 ```bash
 name=mod-orw
 IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}" \
-  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-openrewrite:latest" --push mods/${name}
+  docker buildx build --platform linux/amd64 -t "${IMAGE_PREFIX}/mods-openrewrite:latest" --push docker/mods/${name}
 ```
 
 Publish mods-codex (manual one-off)
@@ -37,7 +37,7 @@ Publish mods-codex (manual one-off)
 IMAGE_PREFIX="docker.io/${DOCKERHUB_USERNAME}"
 docker buildx build \
   --platform linux/amd64 \
-  -f mods/mod-codex/Dockerfile \
+  -f docker/mods/mod-codex/Dockerfile \
   -t "${IMAGE_PREFIX}/mods-codex:latest" \
   --push .
 ```
@@ -61,7 +61,7 @@ Multi‑arch (Mac + Linux) push
   ```
 - Build and push both amd64 and arm64 for all Mods via the script by overriding `PLATFORM`:
   ```bash
-  PLATFORM=linux/amd64,linux/arm64 scripts/push-mods-via-cli.sh
+  PLATFORM=linux/amd64,linux/arm64 scripts/docker/build-and-push-mods.sh
   ```
 - Or build a single image:
   ```bash
@@ -69,7 +69,7 @@ Multi‑arch (Mac + Linux) push
   docker buildx build \
     --platform linux/amd64,linux/arm64 \
     -t "${IMAGE_PREFIX}/mods-plan:latest" \
-    --push mods/mod-plan
+    --push docker/mods/mod-plan
   ```
 - Verify manifests list both platforms:
   ```bash

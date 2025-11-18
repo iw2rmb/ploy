@@ -1,0 +1,181 @@
+package handlers
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/server/events"
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// ===== Run Acknowledgement Tests =====
+// ackRunStartHandler acknowledges that a node has started working on an assigned run.
+
+// TestAckRunStart_Success verifies 204 and store transition when the run
+// is assigned to the requesting node.
+func TestAckRunStart_Success(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusAssigned,
+		},
+	}
+
+	handler := ackRunStartHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]string{"run_id": runID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called")
+	}
+	if st.ackRunStartParam.Bytes != runID {
+		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
+	}
+}
+
+// TestAckRunStart_WrongNode verifies 403 when the run is assigned to a different node.
+func TestAckRunStart_WrongNode(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	otherNode := uuid.New()
+	runID := uuid.New()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: otherNode, Valid: true},
+			Status: store.RunStatusAssigned,
+		},
+	}
+
+	handler := ackRunStartHandler(st, nil)
+	body, _ := json.Marshal(map[string]string{"run_id": runID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", rr.Code)
+	}
+	if st.ackRunStartCalled {
+		t.Fatal("did not expect AckRunStart to be called")
+	}
+}
+
+// TestAckRunStart_WrongStatus verifies 409 when the run is not in assigned state.
+func TestAckRunStart_WrongStatus(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning, // not assigned
+		},
+	}
+
+	handler := ackRunStartHandler(st, nil)
+	body, _ := json.Marshal(map[string]string{"run_id": runID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d", rr.Code)
+	}
+	if st.ackRunStartCalled {
+		t.Fatal("did not expect AckRunStart to be called")
+	}
+}
+
+// TestAckRunStart_PublishesEvent verifies that acknowledging a run publishes a running event.
+func TestAckRunStart_PublishesEvent(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusAssigned,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	eventsService, _ := events.New(events.Options{
+		BufferSize:  10,
+		HistorySize: 100,
+	})
+	handler := ackRunStartHandler(st, eventsService)
+
+	body, _ := json.Marshal(map[string]string{"run_id": runID.String()})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify a ticket event was published to the hub by checking the snapshot.
+	snapshot := eventsService.Hub().Snapshot(runID.String())
+	if len(snapshot) == 0 {
+		t.Fatal("expected at least one ticket event to be published")
+	}
+
+	// Verify the event type is "ticket".
+	foundTicketEvent := false
+	for _, evt := range snapshot {
+		if evt.Type == "ticket" {
+			foundTicketEvent = true
+			// Verify the event contains ticket state information with "running" status.
+			if !strings.Contains(string(evt.Data), "running") {
+				t.Errorf("expected ticket event data to contain 'running', got: %s", string(evt.Data))
+			}
+			break
+		}
+	}
+	if !foundTicketEvent {
+		t.Error("expected to find a 'ticket' event in the snapshot")
+	}
+}
