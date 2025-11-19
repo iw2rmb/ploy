@@ -57,7 +57,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 		}
 		st := &mockStore{} // minimal store; handlers may still return 4xx
 		cfg := NewConfigHolder(config.GitLabConfig{})
-		RegisterRoutes(srv, st, ev, cfg)
+		RegisterRoutes(srv, st, ev, cfg, "test-secret")
 		return srv, ev
 	}
 

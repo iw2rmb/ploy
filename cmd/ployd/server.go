@@ -19,7 +19,7 @@ import (
 )
 
 // run executes the main server loop and blocks until the context is canceled.
-func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer) error {
+func run(ctx context.Context, cfg config.Config, configPath string, st store.Store, authorizer *auth.Authorizer, tokenSecret string) error {
 	// Initialize PKI manager for certificate renewal.
 	rotator := pki.NewDefaultRotator(slog.Default())
 	pkiManager, err := pki.New(pki.Options{
@@ -110,7 +110,7 @@ func run(ctx context.Context, cfg config.Config, configPath string, st store.Sto
 	configHolder := handlers.NewConfigHolder(cfg.GitLab)
 
 	// Register HTTP routes.
-	handlers.RegisterRoutes(httpSrv, st, eventsService, configHolder)
+	handlers.RegisterRoutes(httpSrv, st, eventsService, configHolder, tokenSecret)
 
 	// Initialize metrics server.
 	metricsSrv := metrics.New(metrics.Options{
