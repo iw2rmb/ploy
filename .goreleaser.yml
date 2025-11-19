@@ -70,10 +70,13 @@ builds:
       - -X github.com/iw2rmb/ploy/internal/version.BuiltAt={{.Date}}
 
 archives:
-  - id: default
+  # Separate archive for each binary to avoid platform inconsistency
+  - id: ploy
+    builds:
+      - ploy
     format: tar.gz
     name_template: >-
-      {{ .ProjectName }}_
+      ploy_
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
@@ -86,6 +89,36 @@ archives:
       - README*
       - CHANGELOG*
       - docs/**/*
+
+  - id: ployd
+    builds:
+      - ployd
+    format: tar.gz
+    name_template: >-
+      ployd_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+  - id: ployd-node
+    builds:
+      - ployd-node
+    format: tar.gz
+    name_template: >-
+      ployd-node_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
 
 checksum:
   name_template: 'checksums.txt'
