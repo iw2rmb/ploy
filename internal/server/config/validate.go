@@ -24,18 +24,6 @@ func validate(cfg *Config) error {
 		return errors.New("config: control_plane.key is required")
 	}
 
-	if cfg.HTTP.TLS.Enabled {
-		if strings.TrimSpace(cfg.HTTP.TLS.CertPath) == "" {
-			return errors.New("config: http.tls.cert required when TLS enabled")
-		}
-		if strings.TrimSpace(cfg.HTTP.TLS.KeyPath) == "" {
-			return errors.New("config: http.tls.key required when TLS enabled")
-		}
-		if strings.TrimSpace(cfg.HTTP.TLS.ClientCAPath) == "" {
-			return errors.New("config: http.tls.client_ca required when TLS enabled (mTLS is mandatory)")
-		}
-	}
-
 	if strings.TrimSpace(cfg.Admin.Socket) == "" && strings.TrimSpace(cfg.Admin.Listen) == "" {
 		return errors.New("config: admin.socket or admin.listen must be configured")
 	}
