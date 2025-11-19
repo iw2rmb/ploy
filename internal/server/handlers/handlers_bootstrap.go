@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
@@ -20,6 +21,8 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+var errCANotConfigured = errors.New("CA not configured")
 
 // createBootstrapTokenHandler creates a short-lived bootstrap token for node provisioning.
 // Requires control-plane or cli-admin role (enforced by middleware).
@@ -308,4 +311,63 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			"not_after", cert.NotAfter.Format(time.RFC3339),
 		)
 	}
+}
+
+// loadClusterCA loads the cluster CA certificate and private key from environment variables.
+// Returns the parsed CA bundle and the raw CA cert PEM for distribution.
+func loadClusterCA() (*pki.CABundle, string, error) {
+	caCertPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
+	caKeyPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
+
+	if caCertPEM == "" || caKeyPEM == "" {
+		return nil, "", errCANotConfigured
+	}
+
+	// Parse CA certificate
+	block, _ := pem.Decode([]byte(caCertPEM))
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, "", fmt.Errorf("invalid CA cert PEM")
+	}
+
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, "", fmt.Errorf("parse CA cert: %w", err)
+	}
+
+	// Parse CA private key
+	keyBlock, _ := pem.Decode([]byte(caKeyPEM))
+	if keyBlock == nil {
+		return nil, "", fmt.Errorf("invalid CA key PEM")
+	}
+
+	var caKey *ecdsa.PrivateKey
+	switch keyBlock.Type {
+	case "EC PRIVATE KEY":
+		key, err := x509.ParseECPrivateKey(keyBlock.Bytes)
+		if err != nil {
+			return nil, "", fmt.Errorf("parse EC private key: %w", err)
+		}
+		caKey = key
+	case "PRIVATE KEY":
+		key, err := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+		if err != nil {
+			return nil, "", fmt.Errorf("parse PKCS8 private key: %w", err)
+		}
+		ecKey, ok := key.(*ecdsa.PrivateKey)
+		if !ok {
+			return nil, "", fmt.Errorf("expected ECDSA private key, got %T", key)
+		}
+		caKey = ecKey
+	default:
+		return nil, "", fmt.Errorf("unsupported key type: %s", keyBlock.Type)
+	}
+
+	ca := &pki.CABundle{
+		CertPEM: caCertPEM,
+		KeyPEM:  caKeyPEM,
+		Cert:    caCert,
+		Key:     caKey,
+	}
+
+	return ca, caCertPEM, nil
 }

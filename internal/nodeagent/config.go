@@ -20,6 +20,9 @@ type Config struct {
 	// NodeID identifies this node.
 	NodeID string `yaml:"node_id"`
 
+	// ClusterID identifies the cluster this node belongs to.
+	ClusterID string `yaml:"cluster_id"`
+
 	// Concurrency defines the maximum number of concurrent runs.
 	Concurrency int `yaml:"concurrency"`
 
@@ -115,6 +118,9 @@ func (c Config) validate() error {
 		return errors.New("node_id is required")
 	}
 	if c.HTTP.TLS.Enabled {
+		if c.ClusterID == "" {
+			return errors.New("cluster_id is required when TLS is enabled")
+		}
 		if c.HTTP.TLS.CertPath == "" {
 			return errors.New("http.tls.cert_path is required when TLS is enabled")
 		}

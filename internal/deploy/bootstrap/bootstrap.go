@@ -178,19 +178,17 @@ func PrefixedScript(env map[string]string) string {
 
 	// Write node config if this is NOT a primary bootstrap
 	b.WriteString("else\n")
-	b.WriteString("  echo 'Writing node certificate and configuration...'\n")
-	// For nodes, it is safe to (re)write the CA cert from env.
+	b.WriteString("  echo 'Writing bootstrap token and configuration...'\n")
+	// For nodes, write the CA cert for server verification during bootstrap
 	b.WriteString("  if [ -n \"${PLOY_CA_CERT_PEM:-}\" ]; then\n")
 	b.WriteString("    echo \"$PLOY_CA_CERT_PEM\" > /etc/ploy/pki/ca.crt\n")
 	b.WriteString("    chmod 644 /etc/ploy/pki/ca.crt\n")
 	b.WriteString("  fi\n")
-	b.WriteString("  if [ -n \"${PLOY_SERVER_CERT_PEM:-}\" ]; then\n")
-	b.WriteString("    echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/node.crt\n")
-	b.WriteString("    chmod 644 /etc/ploy/pki/node.crt\n")
-	b.WriteString("  fi\n")
-	b.WriteString("  if [ -n \"${PLOY_SERVER_KEY_PEM:-}\" ]; then\n")
-	b.WriteString("    echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/node.key\n")
-	b.WriteString("    chmod 600 /etc/ploy/pki/node.key\n")
+	// Write bootstrap token to secure tmpfs location
+	b.WriteString("  if [ -n \"${PLOY_BOOTSTRAP_TOKEN:-}\" ]; then\n")
+	b.WriteString("    mkdir -p /run/ploy\n")
+	b.WriteString("    echo \"$PLOY_BOOTSTRAP_TOKEN\" > /run/ploy/bootstrap-token\n")
+	b.WriteString("    chmod 600 /run/ploy/bootstrap-token\n")
 	b.WriteString("  fi\n")
 	// Ensure Docker is installed for containerized execution
 	b.WriteString("  echo 'Ensuring Docker is installed...'\n")
@@ -214,6 +212,7 @@ func PrefixedScript(env map[string]string) string {
 	b.WriteString("  cat > /etc/ploy/ployd-node.yaml <<EOF\n")
 	b.WriteString("server_url: ${PLOY_SERVER_URL:-}\n")
 	b.WriteString("node_id: ${NODE_ID:-}\n")
+	b.WriteString("cluster_id: ${CLUSTER_ID:-}\n")
 	b.WriteString("http:\n")
 	b.WriteString("  listen: :8444\n")
 	b.WriteString("  tls:\n")
