@@ -171,6 +171,52 @@ type mockStore struct {
 	createLogParams store.CreateLogParams
 	createLogResult store.Log
 	createLogErr    error
+
+	// API Token tracking
+	insertAPITokenCalled bool
+	insertAPITokenParams store.InsertAPITokenParams
+	insertAPITokenErr    error
+
+	listAPITokensCalled bool
+	listAPITokensParams string // cluster_id
+	listAPITokensResult []store.APIToken
+	listAPITokensErr    error
+
+	revokeAPITokenCalled bool
+	revokeAPITokenParam  string // token_id
+	revokeAPITokenErr    error
+
+	checkAPITokenRevokedCalled bool
+	checkAPITokenRevokedParam  string
+	checkAPITokenRevokedResult pgtype.Timestamptz
+	checkAPITokenRevokedErr    error
+
+	updateAPITokenLastUsedCalled bool
+	updateAPITokenLastUsedParam  string
+	updateAPITokenLastUsedErr    error
+
+	// Bootstrap Token tracking
+	insertBootstrapTokenCalled bool
+	insertBootstrapTokenParams store.InsertBootstrapTokenParams
+	insertBootstrapTokenErr    error
+
+	getBootstrapTokenCalled bool
+	getBootstrapTokenParam  string
+	getBootstrapTokenResult store.GetBootstrapTokenRow
+	getBootstrapTokenErr    error
+
+	checkBootstrapTokenRevokedCalled bool
+	checkBootstrapTokenRevokedParam  string
+	checkBootstrapTokenRevokedResult pgtype.Timestamptz
+	checkBootstrapTokenRevokedErr    error
+
+	updateBootstrapTokenLastUsedCalled bool
+	updateBootstrapTokenLastUsedParam  string
+	updateBootstrapTokenLastUsedErr    error
+
+	markBootstrapTokenUsedCalled bool
+	markBootstrapTokenUsedParam  string
+	markBootstrapTokenUsedErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -382,4 +428,68 @@ func (m *mockStore) CreateLog(ctx context.Context, params store.CreateLogParams)
 	m.createLogCalled = true
 	m.createLogParams = params
 	return m.createLogResult, m.createLogErr
+}
+
+// API Token methods
+
+func (m *mockStore) InsertAPIToken(ctx context.Context, params store.InsertAPITokenParams) error {
+	m.insertAPITokenCalled = true
+	m.insertAPITokenParams = params
+	return m.insertAPITokenErr
+}
+
+func (m *mockStore) ListAPITokens(ctx context.Context, clusterID string) ([]store.APIToken, error) {
+	m.listAPITokensCalled = true
+	m.listAPITokensParams = clusterID
+	return m.listAPITokensResult, m.listAPITokensErr
+}
+
+func (m *mockStore) RevokeAPIToken(ctx context.Context, tokenID string) error {
+	m.revokeAPITokenCalled = true
+	m.revokeAPITokenParam = tokenID
+	return m.revokeAPITokenErr
+}
+
+func (m *mockStore) CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
+	m.checkAPITokenRevokedCalled = true
+	m.checkAPITokenRevokedParam = tokenID
+	return m.checkAPITokenRevokedResult, m.checkAPITokenRevokedErr
+}
+
+func (m *mockStore) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
+	m.updateAPITokenLastUsedCalled = true
+	m.updateAPITokenLastUsedParam = tokenID
+	return m.updateAPITokenLastUsedErr
+}
+
+// Bootstrap Token methods
+
+func (m *mockStore) InsertBootstrapToken(ctx context.Context, params store.InsertBootstrapTokenParams) error {
+	m.insertBootstrapTokenCalled = true
+	m.insertBootstrapTokenParams = params
+	return m.insertBootstrapTokenErr
+}
+
+func (m *mockStore) GetBootstrapToken(ctx context.Context, tokenID string) (store.GetBootstrapTokenRow, error) {
+	m.getBootstrapTokenCalled = true
+	m.getBootstrapTokenParam = tokenID
+	return m.getBootstrapTokenResult, m.getBootstrapTokenErr
+}
+
+func (m *mockStore) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error) {
+	m.checkBootstrapTokenRevokedCalled = true
+	m.checkBootstrapTokenRevokedParam = tokenID
+	return m.checkBootstrapTokenRevokedResult, m.checkBootstrapTokenRevokedErr
+}
+
+func (m *mockStore) UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error {
+	m.updateBootstrapTokenLastUsedCalled = true
+	m.updateBootstrapTokenLastUsedParam = tokenID
+	return m.updateBootstrapTokenLastUsedErr
+}
+
+func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) error {
+	m.markBootstrapTokenUsedCalled = true
+	m.markBootstrapTokenUsedParam = tokenID
+	return m.markBootstrapTokenUsedErr
 }

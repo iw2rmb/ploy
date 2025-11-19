@@ -19,8 +19,8 @@ func TestNormalizeRoleAndAllowlist(t *testing.T) {
 		"custom":        "custom",
 	}
 	for in, want := range cases {
-		if got := normalizeRole(in); got != want {
-			t.Fatalf("normalizeRole(%q)=%q want %q", in, got, want)
+		if got := NormalizeRole(in); got != want {
+			t.Fatalf("NormalizeRole(%q)=%q want %q", in, got, want)
 		}
 	}
 

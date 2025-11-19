@@ -146,7 +146,7 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 			}
 			return Identity{Role: role}, nil
 		}
-		return Identity{}, errors.New("auth: mutual TLS required")
+		return Identity{}, errors.New("authentication required: provide Bearer token")
 	}
 	cert := r.TLS.PeerCertificates[0]
 	role := extractRole(cert)
