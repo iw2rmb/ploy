@@ -838,11 +838,11 @@ b.WriteString("  fi\n")
   - [x] Remove mTLS-specific tests
   - [x] Add bearer token auth tests
   - [x] Add bootstrap flow tests
-- [ ] Update documentation:
-  - [ ] Update `docs/how-to/deploy-locally.md`
-  - [ ] Update `docs/how-to/deploy-a-cluster.md`
-  - [ ] Add token management guide
-  - [ ] Add troubleshooting guide
+- [x] Update documentation:
+  - [x] Update `docs/how-to/deploy-locally.md`
+  - [x] Update `docs/how-to/deploy-a-cluster.md`
+  - [x] Add token management guide
+  - [x] Add troubleshooting guide
 - [ ] Update local development:
   - [ ] Remove `local/gen-certs.sh` (or keep for CA only)
   - [ ] Update `local/docker-compose.yml` config
