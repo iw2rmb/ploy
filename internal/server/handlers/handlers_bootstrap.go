@@ -1,0 +1,311 @@
+package handlers
+
+import (
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
+	"github.com/iw2rmb/ploy/internal/pki"
+	"github.com/iw2rmb/ploy/internal/server/auth"
+	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+// createBootstrapTokenHandler creates a short-lived bootstrap token for node provisioning.
+// Requires control-plane or cli-admin role (enforced by middleware).
+//
+// POST /v1/bootstrap/tokens
+// Request: { "node_id": "uuid", "expires_in_minutes": 15 }
+// Response: { "token": "eyJ...", "node_id": "...", "expires_at": "..." }
+func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse request.
+		var req struct {
+			NodeID           string `json:"node_id"`
+			ExpiresInMinutes int    `json:"expires_in_minutes"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate node_id.
+		if req.NodeID == "" {
+			http.Error(w, "node_id is required", http.StatusBadRequest)
+			return
+		}
+
+		// Default expiration to 15 minutes if not specified.
+		if req.ExpiresInMinutes <= 0 {
+			req.ExpiresInMinutes = 15
+		}
+
+		// Get cluster ID from environment.
+		clusterID := os.Getenv("PLOY_CLUSTER_ID")
+		if clusterID == "" {
+			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			slog.Error("create bootstrap token: PLOY_CLUSTER_ID not set")
+			return
+		}
+
+		// Generate bootstrap token.
+		now := time.Now()
+		expiresAt := now.Add(time.Duration(req.ExpiresInMinutes) * time.Minute)
+		token, err := auth.GenerateBootstrapToken(tokenSecret, clusterID, req.NodeID, expiresAt)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to generate token: %v", err), http.StatusInternalServerError)
+			slog.Error("create bootstrap token: generation failed", "err", err)
+			return
+		}
+
+		// Parse token to extract token ID.
+		claims, err := auth.ValidateToken(token, tokenSecret)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to validate generated token: %v", err), http.StatusInternalServerError)
+			slog.Error("create bootstrap token: validation failed", "err", err)
+			return
+		}
+
+		// Hash the token for storage.
+		hash := sha256.Sum256([]byte(token))
+		tokenHash := hex.EncodeToString(hash[:])
+
+		// Get issuer identity from context.
+		var issuedBy *string
+		if identity, ok := auth.IdentityFromContext(r.Context()); ok {
+			issuedBy = &identity.CommonName
+		}
+
+		// Parse node_id to UUID.
+		nodeID := domaintypes.ToPGUUID(req.NodeID)
+		if !nodeID.Valid {
+			http.Error(w, "invalid node_id: must be a valid UUID", http.StatusBadRequest)
+			return
+		}
+
+		// Store token in database.
+		err = st.InsertBootstrapToken(r.Context(), store.InsertBootstrapTokenParams{
+			TokenHash: tokenHash,
+			TokenID:   claims.ID,
+			NodeID:    nodeID,
+			ClusterID: clusterID,
+			IssuedAt:  pgtype.Timestamptz{Time: now, Valid: true},
+			ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
+			IssuedBy:  issuedBy,
+		})
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to store token: %v", err), http.StatusInternalServerError)
+			slog.Error("create bootstrap token: database insert failed", "err", err)
+			return
+		}
+
+		// Return token.
+		resp := struct {
+			Token     string    `json:"token"`
+			NodeID    string    `json:"node_id"`
+			ExpiresAt time.Time `json:"expires_at"`
+		}{
+			Token:     token,
+			NodeID:    req.NodeID,
+			ExpiresAt: expiresAt,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("create bootstrap token: encode response failed", "err", err)
+		}
+
+		slog.Info("bootstrap token created",
+			"token_id", claims.ID,
+			"node_id", req.NodeID,
+			"expires_at", expiresAt,
+			"issued_by", issuedBy,
+		)
+	}
+}
+
+// bootstrapCertificateHandler exchanges a bootstrap token for a signed certificate.
+// Requires bootstrap token in Authorization header.
+//
+// POST /v1/pki/bootstrap
+// Request: { "csr": "-----BEGIN CERTIFICATE REQUEST-----..." }
+// Response: { "certificate": "...", "ca_bundle": "...", "serial": "...", ... }
+func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract and validate bootstrap token from Authorization header.
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			http.Error(w, "missing or invalid Authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+
+		// Validate token.
+		claims, err := auth.ValidateToken(tokenString, tokenSecret)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid token: %v", err), http.StatusUnauthorized)
+			slog.Warn("bootstrap certificate: invalid token", "err", err)
+			return
+		}
+
+		// Verify token is a bootstrap token.
+		if claims.TokenType != auth.TokenTypeBootstrap {
+			http.Error(w, "invalid token type: expected bootstrap token", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify token is not expired.
+		if time.Now().After(claims.ExpiresAt.Time) {
+			http.Error(w, "token expired", http.StatusUnauthorized)
+			return
+		}
+
+		// Check if token is revoked.
+		revoked, err := st.CheckBootstrapTokenRevoked(r.Context(), claims.ID)
+		if err == nil && revoked.Valid {
+			http.Error(w, "token revoked", http.StatusUnauthorized)
+			return
+		}
+
+		// Get bootstrap token info from database.
+		tokenInfo, err := st.GetBootstrapToken(r.Context(), claims.ID)
+		if err != nil {
+			http.Error(w, "token not found or invalid", http.StatusUnauthorized)
+			slog.Warn("bootstrap certificate: token not found in database", "token_id", claims.ID, "err", err)
+			return
+		}
+
+		// Verify token hasn't been used yet.
+		if tokenInfo.UsedAt.Valid {
+			// If cert was already issued, this is idempotent retry - we could allow it
+			// For now, reject to enforce single-use
+			http.Error(w, "token already used", http.StatusUnauthorized)
+			slog.Warn("bootstrap certificate: token already used", "token_id", claims.ID)
+			return
+		}
+
+		// Parse request body.
+		var req struct {
+			CSR string `json:"csr"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Validate CSR is not empty.
+		if strings.TrimSpace(req.CSR) == "" {
+			http.Error(w, "csr field is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate CSR CN matches token's node_id.
+		block, _ := pem.Decode([]byte(req.CSR))
+		if block == nil || block.Type != "CERTIFICATE REQUEST" {
+			http.Error(w, "invalid CSR PEM", http.StatusBadRequest)
+			return
+		}
+
+		parsedCSR, err := x509.ParseCertificateRequest(block.Bytes)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("parse CSR: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		if err := parsedCSR.CheckSignature(); err != nil {
+			http.Error(w, fmt.Sprintf("verify CSR signature: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		// Verify CSR CN matches token's node_id.
+		expectedCN := "node:" + claims.NodeID
+		if strings.TrimSpace(parsedCSR.Subject.CommonName) != expectedCN {
+			http.Error(w, "CSR subject common name must match node_id from token", http.StatusBadRequest)
+			slog.Warn("bootstrap certificate: CN mismatch",
+				"expected", expectedCN,
+				"actual", parsedCSR.Subject.CommonName,
+			)
+			return
+		}
+
+		// Load cluster CA.
+		ca, rawCACert, err := loadClusterCA()
+		if err != nil {
+			if errors.Is(err, errCANotConfigured) {
+				http.Error(w, "PKI not configured", http.StatusServiceUnavailable)
+			} else {
+				http.Error(w, "failed to load CA", http.StatusInternalServerError)
+			}
+			slog.Error("bootstrap certificate: load CA failed", "err", err)
+			return
+		}
+
+		// Sign the CSR.
+		cert, err := pki.SignNodeCSR(ca, []byte(req.CSR), time.Now())
+		if err != nil {
+			http.Error(w, fmt.Sprintf("sign failed: %v", err), http.StatusBadRequest)
+			slog.Warn("bootstrap certificate: sign CSR failed", "node_id", claims.NodeID, "err", err)
+			return
+		}
+
+		// Mark bootstrap token as used.
+		err = st.UpdateBootstrapTokenLastUsed(r.Context(), claims.ID)
+		if err != nil {
+			slog.Error("bootstrap certificate: failed to mark token as used", "token_id", claims.ID, "err", err)
+			// Don't fail the request - cert was already issued
+		}
+
+		// Mark cert as issued.
+		err = st.MarkBootstrapTokenCertIssued(r.Context(), claims.ID)
+		if err != nil {
+			slog.Error("bootstrap certificate: failed to mark cert as issued", "token_id", claims.ID, "err", err)
+			// Don't fail the request - cert was already issued
+		}
+
+		// Build response.
+		resp := struct {
+			Certificate string `json:"certificate"`
+			CABundle    string `json:"ca_bundle"`
+			Serial      string `json:"serial"`
+			Fingerprint string `json:"fingerprint"`
+			NotBefore   string `json:"not_before"`
+			NotAfter    string `json:"not_after"`
+		}{
+			Certificate: cert.CertPEM,
+			CABundle:    rawCACert,
+			Serial:      cert.Serial,
+			Fingerprint: cert.Fingerprint,
+			NotBefore:   cert.NotBefore.Format(time.RFC3339),
+			NotAfter:    cert.NotAfter.Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			slog.Error("bootstrap certificate: encode response failed", "err", err)
+		}
+
+		slog.Info("bootstrap certificate issued",
+			"token_id", claims.ID,
+			"node_id", claims.NodeID,
+			"serial", cert.Serial,
+			"fingerprint", cert.Fingerprint,
+			"not_before", cert.NotBefore.Format(time.RFC3339),
+			"not_after", cert.NotAfter.Format(time.RFC3339),
+		)
+	}
+}

@@ -43,6 +43,7 @@ type Querier interface {
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
+	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetBuildGateJob(ctx context.Context, id pgtype.UUID) (BuildgateJob, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
@@ -52,6 +53,7 @@ type Querier interface {
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
+	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	ListAPITokens(ctx context.Context, clusterID string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
@@ -78,6 +80,7 @@ type Querier interface {
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
+	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error

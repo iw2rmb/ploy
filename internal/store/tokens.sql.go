@@ -37,6 +37,45 @@ func (q *Queries) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string
 	return revoked_at, err
 }
 
+const getBootstrapToken = `-- name: GetBootstrapToken :one
+SELECT
+    node_id,
+    cluster_id,
+    issued_at,
+    expires_at,
+    used_at,
+    cert_issued_at,
+    revoked_at
+FROM bootstrap_tokens
+WHERE token_id = $1
+LIMIT 1
+`
+
+type GetBootstrapTokenRow struct {
+	NodeID       pgtype.UUID        `json:"node_id"`
+	ClusterID    string             `json:"cluster_id"`
+	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	UsedAt       pgtype.Timestamptz `json:"used_at"`
+	CertIssuedAt pgtype.Timestamptz `json:"cert_issued_at"`
+	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
+}
+
+func (q *Queries) GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error) {
+	row := q.db.QueryRow(ctx, getBootstrapToken, tokenID)
+	var i GetBootstrapTokenRow
+	err := row.Scan(
+		&i.NodeID,
+		&i.ClusterID,
+		&i.IssuedAt,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CertIssuedAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
 const insertAPIToken = `-- name: InsertAPIToken :exec
 INSERT INTO api_tokens (
     token_hash,
@@ -73,6 +112,43 @@ func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) 
 		arg.IssuedAt,
 		arg.ExpiresAt,
 		arg.CreatedBy,
+	)
+	return err
+}
+
+const insertBootstrapToken = `-- name: InsertBootstrapToken :exec
+INSERT INTO bootstrap_tokens (
+    token_hash,
+    token_id,
+    node_id,
+    cluster_id,
+    issued_at,
+    expires_at,
+    issued_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+)
+`
+
+type InsertBootstrapTokenParams struct {
+	TokenHash string             `json:"token_hash"`
+	TokenID   string             `json:"token_id"`
+	NodeID    pgtype.UUID        `json:"node_id"`
+	ClusterID string             `json:"cluster_id"`
+	IssuedAt  pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	IssuedBy  *string            `json:"issued_by"`
+}
+
+func (q *Queries) InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error {
+	_, err := q.db.Exec(ctx, insertBootstrapToken,
+		arg.TokenHash,
+		arg.TokenID,
+		arg.NodeID,
+		arg.ClusterID,
+		arg.IssuedAt,
+		arg.ExpiresAt,
+		arg.IssuedBy,
 	)
 	return err
 }
@@ -130,6 +206,17 @@ func (q *Queries) ListAPITokens(ctx context.Context, clusterID string) ([]ListAP
 		return nil, err
 	}
 	return items, nil
+}
+
+const markBootstrapTokenCertIssued = `-- name: MarkBootstrapTokenCertIssued :exec
+UPDATE bootstrap_tokens
+SET cert_issued_at = NOW()
+WHERE token_id = $1
+`
+
+func (q *Queries) MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error {
+	_, err := q.db.Exec(ctx, markBootstrapTokenCertIssued, tokenID)
+	return err
 }
 
 const revokeAPIToken = `-- name: RevokeAPIToken :exec
