@@ -1,11 +1,18 @@
 # Deploy a Ploy Cluster (Server/Node Architecture)
 
-This guide describes how to deploy a Ploy cluster using the new server/node architecture
-(Postgres + mTLS) as outlined in `README.md` and implemented as of November 2025.
+This guide describes how to deploy a Ploy cluster using the server/node architecture
+with bearer token authentication and bootstrap token provisioning, as outlined in `README.md`
+and implemented as of November 2025.
 The deployment separates control-plane (`ployd` server) from worker execution (`ployd-node`) and
 assumes a 1x server + 2x node layout.
 
-**Note**: This replaces the legacy etcd stack. See `README.md` for architecture details.
+**Authentication Model**:
+- **Bearer tokens** for CLI authentication (JWT-based)
+- **Bootstrap tokens** for node provisioning (short-lived, single-use)
+- **Plain HTTP** for ployd (HTTPS termination at load balancer)
+- **Certificate-based authentication** for nodes (after bootstrap)
+
+**Note**: This replaces the legacy mTLS-only authentication. See `README.md` for architecture details.
 
 ## Prerequisites
 
@@ -29,26 +36,29 @@ dist/ploy server deploy --address <host-or-ip>
 
 This command:
 - Copies the `ployd` server binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd` (mode 0755).
-- Generates a cluster Certificate Authority (CA) locally.
-- Issues a server TLS certificate with appropriate SANs.
+- Generates a cluster Certificate Authority (CA) locally (still required for node certificate issuance).
 - Generates a `cluster_id` (used for PKI and local descriptors). No row is written to PostgreSQL during bootstrap.
+- Generates a secure random JWT signing secret for bearer token authentication.
 - Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
-- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
-- Writes server certificate to `/etc/ploy/pki/server.crt` (mode 644) and private key to `/etc/ploy/pki/server.key` (mode 600).
+- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644) for signing node certificates.
+- Writes CA private key to `/etc/ploy/pki/ca.key` (mode 600).
 - If `--postgresql-dsn` is **not** provided, installs PostgreSQL on the VPS, creates database `ploy` and user `ploy` with a randomly generated 32-character hex password, and exports `PLOY_POSTGRES_DSN` in the format `postgres://ploy:{PASSWORD}@localhost:5432/ploy?sslmode=disable`. The bootstrap writes this DSN as a literal value into `/etc/ploy/ployd.yaml`.
 - Writes server configuration to `/etc/ploy/ployd.yaml` with the following structure:
-  - `http.listen: :8443` with TLS enabled, mTLS required
-  - `http.tls.cert/key/client_ca` pointing to `/etc/ploy/pki/server.{crt,key}` and `ca.crt`
+  - `http.listen: 127.0.0.1:8080` (plain HTTP, bind to localhost only)
   - `metrics.listen: :9100`
-  - `control_plane.endpoint: https://127.0.0.1:8443` with local mTLS paths
+  - `auth.bearer_tokens.enabled: true`
   - `postgres.dsn: ${PLOY_POSTGRES_DSN:-}` (expanded at bootstrap time to a literal DSN in the file)
-  - Note: There is no `http.tls.require_client_cert` knob; mTLS is mandatory whenever TLS is enabled.
+  - Note: HTTPS termination is expected at a load balancer; ployd accepts plain HTTP.
 - Installs systemd unit `/etc/systemd/system/ployd.service` with:
   - `ExecStart=/usr/local/bin/ployd`
   - `Restart=always`, `RestartSec=5`
   - `Environment=PLOYD_CONFIG_PATH=/etc/ploy/ployd.yaml`
+  - `Environment=PLOY_AUTH_SECRET=<generated-secret>` (JWT signing secret)
+  - `Environment=PLOY_SERVER_CA_CERT=<ca-cert-pem>` (for node CSR signing)
+  - `Environment=PLOY_SERVER_CA_KEY=<ca-key-pem>` (for node CSR signing)
   - `After=network.target postgresql.service`
 - Runs `systemctl daemon-reload` and `systemctl enable --now ployd.service`.
+- Creates an initial admin token and saves it to the local cluster descriptor.
 
 At the end of bootstrap, a summary is printed showing the config path, PKI directory, detected certificate files, the systemd service name (with active/enabled status), and helpful commands for viewing logs and checking status, for example:
 
@@ -106,37 +116,56 @@ dist/ploy server deploy --address 203.0.113.42
 Use `ploy node add` to register worker nodes with the cluster:
 
 ```bash
-dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<server-host>:8443
+dist/ploy node add --cluster-id <cluster-id> --address <host-or-ip> --server-url https://<load-balancer-host>
 ```
 
-This command:
+This command implements the bootstrap token flow:
+
+**CLI-side actions:**
+- Generates a unique `node_id` (UUID).
+- Requests a short-lived bootstrap token from the server (`POST /v1/bootstrap/tokens`).
 - Copies the `ployd-node` binary over SSH to `/tmp/ployd-{random}`, then installs it to `/usr/local/bin/ployd-node` (mode 0755).
-- Generates a node private key and CSR locally.
-- Submits the CSR to the server's `/v1/pki/sign` endpoint for signing.
+- Writes the bootstrap token securely to `/run/ploy/bootstrap-token` (mode 600) on the remote host.
+- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644) for server verification.
 - Creates `/etc/ploy/` and `/etc/ploy/pki/` directories on the remote host.
-- Writes CA certificate to `/etc/ploy/pki/ca.crt` (mode 644).
-- Writes node certificate to `/etc/ploy/pki/node.crt` (mode 644) and private key to `/etc/ploy/pki/node.key` (mode 600).
+
+**Node-side bootstrap (on first start):**
+- Checks for existing certificate at `/etc/ploy/pki/node.{crt,key}`.
+- If certificates don't exist:
+  1. Reads bootstrap token from `/run/ploy/bootstrap-token`.
+  2. Generates private key and CSR locally.
+  3. Exchanges bootstrap token for signed certificate (`POST /v1/pki/bootstrap`).
+  4. Writes certificate to `/etc/ploy/pki/node.crt` and key to `/etc/ploy/pki/node.key` (mode 600).
+  5. Deletes the bootstrap token file.
+  6. Proceeds with normal operation.
+
+**Installed configuration:**
 - Writes node configuration to `/etc/ploy/ployd-node.yaml` with the following structure:
-  - `server_url: ${PLOY_SERVER_URL}` (from environment)
-  - `node_id: ${NODE_ID}` (from environment)
-  - `http.listen: :8444` with TLS enabled
-  - `http.tls.ca_path/cert_path/key_path` pointing to `/etc/ploy/pki/{ca.crt,node.crt,node.key}`
+  - `server_url: <load-balancer-url>` (HTTPS)
+  - `node_id: <generated-uuid>`
+  - `cluster_id: <cluster-id>`
+  - `http.listen: :8444`
   - `heartbeat.interval: 30s`, `heartbeat.timeout: 10s`
 - Installs systemd unit `/etc/systemd/system/ployd-node.service` with:
   - `ExecStart=/usr/local/bin/ployd-node`
   - `Restart=always`, `RestartSec=5`
   - `After=network.target`
-  - (Node reads config from default path `/etc/ploy/ployd-node.yaml` via `--config` flag; no environment override)
 - Runs `systemctl daemon-reload` and `systemctl enable --now ployd-node.service`.
 
 Example:
 
 ```bash
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://203.0.113.42:8443
-dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://203.0.113.42:8443
+dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.43 --server-url https://ploy.example.com
+dist/ploy node add --cluster-id alpha-cluster --address 203.0.113.44 --server-url https://ploy.example.com
 ```
 
-This step installs Docker on each node (via apt/yum or get.docker.com), writes `/etc/ploy/ployd-node.yaml` with the
+**Security notes:**
+- Bootstrap tokens expire after 15 minutes (configurable).
+- Bootstrap tokens are single-use (marked as used after successful cert issuance).
+- The token is written to `/run/ploy/` (tmpfs on most systems) and deleted immediately after use.
+- The server validates that the CSR CN matches the `node_id` in the bootstrap token.
+
+This step also installs Docker on each node (via apt/yum or get.docker.com), writes `/etc/ploy/ployd-node.yaml` with the
 literal `server_url` and `node_id`, installs and starts `ployd-node.service`, and enables the Docker daemon.
 
 ### 3. Submit a Run
@@ -394,9 +423,16 @@ Legacy endpoint notice:
 
 ## Connectivity and Authentication
 
-- **mTLS Only**: All communication uses mutual TLS. Bearer tokens have been removed.
-- **Nodes**: Use certificates issued via `/v1/pki/sign` to communicate with the server.
-- **CLI & descriptors**: The server bootstrap saves a local cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json` and marks it as default. Descriptors include `ca_path`, `cert_path`, and `key_path` when available. The CLI loads these paths to establish mTLS and enforces TLS 1.3. When a descriptor is not present or incomplete, the CLI falls back to `PLOY_CONTROL_PLANE_URL`.
+- **Bearer Token Authentication**: CLI authenticates using JWT bearer tokens in the `Authorization: Bearer <token>` header.
+- **Bootstrap Token Flow**: Nodes obtain certificates during initial provisioning using short-lived bootstrap tokens.
+- **Node Certificates**: After bootstrap, nodes use mTLS with certificates issued via `/v1/pki/bootstrap` to communicate with the server.
+- **CLI & descriptors**: The server bootstrap saves a local cluster descriptor at `~/.config/ploy/clusters/<cluster-id>.json` and marks it as default. Descriptors include:
+  - `address` — Server URL (e.g., `https://ploy.example.com`)
+  - `token` — Bearer token for authentication
+  - `cluster_id` — Cluster identifier
+  - `ssh_identity_path` — Path to SSH key for node provisioning (optional)
+- **HTTPS Termination**: In production, a load balancer terminates HTTPS and forwards plain HTTP to ployd on `127.0.0.1:8080`.
+- **Token Management**: Use `ploy token create`, `ploy token list`, and `ploy token revoke` commands to manage API tokens. See `docs/how-to/token-management.md` for details.
 
 ## Appendix: Environment Variables
 
