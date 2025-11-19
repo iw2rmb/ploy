@@ -775,7 +775,7 @@ b.WriteString("  fi\n")
 ### Phase 1: Foundation (Server-Side)
 - [x] Add `github.com/golang-jwt/jwt/v5` to `go.mod`
 - [x] Create `internal/server/auth/token.go` with JWT generation/validation
-- [ ] Create database migration `NNNN_bearer_tokens.sql`
+- [x] Create database migration `NNNN_bearer_tokens.sql`
 - [ ] Update `internal/server/auth/authorizer.go`:
   - [ ] Add `identityFromBearerToken()` method
   - [ ] Update `identityFromRequest()` to try bearer tokens
