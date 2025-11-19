@@ -791,15 +791,15 @@ b.WriteString("  fi\n")
   - [x] Use plain HTTP listener only
 
 ### Phase 2: API Endpoints (Server-Side)
-- [ ] Create `internal/server/handlers/handlers_tokens.go`:
-  - [ ] `HandleCreateAPIToken` - POST /v1/tokens
-  - [ ] `HandleListAPITokens` - GET /v1/tokens
-  - [ ] `HandleRevokeAPIToken` - DELETE /v1/tokens/{id}
+- [x] Create `internal/server/handlers/handlers_tokens.go`:
+  - [x] `HandleCreateAPIToken` - POST /v1/tokens
+  - [x] `HandleListAPITokens` - GET /v1/tokens
+  - [x] `HandleRevokeAPIToken` - DELETE /v1/tokens/{id}
 - [ ] Create `internal/server/handlers/handlers_bootstrap.go`:
   - [ ] `HandleCreateBootstrapToken` - POST /v1/bootstrap/tokens
   - [ ] `HandleBootstrapCertificate` - POST /v1/pki/bootstrap
-- [ ] Update `internal/server/handlers/register.go`:
-  - [ ] Register token management routes
+- [x] Update `internal/server/handlers/register.go`:
+  - [x] Register token management routes
   - [ ] Register bootstrap routes
   - [ ] Remove mTLS-specific routes
 

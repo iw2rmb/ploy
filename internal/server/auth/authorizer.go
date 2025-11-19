@@ -69,7 +69,7 @@ type identityKey struct{}
 
 // NewAuthorizer constructs an Authorizer.
 func NewAuthorizer(opts Options) *Authorizer {
-	role := normalizeRole(opts.DefaultRole)
+	role := NormalizeRole(opts.DefaultRole)
 	if role == "" {
 		role = opts.DefaultRole
 	}
@@ -165,9 +165,9 @@ func extractRole(cert *x509.Certificate) string {
 		return ""
 	}
 	for _, ou := range cert.Subject.OrganizationalUnit {
-		role := normalizeRole(strings.TrimPrefix(strings.TrimSpace(ou), "Ploy"))
+		role := NormalizeRole(strings.TrimPrefix(strings.TrimSpace(ou), "Ploy"))
 		role = strings.TrimSpace(strings.TrimPrefix(role, "role="))
-		if candidate := normalizeRole(role); candidate != "" {
+		if candidate := NormalizeRole(role); candidate != "" {
 			return candidate
 		}
 	}
@@ -180,7 +180,7 @@ func extractRole(cert *x509.Certificate) string {
 			// Fallback to hyphen delimiter (e.g., "control-xyz").
 			role = cn[:idx]
 		}
-		if candidate := normalizeRole(role); candidate != "" {
+		if candidate := NormalizeRole(role); candidate != "" {
 			return candidate
 		}
 	}
@@ -274,7 +274,9 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 	}
 }
 
-func normalizeRole(value string) string {
+// NormalizeRole normalizes a role string to one of the standard role constants.
+// It accepts common aliases and returns the canonical role name.
+func NormalizeRole(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "beacon", "control", "control-plane", "controlplane", "client":
 		return RoleControlPlane
@@ -293,7 +295,7 @@ func allowlist(roles []string) map[string]struct{} {
 	}
 	out := make(map[string]struct{}, len(roles))
 	for _, role := range roles {
-		if normalized := normalizeRole(role); normalized != "" {
+		if normalized := NormalizeRole(role); normalized != "" {
 			out[normalized] = struct{}{}
 		}
 	}

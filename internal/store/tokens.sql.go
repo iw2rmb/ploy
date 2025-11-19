@@ -37,6 +37,112 @@ func (q *Queries) CheckBootstrapTokenRevoked(ctx context.Context, tokenID string
 	return revoked_at, err
 }
 
+const insertAPIToken = `-- name: InsertAPIToken :exec
+INSERT INTO api_tokens (
+    token_hash,
+    token_id,
+    cluster_id,
+    role,
+    description,
+    issued_at,
+    expires_at,
+    created_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8
+)
+`
+
+type InsertAPITokenParams struct {
+	TokenHash   string             `json:"token_hash"`
+	TokenID     string             `json:"token_id"`
+	ClusterID   string             `json:"cluster_id"`
+	Role        string             `json:"role"`
+	Description *string            `json:"description"`
+	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	CreatedBy   *string            `json:"created_by"`
+}
+
+func (q *Queries) InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error {
+	_, err := q.db.Exec(ctx, insertAPIToken,
+		arg.TokenHash,
+		arg.TokenID,
+		arg.ClusterID,
+		arg.Role,
+		arg.Description,
+		arg.IssuedAt,
+		arg.ExpiresAt,
+		arg.CreatedBy,
+	)
+	return err
+}
+
+const listAPITokens = `-- name: ListAPITokens :many
+SELECT
+    token_id,
+    role,
+    description,
+    issued_at,
+    expires_at,
+    last_used_at,
+    revoked_at,
+    created_by
+FROM api_tokens
+WHERE cluster_id = $1
+ORDER BY created_at DESC
+`
+
+type ListAPITokensRow struct {
+	TokenID     string             `json:"token_id"`
+	Role        string             `json:"role"`
+	Description *string            `json:"description"`
+	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	CreatedBy   *string            `json:"created_by"`
+}
+
+func (q *Queries) ListAPITokens(ctx context.Context, clusterID string) ([]ListAPITokensRow, error) {
+	rows, err := q.db.Query(ctx, listAPITokens, clusterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAPITokensRow{}
+	for rows.Next() {
+		var i ListAPITokensRow
+		if err := rows.Scan(
+			&i.TokenID,
+			&i.Role,
+			&i.Description,
+			&i.IssuedAt,
+			&i.ExpiresAt,
+			&i.LastUsedAt,
+			&i.RevokedAt,
+			&i.CreatedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeAPIToken = `-- name: RevokeAPIToken :exec
+UPDATE api_tokens
+SET revoked_at = NOW()
+WHERE token_id = $1
+`
+
+func (q *Queries) RevokeAPIToken(ctx context.Context, tokenID string) error {
+	_, err := q.db.Exec(ctx, revokeAPIToken, tokenID)
+	return err
+}
+
 const updateAPITokenLastUsed = `-- name: UpdateAPITokenLastUsed :exec
 UPDATE api_tokens
 SET last_used_at = NOW()

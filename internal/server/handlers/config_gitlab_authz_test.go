@@ -25,7 +25,7 @@ func TestConfigGitLab_AdminOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("events: %v", err)
 	}
-	RegisterRoutes(sCP, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}))
+	RegisterRoutes(sCP, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}), "test-secret")
 
 	// GET should be forbidden for control-plane.
 	rr := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestConfigGitLab_AdminOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("http server: %v", err)
 	}
-	RegisterRoutes(sAdmin, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}))
+	RegisterRoutes(sAdmin, &mockStore{}, ev, NewConfigHolder(config.GitLabConfig{}), "test-secret")
 
 	// GET should succeed for cli-admin.
 	rr = httptest.NewRecorder()

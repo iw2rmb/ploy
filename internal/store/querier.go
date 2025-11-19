@@ -51,6 +51,8 @@ type Querier interface {
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
+	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
+	ListAPITokens(ctx context.Context, clusterID string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
@@ -76,6 +78,7 @@ type Querier interface {
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
+	RevokeAPIToken(ctx context.Context, tokenID string) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
