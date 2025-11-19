@@ -77,7 +77,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	}
 
 	// Build mods-codex image (tag: mods-codex:latest)
-	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "mods", "mod-codex", "Dockerfile"), repoRoot)
+	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "docker", "mods", "mod-codex", "Dockerfile"), repoRoot)
 
 	// Prepare prompt with explicit verification rule for ploy-buildgate
 	prompt := strings.Join([]string{
