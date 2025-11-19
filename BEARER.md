@@ -850,16 +850,17 @@ b.WriteString("  fi\n")
   - [x] Update `local/node/ployd-node.yaml`
 
 ### Phase 6: Cleanup
-- [ ] Remove unused PKI code:
-  - [ ] Remove `internal/server/handlers/handlers_pki.go` (old cert signing)
-  - [ ] Remove mTLS client cert generation from `internal/pki/ca.go`
-  - [ ] Keep CSR signing functions (still needed for bootstrap)
-- [ ] Remove environment variables:
-  - [ ] `PLOY_SERVER_CA_CERT`, `PLOY_SERVER_CA_KEY`
-  - [ ] `PLOY_SERVER_CA_CERT_PATH`, `PLOY_SERVER_CA_KEY_PATH`
-- [ ] Update `docs/envs/README.md`:
-  - [ ] Document new `PLOY_AUTH_SECRET` variable
-  - [ ] Remove mTLS-related variables
+- [x] Remove unused PKI code:
+  - [x] Remove `internal/server/handlers/handlers_pki.go` (old cert signing) - not present
+  - [x] Remove mTLS client cert generation from `internal/pki/ca.go` - removed `IssueClientCert`
+  - [x] Keep CSR signing functions (still needed for bootstrap)
+- [x] Environment variables status:
+  - Note: `PLOY_SERVER_CA_CERT` and `PLOY_SERVER_CA_KEY` are still used for bootstrap CSR signing
+  - Note: `PLOY_SERVER_CA_CERT_PATH` and `PLOY_SERVER_CA_KEY_PATH` never existed
+  - These will be migrated to config-file-only in a future update
+- [x] Update `docs/envs/README.md`:
+  - [x] Document new `PLOY_AUTH_SECRET` variable
+  - [x] Update authentication model documentation to reflect bearer tokens
 
 ---
 
