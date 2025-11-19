@@ -31,7 +31,7 @@ jobs:
       - name: Run tests
         env:
           PLOY_CONFIG_HOME: /tmp/ploy-test-config
-        run: go test -race -coverprofile=coverage.out ./internal/... ./cmd/... ./tests/...
+        run: go test -race -coverprofile=coverage.out ./internal/... ./cmd/ploy/... ./cmd/ployd/... ./tests/...
 
       - name: Check coverage threshold
         run: |
@@ -44,7 +44,7 @@ jobs:
           fi
 
       - name: Run go vet
-        run: go vet ./internal/... ./cmd/... ./tests/...
+        run: go vet ./internal/... ./cmd/ploy/... ./cmd/ployd/... ./tests/...
 
       - name: Build verification
         run: make build
