@@ -16,57 +16,28 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/iw2rmb/ploy/internal/cli/config"
 )
 
-// handleRefreshAdminCert refreshes the admin certificate from the server.
+// handleRefreshAdminCert is deprecated - bearer token authentication replaces mTLS certificates.
 func handleRefreshAdminCert(ctx context.Context, stderr io.Writer) error {
 	if stderr == nil {
 		stderr = io.Discard
 	}
 
-	// Load the default cluster descriptor to get cluster ID and server address.
-	desc, err := config.LoadDefault()
-	if err != nil {
-		return fmt.Errorf("refresh admin cert: load default cluster descriptor: %w", err)
-	}
-	if desc.ClusterID == "" {
-		return errors.New("refresh admin cert: cluster ID not found in descriptor")
-	}
+	_, _ = fmt.Fprintln(stderr, "ERROR: --refresh-admin-cert is deprecated")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Bearer token authentication has replaced mTLS certificate authentication.")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "To authenticate with the server:")
+	_, _ = fmt.Fprintln(stderr, "  1. Create a new API token:")
+	_, _ = fmt.Fprintln(stderr, "     ploy token create --role cli-admin --description \"My token\"")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "  2. Add the token to your cluster descriptor:")
+	_, _ = fmt.Fprintln(stderr, "     Edit ~/.config/ploy/clusters/<cluster-id>.json")
+	_, _ = fmt.Fprintln(stderr, `     Add: "token": "your-token-here"`)
+	_, _ = fmt.Fprintln(stderr, "")
 
-	_, _ = fmt.Fprintf(stderr, "Refreshing admin certificate for cluster: %s\n", desc.ClusterID)
-
-	// Call server to sign new admin cert.
-	caPEM, certPEM, keyPEM, err := refreshAdminCertFromServer(ctx, string(desc.ClusterID), stderr)
-	if err != nil {
-		return fmt.Errorf("refresh admin cert: %w", err)
-	}
-
-	// Write local admin bundle.
-	caPath, certPath, keyPath, err := writeLocalAdminBundle(string(desc.ClusterID), caPEM, certPEM, keyPEM)
-	if err != nil {
-		return fmt.Errorf("refresh admin cert: write local bundle: %w", err)
-	}
-
-	_, _ = fmt.Fprintf(stderr, "Admin certificate bundle written:\n")
-	_, _ = fmt.Fprintf(stderr, "  CA: %s\n", caPath)
-	_, _ = fmt.Fprintf(stderr, "  Cert: %s\n", certPath)
-	_, _ = fmt.Fprintf(stderr, "  Key: %s\n", keyPath)
-
-	// Update descriptor with new paths.
-	desc.CAPath = caPath
-	desc.CertPath = certPath
-	desc.KeyPath = keyPath
-
-	if _, err := config.SaveDescriptor(desc); err != nil {
-		return fmt.Errorf("refresh admin cert: save descriptor: %w", err)
-	}
-
-	_, _ = fmt.Fprintf(stderr, "\nAdmin certificate refreshed successfully!\n")
-	_, _ = fmt.Fprintf(stderr, "Cluster descriptor updated: ~/.config/ploy/clusters/%s.json\n", desc.ClusterID)
-
-	return nil
+	return errors.New("--refresh-admin-cert is deprecated, use bearer tokens instead")
 }
 
 // generateAdminCSR generates a CSR for cli-admin with proper OU and ExtKeyUsage.

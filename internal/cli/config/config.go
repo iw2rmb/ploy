@@ -25,9 +25,7 @@ type Descriptor struct {
 	Address         string    `json:"address"`
 	Scheme          string    `json:"scheme,omitempty"`
 	SSHIdentityPath string    `json:"ssh_identity_path,omitempty"`
-	CAPath          string    `json:"ca_path,omitempty"`
-	CertPath        string    `json:"cert_path,omitempty"`
-	KeyPath         string    `json:"key_path,omitempty"`
+	Token           string    `json:"token,omitempty"` // Bearer token for API authentication
 	Default         bool      `json:"default,omitempty"`
 }
 
