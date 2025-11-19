@@ -19,9 +19,15 @@ package auth
 import (
 	"context"
 	"crypto/x509"
+	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/iw2rmb/ploy/internal/store"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Role constants encode connection-level privileges.
@@ -39,6 +45,8 @@ const (
 type Options struct {
 	AllowInsecure bool
 	DefaultRole   string
+	TokenSecret   string        // JWT signing secret for bearer token validation
+	Querier       store.Querier // Database querier for token validation
 }
 
 // Authorizer enforces role-based access derived from client certificates.
@@ -46,6 +54,8 @@ type Options struct {
 type Authorizer struct {
 	allowInsecure bool
 	defaultRole   string
+	tokenSecret   string        // JWT signing secret
+	querier       store.Querier // Database for token validation
 }
 
 // Identity describes the caller extracted from the TLS certificate.
@@ -66,6 +76,8 @@ func NewAuthorizer(opts Options) *Authorizer {
 	return &Authorizer{
 		allowInsecure: opts.AllowInsecure,
 		defaultRole:   role,
+		tokenSecret:   opts.TokenSecret,
+		querier:       opts.Querier,
 	}
 }
 
@@ -117,6 +129,15 @@ func (a *Authorizer) Middleware(allowed ...string) func(http.Handler) http.Handl
 }
 
 func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
+	// Try bearer token authentication first
+	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token := strings.TrimPrefix(authHeader, "Bearer ")
+			return a.identityFromBearerToken(r.Context(), token)
+		}
+	}
+
+	// Fall back to mTLS authentication
 	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
 		if a.allowInsecure {
 			role := a.defaultRole
@@ -164,6 +185,93 @@ func extractRole(cert *x509.Certificate) string {
 		}
 	}
 	return ""
+}
+
+// identityFromBearerToken validates a JWT bearer token and extracts the identity.
+func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString string) (Identity, error) {
+	// Validate JWT signature and extract claims
+	claims, err := ValidateToken(tokenString, a.tokenSecret)
+	if err != nil {
+		return Identity{}, fmt.Errorf("invalid token: %w", err)
+	}
+
+	// Verify token is not expired
+	if time.Now().After(claims.ExpiresAt.Time) {
+		return Identity{}, errors.New("token expired")
+	}
+
+	// Check if token is revoked (query database)
+	revoked, err := a.isTokenRevoked(ctx, claims.ID, claims.TokenType)
+	if err != nil {
+		return Identity{}, fmt.Errorf("check token revocation: %w", err)
+	}
+	if revoked {
+		return Identity{}, errors.New("token revoked")
+	}
+
+	// Update last_used_at timestamp (async, don't block request)
+	go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+
+	return Identity{
+		Role:       claims.Role,
+		CommonName: claims.ID, // Use token ID as identifier
+		// ClusterID is in claims but not in Identity struct yet
+	}, nil
+}
+
+// isTokenRevoked checks if a token has been revoked by querying the database.
+func (a *Authorizer) isTokenRevoked(ctx context.Context, tokenID, tokenType string) (bool, error) {
+	if a.querier == nil {
+		// If no database configured, tokens cannot be revoked
+		return false, nil
+	}
+
+	var err error
+	switch tokenType {
+	case TokenTypeAPI:
+		_, err = a.querier.CheckAPITokenRevoked(ctx, tokenID)
+	case TokenTypeBootstrap:
+		_, err = a.querier.CheckBootstrapTokenRevoked(ctx, tokenID)
+	default:
+		return false, fmt.Errorf("unknown token type: %s", tokenType)
+	}
+
+	if err != nil {
+		// If the query returns no rows, the token is not revoked
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		// Check for pgx "no rows" error
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "02000" {
+			return false, nil
+		}
+		return false, fmt.Errorf("query token revocation: %w", err)
+	}
+
+	// If we got a result, the token is revoked
+	return true, nil
+}
+
+// updateTokenLastUsed updates the last_used_at timestamp for a token.
+// This runs asynchronously and does not block the request.
+func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType string) {
+	if a.querier == nil {
+		return
+	}
+
+	var err error
+	switch tokenType {
+	case TokenTypeAPI:
+		err = a.querier.UpdateAPITokenLastUsed(ctx, tokenID)
+	case TokenTypeBootstrap:
+		err = a.querier.UpdateBootstrapTokenLastUsed(ctx, tokenID)
+	}
+
+	if err != nil {
+		// Log error but don't fail the request
+		// TODO: Add proper logging
+		_ = err
+	}
 }
 
 func normalizeRole(value string) string {

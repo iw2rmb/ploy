@@ -776,10 +776,10 @@ b.WriteString("  fi\n")
 - [x] Add `github.com/golang-jwt/jwt/v5` to `go.mod`
 - [x] Create `internal/server/auth/token.go` with JWT generation/validation
 - [x] Create database migration `NNNN_bearer_tokens.sql`
-- [ ] Update `internal/server/auth/authorizer.go`:
-  - [ ] Add `identityFromBearerToken()` method
-  - [ ] Update `identityFromRequest()` to try bearer tokens
-  - [ ] Add token revocation checking
+- [x] Update `internal/server/auth/authorizer.go`:
+  - [x] Add `identityFromBearerToken()` method
+  - [x] Update `identityFromRequest()` to try bearer tokens
+  - [x] Add token revocation checking
 - [ ] Update `internal/server/config/types.go`:
   - [ ] Remove `TLSConfig` struct
   - [ ] Add `AuthConfig` struct with bearer token settings

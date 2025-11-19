@@ -149,6 +149,21 @@ func (ns NullStageStatus) Value() (driver.Value, error) {
 	return string(ns.StageStatus), nil
 }
 
+type ApiToken struct {
+	ID          pgtype.UUID        `json:"id"`
+	TokenHash   string             `json:"token_hash"`
+	TokenID     string             `json:"token_id"`
+	ClusterID   string             `json:"cluster_id"`
+	Role        string             `json:"role"`
+	Description *string            `json:"description"`
+	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	CreatedBy   *string            `json:"created_by"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     pgtype.UUID        `json:"run_id"`
@@ -159,6 +174,21 @@ type ArtifactBundle struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	Cid       *string            `json:"cid"`
 	Digest    *string            `json:"digest"`
+}
+
+type BootstrapToken struct {
+	ID           pgtype.UUID        `json:"id"`
+	TokenHash    string             `json:"token_hash"`
+	TokenID      string             `json:"token_id"`
+	NodeID       pgtype.UUID        `json:"node_id"`
+	ClusterID    string             `json:"cluster_id"`
+	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	UsedAt       pgtype.Timestamptz `json:"used_at"`
+	CertIssuedAt pgtype.Timestamptz `json:"cert_issued_at"`
+	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
+	IssuedBy     *string            `json:"issued_by"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type Build struct {
