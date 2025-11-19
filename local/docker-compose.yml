@@ -22,16 +22,18 @@ services:
       - db
     environment:
       - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
+      - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
-      - ./pki:/etc/ploy/pki:ro
+      - ./pki/ca.crt:/etc/ploy/pki/ca.crt:ro
+      - ./pki/ca.key:/etc/ploy/pki/ca.key:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
-      - "8443:8443"
+      - "8080:8080"
       - "9100:9100"
     healthcheck:
-      # Use metrics (plain HTTP) for health since API requires mTLS
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9100/metrics >/dev/null || exit 1"]
+      # Use /health endpoint (plain HTTP with bearer token auth)
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -41,8 +43,9 @@ services:
     platform: linux/amd64
     depends_on:
       - server
+    environment:
+      - PLOY_BOOTSTRAP_TOKEN=${PLOY_BOOTSTRAP_TOKEN:-}
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
-      - ./pki:/etc/ploy/pki:ro
       - /var/run/docker.sock:/var/run/docker.sock
     command: ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]

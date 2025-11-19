@@ -1,13 +1,9 @@
-server_url: "https://server:8443"
+server_url: "http://server:8080"
 node_id: "00000000-0000-0000-0000-000000000001"
+cluster_id: "local-dev"
 
 http:
   listen: ":8444"
-  tls:
-    enabled: true
-    ca_path: "/etc/ploy/pki/ca.crt"
-    cert_path: "/etc/ploy/pki/node.crt"
-    key_path: "/etc/ploy/pki/node.key"
 
 heartbeat:
   interval: 30s

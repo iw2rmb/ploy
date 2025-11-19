@@ -843,11 +843,11 @@ b.WriteString("  fi\n")
   - [x] Update `docs/how-to/deploy-a-cluster.md`
   - [x] Add token management guide
   - [x] Add troubleshooting guide
-- [ ] Update local development:
-  - [ ] Remove `local/gen-certs.sh` (or keep for CA only)
-  - [ ] Update `local/docker-compose.yml` config
-  - [ ] Update `local/server/ployd.yaml`
-  - [ ] Update `local/node/ployd-node.yaml`
+- [x] Update local development:
+  - [x] Remove `local/gen-certs.sh` (or keep for CA only)
+  - [x] Update `local/docker-compose.yml` config
+  - [x] Update `local/server/ployd.yaml`
+  - [x] Update `local/node/ployd-node.yaml`
 
 ### Phase 6: Cleanup
 - [ ] Remove unused PKI code:

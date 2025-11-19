@@ -3,23 +3,20 @@ set -euo pipefail
 
 usage() {
   cat <<USAGE
-Generate local mTLS bundle for Ploy (CA, server, admin, node).
+Generate local CA certificate for Ploy (used for signing node certificates during bootstrap).
 
 Usage:
-  $(basename "$0") [-n NODE_ID] [--force]
+  $(basename "$0") [--force]
 
 Options:
-  -n, --node-id  Node ID for worker cert (default: node-1)
   -f, --force    Overwrite existing files
   -h, --help     Show this help
 USAGE
 }
 
-NODE_ID="node-1"
 FORCE=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -n|--node-id) NODE_ID="$2"; shift 2 ;;
     -f|--force)   FORCE=1; shift ;;
     -h|--help)    usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage; exit 2 ;;
@@ -51,57 +48,20 @@ if maybe_write "$PKI/ca.crt"; then
     -subj "/CN=ploy-local-CA" -out "$PKI/ca.crt"
 fi
 
-echo "==> Generating server cert (localhost, server, 127.0.0.1)"
-if maybe_write "$PKI/server.key"; then
-  openssl ecparam -name prime256v1 -genkey -noout -out "$PKI/server.key"
-fi
-if maybe_write "$PKI/server.csr"; then
-  openssl req -new -key "$PKI/server.key" -subj "/CN=ployd-local" -out "$PKI/server.csr"
-fi
-printf "subjectAltName=DNS:localhost,DNS:server,IP:127.0.0.1\nextendedKeyUsage=serverAuth\n" > "$PKI/server.ext"
-if maybe_write "$PKI/server.crt"; then
-  openssl x509 -req -in "$PKI/server.csr" -CA "$PKI/ca.crt" -CAkey "$PKI/ca.key" -CAcreateserial \
-    -days 365 -sha256 -extfile "$PKI/server.ext" -out "$PKI/server.crt"
-fi
-
-echo "==> Generating admin client cert (cli-admin)"
-if maybe_write "$PKI/admin.key"; then
-  openssl ecparam -name prime256v1 -genkey -noout -out "$PKI/admin.key"
-fi
-if maybe_write "$PKI/admin.csr"; then
-  openssl req -new -key "$PKI/admin.key" -subj "/CN=cli-admin-local/OU=Ploy role=cli-admin" -out "$PKI/admin.csr"
-fi
-printf "extendedKeyUsage=clientAuth\n" > "$PKI/client.ext"
-if maybe_write "$PKI/admin.crt"; then
-  openssl x509 -req -in "$PKI/admin.csr" -CA "$PKI/ca.crt" -CAkey "$PKI/ca.key" -CAcreateserial \
-    -days 365 -sha256 -extfile "$PKI/client.ext" -out "$PKI/admin.crt"
-fi
-
-echo "==> Generating node client cert (worker, CN=node:${NODE_ID})"
-if maybe_write "$PKI/node.key"; then
-  openssl ecparam -name prime256v1 -genkey -noout -out "$PKI/node.key"
-fi
-if maybe_write "$PKI/node.csr"; then
-  openssl req -new -key "$PKI/node.key" -subj "/CN=node:${NODE_ID}/OU=Ploy role=worker" -out "$PKI/node.csr"
-fi
-if maybe_write "$PKI/node.crt"; then
-  openssl x509 -req -in "$PKI/node.csr" -CA "$PKI/ca.crt" -CAkey "$PKI/ca.key" -CAcreateserial \
-    -days 365 -sha256 -extfile "$PKI/client.ext" -out "$PKI/node.crt"
-fi
-
 chmod 600 "$PKI"/*.key
 chmod 644 "$PKI"/*.crt
 
 cat <<SUMMARY
 
-Certificates written to: $PKI
+CA certificate written to: $PKI
   CA:      ca.crt (key: ca.key)
-  Server:  server.crt (key: server.key)
-  Admin:   admin.crt (key: admin.key)
-  Node:    node.crt (key: node.key, CN=node:${NODE_ID})
+
+Note: Server and nodes use bearer token authentication.
+      The CA is used to sign node certificates during bootstrap.
 
 Next:
+  export PLOY_AUTH_SECRET=\$(openssl rand -base64 32)
   docker compose -f "$DIR/docker-compose.yml" up -d
-  curl --cacert "$PKI/ca.crt" --cert "$PKI/admin.crt" --key "$PKI/admin.key" https://localhost:8443/health
+  # Generate admin token using: ploy token create --role cli-admin
 SUMMARY
 
