@@ -783,12 +783,12 @@ b.WriteString("  fi\n")
 - [x] Update `internal/server/config/types.go`:
   - [x] Remove `TLSConfig` struct
   - [x] Add `AuthConfig` struct with bearer token settings
-- [ ] Update `cmd/ployd/main.go`:
-  - [ ] Load `PLOY_AUTH_SECRET` environment variable
-  - [ ] Initialize authorizer with token support
-- [ ] Update `internal/server/http/server.go`:
-  - [ ] Remove TLS listener logic
-  - [ ] Use plain HTTP listener only
+- [x] Update `cmd/ployd/main.go`:
+  - [x] Load `PLOY_AUTH_SECRET` environment variable
+  - [x] Initialize authorizer with token support
+- [x] Update `internal/server/http/server.go`:
+  - [x] Remove TLS listener logic
+  - [x] Use plain HTTP listener only
 
 ### Phase 2: API Endpoints (Server-Side)
 - [ ] Create `internal/server/handlers/handlers_tokens.go`:

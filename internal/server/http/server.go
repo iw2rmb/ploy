@@ -2,14 +2,11 @@ package httpserver
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -23,7 +20,7 @@ type Options struct {
 	Authorizer *auth.Authorizer
 }
 
-// Server manages the main API HTTP server with TLS/mTLS support.
+// Server manages the main API HTTP server with bearer token authentication.
 type Server struct {
 	mu         sync.Mutex
 	cfg        config.HTTPConfig
@@ -87,7 +84,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.running = true
 	s.mu.Unlock()
 
-	slog.Info("httpserver started", "addr", listener.Addr().String(), "tls", s.cfg.TLS.Enabled)
+	slog.Info("httpserver started", "addr", listener.Addr().String())
 
 	go func() {
 		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -166,50 +163,14 @@ func (s *Server) Handler() http.Handler {
 	return s.mux
 }
 
-// listen creates a TCP or TLS listener based on configuration.
+// listen creates a plain TCP listener.
+// TLS termination is handled by the load balancer.
 func (s *Server) listen(ctx context.Context) (net.Listener, error) {
 	address := s.cfg.Listen
 	if address == "" {
-		address = ":8443"
+		address = ":8080"
 	}
 
-	if !s.cfg.TLS.Enabled {
-		lc := net.ListenConfig{}
-		return lc.Listen(ctx, "tcp", address)
-	}
-
-	// Load server certificate and key.
-	cert, err := tls.LoadX509KeyPair(s.cfg.TLS.CertPath, s.cfg.TLS.KeyPath)
-	if err != nil {
-		return nil, fmt.Errorf("load certificate: %w", err)
-	}
-
-	// Client certificate verification is mandatory when TLS is enabled.
-	if s.cfg.TLS.ClientCAPath == "" {
-		return nil, errors.New("httpserver: client_ca path required when TLS is enabled")
-	}
-
-	caData, err := os.ReadFile(s.cfg.TLS.ClientCAPath)
-	if err != nil {
-		return nil, fmt.Errorf("load client ca certificate: %w", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caData) {
-		return nil, errors.New("httpserver: failed to parse client ca certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS13,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    caCertPool,
-	}
-
-	ln, err := tls.Listen("tcp", address, tlsConfig)
-	if err != nil {
-		return nil, fmt.Errorf("listen tls: %w", err)
-	}
-
-	return ln, nil
+	lc := net.ListenConfig{}
+	return lc.Listen(ctx, "tcp", address)
 }

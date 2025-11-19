@@ -75,18 +75,29 @@ func main() {
 
 	// No cluster table initialization; cluster-id is provided via environment.
 
-	// Initialize Authorizer for mTLS-based authentication.
+	// Load auth secret from env or config
+	authSecret := os.Getenv("PLOY_AUTH_SECRET")
+	if authSecret == "" && cfg.Auth.BearerTokens.Secret != "" {
+		authSecret = cfg.Auth.BearerTokens.Secret
+	}
+	if authSecret == "" {
+		slog.Error("PLOY_AUTH_SECRET environment variable or auth.bearer_tokens.secret config required")
+		os.Exit(1)
+	}
+
+	// Initialize Authorizer with bearer token support.
 	// Default role is RoleControlPlane; AllowInsecure is false for production.
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: false,
 		DefaultRole:   auth.RoleControlPlane,
+		TokenSecret:   authSecret,
+		Querier:       st,
 	})
 
 	// Reflect configured transport settings in startup logs (before listeners come up).
 	slog.Info("ployd server starting",
 		"config", configPath,
-		"tls", cfg.HTTP.TLS.Enabled,
-		"mtls", cfg.HTTP.TLS.Enabled, // mTLS is mandatory when TLS is enabled
+		"bearer_tokens", cfg.Auth.BearerTokens.Enabled,
 	)
 
 	// Set up signal handling for graceful shutdown.
