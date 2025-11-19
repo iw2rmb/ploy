@@ -780,9 +780,9 @@ b.WriteString("  fi\n")
   - [x] Add `identityFromBearerToken()` method
   - [x] Update `identityFromRequest()` to try bearer tokens
   - [x] Add token revocation checking
-- [ ] Update `internal/server/config/types.go`:
-  - [ ] Remove `TLSConfig` struct
-  - [ ] Add `AuthConfig` struct with bearer token settings
+- [x] Update `internal/server/config/types.go`:
+  - [x] Remove `TLSConfig` struct
+  - [x] Add `AuthConfig` struct with bearer token settings
 - [ ] Update `cmd/ployd/main.go`:
   - [ ] Load `PLOY_AUTH_SECRET` environment variable
   - [ ] Initialize authorizer with token support
