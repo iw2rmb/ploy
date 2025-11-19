@@ -13,6 +13,8 @@ import (
 type Querier interface {
 	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
+	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
+	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
@@ -74,6 +76,8 @@ type Querier interface {
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
+	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
+	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
