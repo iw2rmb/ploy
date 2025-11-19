@@ -5,18 +5,20 @@ import "time"
 // HTTPConfig configures the HTTP server.
 type HTTPConfig struct {
 	Listen       string        `yaml:"listen"`
-	TLS          TLSConfig     `yaml:"tls"`
 	ReadTimeout  time.Duration `yaml:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout"`
 	IdleTimeout  time.Duration `yaml:"idle_timeout"`
 }
 
-// TLSConfig configures TLS for HTTP servers.
-type TLSConfig struct {
-	Enabled      bool   `yaml:"enabled"`
-	CertPath     string `yaml:"cert"`
-	KeyPath      string `yaml:"key"`
-	ClientCAPath string `yaml:"client_ca"`
+// AuthConfig configures authentication mechanisms.
+type AuthConfig struct {
+	BearerTokens BearerTokenConfig `yaml:"bearer_tokens"`
+}
+
+// BearerTokenConfig configures JWT bearer token authentication.
+type BearerTokenConfig struct {
+	Enabled bool   `yaml:"enabled"`
+	Secret  string `yaml:"secret"` // JWT signing secret (or load from env)
 }
 
 // MetricsConfig configures the Prometheus metrics endpoint.

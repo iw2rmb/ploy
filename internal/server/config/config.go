@@ -4,6 +4,7 @@ package config
 type Config struct {
 	HTTP         HTTPConfig          `yaml:"http"`
 	Metrics      MetricsConfig       `yaml:"metrics"`
+	Auth         AuthConfig          `yaml:"auth"`
 	Admin        AdminConfig         `yaml:"admin"`
 	ControlPlane ControlPlaneConfig  `yaml:"control_plane"`
 	PKI          PKIConfig           `yaml:"pki"`
