@@ -834,10 +834,10 @@ b.WriteString("  fi\n")
   - [x] Keep CA cert writing for server verification
 
 ### Phase 5: Testing & Documentation
-- [ ] Update integration tests:
-  - [ ] Remove mTLS-specific tests
-  - [ ] Add bearer token auth tests
-  - [ ] Add bootstrap flow tests
+- [x] Update integration tests:
+  - [x] Remove mTLS-specific tests
+  - [x] Add bearer token auth tests
+  - [x] Add bootstrap flow tests
 - [ ] Update documentation:
   - [ ] Update `docs/how-to/deploy-locally.md`
   - [ ] Update `docs/how-to/deploy-a-cluster.md`

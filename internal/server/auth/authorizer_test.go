@@ -170,7 +170,7 @@ func TestAuthorizerRoleGates(t *testing.T) {
 	}
 }
 
-// TestAuthorizerInsecureDefaultOff verifies that AllowInsecure=false rejects non-mTLS requests.
+// TestAuthorizerInsecureDefaultOff verifies that AllowInsecure=false rejects unauthenticated requests.
 func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -181,15 +181,15 @@ func TestAuthorizerInsecureDefaultOff(t *testing.T) {
 		wantErrorMsg  string
 	}{
 		{
-			name:          "secure mode rejects request without mTLS",
+			name:          "secure mode rejects request without bearer token or mTLS",
 			allowInsecure: false,
 			hasTLS:        false,
 			wantCode:      http.StatusForbidden,
 			wantCalled:    false,
-			wantErrorMsg:  "auth: mutual TLS required",
+			wantErrorMsg:  "authentication required: provide Bearer token",
 		},
 		{
-			name:          "insecure mode allows request without mTLS",
+			name:          "insecure mode allows request without authentication",
 			allowInsecure: true,
 			hasTLS:        false,
 			wantCode:      http.StatusOK,
