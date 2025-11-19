@@ -29,6 +29,8 @@ jobs:
           cache: true
 
       - name: Run tests
+        env:
+          PLOY_CONFIG_HOME: /tmp/ploy-test-config
         run: go test -race -coverprofile=coverage.out ./...
 
       - name: Check coverage threshold
