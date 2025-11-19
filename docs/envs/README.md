@@ -1,10 +1,10 @@
 # Environment Variables
 
-**Note: Postgres/mTLS Pivot (November 2025)**
+**Note: Postgres/Bearer Token Pivot (November 2025)**
 
 As of the server/node pivot described in `README.md`, the following legacy systems have been removed:
 - **etcd**: All `PLOY_ETCD_*` variables are no longer consumed by the codebase.
-- **Token-based auth**: Bearer tokens replaced with mTLS-only authentication.
+- **mTLS client authentication**: Replaced with bearer token authentication for CLI and nodes.
 - **Node labels**: Removed in favor of resource-snapshot scheduling.
 
 This document tracks the environment variables that the server, node, and CLI
@@ -43,22 +43,17 @@ defaults change, or components adopt additional configuration.
   (and `PLOY_CONFIG_HOME` is not), the CLI uses `$XDG_CONFIG_HOME/ploy` for cluster
   descriptor storage. Falls back to `~/.config/ploy` when both are unset.
 
-Local cluster descriptors (written under `~/.config/ploy/clusters/`) now embed TLS material used by the CLI for mTLS:
-- `ca_path` — CA certificate used as root trust for the control-plane.
-- `cert_path` — Client certificate presented by the CLI.
-- `key_path` — Private key for the client certificate.
-When these fields are present for the default cluster, the CLI enforces TLS 1.3 and uses mTLS for all control‑plane calls.
+Local cluster descriptors (written under `~/.config/ploy/clusters/`) now use bearer token authentication:
+- `token` — Bearer token for authenticating with the control plane. Generate using `ploy token create`.
 
-Role model (mTLS certificate OUs / CNs):
+Role model (bearer token claims):
 
-- `cli-admin` — administrative CLI role. Allowed to perform admin operations (e.g., PKI sign, server/node rollout) and all
+- `cli-admin` — administrative CLI role. Allowed to perform admin operations (e.g., token management, node bootstrap) and all
   standard client operations. For authorization, `cli-admin` is treated as a superset of `control-plane`.
-- `client` (alias: `control`, `control-plane`, `controlplane`) — standard CLI role. Allowed to run Mods workflows and use
-  control-plane APIs that do not require administrative privileges. Not allowed to hit admin-only endpoints like PKI sign.
-- `worker` (alias: `node`) — node agent role. Used by `ployd-node` only to post heartbeats, logs, events, and claim runs.
-
-Certificates can express role either in Subject OU `Ploy role=<role>` or via the CN prefix `<role>:` (e.g., nodes use `node:<uuid>`).
-The server’s authorizer recognizes both forms.
+- `control-plane` — standard CLI role. Allowed to run Mods workflows and use control-plane APIs that do not require
+  administrative privileges. Not allowed to hit admin-only endpoints like token creation.
+- `worker` — node agent role. Used by nodes after bootstrap to authenticate with the control plane.
+- `bootstrap` — short-lived token type used during node provisioning to exchange for a node certificate.
 - `USER` — Standard Unix environment variable indicating the current user. The CLI
   reads this to populate the `Submitter` field when creating mod runs via `ploy mod run`.
 - `DOCKERHUB_USERNAME` — Docker Hub namespace used by runner templates. Images resolve to
@@ -238,15 +233,23 @@ GitLab integration for automatic MR creation:
   Precedence: `gitlab.token` (inline) wins over `gitlab.token_file` when both are set.
 See the **GitLab Merge Request Integration** section above for usage examples and recommended configuration approach.
 
+### Authentication
+
+- `PLOY_AUTH_SECRET` — JWT signing secret used by the server to generate and validate bearer tokens.
+  Required when bearer token authentication is enabled. This should be a strong random string
+  (e.g., generated via `openssl rand -hex 32`). The same secret must be used consistently across
+  server restarts to maintain token validity. Never commit this secret to version control.
+
 ### PKI
 
-- `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate presented to nodes. Required for
-  the `/v1/pki/sign` endpoint to return signed certificates.
-- `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs. Required
-  alongside `PLOY_SERVER_CA_CERT` for `/v1/pki/sign`. When either value is missing (empty or
-  whitespace-only), the server responds with `503 PKI not configured`.
+- `PLOY_SERVER_CA_CERT` — PEM-encoded cluster CA certificate used to sign node certificates during
+  bootstrap. Required for the `/v1/pki/bootstrap` endpoint to issue certificates.
+- `PLOY_SERVER_CA_KEY` — PEM-encoded cluster CA private key used to sign node CSRs during bootstrap.
+  Required alongside `PLOY_SERVER_CA_CERT`. When either value is missing (empty or whitespace-only),
+  the bootstrap endpoint responds with `503 PKI not configured`.
   If values are set but invalid (malformed PEM), the server returns `500 Internal Server Error`
-  and logs details; fix the stored CA materials.
+  and logs details; fix the stored CA materials. Can also be configured via `pki.ca_cert_path` and
+  `pki.ca_key_path` in the server config file.
 
 
 ## PostgreSQL
