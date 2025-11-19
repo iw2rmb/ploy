@@ -130,7 +130,7 @@ brews:
     homepage: https://github.com/iw2rmb/ploy
     description: "Ploy - Infrastructure orchestration and deployment platform"
     license: "Apache-2.0"
-    folder: Formula
+    directory: Formula
     # Only include the CLI in Homebrew formula
     ids:
       - ploy
