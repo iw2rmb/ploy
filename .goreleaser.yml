@@ -153,23 +153,24 @@ changelog:
     - title: Others
       order: 999
 
-brews:
-  - name: ploy
-    repository:
-      owner: iw2rmb
-      name: homebrew-ploy
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: https://github.com/iw2rmb/ploy
-    description: "Ploy - Infrastructure orchestration and deployment platform"
-    license: "Apache-2.0"
-    directory: Formula
-    # Only include the CLI in Homebrew formula
-    ids:
-      - ploy
-    install: |
-      bin.install "ploy"
-    test: |
-      system "#{bin}/ploy", "version"
+# Homebrew tap disabled for initial release - enable after setting up HOMEBREW_TAP_GITHUB_TOKEN
+# brews:
+#   - name: ploy
+#     repository:
+#       owner: iw2rmb
+#       name: homebrew-ploy
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     homepage: https://github.com/iw2rmb/ploy
+#     description: "Ploy - Infrastructure orchestration and deployment platform"
+#     license: "Apache-2.0"
+#     directory: Formula
+#     # Only include the CLI in Homebrew formula
+#     ids:
+#       - ploy
+#     install: |
+#       bin.install "ploy"
+#     test: |
+#       system "#{bin}/ploy", "version"
 
 release:
   github:
