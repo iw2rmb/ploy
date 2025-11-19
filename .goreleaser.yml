@@ -7,8 +7,7 @@ before:
   hooks:
     # Ensure dependencies are up to date
     - go mod tidy
-    # Run tests before building (exclude tools and ployd-node due to build constraints)
-    - sh -c 'PLOY_CONFIG_HOME=/tmp/ploy-test-config go test ./internal/... ./cmd/ploy/... ./cmd/ployd/... ./tests/...'
+    # Note: Tests are run by GitHub Actions pre-release-checks job
 
 builds:
   # ploy CLI - main client tool
