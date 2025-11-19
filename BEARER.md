@@ -823,15 +823,15 @@ b.WriteString("  fi\n")
   - [ ] Auto-generate and save token (deferred - requires additional infrastructure)
 
 ### Phase 4: Node Agent
-- [ ] Update `internal/nodeagent/agent.go`:
-  - [ ] Add `bootstrap()` method
-  - [ ] Add `requestCertificate()` method with retry logic
-  - [ ] Check for existing cert on startup
-  - [ ] Call bootstrap if cert missing
-- [ ] Update `internal/deploy/bootstrap/bootstrap.go`:
-  - [ ] Write bootstrap token to `/run/ploy/bootstrap-token`
-  - [ ] Remove cert/key writing logic
-  - [ ] Keep CA cert writing for server verification
+- [x] Update `internal/nodeagent/agent.go`:
+  - [x] Add `bootstrap()` method
+  - [x] Add `requestCertificate()` method with retry logic
+  - [x] Check for existing cert on startup
+  - [x] Call bootstrap if cert missing
+- [x] Update `internal/deploy/bootstrap/bootstrap.go`:
+  - [x] Write bootstrap token to `/run/ploy/bootstrap-token`
+  - [x] Remove cert/key writing logic
+  - [x] Keep CA cert writing for server verification
 
 ### Phase 5: Testing & Documentation
 - [ ] Update integration tests:
