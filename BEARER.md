@@ -801,7 +801,7 @@ b.WriteString("  fi\n")
 - [x] Update `internal/server/handlers/register.go`:
   - [x] Register token management routes
   - [x] Register bootstrap routes
-  - [ ] Remove mTLS-specific routes
+  - [x] Remove mTLS-specific routes
 
 ### Phase 3: CLI Commands
 - [ ] Update `internal/cli/config/config.go`:

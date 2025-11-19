@@ -25,11 +25,6 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("POST /v1/bootstrap/tokens", createBootstrapTokenHandler(st, tokenSecret), auth.RoleControlPlane, auth.RoleCLIAdmin)
 	s.HandleFunc("POST /v1/pki/bootstrap", bootstrapCertificateHandler(st, tokenSecret), auth.RoleWorker)
 
-	// PKI
-	s.HandleFunc("POST /v1/pki/sign", pkiSignHandler(st), auth.RoleCLIAdmin)
-	s.HandleFunc("POST /v1/pki/sign/admin", pkiSignAdminHandler(), auth.RoleCLIAdmin)
-	s.HandleFunc("POST /v1/pki/sign/client", pkiSignClientHandler(), auth.RoleCLIAdmin)
-
 	// Mods ticket submission (new simplified API)
 	s.HandleFunc("POST /v1/mods", submitTicketHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("GET /v1/mods/{id}/events", getModEventsHandler(st, eventsService), auth.RoleControlPlane)
