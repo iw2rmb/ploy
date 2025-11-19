@@ -804,23 +804,23 @@ b.WriteString("  fi\n")
   - [x] Remove mTLS-specific routes
 
 ### Phase 3: CLI Commands
-- [ ] Update `internal/cli/config/config.go`:
-  - [ ] Add `Token` field to `Descriptor`
-  - [ ] Remove `CAPath`, `CertPath`, `KeyPath` fields
-- [ ] Update `cmd/ploy/common_http.go`:
-  - [ ] Simplify HTTP client (no mTLS)
-  - [ ] Add `makeAuthenticatedRequest()` helper
-- [ ] Create `cmd/ploy/token_commands.go`:
-  - [ ] `runTokenCreate` - ploy token create
-  - [ ] `runTokenList` - ploy token list
-  - [ ] `runTokenRevoke` - ploy token revoke
-- [ ] Update `cmd/ploy/node_command.go`:
-  - [ ] Replace cert generation with bootstrap token request
-  - [ ] Update `runNodeAdd()` to use new flow
-  - [ ] Add `waitForNodeHeartbeat()` helper
-- [ ] Update `cmd/ploy/server_deploy_run.go`:
-  - [ ] Generate initial admin token (not cert)
-  - [ ] Save token to cluster descriptor
+- [x] Update `internal/cli/config/config.go`:
+  - [x] Add `Token` field to `Descriptor`
+  - [x] Remove `CAPath`, `CertPath`, `KeyPath` fields
+- [x] Update `cmd/ploy/common_http.go`:
+  - [x] Simplify HTTP client (no mTLS)
+  - [x] Add `makeAuthenticatedRequest()` helper
+- [x] Create `cmd/ploy/token_commands.go`:
+  - [x] `handleTokenCreate` - ploy token create
+  - [x] `handleTokenList` - ploy token list
+  - [x] `handleTokenRevoke` - ploy token revoke
+- [x] Update `cmd/ploy/node_command.go`:
+  - [x] Replace cert generation with bootstrap token request
+  - [x] Update `runNodeAdd()` to use new flow
+  - [ ] Add `waitForNodeHeartbeat()` helper (not required for basic functionality)
+- [x] Update `cmd/ploy/server_deploy_run.go`:
+  - [x] Provide instructions for generating initial admin token
+  - [ ] Auto-generate and save token (deferred - requires additional infrastructure)
 
 ### Phase 4: Node Agent
 - [ ] Update `internal/nodeagent/agent.go`:

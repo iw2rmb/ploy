@@ -75,7 +75,6 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	var clusterID string
 	var ca *pki.CABundle
 	var serverCert *pki.IssuedCert
-	var adminCert *pki.IssuedCert
 	var reusingCluster bool
 
 	if cfg.Reuse {
@@ -155,11 +154,8 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		}
 		_, _ = fmt.Fprintln(stderr, "CA and server certificate generated")
 
-		// Generate a CLI-admin client certificate for local descriptor/mTLS
-		adminCert, err = pki.IssueClientCert(ca, clusterID, now)
-		if err != nil {
-			return fmt.Errorf("server deploy: issue cli-admin cert: %w", err)
-		}
+		// Note: Admin client certificates are no longer used with bearer token authentication
+		// Initial admin token must be generated manually after deployment
 	}
 
 	// Determine PostgreSQL DSN
@@ -222,21 +218,9 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		ClusterID:       config.ClusterID(clusterID),
 		Address:         serverAddress,
 		SSHIdentityPath: identityPath,
+		// Token will be empty - admin must generate initial token manually
 	}
-	// Write local mTLS bundle for the default descriptor (only if not reusing)
-	if !reusingCluster && adminCert != nil {
-		caPath, certPath, keyPath, err := writeLocalAdminBundle(clusterID, ca.CertPEM, adminCert.CertPEM, adminCert.KeyPEM)
-		if err == nil {
-			desc.CAPath = caPath
-			desc.CertPath = certPath
-			desc.KeyPath = keyPath
-		} else {
-			_, _ = fmt.Fprintf(stderr, "Warning: failed to write local admin mTLS bundle: %v\n", err)
-		}
-	} else if reusingCluster {
-		_, _ = fmt.Fprintln(stderr, "Skipped admin certificate generation (reusing existing cluster)")
-		_, _ = fmt.Fprintln(stderr, "Note: Use --refresh-admin-cert to obtain a new admin certificate from the server")
-	}
+
 	if _, err := config.SaveDescriptor(desc); err != nil {
 		_, _ = fmt.Fprintf(stderr, "Warning: failed to save cluster descriptor: %v\n", err)
 	} else {
@@ -247,6 +231,30 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 			_, _ = fmt.Fprintf(stderr, "Cluster descriptor saved to ~/.config/ploy/clusters/%s.json\n", clusterID)
 		}
 	}
+
+	// Print instructions for generating initial admin token
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "=================================================================")
+	_, _ = fmt.Fprintln(stderr, "Server deployment complete!")
+	_, _ = fmt.Fprintln(stderr, "=================================================================")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "IMPORTANT: Generate an initial admin token to authenticate:")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Option 1: Use the ployd CLI on the server (recommended):")
+	_, _ = fmt.Fprintf(stderr, "  ssh %s@%s 'ployd token create --role cli-admin'\n", user, cfg.Address)
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Option 2: Direct database insert (advanced):")
+	_, _ = fmt.Fprintf(stderr, "  ssh %s@%s\n", user, cfg.Address)
+	_, _ = fmt.Fprintln(stderr, "  # Then use psql to insert a token into the api_tokens table")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "After generating a token, add it to your cluster descriptor:")
+	_, _ = fmt.Fprintf(stderr, "  ~/.config/ploy/clusters/%s.json\n", clusterID)
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Add the following field:")
+	_, _ = fmt.Fprintln(stderr, `  "token": "your-generated-token-here"`)
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "=================================================================")
+	_, _ = fmt.Fprintln(stderr, "")
 
 	_, _ = fmt.Fprintln(stderr, "\nServer deployment complete!")
 	_, _ = fmt.Fprintf(stderr, "Cluster ID: %s\n", clusterID)

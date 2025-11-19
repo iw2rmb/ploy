@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/iw2rmb/ploy/internal/cli/config"
 	"github.com/iw2rmb/ploy/internal/deploy"
-	"github.com/iw2rmb/ploy/internal/pki"
 )
 
 // handleNode routes node subcommands.
@@ -148,15 +148,6 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 	nodeID := uuid.New().String()
 	_, _ = fmt.Fprintf(stderr, "Generated node ID: %s\n", nodeID)
 
-	// Generate node CSR and private key
-	_, _ = fmt.Fprintln(stderr, "Generating node private key and CSR...")
-	keyBundle, csrPEM, err := pki.GenerateNodeCSR(nodeID, cfg.ClusterID, cfg.Address)
-	if err != nil {
-		return fmt.Errorf("node add: generate CSR: %w", err)
-	}
-	_, _ = fmt.Fprintln(stderr, "CSR generated")
-
-	// Call server to sign the CSR
 	serverURL := strings.TrimSpace(cfg.ServerURL)
 	if serverURL == "" {
 		return errors.New("node add: server-url is required")
@@ -171,25 +162,38 @@ func runNodeAdd(cfg nodeAddConfig, stderr io.Writer) error {
 		return nil
 	}
 
-	_, _ = fmt.Fprintf(stderr, "Requesting certificate signing from %s\n", serverURL)
-
-	signedCert, caCert, err := signNodeCSR(ctx, serverURL, nodeID, csrPEM)
+	// Request bootstrap token from server
+	_, _ = fmt.Fprintln(stderr, "Requesting bootstrap token from server...")
+	bootstrapToken, expiresAt, err := requestBootstrapToken(ctx, serverURL, nodeID)
 	if err != nil {
-		return fmt.Errorf("node add: sign CSR: %w", err)
+		return fmt.Errorf("node add: request bootstrap token: %w", err)
 	}
-	_, _ = fmt.Fprintln(stderr, "Certificate signed successfully")
+	_, _ = fmt.Fprintf(stderr, "Bootstrap token received (expires: %s)\n", expiresAt.Format(time.RFC3339))
+
+	// Get CA certificate for TLS verification (node will need this to verify server)
+	// For now, we'll need to fetch this from the server or require it as a flag
+	// This is a simplified approach - in production, the CA cert should be fetched securely
+	_, _ = fmt.Fprintln(stderr, "Fetching CA certificate for TLS verification...")
+	caCert, err := fetchCACertificate(ctx, serverURL)
+	if err != nil {
+		// For now, we'll allow continuing without CA cert if it fails
+		// The node will use system trust store
+		_, _ = fmt.Fprintf(stderr, "Warning: could not fetch CA certificate: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, "Node will use system trust store for TLS verification")
+		caCert = ""
+	}
 
 	// Prepare environment variables for bootstrap script
 	scriptEnv := map[string]string{
-		"CLUSTER_ID":        cfg.ClusterID,
-		"NODE_ID":           nodeID,
-		"NODE_ADDRESS":      cfg.Address,
-		"BOOTSTRAP_PRIMARY": "false",
-		"PLOY_CA_CERT_PEM":  caCert,
-		// Despite the name, the bootstrap uses PLOY_SERVER_* for both server and node flows.
-		"PLOY_SERVER_CERT_PEM": signedCert,
-		"PLOY_SERVER_KEY_PEM":  keyBundle.KeyPEM,
+		"CLUSTER_ID":           cfg.ClusterID,
+		"NODE_ID":              nodeID,
+		"NODE_ADDRESS":         cfg.Address,
+		"BOOTSTRAP_PRIMARY":    "false",
+		"PLOY_BOOTSTRAP_TOKEN": bootstrapToken,
 		"PLOY_SERVER_URL":      serverURL,
+	}
+	if caCert != "" {
+		scriptEnv["PLOY_CA_CERT_PEM"] = caCert
 	}
 
 	// Provision the node host
@@ -323,4 +327,62 @@ func signNodeCSR(ctx context.Context, serverURL, nodeID string, csrPEM []byte) (
 	}
 
 	return signResp.Certificate, signResp.CABundle, nil
+}
+
+// requestBootstrapToken requests a short-lived bootstrap token from the server for node provisioning.
+func requestBootstrapToken(ctx context.Context, serverURL, nodeID string) (token string, expiresAt time.Time, err error) {
+	baseURL, client, err := resolveControlPlaneHTTP(ctx)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("resolve control plane: %w", err)
+	}
+
+	reqBody := map[string]interface{}{
+		"node_id":            nodeID,
+		"expires_in_minutes": 15, // 15 minute window for provisioning
+	}
+	bodyJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	endpoint := strings.TrimSuffix(baseURL.String(), "/") + "/v1/bootstrap/tokens"
+	req, err := makeAuthenticatedRequest(ctx, "POST", endpoint, bytes.NewReader(bodyJSON))
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("POST %s: %w", endpoint, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return "", time.Time{}, fmt.Errorf("server returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var result struct {
+		Token     string    `json:"token"`
+		NodeID    string    `json:"node_id"`
+		ExpiresAt time.Time `json:"expires_at"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", time.Time{}, fmt.Errorf("decode response: %w", err)
+	}
+
+	return result.Token, result.ExpiresAt, nil
+}
+
+// fetchCACertificate attempts to fetch the CA certificate from the server.
+// This is used by nodes for TLS verification when connecting to the server.
+func fetchCACertificate(ctx context.Context, serverURL string) (string, error) {
+	// For now, we'll try to fetch from a public endpoint
+	// In a real implementation, this should be a dedicated endpoint like GET /v1/pki/ca
+	// or the CA cert should be provided as a configuration parameter
+
+	// Placeholder implementation - return empty string to indicate CA cert not available
+	// The calling code should handle this gracefully
+	return "", fmt.Errorf("CA certificate fetch not implemented - node will use system trust store")
 }

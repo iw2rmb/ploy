@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -16,8 +14,8 @@ import (
 )
 
 // resolveControlPlaneHTTP selects the base URL and HTTP client using the
-// default cluster descriptor at ~/.config/ploy/clusters/default. No
-// environment variable overrides are supported.
+// default cluster descriptor at ~/.config/ploy/clusters/default.
+// Returns a client configured for bearer token authentication.
 func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) {
 	// Load default cluster descriptor (required).
 	desc, err := config.LoadDefault()
@@ -33,36 +31,40 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 		return nil, nil, fmt.Errorf("parse cluster address: %w", err)
 	}
 
-	// Plain HTTP (no mTLS) if scheme is http.
-	if strings.EqualFold(u.Scheme, "http") {
-		return u, &http.Client{Timeout: 10 * time.Second}, nil
+	// Create standard HTTPS client (TLS handled by load balancer)
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		},
 	}
 
-	// HTTPS requires mTLS materials to be present in the descriptor.
-	if strings.TrimSpace(desc.CAPath) == "" || strings.TrimSpace(desc.CertPath) == "" || strings.TrimSpace(desc.KeyPath) == "" {
-		return nil, nil, fmt.Errorf("incomplete TLS config in cluster descriptor (ca, cert, key required)")
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
 	}
 
-	cert, err := tls.LoadX509KeyPair(desc.CertPath, desc.KeyPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load client certificate: %w", err)
-	}
-	caData, err := os.ReadFile(desc.CAPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("load ca certificate: %w", err)
-	}
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caData) {
-		return nil, nil, fmt.Errorf("failed to parse ca certificate")
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      caCertPool,
-		MinVersion:   tls.VersionTLS13,
-	}
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}, Timeout: 10 * time.Second}
 	return u, client, nil
+}
+
+// makeAuthenticatedRequest creates an HTTP request with bearer token authorization.
+// This helper should be used for all API calls that require authentication.
+func makeAuthenticatedRequest(ctx context.Context, method, endpoint string, body io.Reader) (*http.Request, error) {
+	desc, err := config.LoadDefault()
+	if err != nil {
+		return nil, fmt.Errorf("load descriptor: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add bearer token if available
+	if strings.TrimSpace(desc.Token) != "" {
+		req.Header.Set("Authorization", "Bearer "+desc.Token)
+	}
+
+	return req, nil
 }
 
 // controlPlaneHTTPError summarises a non-2xx control-plane response.
