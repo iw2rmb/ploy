@@ -50,3 +50,34 @@ ORDER BY created_at DESC;
 UPDATE api_tokens
 SET revoked_at = NOW()
 WHERE token_id = $1;
+
+-- name: InsertBootstrapToken :exec
+INSERT INTO bootstrap_tokens (
+    token_hash,
+    token_id,
+    node_id,
+    cluster_id,
+    issued_at,
+    expires_at,
+    issued_by
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+);
+
+-- name: GetBootstrapToken :one
+SELECT
+    node_id,
+    cluster_id,
+    issued_at,
+    expires_at,
+    used_at,
+    cert_issued_at,
+    revoked_at
+FROM bootstrap_tokens
+WHERE token_id = $1
+LIMIT 1;
+
+-- name: MarkBootstrapTokenCertIssued :exec
+UPDATE bootstrap_tokens
+SET cert_issued_at = NOW()
+WHERE token_id = $1;

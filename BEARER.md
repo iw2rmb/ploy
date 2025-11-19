@@ -795,12 +795,12 @@ b.WriteString("  fi\n")
   - [x] `HandleCreateAPIToken` - POST /v1/tokens
   - [x] `HandleListAPITokens` - GET /v1/tokens
   - [x] `HandleRevokeAPIToken` - DELETE /v1/tokens/{id}
-- [ ] Create `internal/server/handlers/handlers_bootstrap.go`:
-  - [ ] `HandleCreateBootstrapToken` - POST /v1/bootstrap/tokens
-  - [ ] `HandleBootstrapCertificate` - POST /v1/pki/bootstrap
+- [x] Create `internal/server/handlers/handlers_bootstrap.go`:
+  - [x] `HandleCreateBootstrapToken` - POST /v1/bootstrap/tokens
+  - [x] `HandleBootstrapCertificate` - POST /v1/pki/bootstrap
 - [x] Update `internal/server/handlers/register.go`:
   - [x] Register token management routes
-  - [ ] Register bootstrap routes
+  - [x] Register bootstrap routes
   - [ ] Remove mTLS-specific routes
 
 ### Phase 3: CLI Commands
