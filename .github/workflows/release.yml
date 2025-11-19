@@ -83,6 +83,9 @@ jobs:
             exit 1
           fi
 
+      - name: Clean dist directory
+        run: rm -rf dist
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
