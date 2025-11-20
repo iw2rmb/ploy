@@ -11,7 +11,7 @@ import (
 
 // TestRunControllerStartRun verifies that starting a run registers it in the controller.
 func TestRunControllerStartRun(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
 		runs: make(map[string]*runContext),
@@ -38,7 +38,7 @@ func TestRunControllerStartRun(t *testing.T) {
 
 // TestRunControllerStartRunDuplicate verifies that starting a duplicate run returns an error.
 func TestRunControllerStartRunDuplicate(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
 		runs: make(map[string]*runContext),
@@ -66,7 +66,7 @@ func TestRunControllerStartRunDuplicate(t *testing.T) {
 
 // TestRunControllerStopRun verifies that stopping a run removes it from the controller.
 func TestRunControllerStopRun(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
 		runs: make(map[string]*runContext),
@@ -104,7 +104,7 @@ func TestRunControllerStopRun(t *testing.T) {
 
 // TestRunControllerStopNonExistent verifies that stopping a nonexistent run returns an error.
 func TestRunControllerStopNonExistent(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	rc := &runController{
 		cfg:  cfg,
 		runs: make(map[string]*runContext),

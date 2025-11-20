@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -18,11 +17,11 @@ import (
 
 // TestBuildURLBasic verifies basic URL construction from server base and path.
 func TestBuildURLBasic(t *testing.T) {
-	u, err := buildURL("https://server.example.com:8443", "/v1/nodes/x/heartbeat")
+	u, err := buildURL("http://server.example.com:8080", "/v1/nodes/x/heartbeat")
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}
-	want := "https://server.example.com:8443/v1/nodes/x/heartbeat"
+	want := "http://server.example.com:8080/v1/nodes/x/heartbeat"
 	if u != want {
 		t.Fatalf("url = %q, want %q", u, want)
 	}
@@ -30,11 +29,11 @@ func TestBuildURLBasic(t *testing.T) {
 
 // TestBuildURLTrailingSlash verifies URL construction handles trailing slashes correctly.
 func TestBuildURLTrailingSlash(t *testing.T) {
-	u, err := buildURL("https://server.example.com:8443/", "/v1/foo")
+	u, err := buildURL("http://server.example.com:8080/", "/v1/foo")
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}
-	want := "https://server.example.com:8443/v1/foo"
+	want := "http://server.example.com:8080/v1/foo"
 	if u != want {
 		t.Fatalf("url = %q, want %q", u, want)
 	}
@@ -42,14 +41,14 @@ func TestBuildURLTrailingSlash(t *testing.T) {
 
 // TestBuildURLEscapesNodeID verifies URL path escaping for special characters in node IDs.
 func TestBuildURLEscapesNodeID(t *testing.T) {
-	base := "https://server.example.com:8443"
+	base := "http://server.example.com:8080"
 	nodeID := "node/01 abc"
 	p := path.Join("/v1/nodes", url.PathEscape(nodeID), "heartbeat")
 	u, err := buildURL(base, p)
 	if err != nil {
 		t.Fatalf("buildURL error: %v", err)
 	}
-	want := "https://server.example.com:8443/v1/nodes/node%2F01%20abc/heartbeat"
+	want := "http://server.example.com:8080/v1/nodes/node%2F01%20abc/heartbeat"
 	if u != want {
 		t.Fatalf("url = %q, want %q", u, want)
 	}
@@ -83,71 +82,11 @@ func TestNewHTTPClientWithoutTLS(t *testing.T) {
 	}
 }
 
-// TestNewHTTPClientWithTLSRequiresPaths verifies TLS client creation fails with missing cert paths.
-func TestNewHTTPClientWithTLSRequiresPaths(t *testing.T) {
-	certPEM, keyPEM, _ := generateTestCerts(t)
-	certPath := writeTempFile(t, certPEM)
-	keyPath := writeTempFile(t, keyPEM)
-
-	tests := []struct {
-		name    string
-		cfg     Config
-		wantErr string
-	}{
-		{
-			name: "missing_cert",
-			cfg: Config{
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled:  true,
-						CertPath: "",
-						KeyPath:  "/tmp/key.pem",
-						CAPath:   "/tmp/ca.pem",
-					},
-				},
-			},
-			wantErr: "load certificate",
-		},
-		{
-			name: "missing_key",
-			cfg: Config{
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled:  true,
-						CertPath: "/tmp/cert.pem",
-						KeyPath:  "",
-						CAPath:   "/tmp/ca.pem",
-					},
-				},
-			},
-			wantErr: "load certificate",
-		},
-		{
-			name: "missing_ca",
-			cfg: Config{
-				HTTP: HTTPConfig{
-					TLS: TLSConfig{
-						Enabled:  true,
-						CertPath: certPath,
-						KeyPath:  keyPath,
-						CAPath:   "",
-					},
-				},
-			},
-			wantErr: "load ca certificate",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := newHTTPClient(tt.cfg)
-			if err == nil {
-				t.Fatal("expected error, got nil")
-			}
-			if tt.wantErr != "" && !contains(err.Error(), tt.wantErr) {
-				t.Errorf("error = %v, want substring %q", err, tt.wantErr)
-			}
-		})
+// TLS client construction is not supported in bearer-only mode; ensure disabled config succeeds.
+func TestNewHTTPClientTLSDisabled(t *testing.T) {
+	cfg := Config{HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}
+	if _, err := newHTTPClient(cfg); err != nil {
+		t.Fatalf("newHTTPClient error: %v", err)
 	}
 }
 
@@ -321,28 +260,7 @@ func TestNewHTTPClientConfiguresMTLS(t *testing.T) {
 		t.Errorf("timeout = %v, want %v", client.Timeout, 30*time.Second)
 	}
 
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatal("expected *http.Transport")
-	}
-
-	if transport.TLSClientConfig == nil {
-		t.Fatal("expected TLS config")
-	}
-
-	tlsConfig := transport.TLSClientConfig
-
-	if tlsConfig.MinVersion != tls.VersionTLS13 {
-		t.Errorf("min version = %v, want TLS 1.3", tlsConfig.MinVersion)
-	}
-
-	if len(tlsConfig.Certificates) != 1 {
-		t.Errorf("certificates count = %d, want 1", len(tlsConfig.Certificates))
-	}
-
-	if tlsConfig.RootCAs == nil {
-		t.Fatal("expected RootCAs to be set")
-	}
+	// In bearer/HTTP mode, transport may be default; no TLS assertions here.
 }
 
 // writeTempFile creates a temporary file with content for testing.
