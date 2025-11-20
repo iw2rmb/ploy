@@ -24,9 +24,6 @@ func TestServer_Timeouts(t *testing.T) {
 		opts := Options{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
-				TLS: config.TLSConfig{
-					Enabled: false,
-				},
 				// No timeouts set - defaults should be applied.
 			},
 			Authorizer: authorizer,
@@ -74,9 +71,6 @@ func TestServer_Timeouts(t *testing.T) {
 				ReadTimeout:  5 * time.Second,
 				WriteTimeout: 10 * time.Second,
 				IdleTimeout:  60 * time.Second,
-				TLS: config.TLSConfig{
-					Enabled: false,
-				},
 			},
 			Authorizer: authorizer,
 		}

@@ -253,11 +253,8 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 		return Identity{}, errors.New("token revoked")
 	}
 
-	// Update last_used_at timestamp for API tokens only (async, don't block request)
-	// Bootstrap tokens are marked as used only after successful certificate issuance
-	if claims.TokenType == TokenTypeAPI {
-		go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
-	}
+	// Update last_used_at/used_at asynchronously for all token types.
+	go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
 
 	a.logger.Info("auth: bearer token validated successfully",
 		"token_id", claims.ID,

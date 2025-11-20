@@ -117,7 +117,7 @@ func TestRun_Shutdown(t *testing.T) {
 		t.Fatalf("create temp config: %v", err)
 	}
 
-	if err := run(ctx, cfg, configPath, st, authorizer); err != nil {
+	if err := run(ctx, cfg, configPath, st, authorizer, "test-secret"); err != nil {
 		t.Fatalf("run() error: %v", err)
 	}
 }
@@ -153,7 +153,7 @@ func TestRun_SchedulerIntegration(t *testing.T) {
 	// Start run in a goroutine
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- run(ctx, cfg, configPath, st, authorizer)
+		errCh <- run(ctx, cfg, configPath, st, authorizer, "test-secret")
 	}()
 
 	// Cancel context to trigger shutdown

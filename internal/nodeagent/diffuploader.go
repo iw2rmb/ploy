@@ -125,7 +125,8 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 	}
 
 	// Read bearer token for control plane authentication
-	bearerToken, err := os.ReadFile("/etc/ploy/bearer-token")
+	tokenFile := bearerTokenPath()
+	bearerToken, err := os.ReadFile(tokenFile)
 	if err != nil {
 		return nil, fmt.Errorf("read bearer token: %w", err)
 	}

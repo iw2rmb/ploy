@@ -179,7 +179,7 @@ type mockStore struct {
 
 	listAPITokensCalled bool
 	listAPITokensParams string // cluster_id
-	listAPITokensResult []store.APIToken
+	listAPITokensResult []store.ApiToken
 	listAPITokensErr    error
 
 	revokeAPITokenCalled bool
@@ -438,7 +438,7 @@ func (m *mockStore) InsertAPIToken(ctx context.Context, params store.InsertAPITo
 	return m.insertAPITokenErr
 }
 
-func (m *mockStore) ListAPITokens(ctx context.Context, clusterID string) ([]store.APIToken, error) {
+func (m *mockStore) ListAPITokens(ctx context.Context, clusterID string) ([]store.ApiToken, error) {
 	m.listAPITokensCalled = true
 	m.listAPITokensParams = clusterID
 	return m.listAPITokensResult, m.listAPITokensErr

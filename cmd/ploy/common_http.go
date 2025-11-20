@@ -31,11 +31,17 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 		return nil, nil, fmt.Errorf("parse cluster address: %w", err)
 	}
 
-	// Create standard HTTPS client (TLS handled by load balancer)
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			MinVersion: tls.VersionTLS13,
-		},
+	// Build transport: TLS only when using https.
+	var transport http.RoundTripper
+	if u.Scheme == "https" {
+		transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS13,
+			},
+		}
+	}
+	if transport == nil {
+		transport = http.DefaultTransport
 	}
 
 	// Wrap transport with bearer token injector if token is available
