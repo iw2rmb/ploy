@@ -15,5 +15,6 @@ Core Commands:
   server           Manage control plane server
   node             Manage worker nodes
   rollout          Rolling updates for servers and nodes
+  token            Manage API tokens for authentication
 
 Use 'ploy help <command>' for detailed command help.

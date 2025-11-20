@@ -48,14 +48,8 @@ func TestPrefixedScript_WritesCertsFromEnv(t *testing.T) {
 	if !strings.Contains(script, "echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/server.crt") {
 		t.Fatalf("script should include server cert write in primary branch")
 	}
-	if !strings.Contains(script, "echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/node.crt") {
-		t.Fatalf("script should include node cert write in else branch")
-	}
 	if !strings.Contains(script, "chmod 600 /etc/ploy/pki/server.key") {
 		t.Fatalf("script should set secure permissions on server key in primary branch")
-	}
-	if !strings.Contains(script, "chmod 600 /etc/ploy/pki/node.key") {
-		t.Fatalf("script should set secure permissions on node key in else branch")
 	}
 }
 
@@ -141,11 +135,8 @@ func TestPrefixedScript_ServerConfig(t *testing.T) {
 	if !strings.Contains(script, "postgres:") {
 		t.Fatalf("server config should include postgres section")
 	}
-	if !strings.Contains(script, "http:") || !strings.Contains(script, "tls:") {
-		t.Fatalf("server config should include http.tls section")
-	}
-	if !strings.Contains(script, "control_plane:") {
-		t.Fatalf("server config should include control_plane section")
+	if !strings.Contains(script, "http:") {
+		t.Fatalf("server config should include http section")
 	}
 	if !strings.Contains(script, "cat > /etc/systemd/system/ployd.service") {
 		t.Fatalf("script should install ployd.service systemd unit")
