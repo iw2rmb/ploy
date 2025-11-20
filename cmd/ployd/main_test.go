@@ -104,6 +104,8 @@ func TestRun_Shutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	var cfg apiconfig.Config
+	cfg.HTTP.Listen = "127.0.0.1:0"
+	cfg.Metrics.Listen = "127.0.0.1:0"
 	var st store.Store // nil is fine; ttlworker.New handles nil store gracefully.
 	authorizer := auth.NewAuthorizer(auth.Options{
 		AllowInsecure: false,
