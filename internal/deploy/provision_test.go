@@ -33,14 +33,14 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	// Assert server config file fragments exist
 	assertContains("cat > /etc/ploy/ployd.yaml <<EOF")
 	assertContains("http:")
-	assertContains("listen: 127.0.0.1:8080")
+	assertContains("listen: :8080")
 	assertContains("metrics:")
 	assertContains("listen: :9100")
 	assertContains("postgres:")
 	assertContains("dsn: ${PLOY_POSTGRES_DSN:-}")
 
 	// Assert server systemd unit fragments exist
-	assertContains("cat > /etc/systemd/system/ployd.service <<'EOF'")
+	assertContains("cat > /etc/systemd/system/ployd.service <<EOF")
 	assertContains("[Unit]")
 	assertContains("Description=Ploy Server")
 	assertContains("After=network.target postgresql.service")
@@ -149,7 +149,5 @@ func TestRenderBootstrapScript_NodeConfigAndUnitFragments(t *testing.T) {
 	assertContains("WantedBy=multi-user.target")
 	assertContains("systemctl enable --now ployd-node.service")
 
-	// Verify node-specific PKI paths
-	assertContains("echo \"$PLOY_SERVER_CERT_PEM\" > /etc/ploy/pki/node.crt")
-	assertContains("echo \"$PLOY_SERVER_KEY_PEM\" > /etc/ploy/pki/node.key")
+	// Node-specific PKI is bootstrapped via token exchange; script should not write node cert/key.
 }

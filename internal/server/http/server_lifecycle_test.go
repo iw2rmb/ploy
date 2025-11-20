@@ -163,9 +163,6 @@ func TestServer_GracefulShutdown(t *testing.T) {
 	opts := Options{
 		Config: config.HTTPConfig{
 			Listen: "127.0.0.1:0",
-			TLS: config.TLSConfig{
-				Enabled: false,
-			},
 		},
 		Authorizer: authorizer,
 	}
