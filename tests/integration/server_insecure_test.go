@@ -66,9 +66,6 @@ func TestServerStartStop_InsecureMode(t *testing.T) {
 	// Step 4: Configure and start HTTP server without TLS.
 	httpCfg := config.HTTPConfig{
 		Listen: "127.0.0.1:0", // Use port 0 to let OS assign a free port.
-		TLS: config.TLSConfig{
-			Enabled: false, // Disable TLS for this test.
-		},
 	}
 	httpSrv, err := httpserver.New(httpserver.Options{
 		Config:     httpCfg,

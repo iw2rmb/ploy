@@ -14,8 +14,8 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 	if err != nil {
 		t.Fatalf("descriptorControlPlaneURL default failed: %v", err)
 	}
-	if url != "https://203.0.113.10:8443" {
-		t.Fatalf("expected default https url, got %s", url)
+	if url != "http://203.0.113.10:8080" {
+		t.Fatalf("expected default http url, got %s", url)
 	}
 
 	t.Run("scheme override", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL scheme override failed: %v", err)
 		}
-		if url != "http://203.0.113.10:8443" {
+		if url != "http://203.0.113.10:8080" {
 			t.Fatalf("expected http://..., got %s", url)
 		}
 	})
@@ -35,7 +35,7 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL host:port failed: %v", err)
 		}
-		if url != "https://control.example.com:9000" {
+		if url != "http://control.example.com:9000" {
 			t.Fatalf("expected host:port preserved, got %s", url)
 		}
 	})
@@ -51,14 +51,14 @@ func TestDescriptorControlPlaneURL(t *testing.T) {
 		}
 	})
 
-	// IPv6 address without port should be bracketed and default to 8443.
+	// IPv6 address without port should be bracketed and default to 8080.
 	t.Run("ipv6 default port", func(t *testing.T) {
 		desc := config.Descriptor{ClusterID: config.ClusterID("lab"), Address: "2001:db8::1"}
 		url, err := controlplane.BaseURLFromDescriptor(desc)
 		if err != nil {
 			t.Fatalf("descriptorControlPlaneURL ipv6 failed: %v", err)
 		}
-		if url != "https://[2001:db8::1]:8443" {
+		if url != "http://[2001:db8::1]:8080" {
 			t.Fatalf("expected bracketed IPv6 with default port, got %s", url)
 		}
 	})

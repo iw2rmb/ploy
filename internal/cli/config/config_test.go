@@ -120,9 +120,7 @@ func TestLoadDefault(t *testing.T) {
 		ClusterID:       ClusterID("test-cluster"),
 		Address:         "10.0.0.1:8443",
 		SSHIdentityPath: "/root/.ssh/id_rsa",
-		CAPath:          "/etc/ploy/ca.crt",
-		CertPath:        "/etc/ploy/client.crt",
-		KeyPath:         "/etc/ploy/client.key",
+		Token:           "dummy",
 	}
 	if _, err := SaveDescriptor(d); err != nil {
 		t.Fatalf("SaveDescriptor error: %v", err)
@@ -141,15 +139,6 @@ func TestLoadDefault(t *testing.T) {
 	}
 	if loaded.Address != "10.0.0.1:8443" {
 		t.Errorf("expected address '10.0.0.1:8443', got %q", loaded.Address)
-	}
-	if loaded.CAPath != "/etc/ploy/ca.crt" {
-		t.Errorf("expected CA path '/etc/ploy/ca.crt', got %q", loaded.CAPath)
-	}
-	if loaded.CertPath != "/etc/ploy/client.crt" {
-		t.Errorf("expected cert path '/etc/ploy/client.crt', got %q", loaded.CertPath)
-	}
-	if loaded.KeyPath != "/etc/ploy/client.key" {
-		t.Errorf("expected key path '/etc/ploy/client.key', got %q", loaded.KeyPath)
 	}
 	if !loaded.Default {
 		t.Error("expected Default to be true")

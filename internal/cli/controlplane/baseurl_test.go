@@ -13,15 +13,15 @@ func TestBaseURLFromDescriptor(t *testing.T) {
 		t.Fatalf("pass-through got=%q err=%v", got, err)
 	}
 
-	// Default scheme and port when missing.
+	// Default scheme and port when missing (http:8080).
 	got, err = BaseURLFromDescriptor(config.Descriptor{Address: "example.com"})
-	if err != nil || got != "https://example.com:8443" {
+	if err != nil || got != "http://example.com:8080" {
 		t.Fatalf("defaulting got=%q err=%v", got, err)
 	}
 
 	// Custom scheme without port.
 	got, err = BaseURLFromDescriptor(config.Descriptor{Address: "10.0.0.5", Scheme: "http"})
-	if err != nil || got != "http://10.0.0.5:8443" {
+	if err != nil || got != "http://10.0.0.5:8080" {
 		t.Fatalf("custom scheme got=%q err=%v", got, err)
 	}
 

@@ -69,9 +69,6 @@ func TestServer_StartStop(t *testing.T) {
 		opts := Options{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0", // OS-assigned port for parallel tests.
-				TLS: config.TLSConfig{
-					Enabled: false,
-				},
 			},
 			Authorizer: authorizer,
 		}
@@ -111,9 +108,6 @@ func TestServer_StartStop(t *testing.T) {
 		opts := Options{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0",
-				TLS: config.TLSConfig{
-					Enabled: false,
-				},
 			},
 			Authorizer: authorizer,
 		}

@@ -90,7 +90,7 @@ func TestHandleServerDeployRefreshAdminCertRequiresDescriptor(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when refreshing admin cert without descriptor")
 	}
-	if !bytes.Contains([]byte(err.Error()), []byte("load default cluster descriptor")) {
+	if !bytes.Contains([]byte(err.Error()), []byte("deprecated")) {
 		t.Fatalf("expected descriptor error, got: %v", err)
 	}
 }

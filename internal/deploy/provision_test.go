@@ -33,12 +33,7 @@ func TestRenderBootstrapScript_InjectsServerEnv(t *testing.T) {
 	// Assert server config file fragments exist
 	assertContains("cat > /etc/ploy/ployd.yaml <<EOF")
 	assertContains("http:")
-	assertContains("listen: :8443")
-	assertContains("tls:")
-	assertContains("enabled: true")
-	assertContains("cert: /etc/ploy/pki/server.crt")
-	assertContains("key: /etc/ploy/pki/server.key")
-	assertContains("client_ca: /etc/ploy/pki/ca.crt")
+	assertContains("listen: 127.0.0.1:8080")
 	assertContains("metrics:")
 	assertContains("listen: :9100")
 	assertContains("postgres:")

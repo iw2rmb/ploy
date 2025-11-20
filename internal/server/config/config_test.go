@@ -72,11 +72,6 @@ func TestLoadConfigCustomizations(t *testing.T) {
 	raw := `
 http:
   listen: 127.0.0.1:18443
-  tls:
-    enabled: true
-    cert: /etc/ploy/pki/ployd.pem
-    key: /etc/ploy/pki/ployd-key.pem
-    client_ca: /etc/ploy/pki/clients.pem
 metrics:
   listen: 127.0.0.1:19100
 admin:
@@ -109,12 +104,6 @@ runtime:
 	}
 	if cfg.HTTP.Listen != "127.0.0.1:18443" {
 		t.Fatalf("HTTP.Listen = %q", cfg.HTTP.Listen)
-	}
-	if !cfg.HTTP.TLS.Enabled {
-		t.Fatal("HTTP.TLS.Enabled expected true")
-	}
-	if cfg.HTTP.TLS.CertPath != "/etc/ploy/pki/ployd.pem" {
-		t.Fatalf("HTTP.TLS.CertPath = %q", cfg.HTTP.TLS.CertPath)
 	}
 	if cfg.Metrics.Listen != "127.0.0.1:19100" {
 		t.Fatalf("Metrics.Listen = %q", cfg.Metrics.Listen)

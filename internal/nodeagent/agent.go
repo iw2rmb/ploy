@@ -264,7 +264,7 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 
 // saveBearerToken saves the worker bearer token to a file for use in API requests.
 func (a *Agent) saveBearerToken(token string) error {
-	tokenPath := "/etc/ploy/bearer-token"
+	tokenPath := bearerTokenPath()
 	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
 		return fmt.Errorf("write bearer token: %w", err)
 	}

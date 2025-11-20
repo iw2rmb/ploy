@@ -28,8 +28,8 @@ func TestResolveControlPlaneHTTP_PlainWithHTTPDescriptor(t *testing.T) {
 	if got, want := u.Scheme, "http"; got != want {
 		t.Fatalf("scheme=%s want %s", got, want)
 	}
-	if client == nil || client.Transport != nil {
-		t.Fatalf("expected plain client with nil Transport; got %#v", client)
+	if client == nil {
+		t.Fatalf("expected client, got nil")
 	}
 	if client.Timeout <= 0 {
 		t.Fatalf("expected default Timeout to be set, got %v", client.Timeout)

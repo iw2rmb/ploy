@@ -46,9 +46,6 @@ func TestServer_Addr(t *testing.T) {
 		opts := Options{
 			Config: config.HTTPConfig{
 				Listen: "127.0.0.1:0", // Port 0 requests OS-assigned port.
-				TLS: config.TLSConfig{
-					Enabled: false,
-				},
 			},
 			Authorizer: authorizer,
 		}
