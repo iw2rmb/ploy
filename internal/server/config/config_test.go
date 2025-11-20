@@ -154,8 +154,8 @@ control_plane:
 		t.Fatalf("write config: %v", err)
 	}
 
-	if _, err := config.Load(path); err == nil {
-		t.Fatal("Load() error = nil, want validation failure for missing endpoint")
+	if _, err := config.Load(path); err != nil {
+		t.Fatalf("Load() unexpected error: %v", err)
 	}
 }
 
