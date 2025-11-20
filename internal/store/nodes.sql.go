@@ -103,6 +103,59 @@ func (q *Queries) GetNode(ctx context.Context, id pgtype.UUID) (Node, error) {
 	return i, err
 }
 
+const insertNodeWithID = `-- name: InsertNodeWithID :one
+INSERT INTO nodes (
+  id,
+  name,
+  ip_address,
+  version,
+  concurrency
+) VALUES (
+  $1, $2, $3, $4, $5
+)
+RETURNING id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at
+`
+
+type InsertNodeWithIDParams struct {
+	ID          pgtype.UUID `json:"id"`
+	Name        string      `json:"name"`
+	IpAddress   netip.Addr  `json:"ip_address"`
+	Version     *string     `json:"version"`
+	Concurrency int32       `json:"concurrency"`
+}
+
+func (q *Queries) InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error) {
+	row := q.db.QueryRow(ctx, insertNodeWithID,
+		arg.ID,
+		arg.Name,
+		arg.IpAddress,
+		arg.Version,
+		arg.Concurrency,
+	)
+	var i Node
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.IpAddress,
+		&i.Version,
+		&i.Concurrency,
+		&i.CpuTotalMillis,
+		&i.CpuFreeMillis,
+		&i.MemTotalBytes,
+		&i.MemFreeBytes,
+		&i.DiskTotalBytes,
+		&i.DiskFreeBytes,
+		&i.Drained,
+		&i.CertSerial,
+		&i.CertFingerprint,
+		&i.CertNotBefore,
+		&i.CertNotAfter,
+		&i.LastHeartbeat,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listNodes = `-- name: ListNodes :many
 SELECT id, name, ip_address, version, concurrency, cpu_total_millis, cpu_free_millis, mem_total_bytes, mem_free_bytes, disk_total_bytes, disk_free_bytes, drained, cert_serial, cert_fingerprint, cert_not_before, cert_not_after, last_heartbeat, created_at FROM nodes
 ORDER BY created_at DESC

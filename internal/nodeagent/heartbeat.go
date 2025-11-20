@@ -46,15 +46,13 @@ func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
 		NodeID: cfg.NodeID,
 	})
 
-	client, err := newHTTPClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create http client: %w", err)
-	}
+	// Don't create HTTP client yet - defer until after bootstrap runs.
+	// Client will be lazily initialized on first heartbeat.
 
 	return &HeartbeatManager{
 		cfg:             cfg,
 		collector:       collector,
-		client:          client,
+		client:          nil, // Will be initialized lazily
 		backoffDuration: 0,
 		maxBackoff:      5 * time.Minute,
 	}, nil
@@ -100,6 +98,16 @@ func (h *HeartbeatManager) Start(ctx context.Context) error {
 }
 
 func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
+	// Lazy initialization: create HTTP client if not yet initialized.
+	// This allows bootstrap() to run first and create certificates and bearer token.
+	if h.client == nil {
+		client, err := createHTTPClient(h.cfg)
+		if err != nil {
+			return fmt.Errorf("create http client: %w", err)
+		}
+		h.client = client
+	}
+
 	snap, err := h.collector.Collect(ctx)
 	if err != nil {
 		return fmt.Errorf("collect snapshot: %w", err)

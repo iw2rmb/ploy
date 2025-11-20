@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/cli/controlplane"
 	"github.com/iw2rmb/ploy/internal/deploy"
 	"github.com/iw2rmb/ploy/internal/pki"
+	"github.com/iw2rmb/ploy/internal/server/auth"
 )
 
 type serverDeployConfig struct {
@@ -155,7 +159,62 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		_, _ = fmt.Fprintln(stderr, "CA and server certificate generated")
 
 		// Note: Admin client certificates are no longer used with bearer token authentication
-		// Initial admin token must be generated manually after deployment
+		// Initial admin token will be created after server deployment
+	}
+
+	// Generate JWT signing secret for bearer token authentication
+	authSecret, err := deploy.RandomHexString(32)
+	if err != nil {
+		return fmt.Errorf("server deploy: generate auth secret: %w", err)
+	}
+
+	// Generate initial admin token for CLI use
+	_, _ = fmt.Fprintln(stderr, "Generating initial admin token...")
+	initialTokenExpiry := time.Now().AddDate(1, 0, 0) // 1 year
+	initialToken, err := auth.GenerateAPIToken(authSecret, clusterID, auth.RoleCLIAdmin, initialTokenExpiry)
+	if err != nil {
+		return fmt.Errorf("server deploy: generate initial token: %w", err)
+	}
+
+	// Extract token ID from claims
+	claims, err := auth.ValidateToken(initialToken, authSecret)
+	if err != nil {
+		return fmt.Errorf("server deploy: validate initial token: %w", err)
+	}
+
+	// Compute token hash for database storage
+	hash := sha256.Sum256([]byte(initialToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	// When reusing a cluster, read the CA cert and key from the server for systemd environment
+	if reusingCluster {
+		_, _ = fmt.Fprintln(stderr, "Reading existing CA certificate and key from server...")
+
+		runner := deploy.SystemRunner{}
+		sshArgs := deploy.BuildSSHArgs(identityPath, sshPort)
+		target := fmt.Sprintf("%s@%s", user, cfg.Address)
+
+		// Read CA cert
+		caCertOut := &strings.Builder{}
+		caCertArgs := append(append([]string(nil), sshArgs...), target, "cat /etc/ploy/pki/ca.crt")
+		if err := runner.Run(ctx, "ssh", caCertArgs, nil, deploy.IOStreams{Stdout: caCertOut, Stderr: stderr}); err != nil {
+			return fmt.Errorf("server deploy: read CA cert from server: %w", err)
+		}
+		caCertPEM := caCertOut.String()
+
+		// Read CA key
+		caKeyOut := &strings.Builder{}
+		caKeyArgs := append(append([]string(nil), sshArgs...), target, "cat /etc/ploy/pki/ca.key")
+		if err := runner.Run(ctx, "ssh", caKeyArgs, nil, deploy.IOStreams{Stdout: caKeyOut, Stderr: stderr}); err != nil {
+			return fmt.Errorf("server deploy: read CA key from server: %w", err)
+		}
+		caKeyPEM := caKeyOut.String()
+
+		// Store in a temporary CA bundle structure for later use
+		ca = &pki.CABundle{
+			CertPEM: caCertPEM,
+			KeyPEM:  caKeyPEM,
+		}
 	}
 
 	// Determine PostgreSQL DSN
@@ -177,9 +236,19 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		"NODE_ADDRESS":            cfg.Address,
 		"BOOTSTRAP_PRIMARY":       "true",
 		"PLOY_INSTALL_POSTGRESQL": boolToString(installPostgres),
+		"PLOY_AUTH_SECRET":        authSecret,
+		"PLOY_INITIAL_TOKEN_HASH": tokenHash,
+		"PLOY_INITIAL_TOKEN_ID":   claims.ID,
 	}
 
-	// Only include PKI environment variables when NOT reusing
+	// Set CA environment variables for systemd (always available after reuse logic)
+	// Base64 encode for systemd EnvironmentFile compatibility (multi-line values not supported)
+	if ca != nil {
+		scriptEnv["PLOY_SERVER_CA_CERT"] = base64.StdEncoding.EncodeToString([]byte(ca.CertPEM))
+		scriptEnv["PLOY_SERVER_CA_KEY"] = base64.StdEncoding.EncodeToString([]byte(ca.KeyPEM))
+	}
+
+	// Only include PKI file writes when NOT reusing (bootstrap script will skip writing if CA already exists)
 	if !reusingCluster {
 		scriptEnv["PLOY_CA_CERT_PEM"] = ca.CertPEM
 		scriptEnv["PLOY_CA_KEY_PEM"] = ca.KeyPEM
@@ -212,13 +281,13 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		return fmt.Errorf("server deploy: provision host: %w", err)
 	}
 
-	// Save cluster descriptor locally.
+	// Save cluster descriptor locally with initial admin token
 	serverAddress, _ := controlplane.BaseURLFromDescriptor(config.Descriptor{Address: cfg.Address})
 	desc := config.Descriptor{
 		ClusterID:       config.ClusterID(clusterID),
 		Address:         serverAddress,
 		SSHIdentityPath: identityPath,
-		// Token will be empty - admin must generate initial token manually
+		Token:           initialToken,
 	}
 
 	if _, err := config.SaveDescriptor(desc); err != nil {
@@ -232,36 +301,28 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 		}
 	}
 
-	// Print instructions for generating initial admin token
+	// Print deployment success message
 	_, _ = fmt.Fprintln(stderr, "")
 	_, _ = fmt.Fprintln(stderr, "=================================================================")
 	_, _ = fmt.Fprintln(stderr, "Server deployment complete!")
 	_, _ = fmt.Fprintln(stderr, "=================================================================")
 	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "IMPORTANT: Generate an initial admin token to authenticate:")
-	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "Option 1: Use the ployd CLI on the server (recommended):")
-	_, _ = fmt.Fprintf(stderr, "  ssh %s@%s 'ployd token create --role cli-admin'\n", user, cfg.Address)
-	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "Option 2: Direct database insert (advanced):")
-	_, _ = fmt.Fprintf(stderr, "  ssh %s@%s\n", user, cfg.Address)
-	_, _ = fmt.Fprintln(stderr, "  # Then use psql to insert a token into the api_tokens table")
-	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "After generating a token, add it to your cluster descriptor:")
-	_, _ = fmt.Fprintf(stderr, "  ~/.config/ploy/clusters/%s.json\n", clusterID)
-	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "Add the following field:")
-	_, _ = fmt.Fprintln(stderr, `  "token": "your-generated-token-here"`)
-	_, _ = fmt.Fprintln(stderr, "")
-	_, _ = fmt.Fprintln(stderr, "=================================================================")
-	_, _ = fmt.Fprintln(stderr, "")
-
-	_, _ = fmt.Fprintln(stderr, "\nServer deployment complete!")
 	_, _ = fmt.Fprintf(stderr, "Cluster ID: %s\n", clusterID)
 	_, _ = fmt.Fprintf(stderr, "Server address: %s\n", serverAddress)
-	_, _ = fmt.Fprintln(stderr, "\nNext steps:")
-	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes with: ploy node add --cluster-id %s --address <node-address>\n", clusterID)
-	_, _ = fmt.Fprintln(stderr, "  2. Configure your local environment to point to this server")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Initial admin token has been generated and saved to cluster descriptor.")
+	_, _ = fmt.Fprintln(stderr, "You can now use 'ploy' commands to interact with the cluster.")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Security recommendations:")
+	_, _ = fmt.Fprintln(stderr, "  1. Create additional admin tokens: ploy token create --role cli-admin")
+	_, _ = fmt.Fprintln(stderr, "  2. Revoke the initial token after creating new ones")
+	_, _ = fmt.Fprintln(stderr, "  3. Use short-lived tokens for automation")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "Next steps:")
+	_, _ = fmt.Fprintf(stderr, "  1. Add worker nodes: ploy node add --address <node-address>\n")
+	_, _ = fmt.Fprintln(stderr, "  2. Deploy applications: ploy deploy")
+	_, _ = fmt.Fprintln(stderr, "")
+	_, _ = fmt.Fprintln(stderr, "=================================================================")
 
 	return nil
 }

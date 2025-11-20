@@ -2,7 +2,6 @@ package nodeagent
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 )
@@ -38,16 +37,14 @@ type ClaimResponse struct {
 // NewClaimManager constructs a claim manager with HTTP client and buildgate executor.
 // Initializes backoff parameters for the claim loop polling interval.
 func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error) {
-	client, err := createHTTPClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create http client: %w", err)
-	}
+	// Don't create HTTP client yet - defer until after bootstrap runs.
+	// Client will be lazily initialized on first claim attempt.
 
 	buildgateExec := NewBuildGateExecutor(cfg)
 
 	return &ClaimManager{
 		cfg:             cfg,
-		client:          client,
+		client:          nil, // Will be initialized lazily
 		controller:      controller,
 		buildgateExec:   buildgateExec,
 		backoffDuration: 0,
