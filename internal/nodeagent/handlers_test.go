@@ -82,7 +82,7 @@ func TestHandleRunStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockRunController{startErr: tt.controllerErr}
-			cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+			cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 			srv := &Server{cfg: cfg, controller: mock}
 
 			body, err := json.Marshal(tt.request)
@@ -150,7 +150,7 @@ func TestHandleRunStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := &mockRunController{stopErr: tt.controllerErr}
-			cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+			cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 			srv := &Server{cfg: cfg, controller: mock}
 
 			body, err := json.Marshal(tt.request)
@@ -180,7 +180,7 @@ func TestHandleRunStop(t *testing.T) {
 }
 
 func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -195,7 +195,7 @@ func TestHandleRunStart_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -210,7 +210,7 @@ func TestHandleRunStop_MethodNotAllowed(t *testing.T) {
 }
 
 func TestHandleRunStart_InvalidJSON(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -226,7 +226,7 @@ func TestHandleRunStart_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleRunStop_InvalidJSON(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 
@@ -242,7 +242,7 @@ func TestHandleRunStop_InvalidJSON(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
-	cfg := Config{NodeID: "test-node", ServerURL: "https://server.example.com"}
+	cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 	mock := &mockRunController{}
 	srv := &Server{cfg: cfg, controller: mock}
 

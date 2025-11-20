@@ -191,7 +191,7 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	inDir := ""
 
 	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
-	rc := &runController{cfg: Config{ServerURL: "https://server.example.com:8443", NodeID: "n", HTTP: HTTPConfig{TLS: TLSConfig{Enabled: true, CAPath: "/tmp/ca.crt", CertPath: "/tmp/cert.crt", KeyPath: "/tmp/key.key"}}}}
+	rc := &runController{cfg: Config{ServerURL: "http://127.0.0.1:8080", NodeID: "n", HTTP: HTTPConfig{TLS: TLSConfig{Enabled: false}}}}
 
 	req := StartRunRequest{RunID: types.RunID("t-tls"), RepoURL: types.RepoURL("https://gitlab.com/acme/x.git"), BaseRef: types.GitRef("main"), TargetRef: types.GitRef("br"), Options: map[string]any{
 		"build_gate_healing": map[string]any{"retries": 1, "mods": []any{map[string]any{"image": "heal:latest"}}},
@@ -203,8 +203,8 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	if envSeen == nil {
 		t.Fatal("healing env not captured")
 	}
-	if envSeen["PLOY_SERVER_URL"] != "https://server.example.com:8443" {
-		t.Fatalf("PLOY_SERVER_URL=%q, want https://server.example.com:8443", envSeen["PLOY_SERVER_URL"])
+	if envSeen["PLOY_SERVER_URL"] != "http://127.0.0.1:8080" {
+		t.Fatalf("PLOY_SERVER_URL=%q, want http://127.0.0.1:8080", envSeen["PLOY_SERVER_URL"])
 	}
 	if envSeen["PLOY_CA_CERT_PATH"] == "" || envSeen["PLOY_CLIENT_CERT_PATH"] == "" || envSeen["PLOY_CLIENT_KEY_PATH"] == "" {
 		t.Fatalf("expected TLS envs to be set, got: ca=%q cert=%q key=%q", envSeen["PLOY_CA_CERT_PATH"], envSeen["PLOY_CLIENT_CERT_PATH"], envSeen["PLOY_CLIENT_KEY_PATH"])
