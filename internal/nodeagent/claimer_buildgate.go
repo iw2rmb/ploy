@@ -34,6 +34,16 @@ import (
 // Note: This method returns true if a job was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecuteBuildGateJob(ctx context.Context) (bool, error) {
+	// Lazy initialization: create HTTP client if not yet initialized.
+	// This allows bootstrap() to run first and create certificates.
+	if c.client == nil {
+		client, err := createHTTPClient(c.cfg)
+		if err != nil {
+			return false, fmt.Errorf("create http client: %w", err)
+		}
+		c.client = client
+	}
+
 	// POST /v1/nodes/{id}/buildgate/claim
 	claimURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/claim", c.cfg.ServerURL, c.cfg.NodeID)
 

@@ -54,6 +54,7 @@ type Querier interface {
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
+	InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error)
 	ListAPITokens(ctx context.Context, clusterID string) ([]ListAPITokensRow, error)
 	// ListArtifactBundlePartitions retrieves all partition names for the artifact_bundles table.
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)

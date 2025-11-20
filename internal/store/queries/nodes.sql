@@ -17,6 +17,18 @@ INSERT INTO nodes (
 )
 RETURNING *;
 
+-- name: InsertNodeWithID :one
+INSERT INTO nodes (
+  id,
+  name,
+  ip_address,
+  version,
+  concurrency
+) VALUES (
+  $1, $2, $3, $4, $5
+)
+RETURNING *;
+
 -- name: UpdateNodeHeartbeat :exec
 UPDATE nodes
 SET

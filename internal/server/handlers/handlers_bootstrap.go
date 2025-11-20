@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -11,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"time"
@@ -265,6 +267,35 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			return
 		}
 
+		// Register node in database if it doesn't exist yet.
+		// Use the node_id from the bootstrap token and default values for other fields.
+		nodeUUID := domaintypes.ToPGUUID(claims.NodeID)
+		if !nodeUUID.Valid {
+			http.Error(w, "invalid node_id in token", http.StatusInternalServerError)
+			slog.Error("bootstrap certificate: invalid node_id", "node_id", claims.NodeID)
+			return
+		}
+
+		// Check if node already exists
+		_, err = st.GetNode(r.Context(), nodeUUID)
+		if err != nil {
+			// Node doesn't exist, create it with default values
+			ipAddr, _ := netip.ParseAddr("0.0.0.0")
+			_, err = st.InsertNodeWithID(r.Context(), store.InsertNodeWithIDParams{
+				ID:          nodeUUID,
+				Name:        "node-" + claims.NodeID[:8], // Use first 8 chars of UUID as name
+				IpAddress:   ipAddr,                      // Placeholder IP, will be updated on first heartbeat
+				Version:     nil,                         // Will be updated on first heartbeat
+				Concurrency: 1,                           // Default concurrency
+			})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to register node: %v", err), http.StatusInternalServerError)
+				slog.Error("bootstrap certificate: failed to register node", "node_id", claims.NodeID, "err", err)
+				return
+			}
+			slog.Info("node registered", "node_id", claims.NodeID)
+		}
+
 		// Mark bootstrap token as used.
 		err = st.UpdateBootstrapTokenLastUsed(r.Context(), claims.ID)
 		if err != nil {
@@ -279,7 +310,32 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			// Don't fail the request - cert was already issued
 		}
 
-		// Build response.
+		// Generate a long-lived worker bearer token for the node to use for API authentication.
+		// The certificate is for the node's own HTTPS server; the bearer token is for control plane auth.
+		tokenSecret := os.Getenv("PLOY_AUTH_SECRET")
+		if tokenSecret == "" {
+			http.Error(w, "server misconfigured: PLOY_AUTH_SECRET not set", http.StatusInternalServerError)
+			slog.Error("bootstrap certificate: PLOY_AUTH_SECRET not set")
+			return
+		}
+
+		clusterID := os.Getenv("PLOY_CLUSTER_ID")
+		if clusterID == "" {
+			http.Error(w, "server misconfigured: PLOY_CLUSTER_ID not set", http.StatusInternalServerError)
+			slog.Error("bootstrap certificate: PLOY_CLUSTER_ID not set")
+			return
+		}
+
+		// Generate worker token with 1 year expiration
+		tokenExpiry := time.Now().AddDate(1, 0, 0)
+		workerToken, err := auth.GenerateAPIToken(tokenSecret, clusterID, auth.RoleWorker, tokenExpiry)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to generate worker token: %v", err), http.StatusInternalServerError)
+			slog.Error("bootstrap certificate: generate worker token failed", "err", err)
+			return
+		}
+
+		// Build response with both certificate and bearer token.
 		resp := struct {
 			Certificate string `json:"certificate"`
 			CABundle    string `json:"ca_bundle"`
@@ -287,6 +343,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			Fingerprint string `json:"fingerprint"`
 			NotBefore   string `json:"not_before"`
 			NotAfter    string `json:"not_after"`
+			BearerToken string `json:"bearer_token"`
 		}{
 			Certificate: cert.CertPEM,
 			CABundle:    rawCACert,
@@ -294,6 +351,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 			Fingerprint: cert.Fingerprint,
 			NotBefore:   cert.NotBefore.Format(time.RFC3339),
 			NotAfter:    cert.NotAfter.Format(time.RFC3339),
+			BearerToken: workerToken,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -316,8 +374,26 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 // loadClusterCA loads the cluster CA certificate and private key from environment variables.
 // Returns the parsed CA bundle and the raw CA cert PEM for distribution.
 func loadClusterCA() (*pki.CABundle, string, error) {
-	caCertPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
-	caKeyPEM := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
+	// Decode base64-encoded PEM from environment (systemd EnvironmentFile doesn't support multi-line)
+	caCertB64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_CERT"))
+	caKeyB64 := strings.TrimSpace(os.Getenv("PLOY_SERVER_CA_KEY"))
+
+	if caCertB64 == "" || caKeyB64 == "" {
+		return nil, "", errCANotConfigured
+	}
+
+	caCertBytes, err := base64.StdEncoding.DecodeString(caCertB64)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode CA cert: %w", err)
+	}
+
+	caKeyBytes, err := base64.StdEncoding.DecodeString(caKeyB64)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode CA key: %w", err)
+	}
+
+	caCertPEM := string(caCertBytes)
+	caKeyPEM := string(caKeyBytes)
 
 	if caCertPEM == "" || caKeyPEM == "" {
 		return nil, "", errCANotConfigured

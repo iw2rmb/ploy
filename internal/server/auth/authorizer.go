@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -47,6 +48,7 @@ type Options struct {
 	DefaultRole   string
 	TokenSecret   string        // JWT signing secret for bearer token validation
 	Querier       store.Querier // Database querier for token validation
+	Logger        *slog.Logger  // Structured logger for auth events
 }
 
 // Authorizer enforces role-based access derived from client certificates.
@@ -56,6 +58,7 @@ type Authorizer struct {
 	defaultRole   string
 	tokenSecret   string        // JWT signing secret
 	querier       store.Querier // Database for token validation
+	logger        *slog.Logger  // Structured logger
 }
 
 // Identity describes the caller extracted from the TLS certificate.
@@ -73,11 +76,16 @@ func NewAuthorizer(opts Options) *Authorizer {
 	if role == "" {
 		role = opts.DefaultRole
 	}
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	return &Authorizer{
 		allowInsecure: opts.AllowInsecure,
 		defaultRole:   role,
 		tokenSecret:   opts.TokenSecret,
 		querier:       opts.Querier,
+		logger:        logger,
 	}
 }
 
@@ -133,6 +141,10 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 	if authHeader := r.Header.Get("Authorization"); authHeader != "" {
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
+			a.logger.Debug("auth: attempting bearer token authentication",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"token_prefix", token[:min(8, len(token))])
 			return a.identityFromBearerToken(r.Context(), token)
 		}
 	}
@@ -144,15 +156,31 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 			if role == "" {
 				role = RoleControlPlane
 			}
+			a.logger.Debug("auth: using insecure mode default role",
+				"method", r.Method,
+				"path", r.URL.Path,
+				"role", role)
 			return Identity{Role: role}, nil
 		}
+		a.logger.Warn("auth: authentication required but no credentials provided",
+			"method", r.Method,
+			"path", r.URL.Path)
 		return Identity{}, errors.New("authentication required: provide Bearer token")
 	}
 	cert := r.TLS.PeerCertificates[0]
 	role := extractRole(cert)
 	if role == "" {
+		a.logger.Warn("auth: certificate missing role claim",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"cn", cert.Subject.CommonName)
 		return Identity{}, errors.New("auth: certificate missing role claim")
 	}
+	a.logger.Debug("auth: authenticated via mTLS",
+		"method", r.Method,
+		"path", r.URL.Path,
+		"role", role,
+		"cn", cert.Subject.CommonName)
 	return Identity{
 		Role:       role,
 		CommonName: cert.Subject.CommonName,
@@ -192,25 +220,50 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 	// Validate JWT signature and extract claims
 	claims, err := ValidateToken(tokenString, a.tokenSecret)
 	if err != nil {
+		a.logger.Warn("auth: bearer token validation failed",
+			"error", err.Error(),
+			"token_prefix", tokenString[:min(8, len(tokenString))])
 		return Identity{}, fmt.Errorf("invalid token: %w", err)
 	}
 
 	// Verify token is not expired
 	if time.Now().After(claims.ExpiresAt.Time) {
+		a.logger.Warn("auth: bearer token expired",
+			"token_id", claims.ID,
+			"token_type", claims.TokenType,
+			"expired_at", claims.ExpiresAt.Time,
+			"role", claims.Role)
 		return Identity{}, errors.New("token expired")
 	}
 
 	// Check if token is revoked (query database)
 	revoked, err := a.isTokenRevoked(ctx, claims.ID, claims.TokenType)
 	if err != nil {
+		a.logger.Error("auth: failed to check token revocation",
+			"error", err.Error(),
+			"token_id", claims.ID,
+			"token_type", claims.TokenType)
 		return Identity{}, fmt.Errorf("check token revocation: %w", err)
 	}
 	if revoked {
+		a.logger.Warn("auth: bearer token revoked",
+			"token_id", claims.ID,
+			"token_type", claims.TokenType,
+			"role", claims.Role)
 		return Identity{}, errors.New("token revoked")
 	}
 
-	// Update last_used_at timestamp (async, don't block request)
-	go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+	// Update last_used_at timestamp for API tokens only (async, don't block request)
+	// Bootstrap tokens are marked as used only after successful certificate issuance
+	if claims.TokenType == TokenTypeAPI {
+		go a.updateTokenLastUsed(context.Background(), claims.ID, claims.TokenType)
+	}
+
+	a.logger.Info("auth: bearer token validated successfully",
+		"token_id", claims.ID,
+		"token_type", claims.TokenType,
+		"role", claims.Role,
+		"cluster_id", claims.ClusterID)
 
 	return Identity{
 		Role:       claims.Role,
@@ -243,6 +296,10 @@ func (a *Authorizer) isTokenRevoked(ctx context.Context, tokenID, tokenType stri
 		}
 		// Check for pgx "no rows" error
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "02000" {
+			return false, nil
+		}
+		// Check for pgx "no rows in result set" error (returned by QueryRow().Scan())
+		if strings.Contains(err.Error(), "no rows in result set") {
 			return false, nil
 		}
 		return false, fmt.Errorf("query token revocation: %w", err)

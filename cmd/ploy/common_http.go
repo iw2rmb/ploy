@@ -38,12 +38,34 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 		},
 	}
 
+	// Wrap transport with bearer token injector if token is available
+	var finalTransport http.RoundTripper = transport
+	if strings.TrimSpace(desc.Token) != "" {
+		finalTransport = &bearerTokenTransport{
+			base:  transport,
+			token: strings.TrimSpace(desc.Token),
+		}
+	}
+
 	client := &http.Client{
-		Transport: transport,
+		Transport: finalTransport,
 		Timeout:   10 * time.Second,
 	}
 
 	return u, client, nil
+}
+
+// bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
+type bearerTokenTransport struct {
+	base  http.RoundTripper
+	token string
+}
+
+func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone request to avoid modifying the original
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "Bearer "+t.token)
+	return t.base.RoundTrip(req)
 }
 
 // makeAuthenticatedRequest creates an HTTP request with bearer token authorization.

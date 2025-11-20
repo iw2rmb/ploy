@@ -1,222 +1,460 @@
-# Checkpoint — Mods E2E (ORW) Current State (Nov 5, 2025)
+# Bearer Token Implementation Verification - Deployment Test Results
 
-## Summary
-We’ve unblocked the control plane and workers, implemented proper container retention and log streaming, and verified the container runtime path with a self‑test. The OpenRewrite (ORW) step still fails quickly with exit code 1 and no mod logs exposed to the stream, so we’re adding a targeted retained probe on the ORW image to capture first‑mile failure details.
-
-Update this document as you go.
-
-## What’s Fixed
-- Container lifecycle: disabled Docker AutoRemove and added explicit delete after logs are fetched; added `--retain-container` to keep containers for inspection.
-- SSE logs: node uploads gzipped chunks; server gunzips and publishes per‑line SSE; log ingest routes now publish to SSE.
-- Diagnostics in status: `GET /v1/mods/{id}` now includes `metadata.node_id` (which worker claimed the run) and `metadata.reason` (e.g., `exit code 1`).
-- Workers re‑added: re‑provisioned worker‑b (193.242.109.13) and worker‑c (45.130.213.91) with correct mTLS config; claims work again.
-- Self‑test: a retained run with `alpine:3.20` and a simple command succeeds on worker‑c, validating Docker and claims path.
-
-## What’s Observed (but not yet explained)
-- ORW runs are consistently claimed (often by worker‑b) and terminate in ~19s with `reason = "exit code 1"`.
-- No mod logs are visible for these failing runs via SSE, and the `/out` bundle is empty; retained container matching the ticket label is typically absent, suggesting failure occurred before container start or the container exited without producing stdout/stderr content that we capture.
-- Earlier on worker‑b we saw historical “Cannot connect to the Docker daemon” errors; those predate re‑bootstrap and do not appear in the latest claims.
-
-## Not Yet Confirmed
-- Whether the ORW container actually starts on worker‑b after the recent bootstrap, and whether the failure is due to:
-  - Maven/OpenRewrite plugin resolution (egress/DNS/Maven Central access),
-  - Workspace hydration mismatch (no `pom.xml` under `/workspace`), or
-  - Command/entrypoint mismatch (we removed placeholder commands; the image CMD should run `mods-orw --apply`).
-- That the retained flag is honored on the exact failing step (we propagate `retain_container`, and we label containers; absence suggests pre‑container failure or another early exit path).
-
-## Next Actions
-1) Run a retained ORW‑image probe with a verbose Maven command to capture first‑mile failure (env, `mvn -v`, list `/workspace`, plugin run `-X`).
-   - The run is submitted with `--mod-image mods-openrewrite:latest`, an explicit `--mod-command` wrapped in `/bin/sh -lc`, and `--retain-container`.
-   - Deliverables: TICKET, claiming `node_id` + `ip`, retained container ID (via label `com.ploy.run_id=<TICKET>`), and first 200 lines of `docker logs`.
-2) If the probe shows Maven egress failures, set or validate node‑level Docker/systemd proxy (and test `wget` in the container).
-3) If the probe shows missing `/workspace/pom.xml`, inspect hydration on the node (ensure repo/refs materialize to `/workspace`).
-4) If logs remain empty but the container starts, add early echo/tee in the ORW entrypoint to guarantee an emitted line before Maven starts, and re‑publish image.
-5) After root cause is confirmed on worker‑b, re‑run `tests/e2e/mods/scenario-orw-pass.sh` with `--retain-container` to confirm logs and artifacts are emitted and downloadable.
-
-## Ground Truth (as of this checkpoint)
-- Control plane: `https://45.9.42.212:8443` (mTLS). Ticket status returns mods‑style summary with `node_id`/`reason`.
-- Workers:
-  - worker‑b (193.242.109.13): claims ORW; recent runs end `exit code 1`; Docker reachable interactively.
-  - worker‑c (45.130.213.91): self‑test succeeded; Docker reachable.
-- Logging: SSE pipeline is enabled end‑to‑end; absence of logs on ORW indicates the container likely isn’t producing (or step fails before start), not a transport issue.
-
-## Notes
-- All retention and log‑fanout changes are unit‑tested; control plane and node binaries have been rebuilt and deployed.
-- Containers created by steps carry `com.ploy.run_id=<TICKET>` (run/ticket UUID) for discovery; removal is explicit and skipped when retained. The historic mislabeling with a step identifier has been fixed.
-- Type semantics are hardened in code (e.g., `RepoURL`, `GitRef`, `CommitSHA`, `TicketID/RunID`, `StageID`, resource units). JSON over the wire remains unchanged (strings with the same shapes), preserving API compatibility.
+**Date**: 2025-11-19
+**Objective**: Verify bearer token implementation (BEARER.md) by deploying a fresh cluster to VPS lab
+**Test Method**: Clean deployment following docs/how-to/deploy-a-cluster.md
+**Environment**: VPS Lab - Server: 45.9.42.212, Nodes: 193.242.109.13, 45.130.213.91
 
 ---
 
-## GitLab MR — Discovery (Phase A / Step 1)
+## Executive Summary
 
-What I mined from repo history (prior MR paths):
+Bearer token authentication implementation is **functionally complete** but deployment automation has critical gaps. The server runs successfully with bearer tokens enabled, but initial admin token creation is not automated, creating a chicken-and-egg problem for first-time deployments.
 
-- Provider and HTTP shapes (commit e087bc49, 2025‑09‑05)
-  - File: `internal/git/provider/gitlab.go` (removed in da348c89).
-  - Endpoints used:
-    - GET `/_api/v4/projects/{project}/merge_requests?source_branch={branch}&state=opened` (check existing MR).
-    - POST `/_api/v4/projects/{project}/merge_requests` body `{title, description, source_branch, target_branch, labels}` (create MR).
-    - PUT  `/_api/v4/projects/{project}/merge_requests/{iid}` body `{title, description, target_branch, labels}` (update MR).
-  - Auth: `Authorization: Bearer <token>`; base URL from `GITLAB_URL` (default `https://gitlab.com`); token from `GITLAB_TOKEN`.
-  - Project path extraction: parsed repo HTTPS URL; trimmed leading `/` and `.git`.
+**Status**:
+- ✅ Core bearer token authentication working
+- ✅ Server deploys and runs successfully
+- ✅ Environment variable handling fixed
+- ⚠️ Initial admin token requires manual creation
+- ⏳ Full cluster deployment pending token automation
 
-- Runner integration (same commit series)
-  - File: `internal/cli/transflow/runner.go` — after push, called `CreateOrUpdateMR`.
-  - MR title: `"Transflow: <workflow ID>"`.
-  - MR labels: `ploy, tfl` (CSV in request payload).
-  - MR description: rendered from template in `internal/mods/mr_template.go` (also existed under `internal/cli/transflow/mr_template.go`).
-  - Branch name template: `workflow/<id>/<timestamp>`.
+---
 
-- Per‑run auth mapping (commit 48f4500f, 2025‑09‑20)
-  - File: `internal/mods/mr_auth.go` — mapped mod config `mr.token_env` to process env; set `PLOY_GITLAB_PAT` and `GITLAB_URL` for provider/git ops.
+## Initial Issue: Verify Bearer Token Migration
 
-- Control‑plane signer (removed)
-  - Files: `internal/config/gitlab/*`, `internal/api/httpserver/controlplane_signer.go`, docs under `docs/design/gitlab-*`.
-  - Provided AES‑key‑backed signer/rotation/revocation; deleted in pivot (docs/envs: "GitLab Signer (Removed)").
+The bearer token migration (BEARER.md) was marked complete with commits through Phase 6. However, deployment testing revealed gaps between specification and implementation:
 
-Implications for current plan:
-- Request shapes and field names match GitLab v4; safe to reuse.
-- Title/description templates exist; can port minimal versions (rename Transflow → Ploy Mods).
-- Env names diverged historically (`GITLAB_TOKEN` vs `PLOY_GITLAB_PAT`). Plan should standardize on server‑stored PAT with per‑run override flag and map to provider without leaking to logs.
+1. Bootstrap script generated obsolete mTLS config format
+2. Config validation incorrectly required control_plane section for server
+3. Environment variables not properly expanded in systemd units
+4. Multi-line PEM certificates corrupted in systemd Environment= directives
+5. pgx-specific error handling missing for token revocation checks
+6. No automatic initial admin token generation
+7. Node agent initialization order bug (HTTP client created before bootstrap)
+8. Deployment instructions referenced non-existent `ployd token create` command
 
-## Updates — 2025‑11‑04
+---
 
-What I attempted (literal to Next Actions):
-- Built CLI (`dist/ploy`).
-- Pointed CLI to control plane: `PLOY_CONTROL_PLANE_URL=https://45.9.42.212:8443` (mTLS via default descriptor).
-- Submitted retained ORW probe twice using `docker.io/iwtormb/mods-openrewrite:latest`, with `--mod-command` printing env/versions, listing `/workspace`, and invoking the Rewrite plugin (`-X`).
-  - Tickets: `fbd8ea42-e9b4-4f2f-bb22-34d573729de3` and `3ccec0b9-a83c-4fcb-b310-a99b6a1b6ccc`.
+## Issues Discovered During Deployment
 
-Observed blockers (initial):
-- Both workers reported drained=true via `GET /v1/nodes`.
-  - worker‑c 45.130.213.91 (drained=true)
-  - worker‑b 193.242.109.13 (drained=true)
-- Result: new tickets remained `pending/queued`; no node claims, no SSE logs.
+### Issue #1: Bootstrap Config Format Mismatch
+**Status**: ✅ FIXED
+**Component**: `internal/deploy/bootstrap/bootstrap.go`
 
-Actions taken after approval:
-- Undrained worker‑b via API; then attempted `ploy rollout nodes --selector worker-b` to refresh `ployd-node`.
-- Rollout failed at the heartbeat confirmation step, but worker‑b resumed heartbeating (hb updated to ~23:24Z).
-- Undrained both worker‑b and worker‑c; current state:
-  - worker‑b 193.242.109.13 — drained=false, last_heartbeat recent (23:24Z)
-  - worker‑c 45.130.213.91 — drained=false, last_heartbeat stale (22:28Z)
+**Problem**: Bootstrap script generated old mTLS config format with `http.tls` section instead of new `auth.bearer_tokens` format.
 
-Current status:
-- Despite worker‑b being undrained and heartbeating, the submitted tickets (including fresh `22886220-332d-46ca-8215-2368e6e74f3f`) remain `pending` with stage `queued`; no `node_id` assigned yet and no SSE logs.
+**Root Cause**: Config structs updated for bearer tokens (Phase 1), but deployment automation not updated to match.
 
-Hypotheses:
-- Claim loop not running or failing on worker‑b (mTLS OK for heartbeat, but claim POST might be failing auth/role).
-- Server returns 204 on claim due to a queue filter mismatch (unlikely; runs are `queued` and nodes undrained).
-- Transient rollout left service updated but not fully restarted; needs a clean restart.
-
-Next steps proposed:
-- SSH to worker‑b and check ployd‑node logs; verify `/v1/nodes/{id}/claim` attempts and responses; restart service if needed.
-- If logs show claim auth errors, verify node cert OU (`worker`) and server authorizer; re‑issue node certs if required.
-- Once claims activate, re‑run the retained ORW probe and capture SSE + retained container evidence.
-
-## Result — 2025‑11‑05 (Post‑fix state)
-
-Fix applied:
-- Worker‑b claim/heartbeat 404s were caused by a NodeID mismatch.
-  - `/etc/ploy/ployd-node.yaml` had `node_id: 57ffe804-a72d-47ab-b7af-14a5a4605a49`.
-  - Control plane reports worker‑b id: `28587647-682f-4ab1-b5a4-a2d036a35a20`.
-  - Updated the node config to the correct id and restarted `ployd-node`.
-  - After restart, worker‑b immediately claimed pending runs.
-
-Probe (retained) — details:
-- Ticket: `35ecc92e-c305-400e-8b05-291f03923530`
-- node_id: `28587647-682f-4ab1-b5a4-a2d036a35a20` (worker‑b 193.242.109.13)
-- Image: `docker.io/iwtormb/mods-openrewrite:latest`
-- Command (argv): `["--apply","--dir","/workspace","--out","/out"]`
-- Retained container: `fe3caaee478d`
-- Exit: `1` (reason in ticket metadata: `exit code 1`)
-
-First 200 lines of docker logs (probe):
-
-```
-[mod-orw] Running OpenRewrite recipe: org.openrewrite.java.migrate.UpgradeToJava17
-[mod-orw] Coordinates: org.openrewrite.recipe:rewrite-java-17:2.6.0 (plugin 6.18.0)
-Apache Maven 3.9.11 (3e54c93a704957b63ee3494413a2b544fd3a825b)
-Maven home: /usr/share/maven
-Java version: 17.0.16, vendor: Eclipse Adoptium, runtime: /opt/java/openjdk
-Default locale: en_US, platform encoding: UTF-8
-OS name: "linux", version: "6.8.0-86-generic", arch: "amd64", family: "unix"
-[DEBUG] Created new class realm maven.api
-[DEBUG] Importing foreign packages into class realm maven.api
-[DEBUG]   Imported: javax.annotation.* < plexus.core
-[DEBUG]   Imported: javax.annotation.security.* < plexus.core
-[DEBUG]   Imported: javax.inject.* < plexus.core
-[DEBUG]   Imported: org.apache.maven.* < plexus.core
-[DEBUG]   Imported: org.apache.maven.artifact < plexus.core
-...
+**Fix Applied**: Updated bootstrap script to generate correct config format:
+```yaml
+http:
+  listen: 127.0.0.1:8080
+auth:
+  bearer_tokens:
+    enabled: true
+postgres:
+  dsn: ${PLOY_POSTGRES_DSN}
 ```
 
-Tail excerpt (failure cause):
+**File Modified**: `internal/deploy/bootstrap/bootstrap.go` lines 135-145
+
+---
+
+### Issue #2: Architectural Bug - Control Plane Validation
+**Status**: ✅ FIXED
+**Component**: `internal/server/config/validate.go`
+
+**Problem**: Server config validation required `control_plane.endpoint`, but server IS the control plane - it doesn't connect to itself.
+
+**Root Cause**: Control plane config is for nodes only (ployd-node), not for server (ployd). Validation was incorrectly applied to all configs.
+
+**Fix Applied**: Removed control_plane validation entirely from server config validation. Added comment explaining the config is node-only.
+
+**File Modified**: `internal/server/config/validate.go` lines 14-17
+
+---
+
+### Issue #3: Environment Variables Not Expanded
+**Status**: ✅ FIXED
+**Component**: `internal/deploy/bootstrap/bootstrap.go`
+
+**Problem**: Systemd environment showed literal `${PLOY_SERVER_CA_CERT:-}` instead of actual CA certificate PEM.
+
+**Root Cause**: Bootstrap script used quoted heredoc `<<'EOF'` which prevents shell variable expansion.
+
+**Fix Applied**: Changed to unquoted heredoc `<<EOF` and removed `:-` default value syntax.
+
+**Files Modified**:
+- `internal/deploy/bootstrap/bootstrap.go` lines 103, 149
+
+---
+
+### Issue #4: PostgreSQL Password Mismatch (Recurring)
+**Status**: ⚠️ WORKAROUND APPLIED
+**Component**: `internal/deploy/bootstrap/bootstrap.go`
+
+**Problem**: Each deployment generates new random password but doesn't update existing PostgreSQL user.
+
+**Workaround**: Manual `ALTER USER` command after each deployment.
+
+**Proper Fix Needed**: Bootstrap script should detect existing user and either:
+- Reuse existing password from `/etc/ploy/.pgpass`
+- Update user with new password
+- Skip user creation entirely if exists
+
+---
+
+### Issue #5: Token Revocation Check Error Handling
+**Status**: ✅ FIXED
+**Component**: `internal/server/auth/authorizer.go`
+
+**Problem**: Bearer token auth failed with "no rows in result set" error when checking non-revoked tokens.
+
+**Root Cause**: pgx returns different error type than `sql.ErrNoRows` for queries returning zero rows.
+
+**Fix Applied**: Added string-based error checking for pgx "no rows in result set" error.
+
+**File Modified**: `internal/server/auth/authorizer.go` lines 289-303
+
+---
+
+### Issue #6: Multi-line PEM Certificates Corrupted
+**Status**: ✅ FIXED
+**Component**: `internal/deploy/bootstrap/bootstrap.go`
+
+**Problem**: CA certificates passed via systemd `Environment=` directives showed as malformed, causing node bootstrap to fail with "invalid CA cert PEM".
+
+**Root Cause**: Multi-line PEM certificates cannot be embedded in systemd Environment= directives - they get corrupted/concatenated.
+
+**Fix Applied**: Changed from embedding in Environment= to using EnvironmentFile=/etc/ploy/cluster.env:
+```bash
+# Write all secrets to environment file
+cat > /etc/ploy/cluster.env <<ENVFILE
+PLOY_CLUSTER_ID=${CLUSTER_ID}
+PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET}
+PLOY_SERVER_CA_CERT=${PLOY_SERVER_CA_CERT}
+PLOY_SERVER_CA_KEY=${PLOY_SERVER_CA_KEY}
+ENVFILE
+chmod 600 /etc/ploy/cluster.env
+
+# Systemd unit uses EnvironmentFile
+[Service]
+EnvironmentFile=/etc/ploy/cluster.env
+```
+
+**File Modified**: `internal/deploy/bootstrap/bootstrap.go` lines 99-107, 159
+
+---
+
+### Issue #7: Node Agent Initialization Order Bug
+**Status**: ✅ FIXED
+**Component**: `internal/nodeagent/heartbeat.go`, `internal/nodeagent/claimer.go`, `internal/nodeagent/claimer_loop.go`
+
+**Problem**: Node agent failed with "open /etc/ploy/pki/node.crt: no such file or directory" during startup.
+
+**Root Cause**: HTTP client created during initialization tried to load certificates before bootstrap process ran:
+1. `nodeagent.New()` called at startup
+2. `NewHeartbeatManager()` and `NewClaimManager()` created HTTP clients
+3. HTTP clients tried to load /etc/ploy/pki/node.crt (doesn't exist yet)
+4. `bootstrap()` only runs later in `Run()` method
+5. Node crashed before bootstrap could create certificates
+
+**Fix Applied**: Implemented lazy HTTP client initialization - client created on first use instead of during construction.
+
+**Files Modified**:
+- `internal/nodeagent/heartbeat.go` lines 43-59, 100-109
+- `internal/nodeagent/claimer.go` lines 40-55
+- `internal/nodeagent/claimer_loop.go` lines 91-100
+
+---
+
+### Issue #8: No Automatic Initial Admin Token Generation
+**Status**: ⚠️ CRITICAL GAP - Requires Implementation
+**Component**: `cmd/ploy/server_deploy_run.go`, `internal/deploy/bootstrap/bootstrap.go`
+
+**Problem**: Chicken-and-egg problem prevents initial cluster use:
+- `POST /v1/tokens` endpoint requires `cli-admin` authentication
+- `ploy token create` command needs token in cluster descriptor
+- Deployment instructions suggest `ployd token create --role cli-admin` which **does not exist**
+- Result: No way to create first admin token without manual database insertion
+
+**Current Workaround**:
+1. Generate token using `tools/gentoken/main.go`
+2. Manually insert into database via psql
+3. Manually update cluster descriptor
+
+**Proper Fix Required**: See "Remaining Work" section below.
+
+---
+
+## Current State
+
+### What Works ✅
+
+1. **Server Deployment**:
+   - Deploys successfully to fresh VPS
+   - PostgreSQL installed and configured automatically
+   - PKI materials (CA, server cert) generated and stored
+   - Systemd service starts and runs successfully
+
+2. **Bearer Token Authentication**:
+   - Server runs with `auth.bearer_tokens.enabled: true`
+   - JWT token generation and validation working (`auth.GenerateAPIToken`)
+   - Token revocation checking works correctly (pgx error handling fixed)
+   - API endpoints protected by bearer token auth
+
+3. **Environment Handling**:
+   - Multi-line PEM certificates properly stored in EnvironmentFile
+   - Variable expansion works correctly (cluster ID, auth secret, CA materials)
+   - Systemd service has access to all required secrets
+
+4. **Database Schema**:
+   - Migrations apply successfully (version 6 - bearer_tokens)
+   - `api_tokens` table created with proper schema
+   - `bootstrap_tokens` table ready for node provisioning
+
+5. **Node Agent Bootstrap Flow**:
+   - HTTP client lazy initialization prevents certificate loading errors
+   - Bootstrap process implemented in `internal/nodeagent/agent.go`
+   - Ready to exchange bootstrap token for node certificate
+
+### What's Broken ⚠️
+
+1. **Initial Admin Token Creation**:
+   - Not automated during deployment
+   - Requires manual database insertion
+   - CLI unusable until token manually created
+   - Deployment instructions reference non-existent command
+
+2. **PostgreSQL Password Management**:
+   - Password regenerated on each deployment
+   - Existing user not updated with new password
+   - Requires manual ALTER USER after redeployment
+
+3. **Node Deployment**:
+   - Not yet tested (blocked by missing admin token)
+   - Bootstrap token flow ready but unverified
+
+---
+
+## Remaining Work
+
+### Critical: Automate Initial Admin Token Generation
+
+**Problem**: Users cannot use freshly deployed cluster without manual database access.
+
+**Required Changes**:
+
+#### 1. Generate Token in Deploy Command
+**File**: `cmd/ploy/server_deploy_run.go`
+
+After JWT secret generation (~line 165):
+```go
+// Generate initial admin token for CLI
+initialTokenExpiry := time.Now().AddDate(1, 0, 0) // 1 year
+initialToken, err := auth.GenerateAPIToken(authSecret, clusterID, auth.RoleCLIAdmin, initialTokenExpiry)
+if err != nil {
+    return fmt.Errorf("generate initial token: %w", err)
+}
+
+// Extract token ID from claims
+claims, err := auth.ValidateToken(initialToken, authSecret)
+if err != nil {
+    return fmt.Errorf("validate initial token: %w", err)
+}
+
+// Compute token hash for database storage
+hash := sha256.Sum256([]byte(initialToken))
+tokenHash := hex.EncodeToString(hash[:])
+```
+
+Pass to bootstrap script environment:
+```go
+scriptEnv := map[string]string{
+    // ... existing vars
+    "PLOY_INITIAL_TOKEN_HASH": tokenHash,
+    "PLOY_INITIAL_TOKEN_ID":   claims.ID,
+}
+```
+
+Save token to cluster descriptor (~line 259):
+```go
+desc := config.Descriptor{
+    ClusterID:       config.ClusterID(clusterID),
+    Address:         serverAddress,
+    SSHIdentityPath: identityPath,
+    Token:           initialToken,  // Include generated token
+}
+```
+
+#### 2. Insert Token in Bootstrap Script
+**File**: `internal/deploy/bootstrap/bootstrap.go`
+
+After ployd service starts (~line 166):
+```bash
+# Insert initial admin token into database
+if [ -n "${PLOY_INITIAL_TOKEN_HASH:-}" ] && [ -n "${PLOY_INITIAL_TOKEN_ID:-}" ]; then
+  # Wait for database to be ready
+  for i in {1..30}; do
+    if sudo -u postgres psql -d ploy -c '\dt' >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+
+  sudo -u postgres psql -d ploy -c "
+  INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
+  VALUES (
+    '${PLOY_INITIAL_TOKEN_HASH}',
+    '${PLOY_INITIAL_TOKEN_ID}',
+    '${CLUSTER_ID}',
+    'cli-admin',
+    'Initial admin token - please rotate',
+    NOW(),
+    NOW() + INTERVAL '365 days'
+  );" || echo 'Warning: Failed to insert initial admin token'
+fi
+```
+
+#### 3. Update Deployment Success Message
+**File**: `cmd/ploy/server_deploy_run.go`
+
+Replace manual instructions (~line 279-309) with:
+```
+=================================================================
+Server deployment complete!
+=================================================================
+
+Cluster ID: cluster-xxxxx
+Server address: https://45.9.42.212:8443
+
+Initial admin token has been generated and saved to cluster descriptor.
+You can now use 'ploy' commands to interact with the cluster.
+
+Security recommendations:
+  1. Create additional admin tokens: ploy token create --role cli-admin
+  2. Revoke the initial token after creating new ones
+  3. Use short-lived tokens for automation
+
+Next steps:
+  1. Add worker nodes: ploy node add --address <node-address>
+  2. Deploy applications: ploy deploy
+
+=================================================================
+```
+
+**Additional Imports Needed**:
+- `crypto/sha256`
+- `encoding/hex`
+- `github.com/iw2rmb/ploy/internal/server/auth`
+
+**Security Considerations**:
+- Token generated on CLI machine (trusted environment)
+- Only hash stored in database (never plaintext)
+- Transmitted via SSH environment variables (encrypted)
+- Saved to user-local config directory only
+- Marked for rotation in database description
+
+---
+
+## Testing Plan
+
+After implementing initial token generation:
+
+1. **Clean Server Deployment**:
+   - Clean up existing server (database, systemd service, PKI)
+   - Run `./dist/ploy server deploy --address 45.9.42.212`
+   - Verify cluster descriptor has token populated
+   - Verify token works: `./dist/ploy token list`
+
+2. **Node Deployment**:
+   - Deploy Node B: `./dist/ploy node add --address 193.242.109.13`
+   - Verify bootstrap token created and transmitted
+   - Verify node exchanges token for certificate
+   - Verify node connects to cluster
+
+3. **Cluster Functionality**:
+   - Check node status: `./dist/ploy nodes list`
+   - Deploy test application
+   - Verify run execution on worker node
+
+4. **Token Management**:
+   - Create additional admin token
+   - Revoke initial token
+   - Verify new token works, old token rejected
+
+---
+
+## Commit History
+
+Bearer token migration commits (most recent first):
 
 ```
-Caused by: org.eclipse.aether.transfer.ArtifactNotFoundException: Could not find artifact org.openrewrite.recipe:rewrite-java-17:jar:2.6.0 in central (https://repo.maven.apache.org/maven2)
+b79db3fd feat: complete Phase 6 cleanup of bearer token migration
+c5ee2f6f feat: update local development config for bearer token authentication (Phase 5)
+5dcfafb9 docs: update documentation for bearer token authentication (Phase 5)
+1d40a75e feat: add bearer token and bootstrap flow tests (Phase 5)
+7a15e109 feat: implement Phase 4 node agent bootstrap functionality
+21f2f95d feat: implement CLI bearer token authentication (Phase 3)
+980471c3 feat: remove mTLS-specific PKI routes
+157d4c2c feat: implement bootstrap token endpoints for node provisioning
+51d7d969 feat: implement API token management endpoints
+3ebd45ee feat: integrate bearer token auth in server startup
+56416246 feat: add bearer token auth config and remove TLS config
+d09e492b feat: add bearer token authentication to authorizer
+f5f15140 feat: add database migration for bearer tokens
+88ee5672 feat: implement JWT token generation and validation
+98f6e0f8 feat: add JWT library dependency for bearer token auth
 ```
 
-Interpretation:
-- Claims/logs path is healthy (container started; logs retained; Maven executed).
-- Not an egress/DNS block; Maven reached Central but the requested recipe artifact/version was not found.
+Deployment test fixes (uncommitted):
+- Fix bootstrap config format (Issue #1)
+- Remove control_plane validation (Issue #2)
+- Fix environment variable expansion (Issue #3)
+- Fix token revocation error handling (Issue #5)
+- Implement EnvironmentFile for CA materials (Issue #6)
+- Implement lazy HTTP client initialization (Issue #7)
 
-Follow‑up runs and confirmations:
-- Using the scenario coords from tests (env only):
-  - `RECIPE_GROUP=org.openrewrite.recipe`
-  - `RECIPE_ARTIFACT=rewrite-migrate-java`
-  - `RECIPE_VERSION=3.20.0`
-  - `RECIPE_CLASSNAME=org.openrewrite.java.migrate.UpgradeToJava17`
-- Ticket `1e7b3986-756c-4a44-9cac-3a76e07706ec` (main→main) — Succeeded on worker‑b; retained container exited 0; ORW logs show successful run.
-- Ticket `5d89be9c-9462-4681-a2b9-e305eeec7fca` (e2e/fail-missing-symbol→main) — Succeeded on worker‑b; confirms hydration and apply succeed on failing baseline.
-- Diffs are stored in DB (table `diffs`). New endpoints added (requires server rollout):
-  - `GET /v1/mods/{id}/diffs` — list per‑run diffs; `GET /v1/diffs/{id}?download=true` — download gzipped patch.
-  - CLI: `ploy mod diffs <ticket> [--download] [--output <file>]`.
+---
 
-Decision — Build Gate metrics collection:
-- Chosen approach: in‑process collection in node agent (Docker stats/inspect) rather than cAdvisor.
-- Rationale: per‑run, low‑overhead, tight correlation to `run_id`, no extra daemon.
-- If we expand to fleet/continuous metrics later, revisit cAdvisor/Prometheus.
+## Files Modified (This Session)
 
-Current gaps vs test goals (with latest collector changes):
-1) Build Gate confirmation — We execute the Java build gate (`mvn test`) inside the node runner (Docker). Timings are persisted in run `stats` (`build_gate_duration_ms`), but `GET /v1/mods/{id}` does not expose `stats` yet.
-   - Implemented on node side: collect build logs, pass/fail, duration, resource limits and usage; upload `build-gate.log` as artifact (≤256 KiB) tied to `run_id`/`stage_id`; record all metrics under `runs.stats.gate` (limits+usage+duration+passed).
-   - Remaining: expose `runs.stats` (or just `runs.stats.gate`) via `GET /v1/mods/{id}` or a new `GET /v1/mods/{id}/stats`; print in CLI.
-2) GitLab MR — Branch push + MR creation wired
-   - Implemented path: global PAT/domain via control plane config with optional per‑run overrides; node pushes branch using a non‑persistent HTTP Authorization header and creates the MR via GitLab API with bounded retries; MR URL is attached under `runs.stats.metadata.mr_url` and surfaced by `GET /v1/mods/{id}` so `ploy mod inspect` prints it.
+1. `internal/deploy/bootstrap/bootstrap.go` - Bootstrap script config format, environment handling
+2. `internal/server/config/validate.go` - Removed incorrect control_plane validation
+3. `internal/server/auth/authorizer.go` - Fixed pgx error handling for token revocation
+4. `internal/nodeagent/heartbeat.go` - Lazy HTTP client initialization
+5. `internal/nodeagent/claimer.go` - Lazy HTTP client initialization
+6. `internal/nodeagent/claimer_loop.go` - Lazy HTTP client initialization
+7. `tools/gentoken/main.go` - Created token generation utility (temporary workaround)
 
-## What’s Left (Test Exit Criteria)
-1) Build Gate — API/CLI verifiable
-   - Server: include `runs.stats` in `GET /v1/mods/{id}` or add `GET /v1/mods/{id}/stats`.
-   - CLI: print gate status/duration in `mod inspect` when stats present.
-   - Blast radius: server handlers (status), CLI mods/inspect; tests for both. ETA: ~0.5 day.
-2) GitLab MR — push + open MR
-   - Server‑side config: add secure storage of PAT (or reuse existing config), plumb to runner or a post‑apply step.
-   - Node action: after ORW success, push branch and POST `projects/:id/merge_requests` (title, source, target) using PAT; record MR URL in ticket metadata and print in CLI.
-   - Blast radius: nodeagent (post‑step), server config+handlers for MR metadata, CLI mods/inspect to show MR URL; docs update. ETA: ~1–1.5 days.
+---
 
-## Ready to Roll
-- Server adds for diffs are implemented (list/download) and unit‑tested; roll out `ployd` to enable:
-  - Update server binary on 45.9.42.212 and restart.
-  - Then: `dist/ploy mod diffs <ticket> --download > changes.patch` to fetch the patch.
-- Mod coords usage clarified in docs: env‑only (no JSON spec for coords).
+## Next Steps
 
-Next commits landing in lab (already rolled for server endpoints):
-- Server: diffs list/download handlers; artifact upload response now includes `cid`.
-- CLI: `mod diffs` command; `--mod-command` accepts JSON array.
+1. **Implement Initial Token Generation** (Priority: CRITICAL)
+   - Modify `cmd/ploy/server_deploy_run.go` to generate token
+   - Modify `internal/deploy/bootstrap/bootstrap.go` to insert token
+   - Test clean deployment with automatic token
 
-Open items to close the test:
-- Expose `runs.stats.gate` in status API and print in CLI (`mod inspect`).
-- GitLab MR path (PAT ingestion + push + `merge_requests` create; surface MR URL).
+2. **Complete Cluster Deployment** (Priority: HIGH)
+   - Deploy both worker nodes
+   - Verify bootstrap token flow
+   - Verify node certificate provisioning
+   - Test run execution across cluster
 
-Proposal (required to proceed):
-- Undrain at least worker‑b to allow claims, then re‑run the retained ORW probe.
-  - Benefit: enables step 1 to execute and produce first‑mile logs and a retained container.
-  - Risks: worker will start claiming queued work; ensure the lab queue is clean or use unique tickets.
-  - Blast radius: control plane only; affects node scheduling; no code changes.
-  - Time: ~2 minutes to undrain + verify claims; ~5–10 minutes to capture logs depending on pull time.
+3. **Fix PostgreSQL Password Management** (Priority: MEDIUM)
+   - Detect existing user and reuse/update password
+   - Store password securely for redeployment
 
-If approved, next concrete steps:
-- POST `/v1/nodes/{id}/undrain` for worker‑b (mTLS), then re‑submit (or reuse `3ccec0b9-*`) and follow logs.
-- After claim, capture:
-  - `node_id` and IP from `GET /v1/mods/{ticket}`.
-  - First 200 lines of logs via SSE; if empty, fetch `docker logs` on the node for the retained container labeled `com.ploy.run_id=<TICKET>`.
+4. **Commit Changes** (Priority: MEDIUM)
+   - Commit deployment test fixes
+   - Commit initial token generation implementation
+   - Update BEARER.md with deployment verification results
+
+---
+
+## Conclusion
+
+The bearer token migration is **functionally complete** - all core authentication and authorization mechanisms work correctly. However, the deployment automation has critical gaps that prevent smooth first-time cluster deployment.
+
+The highest priority fix is automating initial admin token generation to eliminate the chicken-and-egg problem and provide a production-ready deployment experience.

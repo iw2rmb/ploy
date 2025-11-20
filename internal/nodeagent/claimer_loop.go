@@ -89,6 +89,16 @@ func (c *ClaimManager) claimWork(ctx context.Context) (bool, error) {
 // Note: Returns true if a run was claimed (even if ack/execution fails),
 // because the work has already been assigned to this node.
 func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
+	// Lazy initialization: create HTTP client if not yet initialized.
+	// This allows bootstrap() to run first and create certificates.
+	if c.client == nil {
+		client, err := createHTTPClient(c.cfg)
+		if err != nil {
+			return false, fmt.Errorf("create http client: %w", err)
+		}
+		c.client = client
+	}
+
 	// POST /v1/nodes/{id}/claim
 	claimURL := fmt.Sprintf("%s/v1/nodes/%s/claim", c.cfg.ServerURL, c.cfg.NodeID)
 

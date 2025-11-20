@@ -11,18 +11,10 @@ func validate(cfg *Config) error {
 	if cfg == nil {
 		return errors.New("config: nil configuration")
 	}
-	if strings.TrimSpace(cfg.ControlPlane.Endpoint) == "" {
-		return errors.New("config: control_plane.endpoint is required")
-	}
-	if strings.TrimSpace(cfg.ControlPlane.CAPath) == "" {
-		return errors.New("config: control_plane.ca is required")
-	}
-	if strings.TrimSpace(cfg.ControlPlane.Certificate) == "" {
-		return errors.New("config: control_plane.certificate is required")
-	}
-	if strings.TrimSpace(cfg.ControlPlane.Key) == "" {
-		return errors.New("config: control_plane.key is required")
-	}
+	// Note: control_plane config is NOT required for servers (ployd).
+	// The server IS the control plane; only nodes (ployd-node) need control_plane config.
+	// The ControlPlaneConfig fields are kept in the struct for backwards compatibility
+	// and potential future use, but are not validated or required.
 
 	if strings.TrimSpace(cfg.Admin.Socket) == "" && strings.TrimSpace(cfg.Admin.Listen) == "" {
 		return errors.New("config: admin.socket or admin.listen must be configured")

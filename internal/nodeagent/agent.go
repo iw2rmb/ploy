@@ -239,6 +239,7 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 		var result struct {
 			Certificate string `json:"certificate"`
 			CABundle    string `json:"ca_bundle"`
+			BearerToken string `json:"bearer_token"`
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -247,10 +248,28 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 		}
 		resp.Body.Close()
 
+		// Save bearer token if provided
+		if result.BearerToken != "" {
+			if err := a.saveBearerToken(result.BearerToken); err != nil {
+				slog.Error("failed to save bearer token", "err", err)
+				// Continue anyway - cert was obtained successfully
+			}
+		}
+
 		return result.Certificate, result.CABundle, nil
 	}
 
 	return "", "", fmt.Errorf("failed to obtain certificate after 5 attempts")
+}
+
+// saveBearerToken saves the worker bearer token to a file for use in API requests.
+func (a *Agent) saveBearerToken(token string) error {
+	tokenPath := "/etc/ploy/bearer-token"
+	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
+		return fmt.Errorf("write bearer token: %w", err)
+	}
+	slog.Info("bearer token saved", "path", tokenPath)
+	return nil
 }
 
 // fileExists checks if a file exists and is not a directory.

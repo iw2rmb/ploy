@@ -91,7 +91,8 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, di
 	return nil
 }
 
-// createHTTPClient creates an HTTP client with optional mTLS.
+// createHTTPClient creates an HTTP client with bearer token authentication.
+// Reads the bearer token from /etc/ploy/bearer-token and adds it to all requests.
 func createHTTPClient(cfg Config) (*http.Client, error) {
 	transport := &http.Transport{
 		MaxIdleConns:        10,
@@ -99,7 +100,7 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 		TLSHandshakeTimeout: 10 * time.Second,
 	}
 
-	// Configure mTLS if enabled.
+	// Configure mTLS if enabled (for node's own server, not for control plane auth).
 	if cfg.HTTP.TLS.Enabled {
 		cert, err := tls.LoadX509KeyPair(cfg.HTTP.TLS.CertPath, cfg.HTTP.TLS.KeyPath)
 		if err != nil {
@@ -123,8 +124,33 @@ func createHTTPClient(cfg Config) (*http.Client, error) {
 		}
 	}
 
+	// Read bearer token for control plane authentication
+	bearerToken, err := os.ReadFile("/etc/ploy/bearer-token")
+	if err != nil {
+		return nil, fmt.Errorf("read bearer token: %w", err)
+	}
+
+	// Wrap transport with bearer token injector
+	authenticatedTransport := &bearerTokenTransport{
+		base:  transport,
+		token: string(bearerToken),
+	}
+
 	return &http.Client{
-		Transport: transport,
+		Transport: authenticatedTransport,
 		Timeout:   30 * time.Second,
 	}, nil
+}
+
+// bearerTokenTransport wraps an http.RoundTripper and adds Authorization header to all requests.
+type bearerTokenTransport struct {
+	base  http.RoundTripper
+	token string
+}
+
+func (t *bearerTokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Clone request to avoid modifying the original
+	req = req.Clone(req.Context())
+	req.Header.Set("Authorization", "Bearer "+t.token)
+	return t.base.RoundTrip(req)
 }
