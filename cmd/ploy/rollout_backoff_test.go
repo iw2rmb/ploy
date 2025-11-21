@@ -242,21 +242,31 @@ func TestRetryWithBackoffExponentialIntervals(t *testing.T) {
 	}
 
 	// Check that intervals are increasing with exponential backoff.
-	// Allow 30ms tolerance for timing variance.
-	tolerance := 30 * time.Millisecond
+	// The shared backoff library uses 50% jitter (randomization factor).
+	// This means intervals vary within ±50% of the base value for robustness.
+	// For InitialInterval=50ms with 50% jitter: [25ms, 75ms]
+	// For 100ms base: [50ms, 150ms]
+	// For 200ms base: [100ms, 300ms]
+	// We verify intervals are within the jittered ranges.
 
-	// First interval: ~50ms.
-	if intervals[0] < 50*time.Millisecond-tolerance || intervals[0] > 50*time.Millisecond+tolerance {
-		t.Errorf("expected first interval ~50ms, got %v", intervals[0])
+	// First interval: base 50ms with 50% jitter = [25ms, 75ms], plus timing tolerance.
+	minFirst := 20 * time.Millisecond // 25ms - 5ms tolerance
+	maxFirst := 80 * time.Millisecond // 75ms + 5ms tolerance
+	if intervals[0] < minFirst || intervals[0] > maxFirst {
+		t.Errorf("expected first interval in range [%v, %v] with jitter, got %v", minFirst, maxFirst, intervals[0])
 	}
 
-	// Second interval: ~100ms (50 * 2).
-	if intervals[1] < 100*time.Millisecond-tolerance || intervals[1] > 100*time.Millisecond+tolerance {
-		t.Errorf("expected second interval ~100ms, got %v", intervals[1])
+	// Second interval: base 100ms with 50% jitter = [50ms, 150ms], plus timing tolerance.
+	minSecond := 45 * time.Millisecond  // 50ms - 5ms tolerance
+	maxSecond := 155 * time.Millisecond // 150ms + 5ms tolerance
+	if intervals[1] < minSecond || intervals[1] > maxSecond {
+		t.Errorf("expected second interval in range [%v, %v] with jitter, got %v", minSecond, maxSecond, intervals[1])
 	}
 
-	// Third interval: ~200ms (100 * 2, capped at MaxInterval).
-	if intervals[2] < 200*time.Millisecond-tolerance || intervals[2] > 200*time.Millisecond+tolerance {
-		t.Errorf("expected third interval ~200ms (capped), got %v", intervals[2])
+	// Third interval: base 200ms (capped at MaxInterval) with 50% jitter = [100ms, 300ms], plus timing tolerance.
+	minThird := 95 * time.Millisecond  // 100ms - 5ms tolerance
+	maxThird := 305 * time.Millisecond // 300ms + 5ms tolerance
+	if intervals[2] < minThird || intervals[2] > maxThird {
+		t.Errorf("expected third interval in range [%v, %v] with jitter (capped), got %v", minThird, maxThird, intervals[2])
 	}
 }
