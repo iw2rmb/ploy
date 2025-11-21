@@ -3,20 +3,19 @@ package nodeagent
 import (
 	"encoding/json"
 	"net/http"
-	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // ClaimManager periodically polls the server for work and executes claimed runs.
 // Contains configuration, HTTP client, run controller, and buildgate executor.
 // Manages backoff state for polling intervals when no work is available.
 type ClaimManager struct {
-	cfg             Config
-	client          *http.Client
-	controller      RunController
-	buildgateExec   *BuildGateExecutor
-	backoffDuration time.Duration
-	minBackoff      time.Duration
-	maxBackoff      time.Duration
+	cfg           Config
+	client        *http.Client
+	controller    RunController
+	buildgateExec *BuildGateExecutor
+	backoff       *backoff.StatefulBackoff
 }
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
@@ -42,13 +41,15 @@ func NewClaimManager(cfg Config, controller RunController) (*ClaimManager, error
 
 	buildgateExec := NewBuildGateExecutor(cfg)
 
+	// Initialize shared backoff policy for claim loop polling.
+	// Uses 250ms initial interval, 5s max cap matching previous behavior.
+	backoffPolicy := backoff.ClaimLoopPolicy()
+
 	return &ClaimManager{
-		cfg:             cfg,
-		client:          nil, // Will be initialized lazily
-		controller:      controller,
-		buildgateExec:   buildgateExec,
-		backoffDuration: 0,
-		minBackoff:      250 * time.Millisecond,
-		maxBackoff:      5 * time.Second,
+		cfg:           cfg,
+		client:        nil, // Will be initialized lazily
+		controller:    controller,
+		buildgateExec: buildgateExec,
+		backoff:       backoff.NewStatefulBackoff(backoffPolicy),
 	}, nil
 }

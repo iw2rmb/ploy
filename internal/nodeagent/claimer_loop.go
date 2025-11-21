@@ -24,7 +24,8 @@ import (
 // Continuously polls for work (runs or buildgate jobs) using a ticker with exponential backoff.
 // Backoff increases when no work is available or on errors, resets when work is successfully claimed.
 func (c *ClaimManager) Start(ctx context.Context) error {
-	ticker := time.NewTicker(c.minBackoff)
+	// Initialize ticker with the initial backoff interval from shared policy.
+	ticker := time.NewTicker(c.backoff.GetDuration())
 	defer ticker.Stop()
 
 	for {
@@ -38,17 +39,18 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 			switch {
 			case err != nil:
 				slog.Error("claim loop error", "err", err)
-				c.applyBackoff()
+				// Apply backoff on error; advances to next exponential interval.
+				c.backoff.Apply()
 			case claimed:
-				// Work was claimed and executed; reset backoff.
-				c.resetBackoff()
+				// Work was claimed and executed; reset backoff to initial interval.
+				c.backoff.Reset()
 			default:
-				// No work available (204); apply backoff.
-				c.applyBackoff()
+				// No work available (204); apply backoff to increase polling interval.
+				c.backoff.Apply()
 			}
 
-			// Update ticker interval based on current backoff.
-			ticker.Reset(c.getBackoffDuration())
+			// Update ticker interval based on current backoff duration from shared policy.
+			ticker.Reset(c.backoff.GetDuration())
 		}
 	}
 }
@@ -197,32 +199,4 @@ func (c *ClaimManager) ackRun(ctx context.Context, runID string) error {
 
 	slog.Info("run acknowledged", "run_id", runID)
 	return nil
-}
-
-// applyBackoff increases backoff duration exponentially.
-// Doubles the current duration, capping at maxBackoff.
-func (c *ClaimManager) applyBackoff() {
-	if c.backoffDuration == 0 {
-		c.backoffDuration = c.minBackoff
-	} else {
-		c.backoffDuration *= 2
-		if c.backoffDuration > c.maxBackoff {
-			c.backoffDuration = c.maxBackoff
-		}
-	}
-}
-
-// resetBackoff clears backoff duration when work is successfully claimed.
-// Resets the polling interval to the minimum backoff.
-func (c *ClaimManager) resetBackoff() {
-	c.backoffDuration = c.minBackoff
-}
-
-// getBackoffDuration returns the current backoff duration.
-// Defaults to minBackoff if backoff has not been applied yet.
-func (c *ClaimManager) getBackoffDuration() time.Duration {
-	if c.backoffDuration == 0 {
-		return c.minBackoff
-	}
-	return c.backoffDuration
 }
