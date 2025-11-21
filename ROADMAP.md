@@ -11,7 +11,7 @@ Documentation: `REUSE.md`, `cmd/ploy/README.md`, `docs/how-to/deploy-a-cluster.m
 Legend: [ ] todo, [x] done.
 
 ## Backoff Unification (github.com/cenkalti/backoff/v5)
-- [ ] Introduce shared backoff helper package using cenkalti/backoff/v5 — Centralize retry policy and prepare for call-site refactors
+- [x] Introduce shared backoff helper package using cenkalti/backoff/v5 — Centralize retry policy and prepare for call-site refactors
   - Component: `github.com/iw2rmb/ploy`; `go.mod`; new package `internal/workflow/backoff`
   - Scope: Add dependency `github.com/cenkalti/backoff/v5`; implement helpers (for example, `RunWithBackoff(ctx, logger, metrics, op func() error)` and policy constructors) that capture defaults for initial interval, max interval, jitter, and max elapsed time; wire structured logging and metrics hooks so call sites can emit consistent fields
   - Test: Add `internal/workflow/backoff/backoff_test.go` to cover jitter bounds, cap behavior, and context cancellation; run `go test ./internal/workflow/...` and `make test`; expect all tests passing and coverage ≥90% for `internal/workflow/backoff`
