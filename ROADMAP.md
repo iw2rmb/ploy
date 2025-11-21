@@ -26,7 +26,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace `HeartbeatManager.backoffDuration`, `maxBackoff`, `applyBackoff`, and `resetBackoff` with a shared backoff policy object; configure policy to start at 5s and cap at existing `maxBackoff`; keep 5xx-only triggering via `serverError`; ensure logs (`heartbeat backoff active`) still include backoff duration
   - Test: Update `heartbeat_timing_test.go` cases (e.g., `TestBackoffOn5xxErrors`, cap and reset tests) to exercise the shared helper through the public methods; run `go test ./internal/nodeagent/...`; expect backoff sequences to match current expectations within a small timing tolerance
 
-- [ ] Apply shared backoff to nodeagent claim loop — Use shared policy for polling intervals when no work is available
+- [x] Apply shared backoff to nodeagent claim loop — Use shared policy for polling intervals when no work is available
   - Component: `internal/nodeagent/claimer_loop.go`, `internal/nodeagent/agent_claim_test.go`
   - Scope: Replace `ClaimManager`’s `backoffDuration`, `minBackoff`, `maxBackoff`, `applyBackoff`, `resetBackoff`, and `getBackoffDuration` with a shared backoff policy; ensure the loop uses policy-derived intervals for ticker resets and that backoff resets when work is successfully claimed
   - Test: Adapt `TestClaimLoopBackoff` and related tests to verify interval growth and max-cap via the shared helper; run `go test ./internal/nodeagent/...`; expect backoff to increase and cap exactly as before
