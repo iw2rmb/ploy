@@ -44,43 +44,70 @@ func TestSendHeartbeatRespectsTimeout(t *testing.T) {
 }
 
 // TestBackoffOn5xxErrors verifies exponential backoff behavior on 5xx server errors.
+// With shared StatefulBackoff, intervals include 50% jitter and grow exponentially.
 func TestBackoffOn5xxErrors(t *testing.T) {
 	tests := []struct {
 		name           string
 		statusCodes    []int
-		wantBackoffs   []time.Duration
+		wantBackoffs   []struct{ min, max time.Duration } // Jitter ranges for backoff durations
 		wantFinalReset bool
 	}{
 		{
-			name:         "single_5xx_starts_backoff",
-			statusCodes:  []int{500},
-			wantBackoffs: []time.Duration{5 * time.Second},
+			name:        "single_5xx_starts_backoff",
+			statusCodes: []int{500},
+			// First backoff: 5s initial with 50% jitter => [2.5s, 7.5s]
+			wantBackoffs: []struct{ min, max time.Duration }{{2500 * time.Millisecond, 7500 * time.Millisecond}},
 		},
 		{
-			name:         "consecutive_5xx_increases_backoff",
-			statusCodes:  []int{500, 503, 502},
-			wantBackoffs: []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second},
+			name:        "consecutive_5xx_increases_backoff",
+			statusCodes: []int{500, 503, 502},
+			// 1st: 5s ±50% => [2.5s, 7.5s], 2nd: 10s ±50% => [5s, 15s], 3rd: 20s ±50% => [10s, 30s]
+			wantBackoffs: []struct{ min, max time.Duration }{
+				{2500 * time.Millisecond, 7500 * time.Millisecond},
+				{5 * time.Second, 15 * time.Second},
+				{10 * time.Second, 30 * time.Second},
+			},
 		},
 		{
-			name:         "backoff_caps_at_max",
-			statusCodes:  []int{500, 500, 500, 500, 500, 500, 500, 500},
-			wantBackoffs: []time.Duration{5 * time.Second, 10 * time.Second, 20 * time.Second, 40 * time.Second, 80 * time.Second, 160 * time.Second, 5 * time.Minute, 5 * time.Minute},
+			name:        "backoff_caps_at_max",
+			statusCodes: []int{500, 500, 500, 500, 500, 500, 500, 500},
+			// Grows: 5s, 10s, 20s, 40s, 80s, 160s, then caps at 5m (300s) ±50% => [150s, 450s]
+			wantBackoffs: []struct{ min, max time.Duration }{
+				{2500 * time.Millisecond, 7500 * time.Millisecond}, // 5s ±50%
+				{5 * time.Second, 15 * time.Second},                // 10s ±50%
+				{10 * time.Second, 30 * time.Second},               // 20s ±50%
+				{20 * time.Second, 60 * time.Second},               // 40s ±50%
+				{40 * time.Second, 120 * time.Second},              // 80s ±50%
+				{80 * time.Second, 240 * time.Second},              // 160s ±50%
+				{150 * time.Second, 450 * time.Second},             // 300s (5m) ±50%
+				{150 * time.Second, 450 * time.Second},             // Still capped at 5m ±50%
+			},
 		},
 		{
-			name:           "success_after_5xx_resets_backoff",
-			statusCodes:    []int{500, 200},
-			wantBackoffs:   []time.Duration{5 * time.Second, 0},
+			name:        "success_after_5xx_resets_backoff",
+			statusCodes: []int{500, 200},
+			// First 5xx triggers backoff, then success resets to 0 (backoffActive=false).
+			wantBackoffs: []struct{ min, max time.Duration }{
+				{2500 * time.Millisecond, 7500 * time.Millisecond}, // 5s ±50%
+				{0, 0}, // Reset on success
+			},
 			wantFinalReset: true,
 		},
 		{
-			name:         "4xx_does_not_trigger_backoff",
-			statusCodes:  []int{400, 401, 404},
-			wantBackoffs: []time.Duration{0, 0, 0},
+			name:        "4xx_does_not_trigger_backoff",
+			statusCodes: []int{400, 401, 404},
+			// 4xx errors do not trigger backoff (backoffActive stays false).
+			wantBackoffs: []struct{ min, max time.Duration }{{0, 0}, {0, 0}, {0, 0}},
 		},
 		{
-			name:         "mixed_errors_only_backoff_on_5xx",
-			statusCodes:  []int{500, 400, 503},
-			wantBackoffs: []time.Duration{5 * time.Second, 5 * time.Second, 10 * time.Second},
+			name:        "mixed_errors_only_backoff_on_5xx",
+			statusCodes: []int{500, 400, 503},
+			// 1st 5xx: backoff to 5s ±50%, 2nd 4xx: no change (still 5s ±50%), 3rd 5xx: advance to 10s ±50%
+			wantBackoffs: []struct{ min, max time.Duration }{
+				{2500 * time.Millisecond, 7500 * time.Millisecond}, // 5s ±50%
+				{2500 * time.Millisecond, 7500 * time.Millisecond}, // No change (4xx doesn't trigger backoff)
+				{5 * time.Second, 15 * time.Second},                // 10s ±50%
+			},
 		},
 	}
 
@@ -132,8 +159,24 @@ func TestBackoffOn5xxErrors(t *testing.T) {
 					mgr.applyBackoff(err)
 				}
 
-				if mgr.backoffDuration != tt.wantBackoffs[i] {
-					t.Errorf("request %d: backoff = %v, want %v", i, mgr.backoffDuration, tt.wantBackoffs[i])
+				// Verify backoff duration falls within expected jitter range.
+				wantRange := tt.wantBackoffs[i]
+				var actualDuration time.Duration
+				if mgr.backoffActive {
+					actualDuration = mgr.backoff.GetDuration()
+				} else {
+					actualDuration = 0
+				}
+
+				if actualDuration < wantRange.min || actualDuration > wantRange.max {
+					t.Errorf("request %d: backoff = %v, want in range [%v, %v]", i, actualDuration, wantRange.min, wantRange.max)
+				}
+
+				// Verify backoffActive state for reset case.
+				if tt.wantFinalReset && i == len(tt.statusCodes)-1 {
+					if mgr.backoffActive {
+						t.Errorf("request %d: backoffActive = true, want false after reset", i)
+					}
 				}
 			}
 		})
@@ -184,24 +227,29 @@ func TestServerErrorType(t *testing.T) {
 
 // TestBackoffDoesNotApplyToNon5xxErrors verifies backoff only applies to 5xx server errors.
 func TestBackoffDoesNotApplyToNon5xxErrors(t *testing.T) {
-	mgr := &HeartbeatManager{
-		backoffDuration: 0,
-		maxBackoff:      5 * time.Minute,
+	cfg := Config{
+		NodeID: "test-node",
+	}
+	mgr, err := NewHeartbeatManager(cfg)
+	if err != nil {
+		t.Fatalf("NewHeartbeatManager error: %v", err)
 	}
 
-	// Apply backoff with a non-5xx error.
+	// Apply backoff with a non-5xx error (no serverError wrapper).
 	nonServerErr := fmt.Errorf("network timeout")
 	mgr.applyBackoff(nonServerErr)
 
-	if mgr.backoffDuration != 0 {
-		t.Errorf("backoff = %v, want 0 for non-5xx error", mgr.backoffDuration)
+	// Backoff should remain inactive (not triggered by non-5xx errors).
+	if mgr.backoffActive {
+		t.Errorf("backoffActive = true, want false for non-5xx error")
 	}
 
-	// Apply backoff with a 4xx error.
+	// Apply backoff with a 4xx error (no serverError wrapper).
 	err4xx := fmt.Errorf("heartbeat failed with status 400")
 	mgr.applyBackoff(err4xx)
 
-	if mgr.backoffDuration != 0 {
-		t.Errorf("backoff = %v, want 0 for 4xx error", mgr.backoffDuration)
+	// Backoff should still be inactive (4xx does not trigger backoff).
+	if mgr.backoffActive {
+		t.Errorf("backoffActive = true, want false for 4xx error")
 	}
 }
