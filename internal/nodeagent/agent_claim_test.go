@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // TestClaimLoop verifies the claim loop posts claim, ack, and complete in order.
@@ -80,9 +82,16 @@ func TestClaimLoop(t *testing.T) {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
 
-	// Override backoff to speed up test.
-	claimer.minBackoff = 10 * time.Millisecond
-	claimer.maxBackoff = 100 * time.Millisecond
+	// Override backoff policy to speed up test.
+	// Use custom policy with faster intervals for testing.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     100 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	// Run claim loop in background with timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -164,9 +173,15 @@ func TestClaimLoopNoWork(t *testing.T) {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
 
-	// Override backoff to speed up test.
-	claimer.minBackoff = 10 * time.Millisecond
-	claimer.maxBackoff = 100 * time.Millisecond
+	// Override backoff policy to speed up test.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     100 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	// Run claim loop with short timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
@@ -238,9 +253,15 @@ func TestClaimLoopBackoff(t *testing.T) {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
 
-	// Set backoff parameters.
-	claimer.minBackoff = 50 * time.Millisecond
-	claimer.maxBackoff = 200 * time.Millisecond
+	// Set backoff parameters using custom policy.
+	testPolicy := backoff.Policy{
+		InitialInterval: 50 * time.Millisecond,
+		MaxInterval:     200 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
@@ -272,10 +293,11 @@ func TestClaimLoopBackoff(t *testing.T) {
 		}
 	}
 
-	// Verify max backoff is respected.
+	// Verify max backoff is respected (200ms + 50ms tolerance).
+	maxBackoff := 200 * time.Millisecond
 	for i, interval := range intervals {
-		if interval > claimer.maxBackoff+50*time.Millisecond {
-			t.Errorf("interval[%d]=%v exceeds max backoff %v", i, interval, claimer.maxBackoff)
+		if interval > maxBackoff+50*time.Millisecond {
+			t.Errorf("interval[%d]=%v exceeds max backoff %v", i, interval, maxBackoff)
 		}
 	}
 }
@@ -354,9 +376,15 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
 
-	// Set backoff parameters.
-	claimer.minBackoff = 50 * time.Millisecond
-	claimer.maxBackoff = 200 * time.Millisecond
+	// Set backoff parameters using custom policy.
+	testPolicy := backoff.Policy{
+		InitialInterval: 50 * time.Millisecond,
+		MaxInterval:     200 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -461,8 +489,15 @@ func TestClaimLoopAckFailure(t *testing.T) {
 		t.Fatalf("NewClaimManager failed: %v", err)
 	}
 
-	claimer.minBackoff = 10 * time.Millisecond
-	claimer.maxBackoff = 100 * time.Millisecond
+	// Override backoff policy to speed up test.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     100 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
@@ -535,8 +570,15 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClaimManager: %v", err)
 	}
-	claimer.minBackoff = 10 * time.Millisecond
-	claimer.maxBackoff = 20 * time.Millisecond
+	// Override backoff policy to speed up test.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     20 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
 
 	// Run briefly to process one claim.
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
