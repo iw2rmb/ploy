@@ -16,7 +16,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Add dependency `github.com/cenkalti/backoff/v5`; implement helpers (for example, `RunWithBackoff(ctx, logger, metrics, op func() error)` and policy constructors) that capture defaults for initial interval, max interval, jitter, and max elapsed time; wire structured logging and metrics hooks so call sites can emit consistent fields
   - Test: Add `internal/workflow/backoff/backoff_test.go` to cover jitter bounds, cap behavior, and context cancellation; run `go test ./internal/workflow/...` and `make test`; expect all tests passing and coverage ≥90% for `internal/workflow/backoff`
 
-- [ ] Refactor rollout backoff utilities to use the shared helper — Remove bespoke rollout retry loops while preserving behavior
+- [x] Refactor rollout backoff utilities to use the shared helper — Remove bespoke rollout retry loops while preserving behavior
   - Component: `cmd/ploy/rollout_backoff.go`, `cmd/ploy/rollout_backoff_test.go`, rollout callers under `cmd/ploy/rollout_*`
   - Scope: Replace `RetryPolicy`, `RetryWithBackoff`, and `PollWithBackoff` implementations with thin adapters around `internal/workflow/backoff`; keep effective defaults equivalent to current behavior; ensure `RolloutMetrics` recording and structured log keys (`poll_backoff_attempt`, `poll_backoff_exhausted`, etc.) remain unchanged
   - Test: Extend `cmd/ploy/rollout_backoff_test.go` to assert attempt counts, backoff intervals, and log fields remain stable; run `go test ./cmd/ploy/...`; expect rollout backoff tests to maintain ≥90% coverage of the new adapters
