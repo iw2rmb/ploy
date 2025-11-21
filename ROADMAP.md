@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace `RetryPolicy`, `RetryWithBackoff`, and `PollWithBackoff` implementations with thin adapters around `internal/workflow/backoff`; keep effective defaults equivalent to current behavior; ensure `RolloutMetrics` recording and structured log keys (`poll_backoff_attempt`, `poll_backoff_exhausted`, etc.) remain unchanged
   - Test: Extend `cmd/ploy/rollout_backoff_test.go` to assert attempt counts, backoff intervals, and log fields remain stable; run `go test ./cmd/ploy/...`; expect rollout backoff tests to maintain ≥90% coverage of the new adapters
 
-- [ ] Apply shared backoff to nodeagent heartbeat retry logic — Align heartbeat backoff with shared policy while keeping 5xx-only semantics
+- [x] Apply shared backoff to nodeagent heartbeat retry logic — Align heartbeat backoff with shared policy while keeping 5xx-only semantics
   - Component: `internal/nodeagent/heartbeat.go`, `internal/nodeagent/heartbeat_timing_test.go`
   - Scope: Replace `HeartbeatManager.backoffDuration`, `maxBackoff`, `applyBackoff`, and `resetBackoff` with a shared backoff policy object; configure policy to start at 5s and cap at existing `maxBackoff`; keep 5xx-only triggering via `serverError`; ensure logs (`heartbeat backoff active`) still include backoff duration
   - Test: Update `heartbeat_timing_test.go` cases (e.g., `TestBackoffOn5xxErrors`, cap and reset tests) to exercise the shared helper through the public methods; run `go test ./internal/nodeagent/...`; expect backoff sequences to match current expectations within a small timing tolerance
