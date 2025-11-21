@@ -293,11 +293,15 @@ func TestClaimLoopBackoff(t *testing.T) {
 		}
 	}
 
-	// Verify max backoff is respected (200ms + 50ms tolerance).
+	// Verify max backoff is respected.
+	// The shared backoff policy adds 50% jitter (randomization factor),
+	// so the actual interval can be up to 1.5x the max interval (200ms * 1.5 = 300ms).
+	// We add additional tolerance for timing variance.
 	maxBackoff := 200 * time.Millisecond
+	maxWithJitter := time.Duration(float64(maxBackoff) * 1.5)
 	for i, interval := range intervals {
-		if interval > maxBackoff+50*time.Millisecond {
-			t.Errorf("interval[%d]=%v exceeds max backoff %v", i, interval, maxBackoff)
+		if interval > maxWithJitter+50*time.Millisecond {
+			t.Errorf("interval[%d]=%v exceeds max backoff %v (with jitter)", i, interval, maxWithJitter)
 		}
 	}
 }
