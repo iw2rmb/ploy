@@ -1,96 +1,39 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strings"
-
-	iversion "github.com/iw2rmb/ploy/internal/version"
 )
 
-// main bootstraps the CLI entrypoint.
+// main bootstraps the CLI entrypoint using cobra.
+// Cobra handles command routing, flag parsing, and help generation.
 func main() {
-	if err := execute(os.Args[1:], os.Stderr); err != nil {
-		reportError(err, os.Stderr)
-		os.Exit(1)
-	}
-}
+	// Construct the root cobra command with all subcommands.
+	rootCmd := newRootCmd(os.Stderr)
 
-// execute routes the top-level command to the appropriate handler.
-func execute(args []string, stderr io.Writer) error {
-	if len(args) == 0 {
-		printUsage(stderr)
-		return errors.New("command required")
-	}
-
-	// Legacy command aliases removed; treat unknown names uniformly.
-
-	switch args[0] {
-	case "version", "--version", "-version":
-		printVersion(stderr)
-		return nil
-	case "help":
-		if len(args) > 1 {
-			switch args[1] {
-			case "mod":
-				printModUsage(stderr)
-			case "mods":
-				printModsUsage(stderr)
-			case "runs":
-				printRunsUsage(stderr)
-			case "server":
-				printServerUsage(stderr)
-			case "rollout":
-				printRolloutUsage(stderr)
-			case "config":
-				printConfigUsage(stderr)
-			case "token":
-				printTokenUsage(stderr)
-			default:
-				printUsage(stderr)
-			}
-		} else {
-			printUsage(stderr)
+	// Execute the root command with os.Args (cobra handles os.Args internally).
+	// Cobra's Execute() method processes os.Args[1:] automatically.
+	if err := rootCmd.Execute(); err != nil {
+		// Cobra's SilenceErrors is set, so we control error output here.
+		// Skip reporting if it's the sentinel "version displayed" error.
+		if err.Error() != "version displayed" {
+			reportError(err, os.Stderr)
+			os.Exit(1)
 		}
-		return nil
-	case "mod":
-		return handleMod(args[1:], stderr)
-	case "upload":
-		return handleUpload(args[1:], stderr)
-		// environment command is not dispatched in this build; help lists it.
-	case "manifest":
-		return handleManifest(args[1:], stderr)
-	case "knowledge-base":
-		return handleKnowledgeBase(args[1:], stderr)
-	case "mods":
-		return handleMods(args[1:], stderr)
-	case "runs":
-		return handleRuns(args[1:], stderr)
-	case "server":
-		return handleServer(args[1:], stderr)
-	case "node":
-		return handleNode(args[1:], stderr)
-	case "rollout":
-		return handleRollout(args[1:], stderr)
-	case "config":
-		return handleConfig(args[1:], stderr)
-	case "token":
-		return handleToken(args[1:], stderr)
-
-	default:
-		printUsage(stderr)
-		return fmt.Errorf("unknown command %q", args[0])
+		// For "version displayed", exit cleanly without error message.
+		os.Exit(0)
 	}
 }
 
 // reportError prints a standard error prefix for CLI failures.
+// Preserves the existing error reporting format.
 func reportError(err error, stderr io.Writer) {
 	_, _ = fmt.Fprintf(stderr, "error: %v\n", err)
 }
 
 // printUsage lists the available top-level commands.
+// Preserves the existing usage format exactly.
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Ploy CLI v2")
 	_, _ = fmt.Fprintln(w, "")
@@ -114,16 +57,11 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "Use 'ploy help <command>' for detailed command help.")
 }
 
-func printVersion(w io.Writer) {
-	v := iversion.Version
-	if strings.TrimSpace(v) == "" {
-		v = "dev"
-	}
-	_, _ = fmt.Fprintf(w, "ploy version %s\n", v)
-	if iversion.Commit != "" || iversion.BuiltAt != "" {
-		_, _ = fmt.Fprintf(w, "commit %s\n", iversion.Commit)
-		if iversion.BuiltAt != "" {
-			_, _ = fmt.Fprintf(w, "built  %s\n", iversion.BuiltAt)
-		}
-	}
+// execute provides backward compatibility for existing tests.
+// It wraps the cobra root command execution with the old function signature.
+// This allows existing tests to continue working without modification.
+func execute(args []string, stderr io.Writer) error {
+	rootCmd := newRootCmd(stderr)
+	rootCmd.SetArgs(args)
+	return rootCmd.Execute()
 }
