@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	gitlabclient "gitlab.com/gitlab-org/api/client-go"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
 // ClientConfig holds configuration for creating a GitLab API client.
@@ -25,7 +25,7 @@ type ClientConfig struct {
 // for localhost/127.0.0.1 and https:// for all other domains.
 // Authentication headers include both Authorization (Bearer token) and PRIVATE-TOKEN
 // to preserve compatibility across GitLab setups.
-func NewClient(cfg ClientConfig) (*gitlabclient.Client, error) {
+func NewClient(cfg ClientConfig) (*gitlabapi.Client, error) {
 	if cfg.Domain == "" {
 		return nil, fmt.Errorf("domain is required")
 	}
@@ -51,10 +51,12 @@ func NewClient(cfg ClientConfig) (*gitlabclient.Client, error) {
 
 	// Create client with PAT authentication.
 	// The client-go library sets Authorization header with Bearer token.
-	client, err := gitlabclient.NewClient(
+	// We disable built-in retries since we manage them via the shared backoff helper.
+	client, err := gitlabapi.NewClient(
 		cfg.PAT,
-		gitlabclient.WithBaseURL(baseURL),
-		gitlabclient.WithHTTPClient(httpClient),
+		gitlabapi.WithBaseURL(baseURL),
+		gitlabapi.WithHTTPClient(httpClient),
+		gitlabapi.WithoutRetries(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("create gitlab client: %w", err)
@@ -71,20 +73,23 @@ func NewClient(cfg ClientConfig) (*gitlabclient.Client, error) {
 	return client, nil
 }
 
-// tokenInjector is an http.RoundTripper that injects the PRIVATE-TOKEN header
+// tokenInjector is an http.RoundTripper that injects the Authorization header
 // on every request, preserving the dual-auth behavior from the legacy client.
+// The client-go library already sets PRIVATE-TOKEN, so we only need to add Authorization.
 type tokenInjector struct {
 	base  http.RoundTripper
 	token string
 }
 
-// RoundTrip implements http.RoundTripper by injecting the PRIVATE-TOKEN header.
+// RoundTrip implements http.RoundTripper by injecting the Authorization Bearer header.
 func (t *tokenInjector) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Clone the request to avoid mutating the original.
 	reqClone := req.Clone(req.Context())
 
-	// Inject PRIVATE-TOKEN header (Authorization is already set by client-go).
-	reqClone.Header.Set("PRIVATE-TOKEN", t.token)
+	// Inject Authorization Bearer header to complement the PRIVATE-TOKEN header
+	// that the client-go library already sets. This dual-auth approach ensures
+	// compatibility across different GitLab setups.
+	reqClone.Header.Set("Authorization", "Bearer "+t.token)
 
 	// Use the base transport (or http.DefaultTransport if not set).
 	base := t.base

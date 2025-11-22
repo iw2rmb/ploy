@@ -128,8 +128,7 @@ func TestNewClient(t *testing.T) {
 }
 
 // TestTokenInjector verifies that the tokenInjector transport correctly adds
-// the PRIVATE-TOKEN header to all outgoing requests while preserving the
-// Authorization header set by client-go.
+// the Authorization Bearer header and that the client-go library sets the PRIVATE-TOKEN header.
 func TestTokenInjector(t *testing.T) {
 	t.Parallel()
 
@@ -140,7 +139,7 @@ func TestTokenInjector(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedHeaders = r.Header.Clone()
 		w.WriteHeader(http.StatusOK)
-		_, _ = io.WriteString(w, `{}`)
+		_, _ = io.WriteString(w, `{"id": 1, "username": "test"}`)
 	}))
 	defer server.Close()
 
@@ -156,28 +155,24 @@ func TestTokenInjector(t *testing.T) {
 		t.Fatalf("NewClient() failed: %v", err)
 	}
 
-	// Make a request to trigger the tokenInjector.
-	// We use the low-level Client() method to make a raw request.
-	req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v4/user", nil)
+	// Make an API request to trigger both auth mechanisms.
+	// Use the Users service to make a proper API call that goes through the auth flow.
+	_, _, err = client.Users.CurrentUser()
 	if err != nil {
-		t.Fatalf("NewRequest() failed: %v", err)
+		t.Fatalf("CurrentUser() failed: %v", err)
 	}
 
-	// Execute request through the client's HTTP client (which has tokenInjector).
-	resp, err := client.HTTPClient().Do(req)
-	if err != nil {
-		t.Fatalf("Do() failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// Verify PRIVATE-TOKEN header was injected.
+	// Verify both headers were set correctly.
+	// The client-go library sets PRIVATE-TOKEN.
 	if got := capturedHeaders.Get("PRIVATE-TOKEN"); got != testPAT {
 		t.Errorf("PRIVATE-TOKEN header = %q, want %q", got, testPAT)
 	}
 
-	// Note: We can't easily verify the Authorization header here because
-	// client-go sets it internally. The important thing is that our
-	// tokenInjector doesn't interfere with it.
+	// The tokenInjector sets Authorization Bearer.
+	wantAuth := "Bearer " + testPAT
+	if got := capturedHeaders.Get("Authorization"); got != wantAuth {
+		t.Errorf("Authorization header = %q, want %q", got, wantAuth)
+	}
 }
 
 // TestTokenInjectorWithNilBaseTransport verifies that tokenInjector falls back
@@ -187,9 +182,10 @@ func TestTokenInjectorWithNilBaseTransport(t *testing.T) {
 
 	// Create a simple test server.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify PRIVATE-TOKEN header is present.
-		if r.Header.Get("PRIVATE-TOKEN") != "test-token" {
-			t.Errorf("PRIVATE-TOKEN header not set correctly")
+		// Verify Authorization Bearer header is present.
+		wantAuth := "Bearer test-token"
+		if r.Header.Get("Authorization") != wantAuth {
+			t.Errorf("Authorization header = %q, want %q", r.Header.Get("Authorization"), wantAuth)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
