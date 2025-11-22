@@ -17,7 +17,7 @@ func TestParseSpec_PassesThroughBuildGateHealing(t *testing.T) {
     }`
 
 	var raw json.RawMessage = []byte(specJSON)
-	opts, _ := parseSpec(raw)
+	opts, _, _ := parseSpec(raw)
 
 	v, ok := opts["build_gate_healing"]
 	if !ok {
@@ -59,7 +59,7 @@ func TestParseSpec_FlattensModAndBuildGate(t *testing.T) {
         "build_gate": {"enabled": false, "profile": "java-maven"}
     }`
 	var raw json.RawMessage = []byte(specJSON)
-	opts, env := parseSpec(raw)
+	opts, env, _ := parseSpec(raw)
 	if opts["image"] != "docker.io/test/mod:latest" {
 		t.Fatalf("image not flattened: %v", opts["image"])
 	}

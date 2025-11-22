@@ -16,7 +16,7 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 		"gitlab_domain": "https://gitlab.example.com"
 	}`)
 
-	opts, env := parseSpec(spec)
+	opts, env, _ := parseSpec(spec)
 
 	if opts["stage_id"] != "stage-123" {
 		t.Errorf("stage_id = %v, want stage-123", opts["stage_id"])
@@ -52,7 +52,7 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	}`)
 
 	// Parse the spec.
-	opts, _ := parseSpec(spec)
+	opts, _, _ := parseSpec(spec)
 
 	// Verify all fields are extracted into opts.
 	if opts["stage_id"] != "stage-123" {

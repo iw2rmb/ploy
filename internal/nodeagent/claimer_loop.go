@@ -143,8 +143,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	}
 
 	// Map claim response to StartRunRequest.
-	// Parse spec into options/env
-	optsFromSpec, envFromSpec := parseSpec(claim.Spec)
+	// Parse spec into options/env and typed RunOptions.
+	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
 
 	startReq := StartRunRequest{
 		RunID:     types.RunID(claim.ID),
