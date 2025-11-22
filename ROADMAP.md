@@ -73,7 +73,7 @@ Legend: [ ] todo, [x] done.
   - Test: Manual docs review; run SSE-related e2e tests from `tests/e2e/mods` and confirm they still pass with the new implementation
 
 ## GitLab MR Client Swap (gitlab.com/gitlab-org/api/client-go)
-- [ ] Add GitLab client-go dependency and configuration helper — Prepare to replace the bespoke HTTP MR client
+- [x] Add GitLab client-go dependency and configuration helper — Prepare to replace the bespoke HTTP MR client
   - Component: `go.mod`, `go.sum`, `internal/nodeagent/gitlab`
   - Scope: Add `gitlab.com/gitlab-org/api/client-go` as a dependency; implement a small configuration helper that constructs a typed client using domain, base URL (respecting localhost/127.0.0.1 HTTP scheme), and PAT; ensure headers preserve current behavior (Authorization bearer token plus `PRIVATE-TOKEN`) where required
   - Test: Add unit tests to validate that the configured client targets the expected base URL and carries the correct auth token; run `go test ./internal/nodeagent/gitlab/...`; expect no regressions in existing tests
