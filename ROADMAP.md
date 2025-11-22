@@ -99,7 +99,7 @@ Legend: [ ] todo, [x] done.
   - Test: Manual docs review to confirm that README/how-to sections match `internal/nodeagent/gitlab/mr_client.go` behavior; run GitLab-related integration/e2e tests (if present) that exercise MR creation flows
 
 ## CLI Tree Generation via Cobra/Pflag
-- [ ] Introduce cobra-based root command and subcommands — Migrate from manual dispatch while preserving CLI surface
+- [x] Introduce cobra-based root command and subcommands — Migrate from manual dispatch while preserving CLI surface
   - Component: `go.mod`, `go.sum`, `cmd/ploy/main.go`, new files under `cmd/ploy` (for example, `root.go`)
   - Scope: Add `github.com/spf13/cobra` and `github.com/spf13/pflag` as dependencies; construct a `rootCmd` with subcommands mirroring existing top-level commands (`mod`, `mods`, `runs`, `upload`, `cluster`, `config`, `manifest`, `knowledge-base`, `server`, `node`, `rollout`, `token`, `help`, `version`); change `main` to execute the cobra root while preserving error reporting and exit codes
   - Test: Update or add CLI tests (for example, `cmd/ploy/cli_test.go`) to assert `ploy --help`, `ploy help <command>`, and `ploy version` outputs match existing goldens (or intentionally updated ones); run `go test ./cmd/ploy/...`
