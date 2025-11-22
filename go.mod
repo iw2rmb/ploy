@@ -13,6 +13,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/prometheus/client_golang v1.23.0
 	github.com/shirou/gopsutil/v4 v4.25.9
+	github.com/tmaxmax/go-sse v0.11.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
