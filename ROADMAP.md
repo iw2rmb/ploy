@@ -125,7 +125,7 @@ Legend: [ ] todo, [x] done.
   - Test: Run `bash scripts/check-binary-size_test.sh` and `make test-binary-size` (or `make test`/`make ci-check`) to exercise the guardrail; optionally build locally and confirm that typical changes stay well below the threshold
 
 ## Cross-cutting Validation and Risk Mitigation
-- [ ] Capture baseline test and coverage metrics — Establish a starting point before refactors
+- [x] Capture baseline test and coverage metrics — Establish a starting point before refactors
   - Component: Repository-wide tests and coverage tools
   - Scope: Run `make test` and capture coverage summary for key packages (`internal/workflow/...`, `internal/nodeagent/...`, `internal/cli/stream`, `cmd/ploy`); record baseline in `CHECKPOINT.md` or `CHECKPOINT_MODS.md` to ensure overall coverage stays ≥60% and critical workflow/runner packages remain ≥90%
   - Test: None (documentation step); ensure coverage reports are committed or referenced where appropriate
