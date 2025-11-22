@@ -131,6 +131,43 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
 
+## GitLab MR Integration
+
+The GitLab merge request client uses `gitlab.com/gitlab-org/api/client-go` for typed API interactions and integrates with the shared backoff policy for resilient operation.
+
+### Retry Behavior
+
+GitLab API calls automatically retry on transient failures using the `internal/workflow/backoff` shared helper:
+- **Retry policy**: `GitLabMRPolicy` provides 4 max attempts (1 initial + 3 retries) with a 1s initial interval, 2x multiplier (1s, 2s, 4s backoff schedule), and 50% jitter for robustness.
+- **Retryable conditions**: Rate limits (HTTP 429), server errors (5xx), and network failures without an HTTP response (e.g., connection refused, DNS failures).
+- **Non-retryable conditions**: Client errors (4xx except 429), context cancellation, and missing response data are treated as permanent failures and do not trigger retries.
+- **Context cancellation**: All retry operations honor `context.Context` cancellation and exit early when the context is done.
+
+### Security & PAT Redaction
+
+Personal Access Tokens (PATs) are automatically redacted from all error messages and logs to prevent credential leakage:
+- The client redacts both literal PATs and URL-encoded variants (query-escaped, path-escaped).
+- PATs are never logged or written to disk on worker nodes.
+- Tokens are transmitted securely via mTLS from the control plane to nodes.
+- All errors flowing out of client-go-backed operations pass through the redaction layer.
+
+### Configuration
+
+GitLab credentials can be configured globally on the control plane or overridden per run via CLI flags:
+- **Global config**: Use `ploy config gitlab set --file <config.json>` to configure domain and PAT once (see `docs/how-to/create-mr.md`).
+- **Per-run override**: Use `--gitlab-domain` and `--gitlab-pat` flags to override for a single run.
+- **Domain normalization**: The client accepts bare hostnames (e.g., `gitlab.com`) or full URLs (e.g., `https://gitlab.com`) and normalizes them for API calls. Localhost and 127.0.0.1 addresses default to HTTP; all other domains default to HTTPS.
+- **Authentication headers**: The client-go wrapper sets both `Authorization: Bearer <token>` and `PRIVATE-TOKEN: <token>` headers for compatibility with different GitLab configurations.
+
+### Implementation Notes
+
+The node agent uses `internal/nodeagent/gitlab/mr_client.go` with the following behavior:
+- **Project ID encoding**: External callers provide URL-encoded project IDs (e.g., `org%2Fproject`), which are decoded before passing to client-go (the library re-encodes internally).
+- **Optional fields**: Description and labels are trimmed and only included when non-empty. Labels are split by commas and passed as a slice to client-go.
+- **Error handling**: All API errors include PAT redaction via `redactError()` to ensure tokens never appear in logs or returned errors.
+
+See `docs/how-to/create-mr.md` for end-to-end usage examples and `internal/nodeagent/gitlab/mr_client.go` for implementation details.
+
 ## Build Gate Healing
 
 When a Build Gate fails before the main mod runs, the node agent can execute a healing
