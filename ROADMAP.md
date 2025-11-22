@@ -1,141 +1,37 @@
-# Library Reuse Implementation Roadmap
+# Type System Hardening for Internal Packages
 
-> When following this template:
-> - Align to the template structure
-> - Include steps to update relevant docs
+Scope: Tighten the Go type system in `internal` packages for clarity and maintainability without changing external JSON/wire contracts. Focus on lifecycle snapshots, nodeagent options/specs, ID/VCS validation at server boundaries, enum/status consistency, and removal of untyped extension points.
 
-Scope: Implement the library reuse plan from `REUSE.md`: unify exponential backoff behavior using `github.com/cenkalti/backoff/v5`, replace bespoke SSE and GitLab MR clients with maintained libraries, and migrate CLI command tree/completions to a framework while preserving current CLI behavior and control-plane contracts.
-
-Documentation: `REUSE.md`, `cmd/ploy/README.md`, `docs/how-to/deploy-a-cluster.md`, `docs/how-to/update-a-cluster.md`, `docs/envs/README.md`, `tests/e2e/README.md`.
+Documentation: `GOLANG.md`, `ROADMAP_NEXT.md`, `docs/api/OpenAPI.yaml`, `docs/envs/README.md`
 
 Legend: [ ] todo, [x] done.
 
-## Backoff Unification (github.com/cenkalti/backoff/v5)
-- [x] Introduce shared backoff helper package using cenkalti/backoff/v5 — Centralize retry policy and prepare for call-site refactors
-  - Component: `github.com/iw2rmb/ploy`; `go.mod`; new package `internal/workflow/backoff`
-  - Scope: Add dependency `github.com/cenkalti/backoff/v5`; implement helpers (for example, `RunWithBackoff(ctx, logger, metrics, op func() error)` and policy constructors) that capture defaults for initial interval, max interval, jitter, and max elapsed time; wire structured logging and metrics hooks so call sites can emit consistent fields
-  - Test: Add `internal/workflow/backoff/backoff_test.go` to cover jitter bounds, cap behavior, and context cancellation; run `go test ./internal/workflow/...` and `make test`; expect all tests passing and coverage ≥90% for `internal/workflow/backoff`
+## Lifecycle Snapshots
+- [ ] Introduce typed lifecycle snapshot structs — Harden resource/status schema and reduce `map[string]any` casts
+  - Component: `internal/worker/lifecycle`, `internal/server/status`, `internal/nodeagent`
+  - Scope: Add `NodeStatus` / `NodeCapacity` structs in `internal/worker/lifecycle`; add helpers to convert to/from `map[string]any`; update `Collector.Collect`, `Cache`, `status.Provider`, and `HeartbeatManager.sendHeartbeat` to use typed accessors instead of direct `map[string]any` indexing
+  - Test: `go test ./internal/worker/lifecycle ./internal/server/status ./internal/nodeagent` — Heartbeat and status snapshot tests continue to pass with unchanged JSON payloads
 
-- [x] Refactor rollout backoff utilities to use the shared helper — Remove bespoke rollout retry loops while preserving behavior
-  - Component: `cmd/ploy/rollout_backoff.go`, `cmd/ploy/rollout_backoff_test.go`, rollout callers under `cmd/ploy/rollout_*`
-  - Scope: Replace `RetryPolicy`, `RetryWithBackoff`, and `PollWithBackoff` implementations with thin adapters around `internal/workflow/backoff`; keep effective defaults equivalent to current behavior; ensure `RolloutMetrics` recording and structured log keys (`poll_backoff_attempt`, `poll_backoff_exhausted`, etc.) remain unchanged
-  - Test: Extend `cmd/ploy/rollout_backoff_test.go` to assert attempt counts, backoff intervals, and log fields remain stable; run `go test ./cmd/ploy/...`; expect rollout backoff tests to maintain ≥90% coverage of the new adapters
+## Nodeagent Run Options
+- [ ] Introduce typed RunOptions for nodeagent execution — Clarify which spec/options keys are understood by the agent
+  - Component: `internal/nodeagent`
+  - Scope: Define small option structs (e.g., build gate config, healing config, MR wiring) in a new file; update `parseSpec` and `buildManifestFromRequest` to populate typed options while preserving raw JSON where needed
+  - Test: `go test ./internal/nodeagent` — Healing, MR creation, and manifest builder tests continue to pass; JSON contracts remain stable
 
-- [x] Apply shared backoff to nodeagent heartbeat retry logic — Align heartbeat backoff with shared policy while keeping 5xx-only semantics
-  - Component: `internal/nodeagent/heartbeat.go`, `internal/nodeagent/heartbeat_timing_test.go`
-  - Scope: Replace `HeartbeatManager.backoffDuration`, `maxBackoff`, `applyBackoff`, and `resetBackoff` with a shared backoff policy object; configure policy to start at 5s and cap at existing `maxBackoff`; keep 5xx-only triggering via `serverError`; ensure logs (`heartbeat backoff active`) still include backoff duration
-  - Test: Update `heartbeat_timing_test.go` cases (e.g., `TestBackoffOn5xxErrors`, cap and reset tests) to exercise the shared helper through the public methods; run `go test ./internal/nodeagent/...`; expect backoff sequences to match current expectations within a small timing tolerance
+## ID and VCS Validation
+- [ ] Use domain ID/VCS types at server boundaries — Centralize validation for repo URLs, refs, and identifiers
+  - Component: `internal/server/handlers`, `internal/server/auth`, `internal/cli/config`
+  - Scope: Replace plain `string` fields with `domaintypes.RepoURL`, `GitRef`, `CommitSHA`, and `ClusterID` in handler request/response structs and token claims where JSON stays string-based; add minimal conversion helpers for CLI config if needed
+  - Test: `go test ./internal/server/... ./internal/cli/...` — Mods ticket submission, claim, and auth tests pass; OpenAPI docs and CLI behavior remain unchanged
 
-- [x] Apply shared backoff to nodeagent claim loop — Use shared policy for polling intervals when no work is available
-  - Component: `internal/nodeagent/claimer_loop.go`, `internal/nodeagent/agent_claim_test.go`
-  - Scope: Replace `ClaimManager`’s `backoffDuration`, `minBackoff`, `maxBackoff`, `applyBackoff`, `resetBackoff`, and `getBackoffDuration` with a shared backoff policy; ensure the loop uses policy-derived intervals for ticker resets and that backoff resets when work is successfully claimed
-  - Test: Adapt `TestClaimLoopBackoff` and related tests to verify interval growth and max-cap via the shared helper (with jitter tolerance); run `go test ./internal/nodeagent/...`; expect backoff to increase and respect the configured max interval within jitter bounds
+## Status / Enum Consistency
+- [ ] Align enum/status types across store, workflow contracts, and mods API — Reduce string casts and duplicated status definitions
+  - Component: `internal/store`, `internal/workflow/contracts`, `internal/mods/api`, `internal/server/handlers`
+  - Scope: Introduce shared domain enums for run/stage/buildgate job status or adjust `sqlc.yaml` to reuse existing contract enums; update handlers to rely on shared types instead of ad hoc string conversions
+  - Test: `go test ./internal/store ./internal/workflow/contracts ./internal/mods/api ./internal/server/handlers` — All status transition tests pass and JSON status fields remain identical
 
-- [x] Apply shared backoff to nodeagent status uploads — Unify status uploader retry logic with shared backoff
-  - Component: `internal/nodeagent/statusuploader.go`, `internal/nodeagent/statusuploader_test.go`
-  - Scope: Replace manual `maxRetries` and `backoff` doubling in `UploadStatus` with `internal/workflow/backoff` helpers configured for existing retry counts and base delay; preserve retry conditions for network errors and 5xx responses and keep slog messages unchanged
-  - Test: Extend `TestStatusUploader_RetryBackoff` to assert the total retry duration and attempt count using the shared helper; run `go test ./internal/nodeagent/...`; expect behavior to remain equivalent while implementation complexity drops
-
-- [x] Apply shared backoff to nodeagent certificate request retries — Remove bespoke exponential backoff in agent bootstrap
-  - Component: `internal/nodeagent/agent.go`, `internal/nodeagent/agent_bootstrap_test.go`
-  - Scope: Replace manual exponential backoff loop for certificate requests with a shared backoff wrapper; preserve the current number of attempts and log format (`retrying certificate request`, `backoff` fields); ensure context cancellation is honored and early-exit behavior is unchanged
-  - Test: Add or extend tests (for example, `agent_backoff_test.go`) to validate retry count, backoff progression, and cancellation; run `go test ./internal/nodeagent/...`; expect certificate acquisition to still succeed under transient failures
-
-- [x] Apply shared backoff to GitLab MR retries — Use shared policy for HTTP and API errors
-  - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_retry_test.go`
-  - Scope: Replace custom `shouldRetry` and `backoff` logic in `CreateMR` with `internal/workflow/backoff` helpers while maintaining retry conditions for 429 and 5xx responses; keep approximate delay pattern (1s, 2s, 4s) and ensure PAT redaction behavior remains intact
-  - Test: Update `mr_client_api_retry_test.go` to assert retry count and approximate delays using the shared helper; run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz tests still pass and no PAT values appear in error strings
-
-- [x] Apply shared backoff to SSE stream reconnects — Align SSE reconnect behavior with shared backoff and IdleTimeout logic
-  - Component: `internal/cli/stream/client.go`, SSE-related tests under `cmd/ploy` (for example, `mods_logs_test.go`, `runs_follow` tests)
-  - Scope: Replace `Client.wait` and manual retry/backoff calculations with shared backoff helpers, preserving `MaxRetries`, `RetryBackoff` defaults, IdleTimeout semantics, and `ErrDone` handler behavior; integrate logging and metrics hooks where available
-  - Test: Add or extend tests to cover reconnect attempts, IdleTimeout-triggered cancellation, and `MaxRetries` exhaustion; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect streaming behavior to remain stable under transient failures
-
-- [x] Document shared backoff usage — Make the shared helper the canonical retry mechanism
-  - Component: `REUSE.md`, `GOLANG.md`, any internal developer docs referencing retry logic
-  - Scope: Update `REUSE.md` to reference `internal/workflow/backoff` as the canonical retry package; add guidance in `GOLANG.md` on when and how to use the helper; remove or update references to bespoke backoff implementations in comments and docs
-  - Test: Manual docs review; run `rg "backoff" .` to verify that all runtime retry loops either use or explicitly opt out of the shared helper
-
-## SSE Client Replacement (github.com/tmaxmax/go-sse)
-- [x] Add go-sse dependency and adapter layer — Prepare to replace the custom SSE parser
-  - Component: `go.mod`, `go.sum`, `internal/cli/stream`
-  - Scope: Add `github.com/tmaxmax/go-sse` as a dependency; introduce an adapter (for example, `internal/cli/stream/sse_client.go`) that wraps the library and exposes a `Stream`-style API compatible with existing `Client`, `Event`, and `ErrDone` contracts
-  - Test: Add unit tests in `internal/cli/stream` that exercise the adapter using an in-memory SSE source emitting `id`, `event`, `data`, and comment lines; go-sse’s `Read` helper does not expose the `retry` field, so server `retry` hints are intentionally unsupported in this iteration and any tests that depend on them are skipped; run `go test ./internal/cli/stream/...`; expect events to map correctly into existing `Event` fields and Last-Event-ID behavior
-
-- [x] Replace manual SSE parsing with go-sse — Delegate frame parsing while keeping behavior and flags
-  - Component: `internal/cli/stream/client.go`
-  - Scope: Remove `readEvent` and manual parsing loops; use go-sse’s event stream primitives to read events and map them into `Event`; ensure Last-Event-ID is propagated via headers and maintained across reconnects; keep IdleTimeout behavior by wrapping the connection context; integrate the shared backoff helper for reconnect delays; server `retry` hints are no longer consumed and reconnect delays are driven solely by the shared backoff policy
-  - Test: Update existing SSE-related tests in `cmd/ploy` (for example, `mods_logs_test.go`, `runs_follow` tests) to verify Last-Event-ID replay, IdleTimeout cancellation, handler `ErrDone`, and malformed-frame handling; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect unchanged public behavior aside from ignoring server `retry` hints
-
-- [x] Update streaming documentation — Reflect library-backed SSE semantics in CLI docs
-  - Component: `cmd/ploy/README.md`, `tests/e2e/mods/README.md`
-  - Scope: Ensure documentation for `mods logs` and `runs follow` describes IdleTimeout defaults, `--idle-timeout` and `--timeout` flags, reconnection semantics, and Last-Event-ID support; clarify that SSE streams use resilient reconnects backed by a shared backoff policy
-  - Test: Manual docs review; run SSE-related e2e tests from `tests/e2e/mods` and confirm they still pass with the new implementation
-
-## GitLab MR Client Swap (gitlab.com/gitlab-org/api/client-go)
-- [x] Add GitLab client-go dependency and configuration helper — Prepare to replace the bespoke HTTP MR client
-  - Component: `go.mod`, `go.sum`, `internal/nodeagent/gitlab`
-  - Scope: Add `gitlab.com/gitlab-org/api/client-go` as a dependency; implement a small configuration helper that constructs a typed client using domain, base URL (respecting localhost/127.0.0.1 HTTP scheme), and PAT; ensure headers preserve current behavior (Authorization bearer token plus `PRIVATE-TOKEN`) where required
-  - Test: Add unit tests to validate that the configured client targets the expected base URL and carries the correct auth token; run `go test ./internal/nodeagent/gitlab/...`; expect no regressions in existing tests
-
-- [x] Refactor MR creation to use client-go types — Replace manual HTTP calls with typed API while preserving external contracts
-  - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_create_test.go`
-  - Scope: Replace manual HTTP request/response handling in `CreateMR` with client-go’s merge request creation API; keep `MRCreateRequest` and `MRCreateResponse` available to callers while decoding the URL-encoded project path before passing it to client-go; preserve domain parsing via `NewClient`, label/description handling, and PAT redaction behavior
-  - Test: Keep `mr_client_api_create_test.go` asserting that the client-go–backed implementation posts to `/api/v4/projects/<project>/merge_requests` with the expected headers (Authorization + `PRIVATE-TOKEN`) and payload fields (title, branches, description, labels); run `go test ./internal/nodeagent/gitlab/...` when iterating on this slice
-
-- [x] Integrate shared backoff with client-go MR operations — Keep retry semantics while delegating delays to shared helpers
-  - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/workflow/backoff`
-  - Scope: Replace manual retry loop, `shouldRetry`, and `backoff` functions with shared backoff helpers; preserve retry conditions for transient network errors plus 429 and 5xx statuses and the 3-attempt limit; ensure context cancellation is honored and error messages still pass through `redactError`
-  - Test: Update `mr_client_api_retry_test.go` to validate retry count and approximate delay schedule via the shared helper (including network-error cases); run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz and validation tests continue to pass
-
-- [x] Clean up DTOs and redaction paths — Ensure no PAT leakage after the swap
-  - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_redaction_test.go`
-  - Scope: Remove unused request/response structs if fully replaced by client-go; ensure all errors flowing out of client-go-backed operations are wrapped with `redactError` and that URL-encoded PAT variants remain redacted
-  - Test: Re-run `mr_client_api_redaction_test.go` and add cases for new error shapes if necessary; run `go test ./internal/nodeagent/gitlab/...`; confirm no PAT appears in error strings
-
-- [x] Document GitLab MR client behavior — Keep operator-facing docs in sync with implementation
-  - Component: `cmd/ploy/README.md`, `docs/how-to/update-a-cluster.md`, `docs/how-to/create-mr.md`
-  - Scope: Keep GitLab MR user guides and CLI help aligned with the client-go–backed MR client: document retry semantics (`GitLabMRPolicy` attempts and backoff), PAT redaction behavior (literal and URL-encoded variants), domain normalization rules, and MR creation flags/fields; ensure configuration examples match the current MR wiring
-  - Test: Manual docs review to confirm that README/how-to sections match `internal/nodeagent/gitlab/mr_client.go` behavior; run GitLab-related integration/e2e tests (if present) that exercise MR creation flows
-
-## CLI Tree Generation via Cobra/Pflag
-- [x] Introduce cobra-based root command and subcommands — Migrate from manual dispatch while preserving CLI surface
-  - Component: `go.mod`, `go.sum`, `cmd/ploy/main.go`, new files under `cmd/ploy` (for example, `root.go`)
-  - Scope: Add `github.com/spf13/cobra` and `github.com/spf13/pflag` as dependencies; construct a `rootCmd` with subcommands mirroring existing top-level commands (`mod`, `mods`, `runs`, `upload`, `cluster`, `config`, `manifest`, `knowledge-base`, `server`, `node`, `rollout`, `token`, `help`, `version`); change `main` to execute the cobra root while preserving error reporting and exit codes
-  - Test: Update or add CLI tests (for example, `cmd/ploy/cli_test.go`) to assert `ploy --help`, `ploy help <command>`, and `ploy version` outputs match existing goldens (or intentionally updated ones); run `go test ./cmd/ploy/...`
-
-- [x] Wire existing handlers into cobra commands — Reuse current business logic behind cobra flags and args
-  - Component: Command files under `cmd/ploy` (for example, `mod_command.go`, `server_deploy_cmd.go`, `config_command.go`, `node_command.go`)
-  - Scope: For each command and subcommand, define a cobra `*cobra.Command` that parses flags with `pflag` and then invokes current handlers (such as `handleMod`, `handleServer`, `handleConfig`, `handleNode`, rollout helpers), preserving flag names, defaults, and error messages; deprecate the manual `execute` switch once coverage is in place
-  - Test: Ensure existing command-specific tests (`mod_*_test.go`, `server_*_test.go`, `config_command_*_test.go`, `knowledge_base_command_test.go`, etc.) still pass using the cobra-based entrypoints; run `go test ./cmd/ploy/...`; adjust golden outputs only where cobra formatting requires
-
-- [x] Generate shell completions and command tree from cobra — Replace manual clitree-based completion maintenance
-  - Component: `cmd/ploy/autocomplete/*`, `internal/clitree/tree.go`, new completion-generation helper under `cmd/ploy`
-  - Scope: Use cobra’s completion support to generate bash, zsh, and fish completion scripts; add a small internal helper or command to regenerate `cmd/ploy/autocomplete/ploy.{bash,bash.new,zsh,fish}` from the cobra command tree; remove `internal/clitree/tree.go` and update any tests that depend on it
-  - Test: Update `cmd/ploy/autocomplete_test.go` to validate that generated completions remain in sync with the cobra tree; run `go test ./cmd/ploy/...`; ensure no remaining references to `internal/clitree.Tree`
-
-- [x] Keep CLI documentation aligned with cobra-based behavior — Ensure help and examples stay accurate
-  - Component: `cmd/ploy/README.md`, `docs/how-to/deploy-a-cluster.md`, `docs/how-to/update-a-cluster.md`
-  - Scope: Review CLI usage examples and help snippets, updating them where cobra changes formatting (for example, help headers or subcommand listings); document any new convenience commands (such as `ploy completion <shell>`) added for completion generation
-  - Test: Manual docs review; run CLI help snapshot tests under `cmd/ploy` to confirm consistency between docs and actual output
-
-- [x] Add binary size guardrail for CLI changes — Protect against excessive growth from new dependencies
-  - Component: `scripts/check-binary-size.sh`, `scripts/check-binary-size_test.sh`, `Makefile` (`test-binary-size` target), CI/test harness, `dist/ploy`
-  - Scope: Use `scripts/check-binary-size.sh` to measure `dist/ploy` after `make build` and fail if the binary exceeds the threshold (currently 15 MB); wire the check into `make test`/`make ci-check` via the `test-binary-size` target so CLI changes are guarded automatically
-  - Test: Run `bash scripts/check-binary-size_test.sh` and `make test-binary-size` (or `make test`/`make ci-check`) to exercise the guardrail; optionally build locally and confirm that typical changes stay well below the threshold
-
-## Cross-cutting Validation and Risk Mitigation
-- [x] Capture baseline test and coverage metrics — Establish a starting point before refactors
-  - Component: Repository-wide tests and coverage tools
-  - Scope: Run `make test` and capture coverage summary for key packages (`internal/workflow/...`, `internal/nodeagent/...`, `internal/cli/stream`, `cmd/ploy`); record baseline in `CHECKPOINT.md` or `CHECKPOINT_MODS.md` to ensure overall coverage stays ≥60% and critical workflow/runner packages remain ≥90%
-  - Test: None (documentation step); ensure coverage reports are committed or referenced where appropriate
-
-- [x] Follow RED→GREEN→REFACTOR for each slice — Maintain TDD discipline across backoff, SSE, GitLab, and CLI changes
-  - Component: All affected packages and tests; `scripts/validate-tdd-discipline.sh`; `Makefile` (`validate-tdd` target); `AGENTS.md` (TDD discipline documentation)
-  - Scope: For each roadmap slice (backoff, SSE, GitLab client, CLI), first add or tighten tests to pin current behavior (RED), then implement the minimal change to make tests pass (GREEN), and finally clean up implementations, removing duplication and legacy helpers (REFACTOR); introduced `scripts/validate-tdd-discipline.sh` to automate validation of TDD discipline (test existence, test passing, coverage thresholds, binary size, code quality); added `make validate-tdd` target; documented TDD discipline process in `AGENTS.md` with usage examples and phase descriptions
-  - Test: Enforced via CI: `make test` must pass at each stage; manual review of diffs should show tests leading code changes; run `bash scripts/validate-tdd-discipline_test.sh` to verify validation script correctness; run `make validate-tdd` or `./scripts/validate-tdd-discipline.sh` to validate RED→GREEN→REFACTOR discipline for any package
-
-- [x] Run targeted integration and e2e smoke tests — Validate end-to-end behavior for critical workflows
-  - Component: `tests/smoke_tests.sh` orchestrator, `tests/integration/smoke_workflow_test.go`, `tests/README.md`, `tests/e2e/mods/` scenarios
-  - Scope: Created comprehensive smoke test suite validating critical workflows: (1) Database operations (run/stage/log/diff/event CRUD and ordering), (2) Server lifecycle (start/stop, HTTP endpoints, authorization), (3) SSE streaming (reconnection, Last-Event-ID, idle timeout), (4) Retry/backoff (exponential backoff with jitter, context cancellation, policy-based strategies), (5) GitLab MR client (creation, retry on 429/5xx, PAT redaction), (6) CLI functionality (version, help, subcommands), (7) Container execution (e2e selftest, mod workflows, Build Gate healing); implemented `tests/smoke_tests.sh` orchestrator with --quick (unit + integration + CLI, ~1-2 min) and --full (includes e2e, ~3-5 min) modes; added `tests/integration/smoke_workflow_test.go` validating complete run→stage→log→diff→event workflow through store layer; documented usage, test categories, and troubleshooting in `tests/README.md`
-  - Test: Ran `bash tests/smoke_tests.sh --quick` with all tests passing (7/7): unit tests for backoff/SSE/GitLab packages, CLI smoke tests (version, help, mod/server help), integration tests skipped gracefully when PLOY_TEST_PG_DSN not set; smoke_workflow_test.go compiles and skips properly without database; e2e scenarios (scenario-selftest.sh, scenario-orw-pass.sh, scenario-orw-fail/run.sh) remain available for cluster-based validation per `tests/e2e/mods/README.md`
+## Git Fetcher Publisher Hook
+- [ ] Narrow or remove GitFetcherOptions.Publisher — Eliminate untyped extension point
+  - Component: `internal/worker/hydration`, `internal/nodeagent`
+  - Scope: Either remove the `Publisher` field from `GitFetcherOptions` (if unused) or replace `interface{}` with a small `SnapshotPublisher` interface; update `NewGitFetcher` callers and tests
+  - Test: `go test ./internal/worker/hydration ./internal/nodeagent` — Git fetcher behavior and buildgate executor tests continue to pass
