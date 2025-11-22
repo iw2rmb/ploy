@@ -104,7 +104,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Add `github.com/spf13/cobra` and `github.com/spf13/pflag` as dependencies; construct a `rootCmd` with subcommands mirroring existing top-level commands (`mod`, `mods`, `runs`, `upload`, `cluster`, `config`, `manifest`, `knowledge-base`, `server`, `node`, `rollout`, `token`, `help`, `version`); change `main` to execute the cobra root while preserving error reporting and exit codes
   - Test: Update or add CLI tests (for example, `cmd/ploy/cli_test.go`) to assert `ploy --help`, `ploy help <command>`, and `ploy version` outputs match existing goldens (or intentionally updated ones); run `go test ./cmd/ploy/...`
 
-- [ ] Wire existing handlers into cobra commands — Reuse current business logic behind cobra flags and args
+- [x] Wire existing handlers into cobra commands — Reuse current business logic behind cobra flags and args
   - Component: Command files under `cmd/ploy` (for example, `mod_command.go`, `server_deploy_cmd.go`, `config_command.go`, `node_command.go`)
   - Scope: For each command and subcommand, define a cobra `*cobra.Command` that parses flags with `pflag` and then invokes current handlers (such as `handleMod`, `handleServer`, `handleConfig`, `handleNode`, rollout helpers), preserving flag names, defaults, and error messages; deprecate the manual `execute` switch once coverage is in place
   - Test: Ensure existing command-specific tests (`mod_*_test.go`, `server_*_test.go`, `config_command_*_test.go`, `knowledge_base_command_test.go`, etc.) still pass using the cobra-based entrypoints; run `go test ./cmd/ploy/...`; adjust golden outputs only where cobra formatting requires
