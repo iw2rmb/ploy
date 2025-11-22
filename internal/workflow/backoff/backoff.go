@@ -85,6 +85,19 @@ func StatusUploaderPolicy() Policy {
 	}
 }
 
+// CertificateBootstrapPolicy returns a policy for nodeagent certificate request retries.
+// Starts at 1s with 2x multiplier and 5 total attempts (initial + 4 retries).
+// Matches existing certificate bootstrap retry behavior (1s, 2s, 4s, 8s, 16s).
+func CertificateBootstrapPolicy() Policy {
+	return Policy{
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     16 * time.Second, // 1s * 2^4 = 16s max.
+		Multiplier:      2.0,
+		MaxElapsedTime:  0, // No time limit for certificate bootstrap retries.
+		MaxAttempts:     5, // Initial attempt + 4 retries.
+	}
+}
+
 // NewExponentialBackoff creates a backoff.ExponentialBackOff from the policy.
 // Configures initial interval, max interval, multiplier, randomization factor (jitter).
 // Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
