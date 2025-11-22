@@ -114,7 +114,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Use cobra’s completion support to generate bash, zsh, and fish completion scripts; add a small internal helper or command to regenerate `cmd/ploy/autocomplete/ploy.{bash,bash.new,zsh,fish}` from the cobra command tree; remove `internal/clitree/tree.go` and update any tests that depend on it
   - Test: Update `cmd/ploy/autocomplete_test.go` to validate that generated completions remain in sync with the cobra tree; run `go test ./cmd/ploy/...`; ensure no remaining references to `internal/clitree.Tree`
 
-- [ ] Keep CLI documentation aligned with cobra-based behavior — Ensure help and examples stay accurate
+- [x] Keep CLI documentation aligned with cobra-based behavior — Ensure help and examples stay accurate
   - Component: `cmd/ploy/README.md`, `docs/how-to/deploy-a-cluster.md`, `docs/how-to/update-a-cluster.md`
   - Scope: Review CLI usage examples and help snippets, updating them where cobra changes formatting (for example, help headers or subcommand listings); document any new convenience commands (such as `ploy completion <shell>`) added for completion generation
   - Test: Manual docs review; run CLI help snapshot tests under `cmd/ploy` to confirm consistency between docs and actual output
