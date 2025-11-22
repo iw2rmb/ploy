@@ -109,7 +109,7 @@ Legend: [ ] todo, [x] done.
   - Scope: For each command and subcommand, define a cobra `*cobra.Command` that parses flags with `pflag` and then invokes current handlers (such as `handleMod`, `handleServer`, `handleConfig`, `handleNode`, rollout helpers), preserving flag names, defaults, and error messages; deprecate the manual `execute` switch once coverage is in place
   - Test: Ensure existing command-specific tests (`mod_*_test.go`, `server_*_test.go`, `config_command_*_test.go`, `knowledge_base_command_test.go`, etc.) still pass using the cobra-based entrypoints; run `go test ./cmd/ploy/...`; adjust golden outputs only where cobra formatting requires
 
-- [ ] Generate shell completions and command tree from cobra — Replace manual clitree-based completion maintenance
+- [x] Generate shell completions and command tree from cobra — Replace manual clitree-based completion maintenance
   - Component: `cmd/ploy/autocomplete/*`, `internal/clitree/tree.go`, new completion-generation helper under `cmd/ploy`
   - Scope: Use cobra’s completion support to generate bash, zsh, and fish completion scripts; add a small internal helper or command to regenerate `cmd/ploy/autocomplete/ploy.{bash,bash.new,zsh,fish}` from the cobra command tree; remove `internal/clitree/tree.go` and update any tests that depend on it
   - Test: Update `cmd/ploy/autocomplete_test.go` to validate that generated completions remain in sync with the cobra tree; run `go test ./cmd/ploy/...`; ensure no remaining references to `internal/clitree.Tree`
