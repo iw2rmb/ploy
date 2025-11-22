@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -222,8 +223,8 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 
 // buildExecutionStats constructs the stats payload for terminal status upload.
 // Includes execution timings, exit code, gate history (pre-gate, re-gates), and MR URL.
-func (r *runController) buildExecutionStats(runID, stageID string, result step.Result, execResult executionResult, duration time.Duration, mrURL string) map[string]interface{} {
-	stats := map[string]interface{}{
+func (r *runController) buildExecutionStats(runID, stageID string, result step.Result, execResult executionResult, duration time.Duration, mrURL string) types.RunStats {
+	stats := types.RunStats{
 		"exit_code":   result.ExitCode,
 		"duration_ms": duration.Milliseconds(),
 		"timings": map[string]interface{}{

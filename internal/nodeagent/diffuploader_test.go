@@ -10,20 +10,22 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestDiffUploader_UploadDiff(t *testing.T) {
 	tests := []struct {
 		name           string
 		diffContent    string
-		summary        map[string]interface{}
+		summary        types.DiffSummary
 		wantStatusCode int
 		wantErr        bool
 	}{
 		{
 			name:        "successful upload",
 			diffContent: "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old line\n+new line\n",
-			summary: map[string]interface{}{
+			summary: types.DiffSummary{
 				"exit_code": 0,
 				"timings": map[string]interface{}{
 					"total_duration_ms": 1000,
@@ -35,7 +37,7 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 		{
 			name:        "empty diff",
 			diffContent: "",
-			summary: map[string]interface{}{
+			summary: types.DiffSummary{
 				"exit_code": 0,
 			},
 			wantStatusCode: http.StatusCreated,
@@ -44,7 +46,7 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 		{
 			name:           "server error",
 			diffContent:    "diff content",
-			summary:        map[string]interface{}{},
+			summary:        types.DiffSummary{},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErr:        true,
 		},
@@ -170,7 +172,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, map[string]interface{}{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, types.DiffSummary{})
 	if err == nil {
 		t.Fatal("expected error for oversized diff but got none")
 	}
@@ -237,7 +239,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(diffContent), map[string]interface{}{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(diffContent), types.DiffSummary{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

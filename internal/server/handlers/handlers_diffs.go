@@ -13,16 +13,17 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
 // diffItem represents a single diff in a list response.
 type diffItem struct {
-	ID        string         `json:"id"`
-	StageID   string         `json:"stage_id"`
-	CreatedAt time.Time      `json:"created_at"`
-	Size      int            `json:"gzipped_size"`
-	Summary   map[string]any `json:"summary,omitempty"`
+	ID        string                  `json:"id"`
+	StageID   string                  `json:"stage_id"`
+	CreatedAt time.Time               `json:"created_at"`
+	Size      int                     `json:"gzipped_size"`
+	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
 }
 
 // diffListResponse is the typed response for listing diffs.
@@ -32,12 +33,12 @@ type diffListResponse struct {
 
 // diffGetResponse is the typed response for getting a single diff's metadata.
 type diffGetResponse struct {
-	ID          string         `json:"id"`
-	RunID       string         `json:"run_id"`
-	StageID     *string        `json:"stage_id,omitempty"`
-	CreatedAt   time.Time      `json:"created_at"`
-	GzippedSize int            `json:"gzipped_size"`
-	Summary     map[string]any `json:"summary,omitempty"`
+	ID          string                  `json:"id"`
+	RunID       string                  `json:"run_id"`
+	StageID     *string                 `json:"stage_id,omitempty"`
+	CreatedAt   time.Time               `json:"created_at"`
+	GzippedSize int                     `json:"gzipped_size"`
+	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
 }
 
 // listRunDiffsHandler returns a JSON list of diffs for a given Mods ticket (run id).
@@ -64,7 +65,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 
 		items := make([]diffItem, 0, len(diffs))
 		for _, d := range diffs {
-			var summary map[string]any
+			var summary domaintypes.DiffSummary
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
@@ -116,7 +117,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		var summary map[string]any
+		var summary domaintypes.DiffSummary
 		if len(d.Summary) > 0 {
 			_ = json.Unmarshal(d.Summary, &summary)
 		}
