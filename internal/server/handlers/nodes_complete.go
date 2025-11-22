@@ -63,14 +63,19 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Validate status is a terminal state.
+		// Validate and convert status to canonical RunStatus type.
+		// This uses ConvertToRunStatus to handle various API representations
+		// (e.g., "cancelled" vs "canceled", "pending" -> "queued").
 		if strings.TrimSpace(req.Status) == "" {
 			http.Error(w, "status is required", http.StatusBadRequest)
 			return
 		}
 
-		// Normalize status to match RunStatus enum values.
-		normalizedStatus := store.RunStatus(strings.ToLower(strings.TrimSpace(req.Status)))
+		normalizedStatus, err := store.ConvertToRunStatus(strings.ToLower(strings.TrimSpace(req.Status)))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("invalid status: %v", err), http.StatusBadRequest)
+			return
+		}
 
 		// Validate that status is a terminal state (succeeded, failed, or canceled).
 		if normalizedStatus != store.RunStatusSucceeded &&
@@ -81,7 +86,6 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Verify node exists before attempting to complete the run.
-		var err error
 		_, err = st.GetNode(r.Context(), nodeID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {

@@ -104,15 +104,17 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		// Build response with TicketSummary (ticket_id == run UUID).
+		// Use typed status (store.RunStatus) instead of string cast for type safety;
+		// JSON encoder will serialize the underlying string value.
 		resp := struct {
-			TicketID  string `json:"ticket_id"`
-			Status    string `json:"status"`
-			RepoURL   string `json:"repo_url"`
-			BaseRef   string `json:"base_ref"`
-			TargetRef string `json:"target_ref"`
+			TicketID  string          `json:"ticket_id"`
+			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
+			RepoURL   string          `json:"repo_url"`
+			BaseRef   string          `json:"base_ref"`
+			TargetRef string          `json:"target_ref"`
 		}{
 			TicketID:  uuid.UUID(run.ID.Bytes).String(),
-			Status:    string(run.Status),
+			Status:    run.Status,
 			RepoURL:   run.RepoUrl,
 			BaseRef:   run.BaseRef,
 			TargetRef: run.TargetRef,
@@ -186,22 +188,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Build mods-style TicketStatusResponse with Stages and Artifacts.
-		// Map run status to mods state.
-		var ticketState modsapi.TicketState
-		switch run.Status {
-		case store.RunStatusQueued:
-			ticketState = modsapi.TicketStatePending
-		case store.RunStatusAssigned, store.RunStatusRunning:
-			ticketState = modsapi.TicketStateRunning
-		case store.RunStatusSucceeded:
-			ticketState = modsapi.TicketStateSucceeded
-		case store.RunStatusFailed:
-			ticketState = modsapi.TicketStateFailed
-		case store.RunStatusCanceled:
-			ticketState = modsapi.TicketStateCancelled
-		default:
-			ticketState = modsapi.TicketStatePending
-		}
+		// Use conversion helper to map store.RunStatus to modsapi.TicketState.
+		ticketState := modsapi.TicketStatusFromStore(run.Status)
 
 		summary := modsapi.TicketSummary{
 			TicketID:   domaintypes.TicketID(uuid.UUID(run.ID.Bytes).String()),
@@ -246,22 +234,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 		for _, stg := range stages {
-			// Map store.StageStatus -> modsapi.StageState
-			var s modsapi.StageState
-			switch stg.Status {
-			case store.StageStatusPending:
-				s = modsapi.StageStateQueued
-			case store.StageStatusRunning:
-				s = modsapi.StageStateRunning
-			case store.StageStatusSucceeded:
-				s = modsapi.StageStateSucceeded
-			case store.StageStatusFailed:
-				s = modsapi.StageStateFailed
-			case store.StageStatusCanceled:
-				s = modsapi.StageStateCancelled
-			default:
-				s = modsapi.StageStateQueued
-			}
+			// Use conversion helper to map store.StageStatus -> modsapi.StageState
+			s := modsapi.StageStatusFromStore(stg.Status)
 			artMap := make(map[string]string)
 			bundles, err := st.ListArtifactBundlesByRunAndStage(r.Context(), store.ListArtifactBundlesByRunAndStageParams{RunID: storePgUUID(run.ID), StageID: stg.ID})
 			if err != nil {
