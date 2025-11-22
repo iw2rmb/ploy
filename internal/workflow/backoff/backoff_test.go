@@ -93,9 +93,9 @@ func TestGitLabMRPolicy(t *testing.T) {
 	if p.InitialInterval != 1*time.Second {
 		t.Errorf("InitialInterval = %v, want 1s", p.InitialInterval)
 	}
-	// Max delay: 2s (1s * 2^1).
-	if p.MaxInterval != 2*time.Second {
-		t.Errorf("MaxInterval = %v, want 2s", p.MaxInterval)
+	// Max delay: 4s (1s * 2^2).
+	if p.MaxInterval != 4*time.Second {
+		t.Errorf("MaxInterval = %v, want 4s", p.MaxInterval)
 	}
 	// Multiplier: 2.0 for exponential backoff.
 	if p.Multiplier != 2.0 {
@@ -105,9 +105,9 @@ func TestGitLabMRPolicy(t *testing.T) {
 	if p.MaxElapsedTime != 0 {
 		t.Errorf("MaxElapsedTime = %v, want 0 (no limit)", p.MaxElapsedTime)
 	}
-	// Max 3 attempts (initial + 2 retries).
-	if p.MaxAttempts != 3 {
-		t.Errorf("MaxAttempts = %d, want 3", p.MaxAttempts)
+	// Max 4 attempts (initial + 3 retries).
+	if p.MaxAttempts != 4 {
+		t.Errorf("MaxAttempts = %d, want 4", p.MaxAttempts)
 	}
 }
 
