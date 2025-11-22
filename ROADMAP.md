@@ -78,7 +78,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Add `gitlab.com/gitlab-org/api/client-go` as a dependency; implement a small configuration helper that constructs a typed client using domain, base URL (respecting localhost/127.0.0.1 HTTP scheme), and PAT; ensure headers preserve current behavior (Authorization bearer token plus `PRIVATE-TOKEN`) where required
   - Test: Add unit tests to validate that the configured client targets the expected base URL and carries the correct auth token; run `go test ./internal/nodeagent/gitlab/...`; expect no regressions in existing tests
 
-- [ ] Refactor MR creation to use client-go types — Replace manual HTTP calls with typed API while preserving external contracts
+- [x] Refactor MR creation to use client-go types — Replace manual HTTP calls with typed API while preserving external contracts
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_create_test.go`
   - Scope: Replace manual HTTP request/response handling in `CreateMR` with client-go’s merge request creation API; maintain the external `MRCreateRequest` and `MRCreateResponse` contracts or introduce minimal new DTOs that keep the same call sites; preserve domain parsing, URL construction, and label/description handling
   - Test: Update `mr_client_api_create_test.go` to assert that requests sent via client-go hit the expected endpoint with the correct payload (golden JSON where applicable); run `go test ./internal/nodeagent/gitlab/...`; expect API behavior to match current tests
