@@ -98,6 +98,19 @@ func CertificateBootstrapPolicy() Policy {
 	}
 }
 
+// GitLabMRPolicy returns a policy for GitLab merge request API retries.
+// Starts at 1s with 2x multiplier and 3 total attempts (initial + 2 retries).
+// Matches existing GitLab MR retry behavior (1s, 2s).
+func GitLabMRPolicy() Policy {
+	return Policy{
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     2 * time.Second, // 1s * 2^1 = 2s max.
+		Multiplier:      2.0,
+		MaxElapsedTime:  0, // No time limit for GitLab MR retries.
+		MaxAttempts:     3, // Initial attempt + 2 retries.
+	}
+}
+
 // NewExponentialBackoff creates a backoff.ExponentialBackOff from the policy.
 // Configures initial interval, max interval, multiplier, randomization factor (jitter).
 // Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
@@ -275,4 +288,11 @@ func (s *StatefulBackoff) GetDuration() time.Duration {
 		return s.eb.InitialInterval
 	}
 	return s.current
+}
+
+// Permanent wraps the given error in a *PermanentError to prevent retries.
+// Use this to signal that an error should not be retried (e.g., validation errors, 4xx HTTP status).
+// The underlying backoff.Retry will stop immediately when encountering a permanent error.
+func Permanent(err error) error {
+	return backoff.Permanent(err)
 }

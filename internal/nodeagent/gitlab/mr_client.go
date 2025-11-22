@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // MRClient provides GitLab merge request creation functionality.
@@ -71,6 +72,20 @@ type mrCreateResponse struct {
 	IID    int    `json:"iid"`
 }
 
+// retryableError wraps an error to indicate it should be retried.
+// Used by CreateMR to signal retry logic for 429 and 5xx errors.
+type retryableError struct {
+	err error
+}
+
+func (e *retryableError) Error() string {
+	return e.err.Error()
+}
+
+func (e *retryableError) Unwrap() error {
+	return e.err
+}
+
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 3 attempts).
@@ -108,16 +123,17 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		return "", redactError(fmt.Errorf("marshal request: %w", err), req.PAT)
 	}
 
-	// Retry logic with exponential backoff for 429 and 5xx errors (max 3 attempts).
-	const maxRetries = 3
-	const baseDelay = 1 * time.Second
+	// Result holder for successful response.
+	var webURL string
 
-	var lastErr error
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	// Retry operation using shared backoff helper.
+	// The operation returns retryableError for 429 and 5xx responses to trigger retry.
+	policy := backoff.GitLabMRPolicy()
+	operation := func() error {
 		// Create HTTP request.
 		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 		if err != nil {
-			return "", redactError(fmt.Errorf("create request: %w", err), req.PAT)
+			return fmt.Errorf("create request: %w", err)
 		}
 
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -128,12 +144,11 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		// Send request.
 		resp, err := c.client.Do(httpReq)
 		if err != nil {
-			lastErr = err
-			if attempt < maxRetries-1 && c.shouldRetry(ctx, err, 0) {
-				c.backoff(ctx, attempt, baseDelay)
-				continue
+			// Network errors are retryable (unless context is cancelled).
+			if ctx.Err() != nil {
+				return err
 			}
-			return "", redactError(fmt.Errorf("send request: %w", err), req.PAT)
+			return &retryableError{err: err}
 		}
 
 		// Read response body.
@@ -143,7 +158,7 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 			slog.Warn("failed to close response body", "error", closeErr)
 		}
 		if err != nil {
-			return "", redactError(fmt.Errorf("read response: %w", err), req.PAT)
+			return fmt.Errorf("read response: %w", err)
 		}
 
 		// Check response status.
@@ -151,29 +166,56 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 			// Success: parse response using DTO.
 			var result mrCreateResponse
 			if err := json.Unmarshal(bodyBytes, &result); err != nil {
-				return "", redactError(fmt.Errorf("parse response: %w", err), req.PAT)
+				return fmt.Errorf("parse response: %w", err)
 			}
 
 			if result.WebURL == "" {
-				return "", redactError(fmt.Errorf("no web_url in response"), req.PAT)
+				return fmt.Errorf("no web_url in response")
 			}
 
-			return result.WebURL, nil
+			webURL = result.WebURL
+			return nil
 		}
+
+		// Build error from response.
+		apiErr := fmt.Errorf("gitlab api error: status %d: %s", resp.StatusCode, string(bodyBytes))
 
 		// Check if we should retry (429 or 5xx).
-		lastErr = fmt.Errorf("gitlab api error: status %d: %s", resp.StatusCode, string(bodyBytes))
-		if attempt < maxRetries-1 && c.shouldRetry(ctx, nil, resp.StatusCode) {
-			c.backoff(ctx, attempt, baseDelay)
-			continue
+		if c.shouldRetry(ctx, nil, resp.StatusCode) {
+			return &retryableError{err: apiErr}
 		}
 
-		// Non-retryable error or final attempt.
-		return "", redactError(lastErr, req.PAT)
+		// Non-retryable error.
+		return apiErr
 	}
 
-	// All retries exhausted.
-	return "", redactError(fmt.Errorf("max retries exhausted: %w", lastErr), req.PAT)
+	// Wrap operation with retry filter that only retries on retryableError.
+	err = backoff.RunWithBackoff(ctx, policy, slog.Default(), func() error {
+		err := operation()
+		if err == nil {
+			return nil
+		}
+		// Only propagate error for retry if it's a retryableError.
+		var retryable *retryableError
+		if err != nil {
+			// Check if the error is retryable.
+			if re, ok := err.(*retryableError); ok {
+				retryable = re
+			}
+		}
+		if retryable != nil {
+			// Return the wrapped error to trigger retry.
+			return retryable.err
+		}
+		// Non-retryable error: return as permanent failure.
+		return backoff.Permanent(err)
+	})
+
+	if err != nil {
+		return "", redactError(err, req.PAT)
+	}
+
+	return webURL, nil
 }
 
 // validateMRCreateRequest checks that required fields are provided.
@@ -214,24 +256,6 @@ func (c *MRClient) shouldRetry(ctx context.Context, err error, statusCode int) b
 
 	// Retry on 429 (rate limit) or 5xx (server errors).
 	return statusCode == http.StatusTooManyRequests || (statusCode >= 500 && statusCode < 600)
-}
-
-// backoff sleeps for an exponentially increasing duration before retrying.
-// Base delay is 1 second; each retry doubles the delay (1s, 2s, 4s).
-func (c *MRClient) backoff(ctx context.Context, attempt int, baseDelay time.Duration) {
-	// Calculate delay: baseDelay * 2^attempt.
-	delay := time.Duration(float64(baseDelay) * math.Pow(2, float64(attempt)))
-
-	// Sleep with context awareness.
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return
-	case <-timer.C:
-		return
-	}
 }
 
 // redactError replaces any occurrence of the PAT in error messages with [REDACTED].

@@ -225,17 +225,26 @@ func TestCreateMR_RetryBackoff(t *testing.T) {
 	}
 
 	// Check that delays roughly follow exponential backoff (1s, 2s).
-	// Allow some tolerance for test execution time (±200ms).
+	// The shared backoff helper uses 50% jitter (randomization factor),
+	// so delays can vary: 1s ± 50% = [0.5s, 1.5s], 2s ± 50% = [1s, 3s].
+	// Allow wider tolerance to account for jitter and test execution time.
 	delay1 := attemptTimes[1].Sub(attemptTimes[0])
 	delay2 := attemptTimes[2].Sub(attemptTimes[1])
 
-	const tolerance = 200 * time.Millisecond
-	if delay1 < 1*time.Second-tolerance || delay1 > 1*time.Second+tolerance {
-		t.Errorf("first retry delay = %v, expected ~1s", delay1)
+	// First delay: 1s ± 50% jitter = [0.5s, 1.5s].
+	// Add 200ms tolerance for test execution overhead.
+	const minDelay1 = 500*time.Millisecond - 200*time.Millisecond
+	const maxDelay1 = 1500*time.Millisecond + 200*time.Millisecond
+	if delay1 < minDelay1 || delay1 > maxDelay1 {
+		t.Errorf("first retry delay = %v, expected ~1s with 50%% jitter [%v, %v]", delay1, minDelay1, maxDelay1)
 	}
 
-	if delay2 < 2*time.Second-tolerance || delay2 > 2*time.Second+tolerance {
-		t.Errorf("second retry delay = %v, expected ~2s", delay2)
+	// Second delay: 2s ± 50% jitter = [1s, 3s].
+	// Add 200ms tolerance for test execution overhead.
+	const minDelay2 = 1000*time.Millisecond - 200*time.Millisecond
+	const maxDelay2 = 3000*time.Millisecond + 200*time.Millisecond
+	if delay2 < minDelay2 || delay2 > maxDelay2 {
+		t.Errorf("second retry delay = %v, expected ~2s with 50%% jitter [%v, %v]", delay2, minDelay2, maxDelay2)
 	}
 }
 
