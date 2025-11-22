@@ -67,7 +67,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Remove `readEvent` and manual parsing loops; use go-sse’s event stream primitives to read events and map them into `Event`; ensure Last-Event-ID is propagated via headers and maintained across reconnects; keep IdleTimeout behavior by wrapping the connection context; integrate the shared backoff helper for reconnect delays; server `retry` hints are no longer consumed and reconnect delays are driven solely by the shared backoff policy
   - Test: Update existing SSE-related tests in `cmd/ploy` (for example, `mods_logs_test.go`, `runs_follow` tests) to verify Last-Event-ID replay, IdleTimeout cancellation, handler `ErrDone`, and malformed-frame handling; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect unchanged public behavior aside from ignoring server `retry` hints
 
-- [ ] Update streaming documentation — Reflect library-backed SSE semantics in CLI docs
+- [x] Update streaming documentation — Reflect library-backed SSE semantics in CLI docs
   - Component: `cmd/ploy/README.md`, `tests/e2e/mods/README.md`
   - Scope: Ensure documentation for `mods logs` and `runs follow` describes IdleTimeout defaults, `--idle-timeout` and `--timeout` flags, reconnection semantics, and Last-Event-ID support; clarify that SSE streams use resilient reconnects backed by a shared backoff policy
   - Test: Manual docs review; run SSE-related e2e tests from `tests/e2e/mods` and confirm they still pass with the new implementation
