@@ -51,7 +51,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace `Client.wait` and manual retry/backoff calculations with shared backoff helpers, preserving `MaxRetries`, `RetryBackoff` defaults, IdleTimeout semantics, and `ErrDone` handler behavior; integrate logging and metrics hooks where available
   - Test: Add or extend tests to cover reconnect attempts, IdleTimeout-triggered cancellation, and `MaxRetries` exhaustion; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect streaming behavior to remain stable under transient failures
 
-- [ ] Document shared backoff usage — Make the shared helper the canonical retry mechanism
+- [x] Document shared backoff usage — Make the shared helper the canonical retry mechanism
   - Component: `REUSE.md`, `GOLANG.md`, any internal developer docs referencing retry logic
   - Scope: Update `REUSE.md` to reference `internal/workflow/backoff` as the canonical retry package; add guidance in `GOLANG.md` on when and how to use the helper; remove or update references to bespoke backoff implementations in comments and docs
   - Test: Manual docs review; run `rg "backoff" .` to verify that all runtime retry loops either use or explicitly opt out of the shared helper
