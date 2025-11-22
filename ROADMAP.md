@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace `ClaimManager`’s `backoffDuration`, `minBackoff`, `maxBackoff`, `applyBackoff`, `resetBackoff`, and `getBackoffDuration` with a shared backoff policy; ensure the loop uses policy-derived intervals for ticker resets and that backoff resets when work is successfully claimed
   - Test: Adapt `TestClaimLoopBackoff` and related tests to verify interval growth and max-cap via the shared helper (with jitter tolerance); run `go test ./internal/nodeagent/...`; expect backoff to increase and respect the configured max interval within jitter bounds
 
-- [ ] Apply shared backoff to nodeagent status uploads — Unify status uploader retry logic with shared backoff
+- [x] Apply shared backoff to nodeagent status uploads — Unify status uploader retry logic with shared backoff
   - Component: `internal/nodeagent/statusuploader.go`, `internal/nodeagent/statusuploader_test.go`
   - Scope: Replace manual `maxRetries` and `backoff` doubling in `UploadStatus` with `internal/workflow/backoff` helpers configured for existing retry counts and base delay; preserve retry conditions for network errors and 5xx responses and keep slog messages unchanged
   - Test: Extend `TestStatusUploader_RetryBackoff` to assert the total retry duration and attempt count using the shared helper; run `go test ./internal/nodeagent/...`; expect behavior to remain equivalent while implementation complexity drops
