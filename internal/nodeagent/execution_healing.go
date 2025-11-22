@@ -145,6 +145,12 @@ func (r *runController) executeWithHealing(
 	var reGates []gateRunMetadata
 
 	// Attempt healing loop.
+	// Note: This is a domain-specific healing retry loop (not a transient error retry).
+	// It executes healing mods between gate validation attempts based on user-configured retries.
+	// We intentionally do not use internal/workflow/backoff here because:
+	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running healing mods).
+	//  2. The retry count is user-configured (manifest-specified retries parameter).
+	//  3. No exponential backoff is needed; each healing attempt runs immediately after healing mods complete.
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries)
 

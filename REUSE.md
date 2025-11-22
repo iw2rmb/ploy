@@ -9,9 +9,16 @@
   - CLI tree drift: generate command tree/completions from a framework (`spf13/cobra` + `pflag`) instead of maintaining `internal/clitree/tree.go` manually.
 
 - **Backoff Unification**
-  - Add dependency; centralize policy defaults and logging in `internal/workflow/backoff` (or similar).
-  - Refactor call sites in rollout, nodeagent heartbeat/claimer/statusuploader, stream client, GitLab MR retry code to use a shared helper that accepts context, logger, metrics hooks.
-  - Add unit tests for jitter, max cap, and context cancellation; update existing backoff tests to cover shared helper.
+  - **Status**: ✅ Complete. All backoff logic migrated to `internal/workflow/backoff`.
+  - **Package**: `internal/workflow/backoff` is the canonical retry mechanism using `github.com/cenkalti/backoff/v5`.
+  - **Policies**: Use predefined policies (`DefaultPolicy`, `RolloutPolicy`, `HeartbeatPolicy`, `ClaimLoopPolicy`, `StatusUploaderPolicy`, `CertificateBootstrapPolicy`, `GitLabMRPolicy`, `SSEStreamPolicy`) or create custom `Policy` instances.
+  - **Helpers**:
+    - `RunWithBackoff(ctx, policy, logger, op)` — Execute operation with retry and structured logging.
+    - `PollWithBackoff(ctx, policy, logger, condition)` — Poll condition until success or exhaustion.
+    - `NewStatefulBackoff(policy)` — Maintain backoff state across events (Apply/Reset/GetDuration).
+    - `Permanent(err)` — Mark error as non-retryable.
+  - **Migration**: All call sites in rollout, nodeagent (heartbeat, claimer, status uploader, certificate bootstrap), SSE stream client, and GitLab MR client now use the shared helper.
+  - **Tests**: Unit tests cover jitter bounds, max cap, context cancellation, and policy behavior in `internal/workflow/backoff/backoff_test.go` with ≥90% coverage.
 
 - **GitLab Client Swap**
   - Add `go-gitlab`; wire MR creation via typed client with retry/backoff wrapper above.
