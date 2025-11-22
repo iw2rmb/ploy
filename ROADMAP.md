@@ -36,8 +36,8 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace manual `maxRetries` and `backoff` doubling in `UploadStatus` with `internal/workflow/backoff` helpers configured for existing retry counts and base delay; preserve retry conditions for network errors and 5xx responses and keep slog messages unchanged
   - Test: Extend `TestStatusUploader_RetryBackoff` to assert the total retry duration and attempt count using the shared helper; run `go test ./internal/nodeagent/...`; expect behavior to remain equivalent while implementation complexity drops
 
-- [ ] Apply shared backoff to nodeagent certificate request retries — Remove bespoke exponential backoff in agent bootstrap
-  - Component: `internal/nodeagent/agent.go`
+- [x] Apply shared backoff to nodeagent certificate request retries — Remove bespoke exponential backoff in agent bootstrap
+  - Component: `internal/nodeagent/agent.go`, `internal/nodeagent/agent_bootstrap_test.go`
   - Scope: Replace manual exponential backoff loop for certificate requests with a shared backoff wrapper; preserve the current number of attempts and log format (`retrying certificate request`, `backoff` fields); ensure context cancellation is honored and early-exit behavior is unchanged
   - Test: Add or extend tests (for example, `agent_backoff_test.go`) to validate retry count, backoff progression, and cancellation; run `go test ./internal/nodeagent/...`; expect certificate acquisition to still succeed under transient failures
 
