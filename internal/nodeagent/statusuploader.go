@@ -8,7 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
+
+	"github.com/cenkalti/backoff/v5"
+	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // StatusUploader uploads terminal status and stats to the control-plane server.
@@ -54,16 +56,24 @@ func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string,
 	// Construct URL.
 	url := fmt.Sprintf("%s/v1/nodes/%s/complete", u.cfg.ServerURL, u.cfg.NodeID)
 
-	// Retry parameters: exponential backoff for transient 5xx errors.
-	maxRetries := 3
-	backoff := 100 * time.Millisecond
+	// Use shared backoff policy for status upload retries.
+	// Retries on network errors and 5xx responses with exponential backoff.
+	policy := wfbackoff.StatusUploaderPolicy()
+	logger := slog.Default()
 
+	// Track attempt count for logging (matches existing behavior).
+	attempt := 0
 	var lastErr error
-	for attempt := 0; attempt <= maxRetries; attempt++ {
+
+	// Define the upload operation with retry logic.
+	uploadOp := func() error {
+		attempt++
+
 		// Create HTTP request.
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 		if err != nil {
-			return fmt.Errorf("create request: %w", err)
+			// Request creation errors are non-retryable.
+			return backoff.Permanent(fmt.Errorf("create request: %w", err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 
@@ -72,16 +82,7 @@ func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string,
 		if err != nil {
 			lastErr = fmt.Errorf("send request: %w", err)
 			// Network errors are retryable.
-			if attempt < maxRetries {
-				slog.Warn("upload status request failed, retrying", "run_id", runID, "attempt", attempt+1, "error", err)
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(backoff):
-					backoff *= 2
-					continue
-				}
-			}
+			logger.Warn("upload status request failed, retrying", "run_id", runID, "attempt", attempt, "error", err)
 			return lastErr
 		}
 
@@ -98,22 +99,14 @@ func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string,
 		// Retry on transient 5xx errors.
 		if resp.StatusCode >= 500 && resp.StatusCode < 600 {
 			lastErr = fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
-			if attempt < maxRetries {
-				slog.Warn("upload status received 5xx, retrying", "run_id", runID, "status_code", resp.StatusCode, "attempt", attempt+1)
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case <-time.After(backoff):
-					backoff *= 2
-					continue
-				}
-			}
+			logger.Warn("upload status received 5xx, retrying", "run_id", runID, "status_code", resp.StatusCode, "attempt", attempt)
 			return lastErr
 		}
 
-		// Non-retryable error (4xx or other).
-		return fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes))
+		// Non-retryable error (4xx or other) - mark as permanent.
+		return backoff.Permanent(fmt.Errorf("upload failed: status %d: %s", resp.StatusCode, string(bodyBytes)))
 	}
 
-	return lastErr
+	// Run the upload operation with shared backoff.
+	return wfbackoff.RunWithBackoff(ctx, policy, logger, uploadOp)
 }

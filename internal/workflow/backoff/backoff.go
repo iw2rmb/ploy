@@ -72,6 +72,19 @@ func ClaimLoopPolicy() Policy {
 	}
 }
 
+// StatusUploaderPolicy returns a policy for nodeagent status upload retries.
+// Starts at 100ms with 2x multiplier and 4 total attempts (initial + 3 retries).
+// Matches existing status uploader retry behavior.
+func StatusUploaderPolicy() Policy {
+	return Policy{
+		InitialInterval: 100 * time.Millisecond,
+		MaxInterval:     400 * time.Millisecond, // 100ms * 2^2 = 400ms (won't exceed this).
+		Multiplier:      2.0,
+		MaxElapsedTime:  0, // No time limit for status upload retries.
+		MaxAttempts:     4, // Initial attempt + 3 retries.
+	}
+}
+
 // NewExponentialBackoff creates a backoff.ExponentialBackOff from the policy.
 // Configures initial interval, max interval, multiplier, randomization factor (jitter).
 // Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
