@@ -48,7 +48,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	slog.Info("starting run execution", "run_id", req.RunID, "repo_url", req.RepoURL)
 
 	// Phase 1: Convert the StartRunRequest to a StepManifest.
-	manifest, err := buildManifestFromRequest(req)
+	// Parse typed options from the raw options map to reduce map[string]any casts.
+	typedOpts := parseRunOptions(req.Options)
+	manifest, err := buildManifestFromRequest(req, typedOpts)
 	if err != nil {
 		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
 		return

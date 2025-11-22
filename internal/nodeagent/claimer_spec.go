@@ -35,24 +35,26 @@ func stringValue(s *string) string {
 //     "mr_on_success", and "mr_on_fail" are passed through as-is.
 //   - The "build_gate_healing" block is preserved in options to support heal → re-gate loops.
 //
-// Returns two maps:
-//   - opts: map[string]any containing flattened options for run execution.
+// Returns:
+//   - opts: map[string]any containing flattened options (preserved for raw JSON access).
 //   - env: map[string]string containing merged environment variables.
+//   - typedOpts: RunOptions with typed accessors for all understood option keys.
 //
-// If the spec is empty or invalid JSON, returns empty maps.
-func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
+// If the spec is empty or invalid JSON, returns empty maps and zero RunOptions.
+func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOptions) {
 	opts := map[string]any{}
 	env := map[string]string{}
+	var typedOpts RunOptions
 	if len(spec) == 0 {
-		return opts, env
+		return opts, env, typedOpts
 	}
 	var root any
 	if err := json.Unmarshal(spec, &root); err != nil {
-		return opts, env
+		return opts, env, typedOpts
 	}
 	m, ok := root.(map[string]any)
 	if !ok {
-		return map[string]any{"spec": root}, env
+		return map[string]any{"spec": root}, env, typedOpts
 	}
 	// Extract known fields at top level.
 	if v, ok := m["image"].(string); ok && v != "" {
@@ -179,5 +181,11 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string) {
 			opts["build_gate_profile"] = p
 		}
 	}
-	return opts, env
+
+	// Parse typed options from the flattened opts map.
+	// This provides type-safe accessors for all understood option keys while
+	// preserving the raw map for backward compatibility and wire-level JSON access.
+	typedOpts = parseRunOptions(opts)
+
+	return opts, env, typedOpts
 }

@@ -100,25 +100,22 @@ func (r *runController) executeWithHealing(
 	}
 
 	// Build gate failed. Check if healing is configured.
-	healingConfig, hasHealing := req.Options["build_gate_healing"].(map[string]any)
-	if !hasHealing {
+	// Parse typed healing config from raw options to avoid map[string]any casts.
+	typedOpts := parseRunOptions(req.Options)
+	if typedOpts.Healing == nil {
 		// No healing configured; return the gate failure.
 		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
-	// Extract healing parameters.
-	retries := 1 // Default to 1 retry
-	if r, ok := healingConfig["retries"].(int); ok && r > 0 {
-		retries = r
-	} else if rf, ok := healingConfig["retries"].(float64); ok && rf > 0 {
-		retries = int(rf)
-	}
+	healingConfig := typedOpts.Healing
 
-	healingMods, ok := healingConfig["mods"].([]any)
-	if !ok || len(healingMods) == 0 {
+	// Validate healing configuration.
+	if len(healingConfig.Mods) == 0 {
 		slog.Warn("build_gate_healing configured but no mods provided", "run_id", req.RunID)
 		return executionResult{Result: result, PreGate: preGate}, err
 	}
+
+	retries := healingConfig.Retries
 
 	// Create /in directory if not already created (for build-gate.log).
 	if *inDir == "" {
@@ -154,9 +151,9 @@ func (r *runController) executeWithHealing(
 	for attempt := 1; attempt <= retries; attempt++ {
 		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries)
 
-		// Execute each healing mod in sequence.
-		for idx, modEntry := range healingMods {
-			healManifest, buildErr := buildHealingManifest(req, modEntry, idx)
+		// Execute each healing mod in sequence using typed HealingMod structs.
+		for idx, mod := range healingConfig.Mods {
+			healManifest, buildErr := buildHealingManifest(req, mod, idx)
 			if buildErr != nil {
 				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
 				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)

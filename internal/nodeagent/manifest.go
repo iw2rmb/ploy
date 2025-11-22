@@ -11,7 +11,9 @@ import (
 )
 
 // buildManifestFromRequest converts a StartRunRequest into a StepManifest.
-func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, error) {
+// The function accepts typed RunOptions to reduce map[string]any casts while
+// preserving backward compatibility with the raw Options map for wire-level access.
+func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -23,21 +25,12 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 	// preserve image-provided CMD/ENTRYPOINT for custom mods containers.
 	const defaultImage = "ubuntu:latest"
 	image := defaultImage
-	var command []string
-	if imgOpt, ok := req.Options["image"].(string); ok && strings.TrimSpace(imgOpt) != "" {
-		image = strings.TrimSpace(imgOpt)
+	if typedOpts.Execution.Image != "" {
+		image = strings.TrimSpace(typedOpts.Execution.Image)
 	}
-	// Accept command as []string or single shell string.
-	switch v := req.Options["command"].(type) {
-	case []string:
-		if len(v) > 0 {
-			command = v
-		}
-	case string:
-		if s := strings.TrimSpace(v); s != "" {
-			command = []string{"/bin/sh", "-c", s}
-		}
-	}
+
+	// Use typed command accessor to avoid map[string]any cast.
+	command := typedOpts.Execution.Command.ToSlice()
 
 	// If no explicit command was provided, inject a harmless placeholder only
 	// when running the default ubuntu image. For custom images (e.g., mods
@@ -68,44 +61,38 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		env[k] = v
 	}
 
-	// Optional: allow spec to request container retention for post-run inspection.
-	retain := false
-	if b, ok := req.Options["retain_container"].(bool); ok {
-		retain = b
-	}
+	// Use typed accessor for container retention.
+	retain := typedOpts.Execution.RetainContainer
 
-	// Extract options required by later phases in the node agent. Only select
-	// keys are propagated to manifest.Options to keep scope tight and avoid
-	// accidentally logging/transmitting unrelated values.
+	// Build manifest options from typed accessors. Only select keys are propagated
+	// to manifest.Options to keep scope tight and avoid accidentally logging/transmitting
+	// unrelated values.
 	//
 	// Allowed keys:
 	//   - gitlab_pat, gitlab_domain, mr_on_success, mr_on_fail (MR wiring)
 	//   - stage_id (server-provided stage identifier for uploads)
 	//   - artifact_name (optional bundle name override)
-	gitlabOpts := make(map[string]any)
-	if pat, ok := req.Options["gitlab_pat"].(string); ok && strings.TrimSpace(pat) != "" {
-		gitlabOpts["gitlab_pat"] = strings.TrimSpace(pat)
-	}
-	if domain, ok := req.Options["gitlab_domain"].(string); ok && strings.TrimSpace(domain) != "" {
-		gitlabOpts["gitlab_domain"] = strings.TrimSpace(domain)
-	}
-	if mrSuccess, ok := req.Options["mr_on_success"].(bool); ok {
-		gitlabOpts["mr_on_success"] = mrSuccess
-	}
-	if mrFail, ok := req.Options["mr_on_fail"].(bool); ok {
-		gitlabOpts["mr_on_fail"] = mrFail
-	}
-	if sid, ok := req.Options["stage_id"].(string); ok && strings.TrimSpace(sid) != "" {
-		gitlabOpts["stage_id"] = strings.TrimSpace(sid)
-	}
-	if aname, ok := req.Options["artifact_name"].(string); ok && strings.TrimSpace(aname) != "" {
-		gitlabOpts["artifact_name"] = strings.TrimSpace(aname)
-	}
-
-	// Options are intentionally restricted to the allowed keys above. Do NOT
-	// propagate generic request options (e.g., image, command, retain_container,
-	// build_gate_*, artifact_paths) into manifest.Options.
 	mergedOpts := make(map[string]any)
+	if pat := strings.TrimSpace(typedOpts.MRWiring.GitLabPAT); pat != "" {
+		mergedOpts["gitlab_pat"] = pat
+	}
+	if domain := strings.TrimSpace(typedOpts.MRWiring.GitLabDomain); domain != "" {
+		mergedOpts["gitlab_domain"] = domain
+	}
+	// Include MR flags in options only when explicitly set (not just default false).
+	// We check the raw options map to distinguish between "not set" and "set to false".
+	if _, hasMRSuccess := req.Options["mr_on_success"]; hasMRSuccess {
+		mergedOpts["mr_on_success"] = typedOpts.MRWiring.MROnSuccess
+	}
+	if _, hasMRFail := req.Options["mr_on_fail"]; hasMRFail {
+		mergedOpts["mr_on_fail"] = typedOpts.MRWiring.MROnFail
+	}
+	if sid := strings.TrimSpace(typedOpts.ServerMetadata.StageID); sid != "" {
+		mergedOpts["stage_id"] = sid
+	}
+	if aname := strings.TrimSpace(typedOpts.Artifacts.Name); aname != "" {
+		mergedOpts["artifact_name"] = aname
+	}
 
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.RunID),
@@ -132,67 +119,36 @@ func buildManifestFromRequest(req StartRunRequest) (contracts.StepManifest, erro
 		Options: mergedOpts,
 	}
 
-	// Merge GitLab options on top of existing options.
-	for k, v := range gitlabOpts {
-		manifest.Options[k] = v
-	}
-
-	// Override Gate from options when provided (flattened in parseSpec).
-	if b, ok := req.Options["build_gate_enabled"].(bool); ok {
-		manifest.Gate.Enabled = b
-	}
-	if p, ok := req.Options["build_gate_profile"].(string); ok && strings.TrimSpace(p) != "" {
-		manifest.Gate.Profile = strings.TrimSpace(p)
+	// Override Gate from typed build gate options.
+	manifest.Gate.Enabled = typedOpts.BuildGate.Enabled
+	if profile := strings.TrimSpace(typedOpts.BuildGate.Profile); profile != "" {
+		manifest.Gate.Profile = profile
 	}
 
 	return manifest, nil
 }
 
-// buildHealingManifest constructs a StepManifest from a healing mod entry.
+// buildHealingManifest constructs a StepManifest from a typed HealingMod.
 // The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
-func buildHealingManifest(req StartRunRequest, modEntry any, index int) (contracts.StepManifest, error) {
-	entry, ok := modEntry.(map[string]any)
-	if !ok {
-		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: expected map, got %T", index, modEntry)
-	}
-
-	// Extract image (required).
-	image, ok := entry["image"].(string)
-	if !ok || strings.TrimSpace(image) == "" {
+// Using typed HealingMod clarifies which fields are understood by the agent.
+func buildHealingManifest(req StartRunRequest, mod HealingMod, index int) (contracts.StepManifest, error) {
+	// Validate required image field.
+	image := strings.TrimSpace(mod.Image)
+	if image == "" {
 		return contracts.StepManifest{}, fmt.Errorf("healing mod[%d]: image required", index)
 	}
-	image = strings.TrimSpace(image)
 
-	// Extract command (optional).
-	var command []string
-	switch v := entry["command"].(type) {
-	case []any:
-		for _, c := range v {
-			if s, ok := c.(string); ok {
-				command = append(command, s)
-			}
-		}
-	case string:
-		if s := strings.TrimSpace(v); s != "" {
-			command = []string{"/bin/sh", "-c", s}
-		}
+	// Use typed command accessor to avoid polymorphic handling.
+	command := mod.Command.ToSlice()
+
+	// Use typed env map (already map[string]string).
+	env := mod.Env
+	if env == nil {
+		env = make(map[string]string)
 	}
 
-	// Extract env (optional).
-	env := make(map[string]string)
-	if envMap, ok := entry["env"].(map[string]any); ok {
-		for k, v := range envMap {
-			if s, ok := v.(string); ok {
-				env[k] = s
-			}
-		}
-	}
-
-	// Extract retain_container (optional).
-	retain := false
-	if b, ok := entry["retain_container"].(bool); ok {
-		retain = b
-	}
+	// Use typed retain flag.
+	retain := mod.RetainContainer
 
 	// For healing, reuse the existing workspace; do not re-hydrate the repo.
 

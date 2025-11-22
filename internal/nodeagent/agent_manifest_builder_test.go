@@ -26,7 +26,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			},
 		}
 
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -88,7 +88,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
 
-		_, err := buildManifestFromRequest(req)
+		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err == nil {
 			t.Fatal("expected error for missing run_id")
 		}
@@ -102,7 +102,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID: types.RunID("run-123"),
 		}
 
-		_, err := buildManifestFromRequest(req)
+		_, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err == nil {
 			t.Fatal("expected error for missing repo_url")
 		}
@@ -118,7 +118,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			BaseRef: types.GitRef("main"),
 		}
 
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			TargetRef: types.GitRef("main"),
 		}
 
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -155,7 +155,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			},
 		}
 
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -181,7 +181,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"image": "docker.io/example/mods-openrewrite:latest",
 			},
 		}
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -198,7 +198,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 			RunID:   types.RunID("run-456"),
 			RepoURL: types.RepoURL("https://github.com/example/repo.git"),
 		}
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -225,7 +225,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"retain_container": true,
 			},
 		}
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
@@ -258,7 +258,7 @@ func TestBuildManifestFromRequest(t *testing.T) {
 				"mr_on_success": true,
 			},
 		}
-		manifest, err := buildManifestFromRequest(req)
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
 		if err != nil {
 			t.Fatalf("buildManifestFromRequest() error: %v", err)
 		}
