@@ -119,7 +119,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Review CLI usage examples and help snippets, updating them where cobra changes formatting (for example, help headers or subcommand listings); document any new convenience commands (such as `ploy completion <shell>`) added for completion generation
   - Test: Manual docs review; run CLI help snapshot tests under `cmd/ploy` to confirm consistency between docs and actual output
 
-- [ ] Add binary size guardrail for CLI changes — Protect against excessive growth from new dependencies
+- [x] Add binary size guardrail for CLI changes — Protect against excessive growth from new dependencies
   - Component: `Makefile`, CI/test harness, `dist/ploy`
   - Scope: Introduce a guardrail that measures `dist/ploy` after `make build` (for example, a simple size check script) and fails the build if the binary exceeds an agreed threshold; wire this into `make test` or a dedicated CI job
   - Test: Manually verify the guardrail by building and checking size locally; ensure regular builds pass and CI enforces the threshold
