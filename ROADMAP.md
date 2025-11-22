@@ -57,7 +57,7 @@ Legend: [ ] todo, [x] done.
   - Test: Manual docs review; run `rg "backoff" .` to verify that all runtime retry loops either use or explicitly opt out of the shared helper
 
 ## SSE Client Replacement (github.com/tmaxmax/go-sse)
-- [ ] Add go-sse dependency and adapter layer — Prepare to replace the custom SSE parser
+- [x] Add go-sse dependency and adapter layer — Prepare to replace the custom SSE parser
   - Component: `go.mod`, `go.sum`, `internal/cli/stream`
   - Scope: Add `github.com/tmaxmax/go-sse` as a dependency; introduce an adapter (for example, `internal/cli/stream/sse_client.go`) that wraps the library and exposes a `Stream`-style API compatible with existing `Client`, `Event`, and `ErrDone` contracts
   - Test: Add unit tests in `internal/cli/stream` that exercise the adapter using an in-memory SSE source emitting `id`, `event`, `data`, `retry`, and comment lines; run `go test ./internal/cli/stream/...`; expect events to map correctly into existing `Event` fields
