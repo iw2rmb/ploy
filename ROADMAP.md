@@ -80,13 +80,13 @@ Legend: [ ] todo, [x] done.
 
 - [x] Refactor MR creation to use client-go types — Replace manual HTTP calls with typed API while preserving external contracts
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_create_test.go`
-  - Scope: Replace manual HTTP request/response handling in `CreateMR` with client-go’s merge request creation API; maintain the external `MRCreateRequest` and `MRCreateResponse` contracts or introduce minimal new DTOs that keep the same call sites; preserve domain parsing, URL construction, and label/description handling
-  - Test: Update `mr_client_api_create_test.go` to assert that requests sent via client-go hit the expected endpoint with the correct payload (golden JSON where applicable); run `go test ./internal/nodeagent/gitlab/...`; expect API behavior to match current tests
+  - Scope: Replace manual HTTP request/response handling in `CreateMR` with client-go’s merge request creation API; keep `MRCreateRequest` and `MRCreateResponse` available to callers while decoding the URL-encoded project path before passing it to client-go; preserve domain parsing via `NewClient`, label/description handling, and PAT redaction behavior
+  - Test: Keep `mr_client_api_create_test.go` asserting that the client-go–backed implementation posts to `/api/v4/projects/<project>/merge_requests` with the expected headers (Authorization + `PRIVATE-TOKEN`) and payload fields (title, branches, description, labels); run `go test ./internal/nodeagent/gitlab/...` when iterating on this slice
 
 - [ ] Integrate shared backoff with client-go MR operations — Keep retry semantics while delegating delays to shared helpers
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/workflow/backoff`
-  - Scope: Replace manual retry loop, `shouldRetry`, and `backoff` functions with shared backoff helpers; preserve retry conditions for 429 and 5xx statuses and the 3-attempt limit; ensure context cancellation is honored and error messages still pass through `redactError`
-  - Test: Update `mr_client_api_retry_test.go` to validate retry count and approximate delay schedule via the shared helper; run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz and validation tests continue to pass
+  - Scope: Replace manual retry loop, `shouldRetry`, and `backoff` functions with shared backoff helpers; preserve retry conditions for transient network errors plus 429 and 5xx statuses and the 3-attempt limit; ensure context cancellation is honored and error messages still pass through `redactError`
+  - Test: Update `mr_client_api_retry_test.go` to validate retry count and approximate delay schedule via the shared helper (including network-error cases); run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz and validation tests continue to pass
 
 - [ ] Clean up DTOs and redaction paths — Ensure no PAT leakage after the swap
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_redaction_test.go`
