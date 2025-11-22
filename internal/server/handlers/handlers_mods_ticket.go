@@ -24,14 +24,15 @@ import (
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
 func submitTicketHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Decode request body.
+		// Decode request body with domain types for VCS fields.
+		// JSON unmarshaling will automatically validate repo URL scheme and non-empty refs.
 		var req struct {
-			RepoURL   string           `json:"repo_url"`
-			BaseRef   string           `json:"base_ref"`
-			TargetRef string           `json:"target_ref"`
-			CommitSha *string          `json:"commit_sha,omitempty"`
-			Spec      *json.RawMessage `json:"spec,omitempty"`
-			CreatedBy *string          `json:"created_by,omitempty"`
+			RepoURL   domaintypes.RepoURL    `json:"repo_url"`
+			BaseRef   domaintypes.GitRef     `json:"base_ref"`
+			TargetRef domaintypes.GitRef     `json:"target_ref"`
+			CommitSha *domaintypes.CommitSHA `json:"commit_sha,omitempty"`
+			Spec      *json.RawMessage       `json:"spec,omitempty"`
+			CreatedBy *string                `json:"created_by,omitempty"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -39,18 +40,25 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Validate required fields.
-		if strings.TrimSpace(req.RepoURL) == "" {
-			http.Error(w, "repo_url field is required", http.StatusBadRequest)
+		// Validate domain types explicitly to catch missing/zero-value fields.
+		// When JSON fields are omitted, domain types remain at zero value and need validation.
+		if err := req.RepoURL.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("repo_url: %v", err), http.StatusBadRequest)
 			return
 		}
-		if strings.TrimSpace(req.BaseRef) == "" {
-			http.Error(w, "base_ref field is required", http.StatusBadRequest)
+		if err := req.BaseRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("base_ref: %v", err), http.StatusBadRequest)
 			return
 		}
-		if strings.TrimSpace(req.TargetRef) == "" {
-			http.Error(w, "target_ref field is required", http.StatusBadRequest)
+		if err := req.TargetRef.Validate(); err != nil {
+			http.Error(w, fmt.Sprintf("target_ref: %v", err), http.StatusBadRequest)
 			return
+		}
+		if req.CommitSha != nil {
+			if err := req.CommitSha.Validate(); err != nil {
+				http.Error(w, fmt.Sprintf("commit_sha: %v", err), http.StatusBadRequest)
+				return
+			}
 		}
 
 		// Prepare spec (default to empty JSON object if not provided).
@@ -60,14 +68,20 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 		}
 
 		// Create the run directly with repo_url and spec inlined.
+		// Convert domain types to strings for storage layer.
+		var commitShaStr *string
+		if req.CommitSha != nil {
+			s := req.CommitSha.String()
+			commitShaStr = &s
+		}
 		run, err := st.CreateRun(r.Context(), store.CreateRunParams{
-			RepoUrl:   req.RepoURL,
+			RepoUrl:   req.RepoURL.String(),
 			Spec:      spec,
 			CreatedBy: req.CreatedBy,
 			Status:    store.RunStatusQueued,
-			BaseRef:   req.BaseRef,
-			TargetRef: req.TargetRef,
-			CommitSha: req.CommitSha,
+			BaseRef:   req.BaseRef.String(),
+			TargetRef: req.TargetRef.String(),
+			CommitSha: commitShaStr,
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to create run: %v", err), http.StatusInternalServerError)

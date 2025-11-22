@@ -88,6 +88,7 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 		mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
 
 		// Build response with claimed run details.
+		// Domain types ensure VCS fields have been validated at ingestion.
 		resp := struct {
 			ID        string          `json:"id"`
 			RepoURL   string          `json:"repo_url"`
