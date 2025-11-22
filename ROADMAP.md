@@ -7,7 +7,7 @@ Documentation: `GOLANG.md`, `ROADMAP_NEXT.md`, `docs/api/OpenAPI.yaml`, `docs/en
 Legend: [ ] todo, [x] done.
 
 ## Lifecycle Snapshots
-- [ ] Introduce typed lifecycle snapshot structs — Harden resource/status schema and reduce `map[string]any` casts
+- [x] Introduce typed lifecycle snapshot structs — Harden resource/status schema and reduce `map[string]any` casts
   - Component: `internal/worker/lifecycle`, `internal/server/status`, `internal/nodeagent`
   - Scope: Add `NodeStatus` / `NodeCapacity` structs in `internal/worker/lifecycle`; add helpers to convert to/from `map[string]any`; update `Collector.Collect`, `Cache`, `status.Provider`, and `HeartbeatManager.sendHeartbeat` to use typed accessors instead of direct `map[string]any` indexing
   - Test: `go test ./internal/worker/lifecycle ./internal/server/status ./internal/nodeagent` — Heartbeat and status snapshot tests continue to pass with unchanged JSON payloads
