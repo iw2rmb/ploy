@@ -77,6 +77,10 @@ test-binary-size: ## Enforce binary size threshold (protects against dependency 
 	fi
 	@./scripts/check-binary-size.sh $(BUILD_DIR)/$(BINARY) $(BINARY_SIZE_THRESHOLD_MB)
 
+.PHONY: validate-tdd
+validate-tdd: ## Validate RED→GREEN→REFACTOR discipline (tests, coverage, binary size, code quality)
+	@./scripts/validate-tdd-discipline.sh
+
 .PHONY: vet
 vet: ## Run go vet
 	go vet ./...
@@ -147,6 +151,7 @@ help: ## Show available targets
 	@echo "  make test-coverage-threshold    # Enforce 60% overall coverage threshold"
 	@echo "  make test-coverage-critical     # Enforce 90% coverage on scheduler/PKI/ingest critical paths"
 	@echo "  make test-binary-size           # Enforce binary size threshold (protects against dependency bloat)"
+	@echo "  make validate-tdd               # Validate RED→GREEN→REFACTOR discipline"
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"

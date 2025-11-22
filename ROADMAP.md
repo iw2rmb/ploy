@@ -130,10 +130,10 @@ Legend: [ ] todo, [x] done.
   - Scope: Run `make test` and capture coverage summary for key packages (`internal/workflow/...`, `internal/nodeagent/...`, `internal/cli/stream`, `cmd/ploy`); record baseline in `CHECKPOINT.md` or `CHECKPOINT_MODS.md` to ensure overall coverage stays ≥60% and critical workflow/runner packages remain ≥90%
   - Test: None (documentation step); ensure coverage reports are committed or referenced where appropriate
 
-- [ ] Follow RED→GREEN→REFACTOR for each slice — Maintain TDD discipline across backoff, SSE, GitLab, and CLI changes
-  - Component: All affected packages and tests
-  - Scope: For each roadmap slice (backoff, SSE, GitLab client, CLI), first add or tighten tests to pin current behavior (RED), then implement the minimal change to make tests pass (GREEN), and finally clean up implementations, removing duplication and legacy helpers (REFACTOR)
-  - Test: Enforced via CI: `make test` must pass at each stage; manual review of diffs should show tests leading code changes
+- [x] Follow RED→GREEN→REFACTOR for each slice — Maintain TDD discipline across backoff, SSE, GitLab, and CLI changes
+  - Component: All affected packages and tests; `scripts/validate-tdd-discipline.sh`; `Makefile` (`validate-tdd` target); `AGENTS.md` (TDD discipline documentation)
+  - Scope: For each roadmap slice (backoff, SSE, GitLab client, CLI), first add or tighten tests to pin current behavior (RED), then implement the minimal change to make tests pass (GREEN), and finally clean up implementations, removing duplication and legacy helpers (REFACTOR); introduced `scripts/validate-tdd-discipline.sh` to automate validation of TDD discipline (test existence, test passing, coverage thresholds, binary size, code quality); added `make validate-tdd` target; documented TDD discipline process in `AGENTS.md` with usage examples and phase descriptions
+  - Test: Enforced via CI: `make test` must pass at each stage; manual review of diffs should show tests leading code changes; run `bash scripts/validate-tdd-discipline_test.sh` to verify validation script correctness; run `make validate-tdd` or `./scripts/validate-tdd-discipline.sh` to validate RED→GREEN→REFACTOR discipline for any package
 
 - [ ] Run targeted integration and e2e smoke tests — Validate end-to-end behavior for critical workflows
   - Component: `tests/e2e` harness, especially Mods workflows, SSE log streaming, and GitLab MR flows
