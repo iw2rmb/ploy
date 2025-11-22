@@ -20,7 +20,7 @@ Legend: [ ] todo, [x] done.
   - Follow-up: Extend `parseRunOptions` to also handle `StartRunRequest.Options["command"]` values decoded as `[]any` (in addition to `string` and `[]string`) so exec-array commands from JSON payloads are always reflected in `Execution.Command`
 
 ## ID and VCS Validation
-- [ ] Use domain ID/VCS types at server boundaries — Centralize validation for repo URLs, refs, and identifiers
+- [x] Use domain ID/VCS types at server boundaries — Centralize validation for repo URLs, refs, and identifiers
   - Component: `internal/server/handlers`, `internal/server/auth`, `internal/cli/config`
   - Scope: Replace plain `string` fields with `domaintypes.RepoURL`, `GitRef`, `CommitSHA`, and `ClusterID` in handler request/response structs and token claims where JSON stays string-based; add minimal conversion helpers for CLI config if needed
   - Test: `go test ./internal/server/... ./internal/cli/...` — Mods ticket submission, claim, and auth tests pass; OpenAPI docs and CLI behavior remain unchanged
