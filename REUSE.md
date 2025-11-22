@@ -10,13 +10,33 @@
 
 - **Backoff Unification**
   - **Status**: ✅ Complete. All backoff logic migrated to `internal/workflow/backoff`.
-  - **Package**: `internal/workflow/backoff` is the canonical retry mechanism using `github.com/cenkalti/backoff/v5`.
-  - **Policies**: Use predefined policies (`DefaultPolicy`, `RolloutPolicy`, `HeartbeatPolicy`, `ClaimLoopPolicy`, `StatusUploaderPolicy`, `CertificateBootstrapPolicy`, `GitLabMRPolicy`, `SSEStreamPolicy`) or create custom `Policy` instances.
-  - **Helpers**:
-    - `RunWithBackoff(ctx, policy, logger, op)` — Execute operation with retry and structured logging.
-    - `PollWithBackoff(ctx, policy, logger, condition)` — Poll condition until success or exhaustion.
-    - `NewStatefulBackoff(policy)` — Maintain backoff state across events (Apply/Reset/GetDuration).
-    - `Permanent(err)` — Mark error as non-retryable.
+  - **Package**: `internal/workflow/backoff` is the **canonical retry mechanism** using `github.com/cenkalti/backoff/v5`.
+  - **Rule**: Do not implement bespoke retry loops. Use the shared helper or document the opt-out rationale.
+
+  - **Usage Guide**:
+    1. **One-off retries**: Use `RunWithBackoff(ctx, policy, logger, op)` where `op` returns `error`.
+    2. **Polling**: Use `PollWithBackoff(ctx, policy, logger, condition)` where `condition` returns `(bool, error)`.
+    3. **Long-running loops**: Use `NewStatefulBackoff(policy)` and call `Apply()` on errors, `Reset()` on success, `GetDuration()` for current interval.
+    4. **Non-retryable errors**: Wrap validation errors, 4xx HTTP status with `Permanent(err)` to prevent retries.
+
+  - **Predefined Policies**: Use appropriate policy for your use case:
+    - `DefaultPolicy()` — General retry operations (2s–30s, 10 attempts, 5m max elapsed).
+    - `RolloutPolicy()` — Rollout operations (2s–30s, 10 attempts, 5m max elapsed).
+    - `HeartbeatPolicy()` — Nodeagent heartbeat (5s–5m, unlimited attempts, no time limit).
+    - `ClaimLoopPolicy()` — Nodeagent claim polling (250ms–5s, unlimited attempts).
+    - `StatusUploaderPolicy()` — Status upload retries (100ms–400ms, 4 attempts).
+    - `CertificateBootstrapPolicy()` — Certificate requests (1s–16s, 5 attempts).
+    - `GitLabMRPolicy()` — GitLab MR API calls (1s–4s, 4 attempts).
+    - `SSEStreamPolicy()` — SSE reconnects (250ms–30s, unlimited by default).
+
+  - **Custom Policies**: Create custom `Policy` struct with `InitialInterval`, `MaxInterval`, `Multiplier`, `MaxElapsedTime`, and `MaxAttempts`.
+
+  - **Features**:
+    - Exponential backoff with 50% jitter for robustness.
+    - Context cancellation honored (returns early when `ctx` is done).
+    - Structured logging via `slog` with stable keys (`attempt`, `backoff_duration`, `status`, `error`).
+    - Metrics hooks available for emitting retry telemetry.
+
   - **Migration**: All call sites in rollout, nodeagent (heartbeat, claimer, status uploader, certificate bootstrap), SSE stream client, and GitLab MR client now use the shared helper.
   - **Tests**: Unit tests cover jitter bounds, max cap, context cancellation, and policy behavior in `internal/workflow/backoff/backoff_test.go` with ≥90% coverage.
 
