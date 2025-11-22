@@ -26,7 +26,7 @@ Legend: [ ] todo, [x] done.
   - Test: `go test ./internal/server/... ./internal/cli/...` — Mods ticket submission, claim, and auth tests pass; OpenAPI docs and CLI behavior remain unchanged
 
 ## Status / Enum Consistency
-- [ ] Align enum/status types across store, workflow contracts, and mods API — Reduce string casts and duplicated status definitions
+- [x] Align enum/status types across store, workflow contracts, and mods API — Reduce string casts and duplicated status definitions
   - Component: `internal/store`, `internal/workflow/contracts`, `internal/mods/api`, `internal/server/handlers`
   - Scope: Introduce shared domain enums for run/stage/buildgate job status or adjust `sqlc.yaml` to reuse existing contract enums; update handlers to rely on shared types instead of ad hoc string conversions
   - Test: `go test ./internal/store ./internal/workflow/contracts ./internal/mods/api ./internal/server/handlers` — All status transition tests pass and JSON status fields remain identical
