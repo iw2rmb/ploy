@@ -99,15 +99,15 @@ func CertificateBootstrapPolicy() Policy {
 }
 
 // GitLabMRPolicy returns a policy for GitLab merge request API retries.
-// Starts at 1s with 2x multiplier and 3 total attempts (initial + 2 retries).
-// Matches existing GitLab MR retry behavior (1s, 2s).
+// Starts at 1s with 2x multiplier and 4 total attempts (initial + 3 retries).
+// Matches existing GitLab MR retry behavior (1s, 2s, 4s).
 func GitLabMRPolicy() Policy {
 	return Policy{
 		InitialInterval: 1 * time.Second,
-		MaxInterval:     2 * time.Second, // 1s * 2^1 = 2s max.
+		MaxInterval:     4 * time.Second, // 1s * 2^2 = 4s max.
 		Multiplier:      2.0,
 		MaxElapsedTime:  0, // No time limit for GitLab MR retries.
-		MaxAttempts:     3, // Initial attempt + 2 retries.
+		MaxAttempts:     4, // Initial attempt + 3 retries.
 	}
 }
 

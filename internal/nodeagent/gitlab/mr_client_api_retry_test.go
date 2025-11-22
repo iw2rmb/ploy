@@ -64,10 +64,11 @@ func TestCreateMR_RetryBehavior(t *testing.T) {
 				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
 				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
 				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
+				{statusCode: http.StatusTooManyRequests, body: `{"message":"Rate limit exceeded"}`},
 			},
 			wantURL:      "",
 			wantErr:      true,
-			wantAttempts: 3,
+			wantAttempts: 4,
 		},
 		{
 			name: "retry_exhausted_500",
@@ -84,12 +85,13 @@ func TestCreateMR_RetryBehavior(t *testing.T) {
 				body       string
 			}{
 				{statusCode: http.StatusInternalServerError, body: `{"message":"Internal server error"}`},
+				{statusCode: http.StatusInternalServerError, body: `{"message":"Internal server error"}`},
 				{statusCode: http.StatusServiceUnavailable, body: `{"message":"Service unavailable"}`},
 				{statusCode: http.StatusGatewayTimeout, body: `{"message":"Gateway timeout"}`},
 			},
 			wantURL:      "",
 			wantErr:      true,
-			wantAttempts: 3,
+			wantAttempts: 4,
 		},
 		{
 			name: "no_retry_on_401",
