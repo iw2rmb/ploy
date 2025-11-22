@@ -41,7 +41,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace manual exponential backoff loop for certificate requests with a shared backoff wrapper; preserve the current number of attempts and log format (`retrying certificate request`, `backoff` fields); ensure context cancellation is honored and early-exit behavior is unchanged
   - Test: Add or extend tests (for example, `agent_backoff_test.go`) to validate retry count, backoff progression, and cancellation; run `go test ./internal/nodeagent/...`; expect certificate acquisition to still succeed under transient failures
 
-- [ ] Apply shared backoff to GitLab MR retries — Use shared policy for HTTP and API errors
+- [x] Apply shared backoff to GitLab MR retries — Use shared policy for HTTP and API errors
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_retry_test.go`
   - Scope: Replace custom `shouldRetry` and `backoff` logic in `CreateMR` with `internal/workflow/backoff` helpers while maintaining retry conditions for 429 and 5xx responses; keep approximate delay pattern (1s, 2s, 4s) and ensure PAT redaction behavior remains intact
   - Test: Update `mr_client_api_retry_test.go` to assert retry count and approximate delays using the shared helper; run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz tests still pass and no PAT values appear in error strings

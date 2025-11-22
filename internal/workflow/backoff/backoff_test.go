@@ -84,6 +84,33 @@ func TestClaimLoopPolicy(t *testing.T) {
 	}
 }
 
+// TestGitLabMRPolicy verifies GitLab MR policy matches existing retry behavior.
+func TestGitLabMRPolicy(t *testing.T) {
+	t.Parallel()
+	p := GitLabMRPolicy()
+
+	// Initial delay: 1s.
+	if p.InitialInterval != 1*time.Second {
+		t.Errorf("InitialInterval = %v, want 1s", p.InitialInterval)
+	}
+	// Max delay: 2s (1s * 2^1).
+	if p.MaxInterval != 2*time.Second {
+		t.Errorf("MaxInterval = %v, want 2s", p.MaxInterval)
+	}
+	// Multiplier: 2.0 for exponential backoff.
+	if p.Multiplier != 2.0 {
+		t.Errorf("Multiplier = %v, want 2.0", p.Multiplier)
+	}
+	// No time limit for GitLab MR retries.
+	if p.MaxElapsedTime != 0 {
+		t.Errorf("MaxElapsedTime = %v, want 0 (no limit)", p.MaxElapsedTime)
+	}
+	// Max 3 attempts (initial + 2 retries).
+	if p.MaxAttempts != 3 {
+		t.Errorf("MaxAttempts = %d, want 3", p.MaxAttempts)
+	}
+}
+
 // TestNewExponentialBackoff verifies exponential backoff instance creation.
 func TestNewExponentialBackoff(t *testing.T) {
 	t.Parallel()
