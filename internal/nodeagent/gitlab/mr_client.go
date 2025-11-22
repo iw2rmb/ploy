@@ -57,20 +57,6 @@ type MRCreateResponse struct {
 	IID int
 }
 
-// retryableError wraps an error to indicate it should be retried.
-// Used by CreateMR to signal retry logic for 429 and 5xx errors.
-type retryableError struct {
-	err error
-}
-
-func (e *retryableError) Error() string {
-	return e.err.Error()
-}
-
-func (e *retryableError) Unwrap() error {
-	return e.err
-}
-
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 4 attempts).
@@ -128,10 +114,12 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 	// Result holder for successful response web URL.
 	var webURL string
 
-	// Retry operation using shared backoff helper.
-	// The operation returns retryableError for 429 and 5xx responses to trigger retry.
+	// Retry operation using shared backoff helper with GitLabMRPolicy.
+	// The policy provides 4 max attempts (initial + 3 retries) with 1s initial interval
+	// and 2x multiplier (1s, 2s, 4s backoff schedule), plus 50% jitter for robustness.
+	// The helper honors context cancellation and logs each attempt via slog.
 	policy := backoff.GitLabMRPolicy()
-	operation := func() error {
+	err = backoff.RunWithBackoff(ctx, policy, slog.Default(), func() error {
 		// Call the GitLab API to create the merge request.
 		// The client-go library handles JSON marshaling and HTTP request construction.
 		mr, resp, err := glClient.MergeRequests.CreateMergeRequest(projectID, options)
@@ -140,45 +128,34 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		if err != nil {
 			// Check if context was cancelled (don't retry).
 			if ctx.Err() != nil {
-				return err
+				return backoff.Permanent(err)
 			}
 
-			// Determine if the error is retryable based on HTTP response.
-			if resp != nil && c.shouldRetry(ctx, nil, resp.StatusCode) {
-				return &retryableError{err: fmt.Errorf("gitlab api error: %w", err)}
+			// Check if the error is retryable based on HTTP response status code.
+			// Retry on 429 (rate limit) and 5xx (server errors); network errors are retryable by default.
+			if resp != nil {
+				statusCode := resp.StatusCode
+				// Retry on 429 (Too Many Requests) or 5xx (server errors).
+				if statusCode == http.StatusTooManyRequests || (statusCode >= 500 && statusCode < 600) {
+					return fmt.Errorf("gitlab api error (retryable): %w", err)
+				}
+				// Non-retryable HTTP error (e.g., 4xx client errors like 400, 401, 404).
+				return backoff.Permanent(fmt.Errorf("create merge request: %w", err))
 			}
 
-			// Non-retryable error (e.g., 4xx client errors).
-			return fmt.Errorf("create merge request: %w", err)
+			// Network error without HTTP response (e.g., connection refused, DNS failure).
+			// These are transient failures that should be retried.
+			return fmt.Errorf("gitlab api network error: %w", err)
 		}
 
 		// Verify that the response includes the web URL.
 		if mr == nil || mr.WebURL == "" {
-			return fmt.Errorf("no web_url in merge request response")
+			return backoff.Permanent(fmt.Errorf("no web_url in merge request response"))
 		}
 
 		// Store the result and return success.
 		webURL = mr.WebURL
 		return nil
-	}
-
-	// Wrap operation with retry filter that only retries on retryableError.
-	err = backoff.RunWithBackoff(ctx, policy, slog.Default(), func() error {
-		err := operation()
-		if err == nil {
-			return nil
-		}
-		// Only propagate error for retry if it's a retryableError.
-		var retryable *retryableError
-		if re, ok := err.(*retryableError); ok {
-			retryable = re
-		}
-		if retryable != nil {
-			// Return the wrapped error to trigger retry.
-			return retryable.err
-		}
-		// Non-retryable error: return as permanent failure.
-		return backoff.Permanent(err)
 	})
 
 	if err != nil {
@@ -209,23 +186,6 @@ func validateMRCreateRequest(req MRCreateRequest) error {
 		return fmt.Errorf("target_branch is required")
 	}
 	return nil
-}
-
-// shouldRetry determines if a request should be retried based on the error or HTTP status code.
-// Retries on 429 (Too Many Requests) and 5xx (server errors).
-func (c *MRClient) shouldRetry(ctx context.Context, err error, statusCode int) bool {
-	// Check context cancellation.
-	if ctx.Err() != nil {
-		return false
-	}
-
-	// Retry on network errors (except context cancellation).
-	if err != nil {
-		return true
-	}
-
-	// Retry on 429 (rate limit) or 5xx (server errors).
-	return statusCode == http.StatusTooManyRequests || (statusCode >= 500 && statusCode < 600)
 }
 
 // redactError replaces any occurrence of the PAT in error messages with [REDACTED].
