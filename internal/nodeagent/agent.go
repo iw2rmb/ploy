@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/pki"
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // Agent coordinates the node agent's HTTP server, heartbeat manager, and claim loop.
@@ -180,9 +181,10 @@ func (a *Agent) bootstrap(ctx context.Context) error {
 
 // requestCertificate exchanges a bootstrap token for a signed certificate.
 // It retries with exponential backoff to handle temporary network failures.
+// Uses shared backoff policy (1s initial, 2x multiplier, 5 attempts total).
 func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []byte) (cert, caCert string, err error) {
-	// Create plain HTTPS client (no mTLS - we don't have certs yet)
-	// Only verify server's CA certificate
+	// Create plain HTTPS client (no mTLS - we don't have certs yet).
+	// Only verify server's CA certificate.
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
@@ -192,7 +194,7 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 		},
 	}
 
-	// Prepare request body
+	// Prepare request body.
 	reqBody := map[string]string{
 		"csr": string(csrPEM),
 	}
@@ -203,21 +205,21 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 
 	url := strings.TrimSuffix(a.cfg.ServerURL, "/") + "/v1/pki/bootstrap"
 
-	// Retry with exponential backoff: 1s, 2s, 4s, 8s, 16s (max 5 attempts)
-	for attempt := 0; attempt < 5; attempt++ {
-		if attempt > 0 {
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
-			slog.Info("retrying certificate request", "attempt", attempt+1, "backoff", backoff)
-			select {
-			case <-time.After(backoff):
-			case <-ctx.Done():
-				return "", "", ctx.Err()
-			}
-		}
+	// Variables to capture successful response.
+	var certResult, caResult string
+
+	// Track attempt number for structured logging (matches existing log format).
+	attemptNum := 0
+
+	// Retry with exponential backoff using shared policy.
+	// Policy: 1s initial interval, 2x multiplier, 5 total attempts.
+	policy := backoff.CertificateBootstrapPolicy()
+	operation := func() error {
+		attemptNum++
 
 		req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
 		if err != nil {
-			return "", "", fmt.Errorf("create request: %w", err)
+			return fmt.Errorf("create request: %w", err)
 		}
 
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -225,17 +227,19 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 
 		resp, err := client.Do(req)
 		if err != nil {
-			slog.Warn("certificate request failed", "error", err, "attempt", attempt+1)
-			continue
+			// Network error - retry with backoff.
+			slog.Warn("certificate request failed", "error", err, "attempt", attemptNum)
+			return err
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			slog.Warn("certificate request returned non-200 status", "status", resp.StatusCode, "attempt", attempt+1)
-			continue
+			// Non-200 status - retry with backoff.
+			slog.Warn("certificate request returned non-200 status", "status", resp.StatusCode, "attempt", attemptNum)
+			return fmt.Errorf("server returned status %d", resp.StatusCode)
 		}
 
-		// Parse response
+		// Parse response.
 		var result struct {
 			Certificate string `json:"certificate"`
 			CABundle    string `json:"ca_bundle"`
@@ -243,23 +247,34 @@ func (a *Agent) requestCertificate(ctx context.Context, token string, csrPEM []b
 		}
 
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			resp.Body.Close()
-			return "", "", fmt.Errorf("decode response: %w", err)
+			return fmt.Errorf("decode response: %w", err)
 		}
-		resp.Body.Close()
 
-		// Save bearer token if provided
+		// Save bearer token if provided.
 		if result.BearerToken != "" {
 			if err := a.saveBearerToken(result.BearerToken); err != nil {
 				slog.Error("failed to save bearer token", "err", err)
-				// Continue anyway - cert was obtained successfully
+				// Continue anyway - cert was obtained successfully.
 			}
 		}
 
-		return result.Certificate, result.CABundle, nil
+		// Capture result for return.
+		certResult = result.Certificate
+		caResult = result.CABundle
+		return nil
 	}
 
-	return "", "", fmt.Errorf("failed to obtain certificate after 5 attempts")
+	// Run with backoff. The shared backoff helper handles:
+	// - Exponential backoff intervals with jitter
+	// - Context cancellation
+	// - Max attempts enforcement
+	// - Structured logging of retry attempts
+	err = backoff.RunWithBackoff(ctx, policy, slog.Default(), operation)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to obtain certificate after %d attempts: %w", attemptNum, err)
+	}
+
+	return certResult, caResult, nil
 }
 
 // saveBearerToken saves the worker bearer token to a file for use in API requests.
