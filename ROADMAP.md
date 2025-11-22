@@ -15,8 +15,9 @@ Legend: [ ] todo, [x] done.
 ## Nodeagent Run Options
 - [x] Introduce typed RunOptions for nodeagent execution — Clarify which spec/options keys are understood by the agent
   - Component: `internal/nodeagent`
-  - Scope: Define small option structs (e.g., build gate config, healing config, MR wiring) in a new file; update `parseSpec` and `buildManifestFromRequest` to populate typed options while preserving raw JSON where needed
-  - Test: `go test ./internal/nodeagent` — Healing, MR creation, and manifest builder tests continue to pass; JSON contracts remain stable
+  - Scope: Define RunOptions plus small option structs (build gate, healing, MR wiring, execution, artifacts, server metadata) in `internal/nodeagent/run_options.go`; add `parseRunOptions` to normalize StartRunRequest.Options keys (`image`, `command`, `retain_container`, `build_gate_enabled`, `build_gate_profile`, `build_gate_healing`, `gitlab_pat`, `gitlab_domain`, `mr_on_success`, `mr_on_fail`, `artifact_name`, `stage_id`); thread typed options through `parseSpec`, `buildManifestFromRequest`, `executeWithHealing`, and `executeRun` while preserving the raw `Options` map for wire-level compatibility
+  - Test: `go test ./internal/nodeagent` — Healing, MR creation, manifest builder, and run_options tests continue to pass; JSON contracts remain stable
+  - Follow-up: Extend `parseRunOptions` to also handle `StartRunRequest.Options["command"]` values decoded as `[]any` (in addition to `string` and `[]string`) so exec-array commands from JSON payloads are always reflected in `Execution.Command`
 
 ## ID and VCS Validation
 - [ ] Use domain ID/VCS types at server boundaries — Centralize validation for repo URLs, refs, and identifiers
