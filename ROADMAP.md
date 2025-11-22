@@ -94,9 +94,9 @@ Legend: [ ] todo, [x] done.
   - Test: Re-run `mr_client_api_redaction_test.go` and add cases for new error shapes if necessary; run `go test ./internal/nodeagent/gitlab/...`; confirm no PAT appears in error strings
 
 - [x] Document GitLab MR client behavior — Keep operator-facing docs in sync with implementation
-  - Component: `cmd/ploy/README.md`, `docs/how-to/update-a-cluster.md`
-  - Scope: Update any documentation describing GitLab MR creation and GitLab integration flags to note the client-go usage where relevant; ensure examples for MR-related flags and spec fields remain accurate
-  - Test: Manual docs review; run GitLab-related integration/e2e tests (if present) that exercise MR creation flows
+  - Component: `cmd/ploy/README.md`, `docs/how-to/update-a-cluster.md`, `docs/how-to/create-mr.md`
+  - Scope: Keep GitLab MR user guides and CLI help aligned with the client-go–backed MR client: document retry semantics (`GitLabMRPolicy` attempts and backoff), PAT redaction behavior (literal and URL-encoded variants), domain normalization rules, and MR creation flags/fields; ensure configuration examples match the current MR wiring
+  - Test: Manual docs review to confirm that README/how-to sections match `internal/nodeagent/gitlab/mr_client.go` behavior; run GitLab-related integration/e2e tests (if present) that exercise MR creation flows
 
 ## CLI Tree Generation via Cobra/Pflag
 - [ ] Introduce cobra-based root command and subcommands — Migrate from manual dispatch while preserving CLI surface
