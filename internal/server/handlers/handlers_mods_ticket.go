@@ -207,20 +207,14 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 
 		// Surface MR URL (and other future metadata) from runs.stats if present.
 		// Node stores MR URL under stats.metadata.mr_url; copy it into summary.Metadata.
-		if len(run.Stats) > 0 {
-			var stats map[string]any
-			if json.Valid(run.Stats) {
-				if err := json.Unmarshal(run.Stats, &stats); err == nil {
-					if metaRaw, ok := stats["metadata"]; ok {
-						if metaMap, ok := metaRaw.(map[string]any); ok {
-							if v, ok := metaMap["mr_url"].(string); ok && strings.TrimSpace(v) != "" {
-								if summary.Metadata == nil {
-									summary.Metadata = map[string]string{}
-								}
-								summary.Metadata["mr_url"] = strings.TrimSpace(v)
-							}
-						}
+		if len(run.Stats) > 0 && json.Valid(run.Stats) {
+			var stats domaintypes.RunStats
+			if err := json.Unmarshal(run.Stats, &stats); err == nil {
+				if mr := stats.MRURL(); mr != "" {
+					if summary.Metadata == nil {
+						summary.Metadata = map[string]string{}
 					}
+					summary.Metadata["mr_url"] = mr
 				}
 			}
 		}

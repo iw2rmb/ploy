@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 func TestStatusUploader_UploadStatus(t *testing.T) {
@@ -14,7 +16,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 		name           string
 		status         string
 		reason         *string
-		stats          map[string]interface{}
+		stats          types.RunStats
 		wantStatusCode int
 		wantErr        bool
 	}{
@@ -22,7 +24,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 			name:   "successful upload with stats",
 			status: "succeeded",
 			reason: nil,
-			stats: map[string]interface{}{
+			stats: types.RunStats{
 				"exit_code":   0,
 				"duration_ms": 1000,
 				"timings": map[string]interface{}{
@@ -36,7 +38,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 			name:   "failed status with reason",
 			status: "failed",
 			reason: stringPtr("exit code 1"),
-			stats: map[string]interface{}{
+			stats: types.RunStats{
 				"exit_code":   1,
 				"duration_ms": 500,
 			},
@@ -55,7 +57,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 			name:           "server error",
 			status:         "succeeded",
 			reason:         nil,
-			stats:          map[string]interface{}{},
+			stats:          types.RunStats{},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErr:        true,
 		},
@@ -63,7 +65,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 			name:           "conflict error (not running)",
 			status:         "succeeded",
 			reason:         nil,
-			stats:          map[string]interface{}{},
+			stats:          types.RunStats{},
 			wantStatusCode: http.StatusConflict,
 			wantErr:        true,
 		},
@@ -179,7 +181,7 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 
 	ctx := context.Background()
 	reason := stringPtr("test failure")
-	stats := map[string]interface{}{
+	stats := types.RunStats{
 		"exit_code":   1,
 		"duration_ms": 2500,
 		"timings": map[string]interface{}{

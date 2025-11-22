@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/cenkalti/backoff/v5"
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	wfbackoff "github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -33,7 +34,7 @@ func NewStatusUploader(cfg Config) (*StatusUploader, error) {
 }
 
 // UploadStatus uploads terminal status and stats to the server with retry on transient 5xx errors.
-func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, reason *string, stats map[string]interface{}) error {
+func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, reason *string, stats types.RunStats) error {
 	// Build request payload.
 	payload := map[string]interface{}{
 		"run_id": runID,

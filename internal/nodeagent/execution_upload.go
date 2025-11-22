@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -53,7 +54,7 @@ func (r *runController) uploadDiff(ctx context.Context, runID, stageID string, d
 	}
 
 	// Build execution summary with timings for diff metadata.
-	summary := map[string]interface{}{
+	summary := types.DiffSummary{
 		"exit_code": result.ExitCode,
 		"timings": map[string]interface{}{
 			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),
@@ -181,7 +182,7 @@ func (r *runController) uploadOutDir(ctx context.Context, runID, stageID, outDir
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // It uses a short, detached context to ensure the status is reported even if the
 // run context is cancelled. Retry logic is handled by StatusUploader.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, reason *string, stats map[string]interface{}) error {
+func (r *runController) uploadStatus(ctx context.Context, runID, status string, reason *string, stats types.RunStats) error {
 	statusUploader, err := NewStatusUploader(r.cfg)
 	if err != nil {
 		return fmt.Errorf("create status uploader: %w", err)

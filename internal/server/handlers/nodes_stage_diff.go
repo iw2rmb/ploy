@@ -62,9 +62,9 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 
 		// Decode request body.
 		var req struct {
-			RunID   string                 `json:"run_id"`
-			Patch   []byte                 `json:"patch"`   // gzipped diff (raw bytes)
-			Summary map[string]interface{} `json:"summary"` // optional summary metadata
+			RunID   string                  `json:"run_id"`
+			Patch   []byte                  `json:"patch"`   // gzipped diff (raw bytes)
+			Summary domaintypes.DiffSummary `json:"summary"` // optional summary metadata
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

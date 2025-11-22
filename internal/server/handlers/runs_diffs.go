@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -40,9 +41,9 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		var req struct {
-			StageID *string                `json:"stage_id,omitempty"`
-			Patch   []byte                 `json:"patch"`
-			Summary map[string]interface{} `json:"summary"`
+			StageID *string                 `json:"stage_id,omitempty"`
+			Patch   []byte                  `json:"patch"`
+			Summary domaintypes.DiffSummary `json:"summary"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			var maxErr *http.MaxBytesError

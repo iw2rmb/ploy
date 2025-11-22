@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // DiffUploader uploads diff and summary data to the control-plane server.
@@ -34,7 +36,7 @@ func NewDiffUploader(cfg Config) (*DiffUploader, error) {
 }
 
 // UploadDiff compresses and uploads a diff to the server.
-func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, diffBytes []byte, summary map[string]interface{}) error {
+func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, diffBytes []byte, summary types.DiffSummary) error {
 	// Gzip the diff content.
 	var gzBuf bytes.Buffer
 	gzWriter := gzip.NewWriter(&gzBuf)
