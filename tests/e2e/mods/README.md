@@ -114,7 +114,18 @@ Cross-phase inputs are mounted at `/in` (read-only):
 What to expect with the provided E2E images:
 - Spec-driven healing runs with `mods-codex`; artifacts across stages are attached to the ticket and can be downloaded via `--artifact-dir`.
 
-Tip: The control plane exposes streaming events and per-stage artifacts. The CLI prints status and can also fetch artifacts via `--artifact-dir`.
+**Streaming Events and Reconnection**
+
+The control plane exposes SSE streams for real-time event delivery. The CLI `--follow` flag uses resilient SSE streaming with:
+- **Automatic reconnection**: On connection errors or mid-stream failures, the client reconnects with exponential backoff (250ms initial, 2x multiplier, capped at 30s).
+- **Last-Event-ID support**: The client preserves the last event ID across reconnects to resume from the last processed event and avoid duplicate processing.
+- **Idle timeout**: Default `45s` idle timeout cancels the stream if no events arrive. Configure via `--idle-timeout <duration>` or disable with `--idle-timeout 0`.
+- **Overall timeout**: Use `--timeout <duration>` to cap total stream time (default unlimited).
+- **Max retries**: Default `3` reconnect attempts. Use `--max-retries -1` for unlimited retries.
+
+The streaming implementation uses `github.com/tmaxmax/go-sse` and the shared backoff policy from `internal/workflow/backoff`. Server `retry` hints are not consumed; reconnect delays are controlled by the backoff policy.
+
+Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 
 **Environment Considerations**
 
