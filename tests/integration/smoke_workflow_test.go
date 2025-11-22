@@ -1,0 +1,354 @@
+package integration
+
+import (
+	"context"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/iw2rmb/ploy/internal/store"
+)
+
+// TestSmokeWorkflow_EndToEnd validates a complete workflow combining multiple operations:
+// 1. Create run (queued)
+// 2. Create stages (build, test, deploy)
+// 3. Append logs across stages
+// 4. Generate diffs
+// 5. Create events
+// 6. Update run status to completed
+// 7. Verify all data is correctly persisted and retrievable
+//
+// This test simulates the critical path through the system from run creation
+// to completion, validating database operations, foreign key relationships,
+// and query correctness.
+//
+// Requires: PLOY_TEST_PG_DSN environment variable.
+func TestSmokeWorkflow_EndToEnd(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping smoke workflow test")
+	}
+
+	ctx := context.Background()
+	db, err := store.NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Step 1: Create a run representing a mod execution workflow.
+	modSpec := []byte(`{
+		"type": "smoke-workflow",
+		"mod": {
+			"image": "docker.io/example/mod-test:latest",
+			"command": ["mod-test", "--input", "/workspace"]
+		},
+		"build_gate": {
+			"enabled": true,
+			"profile": "java-maven"
+		}
+	}`)
+
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		RepoUrl:   "https://github.com/example/smoke-workflow",
+		Spec:      modSpec,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature/smoke-workflow",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
+
+	// Step 2: Create multiple stages representing the workflow phases.
+	// Stage 1: Build Gate (pre-validation)
+	stageBuildGate, err := db.CreateStage(ctx, store.CreateStageParams{
+		RunID:  run.ID,
+		Name:   "build-gate",
+		Status: store.StageStatusRunning,
+		Meta:   []byte(`{"type":"build-gate","profile":"java-maven"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateStage(build-gate) failed: %v", err)
+	}
+	t.Logf("✓ Created stage: id=%v, name=%s", stageBuildGate.ID, stageBuildGate.Name)
+
+	// Stage 2: Main mod execution
+	stageMain, err := db.CreateStage(ctx, store.CreateStageParams{
+		RunID:  run.ID,
+		Name:   "main",
+		Status: store.StageStatusPending,
+		Meta:   []byte(`{"type":"mod","lane":"main"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateStage(main) failed: %v", err)
+	}
+	t.Logf("✓ Created stage: id=%v, name=%s", stageMain.ID, stageMain.Name)
+
+	// Stage 3: Post-processing (e.g., artifact upload)
+	stagePost, err := db.CreateStage(ctx, store.CreateStageParams{
+		RunID:  run.ID,
+		Name:   "post-process",
+		Status: store.StageStatusPending,
+		Meta:   []byte(`{"type":"post-process","action":"upload-artifacts"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateStage(post-process) failed: %v", err)
+	}
+	t.Logf("✓ Created stage: id=%v, name=%s", stagePost.ID, stagePost.Name)
+
+	// Step 3: Simulate log streaming across stages.
+	// Build Gate logs
+	buildGateLog := []byte("INFO: Starting build gate validation\nINFO: Running Maven build\nINFO: Build gate passed\n")
+	log1, err := db.CreateLog(ctx, store.CreateLogParams{
+		RunID:   run.ID,
+		ChunkNo: 0,
+		Data:    buildGateLog,
+	})
+	if err != nil {
+		t.Fatalf("CreateLog(build-gate) failed: %v", err)
+	}
+	t.Logf("✓ Created log chunk 0: %d bytes", len(log1.Data))
+
+	// Main stage logs
+	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
+	log2, err := db.CreateLog(ctx, store.CreateLogParams{
+		RunID:   run.ID,
+		ChunkNo: 1,
+		Data:    mainLog,
+	})
+	if err != nil {
+		t.Fatalf("CreateLog(main) failed: %v", err)
+	}
+	t.Logf("✓ Created log chunk 1: %d bytes", len(log2.Data))
+
+	// Post-processing logs
+	postLog := []byte("INFO: Uploading artifacts\nINFO: Artifacts uploaded successfully\n")
+	log3, err := db.CreateLog(ctx, store.CreateLogParams{
+		RunID:   run.ID,
+		ChunkNo: 2,
+		Data:    postLog,
+	})
+	if err != nil {
+		t.Fatalf("CreateLog(post-process) failed: %v", err)
+	}
+	t.Logf("✓ Created log chunk 2: %d bytes", len(log3.Data))
+
+	// Step 4: Generate diffs for the main stage.
+	diffPatch := []byte(`diff --git a/src/Main.java b/src/Main.java
+index abc1234..def5678 100644
+--- a/src/Main.java
++++ b/src/Main.java
+@@ -10,7 +10,7 @@ public class Main {
+     }
+
+     private static void processData() {
+-        // Old implementation
++        // New implementation using modern APIs
+         System.out.println("Processing data");
+     }
+ }
+`)
+	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
+	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:   run.ID,
+		StageID: stageMain.ID,
+		Patch:   diffPatch,
+		Summary: diffSummary,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff() failed: %v", err)
+	}
+	t.Logf("✓ Created diff: id=%v, patch_len=%d", diff.ID, len(diff.Patch))
+
+	// Step 5: Create events representing workflow state transitions.
+	now := time.Now().UTC()
+
+	// Event 1: Run started
+	event1, err := db.CreateEvent(ctx, store.CreateEventParams{
+		RunID: run.ID,
+		Time: pgtype.Timestamptz{
+			Time:  now,
+			Valid: true,
+		},
+		Level:   "info",
+		Message: "Run started: smoke workflow",
+		Meta:    []byte(`{"source":"smoke-test","phase":"start"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent(start) failed: %v", err)
+	}
+	t.Logf("✓ Created event: id=%d, message=%s", event1.ID, event1.Message)
+
+	// Event 2: Build gate passed
+	event2, err := db.CreateEvent(ctx, store.CreateEventParams{
+		RunID: run.ID,
+		Time: pgtype.Timestamptz{
+			Time:  now.Add(10 * time.Second),
+			Valid: true,
+		},
+		Level:   "info",
+		Message: "Build gate validation passed",
+		Meta:    []byte(`{"source":"smoke-test","phase":"build-gate","status":"passed"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent(build-gate-passed) failed: %v", err)
+	}
+	t.Logf("✓ Created event: id=%d, message=%s", event2.ID, event2.Message)
+
+	// Event 3: Main mod completed
+	event3, err := db.CreateEvent(ctx, store.CreateEventParams{
+		RunID: run.ID,
+		Time: pgtype.Timestamptz{
+			Time:  now.Add(30 * time.Second),
+			Valid: true,
+		},
+		Level:   "info",
+		Message: "Mod execution completed successfully",
+		Meta:    []byte(`{"source":"smoke-test","phase":"main","status":"completed"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent(main-completed) failed: %v", err)
+	}
+	t.Logf("✓ Created event: id=%d, message=%s", event3.ID, event3.Message)
+
+	// Event 4: Run completed
+	event4, err := db.CreateEvent(ctx, store.CreateEventParams{
+		RunID: run.ID,
+		Time: pgtype.Timestamptz{
+			Time:  now.Add(40 * time.Second),
+			Valid: true,
+		},
+		Level:   "info",
+		Message: "Run completed: all stages successful",
+		Meta:    []byte(`{"source":"smoke-test","phase":"complete","status":"success"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateEvent(completed) failed: %v", err)
+	}
+	t.Logf("✓ Created event: id=%d, message=%s", event4.ID, event4.Message)
+
+	// Step 6: Update run status to succeeded.
+	// In a real workflow, the runner would update stage statuses and then the run status.
+	err = db.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
+		ID:     run.ID,
+		Status: store.RunStatusSucceeded,
+	})
+	if err != nil {
+		t.Fatalf("UpdateRunStatus() failed: %v", err)
+	}
+	t.Logf("✓ Updated run status to succeeded")
+
+	// Step 7: Verify all data is correctly persisted and retrievable.
+	// Verify run retrieval
+	fetchedRun, err := db.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+	if fetchedRun.Status != store.RunStatusSucceeded {
+		t.Errorf("Fetched run status mismatch: expected 'succeeded', got %s", fetchedRun.Status)
+	}
+	t.Logf("✓ Verified run status: %s", fetchedRun.Status)
+
+	// Verify stages are listable
+	stages, err := db.ListStagesByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListStagesByRun() failed: %v", err)
+	}
+	if len(stages) != 3 {
+		t.Errorf("Expected 3 stages, got %d", len(stages))
+	}
+	// Verify stage names are correct
+	stageNames := make(map[string]bool)
+	for _, s := range stages {
+		stageNames[s.Name] = true
+	}
+	expectedStages := []string{"build-gate", "main", "post-process"}
+	for _, name := range expectedStages {
+		if !stageNames[name] {
+			t.Errorf("Expected stage %s not found", name)
+		}
+	}
+	t.Logf("✓ Verified %d stages with correct names", len(stages))
+
+	// Verify logs are ordered and complete
+	logs, err := db.ListLogsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListLogsByRun() failed: %v", err)
+	}
+	if len(logs) != 3 {
+		t.Errorf("Expected 3 log chunks, got %d", len(logs))
+	}
+	// Verify log order and content
+	if len(logs) >= 3 {
+		if logs[0].ChunkNo != 0 || logs[1].ChunkNo != 1 || logs[2].ChunkNo != 2 {
+			t.Errorf("Log chunks not ordered correctly: got chunk_nos %d, %d, %d",
+				logs[0].ChunkNo, logs[1].ChunkNo, logs[2].ChunkNo)
+		}
+		// Spot-check log content
+		if string(logs[0].Data) != string(buildGateLog) {
+			t.Errorf("Log chunk 0 content mismatch")
+		}
+	}
+	t.Logf("✓ Verified %d log chunks in correct order", len(logs))
+
+	// Verify diffs are retrievable
+	diffs, err := db.ListDiffsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
+	}
+	if len(diffs) != 1 {
+		t.Errorf("Expected 1 diff, got %d", len(diffs))
+	}
+	if len(diffs) >= 1 {
+		if diffs[0].StageID.Bytes != stageMain.ID.Bytes {
+			t.Errorf("Diff stage_id mismatch: expected %v, got %v", stageMain.ID, diffs[0].StageID)
+		}
+		if string(diffs[0].Patch) != string(diffPatch) {
+			t.Errorf("Diff patch content mismatch")
+		}
+	}
+	t.Logf("✓ Verified %d diff(s) with correct stage association", len(diffs))
+
+	// Verify events are ordered chronologically
+	events, err := db.ListEventsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListEventsByRun() failed: %v", err)
+	}
+	if len(events) != 4 {
+		t.Errorf("Expected 4 events, got %d", len(events))
+	}
+	// Verify event order (should be chronological by time)
+	if len(events) >= 4 {
+		expectedIDs := []int64{event1.ID, event2.ID, event3.ID, event4.ID}
+		for i, e := range events {
+			if e.ID != expectedIDs[i] {
+				t.Errorf("Event %d ID mismatch: expected %d, got %d", i, expectedIDs[i], e.ID)
+			}
+		}
+	}
+	t.Logf("✓ Verified %d events in chronological order", len(events))
+
+	// Verify ListEventsByRunSince works correctly
+	eventsSince, err := db.ListEventsByRunSince(ctx, store.ListEventsByRunSinceParams{
+		RunID: run.ID,
+		ID:    event2.ID, // Get events after build-gate-passed
+	})
+	if err != nil {
+		t.Fatalf("ListEventsByRunSince() failed: %v", err)
+	}
+	if len(eventsSince) != 2 { // Should get event3 and event4
+		t.Errorf("ListEventsByRunSince: expected 2 events, got %d", len(eventsSince))
+	}
+	if len(eventsSince) >= 2 {
+		if eventsSince[0].ID != event3.ID || eventsSince[1].ID != event4.ID {
+			t.Errorf("ListEventsByRunSince: unexpected event IDs")
+		}
+	}
+	t.Logf("✓ Verified ListEventsByRunSince returns correct event subset")
+
+	t.Log("✓✓✓ Smoke workflow end-to-end test completed successfully")
+}
