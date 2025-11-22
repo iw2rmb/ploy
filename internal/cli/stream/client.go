@@ -1,18 +1,17 @@
 package stream
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	"github.com/tmaxmax/go-sse"
 )
 
 // ErrDone signals that the consumer has finished processing the stream.
@@ -119,69 +118,110 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			return fmt.Errorf("stream: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 
-		reader := bufio.NewReader(resp.Body)
 		// Idle timer: cancels the connection if no events are received within IdleTimeout.
+		// We set up the timer to cancel connCtx, which will abort the underlying HTTP connection.
 		var idle *time.Timer
 		if c.IdleTimeout > 0 {
 			idle = time.AfterFunc(c.IdleTimeout, func() {
 				logger.Debug("stream_idle_timeout_triggered", "timeout", c.IdleTimeout)
+				// Cancel the connection context to abort the HTTP request.
+				// This will cause resp.Body reads to fail with an error.
 				cancelConn()
 			})
 		}
 		var sawEvent bool
 		var connectionFailed bool
-		for {
-			event, err := readEvent(reader)
+		var handlerErr error
+		var gotDone bool // Track if handler explicitly returned ErrDone.
+
+		// Use go-sse library to parse SSE frames instead of manual parsing.
+		// Configure a reasonable max event size (1MB) to prevent unbounded memory usage.
+		readConfig := &sse.ReadConfig{
+			MaxEventSize: 1 << 20, // 1MB max event size
+		}
+
+		// go-sse's Read function returns an iterator function that internally loops
+		// over events and invokes our callback for each event or error.
+		// The callback returns false to stop iteration, true to continue.
+		// Note: Read handles EOF gracefully and does not pass it as an error.
+		sse.Read(resp.Body, readConfig)(func(sseEvent sse.Event, err error) bool {
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					// Clean EOF: server closed the stream gracefully.
-					logger.Debug("stream_eof", "endpoint", endpoint)
-					break
+				// Check if idle timeout triggered the cancellation.
+				// When the connection context is cancelled, the body read will fail.
+				if connCtx.Err() != nil {
+					if c.IdleTimeout > 0 {
+						handlerErr = fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
+						logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
+						return false
+					}
+					// Context cancelled for other reasons (parent context or explicit cancel).
+					handlerErr = connCtx.Err()
+					return false
 				}
 				// Treat read errors as transient and trigger a reconnect loop
 				// instead of failing the entire stream immediately. This
 				// improves resilience on flaky TLS/HTTP/2 links.
-				_ = resp.Body.Close()
-				if connCtx.Err() != nil && c.IdleTimeout > 0 {
-					logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
-					return fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
-				}
 				logger.Debug("stream_read_error", "error", err.Error())
 				connectionFailed = true
-				break
+				return false
 			}
+
 			sawEvent = true
 			// Reset the idle timer on each successful event.
 			if idle != nil {
 				idle.Reset(c.IdleTimeout)
 			}
+
+			// Map go-sse.Event to our Event struct.
+			// go-sse provides LastEventID (the current event's ID) in the Event struct.
+			event := Event{
+				ID:   sseEvent.LastEventID,
+				Type: sseEvent.Type,
+				Data: []byte(sseEvent.Data),
+				// Note: go-sse's Read function does not expose the "retry" field.
+				// Server retry hints are not available with the Read-based approach.
+				// This is a known limitation that requires using go-sse's Client API instead.
+				Retry: 0,
+			}
+
 			// Track Last-Event-ID for resumption on reconnect.
 			if event.ID != "" {
 				lastID = event.ID
 			}
-			// Server may send a "retry" field to override backoff delay.
-			// Apply this to the stateful backoff by resetting it to the server-specified duration.
-			if event.Retry > 0 {
-				logger.Debug("stream_server_retry_hint", "retry", event.Retry)
-				// To honor server retry hint, reset backoff to the specified initial interval.
-				// This is a deviation from pure exponential backoff but aligns with SSE spec.
-				policy.InitialInterval = event.Retry
-				sb = backoff.NewStatefulBackoff(policy)
-			}
+
 			// Invoke the user's event handler.
 			if err := handler(event); err != nil {
-				_ = resp.Body.Close()
 				if errors.Is(err, ErrDone) {
 					logger.Debug("stream_done", "endpoint", endpoint)
-					return nil
+					gotDone = true // Mark that we got ErrDone.
+					return false
 				}
 				logger.Error("stream_handler_error", "error", err.Error())
-				return err
+				handlerErr = err
+				return false
 			}
+
+			// Continue iteration (return true).
+			return true
+		})
+		// When Read returns, it means either EOF was reached or the callback returned false.
+		// If no error was set and we didn't get ErrDone, this is a clean EOF from the server.
+		if !gotDone && handlerErr == nil && !connectionFailed {
+			logger.Debug("stream_eof", "endpoint", endpoint)
 		}
 		_ = resp.Body.Close()
 		if idle != nil {
 			idle.Stop()
+		}
+
+		// If handler explicitly returned ErrDone, return nil to signal graceful completion.
+		if gotDone {
+			return nil
+		}
+
+		// If handler returned an error (non-ErrDone), propagate it.
+		if handlerErr != nil {
+			return handlerErr
 		}
 
 		// Check if the parent context was cancelled while processing events.
@@ -239,54 +279,5 @@ func (c Client) waitWithBackoff(ctx context.Context, d time.Duration) error {
 		return ctx.Err()
 	case <-timer.C:
 		return nil
-	}
-}
-
-func readEvent(r *bufio.Reader) (Event, error) {
-	var evt Event
-	var hasData bool
-
-	for {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				if evt.Type != "" || hasData || evt.ID != "" || evt.Retry > 0 {
-					return evt, nil
-				}
-			}
-			return evt, err
-		}
-		line = strings.TrimRight(line, "\r\n")
-		if line == "" {
-			if evt.Type == "" && !hasData && evt.ID == "" && evt.Retry == 0 {
-				continue
-			}
-			return evt, nil
-		}
-		if strings.HasPrefix(line, ":") {
-			continue
-		}
-		field := line
-		value := ""
-		if idx := strings.Index(line, ":"); idx >= 0 {
-			field = line[:idx]
-			value = strings.TrimSpace(line[idx+1:])
-		}
-		switch field {
-		case "event":
-			evt.Type = value
-		case "data":
-			if hasData {
-				evt.Data = append(evt.Data, '\n')
-			}
-			evt.Data = append(evt.Data, value...)
-			hasData = true
-		case "id":
-			evt.ID = value
-		case "retry":
-			if ms, err := strconv.Atoi(value); err == nil && ms >= 0 {
-				evt.Retry = time.Duration(ms) * time.Millisecond
-			}
-		}
 	}
 }
