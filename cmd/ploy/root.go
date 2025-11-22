@@ -56,144 +56,29 @@ func newRootCmd(stderr io.Writer) *cobra.Command {
 	}
 
 	// Subcommands: wire existing handlers into cobra commands.
-	// Each command delegates to the existing handler functions, preserving business logic.
+	// Commands are structured via dedicated builder functions (newModCmd, newServerCmd, etc.)
+	// that encapsulate command hierarchy and preserve existing business logic.
+	// Each builder function creates a cobra command tree with proper subcommand structure.
 
-	// mod command and subcommands.
-	// DisableFlagParsing allows the existing handler to parse flags itself.
-	modCmd := &cobra.Command{
-		Use:                "mod",
-		Short:              "Plan and run Mods workflows",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleMod(args, stderr)
-		},
-	}
-	root.AddCommand(modCmd)
+	// Mods workflow commands
+	root.AddCommand(newModCmd(stderr))    // ploy mod (run, fetch, cancel, resume, inspect, artifacts, diffs)
+	root.AddCommand(newModsCmd(stderr))   // ploy mods (logs, etc.)
+	root.AddCommand(newRunsCmd(stderr))   // ploy runs (follow, inspect)
+	root.AddCommand(newUploadCmd(stderr)) // ploy upload
 
-	// mods command: observe Mods execution.
-	modsCmd := &cobra.Command{
-		Use:                "mods",
-		Short:              "Observe Mods execution (logs, events)",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleMods(args, stderr)
-		},
-	}
-	root.AddCommand(modsCmd)
+	// Cluster and configuration commands
+	root.AddCommand(newClusterCmd(stderr))       // ploy cluster (not yet implemented)
+	root.AddCommand(newConfigCmd(stderr))        // ploy config (gitlab show/set/validate)
+	root.AddCommand(newManifestCmd(stderr))      // ploy manifest (schema, validate)
+	root.AddCommand(newKnowledgeBaseCmd(stderr)) // ploy knowledge-base (ingest, evaluate)
 
-	// runs command: inspect and follow individual runs.
-	runsCmd := &cobra.Command{
-		Use:                "runs",
-		Short:              "Inspect and follow individual runs",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleRuns(args, stderr)
-		},
-	}
-	root.AddCommand(runsCmd)
+	// Server and node management commands
+	root.AddCommand(newServerCmd(stderr))  // ploy server (deploy)
+	root.AddCommand(newNodeCmd(stderr))    // ploy node (add)
+	root.AddCommand(newRolloutCmd(stderr)) // ploy rollout (server, nodes)
 
-	// upload command: upload artifact bundle to a run.
-	uploadCmd := &cobra.Command{
-		Use:                "upload",
-		Short:              "Upload artifact bundle to a run (HTTPS)",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleUpload(args, stderr)
-		},
-	}
-	root.AddCommand(uploadCmd)
-
-	// cluster command: manage local cluster descriptors.
-	// Note: no handleCluster in current main.go; this is a placeholder for future wiring.
-	// If the command is not implemented, we omit it or provide a stub that returns an error.
-	// Checking existing main.go, "cluster" is listed in help but not dispatched.
-	// For now, we add a stub that prints an error message.
-	clusterCmd := &cobra.Command{
-		Use:                "cluster",
-		Short:              "Manage local cluster descriptors",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("cluster command not yet implemented")
-		},
-	}
-	root.AddCommand(clusterCmd)
-
-	// config command: inspect or update cluster configuration.
-	configCmd := &cobra.Command{
-		Use:                "config",
-		Short:              "Inspect or update cluster configuration",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleConfig(args, stderr)
-		},
-	}
-	root.AddCommand(configCmd)
-
-	// manifest command: inspect and validate integration manifests.
-	manifestCmd := &cobra.Command{
-		Use:                "manifest",
-		Short:              "Inspect and validate integration manifests",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleManifest(args, stderr)
-		},
-	}
-	root.AddCommand(manifestCmd)
-
-	// knowledge-base command: curate knowledge base fixtures.
-	kbCmd := &cobra.Command{
-		Use:                "knowledge-base",
-		Short:              "Curate knowledge base fixtures",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleKnowledgeBase(args, stderr)
-		},
-	}
-	root.AddCommand(kbCmd)
-
-	// server command: manage control plane server.
-	serverCmd := &cobra.Command{
-		Use:                "server",
-		Short:              "Manage control plane server",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleServer(args, stderr)
-		},
-	}
-	root.AddCommand(serverCmd)
-
-	// node command: manage worker nodes.
-	nodeCmd := &cobra.Command{
-		Use:                "node",
-		Short:              "Manage worker nodes",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleNode(args, stderr)
-		},
-	}
-	root.AddCommand(nodeCmd)
-
-	// rollout command: rolling updates for servers and nodes.
-	rolloutCmd := &cobra.Command{
-		Use:                "rollout",
-		Short:              "Rolling updates for servers and nodes",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleRollout(args, stderr)
-		},
-	}
-	root.AddCommand(rolloutCmd)
-
-	// token command: manage API tokens for authentication.
-	tokenCmd := &cobra.Command{
-		Use:                "token",
-		Short:              "Manage API tokens for authentication",
-		DisableFlagParsing: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return handleToken(args, stderr)
-		},
-	}
-	root.AddCommand(tokenCmd)
+	// Authentication commands
+	root.AddCommand(newTokenCmd(stderr)) // ploy token (create, list, revoke)
 
 	// Override help command to preserve existing behavior.
 	// Cobra provides a default help command, but we want to preserve printUsage logic.
