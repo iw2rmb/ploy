@@ -93,7 +93,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Remove unused request/response structs if fully replaced by client-go; ensure all errors flowing out of client-go-backed operations are wrapped with `redactError` and that URL-encoded PAT variants remain redacted
   - Test: Re-run `mr_client_api_redaction_test.go` and add cases for new error shapes if necessary; run `go test ./internal/nodeagent/gitlab/...`; confirm no PAT appears in error strings
 
-- [ ] Document GitLab MR client behavior — Keep operator-facing docs in sync with implementation
+- [x] Document GitLab MR client behavior — Keep operator-facing docs in sync with implementation
   - Component: `cmd/ploy/README.md`, `docs/how-to/update-a-cluster.md`
   - Scope: Update any documentation describing GitLab MR creation and GitLab integration flags to note the client-go usage where relevant; ensure examples for MR-related flags and spec fields remain accurate
   - Test: Manual docs review; run GitLab-related integration/e2e tests (if present) that exercise MR creation flows
