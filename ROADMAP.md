@@ -88,7 +88,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace manual retry loop, `shouldRetry`, and `backoff` functions with shared backoff helpers; preserve retry conditions for transient network errors plus 429 and 5xx statuses and the 3-attempt limit; ensure context cancellation is honored and error messages still pass through `redactError`
   - Test: Update `mr_client_api_retry_test.go` to validate retry count and approximate delay schedule via the shared helper (including network-error cases); run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz and validation tests continue to pass
 
-- [ ] Clean up DTOs and redaction paths — Ensure no PAT leakage after the swap
+- [x] Clean up DTOs and redaction paths — Ensure no PAT leakage after the swap
   - Component: `internal/nodeagent/gitlab/mr_client.go`, `internal/nodeagent/gitlab/mr_client_api_redaction_test.go`
   - Scope: Remove unused request/response structs if fully replaced by client-go; ensure all errors flowing out of client-go-backed operations are wrapped with `redactError` and that URL-encoded PAT variants remain redacted
   - Test: Re-run `mr_client_api_redaction_test.go` and add cases for new error shapes if necessary; run `go test ./internal/nodeagent/gitlab/...`; confirm no PAT appears in error strings
