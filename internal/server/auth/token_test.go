@@ -30,7 +30,7 @@ func TestGenerateAPIToken_Success(t *testing.T) {
 		t.Fatalf("ValidateToken error: %v", err)
 	}
 
-	if claims.ClusterID != clusterID {
+	if claims.ClusterID.String() != clusterID {
 		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
 	}
 	if claims.Role != role {
@@ -57,7 +57,7 @@ func TestGenerateAPIToken_ContainsCorrectClaims(t *testing.T) {
 	}
 
 	// Verify all required claims are present
-	if claims.ClusterID != clusterID {
+	if claims.ClusterID.String() != clusterID {
 		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
 	}
 	if claims.Role != role {
@@ -133,7 +133,7 @@ func TestGenerateBootstrapToken_Success(t *testing.T) {
 		t.Fatalf("ValidateToken error: %v", err)
 	}
 
-	if claims.ClusterID != clusterID {
+	if claims.ClusterID.String() != clusterID {
 		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
 	}
 	if claims.TokenType != TokenTypeBootstrap {

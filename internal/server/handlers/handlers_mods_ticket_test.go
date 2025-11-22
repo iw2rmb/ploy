@@ -94,6 +94,7 @@ func TestSubmitTicketHandlerSuccess(t *testing.T) {
 }
 
 // TestSubmitTicketHandlerMissingFields verifies validation of required fields.
+// Domain types now validate at JSON unmarshal time, rejecting empty/invalid values.
 func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 	st := &mockStore{}
 	handler := submitTicketHandler(st, nil)
@@ -101,17 +102,17 @@ func TestSubmitTicketHandlerMissingFields(t *testing.T) {
 	cases := []struct {
 		name string
 		body map[string]interface{}
-		err  string
+		err  string // Expected error substring (domain validation errors)
 	}{
-		{"empty repo_url", map[string]interface{}{"repo_url": "", "base_ref": "main", "target_ref": "feature"}, "repo_url field is required"},
-		{"whitespace repo_url", map[string]interface{}{"repo_url": "   ", "base_ref": "main", "target_ref": "feature"}, "repo_url field is required"},
-		{"no repo_url", map[string]interface{}{"base_ref": "main", "target_ref": "feature"}, "repo_url field is required"},
-		{"empty base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "", "target_ref": "feature"}, "base_ref field is required"},
-		{"whitespace base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "   ", "target_ref": "feature"}, "base_ref field is required"},
-		{"no base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "target_ref": "feature"}, "base_ref field is required"},
-		{"empty target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": ""}, "target_ref field is required"},
-		{"whitespace target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "   "}, "target_ref field is required"},
-		{"no target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main"}, "target_ref field is required"},
+		{"empty repo_url", map[string]interface{}{"repo_url": "", "base_ref": "main", "target_ref": "feature"}, "empty"},
+		{"whitespace repo_url", map[string]interface{}{"repo_url": "   ", "base_ref": "main", "target_ref": "feature"}, "empty"},
+		{"no repo_url", map[string]interface{}{"base_ref": "main", "target_ref": "feature"}, "empty"},
+		{"empty base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "", "target_ref": "feature"}, "empty"},
+		{"whitespace base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "   ", "target_ref": "feature"}, "empty"},
+		{"no base_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "target_ref": "feature"}, "empty"},
+		{"empty target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": ""}, "empty"},
+		{"whitespace target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main", "target_ref": "   "}, "empty"},
+		{"no target_ref", map[string]interface{}{"repo_url": "https://github.com/user/repo.git", "base_ref": "main"}, "empty"},
 	}
 
 	for _, tc := range cases {
@@ -147,6 +148,44 @@ func TestSubmitTicketHandlerInvalidJSON(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "invalid request") {
 		t.Errorf("expected 'invalid request' error, got: %s", rr.Body.String())
+	}
+}
+
+// TestSubmitTicketHandlerInvalidRepoURL verifies domain type validation for repo URLs.
+func TestSubmitTicketHandlerInvalidRepoURL(t *testing.T) {
+	st := &mockStore{}
+	handler := submitTicketHandler(st, nil)
+
+	cases := []struct {
+		name    string
+		repoURL string
+		errMsg  string
+	}{
+		{"http scheme", "http://github.com/user/repo.git", "invalid repo url"},
+		{"git scheme", "git://github.com/user/repo.git", "invalid repo url"},
+		{"no scheme", "github.com/user/repo.git", "invalid repo url"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := map[string]interface{}{
+				"repo_url":   tc.repoURL,
+				"base_ref":   "main",
+				"target_ref": "feature",
+			}
+			bodyBytes, _ := json.Marshal(body)
+			req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(bodyBytes))
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("expected status 400, got %d", rr.Code)
+			}
+			if !strings.Contains(rr.Body.String(), tc.errMsg) {
+				t.Errorf("expected error %q, got: %s", tc.errMsg, rr.Body.String())
+			}
+		})
 	}
 }
 

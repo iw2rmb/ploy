@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // Token types
@@ -15,19 +16,21 @@ const (
 	TokenTypeBootstrap = "bootstrap" // Short-lived tokens for node bootstrapping
 )
 
-// JWT Claims structure
+// JWT Claims structure with domain types for cluster identifier.
+// ClusterID is validated on unmarshal (non-empty after trimming spaces).
 type TokenClaims struct {
-	ClusterID string `json:"cluster_id"`
-	Role      string `json:"role"`              // "cli-admin", "control-plane", "worker"
-	TokenType string `json:"token_type"`        // "api" or "bootstrap"
-	NodeID    string `json:"node_id,omitempty"` // Only for bootstrap tokens
+	ClusterID domaintypes.ClusterID `json:"cluster_id"`
+	Role      string                `json:"role"`              // "cli-admin", "control-plane", "worker"
+	TokenType string                `json:"token_type"`        // "api" or "bootstrap"
+	NodeID    string                `json:"node_id,omitempty"` // Only for bootstrap tokens
 	jwt.RegisteredClaims
 }
 
-// GenerateAPIToken creates a long-lived bearer token for CLI usage
+// GenerateAPIToken creates a long-lived bearer token for CLI usage.
+// clusterID is passed as a string and converted to domain type for validation.
 func GenerateAPIToken(secret, clusterID, role string, expiresAt time.Time) (string, error) {
 	claims := &TokenClaims{
-		ClusterID: clusterID,
+		ClusterID: domaintypes.ClusterID(clusterID),
 		Role:      role,
 		TokenType: TokenTypeAPI,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -41,10 +44,11 @@ func GenerateAPIToken(secret, clusterID, role string, expiresAt time.Time) (stri
 	return token.SignedString([]byte(secret))
 }
 
-// GenerateBootstrapToken creates a short-lived token for node bootstrapping
+// GenerateBootstrapToken creates a short-lived token for node bootstrapping.
+// clusterID is passed as a string and converted to domain type for validation.
 func GenerateBootstrapToken(secret, clusterID, nodeID string, expiresAt time.Time) (string, error) {
 	claims := &TokenClaims{
-		ClusterID: clusterID,
+		ClusterID: domaintypes.ClusterID(clusterID),
 		Role:      RoleWorker,
 		TokenType: TokenTypeBootstrap,
 		NodeID:    nodeID,

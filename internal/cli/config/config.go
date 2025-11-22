@@ -11,13 +11,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// ClusterID identifies a Ploy cluster.
-//
-// It is a distinct type to harden APIs that accept or return cluster
-// identifiers while remaining JSON-compatible with a plain string.
-type ClusterID string
+// ClusterID is an alias for the domain ClusterID type for convenience.
+// Use domaintypes.ClusterID directly in new code.
+type ClusterID = domaintypes.ClusterID
 
 // Descriptor represents a local cluster descriptor written by bootstrap.
 type Descriptor struct {
