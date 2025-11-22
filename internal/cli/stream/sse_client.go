@@ -68,8 +68,13 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 	currentBackoff := initialBackoff
 
 	for {
-		// Build the HTTP request with context for per-connection cancellation.
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+		// Derive a per-connection context so we can cancel on idle timeout without
+		// affecting the caller's context.
+		connCtx, cancelConn := context.WithCancel(ctx)
+		defer cancelConn()
+
+		// Build the HTTP request with the connection-scoped context for per-connection cancellation.
+		req, err := http.NewRequestWithContext(connCtx, http.MethodGet, endpoint, nil)
 		if err != nil {
 			return fmt.Errorf("sse_client: build request: %w", err)
 		}
@@ -82,6 +87,14 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 
 		resp, err := c.HTTPClient.Do(req)
 		if err != nil {
+			if connCtx.Err() != nil {
+				// Detect connection-cancel due to idle timeout.
+				if c.IdleTimeout > 0 {
+					logger.Error("sse_client_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
+					return fmt.Errorf("sse_client: idle timeout after %s", c.IdleTimeout)
+				}
+				return connCtx.Err()
+			}
 			// Connection error: check if retries are exhausted.
 			if maxRetries >= 0 && retries >= maxRetries {
 				logger.Error("sse_client_max_retries_exhausted", "retries", retries, "endpoint", endpoint)
@@ -110,13 +123,14 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 			return fmt.Errorf("sse_client: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 
-		// Wrap the response body with an idle timeout cancellation mechanism.
-		connCtx, cancelConn := context.WithCancel(ctx)
-		defer cancelConn()
+		// Set up idle timeout timer that will cancel the connection context.
+		// This will abort the underlying HTTP connection when no events are received.
 		var idleTimer *time.Timer
 		if c.IdleTimeout > 0 {
 			idleTimer = time.AfterFunc(c.IdleTimeout, func() {
 				logger.Debug("sse_client_idle_timeout_triggered", "timeout", c.IdleTimeout)
+				// Cancel the connection context to abort the HTTP request.
+				// This will cause resp.Body reads to fail with an error.
 				cancelConn()
 			})
 			defer idleTimer.Stop()
@@ -132,91 +146,85 @@ func (c *SSEClient) Stream(ctx context.Context, endpoint string, handler func(Ev
 		sawEvent := false
 		connectionFailed := false
 		handlerErr := error(nil)
+		gotDone := false // Track if handler explicitly returned ErrDone.
 
-		// The Read function returns an iterator function that accepts a callback.
-		// The callback is invoked for each event or error, and returns false to stop iteration.
-		for next := sse.Read(resp.Body, readConfig); ; {
-			done := false
-			next(func(sseEvent sse.Event, err error) bool {
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						logger.Debug("sse_client_eof", "endpoint", endpoint)
-						done = true
-						return false // Stop iteration on EOF.
-					}
-					// Check if idle timeout triggered the cancellation.
-					if connCtx.Err() != nil && c.IdleTimeout > 0 {
+		// go-sse's Read function returns an iterator function that internally loops
+		// over events and invokes our callback for each event or error.
+		// The callback returns false to stop iteration, true to continue.
+		// Note: Read handles EOF gracefully and does not pass it as an error.
+		sse.Read(resp.Body, readConfig)(func(sseEvent sse.Event, err error) bool {
+			if err != nil {
+				// Check if idle timeout triggered the cancellation.
+				// When the connection context is cancelled, the body read will fail.
+				if connCtx.Err() != nil {
+					if c.IdleTimeout > 0 {
 						handlerErr = fmt.Errorf("sse_client: idle timeout after %s", c.IdleTimeout)
 						logger.Error("sse_client_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
-						done = true
 						return false
 					}
-					// Treat read errors as transient and trigger reconnect.
-					logger.Debug("sse_client_read_error", "error", err.Error())
-					connectionFailed = true
-					done = true
+					// Context cancelled for other reasons (parent context or explicit cancel).
+					handlerErr = connCtx.Err()
 					return false
 				}
-
-				sawEvent = true
-				// Reset idle timer on each successful event.
-				if idleTimer != nil {
-					idleTimer.Reset(c.IdleTimeout)
-				}
-
-				// Map go-sse.Event to our Event struct.
-				evt := Event{
-					ID:   sseEvent.LastEventID,
-					Type: sseEvent.Type,
-					Data: []byte(sseEvent.Data),
-				}
-
-				// Track the last event ID for resumption on reconnect.
-				if evt.ID != "" {
-					lastEventID = evt.ID
-				}
-
-				// Note: go-sse's Read function does not expose the "retry" field.
-				// Retry handling requires using the Client/Connection API instead.
-				// For this adapter, we omit server retry hint support to keep
-				// compatibility with the Read-based approach.
-
-				// Invoke the user's event handler.
-				if err := handler(evt); err != nil {
-					if errors.Is(err, ErrDone) {
-						logger.Debug("sse_client_done", "endpoint", endpoint)
-						handlerErr = nil // ErrDone is not an error, signal graceful stop.
-						done = true
-						return false
-					}
-					logger.Error("sse_client_handler_error", "error", err.Error())
-					handlerErr = err
-					done = true
-					return false
-				}
-
-				// Continue iteration (return true).
-				return true
-			})
-
-			// Check if iteration was terminated.
-			if done {
-				break
+				// Treat read errors as transient and trigger reconnect.
+				logger.Debug("sse_client_read_error", "error", err.Error())
+				connectionFailed = true
+				return false
 			}
+
+			sawEvent = true
+			// Reset idle timer on each successful event.
+			if idleTimer != nil {
+				idleTimer.Reset(c.IdleTimeout)
+			}
+
+			// Map go-sse.Event to our Event struct.
+			evt := Event{
+				ID:   sseEvent.LastEventID,
+				Type: sseEvent.Type,
+				Data: []byte(sseEvent.Data),
+			}
+
+			// Track the last event ID for resumption on reconnect.
+			if evt.ID != "" {
+				lastEventID = evt.ID
+			}
+
+			// Note: go-sse's Read function does not expose the "retry" field.
+			// Retry handling requires using the Client/Connection API instead.
+			// For this adapter, we omit server retry hint support to keep
+			// compatibility with the Read-based approach.
+
+			// Invoke the user's event handler.
+			if err := handler(evt); err != nil {
+				if errors.Is(err, ErrDone) {
+					logger.Debug("sse_client_done", "endpoint", endpoint)
+					gotDone = true // Mark that we got ErrDone.
+					return false
+				}
+				logger.Error("sse_client_handler_error", "error", err.Error())
+				handlerErr = err
+				return false
+			}
+
+			// Continue iteration (return true).
+			return true
+		})
+		// When Read returns, it means either EOF was reached or the callback returned false.
+		// If no error was set and we didn't get ErrDone, this is a clean EOF from the server.
+		if !gotDone && handlerErr == nil && !connectionFailed {
+			logger.Debug("sse_client_eof", "endpoint", endpoint)
 		}
 		_ = resp.Body.Close()
+
+		// If handler explicitly returned ErrDone, return nil to signal graceful completion.
+		if gotDone {
+			return nil
+		}
 
 		// If handler returned an error (non-ErrDone), propagate it.
 		if handlerErr != nil {
 			return handlerErr
-		}
-
-		// If handler returned ErrDone, we set handlerErr to nil above.
-		// In that case, return nil to signal graceful completion.
-		if sawEvent && !connectionFailed && handlerErr == nil {
-			// Check if we had at least one event and no errors: this might be ErrDone.
-			// Since we set handlerErr=nil for ErrDone, return nil here.
-			return nil
 		}
 
 		// Check if the parent context was cancelled.
