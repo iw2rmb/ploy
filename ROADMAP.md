@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Add `github.com/tmaxmax/go-sse` as a dependency; introduce an adapter (for example, `internal/cli/stream/sse_client.go`) that wraps the library and exposes a `Stream`-style API compatible with existing `Client`, `Event`, and `ErrDone` contracts
   - Test: Add unit tests in `internal/cli/stream` that exercise the adapter using an in-memory SSE source emitting `id`, `event`, `data`, and comment lines; go-sse’s `Read` helper does not expose the `retry` field, so `retry` coverage is deferred to the “Replace manual SSE parsing with go-sse” slice; run `go test ./internal/cli/stream/...`; expect events to map correctly into existing `Event` fields
 
-- [ ] Replace manual SSE parsing with go-sse — Delegate frame parsing while keeping behavior and flags
+- [x] Replace manual SSE parsing with go-sse — Delegate frame parsing while keeping behavior and flags
   - Component: `internal/cli/stream/client.go`
   - Scope: Remove `readEvent` and manual parsing loops; use go-sse’s event stream primitives to read events and map them into `Event`; ensure Last-Event-ID is propagated via headers and maintained across reconnects; keep IdleTimeout behavior by wrapping the connection context; integrate the shared backoff helper for reconnect delays
   - Test: Update existing SSE-related tests in `cmd/ploy` (for example, `mods_logs_test.go`, `runs_follow` tests) to verify Last-Event-ID replay, IdleTimeout cancellation, handler `ErrDone`, and malformed-frame handling; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect unchanged public behavior
