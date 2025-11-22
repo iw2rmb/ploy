@@ -1,6 +1,7 @@
 BINARY := ploy
 BUILD_DIR := dist
 COVERAGE_FILE := $(BUILD_DIR)/coverage.out
+BINARY_SIZE_THRESHOLD_MB := 15
 
 # Version stamping
 GIT_COMMIT := $(shell git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)
@@ -35,7 +36,7 @@ lanes-validate: ## Validate bundled lane catalog
 	go run ./tools/lanesvalidate --dir configs/lanes
 
 .PHONY: test
-test: test-coverage-threshold test-coverage-critical ## Run all unit tests with coverage enforcement (≥60% overall, ≥90% critical)
+test: test-coverage-threshold test-coverage-critical test-binary-size ## Run all unit tests with coverage enforcement (≥60% overall, ≥90% critical) and binary size check
 
 .PHONY: test-race
 test-race: ## Run all unit tests with race detector
@@ -68,6 +69,14 @@ test-coverage-threshold: $(COVERAGE_FILE) ## Enforce 60% overall coverage thresh
 test-coverage-critical: $(COVERAGE_FILE) ## Enforce 90% coverage on scheduler/PKI/ingest critical paths
 	@./scripts/check-critical-coverage.sh $(COVERAGE_FILE)
 
+.PHONY: test-binary-size
+test-binary-size: ## Enforce binary size threshold (protects against dependency bloat)
+	@if [ ! -f $(BUILD_DIR)/$(BINARY) ]; then \
+		echo "ERROR: Binary not found at $(BUILD_DIR)/$(BINARY). Run 'make build' first."; \
+		exit 1; \
+	fi
+	@./scripts/check-binary-size.sh $(BUILD_DIR)/$(BINARY) $(BINARY_SIZE_THRESHOLD_MB)
+
 .PHONY: vet
 vet: ## Run go vet
 	go vet ./...
@@ -91,7 +100,7 @@ staticcheck: ## Run staticcheck
 	fi
 
 .PHONY: ci-check
-ci-check: fmt vet staticcheck test-coverage-threshold test-coverage-critical ## Run core CI checks locally
+ci-check: fmt vet staticcheck test-coverage-threshold test-coverage-critical test-binary-size ## Run core CI checks locally (includes binary size guardrail)
 	@echo "\n=== All CI checks passed ==="
 
 .PHONY: pre-commit-install
@@ -132,11 +141,12 @@ help: ## Show available targets
 	@echo "Targets:"
 	@echo "  make build                      # Build the CLI and server binaries"
 	@echo "  make fmt                        # Run gofmt over Go source"
-	@echo "  make test                       # Run unit tests with coverage thresholds"
+	@echo "  make test                       # Run unit tests with coverage thresholds and binary size check"
 	@echo "  make test-race                  # Run tests with race detector"
 	@echo "  make test-coverage              # Run tests and generate coverage report"
 	@echo "  make test-coverage-threshold    # Enforce 60% overall coverage threshold"
 	@echo "  make test-coverage-critical     # Enforce 90% coverage on scheduler/PKI/ingest critical paths"
+	@echo "  make test-binary-size           # Enforce binary size threshold (protects against dependency bloat)"
 	@echo "  make vet                        # Run go vet"
 	@echo "  make lint                       # Run golangci-lint"
 	@echo "  make staticcheck                # Run staticcheck"
