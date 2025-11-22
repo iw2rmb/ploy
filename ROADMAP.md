@@ -32,7 +32,7 @@ Legend: [ ] todo, [x] done.
   - Test: `go test ./internal/store ./internal/workflow/contracts ./internal/mods/api ./internal/server/handlers` — All status transition tests pass and JSON status fields remain identical
 
 ## Git Fetcher Publisher Hook
-- [ ] Narrow or remove GitFetcherOptions.Publisher — Eliminate untyped extension point
+- [x] Narrow or remove GitFetcherOptions.Publisher — Eliminate untyped extension point
   - Component: `internal/worker/hydration`, `internal/nodeagent`
   - Scope: Either remove the `Publisher` field from `GitFetcherOptions` (if unused) or replace `interface{}` with a small `SnapshotPublisher` interface; update `NewGitFetcher` callers and tests
   - Test: `go test ./internal/worker/hydration ./internal/nodeagent` — Git fetcher behavior and buildgate executor tests continue to pass

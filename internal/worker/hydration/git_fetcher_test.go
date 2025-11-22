@@ -174,9 +174,8 @@ func TestNewGitFetcher(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "with publisher",
+			name: "with PublishSnapshot enabled",
 			opts: GitFetcherOptions{
-				Publisher:       &struct{}{},
 				PublishSnapshot: true,
 			},
 			wantErr: false,
