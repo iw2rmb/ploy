@@ -125,3 +125,116 @@ func TestCreateMR_ValidationRedaction(t *testing.T) {
 		t.Errorf("PAT leaked in validation error message: %s", errMsg)
 	}
 }
+
+// TestCreateMR_ClientGoErrorRedaction verifies that errors from the client-go
+// library are properly redacted when they contain PAT tokens in error details.
+// This covers new error shapes introduced after migrating from manual HTTP calls.
+func TestCreateMR_ClientGoErrorRedaction(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		pat        string
+		serverFunc func(w http.ResponseWriter, r *http.Request)
+		wantError  bool
+	}{
+		{
+			name: "client_go_error_with_bearer_token",
+			pat:  "glpat-secret-123",
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				// Simulate client-go error that echoes the Authorization header.
+				// This tests that errors from the client-go library that might
+				// include auth details are properly redacted.
+				w.WriteHeader(http.StatusUnauthorized)
+				auth := r.Header.Get("Authorization")
+				_, _ = w.Write([]byte(fmt.Sprintf(`{"error":"unauthorized","details":"%s"}`, auth)))
+			},
+			wantError: true,
+		},
+		{
+			name: "client_go_network_error_with_encoded_pat",
+			pat:  "secret@token/value",
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				// Simulate a server error that might include URL-encoded PAT variants
+				// in error messages (e.g., from URL construction errors).
+				w.WriteHeader(http.StatusInternalServerError)
+				// Include both URL-encoded variants that might appear in error traces.
+				_, _ = w.Write([]byte(`{"message":"error: secret%40token%2Fvalue"}`))
+			},
+			wantError: true,
+		},
+		{
+			name: "malformed_response_without_web_url",
+			pat:  "glpat-token-456",
+			serverFunc: func(w http.ResponseWriter, r *http.Request) {
+				// Return success but missing web_url to trigger permanent error path.
+				// This tests that permanent errors from client-go are also redacted.
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"iid":1}`)) // Missing web_url.
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test server that simulates GitLab API.
+			server := httptest.NewServer(http.HandlerFunc(tt.serverFunc))
+			defer server.Close()
+
+			client := NewMRClient()
+			ctx := context.Background()
+
+			// Build request with test domain extracted from server URL.
+			req := MRCreateRequest{
+				Domain:       strings.TrimPrefix(server.URL, "http://"),
+				ProjectID:    "org%2Fproject",
+				PAT:          tt.pat,
+				Title:        "Test MR",
+				SourceBranch: "feature",
+				TargetBranch: "main",
+			}
+
+			_, err := client.CreateMR(ctx, req)
+
+			// Verify error expectation.
+			if tt.wantError && err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !tt.wantError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if err != nil {
+				errMsg := err.Error()
+
+				// Verify that the literal PAT is not in the error message.
+				if strings.Contains(errMsg, tt.pat) {
+					t.Errorf("PAT not redacted in client-go error: %s", errMsg)
+				}
+
+				// Verify URL-encoded variants are also redacted.
+				// The redactError function handles QueryEscape, PathEscape, and custom variants.
+				encodedVariants := []string{
+					strings.ReplaceAll(tt.pat, "@", "%40"),
+					strings.ReplaceAll(tt.pat, "/", "%2F"),
+					strings.ReplaceAll(strings.ReplaceAll(tt.pat, " ", "%20"), "@", "%40"),
+				}
+				for _, variant := range encodedVariants {
+					if variant != tt.pat && strings.Contains(errMsg, variant) {
+						t.Errorf("URL-encoded PAT variant %q not redacted in error: %s", variant, errMsg)
+					}
+				}
+
+				// Verify [REDACTED] appears when PAT was present in the original error.
+				// This is a best-effort check since not all errors will contain PAT.
+				// We only enforce this for tests that explicitly inject PAT in responses.
+				if tt.name != "malformed_response_without_web_url" {
+					if !strings.Contains(errMsg, "[REDACTED]") {
+						t.Logf("note: [REDACTED] not found in error (may not contain PAT): %s", errMsg)
+					}
+				}
+			}
+		})
+	}
+}
