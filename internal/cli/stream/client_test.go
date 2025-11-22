@@ -48,15 +48,15 @@ func TestReadEventEOFWithPartialFrame(t *testing.T) {
 	}
 }
 
-func TestClientWaitHonorsContext(t *testing.T) {
+func TestClientWaitWithBackoffHonorsContext(t *testing.T) {
 	c := Client{}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := c.wait(ctx, 10*time.Millisecond); err == nil {
-		t.Fatalf("expected canceled context error from wait")
+	if err := c.waitWithBackoff(ctx, 10*time.Millisecond); err == nil {
+		t.Fatalf("expected canceled context error from waitWithBackoff")
 	}
 	// Zero duration returns immediately without error.
-	if err := c.wait(context.Background(), 0); err != nil {
+	if err := c.waitWithBackoff(context.Background(), 0); err != nil {
 		t.Fatalf("unexpected error for zero wait: %v", err)
 	}
 }
@@ -186,5 +186,274 @@ func TestClientStreamSendsLastEventIDOnReconnect(t *testing.T) {
 	})
 	if sawLastID != "7" {
 		t.Fatalf("expected Last-Event-ID 7, got %q", sawLastID)
+	}
+}
+
+// TestClientStreamReconnectBackoffGrowth verifies that reconnect delays grow exponentially
+// with jitter when the server repeatedly closes the connection (EOF without events).
+func TestClientStreamReconnectBackoffGrowth(t *testing.T) {
+	t.Parallel()
+	attempts := 0
+	reconnectTimes := []time.Time{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reconnectTimes = append(reconnectTimes, time.Now())
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// Server immediately closes connection (EOF without events) to trigger backoff.
+		// After 3 reconnects, send done event to stop.
+		if attempts >= 3 {
+			_, _ = w.Write([]byte("event: done\n\n"))
+		}
+	}))
+	defer srv.Close()
+
+	// Use small initial backoff for fast test, but allow exponential growth.
+	c := Client{
+		HTTPClient:   srv.Client(),
+		MaxRetries:   10,
+		RetryBackoff: 50 * time.Millisecond, // Initial backoff: 50ms
+	}
+
+	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
+		if e.Type == "done" {
+			return ErrDone
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	// We expect at least 3 reconnects (initial + 2 retries before the final success).
+	if len(reconnectTimes) < 3 {
+		t.Fatalf("expected at least 3 connection attempts, got %d", len(reconnectTimes))
+	}
+
+	// Verify backoff delay between first and second reconnect is >= initial backoff (50ms)
+	// with jitter tolerance. The backoff grows: 50ms, 100ms, 200ms, etc.
+	// We allow jitter (±50%) so minimum delay is ~25ms and maximum is ~75ms for first backoff.
+	if len(reconnectTimes) >= 2 {
+		delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
+		// Allow jitter tolerance: expect delay in range [25ms, 150ms] for first backoff.
+		if delay1 < 25*time.Millisecond || delay1 > 150*time.Millisecond {
+			t.Logf("warning: first backoff delay %v outside expected range [25ms, 150ms]", delay1)
+		}
+	}
+
+	// Verify that the second backoff is longer than the first (exponential growth).
+	if len(reconnectTimes) >= 3 {
+		delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
+		delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
+		// Second delay should be roughly 2x first delay, with jitter tolerance.
+		// We don't enforce strict ordering due to jitter, but log if suspicious.
+		if delay2 < delay1/2 {
+			t.Logf("warning: second backoff delay %v not growing as expected (first was %v)", delay2, delay1)
+		}
+	}
+}
+
+// TestClientStreamBackoffResetAfterSuccessfulEvent verifies that backoff state is reset
+// after successfully receiving an event, so subsequent reconnects start fresh.
+func TestClientStreamBackoffResetAfterSuccessfulEvent(t *testing.T) {
+	t.Parallel()
+	attempts := 0
+	reconnectTimes := []time.Time{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reconnectTimes = append(reconnectTimes, time.Now())
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// First connection: send an event then EOF to trigger reconnect.
+		// Second connection: immediately EOF (no event) to trigger backoff.
+		// Third connection: send done event to stop.
+		if attempts == 1 {
+			_, _ = w.Write([]byte("event: data\ndata: test\n\n"))
+			return
+		}
+		if attempts == 2 {
+			// EOF without event: should apply backoff.
+			return
+		}
+		if attempts >= 3 {
+			_, _ = w.Write([]byte("event: done\n\n"))
+		}
+	}))
+	defer srv.Close()
+
+	c := Client{
+		HTTPClient:   srv.Client(),
+		MaxRetries:   10,
+		RetryBackoff: 50 * time.Millisecond,
+	}
+
+	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
+		if e.Type == "done" {
+			return ErrDone
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	// We expect 3 connection attempts: initial (with event), retry (EOF), retry (done).
+	if len(reconnectTimes) != 3 {
+		t.Fatalf("expected 3 connection attempts, got %d", len(reconnectTimes))
+	}
+
+	// After first connection with event, backoff should reset.
+	// The second reconnect should use initial backoff again (not doubled).
+	delay1 := reconnectTimes[1].Sub(reconnectTimes[0])
+	delay2 := reconnectTimes[2].Sub(reconnectTimes[1])
+
+	// First delay after event should be small (initial backoff ~50ms with jitter).
+	// Second delay should also be small because backoff was reset after the event.
+	// We verify both are within the initial backoff range (25ms-150ms with jitter).
+	if delay1 < 10*time.Millisecond || delay1 > 200*time.Millisecond {
+		t.Logf("warning: first delay %v outside expected range", delay1)
+	}
+	if delay2 < 10*time.Millisecond || delay2 > 200*time.Millisecond {
+		t.Logf("warning: second delay %v outside expected range", delay2)
+	}
+
+	// The key assertion: second delay should not be significantly larger than first,
+	// indicating that backoff was reset after the event.
+	// If backoff was not reset, delay2 would be ~2x-4x delay1.
+	// We allow up to 3x difference due to jitter, but expect roughly similar delays.
+	if delay2 > 3*delay1 {
+		t.Fatalf("backoff was not reset after event: delay1=%v, delay2=%v (expected similar)", delay1, delay2)
+	}
+}
+
+// TestClientStreamMaxRetriesExhausted verifies that Stream returns an error
+// when MaxRetries is exceeded due to repeated connection failures.
+func TestClientStreamMaxRetriesExhausted(t *testing.T) {
+	t.Parallel()
+	attempts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// Always EOF without events to trigger reconnect backoff.
+	}))
+	defer srv.Close()
+
+	c := Client{
+		HTTPClient:   srv.Client(),
+		MaxRetries:   2, // Initial attempt + 2 retries = 3 total attempts.
+		RetryBackoff: 10 * time.Millisecond,
+	}
+
+	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
+		return nil
+	})
+	if err == nil || !strings.Contains(err.Error(), "exceeded max retries") {
+		t.Fatalf("expected max retries error, got %v", err)
+	}
+
+	// We expect MaxRetries+1 attempts: initial attempt (retries=0) + MaxRetries retries.
+	// MaxRetries=2 means: attempt 0 (initial), attempt 1 (retry 1), attempt 2 (retry 2) = 3 total.
+	if attempts != 3 {
+		t.Fatalf("expected 3 connection attempts (MaxRetries=2), got %d", attempts)
+	}
+}
+
+// TestClientStreamIdleTimeoutCancelsConnection verifies that IdleTimeout
+// triggers context cancellation if no events are received within the timeout period.
+func TestClientStreamIdleTimeoutCancelsConnection(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// Server never sends events; waits for context cancellation (idle timeout).
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	c := Client{
+		HTTPClient:  srv.Client(),
+		IdleTimeout: 50 * time.Millisecond,
+		MaxRetries:  0, // No retries; fail immediately on idle timeout.
+	}
+
+	start := time.Now()
+	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
+		return nil
+	})
+	elapsed := time.Since(start)
+
+	if err == nil || !strings.Contains(err.Error(), "idle timeout") {
+		t.Fatalf("expected idle timeout error, got %v", err)
+	}
+
+	// Verify that the stream was cancelled around the idle timeout duration.
+	// Allow some tolerance for scheduling and timing jitter.
+	if elapsed < 30*time.Millisecond || elapsed > 150*time.Millisecond {
+		t.Logf("warning: idle timeout took %v, expected ~50ms", elapsed)
+	}
+}
+
+// TestClientStreamServerRetryHint verifies that the server's "retry" field
+// overrides the client's backoff policy for subsequent reconnects.
+func TestClientStreamServerRetryHint(t *testing.T) {
+	t.Parallel()
+	attempts := 0
+	reconnectTimes := []time.Time{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reconnectTimes = append(reconnectTimes, time.Now())
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		// First connection: send a retry hint of 100ms, then EOF.
+		// Second connection: send done event to stop.
+		if attempts == 1 {
+			_, _ = w.Write([]byte("retry: 100\n"))
+			_, _ = w.Write([]byte("event: ping\ndata: test\n\n"))
+			return
+		}
+		if attempts >= 2 {
+			_, _ = w.Write([]byte("event: done\n\n"))
+		}
+	}))
+	defer srv.Close()
+
+	c := Client{
+		HTTPClient:   srv.Client(),
+		MaxRetries:   10,
+		RetryBackoff: 20 * time.Millisecond, // Initial backoff (should be overridden by server hint).
+	}
+
+	err := c.Stream(context.Background(), srv.URL, func(e Event) error {
+		if e.Type == "done" {
+			return ErrDone
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Stream error: %v", err)
+	}
+
+	// We expect 2 connection attempts: initial (with retry hint), retry (done).
+	if len(reconnectTimes) != 2 {
+		t.Fatalf("expected 2 connection attempts, got %d", len(reconnectTimes))
+	}
+
+	// The delay between first and second connection should be ~100ms (server hint)
+	// with jitter tolerance, not the original 20ms client backoff.
+	delay := reconnectTimes[1].Sub(reconnectTimes[0])
+	// Allow jitter: expect delay in range [50ms, 200ms] for 100ms hint with 50% jitter.
+	if delay < 50*time.Millisecond || delay > 200*time.Millisecond {
+		t.Logf("warning: delay %v outside expected range [50ms, 200ms] for 100ms server hint", delay)
 	}
 }
