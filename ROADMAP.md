@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
   - Test: `go test ./internal/worker/lifecycle ./internal/server/status ./internal/nodeagent` — Heartbeat and status snapshot tests continue to pass with unchanged JSON payloads
 
 ## Nodeagent Run Options
-- [ ] Introduce typed RunOptions for nodeagent execution — Clarify which spec/options keys are understood by the agent
+- [x] Introduce typed RunOptions for nodeagent execution — Clarify which spec/options keys are understood by the agent
   - Component: `internal/nodeagent`
   - Scope: Define small option structs (e.g., build gate config, healing config, MR wiring) in a new file; update `parseSpec` and `buildManifestFromRequest` to populate typed options while preserving raw JSON where needed
   - Test: `go test ./internal/nodeagent` — Healing, MR creation, and manifest builder tests continue to pass; JSON contracts remain stable
