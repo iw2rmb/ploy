@@ -371,11 +371,19 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// With 100ms initial backoff and 2x exponential, expect at least 300ms total.
-	// First retry: 100ms, second retry: 200ms.
-	expectedMinDuration := 300 * time.Millisecond
+	// With shared backoff policy (100ms initial, 2x multiplier, 50% jitter):
+	// First retry:  ~50-150ms (100ms ± 50%)
+	// Second retry: ~100-300ms (200ms ± 50%)
+	// Total minimum (lower bound): ~150ms (50ms + 100ms)
+	// We use a conservative lower bound to account for jitter.
+	expectedMinDuration := 150 * time.Millisecond
 	if elapsed < expectedMinDuration {
 		t.Errorf("expected backoff duration >= %v, got %v", expectedMinDuration, elapsed)
+	}
+
+	// Verify we got the expected number of attempts.
+	if attemptCount != 3 {
+		t.Errorf("expected 3 attempts, got %d", attemptCount)
 	}
 }
 
