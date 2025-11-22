@@ -122,7 +122,13 @@ The deprecated `--job-id` flag remains as an alias for `--run-id` for backward c
   successful run (`mod run --follow`). A `manifest.json` file is created with
   artifact metadata.
 - Streaming guards (long-lived SSE):
-  - `mods logs` and `runs follow` support `--idle-timeout <duration>` (default `45s`) to cancel when no events arrive, and `--timeout <duration>` to cap overall stream time.
+  - `mods logs` and `runs follow` use resilient SSE streams backed by `github.com/tmaxmax/go-sse` and a shared exponential backoff policy.
+  - `--idle-timeout <duration>` (default `45s`): Cancels the stream when no events arrive within the specified duration. Set to `0` to disable idle timeout.
+  - `--timeout <duration>` (default `0`, unlimited): Caps the overall stream time. When exceeded, the CLI exits the stream.
+  - `--max-retries <int>` (default `3` for `mods logs`, `3` for `runs follow`): Maximum number of reconnect attempts. Set to `-1` for unlimited retries.
+  - `--retry-wait <duration>` (deprecated; default `1s` for `mods logs`, `500ms` for `runs follow`): Initial wait duration between reconnect attempts. The backoff policy applies exponential growth with jitter (2x multiplier, capped at 30s). This flag is preserved for backward compatibility; the shared backoff policy handles reconnect delays.
+  - Reconnection semantics: On connection errors or mid-stream failures, the client automatically reconnects with exponential backoff (starting at `--retry-wait` if set, otherwise 250ms for SSE streams). Backoff resets after successfully receiving events. Last-Event-ID is preserved across reconnects to resume from the last processed event.
+  - Server `retry` hints are not supported: The library-backed SSE client does not consume server-sent `retry` fields. Reconnect delays are driven entirely by the shared backoff policy.
 - `--cap` — Overall time limit for `--follow`. When the duration elapses, the CLI stops following; use `--cancel-on-cap` to cancel the ticket too (e.g., `--cap 5m --cancel-on-cap`).
 
 ## Build Gate Healing
