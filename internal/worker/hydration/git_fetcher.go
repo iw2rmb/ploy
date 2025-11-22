@@ -12,7 +12,8 @@ import (
 
 // GitFetcherOptions holds configuration for the git fetcher.
 type GitFetcherOptions struct {
-	Publisher       interface{}
+	// PublishSnapshot indicates whether snapshots should be published during fetch.
+	// Currently unused but reserved for future observability extensions.
 	PublishSnapshot bool
 }
 
