@@ -46,7 +46,7 @@ Legend: [ ] todo, [x] done.
   - Scope: Replace custom `shouldRetry` and `backoff` logic in `CreateMR` with `internal/workflow/backoff` helpers while maintaining retry conditions for 429 and 5xx responses; keep approximate delay pattern (1s, 2s, 4s) and ensure PAT redaction behavior remains intact
   - Test: Update `mr_client_api_retry_test.go` to assert retry count and approximate delays using the shared helper; run `go test ./internal/nodeagent/gitlab/...`; confirm fuzz tests still pass and no PAT values appear in error strings
 
-- [ ] Apply shared backoff to SSE stream reconnects — Align SSE reconnect behavior with shared backoff and IdleTimeout logic
+- [x] Apply shared backoff to SSE stream reconnects — Align SSE reconnect behavior with shared backoff and IdleTimeout logic
   - Component: `internal/cli/stream/client.go`, SSE-related tests under `cmd/ploy` (for example, `mods_logs_test.go`, `runs_follow` tests)
   - Scope: Replace `Client.wait` and manual retry/backoff calculations with shared backoff helpers, preserving `MaxRetries`, `RetryBackoff` defaults, IdleTimeout semantics, and `ErrDone` handler behavior; integrate logging and metrics hooks where available
   - Test: Add or extend tests to cover reconnect attempts, IdleTimeout-triggered cancellation, and `MaxRetries` exhaustion; run `go test ./internal/cli/stream/... ./cmd/ploy/...`; expect streaming behavior to remain stable under transient failures
