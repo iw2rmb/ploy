@@ -120,9 +120,9 @@ Legend: [ ] todo, [x] done.
   - Test: Manual docs review; run CLI help snapshot tests under `cmd/ploy` to confirm consistency between docs and actual output
 
 - [x] Add binary size guardrail for CLI changes — Protect against excessive growth from new dependencies
-  - Component: `Makefile`, CI/test harness, `dist/ploy`
-  - Scope: Introduce a guardrail that measures `dist/ploy` after `make build` (for example, a simple size check script) and fails the build if the binary exceeds an agreed threshold; wire this into `make test` or a dedicated CI job
-  - Test: Manually verify the guardrail by building and checking size locally; ensure regular builds pass and CI enforces the threshold
+  - Component: `scripts/check-binary-size.sh`, `scripts/check-binary-size_test.sh`, `Makefile` (`test-binary-size` target), CI/test harness, `dist/ploy`
+  - Scope: Use `scripts/check-binary-size.sh` to measure `dist/ploy` after `make build` and fail if the binary exceeds the threshold (currently 15 MB); wire the check into `make test`/`make ci-check` via the `test-binary-size` target so CLI changes are guarded automatically
+  - Test: Run `bash scripts/check-binary-size_test.sh` and `make test-binary-size` (or `make test`/`make ci-check`) to exercise the guardrail; optionally build locally and confirm that typical changes stay well below the threshold
 
 ## Cross-cutting Validation and Risk Mitigation
 - [ ] Capture baseline test and coverage metrics — Establish a starting point before refactors
