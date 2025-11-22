@@ -7,6 +7,16 @@ removed during the workstation legacy teardown.
 
 ## Usage
 
+The CLI uses Cobra for command structure and help. To see available commands:
+
+```bash
+ploy --help                    # List all top-level commands
+ploy <command> --help          # Get help for a specific command
+ploy help <command>            # Alternative help syntax
+```
+
+Common command patterns:
+
 ```bash
 ploy lanes describe --lane <lane-name> \
   [--commit <sha>] [--manifest <version>] \
@@ -81,6 +91,44 @@ classifier drift without leaving the workstation.
 `upload` uses the cached mTLS cluster descriptor to post gzipped bundles to the control‑plane HTTPS API (no SSH). The CLI always targets the default descriptor at `~/.config/ploy/clusters/default`.
 It targets `POST /v1/runs/{id}/artifact_bundles` and enforces the 1 MiB bundle cap locally before sending.
 The deprecated `--job-id` flag remains as an alias for `--run-id` for backward compatibility.
+
+## Shell Completion
+
+The CLI provides shell completion for bash, zsh, fish, and PowerShell via the `completion` command:
+
+```bash
+# Generate completion script for your shell
+ploy completion bash > /etc/bash_completion.d/ploy  # bash
+ploy completion zsh > ~/.zsh/completion/_ploy       # zsh
+ploy completion fish > ~/.config/fish/completions/ploy.fish  # fish
+ploy completion powershell > ploy.ps1               # PowerShell
+```
+
+To load completions in your current shell session:
+
+```bash
+# bash
+source <(ploy completion bash)
+
+# zsh
+source <(ploy completion zsh)
+
+# fish
+ploy completion fish | source
+
+# PowerShell
+ploy completion powershell | Out-String | Invoke-Expression
+```
+
+The completion command is powered by Cobra and provides:
+- Command completion for all subcommands (mod, server, node, etc.)
+- Flag completion for available options
+- Context-aware suggestions based on command hierarchy
+
+For persistent setup instructions specific to your shell, run:
+```bash
+ploy completion <shell> --help
+```
 
 ## Flags
 

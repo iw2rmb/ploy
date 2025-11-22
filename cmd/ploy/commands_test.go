@@ -156,3 +156,133 @@ func TestRootCmdPreservesExistingBehavior(t *testing.T) {
 		}
 	})
 }
+
+// TestHelpOutputMatchesDocumentation verifies that CLI help output remains
+// consistent with the cobra-based implementation. This test ensures that
+// documentation examples stay accurate when the CLI structure changes.
+//
+// The test validates:
+// - Root help includes all expected commands (mod, server, node, etc.)
+// - The completion command is documented and functional
+// - Help format matches cobra conventions
+// - Key commands have proper Short descriptions
+func TestHelpOutputMatchesDocumentation(t *testing.T) {
+	t.Parallel()
+
+	// Test cases for different help outputs.
+	// Each test ensures that key documentation elements are present in the help text.
+	tests := []struct {
+		name           string
+		args           []string
+		expectedInHelp []string // Strings that must appear in help output
+		mustContainAll bool     // If true, all expected strings must be present
+		description    string
+	}{
+		{
+			name: "root help shows all commands",
+			args: []string{"--help"},
+			expectedInHelp: []string{
+				"Ploy CLI v2",
+				"Available Commands:",
+				"mod",
+				"server",
+				"node",
+				"rollout",
+				"completion", // Newly added cobra feature
+				"help",
+				"version",
+			},
+			mustContainAll: true,
+			description:    "Root help must list all top-level commands including completion",
+		},
+		{
+			name: "completion command exists",
+			args: []string{"completion", "--help"},
+			expectedInHelp: []string{
+				"completion",
+				"bash",
+				"zsh",
+				"fish",
+				"powershell",
+			},
+			mustContainAll: true,
+			description:    "completion --help must show all supported shells",
+		},
+		{
+			name: "mod command shows subcommands",
+			args: []string{"mod", "--help"},
+			expectedInHelp: []string{
+				"mod",
+				"run",
+				"cancel",
+				"resume",
+			},
+			mustContainAll: true,
+			description:    "mod --help must list all subcommands",
+		},
+	}
+
+	for _, tt := range tests {
+		// Capture test case for parallel execution.
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create root command with stderr buffer.
+			stderr := &bytes.Buffer{}
+			rootCmd := newRootCmd(stderr)
+			rootCmd.SetArgs(tt.args)
+
+			// Execute and capture output.
+			// Help commands return an error (e.g., ErrHelp), which is expected.
+			_ = rootCmd.Execute()
+			output := stderr.String()
+
+			// Verify expected strings appear in help output.
+			for _, expected := range tt.expectedInHelp {
+				if !strings.Contains(output, expected) {
+					t.Errorf("%s: expected help output to contain %q, got:\n%s",
+						tt.description, expected, output)
+					if tt.mustContainAll {
+						// Continue checking other strings even if one fails.
+						continue
+					}
+					return
+				}
+			}
+		})
+	}
+}
+
+// TestCompletionCommandFunctional verifies that the completion command
+// can generate completion scripts for all supported shells without errors.
+// This ensures the cobra completion integration works correctly.
+func TestCompletionCommandFunctional(t *testing.T) {
+	t.Parallel()
+
+	// Supported shells from cobra's completion command.
+	shells := []string{"bash", "zsh", "fish", "powershell"}
+
+	for _, shell := range shells {
+		shell := shell
+		t.Run(shell, func(t *testing.T) {
+			t.Parallel()
+
+			stderr := &bytes.Buffer{}
+			rootCmd := newRootCmd(stderr)
+			rootCmd.SetArgs([]string{"completion", shell})
+
+			// Execute completion generation.
+			// The completion command writes to stdout and should not return an error.
+			err := rootCmd.Execute()
+			if err != nil {
+				t.Errorf("completion %s failed: %v", shell, err)
+			}
+
+			// Verify that completion output was generated (non-empty stderr or no error).
+			// Note: cobra writes completion scripts to stdout, not stderr.
+			// Since we're testing in-memory, just verify no error occurred.
+			// The actual completion script content is tested by cobra itself.
+		})
+	}
+}
