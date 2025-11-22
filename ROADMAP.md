@@ -28,7 +28,7 @@ Legend: [ ] todo, [x] done.
 ## Status / Enum Consistency
 - [x] Align enum/status types across store, workflow contracts, and mods API — Reduce string casts and duplicated status definitions
   - Component: `internal/store`, `internal/workflow/contracts`, `internal/mods/api`, `internal/server/handlers`
-  - Scope: Introduce shared domain enums for run/stage/buildgate job status or adjust `sqlc.yaml` to reuse existing contract enums; update handlers to rely on shared types instead of ad hoc string conversions
+  - Scope: Centralize status enums and conversion helpers; use `store.StageStatus`, `store.RunStatus`, and `store.BuildgateJobStatus` as canonical types; add `internal/store/status_conversion.go` and `internal/mods/api/status_conversion.go` for mods↔store mappings; update workflow contracts and handlers to rely on typed statuses instead of ad hoc string conversions
   - Test: `go test ./internal/store ./internal/workflow/contracts ./internal/mods/api ./internal/server/handlers` — All status transition tests pass and JSON status fields remain identical
 
 ## Git Fetcher Publisher Hook
