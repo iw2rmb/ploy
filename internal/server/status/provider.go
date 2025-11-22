@@ -9,8 +9,9 @@ import (
 )
 
 // SnapshotSource exposes cached lifecycle status snapshots.
+// Uses LatestStatusMap for backward-compatible map[string]any access.
 type SnapshotSource interface {
-	LatestStatus() (map[string]any, bool)
+	LatestStatusMap() (map[string]any, bool)
 }
 
 // Options configure the status provider.
@@ -40,7 +41,7 @@ func New(opts Options) *Provider {
 // Snapshot returns the current node status.
 func (p *Provider) Snapshot(context.Context) (map[string]any, error) {
 	if p.source != nil {
-		if snapshot, ok := p.source.LatestStatus(); ok && len(snapshot) > 0 {
+		if snapshot, ok := p.source.LatestStatusMap(); ok && len(snapshot) > 0 {
 			return snapshot, nil
 		}
 	}

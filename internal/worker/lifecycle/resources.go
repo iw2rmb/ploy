@@ -58,63 +58,51 @@ type resourceSnapshot struct {
 	NetworkInterfaces    map[string]networkInterfaceSnapshot
 }
 
-func (r resourceSnapshot) asMap() map[string]any {
-	resources := map[string]any{
-		"cpu": map[string]any{
-			"total_mcores": r.CPUTotalMilli,
-			"free_mcores":  r.CPUFreeMilli,
-			"load_1m":      r.CPULoad1,
-		},
-		"memory": map[string]any{
-			"total_mb": r.MemoryTotalMB,
-			"free_mb":  r.MemoryFreeMB,
-		},
-	}
-
-	diskMap := map[string]any{
-		"total_mb": r.DiskTotalMB,
-		"free_mb":  r.DiskFreeMB,
-	}
-	ioMap := map[string]any{
-		"read_mb_per_sec":  r.DiskReadMBps,
-		"write_mb_per_sec": r.DiskWriteMBps,
-		"read_iops":        r.DiskReadIOPS,
-		"write_iops":       r.DiskWriteIOPS,
-	}
-	if r.DiskInitialSample {
-		ioMap["details"] = map[string]any{"initial_sample": true}
-	}
-	diskMap["io"] = ioMap
-	resources["disk"] = diskMap
-
-	networkMap := map[string]any{
-		"rx_bytes_per_sec":   r.NetworkRxBps,
-		"tx_bytes_per_sec":   r.NetworkTxBps,
-		"rx_packets_per_sec": r.NetworkRxPps,
-		"tx_packets_per_sec": r.NetworkTxPps,
-	}
-	if r.NetworkInitialSample {
-		networkMap["details"] = map[string]any{"initial_sample": true}
-	}
-	if len(r.NetworkInterfaces) > 0 {
-		ifaces := make(map[string]any, len(r.NetworkInterfaces))
-		for name, iface := range r.NetworkInterfaces {
-			entry := map[string]any{
-				"rx_bytes_per_sec":   iface.RXBytesPerSec,
-				"tx_bytes_per_sec":   iface.TXBytesPerSec,
-				"rx_packets_per_sec": iface.RXPacketsPerSec,
-				"tx_packets_per_sec": iface.TXPacketsPerSec,
-			}
-			if iface.InitialSample {
-				entry["details"] = map[string]any{"initial_sample": true}
-			}
-			ifaces[name] = entry
+// toNodeResources converts the internal resourceSnapshot to the typed NodeResources struct.
+// This eliminates map[string]any casts by providing a strongly-typed representation.
+func (r resourceSnapshot) toNodeResources() NodeResources {
+	// Convert network interfaces from internal snapshot format to typed format.
+	interfaces := make(map[string]NetworkInterface, len(r.NetworkInterfaces))
+	for name, iface := range r.NetworkInterfaces {
+		interfaces[name] = NetworkInterface{
+			RXBytesPerSec:   iface.RXBytesPerSec,
+			TXBytesPerSec:   iface.TXBytesPerSec,
+			RXPacketsPerSec: iface.RXPacketsPerSec,
+			TXPacketsPerSec: iface.TXPacketsPerSec,
+			InitialSample:   iface.InitialSample,
 		}
-		networkMap["interfaces"] = ifaces
 	}
-	resources["network"] = networkMap
 
-	return resources
+	return NodeResources{
+		CPU: CPUResources{
+			TotalMCores: r.CPUTotalMilli,
+			FreeMCores:  r.CPUFreeMilli,
+			Load1:       r.CPULoad1,
+		},
+		Memory: MemoryResources{
+			TotalMB: r.MemoryTotalMB,
+			FreeMB:  r.MemoryFreeMB,
+		},
+		Disk: DiskResources{
+			TotalMB: r.DiskTotalMB,
+			FreeMB:  r.DiskFreeMB,
+			IO: DiskIO{
+				ReadMBPerSec:  r.DiskReadMBps,
+				WriteMBPerSec: r.DiskWriteMBps,
+				ReadIOPS:      r.DiskReadIOPS,
+				WriteIOPS:     r.DiskWriteIOPS,
+				InitialSample: r.DiskInitialSample,
+			},
+		},
+		Network: NetworkResources{
+			RXBytesPerSec:   r.NetworkRxBps,
+			TXBytesPerSec:   r.NetworkTxBps,
+			RXPacketsPerSec: r.NetworkRxPps,
+			TXPacketsPerSec: r.NetworkTxPps,
+			InitialSample:   r.NetworkInitialSample,
+			Interfaces:      interfaces,
+		},
+	}
 }
 
 func (c *Collector) collectResources(ctx context.Context) (resourceSnapshot, error) {

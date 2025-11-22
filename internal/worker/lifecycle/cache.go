@@ -5,9 +5,10 @@ import (
 )
 
 // Cache stores the latest lifecycle status snapshot for reuse.
+// Now stores typed NodeStatus instead of map[string]any for type safety.
 type Cache struct {
 	mu     sync.RWMutex
-	status map[string]any
+	status *NodeStatus
 }
 
 // NewCache constructs an empty lifecycle status cache.
@@ -15,27 +16,37 @@ func NewCache() *Cache {
 	return &Cache{}
 }
 
-// Store replaces the cached status with the provided map.
-func (c *Cache) Store(status map[string]any) {
+// Store replaces the cached status with the provided NodeStatus.
+func (c *Cache) Store(status NodeStatus) {
 	if c == nil {
 		return
 	}
 	c.mu.Lock()
-	c.status = cloneAnyMap(status)
+	c.status = &status
 	c.mu.Unlock()
 }
 
-// LatestStatus returns a deep copy of the cached status when available.
-func (c *Cache) LatestStatus() (map[string]any, bool) {
+// LatestStatus returns a copy of the cached NodeStatus when available.
+func (c *Cache) LatestStatus() (NodeStatus, bool) {
 	if c == nil {
-		return nil, false
+		return NodeStatus{}, false
 	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if len(c.status) == 0 {
+	if c.status == nil {
+		return NodeStatus{}, false
+	}
+	return *c.status, true
+}
+
+// LatestStatusMap returns the cached status as map[string]any for backward compatibility.
+// This preserves the existing SnapshotSource interface used by status.Provider.
+func (c *Cache) LatestStatusMap() (map[string]any, bool) {
+	status, ok := c.LatestStatus()
+	if !ok {
 		return nil, false
 	}
-	return cloneAnyMap(c.status), true
+	return status.ToMap(), true
 }
 
 func cloneAnyMap(src map[string]any) map[string]any {

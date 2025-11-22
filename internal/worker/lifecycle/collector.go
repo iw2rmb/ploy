@@ -44,10 +44,11 @@ type Options struct {
 	IgnoreInterfaces []string
 }
 
-// Snapshot aggregates status and capacity payloads.
+// Snapshot aggregates typed status and capacity payloads.
+// Replaces map[string]any with strongly-typed NodeStatus and NodeCapacity.
 type Snapshot struct {
-	Status   map[string]any
-	Capacity map[string]any
+	Status   NodeStatus
+	Capacity NodeCapacity
 }
 
 // Collector gathers node lifecycle data for status endpoints and heartbeats.
@@ -98,38 +99,48 @@ func NewCollector(opts Options) *Collector {
 }
 
 // Collect builds the latest status and capacity payloads.
+// Returns typed NodeStatus and NodeCapacity instead of map[string]any.
 func (c *Collector) Collect(ctx context.Context) (Snapshot, error) {
 	now := c.now()
 	host, _ := c.hostname()
 
 	resources, resErr := c.collectResources(ctx)
 
-	components := map[string]ComponentStatus{
-		"docker": c.checkComponent(ctx, c.docker),
-		"gate":   c.checkComponent(ctx, c.gate),
+	// Build typed component status (no more map[string]ComponentStatus).
+	dockerStatus := c.checkComponent(ctx, c.docker)
+	gateStatus := c.checkComponent(ctx, c.gate)
+	components := NodeComponents{
+		Docker: dockerStatus,
+		Gate:   gateStatus,
 	}
 
-	statusState := aggregateState(components, resErr)
+	// Aggregate state from typed components.
+	statusState := aggregateComponentState(dockerStatus, gateStatus, resErr)
 
-	status := map[string]any{
-		"state":      statusState,
-		"timestamp":  now.Format(time.RFC3339Nano),
-		"heartbeat":  now.Format(time.RFC3339Nano),
-		"role":       c.roleOrDefault(),
-		"node_id":    c.nodeID,
-		"hostname":   strings.TrimSpace(host),
-		"resources":  resources.asMap(),
-		"components": componentsToMap(components),
+	// Build typed NodeStatus.
+	status := NodeStatus{
+		State:      statusState,
+		Timestamp:  now,
+		Heartbeat:  now,
+		Role:       c.roleOrDefault(),
+		NodeID:     c.nodeID,
+		Hostname:   strings.TrimSpace(host),
+		Resources:  resources.toNodeResources(),
+		Components: components,
 	}
 	if resErr != nil {
-		status["resource_warning"] = resErr.Error()
+		status.ResourceWarning = resErr.Error()
 	}
 
-	capacity := map[string]any{
-		"cpu_free":  resources.CPUFreeMilli,
-		"mem_free":  resources.MemoryFreeMB,
-		"disk_free": resources.DiskFreeMB,
-		"heartbeat": now.Format(time.RFC3339Nano),
+	// Build typed NodeCapacity.
+	capacity := NodeCapacity{
+		CPUFreeMilli:  resources.CPUFreeMilli,
+		MemFreeMB:     resources.MemoryFreeMB,
+		DiskFreeMB:    resources.DiskFreeMB,
+		CPUTotalMilli: resources.CPUTotalMilli,
+		MemTotalMB:    resources.MemoryTotalMB,
+		DiskTotalMB:   resources.DiskTotalMB,
+		Heartbeat:     now,
 	}
 
 	return Snapshot{Status: status, Capacity: capacity}, nil
@@ -156,45 +167,41 @@ func (c *Collector) checkComponent(ctx context.Context, checker HealthChecker) C
 	return status
 }
 
-func componentsToMap(components map[string]ComponentStatus) map[string]any {
-	out := make(map[string]any, len(components))
-	for name, status := range components {
-		component := map[string]any{
-			"state":      status.State,
-			"checked_at": status.CheckedAt.UTC().Format(time.RFC3339Nano),
-		}
-		if strings.TrimSpace(status.Message) != "" {
-			component["message"] = status.Message
-		}
-		if strings.TrimSpace(status.Version) != "" {
-			component["version"] = status.Version
-		}
-		if len(status.Details) > 0 {
-			component["details"] = cloneAnyMap(status.Details)
-		}
-		out[name] = component
-	}
-	return out
-}
-
-func aggregateState(components map[string]ComponentStatus, resErr error) string {
+// aggregateComponentState computes the overall node state from individual component statuses.
+// Replaces map iteration with explicit component checks for type safety.
+func aggregateComponentState(docker, gate ComponentStatus, resErr error) string {
 	state := stateOK
 	if resErr != nil {
 		state = stateDegraded
 	}
-	for _, comp := range components {
-		switch strings.ToLower(comp.State) {
-		case stateError:
-			return stateError
-		case stateDegraded:
-			if state != stateError {
-				state = stateDegraded
-			}
-		case stateUnknown:
-			if state == stateOK {
-				state = stateUnknown
-			}
+
+	// Check docker component.
+	switch strings.ToLower(docker.State) {
+	case stateError:
+		return stateError
+	case stateDegraded:
+		if state != stateError {
+			state = stateDegraded
+		}
+	case stateUnknown:
+		if state == stateOK {
+			state = stateUnknown
 		}
 	}
+
+	// Check gate component.
+	switch strings.ToLower(gate.State) {
+	case stateError:
+		return stateError
+	case stateDegraded:
+		if state != stateError {
+			state = stateDegraded
+		}
+	case stateUnknown:
+		if state == stateOK {
+			state = stateUnknown
+		}
+	}
+
 	return state
 }

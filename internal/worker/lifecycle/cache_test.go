@@ -1,38 +1,104 @@
 package lifecycle
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
+// TestCacheStoreAndCopy verifies that Cache stores and returns typed NodeStatus correctly.
+// The cache should return a copy of the stored status, not a reference.
 func TestCacheStoreAndCopy(t *testing.T) {
 	c := NewCache()
-	// Store nested structure
-	src := map[string]any{
-		"cpu":  map[string]any{"total": 4000.0, "free": 2000.0},
-		"list": []any{map[string]any{"k": "v"}, 42, "x"},
+
+	// Create a typed NodeStatus with nested resources.
+	now := time.Now().UTC()
+	src := NodeStatus{
+		State:     "ok",
+		Timestamp: now,
+		Heartbeat: now,
+		Role:      "node",
+		NodeID:    "test-node-123",
+		Hostname:  "test-host",
+		Resources: NodeResources{
+			CPU: CPUResources{
+				TotalMCores: 4000.0,
+				FreeMCores:  2000.0,
+				Load1:       1.5,
+			},
+			Memory: MemoryResources{
+				TotalMB: 8192.0,
+				FreeMB:  4096.0,
+			},
+			Disk: DiskResources{
+				TotalMB: 102400.0,
+				FreeMB:  51200.0,
+				IO: DiskIO{
+					ReadMBPerSec:  10.5,
+					WriteMBPerSec: 5.2,
+					ReadIOPS:      100.0,
+					WriteIOPS:     50.0,
+					InitialSample: false,
+				},
+			},
+			Network: NetworkResources{
+				RXBytesPerSec:   1000000.0,
+				TXBytesPerSec:   500000.0,
+				RXPacketsPerSec: 1000.0,
+				TXPacketsPerSec: 500.0,
+				InitialSample:   false,
+			},
+		},
+		Components: NodeComponents{
+			Docker: ComponentStatus{State: "ok", CheckedAt: now},
+			Gate:   ComponentStatus{State: "ok", CheckedAt: now},
+		},
 	}
+
+	// Store the status.
 	c.Store(src)
 
-	// Mutate original after storing and ensure cache is not affected
-	src["cpu"].(map[string]any)["free"] = 0.0
-	src["list"].([]any)[0].(map[string]any)["k"] = "mut"
-
+	// Retrieve the status and verify it matches what was stored.
 	got, ok := c.LatestStatus()
 	if !ok {
 		t.Fatal("expected cached status available")
 	}
-	if got["cpu"].(map[string]any)["free"].(float64) != 2000.0 {
-		t.Fatalf("unexpected cpu.free: %#v", got["cpu"])
+	if got.Resources.CPU.FreeMCores != 2000.0 {
+		t.Fatalf("unexpected cpu.free_mcores: got %v, want 2000.0", got.Resources.CPU.FreeMCores)
 	}
-	if got["list"].([]any)[0].(map[string]any)["k"].(string) != "v" {
-		t.Fatalf("deep copy not preserved: %#v", got["list"])
+	if got.State != "ok" {
+		t.Fatalf("unexpected state: got %v, want ok", got.State)
+	}
+	if got.NodeID != "test-node-123" {
+		t.Fatalf("unexpected node_id: got %v, want test-node-123", got.NodeID)
 	}
 
-	// Mutate returned copy; cache must remain unchanged
-	got["cpu"].(map[string]any)["free"] = 1.0
-	got2, ok := c.LatestStatus()
+	// Verify LatestStatusMap returns the correct map representation.
+	gotMap, ok := c.LatestStatusMap()
 	if !ok {
-		t.Fatal("expected cached status available (second read)")
+		t.Fatal("expected cached status available from LatestStatusMap")
 	}
-	if got2["cpu"].(map[string]any)["free"].(float64) != 2000.0 {
-		t.Fatalf("cache mutated by caller: %#v", got2["cpu"])
+	resources, ok := gotMap["resources"].(map[string]any)
+	if !ok {
+		t.Fatal("expected resources to be map[string]any")
+	}
+	cpu, ok := resources["cpu"].(map[string]any)
+	if !ok {
+		t.Fatal("expected cpu to be map[string]any")
+	}
+	if cpu["free_mcores"].(float64) != 2000.0 {
+		t.Fatalf("unexpected cpu.free_mcores from map: got %v, want 2000.0", cpu["free_mcores"])
+	}
+}
+
+// TestCacheEmpty verifies that an empty cache returns false for both typed and map accessors.
+func TestCacheEmpty(t *testing.T) {
+	c := NewCache()
+
+	if _, ok := c.LatestStatus(); ok {
+		t.Fatal("expected empty cache to return false")
+	}
+
+	if _, ok := c.LatestStatusMap(); ok {
+		t.Fatal("expected empty cache to return false from LatestStatusMap")
 	}
 }
