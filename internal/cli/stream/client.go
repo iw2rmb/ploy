@@ -6,10 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
 // ErrDone signals that the consumer has finished processing the stream.
@@ -19,8 +22,9 @@ var ErrDone = errors.New("stream: done")
 type Client struct {
 	HTTPClient   *http.Client
 	MaxRetries   int           // -1 for unlimited retries
-	RetryBackoff time.Duration // wait between reconnect attempts
+	RetryBackoff time.Duration // deprecated: wait between reconnect attempts (use backoff policy instead)
 	IdleTimeout  time.Duration // optional: cancel stream if no events for this duration
+	Logger       *slog.Logger  // optional: logger for backoff and reconnect events
 }
 
 // Event represents a server-sent event frame.
@@ -33,6 +37,7 @@ type Event struct {
 
 // Stream consumes events from the endpoint and invokes handler for each event.
 // The handler may return ErrDone to stop streaming gracefully.
+// Uses shared backoff policy for reconnects; respects MaxRetries, IdleTimeout, and server retry hints.
 func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event) error) error {
 	if c.HTTPClient == nil {
 		return errors.New("stream: http client required")
@@ -40,13 +45,30 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 	if handler == nil {
 		return errors.New("stream: handler required")
 	}
-	backoff := c.RetryBackoff
-	if backoff <= 0 {
-		backoff = 250 * time.Millisecond
+
+	// Use shared backoff policy for exponential reconnect delays with jitter.
+	policy := backoff.SSEStreamPolicy()
+	// If client specifies MaxRetries, apply it to the policy; -1 means unlimited.
+	if c.MaxRetries >= 0 {
+		policy.MaxAttempts = c.MaxRetries
 	}
-	maxRetries := c.MaxRetries
+	// If client specifies a legacy RetryBackoff, use it as InitialInterval; otherwise use policy default.
+	if c.RetryBackoff > 0 {
+		policy.InitialInterval = c.RetryBackoff
+	}
+
+	// Create a stateful backoff manager to track exponential backoff state across reconnects.
+	// This allows backoff to grow on repeated failures and reset on successful events.
+	sb := backoff.NewStatefulBackoff(policy)
+
+	logger := c.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	var lastID string
 	retries := 0
+	maxRetries := c.MaxRetries
 
 	for {
 		// Derive a per-connection context so we can cancel on idle timeout without
@@ -59,6 +81,7 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			return fmt.Errorf("stream: build request: %w", err)
 		}
 		req.Header.Set("Accept", "text/event-stream")
+		// Include Last-Event-ID header to resume from the last successfully processed event.
 		if lastID != "" {
 			req.Header.Set("Last-Event-ID", lastID)
 		}
@@ -68,23 +91,31 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			if connCtx.Err() != nil {
 				// Detect connection-cancel due to idle timeout.
 				if c.IdleTimeout > 0 {
+					logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
 					return fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
 				}
 				return connCtx.Err()
 			}
+			// Connection error: check if retries are exhausted before backing off.
 			if maxRetries >= 0 && retries >= maxRetries {
+				logger.Error("stream_max_retries_exhausted", "retries", retries, "endpoint", endpoint)
 				return fmt.Errorf("stream: connect failed after %d retries: %w", retries, err)
 			}
+			// Apply backoff and retry.
 			retries++
-			if err := c.wait(ctx, backoff); err != nil {
+			backoffDuration := sb.Apply()
+			logger.Warn("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration, "error", err.Error())
+			if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 				return err
 			}
 			continue
 		}
 
+		// Non-200 status: treat as permanent error and fail immediately.
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 			_ = resp.Body.Close()
+			logger.Error("stream_unexpected_status", "status", resp.StatusCode, "body", strings.TrimSpace(string(body)))
 			return fmt.Errorf("stream: unexpected status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 
@@ -92,7 +123,10 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 		// Idle timer: cancels the connection if no events are received within IdleTimeout.
 		var idle *time.Timer
 		if c.IdleTimeout > 0 {
-			idle = time.AfterFunc(c.IdleTimeout, func() { cancelConn() })
+			idle = time.AfterFunc(c.IdleTimeout, func() {
+				logger.Debug("stream_idle_timeout_triggered", "timeout", c.IdleTimeout)
+				cancelConn()
+			})
 		}
 		var sawEvent bool
 		var connectionFailed bool
@@ -100,6 +134,8 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			event, err := readEvent(reader)
 			if err != nil {
 				if errors.Is(err, io.EOF) {
+					// Clean EOF: server closed the stream gracefully.
+					logger.Debug("stream_eof", "endpoint", endpoint)
 					break
 				}
 				// Treat read errors as transient and trigger a reconnect loop
@@ -107,26 +143,39 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 				// improves resilience on flaky TLS/HTTP/2 links.
 				_ = resp.Body.Close()
 				if connCtx.Err() != nil && c.IdleTimeout > 0 {
+					logger.Error("stream_idle_timeout", "timeout", c.IdleTimeout, "endpoint", endpoint)
 					return fmt.Errorf("stream: idle timeout after %s", c.IdleTimeout)
 				}
+				logger.Debug("stream_read_error", "error", err.Error())
 				connectionFailed = true
 				break
 			}
 			sawEvent = true
+			// Reset the idle timer on each successful event.
 			if idle != nil {
 				idle.Reset(c.IdleTimeout)
 			}
+			// Track Last-Event-ID for resumption on reconnect.
 			if event.ID != "" {
 				lastID = event.ID
 			}
+			// Server may send a "retry" field to override backoff delay.
+			// Apply this to the stateful backoff by resetting it to the server-specified duration.
 			if event.Retry > 0 {
-				backoff = event.Retry
+				logger.Debug("stream_server_retry_hint", "retry", event.Retry)
+				// To honor server retry hint, reset backoff to the specified initial interval.
+				// This is a deviation from pure exponential backoff but aligns with SSE spec.
+				policy.InitialInterval = event.Retry
+				sb = backoff.NewStatefulBackoff(policy)
 			}
+			// Invoke the user's event handler.
 			if err := handler(event); err != nil {
 				_ = resp.Body.Close()
 				if errors.Is(err, ErrDone) {
+					logger.Debug("stream_done", "endpoint", endpoint)
 					return nil
 				}
+				logger.Error("stream_handler_error", "error", err.Error())
 				return err
 			}
 		}
@@ -135,34 +184,51 @@ func (c Client) Stream(ctx context.Context, endpoint string, handler func(Event)
 			idle.Stop()
 		}
 
+		// Check if the parent context was cancelled while processing events.
 		if ctx.Err() != nil {
+			logger.Debug("stream_context_cancelled", "error", ctx.Err().Error())
 			return ctx.Err()
 		}
+
+		// If we successfully received events, reset the backoff state for future reconnects.
 		if sawEvent {
+			logger.Debug("stream_reset_backoff", "endpoint", endpoint)
+			sb.Reset()
 			retries = 0
 		}
+
+		// If connection failed mid-stream, check retries and apply backoff before reconnecting.
 		if connectionFailed {
-			// Apply retry/backoff after read failure and attempt reconnect.
 			if maxRetries >= 0 && retries >= maxRetries {
+				logger.Error("stream_max_retries_exhausted", "retries", retries, "endpoint", endpoint)
 				return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
 			}
 			retries++
-			if err := c.wait(ctx, backoff); err != nil {
+			backoffDuration := sb.Apply()
+			logger.Warn("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration)
+			if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 				return err
 			}
 			continue
 		}
+
+		// EOF without events: check retries, apply backoff, and retry.
 		if maxRetries >= 0 && retries >= maxRetries {
+			logger.Error("stream_max_retries_exhausted", "retries", retries, "endpoint", endpoint)
 			return fmt.Errorf("stream: exceeded max retries (%d)", maxRetries)
 		}
 		retries++
-		if err := c.wait(ctx, backoff); err != nil {
+		backoffDuration := sb.Apply()
+		logger.Debug("stream_reconnect_backoff", "attempt", retries, "backoff", backoffDuration)
+		if err := c.waitWithBackoff(ctx, backoffDuration); err != nil {
 			return err
 		}
 	}
 }
 
-func (c Client) wait(ctx context.Context, d time.Duration) error {
+// waitWithBackoff waits for the specified duration or until context is cancelled.
+// Used by the Stream method to apply backoff delays between reconnect attempts.
+func (c Client) waitWithBackoff(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}

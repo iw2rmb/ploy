@@ -111,6 +111,20 @@ func GitLabMRPolicy() Policy {
 	}
 }
 
+// SSEStreamPolicy returns a policy for SSE stream reconnect backoff.
+// Starts at 250ms with 2x multiplier, matching existing SSE default.
+// Uses unlimited retries (-1) unless caller configures MaxRetries.
+// This policy provides a base configuration; callers override MaxAttempts via Client.MaxRetries.
+func SSEStreamPolicy() Policy {
+	return Policy{
+		InitialInterval: 250 * time.Millisecond,
+		MaxInterval:     30 * time.Second, // Cap reconnect delay at 30s.
+		Multiplier:      2.0,
+		MaxElapsedTime:  0, // No time limit; rely on MaxRetries or context cancellation.
+		MaxAttempts:     0, // Unlimited by default; use Client.MaxRetries to cap.
+	}
+}
+
 // NewExponentialBackoff creates a backoff.ExponentialBackOff from the policy.
 // Configures initial interval, max interval, multiplier, randomization factor (jitter).
 // Callers use this with backoff.Retry and options like WithMaxTries, WithMaxElapsedTime.
