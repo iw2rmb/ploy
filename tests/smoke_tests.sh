@@ -10,7 +10,7 @@
 #   bash tests/smoke_tests.sh [--quick|--full]
 #
 # Modes:
-#   --quick: Run fast integration tests only (database, CLI)
+#   --quick: Run fast unit, CLI, and integration tests (no e2e)
 #   --full:  Run all tests including e2e scenarios (requires cluster)
 #
 # Environment:
