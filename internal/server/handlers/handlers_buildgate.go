@@ -75,7 +75,7 @@ func validateBuildGateHandler(st store.Store) http.HandlerFunc {
 				// Timeout - return job ID for async polling.
 				resp := contracts.BuildGateValidateResponse{
 					JobID:  jobID,
-					Status: contracts.BuildGateJobStatus(job.Status),
+					Status: job.Status, // No cast needed: contracts.BuildGateJobStatus is now an alias for store.BuildgateJobStatus
 				}
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusAccepted)
@@ -111,7 +111,7 @@ func validateBuildGateHandler(st store.Store) http.HandlerFunc {
 
 					resp := contracts.BuildGateValidateResponse{
 						JobID:  jobID,
-						Status: contracts.BuildGateJobStatus(job.Status),
+						Status: job.Status, // No cast needed: contracts.BuildGateJobStatus is now an alias for store.BuildgateJobStatus
 						Result: result,
 					}
 
@@ -188,7 +188,7 @@ func getBuildGateJobStatusHandler(st store.Store) http.HandlerFunc {
 
 		resp := contracts.BuildGateJobStatusResponse{
 			JobID:      jobIDStr,
-			Status:     contracts.BuildGateJobStatus(job.Status),
+			Status:     job.Status, // No cast needed: contracts.BuildGateJobStatus is now an alias for store.BuildgateJobStatus
 			Result:     result,
 			Error:      errorMsg,
 			CreatedAt:  formatTimestamp(job.CreatedAt),
@@ -270,11 +270,11 @@ func claimBuildGateJobHandler(st store.Store) http.HandlerFunc {
 		resp := struct {
 			JobID   string                             `json:"job_id"`
 			Request contracts.BuildGateValidateRequest `json:"request"`
-			Status  string                             `json:"status"`
+			Status  store.BuildgateJobStatus           `json:"status"` // Use typed status instead of string cast
 		}{
 			JobID:   uuid.UUID(job.ID.Bytes).String(),
 			Request: req,
-			Status:  string(job.Status),
+			Status:  job.Status,
 		}
 
 		w.Header().Set("Content-Type", "application/json")

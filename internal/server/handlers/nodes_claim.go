@@ -89,10 +89,12 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 
 		// Build response with claimed run details.
 		// Domain types ensure VCS fields have been validated at ingestion.
+		// Use typed status (store.RunStatus) instead of string cast for type safety;
+		// JSON encoder will serialize the underlying string value.
 		resp := struct {
 			ID        string          `json:"id"`
 			RepoURL   string          `json:"repo_url"`
-			Status    string          `json:"status"`
+			Status    store.RunStatus `json:"status"` // Typed status instead of string cast
 			NodeID    string          `json:"node_id"`
 			BaseRef   string          `json:"base_ref"`
 			TargetRef string          `json:"target_ref"`
@@ -103,7 +105,7 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 		}{
 			ID:        uuid.UUID(run.ID.Bytes).String(),
 			RepoURL:   run.RepoUrl,
-			Status:    string(run.Status),
+			Status:    run.Status,
 			NodeID:    uuid.UUID(run.NodeID.Bytes).String(),
 			BaseRef:   run.BaseRef,
 			TargetRef: run.TargetRef,
