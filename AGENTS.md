@@ -28,10 +28,31 @@
   - Nodes: 45.9.42.212 (A), 193.242.109.13 (B), 45.130.213.91 (C).
   - Reuse the current cluster descriptor from `~/.config/ploy/clusters/` to connect.
     If multiple descriptors exist, prefer the default marker (`~/.config/ploy/clusters/default`) or
-    pick the one matching the lab’s cluster ID.
+    pick the one matching the lab's cluster ID.
 - Coverage: maintain ≥60% overall and ≥90% on critical workflow runner packages.
 - Cycle: RED (failing tests) → GREEN (minimal code) → REFACTOR (exercise VPS when needed).
 - For Codex execution details on the Mods E2E harness, consult `tests/e2e/README.md`.
+
+#### TDD Discipline Validation
+
+Use `scripts/validate-tdd-discipline.sh` to enforce RED→GREEN→REFACTOR discipline:
+
+```bash
+# Validate entire repository (recommended before commits)
+./scripts/validate-tdd-discipline.sh
+
+# Validate specific package during development
+./scripts/validate-tdd-discipline.sh ./internal/workflow/...
+```
+
+The validation script checks:
+1. **RED phase**: Test files exist for all packages with implementation code.
+2. **GREEN phase**: All tests pass with `go test -cover ./...`.
+3. **GREEN validation**: Coverage thresholds met (≥60% overall, ≥90% critical paths).
+4. **REFACTOR validation**: Binary size remains under threshold (detects dependency bloat).
+5. **Code quality**: `go vet` and `staticcheck` pass.
+
+Reference: `GOLANG.md` (line 135-141), `ROADMAP.md` (line 133-136).
 
 ### CLI Build & Smoke Checks
 
