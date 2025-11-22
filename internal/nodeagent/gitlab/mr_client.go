@@ -1,11 +1,8 @@
 package gitlab
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -13,17 +10,20 @@ import (
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
 // MRClient provides GitLab merge request creation functionality.
+// It uses the GitLab client-go library for typed API interactions.
 type MRClient struct {
-	client *http.Client
+	httpClient *http.Client
 }
 
 // NewMRClient creates a new GitLab MR client.
+// The HTTP client will be used to configure the GitLab API client for each request.
 func NewMRClient() *MRClient {
 	return &MRClient{
-		client: &http.Client{
+		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
@@ -57,21 +57,6 @@ type MRCreateResponse struct {
 	IID int
 }
 
-// mrCreatePayload is the request body for creating a merge request via GitLab API.
-type mrCreatePayload struct {
-	Title        string `json:"title"`
-	SourceBranch string `json:"source_branch"`
-	TargetBranch string `json:"target_branch"`
-	Description  string `json:"description,omitempty"`
-	Labels       string `json:"labels,omitempty"`
-}
-
-// mrCreateResponse is the response body from GitLab API when creating a merge request.
-type mrCreateResponse struct {
-	WebURL string `json:"web_url"`
-	IID    int    `json:"iid"`
-}
-
 // retryableError wraps an error to indicate it should be retried.
 // Used by CreateMR to signal retry logic for 429 and 5xx errors.
 type retryableError struct {
@@ -88,105 +73,93 @@ func (e *retryableError) Unwrap() error {
 
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
-// Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 3 attempts).
+// Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 4 attempts).
 func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, error) {
 	if err := validateMRCreateRequest(req); err != nil {
 		return "", redactError(fmt.Errorf("invalid request: %w", err), req.PAT)
 	}
 
-	// Construct GitLab API URL.
-	// Use http:// scheme if domain starts with localhost or 127.0.0.1 (for testing).
-	scheme := "https"
-	if strings.HasPrefix(req.Domain, "localhost") || strings.HasPrefix(req.Domain, "127.0.0.1") {
-		scheme = "http"
-	}
-	apiURL := fmt.Sprintf("%s://%s/api/v4/projects/%s/merge_requests",
-		scheme, req.Domain, req.ProjectID)
-
-	// Build request payload using DTO.
-	payload := mrCreatePayload{
-		Title:        req.Title,
-		SourceBranch: req.SourceBranch,
-		TargetBranch: req.TargetBranch,
-	}
-
-	if strings.TrimSpace(req.Description) != "" {
-		payload.Description = req.Description
-	}
-
-	if strings.TrimSpace(req.Labels) != "" {
-		payload.Labels = req.Labels
-	}
-
-	body, err := json.Marshal(payload)
+	// Create GitLab API client using the shared configuration helper.
+	// This client is configured with the appropriate base URL (http/https based on domain),
+	// and dual auth headers (Authorization + PRIVATE-TOKEN) for compatibility.
+	glClient, err := NewClient(ClientConfig{
+		Domain:     req.Domain,
+		PAT:        req.PAT,
+		HTTPClient: c.httpClient,
+	})
 	if err != nil {
-		return "", redactError(fmt.Errorf("marshal request: %w", err), req.PAT)
+		return "", redactError(fmt.Errorf("create gitlab client: %w", err), req.PAT)
 	}
 
-	// Result holder for successful response.
+	// Decode the URL-encoded project ID since the client-go library will re-encode it.
+	// Our external contract uses URL-encoded project IDs (e.g., "org%2Fproject"),
+	// but the library expects unencoded strings (e.g., "org/project") and handles encoding internally.
+	projectID, err := url.PathUnescape(req.ProjectID)
+	if err != nil {
+		return "", redactError(fmt.Errorf("invalid project_id: %w", err), req.PAT)
+	}
+
+	// Build merge request creation options using client-go types.
+	// The library uses pointer fields for optional parameters.
+	options := &gitlabapi.CreateMergeRequestOptions{
+		Title:        &req.Title,
+		SourceBranch: &req.SourceBranch,
+		TargetBranch: &req.TargetBranch,
+	}
+
+	// Add optional description if provided (non-empty after trimming).
+	if desc := strings.TrimSpace(req.Description); desc != "" {
+		options.Description = &desc
+	}
+
+	// Add optional labels if provided (non-empty after trimming).
+	// The client-go library expects a LabelOptions (slice of strings) that will be
+	// marshaled as a comma-separated string in the JSON request.
+	if labels := strings.TrimSpace(req.Labels); labels != "" {
+		// Split comma-separated labels into a slice.
+		labelSlice := strings.Split(labels, ",")
+		for i := range labelSlice {
+			labelSlice[i] = strings.TrimSpace(labelSlice[i])
+		}
+		labelOpts := gitlabapi.LabelOptions(labelSlice)
+		options.Labels = &labelOpts
+	}
+
+	// Result holder for successful response web URL.
 	var webURL string
 
 	// Retry operation using shared backoff helper.
 	// The operation returns retryableError for 429 and 5xx responses to trigger retry.
 	policy := backoff.GitLabMRPolicy()
 	operation := func() error {
-		// Create HTTP request.
-		httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
-		if err != nil {
-			return fmt.Errorf("create request: %w", err)
-		}
+		// Call the GitLab API to create the merge request.
+		// The client-go library handles JSON marshaling and HTTP request construction.
+		mr, resp, err := glClient.MergeRequests.CreateMergeRequest(projectID, options)
 
-		httpReq.Header.Set("Content-Type", "application/json")
-		// Send both Authorization and PRIVATE-TOKEN for compatibility across GitLab setups.
-		httpReq.Header.Set("Authorization", "Bearer "+req.PAT)
-		httpReq.Header.Set("PRIVATE-TOKEN", req.PAT)
-
-		// Send request.
-		resp, err := c.client.Do(httpReq)
+		// Handle network or API errors.
 		if err != nil {
-			// Network errors are retryable (unless context is cancelled).
+			// Check if context was cancelled (don't retry).
 			if ctx.Err() != nil {
 				return err
 			}
-			return &retryableError{err: err}
-		}
 
-		// Read response body.
-		bodyBytes, err := io.ReadAll(resp.Body)
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			// Log close error but don't fail the request if body was read successfully.
-			slog.Warn("failed to close response body", "error", closeErr)
-		}
-		if err != nil {
-			return fmt.Errorf("read response: %w", err)
-		}
-
-		// Check response status.
-		if resp.StatusCode == http.StatusCreated {
-			// Success: parse response using DTO.
-			var result mrCreateResponse
-			if err := json.Unmarshal(bodyBytes, &result); err != nil {
-				return fmt.Errorf("parse response: %w", err)
+			// Determine if the error is retryable based on HTTP response.
+			if resp != nil && c.shouldRetry(ctx, nil, resp.StatusCode) {
+				return &retryableError{err: fmt.Errorf("gitlab api error: %w", err)}
 			}
 
-			if result.WebURL == "" {
-				return fmt.Errorf("no web_url in response")
-			}
-
-			webURL = result.WebURL
-			return nil
+			// Non-retryable error (e.g., 4xx client errors).
+			return fmt.Errorf("create merge request: %w", err)
 		}
 
-		// Build error from response.
-		apiErr := fmt.Errorf("gitlab api error: status %d: %s", resp.StatusCode, string(bodyBytes))
-
-		// Check if we should retry (429 or 5xx).
-		if c.shouldRetry(ctx, nil, resp.StatusCode) {
-			return &retryableError{err: apiErr}
+		// Verify that the response includes the web URL.
+		if mr == nil || mr.WebURL == "" {
+			return fmt.Errorf("no web_url in merge request response")
 		}
 
-		// Non-retryable error.
-		return apiErr
+		// Store the result and return success.
+		webURL = mr.WebURL
+		return nil
 	}
 
 	// Wrap operation with retry filter that only retries on retryableError.
@@ -197,11 +170,8 @@ func (c *MRClient) CreateMR(ctx context.Context, req MRCreateRequest) (string, e
 		}
 		// Only propagate error for retry if it's a retryableError.
 		var retryable *retryableError
-		if err != nil {
-			// Check if the error is retryable.
-			if re, ok := err.(*retryableError); ok {
-				retryable = re
-			}
+		if re, ok := err.(*retryableError); ok {
+			retryable = re
 		}
 		if retryable != nil {
 			// Return the wrapped error to trigger retry.
