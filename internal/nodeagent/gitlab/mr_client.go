@@ -49,14 +49,6 @@ type MRCreateRequest struct {
 	Labels string
 }
 
-// MRCreateResponse holds the response from creating a merge request.
-type MRCreateResponse struct {
-	// WebURL is the URL to view the MR in GitLab.
-	WebURL string
-	// IID is the internal ID of the MR within the project.
-	IID int
-}
-
 // CreateMR creates a merge request in GitLab using the provided parameters.
 // Returns the MR URL on success.
 // Retries on 429 (rate limit) and 5xx (server errors) with exponential backoff (max 4 attempts).
