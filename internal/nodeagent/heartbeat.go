@@ -119,20 +119,19 @@ func (h *HeartbeatManager) sendHeartbeat(ctx context.Context) error {
 		return fmt.Errorf("collect snapshot: %w", err)
 	}
 
-	resources := snap.Status["resources"].(map[string]any)
-	cpu := resources["cpu"].(map[string]any)
-	memory := resources["memory"].(map[string]any)
-	disk := resources["disk"].(map[string]any)
+	// Use typed NodeCapacity instead of map[string]any casts.
+	// This eliminates unsafe type assertions and provides compile-time safety.
+	capacity := snap.Capacity
 
 	payload := HeartbeatPayload{
 		NodeID:        h.cfg.NodeID,
 		Timestamp:     time.Now().UTC(),
-		CPUFreeMilli:  cpu["free_mcores"].(float64),
-		CPUTotalMilli: cpu["total_mcores"].(float64),
-		MemFreeMB:     memory["free_mb"].(float64),
-		MemTotalMB:    memory["total_mb"].(float64),
-		DiskFreeMB:    disk["free_mb"].(float64),
-		DiskTotalMB:   disk["total_mb"].(float64),
+		CPUFreeMilli:  capacity.CPUFreeMilli,
+		CPUTotalMilli: capacity.CPUTotalMilli,
+		MemFreeMB:     capacity.MemFreeMB,
+		MemTotalMB:    capacity.MemTotalMB,
+		DiskFreeMB:    capacity.DiskFreeMB,
+		DiskTotalMB:   capacity.DiskTotalMB,
 	}
 
 	body, err := json.Marshal(payload)

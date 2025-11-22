@@ -11,7 +11,8 @@ type snapshotSource struct {
 	status map[string]any
 }
 
-func (s snapshotSource) LatestStatus() (map[string]any, bool) {
+// LatestStatusMap implements the SnapshotSource interface.
+func (s snapshotSource) LatestStatusMap() (map[string]any, bool) {
 	if len(s.status) == 0 {
 		return nil, false
 	}
