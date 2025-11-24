@@ -16,10 +16,5 @@ control_plane:
   endpoint: "http://localhost:8080"
   token: ""  # Set via PLOY_ADMIN_TOKEN env var or generate after startup
 
-pki:
-  ca_cert_path: "/etc/ploy/pki/ca.crt"
-  ca_key_path: "/etc/ploy/pki/ca.key"
-
 postgres:
   dsn: ""
-

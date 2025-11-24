@@ -1,7 +1,0 @@
-[ req ]
-distinguished_name = dn
-prompt = no
-
-[ dn ]
-CN = cli-admin
-OU = cli-admin
