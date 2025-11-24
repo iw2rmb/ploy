@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   db:
-    image: ${DOCKERHUB_USERNAME:-iw2rmb}/ploy-db:latest
+    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-db:latest
     environment:
       - POSTGRES_DB=ploy
       - POSTGRES_USER=ploy
@@ -16,7 +16,7 @@ services:
       retries: 20
 
   server:
-    image: ${DOCKERHUB_USERNAME:-iw2rmb}/ploy-server:latest
+    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-server:latest
     platform: linux/amd64
     depends_on:
       - db
@@ -32,17 +32,22 @@ services:
       - "9100:9100"
     healthcheck:
       # Use /health endpoint (plain HTTP with bearer token auth)
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health >/dev/null || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:8080/health >/dev/null || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
 
   node:
-    image: ${DOCKERHUB_USERNAME:-iw2rmb}/ploy-node:latest
+    image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-node:latest
     platform: linux/amd64
     depends_on:
       - server
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
-    command: ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
+    command:
+      ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]
