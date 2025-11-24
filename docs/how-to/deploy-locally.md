@@ -8,12 +8,12 @@ This guide brings up a full local Ploy stack using Docker:
 All files referenced live under `local/` and were added to the repo:
 - `local/docker-compose.yml` — services and wiring
 - `local/server/ployd.yaml` — server config (bearer token authentication, metrics)
-- `local/node/ployd-node.yaml` — node config (connects to server via HTTPS)
+- `local/node/ployd-node.yaml` — node config (connects to server via HTTP with bearer tokens)
 
 **Note**: As of the bearer token authentication migration, this deployment uses:
 - **Bearer tokens** for CLI authentication (instead of mTLS client certificates)
-- **Bootstrap tokens** for node provisioning
-- **Plain HTTP** for ployd (HTTPS termination expected at load balancer in production)
+- **Bearer tokens** for worker (node) authentication against the control plane
+- **Plain HTTP** for ployd in this Docker stack (HTTPS termination is expected at a load balancer in VPS deployments)
 
 See also: `docs/how-to/deploy-a-cluster.md` (server/node on VPS) and `docs/envs/README.md` (env vars).
 
@@ -57,25 +57,68 @@ What you get:
 - `server` exposing:
   - API `http://localhost:8080` (plain HTTP, bearer token required)
   - Metrics `http://localhost:9100/metrics`
-- `node` connecting to `server` using bootstrap token flow; Docker socket mounted for container work.
+- `node` calling the control plane using bearer token authentication; Docker socket mounted for container work.
 
 ## 4) Create Initial Admin Token
 
-After the server starts, you need to create an initial admin token. You can do this by directly connecting to the database or using the server's token generation endpoint.
+After the server starts, create an initial **JWT** admin token and register it in PostgreSQL.
 
-For local development, you can generate a token manually:
+1. Generate a JWT admin token (on the host, from the repo root):
 
 ```bash
-# Connect to the running server container and generate a token
-# This requires the server to expose a bootstrap endpoint or direct DB access
-# For now, you'll need to use the CLI after it's configured with a token
+# Reuse the secret from step 2
+export PLOY_AUTH_SECRET="$(cat local/auth-secret.txt)"
 
-# Alternative: Generate token directly via psql
+python - <<'PY'
+import os, base64, json, hmac, hashlib, secrets, time
+
+secret = os.environ["PLOY_AUTH_SECRET"]
+cluster_id = "local"
+role = "cli-admin"
+now = int(time.time())
+exp = now + 365*24*60*60
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+header = {"alg": "HS256", "typ": "JWT"}
+payload = {
+    "cluster_id": cluster_id,
+    "role": role,
+    "token_type": "api",
+    "iat": now,
+    "exp": exp,
+    "jti": secrets.token_urlsafe(16),
+}
+
+header_b64 = b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+payload_b64 = b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+unsigned = f"{header_b64}.{payload_b64}"
+sig = hmac.new(secret.encode("utf-8"), unsigned.encode("utf-8"), hashlib.sha256).digest()
+token = unsigned + "." + b64url(sig)
+
+print("TOKEN=" + token)
+print("TOKEN_ID=" + payload["jti"])
+PY
+```
+
+2. Copy `TOKEN` and `TOKEN_ID` from the output, then compute the hash:
+
+```bash
+TOKEN="...value from previous step..."
+TOKEN_ID="...value from previous step..."
+
+TOKEN_HASH="$(printf '%s' "$TOKEN" | sha256sum | awk '{print $1}')"
+```
+
+3. Insert the token into PostgreSQL for cluster `local`:
+
+```bash
 docker exec -it ploy-db-1 psql -U ploy -d ploy -c "
 INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at)
 VALUES (
-  encode(sha256('your-admin-token'::bytea), 'hex'),
-  'initial-admin',
+  '${TOKEN_HASH}',
+  '${TOKEN_ID}',
   'local',
   'cli-admin',
   'Initial admin token for local development',
@@ -84,7 +127,9 @@ VALUES (
 );"
 ```
 
-**Note**: In production, use `ploy token create` after bootstrapping with the initial token.
+Use the `TOKEN` value as the admin token in the following steps.
+
+**Note**: In production (and once this token exists), use `ploy token create` / `ploy token revoke` for ongoing token management.
 
 ## 5) Verify
 
@@ -98,7 +143,7 @@ curl -s http://localhost:9100/metrics | head
 
 ```bash
 # Using the admin token from step 4
-curl -H "Authorization: Bearer your-admin-token" \
+curl -H "Authorization: Bearer <JWT-from-step-4>" \
      http://localhost:8080/health
 ```
 
@@ -113,7 +158,7 @@ cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
 {
   "cluster_id": "local",
   "address": "http://localhost:8080",
-  "token": "your-admin-token"
+  "token": "<JWT-from-step-4>"
 }
 JSON
 ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
@@ -163,4 +208,3 @@ See `docs/how-to/token-management.md` for detailed token management guide.
 ---
 
 This local setup is for development only. For VPS deployment, use `dist/ploy server deploy` and `dist/ploy node add` as documented in `docs/how-to/deploy-a-cluster.md`.
-

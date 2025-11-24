@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# End-to-end local deployment for the Docker-based Ploy stack.
+# This script automates the steps from docs/how-to/deploy-locally.md:
+# - make build
+# - generate auth secret (if missing)
+# - start docker-compose stack
+# - wait for db and server health
+# - generate JWT admin + worker tokens and insert into api_tokens
+# - seed local node record
+# - provision worker bearer token into node container
+# - wire local CLI descriptor
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
+
+COMPOSE_CMD="${COMPOSE_CMD:-docker compose -f local/docker-compose.yml}"
+CLUSTER_ID="${CLUSTER_ID:-local}"
+NODE_ID="${NODE_ID:-00000000-0000-0000-0000-000000000001}"
+AUTH_SECRET_PATH="${AUTH_SECRET_PATH:-local/auth-secret.txt}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+PLOY_CONFIG_HOME="${PLOY_CONFIG_HOME:-$ROOT_DIR/local/cli}"
+
+log() {
+  echo "[$(date -u +%H:%M:%S)] $*"
+}
+
+need() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "error: missing dependency: $1" >&2
+    exit 1
+  fi
+}
+
+generate_tokens() {
+  # Prints shell assignments for ADMIN_TOKEN*, WORKER_TOKEN* using PLOY_AUTH_SECRET.
+  "$PYTHON_BIN" <<'PY'
+import os, base64, json, hmac, hashlib, secrets, time
+
+secret = os.environ["PLOY_AUTH_SECRET"]
+cluster_id = os.environ.get("CLUSTER_ID", "local")
+
+def b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+def gen_token(role: str):
+    now = int(time.time())
+    exp = now + 365*24*60*60
+    header = {"alg": "HS256", "typ": "JWT"}
+    jti = secrets.token_urlsafe(16)
+    payload = {
+        "cluster_id": cluster_id,
+        "role": role,
+        "token_type": "api",
+        "iat": now,
+        "exp": exp,
+        "jti": jti,
+    }
+    header_b64 = b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+    payload_b64 = b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    unsigned = f"{header_b64}.{payload_b64}"
+    sig = hmac.new(secret.encode("utf-8"), unsigned.encode("utf-8"), hashlib.sha256).digest()
+    token = unsigned + "." + b64url(sig)
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return token, jti, token_hash
+
+admin_token, admin_id, admin_hash = gen_token("cli-admin")
+worker_token, worker_id, worker_hash = gen_token("worker")
+
+print(f"ADMIN_TOKEN={admin_token}")
+print(f"ADMIN_TOKEN_ID={admin_id}")
+print(f"ADMIN_TOKEN_HASH={admin_hash}")
+print(f"WORKER_TOKEN={worker_token}")
+print(f"WORKER_TOKEN_ID={worker_id}")
+print(f"WORKER_TOKEN_HASH={worker_hash}")
+PY
+}
+
+main() {
+  log "Checking prerequisites..."
+  need docker
+  need "$PYTHON_BIN"
+  need openssl
+  need make
+
+  log "Building CLI/binaries (make build)..."
+  make build
+
+  if [[ ! -f "$AUTH_SECRET_PATH" ]]; then
+    log "Generating auth secret at $AUTH_SECRET_PATH..."
+    mkdir -p "$(dirname "$AUTH_SECRET_PATH")"
+    openssl rand -hex 32 > "$AUTH_SECRET_PATH"
+  fi
+
+  export PLOY_AUTH_SECRET
+  PLOY_AUTH_SECRET="$(cat "$AUTH_SECRET_PATH")"
+  export CLUSTER_ID
+
+  log "Starting local docker stack with: $COMPOSE_CMD up -d"
+  $COMPOSE_CMD up -d
+
+  log "Waiting for database to be ready..."
+  for i in {1..60}; do
+    if $COMPOSE_CMD exec -T db pg_isready -U ploy -d ploy >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+    if [[ $i -eq 60 ]]; then
+      echo "error: database did not become ready in time" >&2
+      exit 1
+    fi
+  done
+
+  log "Waiting for server health on http://localhost:8080/health..."
+  for i in {1..60}; do
+    if curl -fsS http://localhost:8080/health >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+    if [[ $i -eq 60 ]]; then
+      echo "error: server did not become healthy in time" >&2
+      exit 1
+    fi
+  done
+
+  log "Generating admin and worker JWT tokens..."
+  # shellcheck disable=SC2046
+  eval "$(generate_tokens)"
+
+  log "Inserting admin token into api_tokens..."
+  $COMPOSE_CMD exec -T db psql -U ploy -d ploy -v ON_ERROR_STOP=1 -c "\
+    SET search_path TO ploy, public; \
+    INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at) \
+    VALUES ( \
+      '${ADMIN_TOKEN_HASH}', \
+      '${ADMIN_TOKEN_ID}', \
+      '${CLUSTER_ID}', \
+      'cli-admin', \
+      'Initial admin token for local development', \
+      NOW(), \
+      NOW() + INTERVAL '365 days' \
+    ) \
+    ON CONFLICT (token_id) DO NOTHING;"
+
+  log "Inserting worker token into api_tokens..."
+  $COMPOSE_CMD exec -T db psql -U ploy -d ploy -v ON_ERROR_STOP=1 -c "\
+    SET search_path TO ploy, public; \
+    INSERT INTO api_tokens (token_hash, token_id, cluster_id, role, description, issued_at, expires_at) \
+    VALUES ( \
+      '${WORKER_TOKEN_HASH}', \
+      '${WORKER_TOKEN_ID}', \
+      '${CLUSTER_ID}', \
+      'worker', \
+      'Local worker token for node ${NODE_ID}', \
+      NOW(), \
+      NOW() + INTERVAL '365 days' \
+    ) \
+    ON CONFLICT (token_id) DO NOTHING;"
+
+  log "Provisioning worker bearer token into node container..."
+  $COMPOSE_CMD exec -T node sh -lc "\
+    mkdir -p /etc/ploy && \
+    printf '%s\n' '${WORKER_TOKEN}' > /etc/ploy/bearer-token && \
+    chmod 600 /etc/ploy/bearer-token"
+
+  log "Seeding node record in ploy.nodes..."
+  UUID="${NODE_ID}"
+  NAME="${NODE_NAME:-local-node-0001}"
+  IP="${NODE_IP:-127.0.0.1}"
+  VERSION="${NODE_VERSION:-dev}"
+  CONCURRENCY="${NODE_CONCURRENCY:-1}"
+  log "Inserting node ${UUID} (${NAME} @ ${IP}) into ploy.nodes..."
+  $COMPOSE_CMD exec -T db psql -U ploy -d ploy -v ON_ERROR_STOP=1 -c "\
+    SET search_path TO ploy, public; \
+    INSERT INTO nodes (id, name, ip_address, version, concurrency) \
+    VALUES ('${UUID}', '${NAME}', '${IP}', '${VERSION}', ${CONCURRENCY}) \
+    ON CONFLICT (id) DO NOTHING;"
+
+  log "Wiring local CLI descriptor..."
+  mkdir -p "$PLOY_CONFIG_HOME/clusters"
+  cat > "$PLOY_CONFIG_HOME/clusters/local.json" <<JSON
+{
+  "cluster_id": "${CLUSTER_ID}",
+  "address": "http://localhost:8080",
+  "token": "${ADMIN_TOKEN}"
+}
+JSON
+  ln -sf local.json "$PLOY_CONFIG_HOME/clusters/default"
+
+  log "Smoke testing CLI token list (optional)..."
+  if [[ -x "./dist/ploy" ]]; then
+    PLOY_CONFIG_HOME="$PLOY_CONFIG_HOME" ./dist/ploy token list || true
+  fi
+
+  log "Local Ploy cluster is up."
+  log "Admin JWT (save securely):"
+  echo "$ADMIN_TOKEN"
+}
+
+main "$@"

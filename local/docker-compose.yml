@@ -23,10 +23,9 @@ services:
     environment:
       - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
+      - PLOY_CLUSTER_ID=local
     volumes:
       - ./server/ployd.yaml:/etc/ploy/ployd.yaml:ro
-      - ./pki/ca.crt:/etc/ploy/pki/ca.crt:ro
-      - ./pki/ca.key:/etc/ploy/pki/ca.key:ro
     command: ["/usr/local/bin/ployd", "--config", "/etc/ploy/ployd.yaml"]
     ports:
       - "8080:8080"
@@ -43,8 +42,6 @@ services:
     platform: linux/amd64
     depends_on:
       - server
-    environment:
-      - PLOY_BOOTSTRAP_TOKEN=${PLOY_BOOTSTRAP_TOKEN:-}
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
