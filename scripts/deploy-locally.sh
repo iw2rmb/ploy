@@ -141,7 +141,7 @@ main() {
       NOW(), \
       NOW() + INTERVAL '365 days' \
     ) \
-    ON CONFLICT (token_id) DO NOTHING;"
+    ON CONFLICT (token_hash) DO NOTHING;"
 
   log "Inserting worker token into api_tokens..."
   $COMPOSE_CMD exec -T db psql -U ploy -d ploy -v ON_ERROR_STOP=1 -c "\
@@ -156,12 +156,12 @@ main() {
       NOW(), \
       NOW() + INTERVAL '365 days' \
     ) \
-    ON CONFLICT (token_id) DO NOTHING;"
+    ON CONFLICT (token_hash) DO NOTHING;"
 
   log "Provisioning worker bearer token into node container..."
   $COMPOSE_CMD exec -T node sh -lc "\
     mkdir -p /etc/ploy && \
-    printf '%s\n' '${WORKER_TOKEN}' > /etc/ploy/bearer-token && \
+    printf '%s' '${WORKER_TOKEN}' > /etc/ploy/bearer-token && \
     chmod 600 /etc/ploy/bearer-token"
 
   log "Seeding node record in ploy.nodes..."
@@ -176,6 +176,9 @@ main() {
     INSERT INTO nodes (id, name, ip_address, version, concurrency) \
     VALUES ('${UUID}', '${NAME}', '${IP}', '${VERSION}', ${CONCURRENCY}) \
     ON CONFLICT (id) DO NOTHING;"
+
+  log "Restarting node service to pick up bearer token..."
+  $COMPOSE_CMD restart node
 
   log "Wiring local CLI descriptor..."
   mkdir -p "$PLOY_CONFIG_HOME/clusters"

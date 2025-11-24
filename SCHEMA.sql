@@ -3,7 +3,6 @@
 -- - Uses pgcrypto for UUID generation via gen_random_uuid().
 -- - Stores only metadata and run artifacts (diffs/logs/events). No repository
 --   contents are ever stored on the server; nodes fetch repos directly by URL.
--- - Partitioning stubs are included for large append-only tables.
 
 CREATE SCHEMA IF NOT EXISTS ploy;
 SET search_path TO ploy, public;
@@ -87,22 +86,16 @@ CREATE TABLE IF NOT EXISTS stages (
 );
 CREATE INDEX IF NOT EXISTS stages_run_idx ON stages(run_id);
 
--- Events (partitioned by time)
+-- Events (append-only)
 CREATE TABLE IF NOT EXISTS events (
-  id        BIGSERIAL NOT NULL,
+  id        BIGSERIAL PRIMARY KEY,
   run_id    UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   stage_id  UUID REFERENCES stages(id) ON DELETE SET NULL,
   time      TIMESTAMPTZ NOT NULL DEFAULT now(),
   level     TEXT NOT NULL DEFAULT 'info',
   message   TEXT NOT NULL,
-  meta      JSONB NOT NULL DEFAULT '{}'::jsonb,
-  PRIMARY KEY (id, time)
-) PARTITION BY RANGE (time);
-
--- Example current-month partition (create future partitions via a scheduler)
--- CREATE TABLE IF NOT EXISTS events_2025_10 PARTITION OF events
---   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
-
+  meta      JSONB NOT NULL DEFAULT '{}'::jsonb
+);
 CREATE INDEX IF NOT EXISTS events_run_time_idx ON events USING BRIN (time) WITH (pages_per_range=64);
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
@@ -133,21 +126,16 @@ CREATE TABLE IF NOT EXISTS diffs (
 );
 CREATE INDEX IF NOT EXISTS diffs_run_idx ON diffs(run_id);
 
--- Logs (append-only, partitioned by time)
+-- Logs (append-only)
 CREATE TABLE IF NOT EXISTS logs (
-  id         BIGSERIAL NOT NULL,
+  id         BIGSERIAL PRIMARY KEY,
   run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
   build_id   UUID REFERENCES builds(id) ON DELETE SET NULL,
   chunk_no   INTEGER NOT NULL,
   data       BYTEA NOT NULL CHECK (octet_length(data) <= 1048576),      -- expected gzipped (cap: 1 MiB)
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (id, created_at)
-) PARTITION BY RANGE (created_at);
-
--- Example current-month partition (create future partitions via a scheduler)
--- CREATE TABLE IF NOT EXISTS logs_2025_10 PARTITION OF logs
---   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE UNIQUE INDEX IF NOT EXISTS logs_run_stage_build_chunk_uniq ON logs(run_id, stage_id, build_id, chunk_no);
 CREATE INDEX IF NOT EXISTS logs_run_idx ON logs(run_id);
@@ -161,12 +149,7 @@ CREATE TABLE IF NOT EXISTS artifact_bundles (
   name       TEXT,                -- optional logical name
   bundle     BYTEA NOT NULL CHECK (octet_length(bundle) <= 1048576),      -- expected gzipped tar (cap: 1 MiB)
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-) PARTITION BY RANGE (created_at);
-
--- Example partition stub
--- CREATE TABLE IF NOT EXISTS artifact_bundles_2025_10 PARTITION OF artifact_bundles
---   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
-
+);
 CREATE INDEX IF NOT EXISTS artifact_bundles_run_idx ON artifact_bundles(run_id);
 CREATE INDEX IF NOT EXISTS artifact_bundles_stage_idx ON artifact_bundles(stage_id);
 
@@ -181,12 +164,7 @@ CREATE TABLE IF NOT EXISTS node_metrics (
   mem_free_bytes   BIGINT  NOT NULL DEFAULT 0,
   disk_total_bytes BIGINT  NOT NULL DEFAULT 0,
   disk_free_bytes  BIGINT  NOT NULL DEFAULT 0
-) PARTITION BY RANGE (created_at);
-
--- Example partition stub
--- CREATE TABLE IF NOT EXISTS node_metrics_2025_10 PARTITION OF node_metrics
---   FOR VALUES FROM ('2025-10-01') TO ('2025-11-01');
-
+);
 CREATE INDEX IF NOT EXISTS node_metrics_node_time_idx ON node_metrics USING BRIN (created_at);
 CREATE INDEX IF NOT EXISTS node_metrics_node_idx ON node_metrics(node_id);
 

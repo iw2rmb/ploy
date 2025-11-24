@@ -23,8 +23,8 @@ type Options struct {
 	// Logger is used for structured logging. If nil, a default logger is used.
 	Logger *slog.Logger
 	// DropPartitions enables dropping entire monthly partitions instead of
-	// row-by-row deletion for partitioned tables (logs, events, artifact_bundles).
-	// This is much more efficient for large datasets. Default: false.
+	// row-by-row deletion when the operator configures partitioned tables
+	// out-of-band (e.g., on logs/events/artifact_bundles). Default: false.
 	DropPartitions bool
 }
 
