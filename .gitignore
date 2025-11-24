@@ -67,3 +67,6 @@ tests/e2e/deploy/e2e-logs/
 .bin/
 .codex/
 .tmp/
+
+# Local deployment
+local/auth-secret.txt
