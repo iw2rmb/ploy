@@ -1,8 +1,7 @@
-version: "3.9"
-
 services:
   db:
     image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-db:latest
+    platform: linux/amd64
     environment:
       - POSTGRES_DB=ploy
       - POSTGRES_USER=ploy
@@ -19,7 +18,9 @@ services:
     image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-server:latest
     platform: linux/amd64
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: unless-stopped
     environment:
       - PLOY_POSTGRES_DSN=postgres://ploy:ploy@db:5432/ploy?sslmode=disable
       - PLOY_AUTH_SECRET=${PLOY_AUTH_SECRET:-changeme-insecure-local-secret}
@@ -44,10 +45,17 @@ services:
   node:
     image: ${DOCKERHUB_USERNAME:-iwtormb}/ploy-node:latest
     platform: linux/amd64
+    user: "0:0"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      - PLOYD_CACHE_HOME=/private/tmp
+      - TMPDIR=/private/tmp
     volumes:
       - ./node/ployd-node.yaml:/etc/ploy/ployd-node.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - /private/tmp:/private/tmp
     command:
       ["/usr/local/bin/ployd-node", "--config", "/etc/ploy/ployd-node.yaml"]

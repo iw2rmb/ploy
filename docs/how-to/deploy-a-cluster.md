@@ -385,8 +385,9 @@ Logs stream via SSE from `/v1/mods/{id}/events`. Final logs are persisted in Pos
 ### TTL and Cleanup
 
 - The server runs a TTL worker to purge old `logs`, `diffs`, `events`, and `artifact_bundles` (default: 30 days).
-- Prefer time-based partitioning and drop whole partitions daily for performance.
-- See `README.md` for partition management examples.
+  Cleanup is row‑by‑row by default; large installations can optionally configure
+  their own table partitioning strategy and enable partition dropping via
+  `scheduler.drop_partitions` if needed.
 
 ### Certificate Rotation
 

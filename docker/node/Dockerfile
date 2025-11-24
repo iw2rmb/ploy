@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags "-s -w" -o /out/ployd-node ./cmd/ployd-node
 
 FROM alpine:${ALPINE_VERSION}
-RUN apk add --no-cache ca-certificates bash tzdata curl jq docker-cli && \
+RUN apk add --no-cache ca-certificates bash tzdata curl jq docker-cli git && \
     adduser -D -H -s /sbin/nologin ploy && \
     mkdir -p /etc/ploy /etc/ploy/pki /var/lib/ploy && \
     chown -R ploy:ploy /etc/ploy /var/lib/ploy
@@ -26,4 +26,3 @@ VOLUME ["/var/run/docker.sock"]
 USER ploy
 ENTRYPOINT ["/usr/local/bin/ployd-node"]
 CMD ["--config","/etc/ploy/ployd-node.yaml"]
-
