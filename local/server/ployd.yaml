@@ -10,11 +10,6 @@ admin:
 auth:
   bearer_tokens:
     enabled: true
-    secret: ""  # Load from PLOY_AUTH_SECRET env var
-
-control_plane:
-  endpoint: "http://localhost:8080"
-  token: ""  # Set via PLOY_ADMIN_TOKEN env var or generate after startup
 
 postgres:
   dsn: ""
