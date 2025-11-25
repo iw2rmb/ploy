@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -557,5 +558,392 @@ func TestCompleteRunStep_StepNotFound(t *testing.T) {
 	}
 	if st.updateRunStepCompletionCalled {
 		t.Fatal("did not expect UpdateRunStepCompletion to be called")
+	}
+}
+
+// ===== Multi-step Run Completion Tests =====
+// These tests verify that run-level completion is derived from run_steps state
+// instead of trusting the caller's status field.
+
+// TestMultiStepRun_AllStepsSucceeded verifies the run is marked succeeded
+// when all steps succeed.
+func TestMultiStepRun_AllStepsSucceeded(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(2) // Last step (0, 1, 2)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+		// Multi-step run with 3 total steps.
+		countRunStepsResult: 3,
+	}
+
+	// Simulate: all 3 steps succeeded (after this step completes).
+	st.countRunStepsByStatusHandler = func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
+		switch arg.Status {
+		case store.RunStepStatusSucceeded:
+			return 3, nil // All 3 succeeded
+		case store.RunStepStatusFailed:
+			return 0, nil // 0 failed
+		case store.RunStepStatusCanceled:
+			return 0, nil // 0 canceled
+		default:
+			return 0, nil
+		}
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Complete the last step as succeeded.
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step completion was called.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+
+	// Verify run completion was called with succeeded status.
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called for multi-step run")
+	}
+	if st.updateRunCompletionParams.Status != store.RunStatusSucceeded {
+		t.Fatalf("expected run status succeeded, got %v", st.updateRunCompletionParams.Status)
+	}
+}
+
+// TestMultiStepRun_OneStepFailed verifies the run is marked failed
+// when at least one step fails.
+func TestMultiStepRun_OneStepFailed(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(1) // Second step (0, 1, 2)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+		// Multi-step run with 3 total steps.
+		countRunStepsResult: 3,
+	}
+
+	// Simulate: step 0 succeeded, step 1 failed (this call), step 2 canceled.
+	// Use a custom handler to return different counts based on status param.
+	st.countRunStepsByStatusHandler = func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
+		switch arg.Status {
+		case store.RunStepStatusSucceeded:
+			return 1, nil // 1 succeeded
+		case store.RunStepStatusFailed:
+			return 1, nil // 1 failed (after this step completes)
+		case store.RunStepStatusCanceled:
+			return 1, nil // 1 canceled
+		default:
+			return 0, nil
+		}
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Complete the step as failed.
+	reason := "build gate failed"
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "failed",
+		"reason":     reason,
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step completion was called with failed status.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+	if st.updateRunStepCompletionParams.Status != store.RunStepStatusFailed {
+		t.Fatalf("expected step status failed, got %v", st.updateRunStepCompletionParams.Status)
+	}
+
+	// Verify run completion was called with failed status (derived from steps).
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called for multi-step run")
+	}
+	if st.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Fatalf("expected run status failed, got %v", st.updateRunCompletionParams.Status)
+	}
+	// Verify reason includes step count.
+	if st.updateRunCompletionParams.Reason == nil {
+		t.Fatal("expected run completion reason to be set")
+	}
+	if !strings.Contains(*st.updateRunCompletionParams.Reason, "1 of 3 steps failed") {
+		t.Fatalf("expected reason to contain '1 of 3 steps failed', got %s", *st.updateRunCompletionParams.Reason)
+	}
+}
+
+// TestMultiStepRun_SomeStepsCanceled verifies the run is marked canceled
+// when at least one step is canceled and no steps failed.
+func TestMultiStepRun_SomeStepsCanceled(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(1) // Last step
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+		// Multi-step run with 2 total steps.
+		countRunStepsResult: 2,
+	}
+
+	// Simulate: step 0 succeeded, step 1 canceled (this call).
+	st.countRunStepsByStatusHandler = func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
+		switch arg.Status {
+		case store.RunStepStatusSucceeded:
+			return 1, nil // 1 succeeded
+		case store.RunStepStatusFailed:
+			return 0, nil // 0 failed
+		case store.RunStepStatusCanceled:
+			return 1, nil // 1 canceled (after this step completes)
+		default:
+			return 0, nil
+		}
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Complete the step as canceled.
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "canceled",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step completion was called with canceled status.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+	if st.updateRunStepCompletionParams.Status != store.RunStepStatusCanceled {
+		t.Fatalf("expected step status canceled, got %v", st.updateRunStepCompletionParams.Status)
+	}
+
+	// Verify run completion was called with canceled status (derived from steps).
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called for multi-step run")
+	}
+	if st.updateRunCompletionParams.Status != store.RunStatusCanceled {
+		t.Fatalf("expected run status canceled, got %v", st.updateRunCompletionParams.Status)
+	}
+	// Verify reason includes step count.
+	if st.updateRunCompletionParams.Reason == nil {
+		t.Fatal("expected run completion reason to be set")
+	}
+	if !strings.Contains(*st.updateRunCompletionParams.Reason, "1 of 2 steps canceled") {
+		t.Fatalf("expected reason to contain '1 of 2 steps canceled', got %s", *st.updateRunCompletionParams.Reason)
+	}
+}
+
+// TestMultiStepRun_StillInProgress verifies the run is NOT marked complete
+// when some steps are still pending/assigned/running.
+func TestMultiStepRun_StillInProgress(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(0) // First step
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+		// Multi-step run with 3 total steps.
+		countRunStepsResult: 3,
+	}
+
+	// Simulate: step 0 succeeded (this call), steps 1 and 2 still queued.
+	st.countRunStepsByStatusHandler = func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
+		switch arg.Status {
+		case store.RunStepStatusSucceeded:
+			return 1, nil // 1 succeeded (after this step completes)
+		case store.RunStepStatusFailed:
+			return 0, nil // 0 failed
+		case store.RunStepStatusCanceled:
+			return 0, nil // 0 canceled
+		default:
+			return 0, nil
+		}
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Complete the first step as succeeded.
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step completion was called.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+
+	// Verify run completion was NOT called (run still in progress).
+	if st.updateRunCompletionCalled {
+		t.Fatal("did not expect UpdateRunCompletion to be called (run still in progress)")
+	}
+}
+
+// TestMultiStepRun_NoSteps verifies that runs without run_steps rows
+// are treated as legacy single-step runs and do not invoke the multi-step logic.
+func TestMultiStepRun_NoSteps(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(0)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStatusRunning,
+			RepoUrl:   "https://github.com/user/repo.git",
+			CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+		// No run_steps rows (legacy single-step run).
+		countRunStepsResult: 0,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Complete the step as succeeded.
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step completion was called.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+
+	// Verify run completion was NOT called (no run_steps = legacy run).
+	if st.updateRunCompletionCalled {
+		t.Fatal("did not expect UpdateRunCompletion to be called for legacy run")
 	}
 }

@@ -247,6 +247,19 @@ type mockStore struct {
 	updateRunStepCompletionCalled bool
 	updateRunStepCompletionParams store.UpdateRunStepCompletionParams
 	updateRunStepCompletionErr    error
+
+	// CountRunSteps tracking
+	countRunStepsCalled bool
+	countRunStepsParam  pgtype.UUID
+	countRunStepsResult int64
+	countRunStepsErr    error
+
+	// CountRunStepsByStatus tracking
+	countRunStepsByStatusCalled  bool
+	countRunStepsByStatusParams  store.CountRunStepsByStatusParams
+	countRunStepsByStatusResult  int64
+	countRunStepsByStatusErr     error
+	countRunStepsByStatusHandler func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error)
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -581,4 +594,22 @@ func (m *mockStore) UpdateRunStepCompletion(ctx context.Context, arg store.Updat
 	m.updateRunStepCompletionCalled = true
 	m.updateRunStepCompletionParams = arg
 	return m.updateRunStepCompletionErr
+}
+
+// CountRunSteps counts the total number of steps for a run.
+func (m *mockStore) CountRunSteps(ctx context.Context, runID pgtype.UUID) (int64, error) {
+	m.countRunStepsCalled = true
+	m.countRunStepsParam = runID
+	return m.countRunStepsResult, m.countRunStepsErr
+}
+
+// CountRunStepsByStatus counts steps for a run with a specific status.
+func (m *mockStore) CountRunStepsByStatus(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
+	m.countRunStepsByStatusCalled = true
+	m.countRunStepsByStatusParams = arg
+	// If a custom handler is set, use it instead of the default result.
+	if m.countRunStepsByStatusHandler != nil {
+		return m.countRunStepsByStatusHandler(ctx, arg)
+	}
+	return m.countRunStepsByStatusResult, m.countRunStepsByStatusErr
 }

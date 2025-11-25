@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
@@ -205,6 +207,14 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 				"stats_size", len(statsBytes),
 			)
 
+			// After completing a step, check if the run should transition to terminal state.
+			// Derive the run's terminal status from the collective state of all run_steps
+			// instead of trusting the caller's status field.
+			if err := maybeCompleteMultiStepRun(r.Context(), st, eventsService, run, runID); err != nil {
+				// Log error but don't fail the step completion (step is already marked complete).
+				slog.Error("complete run step: failed to check run completion", "run_id", req.RunID, "step_index", *req.StepIndex, "err", err)
+			}
+
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -302,4 +312,184 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			"stats_size", len(statsBytes),
 		)
 	}
+}
+
+// maybeCompleteMultiStepRun checks if all steps of a multi-step run are complete
+// and transitions the run to its terminal state (succeeded/failed/canceled).
+// This function derives the run's terminal status from the collective state of
+// all run_steps instead of trusting the caller's status field.
+//
+// Status derivation rules:
+// - If any step failed, the run is marked as failed.
+// - If any step was canceled, the run is marked as canceled (unless a step failed).
+// - If all steps succeeded, the run is marked as succeeded.
+// - If steps are still pending/assigned/running, the run remains in running state.
+func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID pgtype.UUID) error {
+	// Count the total number of steps for this run.
+	totalSteps, err := st.CountRunSteps(ctx, runID)
+	if err != nil {
+		return fmt.Errorf("count run steps: %w", err)
+	}
+
+	// If there are no run_steps, this is a legacy single-step run (not a multi-step run).
+	// The caller path (run-level completion) already handles this case.
+	if totalSteps == 0 {
+		return nil
+	}
+
+	// Count steps by terminal status to determine the run's effective state.
+	succeededCount, err := st.CountRunStepsByStatus(ctx, store.CountRunStepsByStatusParams{
+		RunID:  runID,
+		Status: store.RunStepStatusSucceeded,
+	})
+	if err != nil {
+		return fmt.Errorf("count succeeded steps: %w", err)
+	}
+
+	failedCount, err := st.CountRunStepsByStatus(ctx, store.CountRunStepsByStatusParams{
+		RunID:  runID,
+		Status: store.RunStepStatusFailed,
+	})
+	if err != nil {
+		return fmt.Errorf("count failed steps: %w", err)
+	}
+
+	canceledCount, err := st.CountRunStepsByStatus(ctx, store.CountRunStepsByStatusParams{
+		RunID:  runID,
+		Status: store.RunStepStatusCanceled,
+	})
+	if err != nil {
+		return fmt.Errorf("count canceled steps: %w", err)
+	}
+
+	// Calculate terminal steps (succeeded + failed + canceled).
+	terminalSteps := succeededCount + failedCount + canceledCount
+
+	// If not all steps are in terminal state, the run is still in progress.
+	// Do not transition the run to a terminal state yet.
+	if terminalSteps < totalSteps {
+		slog.Debug("multi-step run still in progress",
+			"run_id", runID,
+			"total_steps", totalSteps,
+			"terminal_steps", terminalSteps,
+			"succeeded", succeededCount,
+			"failed", failedCount,
+			"canceled", canceledCount,
+		)
+		return nil
+	}
+
+	// All steps are in terminal state. Derive the run's terminal status.
+	// Priority: failed > canceled > succeeded.
+	var runStatus store.RunStatus
+	var reason *string
+
+	if failedCount > 0 {
+		// At least one step failed: mark the run as failed.
+		runStatus = store.RunStatusFailed
+		reasonMsg := fmt.Sprintf("%d of %d steps failed", failedCount, totalSteps)
+		reason = &reasonMsg
+	} else if canceledCount > 0 {
+		// At least one step was canceled (and no failures): mark the run as canceled.
+		runStatus = store.RunStatusCanceled
+		reasonMsg := fmt.Sprintf("%d of %d steps canceled", canceledCount, totalSteps)
+		reason = &reasonMsg
+	} else {
+		// All steps succeeded: mark the run as succeeded.
+		runStatus = store.RunStatusSucceeded
+	}
+
+	slog.Info("multi-step run completing",
+		"run_id", runID,
+		"total_steps", totalSteps,
+		"succeeded", succeededCount,
+		"failed", failedCount,
+		"canceled", canceledCount,
+		"derived_status", runStatus,
+	)
+
+	// Transition the run to its terminal status.
+	// Use empty JSON object for stats (step-level stats are tracked per step).
+	err = st.UpdateRunCompletion(ctx, store.UpdateRunCompletionParams{
+		ID:     runID,
+		Status: runStatus,
+		Reason: reason,
+		Stats:  []byte("{}"),
+	})
+	if err != nil {
+		return fmt.Errorf("update run completion: %w", err)
+	}
+
+	// Update stage status to terminal and set finished_at/duration.
+	if stages, err := st.ListStagesByRun(ctx, runID); err == nil && len(stages) > 0 {
+		now := time.Now().UTC()
+		var stStatus store.StageStatus
+		switch runStatus {
+		case store.RunStatusSucceeded:
+			stStatus = store.StageStatusSucceeded
+		case store.RunStatusFailed:
+			stStatus = store.StageStatusFailed
+		case store.RunStatusCanceled:
+			stStatus = store.StageStatusCanceled
+		default:
+			stStatus = store.StageStatusFailed
+		}
+		dur := int64(0)
+		if stages[0].StartedAt.Valid {
+			d := now.Sub(stages[0].StartedAt.Time).Milliseconds()
+			if d > 0 {
+				dur = d
+			}
+		}
+		_ = st.UpdateStageStatus(ctx, store.UpdateStageStatusParams{
+			ID:         stages[0].ID,
+			Status:     stStatus,
+			StartedAt:  stages[0].StartedAt,
+			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
+			DurationMs: dur,
+		})
+	}
+
+	// Publish terminal ticket event and done status to SSE hub.
+	if eventsService != nil {
+		// Map store.RunStatus to modsapi.TicketState.
+		var ticketState modsapi.TicketState
+		switch runStatus {
+		case store.RunStatusSucceeded:
+			ticketState = modsapi.TicketStateSucceeded
+		case store.RunStatusFailed:
+			ticketState = modsapi.TicketStateFailed
+		case store.RunStatusCanceled:
+			ticketState = modsapi.TicketStateCancelled
+		default:
+			ticketState = modsapi.TicketStateFailed
+		}
+
+		runUUID := uuid.UUID(runID.Bytes)
+		ticketSummary := modsapi.TicketSummary{
+			TicketID:   domaintypes.TicketID(runUUID.String()),
+			State:      ticketState,
+			Repository: run.RepoUrl,
+			CreatedAt:  run.CreatedAt.Time,
+			UpdatedAt:  time.Now().UTC(),
+			Stages:     make(map[string]modsapi.StageStatus),
+		}
+		if err := eventsService.PublishTicket(ctx, runUUID.String(), ticketSummary); err != nil {
+			slog.Error("complete multi-step run: publish ticket event failed", "run_id", runID, "err", err)
+		}
+
+		// Publish done event to signal stream completion.
+		doneStatus := logstream.Status{Status: "done"}
+		if err := eventsService.Hub().PublishStatus(ctx, runUUID.String(), doneStatus); err != nil {
+			slog.Error("complete multi-step run: publish done status failed", "run_id", runID, "err", err)
+		}
+	}
+
+	slog.Info("multi-step run completed",
+		"run_id", runID,
+		"status", runStatus,
+		"has_reason", reason != nil,
+	)
+
+	return nil
 }
