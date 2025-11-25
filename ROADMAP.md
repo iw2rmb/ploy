@@ -76,7 +76,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (nodeagent, workflow runtime)
   - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (ensureBaselineCommitForRehydration helper that stages rehydrated changes and writes the baseline commit via git CLI), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests in internal/nodeagent/execution_rehydrate_test.go verify that applying stored per-step diffs for steps 0..k-1 to a fresh base clone yields the expected workspace contents for step k
-- [ ] Refine run-level start semantics for multi-step runs — Mark run as running when the first step starts, even when claimed via run_steps
+- [x] Refine run-level start semantics for multi-step runs — Mark run as running when the first step starts, even when claimed via run_steps
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/nodes_ack.go (when step_index is present and run has run_steps rows, relax the status precondition to allow queued→running transition, and call AckRunStart or a dedicated helper to set runs.status=running), internal/store/queries/runs.sql (reuse AckRunStart)
   - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that the first step ack moves run.status to running for multi-step runs, while subsequent step acks leave run.status unchanged
