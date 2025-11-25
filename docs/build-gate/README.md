@@ -5,8 +5,14 @@ Scope
 - Works in Mods and standalone CI.
 
 HTTP Build Gate API
-- Endpoint: `POST /v1/buildgate/validate`
-- Contract: Submit a build validation job using a Git repo+ref baseline, with an optional diff patch for healing flows.
+
+The Build Gate uses a repo+diff validation model: callers provide a Git repository URL and ref as baseline,
+with an optional unified diff patch for healing flows. This replaces the legacy content_archive-based
+workspace uploads and avoids transmitting large payloads over HTTP.
+
+Endpoint: `POST /v1/buildgate/validate`
+
+Contract: Submit a build validation job using a Git repo+ref baseline, with an optional diff patch for healing flows.
 
 Required fields:
 - `repo_url` — Git repository URL to clone (e.g., `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`).
@@ -36,6 +42,13 @@ Semantics:
 3. The build runs against the resulting workspace.
 
 This model avoids transmitting large workspace archives over HTTP, instead leveraging Git for baseline state and transmitting only the delta.
+
+Response:
+- On success (200): Returns `BuildGateValidateResponse` with `status` (`completed` or `failed`) and `result` object.
+- On accepted (202): Returns `BuildGateValidateResponse` with `job_id` and `status=pending` for async polling via `GET /v1/buildgate/jobs/{id}`.
+- On validation error (400): Missing required fields (`repo_url` or `ref`).
+
+Status polling: Use `GET /v1/buildgate/jobs/{job_id}` to poll job status until `completed` or `failed`.
 
 Inputs
 - Workspace mount: `/workspace` (required, read–write). Contains a shallow Git checkout at `HEAD`.
@@ -67,3 +80,22 @@ Outputs
 Notes
 - When the container runtime is unavailable, the gate is skipped (no-op) and metadata is empty.
 - Disk limit is driver dependent; if unsupported, container creation may fail early.
+
+Healing Container Environment
+
+Healing containers that need to call the Build Gate HTTP API directly (e.g., via `buildgate-validate`)
+receive the following environment variables from the node agent:
+
+- `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
+- `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
+- `PLOY_TARGET_REF` — Target Git reference for the run
+- `PLOY_COMMIT_SHA` — Pinned commit SHA when available
+- `PLOY_SERVER_URL` — Control plane URL for Build Gate HTTP API access
+- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
+
+The `buildgate-validate` CLI wrapper (bundled in `mods-codex`) accepts `--repo-url` and `--ref` flags
+or reads from `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` environment variables. When using the node-injected
+env vars, set `PLOY_BUILDGATE_REF="$PLOY_BASE_REF"` (or use `$PLOY_COMMIT_SHA` if pinned) in your healing
+mod command to map the node-provided baseline to the wrapper's expected variable.
+
+See `docs/envs/README.md` for the complete environment variable reference.

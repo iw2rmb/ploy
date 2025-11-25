@@ -83,7 +83,7 @@ Done when:
   - Test: bash tests/e2e/mods/scenario-orw-fail/run.sh && bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh — Scenarios confirm that healing produces diff patches, Build Gate verification uses the repo+diff API, and Mods runs still complete successfully.
 
 ## Docs & Cleanup
-- [ ] Update environment and Build Gate docs for repo+diff mode — Keep operator-facing documentation in sync with the new contract
+- [x] Update environment and Build Gate docs for repo+diff mode — Keep operator-facing documentation in sync with the new contract
   - Component: ploy (docs)
   - Scope:
     - docs/build-gate/README.md — Add a section describing the HTTP Build Gate contract (fields repo_url, ref, profile, timeout, diff_patch); remove references to content_archive-based workspace uploads.
