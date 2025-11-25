@@ -448,7 +448,7 @@ mods:
 - Diffs with `step_index=NULL` sort last in queries (`NULLS LAST`), preserving legacy behavior
 
 For detailed implementation reference, see:
-- `CHECKPOINT_MODS.md` — Multi-Node Mods Architecture and Rehydration Model section
+- `docs/mods-lifecycle.md` — Multi-Node Mods architecture, ticket model and rehydration flow
 - `ROADMAP.md` — Comprehensive delivery plan for multi-node features
 - Implementation files:
   - `internal/nodeagent/execution_orchestrator.go` — Step loop orchestration
