@@ -42,9 +42,9 @@ Legend: [ ] todo, [x] done.
 
 ## Multi-step Execution & Multi-node Scheduling
 - [x] Refactor Mods run execution into explicit steps (gates + mods) — Represent each gate+mod pair as a logical step with an index
-  - Component: ploy (server, nodeagent)
-  - Scope: CHECKPOINT_MODS.md, internal/server/handlers/handlers_mods_ticket.go (step metadata), internal/nodeagent/execution_orchestrator.go (loop over steps instead of single manifest)
-  - Test: go test ./internal/server/... ./internal/nodeagent/... — Execution logs and stats show per-step boundaries and indices
+  - Component: ploy (nodeagent)
+  - Scope: internal/nodeagent/run_options.go (typed multi-step mods[] as Steps), internal/nodeagent/claimer_spec.go (preserve mods[] for nodeagent), internal/nodeagent/manifest.go (step-specific image/command/env), internal/nodeagent/execution_orchestrator.go (loop over steps and per-step logging)
+  - Test: go test ./internal/nodeagent/... — Multi-step runs execute sequential steps with per-step indices; single-step runs still pass
 - [ ] Make gate/mod steps rehydratable on any node — Use rehydration helper instead of long-lived workspaces per run
   - Component: ploy (nodeagent)
   - Scope: internal/nodeagent/execution_orchestrator.go (create a fresh workspace per step), internal/nodeagent/execution_healing.go (healing uses rehydrated workspace), internal/nodeagent/workspace.go
