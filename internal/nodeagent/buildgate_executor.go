@@ -63,6 +63,7 @@ func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contr
 	// Create gate executor.
 	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
 		PullImage: true,
+		Network:   os.Getenv("PLOY_DOCKER_NETWORK"),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create container runtime: %w", err)

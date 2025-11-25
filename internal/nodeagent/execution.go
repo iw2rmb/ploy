@@ -1,6 +1,8 @@
 package nodeagent
 
 import (
+	"os"
+
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -22,8 +24,10 @@ func (r *runController) createWorkspaceHydrator(fetcher step.GitFetcher) (step.W
 
 // createContainerRuntime initializes a Docker container runtime with image pull enabled.
 func (r *runController) createContainerRuntime() (step.ContainerRuntime, error) {
+	network := os.Getenv("PLOY_DOCKER_NETWORK")
 	return step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
 		PullImage: true,
+		Network:   network,
 	})
 }
 
