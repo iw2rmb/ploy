@@ -184,7 +184,32 @@ Current gaps vs test goals (with latest collector changes):
 2) GitLab MR — Branch push + MR creation wired
    - Implemented path: global PAT/domain via control plane config with optional per‑run overrides; node pushes branch using a non‑persistent HTTP Authorization header and creates the MR via GitLab API with bounded retries; MR URL is attached under `runs.stats.metadata.mr_url` and surfaced by `GET /v1/mods/{id}` so `ploy mod inspect` prints it.
 
-## What’s Left (Test Exit Criteria)
+## Ticket Model for Multi-step Mods Runs — Implemented (2025-11-25)
+
+**Goal**: Clarify control plane ticket model to treat runs as ordered sequences of steps for multi-step Mods runs.
+
+**Changes**:
+1. **API Types** (internal/mods/api/types.go):
+   - Added `StepIndex` field to `StageStatus` (0-based position in run's step sequence).
+   - Added `StageMetadata` struct with `step_index`, `step_total`, and `mod_image` fields.
+   - Metadata is stored in `stages.meta` JSONB column, enabling ordered execution.
+
+2. **Handler Logic** (internal/server/handlers/handlers_mods_ticket.go):
+   - `submitTicketHandler` now parses spec and creates one stage per mod step.
+   - For multi-step runs (`mods[]` array), creates stages named `mods-openrewrite-0`, `mods-openrewrite-1`, etc.
+   - For single-step runs (`mod` or legacy top-level), creates one stage `mods-openrewrite`.
+   - Each stage's `meta` JSONB includes `step_index`, `step_total`, and `mod_image` for diagnostics.
+   - `getTicketStatusHandler` parses step metadata from `stages.meta` and exposes `step_index` in response.
+
+3. **Tests** (internal/server/handlers/handlers_mods_ticket_test.go):
+   - Added `TestSubmitTicketHandlerMultiStepCreatesMultipleStages` verifying 3 stages for 3 mods.
+   - Added `TestSubmitTicketHandlerSingleStepCreatesOneStage` verifying backward compatibility.
+   - Added `TestGetTicketStatusHandlerExposesStepIndex` verifying step metadata exposure.
+   - All existing tests pass; backward compatibility maintained.
+
+**Result**: Control plane now treats multi-step runs as ordered sequences of stages with explicit step indexing, enabling future rehydration with diffs from prior steps (ROADMAP.md line 24+).
+
+## What's Left (Test Exit Criteria)
 1) Build Gate — API/CLI verifiable
    - Server: include `runs.stats` in `GET /v1/mods/{id}` or add `GET /v1/mods/{id}/stats`.
    - CLI: print gate status/duration in `mod inspect` when stats present.

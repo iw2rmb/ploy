@@ -112,11 +112,18 @@ type mockStore struct {
 	getArtifactBundleResult store.ArtifactBundle
 	getArtifactBundleErr    error
 
+	// ListArtifactBundlesByRunAndStage tracking
+	listArtifactBundlesByRunAndStageCalled bool
+	listArtifactBundlesByRunAndStageParams store.ListArtifactBundlesByRunAndStageParams
+	listArtifactBundlesByRunAndStageResult []store.ArtifactBundle
+	listArtifactBundlesByRunAndStageErr    error
+
 	// CreateStage tracking
-	createStageCalled bool
-	createStageParams store.CreateStageParams
-	createStageResult store.Stage
-	createStageErr    error
+	createStageCalled    bool
+	createStageCallCount int
+	createStageParams    []store.CreateStageParams
+	createStageResult    store.Stage
+	createStageErr       error
 
 	// ListStagesByRun tracking
 	listStagesByRunCalled bool
@@ -338,18 +345,29 @@ func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (stor
 	return m.getArtifactBundleResult, m.getArtifactBundleErr
 }
 
+func (m *mockStore) ListArtifactBundlesByRunAndStage(ctx context.Context, arg store.ListArtifactBundlesByRunAndStageParams) ([]store.ArtifactBundle, error) {
+	m.listArtifactBundlesByRunAndStageCalled = true
+	m.listArtifactBundlesByRunAndStageParams = arg
+	return m.listArtifactBundlesByRunAndStageResult, m.listArtifactBundlesByRunAndStageErr
+}
+
 func (m *mockStore) CreateStage(ctx context.Context, params store.CreateStageParams) (store.Stage, error) {
 	m.createStageCalled = true
-	m.createStageParams = params
-	if !m.createStageResult.ID.Valid {
+	m.createStageCallCount++
+	// Append params to track all CreateStage calls (for multi-step tests).
+	m.createStageParams = append(m.createStageParams, params)
+
+	// Build a result stage for this call.
+	result := m.createStageResult
+	if !result.ID.Valid {
 		// Provide a default stage id when not preset by the test.
-		m.createStageResult.ID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
+		result.ID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	}
-	m.createStageResult.RunID = params.RunID
-	m.createStageResult.Name = params.Name
-	m.createStageResult.Status = params.Status
-	m.createStageResult.Meta = params.Meta
-	return m.createStageResult, m.createStageErr
+	result.RunID = params.RunID
+	result.Name = params.Name
+	result.Status = params.Status
+	result.Meta = params.Meta
+	return result, m.createStageErr
 }
 
 func (m *mockStore) ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]store.Stage, error) {

@@ -83,8 +83,28 @@ type StageStatus struct {
 	CurrentJobID JobID             `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`
 	LastError    string            `json:"last_error,omitempty"`
+	// StepIndex identifies the position of this stage in multi-step Mods runs.
+	// For single-step runs, this is 0. For multi-step runs (mods[]), this is
+	// the array index (0, 1, 2, ...). The control plane uses this to order
+	// stages when rehydrating workspaces with diffs from prior steps.
+	StepIndex int `json:"step_index,omitempty"`
 }
 
 // JobID identifies a job within the Mods execution context.
 // Kept as a plain string type; JSON remains a string for compatibility.
 type JobID string
+
+// StageMetadata captures step-level metadata stored in stages.meta JSONB.
+// This metadata enables the control plane to treat a run as an ordered
+// sequence of steps for multi-step Mods runs (mods[] array in spec).
+type StageMetadata struct {
+	// StepIndex is the 0-based position of this stage in the run's step sequence.
+	// For single-step runs, this is 0. For multi-step runs, this matches the
+	// index in the mods[] array (0, 1, 2, ...).
+	StepIndex int `json:"step_index"`
+	// StepTotal is the total number of steps in this run.
+	// For single-step runs, this is 1. For multi-step runs, this is len(mods[]).
+	StepTotal int `json:"step_total"`
+	// ModImage is the container image for this step (optional, for diagnostics).
+	ModImage string `json:"mod_image,omitempty"`
+}

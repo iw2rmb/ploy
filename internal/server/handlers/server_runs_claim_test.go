@@ -225,13 +225,17 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 	}
 
 	// Verify the stage was created with correct parameters.
-	if st.createStageParams.RunID.Bytes != runID {
-		t.Errorf("CreateStage called with wrong run_id: %v", st.createStageParams.RunID)
+	// Since createStageParams is now a slice, check the first element.
+	if len(st.createStageParams) == 0 {
+		t.Fatal("expected at least one CreateStage call")
 	}
-	if st.createStageParams.Name != "mods-openrewrite" {
-		t.Errorf("expected stage name 'mods-openrewrite', got %s", st.createStageParams.Name)
+	if st.createStageParams[0].RunID.Bytes != runID {
+		t.Errorf("CreateStage called with wrong run_id: %v", st.createStageParams[0].RunID)
 	}
-	if st.createStageParams.Status != store.StageStatusPending {
-		t.Errorf("expected stage status %s, got %s", store.StageStatusPending, st.createStageParams.Status)
+	if st.createStageParams[0].Name != "mods-openrewrite" {
+		t.Errorf("expected stage name 'mods-openrewrite', got %s", st.createStageParams[0].Name)
+	}
+	if st.createStageParams[0].Status != store.StageStatusPending {
+		t.Errorf("expected stage status %s, got %s", store.StageStatusPending, st.createStageParams[0].Status)
 	}
 }

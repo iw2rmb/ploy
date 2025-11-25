@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -472,5 +473,244 @@ func TestSubmitTicketHandlerPublishesEvent(t *testing.T) {
 	}
 	if !foundTicketEvent {
 		t.Error("expected to find a 'ticket' event in the snapshot")
+	}
+}
+
+// TestSubmitTicketHandlerMultiStepCreatesMultipleStages verifies that submitting
+// a multi-step spec (with mods[] array) creates one stage per mod.
+func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
+	runID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		createRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	handler := submitTicketHandler(st, nil)
+
+	reqBody := map[string]interface{}{
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
+		"spec": map[string]interface{}{
+			"mods": []map[string]string{
+				{"image": "img1:latest"},
+				{"image": "img2:latest"},
+				{"image": "img3:latest"},
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify three stages were created (one per mod in mods[] array).
+	if st.createStageCallCount != 3 {
+		t.Errorf("expected 3 CreateStage calls (one per mod), got %d", st.createStageCallCount)
+	}
+
+	// Verify stage names are sequential: mods-openrewrite-0, mods-openrewrite-1, mods-openrewrite-2.
+	expectedStageNames := []string{"mods-openrewrite-0", "mods-openrewrite-1", "mods-openrewrite-2"}
+	if len(st.createStageParams) != 3 {
+		t.Fatalf("expected 3 stage params, got %d", len(st.createStageParams))
+	}
+	for i, expected := range expectedStageNames {
+		if st.createStageParams[i].Name != expected {
+			t.Errorf("expected stage %d name %q, got %q", i, expected, st.createStageParams[i].Name)
+		}
+	}
+
+	// Verify each stage has correct step metadata (step_index, step_total, mod_image).
+	for i, params := range st.createStageParams {
+		var meta modsapi.StageMetadata
+		if err := json.Unmarshal(params.Meta, &meta); err != nil {
+			t.Fatalf("failed to unmarshal stage %d metadata: %v", i, err)
+		}
+		if meta.StepIndex != i {
+			t.Errorf("expected stage %d step_index %d, got %d", i, i, meta.StepIndex)
+		}
+		if meta.StepTotal != 3 {
+			t.Errorf("expected stage %d step_total 3, got %d", i, meta.StepTotal)
+		}
+		expectedImage := fmt.Sprintf("img%d:latest", i+1)
+		if meta.ModImage != expectedImage {
+			t.Errorf("expected stage %d mod_image %q, got %q", i, expectedImage, meta.ModImage)
+		}
+	}
+}
+
+// TestSubmitTicketHandlerSingleStepCreatesOneStage verifies that submitting
+// a single-step spec (with mod section or legacy top-level) creates one stage.
+func TestSubmitTicketHandlerSingleStepCreatesOneStage(t *testing.T) {
+	cases := []struct {
+		name     string
+		spec     map[string]interface{}
+		wantName string
+	}{
+		{
+			name:     "mod section",
+			spec:     map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
+			wantName: "mods-openrewrite",
+		},
+		{
+			name:     "legacy top-level",
+			spec:     map[string]interface{}{"image": "legacy:latest"},
+			wantName: "mods-openrewrite",
+		},
+		{
+			name:     "empty spec",
+			spec:     map[string]interface{}{},
+			wantName: "mods-openrewrite",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runID := uuid.New()
+			now := time.Now()
+
+			specBytes, _ := json.Marshal(tc.spec)
+			st := &mockStore{
+				createRunResult: store.Run{
+					ID:        pgtype.UUID{Bytes: runID, Valid: true},
+					RepoUrl:   "https://github.com/user/repo.git",
+					Spec:      specBytes,
+					Status:    store.RunStatusQueued,
+					BaseRef:   "main",
+					TargetRef: "feature",
+					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+				},
+			}
+
+			handler := submitTicketHandler(st, nil)
+
+			reqBody := map[string]interface{}{
+				"repo_url":   "https://github.com/user/repo.git",
+				"base_ref":   "main",
+				"target_ref": "feature",
+				"spec":       tc.spec,
+			}
+			body, _ := json.Marshal(reqBody)
+			req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			// Verify one stage was created.
+			if st.createStageCallCount != 1 {
+				t.Errorf("expected 1 CreateStage call, got %d", st.createStageCallCount)
+			}
+
+			// Verify stage name matches expected.
+			if len(st.createStageParams) != 1 {
+				t.Fatalf("expected 1 stage param, got %d", len(st.createStageParams))
+			}
+			if st.createStageParams[0].Name != tc.wantName {
+				t.Errorf("expected stage name %q, got %q", tc.wantName, st.createStageParams[0].Name)
+			}
+
+			// Verify stage metadata has step_index=0 and step_total=1.
+			var meta modsapi.StageMetadata
+			if err := json.Unmarshal(st.createStageParams[0].Meta, &meta); err != nil {
+				t.Fatalf("failed to unmarshal stage metadata: %v", err)
+			}
+			if meta.StepIndex != 0 {
+				t.Errorf("expected step_index 0, got %d", meta.StepIndex)
+			}
+			if meta.StepTotal != 1 {
+				t.Errorf("expected step_total 1, got %d", meta.StepTotal)
+			}
+		})
+	}
+}
+
+// TestGetTicketStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
+// exposes step_index for each stage when multi-step metadata is present.
+func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
+	ticketID := uuid.New()
+	now := time.Now()
+
+	// Create mock stages with step metadata.
+	stage0 := store.Stage{
+		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:  pgtype.UUID{Bytes: ticketID, Valid: true},
+		Name:   "mods-openrewrite-0",
+		Status: store.StageStatusPending,
+		Meta:   []byte(`{"step_index":0,"step_total":2,"mod_image":"img1:latest"}`),
+	}
+	stage1 := store.Stage{
+		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:  pgtype.UUID{Bytes: ticketID, Valid: true},
+		Name:   "mods-openrewrite-1",
+		Status: store.StageStatusPending,
+		Meta:   []byte(`{"step_index":1,"step_total":2,"mod_image":"img2:latest"}`),
+	}
+
+	st := &mockStore{
+		getRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: ticketID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+		listStagesByRunResult: []store.Stage{stage0, stage1},
+	}
+
+	handler := getTicketStatusHandler(st)
+	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+ticketID.String(), nil)
+	req.SetPathValue("id", ticketID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp modsapi.TicketStatusResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	// Verify both stages are present with correct step_index.
+	if len(resp.Ticket.Stages) != 2 {
+		t.Fatalf("expected 2 stages, got %d", len(resp.Ticket.Stages))
+	}
+
+	stage0ID := uuid.UUID(stage0.ID.Bytes).String()
+	stage1ID := uuid.UUID(stage1.ID.Bytes).String()
+
+	if _, ok := resp.Ticket.Stages[stage0ID]; !ok {
+		t.Errorf("expected stage %s to be present", stage0ID)
+	}
+	if resp.Ticket.Stages[stage0ID].StepIndex != 0 {
+		t.Errorf("expected stage 0 step_index 0, got %d", resp.Ticket.Stages[stage0ID].StepIndex)
+	}
+
+	if _, ok := resp.Ticket.Stages[stage1ID]; !ok {
+		t.Errorf("expected stage %s to be present", stage1ID)
+	}
+	if resp.Ticket.Stages[stage1ID].StepIndex != 1 {
+		t.Errorf("expected stage 1 step_index 1, got %d", resp.Ticket.Stages[stage1ID].StepIndex)
 	}
 }
