@@ -33,8 +33,8 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/worker/hydration/... ./internal/nodeagent/... — Hydration shallow-clones base_ref and pins commit_sha when present
 - [x] Add per-node base clone caching under PLOYD_CACHE_HOME — Avoid repeated full clones for the same run/repo on one node
   - Component: ploy (nodeagent, hydration)
-  - Scope: internal/nodeagent/workspace.go, internal/worker/hydration/git_fetcher.go (optional cache dir support), docs/envs/README.md (PLOYD_CACHE_HOME expectations)
-  - Test: go test ./internal/nodeagent/... ./internal/worker/hydration/... — Second hydration for same repo/ref under PLOYD_CACHE_HOME reuses cache
+  - Scope: internal/nodeagent/workspace.go, internal/nodeagent/execution.go, internal/nodeagent/buildgate_executor.go, internal/worker/hydration/git_fetcher.go (optional cache dir support), docs/envs/README.md (PLOYD_CACHE_HOME expectations)
+  - Test: go test ./internal/nodeagent/... ./internal/worker/hydration/... — Second hydration for same repo/ref under PLOYD_CACHE_HOME reuses cache; cache failures fall back to fresh clone
 - [ ] Implement “rehydrate from base+diffs” helper for Mods steps — Build a fresh workspace by copying base clone and applying ordered diffs
   - Component: ploy (nodeagent, workflow runtime)
   - Scope: internal/nodeagent/execution.go (new rehydration helper), internal/workflow/runtime/step/hydrator_test.go, internal/workflow/runtime/step/stub.go (hydration path selection)
