@@ -11,7 +11,7 @@ Done when:
 - Mods E2E scenarios `scenario-orw-fail` and `scenario-multi-node-rehydration` pass using the repo+diff Build Gate model.
 
 ## API & Contracts
-- [ ] Ref-only BuildGateValidateRequest (remove content_archive) — Simplify Build Gate contract and remove large workspace payloads
+- [x] Ref-only BuildGateValidateRequest (remove content_archive) — Simplify Build Gate contract and remove large workspace payloads
   - Component: ploy (server, workflow contracts, docs)
   - Scope:
     - internal/workflow/contracts/buildgate_service.go — Remove `ContentArchive` from `BuildGateValidateRequest`; require `RepoURL` and `Ref` (both non-empty) in `Validate()`.
