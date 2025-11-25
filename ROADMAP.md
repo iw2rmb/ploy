@@ -53,7 +53,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, nodeagent)
   - Scope: internal/store/migrations/008_run_steps.sql (run_steps table for per-step status), internal/store/queries/run_steps.sql (ClaimRunStep and step status helpers), internal/server/handlers/nodes_claim.go (step-level claims before whole-run claims), internal/nodeagent/diffuploader.go (step_index tagging for diffs), internal/nodeagent/handlers.go and internal/nodeagent/claimer.go/claimer_loop.go (thread step_index into StartRunRequest), internal/nodeagent/execution_orchestrator.go (execute only claimed step and upload per-step diffs)
   - Test: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodes can claim specific steps of a multi-step run, execute only the claimed step with rehydrated workspace, and upload diffs tagged with step_index
-  - Note: run_step_status transitions (AckRunStepStart / UpdateRunStepCompletion) are defined but not yet wired into status handlers; multi-node scheduling remains behind a feature flag until those updates and integration tests are added
+  - Note: run_step_status transitions (AckRunStepStart / UpdateRunStepCompletion) are now wired into status handlers and exercised by tests in internal/server/handlers and internal/nodeagent
 
 ## Scheduler Status Wiring & Run Semantics
 - [x] Materialize run_steps rows for multi-step runs — Create one step record per mods[] entry when a run is queued
@@ -71,7 +71,7 @@ Legend: [ ] todo, [x] done.
 - [x] Wire UpdateRunStepCompletion through completion endpoint — Transition run_steps.status to terminal state on step completion
   - Component: ploy (server, nodeagent, store)
   - Scope: internal/server/handlers/nodes_complete.go (accept optional step_index, load run_step via GetRunStepByIndex, and call UpdateRunStepCompletion with mapped RunStepStatus and reason), internal/nodeagent/statusuploader.go and internal/nodeagent/execution_upload.go (thread optional step_index from executeRun into StatusUploader payload)
-  - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — New tests assert run_step_status flows queued→assigned→running→succeeded/failed/canceled for multi-step runs
+  - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — Tests cover UpdateRunStepCompletion and verify step_index and terminal step status are handled correctly for multi-step runs
 - [ ] Ensure per-step diffs are incremental and rehydration-safe — Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]
   - Component: ploy (nodeagent, workflow runtime)
   - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (helper that uses internal/nodeagent/git.EnsureCommit to write the baseline commit), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
