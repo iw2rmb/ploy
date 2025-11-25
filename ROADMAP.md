@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (nodeagent, hydration)
   - Scope: internal/nodeagent/workspace.go, internal/nodeagent/execution.go, internal/nodeagent/buildgate_executor.go, internal/worker/hydration/git_fetcher.go (optional cache dir support), docs/envs/README.md (PLOYD_CACHE_HOME expectations)
   - Test: go test ./internal/nodeagent/... ./internal/worker/hydration/... — Second hydration for same repo/ref under PLOYD_CACHE_HOME reuses cache; cache failures fall back to fresh clone
-- [ ] Implement “rehydrate from base+diffs” helper for Mods steps — Build a fresh workspace by copying base clone and applying ordered diffs
+- [x] Implement “rehydrate from base+diffs” helper for Mods steps — Build a fresh workspace by copying base clone and applying ordered diffs
   - Component: ploy (nodeagent, workflow runtime)
   - Scope: internal/nodeagent/execution.go (new rehydration helper), internal/workflow/runtime/step/hydrator_test.go, internal/workflow/runtime/step/stub.go (hydration path selection)
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — Given a base clone and N diffs, rehydrated workspace matches incremental edits
