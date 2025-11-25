@@ -41,7 +41,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — Given a base clone and N diffs, rehydrated workspace matches incremental edits
 
 ## Multi-step Execution & Multi-node Scheduling
-- [ ] Refactor Mods run execution into explicit steps (gates + mods) — Represent each gate+mod pair as a logical step with an index
+- [x] Refactor Mods run execution into explicit steps (gates + mods) — Represent each gate+mod pair as a logical step with an index
   - Component: ploy (server, nodeagent)
   - Scope: CHECKPOINT_MODS.md, internal/server/handlers/handlers_mods_ticket.go (step metadata), internal/nodeagent/execution_orchestrator.go (loop over steps instead of single manifest)
   - Test: go test ./internal/server/... ./internal/nodeagent/... — Execution logs and stats show per-step boundaries and indices
