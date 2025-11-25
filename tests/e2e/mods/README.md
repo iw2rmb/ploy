@@ -149,6 +149,36 @@ Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
 - Live logs:
   - Use the CLI `--follow` flag to stream events. Check the control plane logs if stages appear stuck (cluster scheduling/resources).
 
+**Multi-Step, Multi-Node Rehydration Scenario**
+
+E2E validation for multi-step Mods runs with multi-node execution and workspace rehydration:
+  - `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh`
+
+This scenario validates:
+- Multi-step execution (3 sequential Java migration steps: Java 8 → 11 → 17)
+- Multi-node scheduling: scheduler can assign different steps to different nodes
+- Workspace rehydration: nodes correctly reconstruct workspace state from base clone + ordered diffs
+- Build gate validation: gate runs after each step with accumulated changes
+- MR content: final MR contains cumulative changes from all steps
+
+When running on a multi-node cluster, steps may execute on different nodes. The scheduler creates independent step manifests and nodes claim them as capacity allows. Each node rehydrates the workspace by:
+1. Copying the base clone (repo at base_ref + optional commit_sha)
+2. Fetching diffs for all prior steps (0 through k-1) from the control plane
+3. Applying diffs sequentially using `git apply` to reconstruct workspace state for step k
+
+The scenario passes on both single-node and multi-node clusters. On single-node, all steps execute on the same node but still exercise the rehydration path.
+
+Configuration:
+- Uses the public test repository: `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`
+- Three OpenRewrite transformation steps with build gate validation
+- Optional: Set `PLOY_GITLAB_PAT` to validate MR creation with cumulative changes
+- Artifacts saved to `./tmp/mods/scenario-multi-node-rehydration/<timestamp>/`
+
+Skip artifact collection for faster runs (e.g., in CI):
+```bash
+SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+```
+
 **References**
 
 - Historic E2E assets (legacy Nomad-based) found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
@@ -156,3 +186,5 @@ Tip: The CLI prints status and can also fetch artifacts via `--artifact-dir`.
   - `internal/workflow/contracts/` — Step manifest shapes and validation.
   - `internal/workflow/runner/job_templates.go` — Mods image bindings for lanes.
   - `internal/workflow/runner/healing.go` — Healing flow appended after Build Gate failures.
+  - `internal/nodeagent/execution.go` — Workspace rehydration implementation (base clone + diff chain).
+  - `internal/nodeagent/execution_rehydrate_test.go` — Unit tests for rehydration logic.

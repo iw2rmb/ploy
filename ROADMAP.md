@@ -74,7 +74,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (docs)
   - Scope: docs/how-to/deploy-a-cluster.md, docs/how-to/publish-mods.md, CHECKPOINT_MODS.md, ROADMAP_NEXT.md (link to this roadmap)
   - Test: make lint-docs or manual review — Docs describe the new flow consistently with implementation
-- [ ] Add E2E scenarios for multi-step, multi-node Mods runs — Validate rehydration and MR content end-to-end
+- [x] Add E2E scenarios for multi-step, multi-node Mods runs — Validate rehydration and MR content end-to-end
   - Component: ploy (tests)
-  - Scope: tests/e2e/mods/* (new multi-step specs and run.sh), tests/README.md, tests/e2e/mods/README.md (usage)
-  - Test: bash tests/e2e/mods/<new-scenario>/run.sh — Scenario passes with steps on one node and with steps split across nodes (when lab is available)
+  - Scope: tests/e2e/mods/scenario-multi-node-rehydration/* (new spec and run.sh), tests/e2e/mods/README.md (usage)
+  - Test: bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh — Scenario validates multi-step execution with rehydration, works on both single-node and multi-node clusters
