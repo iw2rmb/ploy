@@ -2,9 +2,12 @@ post:
   tags: [Control]
   summary: Submit a build validation job
   description: |
-    Accepts either a repository ref (repo_url+ref) or a content archive
-    (base64-encoded tar/tar.gz). Returns the result if completed within a
-    short timeout, or a JobID for polling.
+    Submit a Git-based build validation job. Requires repo_url and ref fields.
+    Returns the result if completed within a short timeout, or a JobID for
+    async polling via GET /v1/buildgate/jobs/{id}.
+
+    The content_archive mode has been removed to simplify the Build Gate
+    contract and avoid large workspace payloads.
   requestBody:
     required: true
     content:
@@ -24,5 +27,5 @@ post:
         application/json:
           schema:
             $ref: '../OpenAPI.yaml#/components/schemas/BuildGateValidateResponse'
-    '400': { description: Invalid request }
+    '400': { description: Invalid request (missing repo_url or ref) }
     '500': { description: Server error }
