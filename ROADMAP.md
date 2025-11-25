@@ -17,7 +17,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/server/... ./internal/store/... — New tests assert run creation and stage metadata support multi-step runs
 
 ## Diff Lifecycle & Storage
-- [ ] Introduce per-step diff lifecycle for Mods runs — Capture a diff after each gate+mod step instead of only once at the end
+- [x] Introduce per-step diff lifecycle for Mods runs — Capture a diff after each gate+mod step instead of only once at the end
   - Component: ploy (nodeagent, server, store)
   - Scope: internal/nodeagent/execution_orchestrator.go (call uploadDiff per step), internal/nodeagent/execution_healing.go (decide where a “step” ends), internal/server/handlers/nodes_stage_diff.go, internal/store/queries/diffs.sql
   - Test: go test ./internal/nodeagent/... ./internal/server/... ./internal/store/... — Multiple diffs per run are created, ordered by created_at
