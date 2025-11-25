@@ -72,6 +72,22 @@ When `build_gate_healing` is configured in the spec:
 4. The loop retries up to `build_gate_healing.retries` times (default: 1).
 5. If the gate still fails after retries, the run terminates with `status=failed` and `reason=build-gate`.
 
+**Repo+Diff Verification Semantics:**
+
+Healing verification aligns with the HTTP Build Gate API's repo+diff model:
+
+- **Initial workspace**: The Build Gate validates code cloned from `repo_url+ref`.
+- **Healing modifications**: Healing mods modify the workspace in-place. Changes accumulate as diffs on top of the repo baseline.
+- **Re-gate verification**: After healing, the gate re-runs against `workspace = repo_url+ref + healing changes`. This is semantically equivalent to calling:
+  ```
+  POST /v1/buildgate/validate
+  {"repo_url": "...", "ref": "...", "diff_patch": "<healing-changes>"}
+  ```
+  The in-process re-gate avoids network overhead since the workspace already contains the modified state.
+- **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
+
+Healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
+
 **Cross-phase inputs available to healing mods:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
