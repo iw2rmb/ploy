@@ -16,7 +16,7 @@ const (
 	TokenTypeBootstrap = "bootstrap" // Short-lived tokens for node bootstrapping
 )
 
-// JWT Claims structure with domain types for cluster identifier.
+// TokenClaims is a JWT claims structure with domain types for cluster identifier.
 // ClusterID is validated on unmarshal (non-empty after trimming spaces).
 type TokenClaims struct {
 	ClusterID domaintypes.ClusterID `json:"cluster_id"`
