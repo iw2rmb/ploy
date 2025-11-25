@@ -68,7 +68,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, nodeagent)
   - Scope: internal/server/handlers/nodes_ack.go (extend request payload with optional step_index and, when present, call GetRunStepByIndex and AckRunStepStart after validating node_id and run_id), internal/nodeagent/claimer_loop.go (include ClaimResponse.StepIndex in POST /v1/nodes/{id}/ack payload)
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... — New tests assert AckRunStepStart is invoked for multi-step claims and that ack payloads include the expected step_index
-- [ ] Wire UpdateRunStepCompletion through completion endpoint — Transition run_steps.status to terminal state on step completion
+- [x] Wire UpdateRunStepCompletion through completion endpoint — Transition run_steps.status to terminal state on step completion
   - Component: ploy (server, nodeagent, store)
   - Scope: internal/server/handlers/nodes_complete.go (accept optional step_index, load run_step via GetRunStepByIndex, and call UpdateRunStepCompletion with mapped RunStepStatus and reason), internal/nodeagent/statusuploader.go and internal/nodeagent/execution_upload.go (thread optional step_index from executeRun into StatusUploader payload)
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — New tests assert run_step_status flows queued→assigned→running→succeeded/failed/canceled for multi-step runs
