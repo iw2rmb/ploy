@@ -45,7 +45,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (nodeagent)
   - Scope: internal/nodeagent/run_options.go (typed multi-step mods[] as Steps), internal/nodeagent/claimer_spec.go (preserve mods[] for nodeagent), internal/nodeagent/manifest.go (step-specific image/command/env), internal/nodeagent/execution_orchestrator.go (loop over steps and per-step logging)
   - Test: go test ./internal/nodeagent/... — Multi-step runs execute sequential steps with per-step indices; single-step runs still pass
-- [ ] Make gate/mod steps rehydratable on any node — Use rehydration helper instead of long-lived workspaces per run
+- [x] Make gate/mod steps rehydratable on any node — Use rehydration helper instead of long-lived workspaces per run
   - Component: ploy (nodeagent)
   - Scope: internal/nodeagent/execution_orchestrator.go (create a fresh workspace per step), internal/nodeagent/execution_healing.go (healing uses rehydrated workspace), internal/nodeagent/workspace.go
   - Test: go test ./internal/nodeagent/... — Steps can be executed in isolation; parallel tests use different workspaces without interference
