@@ -13,7 +13,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./cmd/ploy/... — Spec parsing tests cover mods[] and env_from_file; bash tests/e2e/mods/scenario-multi-step/run.sh — multi-step spec submission works end-to-end
 - [x] Clarify ticket model for multi-step Mods runs — Ensure control plane treats a run as an ordered sequence of steps
   - Component: ploy (server, store)
-  - Scope: internal/mods/api/types.go, internal/server/handlers/handlers_mods_ticket.go, internal/store/migrations/* (if step metadata needed), CHECKPOINT_MODS.md
+  - Scope: internal/mods/api/types.go, internal/server/handlers/handlers_mods_ticket.go, internal/store/migrations/* (if step metadata needed), docs/mods-lifecycle.md
   - Test: go test ./internal/server/... ./internal/store/... — New tests assert run creation and stage metadata support multi-step runs
 
 ## Diff Lifecycle & Storage
@@ -106,7 +106,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./cmd/ploy/... ./internal/nodeagent/... — Spec round-trips mods[] and step metadata; legacy single-mod specs still pass
 - [x] Document multi-node Mods architecture and rehydration model — Explain base clone + diff chain semantics and scheduler behaviour
   - Component: ploy (docs)
-  - Scope: docs/how-to/deploy-a-cluster.md, docs/how-to/publish-mods.md, CHECKPOINT_MODS.md, ROADMAP_NEXT.md (link to this roadmap)
+  - Scope: docs/how-to/deploy-a-cluster.md, docs/how-to/publish-mods.md, docs/mods-lifecycle.md, ROADMAP_NEXT.md (link to this roadmap)
   - Test: make lint-docs or manual review — Docs describe the new flow consistently with implementation
 - [x] Add E2E scenarios for multi-step, multi-node Mods runs — Validate rehydration and MR content end-to-end
   - Component: ploy (tests)

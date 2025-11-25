@@ -62,7 +62,7 @@ Note: As of November 2025 the API is simplified to a `/v1/mods` facade for submi
 - Control‑plane APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas)
 - Environment variables: `docs/envs/README.md`
 - Engineering rules: `GOLANG.md`
-- Minimal Mods flow: `docs/mod-simple-happy-path.md`
+- Minimal Mods flow: `docs/mods-lifecycle.md`
 
 **Docs Map**
 - Overview & quick start: this `README.md` (canonical entry).
@@ -70,7 +70,7 @@ Note: As of November 2025 the API is simplified to a `/v1/mods` facade for submi
 - APIs: `docs/api/OpenAPI.yaml` (authoritative endpoints and schemas).
 - How‑tos: `docs/how-to/*.md` (deploy/update guides).
 - Envs: `docs/envs/README.md` (canonical env reference).
-- Mods E2E minimal path: `docs/mod-simple-happy-path.md` (claim→ack→complete + ticket SSE).
+- Mods E2E minimal path: `docs/mods-lifecycle.md` (claim→ack→complete + ticket SSE).
 - Contributor process: `AGENTS.md` (TDD, coverage, docs policy).
 
 **Installation**

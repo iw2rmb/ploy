@@ -9,7 +9,7 @@
 # - Per-package coverage for critical workflow/runner packages (target: ≥90%)
 # - Key packages: internal/workflow/..., internal/nodeagent/..., internal/cli/stream, cmd/ploy
 #
-# The output is formatted as markdown suitable for inclusion in CHECKPOINT_MODS.md
+# The output is formatted as markdown suitable for inclusion in mods checkpoint docs.
 # or similar documentation.
 
 set -euo pipefail
