@@ -103,6 +103,52 @@ func (ns NullRunStatus) Value() (driver.Value, error) {
 	return string(ns.RunStatus), nil
 }
 
+type RunStepStatus string
+
+const (
+	RunStepStatusQueued    RunStepStatus = "queued"
+	RunStepStatusAssigned  RunStepStatus = "assigned"
+	RunStepStatusRunning   RunStepStatus = "running"
+	RunStepStatusSucceeded RunStepStatus = "succeeded"
+	RunStepStatusFailed    RunStepStatus = "failed"
+	RunStepStatusCanceled  RunStepStatus = "canceled"
+)
+
+func (e *RunStepStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RunStepStatus(s)
+	case string:
+		*e = RunStepStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RunStepStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRunStepStatus struct {
+	RunStepStatus RunStepStatus `json:"run_step_status"`
+	Valid         bool          `json:"valid"` // Valid is true if RunStepStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRunStepStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RunStepStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RunStepStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRunStepStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RunStepStatus), nil
+}
+
 type StageStatus string
 
 const (
@@ -294,6 +340,17 @@ type Run struct {
 	TargetRef  string             `json:"target_ref"`
 	CommitSha  *string            `json:"commit_sha"`
 	Stats      []byte             `json:"stats"`
+}
+
+type RunStep struct {
+	ID         pgtype.UUID        `json:"id"`
+	RunID      pgtype.UUID        `json:"run_id"`
+	StepIndex  int32              `json:"step_index"`
+	Status     RunStepStatus      `json:"status"`
+	NodeID     pgtype.UUID        `json:"node_id"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	Reason     *string            `json:"reason"`
 }
 
 type RunsTiming struct {

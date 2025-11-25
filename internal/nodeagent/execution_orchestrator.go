@@ -53,10 +53,19 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Detect multi-step vs single-step execution mode.
 	// Multi-step runs loop over Steps; single-step runs execute once with stepIndex=0.
+	// When req.StepIndex is present, constrain execution to that single step (multi-node execution).
 	stepCount := 1
+	startStepIndex := 0
 	if len(typedOpts.Steps) > 0 {
 		stepCount = len(typedOpts.Steps)
 		slog.Info("multi-step run detected", "run_id", req.RunID, "step_count", stepCount)
+	}
+
+	// If a specific step was claimed (multi-node execution), constrain to that step only.
+	if req.StepIndex != nil {
+		startStepIndex = int(*req.StepIndex)
+		stepCount = startStepIndex + 1 // Execute only this step
+		slog.Info("single-step execution (multi-node claim)", "run_id", req.RunID, "step_index", startStepIndex)
 	}
 
 	// Phase 2: Prepare base clone cache for rehydration.
@@ -103,6 +112,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	// Phase 4: Execute steps sequentially (gate+mod for each step).
 	// For multi-step runs, loop over Steps; for single-step runs, execute once with stepIndex=0.
+	// For multi-node step-level claims, execute only the claimed step (startStepIndex..stepCount).
 	// Each step runs in a fresh workspace created via rehydration (base + ordered diffs).
 	// If any step fails, halt execution and report terminal status.
 	var finalExecResult executionResult
@@ -111,7 +121,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	var finalWorkspace string // Track final workspace for artifacts and MR.
 	totalDuration := time.Duration(0)
 
-	for stepIndex := 0; stepIndex < stepCount; stepIndex++ {
+	for stepIndex := startStepIndex; stepIndex < stepCount; stepIndex++ {
 		slog.Info("executing step", "run_id", req.RunID, "step_index", stepIndex, "step_total", stepCount)
 
 		// Build manifest for this step.
@@ -555,7 +565,9 @@ func (r *runController) uploadDiffForStep(
 		return
 	}
 
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary); err != nil {
+	// Convert stepIndex to *int32 for API compatibility.
+	stepIdx := int32(stepIndex)
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
 		slog.Error("failed to upload step diff", "run_id", runID, "step_index", stepIndex, "error", err)
 		return
 	}

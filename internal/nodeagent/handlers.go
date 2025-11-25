@@ -25,12 +25,17 @@ import (
 //   - "retain_container" (bool) — retain container after run for debugging.
 //   - "artifact_paths" ([]string|[]any) — list of workspace‑relative files/dirs to upload as a bundle.
 //   - "build_gate_healing" (object) — healing policy: {retries:int, mods:[{image,command,env,...}]}.
+//
+// StepIndex field:
+//   - When nil: execute all steps sequentially (traditional single-node execution).
+//   - When present: execute only the specified step (multi-node step-level execution).
 type StartRunRequest struct {
 	RunID     types.RunID       `json:"run_id,omitempty"`
 	RepoURL   types.RepoURL     `json:"repo_url,omitempty"`
 	BaseRef   types.GitRef      `json:"base_ref,omitempty"`
 	TargetRef types.GitRef      `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA   `json:"commit_sha,omitempty"`
+	StepIndex *int32            `json:"step_index,omitempty"` // Constrains execution to a single step
 	Options   map[string]any    `json:"options"`
 	Env       map[string]string `json:"env"`
 }

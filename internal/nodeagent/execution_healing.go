@@ -95,7 +95,9 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 		return
 	}
 
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary); err != nil {
+	// Healing mod diffs don't have a step_index (they are intermediate diffs within a step).
+	// Pass nil for step_index to indicate this is a healing diff, not a per-step diff.
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, nil); err != nil {
 		slog.Error("failed to upload healing mod diff", "run_id", runID, "mod_index", modIndex, "error", err)
 		return
 	}

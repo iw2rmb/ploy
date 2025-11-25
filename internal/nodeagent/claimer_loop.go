@@ -152,11 +152,14 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		BaseRef:   types.GitRef(claim.BaseRef),
 		TargetRef: types.GitRef(claim.TargetRef),
 		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
+		StepIndex: claim.StepIndex, // Present for multi-node step-level execution
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}
 
-	// Invoke controller.StartRun to execute the run.
+	// Invoke controller.StartRun to execute the run or specific step.
+	// If StepIndex is present, only that step will be executed (multi-node execution).
+	// Otherwise, all steps are executed sequentially (single-node execution).
 	if err := c.controller.StartRun(ctx, startReq); err != nil {
 		// Even if StartRun fails, we've already claimed the work.
 		// The controller's executeRun will upload terminal status.
