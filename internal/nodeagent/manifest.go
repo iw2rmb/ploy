@@ -13,7 +13,12 @@ import (
 // buildManifestFromRequest converts a StartRunRequest into a StepManifest.
 // The function accepts typed RunOptions to reduce map[string]any casts while
 // preserving backward compatibility with the raw Options map for wire-level access.
-func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contracts.StepManifest, error) {
+//
+// For multi-step runs (when typedOpts.Steps is non-empty), stepIndex selects which
+// mod step to build a manifest for. For single-step runs, stepIndex is ignored and
+// Execution options are used. This enables step-by-step execution where each step
+// runs gate+mod with its own image/command/env configuration.
+func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepIndex int) (contracts.StepManifest, error) {
 	if req.RunID.IsZero() {
 		return contracts.StepManifest{}, errors.New("run_id required")
 	}
@@ -25,12 +30,49 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contra
 	// preserve image-provided CMD/ENTRYPOINT for custom mods containers.
 	const defaultImage = "ubuntu:latest"
 	image := defaultImage
-	if typedOpts.Execution.Image != "" {
-		image = strings.TrimSpace(typedOpts.Execution.Image)
-	}
+	command := []string(nil)
+	env := make(map[string]string, len(req.Env))
+	retain := false
 
-	// Use typed command accessor to avoid map[string]any cast.
-	command := typedOpts.Execution.Command.ToSlice()
+	// Select step-specific configuration: use Steps[stepIndex] for multi-step runs,
+	// or Execution for single-step runs. Multi-step runs take precedence when Steps
+	// is non-empty.
+	if len(typedOpts.Steps) > 0 {
+		// Multi-step run: extract image, command, env, and retention from Steps[stepIndex].
+		if stepIndex < 0 || stepIndex >= len(typedOpts.Steps) {
+			return contracts.StepManifest{}, fmt.Errorf("step index %d out of range (0-%d)", stepIndex, len(typedOpts.Steps)-1)
+		}
+		stepMod := typedOpts.Steps[stepIndex]
+
+		// Use step-specific image and command.
+		if stepMod.Image != "" {
+			image = strings.TrimSpace(stepMod.Image)
+		}
+		command = stepMod.Command.ToSlice()
+
+		// Merge base env (from spec top-level) with step-specific env (step wins on conflict).
+		for k, v := range req.Env {
+			env[k] = v
+		}
+		for k, v := range stepMod.Env {
+			env[k] = v
+		}
+
+		retain = stepMod.RetainContainer
+	} else {
+		// Single-step run: use Execution options.
+		if typedOpts.Execution.Image != "" {
+			image = strings.TrimSpace(typedOpts.Execution.Image)
+		}
+		command = typedOpts.Execution.Command.ToSlice()
+
+		// Copy base env.
+		for k, v := range req.Env {
+			env[k] = v
+		}
+
+		retain = typedOpts.Execution.RetainContainer
+	}
 
 	// If no explicit command was provided, inject a harmless placeholder only
 	// when running the default ubuntu image. For custom images (e.g., mods
@@ -53,16 +95,6 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions) (contra
 		TargetRef: types.GitRef(targetRef),
 		Commit:    req.CommitSHA,
 	}
-
-	// Create a single read-write input that will be hydrated from the repository.
-	// Defensive copy of env to avoid aliasing caller map.
-	env := make(map[string]string, len(req.Env))
-	for k, v := range req.Env {
-		env[k] = v
-	}
-
-	// Use typed accessor for container retention.
-	retain := typedOpts.Execution.RetainContainer
 
 	// Build manifest options from typed accessors. Only select keys are propagated
 	// to manifest.Options to keep scope tight and avoid accidentally logging/transmitting

@@ -31,6 +31,11 @@ type RunOptions struct {
 
 	// ServerMetadata holds server-injected metadata for uploads and tracking.
 	ServerMetadata ServerMetadataOptions
+
+	// Steps holds the list of mod steps for multi-step runs (mods[] array).
+	// For single-step runs, this slice is empty and Execution options are used.
+	// For multi-step runs, this slice contains one entry per mod in mods[].
+	Steps []StepMod
 }
 
 // BuildGateOptions configures pre-mod build gate validation.
@@ -185,6 +190,23 @@ type ServerMetadataOptions struct {
 	StageID string
 }
 
+// StepMod describes a single mod step in a multi-step run (mods[] array).
+// Each step has its own image, command, and environment configuration.
+// Steps execute sequentially with shared workspace, each running gate+mod.
+type StepMod struct {
+	// Image is the container image for this step (required).
+	Image string
+
+	// Command is the container command override for this step (optional).
+	Command ExecutionCommand
+
+	// Env holds environment variables specific to this step.
+	Env map[string]string
+
+	// RetainContainer controls whether this step's container is retained.
+	RetainContainer bool
+}
+
 // parseRunOptions extracts typed options from untyped map[string]any.
 // This function centralizes the map[string]any → RunOptions conversion and
 // provides a single point for option validation and defaulting.
@@ -270,7 +292,61 @@ func parseRunOptions(opts map[string]any) RunOptions {
 		runOpts.ServerMetadata.StageID = stageID
 	}
 
+	// Parse multi-step mods array for sequential execution.
+	// For multi-step runs (mods[] in spec), each entry defines a step.
+	// For single-step runs (mod or legacy top-level), Steps remains empty.
+	if modsSlice, ok := opts["mods"].([]any); ok && len(modsSlice) > 0 {
+		for _, modEntry := range modsSlice {
+			if modMap, ok := modEntry.(map[string]any); ok {
+				stepMod := parseStepMod(modMap)
+				runOpts.Steps = append(runOpts.Steps, stepMod)
+			}
+		}
+	}
+
 	return runOpts
+}
+
+// parseStepMod extracts a StepMod from an untyped map[string]any.
+// This function handles the polymorphic command representation (string or []any)
+// and provides safe type conversions for multi-step mod entries.
+func parseStepMod(modMap map[string]any) StepMod {
+	stepMod := StepMod{
+		Env: make(map[string]string),
+	}
+
+	// Extract image (required for multi-step mods).
+	if image, ok := modMap["image"].(string); ok {
+		stepMod.Image = image
+	}
+
+	// Extract command (polymorphic: string or []any).
+	switch cmd := modMap["command"].(type) {
+	case string:
+		stepMod.Command.Shell = cmd
+	case []any:
+		for _, elem := range cmd {
+			if s, ok := elem.(string); ok {
+				stepMod.Command.Exec = append(stepMod.Command.Exec, s)
+			}
+		}
+	}
+
+	// Extract env map.
+	if envMap, ok := modMap["env"].(map[string]any); ok {
+		for k, v := range envMap {
+			if s, ok := v.(string); ok {
+				stepMod.Env[k] = s
+			}
+		}
+	}
+
+	// Extract retain_container.
+	if retain, ok := modMap["retain_container"].(bool); ok {
+		stepMod.RetainContainer = retain
+	}
+
+	return stepMod
 }
 
 // parseHealingMod extracts a HealingMod from an untyped map[string]any.
