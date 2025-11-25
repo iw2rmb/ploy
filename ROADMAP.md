@@ -9,8 +9,8 @@ Legend: [ ] todo, [x] done.
 ## Spec & Ticket Model
 - [x] Extend Mod spec for multi-step mods (global build_gate/build_gate_healing, mods[]) — Define how multiple mods share one repo and global gate/heal policy
   - Component: ploy (CLI, docs)
-  - Scope: docs/schemas/mod.example.yaml, tests/e2e/mods/scenario-*/mod.yaml, docs/how-to/publish-mods.md; describe mods[] semantics (sequential steps, global gate, shared repo)
-  - Test: go test ./cmd/ploy/... ./tests/e2e/... — Spec parsing tests cover mods[], docs reference new fields
+  - Scope: docs/schemas/mod.example.yaml, tests/e2e/mods/scenario-multi-step/*; describe mods[] semantics (sequential steps, shared repo, global build_gate/build_gate_healing policy)
+  - Test: go test ./cmd/ploy/... — Spec parsing tests cover mods[] and env_from_file; bash tests/e2e/mods/scenario-multi-step/run.sh — multi-step spec submission works end-to-end
 - [ ] Clarify ticket model for multi-step Mods runs — Ensure control plane treats a run as an ordered sequence of steps
   - Component: ploy (server, store)
   - Scope: internal/mods/api/types.go, internal/server/handlers/handlers_mods_ticket.go, internal/store/migrations/* (if step metadata needed), CHECKPOINT_MODS.md
