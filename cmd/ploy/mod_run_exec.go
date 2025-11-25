@@ -34,6 +34,9 @@ import (
 // 1. Plan stage: determines which modifications are needed
 // 2. ORW stages: apply and generate OpenRewrite transformations
 // 3. LLM stages: plan and execute LLM-based modifications
+// When the control plane handles the simplified /v1/mods submission flow, it
+// creates stages from the spec (mod/mods[]) but reuses these logical stage
+// names and lane roles.
 func defaultStageDefinitions() []modsapi.StageDefinition {
 	return []modsapi.StageDefinition{
 		{ID: domaintypes.StageID(modplan.StageNamePlan), Lane: "mods-plan", Priority: "default", MaxAttempts: 1},

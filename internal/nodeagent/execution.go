@@ -72,7 +72,8 @@ func (r *runController) createDiffGenerator() step.DiffGenerator {
 // Note: The caller is responsible for fetching diffs in the correct order (by step_index).
 // In practice, callers use the control plane API endpoint GET /v1/mods/{id}/diffs to list
 // all diffs for a run and then filter/sort by step_index (see DiffFetcher.FetchDiffsForStep)
-// to obtain diffs for steps 0 through k-1 when preparing to execute step k.
+// to obtain diffs for steps 0 through k-1 when preparing to execute step k. The same
+// step_index values are stored alongside stages and run_steps for this ticket.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
 	// Step 1: Copy base clone to destination workspace.
 	// This creates a fresh workspace starting from the base snapshot (base_ref + optional commit_sha).
@@ -201,6 +202,8 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 // The baseline commit ensures:
 //   - diff[k] = git diff HEAD (after step k) = changes from step k only
 //   - Replaying diffs[0..k] on base clone reconstructs workspace[step_k+1]
+//
+// Control plane persists these per-step diffs under the same step_index used for stages/run_steps.
 //
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.

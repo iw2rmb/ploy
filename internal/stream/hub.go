@@ -99,6 +99,11 @@ func (h *Hub) PublishRetention(ctx context.Context, streamID string, hint Retent
 }
 
 // PublishStatus appends a terminal status event to a stream.
+// Event types emitted by the hub are:
+//   - "log": LogRecord {Timestamp, Stream, Line}
+//   - "retention": RetentionHint {Retained, TTL, Expires, Bundle}
+//   - "ticket": api.TicketSummary snapshot
+//   - "done": Status {Status: "done"} sentinel for stream completion.
 func (h *Hub) PublishStatus(ctx context.Context, streamID string, status Status) error {
 	if err := h.publish(ctx, streamID, "done", status); err != nil {
 		return err

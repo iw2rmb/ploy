@@ -6,6 +6,9 @@ import (
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
+// Package api defines the Mods ticket and stage types shared by the CLI,
+// control plane (/v1/mods*) and SSE hub. JSON tags mirror the wire shape.
+
 // StageState mirrors Mods stage lifecycle states exposed over the API.
 type StageState string
 
@@ -62,14 +65,16 @@ type TicketStatusResponse struct {
 
 // TicketSummary summarises ticket lifecycle state and associated stages.
 type TicketSummary struct {
-	TicketID   domaintypes.TicketID   `json:"ticket_id"`
-	State      TicketState            `json:"state"`
-	Submitter  string                 `json:"submitter,omitempty"`
-	Repository string                 `json:"repository,omitempty"`
-	Metadata   map[string]string      `json:"metadata,omitempty"`
-	CreatedAt  time.Time              `json:"created_at"`
-	UpdatedAt  time.Time              `json:"updated_at"`
-	Stages     map[string]StageStatus `json:"stages"`
+	TicketID   domaintypes.TicketID `json:"ticket_id"`
+	State      TicketState          `json:"state"`
+	Submitter  string               `json:"submitter,omitempty"`
+	Repository string               `json:"repository,omitempty"`
+	Metadata   map[string]string    `json:"metadata,omitempty"`
+	CreatedAt  time.Time            `json:"created_at"`
+	UpdatedAt  time.Time            `json:"updated_at"`
+	// Stages is keyed by stage UUID (database id). Use StageStatus.StepIndex
+	// when you need an ordered, user-facing step sequence.
+	Stages map[string]StageStatus `json:"stages"`
 }
 
 // StageStatus summarises the execution state for a ticket stage.
@@ -86,7 +91,9 @@ type StageStatus struct {
 	// StepIndex identifies the position of this stage in multi-step Mods runs.
 	// For single-step runs, this is 0. For multi-step runs (mods[]), this is
 	// the array index (0, 1, 2, ...). The control plane uses this to order
-	// stages when rehydrating workspaces with diffs from prior steps.
+	// stages when rehydrating workspaces with diffs from prior steps. It is
+	// populated from stages.meta.step_index and matches run_steps.step_index
+	// and diffs.step_index for this stage.
 	StepIndex int `json:"step_index,omitempty"`
 }
 
@@ -96,7 +103,8 @@ type JobID string
 
 // StageMetadata captures step-level metadata stored in stages.meta JSONB.
 // This metadata enables the control plane to treat a run as an ordered
-// sequence of steps for multi-step Mods runs (mods[] array in spec).
+// sequence of steps for multi-step Mods runs (mods[] array in spec). It is
+// serialized directly into stages.meta JSONB and reloaded via GET /v1/mods/{id}.
 type StageMetadata struct {
 	// StepIndex is the 0-based position of this stage in the run's step sequence.
 	// For single-step runs, this is 0. For multi-step runs, this matches the
