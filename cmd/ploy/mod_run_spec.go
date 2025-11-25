@@ -103,13 +103,24 @@ func resolveEnvFromFileInPlace(spec map[string]any) error {
 //
 // Processing order:
 // 1. Load spec file (YAML or JSON format) if provided
-// 2. Resolve env_from_file references in mod, build_gate_healing.mods[], and top-level
+// 2. Resolve env_from_file references in:
+//   - mod (single-mod format)
+//   - mods[] (multi-step format)
+//   - build_gate_healing.mods[] (healing steps)
+//   - top-level (back-compat)
+//
 // 3. Apply CLI flag overrides (higher precedence than spec file)
 //   - When a canonical `mod` section exists, apply overrides inside `mod` (env/image/command/retain).
+//   - Multi-step mods[] are preserved as-is; CLI overrides apply only to single-mod format.
 //
 // 4. Apply defaults (e.g., gitlab_domain when gitlab_pat is set)
 //
 // Returns nil payload when neither spec file nor CLI overrides are provided.
+//
+// Multi-step semantics (mods[] array):
+// - Each entry in mods[] represents a sequential transformation step.
+// - All mods share the same repository and global build_gate/build_gate_healing policy.
+// - The CLI preserves mods[] without modification; overrides do not apply to multi-step format.
 func buildSpecPayload(
 	specFile string,
 	modEnvs []string,
@@ -161,6 +172,20 @@ func buildSpecPayload(
 					if err := resolveEnvFromFileInPlace(modEntry); err != nil {
 						return nil, fmt.Errorf("resolve env from file (build_gate_healing.mods[%d]): %w", i, err)
 					}
+				}
+			}
+		}
+	}
+
+	// Resolve env_from_file references in top-level mods[] array (multi-step mods)
+	// This array holds sequential transformation steps that share the same global
+	// gate and healing policy. Each mod in the array has the same schema as the
+	// single mod section (image, command, env, env_from_file, retain_container).
+	if mods, ok := base["mods"].([]any); ok {
+		for i, m := range mods {
+			if modEntry, ok := m.(map[string]any); ok {
+				if err := resolveEnvFromFileInPlace(modEntry); err != nil {
+					return nil, fmt.Errorf("resolve env from file (mods[%d]): %w", i, err)
 				}
 			}
 		}

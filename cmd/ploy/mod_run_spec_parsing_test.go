@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -318,5 +319,168 @@ build_gate_healing:
 
 	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/healer:latest" {
 		t.Errorf("expected first mod.image=docker.io/test/healer:latest, got %v", mod0["image"])
+	}
+}
+
+// TestBuildSpecPayloadMultiStepMods verifies that the mods[] array is correctly
+// parsed and preserved when using multi-step mod format. The mods[] array
+// represents sequential transformation steps sharing a global gate/heal policy.
+func TestBuildSpecPayloadMultiStepMods(t *testing.T) {
+	// Create a spec with multi-step mods[] array
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "multi.yaml")
+	specContent := `
+apiVersion: ploy.mod/v1alpha1
+kind: ModRunSpec
+mods:
+  - image: docker.io/test/mod-step1:latest
+    env:
+      STEP: "1"
+      TARGET: java8
+  - image: docker.io/test/mod-step2:latest
+    env:
+      STEP: "2"
+      TARGET: java11
+  - image: docker.io/test/mod-step3:latest
+    env:
+      STEP: "3"
+      TARGET: java17
+build_gate:
+  enabled: true
+  profile: auto
+build_gate_healing:
+  retries: 1
+  mods:
+    - image: docker.io/test/healer:latest
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify mods[] array exists and has 3 entries
+	mods, ok := result["mods"].([]any)
+	if !ok {
+		t.Fatalf("expected mods array in payload, got %T", result["mods"])
+	}
+	if len(mods) != 3 {
+		t.Fatalf("expected 3 mods in array, got %d", len(mods))
+	}
+
+	// Verify first mod step
+	mod0, ok := mods[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mods[0] to be map, got %T", mods[0])
+	}
+	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/mod-step1:latest" {
+		t.Errorf("expected mods[0].image=docker.io/test/mod-step1:latest, got %v", mod0["image"])
+	}
+	env0, ok := mod0["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mods[0].env to be map, got %T", mod0["env"])
+	}
+	if step, ok := env0["STEP"].(string); !ok || step != "1" {
+		t.Errorf("expected mods[0].env.STEP=1, got %v", env0["STEP"])
+	}
+
+	// Verify second mod step
+	mod1, ok := mods[1].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mods[1] to be map, got %T", mods[1])
+	}
+	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/mod-step2:latest" {
+		t.Errorf("expected mods[1].image=docker.io/test/mod-step2:latest, got %v", mod1["image"])
+	}
+
+	// Verify third mod step
+	mod2, ok := mods[2].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mods[2] to be map, got %T", mods[2])
+	}
+	if img, ok := mod2["image"].(string); !ok || img != "docker.io/test/mod-step3:latest" {
+		t.Errorf("expected mods[2].image=docker.io/test/mod-step3:latest, got %v", mod2["image"])
+	}
+
+	// Verify global build_gate and build_gate_healing are preserved
+	if _, ok := result["build_gate"].(map[string]any); !ok {
+		t.Errorf("expected build_gate in payload")
+	}
+	if _, ok := result["build_gate_healing"].(map[string]any); !ok {
+		t.Errorf("expected build_gate_healing in payload")
+	}
+}
+
+// TestBuildSpecPayloadMultiStepModsWithEnvFromFile verifies that env_from_file
+// resolution works correctly for each mod entry in the mods[] array.
+func TestBuildSpecPayloadMultiStepModsWithEnvFromFile(t *testing.T) {
+	// Create temp files for env_from_file references
+	tmpDir := t.TempDir()
+	envFile1 := filepath.Join(tmpDir, "env1.txt")
+	envFile2 := filepath.Join(tmpDir, "env2.txt")
+	if err := os.WriteFile(envFile1, []byte("secret-token-1"), 0o644); err != nil {
+		t.Fatalf("write env file 1: %v", err)
+	}
+	if err := os.WriteFile(envFile2, []byte("secret-token-2"), 0o644); err != nil {
+		t.Fatalf("write env file 2: %v", err)
+	}
+
+	// Create spec with mods[] using env_from_file
+	specPath := filepath.Join(tmpDir, "spec.yaml")
+	specContent := fmt.Sprintf(`
+mods:
+  - image: docker.io/test/mod1:latest
+    env_from_file:
+      TOKEN: %s
+  - image: docker.io/test/mod2:latest
+    env_from_file:
+      TOKEN: %s
+`, envFile1, envFile2)
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	payload, err := buildSpecPayload(specPath, nil, "", false, "", "", "", false, false, false)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify env_from_file was resolved for both mods
+	mods, ok := result["mods"].([]any)
+	if !ok || len(mods) != 2 {
+		t.Fatalf("expected 2 mods in array, got %v", result["mods"])
+	}
+
+	mod0 := mods[0].(map[string]any)
+	env0 := mod0["env"].(map[string]any)
+	if token, ok := env0["TOKEN"].(string); !ok || token != "secret-token-1" {
+		t.Errorf("expected mods[0].env.TOKEN=secret-token-1, got %v", env0["TOKEN"])
+	}
+
+	mod1 := mods[1].(map[string]any)
+	env1 := mod1["env"].(map[string]any)
+	if token, ok := env1["TOKEN"].(string); !ok || token != "secret-token-2" {
+		t.Errorf("expected mods[1].env.TOKEN=secret-token-2, got %v", env1["TOKEN"])
+	}
+
+	// Verify env_from_file was removed after resolution (clean spec)
+	if _, exists := mod0["env_from_file"]; exists {
+		t.Errorf("expected env_from_file to be removed from mods[0]")
+	}
+	if _, exists := mod1["env_from_file"]; exists {
+		t.Errorf("expected env_from_file to be removed from mods[1]")
 	}
 }

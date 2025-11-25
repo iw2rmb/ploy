@@ -1,0 +1,93 @@
+# Multi-step mod spec demonstrating sequential transformation steps with
+# global build gate and healing policy. This example shows a three-step Java
+# migration workflow: Java 8 → Java 11 → Java 17, with each step producing
+# a diff that enables per-step rehydration and multi-node execution.
+#
+# Submit with:
+#   dist/ploy mod run \
+#     --repo-url https://gitlab.com/example/my-java-project.git \
+#     --repo-base-ref main \
+#     --repo-target-ref mods-multi-step-java-upgrade \
+#     --spec tests/e2e/mods/scenario-multi-step/mod.yaml \
+#     --follow
+
+apiVersion: ploy.mod/v1alpha1
+kind: ModRunSpec
+
+################################################################################
+# MULTI-STEP MODS
+################################################################################
+# Sequential transformation steps: Java 8 → Java 11 → Java 17
+# Each mod executes in array order, sharing the same repository and global
+# build gate/healing policy. The diff from each step is captured before the
+# next step begins.
+mods:
+  # Step 1: Migrate to Java 8
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.Java8
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "1"
+
+  # Step 2: Migrate to Java 11
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava11
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "2"
+
+  # Step 3: Migrate to Java 17
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "3"
+
+################################################################################
+# GLOBAL BUILD GATE AND HEALING POLICY
+################################################################################
+# Build gate runs after each mod step. For multi-step runs, the gate validates
+# the accumulated changes from all prior steps.
+build_gate:
+  enabled: true
+  profile: auto  # auto-detect Maven or Gradle
+
+# Healing policy applies to any step that fails its gate check. The healing
+# sequence runs once per retry count, then the gate is re-evaluated before
+# proceeding to the next step.
+build_gate_healing:
+  retries: 1
+  mods:
+    # Codex healing container with Docker socket access for build verification
+    - image: docker.io/iwtormb/mods-codex:latest
+      env:
+        CODEX_PROMPT: |-
+          Rules:
+          - After making any change, verify the build.
+          - Run: buildgate-validate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - If it fails, iterate and try again until it passes.
+          - Only finalize once the gate passes; then print "BUILD PASSED".
+
+          Task:
+          Fix the compilation error described in /in/build-gate.log.
+      env_from_file:
+        # Inline Codex auth JSON from local file (resolved by CLI)
+        # Uncomment and set your auth file path:
+        # CODEX_AUTH_JSON: ~/.codex/auth.json
+
+################################################################################
+# GITLAB INTEGRATION (optional)
+################################################################################
+mr_on_fail: false
+mr_on_success: true
+# gitlab_domain: gitlab.com  # optional; defaults to gitlab.com when gitlab_pat is set
+# gitlab_pat: ""  # optional; can be provided via CLI or env_from_file

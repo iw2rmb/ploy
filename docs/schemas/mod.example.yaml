@@ -4,7 +4,12 @@
 apiVersion: ploy.mod/v1alpha1
 kind: ModRunSpec
 
+################################################################################
+# SINGLE-STEP MOD (default, backward-compatible)
+################################################################################
 # Main mod container to run against the hydrated repository at /workspace.
+# This is the traditional single-mod format. For multi-step workflows, use the
+# mods[] array instead (see MULTI-STEP section below).
 mod:
   # Required: image that performs the transformation (e.g., OpenRewrite)
   image: docker.io/your-dh-user/mods-openrewrite:latest
@@ -25,15 +30,53 @@ mod:
   # Retain container for debugging (disabled by default)
   retain_container: false
 
-# Build Gate settings. The node agent reuses the same Java gate for Maven/Gradle
-# (maven: -e; gradle: --stacktrace). Profile "auto" detects pom.xml/gradle files.
+################################################################################
+# MULTI-STEP MODS (optional, for sequential transformations)
+################################################################################
+# When you need multiple transformation steps executed sequentially, use mods[]
+# instead of the single mod section above. Each step runs with the same global
+# build gate and healing policy. The diff from each step is captured before the
+# next step begins, enabling per-step rehydration and multi-node execution.
+#
+# Rules:
+# - Mods execute in array order (steps are sequential within one run).
+# - All mods share the same repository, base_ref, target_ref, and global gate policy.
+# - Each mod step produces a diff artifact before the next step starts.
+# - If any step fails its gate check, the global healing policy applies.
+#
+# Example (disabled by default; remove comments to activate):
+# mods:
+#   - image: docker.io/your-dh-user/mods-migrate-java8:latest
+#     env:
+#       MIGRATION_TARGET: java8
+#   - image: docker.io/your-dh-user/mods-migrate-java11:latest
+#     env:
+#       MIGRATION_TARGET: java11
+#   - image: docker.io/your-dh-user/mods-migrate-java17:latest
+#     env:
+#       MIGRATION_TARGET: java17
+#       RECIPE_VERSION: "3.20.0"
+
+################################################################################
+# GLOBAL BUILD GATE AND HEALING POLICY
+################################################################################
+# Build Gate settings apply to all mods (both single-mod and multi-step runs).
+# The node agent reuses the same Java gate for Maven/Gradle (maven: -e; gradle:
+# --stacktrace). Profile "auto" detects pom.xml/gradle files.
+#
+# Gate execution occurs after each mod transformation. For multi-step runs, the
+# gate validates the accumulated changes from all prior steps.
 build_gate:
   enabled: true
   profile: auto # auto | java | java-maven | java-gradle
 
-# Healing sequence executed when the initial Build Gate fails. Each item is a
-# container step that can modify /workspace and emit artifacts to /out. After
-# running all steps, the gate is re-run; on pass, the main mod proceeds.
+# Healing sequence executed when the Build Gate fails (applies globally to all mods).
+# Each item is a container step that can modify /workspace and emit artifacts to
+# /out. After running all steps, the gate is re-run; on pass, the next mod proceeds.
+#
+# For multi-step runs, the healing policy is shared across all mod steps. When a
+# step's gate fails, healing runs once per the retry count, then the gate is
+# re-evaluated before proceeding to the next step.
 build_gate_healing:
   retries: 1
   mods:
@@ -65,10 +108,27 @@ gitlab_domain: gitlab.com          # optional; defaults to gitlab.com when gitla
 mr_on_success: true
 mr_on_fail: true
 
-# Notes
+################################################################################
+# NOTES
+################################################################################
 # - This YAML is submitted via: `ploy mod run --spec mod.yaml` along with
 #   repository flags (e.g., --repo-url, --repo-base-ref, --repo-target-ref).
-# - The current agent honors: mod.image, mod.command, mod.env, mod.retain_container,
-#   gitlab_domain, gitlab_pat, mr_on_success, mr_on_fail, build_gate.* (profile),
-#   and build_gate_healing.* (e.g., retries, mods). The node agent consumes
-#   build_gate_healing to run the heal → re-gate loop after the first gate fail.
+#
+# - The agent honors: mod.image, mod.command, mod.env, mod.retain_container,
+#   mods[] (for multi-step runs), gitlab_domain, gitlab_pat, mr_on_success,
+#   mr_on_fail, build_gate.* (profile), and build_gate_healing.* (retries, mods).
+#
+# - Single-mod vs multi-step:
+#   * Single-mod: Use the `mod` section for one transformation.
+#   * Multi-step: Use the `mods[]` array for sequential transformations.
+#   * Both formats share the same global build_gate and build_gate_healing policy.
+#
+# - Multi-step semantics:
+#   * Mods execute in array order (sequential steps within one run).
+#   * All mods share the same repository and global gate/heal policy.
+#   * Each mod step produces a diff artifact captured before the next step.
+#   * Diffs enable rehydration: any step can be re-executed on any node by
+#     applying the ordered chain of diffs from prior steps onto the base snapshot.
+#
+# - The node agent consumes build_gate_healing to run the heal → re-gate loop
+#   after the first gate fail (applies to both single-mod and multi-step runs).
