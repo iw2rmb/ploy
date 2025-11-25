@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (nodeagent, server, store)
   - Scope: internal/nodeagent/execution_orchestrator.go (call uploadDiff per step), internal/nodeagent/execution_healing.go (decide where a “step” ends), internal/server/handlers/nodes_stage_diff.go, internal/store/queries/diffs.sql
   - Test: go test ./internal/nodeagent/... ./internal/server/... ./internal/store/... — Multiple diffs per run are created, ordered by created_at
-- [ ] Attach step identity to stored diffs — Allow rehydration to select “all diffs before step k”
+- [x] Attach step identity to stored diffs — Allow rehydration to select “all diffs before step k”
   - Component: ploy (server, store)
   - Scope: internal/store/migrations/* (optional step_index/phase in diffs), internal/server/handlers/nodes_stage_diff.go, internal/server/handlers/handlers_diffs.go
   - Test: go test ./internal/server/... ./internal/store/... — ListRunDiffs exposes step metadata; ordering by step_index matches created_at
