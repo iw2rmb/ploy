@@ -16,8 +16,7 @@
 #   --profile <name>   | PLOY_BUILDGATE_PROFILE  - Build profile (default: auto)
 #   --timeout <dur>    | PLOY_BUILDGATE_TIMEOUT  - Timeout duration (default: 10m)
 #   --diff-patch <file>| PLOY_DIFF_PATCH_FILE    - Path to unified diff file to apply
-#   --workspace <path> | WORKSPACE               - Workspace path (used if --diff-patch is
-#                                                  not specified but changes exist)
+#   --workspace <path> | WORKSPACE               - Reserved; accepted but unused in repo+diff mode
 #
 # Environment (connection):
 #   PLOY_SERVER_URL         - Required: ploy server URL (e.g., https://server:8443)
@@ -72,7 +71,7 @@ Options:
   --profile <name>      Build profile (default: auto, or PLOY_BUILDGATE_PROFILE)
   --timeout <dur>       Timeout duration (default: 10m, or PLOY_BUILDGATE_TIMEOUT)
   --diff-patch <file>   Path to unified diff file to apply on top of repo+ref
-  --workspace <path>    Workspace path (for generating diff if --diff-patch omitted)
+  --workspace <path>    Reserved; accepted but unused in repo+diff mode
   -h, --help            Show this help message
 
 Environment:
