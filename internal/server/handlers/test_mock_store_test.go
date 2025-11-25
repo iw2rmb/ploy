@@ -313,6 +313,11 @@ func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run
 func (m *mockStore) ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (store.RunStep, error) {
 	m.claimRunStepCalled = true
 	m.claimRunStepParams = nodeID
+	// If no specific error is set and no result is configured, return ErrNoRows by default.
+	// This ensures existing tests that don't configure ClaimRunStep fall back to ClaimRun.
+	if m.claimRunStepErr == nil && !m.claimRunStepResult.ID.Valid {
+		return store.RunStep{}, pgx.ErrNoRows
+	}
 	return m.claimRunStepResult, m.claimRunStepErr
 }
 
