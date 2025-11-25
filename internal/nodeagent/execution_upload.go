@@ -188,7 +188,8 @@ func (r *runController) uploadOutDir(ctx context.Context, runID, stageID, outDir
 // uploadStatus uploads terminal status and execution statistics to the control plane.
 // It uses a short, detached context to ensure the status is reported even if the
 // run context is cancelled. Retry logic is handled by StatusUploader.
-func (r *runController) uploadStatus(ctx context.Context, runID, status string, reason *string, stats types.RunStats) error {
+// When stepIndex is non-nil, this triggers step-level completion (multi-step runs).
+func (r *runController) uploadStatus(ctx context.Context, runID, status string, reason *string, stats types.RunStats, stepIndex *int32) error {
 	statusUploader, err := NewStatusUploader(r.cfg)
 	if err != nil {
 		return fmt.Errorf("create status uploader: %w", err)
@@ -199,11 +200,11 @@ func (r *runController) uploadStatus(ctx context.Context, runID, status string, 
 	statusCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if uploadErr := statusUploader.UploadStatus(statusCtx, runID, status, reason, stats); uploadErr != nil {
+	if uploadErr := statusUploader.UploadStatus(statusCtx, runID, status, reason, stats, stepIndex); uploadErr != nil {
 		return fmt.Errorf("upload status: %w", uploadErr)
 	}
 
-	slog.Info("terminal status uploaded successfully", "run_id", runID, "status", status)
+	slog.Info("terminal status uploaded successfully", "run_id", runID, "status", status, "has_step_index", stepIndex != nil)
 	return nil
 }
 

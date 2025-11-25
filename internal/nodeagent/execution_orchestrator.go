@@ -311,7 +311,8 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	stats := r.buildExecutionStats(req.RunID.String(), stageID, result, execResult, duration, mrURL)
 
 	// Phase 8: Upload terminal status to server.
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats); uploadErr != nil {
+	// Pass req.StepIndex to trigger step-level completion for multi-step runs.
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats, req.StepIndex); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
 	}
 }

@@ -242,6 +242,11 @@ type mockStore struct {
 	ackRunStepStartCalled bool
 	ackRunStepStartParam  pgtype.UUID
 	ackRunStepStartErr    error
+
+	// UpdateRunStepCompletion tracking
+	updateRunStepCompletionCalled bool
+	updateRunStepCompletionParams store.UpdateRunStepCompletionParams
+	updateRunStepCompletionErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -569,4 +574,11 @@ func (m *mockStore) AckRunStepStart(ctx context.Context, id pgtype.UUID) error {
 	m.ackRunStepStartCalled = true
 	m.ackRunStepStartParam = id
 	return m.ackRunStepStartErr
+}
+
+// UpdateRunStepCompletion updates a step's terminal status (succeeded/failed/canceled) and timing.
+func (m *mockStore) UpdateRunStepCompletion(ctx context.Context, arg store.UpdateRunStepCompletionParams) error {
+	m.updateRunStepCompletionCalled = true
+	m.updateRunStepCompletionParams = arg
+	return m.updateRunStepCompletionErr
 }
