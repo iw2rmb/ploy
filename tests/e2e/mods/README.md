@@ -157,7 +157,7 @@ What to verify:
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `buildgate-validate` which calls the ploy server's buildgate API with the workspace content.
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `buildgate-validate` which calls the ploy server's Build Gate HTTP API using `repo_url` + `ref` and an optional `diff_patch` (repo+diff model), instead of uploading full workspace archives.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
