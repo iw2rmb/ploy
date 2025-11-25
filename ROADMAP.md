@@ -65,7 +65,7 @@ Done when:
   - Test: bash tests/e2e/mods/scenario-orw-fail/run.sh — Scenario continues to demonstrate fail→heal→re-gate with the repo+diff model; logs and artifacts show that healing does not require shipping full workspaces over HTTP.
 
 ## CLI Wrapper & Codex Healing
-- [ ] Update buildgate-validate.sh to send repo+diff payloads — Make the Codex wrapper use the ref-based Build Gate API
+- [x] Update buildgate-validate.sh to send repo+diff payloads — Make the Codex wrapper use the ref-based Build Gate API
   - Component: ploy (docker mods, tooling)
   - Scope:
     - docker/mods/mod-codex/buildgate-validate.sh — Remove tarball creation and `content_archive` field; require `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` (or equivalent) and build JSON payload with `repo_url`, `ref`, `profile`, `timeout`, and optional `diff_patch`.
