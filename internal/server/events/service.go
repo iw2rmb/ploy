@@ -118,8 +118,8 @@ func (s *Service) CreateAndPublishEvent(ctx context.Context, params store.Create
 }
 
 // CreateAndPublishLog persists a log chunk to the database and publishes it to the SSE hub.
-// The runID is used as the streamID for SSE fanout.
-// Returns the created log from the database or an error if either operation fails.
+// The runID is used as the streamID for SSE fanout. Log data is decoded into per-line
+// stdout LogRecord frames before fanout so clients see structured "log" events.
 func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLogParams) (store.Log, error) {
 	if s.store == nil {
 		return store.Log{}, errors.New("events: store not configured")
@@ -149,11 +149,13 @@ func (s *Service) CreateAndPublishLog(ctx context.Context, params store.CreateLo
 }
 
 // PublishTicket publishes a ticket lifecycle event (queued/running/succeeded/failed/cancelled)
-// to the SSE hub. The runID is used as the streamID for SSE fanout.
+// to the SSE hub. The runID (mods ticket UUID) is used as the streamID for SSE fanout.
 //
 // The payload is intentionally typed as modsapi.TicketSummary to enforce a
 // JSON‑serializable contract at the service boundary and prevent accidental
-// non‑JSON payloads from being published. Returns an error if the fanout fails.
+// non‑JSON payloads from being published. Callers should also emit a terminal
+// "done" status via Hub().PublishStatus when the ticket reaches a terminal state
+// so SSE clients can terminate streams cleanly. Returns an error if the fanout fails.
 func (s *Service) PublishTicket(ctx context.Context, runID string, payload modsapi.TicketSummary) error {
 	// Validate stream id after trimming whitespace so callers can't silently
 	// succeed with an all‑whitespace runID (the hub ignores empty ids).

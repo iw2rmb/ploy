@@ -48,6 +48,8 @@ type EventsCommand struct {
 	Printer EventsPrinter
 }
 
+// EventsCommand consumes "ticket" and "stage" SSE events from /v1/mods/{id}/events.
+// Unknown event types are ignored so the CLI remains forward compatible.
 // Run starts streaming and returns the final ticket state.
 func (c EventsCommand) Run(ctx context.Context) (modsapi.TicketState, error) {
 	if c.Client.HTTPClient == nil {

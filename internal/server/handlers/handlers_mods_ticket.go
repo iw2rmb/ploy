@@ -20,6 +20,10 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
+// Mods ticket handlers implement the /v1/mods facade: ticket submission from
+// repo/spec, ticket status as mods-style TicketSummary, and stage/run_step
+// materialization for single- and multi-step runs.
+
 // submitTicketHandler returns an HTTP handler that submits a new ticket (mods run).
 // POST /v1/mods — Accepts TicketSubmitRequest, returns TicketSummary (ticket_id == run UUID).
 // Accepts repo URL/refs directly (no pre-registered mod/repo required).
@@ -278,6 +282,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
+			// Attempts/MaxAttempts are currently fixed at 1; future retries must
+			// update these counters without changing StepIndex semantics.
 			summary.Stages[uuid.UUID(stg.ID.Bytes).String()] = modsapi.StageStatus{
 				StageID:     domaintypes.StageID(uuid.UUID(stg.ID.Bytes).String()),
 				State:       s,
@@ -299,7 +305,8 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 // createStagesFromSpec parses the run spec and creates stages for multi-step or single-step runs.
 // For multi-step runs (mods[] array in spec), creates one stage per mod.
 // For single-step runs (mod or legacy top-level), creates a single stage named "mods-openrewrite".
-// Each stage's meta JSONB includes step_index and step_total for ordered execution.
+// Each stage's meta JSONB includes step_index and step_total for ordered execution. These values
+// are persisted in stages.meta JSONB and surfaced via GET /v1/mods/{id} as StageStatus.StepIndex.
 func createStagesFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
 	// Parse spec to detect multi-step vs single-step.
 	var specMap map[string]interface{}
@@ -375,9 +382,11 @@ func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID,
 
 // materializeRunStepsIfNeeded creates run_steps rows for multi-step runs.
 // For multi-step runs (spec contains mods[] array), it materializes one run_step record
-// per mods[] entry with status 'queued'. For single-step runs, it does nothing (the run
-// will be claimed atomically via ClaimRun). This enables step-level claiming and multi-node
-// execution for multi-step runs while preserving backward compatibility for single-step runs.
+// per mods[] entry with status 'queued'. Each run_step uses StepIndex that matches the
+// mods[] array index; scheduler and rehydration logic rely on this ordering. For single-step
+// runs, it does nothing (the run will be claimed atomically via ClaimRun). This enables
+// step-level claiming and multi-node execution for multi-step runs while preserving backward
+// compatibility for single-step runs.
 func materializeRunStepsIfNeeded(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
 	// Parse spec to detect multi-step vs single-step.
 	var specMap map[string]interface{}
