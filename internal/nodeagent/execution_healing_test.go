@@ -136,7 +136,7 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		Options: req.Options,
 	}
 
-	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir)
+	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
 
 	if err != nil {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
@@ -314,7 +314,7 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	}
 
 	// Execute with healing.
-	result, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir)
+	result, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
 
 	// Should succeed after healing.
 	if err != nil {
@@ -421,7 +421,7 @@ func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
 		Options: req.Options,
 	}
 
-	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir)
+	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
 
 	// Should return build gate failure error.
 	if err == nil {

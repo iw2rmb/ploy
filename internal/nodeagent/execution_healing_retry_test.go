@@ -58,7 +58,7 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
-	res, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir)
+	res, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err != nil {
 		t.Fatalf("executeWithHealing() error = %v, want nil", err)
 	}
@@ -110,7 +110,7 @@ func TestExecuteWithHealing_RetriesFloat64ValueHonored(t *testing.T) {
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
-	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir)
+	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
 		t.Fatalf("want ErrBuildGateFailed after retries exhausted, got %v", err)
 	}
@@ -150,7 +150,7 @@ func TestExecuteWithHealing_HealingConfiguredNoMods_NoHealing(t *testing.T) {
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
-	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir)
+	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
 		t.Fatalf("want ErrBuildGateFailed without healing, got %v", err)
 	}
@@ -198,7 +198,7 @@ func TestExecuteWithHealing_InjectsServerAndTLSVars(t *testing.T) {
 	}}
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
-	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir)
+	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
 	if envSeen == nil {
 		t.Fatal("healing env not captured")
@@ -308,7 +308,7 @@ func TestExecuteWithHealing_RetriesExhausted(t *testing.T) {
 		Options: req.Options,
 	}
 
-	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir)
+	_, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
 
 	// Should return build gate failure error.
 	if err == nil {
@@ -383,7 +383,7 @@ func TestExecuteWithHealing_InjectsHostWorkspaceEnv(t *testing.T) {
 
 	manifest := contracts.StepManifest{ID: types.StepID(req.RunID), Image: "main:latest", Inputs: []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}}, Gate: &contracts.StepGateSpec{Enabled: true, Profile: "java"}, Options: req.Options}
 
-	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir)
+	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
 
 	if capturedEnv == nil {
 		t.Fatal("healing env not captured")
