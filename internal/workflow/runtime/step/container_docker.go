@@ -54,6 +54,10 @@ func (r *DockerContainerRuntime) Create(ctx context.Context, spec ContainerSpec)
 		hostCfg.Resources.NanoCPUs = spec.LimitNanoCPUs
 		hostCfg.Resources.Memory = spec.LimitMemoryBytes
 	}
+	// Optional: attach container to a specific Docker network when configured.
+	if strings.TrimSpace(r.opts.Network) != "" {
+		hostCfg.NetworkMode = container.NetworkMode(strings.TrimSpace(r.opts.Network))
+	}
 	// Optional disk size limit (driver dependent; e.g., overlay2 with xfs project quota).
 	if strings.TrimSpace(spec.StorageSizeOpt) != "" {
 		if hostCfg.StorageOpt == nil {
