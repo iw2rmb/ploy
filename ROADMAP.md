@@ -27,10 +27,10 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/server/... ./internal/store/... — ListRunDiffs exposes step metadata; ordering by step_index matches created_at
 
 ## Workspace Hydration & Rehydration
-- [x] Define base hydration strategy using shallow clones — Use git clone of base_ref/commit_sha as the logical “base snapshot” on each node
+- [x] Define base hydration strategy using shallow clones — Use a shallow git clone of base_ref (or default branch) and optional commit_sha as the logical "base snapshot" on each node
   - Component: ploy (worker hydration, nodeagent)
   - Scope: internal/worker/hydration/git_fetcher.go, internal/nodeagent/execution.go, GOLANG.md (document shallow clone behaviour)
-  - Test: go test ./internal/worker/hydration/... ./internal/nodeagent/... — Hydration always clones the expected ref; respects commit_sha when present
+  - Test: go test ./internal/worker/hydration/... ./internal/nodeagent/... — Hydration shallow-clones base_ref and pins commit_sha when present
 - [ ] Add per-node base clone caching under PLOYD_CACHE_HOME — Avoid repeated full clones for the same run/repo on one node
   - Component: ploy (nodeagent, hydration)
   - Scope: internal/nodeagent/workspace.go, internal/worker/hydration/git_fetcher.go (optional cache dir support), docs/envs/README.md (PLOYD_CACHE_HOME expectations)
