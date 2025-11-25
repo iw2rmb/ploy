@@ -74,7 +74,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — Tests cover UpdateRunStepCompletion and verify step_index and terminal step status are handled correctly for multi-step runs
 - [x] Ensure per-step diffs are incremental and rehydration-safe — Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]
   - Component: ploy (nodeagent, workflow runtime)
-  - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (helper that uses internal/nodeagent/git.EnsureCommit to write the baseline commit), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
+  - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (ensureBaselineCommitForRehydration helper that stages rehydrated changes and writes the baseline commit via git CLI), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests in internal/nodeagent/execution_rehydrate_test.go verify that applying stored per-step diffs for steps 0..k-1 to a fresh base clone yields the expected workspace contents for step k
 - [ ] Refine run-level start semantics for multi-step runs — Mark run as running when the first step starts, even when claimed via run_steps
   - Component: ploy (server, store)
