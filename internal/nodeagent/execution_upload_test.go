@@ -484,6 +484,90 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 	}
 }
 
+// TestRunController_uploadDiff_MainModMetadata verifies that main mod diffs
+// are tagged with mod_type="main" to distinguish from healing mod diffs.
+func TestRunController_uploadDiff_MainModMetadata(t *testing.T) {
+	t.Parallel()
+
+	var capturedSummary types.DiffSummary
+
+	// Mock server that captures the diff summary for validation.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/diff" {
+			var payload struct {
+				RunID   string            `json:"run_id"`
+				Patch   string            `json:"patch"`
+				Summary types.DiffSummary `json:"summary"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Errorf("failed to decode request body: %v", err)
+			}
+			capturedSummary = payload.Summary
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
+		} else if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+			// Artifact endpoint (diff artifact bundle)
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
+		}
+	}))
+	defer server.Close()
+
+	// Create workspace.
+	workspace, err := os.MkdirTemp("", "ploy-test-workspace-*")
+	if err != nil {
+		t.Fatalf("failed to create workspace: %v", err)
+	}
+	defer os.RemoveAll(workspace)
+
+	// Initialize test infrastructure.
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node",
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+
+	controller := &runController{cfg: cfg}
+
+	// Create a mock diff generator with sample diff.
+	diffGen := &mockDiffGenerator{
+		diffContent: "diff --git a/file.txt b/file.txt\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n",
+	}
+
+	// Build test result.
+	result := step.Result{
+		ExitCode: 0,
+		Timings: step.StageTiming{
+			HydrationDuration: 100 * time.Millisecond,
+			ExecutionDuration: 200 * time.Millisecond,
+			BuildGateDuration: 50 * time.Millisecond,
+			DiffDuration:      10 * time.Millisecond,
+			TotalDuration:     360 * time.Millisecond,
+		},
+	}
+
+	// Execute upload.
+	ctx := context.Background()
+	controller.uploadDiff(ctx, "test-run", "test-stage", diffGen, workspace, result)
+
+	// Verify that mod_type is set to "main".
+	modType, ok := capturedSummary["mod_type"].(string)
+	if !ok {
+		t.Errorf("mod_type field missing or not a string in summary: %+v", capturedSummary)
+	}
+	if modType != "main" {
+		t.Errorf("mod_type = %q, want \"main\"", modType)
+	}
+
+	// Verify other fields are present.
+	if _, ok := capturedSummary["exit_code"]; !ok {
+		t.Errorf("exit_code field missing in summary")
+	}
+	if _, ok := capturedSummary["timings"]; !ok {
+		t.Errorf("timings field missing in summary")
+	}
+}
+
 // mockDiffGenerator is a test helper that returns pre-configured diff content.
 type mockDiffGenerator struct {
 	diffContent string
