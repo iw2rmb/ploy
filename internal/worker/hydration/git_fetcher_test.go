@@ -12,11 +12,30 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
+// Package hydration_test contains tests for GitFetcher that are designed to be
+// deterministic and network-free to avoid flakiness from external dependencies.
+//
+// Design Decisions:
+// - All Fetch tests use local test repositories created on the fly with file:// URLs.
+// - This eliminates network flakiness and external reference drift (e.g., remote commits being deleted).
+// - Test repositories are created in temporary directories and cleaned up automatically via t.TempDir().
+// - The only external dependency is the git CLI, which is checked at test start via exec.LookPath.
+//
+// URL Usage:
+// - Actual Fetch operations: file:// URLs pointing to local repos (zero network dependency).
+// - Error validation tests: fake https:// URLs that never trigger network calls (fail validation early).
+// - Cache key tests: https:// URLs for string manipulation only (no network calls).
+
 func TestGitFetcher_Fetch(t *testing.T) {
 	// Skip if git is not available.
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git command not found, skipping test")
 	}
+
+	// Create a shared test repository for commit pinning tests.
+	// We must create this once and reuse it to ensure the commit SHA exists in the repo.
+	sharedRepoWithCommits := setupTestGitRepoWithCommits(t)
+	secondCommitSHA := getSecondCommitSHA(t, sharedRepoWithCommits)
 
 	tests := []struct {
 		name      string
@@ -45,6 +64,8 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "missing target_ref and commit",
 			repo: &contracts.RepoMaterialization{
+				// Using a fake URL for validation tests; no network call is made
+				// because validation fails before any git operations.
 				URL: types.RepoURL("https://github.com/example/repo.git"),
 			},
 			setup:     func(t *testing.T) string { return t.TempDir() },
@@ -95,10 +116,10 @@ func TestGitFetcher_Fetch(t *testing.T) {
 		{
 			name: "commit_sha pins to specific commit for deterministic base",
 			repo: &contracts.RepoMaterialization{
-				URL:       types.RepoURL("file://" + setupTestGitRepoWithCommits(t)),
+				URL:       types.RepoURL("file://" + sharedRepoWithCommits),
 				BaseRef:   types.GitRef("main"),
 				TargetRef: types.GitRef("main"),
-				Commit:    types.CommitSHA(getSecondCommitSHA(t, setupTestGitRepoWithCommits(t))),
+				Commit:    types.CommitSHA(secondCommitSHA),
 			},
 			setup:   func(t *testing.T) string { return t.TempDir() },
 			wantErr: false,
@@ -136,7 +157,18 @@ func TestGitFetcher_Fetch(t *testing.T) {
 	}
 }
 
-// setupTestGitRepo creates a temporary git repository for testing.
+// setupTestGitRepo creates a local temporary git repository for testing GitFetcher
+// without network dependencies. This eliminates flakiness from external references
+// (e.g., remote commits being force-pushed or deleted).
+//
+// The repository is created in a temporary directory managed by t.TempDir(),
+// ensuring automatic cleanup. Tests use file:// URLs to fetch from these local repos,
+// making the test suite fully deterministic and network-free.
+//
+// Parameters:
+//   - variant: determines the repo structure ("target" creates a feature branch, others create main only)
+//
+// Returns the absolute path to the created repository (use with file:// prefix for Fetch tests).
 func setupTestGitRepo(t *testing.T, variant string) string {
 	t.Helper()
 
@@ -172,7 +204,15 @@ func setupTestGitRepo(t *testing.T, variant string) string {
 	return repoDir
 }
 
-// setupTestGitRepoWithCommits creates a test repository with multiple commits for testing commit_sha pinning.
+// setupTestGitRepoWithCommits creates a local test repository with multiple commits
+// for testing commit_sha pinning without network dependencies. This ensures
+// deterministic behavior when testing commit-specific fetches.
+//
+// The repository contains three commits on the main branch, allowing tests to
+// verify that GitFetcher can pin to specific historical commits. All commits
+// are local, eliminating any risk of external reference drift.
+//
+// Returns the absolute path to the created repository (use with file:// prefix).
 func setupTestGitRepoWithCommits(t *testing.T) string {
 	t.Helper()
 
@@ -209,7 +249,10 @@ func setupTestGitRepoWithCommits(t *testing.T) string {
 	return repoDir
 }
 
-// getSecondCommitSHA returns the SHA of the second commit in a repository.
+// getSecondCommitSHA returns the SHA of the second commit (HEAD~1) in a local
+// test repository. This helper is used to test commit pinning functionality
+// with deterministic local references instead of hard-coded external commit SHAs
+// that might drift or be deleted.
 func getSecondCommitSHA(t *testing.T, repoDir string) string {
 	t.Helper()
 	cmd := exec.Command("git", "rev-parse", "HEAD~1")
@@ -221,7 +264,9 @@ func getSecondCommitSHA(t *testing.T, repoDir string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// runCmd executes a command in the specified directory.
+// runCmd executes a git command in the specified directory. This helper is used
+// by test fixture setup functions to initialize local test repositories without
+// network dependencies.
 func runCmd(t *testing.T, dir string, name string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
