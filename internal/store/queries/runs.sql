@@ -18,10 +18,18 @@ SET status = $2, reason = $3, finished_at = $4
 WHERE id = $1;
 
 -- name: ClaimRun :one
+-- Claims a queued run for a node. Only claims runs that do NOT have run_steps rows.
+-- Multi-step runs (with run_steps entries) must be claimed via ClaimRunStep instead.
 WITH cte AS (
   SELECT runs.id FROM runs
   INNER JOIN nodes ON nodes.id = $1
-  WHERE runs.status = 'queued' AND nodes.drained = false
+  WHERE runs.status = 'queued'
+    AND nodes.drained = false
+    -- Exclude runs that have run_steps: multi-step runs are claimed via ClaimRunStep.
+    AND NOT EXISTS (
+      SELECT 1 FROM run_steps
+      WHERE run_steps.run_id = runs.id
+    )
   ORDER BY runs.created_at
   FOR UPDATE SKIP LOCKED
   LIMIT 1

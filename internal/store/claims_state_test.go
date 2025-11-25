@@ -588,6 +588,162 @@ func ipForTest(subnet, host int) string {
 	return "192.168." + strconv.Itoa(subnet) + "." + strconv.Itoa(host)
 }
 
+// TestClaimRun_SkipsRunsWithRunSteps tests that ClaimRun excludes runs that have run_steps.
+// Multi-step runs (with run_steps entries) should only be claimable via ClaimRunStep.
+func TestClaimRun_SkipsRunsWithRunSteps(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a queued run with run_steps (multi-step run).
+	runWithSteps, err := db.CreateRun(ctx, CreateRunParams{
+		RepoUrl:   "https://github.com/test/multi-step",
+		Spec:      []byte(`{"type":"multi-step","mods":[{"name":"step1"},{"name":"step2"}]}`),
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create run_steps for this run (making it a multi-step run).
+	_, err = db.CreateRunStep(ctx, CreateRunStepParams{
+		RunID:     runWithSteps.ID,
+		StepIndex: 0,
+		Status:    RunStepStatusQueued,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunStep(0) failed: %v", err)
+	}
+
+	_, err = db.CreateRunStep(ctx, CreateRunStepParams{
+		RunID:     runWithSteps.ID,
+		StepIndex: 1,
+		Status:    RunStepStatusQueued,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunStep(1) failed: %v", err)
+	}
+
+	// Create a queued run without run_steps (single-step run).
+	runWithoutSteps, err := db.CreateRun(ctx, CreateRunParams{
+		RepoUrl:   "https://github.com/test/single-step",
+		Spec:      []byte(`{"type":"single-step"}`),
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create a test node.
+	node, err := db.CreateNode(ctx, CreateNodeParams{
+		Name:      "test-node-claim-skip-steps",
+		IpAddress: mustParseAddr(t, "192.168.10.100"),
+	})
+	if err != nil {
+		t.Fatalf("CreateNode() failed: %v", err)
+	}
+
+	// Attempt to claim a run. Should get the single-step run, NOT the multi-step run.
+	claimedRun, err := db.ClaimRun(ctx, node.ID)
+	if err != nil {
+		t.Fatalf("ClaimRun() failed: %v", err)
+	}
+
+	// Verify we claimed the run WITHOUT steps, not the one WITH steps.
+	if claimedRun.ID != runWithoutSteps.ID {
+		t.Errorf("Expected to claim run without steps (%v), but claimed %v", runWithoutSteps.ID, claimedRun.ID)
+	}
+
+	// Verify the multi-step run is still queued and was not claimed.
+	fetchedMultiStepRun, err := db.GetRun(ctx, runWithSteps.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+	if fetchedMultiStepRun.Status != RunStatusQueued {
+		t.Errorf("Expected multi-step run to remain queued, got %s", fetchedMultiStepRun.Status)
+	}
+	if fetchedMultiStepRun.NodeID.Valid {
+		t.Error("Expected multi-step run node_id to remain unset")
+	}
+}
+
+// TestClaimRun_OnlyClaimsSingleStepRuns tests that when only multi-step runs exist,
+// ClaimRun returns no rows (ErrNoRows).
+func TestClaimRun_OnlyClaimsSingleStepRuns(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping integration test")
+	}
+
+	ctx := context.Background()
+	db, err := NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a queued run with run_steps (multi-step run).
+	run, err := db.CreateRun(ctx, CreateRunParams{
+		RepoUrl:   "https://github.com/test/only-multi-step",
+		Spec:      []byte(`{"type":"multi-step","mods":[{"name":"step1"}]}`),
+		Status:    RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+
+	// Create run_steps for this run.
+	_, err = db.CreateRunStep(ctx, CreateRunStepParams{
+		RunID:     run.ID,
+		StepIndex: 0,
+		Status:    RunStepStatusQueued,
+	})
+	if err != nil {
+		t.Fatalf("CreateRunStep() failed: %v", err)
+	}
+
+	// Create a test node.
+	node, err := db.CreateNode(ctx, CreateNodeParams{
+		Name:      "test-node-only-multi",
+		IpAddress: mustParseAddr(t, "192.168.11.100"),
+	})
+	if err != nil {
+		t.Fatalf("CreateNode() failed: %v", err)
+	}
+
+	// Attempt to claim a run. Should fail because the only queued run has run_steps.
+	_, err = db.ClaimRun(ctx, node.ID)
+	if err == nil {
+		t.Error("Expected ClaimRun to fail when only multi-step runs exist, but it succeeded")
+	}
+
+	// Verify the run is still queued and was not claimed.
+	fetchedRun, err := db.GetRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() failed: %v", err)
+	}
+	if fetchedRun.Status != RunStatusQueued {
+		t.Errorf("Expected run to remain queued, got %s", fetchedRun.Status)
+	}
+	if fetchedRun.NodeID.Valid {
+		t.Error("Expected run node_id to remain unset")
+	}
+}
+
 // mustParseAddr parses an IP address string and fails the test on error.
 func mustParseAddr(t *testing.T, s string) netip.Addr {
 	t.Helper()
