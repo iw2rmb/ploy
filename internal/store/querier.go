@@ -12,6 +12,11 @@ import (
 
 type Querier interface {
 	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
+	// Transitions run status to 'running' when execution starts.
+	// For single-step runs (claimed via ClaimRun), status is 'assigned' before ack.
+	// For multi-step runs (claimed via ClaimRunStep), status may be 'queued' since
+	// the run itself is never assigned to a node; only individual steps are assigned.
+	// We support both transitions: assigned→running and queued→running.
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
 	// Acknowledges that a step has started execution (transitions from 'assigned' to 'running').
 	AckRunStepStart(ctx context.Context, id pgtype.UUID) error
