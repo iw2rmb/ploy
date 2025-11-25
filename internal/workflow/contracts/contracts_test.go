@@ -482,6 +482,24 @@ func TestBuildGateValidateRequestValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "diff_patch without repo_url",
+			req: BuildGateValidateRequest{
+				Ref:       "main",
+				DiffPatch: sampleDiffPatch,
+			},
+			wantErr: true,
+			errMsg:  "diff_patch requires both repo_url and ref",
+		},
+		{
+			name: "diff_patch without ref",
+			req: BuildGateValidateRequest{
+				RepoURL:   "https://example.com/repo.git",
+				DiffPatch: sampleDiffPatch,
+			},
+			wantErr: true,
+			errMsg:  "diff_patch requires both repo_url and ref",
+		},
 		// --- baseline validation cases (existing) ---
 		{
 			name:    "missing repo_url",
