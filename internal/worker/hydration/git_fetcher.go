@@ -17,7 +17,21 @@ type GitFetcherOptions struct {
 	PublishSnapshot bool
 }
 
-// GitFetcher fetches git repositories.
+// GitFetcher fetches git repositories using shallow clones for base hydration.
+//
+// Base Hydration Strategy:
+// The fetcher uses git shallow clones (--depth 1) to create the logical "base snapshot"
+// for each run on each node. This strategy minimizes network transfer and disk usage
+// while providing a consistent starting point for applying per-step diffs during
+// multi-step Mods runs.
+//
+// The base snapshot is determined by:
+//  1. base_ref (if provided): Clones the specified branch/tag as the base.
+//  2. commit_sha (if provided): Fetches and checks out the specific commit after cloning.
+//  3. Default branch: Used when base_ref is not specified.
+//
+// For multi-node execution, each node clones the same base_ref/commit_sha independently,
+// ensuring identical base states across nodes before applying ordered diffs.
 type GitFetcher interface {
 	// Fetch performs shallow clone and checkout of the specified repository.
 	Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error
@@ -32,7 +46,21 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 	return &gitFetcher{opts: opts}, nil
 }
 
-// Fetch performs a shallow clone by repo URL, checking out base_ref then fetching target_ref or commit_sha.
+// Fetch performs a shallow clone to create the base snapshot for hydration.
+//
+// This method implements the base hydration strategy using git shallow clones:
+//  1. Clones the repository with --depth 1 to minimize data transfer.
+//  2. Uses base_ref (if provided) to determine the starting branch/tag.
+//  3. Optionally fetches and checks out a specific commit_sha for pinned snapshots.
+//
+// The resulting clone serves as the logical "base snapshot" that nodes use
+// for applying ordered per-step diffs during multi-step Mods runs. Each node
+// performs this clone independently, ensuring consistent base states across
+// distributed execution.
+//
+// Note: target_ref is intentionally not checked out during hydration. The workspace
+// remains on base_ref so that subsequent diff application produces the correct
+// final state for each step.
 func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterialization, dest string) error {
 	if repo == nil {
 		return fmt.Errorf("repo materialization is required")
@@ -47,8 +75,10 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	_ = strings.TrimSpace(string(repo.TargetRef)) // targetRef is intentionally unused during hydration
 	commitSHA := strings.TrimSpace(string(repo.Commit))
 
-	// Step 1: Shallow clone with base_ref (if provided) or default branch.
-	// Use --depth 1 for shallow clone, --single-branch for efficiency.
+	// Step 1: Create base snapshot via shallow clone.
+	// --depth 1: Fetch only the latest commit to minimize transfer size.
+	// --single-branch: Fetch only the specified branch to reduce clone time.
+	// If base_ref is empty, git clones the repository's default branch.
 	cloneArgs := []string{"clone", "--depth", "1"}
 	if baseRef != "" {
 		cloneArgs = append(cloneArgs, "--branch", baseRef, "--single-branch")
@@ -59,8 +89,10 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		return fmt.Errorf("git clone failed: %w", err)
 	}
 
-	// Step 2: Stay on base_ref for modification runs; do not checkout target_ref here.
-	// If a specific commit is requested (rare), checkout that commit.
+	// Step 2: Pin to specific commit if requested (optional).
+	// When commit_sha is provided, fetch and checkout that exact commit.
+	// This ensures deterministic base snapshots across nodes for the same run,
+	// even if base_ref (e.g., 'main') has moved forward between node executions.
 	if commitSHA != "" {
 		fetchArgs := []string{"fetch", "origin", commitSHA, "--depth", "1"}
 		if err := runGitCommand(ctx, dest, fetchArgs...); err != nil {
