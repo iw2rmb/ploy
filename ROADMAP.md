@@ -40,7 +40,7 @@ Done when:
   - Test: go test ./internal/workflow/contracts/... ./internal/server/handlers/... — New tests cover acceptance of repo_url+ref+diff_patch and rejection when diff_patch is provided without a valid ref baseline.
 
 ## Node Build Gate Executor
-- [ ] Clone repo and apply diff_patch in BuildGateExecutor — Execute Build Gate jobs against repo+diff workspaces on nodes
+- [x] Clone repo and apply diff_patch in BuildGateExecutor — Execute Build Gate jobs against repo+diff workspaces on nodes
   - Component: ploy (nodeagent, worker hydration)
   - Scope:
     - internal/nodeagent/buildgate_executor.go — Simplify workspace population to always use `cloneRepo(ctx, req.RepoURL, req.Ref, workspaceRoot)`; remove content-archive extraction path.
