@@ -100,6 +100,16 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
+		// Materialize run_steps rows for multi-step runs.
+		// For multi-step runs (mods[] array present), create one run_step record per mods[] entry.
+		// For single-step runs, skip run_steps materialization (run is claimed atomically via ClaimRun).
+		// This enables step-level claiming and multi-node execution for multi-step runs.
+		if err := materializeRunStepsIfNeeded(r.Context(), st, run.ID, spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create run steps: %v", err), http.StatusInternalServerError)
+			slog.Error("submit ticket: create run steps failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			return
+		}
+
 		// Build response with TicketSummary (ticket_id == run UUID).
 		// Use typed status (store.RunStatus) instead of string cast for type safety;
 		// JSON encoder will serialize the underlying string value.
@@ -353,6 +363,44 @@ func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID,
 		Meta:   metaBytes,
 	})
 	return err
+}
+
+// materializeRunStepsIfNeeded creates run_steps rows for multi-step runs.
+// For multi-step runs (spec contains mods[] array), it materializes one run_step record
+// per mods[] entry with status 'queued'. For single-step runs, it does nothing (the run
+// will be claimed atomically via ClaimRun). This enables step-level claiming and multi-node
+// execution for multi-step runs while preserving backward compatibility for single-step runs.
+func materializeRunStepsIfNeeded(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
+	// Parse spec to detect multi-step vs single-step.
+	var specMap map[string]interface{}
+	if len(spec) > 0 && json.Valid(spec) {
+		if err := json.Unmarshal(spec, &specMap); err != nil {
+			// Invalid JSON; skip run_steps materialization (single-step fallback).
+			return nil
+		}
+	}
+
+	// Check for mods[] array (multi-step run).
+	mods, ok := specMap["mods"].([]interface{})
+	if !ok || len(mods) == 0 {
+		// Single-step run: no run_steps rows needed.
+		return nil
+	}
+
+	// Multi-step run: create one run_step per mods[] entry.
+	// Each step starts in 'queued' status and will be claimed via ClaimRunStep.
+	for stepIndex := range mods {
+		_, err := st.CreateRunStep(ctx, store.CreateRunStepParams{
+			RunID:     runID,
+			StepIndex: int32(stepIndex),
+			Status:    store.RunStepStatusQueued,
+		})
+		if err != nil {
+			return fmt.Errorf("create run_step for step %d: %w", stepIndex, err)
+		}
+	}
+
+	return nil
 }
 
 // helpers
