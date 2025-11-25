@@ -166,12 +166,14 @@ func (r *runController) executeWithHealing(
 				healManifest.Env = map[string]string{}
 			}
 			healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-
 			// Inject server connection details for buildgate API access from healing containers.
 			healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
 			healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
 			healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
 			healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+			if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+				healManifest.Env["PLOY_API_TOKEN"] = token
+			}
 
 			// Mount node's TLS certificates into healing container for buildgate API access.
 			if healManifest.Options == nil {

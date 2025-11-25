@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 // then overrides only the token-related methods needed for testing.
 type mockQuerier struct {
 	*store.Queries // Embedded nil pointer provides default panic behavior for unused methods
+
+	mu sync.Mutex
 
 	checkAPITokenRevokedFunc         func(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	checkBootstrapTokenRevokedFunc   func(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
@@ -45,7 +48,9 @@ func (m *mockQuerier) CheckBootstrapTokenRevoked(ctx context.Context, tokenID st
 }
 
 func (m *mockQuerier) UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error {
+	m.mu.Lock()
 	m.updateAPITokenLastUsedCalled = true
+	m.mu.Unlock()
 	if m.updateAPITokenLastUsedFunc != nil {
 		return m.updateAPITokenLastUsedFunc(ctx, tokenID)
 	}
@@ -53,11 +58,25 @@ func (m *mockQuerier) UpdateAPITokenLastUsed(ctx context.Context, tokenID string
 }
 
 func (m *mockQuerier) UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error {
+	m.mu.Lock()
 	m.updateBootstrapTokenLastUsedCalled = true
+	m.mu.Unlock()
 	if m.updateBootstrapTokenLastUsedFunc != nil {
 		return m.updateBootstrapTokenLastUsedFunc(ctx, tokenID)
 	}
 	return nil
+}
+
+func (m *mockQuerier) APITokenLastUsedCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.updateAPITokenLastUsedCalled
+}
+
+func (m *mockQuerier) BootstrapTokenLastUsedCalled() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.updateBootstrapTokenLastUsedCalled
 }
 
 func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
@@ -113,7 +132,7 @@ func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
 
 	// Give async updateTokenLastUsed a moment to run
 	time.Sleep(50 * time.Millisecond)
-	if !mockQ.updateAPITokenLastUsedCalled {
+	if !mockQ.APITokenLastUsedCalled() {
 		t.Error("expected UpdateAPITokenLastUsed to be called")
 	}
 }
@@ -353,7 +372,7 @@ func TestAuthorizerBearerToken_BootstrapToken(t *testing.T) {
 
 	// Give async updateTokenLastUsed a moment to run
 	time.Sleep(50 * time.Millisecond)
-	if !mockQ.updateBootstrapTokenLastUsedCalled {
+	if !mockQ.BootstrapTokenLastUsedCalled() {
 		t.Error("expected UpdateBootstrapTokenLastUsed to be called")
 	}
 }
