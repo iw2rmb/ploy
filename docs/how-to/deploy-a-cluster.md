@@ -362,6 +362,100 @@ Firewall notes:
 - **Certificates**: The cluster CA issues all certificates. Nodes submit CSRs to `/v1/pki/sign` to
   obtain signed certificates with both `serverAuth` and `clientAuth` EKUs for bidirectional mTLS.
 
+### Multi-Node Mods Architecture
+
+Ploy supports distributed execution of multi-step Mods runs across a cluster using a **base clone + diff chain** rehydration model. This architecture enables each step of a run to execute on a different node without requiring shared storage or long-lived mutable workspaces.
+
+#### Core Concepts
+
+**Base Clone (Immutable Snapshot)**:
+- A shallow git clone (`git clone --depth 1`) of the repository at `base_ref` or pinned to `commit_sha`
+- Created once per run and cached under `PLOYD_CACHE_HOME` on each node
+- Never modified during execution; serves as the immutable starting point for all steps
+
+**Diff Chain (Ordered Modifications)**:
+- A sequence of gzipped unified diffs captured after each step (gate + mod pair)
+- Stored in PostgreSQL with `step_index` metadata for ordering
+- Each diff represents the workspace changes produced by one step
+
+**Workspace Rehydration**:
+```
+workspace[step_k] = copy(base_clone) + apply(diff[0]) + ... + apply(diff[k-1])
+```
+
+This formula ensures every node can independently reconstruct the exact workspace state needed for any step.
+
+#### Step-Level Scheduling
+
+The scheduler treats multi-step runs as ordered sequences of claims:
+
+- **Step 0**: Claimable immediately (no dependencies)
+- **Step k>0**: Claimable only after step k-1 succeeds
+
+The `run_steps` table tracks per-step status (`queued → assigned → running → succeeded/failed`) and uses `FOR UPDATE SKIP LOCKED` for lock-free, concurrent claims across multiple nodes.
+
+#### Execution Flow (Multi-Node Example)
+
+Given a 3-step run with spec:
+```yaml
+repo_url: https://github.com/example/project.git
+base_ref: main
+target_ref: feature-branch
+build_gate: mvn test
+mods:
+  - image: mods-plan:latest
+  - image: mods-openrewrite:latest
+  - image: mods-codex:latest
+```
+
+**Node A claims step 0**:
+1. Fetches base clone: `git clone --depth 1 --branch main`
+2. Rehydrates workspace: `copy(base_clone)` (no diffs yet)
+3. Executes gate: `mvn test`, then mod: `docker run mods-plan:latest`
+4. Generates diff[0]: `git diff HEAD | gzip`
+5. Uploads diff[0] with `step_index=0` to control plane
+
+**Node B claims step 1**:
+1. Fetches base clone (cached if available)
+2. Fetches diff[0] from control plane
+3. Rehydrates workspace: `copy(base_clone) + apply(diff[0])`
+4. Executes gate, then mod: `docker run mods-openrewrite:latest`
+5. Generates and uploads diff[1] with `step_index=1`
+
+**Node A claims step 2**:
+1. Base clone already cached from step 0
+2. Fetches diff[0] and diff[1] from control plane
+3. Rehydrates workspace: `copy(base_clone) + apply(diff[0]) + apply(diff[1])`
+4. Executes gate, then mod: `docker run mods-codex:latest`
+5. Generates diff[2], pushes branch to Git remote, creates MR (if configured)
+
+**Result**: Steps executed across 2 nodes with consistent workspace state reconstruction at each step.
+
+#### Key Properties
+
+**Correctness**:
+- Sequential step claiming enforces dependencies: step k cannot start until k-1 completes successfully
+- Diffs are ordered by `step_index` and applied deterministically
+- Rehydration produces identical workspace state regardless of which node executes the step
+
+**Efficiency**:
+- Shallow clones minimize network transfer (single-commit depth)
+- Base clone caching eliminates redundant fetches for multi-step runs on same node
+- Ephemeral workspaces enable parallel execution without workspace contention
+
+**Backward Compatibility**:
+- Single-step runs (legacy specs with top-level `mod` field) use whole-run claims
+- Diffs with `step_index=NULL` sort last in queries (`NULLS LAST`), preserving legacy behavior
+
+For detailed implementation reference, see:
+- `CHECKPOINT_MODS.md` — Multi-Node Mods Architecture and Rehydration Model section
+- `ROADMAP.md` — Comprehensive delivery plan for multi-node features
+- Implementation files:
+  - `internal/nodeagent/execution_orchestrator.go` — Step loop orchestration
+  - `internal/nodeagent/execution.go` — Rehydration helper
+  - `internal/worker/hydration/git_fetcher.go` — Shallow clone and caching
+  - `internal/server/handlers/nodes_claim.go` — Step-level claim handler
+
 See also:
 - `README.md` — Pivot architecture and current API surface.
 - See `CHANGELOG.md` for status and acceptance summary.
