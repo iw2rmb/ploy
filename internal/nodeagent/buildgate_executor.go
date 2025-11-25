@@ -43,6 +43,19 @@ func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contr
 		return nil, fmt.Errorf("clone repo: %w", err)
 	}
 
+	// Apply optional diff_patch on top of the cloned baseline.
+	// This enables healing flows to verify build fixes by replaying changes
+	// (gzipped unified diff) without shipping full workspace archives.
+	if len(req.DiffPatch) > 0 {
+		slog.Info("applying diff_patch to workspace",
+			"job_id", jobID,
+			"patch_size", len(req.DiffPatch),
+		)
+		if err := e.applyDiffPatch(ctx, workspaceRoot, req.DiffPatch); err != nil {
+			return nil, fmt.Errorf("apply diff_patch: %w", err)
+		}
+	}
+
 	// Create gate executor.
 	containerRuntime, err := step.NewDockerContainerRuntime(step.DockerContainerRuntimeOptions{
 		PullImage: true,
@@ -103,4 +116,17 @@ func (e *BuildGateExecutor) cloneRepo(ctx context.Context, repoURL, ref, workspa
 
 	slog.Info("repository cloned successfully", "workspace", workspace)
 	return nil
+}
+
+// applyDiffPatch applies a gzipped unified diff to the workspace.
+// The patch is decompressed and applied via "git apply" to replay changes
+// on top of the cloned repo baseline.
+//
+// This method reuses the applyGzippedPatch helper from execution.go to avoid
+// duplication. The shared helper handles:
+//   - Gzip decompression of the patch bytes
+//   - Empty patch handling (no-op for zero-length patches)
+//   - git apply execution with proper error reporting
+func (e *BuildGateExecutor) applyDiffPatch(ctx context.Context, workspace string, gzippedPatch []byte) error {
+	return applyGzippedPatch(ctx, workspace, gzippedPatch)
 }
