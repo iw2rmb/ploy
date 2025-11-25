@@ -122,10 +122,13 @@ if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
 fi
 
 # Execute the run
-# The --follow flag will stream logs until the run completes or fails
+# The --follow flag will stream logs until the run completes or fails.
+# Temporarily disable 'set -e' so we can capture the exit code and
+# print a post-run summary even on failure.
+set +e
 "${CMD_ARGS[@]}"
-
 EXIT_CODE=$?
+set -e
 
 echo ""
 echo "=========================================="
