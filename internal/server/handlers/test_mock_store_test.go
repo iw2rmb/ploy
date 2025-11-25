@@ -231,6 +231,17 @@ type mockStore struct {
 	createRunStepParams    []store.CreateRunStepParams
 	createRunStepResults   []store.RunStep
 	createRunStepErr       error
+
+	// GetRunStepByIndex tracking
+	getRunStepByIndexCalled bool
+	getRunStepByIndexParams store.GetRunStepByIndexParams
+	getRunStepByIndexResult store.RunStep
+	getRunStepByIndexErr    error
+
+	// AckRunStepStart tracking
+	ackRunStepStartCalled bool
+	ackRunStepStartParam  pgtype.UUID
+	ackRunStepStartErr    error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -544,4 +555,18 @@ func (m *mockStore) CreateRunStep(ctx context.Context, params store.CreateRunSte
 		StepIndex: params.StepIndex,
 		Status:    params.Status,
 	}, m.createRunStepErr
+}
+
+// GetRunStepByIndex retrieves a specific step of a run by step_index.
+func (m *mockStore) GetRunStepByIndex(ctx context.Context, arg store.GetRunStepByIndexParams) (store.RunStep, error) {
+	m.getRunStepByIndexCalled = true
+	m.getRunStepByIndexParams = arg
+	return m.getRunStepByIndexResult, m.getRunStepByIndexErr
+}
+
+// AckRunStepStart acknowledges that a step has started execution (transitions from 'assigned' to 'running').
+func (m *mockStore) AckRunStepStart(ctx context.Context, id pgtype.UUID) error {
+	m.ackRunStepStartCalled = true
+	m.ackRunStepStartParam = id
+	return m.ackRunStepStartErr
 }

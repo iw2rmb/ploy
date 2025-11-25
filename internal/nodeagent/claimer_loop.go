@@ -138,7 +138,8 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	slog.Info("claimed run", "run_id", claim.ID, "repo_url", claim.RepoURL)
 
 	// Send ack before execution.
-	if err := c.ackRun(ctx, claim.ID); err != nil {
+	// Include step_index if present (multi-step run) to trigger step-level ack.
+	if err := c.ackRun(ctx, claim.ID, claim.StepIndex); err != nil {
 		return true, fmt.Errorf("ack run: %w", err)
 	}
 
@@ -170,11 +171,16 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 }
 
 // ackRun sends POST /v1/nodes/{id}/ack to acknowledge run start.
-// This transitions the run from "assigned" to "running" state before execution begins.
-func (c *ClaimManager) ackRun(ctx context.Context, runID string) error {
+// If stepIndex is provided, transitions the run_step from "assigned" to "running" (multi-step run).
+// Otherwise, transitions the run from "assigned" to "running" (single-step or legacy run).
+func (c *ClaimManager) ackRun(ctx context.Context, runID string, stepIndex *int32) error {
 	ackURL := fmt.Sprintf("%s/v1/nodes/%s/ack", c.cfg.ServerURL, c.cfg.NodeID)
 
-	payload := map[string]string{"run_id": runID}
+	// Build payload with optional step_index for multi-step runs.
+	payload := map[string]interface{}{"run_id": runID}
+	if stepIndex != nil {
+		payload["step_index"] = *stepIndex
+	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal ack payload: %w", err)
