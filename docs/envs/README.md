@@ -91,7 +91,12 @@ Role model (bearer token claims):
 - `PLOYD_HOME_DIR` — Home directory for the ployd daemon. Exported by bootstrap as `/root` for
   systemd context; not currently read by the codebase.
 - `PLOYD_CACHE_HOME` — Cache directory for working data. Defaults to `/var/cache/ploy` when set
-  by bootstrap. Used at runtime by the node agent for ephemeral workspaces.
+  by bootstrap. Used at runtime by the node agent for ephemeral workspaces and git clone caching.
+  When set, the node agent caches base git clones under `$PLOYD_CACHE_HOME/git-clones/` to avoid
+  repeated network fetches for the same repo/ref/commit combination. The cache key is derived from
+  the normalized repo URL, base_ref, and commit_sha. Subsequent hydrations for the same run or
+  different runs with identical repo parameters reuse the cached clone, significantly reducing
+  clone time and network bandwidth usage.
 - `PLOYD_METRICS_LISTEN` — Exported by bootstrap as `127.0.0.1:9101` for early scripts; not
   read by `ployd` at runtime. Use the YAML key `metrics.listen` (default `:9100`).
 
