@@ -609,3 +609,373 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		t.Errorf("CommitSHA=%q want %q", got.CommitSHA, *claim.CommitSha)
 	}
 }
+
+// TestClaimLoop_StepIndexMapping verifies that when a step-level claim includes
+// step_index, it is correctly mapped into StartRunRequest.StepIndex, enabling
+// single-step execution in multi-node scenarios.
+func TestClaimLoop_StepIndexMapping(t *testing.T) {
+	t.Parallel()
+
+	stepIndex := int32(1)
+	commit := "abc123"
+	claim := ClaimResponse{
+		ID:        "run-step-map",
+		RepoURL:   "https://github.com/acme/multi.git",
+		Status:    "assigned",
+		NodeID:    "test-node",
+		BaseRef:   "main",
+		TargetRef: "feature/multi-step",
+		CommitSha: &commit,
+		StepIndex: &stepIndex, // Step-level claim: node executes only step 1.
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// HTTP test server that returns a step-level claim and accepts ack.
+	var ackPayload map[string]interface{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case "/v1/nodes/test-node/claim":
+			// Return step-level claim with step_index=1.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(claim)
+		case "/v1/nodes/test-node/ack":
+			// Capture ack payload to verify step_index is sent.
+			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
+			w.WriteHeader(http.StatusNoContent)
+		case "/v1/nodes/test-node/complete":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	// Capture StartRunRequest via a mock controller.
+	mock := &mockRunController{}
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    "test-node",
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+
+	claimer, err := NewClaimManager(cfg, mock)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	// Override backoff policy to speed up test.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     20 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
+
+	// Run briefly to process one claim.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_ = claimer.Start(ctx)
+
+	// Verify controller.StartRun was called with StepIndex populated.
+	if !mock.startCalled {
+		t.Fatalf("controller.StartRun not called")
+	}
+	got := mock.lastStart
+
+	// Verify StepIndex is present and matches the claim.
+	if got.StepIndex == nil {
+		t.Fatalf("StartRunRequest.StepIndex is nil, expected %d", stepIndex)
+	}
+	if *got.StepIndex != stepIndex {
+		t.Errorf("StepIndex=%d want %d", *got.StepIndex, stepIndex)
+	}
+
+	// Verify ack request included step_index.
+	if ackPayload == nil {
+		t.Fatal("ack payload not captured")
+	}
+	ackStepIndex, ok := ackPayload["step_index"]
+	if !ok {
+		t.Error("ack payload missing step_index field")
+	} else {
+		// JSON numbers decode as float64.
+		ackStepIndexFloat, ok := ackStepIndex.(float64)
+		if !ok || int32(ackStepIndexFloat) != stepIndex {
+			t.Errorf("ack step_index=%v want %d", ackStepIndex, stepIndex)
+		}
+	}
+
+	// Verify other fields remain correct.
+	if got.RunID.String() != claim.ID {
+		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
+	}
+	if got.RepoURL.String() != claim.RepoURL {
+		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
+	}
+	if got.BaseRef.String() != claim.BaseRef {
+		t.Errorf("BaseRef=%q want %q", got.BaseRef, claim.BaseRef)
+	}
+	if got.TargetRef.String() != claim.TargetRef {
+		t.Errorf("TargetRef=%q want %q", got.TargetRef, claim.TargetRef)
+	}
+}
+
+// TestClaimLoop_StepIndexOmittedForWholeRun verifies that when claiming a
+// whole run (no step_index in ClaimResponse), StepIndex remains nil in
+// StartRunRequest, enabling traditional single-node multi-step execution.
+func TestClaimLoop_StepIndexOmittedForWholeRun(t *testing.T) {
+	t.Parallel()
+
+	commit := "xyz789"
+	claim := ClaimResponse{
+		ID:        "run-whole",
+		RepoURL:   "https://github.com/acme/single.git",
+		Status:    "assigned",
+		NodeID:    "test-node",
+		BaseRef:   "main",
+		TargetRef: "feature/single-node",
+		CommitSha: &commit,
+		// StepIndex is nil → whole-run claim.
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// HTTP test server that returns a whole-run claim.
+	var ackPayload map[string]interface{}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes/test-node/buildgate/claim":
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case "/v1/nodes/test-node/claim":
+			// Return whole-run claim without step_index.
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(claim)
+		case "/v1/nodes/test-node/ack":
+			// Capture ack payload to verify step_index is absent.
+			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
+			w.WriteHeader(http.StatusNoContent)
+		case "/v1/nodes/test-node/complete":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+
+	// Capture StartRunRequest via a mock controller.
+	mock := &mockRunController{}
+
+	cfg := Config{
+		ServerURL: ts.URL,
+		NodeID:    "test-node",
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+
+	claimer, err := NewClaimManager(cfg, mock)
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+	// Override backoff policy to speed up test.
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     20 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
+
+	// Run briefly to process one claim.
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	_ = claimer.Start(ctx)
+
+	// Verify controller.StartRun was called.
+	if !mock.startCalled {
+		t.Fatalf("controller.StartRun not called")
+	}
+	got := mock.lastStart
+
+	// Verify StepIndex is nil for whole-run execution.
+	if got.StepIndex != nil {
+		t.Errorf("StartRunRequest.StepIndex=%v want nil (whole-run execution)", *got.StepIndex)
+	}
+
+	// Verify ack request does NOT include step_index.
+	if ackPayload == nil {
+		t.Fatal("ack payload not captured")
+	}
+	if _, exists := ackPayload["step_index"]; exists {
+		t.Errorf("ack payload contains step_index for whole-run claim: %v", ackPayload["step_index"])
+	}
+
+	// Verify other fields remain correct.
+	if got.RunID.String() != claim.ID {
+		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
+	}
+	if got.RepoURL.String() != claim.RepoURL {
+		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
+	}
+}
+
+// TestClaimLoop_MultipleNodesSingleRun simulates two distinct nodes claiming
+// different steps of the same multi-step run, demonstrating end-to-end
+// step-level claiming and execution isolation.
+func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
+	t.Parallel()
+
+	runID := "run-multi-node-123"
+	commit := "deadbeef"
+
+	// Node1 claims step 0.
+	stepIndex0 := int32(0)
+	claim0 := ClaimResponse{
+		ID:        runID,
+		RepoURL:   "https://github.com/acme/multi-node.git",
+		Status:    "assigned",
+		NodeID:    "node-1",
+		BaseRef:   "main",
+		TargetRef: "feature/parallel-steps",
+		CommitSha: &commit,
+		StepIndex: &stepIndex0,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// Node2 claims step 1.
+	stepIndex1 := int32(1)
+	claim1 := ClaimResponse{
+		ID:        runID,
+		RepoURL:   "https://github.com/acme/multi-node.git",
+		Status:    "assigned",
+		NodeID:    "node-2",
+		BaseRef:   "main",
+		TargetRef: "feature/parallel-steps",
+		CommitSha: &commit,
+		StepIndex: &stepIndex1,
+		StartedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	// ===== Simulate Node 1 claiming step 0 =====
+	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes/node-1/buildgate/claim":
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case "/v1/nodes/node-1/claim":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(claim0)
+		case "/v1/nodes/node-1/ack":
+			w.WriteHeader(http.StatusNoContent)
+		case "/v1/nodes/node-1/complete":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts1.Close()
+
+	mock1 := &mockRunController{}
+	cfg1 := Config{
+		ServerURL: ts1.URL,
+		NodeID:    "node-1",
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	claimer1, err := NewClaimManager(cfg1, mock1)
+	if err != nil {
+		t.Fatalf("NewClaimManager node-1: %v", err)
+	}
+	testPolicy := backoff.Policy{
+		InitialInterval: 10 * time.Millisecond,
+		MaxInterval:     20 * time.Millisecond,
+		Multiplier:      2.0,
+		MaxElapsedTime:  0,
+		MaxAttempts:     0,
+	}
+	claimer1.backoff = backoff.NewStatefulBackoff(testPolicy)
+
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel1()
+	_ = claimer1.Start(ctx1)
+
+	// Verify node-1 claimed step 0.
+	if !mock1.startCalled {
+		t.Fatalf("node-1: controller.StartRun not called")
+	}
+	if mock1.lastStart.StepIndex == nil {
+		t.Fatalf("node-1: StepIndex is nil, expected %d", stepIndex0)
+	}
+	if *mock1.lastStart.StepIndex != stepIndex0 {
+		t.Errorf("node-1: StepIndex=%d want %d", *mock1.lastStart.StepIndex, stepIndex0)
+	}
+	if mock1.lastStart.RunID.String() != runID {
+		t.Errorf("node-1: RunID=%q want %q", mock1.lastStart.RunID, runID)
+	}
+
+	// ===== Simulate Node 2 claiming step 1 =====
+	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/nodes/node-2/buildgate/claim":
+			w.WriteHeader(http.StatusNoContent)
+			return
+		case "/v1/nodes/node-2/claim":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(claim1)
+		case "/v1/nodes/node-2/ack":
+			w.WriteHeader(http.StatusNoContent)
+		case "/v1/nodes/node-2/complete":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts2.Close()
+
+	mock2 := &mockRunController{}
+	cfg2 := Config{
+		ServerURL: ts2.URL,
+		NodeID:    "node-2",
+		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
+	}
+	claimer2, err := NewClaimManager(cfg2, mock2)
+	if err != nil {
+		t.Fatalf("NewClaimManager node-2: %v", err)
+	}
+	claimer2.backoff = backoff.NewStatefulBackoff(testPolicy)
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel2()
+	_ = claimer2.Start(ctx2)
+
+	// Verify node-2 claimed step 1.
+	if !mock2.startCalled {
+		t.Fatalf("node-2: controller.StartRun not called")
+	}
+	if mock2.lastStart.StepIndex == nil {
+		t.Fatalf("node-2: StepIndex is nil, expected %d", stepIndex1)
+	}
+	if *mock2.lastStart.StepIndex != stepIndex1 {
+		t.Errorf("node-2: StepIndex=%d want %d", *mock2.lastStart.StepIndex, stepIndex1)
+	}
+	if mock2.lastStart.RunID.String() != runID {
+		t.Errorf("node-2: RunID=%q want %q", mock2.lastStart.RunID, runID)
+	}
+
+	// Verify both nodes executed the same run but different steps.
+	if mock1.lastStart.RunID != mock2.lastStart.RunID {
+		t.Errorf("nodes executed different runs: node-1=%q node-2=%q", mock1.lastStart.RunID, mock2.lastStart.RunID)
+	}
+	if mock1.lastStart.StepIndex != nil && mock2.lastStart.StepIndex != nil {
+		if *mock1.lastStart.StepIndex == *mock2.lastStart.StepIndex {
+			t.Error("nodes executed the same step, expected different step indices")
+		}
+	}
+}

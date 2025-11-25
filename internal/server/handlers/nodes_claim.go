@@ -64,7 +64,8 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 				return
 			}
 			// Build and send response with step information included.
-			buildAndSendClaimResponse(w, r, st, configHolder, run, &step.StepIndex)
+			// For step-level claims, pass the step so the response uses the step's node_id.
+			buildAndSendClaimResponse(w, r, st, configHolder, run, &step)
 			slog.Info("step claimed",
 				"step_id", uuid.UUID(step.ID.Bytes).String(),
 				"run_id", uuid.UUID(run.ID.Bytes).String(),
@@ -105,14 +106,15 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 }
 
 // buildAndSendClaimResponse constructs and sends the claim response for a run or step.
-// If stepIndex is non-nil, includes step_index in the response for multi-step execution.
+// If claimedStep is non-nil, includes step_index in the response and uses the step's node_id
+// for multi-step execution. Otherwise, uses the run's node_id for whole-run claims.
 func buildAndSendClaimResponse(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
-	stepIndex *int32,
+	claimedStep *store.RunStep,
 ) {
 	// Determine or create a stage for this run and merge stage_id into spec.
 	stagesForRun, err := st.ListStagesByRun(r.Context(), run.ID)
@@ -142,9 +144,21 @@ func buildAndSendClaimResponse(
 
 	// Build response with claimed run details.
 	// Include step_index if this is a step claim (multi-node execution).
+	// For step claims, use the step's node_id; for whole run claims, use the run's node_id.
 	// Domain types ensure VCS fields have been validated at ingestion.
 	// Use typed status (store.RunStatus) instead of string cast for type safety;
 	// JSON encoder will serialize the underlying string value.
+	var nodeIDStr string
+	var stepIndex *int32
+	if claimedStep != nil {
+		// Step-level claim: use step's node_id and include step_index.
+		nodeIDStr = uuid.UUID(claimedStep.NodeID.Bytes).String()
+		stepIndex = &claimedStep.StepIndex
+	} else {
+		// Whole-run claim: use run's node_id, step_index remains nil.
+		nodeIDStr = uuid.UUID(run.NodeID.Bytes).String()
+	}
+
 	resp := struct {
 		ID        string          `json:"id"`
 		RepoURL   string          `json:"repo_url"`
@@ -161,7 +175,7 @@ func buildAndSendClaimResponse(
 		ID:        uuid.UUID(run.ID.Bytes).String(),
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
-		NodeID:    uuid.UUID(run.NodeID.Bytes).String(),
+		NodeID:    nodeIDStr,
 		BaseRef:   run.BaseRef,
 		TargetRef: run.TargetRef,
 		CommitSha: run.CommitSha,
