@@ -70,7 +70,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (CLI, nodeagent)
   - Scope: cmd/ploy/mod_run_spec.go, cmd/ploy/mod_run_spec_parsing_test.go, internal/nodeagent/claimer_spec.go
   - Test: go test ./cmd/ploy/... ./internal/nodeagent/... — Spec round-trips mods[] and step metadata; legacy single-mod specs still pass
-- [ ] Document multi-node Mods architecture and rehydration model — Explain base clone + diff chain semantics and scheduler behaviour
+- [x] Document multi-node Mods architecture and rehydration model — Explain base clone + diff chain semantics and scheduler behaviour
   - Component: ploy (docs)
   - Scope: docs/how-to/deploy-a-cluster.md, docs/how-to/publish-mods.md, CHECKPOINT_MODS.md, ROADMAP_NEXT.md (link to this roadmap)
   - Test: make lint-docs or manual review — Docs describe the new flow consistently with implementation
