@@ -44,6 +44,65 @@ type executionResult struct {
 	ReGates []gateRunMetadata
 }
 
+// uploadHealingModDiff generates and uploads diff after a single healing mod execution.
+// It enriches the diff summary with healing-specific metadata (mod_type, mod_index, healing_attempt)
+// to distinguish healing mod diffs from main mod diffs in the database.
+//
+// This per-step diff capture enables multi-node rehydration where each node can reconstruct
+// the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
+func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID, workspace string, healResult step.Result, modIndex, healingAttempt int) {
+	// Retrieve the diff generator from runtime components.
+	// Since healing reuses the same runner, we need to access the diff generator.
+	// The diff generator is initialized in initializeRuntime and reused across healing steps.
+	diffGenerator := r.createDiffGenerator()
+	if diffGenerator == nil {
+		return
+	}
+
+	// Generate workspace diff for this healing mod step.
+	diffBytes, err := diffGenerator.Generate(ctx, workspace)
+	if err != nil {
+		slog.Error("failed to generate healing mod diff", "run_id", runID, "mod_index", modIndex, "error", err)
+		return
+	}
+
+	if len(diffBytes) == 0 {
+		// No changes from this healing mod; skip upload.
+		return
+	}
+
+	// Build diff summary with healing mod metadata for database storage.
+	// The mod_type field distinguishes healing mod diffs from main mod diffs.
+	// The mod_index and healing_attempt fields enable ordering and rehydration.
+	summary := types.DiffSummary{
+		"mod_type":        "healing",
+		"mod_index":       modIndex,
+		"healing_attempt": healingAttempt,
+		"exit_code":       healResult.ExitCode,
+		"timings": map[string]interface{}{
+			"hydration_duration_ms":  healResult.Timings.HydrationDuration.Milliseconds(),
+			"execution_duration_ms":  healResult.Timings.ExecutionDuration.Milliseconds(),
+			"build_gate_duration_ms": healResult.Timings.BuildGateDuration.Milliseconds(),
+			"diff_duration_ms":       healResult.Timings.DiffDuration.Milliseconds(),
+			"total_duration_ms":      healResult.Timings.TotalDuration.Milliseconds(),
+		},
+	}
+
+	// Upload diff with healing metadata to control plane.
+	diffUploader, err := NewDiffUploader(r.cfg)
+	if err != nil {
+		slog.Error("failed to create diff uploader for healing mod", "run_id", runID, "mod_index", modIndex, "error", err)
+		return
+	}
+
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary); err != nil {
+		slog.Error("failed to upload healing mod diff", "run_id", runID, "mod_index", modIndex, "error", err)
+		return
+	}
+
+	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "size", len(diffBytes))
+}
+
 // executeWithHealing runs the main step with optional healing loop when the build gate fails.
 // It handles the gate-heal-regate orchestration as specified in build_gate_healing options.
 //
@@ -208,6 +267,12 @@ func (r *runController) executeWithHealing(
 			if uploadErr := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); uploadErr != nil {
 				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
 			}
+
+			// Per-step diff capture: Generate and upload diff after each healing mod step.
+			// This enables rehydration of workspaces from base + ordered diff chain.
+			// Each healing mod diff is tagged with mod_type and mod_index to distinguish
+			// from the main mod diff captured later in execution_orchestrator.go.
+			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt)
 		}
 
 		// Re-run the gate after healing mods.
