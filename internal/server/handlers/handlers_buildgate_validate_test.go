@@ -132,17 +132,16 @@ func TestValidateBuildGate_EmptyRequest(t *testing.T) {
 	}
 }
 
-// TestValidateBuildGate_LegacyContentArchiveRejected verifies that legacy
-// content_archive payloads are rejected (field is ignored, validation fails
-// because repo_url+ref are missing).
-func TestValidateBuildGate_LegacyContentArchiveRejected(t *testing.T) {
+// TestValidateBuildGate_LegacyArchivePayloadRejected verifies that legacy
+// archive-style payloads that omit repo_url/ref are rejected.
+func TestValidateBuildGate_LegacyArchivePayloadRejected(t *testing.T) {
 	st := &mockStore{}
-	// Legacy payload with content_archive but no repo_url+ref.
-	// Since content_archive is no longer recognized, the request should fail
+	// Legacy payload with archive-style content but no repo_url+ref.
+	// Since archive uploads are no longer recognized, the request should fail
 	// validation because repo_url and ref are now required.
 	body := map[string]any{
-		"content_archive": "SGVsbG8gV29ybGQ=", // base64 "Hello World"
-		"profile":         "java-maven",
+		"legacy_archive": "SGVsbG8gV29ybGQ=", // base64 "Hello World"
+		"profile":        "java-maven",
 	}
 	b, _ := json.Marshal(body)
 
@@ -155,7 +154,7 @@ func TestValidateBuildGate_LegacyContentArchiveRejected(t *testing.T) {
 
 	// Should be rejected because repo_url is now required.
 	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for legacy content_archive payload, got status=%d body=%s", rr.Code, rr.Body.String())
+		t.Fatalf("expected 400 for legacy archive-style payload, got status=%d body=%s", rr.Code, rr.Body.String())
 	}
 	if !strings.Contains(rr.Body.String(), "repo_url is required") {
 		t.Fatalf("expected error about missing repo_url, got: %s", rr.Body.String())

@@ -373,9 +373,9 @@ MOCKCURL
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Test: No content_archive field in payload (removed from repo+diff API)
+# Test: Payload contains only expected fields (no legacy archive field)
 # ─────────────────────────────────────────────────────────────────────────────
-test_no_content_archive_field() {
+test_payload_has_only_expected_fields() {
   run_test
 
   # Use a mock curl that writes the --data payload to a temp file
@@ -417,15 +417,24 @@ MOCKCURL
   rm -rf "$tmp_bin" "$tmp_capture"
 
   if [[ $exit_code -ne 0 ]]; then
-    fail "no content_archive" "script failed with exit=$exit_code"
+    fail "expected fields only" "script failed with exit=$exit_code"
     return
   fi
 
-  # Verify content_archive is NOT in the captured payload
-  if echo "$captured_json" | grep -q 'content_archive'; then
-    fail "no content_archive field" "content_archive should not be in payload"
+  # Verify a minimal set of expected fields is present and no obvious legacy
+  # archive-style field names appear in the payload.
+  if ! echo "$captured_json" | grep -q '"repo_url"'; then
+    fail "expected fields only" "repo_url missing from payload: $captured_json"
+    return
+  fi
+  if ! echo "$captured_json" | grep -q '"ref"'; then
+    fail "expected fields only" "ref missing from payload: $captured_json"
+    return
+  fi
+  if echo "$captured_json" | grep -qi 'archive'; then
+    fail "expected fields only" "unexpected archive-like field in payload: $captured_json"
   else
-    pass "no content_archive field in payload (removed)"
+    pass "payload contains only expected repo+ref(+diff_patch) fields"
   fi
 }
 
@@ -471,8 +480,8 @@ echo "Test: CLI flags override environment"
 test_cli_flags_override_env
 
 echo ""
-echo "Test: No content_archive field"
-test_no_content_archive_field
+echo "Test: Payload has only expected fields"
+test_payload_has_only_expected_fields
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Summary

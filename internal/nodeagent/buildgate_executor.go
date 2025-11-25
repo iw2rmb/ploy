@@ -37,8 +37,7 @@ func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contr
 		_ = os.RemoveAll(workspaceRoot)
 	}()
 
-	// Populate workspace via Git clone. The content_archive mode has been removed
-	// to simplify the Build Gate contract.
+	// Populate workspace via Git clone (repo+ref baseline for validation).
 	if err := e.cloneRepo(ctx, req.RepoURL, req.Ref, workspaceRoot); err != nil {
 		return nil, fmt.Errorf("clone repo: %w", err)
 	}
