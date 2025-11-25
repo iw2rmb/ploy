@@ -49,7 +49,7 @@ Done when:
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests assert that BuildGateExecutor clones the repo, applies a diff patch correctly, and fails cleanly when the patch is invalid.
 
 ## Healing Mods & Environment
-- [ ] Inject repo metadata into healing manifests — Allow healing containers to derive the same Git baseline used by Mods runs
+- [x] Inject repo metadata into healing manifests — Allow healing containers to derive the same Git baseline used by Mods runs
   - Component: ploy (nodeagent)
   - Scope:
     - internal/nodeagent/manifest.go — In `buildHealingManifest`, inject repo metadata into `manifest.Env`, e.g. `PLOY_REPO_URL`, `PLOY_BASE_REF`, `PLOY_TARGET_REF`, and `PLOY_COMMIT_SHA` sourced from `StartRunRequest` when present.
