@@ -171,6 +171,14 @@ NodeClaimResponse:
     base_ref: { type: string }
     target_ref: { type: string }
     commit_sha: { type: string, nullable: true }
+    step_index:
+      type: integer
+      format: int32
+      nullable: true
+      description: |
+        Present for multi-node execution when a specific step was claimed.
+        When null, the node should execute all steps sequentially (traditional single-node execution).
+        When present, the node should execute only the specified step (multi-node step-level execution).
     started_at: { type: string, format: date-time }
     created_at: { type: string, format: date-time }
     spec:

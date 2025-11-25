@@ -268,6 +268,12 @@ func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run
 	return m.claimRunResult, m.claimRunErr
 }
 
+// ClaimRunStep implements the new step-level claim method for multi-node execution.
+// For testing, it always returns ErrNoRows to indicate no steps are available.
+func (m *mockStore) ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (store.RunStep, error) {
+	return store.RunStep{}, pgx.ErrNoRows
+}
+
 func (m *mockStore) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
 	m.getNodeCalled = true
 	m.getNodeParams = id
