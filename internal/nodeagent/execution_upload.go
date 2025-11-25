@@ -69,7 +69,9 @@ func (r *runController) uploadDiff(ctx context.Context, runID, stageID string, d
 		},
 	}
 
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary); err != nil {
+	// Legacy uploadDiff without step_index (for backward compatibility or final aggregate diffs).
+	// Pass nil for step_index to indicate this is not a per-step diff.
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, nil); err != nil {
 		slog.Error("failed to upload diff", "run_id", runID, "error", err)
 		return
 	}

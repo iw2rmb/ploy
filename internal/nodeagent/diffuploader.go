@@ -35,8 +35,10 @@ func NewDiffUploader(cfg Config) (*DiffUploader, error) {
 	}, nil
 }
 
-// UploadDiff compresses and uploads a diff to the server.
-func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, diffBytes []byte, summary types.DiffSummary) error {
+// UploadDiff compresses and uploads a diff to the server with optional step_index.
+// The step_index parameter enables multi-node execution by tagging diffs with their
+// logical step order, allowing rehydration to fetch diffs up to a specific step.
+func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, diffBytes []byte, summary types.DiffSummary, stepIndex *int32) error {
 	// Gzip the diff content.
 	var gzBuf bytes.Buffer
 	gzWriter := gzip.NewWriter(&gzBuf)
@@ -56,10 +58,14 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, di
 	}
 
 	// Build request payload.
+	// Include step_index field for multi-step run ordering (nullable for backward compatibility).
 	payload := map[string]interface{}{
 		"run_id":  runID,
 		"patch":   gzippedDiff,
 		"summary": summary,
+	}
+	if stepIndex != nil {
+		payload["step_index"] = *stepIndex
 	}
 
 	body, err := json.Marshal(payload)

@@ -19,7 +19,8 @@ type ClaimManager struct {
 }
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
-// Returned by the server when a run is successfully claimed and assigned to this node.
+// Returned by the server when a run or step is successfully claimed and assigned to this node.
+// StepIndex is present for multi-step runs where a specific step was claimed (multi-node execution).
 type ClaimResponse struct {
 	ID        string          `json:"id"`
 	RepoURL   string          `json:"repo_url"`
@@ -28,6 +29,7 @@ type ClaimResponse struct {
 	BaseRef   string          `json:"base_ref"`
 	TargetRef string          `json:"target_ref"`
 	CommitSha *string         `json:"commit_sha,omitempty"`
+	StepIndex *int32          `json:"step_index,omitempty"` // Present for step-level claims
 	StartedAt string          `json:"started_at"`
 	CreatedAt string          `json:"created_at"`
 	Spec      json.RawMessage `json:"spec,omitempty"`

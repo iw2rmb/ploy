@@ -116,9 +116,9 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
 
-			// Upload diff.
+			// Upload diff with no step_index (legacy test).
 			ctx := context.Background()
-			err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(tt.diffContent), tt.summary)
+			err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(tt.diffContent), tt.summary, nil)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -172,7 +172,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, types.DiffSummary{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, types.DiffSummary{}, nil)
 	if err == nil {
 		t.Fatal("expected error for oversized diff but got none")
 	}
@@ -239,7 +239,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(diffContent), types.DiffSummary{})
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(diffContent), types.DiffSummary{}, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

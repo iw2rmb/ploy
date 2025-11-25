@@ -13,10 +13,28 @@ import (
 type Querier interface {
 	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
+	// Acknowledges that a step has started execution (transitions from 'assigned' to 'running').
+	AckRunStepStart(ctx context.Context, id pgtype.UUID) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
+	// Claims the next available step for execution using FOR UPDATE SKIP LOCKED.
+	// Returns the step and its parent run information for execution.
+	//
+	// Claim strategy:
+	// 1. Find queued steps where the previous step (step_index - 1) has succeeded OR step_index = 0.
+	// 2. Join with runs to get run metadata (repo_url, base_ref, etc.).
+	// 3. Join with nodes to ensure the node is not drained.
+	// 4. Use FOR UPDATE SKIP LOCKED to avoid contention.
+	// 5. Update step status to 'assigned' and set node_id.
+	//
+	// This ensures sequential execution: step k can only be claimed after step k-1 succeeds.
+	ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (RunStep, error)
+	// Counts the total number of steps for a run.
+	CountRunSteps(ctx context.Context, runID pgtype.UUID) (int64, error)
+	// Counts steps for a run with a specific status.
+	CountRunStepsByStatus(ctx context.Context, arg CountRunStepsByStatusParams) (int64, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
 	// Creates a new diff entry with optional step_index for multi-step runs.
@@ -26,6 +44,8 @@ type Querier interface {
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
+	// Creates a new step for a run (called when multi-step run is queued).
+	CreateRunStep(ctx context.Context, arg CreateRunStepParams) (RunStep, error)
 	CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
@@ -43,6 +63,8 @@ type Querier interface {
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
+	// Deletes a step (usually for cleanup or test teardown).
+	DeleteRunStep(ctx context.Context, id pgtype.UUID) error
 	DeleteStage(ctx context.Context, id pgtype.UUID) error
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
@@ -52,6 +74,10 @@ type Querier interface {
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
+	// Retrieves a single step by its ID.
+	GetRunStep(ctx context.Context, id pgtype.UUID) (RunStep, error)
+	// Retrieves a specific step of a run by step_index.
+	GetRunStepByIndex(ctx context.Context, arg GetRunStepByIndexParams) (RunStep, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
 	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
@@ -86,6 +112,8 @@ type Querier interface {
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
+	// Lists all steps for a run ordered by step_index.
+	ListRunSteps(ctx context.Context, runID pgtype.UUID) ([]RunStep, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
 	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
@@ -99,6 +127,8 @@ type Querier interface {
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
 	UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
+	// Updates a step's terminal status (succeeded/failed/canceled) and timing.
+	UpdateRunStepCompletion(ctx context.Context, arg UpdateRunStepCompletionParams) error
 	UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) error
 }
 
