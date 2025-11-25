@@ -19,7 +19,7 @@ func TestBuildManifestFromRequest_PropagatesStageAndArtifactName(t *testing.T) {
 		},
 	}
 
-	m, err := buildManifestFromRequest(req, parseRunOptions(req.Options))
+	m, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
 	if err != nil {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}

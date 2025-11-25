@@ -47,16 +47,20 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 
 	slog.Info("starting run execution", "run_id", req.RunID, "repo_url", req.RepoURL)
 
-	// Phase 1: Convert the StartRunRequest to a StepManifest.
-	// Parse typed options from the raw options map to reduce map[string]any casts.
+	// Phase 1: Parse typed options from the raw options map to reduce map[string]any casts.
+	// Determine if this is a multi-step run (mods[] array) or single-step run.
 	typedOpts := parseRunOptions(req.Options)
-	manifest, err := buildManifestFromRequest(req, typedOpts)
-	if err != nil {
-		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
-		return
+
+	// Detect multi-step vs single-step execution mode.
+	// Multi-step runs loop over Steps; single-step runs execute once with stepIndex=0.
+	stepCount := 1
+	if len(typedOpts.Steps) > 0 {
+		stepCount = len(typedOpts.Steps)
+		slog.Info("multi-step run detected", "run_id", req.RunID, "step_count", stepCount)
 	}
 
 	// Phase 2: Create ephemeral workspace directory (honors PLOYD_CACHE_HOME when set).
+	// The workspace is shared across all steps in multi-step runs to enable incremental edits.
 	workspaceRoot, err := createWorkspaceDir()
 	if err != nil {
 		slog.Error("failed to create workspace", "run_id", req.RunID, "error", err)
@@ -94,41 +98,89 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		}
 	}()
 
-	// Phase 4: Execute the step with possible healing loop.
-	startTime := time.Now()
-	execResult, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir)
-	duration := time.Since(startTime)
-	result := execResult.Result
+	// Phase 4: Execute steps sequentially (gate+mod for each step).
+	// For multi-step runs, loop over Steps; for single-step runs, execute once with stepIndex=0.
+	// Each step runs gate+mod, uploads diff, and continues to next step.
+	// If any step fails, halt execution and report terminal status.
+	var finalExecResult executionResult
+	var finalExecErr error
+	var finalManifest contracts.StepManifest
+	totalDuration := time.Duration(0)
 
-	if execErr != nil {
-		slog.Error("run execution failed",
+	for stepIndex := 0; stepIndex < stepCount; stepIndex++ {
+		slog.Info("executing step", "run_id", req.RunID, "step_index", stepIndex, "step_total", stepCount)
+
+		// Build manifest for this step.
+		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex)
+		if err != nil {
+			slog.Error("failed to build manifest for step", "run_id", req.RunID, "step_index", stepIndex, "error", err)
+			finalExecErr = err
+			break
+		}
+
+		// Execute this step with possible healing loop.
+		startTime := time.Now()
+		execResult, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir)
+		duration := time.Since(startTime)
+		totalDuration += duration
+		result := execResult.Result
+
+		if execErr != nil {
+			slog.Error("step execution failed",
+				"run_id", req.RunID,
+				"step_index", stepIndex,
+				"error", execErr,
+				"duration", duration,
+				"exit_code", result.ExitCode,
+			)
+			finalExecResult = execResult
+			finalExecErr = execErr
+			finalManifest = manifest
+			// Stop execution on step failure.
+			break
+		}
+
+		slog.Info("step execution succeeded",
 			"run_id", req.RunID,
-			"error", execErr,
+			"step_index", stepIndex,
 			"duration", duration,
 			"exit_code", result.ExitCode,
 		)
-		// Continue to emit terminal status even on failure.
+
+		// Upload diff for this step to enable rehydration of workspaces from base + ordered diff chain.
+		stageID, _ := manifest.OptionString("stage_id")
+		r.uploadDiff(ctx, req.RunID.String(), stageID, diffGenerator, workspaceRoot, result)
+
+		// Track the last successful execution result for final status reporting.
+		finalExecResult = execResult
+		finalExecErr = nil
+		finalManifest = manifest
 	}
 
-	// Phase 5: Generate and upload diff to server if diff generator is available.
-	stageID, _ := manifest.OptionString("stage_id")
-	r.uploadDiff(ctx, req.RunID.String(), stageID, diffGenerator, workspaceRoot, result)
-
 	// Phase 6a: Upload configured artifact bundles (artifact_paths option).
-	r.uploadConfiguredArtifacts(ctx, req, manifest, workspaceRoot)
+	// Use the final manifest for artifact paths (same across steps).
+	r.uploadConfiguredArtifacts(ctx, req, finalManifest, workspaceRoot)
 
 	// Phase 6b: Always attempt to bundle and upload /out directory.
+	stageID, _ := finalManifest.OptionString("stage_id")
 	if err := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); err != nil {
 		slog.Error("/out artifact upload failed", "run_id", req.RunID, "error", err)
 	}
 
 	// Phase 7 & 8: Emit terminal status and conditionally create merge request.
-	r.finalizeRun(ctx, req, manifest, execResult, execErr, workspaceRoot, duration)
+	// Use the final step's result and total duration for status reporting.
+	r.finalizeRun(ctx, req, finalManifest, finalExecResult, finalExecErr, workspaceRoot, totalDuration)
 
+	// Log final execution summary with total duration and final exit code.
+	finalExitCode := 0
+	if finalExecResult.Result.ExitCode != 0 {
+		finalExitCode = finalExecResult.Result.ExitCode
+	}
 	slog.Info("run execution completed",
 		"run_id", req.RunID,
-		"duration", duration,
-		"exit_code", result.ExitCode,
+		"duration", totalDuration,
+		"exit_code", finalExitCode,
+		"step_count", stepCount,
 	)
 }
 

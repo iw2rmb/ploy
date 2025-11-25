@@ -182,6 +182,13 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 		}
 	}
 
+	// Pass through mods[] array for multi-step run execution.
+	// For multi-step runs (mods[] in spec), preserve the array for step-by-step execution.
+	// Each entry in mods[] defines a gate+mod step with its own image, command, and env.
+	if modsSlice, ok := m["mods"].([]any); ok && len(modsSlice) > 0 {
+		opts["mods"] = modsSlice
+	}
+
 	// Parse typed options from the flattened opts map.
 	// This provides type-safe accessors for all understood option keys while
 	// preserving the raw map for backward compatibility and wire-level JSON access.
