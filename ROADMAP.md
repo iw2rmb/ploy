@@ -51,8 +51,9 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/nodeagent/... — Steps can be executed in isolation; parallel tests use different workspaces without interference
 - [x] Allow scheduler to assign steps across nodes (same run) — Enable multiple nodes to execute distinct steps of one run using rehydration
   - Component: ploy (server, nodeagent)
-  - Scope: internal/server/handlers/nodes_claim.go (step-level claims), internal/nodeagent/claimer_loop.go (claim “step work” not just whole runs), internal/store/queries/runs.sql and stages.sql (if additional step rows needed)
-  - Test: integration tests ./tests/integration/... — Two nodes claim different steps of the same run; both succeed and final MR includes all changes
+  - Scope: internal/store/migrations/008_run_steps.sql (run_steps table for per-step status), internal/store/queries/run_steps.sql (ClaimRunStep and step status helpers), internal/server/handlers/nodes_claim.go (step-level claims before whole-run claims), internal/nodeagent/diffuploader.go (step_index tagging for diffs), internal/nodeagent/handlers.go and internal/nodeagent/claimer.go/claimer_loop.go (thread step_index into StartRunRequest), internal/nodeagent/execution_orchestrator.go (execute only claimed step and upload per-step diffs)
+  - Test: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodes can claim specific steps of a multi-step run, execute only the claimed step with rehydrated workspace, and upload diffs tagged with step_index
+  - Note: run_step_status transitions (AckRunStepStart / UpdateRunStepCompletion) are defined but not yet wired into status handlers; multi-node scheduling remains behind a feature flag until those updates and integration tests are added
 
 ## Diff Download & Apply Pipeline
 - [x] Provide node-facing API to list and fetch run diffs — Let nodes pull gzipped patches and metadata per run
