@@ -72,7 +72,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, nodeagent, store)
   - Scope: internal/server/handlers/nodes_complete.go (accept optional step_index, load run_step via GetRunStepByIndex, and call UpdateRunStepCompletion with mapped RunStepStatus and reason), internal/nodeagent/statusuploader.go and internal/nodeagent/execution_upload.go (thread optional step_index from executeRun into StatusUploader payload)
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — Tests cover UpdateRunStepCompletion and verify step_index and terminal step status are handled correctly for multi-step runs
-- [ ] Ensure per-step diffs are incremental and rehydration-safe — Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]
+- [x] Ensure per-step diffs are incremental and rehydration-safe — Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]
   - Component: ploy (nodeagent, workflow runtime)
   - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (helper that uses internal/nodeagent/git.EnsureCommit to write the baseline commit), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests in internal/nodeagent/execution_rehydrate_test.go verify that applying stored per-step diffs for steps 0..k-1 to a fresh base clone yields the expected workspace contents for step k
