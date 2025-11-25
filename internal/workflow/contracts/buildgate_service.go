@@ -60,19 +60,16 @@ func (r BuildGateValidateRequest) Validate() error {
 	repoURLEmpty := strings.TrimSpace(r.RepoURL) == ""
 	refEmpty := strings.TrimSpace(r.Ref) == ""
 
+	// DiffPatch requires a valid baseline (repo_url + ref).
+	if len(r.DiffPatch) > 0 && (repoURLEmpty || refEmpty) {
+		return fmt.Errorf("diff_patch requires both repo_url and ref")
+	}
+
 	if repoURLEmpty {
 		return fmt.Errorf("repo_url is required")
 	}
 	if refEmpty {
 		return fmt.Errorf("ref is required")
-	}
-
-	// DiffPatch requires a valid baseline (repo_url + ref). Since both are
-	// required above, we only reject diff_patch if baseline fields failed
-	// validation. This is a defensive check for callers who may construct
-	// requests programmatically with partial fields.
-	if len(r.DiffPatch) > 0 && (repoURLEmpty || refEmpty) {
-		return fmt.Errorf("diff_patch requires both repo_url and ref")
 	}
 
 	// Validate resource limits are non-negative when provided.
