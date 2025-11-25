@@ -116,7 +116,7 @@ Role model (bearer token claims):
 - `concurrency` (config YAML) — Maximum concurrent runs the node will execute. Set in the
   node YAML under `concurrency`; defaults to `1` if not set.
 - `PLOY_LIFECYCLE_NET_IGNORE` — Optional comma-separated list of network interface patterns (supports `*` globs) that the node lifecycle collector skips when computing throughput metrics. Example: `lo,cni*,docker*`.
-  TODO: lifecycle collector to read this in an upcoming slice.
+  The nodeagent heartbeat manager reads this environment variable at startup and passes the parsed patterns to the lifecycle collector via `lifecycle.Options.IgnoreInterfaces`.
   - Pin via systemd drop-in or in `ployd.yaml` under `environment:` e.g.:
 
     environment:
