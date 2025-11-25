@@ -22,6 +22,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     CODEX_EXTRA_DIR="" \
     CODEX_AUTH_JSON="" \
     PLOY_SERVER_URL="" \
+    PLOY_API_TOKEN="" \
     PLOY_CA_CERT_PATH="/etc/ploy/certs/ca.crt" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"

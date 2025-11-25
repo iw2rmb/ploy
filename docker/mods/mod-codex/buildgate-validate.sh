@@ -8,6 +8,7 @@
 #   PLOY_CA_CERT_PATH       - Optional: path to CA certificate for mTLS
 #   PLOY_CLIENT_CERT_PATH   - Optional: path to client certificate for mTLS
 #   PLOY_CLIENT_KEY_PATH    - Optional: path to client key for mTLS
+#   PLOY_API_TOKEN          - Optional: bearer token for Build Gate HTTP API
 #
 # Exit codes:
 #   0: Build gate passed
@@ -70,6 +71,11 @@ curl_args=(
   --show-error
   --fail-with-body
 )
+
+# Optional bearer token authentication
+if [[ -n "${PLOY_API_TOKEN:-}" ]]; then
+  curl_args+=(-H "Authorization: Bearer $PLOY_API_TOKEN")
+fi
 
 # Add mTLS certificates if provided
 if [[ -n "${PLOY_CA_CERT_PATH:-}" && -f "$PLOY_CA_CERT_PATH" ]]; then
@@ -147,4 +153,3 @@ else
     echo "[buildgate] Status: $poll_status, waiting..." >&2
   done
 fi
-

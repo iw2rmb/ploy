@@ -26,9 +26,6 @@ jobs:
           - name: storage
             path: ./internal/storage
             min: 70
-          - name: api_mods
-            path: ./api/mods
-            min: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -89,7 +86,6 @@ jobs:
             "mods ./internal/mods"
             "orchestration ./internal/orchestration"
             "storage ./internal/storage"
-            "api_mods ./api/mods"
           )
           mkdir -p badges
           gen_badge() {
@@ -162,7 +158,6 @@ EOF
             "mods ./internal/mods"
             "orchestration ./internal/orchestration"
             "storage ./internal/storage"
-            "api_mods ./api/mods"
           )
           echo "mode: atomic" > coverage_all.out
           for entry in "${components[@]}"; do

@@ -19,6 +19,7 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: ${{ hashFiles('services/langgraph-runner/Dockerfile') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,4 +52,3 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
