@@ -36,9 +36,11 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Decode request body to get run_id.
+		// Decode request body to get run_id and optional step_index.
+		// For multi-step runs, nodeagent includes step_index to trigger step-level ack.
 		var req struct {
-			RunID string `json:"run_id"`
+			RunID     string `json:"run_id"`
+			StepIndex *int32 `json:"step_index,omitempty"` // Present for step-level claims
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -84,24 +86,77 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Verify the run is assigned to the requesting node.
-		if !run.NodeID.Valid || run.NodeID != nodeID {
-			http.Error(w, "run not assigned to this node", http.StatusForbidden)
-			return
-		}
+		// If step_index is present, this is a step-level ack (multi-step run).
+		// Otherwise, it's a run-level ack (single-step or legacy run).
+		if req.StepIndex != nil {
+			// Step-level ack: retrieve the run_step and transition it from assigned→running.
+			runStep, err := st.GetRunStepByIndex(r.Context(), store.GetRunStepByIndexParams{
+				RunID:     runID,
+				StepIndex: *req.StepIndex,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(w, "run step not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, fmt.Sprintf("failed to get run step: %v", err), http.StatusInternalServerError)
+				slog.Error("ack run step start: get step failed", "run_id", req.RunID, "step_index", *req.StepIndex, "err", err)
+				return
+			}
 
-		// Verify the run is in 'assigned' status before transitioning to 'running'.
-		if run.Status != store.RunStatusAssigned {
-			http.Error(w, fmt.Sprintf("run status is %s, expected assigned", run.Status), http.StatusConflict)
-			return
-		}
+			// Verify the step is assigned to the requesting node.
+			if !runStep.NodeID.Valid || runStep.NodeID != nodeID {
+				http.Error(w, "run step not assigned to this node", http.StatusForbidden)
+				return
+			}
 
-		// Transition run status from 'assigned' to 'running'.
-		err = st.AckRunStart(r.Context(), runID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to acknowledge run start: %v", err), http.StatusInternalServerError)
-			slog.Error("ack run start: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
-			return
+			// Verify the step is in 'assigned' status before transitioning to 'running'.
+			if runStep.Status != store.RunStepStatusAssigned {
+				http.Error(w, fmt.Sprintf("run step status is %s, expected assigned", runStep.Status), http.StatusConflict)
+				return
+			}
+
+			// Transition run_step status from 'assigned' to 'running'.
+			err = st.AckRunStepStart(r.Context(), runStep.ID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to acknowledge run step start: %v", err), http.StatusInternalServerError)
+				slog.Error("ack run step start: update failed", "run_id", req.RunID, "step_index", *req.StepIndex, "node_id", nodeIDStr, "err", err)
+				return
+			}
+
+			slog.Info("run step start acknowledged",
+				"run_id", req.RunID,
+				"step_index", *req.StepIndex,
+				"node_id", nodeIDStr,
+				"status", "running",
+			)
+		} else {
+			// Run-level ack: verify the run is assigned to this node and transition from assigned→running.
+			// This path is used for single-step runs or legacy runs without run_steps rows.
+			if !run.NodeID.Valid || run.NodeID != nodeID {
+				http.Error(w, "run not assigned to this node", http.StatusForbidden)
+				return
+			}
+
+			// Verify the run is in 'assigned' status before transitioning to 'running'.
+			if run.Status != store.RunStatusAssigned {
+				http.Error(w, fmt.Sprintf("run status is %s, expected assigned", run.Status), http.StatusConflict)
+				return
+			}
+
+			// Transition run status from 'assigned' to 'running'.
+			err = st.AckRunStart(r.Context(), runID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to acknowledge run start: %v", err), http.StatusInternalServerError)
+				slog.Error("ack run start: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
+				return
+			}
+
+			slog.Info("run start acknowledged",
+				"run_id", req.RunID,
+				"node_id", nodeIDStr,
+				"status", "running",
+			)
 		}
 
 		// Update stage to running and set started_at.
@@ -131,10 +186,5 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		w.WriteHeader(http.StatusNoContent)
-		slog.Info("run start acknowledged",
-			"run_id", req.RunID,
-			"node_id", nodeIDStr,
-			"status", "running",
-		)
 	}
 }
