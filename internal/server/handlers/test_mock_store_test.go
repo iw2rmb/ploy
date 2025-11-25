@@ -224,6 +224,13 @@ type mockStore struct {
 	markBootstrapTokenUsedCalled bool
 	markBootstrapTokenUsedParam  string
 	markBootstrapTokenUsedErr    error
+
+	// CreateRunStep tracking
+	createRunStepCalled    bool
+	createRunStepCallCount int
+	createRunStepParams    []store.CreateRunStepParams
+	createRunStepResults   []store.RunStep
+	createRunStepErr       error
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -516,4 +523,25 @@ func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) 
 	m.markBootstrapTokenUsedCalled = true
 	m.markBootstrapTokenUsedParam = tokenID
 	return m.markBootstrapTokenUsedErr
+}
+
+// CreateRunStep implements the CreateRunStep method for testing.
+func (m *mockStore) CreateRunStep(ctx context.Context, params store.CreateRunStepParams) (store.RunStep, error) {
+	m.createRunStepCalled = true
+	m.createRunStepCallCount++
+	// Track params for all CreateRunStep calls (for multi-step tests).
+	m.createRunStepParams = append(m.createRunStepParams, params)
+
+	// Return a result for this call (use preset or generate default).
+	if m.createRunStepCallCount <= len(m.createRunStepResults) {
+		return m.createRunStepResults[m.createRunStepCallCount-1], m.createRunStepErr
+	}
+
+	// Default: generate a RunStep with the provided params.
+	return store.RunStep{
+		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:     params.RunID,
+		StepIndex: params.StepIndex,
+		Status:    params.Status,
+	}, m.createRunStepErr
 }

@@ -642,6 +642,135 @@ func TestSubmitTicketHandlerSingleStepCreatesOneStage(t *testing.T) {
 	}
 }
 
+// TestSubmitTicketHandlerMultiStepMaterializesRunSteps verifies that submitting
+// a multi-step spec (with mods[] array) materializes run_steps rows (one per mod).
+func TestSubmitTicketHandlerMultiStepMaterializesRunSteps(t *testing.T) {
+	runID := uuid.New()
+	now := time.Now()
+
+	st := &mockStore{
+		createRunResult: store.Run{
+			ID:        pgtype.UUID{Bytes: runID, Valid: true},
+			RepoUrl:   "https://github.com/user/repo.git",
+			Spec:      []byte(`{"mods":[{"image":"img1:latest"},{"image":"img2:latest"},{"image":"img3:latest"}]}`),
+			Status:    store.RunStatusQueued,
+			BaseRef:   "main",
+			TargetRef: "feature",
+			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		},
+	}
+
+	handler := submitTicketHandler(st, nil)
+
+	reqBody := map[string]interface{}{
+		"repo_url":   "https://github.com/user/repo.git",
+		"base_ref":   "main",
+		"target_ref": "feature",
+		"spec": map[string]interface{}{
+			"mods": []map[string]string{
+				{"image": "img1:latest"},
+				{"image": "img2:latest"},
+				{"image": "img3:latest"},
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify three run_steps were materialized (one per mod in mods[] array).
+	if st.createRunStepCallCount != 3 {
+		t.Errorf("expected 3 CreateRunStep calls (one per mod), got %d", st.createRunStepCallCount)
+	}
+
+	// Verify each run_step has correct step_index and status.
+	if len(st.createRunStepParams) != 3 {
+		t.Fatalf("expected 3 run_step params, got %d", len(st.createRunStepParams))
+	}
+	for i, params := range st.createRunStepParams {
+		if params.StepIndex != int32(i) {
+			t.Errorf("expected run_step %d step_index %d, got %d", i, i, params.StepIndex)
+		}
+		if params.Status != store.RunStepStatusQueued {
+			t.Errorf("expected run_step %d status 'queued', got %s", i, params.Status)
+		}
+		if params.RunID.Bytes != runID {
+			t.Errorf("expected run_step %d run_id %s, got %s", i, runID.String(), uuid.UUID(params.RunID.Bytes).String())
+		}
+	}
+}
+
+// TestSubmitTicketHandlerSingleStepSkipsRunSteps verifies that submitting
+// a single-step spec (with mod section or legacy top-level) does NOT materialize run_steps.
+func TestSubmitTicketHandlerSingleStepSkipsRunSteps(t *testing.T) {
+	cases := []struct {
+		name string
+		spec map[string]interface{}
+	}{
+		{
+			name: "mod section",
+			spec: map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
+		},
+		{
+			name: "legacy top-level",
+			spec: map[string]interface{}{"image": "legacy:latest"},
+		},
+		{
+			name: "empty spec",
+			spec: map[string]interface{}{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runID := uuid.New()
+			now := time.Now()
+
+			specBytes, _ := json.Marshal(tc.spec)
+			st := &mockStore{
+				createRunResult: store.Run{
+					ID:        pgtype.UUID{Bytes: runID, Valid: true},
+					RepoUrl:   "https://github.com/user/repo.git",
+					Spec:      specBytes,
+					Status:    store.RunStatusQueued,
+					BaseRef:   "main",
+					TargetRef: "feature",
+					CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+				},
+			}
+
+			handler := submitTicketHandler(st, nil)
+
+			reqBody := map[string]interface{}{
+				"repo_url":   "https://github.com/user/repo.git",
+				"base_ref":   "main",
+				"target_ref": "feature",
+				"spec":       tc.spec,
+			}
+			body, _ := json.Marshal(reqBody)
+			req := httptest.NewRequest(http.MethodPost, "/v1/mods", bytes.NewReader(body))
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusCreated {
+				t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			// Verify NO run_steps were materialized (single-step runs use ClaimRun).
+			if st.createRunStepCalled {
+				t.Errorf("expected CreateRunStep NOT to be called for single-step run, but it was called %d times", st.createRunStepCallCount)
+			}
+		})
+	}
+}
+
 // TestGetTicketStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
 // exposes step_index for each stage when multi-step metadata is present.
 func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
