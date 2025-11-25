@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,17 +90,13 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Create initial stage for the run (single-stage model: mods-openrewrite).
-		// Future: derive stage name from spec if provided.
-		_, err = st.CreateStage(r.Context(), store.CreateStageParams{
-			RunID:  storePgUUID(run.ID),
-			Name:   "mods-openrewrite",
-			Status: store.StageStatusPending,
-			Meta:   []byte("{}"),
-		})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create stage: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create stage failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+		// Create stages for the run based on the spec (single-step or multi-step).
+		// For multi-step runs (mods[] array), create one stage per mod step.
+		// For single-step runs (mod or legacy top-level), create a single stage.
+		// Each stage metadata includes step_index and step_total to enable ordered execution.
+		if err := createStagesFromSpec(r.Context(), st, run.ID, spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create stages: %v", err), http.StatusInternalServerError)
+			slog.Error("submit ticket: create stages failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
 
@@ -252,12 +249,24 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 					artMap[name] = strings.TrimSpace(*b.Cid)
 				}
 			}
+
+			// Parse step metadata from stage.meta JSONB.
+			// For multi-step runs, this includes step_index for ordering.
+			stepIndex := 0
+			if len(stg.Meta) > 0 && json.Valid(stg.Meta) {
+				var stageMeta modsapi.StageMetadata
+				if err := json.Unmarshal(stg.Meta, &stageMeta); err == nil {
+					stepIndex = stageMeta.StepIndex
+				}
+			}
+
 			summary.Stages[uuid.UUID(stg.ID.Bytes).String()] = modsapi.StageStatus{
 				StageID:     domaintypes.StageID(uuid.UUID(stg.ID.Bytes).String()),
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
 				Artifacts:   artMap,
+				StepIndex:   stepIndex,
 			}
 		}
 
@@ -267,6 +276,83 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			slog.Error("get ticket status: encode response failed", "err", err)
 		}
 	}
+}
+
+// createStagesFromSpec parses the run spec and creates stages for multi-step or single-step runs.
+// For multi-step runs (mods[] array in spec), creates one stage per mod.
+// For single-step runs (mod or legacy top-level), creates a single stage named "mods-openrewrite".
+// Each stage's meta JSONB includes step_index and step_total for ordered execution.
+func createStagesFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
+	// Parse spec to detect multi-step vs single-step.
+	var specMap map[string]interface{}
+	if len(spec) > 0 && json.Valid(spec) {
+		if err := json.Unmarshal(spec, &specMap); err != nil {
+			// Invalid JSON; fallback to single stage.
+			return createSingleStage(ctx, st, runID, 0, 1, "")
+		}
+	}
+
+	// Check for mods[] array (multi-step run).
+	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
+		// Multi-step run: create one stage per mod.
+		stepTotal := len(mods)
+		for stepIndex, modInterface := range mods {
+			// Extract mod image for metadata if present.
+			modImage := ""
+			if modMap, ok := modInterface.(map[string]interface{}); ok {
+				if img, ok := modMap["image"].(string); ok {
+					modImage = strings.TrimSpace(img)
+				}
+			}
+			// Stage name: "mods-openrewrite-0", "mods-openrewrite-1", etc.
+			stageName := fmt.Sprintf("mods-openrewrite-%d", stepIndex)
+			if err := createStageWithMeta(ctx, st, runID, stageName, stepIndex, stepTotal, modImage); err != nil {
+				return fmt.Errorf("create stage %d: %w", stepIndex, err)
+			}
+		}
+		return nil
+	}
+
+	// Single-step run: create one stage.
+	// Extract mod image from spec if present (under "mod" or top-level).
+	modImage := ""
+	if mod, ok := specMap["mod"].(map[string]interface{}); ok {
+		if img, ok := mod["image"].(string); ok {
+			modImage = strings.TrimSpace(img)
+		}
+	} else if img, ok := specMap["image"].(string); ok {
+		// Legacy top-level image.
+		modImage = strings.TrimSpace(img)
+	}
+	return createSingleStage(ctx, st, runID, 0, 1, modImage)
+}
+
+// createSingleStage creates a single stage for a run with the given step metadata.
+func createSingleStage(ctx context.Context, st store.Store, runID pgtype.UUID, stepIndex, stepTotal int, modImage string) error {
+	return createStageWithMeta(ctx, st, runID, "mods-openrewrite", stepIndex, stepTotal, modImage)
+}
+
+// createStageWithMeta creates a stage with step metadata in the meta JSONB field.
+func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID, name string, stepIndex, stepTotal int, modImage string) error {
+	// Build stage metadata with step information.
+	stageMeta := modsapi.StageMetadata{
+		StepIndex: stepIndex,
+		StepTotal: stepTotal,
+		ModImage:  modImage,
+	}
+	metaBytes, err := json.Marshal(stageMeta)
+	if err != nil {
+		return fmt.Errorf("marshal stage metadata: %w", err)
+	}
+
+	// Create the stage with metadata.
+	_, err = st.CreateStage(ctx, store.CreateStageParams{
+		RunID:  runID,
+		Name:   name,
+		Status: store.StageStatusPending,
+		Meta:   metaBytes,
+	})
+	return err
 }
 
 // helpers
