@@ -18,11 +18,9 @@ func TestNoCircularDependencies(t *testing.T) {
 	cmd := exec.Command("go", "list", "-e", "-f", "{{if .Error}}{{.ImportPath}}: {{.Error.Err}}{{end}}", "./...")
 	cmd.Dir = ".." // Run from repo root (one level up from cmd/)
 
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Non-zero exit is expected if there are errors in packages
-		// We'll check the output content for import cycle messages
-	}
+	// Non-zero exit is expected if there are errors in packages; we inspect
+	// the output content for import cycle messages instead of failing on exit.
+	output, _ := cmd.CombinedOutput()
 
 	outputStr := strings.TrimSpace(string(output))
 	if outputStr == "" {

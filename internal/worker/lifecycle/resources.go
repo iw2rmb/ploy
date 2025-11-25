@@ -64,13 +64,7 @@ func (r resourceSnapshot) toNodeResources() NodeResources {
 	// Convert network interfaces from internal snapshot format to typed format.
 	interfaces := make(map[string]NetworkInterface, len(r.NetworkInterfaces))
 	for name, iface := range r.NetworkInterfaces {
-		interfaces[name] = NetworkInterface{
-			RXBytesPerSec:   iface.RXBytesPerSec,
-			TXBytesPerSec:   iface.TXBytesPerSec,
-			RXPacketsPerSec: iface.RXPacketsPerSec,
-			TXPacketsPerSec: iface.TXPacketsPerSec,
-			InitialSample:   iface.InitialSample,
-		}
+		interfaces[name] = NetworkInterface(iface)
 	}
 
 	return NodeResources{

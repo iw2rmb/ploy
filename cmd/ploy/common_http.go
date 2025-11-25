@@ -45,7 +45,7 @@ func resolveControlPlaneHTTP(_ context.Context) (*url.URL, *http.Client, error) 
 	}
 
 	// Wrap transport with bearer token injector if token is available
-	var finalTransport http.RoundTripper = transport
+	finalTransport := transport
 	if strings.TrimSpace(desc.Token) != "" {
 		finalTransport = &bearerTokenTransport{
 			base:  transport,
