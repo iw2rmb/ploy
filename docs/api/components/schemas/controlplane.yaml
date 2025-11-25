@@ -97,23 +97,19 @@ TicketStatus:
 # Build Gate — client requests and responses
 BuildGateValidateRequest:
   type: object
-  description: Submit a build validation job via ref or content archive.
+  description: |
+    Submit a build validation job. Requires repo_url and ref for Git-based
+    validation. The content_archive mode has been removed to simplify the
+    Build Gate contract and avoid large workspace payloads.
   properties:
-    repo_url: { type: string, description: Git repository URL, nullable: true }
-    ref: { type: string, description: Git ref to validate, nullable: true }
-    content_archive:
-      type: string
-      description: Tar or tar.gz archive bytes, base64-encoded.
-      contentEncoding: base64
-      nullable: true
+    repo_url: { type: string, description: Git repository URL to clone (required) }
+    ref: { type: string, description: Git ref (branch, tag, or commit SHA) to validate (required) }
     profile: { type: string, description: Gate profile (e.g., auto, java), nullable: true }
     timeout: { type: string, description: Duration string (e.g., 5m), nullable: true }
     limit_memory_bytes: { type: integer, format: int64, nullable: true }
     limit_cpu_millis: { type: integer, format: int64, nullable: true }
     limit_disk_space: { type: integer, format: int64, nullable: true }
-  oneOf:
-    - required: [repo_url, ref]
-    - required: [content_archive]
+  required: [repo_url, ref]
 
 BuildGateValidateResponse:
   type: object
