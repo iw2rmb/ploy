@@ -408,3 +408,136 @@ func TestModsHumanMetadataValidate(t *testing.T) {
 		t.Fatal("expected validation error for blank playbook")
 	}
 }
+
+// TestBuildGateValidateRequestValidate tests the ref-only BuildGateValidateRequest validation.
+func TestBuildGateValidateRequestValidate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     BuildGateValidateRequest
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid request with repo_url and ref",
+			req: BuildGateValidateRequest{
+				RepoURL: "https://example.com/repo.git",
+				Ref:     "main",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with all optional fields",
+			req: BuildGateValidateRequest{
+				RepoURL:          "https://example.com/repo.git",
+				Ref:              "v1.0.0",
+				Profile:          "java-maven",
+				Timeout:          "5m",
+				LimitMemoryBytes: ptrInt64(1073741824), // 1GB
+				LimitCPUMillis:   ptrInt64(2000),       // 2 cores
+				LimitDiskSpace:   ptrInt64(5368709120), // 5GB
+			},
+			wantErr: false,
+		},
+		{
+			name:    "missing repo_url",
+			req:     BuildGateValidateRequest{Ref: "main"},
+			wantErr: true,
+			errMsg:  "repo_url is required",
+		},
+		{
+			name:    "missing ref",
+			req:     BuildGateValidateRequest{RepoURL: "https://example.com/repo.git"},
+			wantErr: true,
+			errMsg:  "ref is required",
+		},
+		{
+			name:    "empty request",
+			req:     BuildGateValidateRequest{},
+			wantErr: true,
+			errMsg:  "repo_url is required",
+		},
+		{
+			name: "whitespace-only repo_url",
+			req: BuildGateValidateRequest{
+				RepoURL: "   ",
+				Ref:     "main",
+			},
+			wantErr: true,
+			errMsg:  "repo_url is required",
+		},
+		{
+			name: "whitespace-only ref",
+			req: BuildGateValidateRequest{
+				RepoURL: "https://example.com/repo.git",
+				Ref:     "   ",
+			},
+			wantErr: true,
+			errMsg:  "ref is required",
+		},
+		{
+			name: "negative memory limit",
+			req: BuildGateValidateRequest{
+				RepoURL:          "https://example.com/repo.git",
+				Ref:              "main",
+				LimitMemoryBytes: ptrInt64(-1),
+			},
+			wantErr: true,
+			errMsg:  "limit_memory_bytes cannot be negative",
+		},
+		{
+			name: "negative cpu limit",
+			req: BuildGateValidateRequest{
+				RepoURL:        "https://example.com/repo.git",
+				Ref:            "main",
+				LimitCPUMillis: ptrInt64(-100),
+			},
+			wantErr: true,
+			errMsg:  "limit_cpu_millis cannot be negative",
+		},
+		{
+			name: "negative disk limit",
+			req: BuildGateValidateRequest{
+				RepoURL:        "https://example.com/repo.git",
+				Ref:            "main",
+				LimitDiskSpace: ptrInt64(-1024),
+			},
+			wantErr: true,
+			errMsg:  "limit_disk_space cannot be negative",
+		},
+		{
+			name: "zero limits allowed",
+			req: BuildGateValidateRequest{
+				RepoURL:          "https://example.com/repo.git",
+				Ref:              "main",
+				LimitMemoryBytes: ptrInt64(0),
+				LimitCPUMillis:   ptrInt64(0),
+				LimitDiskSpace:   ptrInt64(0),
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("expected error containing %q, got nil", tt.errMsg)
+					return
+				}
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("expected error containing %q, got %q", tt.errMsg, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
+// ptrInt64 returns a pointer to the given int64 value.
+func ptrInt64(v int64) *int64 {
+	return &v
+}
