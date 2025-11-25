@@ -21,6 +21,7 @@ import (
 type diffItem struct {
 	ID        string                  `json:"id"`
 	StageID   string                  `json:"stage_id"`
+	StepIndex *int32                  `json:"step_index,omitempty"` // step identity for multi-step runs (0-based)
 	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
 	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
@@ -36,6 +37,7 @@ type diffGetResponse struct {
 	ID          string                  `json:"id"`
 	RunID       string                  `json:"run_id"`
 	StageID     *string                 `json:"stage_id,omitempty"`
+	StepIndex   *int32                  `json:"step_index,omitempty"` // step identity for multi-step runs (0-based)
 	CreatedAt   time.Time               `json:"created_at"`
 	GzippedSize int                     `json:"gzipped_size"`
 	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
@@ -72,6 +74,7 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(),
 				StageID:   uuid.UUID(d.StageID.Bytes).String(),
+				StepIndex: d.StepIndex, // expose step identity for rehydration logic
 				CreatedAt: d.CreatedAt.Time,
 				Size:      len(d.Patch),
 				Summary:   summary,
@@ -124,6 +127,7 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
 			RunID:       uuid.UUID(d.RunID.Bytes).String(),
+			StepIndex:   d.StepIndex, // expose step identity for rehydration logic
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,

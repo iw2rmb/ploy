@@ -19,6 +19,8 @@ type Querier interface {
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
+	// Creates a new diff entry with optional step_index for multi-step runs.
+	// step_index is NULL for legacy single-step runs or final aggregate diffs.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
@@ -61,6 +63,12 @@ type Querier interface {
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error)
+	// Returns all diffs for a run up to (and including) the specified step_index.
+	// Used for workspace rehydration: apply all diffs from steps 0..k to build workspace for step k+1.
+	// Excludes diffs with NULL step_index to avoid applying legacy/aggregate diffs during rehydration.
+	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
+	// Returns diffs for a run ordered by step_index (if present), then by created_at.
+	// This allows rehydration to select diffs in logical step order for multi-step runs.
 	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)

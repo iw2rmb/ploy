@@ -62,9 +62,10 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 
 		// Decode request body.
 		var req struct {
-			RunID   string                  `json:"run_id"`
-			Patch   []byte                  `json:"patch"`   // gzipped diff (raw bytes)
-			Summary domaintypes.DiffSummary `json:"summary"` // optional summary metadata
+			RunID     string                  `json:"run_id"`
+			Patch     []byte                  `json:"patch"`      // gzipped diff (raw bytes)
+			Summary   domaintypes.DiffSummary `json:"summary"`    // optional summary metadata
+			StepIndex *int32                  `json:"step_index"` // optional step identity (0-based) for multi-step runs
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -153,7 +154,19 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		params := store.CreateDiffParams{RunID: runID, StageID: stageID, Patch: req.Patch, Summary: summaryBytes}
+		// Validate step_index if provided: must be non-negative per DB constraint.
+		if req.StepIndex != nil && *req.StepIndex < 0 {
+			http.Error(w, "step_index must be >= 0", http.StatusBadRequest)
+			return
+		}
+
+		params := store.CreateDiffParams{
+			RunID:     runID,
+			StageID:   stageID,
+			Patch:     req.Patch,
+			Summary:   summaryBytes,
+			StepIndex: req.StepIndex,
+		}
 
 		// Persist diff to DB.
 		diff, err := st.CreateDiff(r.Context(), params)

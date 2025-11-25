@@ -223,6 +223,7 @@ type Diff struct {
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	StepIndex *int32             `json:"step_index"`
 }
 
 type Event struct {
