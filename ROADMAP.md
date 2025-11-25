@@ -57,7 +57,7 @@ Done when:
     - CHECKPOINT_MODS.md — Update examples showing healing mod environment to mention repo metadata env vars.
   - Test: go test ./internal/nodeagent/... — New tests validate that healing manifests receive the expected env values and that missing metadata is handled gracefully (no panics).
 
-- [ ] Align healing verification with repo+diff Build Gate API — Use the HTTP Build Gate to verify healing changes via repo+diff semantics
+- [x] Align healing verification with repo+diff Build Gate API — Use the HTTP Build Gate to verify healing changes via repo+diff semantics
   - Component: ploy (nodeagent, mods E2E)
   - Scope:
     - internal/nodeagent/execution_healing.go — Ensure healing mods run in the same workspace as initial Build Gate; keep the existing gate→heal→re-gate loop, but document that re-gate verification is conceptually equivalent to applying diffs on top of repo_url+ref.
