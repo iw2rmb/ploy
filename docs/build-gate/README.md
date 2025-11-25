@@ -4,6 +4,39 @@ Scope
 - Minimal, stable contract to validate a repository after each Mods stage.
 - Works in Mods and standalone CI.
 
+HTTP Build Gate API
+- Endpoint: `POST /v1/buildgate/validate`
+- Contract: Submit a build validation job using a Git repo+ref baseline, with an optional diff patch for healing flows.
+
+Required fields:
+- `repo_url` — Git repository URL to clone (e.g., `https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git`).
+- `ref` — Git ref (branch, tag, or commit SHA) to validate (e.g., `e2e/fail-missing-symbol`).
+
+Optional fields:
+- `diff_patch` — Gzipped unified diff (base64-encoded) to apply on top of the cloned repo_url+ref baseline. Enables healing mods to replay changes without shipping full workspace archives.
+- `profile` — Build profile (`auto`, `java`, `java-maven`, `java-gradle`). Defaults to auto-detection.
+- `timeout` — Duration string (e.g., `5m`). Defaults to server-side limit.
+- `limit_memory_bytes`, `limit_cpu_millis`, `limit_disk_space` — Resource limits for the validation job.
+
+Example request payload (repo+diff model):
+
+```json
+{
+  "repo_url": "https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git",
+  "ref": "e2e/fail-missing-symbol",
+  "profile": "java-maven",
+  "timeout": "5m",
+  "diff_patch": "<base64(gzip(unified-diff))>"
+}
+```
+
+Semantics:
+1. The executor clones `repo_url` at `ref`.
+2. If `diff_patch` is non-empty, it decodes and decompresses the payload, then applies the patch via `git apply`.
+3. The build runs against the resulting workspace.
+
+This model avoids transmitting large workspace archives over HTTP, instead leveraging Git for baseline state and transmitting only the delta.
+
 Inputs
 - Workspace mount: `/workspace` (required, read–write). Contains a shallow Git checkout at `HEAD`.
 - Profile: configurable or auto

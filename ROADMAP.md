@@ -20,7 +20,7 @@ Done when:
     - internal/server/handlers/handlers_buildgate.go — Ensure `validateBuildGateHandler` uses the ref-only `BuildGateValidateRequest` and surfaces validation errors for missing `repo_url`/`ref`.
   - Test: go test ./internal/workflow/contracts/... ./internal/server/handlers/... — New tests assert that POST /v1/buildgate/validate with only repo_url+ref is accepted and that legacy content_archive payloads are rejected.
 
-- [ ] Introduce diff_patch field for repo+diff validation — Allow Build Gate jobs to replay healing changes without shipping full workspaces
+- [x] Introduce diff_patch field for repo+diff validation — Allow Build Gate jobs to replay healing changes without shipping full workspaces
   - Component: ploy (server, workflow contracts, docs)
   - Scope:
     - internal/workflow/contracts/buildgate_service.go — Add `DiffPatch []byte \`json:"diff_patch,omitempty"\`` to `BuildGateValidateRequest`; extend `Validate()` to allow optional `DiffPatch` only when `RepoURL` and `Ref` are present.
