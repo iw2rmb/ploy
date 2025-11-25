@@ -55,6 +55,40 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/nodeagent/... ./internal/server/handlers/... — Nodes can claim specific steps of a multi-step run, execute only the claimed step with rehydrated workspace, and upload diffs tagged with step_index
   - Note: run_step_status transitions (AckRunStepStart / UpdateRunStepCompletion) are defined but not yet wired into status handlers; multi-node scheduling remains behind a feature flag until those updates and integration tests are added
 
+## Scheduler Status Wiring & Run Semantics
+- [ ] Materialize run_steps rows for multi-step runs — Create one step record per mods[] entry when a run is queued
+  - Component: ploy (server, store)
+  - Scope: internal/server/handlers/handlers_mods_ticket.go (helper called from submitTicketHandler to invoke CreateRunStep once per mods[] index), internal/store/queries/run_steps.sql (CreateRunStep)
+  - Test: go test ./internal/server/handlers/... — New tests assert CreateRunStep is invoked for multi-step specs (mods[] present) and skipped for single-step specs
+- [ ] Restrict ClaimRun to runs without run_steps — Ensure multi-step runs are claimed via ClaimRunStep only
+  - Component: ploy (store)
+  - Scope: internal/store/queries/runs.sql (ClaimRun WHERE clause gains NOT EXISTS (SELECT 1 FROM run_steps WHERE run_id = runs.id)), regenerate internal/store/runs.sql.go via sqlc
+  - Test: go test ./internal/store/... — New tests seed runs with and without run_steps rows and assert ClaimRun only returns runs that have no run_steps
+- [ ] Wire AckRunStepStart through node ack endpoint — Transition run_steps.status from assigned→running for step claims
+  - Component: ploy (server, nodeagent)
+  - Scope: internal/server/handlers/nodes_ack.go (extend request payload with optional step_index and, when present, call GetRunStepByIndex and AckRunStepStart after validating node_id and run_id), internal/nodeagent/claimer_loop.go (include ClaimResponse.StepIndex in POST /v1/nodes/{id}/ack payload)
+  - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... — New tests assert AckRunStepStart is invoked for multi-step claims and that ack payloads include the expected step_index
+- [ ] Wire UpdateRunStepCompletion through completion endpoint — Transition run_steps.status to terminal state on step completion
+  - Component: ploy (server, nodeagent, store)
+  - Scope: internal/server/handlers/nodes_complete.go (accept optional step_index, load run_step via GetRunStepByIndex, and call UpdateRunStepCompletion with mapped RunStepStatus and reason), internal/nodeagent/statusuploader.go and internal/nodeagent/execution_upload.go (thread optional step_index from executeRun into StatusUploader payload)
+  - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... ./internal/store/... — New tests assert run_step_status flows queued→assigned→running→succeeded/failed/canceled for multi-step runs
+- [ ] Ensure per-step diffs are incremental and rehydration-safe — Make diff[0..k-1] replayable in order to reconstruct workspace[step_k]
+  - Component: ploy (nodeagent, workflow runtime)
+  - Scope: internal/nodeagent/execution_orchestrator.go (after rehydration for stepIndex>0, create a baseline git commit in the workspace before execution), internal/nodeagent/execution.go (helper that uses internal/nodeagent/git.EnsureCommit to write the baseline commit), internal/workflow/runtime/step/stub.go (continue to use git diff HEAD in filesystemDiffGenerator)
+  - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests in internal/nodeagent/execution_rehydrate_test.go verify that applying stored per-step diffs for steps 0..k-1 to a fresh base clone yields the expected workspace contents for step k
+- [ ] Refine run-level start semantics for multi-step runs — Mark run as running when the first step starts, even when claimed via run_steps
+  - Component: ploy (server, store)
+  - Scope: internal/server/handlers/nodes_ack.go (when step_index is present and run has run_steps rows, relax the status precondition to allow queued→running transition, and call AckRunStart or a dedicated helper to set runs.status=running), internal/store/queries/runs.sql (reuse AckRunStart)
+  - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that the first step ack moves run.status to running for multi-step runs, while subsequent step acks leave run.status unchanged
+- [ ] Refine run-level completion semantics for multi-step runs — Derive terminal run status from run_steps instead of trusting caller status
+  - Component: ploy (server, store)
+  - Scope: internal/server/handlers/nodes_complete.go (for runs that have run_steps entries, compute the effective run terminal state using CountRunSteps and CountRunStepsByStatus instead of blindly trusting the status field in the request), internal/store/queries/run_steps.sql (CountRunSteps, CountRunStepsByStatus already present)
+  - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that runs are marked succeeded only when all steps succeeded, failed when any step failed, and that inconsistent combinations of requested run status and run_steps state are rejected or normalized
+- [ ] Add explicit tests for step-level claiming and single-step execution — Demonstrate end-to-end that nodes execute only the claimed step and upload step-indexed diffs
+  - Component: ploy (server, nodeagent)
+  - Scope: internal/server/handlers/nodes_claim.go (unit tests that simulate multi-step runs with run_steps rows and assert ClaimRunStep is used and step_index is present in claim responses), internal/nodeagent/agent_claim_test.go or equivalent (tests that ClaimManager maps ClaimResponse.StepIndex into StartRunRequest.StepIndex and executes a single step in executeRun when StepIndex is non-nil)
+  - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... — New tests show nodes can claim distinct steps of the same run, execute only the claimed step per node, and still support legacy single-step runs claimed via ClaimRun
+
 ## Diff Download & Apply Pipeline
 - [x] Provide node-facing API to list and fetch run diffs — Let nodes pull gzipped patches and metadata per run
   - Component: ploy (server, nodeagent)
