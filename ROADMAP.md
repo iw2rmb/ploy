@@ -31,7 +31,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (worker hydration, nodeagent)
   - Scope: internal/worker/hydration/git_fetcher.go, internal/nodeagent/execution.go, GOLANG.md (document shallow clone behaviour)
   - Test: go test ./internal/worker/hydration/... ./internal/nodeagent/... — Hydration shallow-clones base_ref and pins commit_sha when present
-- [ ] Add per-node base clone caching under PLOYD_CACHE_HOME — Avoid repeated full clones for the same run/repo on one node
+- [x] Add per-node base clone caching under PLOYD_CACHE_HOME — Avoid repeated full clones for the same run/repo on one node
   - Component: ploy (nodeagent, hydration)
   - Scope: internal/nodeagent/workspace.go, internal/worker/hydration/git_fetcher.go (optional cache dir support), docs/envs/README.md (PLOYD_CACHE_HOME expectations)
   - Test: go test ./internal/nodeagent/... ./internal/worker/hydration/... — Second hydration for same repo/ref under PLOYD_CACHE_HOME reuses cache
