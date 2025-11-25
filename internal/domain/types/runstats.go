@@ -1,6 +1,9 @@
 package types
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // RunStats represents the terminal statistics payload stored on a run.
 //
@@ -67,4 +70,96 @@ func (s RunStats) MRURL() string {
 		return ""
 	}
 	return strings.TrimSpace(meta["mr_url"])
+}
+
+// GateSummary extracts build gate execution summary from the gate field.
+// Returns a human-readable summary string suitable for CLI/API display.
+// Format: "passed duration=123ms" or "failed pre-gate duration=45ms" or empty if no gate data.
+func (s RunStats) GateSummary() string {
+	gateRaw, ok := s["gate"]
+	if !ok || gateRaw == nil {
+		return ""
+	}
+	gate, ok := gateRaw.(map[string]any)
+	if !ok {
+		return ""
+	}
+
+	// Check final_gate first (post-mod gate is most important).
+	if finalGate := extractGatePhase(gate, "final_gate"); finalGate != "" {
+		return finalGate
+	}
+
+	// Check re_gates array (healing attempts).
+	if reGatesRaw, ok := gate["re_gates"]; ok && reGatesRaw != nil {
+		if reGates, ok := reGatesRaw.([]any); ok && len(reGates) > 0 {
+			// Take the last re-gate run as the most recent healing result.
+			if lastReGate, ok := reGates[len(reGates)-1].(map[string]any); ok {
+				if summary := formatGatePhase(lastReGate, "re-gate"); summary != "" {
+					return summary
+				}
+			}
+		}
+	}
+
+	// Fall back to pre_gate (pre-mod gate).
+	if preGate := extractGatePhase(gate, "pre_gate"); preGate != "" {
+		return preGate
+	}
+
+	return ""
+}
+
+// extractGatePhase pulls a named gate phase from the gate map and formats it.
+func extractGatePhase(gate map[string]any, phase string) string {
+	phaseRaw, ok := gate[phase]
+	if !ok || phaseRaw == nil {
+		return ""
+	}
+	phaseMap, ok := phaseRaw.(map[string]any)
+	if !ok {
+		return ""
+	}
+	// For pre_gate and final_gate, use the phase name; for re-gate, caller supplies label.
+	label := phase
+	if phase == "pre_gate" {
+		label = "pre-gate"
+	} else if phase == "final_gate" {
+		label = "final-gate"
+	}
+	return formatGatePhase(phaseMap, label)
+}
+
+// formatGatePhase builds a summary string from a gate phase map.
+// Format: "passed duration=123ms" or "failed pre-gate duration=45ms".
+func formatGatePhase(phaseMap map[string]any, label string) string {
+	passed, passedOK := phaseMap["passed"].(bool)
+	durationRaw, durationOK := phaseMap["duration_ms"]
+
+	if !passedOK {
+		return ""
+	}
+
+	var durationMs int64
+	if durationOK && durationRaw != nil {
+		switch d := durationRaw.(type) {
+		case int:
+			durationMs = int64(d)
+		case int64:
+			durationMs = d
+		case float64:
+			durationMs = int64(d)
+		}
+	}
+
+	status := "passed"
+	if !passed {
+		status = "failed"
+	}
+
+	// Include phase label only for failed gates or non-final phases for clarity.
+	if !passed || label != "final-gate" {
+		return fmt.Sprintf("%s %s duration=%dms", status, label, durationMs)
+	}
+	return fmt.Sprintf("%s duration=%dms", status, durationMs)
 }

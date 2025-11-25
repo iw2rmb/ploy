@@ -82,6 +82,7 @@ Role model (bearer token claims):
   - After each healing attempt, the Build Gate is re-run; on pass, the main mod proceeds
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods
+  - Gate status visibility: Use `ploy mod inspect <ticket-id>` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`). Also available via `GET /v1/mods/{id}` API in `Metadata["gate_summary"]`.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
