@@ -37,12 +37,14 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Decode request body to get run_id, status, reason, and stats.
+		// Decode request body to get run_id, status, reason, stats, and optional step_index.
+		// For multi-step runs, nodeagent includes step_index to trigger step-level completion.
 		var req struct {
-			RunID  string          `json:"run_id"`
-			Status string          `json:"status"`
-			Reason *string         `json:"reason,omitempty"`
-			Stats  json.RawMessage `json:"stats,omitempty"`
+			RunID     string          `json:"run_id"`
+			Status    string          `json:"status"`
+			Reason    *string         `json:"reason,omitempty"`
+			Stats     json.RawMessage `json:"stats,omitempty"`
+			StepIndex *int32          `json:"step_index,omitempty"` // Present for step-level completions
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -115,13 +117,8 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Verify the run is in 'running' status before transitioning to terminal state.
-		if run.Status != store.RunStatusRunning {
-			http.Error(w, fmt.Sprintf("run status is %s, expected running", run.Status), http.StatusConflict)
-			return
-		}
-
 		// Prepare stats field (default to empty JSON object if not provided).
+		// Stats validation is shared between run-level and step-level completions.
 		statsBytes := []byte("{}")
 		if len(req.Stats) > 0 {
 			// Validate that stats is valid JSON and a JSON object.
@@ -140,6 +137,83 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 				return
 			}
 			statsBytes = req.Stats
+		}
+
+		// If step_index is present, this is a step-level completion (multi-step run).
+		// Otherwise, it's a run-level completion (single-step or legacy run).
+		if req.StepIndex != nil {
+			// Step-level completion: retrieve the run_step and transition it to terminal state.
+			runStep, err := st.GetRunStepByIndex(r.Context(), store.GetRunStepByIndexParams{
+				RunID:     runID,
+				StepIndex: *req.StepIndex,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					http.Error(w, "run step not found", http.StatusNotFound)
+					return
+				}
+				http.Error(w, fmt.Sprintf("failed to get run step: %v", err), http.StatusInternalServerError)
+				slog.Error("complete run step: get step failed", "run_id", req.RunID, "step_index", *req.StepIndex, "err", err)
+				return
+			}
+
+			// Verify the step is assigned to the requesting node.
+			if !runStep.NodeID.Valid || runStep.NodeID != nodeID {
+				http.Error(w, "run step not assigned to this node", http.StatusForbidden)
+				return
+			}
+
+			// Verify the step is in 'running' status before transitioning to terminal state.
+			if runStep.Status != store.RunStepStatusRunning {
+				http.Error(w, fmt.Sprintf("run step status is %s, expected running", runStep.Status), http.StatusConflict)
+				return
+			}
+
+			// Map run terminal status (succeeded/failed/canceled) to RunStepStatus.
+			var stepStatus store.RunStepStatus
+			switch normalizedStatus {
+			case store.RunStatusSucceeded:
+				stepStatus = store.RunStepStatusSucceeded
+			case store.RunStatusFailed:
+				stepStatus = store.RunStepStatusFailed
+			case store.RunStatusCanceled:
+				stepStatus = store.RunStepStatusCanceled
+			default:
+				// Fallback for unexpected terminal states.
+				stepStatus = store.RunStepStatusFailed
+			}
+
+			// Transition run_step status to terminal state (succeeded/failed/canceled).
+			// Sets finished_at timestamp and optional reason for failure/cancellation.
+			err = st.UpdateRunStepCompletion(r.Context(), store.UpdateRunStepCompletionParams{
+				ID:     runStep.ID,
+				Status: stepStatus,
+				Reason: req.Reason,
+			})
+			if err != nil {
+				http.Error(w, fmt.Sprintf("failed to complete run step: %v", err), http.StatusInternalServerError)
+				slog.Error("complete run step: update failed", "run_id", req.RunID, "step_index", *req.StepIndex, "node_id", nodeIDStr, "err", err)
+				return
+			}
+
+			slog.Info("run step completed",
+				"run_id", req.RunID,
+				"step_index", *req.StepIndex,
+				"node_id", nodeIDStr,
+				"status", stepStatus,
+				"has_reason", req.Reason != nil,
+				"stats_size", len(statsBytes),
+			)
+
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Run-level completion: verify the run is in 'running' status before transitioning to terminal state.
+		// This path is used for single-step runs or legacy runs without run_steps rows.
+		if run.Status != store.RunStatusRunning {
+			http.Error(w, fmt.Sprintf("run status is %s, expected running", run.Status), http.StatusConflict)
+			return
 		}
 
 		// Update run completion: set status, reason, finished_at (server-side now()), and stats.

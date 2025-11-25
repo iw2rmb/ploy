@@ -135,9 +135,9 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
 
-			// Upload status.
+			// Upload status (nil stepIndex for run-level completion).
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.reason, tt.stats)
+			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.reason, tt.stats, nil)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -190,7 +190,7 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 		},
 	}
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "failed", reason, stats)
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", reason, stats, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -318,7 +318,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -366,7 +366,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 
 	ctx := context.Background()
 	start := time.Now()
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -418,7 +418,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
 
 	if err == nil {
 		t.Error("expected context cancellation error")

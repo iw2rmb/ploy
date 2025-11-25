@@ -299,3 +299,263 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 		t.Error("expected to find a 'done' event in the snapshot")
 	}
 }
+
+// ===== Run Step Completion Tests =====
+// These tests verify step-level completion flow for multi-step runs.
+
+// TestCompleteRunStep_Success verifies 204 and UpdateRunStepCompletion is called
+// when a valid step_index is provided and the step is assigned to the node.
+func TestCompleteRunStep_Success(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(1)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	// Include step_index in the payload to trigger step-level completion.
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify GetRunStepByIndex was called with correct params.
+	if !st.getRunStepByIndexCalled {
+		t.Fatal("expected GetRunStepByIndex to be called")
+	}
+	if st.getRunStepByIndexParams.RunID.Bytes != runID {
+		t.Fatalf("GetRunStepByIndex called with wrong run_id: %v", st.getRunStepByIndexParams.RunID)
+	}
+	if st.getRunStepByIndexParams.StepIndex != stepIndex {
+		t.Fatalf("GetRunStepByIndex called with wrong step_index: %d", st.getRunStepByIndexParams.StepIndex)
+	}
+
+	// Verify UpdateRunStepCompletion was called with the step ID and correct status.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+	if st.updateRunStepCompletionParams.ID.Bytes != stepID {
+		t.Fatalf("UpdateRunStepCompletion called with wrong step id: %v", st.updateRunStepCompletionParams.ID)
+	}
+	if st.updateRunStepCompletionParams.Status != store.RunStepStatusSucceeded {
+		t.Fatalf("UpdateRunStepCompletion called with wrong status: %v", st.updateRunStepCompletionParams.Status)
+	}
+
+	// Verify run-level completion was NOT called (step-level completion path).
+	if st.updateRunCompletionCalled {
+		t.Fatal("did not expect UpdateRunCompletion to be called for step-level completion")
+	}
+}
+
+// TestCompleteRunStep_Failed verifies step completion with failed status.
+func TestCompleteRunStep_Failed(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(2)
+	reason := "build gate failed"
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusRunning,
+		},
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "failed",
+		"reason":     reason,
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify UpdateRunStepCompletion was called with failed status and reason.
+	if !st.updateRunStepCompletionCalled {
+		t.Fatal("expected UpdateRunStepCompletion to be called")
+	}
+	if st.updateRunStepCompletionParams.Status != store.RunStepStatusFailed {
+		t.Fatalf("UpdateRunStepCompletion called with wrong status: %v", st.updateRunStepCompletionParams.Status)
+	}
+	if st.updateRunStepCompletionParams.Reason == nil || *st.updateRunStepCompletionParams.Reason != reason {
+		t.Fatalf("UpdateRunStepCompletion called with wrong reason: %v", st.updateRunStepCompletionParams.Reason)
+	}
+}
+
+// TestCompleteRunStep_WrongNode verifies 403 when the step is assigned to a different node.
+func TestCompleteRunStep_WrongNode(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	otherNode := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(0)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: otherNode, Valid: true}, // Different node
+			Status:    store.RunStepStatusRunning,
+		},
+	}
+
+	handler := completeRunHandler(st, nil)
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status 403, got %d", rr.Code)
+	}
+	if st.updateRunStepCompletionCalled {
+		t.Fatal("did not expect UpdateRunStepCompletion to be called")
+	}
+}
+
+// TestCompleteRunStep_WrongStatus verifies 409 when the step is not in running state.
+func TestCompleteRunStep_WrongStatus(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(1)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusSucceeded, // Already completed, not running
+		},
+	}
+
+	handler := completeRunHandler(st, nil)
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("expected status 409, got %d", rr.Code)
+	}
+	if st.updateRunStepCompletionCalled {
+		t.Fatal("did not expect UpdateRunStepCompletion to be called")
+	}
+}
+
+// TestCompleteRunStep_StepNotFound verifies 404 when the step doesn't exist.
+func TestCompleteRunStep_StepNotFound(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepIndex := int32(5)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getRunStepByIndexErr: pgx.ErrNoRows, // Step not found
+	}
+
+	handler := completeRunHandler(st, nil)
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rr.Code)
+	}
+	if st.updateRunStepCompletionCalled {
+		t.Fatal("did not expect UpdateRunStepCompletion to be called")
+	}
+}
