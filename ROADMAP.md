@@ -49,7 +49,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (nodeagent)
   - Scope: internal/nodeagent/execution_orchestrator.go (create a fresh workspace per step), internal/nodeagent/execution_healing.go (healing uses rehydrated workspace), internal/nodeagent/workspace.go
   - Test: go test ./internal/nodeagent/... — Steps can be executed in isolation; parallel tests use different workspaces without interference
-- [ ] Allow scheduler to assign steps across nodes (same run) — Enable multiple nodes to execute distinct steps of one run using rehydration
+- [x] Allow scheduler to assign steps across nodes (same run) — Enable multiple nodes to execute distinct steps of one run using rehydration
   - Component: ploy (server, nodeagent)
   - Scope: internal/server/handlers/nodes_claim.go (step-level claims), internal/nodeagent/claimer_loop.go (claim “step work” not just whole runs), internal/store/queries/runs.sql and stages.sql (if additional step rows needed)
   - Test: integration tests ./tests/integration/... — Two nodes claim different steps of the same run; both succeed and final MR includes all changes
