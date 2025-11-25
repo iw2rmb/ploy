@@ -385,7 +385,12 @@ func TestAgentWithTLS(t *testing.T) {
 	// Wait for shutdown.
 	select {
 	case err := <-errCh:
-		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		if err != nil &&
+			!errors.Is(err, context.Canceled) &&
+			!errors.Is(err, context.DeadlineExceeded) &&
+			// Some platforms return a net.OpError wrapping "use of closed network connection"
+			// when the listener has already been closed. Treat it as benign.
+			!strings.Contains(err.Error(), "use of closed network connection") {
 			t.Errorf("agent.Run() error = %v", err)
 		}
 	case <-time.After(2 * time.Second):
