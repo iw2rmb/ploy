@@ -51,6 +51,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     environment:
+      - PLOY_DOCKER_NETWORK=local_default
       - PLOYD_CACHE_HOME=/private/tmp
       - TMPDIR=/private/tmp
     volumes:
