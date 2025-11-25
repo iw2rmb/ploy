@@ -76,10 +76,10 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 		t.Fatalf("expected compilation error in build-gate.log, got:\n%s", string(b))
 	}
 
-	// Build mods-codex image (tag: mods-codex:latest)
+	// Build mods-codex image (tag: mods-codex:latest).
 	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "docker", "mods", "mod-codex", "Dockerfile"), repoRoot)
 
-	// Prepare prompt with explicit verification rule for ploy-buildgate.
+	// Prepare prompt with an explicit verification rule for buildgate-validate.
 	// Healing mods should generate a diff patch file and pass it to buildgate-validate
 	// for repo+diff verification via the Build Gate HTTP API.
 	prompt := strings.Join([]string{
@@ -102,8 +102,8 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if strings.TrimSpace(auth) == "" {
 		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
 	}
-	// Run mod-codex; map workspace to the same absolute path inside container, mount Docker socket for ploy-buildgate.
-	// Inject repo metadata env vars so healing can construct diff-patch payloads for Build Gate verification.
+	// Run mod-codex; map workspace to the same absolute path inside container, mount Docker socket for Build Gate verification.
+	// Inject repo metadata env vars so healing can construct diff-patch payloads for Build Gate verification via buildgate-validate.
 	run := exec.Command("docker", "run", "--rm",
 		"-e", "CODEX_AUTH_JSON="+auth,
 		"-e", "PLOY_HOST_WORKSPACE="+ws,
