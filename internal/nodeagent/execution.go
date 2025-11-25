@@ -11,8 +11,14 @@ import (
 // These methods isolate component initialization logic from the orchestration flow.
 
 // createGitFetcher initializes a git fetcher for repository operations.
+// When PLOYD_CACHE_HOME is set, the fetcher uses it as the base directory for
+// caching git clones, avoiding repeated network fetches for the same repo/ref/commit.
 func (r *runController) createGitFetcher() (step.GitFetcher, error) {
-	return hydration.NewGitFetcher(hydration.GitFetcherOptions{PublishSnapshot: false})
+	cacheDir := os.Getenv("PLOYD_CACHE_HOME")
+	return hydration.NewGitFetcher(hydration.GitFetcherOptions{
+		PublishSnapshot: false,
+		CacheDir:        cacheDir,
+	})
 }
 
 // createWorkspaceHydrator initializes a workspace hydrator with the provided repo fetcher.

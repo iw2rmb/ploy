@@ -96,9 +96,12 @@ func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contr
 func (e *BuildGateExecutor) cloneRepo(ctx context.Context, repoURL, ref, workspace string) error {
 	slog.Info("cloning repository", "repo_url", repoURL, "ref", ref, "workspace", workspace)
 
-	// Create git fetcher.
+	// Create git fetcher with cache support when PLOYD_CACHE_HOME is set.
+	// This avoids repeated network fetches for the same repo/ref/commit across runs.
+	cacheDir := os.Getenv("PLOYD_CACHE_HOME")
 	gitFetcher, err := hydration.NewGitFetcher(hydration.GitFetcherOptions{
 		PublishSnapshot: false,
+		CacheDir:        cacheDir,
 	})
 	if err != nil {
 		return fmt.Errorf("create git fetcher: %w", err)

@@ -2,9 +2,12 @@ package hydration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
@@ -15,6 +18,12 @@ type GitFetcherOptions struct {
 	// PublishSnapshot indicates whether snapshots should be published during fetch.
 	// Currently unused but reserved for future observability extensions.
 	PublishSnapshot bool
+
+	// CacheDir specifies the base directory for caching git clones.
+	// When set (typically from PLOYD_CACHE_HOME), the fetcher reuses existing clones
+	// for the same repo/ref/commit combination, avoiding repeated full clones.
+	// When empty, caching is disabled and each fetch performs a fresh clone.
+	CacheDir string
 }
 
 // GitFetcher fetches git repositories using shallow clones for base hydration.
@@ -53,6 +62,11 @@ func NewGitFetcher(opts GitFetcherOptions) (GitFetcher, error) {
 //  2. Uses base_ref (if provided) to determine the starting branch/tag.
 //  3. Optionally fetches and checks out a specific commit_sha for pinned snapshots.
 //
+// When CacheDir is configured (via PLOYD_CACHE_HOME), the fetcher reuses existing
+// base clones for the same repo/ref/commit combination. The cache key is derived from
+// the normalized repo URL, base_ref, and commit_sha. If a cached clone exists, it is
+// copied to the destination workspace, avoiding repeated network fetches.
+//
 // The resulting clone serves as the logical "base snapshot" that nodes use
 // for applying ordered per-step diffs during multi-step Mods runs. Each node
 // performs this clone independently, ensuring consistent base states across
@@ -75,6 +89,44 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	_ = strings.TrimSpace(string(repo.TargetRef)) // targetRef is intentionally unused during hydration
 	commitSHA := strings.TrimSpace(string(repo.Commit))
 
+	// Check if caching is enabled and we have a cached clone.
+	if g.opts.CacheDir != "" {
+		cacheKey := computeCacheKey(url, baseRef, commitSHA)
+		cachedClonePath := filepath.Join(g.opts.CacheDir, "git-clones", cacheKey)
+
+		// If cache exists, copy it to dest and return early.
+		if _, err := os.Stat(cachedClonePath); err == nil {
+			if err := copyGitClone(cachedClonePath, dest); err != nil {
+				// Cache copy failed; fall through to fresh clone.
+				// We don't treat this as a hard error since we can still fetch fresh.
+			} else {
+				// Cache hit: successfully reused cached clone.
+				return nil
+			}
+		}
+
+		// Cache miss or copy failed: perform fresh clone and populate cache.
+		if err := g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest); err != nil {
+			return err
+		}
+
+		// Populate cache: copy dest to cache directory.
+		// Ignore errors here to avoid failing the overall fetch if cache write fails.
+		// The clone succeeded, so the workspace is valid even if caching fails.
+		if err := os.MkdirAll(filepath.Dir(cachedClonePath), 0o755); err == nil {
+			_ = copyGitClone(dest, cachedClonePath)
+		}
+
+		return nil
+	}
+
+	// No caching: perform a fresh clone.
+	return g.cloneAndCheckout(ctx, url, baseRef, commitSHA, dest)
+}
+
+// cloneAndCheckout performs a shallow clone and optional commit checkout.
+// This is the core git fetch logic extracted for reuse between cached and non-cached flows.
+func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitSHA, dest string) error {
 	// Step 1: Create base snapshot via shallow clone.
 	// --depth 1: Fetch only the latest commit to minimize transfer size.
 	// --single-branch: Fetch only the specified branch to reduce clone time.
@@ -102,6 +154,53 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 		if err := runGitCommand(ctx, dest, checkoutArgs...); err != nil {
 			return fmt.Errorf("git checkout %s failed: %w", commitSHA, err)
 		}
+	}
+
+	return nil
+}
+
+// computeCacheKey generates a stable cache key for a repo/ref/commit combination.
+// The key is a SHA256 hash of the normalized inputs to ensure filesystem-safe,
+// collision-resistant identifiers that remain stable across runs.
+func computeCacheKey(url, baseRef, commitSHA string) string {
+	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
+	normalized := strings.TrimSuffix(strings.TrimSpace(url), "/")
+	normalized = strings.TrimSuffix(normalized, ".git")
+
+	// Include base_ref and commit_sha in the key for cache isolation.
+	// Different base_ref or commit_sha values result in different cache entries.
+	keyInput := fmt.Sprintf("%s|%s|%s", normalized, baseRef, commitSHA)
+
+	hash := sha256.Sum256([]byte(keyInput))
+	return hex.EncodeToString(hash[:])
+}
+
+// copyGitClone creates a copy of a git repository from src to dest.
+// This uses rsync for efficient copying of git repositories, including the .git directory.
+// Falls back to cp if rsync is not available.
+func copyGitClone(src, dest string) error {
+	// Ensure src is a git repository.
+	if _, err := os.Stat(filepath.Join(src, ".git")); err != nil {
+		return fmt.Errorf("source is not a git repository: %w", err)
+	}
+
+	// Try rsync first (more efficient for git repos).
+	if _, err := exec.LookPath("rsync"); err == nil {
+		// rsync -a preserves permissions, timestamps, and copies recursively.
+		// Trailing slash on src ensures contents are copied, not the directory itself.
+		cmd := exec.Command("rsync", "-a", src+"/", dest)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("rsync failed: %w (output: %s)", err, string(output))
+		}
+		return nil
+	}
+
+	// Fallback: use cp -R (less efficient but more portable).
+	cmd := exec.Command("cp", "-R", src, dest)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("cp failed: %w (output: %s)", err, string(output))
 	}
 
 	return nil

@@ -266,6 +266,377 @@ func TestNewGitFetcher(t *testing.T) {
 	}
 }
 
+// TestGitFetcher_CacheDir validates the cache directory functionality.
+func TestGitFetcher_CacheDir(t *testing.T) {
+	// Skip if git is not available.
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git command not found, skipping test")
+	}
+
+	t.Run("cache miss performs fresh clone", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup: Create a test repo and cache directory.
+		repoDir := setupTestGitRepo(t, "cache-miss")
+		cacheDir := t.TempDir()
+		dest := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{
+			CacheDir: cacheDir,
+		})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		// Fetch with caching enabled (first fetch, should be a cache miss).
+		repo := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+
+		ctx := context.Background()
+		if err := fetcher.Fetch(ctx, repo, dest); err != nil {
+			t.Fatalf("Fetch() error = %v", err)
+		}
+
+		// Verify .git directory exists in dest.
+		gitDir := filepath.Join(dest, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			t.Errorf("expected .git directory at %s", gitDir)
+		}
+
+		// Verify cache was populated (cache directory should exist).
+		cacheCloneDir := filepath.Join(cacheDir, "git-clones")
+		if _, err := os.Stat(cacheCloneDir); os.IsNotExist(err) {
+			t.Errorf("expected cache directory at %s", cacheCloneDir)
+		}
+	})
+
+	t.Run("cache hit reuses cached clone", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup: Create a test repo and cache directory.
+		repoDir := setupTestGitRepo(t, "cache-hit")
+		cacheDir := t.TempDir()
+		dest1 := t.TempDir()
+		dest2 := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{
+			CacheDir: cacheDir,
+		})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		repo := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+
+		ctx := context.Background()
+
+		// First fetch: populate cache.
+		if err := fetcher.Fetch(ctx, repo, dest1); err != nil {
+			t.Fatalf("Fetch() first call error = %v", err)
+		}
+
+		// Second fetch: should reuse cache.
+		if err := fetcher.Fetch(ctx, repo, dest2); err != nil {
+			t.Fatalf("Fetch() second call error = %v", err)
+		}
+
+		// Verify both destinations have .git directories.
+		for i, dest := range []string{dest1, dest2} {
+			gitDir := filepath.Join(dest, ".git")
+			if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+				t.Errorf("dest%d: expected .git directory at %s", i+1, gitDir)
+			}
+		}
+
+		// Verify both destinations have the same content (README.md).
+		readme1Path := filepath.Join(dest1, "README.md")
+		readme2Path := filepath.Join(dest2, "README.md")
+		content1, err := os.ReadFile(readme1Path)
+		if err != nil {
+			t.Fatalf("failed to read README.md from dest1: %v", err)
+		}
+		content2, err := os.ReadFile(readme2Path)
+		if err != nil {
+			t.Fatalf("failed to read README.md from dest2: %v", err)
+		}
+		if string(content1) != string(content2) {
+			t.Errorf("cached clone content mismatch: %q vs %q", string(content1), string(content2))
+		}
+	})
+
+	t.Run("different repos get separate cache entries", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup: Create two different test repos.
+		repo1Dir := setupTestGitRepo(t, "repo1")
+		repo2Dir := setupTestGitRepo(t, "repo2")
+		cacheDir := t.TempDir()
+		dest1 := t.TempDir()
+		dest2 := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{
+			CacheDir: cacheDir,
+		})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		ctx := context.Background()
+
+		// Fetch repo1.
+		repo1 := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repo1Dir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+		if err := fetcher.Fetch(ctx, repo1, dest1); err != nil {
+			t.Fatalf("Fetch() repo1 error = %v", err)
+		}
+
+		// Fetch repo2.
+		repo2 := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repo2Dir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+		if err := fetcher.Fetch(ctx, repo2, dest2); err != nil {
+			t.Fatalf("Fetch() repo2 error = %v", err)
+		}
+
+		// Verify cache has two separate entries (two subdirectories under git-clones).
+		cacheCloneDir := filepath.Join(cacheDir, "git-clones")
+		entries, err := os.ReadDir(cacheCloneDir)
+		if err != nil {
+			t.Fatalf("failed to read cache directory: %v", err)
+		}
+		if len(entries) != 2 {
+			t.Errorf("expected 2 cache entries, got %d", len(entries))
+		}
+	})
+
+	t.Run("different commit_sha gets separate cache entry", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup: Create a repo with multiple commits.
+		repoDir := setupTestGitRepoWithCommits(t)
+		secondCommitSHA := getSecondCommitSHA(t, repoDir)
+		cacheDir := t.TempDir()
+		dest1 := t.TempDir()
+		dest2 := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{
+			CacheDir: cacheDir,
+		})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		ctx := context.Background()
+
+		// Fetch with no commit_sha (latest commit).
+		repo1 := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+		if err := fetcher.Fetch(ctx, repo1, dest1); err != nil {
+			t.Fatalf("Fetch() latest commit error = %v", err)
+		}
+
+		// Fetch with specific commit_sha.
+		repo2 := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+			Commit:    types.CommitSHA(secondCommitSHA),
+		}
+		if err := fetcher.Fetch(ctx, repo2, dest2); err != nil {
+			t.Fatalf("Fetch() specific commit error = %v", err)
+		}
+
+		// Verify cache has two separate entries.
+		cacheCloneDir := filepath.Join(cacheDir, "git-clones")
+		entries, err := os.ReadDir(cacheCloneDir)
+		if err != nil {
+			t.Fatalf("failed to read cache directory: %v", err)
+		}
+		if len(entries) != 2 {
+			t.Errorf("expected 2 cache entries for different commits, got %d", len(entries))
+		}
+
+		// Verify dest1 has the latest commit content.
+		readme1Path := filepath.Join(dest1, "README.md")
+		content1, err := os.ReadFile(readme1Path)
+		if err != nil {
+			t.Fatalf("failed to read README.md from dest1: %v", err)
+		}
+		expectedContent1 := "# Third commit\n"
+		if string(content1) != expectedContent1 {
+			t.Errorf("dest1 expected %q, got %q", expectedContent1, string(content1))
+		}
+
+		// Verify dest2 has the second commit content.
+		readme2Path := filepath.Join(dest2, "README.md")
+		content2, err := os.ReadFile(readme2Path)
+		if err != nil {
+			t.Fatalf("failed to read README.md from dest2: %v", err)
+		}
+		expectedContent2 := "# Second commit\n"
+		if string(content2) != expectedContent2 {
+			t.Errorf("dest2 expected %q, got %q", expectedContent2, string(content2))
+		}
+	})
+
+	t.Run("no cache dir disables caching", func(t *testing.T) {
+		t.Parallel()
+
+		// Setup: Create a test repo with no cache directory.
+		repoDir := setupTestGitRepo(t, "no-cache")
+		dest := t.TempDir()
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{
+			CacheDir: "", // Caching disabled.
+		})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		repo := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+
+		ctx := context.Background()
+		if err := fetcher.Fetch(ctx, repo, dest); err != nil {
+			t.Fatalf("Fetch() error = %v", err)
+		}
+
+		// Verify .git directory exists in dest.
+		gitDir := filepath.Join(dest, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			t.Errorf("expected .git directory at %s", gitDir)
+		}
+
+		// No cache directory should exist since caching is disabled.
+		// We don't have a way to assert this directly, but the test passes if no errors occur.
+	})
+}
+
+// TestComputeCacheKey validates the cache key generation logic.
+func TestComputeCacheKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		url1     string
+		baseRef1 string
+		commit1  string
+		url2     string
+		baseRef2 string
+		commit2  string
+		wantSame bool
+	}{
+		{
+			name:     "same inputs produce same key",
+			url1:     "https://github.com/example/repo.git",
+			baseRef1: "main",
+			commit1:  "abc123",
+			url2:     "https://github.com/example/repo.git",
+			baseRef2: "main",
+			commit2:  "abc123",
+			wantSame: true,
+		},
+		{
+			name:     "URL normalization: trailing slash ignored",
+			url1:     "https://github.com/example/repo.git",
+			baseRef1: "main",
+			commit1:  "",
+			url2:     "https://github.com/example/repo.git/",
+			baseRef2: "main",
+			commit2:  "",
+			wantSame: true,
+		},
+		{
+			name:     "URL normalization: .git suffix ignored",
+			url1:     "https://github.com/example/repo",
+			baseRef1: "main",
+			commit1:  "",
+			url2:     "https://github.com/example/repo.git",
+			baseRef2: "main",
+			commit2:  "",
+			wantSame: true,
+		},
+		{
+			name:     "different base_ref produces different key",
+			url1:     "https://github.com/example/repo.git",
+			baseRef1: "main",
+			commit1:  "",
+			url2:     "https://github.com/example/repo.git",
+			baseRef2: "develop",
+			commit2:  "",
+			wantSame: false,
+		},
+		{
+			name:     "different commit_sha produces different key",
+			url1:     "https://github.com/example/repo.git",
+			baseRef1: "main",
+			commit1:  "abc123",
+			url2:     "https://github.com/example/repo.git",
+			baseRef2: "main",
+			commit2:  "def456",
+			wantSame: false,
+		},
+		{
+			name:     "different URL produces different key",
+			url1:     "https://github.com/example/repo1.git",
+			baseRef1: "main",
+			commit1:  "",
+			url2:     "https://github.com/example/repo2.git",
+			baseRef2: "main",
+			commit2:  "",
+			wantSame: false,
+		},
+		{
+			name:     "empty vs non-empty commit produces different key",
+			url1:     "https://github.com/example/repo.git",
+			baseRef1: "main",
+			commit1:  "",
+			url2:     "https://github.com/example/repo.git",
+			baseRef2: "main",
+			commit2:  "abc123",
+			wantSame: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key1 := computeCacheKey(tt.url1, tt.baseRef1, tt.commit1)
+			key2 := computeCacheKey(tt.url2, tt.baseRef2, tt.commit2)
+
+			if tt.wantSame {
+				if key1 != key2 {
+					t.Errorf("expected same cache key, got %q and %q", key1, key2)
+				}
+			} else {
+				if key1 == key2 {
+					t.Errorf("expected different cache keys, both got %q", key1)
+				}
+			}
+
+			// Verify key is filesystem-safe (hex string).
+			if len(key1) != 64 { // SHA256 hex = 64 chars
+				t.Errorf("expected 64-char hex string, got %d chars: %q", len(key1), key1)
+			}
+		})
+	}
+}
+
 // TestGitFetcher_BaseHydrationStrategy validates the shallow clone base hydration strategy.
 func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 	// Skip if git is not available.
