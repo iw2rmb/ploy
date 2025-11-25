@@ -115,7 +115,7 @@ Legend: [ ] todo, [x] done.
 
 ## Follow-ups / Remaining Work
 
-- [ ] Expose Build Gate stats via Mods status API and CLI — Make gate health visible without inspecting raw artifacts
+- [x] Expose Build Gate stats via Mods status API and CLI — Make gate health visible without inspecting raw artifacts
   - Component: ploy (server, CLI, docs)
   - Scope:
     - internal/server/handlers/handlers_mods_ticket.go — extend TicketSummary to surface `runs.stats.gate` (or a summarized view) alongside existing metadata (keeps MR URL propagation via `RunStats.MRURL()` intact).
