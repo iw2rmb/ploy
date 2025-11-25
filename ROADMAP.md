@@ -55,14 +55,14 @@ Legend: [ ] todo, [x] done.
   - Test: integration tests ./tests/integration/... — Two nodes claim different steps of the same run; both succeed and final MR includes all changes
 
 ## Diff Download & Apply Pipeline
-- [ ] Provide node-facing API to list and fetch run diffs — Let nodes pull gzipped patches and metadata per run
+- [x] Provide node-facing API to list and fetch run diffs — Let nodes pull gzipped patches and metadata per run
   - Component: ploy (server, nodeagent)
-  - Scope: internal/server/handlers/handlers_diffs.go (reuse GET /v1/mods/{id}/diffs and GET /v1/diffs/{id}?download=true), internal/nodeagent/diffuploader.go (document symmetry), internal/nodeagent/new diff client helper
+  - Scope: internal/server/handlers/handlers_diffs.go (reuse GET /v1/mods/{id}/diffs and GET /v1/diffs/{id}?download=true), internal/nodeagent/diffuploader.go (document symmetry), internal/nodeagent/difffetcher.go (node diff client helper)
   - Test: go test ./internal/server/... ./internal/nodeagent/... — Node can fetch and gunzip patches uploaded earlier by any node
-- [ ] Implement patch application in nodeagent using git/patch — Apply ordered run diffs onto a fresh base clone when rehydrating
+- [x] Implement patch application in nodeagent using git/patch — Apply ordered run diffs onto a fresh base clone when rehydrating
   - Component: ploy (nodeagent)
-  - Scope: internal/nodeagent/execution.go (apply patch chain), internal/nodeagent/git/* (helper for git apply), internal/nodeagent/execution_orchestrator.go (wire into step hydration)
-  - Test: go test ./internal/nodeagent/... — Given stored patches, workspace contents match expected code after each step
+  - Scope: internal/nodeagent/execution.go (apply patch chain), internal/nodeagent/difffetcher.go (fetch patches), internal/nodeagent/execution_orchestrator.go (wire into step hydration)
+  - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — Given stored patches, workspace contents match expected code after each step
 
 ## CLI, Docs & E2E Coverage
 - [ ] Update CLI spec handling to preserve mods[] and new step metadata — Ensure buildSpecPayload and parseSpec handle multi-step fields without breaking single-mod flows
