@@ -74,7 +74,7 @@ Done when:
     - Example CLI usage inside a healing mod: `buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch`
   - Test: go test ./internal/server/handlers/... && bash tests/e2e/mods/scenario-orw-fail/run.sh — New tests assert that calls from buildgate-validate with repo_url+ref(+diff_patch) are accepted and that the E2E scenario exercises the updated wrapper.
 
-- [ ] Wire Codex healing to produce diff patches for verification — Ensure healing mods can generate and hand off patches to Build Gate
+- [x] Wire Codex healing to produce diff patches for verification — Ensure healing mods can generate and hand off patches to Build Gate
   - Component: ploy (tests, docs; Codex image behavior)
   - Scope:
     - tests/integration/mods/mod-codex/mod_codex_test.go — Extend the prompt or test harness so mods-codex writes its healing changes as a unified diff file (e.g. /workspace/heal.patch or /out/heal.patch) before calling buildgate-validate.

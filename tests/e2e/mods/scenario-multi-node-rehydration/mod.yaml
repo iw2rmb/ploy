@@ -92,13 +92,15 @@ build_gate:
 build_gate_healing:
   retries: 1
   mods:
-    # Codex healing container that can validate builds and make fixes
+    # Codex healing container that generates a unified diff patch for Build Gate
+    # verification using the repo+diff API model (repo_url + ref + diff_patch).
     - image: docker.io/iwtormb/mods-codex:latest
       env:
         CODEX_PROMPT: |-
           Rules:
-          - After making any change, verify the build passes.
-          - Run: buildgate-validate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - After making any change, generate a unified diff and verify the build passes.
+          - Generate diff: cd /workspace && git diff > /out/heal.patch
+          - Run: buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch
           - If it fails, iterate and try again until it passes.
           - Only finalize once the gate passes; then print "BUILD PASSED".
 
