@@ -294,6 +294,11 @@ usage but are documented here for completeness.
   for labeling during provisioning; not yet persisted or consumed by server runtime.
 - `NODE_ADDRESS` — IP/hostname of the node being provisioned, passed as `--node-address` script
   argument.
+- `PLOY_DOCKER_NETWORK` — Optional Docker network name to attach runtime containers (Build Gate
+  and healing mods) to. When set on the node, the node agent's Docker runtime uses this network
+  so containers (e.g., `mods-codex`) can reach the control-plane service by its Docker network
+  hostname (e.g., `server:8080` in the local Docker stack). When unset, the default Docker
+  network is used (no behavior change for non-Docker/VPS deployments).
 - `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
   `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
   Additionally, healing containers (e.g., `mods-codex`) consume this variable to call
