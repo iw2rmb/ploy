@@ -41,9 +41,14 @@ WHERE r.id = cte.id
 RETURNING r.*;
 
 -- name: AckRunStart :exec
+-- Transitions run status to 'running' when execution starts.
+-- For single-step runs (claimed via ClaimRun), status is 'assigned' before ack.
+-- For multi-step runs (claimed via ClaimRunStep), status may be 'queued' since
+-- the run itself is never assigned to a node; only individual steps are assigned.
+-- We support both transitions: assigned→running and queued→running.
 UPDATE runs
 SET status = 'running'
-WHERE id = $1 AND status = 'assigned';
+WHERE id = $1 AND status IN ('assigned', 'queued');
 
 -- name: UpdateRunCompletion :exec
 UPDATE runs

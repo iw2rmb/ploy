@@ -245,9 +245,13 @@ func TestAckRunStepStart_Success(t *testing.T) {
 		t.Fatalf("AckRunStepStart called with wrong step id: %v", st.ackRunStepStartParam)
 	}
 
-	// Verify run-level ack was NOT called (step-level ack path).
-	if st.ackRunStartCalled {
-		t.Fatal("did not expect AckRunStart to be called for step-level ack")
+	// Verify run-level ack was also called to transition run status to 'running'.
+	// This is the new behavior: when a step starts, the run also transitions to 'running'.
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called for step-level ack")
+	}
+	if st.ackRunStartParam.Bytes != runID {
+		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
 	}
 }
 
@@ -371,5 +375,121 @@ func TestAckRunStepStart_StepNotFound(t *testing.T) {
 	}
 	if st.ackRunStepStartCalled {
 		t.Fatal("did not expect AckRunStepStart to be called")
+	}
+}
+
+// ===== Run-level Start Semantics for Multi-step Runs =====
+// These tests verify that run.status transitions to 'running' when the first step starts.
+
+// TestAckRunStepStart_FirstStepTransitionsRunToRunning verifies that when the first step
+// of a multi-step run is acknowledged, both the step and the run status transition to 'running'.
+func TestAckRunStepStart_FirstStepTransitionsRunToRunning(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(0) // First step
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusQueued, // Multi-step run starts in 'queued' status
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusAssigned,
+		},
+	}
+
+	handler := ackRunStartHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step-level ack was called.
+	if !st.ackRunStepStartCalled {
+		t.Fatal("expected AckRunStepStart to be called")
+	}
+	if st.ackRunStepStartParam.Bytes != stepID {
+		t.Fatalf("AckRunStepStart called with wrong step id: %v", st.ackRunStepStartParam)
+	}
+
+	// Verify run-level ack was also called to transition run status to 'running'.
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called for first step of multi-step run")
+	}
+	if st.ackRunStartParam.Bytes != runID {
+		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
+	}
+}
+
+// TestAckRunStepStart_SubsequentStepLeavesRunStatusUnchanged verifies that when a
+// subsequent step (not the first) is acknowledged, only the step status transitions to 'running'
+// and the run status is left unchanged (already 'running' from first step ack).
+func TestAckRunStepStart_SubsequentStepLeavesRunStatusUnchanged(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	stepID := uuid.New()
+	stepIndex := int32(2) // Subsequent step (not first)
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning, // Run already in 'running' status from first step
+		},
+		getRunStepByIndexResult: store.RunStep{
+			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			StepIndex: stepIndex,
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.RunStepStatusAssigned,
+		},
+	}
+
+	handler := ackRunStartHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"run_id":     runID.String(),
+		"step_index": stepIndex,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/ack", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify step-level ack was called.
+	if !st.ackRunStepStartCalled {
+		t.Fatal("expected AckRunStepStart to be called")
+	}
+
+	// Verify run-level ack was still called (it's a no-op for already 'running' status).
+	// The SQL query won't match any rows since status is 'running', not 'queued' or 'assigned'.
+	// This is acceptable behavior - AckRunStart is idempotent.
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called (even though it's a no-op for subsequent steps)")
 	}
 }

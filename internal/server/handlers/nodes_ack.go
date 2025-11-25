@@ -124,6 +124,17 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 				return
 			}
 
+			// For multi-step runs, transition the run status to 'running' when the first step starts.
+			// This ensures run.status reflects that execution has begun, even though individual steps
+			// are claimed via run_steps. We relax the status precondition to allow queued→running transition.
+			// AckRunStart is idempotent and only updates if status is 'assigned', so for subsequent steps
+			// (where run.status is already 'running'), this is a no-op.
+			//
+			// Note: The run may be in 'queued' status (no node_id) for multi-step runs since steps are
+			// claimed independently. We call AckRunStart regardless; if run.status is already 'running'
+			// or not 'assigned', the query will not match and that's acceptable (silent no-op).
+			_ = st.AckRunStart(r.Context(), runID)
+
 			slog.Info("run step start acknowledged",
 				"run_id", req.RunID,
 				"step_index", *req.StepIndex,
