@@ -2,12 +2,9 @@ post:
   tags: [Control]
   summary: Submit a build validation job
   description: |
-    Submit a Git-based build validation job. Requires repo_url and ref fields.
-    Returns the result if completed within a short timeout, or a JobID for
-    async polling via GET /v1/buildgate/jobs/{id}.
-
-    The content_archive mode has been removed to simplify the Build Gate
-    contract and avoid large workspace payloads.
+    Submit a Git-based build validation job using the repo+diff model.
+    Requires repo_url and ref fields. Returns the result if completed within
+    a short timeout, or a JobID for async polling via GET /v1/buildgate/jobs/{id}.
   requestBody:
     required: true
     content:

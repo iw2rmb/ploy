@@ -7,8 +7,8 @@ Scope
 HTTP Build Gate API
 
 The Build Gate uses a repo+diff validation model: callers provide a Git repository URL and ref as baseline,
-with an optional unified diff patch for healing flows. This replaces the legacy content_archive-based
-workspace uploads and avoids transmitting large payloads over HTTP.
+with an optional unified diff patch for healing flows. This avoids transmitting large workspace archives
+over HTTP by leveraging Git for the baseline and sending only the delta.
 
 Endpoint: `POST /v1/buildgate/validate`
 

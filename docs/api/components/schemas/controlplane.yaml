@@ -99,8 +99,7 @@ BuildGateValidateRequest:
   type: object
   description: |
     Submit a build validation job. Requires repo_url and ref for Git-based
-    validation. The content_archive mode has been removed to simplify the
-    Build Gate contract and avoid large workspace payloads.
+    validation using the repo+diff model.
 
     Optionally, callers may supply diff_patch (gzipped unified diff, base64-encoded)
     to apply on top of the cloned repo_url+ref baseline. This enables healing flows

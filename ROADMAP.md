@@ -2,23 +2,23 @@
 
 Scope: Replace workspace-archive Build Gate verification with a repo+ref+diff model for healing flows. The Build Gate HTTP API will accept a Git baseline and an optional diff patch instead of a full base64 workspace archive; healing mods will verify builds using this API while reusing the same repo and diff chain semantics as Mods runs.
 
-Documentation: docs/api/OpenAPI.yaml, docs/api/components/schemas/controlplane.yaml, docs/build-gate/README.md, docs/envs/README.md, tests/e2e/mods/README.md, CHECKPOINT_MODS.md.
+Documentation: docs/api/OpenAPI.yaml, docs/api/components/schemas/controlplane.yaml, docs/build-gate/README.md, docs/envs/README.md, tests/e2e/mods/README.md.
 
 Legend: [ ] todo, [x] done.
 
 Done when:
-- All callers use repo_url+ref(+diff_patch); no code or docs reference `content_archive` for Build Gate.
+- All callers use repo_url+ref(+diff_patch); the legacy archive-based Build Gate contract is fully removed from code and docs.
 - Mods E2E scenarios `scenario-orw-fail` and `scenario-multi-node-rehydration` pass using the repo+diff Build Gate model.
 
 ## API & Contracts
-- [x] Ref-only BuildGateValidateRequest (remove content_archive) — Simplify Build Gate contract and remove large workspace payloads
+- [x] Ref-only BuildGateValidateRequest — Simplify Build Gate contract and remove large workspace payloads
   - Component: ploy (server, workflow contracts, docs)
   - Scope:
-    - internal/workflow/contracts/buildgate_service.go — Remove `ContentArchive` from `BuildGateValidateRequest`; require `RepoURL` and `Ref` (both non-empty) in `Validate()`.
-    - docs/api/components/schemas/controlplane.yaml — Drop `content_archive` from `BuildGateValidateRequest`; update schema to require `repo_url` and `ref` only.
+    - internal/workflow/contracts/buildgate_service.go — Require `RepoURL` and `Ref` (both non-empty) in `Validate()`.
+    - docs/api/components/schemas/controlplane.yaml — Ensure `BuildGateValidateRequest` requires `repo_url` and `ref` only.
     - docs/api/paths/buildgate_validate.yaml, docs/api/OpenAPI.yaml — Align description with ref-based API shape.
     - internal/server/handlers/handlers_buildgate.go — Ensure `validateBuildGateHandler` uses the ref-only `BuildGateValidateRequest` and surfaces validation errors for missing `repo_url`/`ref`.
-  - Test: go test ./internal/workflow/contracts/... ./internal/server/handlers/... — New tests assert that POST /v1/buildgate/validate with only repo_url+ref is accepted and that legacy content_archive payloads are rejected.
+  - Test: go test ./internal/workflow/contracts/... ./internal/server/handlers/... — New tests assert that POST /v1/buildgate/validate with only repo_url+ref is accepted and that legacy archive-style payloads are rejected.
 
 - [x] Introduce diff_patch field for repo+diff validation — Allow Build Gate jobs to replay healing changes without shipping full workspaces
   - Component: ploy (server, workflow contracts, docs)
@@ -43,7 +43,7 @@ Done when:
 - [x] Clone repo and apply diff_patch in BuildGateExecutor — Execute Build Gate jobs against repo+diff workspaces on nodes
   - Component: ploy (nodeagent, worker hydration)
   - Scope:
-    - internal/nodeagent/buildgate_executor.go — Simplify workspace population to always use `cloneRepo(ctx, req.RepoURL, req.Ref, workspaceRoot)`; remove content-archive extraction path.
+    - internal/nodeagent/buildgate_executor.go — Simplify workspace population to always use `cloneRepo(ctx, req.RepoURL, req.Ref, workspaceRoot)`; remove any archive-based extraction path.
     - internal/nodeagent/buildgate_executor.go — After clone, when `len(req.DiffPatch) > 0`, decompress gzipped unified diff and apply via `git apply` in `workspaceRoot` (reuse or mirror `decompressPatch`/`applyGzippedPatch` patterns from internal/nodeagent/execution.go).
     - internal/nodeagent/execution.go — Optionally extract shared patch-decompression helpers to avoid duplication.
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — New tests assert that BuildGateExecutor clones the repo, applies a diff patch correctly, and fails cleanly when the patch is invalid.
@@ -54,7 +54,6 @@ Done when:
   - Scope:
     - internal/nodeagent/manifest.go — In `buildHealingManifest`, inject repo metadata into `manifest.Env`, e.g. `PLOY_REPO_URL`, `PLOY_BASE_REF`, `PLOY_TARGET_REF`, and `PLOY_COMMIT_SHA` sourced from `StartRunRequest` when present.
     - internal/nodeagent/handlers.go, internal/nodeagent/run_options.go — Confirm that StartRunRequest already carries repo_url/base_ref/target_ref/commit_sha; extend if needed.
-    - CHECKPOINT_MODS.md — Update examples showing healing mod environment to mention repo metadata env vars.
   - Test: go test ./internal/nodeagent/... — New tests validate that healing manifests receive the expected env values and that missing metadata is handled gracefully (no panics).
 
 - [x] Align healing verification with repo+diff Build Gate API — Use the HTTP Build Gate to verify healing changes via repo+diff semantics
@@ -68,7 +67,7 @@ Done when:
 - [x] Update buildgate-validate.sh to send repo+diff payloads — Make the Codex wrapper use the ref-based Build Gate API
   - Component: ploy (docker mods, tooling)
   - Scope:
-    - docker/mods/mod-codex/buildgate-validate.sh — Remove tarball creation and `content_archive` field; require `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` (or equivalent) and build JSON payload with `repo_url`, `ref`, `profile`, `timeout`, and optional `diff_patch`.
+    - docker/mods/mod-codex/buildgate-validate.sh — Remove tarball-based workspace uploads; require `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` (or equivalent) and build JSON payload with `repo_url`, `ref`, `profile`, `timeout`, and optional `diff_patch`.
     - docker/mods/mod-codex/buildgate-validate.sh — Add `--diff-patch <file>` flag (and/or `PLOY_DIFF_PATCH_FILE` env) that reads a unified diff file, gzips it, base64-encodes it, and sets `diff_patch` in the request.
     - docker/mods/mod-codex/Dockerfile — Ensure buildgate-validate remains installed and executable in the mods-codex image.
     - Example CLI usage inside a healing mod: `buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch`
@@ -86,10 +85,10 @@ Done when:
 - [x] Update environment and Build Gate docs for repo+diff mode — Keep operator-facing documentation in sync with the new contract
   - Component: ploy (docs)
   - Scope:
-    - docs/build-gate/README.md — Add a section describing the HTTP Build Gate contract (fields repo_url, ref, profile, timeout, diff_patch); remove references to content_archive-based workspace uploads.
+    - docs/build-gate/README.md — Add a section describing the HTTP Build Gate contract (fields repo_url, ref, profile, timeout, diff_patch); describe repo+diff as the only supported workspace upload model.
     - docs/envs/README.md — Document new env vars used by healing verification (`PLOY_REPO_URL`, `PLOY_BUILDGATE_REF`, `PLOY_DIFF_PATCH_FILE` or equivalents) alongside existing `PLOY_SERVER_URL`/TLS settings for healing containers.
-    - CHECKPOINT_MODS.md — Mention that Build Gate verification in healing flows uses the same repo+diff semantics as the Mods rehydration model.
-  - Test: make lint-docs (if available) or manual review — Docs consistently describe repo+diff Build Gate behavior; no remaining references to content_archive in the Build Gate HTTP API.
+    - tests/e2e/mods/README.md — Mention that Build Gate verification in healing flows uses the same repo+diff semantics as the Mods rehydration model.
+  - Test: make lint-docs (if available) or manual review — Docs consistently describe repo+diff Build Gate behavior; no remaining references to the legacy archive-based Build Gate HTTP API.
 
 ## TDD Discipline (slice-level)
 - Follow RED→GREEN→REFACTOR for this roadmap item using `scripts/validate-tdd-discipline.sh` (full repo or targeted packages).

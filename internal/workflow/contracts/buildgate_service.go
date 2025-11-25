@@ -21,9 +21,7 @@ const (
 )
 
 // BuildGateValidateRequest is the request payload for POST /v1/buildgate/validate.
-// Requires repo_url and ref for Git-based build validation. The content_archive
-// mode has been removed to simplify the Build Gate contract and avoid large
-// workspace payloads over HTTP.
+// Requires repo_url and ref for Git-based build validation using the repo+diff model.
 //
 // Optionally, callers may supply a DiffPatch (gzipped unified diff, base64-encoded)
 // to apply on top of the cloned repo_url+ref baseline. This enables healing flows
