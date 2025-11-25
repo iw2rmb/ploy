@@ -84,7 +84,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/nodes_complete.go (for runs that have run_steps entries, compute the effective run terminal state using CountRunSteps and CountRunStepsByStatus instead of blindly trusting the status field in the request), internal/store/queries/run_steps.sql (CountRunSteps, CountRunStepsByStatus already present)
   - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that runs are marked succeeded only when all steps succeeded, failed when any step failed, and that inconsistent combinations of requested run status and run_steps state are rejected or normalized
-- [ ] Add explicit tests for step-level claiming and single-step execution — Demonstrate end-to-end that nodes execute only the claimed step and upload step-indexed diffs
+- [x] Add explicit tests for step-level claiming and single-step execution — Demonstrate end-to-end that nodes execute only the claimed step and upload step-indexed diffs
   - Component: ploy (server, nodeagent)
   - Scope: internal/server/handlers/nodes_claim.go (unit tests that simulate multi-step runs with run_steps rows and assert ClaimRunStep is used and step_index is present in claim responses), internal/nodeagent/agent_claim_test.go or equivalent (tests that ClaimManager maps ClaimResponse.StepIndex into StartRunRequest.StepIndex and executes a single step in executeRun when StepIndex is non-nil)
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... — New tests show nodes can claim distinct steps of the same run, execute only the claimed step per node, and still support legacy single-step runs claimed via ClaimRun
