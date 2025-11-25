@@ -7,7 +7,7 @@ Documentation: docs/schemas/mod.example.yaml, docs/how-to/deploy-a-cluster.md, t
 Legend: [ ] todo, [x] done.
 
 ## Spec & Ticket Model
-- [ ] Extend Mod spec for multi-step mods (global build_gate/build_gate_healing, mods[]) — Define how multiple mods share one repo and global gate/heal policy
+- [x] Extend Mod spec for multi-step mods (global build_gate/build_gate_healing, mods[]) — Define how multiple mods share one repo and global gate/heal policy
   - Component: ploy (CLI, docs)
   - Scope: docs/schemas/mod.example.yaml, tests/e2e/mods/scenario-*/mod.yaml, docs/how-to/publish-mods.md; describe mods[] semantics (sequential steps, global gate, shared repo)
   - Test: go test ./cmd/ploy/... ./tests/e2e/... — Spec parsing tests cover mods[], docs reference new fields
