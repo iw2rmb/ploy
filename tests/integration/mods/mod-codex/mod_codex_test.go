@@ -79,11 +79,14 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	// Build mods-codex image (tag: mods-codex:latest)
 	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "docker", "mods", "mod-codex", "Dockerfile"), repoRoot)
 
-	// Prepare prompt with explicit verification rule for ploy-buildgate
+	// Prepare prompt with explicit verification rule for ploy-buildgate.
+	// Healing mods should generate a diff patch file and pass it to buildgate-validate
+	// for repo+diff verification via the Build Gate HTTP API.
 	prompt := strings.Join([]string{
 		"Rules:",
-		"- After making any change, verify the build.",
-		"- Run: ploy-buildgate --workspace \"$PLOY_HOST_WORKSPACE\" --profile auto",
+		"- After making any change, generate a unified diff and verify the build.",
+		"- Generate diff: cd /workspace && git diff > /out/heal.patch",
+		"- Run: buildgate-validate --repo-url \"$PLOY_REPO_URL\" --ref \"$PLOY_BUILDGATE_REF\" --profile auto --diff-patch /out/heal.patch",
 		"- If it fails, iterate and try again until it passes.",
 		"- Only finalize once the gate passes; then print \"BUILD PASSED\".",
 		"",
@@ -99,10 +102,13 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	if strings.TrimSpace(auth) == "" {
 		t.Skip("CODEX_AUTH_JSON not set; skipping real Codex execution test")
 	}
-	// Run mod-codex; map workspace to the same absolute path inside container, mount Docker socket for ploy-buildgate
+	// Run mod-codex; map workspace to the same absolute path inside container, mount Docker socket for ploy-buildgate.
+	// Inject repo metadata env vars so healing can construct diff-patch payloads for Build Gate verification.
 	run := exec.Command("docker", "run", "--rm",
 		"-e", "CODEX_AUTH_JSON="+auth,
 		"-e", "PLOY_HOST_WORKSPACE="+ws,
+		"-e", "PLOY_REPO_URL="+repoURL,
+		"-e", "PLOY_BUILDGATE_REF="+branch,
 		"-v", ws+":"+ws,
 		"-w", ws,
 		"-v", outDir+":/out",
@@ -136,5 +142,13 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	lb, err := os.ReadFile(filepath.Join(outDir, "codex.log"))
 	if err != nil || len(bytes.TrimSpace(lb)) == 0 {
 		t.Fatalf("codex.log missing or empty: %v", err)
+	}
+	// 3) heal.patch exists (healing diff produced for Build Gate verification)
+	// Healing mods should write a unified diff file that can be sent to the Build Gate API.
+	patchPath := filepath.Join(outDir, "heal.patch")
+	if pb, err := os.ReadFile(patchPath); err != nil {
+		t.Logf("heal.patch not found (optional): %v", err)
+	} else if len(bytes.TrimSpace(pb)) > 0 {
+		t.Logf("heal.patch produced (%d bytes); healing generated diff for Build Gate verification", len(pb))
 	}
 }

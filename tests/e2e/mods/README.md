@@ -92,6 +92,33 @@ Healing containers may optionally call the HTTP Build Gate API directly via `bui
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
 
+**Environment variables injected by the node agent for healing mods:**
+- `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
+- `PLOY_BUILDGATE_REF` — Git ref for Build Gate baseline (base_ref or commit_sha)
+- `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
+- `PLOY_SERVER_URL` — ploy server URL for Build Gate HTTP API
+
+**Generating diff patches for Build Gate verification:**
+
+Healing mods should generate unified diff patches and use the repo+diff Build Gate API
+for verification. This avoids shipping full workspace archives over HTTP:
+
+1. Generate a unified diff of healing changes:
+   ```bash
+   cd /workspace && git diff > /out/heal.patch
+   ```
+
+2. Call `buildgate-validate` with `--diff-patch` to verify via the HTTP API:
+   ```bash
+   buildgate-validate \
+     --repo-url "$PLOY_REPO_URL" \
+     --ref "$PLOY_BUILDGATE_REF" \
+     --profile auto \
+     --diff-patch /out/heal.patch
+   ```
+
+3. The Build Gate clones repo_url at ref, applies the diff patch, and runs the build.
+
 Example healing spec block:
 ```yaml
 build_gate_healing:
@@ -100,7 +127,16 @@ build_gate_healing:
     - image: docker.io/you/mods-codex:latest
       command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
       env:
-        CODEX_PROMPT: "Fix the build error in /in/build-gate.log"
+        CODEX_PROMPT: |-
+          Rules:
+          - After making any change, generate a unified diff and verify the build.
+          - Generate diff: cd /workspace && git diff > /out/heal.patch
+          - Run: buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch
+          - If it fails, iterate and try again until it passes.
+          - Only finalize once the gate passes; then print "BUILD PASSED".
+
+          Task:
+          Fix the build error in /in/build-gate.log
       env_from_file:
         CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
