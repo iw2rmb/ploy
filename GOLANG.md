@@ -46,6 +46,30 @@ This document codifies Go engineering rules for this repository. It complements 
 ## HTTP/Networking
 - For servers, set timeouts: `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`. Always close response bodies; use `http.Client{Timeout: ...}` and per‑request contexts.
 
+## Git Operations & Workspace Hydration
+
+### Base Hydration Strategy
+
+Ploy uses **shallow git clones** (via `internal/worker/hydration.GitFetcher`) to create the logical "base snapshot" for each run on each node. This strategy minimizes network transfer and disk usage while providing consistent starting points for applying per-step diffs during multi-step Mods runs.
+
+**Key behaviors:**
+- **Shallow clones**: Uses `git clone --depth 1` to fetch only the latest commit, avoiding full history transfer.
+- **Base reference**: When `base_ref` is provided, clones that specific branch/tag; otherwise uses the repository's default branch.
+- **Commit pinning**: When `commit_sha` is provided, fetches and checks out that exact commit after cloning, ensuring deterministic base snapshots across nodes even if `base_ref` has moved forward.
+- **Multi-node consistency**: Each node clones the same `base_ref`/`commit_sha` independently, guaranteeing identical base states before applying ordered diffs.
+
+**Implementation location:** `internal/worker/hydration/git_fetcher.go`
+
+**Target reference behavior:** The `target_ref` field is intentionally **not** checked out during hydration. The workspace remains on `base_ref` so that subsequent diff application produces the correct final state for each step.
+
+**Example flow:**
+1. Node receives run with `base_ref=main` and `commit_sha=abc123`
+2. GitFetcher performs: `git clone --depth 1 --branch main --single-branch <repo>`
+3. GitFetcher then: `git fetch origin abc123 --depth 1 && git checkout FETCH_HEAD`
+4. Result: Workspace at exact commit `abc123`, ready for diff application
+
+**Testing:** See `internal/worker/hydration/git_fetcher_test.go` for validation of shallow clone depth, commit pinning, and deterministic base snapshot behavior.
+
 ## Database (PostgreSQL) — pgx + sqlc
 - Use `pgx/v5` with `pgxpool` and typed `sqlc` queries as the default data layer (schema in `SCHEMA.sql`).
 - Transactions: check errors on `Commit`; rollback on error with `defer tx.Rollback(ctx)`.
