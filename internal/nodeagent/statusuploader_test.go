@@ -429,3 +429,149 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 		t.Error("expected context to be cancelled")
 	}
 }
+
+// TestStatusUploader_StepIndexIncluded verifies step_index is included in payload
+// when provided (multi-step run completion).
+func TestStatusUploader_StepIndexIncluded(t *testing.T) {
+	t.Parallel()
+
+	var receivedPayload map[string]interface{}
+
+	// Create a test server that captures the payload and verifies step_index.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
+			t.Errorf("failed to decode payload: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	uploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		t.Fatalf("failed to create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	stepIndex := int32(2)
+	reason := stringPtr("build gate failed")
+	stats := types.RunStats{
+		"exit_code":   1,
+		"duration_ms": 1500,
+	}
+
+	// Upload status with step_index (multi-step run completion).
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", reason, stats, &stepIndex)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify payload structure includes step_index.
+	if receivedPayload["run_id"] != "test-run-id" {
+		t.Errorf("expected run_id=test-run-id, got %v", receivedPayload["run_id"])
+	}
+
+	if receivedPayload["status"] != "failed" {
+		t.Errorf("expected status=failed, got %v", receivedPayload["status"])
+	}
+
+	if receivedPayload["reason"] != "build gate failed" {
+		t.Errorf("expected reason='build gate failed', got %v", receivedPayload["reason"])
+	}
+
+	// Verify step_index is present and correct (triggers step-level completion).
+	if stepIdx, ok := receivedPayload["step_index"].(float64); !ok || int32(stepIdx) != stepIndex {
+		t.Errorf("expected step_index=2, got %v", receivedPayload["step_index"])
+	}
+
+	// Verify stats are included.
+	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
+		if exitCode, ok := statsPayload["exit_code"].(float64); !ok || exitCode != 1 {
+			t.Errorf("expected stats.exit_code=1, got %v", statsPayload["exit_code"])
+		}
+	} else {
+		t.Error("stats not present or not a map in payload")
+	}
+}
+
+// TestStatusUploader_StepIndexOmitted verifies step_index is omitted from payload
+// when nil (run-level completion).
+func TestStatusUploader_StepIndexOmitted(t *testing.T) {
+	t.Parallel()
+
+	var receivedPayload map[string]interface{}
+
+	// Create a test server that captures the payload and verifies step_index is absent.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
+			t.Errorf("failed to decode payload: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	cfg := Config{
+		ServerURL: server.URL,
+		NodeID:    "test-node-id",
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{
+				Enabled: false,
+			},
+		},
+	}
+
+	uploader, err := NewStatusUploader(cfg)
+	if err != nil {
+		t.Fatalf("failed to create uploader: %v", err)
+	}
+
+	ctx := context.Background()
+	stats := types.RunStats{
+		"exit_code":   0,
+		"duration_ms": 2000,
+	}
+
+	// Upload status without step_index (run-level completion).
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, stats, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Verify payload structure.
+	if receivedPayload["run_id"] != "test-run-id" {
+		t.Errorf("expected run_id=test-run-id, got %v", receivedPayload["run_id"])
+	}
+
+	if receivedPayload["status"] != "succeeded" {
+		t.Errorf("expected status=succeeded, got %v", receivedPayload["status"])
+	}
+
+	// Verify step_index is NOT present in payload (run-level completion).
+	if _, exists := receivedPayload["step_index"]; exists {
+		t.Errorf("expected step_index to be omitted for run-level completion, but it was present: %v", receivedPayload["step_index"])
+	}
+
+	// Verify stats are included.
+	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
+		if exitCode, ok := statsPayload["exit_code"].(float64); !ok || exitCode != 0 {
+			t.Errorf("expected stats.exit_code=0, got %v", statsPayload["exit_code"])
+		}
+	} else {
+		t.Error("stats not present or not a map in payload")
+	}
+}
