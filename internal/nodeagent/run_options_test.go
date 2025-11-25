@@ -354,3 +354,211 @@ func TestExecutionCommand_ToSlice(t *testing.T) {
 		}
 	})
 }
+
+// TestParseRunOptions_MultiStepMods verifies that parseRunOptions correctly
+// extracts the Steps slice from mods[] array in multi-step run specs.
+// For multi-step runs, RunOptions.Steps is populated; for single-step runs,
+// Steps remains empty and Execution options are used.
+func TestParseRunOptions_MultiStepMods(t *testing.T) {
+	t.Parallel()
+
+	// Multi-step spec with 3 mods entries.
+	opts := map[string]any{
+		"mods": []any{
+			map[string]any{
+				"image":   "docker.io/test/step1:v1",
+				"command": "migrate-java8.sh",
+				"env": map[string]any{
+					"STEP":   "1",
+					"TARGET": "java8",
+				},
+				"retain_container": false,
+			},
+			map[string]any{
+				"image":   "docker.io/test/step2:v1",
+				"command": []any{"/bin/sh", "-c", "migrate-java11.sh"},
+				"env": map[string]any{
+					"STEP":   "2",
+					"TARGET": "java11",
+				},
+				"retain_container": true,
+			},
+			map[string]any{
+				"image": "docker.io/test/step3:v1",
+				"env": map[string]any{
+					"STEP": "3",
+				},
+			},
+		},
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	// Verify Steps slice is populated.
+	if len(runOpts.Steps) != 3 {
+		t.Fatalf("expected 3 steps, got %d", len(runOpts.Steps))
+	}
+
+	// Verify first step.
+	step0 := runOpts.Steps[0]
+	if step0.Image != "docker.io/test/step1:v1" {
+		t.Errorf("expected steps[0].image=docker.io/test/step1:v1, got %q", step0.Image)
+	}
+	if step0.Command.Shell != "migrate-java8.sh" {
+		t.Errorf("expected steps[0].command.shell=migrate-java8.sh, got %q", step0.Command.Shell)
+	}
+	if step0.Env["STEP"] != "1" {
+		t.Errorf("expected steps[0].env.STEP=1, got %q", step0.Env["STEP"])
+	}
+	if step0.Env["TARGET"] != "java8" {
+		t.Errorf("expected steps[0].env.TARGET=java8, got %q", step0.Env["TARGET"])
+	}
+	if step0.RetainContainer {
+		t.Errorf("expected steps[0].retain_container=false, got %v", step0.RetainContainer)
+	}
+
+	// Verify second step (command as exec array).
+	step1 := runOpts.Steps[1]
+	if step1.Image != "docker.io/test/step2:v1" {
+		t.Errorf("expected steps[1].image=docker.io/test/step2:v1, got %q", step1.Image)
+	}
+	want := []string{"/bin/sh", "-c", "migrate-java11.sh"}
+	if len(step1.Command.Exec) != len(want) {
+		t.Fatalf("expected steps[1].command.exec length=%d, got %d", len(want), len(step1.Command.Exec))
+	}
+	for i, v := range want {
+		if step1.Command.Exec[i] != v {
+			t.Errorf("expected steps[1].command.exec[%d]=%q, got %q", i, v, step1.Command.Exec[i])
+		}
+	}
+	if step1.Env["STEP"] != "2" {
+		t.Errorf("expected steps[1].env.STEP=2, got %q", step1.Env["STEP"])
+	}
+	if !step1.RetainContainer {
+		t.Errorf("expected steps[1].retain_container=true, got %v", step1.RetainContainer)
+	}
+
+	// Verify third step (no command specified).
+	step2 := runOpts.Steps[2]
+	if step2.Image != "docker.io/test/step3:v1" {
+		t.Errorf("expected steps[2].image=docker.io/test/step3:v1, got %q", step2.Image)
+	}
+	if !step2.Command.IsEmpty() {
+		t.Errorf("expected steps[2].command to be empty, got shell=%q exec=%v", step2.Command.Shell, step2.Command.Exec)
+	}
+	if step2.Env["STEP"] != "3" {
+		t.Errorf("expected steps[2].env.STEP=3, got %q", step2.Env["STEP"])
+	}
+}
+
+// TestParseRunOptions_EmptyModsArray verifies that an empty mods[] array
+// results in empty Steps slice (not nil).
+func TestParseRunOptions_EmptyModsArray(t *testing.T) {
+	t.Parallel()
+
+	opts := map[string]any{
+		"mods": []any{},
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	// Empty mods[] should not populate Steps (len=0, not nil).
+	if len(runOpts.Steps) != 0 {
+		t.Errorf("expected empty steps slice, got %d steps", len(runOpts.Steps))
+	}
+}
+
+// TestParseRunOptions_SingleStepHasNoSteps verifies that single-step runs
+// (using "mod" or top-level fields) do NOT populate RunOptions.Steps.
+// For single-step runs, Execution options are used instead of Steps.
+func TestParseRunOptions_SingleStepHasNoSteps(t *testing.T) {
+	t.Parallel()
+
+	// Single-step spec (image/command at top-level, no mods[] array).
+	opts := map[string]any{
+		"image":   "docker.io/test/single:v1",
+		"command": "run-single.sh",
+	}
+
+	runOpts := parseRunOptions(opts)
+
+	// Verify Steps is empty (single-step format uses Execution instead).
+	if len(runOpts.Steps) != 0 {
+		t.Errorf("expected empty steps for single-step run, got %d steps", len(runOpts.Steps))
+	}
+
+	// Verify Execution options are populated.
+	if runOpts.Execution.Image != "docker.io/test/single:v1" {
+		t.Errorf("expected execution.image=docker.io/test/single:v1, got %q", runOpts.Execution.Image)
+	}
+	if runOpts.Execution.Command.Shell != "run-single.sh" {
+		t.Errorf("expected execution.command.shell=run-single.sh, got %q", runOpts.Execution.Command.Shell)
+	}
+}
+
+// TestParseSpec_MultiStepProducesTypedSteps verifies that parseSpec correctly
+// produces typed RunOptions.Steps for multi-step specs with mods[] array.
+func TestParseSpec_MultiStepProducesTypedSteps(t *testing.T) {
+	t.Parallel()
+
+	specJSON := `{
+		"mods": [
+			{
+				"image": "docker.io/test/step-a:v1",
+				"command": "step-a.sh",
+				"env": {"KEY": "value-a"}
+			},
+			{
+				"image": "docker.io/test/step-b:v1",
+				"command": ["step-b.sh", "--flag"],
+				"env": {"KEY": "value-b"},
+				"retain_container": true
+			}
+		],
+		"build_gate": {"enabled": true, "profile": "auto"}
+	}`
+
+	var raw json.RawMessage = []byte(specJSON)
+	_, _, typedOpts := parseSpec(raw)
+
+	// Verify typed Steps are populated.
+	if len(typedOpts.Steps) != 2 {
+		t.Fatalf("expected 2 typed steps, got %d", len(typedOpts.Steps))
+	}
+
+	// Verify first step.
+	if typedOpts.Steps[0].Image != "docker.io/test/step-a:v1" {
+		t.Errorf("expected steps[0].image=docker.io/test/step-a:v1, got %q", typedOpts.Steps[0].Image)
+	}
+	if typedOpts.Steps[0].Command.Shell != "step-a.sh" {
+		t.Errorf("expected steps[0].command.shell=step-a.sh, got %q", typedOpts.Steps[0].Command.Shell)
+	}
+	if typedOpts.Steps[0].Env["KEY"] != "value-a" {
+		t.Errorf("expected steps[0].env.KEY=value-a, got %q", typedOpts.Steps[0].Env["KEY"])
+	}
+
+	// Verify second step.
+	if typedOpts.Steps[1].Image != "docker.io/test/step-b:v1" {
+		t.Errorf("expected steps[1].image=docker.io/test/step-b:v1, got %q", typedOpts.Steps[1].Image)
+	}
+	want := []string{"step-b.sh", "--flag"}
+	if len(typedOpts.Steps[1].Command.Exec) != len(want) {
+		t.Fatalf("expected steps[1].command.exec length=%d, got %d", len(want), len(typedOpts.Steps[1].Command.Exec))
+	}
+	for i, v := range want {
+		if typedOpts.Steps[1].Command.Exec[i] != v {
+			t.Errorf("expected steps[1].command.exec[%d]=%q, got %q", i, v, typedOpts.Steps[1].Command.Exec[i])
+		}
+	}
+	if !typedOpts.Steps[1].RetainContainer {
+		t.Errorf("expected steps[1].retain_container=true, got %v", typedOpts.Steps[1].RetainContainer)
+	}
+
+	// Verify build gate is also parsed.
+	if !typedOpts.BuildGate.Enabled {
+		t.Errorf("expected build_gate.enabled=true")
+	}
+	if typedOpts.BuildGate.Profile != "auto" {
+		t.Errorf("expected build_gate.profile=auto, got %q", typedOpts.BuildGate.Profile)
+	}
+}

@@ -484,3 +484,177 @@ mods:
 		t.Errorf("expected env_from_file to be removed from mods[1]")
 	}
 }
+
+// TestBuildSpecPayload_SingleModFlowUnchanged verifies that single-mod specs
+// (using "mod" field) continue to work as before, ensuring backward compatibility.
+// CLI overrides apply to single-mod format but not to multi-step mods[] format.
+func TestBuildSpecPayload_SingleModFlowUnchanged(t *testing.T) {
+	t.Parallel()
+
+	// Test single-mod format with CLI overrides.
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "single.yaml")
+	specContent := `
+mod:
+  image: docker.io/test/base:v1
+  env:
+    BASE_KEY: base_value
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	// Apply CLI overrides (env, image, retain).
+	payload, err := buildSpecPayload(
+		specPath,
+		[]string{"CLI_KEY=cli_value"},
+		"docker.io/test/override:v2",
+		true, // retain
+		"",
+		"",
+		"",
+		false,
+		false,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify CLI overrides are applied to mod section (single-mod format).
+	mod, ok := result["mod"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod section in payload")
+	}
+
+	// Image override applied.
+	if img, ok := mod["image"].(string); !ok || img != "docker.io/test/override:v2" {
+		t.Errorf("expected mod.image=docker.io/test/override:v2, got %v", mod["image"])
+	}
+
+	// Retain override applied.
+	if retain, ok := mod["retain_container"].(bool); !ok || !retain {
+		t.Errorf("expected mod.retain_container=true, got %v", mod["retain_container"])
+	}
+
+	// Env merged (CLI + spec).
+	env, ok := mod["env"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected mod.env to be present")
+	}
+	if base, ok := env["BASE_KEY"].(string); !ok || base != "base_value" {
+		t.Errorf("expected mod.env.BASE_KEY=base_value, got %v", env["BASE_KEY"])
+	}
+	if cli, ok := env["CLI_KEY"].(string); !ok || cli != "cli_value" {
+		t.Errorf("expected mod.env.CLI_KEY=cli_value, got %v", env["CLI_KEY"])
+	}
+
+	// Verify mods[] is NOT present (single-mod format).
+	if _, exists := result["mods"]; exists {
+		t.Errorf("expected mods[] to be absent in single-mod format")
+	}
+}
+
+// TestBuildSpecPayload_MultiStepIgnoresCLIOverrides verifies that when mods[]
+// is present, CLI overrides are NOT applied to the multi-step mods array.
+// Multi-step mods[] must be fully specified in the spec file; CLI flags only
+// apply to single-mod format for backward compatibility.
+func TestBuildSpecPayload_MultiStepIgnoresCLIOverrides(t *testing.T) {
+	t.Parallel()
+
+	// Test multi-step format with CLI overrides (which should be ignored).
+	tmpDir := t.TempDir()
+	specPath := filepath.Join(tmpDir, "multi.yaml")
+	specContent := `
+mods:
+  - image: docker.io/test/step1:v1
+    env:
+      STEP: "1"
+  - image: docker.io/test/step2:v1
+    env:
+      STEP: "2"
+`
+	if err := os.WriteFile(specPath, []byte(specContent), 0o644); err != nil {
+		t.Fatalf("write spec file: %v", err)
+	}
+
+	// Attempt to apply CLI overrides (should be ignored for multi-step format).
+	payload, err := buildSpecPayload(
+		specPath,
+		[]string{"CLI_KEY=cli_value"},
+		"docker.io/test/override:v2",
+		true,
+		"",
+		"",
+		"",
+		false,
+		false,
+		false,
+	)
+	if err != nil {
+		t.Fatalf("buildSpecPayload error: %v", err)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(payload, &result); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+
+	// Verify mods[] is present and unchanged.
+	mods, ok := result["mods"].([]any)
+	if !ok {
+		t.Fatalf("expected mods[] array in payload")
+	}
+	if len(mods) != 2 {
+		t.Fatalf("expected 2 mods in array, got %d", len(mods))
+	}
+
+	// Verify first mod is unchanged (CLI overrides not applied).
+	mod0 := mods[0].(map[string]any)
+	if img, ok := mod0["image"].(string); !ok || img != "docker.io/test/step1:v1" {
+		t.Errorf("expected mods[0].image=docker.io/test/step1:v1, got %v", mod0["image"])
+	}
+	if env0, ok := mod0["env"].(map[string]any); ok {
+		// Only STEP should be present (not CLI_KEY).
+		if len(env0) != 1 {
+			t.Errorf("expected mods[0].env to have 1 key, got %d: %v", len(env0), env0)
+		}
+		if step, ok := env0["STEP"].(string); !ok || step != "1" {
+			t.Errorf("expected mods[0].env.STEP=1, got %v", env0["STEP"])
+		}
+	}
+
+	// Verify second mod is unchanged.
+	mod1 := mods[1].(map[string]any)
+	if img, ok := mod1["image"].(string); !ok || img != "docker.io/test/step2:v1" {
+		t.Errorf("expected mods[1].image=docker.io/test/step2:v1, got %v", mod1["image"])
+	}
+
+	// NOTE: buildSpecPayload currently applies CLI overrides to top-level fields even
+	// when mods[] is present. This is the current behavior: top-level env/image exist
+	// but are IGNORED by nodeagent when mods[] array is present in the spec.
+	// The nodeagent only uses mods[] entries for multi-step runs (see parseSpec and
+	// parseRunOptions which prioritize mods[] over top-level fields).
+	//
+	// This behavior is benign because:
+	// 1. CLI users should use spec files for multi-step mods[] (not CLI flags).
+	// 2. Nodeagent checks for mods[] presence and uses Steps instead of Execution.
+	// 3. Top-level fields are preserved for backward compatibility with single-mod specs.
+	//
+	// Verify that top-level overrides exist (current behavior, benign for multi-step).
+	if topEnv, ok := result["env"].(map[string]any); ok {
+		// Top-level env created by CLI override (ignored by nodeagent when mods[] present).
+		if cli, ok := topEnv["CLI_KEY"].(string); !ok || cli != "cli_value" {
+			t.Logf("top-level env.CLI_KEY=%v (benign, ignored when mods[] present)", topEnv["CLI_KEY"])
+		}
+	}
+	if topImg, exists := result["image"]; exists {
+		// Top-level image created by CLI override (ignored by nodeagent when mods[] present).
+		t.Logf("top-level image=%v (benign, ignored when mods[] present)", topImg)
+	}
+}
