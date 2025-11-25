@@ -162,7 +162,7 @@ Legend: [ ] todo, [x] done.
     - go test ./internal/worker/lifecycle/... (extend net_filters tests to cover env-driven patterns via Options.IgnoreInterfaces)
     - go test ./internal/nodeagent/... (heartbeat tests asserting Collector is constructed with normalized ignore patterns when env is set)
 
-- [ ] Stabilize GitFetcher pinning tests to avoid external ref drift — Ensure go test ./... is green without network flakiness
+- [x] Stabilize GitFetcher pinning tests to avoid external ref drift — Ensure go test ./... is green without network flakiness
   - Component: ploy (worker hydration tests)
   - Scope:
     - internal/worker/hydration/git_fetcher_test.go — replace hard-coded commit SHA `7f3ce072903af0186a763322f749b66826ad691e` (no longer present in remote) with:
