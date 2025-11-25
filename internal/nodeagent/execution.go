@@ -177,3 +177,91 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 
 	return buf.Bytes(), nil
 }
+
+// ensureBaselineCommitForRehydration creates a git commit in the workspace after applying
+// per-step diffs during rehydration. This commit establishes a baseline for incremental
+// diff generation in the current step.
+//
+// Problem: Without a baseline commit, "git diff HEAD" generates a diff from the original
+// base_ref to the current working tree, accumulating changes from all prior steps.
+// This violates the incremental diff requirement: diff[k] should contain only changes
+// from step k, not the cumulative changes from steps 0..k.
+//
+// Solution: After rehydrating workspace[step_k] by applying diffs[0..k-1], create a
+// git commit. This commit becomes the new HEAD, so subsequent "git diff HEAD" in step k
+// generates only the incremental changes introduced by step k's execution.
+//
+// Rehydration-safety: Given base clone + ordered diffs[0..k-1], we can reconstruct
+// workspace[step_k] by:
+//  1. Clone base_ref to temp workspace.
+//  2. Apply diffs[0..k-1] sequentially using "git apply".
+//  3. The resulting working tree matches the state before step k execution.
+//
+// The baseline commit ensures:
+//   - diff[k] = git diff HEAD (after step k) = changes from step k only
+//   - Replaying diffs[0..k] on base clone reconstructs workspace[step_k+1]
+//
+// Parameters:
+//   - ctx: Context for cancellation and deadlines.
+//   - workspace: Path to the rehydrated workspace (after diff application).
+//   - stepIndex: Zero-based index of the step being executed (for commit message).
+//
+// Returns:
+//   - error: Non-nil if git commit fails (identity config, staging, or commit error).
+//
+// Note: This function should only be called for step k>0, after rehydration completes.
+// Step 0 operates directly on the base clone and doesn't need a baseline commit.
+func ensureBaselineCommitForRehydration(ctx context.Context, workspace string, stepIndex int) error {
+	// Import the git helper package for commit operations.
+	// Using internal/nodeagent/git.EnsureCommit to stage and commit rehydrated state.
+	userName := "ploy-rehydrate"
+	userEmail := "ploy-rehydrate@ploy.local"
+	message := fmt.Sprintf("Ploy: rehydration baseline for step %d", stepIndex)
+
+	// Import git package at the top of the file if not already imported.
+	// For now, inline the commit logic to avoid circular dependency.
+	// TODO: Consider extracting to git package if this grows.
+
+	// Configure git identity (local repo config only).
+	if err := runGitCommand(ctx, workspace, "config", "user.name", userName); err != nil {
+		return fmt.Errorf("git config user.name: %w", err)
+	}
+	if err := runGitCommand(ctx, workspace, "config", "user.email", userEmail); err != nil {
+		return fmt.Errorf("git config user.email: %w", err)
+	}
+
+	// Stage all changes (rehydrated diffs have been applied to working tree).
+	// Use "git add -A" to stage modifications, additions, and deletions.
+	// Exclude build outputs (Maven target/, etc.) to keep commits clean.
+	if err := runGitCommand(ctx, workspace, "add", "-A", "--", ".",
+		":(exclude)**/target/**", ":(exclude)target/"); err != nil {
+		return fmt.Errorf("git add: %w", err)
+	}
+
+	// Create commit with the rehydrated baseline.
+	// This commit becomes the new HEAD for incremental diff generation.
+	if err := runGitCommand(ctx, workspace, "commit", "-m", message); err != nil {
+		return fmt.Errorf("git commit: %w", err)
+	}
+
+	return nil
+}
+
+// runGitCommand is a helper to execute git commands in the specified directory.
+// This is extracted for reuse in baseline commit creation.
+func runGitCommand(ctx context.Context, dir string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		if stderr.Len() > 0 {
+			return fmt.Errorf("git %v failed: %w (stderr: %s)", args, err, stderr.String())
+		}
+		return fmt.Errorf("git %v failed: %w", args, err)
+	}
+
+	return nil
+}

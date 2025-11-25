@@ -513,6 +513,17 @@ func (r *runController) rehydrateWorkspaceForStep(
 	}
 
 	slog.Info("workspace rehydrated successfully", "run_id", runID, "step_index", stepIndex, "workspace", workspacePath)
+
+	// Create baseline commit after rehydration to enable incremental diffs.
+	// This commit establishes a new HEAD so that "git diff HEAD" in step k generates
+	// only the changes from step k, not cumulative changes from steps 0..k.
+	// See ensureBaselineCommitForRehydration documentation for detailed explanation.
+	if err := ensureBaselineCommitForRehydration(ctx, workspacePath, stepIndex); err != nil {
+		_ = os.RemoveAll(workspacePath)
+		return "", fmt.Errorf("create baseline commit for rehydration: %w", err)
+	}
+
+	slog.Info("baseline commit created for incremental diff", "run_id", runID, "step_index", stepIndex)
 	return workspacePath, nil
 }
 
