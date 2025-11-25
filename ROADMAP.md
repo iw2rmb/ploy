@@ -60,7 +60,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/handlers_mods_ticket.go (helper called from submitTicketHandler to invoke CreateRunStep once per mods[] index), internal/store/queries/run_steps.sql (CreateRunStep)
   - Test: go test ./internal/server/handlers/... — New tests assert CreateRunStep is invoked for multi-step specs (mods[] present) and skipped for single-step specs
-- [ ] Restrict ClaimRun to runs without run_steps — Ensure multi-step runs are claimed via ClaimRunStep only
+- [x] Restrict ClaimRun to runs without run_steps — Ensure multi-step runs are claimed via ClaimRunStep only
   - Component: ploy (store)
   - Scope: internal/store/queries/runs.sql (ClaimRun WHERE clause gains NOT EXISTS (SELECT 1 FROM run_steps WHERE run_id = runs.id)), regenerate internal/store/runs.sql.go via sqlc
   - Test: go test ./internal/store/... — New tests seed runs with and without run_steps rows and assert ClaimRun only returns runs that have no run_steps
