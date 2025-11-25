@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# E2E scenario: Multi-step, multi-node Mods run with rehydration validation
+#
+# This script validates the complete multi-node execution flow for multi-step Mods runs.
+# It submits a three-step Java migration workflow and validates that:
+# - Steps can execute on different nodes (when multi-node cluster is available)
+# - Rehydration works correctly (base clone + ordered diff application)
+# - Build gate validation passes after each step
+# - Final MR content reflects cumulative changes from all steps
+#
+# Prerequisites:
+# - ploy binary available at dist/ploy (run: make build)
+# - Cluster descriptor configured at ~/.config/ploy/clusters/default
+# - Access to target repository (public read, auth for MR creation)
+# - Optional: PLOY_GITLAB_PAT for MR creation validation
+#
+# Usage:
+#   # From repository root:
+#   bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+#
+#   # With custom configuration:
+#   REPO_URL="https://gitlab.com/example/repo.git" \
+#   REPO_BASE_REF="main" \
+#   REPO_TARGET_REF="test-branch" \
+#   ARTIFACT_DIR="./tmp/custom" \
+#   bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+#
+#   # Skip artifact collection (faster, for CI):
+#   SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
+
+set -euo pipefail
+
+################################################################################
+# CONFIGURATION
+################################################################################
+
+# Locate ploy binary (check multiple possible locations)
+PLOY_BIN=""
+for candidate in "../../../../dist/ploy" "./dist/ploy" "dist/ploy"; do
+  if [[ -x "$candidate" ]]; then
+    PLOY_BIN="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$PLOY_BIN" ]]; then
+  echo "Error: ploy binary not found. Run 'make build' first." >&2
+  exit 1
+fi
+
+# Repository and branch configuration (override via environment variables)
+REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
+REPO_BASE_REF="${REPO_BASE_REF:-main}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-mods-e2e-multi-node-$(date +%y%m%d%H%M%S)}"
+
+# Spec file location (relative to script directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPEC_FILE="${SCRIPT_DIR}/mod.yaml"
+
+# Artifact collection (optional)
+SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  TS=$(date +%y%m%d%H%M%S)
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/mods/scenario-multi-node-rehydration/${TS}}"
+  mkdir -p "${ARTIFACT_DIR}"
+fi
+
+################################################################################
+# PRE-FLIGHT CHECKS
+################################################################################
+
+echo "=========================================="
+echo "E2E: Multi-Node Rehydration Scenario"
+echo "=========================================="
+echo "Ploy binary:     $PLOY_BIN"
+echo "Repo URL:        $REPO_URL"
+echo "Base ref:        $REPO_BASE_REF"
+echo "Target ref:      $REPO_TARGET_REF"
+echo "Spec file:       $SPEC_FILE"
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  echo "Artifacts:       $ARTIFACT_DIR"
+else
+  echo "Artifacts:       SKIPPED"
+fi
+echo "=========================================="
+echo ""
+
+# Verify spec file exists
+if [[ ! -f "$SPEC_FILE" ]]; then
+  echo "Error: Spec file not found at $SPEC_FILE" >&2
+  exit 1
+fi
+
+# Check if GitLab PAT is set (optional but recommended for MR validation)
+if [[ -z "${PLOY_GITLAB_PAT:-}" ]]; then
+  echo "Warning: PLOY_GITLAB_PAT not set. MR creation will be skipped."
+  echo "         To enable MR validation: export PLOY_GITLAB_PAT=your-token"
+  echo ""
+fi
+
+################################################################################
+# SUBMIT RUN AND FOLLOW LOGS
+################################################################################
+
+echo "Submitting multi-step mod run..."
+echo ""
+
+# Build command with required flags
+CMD_ARGS=(
+  "$PLOY_BIN"
+  mod run
+  --repo-url "$REPO_URL"
+  --repo-base-ref "$REPO_BASE_REF"
+  --repo-target-ref "$REPO_TARGET_REF"
+  --spec "$SPEC_FILE"
+  --follow
+)
+
+# Add artifact directory if collection is enabled
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  CMD_ARGS+=(--artifact-dir "$ARTIFACT_DIR")
+fi
+
+# Execute the run
+# The --follow flag will stream logs until the run completes or fails
+"${CMD_ARGS[@]}"
+
+EXIT_CODE=$?
+
+echo ""
+echo "=========================================="
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "✓ Multi-node rehydration scenario PASSED"
+else
+  echo "✗ Multi-node rehydration scenario FAILED (exit code: $EXIT_CODE)"
+fi
+echo "=========================================="
+echo ""
+
+################################################################################
+# POST-RUN VALIDATION SUMMARY
+################################################################################
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "Validation checklist (manual verification):"
+  echo ""
+  echo "1. Multi-node execution (if multi-node cluster):"
+  echo "   - Check control plane logs or status API for node assignments"
+  echo "   - Verify different steps were claimed by different nodes"
+  echo "   - Command: dist/ploy run status <run-id>"
+  echo ""
+  echo "2. Rehydration correctness:"
+  echo "   - Review step logs for successful diff application"
+  echo "   - No 'git apply' failures should appear in logs"
+  if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+    echo "   - Check artifacts in: $ARTIFACT_DIR"
+  fi
+  echo ""
+  echo "3. Build gate validation:"
+  echo "   - All steps should show build gate passed"
+  echo "   - No healing should be required for this scenario"
+  echo ""
+  echo "4. MR content (if PLOY_GITLAB_PAT was set):"
+  echo "   - Check GitLab for created MR"
+  echo "   - Verify MR diff contains all three Java migration changes"
+  echo "   - MR should reference target ref: $REPO_TARGET_REF"
+  echo ""
+  echo "5. Single-node fallback:"
+  echo "   - If running on single-node cluster, all steps execute on same node"
+  echo "   - Rehydration still occurs and validates correctly"
+  echo ""
+
+  if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+    echo "Artifacts saved to: $ARTIFACT_DIR"
+    echo "Review artifacts with:"
+    echo "  ls -lh $ARTIFACT_DIR"
+    echo "  cat $ARTIFACT_DIR/*.log"
+    echo ""
+  fi
+
+  echo "Next steps:"
+  echo "  - Review control plane logs: journalctl -u ployd-server -f"
+  echo "  - Review node logs: journalctl -u ployd-node -f"
+  echo "  - Check run status: dist/ploy run status <run-id>"
+  echo ""
+fi
+
+exit $EXIT_CODE

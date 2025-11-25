@@ -1,0 +1,155 @@
+# E2E scenario: Multi-step, multi-node Mods run with rehydration validation
+#
+# This spec tests the complete multi-node execution flow for multi-step Mods runs,
+# validating that:
+# 1. Each step can execute on a different node (scheduler assigns steps independently)
+# 2. Rehydration works correctly (base clone + ordered diff chain)
+# 3. MR content reflects all changes from all steps
+# 4. Build gate validation passes after accumulated changes
+#
+# Architecture:
+# - Scheduler creates separate step manifests for each mod in mods[] array
+# - Each step can be claimed by any available node (no affinity requirement)
+# - Node rehydrates workspace by: copy base clone + apply diffs[0..k-1] for step k
+# - Final MR contains cumulative changes from all steps
+#
+# Submit with:
+#   dist/ploy mod run \
+#     --repo-url https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git \
+#     --repo-base-ref main \
+#     --repo-target-ref mods-e2e-multi-node-test \
+#     --spec tests/e2e/mods/scenario-multi-node-rehydration/mod.yaml \
+#     --follow
+
+apiVersion: ploy.mod/v1alpha1
+kind: ModRunSpec
+
+################################################################################
+# MULTI-STEP MODS FOR MULTI-NODE EXECUTION
+################################################################################
+# Three-step Java migration workflow designed to demonstrate multi-node execution.
+# Each step is a separate unit of work that can be scheduled to any available node.
+# The scheduler ensures steps execute in order, but different nodes can claim different steps.
+mods:
+  # Step 0: Migrate to Java 8
+  # This step establishes the base transformation. Any node can claim this step.
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.Java8
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "0"
+      # Add marker environment variable to identify this step in logs
+      E2E_STEP_NAME: "java8-migration"
+
+  # Step 1: Migrate to Java 11
+  # This step builds on step 0. The executing node will:
+  # 1. Copy base clone
+  # 2. Fetch and apply diff from step 0
+  # 3. Run this transformation on the rehydrated workspace
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava11
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "1"
+      E2E_STEP_NAME: "java11-migration"
+
+  # Step 2: Migrate to Java 17
+  # This step builds on steps 0 and 1. The executing node will:
+  # 1. Copy base clone
+  # 2. Fetch and apply diffs from steps 0 and 1 in order
+  # 3. Run this transformation on the rehydrated workspace
+  - image: docker.io/iwtormb/mods-openrewrite:latest
+    env:
+      RECIPE_GROUP: org.openrewrite.recipe
+      RECIPE_ARTIFACT: rewrite-migrate-java
+      RECIPE_VERSION: "3.20.0"
+      RECIPE_CLASSNAME: org.openrewrite.java.migrate.UpgradeToJava17
+      MAVEN_PLUGIN_VERSION: "6.18.0"
+      MIGRATION_STEP: "2"
+      E2E_STEP_NAME: "java17-migration"
+
+################################################################################
+# BUILD GATE VALIDATION
+################################################################################
+# Build gate runs after each step completes to validate the accumulated changes.
+# For step k, the gate validates base + diffs[0..k], ensuring the transformation
+# is valid at each checkpoint.
+build_gate:
+  enabled: true
+  profile: auto  # Auto-detect Maven or Gradle
+
+################################################################################
+# HEALING POLICY (optional for E2E)
+################################################################################
+# Include basic healing to validate that healing also works with rehydration.
+# If any step's build gate fails, the healing mod runs on the same rehydrated workspace.
+build_gate_healing:
+  retries: 1
+  mods:
+    # Codex healing container that can validate builds and make fixes
+    - image: docker.io/iwtormb/mods-codex:latest
+      env:
+        CODEX_PROMPT: |-
+          Rules:
+          - After making any change, verify the build passes.
+          - Run: buildgate-validate --workspace "$PLOY_HOST_WORKSPACE" --profile auto
+          - If it fails, iterate and try again until it passes.
+          - Only finalize once the gate passes; then print "BUILD PASSED".
+
+          Task:
+          Fix the compilation error described in /in/build-gate.log.
+        E2E_STEP_NAME: "healing-codex"
+      # Uncomment if you have Codex auth configured:
+      # env_from_file:
+      #   CODEX_AUTH_JSON: ~/.codex/auth.json
+
+################################################################################
+# GITLAB MR INTEGRATION
+################################################################################
+# Create MR on success to validate that final MR contains all step changes.
+# The MR diff should show cumulative effect of all three migration steps.
+mr_on_fail: false
+mr_on_success: true
+# gitlab_domain: gitlab.com  # Defaults to gitlab.com when gitlab_pat is set
+# gitlab_pat: ""  # Can be provided via CLI flag or env: PLOY_GITLAB_PAT
+
+################################################################################
+# E2E VALIDATION CHECKLIST
+################################################################################
+# When running this scenario, verify:
+#
+# 1. Multi-node execution (if multi-node cluster available):
+#    - Check that steps are claimed by different nodes (via metadata.node_id in status)
+#    - Verify logs show different node IPs/hostnames for different steps
+#
+# 2. Rehydration correctness:
+#    - Each step's logs should show successful git apply operations (if verbose)
+#    - No patch application failures in step execution logs
+#    - Final workspace state reflects all transformations
+#
+# 3. Build gate validation:
+#    - Build gate passes after each step (or healing runs if it fails)
+#    - Gate validates accumulated changes (base + all prior step diffs)
+#
+# 4. MR content verification:
+#    - Created MR contains cumulative changes from all three steps
+#    - MR diff is coherent and includes all Java version migrations
+#    - No missing changes or partial applications
+#
+# 5. Single-node fallback:
+#    - Scenario should still pass on single-node cluster
+#    - All steps execute sequentially on the same node
+#    - Rehydration still occurs (validates the rehydration path even with single node)
+#
+# Success criteria:
+# - All steps complete with status=success
+# - Build gate passes for each step
+# - MR is created (if --gitlab-pat provided)
+# - MR diff shows all expected Java migration changes
+# - No errors in control plane or node logs
