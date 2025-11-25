@@ -46,7 +46,7 @@ func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
 }
 
 // TestUploadDiffForStep_TagsStepIndex verifies that uploadDiffForStep includes
-// step_index in the diff summary for proper ordering in multi-step runs.
+// step_index both at the top level and inside the summary for proper ordering in multi-step runs.
 func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 	// Provide a bearer token for createHTTPClient via the overridable path.
 	tmpDir := t.TempDir()

@@ -71,3 +71,5 @@ tests/e2e/deploy/e2e-logs/
 # Local deployment
 local/auth-secret.txt
 local/cli
+
+./ploy
