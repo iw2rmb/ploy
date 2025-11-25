@@ -139,7 +139,7 @@ Legend: [ ] todo, [x] done.
     - go test ./internal/server/handlers/... (new tests asserting gate summary inclusion in GET /v1/mods/{id} responses)
     - go test ./internal/cli/mods/... (mods.InspectCommand prints gate info when present)
 
-- [ ] Wire PLOY_LIFECYCLE_NET_IGNORE into lifecycle collector options — Allow operators to ignore noisy NICs via env
+- [x] Wire PLOY_LIFECYCLE_NET_IGNORE into lifecycle collector options — Allow operators to ignore noisy NICs via env
   - Component: ploy (nodeagent, lifecycle)
   - Scope:
     - internal/nodeagent/heartbeat.go — read `PLOY_LIFECYCLE_NET_IGNORE` (comma-separated patterns) and pass parsed slice into lifecycle.Options.IgnoreInterfaces.
