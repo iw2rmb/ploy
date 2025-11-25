@@ -63,6 +63,10 @@ func (c InspectCommand) Run(ctx context.Context) error {
 		if mrURL, ok := payload.Ticket.Metadata["mr_url"]; ok && mrURL != "" {
 			_, _ = fmt.Fprintf(c.Output, "MR: %s\n", mrURL)
 		}
+		// Display build gate summary when available for quick gate health visibility.
+		if gateSummary, ok := payload.Ticket.Metadata["gate_summary"]; ok && gateSummary != "" {
+			_, _ = fmt.Fprintf(c.Output, "Gate: %s\n", gateSummary)
+		}
 	}
 	return nil
 }

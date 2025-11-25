@@ -214,8 +214,9 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			summary.Metadata["node_id"] = uuid.UUID(run.NodeID.Bytes).String()
 		}
 
-		// Surface MR URL (and other future metadata) from runs.stats if present.
-		// Node stores MR URL under stats.metadata.mr_url; copy it into summary.Metadata.
+		// Surface MR URL and gate summary from runs.stats if present.
+		// Node stores MR URL under stats.metadata.mr_url and gate data under stats.gate.
+		// Gate summary exposes gate health without requiring raw artifact inspection.
 		if len(run.Stats) > 0 && json.Valid(run.Stats) {
 			var stats domaintypes.RunStats
 			if err := json.Unmarshal(run.Stats, &stats); err == nil {
@@ -224,6 +225,13 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 						summary.Metadata = map[string]string{}
 					}
 					summary.Metadata["mr_url"] = mr
+				}
+				// Extract gate summary for quick gate health visibility.
+				if gateSummary := stats.GateSummary(); gateSummary != "" {
+					if summary.Metadata == nil {
+						summary.Metadata = map[string]string{}
+					}
+					summary.Metadata["gate_summary"] = gateSummary
 				}
 			}
 		}

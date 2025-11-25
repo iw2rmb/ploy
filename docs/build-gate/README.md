@@ -27,6 +27,9 @@ Outputs
 - Exit code: `0` = success; non‑zero = error.
 - Logs: combined stdout/stderr captured and truncated to ≤256 KiB; uploaded as `build-gate.log` artifact.
 - Summary: pass/fail flag, duration, optional resource usage (if available from Docker stats).
+- API exposure: gate status is surfaced via `ploy mod inspect <ticket-id>` and JSON output from `ploy mod run --json`.
+  - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
+  - Accessible without inspecting raw artifacts via `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
 
 Notes
 - When the container runtime is unavailable, the gate is skipped (no-op) and metadata is empty.

@@ -49,6 +49,81 @@ func TestInspectAndArtifactsCommands(t *testing.T) {
 	}
 }
 
+func TestInspectCommand_GateSummary(t *testing.T) {
+	// Test that inspect command displays gate summary when present in metadata.
+	tests := []struct {
+		name         string
+		ticket       modsapi.TicketSummary
+		wantContains string
+	}{
+		{
+			name: "gate summary present",
+			ticket: modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID("t-gate-1"),
+				State:    modsapi.TicketStateSucceeded,
+				Metadata: map[string]string{
+					"gate_summary": "passed duration=1234ms",
+				},
+			},
+			wantContains: "Gate: passed duration=1234ms",
+		},
+		{
+			name: "gate summary and MR URL",
+			ticket: modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID("t-gate-2"),
+				State:    modsapi.TicketStateSucceeded,
+				Metadata: map[string]string{
+					"mr_url":       "https://gitlab.com/org/repo/-/merge_requests/42",
+					"gate_summary": "failed pre-gate duration=567ms",
+				},
+			},
+			wantContains: "Gate: failed pre-gate duration=567ms",
+		},
+		{
+			name: "no gate summary",
+			ticket: modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID("t-no-gate"),
+				State:    modsapi.TicketStateSucceeded,
+				Metadata: map[string]string{},
+			},
+			wantContains: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(modsapi.TicketStatusResponse{Ticket: tt.ticket})
+			}))
+			defer srv.Close()
+			base, _ := url.Parse(srv.URL)
+
+			var out bytes.Buffer
+			cmd := InspectCommand{
+				Client:  srv.Client(),
+				BaseURL: base,
+				Ticket:  string(tt.ticket.TicketID),
+				Output:  &out,
+			}
+			if err := cmd.Run(context.Background()); err != nil {
+				t.Fatalf("inspect run: %v", err)
+			}
+
+			output := out.String()
+			if tt.wantContains != "" {
+				if !bytes.Contains([]byte(output), []byte(tt.wantContains)) {
+					t.Errorf("output missing expected gate summary\ngot: %q\nwant substring: %q", output, tt.wantContains)
+				}
+			} else {
+				// When no gate summary, ensure "Gate:" line is not present.
+				if bytes.Contains([]byte(output), []byte("Gate:")) {
+					t.Errorf("output unexpectedly contains gate summary\ngot: %q", output)
+				}
+			}
+		})
+	}
+}
+
 func TestCancelResumeSubmitCommands(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/mods", func(w http.ResponseWriter, r *http.Request) {
