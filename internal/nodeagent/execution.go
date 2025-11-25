@@ -70,8 +70,9 @@ func (r *runController) createDiffGenerator() step.DiffGenerator {
 //   - Returns error if copy or any patch application fails.
 //
 // Note: The caller is responsible for fetching diffs in the correct order (by step_index).
-// Use the control plane API endpoint GET /v1/mods/{id}/diffs?step_index=... to retrieve
-// diffs for steps 0 through k-1 when preparing to execute step k.
+// In practice, callers use the control plane API endpoint GET /v1/mods/{id}/diffs to list
+// all diffs for a run and then filter/sort by step_index (see DiffFetcher.FetchDiffsForStep)
+// to obtain diffs for steps 0 through k-1 when preparing to execute step k.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
 	// Step 1: Copy base clone to destination workspace.
 	// This creates a fresh workspace starting from the base snapshot (base_ref + optional commit_sha).
