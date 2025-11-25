@@ -80,7 +80,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/nodes_ack.go (when step_index is present and run has run_steps rows, relax the status precondition to allow queued→running transition, and call AckRunStart or a dedicated helper to set runs.status=running), internal/store/queries/runs.sql (reuse AckRunStart)
   - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that the first step ack moves run.status to running for multi-step runs, while subsequent step acks leave run.status unchanged
-- [ ] Refine run-level completion semantics for multi-step runs — Derive terminal run status from run_steps instead of trusting caller status
+- [x] Refine run-level completion semantics for multi-step runs — Derive terminal run status from run_steps instead of trusting caller status
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/nodes_complete.go (for runs that have run_steps entries, compute the effective run terminal state using CountRunSteps and CountRunStepsByStatus instead of blindly trusting the status field in the request), internal/store/queries/run_steps.sql (CountRunSteps, CountRunStepsByStatus already present)
   - Test: go test ./internal/server/handlers/... ./internal/store/... — New tests assert that runs are marked succeeded only when all steps succeeded, failed when any step failed, and that inconsistent combinations of requested run status and run_steps state are rejected or normalized
