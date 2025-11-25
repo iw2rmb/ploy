@@ -101,9 +101,23 @@ BuildGateValidateRequest:
     Submit a build validation job. Requires repo_url and ref for Git-based
     validation. The content_archive mode has been removed to simplify the
     Build Gate contract and avoid large workspace payloads.
+
+    Optionally, callers may supply diff_patch (gzipped unified diff, base64-encoded)
+    to apply on top of the cloned repo_url+ref baseline. This enables healing flows
+    to replay changes without shipping full workspace archives.
   properties:
     repo_url: { type: string, description: Git repository URL to clone (required) }
     ref: { type: string, description: Git ref (branch, tag, or commit SHA) to validate (required) }
+    diff_patch:
+      type: string
+      format: byte
+      nullable: true
+      description: |
+        Gzipped unified diff (base64-encoded) to apply on top of the cloned
+        repo_url+ref baseline. Used by healing mods to verify changes without
+        transmitting full workspace archives. If non-empty, the executor clones
+        repo_url at ref, then applies the decoded/decompressed patch via
+        "git apply" before running the build.
     profile: { type: string, description: Gate profile (e.g., auto, java), nullable: true }
     timeout: { type: string, description: Duration string (e.g., 5m), nullable: true }
     limit_memory_bytes: { type: integer, format: int64, nullable: true }

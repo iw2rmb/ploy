@@ -411,6 +411,10 @@ func TestModsHumanMetadataValidate(t *testing.T) {
 
 // TestBuildGateValidateRequestValidate tests the ref-only BuildGateValidateRequest validation.
 func TestBuildGateValidateRequestValidate(t *testing.T) {
+	// Sample diff_patch payload (gzipped unified diff, base64-encoded).
+	// In real usage this would be actual gzipped diff content.
+	sampleDiffPatch := []byte("H4sIAAAAAAAA/ytJLS4BAAx+f9gEAAAA") // placeholder
+
 	tests := []struct {
 		name    string
 		req     BuildGateValidateRequest
@@ -438,6 +442,47 @@ func TestBuildGateValidateRequestValidate(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		// --- diff_patch validation cases ---
+		{
+			name: "valid request with repo_url, ref, and diff_patch",
+			req: BuildGateValidateRequest{
+				RepoURL:   "https://example.com/repo.git",
+				Ref:       "main",
+				DiffPatch: sampleDiffPatch,
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid request with repo_url, ref, diff_patch, and all optional fields",
+			req: BuildGateValidateRequest{
+				RepoURL:          "https://example.com/repo.git",
+				Ref:              "e2e/fail-missing-symbol",
+				DiffPatch:        sampleDiffPatch,
+				Profile:          "java-maven",
+				Timeout:          "5m",
+				LimitMemoryBytes: ptrInt64(1073741824),
+			},
+			wantErr: false,
+		},
+		{
+			name: "empty diff_patch allowed",
+			req: BuildGateValidateRequest{
+				RepoURL:   "https://example.com/repo.git",
+				Ref:       "main",
+				DiffPatch: []byte{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil diff_patch allowed",
+			req: BuildGateValidateRequest{
+				RepoURL:   "https://example.com/repo.git",
+				Ref:       "main",
+				DiffPatch: nil,
+			},
+			wantErr: false,
+		},
+		// --- baseline validation cases (existing) ---
 		{
 			name:    "missing repo_url",
 			req:     BuildGateValidateRequest{Ref: "main"},

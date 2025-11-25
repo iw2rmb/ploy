@@ -24,11 +24,23 @@ const (
 // Requires repo_url and ref for Git-based build validation. The content_archive
 // mode has been removed to simplify the Build Gate contract and avoid large
 // workspace payloads over HTTP.
+//
+// Optionally, callers may supply a DiffPatch (gzipped unified diff, base64-encoded)
+// to apply on top of the cloned repo_url+ref baseline. This enables healing flows
+// to replay changes without shipping full workspace archives.
 type BuildGateValidateRequest struct {
 	// RepoURL is the Git repository URL to clone. Required.
 	RepoURL string `json:"repo_url"`
 	// Ref is the Git ref (branch, tag, or commit SHA) to validate. Required.
 	Ref string `json:"ref"`
+
+	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply
+	// on top of the cloned repo_url+ref baseline. Used by healing mods to verify
+	// changes without transmitting full workspace archives.
+	//
+	// Semantics: if non-empty, the executor clones repo_url at ref, then applies
+	// the decoded/decompressed patch via "git apply" before running the build.
+	DiffPatch []byte `json:"diff_patch,omitempty"`
 
 	// Profile specifies the build profile (e.g., auto, java, java-maven, java-gradle).
 	Profile string `json:"profile,omitempty"`
@@ -42,13 +54,25 @@ type BuildGateValidateRequest struct {
 }
 
 // Validate ensures the request has required repo_url and ref fields.
+// DiffPatch is optional but only valid when both repo_url and ref are present.
 func (r BuildGateValidateRequest) Validate() error {
 	// Both repo_url and ref are required for Git-based build validation.
-	if strings.TrimSpace(r.RepoURL) == "" {
+	repoURLEmpty := strings.TrimSpace(r.RepoURL) == ""
+	refEmpty := strings.TrimSpace(r.Ref) == ""
+
+	if repoURLEmpty {
 		return fmt.Errorf("repo_url is required")
 	}
-	if strings.TrimSpace(r.Ref) == "" {
+	if refEmpty {
 		return fmt.Errorf("ref is required")
+	}
+
+	// DiffPatch requires a valid baseline (repo_url + ref). Since both are
+	// required above, we only reject diff_patch if baseline fields failed
+	// validation. This is a defensive check for callers who may construct
+	// requests programmatically with partial fields.
+	if len(r.DiffPatch) > 0 && (repoURLEmpty || refEmpty) {
+		return fmt.Errorf("diff_patch requires both repo_url and ref")
 	}
 
 	// Validate resource limits are non-negative when provided.
