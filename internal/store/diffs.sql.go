@@ -12,24 +12,28 @@ import (
 )
 
 const createDiff = `-- name: CreateDiff :one
-INSERT INTO diffs (run_id, stage_id, patch, summary)
-VALUES ($1, $2, $3, $4)
-RETURNING id, run_id, stage_id, patch, summary, created_at
+INSERT INTO diffs (run_id, stage_id, patch, summary, step_index)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, run_id, stage_id, patch, summary, created_at, step_index
 `
 
 type CreateDiffParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
-	Patch   []byte      `json:"patch"`
-	Summary []byte      `json:"summary"`
+	RunID     pgtype.UUID `json:"run_id"`
+	StageID   pgtype.UUID `json:"stage_id"`
+	Patch     []byte      `json:"patch"`
+	Summary   []byte      `json:"summary"`
+	StepIndex *int32      `json:"step_index"`
 }
 
+// Creates a new diff entry with optional step_index for multi-step runs.
+// step_index is NULL for legacy single-step runs or final aggregate diffs.
 func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error) {
 	row := q.db.QueryRow(ctx, createDiff,
 		arg.RunID,
 		arg.StageID,
 		arg.Patch,
 		arg.Summary,
+		arg.StepIndex,
 	)
 	var i Diff
 	err := row.Scan(
@@ -39,6 +43,7 @@ func (q *Queries) CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, e
 		&i.Patch,
 		&i.Summary,
 		&i.CreatedAt,
+		&i.StepIndex,
 	)
 	return i, err
 }
@@ -64,7 +69,7 @@ func (q *Queries) DeleteDiffsOlderThan(ctx context.Context, createdAt pgtype.Tim
 }
 
 const getDiff = `-- name: GetDiff :one
-SELECT id, run_id, stage_id, patch, summary, created_at FROM diffs
+SELECT id, run_id, stage_id, patch, summary, created_at, step_index FROM diffs
 WHERE id = $1
 `
 
@@ -78,16 +83,65 @@ func (q *Queries) GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error) {
 		&i.Patch,
 		&i.Summary,
 		&i.CreatedAt,
+		&i.StepIndex,
 	)
 	return i, err
 }
 
-const listDiffsByRun = `-- name: ListDiffsByRun :many
-SELECT id, run_id, stage_id, patch, summary, created_at FROM diffs
+const listDiffsBeforeStep = `-- name: ListDiffsBeforeStep :many
+SELECT id, run_id, stage_id, patch, summary, created_at, step_index FROM diffs
 WHERE run_id = $1
-ORDER BY created_at DESC
+  AND step_index IS NOT NULL
+  AND step_index <= $2
+ORDER BY step_index ASC, created_at ASC
 `
 
+type ListDiffsBeforeStepParams struct {
+	RunID     pgtype.UUID `json:"run_id"`
+	StepIndex *int32      `json:"step_index"`
+}
+
+// Returns all diffs for a run up to (and including) the specified step_index.
+// Used for workspace rehydration: apply all diffs from steps 0..k to build workspace for step k+1.
+// Excludes diffs with NULL step_index to avoid applying legacy/aggregate diffs during rehydration.
+func (q *Queries) ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error) {
+	rows, err := q.db.Query(ctx, listDiffsBeforeStep, arg.RunID, arg.StepIndex)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Diff{}
+	for rows.Next() {
+		var i Diff
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.StageID,
+			&i.Patch,
+			&i.Summary,
+			&i.CreatedAt,
+			&i.StepIndex,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDiffsByRun = `-- name: ListDiffsByRun :many
+SELECT id, run_id, stage_id, patch, summary, created_at, step_index FROM diffs
+WHERE run_id = $1
+ORDER BY
+  step_index NULLS LAST,  -- NULL step_index (legacy diffs) appear last
+  created_at DESC
+`
+
+// Returns diffs for a run ordered by step_index (if present), then by created_at.
+// This allows rehydration to select diffs in logical step order for multi-step runs.
 func (q *Queries) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error) {
 	rows, err := q.db.Query(ctx, listDiffsByRun, runID)
 	if err != nil {
@@ -104,6 +158,7 @@ func (q *Queries) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff
 			&i.Patch,
 			&i.Summary,
 			&i.CreatedAt,
+			&i.StepIndex,
 		); err != nil {
 			return nil, err
 		}
