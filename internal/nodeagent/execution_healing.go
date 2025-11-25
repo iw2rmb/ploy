@@ -126,6 +126,8 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 //
 // The function also mounts node TLS certificates into healing containers to enable
 // authenticated API calls to the control plane for gate verification and artifact uploads.
+//
+// The stepIndex parameter is used for logging and diff upload correlation in multi-step runs.
 func (r *runController) executeWithHealing(
 	ctx context.Context,
 	runner step.Runner,
@@ -134,6 +136,7 @@ func (r *runController) executeWithHealing(
 	workspace string,
 	outDir string,
 	inDir *string,
+	stepIndex int,
 ) (executionResult, error) {
 	// First execution attempt (includes pre-mod gate check).
 	result, err := runner.Run(ctx, step.Request{
