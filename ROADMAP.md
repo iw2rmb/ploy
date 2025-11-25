@@ -64,7 +64,7 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (store)
   - Scope: internal/store/queries/runs.sql (ClaimRun WHERE clause gains NOT EXISTS (SELECT 1 FROM run_steps WHERE run_id = runs.id)), regenerate internal/store/runs.sql.go via sqlc
   - Test: go test ./internal/store/... — New tests seed runs with and without run_steps rows and assert ClaimRun only returns runs that have no run_steps
-- [ ] Wire AckRunStepStart through node ack endpoint — Transition run_steps.status from assigned→running for step claims
+- [x] Wire AckRunStepStart through node ack endpoint — Transition run_steps.status from assigned→running for step claims
   - Component: ploy (server, nodeagent)
   - Scope: internal/server/handlers/nodes_ack.go (extend request payload with optional step_index and, when present, call GetRunStepByIndex and AckRunStepStart after validating node_id and run_id), internal/nodeagent/claimer_loop.go (include ClaimResponse.StepIndex in POST /v1/nodes/{id}/ack payload)
   - Test: go test ./internal/server/handlers/... ./internal/nodeagent/... — New tests assert AckRunStepStart is invoked for multi-step claims and that ack payloads include the expected step_index
