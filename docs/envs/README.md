@@ -83,6 +83,39 @@ Role model (bearer token claims):
   - If healing exhausts retries and gate still fails, run terminates with `reason="build-gate"`
   - Cross-phase inputs (`/in/build-gate.log`, `/in/prompt.txt`) are available to healing mods
   - Gate status visibility: Use `ploy mod inspect <ticket-id>` to view gate results (format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`). Also available via `GET /v1/mods/{id}` API in `Metadata["gate_summary"]`.
+
+## Healing Container Environment
+
+The node agent injects the following environment variables into healing containers to support
+Build Gate verification via the repo+diff HTTP API model. These vars enable healing mods to
+derive the same Git baseline used by the Mods run and call the Build Gate API directly.
+
+Repo metadata (injected from StartRunRequest):
+- `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Mods run)
+- `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
+- `PLOY_TARGET_REF` — Target Git reference for the run
+- `PLOY_COMMIT_SHA` — Pinned commit SHA when available (may be empty)
+
+Server connection details (for Build Gate HTTP API access):
+- `PLOY_SERVER_URL` — Control plane base URL (e.g., `https://<server>:8443`)
+- `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
+- `PLOY_CA_CERT_PATH` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
+- `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
+- `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
+- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node)
+
+Usage with `buildgate-validate` wrapper:
+The `buildgate-validate` CLI (bundled in `mods-codex`) reads `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF`.
+Since the node injects `PLOY_BASE_REF` (not `PLOY_BUILDGATE_REF`), healing mod commands should either:
+1. Use CLI flags: `buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BASE_REF" ...`
+2. Or set the wrapper's expected var: `export PLOY_BUILDGATE_REF="$PLOY_BASE_REF"` before calling
+
+Example healing mod command (from mod.yaml):
+```bash
+buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BASE_REF" --profile auto --diff-patch /out/heal.patch
+```
+
+See `docs/build-gate/README.md` for the complete HTTP Build Gate API contract.
 - `PLOYD_CONFIG_PATH` — When set, provides the default ployd configuration file
   location (default `/etc/ploy/ployd.yaml`). The ployd flag `--config` overrides this
   environment variable when explicitly provided.
