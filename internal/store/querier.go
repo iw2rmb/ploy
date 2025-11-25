@@ -18,6 +18,8 @@ type Querier interface {
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
+	// Claims a queued run for a node. Only claims runs that do NOT have run_steps rows.
+	// Multi-step runs (with run_steps entries) must be claimed via ClaimRunStep instead.
 	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
 	// Claims the next available step for execution using FOR UPDATE SKIP LOCKED.
 	// Returns the step and its parent run information for execution.

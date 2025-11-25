@@ -26,7 +26,13 @@ const claimRun = `-- name: ClaimRun :one
 WITH cte AS (
   SELECT runs.id FROM runs
   INNER JOIN nodes ON nodes.id = $1
-  WHERE runs.status = 'queued' AND nodes.drained = false
+  WHERE runs.status = 'queued'
+    AND nodes.drained = false
+    -- Exclude runs that have run_steps: multi-step runs are claimed via ClaimRunStep.
+    AND NOT EXISTS (
+      SELECT 1 FROM run_steps
+      WHERE run_steps.run_id = runs.id
+    )
   ORDER BY runs.created_at
   FOR UPDATE SKIP LOCKED
   LIMIT 1
@@ -38,6 +44,8 @@ WHERE r.id = cte.id
 RETURNING r.id, r.repo_url, r.spec, r.created_by, r.status, r.reason, r.created_at, r.started_at, r.finished_at, r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats
 `
 
+// Claims a queued run for a node. Only claims runs that do NOT have run_steps rows.
+// Multi-step runs (with run_steps entries) must be claimed via ClaimRunStep instead.
 func (q *Queries) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error) {
 	row := q.db.QueryRow(ctx, claimRun, nodeID)
 	var i Run
