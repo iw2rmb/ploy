@@ -27,7 +27,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/server/... ./internal/store/... — ListRunDiffs exposes step metadata; ordering by step_index matches created_at
 
 ## Workspace Hydration & Rehydration
-- [ ] Define base hydration strategy using shallow clones — Use git clone of base_ref/commit_sha as the logical “base snapshot” on each node
+- [x] Define base hydration strategy using shallow clones — Use git clone of base_ref/commit_sha as the logical “base snapshot” on each node
   - Component: ploy (worker hydration, nodeagent)
   - Scope: internal/worker/hydration/git_fetcher.go, internal/nodeagent/execution.go, GOLANG.md (document shallow clone behaviour)
   - Test: go test ./internal/worker/hydration/... ./internal/nodeagent/... — Hydration always clones the expected ref; respects commit_sha when present
