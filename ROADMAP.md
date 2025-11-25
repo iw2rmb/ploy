@@ -112,3 +112,85 @@ Legend: [ ] todo, [x] done.
   - Component: ploy (tests)
   - Scope: tests/e2e/mods/scenario-multi-node-rehydration/* (new spec and run.sh), tests/e2e/mods/README.md (usage)
   - Test: bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh — Scenario validates multi-step execution with rehydration, works on both single-node and multi-node clusters
+
+## Follow-ups / Remaining Work
+
+- [ ] Expose Build Gate stats via Mods status API and CLI — Make gate health visible without inspecting raw artifacts
+  - Component: ploy (server, CLI, docs)
+  - Scope:
+    - internal/server/handlers/handlers_mods_ticket.go — extend TicketSummary to surface `runs.stats.gate` (or a summarized view) alongside existing metadata (keeps MR URL propagation via `RunStats.MRURL()` intact).
+    - internal/cli/mods/inspect.go — when `payload.Ticket.Metadata` (or a new stats field) includes gate data, print a concise line such as `Gate: passed duration=1234ms` or `Gate: failed reason=build-gate`.
+    - docs/build-gate/README.md, docs/envs/README.md, tests/e2e/mods/README.md — describe how gate status is exposed via `ploy mod inspect` and JSON output from `ploy mod run --json`.
+  - Sketch (server-side extraction; example only):
+    ```go
+    // inside getTicketStatusHandler, after MR URL propagation
+    if len(run.Stats) > 0 && json.Valid(run.Stats) {
+        var stats domaintypes.RunStats
+        if err := json.Unmarshal(run.Stats, &stats); err == nil {
+            if gateRaw, ok := stats["gate"]; ok && gateRaw != nil {
+                // Option A: attach a summarized string
+                summary.Metadata["gate_summary"] = summarizeGate(gateRaw)
+                // Option B: in a follow-up slice, add a dedicated TicketStats field
+            }
+        }
+    }
+    ```
+  - Test:
+    - go test ./internal/server/handlers/... (new tests asserting gate summary inclusion in GET /v1/mods/{id} responses)
+    - go test ./internal/cli/mods/... (mods.InspectCommand prints gate info when present)
+
+- [ ] Wire PLOY_LIFECYCLE_NET_IGNORE into lifecycle collector options — Allow operators to ignore noisy NICs via env
+  - Component: ploy (nodeagent, lifecycle)
+  - Scope:
+    - internal/nodeagent/heartbeat.go — read `PLOY_LIFECYCLE_NET_IGNORE` (comma-separated patterns) and pass parsed slice into lifecycle.Options.IgnoreInterfaces.
+    - internal/worker/lifecycle/collector.go, internal/worker/lifecycle/net_filters.go — already support IgnoreInterfaces and pattern matching via `normalizePatterns` and `shouldIgnoreInterface`; no behavioral change needed there.
+    - docs/envs/README.md — remove TODO note and mark `PLOY_LIFECYCLE_NET_IGNORE` as implemented, referencing the node heartbeat path.
+  - Sketch (heartbeat wiring; example only):
+    ```go
+    // inside NewHeartbeatManager
+    ignore := []string{}
+    if raw := os.Getenv("PLOY_LIFECYCLE_NET_IGNORE"); strings.TrimSpace(raw) != "" {
+        ignore = strings.Split(raw, ",")
+    }
+    collector := lifecycle.NewCollector(lifecycle.Options{
+        Role:             "node",
+        NodeID:           cfg.NodeID,
+        IgnoreInterfaces: ignore,
+    })
+    ```
+  - Test:
+    - go test ./internal/worker/lifecycle/... (extend net_filters tests to cover env-driven patterns via Options.IgnoreInterfaces)
+    - go test ./internal/nodeagent/... (heartbeat tests asserting Collector is constructed with normalized ignore patterns when env is set)
+
+- [ ] Stabilize GitFetcher pinning tests to avoid external ref drift — Ensure go test ./... is green without network flakiness
+  - Component: ploy (worker hydration tests)
+  - Scope:
+    - internal/worker/hydration/git_fetcher_test.go — replace hard-coded commit SHA `7f3ce072903af0186a763322f749b66826ad691e` (no longer present in remote) with:
+      - either a local test repository fixture created on the fly (preferred, zero network), or
+      - a pinned commit in a dedicated test repo owned by the project with explicit maintenance.
+    - Optionally, gate remote-dependent tests behind an env guard (e.g., `PLOY_ENABLE_REMOTE_GIT_TESTS`) to keep CI deterministic.
+  - Sketch (local fixture approach; example only):
+    ```go
+    func TestGitFetcher_Fetch_PinsToCommit(t *testing.T) {
+        tmp := t.TempDir()
+        repoDir := filepath.Join(tmp, "repo")
+        initLocalTestRepo(t, repoDir)          // helper: git init + two commits
+        commitSHA := createSecondCommit(t, repoDir)
+
+        srv := httptest.NewServer(gitHTTPHandler(t, repoDir)) // serve repo over http://
+        defer srv.Close()
+
+        fetcher, _ := NewGitFetcher(GitFetcherOptions{})
+        dest := filepath.Join(tmp, "dest")
+        err := fetcher.Fetch(context.Background(), &contracts.RepoMaterialization{
+            URL:   contracts.RepoURL(srv.URL),
+            BaseRef: "main",
+            Commit:  contracts.CommitSHA(commitSHA),
+        }, dest)
+        if err != nil {
+            t.Fatalf("Fetch() error = %v, want nil", err)
+        }
+    }
+    ```
+  - Test:
+    - go test ./internal/worker/hydration/... (no external git refs; tests pass even when upstream repos change)
