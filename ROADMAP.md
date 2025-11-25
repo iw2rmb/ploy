@@ -56,7 +56,7 @@ Legend: [ ] todo, [x] done.
   - Note: run_step_status transitions (AckRunStepStart / UpdateRunStepCompletion) are defined but not yet wired into status handlers; multi-node scheduling remains behind a feature flag until those updates and integration tests are added
 
 ## Scheduler Status Wiring & Run Semantics
-- [ ] Materialize run_steps rows for multi-step runs — Create one step record per mods[] entry when a run is queued
+- [x] Materialize run_steps rows for multi-step runs — Create one step record per mods[] entry when a run is queued
   - Component: ploy (server, store)
   - Scope: internal/server/handlers/handlers_mods_ticket.go (helper called from submitTicketHandler to invoke CreateRunStep once per mods[] index), internal/store/queries/run_steps.sql (CreateRunStep)
   - Test: go test ./internal/server/handlers/... — New tests assert CreateRunStep is invoked for multi-step specs (mods[] present) and skipped for single-step specs
