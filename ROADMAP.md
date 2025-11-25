@@ -66,7 +66,7 @@ Legend: [ ] todo, [x] done.
   - Test: go test ./internal/nodeagent/... ./internal/workflow/runtime/step/... — Given stored patches, workspace contents match expected code after each step
 
 ## CLI, Docs & E2E Coverage
-- [ ] Update CLI spec handling to preserve mods[] and new step metadata — Ensure buildSpecPayload and parseSpec handle multi-step fields without breaking single-mod flows
+- [x] Update CLI spec handling to preserve mods[] and new step metadata — Ensure buildSpecPayload and parseSpec handle multi-step fields without breaking single-mod flows
   - Component: ploy (CLI, nodeagent)
   - Scope: cmd/ploy/mod_run_spec.go, cmd/ploy/mod_run_spec_parsing_test.go, internal/nodeagent/claimer_spec.go
   - Test: go test ./cmd/ploy/... ./internal/nodeagent/... — Spec round-trips mods[] and step metadata; legacy single-mod specs still pass
