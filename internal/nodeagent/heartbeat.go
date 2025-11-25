@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/iw2rmb/ploy/internal/worker/lifecycle"
@@ -42,9 +43,22 @@ type HeartbeatManager struct {
 
 // NewHeartbeatManager constructs a heartbeat manager.
 func NewHeartbeatManager(cfg Config) (*HeartbeatManager, error) {
+	// Read PLOY_LIFECYCLE_NET_IGNORE env var and parse comma-separated patterns.
+	// This allows operators to ignore noisy network interfaces (e.g., docker*, veth*, cni*)
+	// when computing throughput metrics. Empty patterns are filtered out.
+	ignore := []string{}
+	if raw := os.Getenv("PLOY_LIFECYCLE_NET_IGNORE"); strings.TrimSpace(raw) != "" {
+		for _, pattern := range strings.Split(raw, ",") {
+			if trimmed := strings.TrimSpace(pattern); trimmed != "" {
+				ignore = append(ignore, trimmed)
+			}
+		}
+	}
+
 	collector := lifecycle.NewCollector(lifecycle.Options{
-		Role:   "node",
-		NodeID: cfg.NodeID,
+		Role:             "node",
+		NodeID:           cfg.NodeID,
+		IgnoreInterfaces: ignore,
 	})
 
 	// Don't create HTTP client yet - defer until after bootstrap runs.
