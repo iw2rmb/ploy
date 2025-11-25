@@ -163,6 +163,16 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 // buildHealingManifest constructs a StepManifest from a typed HealingMod.
 // The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // Using typed HealingMod clarifies which fields are understood by the agent.
+//
+// Repo metadata is injected into the manifest environment to allow healing containers
+// to derive the same Git baseline used by the Mods run:
+//   - PLOY_REPO_URL: repository URL for cloning/verification
+//   - PLOY_BASE_REF: base Git reference (branch or tag)
+//   - PLOY_TARGET_REF: target Git reference for the run
+//   - PLOY_COMMIT_SHA: pinned commit SHA when available
+//
+// These env vars enable healing mods to invoke buildgate-validate with the same
+// repo+ref baseline used by the initial Build Gate check.
 func buildHealingManifest(req StartRunRequest, mod HealingMod, index int) (contracts.StepManifest, error) {
 	// Validate required image field.
 	image := strings.TrimSpace(mod.Image)
@@ -173,10 +183,26 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int) (contr
 	// Use typed command accessor to avoid polymorphic handling.
 	command := mod.Command.ToSlice()
 
-	// Use typed env map (already map[string]string).
-	env := mod.Env
-	if env == nil {
-		env = make(map[string]string)
+	// Use typed env map (already map[string]string). Clone to avoid mutating caller's map.
+	env := make(map[string]string, len(mod.Env)+4) // +4 for repo metadata vars
+	for k, v := range mod.Env {
+		env[k] = v
+	}
+
+	// Inject repo metadata from StartRunRequest so healing containers can derive
+	// the same Git baseline used by the Mods run. Only set when values are present
+	// to avoid injecting empty strings into the container environment.
+	if repoURL := strings.TrimSpace(req.RepoURL.String()); repoURL != "" {
+		env["PLOY_REPO_URL"] = repoURL
+	}
+	if baseRef := strings.TrimSpace(req.BaseRef.String()); baseRef != "" {
+		env["PLOY_BASE_REF"] = baseRef
+	}
+	if targetRef := strings.TrimSpace(req.TargetRef.String()); targetRef != "" {
+		env["PLOY_TARGET_REF"] = targetRef
+	}
+	if commitSHA := strings.TrimSpace(req.CommitSHA.String()); commitSHA != "" {
+		env["PLOY_COMMIT_SHA"] = commitSHA
 	}
 
 	// Use typed retain flag.
