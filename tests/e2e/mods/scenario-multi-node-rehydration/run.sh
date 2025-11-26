@@ -51,7 +51,7 @@ fi
 # Repository and branch configuration (override via environment variables)
 REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 REPO_BASE_REF="${REPO_BASE_REF:-main}"
-REPO_TARGET_REF="${REPO_TARGET_REF:-mods-e2e-multi-node-$(date +%y%m%d%H%M%S)}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mod}"
 
 # Spec file location (relative to script directory)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

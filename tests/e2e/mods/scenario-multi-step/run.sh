@@ -30,7 +30,7 @@ fi
 # Configuration (override via environment variables)
 REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
 REPO_BASE_REF="${REPO_BASE_REF:-main}"
-REPO_TARGET_REF="${REPO_TARGET_REF:-mods-multi-step-upgrade}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-java6-multy-mod}"
 SPEC_FILE="$(dirname "$0")/mod.yaml"
 
 echo "=========================================="
