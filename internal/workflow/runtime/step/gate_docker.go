@@ -244,6 +244,12 @@ fi`
 			}
 		}
 	}
+	// Best-effort cleanup: remove container after logs and stats are collected.
+	if remover, ok := e.rt.(interface {
+		Remove(context.Context, ContainerHandle) error
+	}); ok {
+		_ = remover.Remove(ctx, h)
+	}
 	return meta, nil
 }
 
