@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	github.com/cenkalti/backoff/v5 v5.0.3
-	github.com/docker/docker v28.2.2+incompatible
+	github.com/docker/docker v28.3.3
 	github.com/docker/go-units v0.5.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
