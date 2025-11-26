@@ -102,7 +102,10 @@ Server connection details (for Build Gate HTTP API access):
 - `PLOY_CA_CERT_PATH` — Path to CA certificate inside healing container (`/etc/ploy/certs/ca.crt`)
 - `PLOY_CLIENT_CERT_PATH` — Path to client certificate (`/etc/ploy/certs/client.crt`)
 - `PLOY_CLIENT_KEY_PATH` — Path to client key (`/etc/ploy/certs/client.key`)
-- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node)
+- `PLOY_API_TOKEN` — Bearer token for API authentication (when configured on node). On TLS-disabled
+  HTTP stacks (e.g., `docs/how-to/deploy-locally.md`), the node agent also falls back to reading the
+  worker bearer token from `/etc/ploy/bearer-token` and exposing it as `PLOY_API_TOKEN` inside healing
+  containers so tools like `buildgate-validate` can call `POST /v1/buildgate/validate` without extra wiring.
 
 Usage with `buildgate-validate` wrapper:
 The `buildgate-validate` CLI (bundled in `mods-codex`) reads `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF`.

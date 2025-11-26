@@ -92,6 +92,8 @@ receive the following environment variables from the node agent:
 - `PLOY_COMMIT_SHA` — Pinned commit SHA when available
 - `PLOY_SERVER_URL` — Control plane URL for Build Gate HTTP API access
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
+- `PLOY_API_TOKEN` — Bearer token for Build Gate API authentication when configured. On TLS-disabled
+  local stacks the node agent may derive this from the worker bearer token file to simplify testing.
 
 The `buildgate-validate` CLI wrapper (bundled in `mods-codex`) accepts `--repo-url` and `--ref` flags
 or reads from `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` environment variables. When using the node-injected
