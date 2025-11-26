@@ -281,6 +281,12 @@ index 0000000..7898192
 func TestCopyGitClone(t *testing.T) {
 	t.Parallel()
 
+	// rsync is required for copyGitClone; skip if unavailable to avoid
+	// environment-dependent failures on systems without rsync.
+	if _, err := exec.LookPath("rsync"); err != nil {
+		t.Skip("rsync not found, skipping TestCopyGitClone")
+	}
+
 	tests := []struct {
 		name         string
 		setupSrc     func(t *testing.T, srcDir string)

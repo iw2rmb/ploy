@@ -318,6 +318,11 @@ func TestGitFetcher_CacheDir(t *testing.T) {
 		t.Skip("git command not found, skipping test")
 	}
 
+	// rsync is required for copyGitClone used by the cache path.
+	if _, err := exec.LookPath("rsync"); err != nil {
+		t.Skip("rsync command not found, skipping cache dir tests")
+	}
+
 	t.Run("cache miss performs fresh clone", func(t *testing.T) {
 		t.Parallel()
 

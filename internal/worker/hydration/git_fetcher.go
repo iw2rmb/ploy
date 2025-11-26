@@ -206,30 +206,24 @@ func normalizeRepoURL(raw string) string {
 
 // copyGitClone creates a copy of a git repository from src to dest.
 // This uses rsync for efficient copying of git repositories, including the .git directory.
-// Falls back to cp if rsync is not available.
 func copyGitClone(src, dest string) error {
 	// Ensure src is a git repository.
 	if _, err := os.Stat(filepath.Join(src, ".git")); err != nil {
 		return fmt.Errorf("source is not a git repository: %w", err)
 	}
 
-	// Try rsync first (more efficient for git repos).
-	if _, err := exec.LookPath("rsync"); err == nil {
-		// rsync -a preserves permissions, timestamps, and copies recursively.
-		// Trailing slash on src ensures contents are copied, not the directory itself.
-		cmd := exec.Command("rsync", "-a", src+"/", dest)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("rsync failed: %w (output: %s)", err, string(output))
-		}
-		return nil
+	// Use rsync for efficient recursive copy. rsync is required; do not fall back
+	// to cp to avoid diverging semantics between environments.
+	if _, err := exec.LookPath("rsync"); err != nil {
+		return fmt.Errorf("rsync not available for git clone copy: %w", err)
 	}
 
-	// Fallback: use cp -R (less efficient but more portable).
-	cmd := exec.Command("cp", "-R", src, dest)
+	// rsync -a preserves permissions, timestamps, and copies recursively.
+	// Trailing slash on src ensures contents are copied, not the directory itself.
+	cmd := exec.Command("rsync", "-a", src+"/", dest)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("cp failed: %w (output: %s)", err, string(output))
+		return fmt.Errorf("rsync failed: %w (output: %s)", err, string(output))
 	}
 
 	return nil
