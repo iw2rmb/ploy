@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -437,13 +438,20 @@ func (r *runController) rehydrateWorkspaceForStep(
 
 	// Step 1: Ensure base clone exists (create on first step, reuse for subsequent steps).
 	if *baseClonePathPtr == "" {
-		slog.Info("creating base clone for run", "run_id", runID)
-
-		// Create temporary directory for base clone.
-		baseClone, err := createWorkspaceDir()
-		if err != nil {
+		// Create deterministic base clone path per run. Using a stable path rooted
+		// under the node's cache/temp location allows idempotent hydration for
+		// a given ticket: if the path already contains a valid clone for this
+		// repo, the git fetcher will detect it and skip re-cloning.
+		baseRoot := os.Getenv("PLOYD_CACHE_HOME")
+		if baseRoot == "" {
+			baseRoot = os.TempDir()
+		}
+		baseClone := filepath.Join(baseRoot, "ploy", "run", runID, "base")
+		if err := os.MkdirAll(baseClone, 0o755); err != nil {
 			return "", fmt.Errorf("create base clone dir: %w", err)
 		}
+
+		slog.Info("creating base clone for run", "run_id", runID, "path", baseClone)
 
 		// Hydrate base clone using the runner's workspace hydrator.
 		// This performs a shallow git clone of the base_ref + optional commit_sha.
