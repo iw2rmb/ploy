@@ -42,6 +42,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -284,6 +285,14 @@ func (r *runController) executeWithHealing(
 			healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
 			if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
 				healManifest.Env["PLOY_API_TOKEN"] = token
+			} else if !r.cfg.HTTP.TLS.Enabled {
+				if data, err := os.ReadFile(bearerTokenPath()); err == nil {
+					if token := strings.TrimSpace(string(data)); token != "" {
+						healManifest.Env["PLOY_API_TOKEN"] = token
+					}
+				} else {
+					slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
+				}
 			}
 
 			// Mount node's TLS certificates into healing container for buildgate API access.
