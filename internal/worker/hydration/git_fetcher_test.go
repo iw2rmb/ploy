@@ -689,6 +689,39 @@ func TestGitFetcher_BaseHydrationStrategy(t *testing.T) {
 		t.Skip("git command not found, skipping test")
 	}
 
+	t.Run("existing hydrated destination is reused without re-clone", func(t *testing.T) {
+		// Setup: Create a repo and manually clone it to a destination directory.
+		repoDir := setupTestGitRepo(t, "already-hydrated")
+		parent := t.TempDir()
+		dest := filepath.Join(parent, "clone")
+
+		// Initial clone: this simulates a workspace that has already been hydrated
+		// for the given repo URL.
+		runCmd(t, parent, "git", "clone", "file://"+repoDir, "clone")
+
+		fetcher, err := NewGitFetcher(GitFetcherOptions{})
+		if err != nil {
+			t.Fatalf("NewGitFetcher() error = %v", err)
+		}
+
+		repo := &contracts.RepoMaterialization{
+			URL:       types.RepoURL("file://" + repoDir),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("main"),
+		}
+
+		ctx := context.Background()
+		if err := fetcher.Fetch(ctx, repo, dest); err != nil {
+			t.Fatalf("Fetch() on already hydrated dest error = %v", err)
+		}
+
+		// Sanity check: destination still has a .git directory.
+		gitDir := filepath.Join(dest, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			t.Errorf("expected .git directory at %s after reuse", gitDir)
+		}
+	})
+
 	t.Run("shallow clone creates minimal history", func(t *testing.T) {
 		// Setup: Create a repo with multiple commits.
 		repoDir := setupTestGitRepoWithCommits(t)

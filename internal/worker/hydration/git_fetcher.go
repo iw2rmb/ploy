@@ -89,6 +89,27 @@ func (g *gitFetcher) Fetch(ctx context.Context, repo *contracts.RepoMaterializat
 	_ = strings.TrimSpace(string(repo.TargetRef)) // targetRef is intentionally unused during hydration
 	commitSHA := strings.TrimSpace(string(repo.Commit))
 
+	// If destination already looks like a hydrated clone of this repo, skip re-clone.
+	// This makes hydration idempotent when the orchestrator reuses the same workspace
+	// path (for example, when a per-step workspace is a copy of an existing base clone).
+	if dest != "" {
+		if info, err := os.Stat(dest); err == nil && info.IsDir() {
+			gitDir := filepath.Join(dest, ".git")
+			if _, err := os.Stat(gitDir); err == nil {
+				cmd := exec.CommandContext(ctx, "git", "-C", dest, "remote", "get-url", "origin")
+				cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=echo")
+				output, err := cmd.CombinedOutput()
+				if err == nil {
+					remoteURL := strings.TrimSpace(string(output))
+					if normalizeRepoURL(remoteURL) == normalizeRepoURL(url) {
+						// Destination repo already matches requested URL; treat as hydrated.
+						return nil
+					}
+				}
+			}
+		}
+	}
+
 	// Check if caching is enabled and we have a cached clone.
 	if g.opts.CacheDir != "" {
 		cacheKey := computeCacheKey(url, baseRef, commitSHA)
@@ -164,8 +185,7 @@ func (g *gitFetcher) cloneAndCheckout(ctx context.Context, url, baseRef, commitS
 // collision-resistant identifiers that remain stable across runs.
 func computeCacheKey(url, baseRef, commitSHA string) string {
 	// Normalize URL: strip trailing slashes and .git suffix for consistent keys.
-	normalized := strings.TrimSuffix(strings.TrimSpace(url), "/")
-	normalized = strings.TrimSuffix(normalized, ".git")
+	normalized := normalizeRepoURL(url)
 
 	// Include base_ref and commit_sha in the key for cache isolation.
 	// Different base_ref or commit_sha values result in different cache entries.
@@ -173,6 +193,15 @@ func computeCacheKey(url, baseRef, commitSHA string) string {
 
 	hash := sha256.Sum256([]byte(keyInput))
 	return hex.EncodeToString(hash[:])
+}
+
+// normalizeRepoURL normalizes a git repository URL for comparison and cache keys.
+// It trims whitespace, trailing slashes, and a .git suffix to produce a stable form.
+func normalizeRepoURL(raw string) string {
+	normalized := strings.TrimSpace(raw)
+	normalized = strings.TrimSuffix(normalized, "/")
+	normalized = strings.TrimSuffix(normalized, ".git")
+	return normalized
 }
 
 // copyGitClone creates a copy of a git repository from src to dest.
