@@ -128,7 +128,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/nodeagent -run TestExecuteRun_PostGateStopsFurtherMods`.
 
 ## Phase E — Preserve stats and CLI surface while switching to pre-run + per-mod gates
-- [ ] Ensure stats capture pre-run gate and last post gate as final_gate — Keep CLI/API gate summaries correct with new semantics.
+- [x] Ensure stats capture pre-run gate and last post gate as final_gate — Keep CLI/API gate summaries correct with new semantics.
   - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/domain/types/runstats.go`.
   - Scope:
     - In `buildExecutionStats`, keep existing logic but ensure:
