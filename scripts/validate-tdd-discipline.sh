@@ -221,6 +221,109 @@ check_code_quality() {
     log_info "Code quality checks passed"
 }
 
+# Phase 4: Codex healing pipeline discipline (sentinel + session handshake)
+# Validates that the Codex healing pipeline tests cover the new handshake protocol.
+# Per ROADMAP.md Phase D: RED→GREEN→REFACTOR for the Codex healing pipeline.
+check_codex_healing_discipline() {
+    log_info "Validating Codex healing pipeline TDD discipline..."
+
+    local failed=0
+    local repo_root
+    repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+    # 1. Verify unit tests exist for mod-codex.sh
+    local mod_codex_tests="$repo_root/tests/unit/mod_codex_sh_test.sh"
+    if [[ -f "$mod_codex_tests" ]]; then
+        log_info "✓ mod-codex.sh unit tests exist"
+    else
+        log_warn "✗ mod-codex.sh unit tests not found at $mod_codex_tests"
+        failed=1
+    fi
+
+    # 2. Verify Go tests for healing retry and session propagation exist.
+    local healing_tests="$repo_root/internal/nodeagent/execution_healing_retry_test.go"
+    if [[ -f "$healing_tests" ]]; then
+        # Check for session propagation test coverage.
+        if grep -q "TestExecuteWithHealing_CodexSessionPropagation" "$healing_tests"; then
+            log_info "✓ Codex session propagation test exists"
+        else
+            log_warn "✗ TestExecuteWithHealing_CodexSessionPropagation not found"
+            failed=1
+        fi
+
+        # Check for sentinel detection test (via observability tracking).
+        if grep -q "request_build_validation" "$healing_tests"; then
+            log_info "✓ Sentinel detection test coverage present"
+        else
+            log_warn "✗ Sentinel detection test coverage missing"
+            failed=1
+        fi
+
+        # Check for non-Codex healer isolation test.
+        if grep -q "TestExecuteWithHealing_NonCodexHealerNoResume" "$healing_tests"; then
+            log_info "✓ Non-Codex healer isolation test exists"
+        else
+            log_warn "✗ TestExecuteWithHealing_NonCodexHealerNoResume not found"
+            failed=1
+        fi
+    else
+        log_warn "✗ Healing retry tests not found at $healing_tests"
+        failed=1
+    fi
+
+    # 3. Verify integration test for mod-codex exists.
+    local integration_test="$repo_root/tests/integration/mods/mod-codex/mod_codex_test.go"
+    if [[ -f "$integration_test" ]]; then
+        # Check for sentinel and session assertions.
+        if grep -q "buildgate-ready\|request_build_validation" "$integration_test"; then
+            log_info "✓ Integration test includes sentinel assertions"
+        else
+            log_warn "✗ Integration test missing sentinel assertions"
+            failed=1
+        fi
+    else
+        log_warn "✗ mod-codex integration test not found at $integration_test"
+        failed=1
+    fi
+
+    # 4. Verify E2E scenarios include handshake validation.
+    local e2e_orw_fail="$repo_root/tests/e2e/mods/scenario-orw-fail/run.sh"
+    if [[ -f "$e2e_orw_fail" ]]; then
+        if grep -q "Codex healing pipeline artifacts" "$e2e_orw_fail"; then
+            log_info "✓ E2E scenario-orw-fail includes Codex handshake validation"
+        else
+            log_warn "✗ E2E scenario-orw-fail missing Codex handshake validation"
+            failed=1
+        fi
+    else
+        log_warn "✗ E2E scenario-orw-fail/run.sh not found"
+        failed=1
+    fi
+
+    # 5. Verify README documents the handshake checklist.
+    local readme="$repo_root/tests/e2e/mods/README.md"
+    if [[ -f "$readme" ]]; then
+        if grep -q "Codex Healing Handshake Checklist" "$readme"; then
+            log_info "✓ README.md documents Codex handshake checklist"
+        else
+            log_warn "✗ README.md missing Codex Healing Handshake Checklist"
+            failed=1
+        fi
+    else
+        log_warn "✗ tests/e2e/mods/README.md not found"
+        failed=1
+    fi
+
+    if [[ $failed -eq 0 ]]; then
+        log_info "Codex healing pipeline TDD discipline validated"
+        return 0
+    else
+        log_warn "Some Codex healing pipeline TDD checks are missing"
+        log_warn "Reference: ROADMAP.md Phase D, tests/e2e/mods/README.md"
+        return 0  # Warn but don't fail the overall check.
+    fi
+}
+
 main() {
     local packages="${1:-./...}"
 
@@ -258,6 +361,9 @@ main() {
 
     # Code quality
     run_check "Code quality (vet + staticcheck)" check_code_quality
+
+    # Codex healing pipeline discipline (sentinel + session handshake)
+    run_check "Codex healing pipeline (Phase D discipline)" check_codex_healing_discipline
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

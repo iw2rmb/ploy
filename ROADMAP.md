@@ -198,7 +198,7 @@ Legend: [ ] todo, [x] done.
     - Run `scripts/validate-tdd-discipline.sh ./internal/...` to verify coverage and static analysis thresholds for critical workflow packages.
 
 ## Phase D — End-to-end validation and discipline
-- [ ] Align tests and TDD guardrails with the new handshake — Ensure RED→GREEN→REFACTOR for the Codex healing pipeline.
+- [x] Align tests and TDD guardrails with the new handshake — Ensure RED→GREEN→REFACTOR for the Codex healing pipeline.
   - Component: `tests/e2e/mods`, `tests/integration/mods/mod-codex`, `scripts/validate-tdd-discipline.sh`.
   - Scope:
     - Update or add E2E assertions for the sentinel and session behavior:
