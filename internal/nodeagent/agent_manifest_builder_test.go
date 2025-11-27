@@ -428,3 +428,171 @@ func TestBuildManifestFromRequest(t *testing.T) {
 		}
 	})
 }
+
+// TestManifestBuildWithGateRepoMeta verifies that step manifests and gate spec
+// contain expected repo metadata for HTTP-based gate execution (ROADMAP C1).
+//
+// The gate spec's RepoURL and Ref are populated from StartRunRequest to enable
+// remote Build Gate workers to clone and validate the repo without direct
+// workspace access.
+func TestManifestBuildWithGateRepoMeta(t *testing.T) {
+	t.Parallel()
+
+	// Test ref precedence: CommitSHA > TargetRef > BaseRef.
+	t.Run("gate ref from CommitSHA when available", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:     types.RunID("run-gate-001"),
+			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("feature/gate-wiring"),
+			CommitSHA: types.CommitSHA("abc123def456"),
+			Options:   map[string]any{},
+		}
+
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Gate spec must be populated.
+		if manifest.Gate == nil {
+			t.Fatal("expected Gate spec to be set")
+		}
+
+		// RepoURL must match the request's RepoURL.
+		if manifest.Gate.RepoURL != req.RepoURL.String() {
+			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
+		}
+
+		// Ref must be CommitSHA (highest precedence).
+		if manifest.Gate.Ref != req.CommitSHA.String() {
+			t.Errorf("Gate.Ref=%q, want CommitSHA %q", manifest.Gate.Ref, req.CommitSHA.String())
+		}
+	})
+
+	t.Run("gate ref from TargetRef when no CommitSHA", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:     types.RunID("run-gate-002"),
+			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef:   types.GitRef("main"),
+			TargetRef: types.GitRef("feature/gate-wiring"),
+			// No CommitSHA.
+			Options: map[string]any{},
+		}
+
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Ref must be TargetRef (second precedence).
+		if manifest.Gate.Ref != req.TargetRef.String() {
+			t.Errorf("Gate.Ref=%q, want TargetRef %q", manifest.Gate.Ref, req.TargetRef.String())
+		}
+	})
+
+	t.Run("gate ref from BaseRef as fallback", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:   types.RunID("run-gate-003"),
+			RepoURL: types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			BaseRef: types.GitRef("main"),
+			// No TargetRef or CommitSHA.
+			Options: map[string]any{},
+		}
+
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Ref must be BaseRef (lowest precedence fallback).
+		if manifest.Gate.Ref != req.BaseRef.String() {
+			t.Errorf("Gate.Ref=%q, want BaseRef %q", manifest.Gate.Ref, req.BaseRef.String())
+		}
+	})
+
+	t.Run("gate ref empty when no refs provided", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:   types.RunID("run-gate-004"),
+			RepoURL: types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			// No refs at all.
+			Options: map[string]any{},
+		}
+
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// RepoURL still set, Ref is empty (callers should validate before HTTP gate).
+		if manifest.Gate.RepoURL != req.RepoURL.String() {
+			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
+		}
+		if manifest.Gate.Ref != "" {
+			t.Errorf("Gate.Ref=%q, want empty string", manifest.Gate.Ref)
+		}
+	})
+
+	t.Run("gate repo metadata trimmed of whitespace", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:     types.RunID("run-gate-005"),
+			RepoURL:   types.RepoURL("  https://gitlab.com/iw2rmb/ploy-orw.git  "),
+			CommitSHA: types.CommitSHA("  abc123  "),
+			Options:   map[string]any{},
+		}
+
+		manifest, err := buildManifestFromRequest(req, parseRunOptions(req.Options), 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Verify whitespace is trimmed.
+		wantURL := "https://gitlab.com/iw2rmb/ploy-orw.git"
+		if manifest.Gate.RepoURL != wantURL {
+			t.Errorf("Gate.RepoURL=%q, want trimmed %q", manifest.Gate.RepoURL, wantURL)
+		}
+		wantRef := "abc123"
+		if manifest.Gate.Ref != wantRef {
+			t.Errorf("Gate.Ref=%q, want trimmed %q", manifest.Gate.Ref, wantRef)
+		}
+	})
+
+	t.Run("gate profile overridden from build_gate_profile option", func(t *testing.T) {
+		t.Parallel()
+		req := StartRunRequest{
+			RunID:     types.RunID("run-gate-006"),
+			RepoURL:   types.RepoURL("https://gitlab.com/iw2rmb/ploy-orw.git"),
+			TargetRef: types.GitRef("main"),
+			Options: map[string]any{
+				"build_gate_enabled": true,
+				"build_gate_profile": "java-maven",
+			},
+		}
+
+		typedOpts := parseRunOptions(req.Options)
+		manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+		if err != nil {
+			t.Fatalf("buildManifestFromRequest() error: %v", err)
+		}
+
+		// Gate enabled and profile overridden.
+		if !manifest.Gate.Enabled {
+			t.Error("expected Gate.Enabled=true")
+		}
+		if manifest.Gate.Profile != "java-maven" {
+			t.Errorf("Gate.Profile=%q, want java-maven", manifest.Gate.Profile)
+		}
+		// Repo metadata still populated.
+		if manifest.Gate.RepoURL != req.RepoURL.String() {
+			t.Errorf("Gate.RepoURL=%q, want %q", manifest.Gate.RepoURL, req.RepoURL.String())
+		}
+		if manifest.Gate.Ref != req.TargetRef.String() {
+			t.Errorf("Gate.Ref=%q, want %q", manifest.Gate.Ref, req.TargetRef.String())
+		}
+	})
+}
