@@ -35,7 +35,7 @@ Legend: [ ] todo, [x] done.
       ```
   - Test: `bash tests/e2e/mods/scenario-orw-fail/run.sh` and `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh` — Logs show Codex producing `[[REQUEST_BUILD_VALIDATION]]` and no in-container `buildgate-validate` calls; Build Gate still re-runs and the scenarios pass.
 
-- [ ] Remove buildgate-validate usage from Codex-specific docs and examples — Keep documentation aligned with the new handshake.
+- [x] Remove buildgate-validate usage from Codex-specific docs and examples — Keep documentation aligned with the new handshake.
   - Component: `tests/e2e/mods/README.md`, `docs/schemas/mod.example.yaml`, `docs/how-to/publish-mods.md`.
   - Scope:
     - In `tests/e2e/mods/README.md`, replace the Codex healing example that calls `buildgate-validate` with a sentinel-based description: Codex edits the workspace, emits `[[REQUEST_BUILD_VALIDATION]]`, and the control plane re-runs the Build Gate.
