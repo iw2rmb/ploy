@@ -83,7 +83,7 @@ Legend: [ ] todo, [x] done.
     - Run: `go test ./internal/workflow/runtime/step -run TestNewGateExecutor`.
 
 ## Phase C — Define repo+diff inputs for gate from Mods runs
-- [ ] C1 — Thread repo metadata into step manifests for gate — Ensure GateExecutor has `repo_url` and `ref`.
+- [x] C1 — Thread repo metadata into step manifests for gate — Ensure GateExecutor has `repo_url` and `ref`.
   - Component: `internal/nodeagent/manifest.go`, `internal/nodeagent/run_options.go`, `internal/workflow/contracts`.
   - Scope:
     - Verify `StartRunRequest` exposes `RepoURL`, `BaseRef`, `TargetRef`, `CommitSHA` where runtime is initialized.
