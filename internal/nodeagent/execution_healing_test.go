@@ -159,11 +159,12 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 		t.Errorf("pre-gate logs = %q, want '[ERROR] Pre-gate failure\\n'", execResult.PreGate.Metadata.LogsText)
 	}
 
-	// Verify re-gate stats are captured.
-	if len(execResult.ReGates) != 1 {
-		t.Fatalf("len(execResult.ReGates) = %d, want 1", len(execResult.ReGates))
+	// Verify re-gate stats are captured (1 pre-mod re-gate + 1 post-mod gate = 2 total).
+	if len(execResult.ReGates) != 2 {
+		t.Fatalf("len(execResult.ReGates) = %d, want 2 (1 pre-mod re-gate + 1 post-mod gate)", len(execResult.ReGates))
 	}
 
+	// First re-gate: pre-mod healing re-gate.
 	reGate := execResult.ReGates[0]
 	if reGate.Metadata == nil {
 		t.Fatal("re-gate metadata should not be nil")
@@ -176,6 +177,14 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 	if reGate.Metadata.LogsText != "[INFO] Re-gate success\n" {
 		t.Errorf("re-gate logs = %q, want '[INFO] Re-gate success\\n'", reGate.Metadata.LogsText)
 	}
+
+	// Second re-gate: post-mod gate.
+	postGate := execResult.ReGates[1]
+	if postGate.Metadata == nil {
+		t.Fatal("post-mod gate metadata should not be nil")
+	}
+	// Post-mod gate reuses the same mock, so it will also have "[INFO] Re-gate success\n"
+	// (the mock returns passing gates after the first call).
 
 	// Verify duration is tracked (should be > 0).
 	if execResult.PreGate.DurationMs < 0 {
@@ -326,9 +335,9 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 		t.Errorf("executeWithHealing() exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify call sequence: gate (fail) → healing container → gate (pass) → main container
-	// After gate passes, we run the main mod without re-checking the gate.
-	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "container:test/main-mod:latest"}
+	// Verify call sequence: gate (fail) → healing container → gate (pass) → main container → gate (post-mod)
+	// After pre-mod gate passes, we run the main mod. After main mod succeeds, post-mod gate runs.
+	expectedSequence := []string{"gate", "container:test/healer:latest", "gate", "container:test/main-mod:latest", "gate"}
 	if len(callSequence) != len(expectedSequence) {
 		t.Fatalf("call sequence length = %d, want %d. Got: %v", len(callSequence), len(expectedSequence), callSequence)
 	}
@@ -701,17 +710,21 @@ func TestExecuteWithHealing_RepoDiffSemantics(t *testing.T) {
 		t.Errorf("exit code = %d, want 0", result.ExitCode)
 	}
 
-	// Verify repo+diff semantics: pre-gate and re-gate use the SAME workspace path.
+	// Verify repo+diff semantics: all gates (pre-gate, pre-mod re-gate, post-mod gate) use the SAME workspace path.
 	// This ensures healing modifications are validated in-place (repo_url+ref + diffs)
 	// rather than creating a new workspace.
-	if len(gateWorkspaces) != 2 {
-		t.Fatalf("expected 2 gate calls (pre-gate, re-gate), got %d", len(gateWorkspaces))
+	// With post-mod gate, we now have 3 gate calls: pre-gate, pre-mod re-gate, post-mod gate.
+	if len(gateWorkspaces) != 3 {
+		t.Fatalf("expected 3 gate calls (pre-gate, pre-mod re-gate, post-mod gate), got %d", len(gateWorkspaces))
 	}
 
-	if gateWorkspaces[0] != gateWorkspaces[1] {
-		t.Errorf("repo+diff semantics violation: pre-gate workspace %q != re-gate workspace %q; "+
-			"healing verification must reuse the same workspace containing repo_url+ref + healing changes",
-			gateWorkspaces[0], gateWorkspaces[1])
+	// All gate calls should use the same workspace.
+	for i := 1; i < len(gateWorkspaces); i++ {
+		if gateWorkspaces[0] != gateWorkspaces[i] {
+			t.Errorf("repo+diff semantics violation: gate workspace[0] %q != gate workspace[%d] %q; "+
+				"all gates must reuse the same workspace containing repo_url+ref + changes",
+				gateWorkspaces[0], i, gateWorkspaces[i])
+		}
 	}
 
 	// Both should point to our test workspace (the repo_url+ref clone).
@@ -843,6 +856,7 @@ func runCommand(dir, name string, args ...string) error {
 //   - ReGates slice grows with each healing retry attempt
 //   - Each gate execution produces distinct BuildGateStageMetadata
 //   - Gate history enables telemetry and debugging across the healing workflow
+//   - Post-mod gate is also captured in ReGates after main mod succeeds
 //
 // This test ensures consistency between HTTP Build Gate API and Docker gate
 // behavior by verifying the node agent always re-runs the gate after healing
@@ -855,6 +869,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		"[ERROR] After healing attempt 1: still failing",
 		"[ERROR] After healing attempt 2: type mismatch",
 		"[INFO] BUILD SUCCESS after attempt 3",
+		"[INFO] Post-mod gate success", // Post-mod gate after main mod succeeds.
 	}
 
 	mockGate := &mockGateExecutor{
@@ -985,13 +1000,17 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		t.Error("PreGate should have failed check")
 	}
 
-	// --- Verify ReGates capture (3 healing retries = 3 re-gates) ---
-	if len(execResult.ReGates) != 3 {
-		t.Fatalf("len(ReGates) = %d, want 3 (one per healing retry)", len(execResult.ReGates))
+	// --- Verify ReGates capture (3 pre-mod healing re-gates + 1 post-mod gate = 4 total) ---
+	// With post-mod gate now enabled, ReGates contains:
+	//   - ReGates[0..2]: 3 pre-mod healing re-gates (digest-2, digest-3, digest-4)
+	//   - ReGates[3]: 1 post-mod gate (digest-5)
+	if len(execResult.ReGates) != 4 {
+		t.Fatalf("len(ReGates) = %d, want 4 (3 pre-mod re-gates + 1 post-mod gate)", len(execResult.ReGates))
 	}
 
-	// Verify each re-gate has distinct metadata (proving node agent re-runs gate).
-	for i, regate := range execResult.ReGates {
+	// Verify each pre-mod re-gate has distinct metadata (proving node agent re-runs gate).
+	for i := 0; i < 3; i++ {
+		regate := execResult.ReGates[i]
 		if regate.Metadata == nil {
 			t.Fatalf("ReGates[%d].Metadata should not be nil", i)
 		}
@@ -1003,7 +1022,7 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		if regate.Metadata.LogsText != expectedLogs {
 			t.Errorf("ReGates[%d] logs = %q, want %q", i, regate.Metadata.LogsText, expectedLogs)
 		}
-		// Only the last re-gate should pass.
+		// Only the last pre-mod re-gate (index 2) should pass.
 		shouldPass := i == 2
 		if len(regate.Metadata.StaticChecks) == 0 {
 			t.Fatalf("ReGates[%d] should have StaticChecks", i)
@@ -1013,9 +1032,22 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 		}
 	}
 
+	// Verify post-mod gate (ReGates[3]).
+	postGate := execResult.ReGates[3]
+	if postGate.Metadata == nil {
+		t.Fatal("post-mod gate metadata should not be nil")
+	}
+	if postGate.Metadata.LogDigest != "digest-5" {
+		t.Errorf("post-mod gate digest = %q, want 'digest-5'", postGate.Metadata.LogDigest)
+	}
+	if !postGate.Metadata.StaticChecks[0].Passed {
+		t.Error("post-mod gate should have passed")
+	}
+
 	// --- Verify total gate calls ---
-	if gateCallCount != 4 {
-		t.Errorf("total gate calls = %d, want 4 (1 pre-gate + 3 re-gates)", gateCallCount)
+	// 1 pre-gate + 3 pre-mod re-gates + 1 post-mod gate = 5 total.
+	if gateCallCount != 5 {
+		t.Errorf("total gate calls = %d, want 5 (1 pre-gate + 3 pre-mod re-gates + 1 post-mod gate)", gateCallCount)
 	}
 
 	// --- Verify healing containers ran ---
@@ -1821,6 +1853,310 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	// Verify /in directory was NOT created (no healing).
 	if inDir != "" {
 		t.Errorf("inDir should remain empty when gate passes, got %q", inDir)
+	}
+}
+
+// TestExecuteWithHealing_PostGate_PassesWithoutHealing verifies the post-mod gate path when:
+// - Pre-mod gate passes immediately (no healing)
+// - Main mod executes and exits 0
+// - Post-mod gate passes immediately (no healing)
+//
+// This test validates that runGateWithHealing is invoked with gatePhase="post" and
+// the post-mod gate metadata is correctly appended to ReGates and stored in BuildGate.
+func TestExecuteWithHealing_PostGate_PassesWithoutHealing(t *testing.T) {
+	// Track gate calls to distinguish pre-mod vs post-mod gates.
+	var gateCalls []string
+	gateCallCount := 0
+
+	// Mock gate: all gates pass immediately.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			// Gate is called twice by runner.Run (pre-mod) and once by post-mod gate.
+			// runner.Run calls gate internally when Gate.Enabled=true.
+			gateCalls = append(gateCalls, fmt.Sprintf("gate-%d", gateCallCount))
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: true},
+				},
+				LogsText:  fmt.Sprintf("[INFO] Gate %d success\n", gateCallCount),
+				LogDigest: fmt.Sprintf("digest-%d", gateCallCount),
+			}, nil
+		},
+	}
+
+	// Track container execution to verify main mod runs.
+	containerCallCount := 0
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			containerCallCount++
+			return step.ContainerHandle{ID: "mock"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return []byte("logs"), nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	workspace, _ := os.MkdirTemp("", "ploy-postgate-pass-*")
+	defer os.RemoveAll(workspace)
+	outDir, _ := os.MkdirTemp("", "ploy-postgate-pass-out-*")
+	defer os.RemoveAll(outDir)
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+	}
+
+	req := StartRunRequest{
+		RunID:   types.RunID("test-postgate-pass"),
+		Options: map[string]any{},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "main:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
+		},
+		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Options: req.Options,
+	}
+
+	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
+
+	// Should succeed without error.
+	if err != nil {
+		t.Fatalf("executeWithHealing() error = %v, want nil", err)
+	}
+
+	// Main mod should exit 0.
+	if execResult.ExitCode != 0 {
+		t.Errorf("ExitCode = %d, want 0", execResult.ExitCode)
+	}
+
+	// PreGate should capture the initial pre-mod gate (from runner.Run).
+	if execResult.PreGate == nil {
+		t.Fatal("PreGate should be captured")
+	}
+	if !execResult.PreGate.Metadata.StaticChecks[0].Passed {
+		t.Error("PreGate should have passed")
+	}
+
+	// ReGates should contain exactly one entry: the post-mod gate.
+	// (Pre-mod gate passes immediately, so no pre-mod re-gates.)
+	if len(execResult.ReGates) != 1 {
+		t.Fatalf("len(ReGates) = %d, want 1 (post-mod gate only)", len(execResult.ReGates))
+	}
+
+	// Verify the post-mod gate metadata.
+	postGate := execResult.ReGates[0]
+	if postGate.Metadata == nil {
+		t.Fatal("post-mod gate metadata should not be nil")
+	}
+	if !postGate.Metadata.StaticChecks[0].Passed {
+		t.Error("post-mod gate should have passed")
+	}
+
+	// result.BuildGate should be updated to the post-mod gate result.
+	if execResult.BuildGate == nil {
+		t.Fatal("BuildGate should be set to post-mod gate result")
+	}
+	// The post-mod gate is the second gate call (after pre-mod from runner.Run).
+	if execResult.BuildGate.LogDigest != "digest-2" {
+		t.Errorf("BuildGate.LogDigest = %q, want 'digest-2' (post-mod gate)", execResult.BuildGate.LogDigest)
+	}
+
+	// Verify gate call count: 1 pre-mod (from runner.Run) + 1 post-mod = 2.
+	if gateCallCount != 2 {
+		t.Errorf("gate call count = %d, want 2", gateCallCount)
+	}
+
+	// Verify main mod container ran.
+	if containerCallCount != 1 {
+		t.Errorf("container call count = %d, want 1 (main mod only)", containerCallCount)
+	}
+}
+
+// TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses verifies the post-mod gate path when:
+// - Pre-mod gate passes immediately (no healing)
+// - Main mod executes and exits 0
+// - Post-mod gate fails on first check
+// - Healing mod executes
+// - Post-mod re-gate passes
+//
+// This test validates that post-mod gates use runGateWithHealing for consistent healing behavior.
+func TestExecuteWithHealing_PostGate_FailsOnceHealsThenPasses(t *testing.T) {
+	// Track call sequence to verify orchestration order.
+	var callSequence []string
+	gateCallCount := 0
+
+	// Mock gate: pre-mod passes, first post-mod fails, second post-mod (re-gate) passes.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			callSequence = append(callSequence, fmt.Sprintf("gate-%d", gateCallCount))
+
+			switch gateCallCount {
+			case 1:
+				// Pre-mod gate passes (from runner.Run).
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
+					LogsText:     "[INFO] Pre-mod success\n",
+					LogDigest:    "pre-mod-digest",
+				}, nil
+			case 2:
+				// Post-mod gate fails (triggers healing).
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+					LogsText:     "[ERROR] Post-mod failure\n",
+					LogDigest:    "post-mod-fail-digest",
+				}, nil
+			default:
+				// Post-mod re-gate passes after healing.
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
+					LogsText:     "[INFO] Post-mod success after healing\n",
+					LogDigest:    "post-mod-heal-digest",
+				}, nil
+			}
+		},
+	}
+
+	// Track container execution: main mod + healing mod.
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			callSequence = append(callSequence, "container:"+spec.Image)
+			return step.ContainerHandle{ID: "mock"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return []byte("logs"), nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	workspace, _ := os.MkdirTemp("", "ploy-postgate-heal-*")
+	defer os.RemoveAll(workspace)
+	outDir, _ := os.MkdirTemp("", "ploy-postgate-heal-out-*")
+	defer os.RemoveAll(outDir)
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("test-postgate-heal"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods":    []any{map[string]any{"image": "healer:latest"}},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "main:latest",
+		Inputs: []contracts.StepInput{
+			{Name: "workspace", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite},
+		},
+		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Options: req.Options,
+	}
+
+	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
+
+	// Should succeed after post-mod healing.
+	if err != nil {
+		t.Fatalf("executeWithHealing() error = %v, want nil", err)
+	}
+
+	// Main mod should exit 0.
+	if execResult.ExitCode != 0 {
+		t.Errorf("ExitCode = %d, want 0", execResult.ExitCode)
+	}
+
+	// Verify call sequence:
+	// 1. gate-1 (pre-mod, passes)
+	// 2. container:main:latest (main mod)
+	// 3. gate-2 (post-mod, fails)
+	// 4. container:healer:latest (healing mod)
+	// 5. gate-3 (post-mod re-gate, passes)
+	expectedSequence := []string{
+		"gate-1",
+		"container:main:latest",
+		"gate-2",
+		"container:healer:latest",
+		"gate-3",
+	}
+	if len(callSequence) != len(expectedSequence) {
+		t.Fatalf("call sequence = %v, want %v", callSequence, expectedSequence)
+	}
+	for i, expected := range expectedSequence {
+		if callSequence[i] != expected {
+			t.Errorf("call sequence[%d] = %q, want %q", i, callSequence[i], expected)
+		}
+	}
+
+	// PreGate should capture the pre-mod gate.
+	if execResult.PreGate == nil {
+		t.Fatal("PreGate should be captured")
+	}
+	if execResult.PreGate.Metadata.LogDigest != "pre-mod-digest" {
+		t.Errorf("PreGate.LogDigest = %q, want 'pre-mod-digest'", execResult.PreGate.Metadata.LogDigest)
+	}
+
+	// ReGates should contain 2 entries: initial post-mod gate (failed) + post-mod re-gate (passed).
+	if len(execResult.ReGates) != 2 {
+		t.Fatalf("len(ReGates) = %d, want 2 (post-mod + post-mod re-gate)", len(execResult.ReGates))
+	}
+
+	// First entry: initial post-mod gate (failed).
+	if execResult.ReGates[0].Metadata.LogDigest != "post-mod-fail-digest" {
+		t.Errorf("ReGates[0].LogDigest = %q, want 'post-mod-fail-digest'", execResult.ReGates[0].Metadata.LogDigest)
+	}
+	if execResult.ReGates[0].Metadata.StaticChecks[0].Passed {
+		t.Error("ReGates[0] should have failed")
+	}
+
+	// Second entry: post-mod re-gate (passed after healing).
+	if execResult.ReGates[1].Metadata.LogDigest != "post-mod-heal-digest" {
+		t.Errorf("ReGates[1].LogDigest = %q, want 'post-mod-heal-digest'", execResult.ReGates[1].Metadata.LogDigest)
+	}
+	if !execResult.ReGates[1].Metadata.StaticChecks[0].Passed {
+		t.Error("ReGates[1] should have passed")
+	}
+
+	// result.BuildGate should be updated to the final post-mod re-gate result.
+	if execResult.BuildGate == nil {
+		t.Fatal("BuildGate should be set")
+	}
+	if execResult.BuildGate.LogDigest != "post-mod-heal-digest" {
+		t.Errorf("BuildGate.LogDigest = %q, want 'post-mod-heal-digest'", execResult.BuildGate.LogDigest)
+	}
+
+	// Gate call count: 1 pre-mod + 1 post-mod + 1 post-mod re-gate = 3.
+	if gateCallCount != 3 {
+		t.Errorf("gate call count = %d, want 3", gateCallCount)
 	}
 }
 

@@ -497,7 +497,18 @@ func (r *runController) runGateWithHealing(
 //     c. Re-run build gate after healing mods complete
 //     d. If gate passes, execute main mod without re-running gate or hydration
 //     e. If gate fails, retry up to configured retries limit
-//  3. Return execution result with full gate history (pre-gate + re-gates)
+//  3. If main mod succeeds (ExitCode == 0), run post-mod gate with healing
+//  4. Return execution result with full gate history (pre-gate + re-gates)
+//
+// ## Post-Mod Gate
+//
+// When the main mod completes with ExitCode == 0, executeWithHealing invokes
+// runGateWithHealing with gatePhase="post" to validate the workspace after
+// modifications. This ensures the same healing behavior for both pre- and
+// post-mod gates, keeping gate orchestration consistent.
+//
+// Post-mod gate metadata is appended to the ReGates slice and the final gate
+// result is stored in result.BuildGate for downstream telemetry.
 //
 // ## Repo+Diff Verification Model
 //
@@ -559,8 +570,40 @@ func (r *runController) executeWithHealing(
 		}
 	}
 
-	// If execution succeeded or error is not a build gate failure, return immediately.
+	// If execution succeeded or error is not a build gate failure, check for post-mod gate.
 	if err == nil || !errors.Is(err, step.ErrBuildGateFailed) {
+		// Run post-mod gate only if main mod succeeded (ExitCode == 0) and no execution error.
+		// This validates the workspace after modifications using the same healing behavior
+		// as pre-mod gates, keeping gate orchestration consistent.
+		if err == nil && result.ExitCode == 0 {
+			postGate, postReGates, postErr := r.runGateWithHealing(
+				ctx, runner, req, manifest, workspace, outDir, inDir, "post",
+			)
+			// Build combined ReGates slice: pre-mod re-gates (empty for success path) + post-mod gates.
+			var reGates []gateRunMetadata
+			if postGate != nil {
+				// Append initial post-gate run to history.
+				reGates = append(reGates, *postGate)
+			}
+			// Append any post-mod healing re-gates to history.
+			reGates = append(reGates, postReGates...)
+
+			// Update result.BuildGate to reflect the final post-mod gate outcome.
+			// This provides downstream telemetry with the canonical gate result.
+			if len(postReGates) > 0 {
+				// Use the last re-gate result (final healing attempt).
+				result.BuildGate = postReGates[len(postReGates)-1].Metadata
+			} else if postGate != nil {
+				// No re-gates; use initial post-gate result.
+				result.BuildGate = postGate.Metadata
+			}
+
+			return executionResult{
+				Result:  result,
+				PreGate: preGate,
+				ReGates: reGates,
+			}, postErr
+		}
 		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
@@ -581,11 +624,41 @@ func (r *runController) executeWithHealing(
 	if errors.As(healErr, &hr) {
 		// Healing was attempted. Check if it succeeded (MainResult != nil) or failed.
 		if hr.MainResult != nil {
-			// Healing succeeded and main mod ran. Return the main mod result with gate history.
+			// Healing succeeded and main mod ran. Run post-mod gate if main mod succeeded.
+			mainResult := *hr.MainResult
+			reGates := hr.ReGates
+
+			// Run post-mod gate only if main mod succeeded (ExitCode == 0) and no error.
+			// This validates the workspace after modifications, consistent with pre-mod gate behavior.
+			if hr.Err == nil && mainResult.ExitCode == 0 {
+				postGate, postReGates, postErr := r.runGateWithHealing(
+					ctx, runner, req, manifest, workspace, outDir, inDir, "post",
+				)
+				// Append post-mod gate metadata to history (after pre-mod healing re-gates).
+				if postGate != nil {
+					reGates = append(reGates, *postGate)
+				}
+				reGates = append(reGates, postReGates...)
+
+				// Update mainResult.BuildGate to reflect the final post-mod gate outcome.
+				if len(postReGates) > 0 {
+					mainResult.BuildGate = postReGates[len(postReGates)-1].Metadata
+				} else if postGate != nil {
+					mainResult.BuildGate = postGate.Metadata
+				}
+
+				return executionResult{
+					Result:  mainResult,
+					PreGate: preGate,
+					ReGates: reGates,
+				}, postErr
+			}
+
+			// Main mod succeeded but no post-gate needed (or mod had non-zero exit).
 			return executionResult{
-				Result:  *hr.MainResult,
+				Result:  mainResult,
 				PreGate: preGate,
-				ReGates: hr.ReGates,
+				ReGates: reGates,
 			}, hr.Err
 		}
 		// Healing failed (mod execution error or retries exhausted).

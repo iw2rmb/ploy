@@ -68,8 +68,9 @@ func TestExecuteWithHealing_ModNonZeroExit_DoesNotAbort(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("main mod not executed successfully: exit=%d", res.ExitCode)
 	}
-	if gateCallCount != 2 {
-		t.Fatalf("expected 2 gate calls (pre + re), got %d", gateCallCount)
+	// With post-mod gate enabled, we now have 3 gate calls: pre-gate, pre-mod re-gate, post-mod gate.
+	if gateCallCount != 3 {
+		t.Fatalf("expected 3 gate calls (pre + re + post), got %d", gateCallCount)
 	}
 }
 
