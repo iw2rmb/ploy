@@ -19,7 +19,7 @@ Legend: [ ] todo, [x] done.
       - Post-mod gates: run on the same workspace after each mod in `mods[]` that exits with code 0; on failure and when healing mods are configured, enter the same fail → heal mods → re-gate loop; if still failing after retries, the run fails and no further mods execute.
      - Extend the Mods execution diagrams or bullet list to show: `pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gate[1](+healing) → ...`.
   - Test: `rg "Pre-mod Build Gate" docs/mods-lifecycle.md` — Confirm the sequence is described; run `make test`.
-- [ ] Document workspace/rehydration semantics for gates — Avoid ambiguity about which code version each gate sees.
+- [x] Document workspace/rehydration semantics for gates — Avoid ambiguity about which code version each gate sees.
   - Component: `docs/mods-lifecycle.md`.
   - Scope:
     - Add a short subsection referencing:
