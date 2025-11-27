@@ -62,15 +62,18 @@ else
 fi
 
 # Build Codex exec command
-# Build base codex exec command; detect CLI capabilities
+# Build base codex exec command; detect CLI capabilities via --help output.
 cmd=(codex exec)
 help_out="$(codex exec --help 2>&1 || true)"
+
+# Detect auto-approval flag (required for non-interactive execution).
 if grep -q -- "--yolo" <<<"$help_out"; then
   cmd+=(--yolo)
 elif grep -q -- "--dangerously-bypass-approvals-and-sandbox" <<<"$help_out"; then
   cmd+=(--dangerously-bypass-approvals-and-sandbox)
 fi
 
+# Detect --add-dir support for attaching repository context.
 supports_add_dir=false
 if grep -q -- "--add-dir" <<<"$help_out"; then
   supports_add_dir=true
@@ -85,26 +88,85 @@ if [[ -n "$model" ]]; then
   cmd+=(--model "$model")
 fi
 
-# Always include /in as context when the directory exists
+# Always include /in as context when the directory exists.
 if [[ "$supports_add_dir" == true && -d "/in" ]]; then
   cmd+=(--add-dir "/in")
 fi
+
+# Detect and enable structured output options for session/thread capture.
+# --json: Emit JSON events to stdout (enables JSONL capture for downstream parsing).
+if grep -q -- "--json" <<<"$help_out"; then
+  cmd+=(--json)
+fi
+
+# --output-last-message: Write the final assistant message to a file (for sentinel detection).
+if grep -q -- "--output-last-message" <<<"$help_out"; then
+  cmd+=(--output-last-message "$out_dir/codex-last.txt")
+fi
+
+# --output-dir: Write full transcript/session data to a directory (for audit/resume).
+if grep -q -- "--output-dir" <<<"$help_out"; then
+  cmd+=(--output-dir "$out_dir/codex-transcript")
+fi
+
 cmd+=( - )
 
-# Run Codex; pipe prompt via stdin; capture both stdout and stderr
+# Run Codex; pipe prompt via stdin; capture stdout/stderr to log and JSONL files.
 logfile="$out_dir/codex.log"
 manifest="$out_dir/codex-run.json"
+jsonl="$out_dir/codex-events.jsonl"
+
 echo "[mod-codex] starting codex exec with repo context" > "$logfile"
 set +e
-printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile"
+# Pipe Codex output to:
+#   1. codex.log (human-readable log, appended)
+#   2. codex-events.jsonl (JSON events for session ID extraction)
+# The tee chain ensures both files receive the same stream.
+printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile" | tee "$jsonl" >/dev/null
 status=${PIPESTATUS[1]}
 set -e
 if [[ ! -s "$logfile" ]]; then
   echo "[mod-codex] no output captured from codex" >> "$logfile"
 fi
 
-# Minimal manifest for downstream debugging
+# Extract session/thread ID from JSON events (if jq is available and events were captured).
+# The Codex CLI emits thread.started events with a thread_id field we can use for resume.
+session_id=""
+if command -v jq >/dev/null 2>&1 && [[ -s "$jsonl" ]]; then
+  # Select the first thread.started event and extract thread_id; ignore parse errors.
+  session_id="$(jq -r 'select(.type=="thread.started") | .thread_id // empty' "$jsonl" 2>/dev/null | head -1 || true)"
+fi
+
+# Write session ID to a separate file for downstream consumption (nodeagent resume mode).
+if [[ -n "$session_id" ]]; then
+  printf "%s\n" "$session_id" > "$out_dir/codex-session.txt"
+fi
+
+# Detect whether Codex requested Build Gate validation via the sentinel message.
+# The sentinel [[REQUEST_BUILD_VALIDATION]] in codex-last.txt signals that Codex
+# wants the node agent to run the build gate and provide feedback.
+requested_build=false
+if [[ -f "$out_dir/codex-last.txt" ]]; then
+  # Normalize whitespace and check for exact sentinel match.
+  last_msg="$(tr -d '\r\n' < "$out_dir/codex-last.txt")"
+  if [[ "$last_msg" == "[[REQUEST_BUILD_VALIDATION]]" ]]; then
+    requested_build=true
+    # Write a simple flag file for easy downstream detection by node agent.
+    printf "true\n" > "$out_dir/request_build_validation"
+  fi
+fi
+
+# Write run manifest with all captured metadata for nodeagent consumption.
+# Fields:
+#   ts                       - ISO timestamp of completion
+#   exit_code                - Codex CLI exit status
+#   model                    - Model used (may be empty if default)
+#   input                    - Input directory path
+#   requested_build_validation - Whether sentinel was detected
+#   session_id               - Thread/session ID for resume (may be empty)
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s"}\n' "$ts" "${status:-0}" "${model}" "$input_dir" > "$manifest"
+printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","requested_build_validation":%s,"session_id":"%s"}\n' \
+  "$ts" "${status:-0}" "${model}" "$input_dir" \
+  "${requested_build}" "${session_id}" > "$manifest"
 
 exit "${status:-0}"
