@@ -115,7 +115,7 @@ Legend: [ ] todo, [x] done.
       - Pre-mod gate passes, mod exits 0, post-mod gate passes without healing.
       - Pre-mod gate passes, mod exits 0, post-mod gate fails once, heals, then passes.
     - Run `go test ./internal/nodeagent -run TestExecuteWithHealing_PostGate`.
-- [ ] Stop executing further mods when a post-mod gate cannot be healed — Ensure a failing post gate terminates the run.
+- [x] Stop executing further mods when a post-mod gate cannot be healed — Ensure a failing post gate terminates the run.
   - Component: `internal/nodeagent/execution_orchestrator.go`.
   - Scope:
     - In `executeRun`, when the execution result for a given `stepIndex` contains an error rooted at `step.ErrBuildGateFailed` from a post gate:
