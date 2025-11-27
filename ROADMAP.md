@@ -11,7 +11,7 @@ Documentation: `docs/mods-lifecycle.md`, `docs/build-gate/README.md`, `docs/envs
 Legend: [ ] todo, [x] done.
 
 ## Phase A — Clarify pre-gate vs post-gate semantics
-- [ ] Document gate sequence for single- and multi-mod runs — Make pre-/post-gate order explicit.
+- [x] Document gate sequence for single- and multi-mod runs — Make pre-/post-gate order explicit.
   - Component: `docs/mods-lifecycle.md`.
   - Scope:
     - Update the Build Gate section to describe:
