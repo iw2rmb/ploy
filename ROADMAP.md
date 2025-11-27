@@ -160,7 +160,7 @@ Legend: [ ] todo, [x] done.
       - A stats payload with only pre_gate (no mods executed) still renders `Gate: failed pre-gate ...`.
     - Run `go test ./internal/cli/mods -run TestInspect`.
 
-- [ ] Extend integration and E2E coverage for post-mod failures and healing — Guard against regressions in gate-heal-regate behavior.
+- [x] Extend integration and E2E coverage for post-mod failures and healing — Guard against regressions in gate-heal-regate behavior.
   - Component: `tests/integration/build-gate`, `tests/e2e/mods`.
   - Scope:
     - In `tests/integration/build-gate`, add a scenario (e.g. `scenario-post-mod-fail.sh`) that:
