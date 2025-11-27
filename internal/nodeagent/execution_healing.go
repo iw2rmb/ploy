@@ -184,6 +184,307 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "size", len(diffBytes))
 }
 
+// runGateWithHealing executes the build gate with optional healing loop when validation fails.
+// This helper centralizes gate+healing orchestration logic for reuse by both pre-mod and
+// post-mod gate phases.
+//
+// ## Parameters
+//
+//   - ctx: Context for cancellation and deadlines.
+//   - runner: Step runner with gate executor and container runtime.
+//   - req: Start run request containing healing configuration in Options.
+//   - manifest: Step manifest with gate spec.
+//   - workspace: Path to the workspace directory (repo_url+ref clone).
+//   - outDir: Path to the /out directory for artifacts.
+//   - inDir: Pointer to the /in directory path; created if empty and healing is triggered.
+//   - gatePhase: "pre" or "post" to indicate which gate phase is executing.
+//
+// ## Returns
+//
+//   - initialGate: Metadata from the first gate execution (always populated if gate runs).
+//   - reGates: Slice of re-gate metadata after each healing attempt (empty if gate passes).
+//   - error: nil if gate passes (with or without healing), ErrBuildGateFailed if exhausted.
+//
+// ## Healing Workflow
+//
+//  1. Execute initial gate via runner.Gate.Execute
+//  2. If gate passes, return immediately with initialGate metadata
+//  3. If gate fails and healing is configured:
+//     a. Create /in directory if not already created
+//     b. Write /in/build-gate.log for healer inspection
+//     c. For each retry attempt:
+//     - Execute each healing mod in sequence
+//     - Upload healing mod diffs for rehydration
+//     - Re-run gate after healing mods complete
+//     - If gate passes, return success
+//     d. If all retries exhausted, return ErrBuildGateFailed
+//
+// ## Repo+Diff Verification Model
+//
+// Healing verification uses the same repo+diff semantics as the HTTP Build Gate API:
+// the workspace contains repo_url+ref plus accumulated healing modifications.
+// This is semantically equivalent to POST /v1/buildgate/validate with diff_patch.
+//
+// ## Configuration
+//
+// Healing configuration is specified via build_gate_healing option in req.Options:
+//   - retries (int): maximum number of healing attempts (default: 1)
+//   - mods ([]map): list of healing mod specs (image, command, env)
+func (r *runController) runGateWithHealing(
+	ctx context.Context,
+	runner step.Runner,
+	req StartRunRequest,
+	manifest contracts.StepManifest,
+	workspace, outDir string,
+	inDir *string,
+	gatePhase string, // "pre" or "post"
+) (*gateRunMetadata, []gateRunMetadata, error) {
+	// Resolve gate spec from manifest (with backward compat for deprecated Shift field).
+	gateSpec := manifest.Gate
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
+	if gateSpec == nil && manifest.Shift != nil {
+		gateSpec = &contracts.StepGateSpec{
+			Enabled: manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
+			Profile: manifest.Shift.Profile, //lint:ignore SA1019 compat field access
+			Env:     manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+		}
+	}
+
+	// If gate is disabled or executor unavailable, return immediately.
+	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
+		return nil, nil, nil
+	}
+
+	// Execute initial gate.
+	gateStart := time.Now()
+	gateMetadata, gateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+	gateDuration := time.Since(gateStart)
+
+	if gateErr != nil {
+		return nil, nil, fmt.Errorf("gate execution failed: %w", gateErr)
+	}
+
+	// Capture initial gate metadata for stats.
+	initialGate := &gateRunMetadata{
+		Metadata:   gateMetadata,
+		DurationMs: gateDuration.Milliseconds(),
+	}
+
+	// Check if gate passed.
+	gatePassed := false
+	if len(gateMetadata.StaticChecks) > 0 {
+		gatePassed = gateMetadata.StaticChecks[0].Passed
+	}
+
+	if gatePassed {
+		slog.Info("gate passed", "run_id", req.RunID, "phase", gatePhase)
+		return initialGate, nil, nil
+	}
+
+	// Gate failed. Check if healing is configured.
+	typedOpts := parseRunOptions(req.Options)
+	if typedOpts.Healing == nil {
+		// No healing configured; return the gate failure.
+		slog.Info("gate failed, no healing configured", "run_id", req.RunID, "phase", gatePhase)
+		return initialGate, nil, step.ErrBuildGateFailed
+	}
+
+	healingConfig := typedOpts.Healing
+	if len(healingConfig.Mods) == 0 {
+		slog.Warn("build_gate_healing configured but no mods provided", "run_id", req.RunID, "phase", gatePhase)
+		return initialGate, nil, step.ErrBuildGateFailed
+	}
+
+	retries := healingConfig.Retries
+
+	// Create /in directory if not already created (for build-gate.log).
+	if *inDir == "" {
+		tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
+		if dirErr != nil {
+			slog.Error("failed to create /in directory for healing", "run_id", req.RunID, "error", dirErr)
+			return initialGate, nil, step.ErrBuildGateFailed
+		}
+		*inDir = tmpInDir
+		// Caller handles cleanup via defer.
+	}
+
+	// Write build-gate.log to /in for healing containers.
+	// Prefer trimmed log view (LogFindings) when available so Codex and
+	// other healing mods see a focused failure slice instead of the full truncated gate log.
+	logPayload := gateMetadata.LogsText
+	if len(gateMetadata.LogFindings) > 0 {
+		if trimmed := strings.TrimSpace(gateMetadata.LogFindings[0].Message); trimmed != "" {
+			logPayload = trimmed
+			if !strings.HasSuffix(logPayload, "\n") {
+				logPayload += "\n"
+			}
+		}
+	}
+	if logPayload != "" {
+		inLogPath := filepath.Join(*inDir, "build-gate.log")
+		if writeErr := os.WriteFile(inLogPath, []byte(logPayload), 0o644); writeErr != nil {
+			slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
+		} else {
+			slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath, "phase", gatePhase)
+		}
+	}
+
+	// Track re-gate runs for stats.
+	var reGates []gateRunMetadata
+
+	// Track Codex session state across healing loop iterations.
+	// When a Codex-based healing mod writes codex-session.txt to /out, the agent
+	// reads and persists this session ID to /in for subsequent attempts.
+	var codexSession string
+	var codexRequestedValidation bool
+
+	// Attempt healing loop.
+	// Note: This is a domain-specific healing retry loop (not a transient error retry).
+	// It executes healing mods between gate validation attempts based on user-configured retries.
+	// We intentionally do not use internal/workflow/backoff here because:
+	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running healing mods).
+	//  2. The retry count is user-configured (manifest-specified retries parameter).
+	//  3. No exponential backoff is needed; each healing attempt runs immediately after healing mods complete.
+	for attempt := 1; attempt <= retries; attempt++ {
+		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries, "phase", gatePhase)
+
+		// Execute each healing mod in sequence using typed HealingMod structs.
+		for idx, mod := range healingConfig.Mods {
+			// Pass codexSession to enable CODEX_RESUME=1 injection for Codex-based healers.
+			healManifest, buildErr := buildHealingManifest(req, mod, idx, codexSession)
+			if buildErr != nil {
+				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
+				return initialGate, reGates, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
+			}
+
+			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image, "phase", gatePhase)
+
+			// Provide host workspace path for in-container build verification tools.
+			if healManifest.Env == nil {
+				healManifest.Env = map[string]string{}
+			}
+			healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
+			// Inject server connection details for buildgate API access from healing containers.
+			healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+			healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
+			healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
+			healManifest.Env["PLOY_CLIENT_KEY_PATH"] = "/etc/ploy/certs/client.key"
+			if token := os.Getenv("PLOY_API_TOKEN"); token != "" {
+				healManifest.Env["PLOY_API_TOKEN"] = token
+			} else if !r.cfg.HTTP.TLS.Enabled {
+				if data, err := os.ReadFile(bearerTokenPath()); err == nil {
+					if token := strings.TrimSpace(string(data)); token != "" {
+						healManifest.Env["PLOY_API_TOKEN"] = token
+					}
+				} else {
+					slog.Warn("healing: failed to read bearer token for PLOY_API_TOKEN fallback", "error", err)
+				}
+			}
+
+			// Mount node's TLS certificates into healing container for buildgate API access.
+			if healManifest.Options == nil {
+				healManifest.Options = make(map[string]any)
+			}
+			healManifest.Options["ploy_ca_cert_path"] = r.cfg.HTTP.TLS.CAPath
+			healManifest.Options["ploy_client_cert_path"] = r.cfg.HTTP.TLS.CertPath
+			healManifest.Options["ploy_client_key_path"] = r.cfg.HTTP.TLS.KeyPath
+
+			// Run the healing mod container.
+			healResult, healErr := runner.Run(ctx, step.Request{
+				TicketID:  types.TicketID(req.RunID),
+				Manifest:  healManifest,
+				Workspace: workspace,
+				OutDir:    outDir,
+				InDir:     *inDir,
+			})
+
+			if healErr != nil {
+				slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", idx, "error", healErr)
+				return initialGate, reGates, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
+			}
+
+			if healResult.ExitCode != 0 {
+				slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", idx, "exit_code", healResult.ExitCode)
+				// Continue with remaining mods; we'll check gate after all mods run.
+			}
+
+			// Upload /out artifacts for this healing mod if present.
+			stageID, _ := manifest.OptionString("stage_id")
+			if uploadErr := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); uploadErr != nil {
+				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
+			}
+
+			// Per-step diff capture: Generate and upload diff after each healing mod step.
+			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt)
+
+			// Read Codex session and sentinel artifacts from /out for session propagation.
+			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
+				if session := strings.TrimSpace(string(sessionBytes)); session != "" {
+					codexSession = session
+					slog.Info("healing: captured codex session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", codexSession)
+				}
+			}
+
+			// Check for sentinel file indicating Codex requested build validation.
+			if _, statErr := os.Stat(filepath.Join(outDir, "request_build_validation")); statErr == nil {
+				codexRequestedValidation = true
+				slog.Info("healing: codex requested build validation", "run_id", req.RunID, "mod_index", idx)
+			}
+		}
+
+		// Persist codex-session.txt to /in for subsequent healing attempts.
+		if codexSession != "" && *inDir != "" {
+			sessionPath := filepath.Join(*inDir, "codex-session.txt")
+			if writeErr := os.WriteFile(sessionPath, []byte(codexSession), 0o644); writeErr != nil {
+				slog.Warn("healing: failed to persist codex-session.txt into /in", "run_id", req.RunID, "error", writeErr)
+			} else {
+				slog.Info("healing: persisted codex-session.txt to /in for resume", "run_id", req.RunID, "session_id", codexSession)
+			}
+		}
+
+		// Log sentinel state for observability (gate semantics unchanged).
+		_ = codexRequestedValidation
+
+		// Re-run the gate after healing mods complete.
+		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
+		// even if healing mods called the HTTP Build Gate API directly.
+		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
+
+		regateStart := time.Now()
+		reGateMetadata, regateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+		regateDuration := time.Since(regateStart)
+
+		if regateErr != nil {
+			slog.Error("re-gate execution failed", "run_id", req.RunID, "error", regateErr)
+			return initialGate, reGates, fmt.Errorf("re-gate execution failed: %w", regateErr)
+		}
+
+		// Capture re-gate metadata for stats.
+		reGates = append(reGates, gateRunMetadata{
+			Metadata:   reGateMetadata,
+			DurationMs: regateDuration.Milliseconds(),
+		})
+
+		// Check if gate passed.
+		regatePassed := false
+		if len(reGateMetadata.StaticChecks) > 0 {
+			regatePassed = reGateMetadata.StaticChecks[0].Passed
+		}
+
+		if regatePassed {
+			slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
+			return initialGate, reGates, nil
+		}
+
+		// Re-gate failed; continue to next retry or exit when exhausted.
+		slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
+	}
+
+	// Retries exhausted; return the gate failure.
+	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID, "phase", gatePhase)
+	return initialGate, reGates, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
+}
+
 // executeWithHealing runs the main step with optional healing loop when the build gate fails.
 // It handles the gate-heal-regate orchestration as specified in build_gate_healing options.
 //
@@ -239,7 +540,8 @@ func (r *runController) executeWithHealing(
 	inDir *string,
 	stepIndex int,
 ) (executionResult, error) {
-	// First execution attempt (includes pre-mod gate check).
+	// First execution attempt (includes pre-mod gate check via Runner.Run).
+	// Runner.Run internally executes the gate before the container if Gate.Enabled=true.
 	result, err := runner.Run(ctx, step.Request{
 		TicketID:  types.TicketID(req.RunID),
 		Manifest:  manifest,
@@ -248,7 +550,7 @@ func (r *runController) executeWithHealing(
 		InDir:     *inDir,
 	})
 
-	// Capture pre-gate metadata for stats (if gate was executed).
+	// Capture pre-gate metadata for stats (if gate was executed by Runner.Run).
 	var preGate *gateRunMetadata
 	if result.BuildGate != nil {
 		preGate = &gateRunMetadata{
@@ -262,20 +564,104 @@ func (r *runController) executeWithHealing(
 		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
-	// Build gate failed. Check if healing is configured.
-	// Parse typed healing config from raw options to avoid map[string]any casts.
-	typedOpts := parseRunOptions(req.Options)
-	if typedOpts.Healing == nil {
-		// No healing configured; return the gate failure.
+	// Build gate failed during Runner.Run. Delegate healing+re-gate orchestration
+	// to runGateWithHealing which handles /in directory creation, build-gate.log,
+	// healing mods execution, and re-gate loops.
+	//
+	// Note: We pass the gate metadata from the initial failure (result.BuildGate) into
+	// runHealingAfterGateFailure, which handles the healing loop and re-gates. This
+	// approach preserves the existing test expectations where PreGate captures the
+	// initial Runner.Run gate result (with its timing from result.Timings).
+
+	healErr := r.runHealingAfterGateFailure(ctx, runner, req, manifest, workspace, outDir, inDir, result.BuildGate)
+
+	// runHealingAfterGateFailure always returns a healingResult (as error) with re-gate history.
+	// Extract it to populate the executionResult with gate stats.
+	var hr *healingResult
+	if errors.As(healErr, &hr) {
+		// Healing was attempted. Check if it succeeded (MainResult != nil) or failed.
+		if hr.MainResult != nil {
+			// Healing succeeded and main mod ran. Return the main mod result with gate history.
+			return executionResult{
+				Result:  *hr.MainResult,
+				PreGate: preGate,
+				ReGates: hr.ReGates,
+			}, hr.Err
+		}
+		// Healing failed (mod execution error or retries exhausted).
+		return executionResult{
+			Result:  result,
+			PreGate: preGate,
+			ReGates: hr.ReGates,
+		}, hr.Err
+	}
+
+	// errHealingNotConfigured: no healing was attempted, return original error.
+	if errors.Is(healErr, errHealingNotConfigured) {
 		return executionResult{Result: result, PreGate: preGate}, err
 	}
 
-	healingConfig := typedOpts.Healing
+	// Unexpected error path (should not happen with current implementation).
+	return executionResult{Result: result, PreGate: preGate}, healErr
+}
 
-	// Validate healing configuration.
+// errHealingNotConfigured indicates healing was not attempted because no healing config exists.
+var errHealingNotConfigured = errors.New("healing not configured")
+
+// healingResult wraps the outcome of a healing attempt for structured error handling.
+// When healing succeeds, Err is nil and ReGates contains all re-gate metadata.
+// When healing fails, Err contains the underlying error and ReGates contains partial history.
+type healingResult struct {
+	ReGates    []gateRunMetadata
+	FinalGate  *contracts.BuildGateStageMetadata
+	MainResult *step.Result // non-nil when main mod was executed after successful healing
+	Err        error
+}
+
+// Error implements the error interface for healingResult.
+func (hr *healingResult) Error() string {
+	if hr.Err != nil {
+		return hr.Err.Error()
+	}
+	return "healing completed"
+}
+
+// Unwrap returns the underlying error for errors.Is/As compatibility.
+func (hr *healingResult) Unwrap() error {
+	return hr.Err
+}
+
+// runHealingAfterGateFailure orchestrates healing mods and re-gates after an initial gate failure.
+// This function is called by executeWithHealing when Runner.Run returns ErrBuildGateFailed.
+//
+// It uses runGateWithHealing internally to execute healing mods and re-gates in a loop.
+// Since runGateWithHealing expects to run the initial gate itself, we use a slightly
+// different approach here: we accept the pre-failed gate metadata and directly enter
+// the healing loop.
+//
+// Returns:
+//   - errHealingNotConfigured if no healing config exists
+//   - healingResult (as error) containing re-gate history and main mod result on success
+//   - healingResult (as error) containing partial history and underlying error on failure
+func (r *runController) runHealingAfterGateFailure(
+	ctx context.Context,
+	runner step.Runner,
+	req StartRunRequest,
+	manifest contracts.StepManifest,
+	workspace, outDir string,
+	inDir *string,
+	failedGateMetadata *contracts.BuildGateStageMetadata,
+) error {
+	// Check if healing is configured.
+	typedOpts := parseRunOptions(req.Options)
+	if typedOpts.Healing == nil {
+		return errHealingNotConfigured
+	}
+
+	healingConfig := typedOpts.Healing
 	if len(healingConfig.Mods) == 0 {
 		slog.Warn("build_gate_healing configured but no mods provided", "run_id", req.RunID)
-		return executionResult{Result: result, PreGate: preGate}, err
+		return errHealingNotConfigured
 	}
 
 	retries := healingConfig.Retries
@@ -285,32 +671,31 @@ func (r *runController) executeWithHealing(
 		tmpInDir, dirErr := os.MkdirTemp("", "ploy-mod-in-*")
 		if dirErr != nil {
 			slog.Error("failed to create /in directory for healing", "run_id", req.RunID, "error", dirErr)
-			return executionResult{Result: result, PreGate: preGate}, err
+			return &healingResult{Err: step.ErrBuildGateFailed}
 		}
 		*inDir = tmpInDir
 		// Caller handles cleanup via defer.
+	}
 
-		// Write build-gate.log to /in for healing containers.
-		if result.BuildGate != nil {
-			// Prefer trimmed log view (LogFindings) when available so Codex and
-			// other healing mods see a focused failure slice instead of the full
-			// truncated gate log.
-			logPayload := result.BuildGate.LogsText
-			if len(result.BuildGate.LogFindings) > 0 {
-				if trimmed := strings.TrimSpace(result.BuildGate.LogFindings[0].Message); trimmed != "" {
-					logPayload = trimmed
-					if !strings.HasSuffix(logPayload, "\n") {
-						logPayload += "\n"
-					}
+	// Write build-gate.log to /in for healing containers.
+	// Prefer trimmed log view (LogFindings) when available so Codex and
+	// other healing mods see a focused failure slice instead of the full truncated gate log.
+	if failedGateMetadata != nil {
+		logPayload := failedGateMetadata.LogsText
+		if len(failedGateMetadata.LogFindings) > 0 {
+			if trimmed := strings.TrimSpace(failedGateMetadata.LogFindings[0].Message); trimmed != "" {
+				logPayload = trimmed
+				if !strings.HasSuffix(logPayload, "\n") {
+					logPayload += "\n"
 				}
 			}
-			if logPayload != "" {
-				inLogPath := filepath.Join(*inDir, "build-gate.log")
-				if writeErr := os.WriteFile(inLogPath, []byte(logPayload), 0o644); writeErr != nil {
-					slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
-				} else {
-					slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
-				}
+		}
+		if logPayload != "" {
+			inLogPath := filepath.Join(*inDir, "build-gate.log")
+			if writeErr := os.WriteFile(inLogPath, []byte(logPayload), 0o644); writeErr != nil {
+				slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
+			} else {
+				slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
 			}
 		}
 	}
@@ -319,43 +704,41 @@ func (r *runController) executeWithHealing(
 	var reGates []gateRunMetadata
 
 	// Track Codex session state across healing loop iterations.
-	// When a Codex-based healing mod writes codex-session.txt to /out, the agent
-	// reads and persists this session ID to /in for subsequent attempts. This enables
-	// Codex to resume conversations instead of starting fresh on each retry.
-	// The sentinel state (request_build_validation) is tracked for observability but
-	// does not affect gate semantics: the agent always re-runs the gate after healing.
 	var codexSession string
 	var codexRequestedValidation bool
 
-	// Attempt healing loop.
-	// Note: This is a domain-specific healing retry loop (not a transient error retry).
-	// It executes healing mods between gate validation attempts based on user-configured retries.
-	// We intentionally do not use internal/workflow/backoff here because:
-	//  1. This is not a retry-on-failure pattern (each iteration does useful work: running healing mods).
-	//  2. The retry count is user-configured (manifest-specified retries parameter).
-	//  3. No exponential backoff is needed; each healing attempt runs immediately after healing mods complete.
-	for attempt := 1; attempt <= retries; attempt++ {
-		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries)
+	// Resolve gate spec from manifest (with backward compat for deprecated Shift field).
+	gateSpec := manifest.Gate
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
+	if gateSpec == nil && manifest.Shift != nil {
+		gateSpec = &contracts.StepGateSpec{
+			Enabled: manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
+			Profile: manifest.Shift.Profile, //lint:ignore SA1019 compat field access
+			Env:     manifest.Shift.Env,     //lint:ignore SA1019 compat field access
+		}
+	}
 
-		// Execute each healing mod in sequence using typed HealingMod structs.
+	// Healing loop: execute healing mods and re-gate after each attempt.
+	// This loop mirrors the logic in runGateWithHealing but enters after an initial
+	// gate failure (handled by Runner.Run).
+	for attempt := 1; attempt <= retries; attempt++ {
+		slog.Info("starting healing attempt", "run_id", req.RunID, "attempt", attempt, "max_retries", retries, "phase", "pre")
+
+		// Execute each healing mod in sequence.
 		for idx, mod := range healingConfig.Mods {
-			// Pass codexSession to enable CODEX_RESUME=1 injection for Codex-based healers.
-			// On the first attempt codexSession is empty; subsequent attempts may have
-			// a session ID from the previous healing mod run.
 			healManifest, buildErr := buildHealingManifest(req, mod, idx, codexSession)
 			if buildErr != nil {
 				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
-				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
+				return &healingResult{ReGates: reGates, Err: fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)}
 			}
 
-			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image)
+			slog.Info("executing healing mod", "run_id", req.RunID, "attempt", attempt, "mod_index", idx, "image", healManifest.Image, "phase", "pre")
 
-			// Provide host workspace path for in-container build verification tools.
+			// Provide host workspace path and server connection details for healing containers.
 			if healManifest.Env == nil {
 				healManifest.Env = map[string]string{}
 			}
 			healManifest.Env["PLOY_HOST_WORKSPACE"] = workspace
-			// Inject server connection details for buildgate API access from healing containers.
 			healManifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
 			healManifest.Env["PLOY_CA_CERT_PATH"] = "/etc/ploy/certs/ca.crt"
 			healManifest.Env["PLOY_CLIENT_CERT_PATH"] = "/etc/ploy/certs/client.crt"
@@ -372,7 +755,7 @@ func (r *runController) executeWithHealing(
 				}
 			}
 
-			// Mount node's TLS certificates into healing container for buildgate API access.
+			// Mount node's TLS certificates into healing container.
 			if healManifest.Options == nil {
 				healManifest.Options = make(map[string]any)
 			}
@@ -391,30 +774,23 @@ func (r *runController) executeWithHealing(
 
 			if healErr != nil {
 				slog.Error("healing mod execution failed", "run_id", req.RunID, "mod_index", idx, "error", healErr)
-				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)
+				return &healingResult{ReGates: reGates, Err: fmt.Errorf("healing mod[%d] failed: %w", idx, healErr)}
 			}
 
 			if healResult.ExitCode != 0 {
 				slog.Warn("healing mod exited with non-zero code", "run_id", req.RunID, "mod_index", idx, "exit_code", healResult.ExitCode)
-				// Continue with remaining mods; we'll check gate after all mods run.
 			}
 
-			// Upload /out artifacts for this healing mod if present.
-			// Use centralized options accessor for stage_id when re-gating.
+			// Upload /out artifacts for this healing mod.
 			stageID, _ := manifest.OptionString("stage_id")
 			if uploadErr := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); uploadErr != nil {
 				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
 			}
 
-			// Per-step diff capture: Generate and upload diff after each healing mod step.
-			// This enables rehydration of workspaces from base + ordered diff chain.
-			// Each healing mod diff is tagged with mod_type and mod_index to distinguish
-			// from the main mod diff captured later in execution_orchestrator.go.
+			// Per-step diff capture.
 			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt)
 
-			// Read Codex session and sentinel artifacts from /out for session propagation.
-			// These files enable resume mode for Codex-based healers and observability
-			// for whether Codex requested build validation.
+			// Read Codex session and sentinel artifacts from /out.
 			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
 				if session := strings.TrimSpace(string(sessionBytes)); session != "" {
 					codexSession = session
@@ -422,8 +798,6 @@ func (r *runController) executeWithHealing(
 				}
 			}
 
-			// Check for sentinel file indicating Codex requested build validation.
-			// This is tracked for observability but does not affect gate semantics.
 			if _, statErr := os.Stat(filepath.Join(outDir, "request_build_validation")); statErr == nil {
 				codexRequestedValidation = true
 				slog.Info("healing: codex requested build validation", "run_id", req.RunID, "mod_index", idx)
@@ -431,9 +805,6 @@ func (r *runController) executeWithHealing(
 		}
 
 		// Persist codex-session.txt to /in for subsequent healing attempts.
-		// This allows Codex-based healers to resume from the previous conversation
-		// instead of starting fresh. The /in directory is read-only inside containers,
-		// so we write from the host side only.
 		if codexSession != "" && *inDir != "" {
 			sessionPath := filepath.Join(*inDir, "codex-session.txt")
 			if writeErr := os.WriteFile(sessionPath, []byte(codexSession), 0o644); writeErr != nil {
@@ -443,60 +814,38 @@ func (r *runController) executeWithHealing(
 			}
 		}
 
-		// Log sentinel state for observability (gate semantics unchanged).
-		_ = codexRequestedValidation // Use variable to silence unused warning in non-logging builds.
+		_ = codexRequestedValidation // For observability; does not affect semantics.
 
 		// Re-run the gate after healing mods complete.
-		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
-		// even if healing mods called the HTTP Build Gate API directly. This ensures:
-		//   1. Consistent gate semantics between HTTP API and Docker gate execution
-		//   2. Canonical gate results are produced by the node agent (not in-container scripts)
-		//   3. Full gate history is captured in ReGates for telemetry and auditing
-		//
-		// This verification uses the same repo+diff semantics as the HTTP Build Gate API:
-		// the workspace now contains repo_url+ref plus accumulated healing modifications.
-		// Conceptually equivalent to: POST /v1/buildgate/validate with diff_patch.
-		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt)
-
-		gateSpec := manifest.Gate
-		//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
-		if gateSpec == nil && manifest.Shift != nil {
-			gateSpec = &contracts.StepGateSpec{
-				Enabled: manifest.Shift.Enabled, //lint:ignore SA1019 compat field access
-				Profile: manifest.Shift.Profile, //lint:ignore SA1019 compat field access
-				Env:     manifest.Shift.Env,     //lint:ignore SA1019 compat field access
-			}
-		}
+		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", "pre")
 
 		if runner.Gate != nil && gateSpec != nil && gateSpec.Enabled {
 			regateStart := time.Now()
-			gateMetadata, gateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+			reGateMetadata, regateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
 			regateDuration := time.Since(regateStart)
 
-			if gateErr != nil {
-				slog.Error("re-gate execution failed", "run_id", req.RunID, "error", gateErr)
-				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("re-gate execution failed: %w", gateErr)
+			if regateErr != nil {
+				slog.Error("re-gate execution failed", "run_id", req.RunID, "error", regateErr)
+				return &healingResult{ReGates: reGates, Err: fmt.Errorf("re-gate execution failed: %w", regateErr)}
 			}
-
-			result.BuildGate = gateMetadata
 
 			// Capture re-gate metadata for stats.
 			reGates = append(reGates, gateRunMetadata{
-				Metadata:   gateMetadata,
+				Metadata:   reGateMetadata,
 				DurationMs: regateDuration.Milliseconds(),
 			})
 
 			// Check if gate passed.
 			gatePassed := false
-			if len(gateMetadata.StaticChecks) > 0 {
-				gatePassed = gateMetadata.StaticChecks[0].Passed
+			if len(reGateMetadata.StaticChecks) > 0 {
+				gatePassed = reGateMetadata.StaticChecks[0].Passed
 			}
 
 			if gatePassed {
-				slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt)
+				slog.Info("build gate passed after healing", "run_id", req.RunID, "attempt", attempt, "phase", "pre")
+
 				// Gate passed; proceed to main mod execution.
-				// Disable the gate and hydration for the follow-up main mod run to
-				// avoid cloning the repository a second time in the same workspace.
+				// Disable the gate and hydration for the follow-up main mod run.
 				manifestForMainMod := manifest
 				manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}
 				//lint:ignore SA1019 Backward compatibility: also disable deprecated Shift field.
@@ -518,16 +867,22 @@ func (r *runController) executeWithHealing(
 					OutDir:    outDir,
 					InDir:     *inDir,
 				})
-				// Return with all gate history.
-				return executionResult{Result: mainResult, PreGate: preGate, ReGates: reGates}, mainErr
+
+				// Return healingResult with success (Err=mainErr which may be nil).
+				return &healingResult{
+					ReGates:    reGates,
+					FinalGate:  reGateMetadata,
+					MainResult: &mainResult,
+					Err:        mainErr,
+				}
 			}
 
 			// Re-gate failed; continue to next retry or exit when exhausted.
-			slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt)
+			slog.Warn("build gate still failing after healing", "run_id", req.RunID, "attempt", attempt, "phase", "pre")
 		}
 	}
 
 	// Retries exhausted; return the gate failure.
-	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID)
-	return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)
+	slog.Error("healing retries exhausted, build gate still failing", "run_id", req.RunID, "phase", "pre")
+	return &healingResult{ReGates: reGates, Err: fmt.Errorf("%w: healing retries exhausted", step.ErrBuildGateFailed)}
 }

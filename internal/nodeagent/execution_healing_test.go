@@ -1035,6 +1035,437 @@ func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
 	}
 }
 
+// TestRunGateWithHealing_GatePassesImmediately verifies that runGateWithHealing returns
+// immediately with the gate metadata when the initial gate passes without healing.
+// This test validates the reusable helper for future pre-mod and post-mod gate phases.
+func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
+	// Mock gate executor that passes immediately.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: true},
+				},
+				LogsText: "[INFO] BUILD SUCCESS\n",
+			}, nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-test-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: &mockContainerRuntime{},
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("test-gate-pass"),
+	}
+
+	manifest := contracts.StepManifest{
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+	}
+
+	// Call runGateWithHealing directly (the reusable helper).
+	initialGate, reGates, gateErr := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+	)
+
+	// Gate should pass without error.
+	if gateErr != nil {
+		t.Fatalf("runGateWithHealing() error = %v, want nil", gateErr)
+	}
+
+	// Initial gate metadata should be captured.
+	if initialGate == nil {
+		t.Fatal("initialGate should not be nil when gate is enabled")
+	}
+
+	if initialGate.Metadata == nil {
+		t.Fatal("initialGate.Metadata should not be nil")
+	}
+
+	if len(initialGate.Metadata.StaticChecks) == 0 || !initialGate.Metadata.StaticChecks[0].Passed {
+		t.Error("gate should have passed")
+	}
+
+	// No re-gates should occur when gate passes immediately.
+	if len(reGates) != 0 {
+		t.Errorf("len(reGates) = %d, want 0 (no healing needed)", len(reGates))
+	}
+
+	// inDir should not be created when gate passes.
+	if inDir != "" {
+		t.Errorf("inDir should remain empty when gate passes, got %q", inDir)
+	}
+}
+
+// TestRunGateWithHealing_GateFailsNoHealing verifies that runGateWithHealing returns
+// ErrBuildGateFailed when the gate fails and no healing is configured.
+func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
+	// Mock gate executor that fails.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: false},
+				},
+				LogsText: "[ERROR] Build failure\n",
+			}, nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-test-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: &mockContainerRuntime{},
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:   types.RunID("test-gate-fail-no-heal"),
+		Options: map[string]any{}, // No healing configured.
+	}
+
+	manifest := contracts.StepManifest{
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+	}
+
+	// Call runGateWithHealing directly.
+	initialGate, reGates, gateErr := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+	)
+
+	// Should return ErrBuildGateFailed.
+	if !errors.Is(gateErr, step.ErrBuildGateFailed) {
+		t.Fatalf("runGateWithHealing() error = %v, want ErrBuildGateFailed", gateErr)
+	}
+
+	// Initial gate metadata should still be captured.
+	if initialGate == nil {
+		t.Fatal("initialGate should not be nil even when gate fails")
+	}
+
+	if len(initialGate.Metadata.StaticChecks) == 0 || initialGate.Metadata.StaticChecks[0].Passed {
+		t.Error("gate should have failed check")
+	}
+
+	// No re-gates since no healing was configured.
+	if len(reGates) != 0 {
+		t.Errorf("len(reGates) = %d, want 0", len(reGates))
+	}
+}
+
+// TestRunGateWithHealing_GateFailsHealingSucceeds verifies the gate+healing orchestration
+// when the initial gate fails but healing succeeds on the first attempt.
+func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
+	// Track call sequence.
+	var callSequence []string
+	gateCallCount := 0
+
+	// Mock gate that fails on first call, passes on second.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			callSequence = append(callSequence, fmt.Sprintf("gate-%d", gateCallCount))
+
+			if gateCallCount == 1 {
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+					LogsText:     "[ERROR] Initial failure\n",
+				}, nil
+			}
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: true}},
+				LogsText:     "[INFO] Success after healing\n",
+			}, nil
+		},
+	}
+
+	// Mock container runtime.
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			callSequence = append(callSequence, "container:"+spec.Image)
+			return step.ContainerHandle{ID: "mock"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("logs"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-test-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("test-gate-heal-success"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods": []any{
+					map[string]any{"image": "healer:latest"},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:   types.StepID(req.RunID),
+		Name: "Test",
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	// Call runGateWithHealing directly.
+	initialGate, reGates, gateErr := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+	)
+
+	// Should succeed after healing.
+	if gateErr != nil {
+		t.Fatalf("runGateWithHealing() error = %v, want nil", gateErr)
+	}
+
+	// Verify call sequence: gate-1 (fail) → healing container → gate-2 (pass).
+	expectedSequence := []string{"gate-1", "container:healer:latest", "gate-2"}
+	if len(callSequence) != len(expectedSequence) {
+		t.Fatalf("call sequence = %v, want %v", callSequence, expectedSequence)
+	}
+	for i, expected := range expectedSequence {
+		if callSequence[i] != expected {
+			t.Errorf("call sequence[%d] = %q, want %q", i, callSequence[i], expected)
+		}
+	}
+
+	// Verify initial gate captured failure.
+	if initialGate == nil || initialGate.Metadata == nil {
+		t.Fatal("initialGate should be captured")
+	}
+	if initialGate.Metadata.StaticChecks[0].Passed {
+		t.Error("initial gate should have failed")
+	}
+
+	// Verify one re-gate captured (success after healing).
+	if len(reGates) != 1 {
+		t.Fatalf("len(reGates) = %d, want 1", len(reGates))
+	}
+	if !reGates[0].Metadata.StaticChecks[0].Passed {
+		t.Error("re-gate should have passed")
+	}
+
+	// Verify /in directory was created.
+	if inDir == "" {
+		t.Error("inDir should be created for healing")
+	}
+}
+
+// TestRunGateWithHealing_HealingRetriesExhausted verifies that runGateWithHealing returns
+// ErrBuildGateFailed when healing retries are exhausted without the gate passing.
+func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
+	gateCallCount := 0
+
+	// Mock gate that always fails.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "maven", Passed: false}},
+				LogsText:     fmt.Sprintf("[ERROR] Failure %d\n", gateCallCount),
+			}, nil
+		},
+	}
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			return step.ContainerHandle{ID: "mock"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return []byte("logs"), nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	workspace, _ := os.MkdirTemp("", "ploy-test-ws-*")
+	defer os.RemoveAll(workspace)
+	outDir, _ := os.MkdirTemp("", "ploy-test-out-*")
+	defer os.RemoveAll(outDir)
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{ServerURL: "http://localhost:9999", NodeID: "test-node"},
+	}
+
+	req := StartRunRequest{
+		RunID: types.RunID("test-heal-exhausted"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 2,
+				"mods":    []any{map[string]any{"image": "healer:latest"}},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:      types.StepID(req.RunID),
+		Name:    "Test",
+		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Options: req.Options,
+	}
+
+	initialGate, reGates, gateErr := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+	)
+
+	// Should return ErrBuildGateFailed.
+	if !errors.Is(gateErr, step.ErrBuildGateFailed) {
+		t.Fatalf("runGateWithHealing() error = %v, want ErrBuildGateFailed", gateErr)
+	}
+
+	// Initial gate should be captured.
+	if initialGate == nil {
+		t.Fatal("initialGate should not be nil")
+	}
+
+	// Two re-gates should be captured (one per retry).
+	if len(reGates) != 2 {
+		t.Fatalf("len(reGates) = %d, want 2", len(reGates))
+	}
+
+	// Total gate calls: 1 initial + 2 re-gates = 3.
+	if gateCallCount != 3 {
+		t.Errorf("gate call count = %d, want 3", gateCallCount)
+	}
+}
+
+// TestRunGateWithHealing_GateDisabled verifies that runGateWithHealing returns immediately
+// without error when the gate is disabled.
+func TestRunGateWithHealing_GateDisabled(t *testing.T) {
+	// Gate should not be called.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			t.Error("gate should not be called when disabled")
+			return nil, nil
+		},
+	}
+
+	runner := step.Runner{Gate: mockGate}
+	rc := &runController{}
+	req := StartRunRequest{RunID: types.RunID("test-disabled")}
+
+	// Gate disabled explicitly.
+	manifest := contracts.StepManifest{
+		Gate: &contracts.StepGateSpec{Enabled: false},
+	}
+
+	inDir := ""
+	initialGate, reGates, gateErr := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, "", "", &inDir, "pre",
+	)
+
+	if gateErr != nil {
+		t.Errorf("runGateWithHealing() error = %v, want nil", gateErr)
+	}
+	if initialGate != nil {
+		t.Error("initialGate should be nil when gate is disabled")
+	}
+	if len(reGates) != 0 {
+		t.Error("reGates should be empty when gate is disabled")
+	}
+}
+
 // Mock implementations for testing.
 
 type mockWorkspaceHydrator struct{}
