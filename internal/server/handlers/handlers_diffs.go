@@ -19,17 +19,16 @@ import (
 
 // diffItem represents a single diff in a list response.
 //
-// C2: Each diff is tagged with step_index and mod_type to enable unified rehydration.
-// - step_index: 0-based step number for ordering; same index for mod + healing diffs.
+// C2: Each diff is tagged with job_id and mod_type (in summary) to enable unified rehydration.
+// - job_id: References the job that produced this diff; job's step_index provides ordering.
 // - mod_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
-// Rehydration queries fetch all diffs where step_index <= k, including healing diffs.
+// Rehydration queries fetch all diffs ordered by job step_index.
 type diffItem struct {
 	ID        string                  `json:"id"`
-	StageID   string                  `json:"stage_id"`
-	StepIndex *int32                  `json:"step_index,omitempty"` // step identity for multi-step runs (0-based)
+	JobID     string                  `json:"job_id"`
 	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains mod_type, step_index, timings.
+	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains mod_type, timings.
 }
 
 // diffListResponse is the typed response for listing diffs.
@@ -41,8 +40,7 @@ type diffListResponse struct {
 type diffGetResponse struct {
 	ID          string                  `json:"id"`
 	RunID       string                  `json:"run_id"`
-	StageID     *string                 `json:"stage_id,omitempty"`
-	StepIndex   *int32                  `json:"step_index,omitempty"` // step identity for multi-step runs (0-based)
+	JobID       *string                 `json:"job_id,omitempty"`
 	CreatedAt   time.Time               `json:"created_at"`
 	GzippedSize int                     `json:"gzipped_size"`
 	Summary     domaintypes.DiffSummary `json:"summary,omitempty"`
@@ -76,10 +74,13 @@ func listRunDiffsHandler(st store.Store) http.HandlerFunc {
 			if len(d.Summary) > 0 {
 				_ = json.Unmarshal(d.Summary, &summary)
 			}
+			jobIDStr := ""
+			if d.JobID.Valid {
+				jobIDStr = uuid.UUID(d.JobID.Bytes).String()
+			}
 			items = append(items, diffItem{
 				ID:        uuid.UUID(d.ID.Bytes).String(),
-				StageID:   uuid.UUID(d.StageID.Bytes).String(),
-				StepIndex: d.StepIndex, // expose step identity for rehydration logic
+				JobID:     jobIDStr,
 				CreatedAt: d.CreatedAt.Time,
 				Size:      len(d.Patch),
 				Summary:   summary,
@@ -132,14 +133,13 @@ func getDiffHandler(st store.Store) http.HandlerFunc {
 		resp := diffGetResponse{
 			ID:          uuid.UUID(d.ID.Bytes).String(),
 			RunID:       uuid.UUID(d.RunID.Bytes).String(),
-			StepIndex:   d.StepIndex, // expose step identity for rehydration logic
 			CreatedAt:   d.CreatedAt.Time,
 			GzippedSize: len(d.Patch),
 			Summary:     summary,
 		}
-		if d.StageID.Valid {
-			sid := uuid.UUID(d.StageID.Bytes).String()
-			resp.StageID = &sid
+		if d.JobID.Valid {
+			jid := uuid.UUID(d.JobID.Bytes).String()
+			resp.JobID = &jid
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

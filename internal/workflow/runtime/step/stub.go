@@ -140,7 +140,8 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 func generateGitDiffBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
 	// Use git diff --no-index to compare two arbitrary directories.
 	// Note: git diff --no-index returns exit code 1 when there ARE differences (not an error).
-	cmd := exec.CommandContext(ctx, "git", "diff", "--no-index", baseDir, modifiedDir)
+	// Use --no-prefix to get raw paths, then normalize them for portable diffs.
+	cmd := exec.CommandContext(ctx, "git", "diff", "--no-index", "--no-prefix", baseDir, modifiedDir)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -161,7 +162,8 @@ func generateGitDiffBetween(ctx context.Context, baseDir, modifiedDir string) ([
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 {
 				// Exit code 1 means differences were found - this is the expected case.
-				return stdout.Bytes(), nil
+				// Normalize paths to produce portable diffs.
+				return normalizeDiffPaths(stdout.Bytes(), baseDir, modifiedDir), nil
 			}
 		}
 		// Actual error occurred.
@@ -173,6 +175,71 @@ func generateGitDiffBetween(ctx context.Context, baseDir, modifiedDir string) ([
 
 	// Exit code 0: no differences.
 	return stdout.Bytes(), nil
+}
+
+// normalizeDiffPaths rewrites git diff output to use standard a/ and b/ prefixes
+// with relative paths. git diff --no-index --no-prefix produces paths like:
+//
+//	diff --git private/tmp/base/file private/tmp/modified/file
+//	--- private/tmp/base/file
+//	+++ private/tmp/modified/file
+//
+// (Note: git strips the leading / from absolute paths in --no-prefix mode)
+//
+// This function normalizes them to:
+//
+//	diff --git a/file b/file
+//	--- a/file
+//	+++ b/file
+//
+// This enables git apply -p1 to work correctly during rehydration.
+// Additionally, it filters out .git/ directory changes which git apply rejects.
+func normalizeDiffPaths(diff []byte, baseDir, modifiedDir string) []byte {
+	// Git strips leading / from paths in --no-prefix mode, so we need to match
+	// both with and without the leading slash.
+	baseDir = strings.TrimPrefix(baseDir, "/")
+	modifiedDir = strings.TrimPrefix(modifiedDir, "/")
+
+	// Ensure paths end with / for clean replacement.
+	if !strings.HasSuffix(baseDir, "/") {
+		baseDir += "/"
+	}
+	if !strings.HasSuffix(modifiedDir, "/") {
+		modifiedDir += "/"
+	}
+
+	result := string(diff)
+	// Replace base directory paths with a/ prefix.
+	result = strings.ReplaceAll(result, baseDir, "a/")
+	// Replace modified directory paths with b/ prefix.
+	result = strings.ReplaceAll(result, modifiedDir, "b/")
+
+	// Filter out .git/ directory changes - git apply rejects patches to .git/ internals.
+	return filterGitDir([]byte(result))
+}
+
+// filterGitDir removes diff hunks that modify .git/ directory contents.
+// git apply rejects patches that attempt to modify .git/ internals (e.g., .git/index),
+// so we strip them from the diff output.
+func filterGitDir(diff []byte) []byte {
+	lines := strings.Split(string(diff), "\n")
+	var filtered []string
+	skip := false
+
+	for _, line := range lines {
+		// Each file in a diff starts with "diff --git ..."
+		if strings.HasPrefix(line, "diff --git") {
+			// Check if this diff hunk is for a .git/ file
+			skip = strings.Contains(line, "/.git/") ||
+				strings.Contains(line, "a/.git/") ||
+				strings.Contains(line, "b/.git/")
+		}
+		if !skip {
+			filtered = append(filtered, line)
+		}
+	}
+
+	return []byte(strings.Join(filtered, "\n"))
 }
 
 // Runner executes workflow steps.

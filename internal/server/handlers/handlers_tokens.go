@@ -58,7 +58,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		// Generate token.
 		now := time.Now()
 		expiresAt := now.AddDate(0, 0, req.ExpiresInDays)
-		token, err := auth.GenerateAPIToken(tokenSecret, clusterID, normalizedRole, expiresAt)
+		token, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(normalizedRole), expiresAt)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate token: %v", err), http.StatusInternalServerError)
 			slog.Error("create api token: generation failed", "err", err)
@@ -93,7 +93,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 			TokenHash:   tokenHash,
 			TokenID:     claims.ID,
 			ClusterID:   clusterID,
-			Role:        normalizedRole,
+			Role:        string(normalizedRole),
 			Description: description,
 			IssuedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 			ExpiresAt:   pgtype.Timestamptz{Time: expiresAt, Valid: true},
@@ -115,7 +115,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		}{
 			Token:     token,
 			TokenID:   claims.ID,
-			Role:      normalizedRole,
+			Role:      string(normalizedRole),
 			ExpiresAt: expiresAt,
 			Warning:   "Save this token securely. It will not be shown again.",
 		}

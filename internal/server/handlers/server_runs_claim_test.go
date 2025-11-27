@@ -15,7 +15,7 @@ import (
 )
 
 // ===== Run Claim Tests =====
-// claimRunHandler allows nodes to claim a queued run for execution.
+// claimJobHandler allows nodes to claim a queued run for execution.
 
 // TestClaimRun_Success verifies a node successfully claims a queued run
 // when a run is available and the node exists.
@@ -24,10 +24,10 @@ func TestClaimRun_Success(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	now := time.Now()
 
-	// Mock store that returns a node, a claimed run, and a stage for that run.
+	// Mock store that returns a node, a claimed run, and a job for that run.
 	st := &mockStore{
 		getNodeResult: store.Node{
 			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
@@ -43,12 +43,12 @@ func TestClaimRun_Success(t *testing.T) {
 			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"key":"value"}`),
 		},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			{
-				ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
 				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
 				Name:   "mods-openrewrite",
-				Status: store.StageStatusPending,
+				Status: store.JobStatusPending,
 				Meta:   []byte("{}"),
 			},
 		},
@@ -56,7 +56,7 @@ func TestClaimRun_Success(t *testing.T) {
 
 	// Create handler with empty config holder.
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -110,7 +110,7 @@ func TestClaimRun_NoRunsAvailable(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -137,7 +137,7 @@ func TestClaimRun_NodeNotFound(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -163,7 +163,7 @@ func TestClaimRun_InvalidNodeID(t *testing.T) {
 
 	st := &mockStore{}
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/invalid-uuid/claim", nil)
 	req.SetPathValue("id", "invalid-uuid")
@@ -177,8 +177,8 @@ func TestClaimRun_InvalidNodeID(t *testing.T) {
 	}
 }
 
-// TestClaimRun_CreatesStageWhenNoneExist verifies that a stage is created
-// when a run is claimed but no stages exist for that run.
+// TestClaimRun_CreatesStageWhenNoneExist verifies that a job is created
+// when a run is claimed but no jobs exist for that run.
 func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 	t.Parallel()
 
@@ -186,7 +186,7 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
-	// Mock store that returns no stages, so a new stage should be created.
+	// Mock store that returns no jobs, so a new job should be created.
 	st := &mockStore{
 		getNodeResult: store.Node{
 			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
@@ -202,11 +202,11 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{}`),
 		},
-		listStagesByRunResult: []store.Stage{}, // No stages exist
+		listJobsByRunResult: []store.Job{}, // No jobs exist
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -220,23 +220,23 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 	}
 
 	// Verify CreateStage was called.
-	if !st.createStageCalled {
+	if !st.createJobCalled {
 		t.Fatal("expected CreateStage to be called")
 	}
 
-	// Verify the stage was created with correct parameters.
-	// Since createStageParams is now a slice, check the first element.
-	if len(st.createStageParams) == 0 {
+	// Verify the job was created with correct parameters.
+	// Since createJobParams is now a slice, check the first element.
+	if len(st.createJobParams) == 0 {
 		t.Fatal("expected at least one CreateStage call")
 	}
-	if st.createStageParams[0].RunID.Bytes != runID {
-		t.Errorf("CreateStage called with wrong run_id: %v", st.createStageParams[0].RunID)
+	if st.createJobParams[0].RunID.Bytes != runID {
+		t.Errorf("CreateStage called with wrong run_id: %v", st.createJobParams[0].RunID)
 	}
-	if st.createStageParams[0].Name != "mods-openrewrite" {
-		t.Errorf("expected stage name 'mods-openrewrite', got %s", st.createStageParams[0].Name)
+	if st.createJobParams[0].Name != "mods-openrewrite" {
+		t.Errorf("expected job name 'mods-openrewrite', got %s", st.createJobParams[0].Name)
 	}
-	if st.createStageParams[0].Status != store.StageStatusPending {
-		t.Errorf("expected stage status %s, got %s", store.StageStatusPending, st.createStageParams[0].Status)
+	if st.createJobParams[0].Status != store.JobStatusPending {
+		t.Errorf("expected job status %s, got %s", store.JobStatusPending, st.createJobParams[0].Status)
 	}
 }
 
@@ -253,7 +253,7 @@ func TestClaimRun_StepLevelClaim_Success(t *testing.T) {
 	nodeID := uuid.New()
 	runID := uuid.New()
 	stepID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	now := time.Now()
 	stepIndex := int32(0)
 
@@ -283,19 +283,19 @@ func TestClaimRun_StepLevelClaim_Success(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
 		},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			{
-				ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
 				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
 				Name:   "mods-openrewrite",
-				Status: store.StageStatusPending,
+				Status: store.JobStatusPending,
 				Meta:   []byte("{}"),
 			},
 		},
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -369,7 +369,7 @@ func TestClaimRun_StepLevelClaim_FallbackToWholeRun(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	now := time.Now()
 
 	// Mock store where ClaimRunStep returns ErrNoRows (no steps available),
@@ -392,19 +392,19 @@ func TestClaimRun_StepLevelClaim_FallbackToWholeRun(t *testing.T) {
 			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"action":"shell","cmd":"echo hello"}`),
 		},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			{
-				ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
 				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
 				Name:   "mods-openrewrite",
-				Status: store.StageStatusPending,
+				Status: store.JobStatusPending,
 				Meta:   []byte("{}"),
 			},
 		},
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -464,7 +464,7 @@ func TestClaimRun_StepLevelClaim_BothStrategiesFail(t *testing.T) {
 	}
 
 	configHolder := &ConfigHolder{}
-	handler := claimRunHandler(st, configHolder)
+	handler := claimJobHandler(st, configHolder)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
 	req.SetPathValue("id", nodeID.String())
@@ -496,7 +496,7 @@ func TestClaimRun_StepLevelClaim_MultipleSteps(t *testing.T) {
 	runID := uuid.New()
 	step0ID := uuid.New()
 	step1ID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	now := time.Now()
 
 	// Scenario: node1 claims step 0, then node2 claims step 1.
@@ -524,19 +524,19 @@ func TestClaimRun_StepLevelClaim_MultipleSteps(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
 		},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			{
-				ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
 				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
 				Name:   "mods-openrewrite",
-				Status: store.StageStatusPending,
+				Status: store.JobStatusPending,
 				Meta:   []byte("{}"),
 			},
 		},
 	}
 
 	configHolder := &ConfigHolder{}
-	handler1 := claimRunHandler(st1, configHolder)
+	handler1 := claimJobHandler(st1, configHolder)
 
 	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+node1ID.String()+"/claim", nil)
 	req1.SetPathValue("id", node1ID.String())
@@ -587,18 +587,18 @@ func TestClaimRun_StepLevelClaim_MultipleSteps(t *testing.T) {
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
 		},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			{
-				ID:     pgtype.UUID{Bytes: stageID, Valid: true},
+				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
 				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
 				Name:   "mods-openrewrite",
-				Status: store.StageStatusPending,
+				Status: store.JobStatusPending,
 				Meta:   []byte("{}"),
 			},
 		},
 	}
 
-	handler2 := claimRunHandler(st2, configHolder)
+	handler2 := claimJobHandler(st2, configHolder)
 
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+node2ID.String()+"/claim", nil)
 	req2.SetPathValue("id", node2ID.String())

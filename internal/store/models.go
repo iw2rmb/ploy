@@ -57,6 +57,53 @@ func (ns NullBuildgateJobStatus) Value() (driver.Value, error) {
 	return string(ns.BuildgateJobStatus), nil
 }
 
+type JobStatus string
+
+const (
+	JobStatusPending   JobStatus = "pending"
+	JobStatusAssigned  JobStatus = "assigned"
+	JobStatusRunning   JobStatus = "running"
+	JobStatusSucceeded JobStatus = "succeeded"
+	JobStatusFailed    JobStatus = "failed"
+	JobStatusSkipped   JobStatus = "skipped"
+	JobStatusCanceled  JobStatus = "canceled"
+)
+
+func (e *JobStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = JobStatus(s)
+	case string:
+		*e = JobStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for JobStatus: %T", src)
+	}
+	return nil
+}
+
+type NullJobStatus struct {
+	JobStatus JobStatus `json:"job_status"`
+	Valid     bool      `json:"valid"` // Valid is true if JobStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullJobStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.JobStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.JobStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullJobStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.JobStatus), nil
+}
+
 type RunStatus string
 
 const (
@@ -149,52 +196,6 @@ func (ns NullRunStepStatus) Value() (driver.Value, error) {
 	return string(ns.RunStepStatus), nil
 }
 
-type StageStatus string
-
-const (
-	StageStatusPending   StageStatus = "pending"
-	StageStatusRunning   StageStatus = "running"
-	StageStatusSucceeded StageStatus = "succeeded"
-	StageStatusFailed    StageStatus = "failed"
-	StageStatusSkipped   StageStatus = "skipped"
-	StageStatusCanceled  StageStatus = "canceled"
-)
-
-func (e *StageStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = StageStatus(s)
-	case string:
-		*e = StageStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for StageStatus: %T", src)
-	}
-	return nil
-}
-
-type NullStageStatus struct {
-	StageStatus StageStatus `json:"stage_status"`
-	Valid       bool        `json:"valid"` // Valid is true if StageStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullStageStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.StageStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.StageStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullStageStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.StageStatus), nil
-}
-
 type ApiToken struct {
 	ID          pgtype.UUID        `json:"id"`
 	TokenHash   string             `json:"token_hash"`
@@ -213,7 +214,7 @@ type ApiToken struct {
 type ArtifactBundle struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     pgtype.UUID        `json:"run_id"`
-	StageID   pgtype.UUID        `json:"stage_id"`
+	JobID     pgtype.UUID        `json:"job_id"`
 	BuildID   pgtype.UUID        `json:"build_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
@@ -240,10 +241,10 @@ type BootstrapToken struct {
 type Build struct {
 	ID         pgtype.UUID        `json:"id"`
 	RunID      pgtype.UUID        `json:"run_id"`
-	StageID    pgtype.UUID        `json:"stage_id"`
+	JobID      pgtype.UUID        `json:"job_id"`
 	Tool       *string            `json:"tool"`
 	Command    *string            `json:"command"`
-	Status     StageStatus        `json:"status"`
+	Status     JobStatus          `json:"status"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 	DurationMs int64              `json:"duration_ms"`
@@ -265,27 +266,39 @@ type BuildgateJob struct {
 type Diff struct {
 	ID        pgtype.UUID        `json:"id"`
 	RunID     pgtype.UUID        `json:"run_id"`
-	StageID   pgtype.UUID        `json:"stage_id"`
+	JobID     pgtype.UUID        `json:"job_id"`
 	Patch     []byte             `json:"patch"`
 	Summary   []byte             `json:"summary"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	StepIndex *int32             `json:"step_index"`
 }
 
 type Event struct {
 	ID      int64              `json:"id"`
 	RunID   pgtype.UUID        `json:"run_id"`
-	StageID pgtype.UUID        `json:"stage_id"`
+	JobID   pgtype.UUID        `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
 	Message string             `json:"message"`
 	Meta    []byte             `json:"meta"`
 }
 
+type Job struct {
+	ID         pgtype.UUID        `json:"id"`
+	RunID      pgtype.UUID        `json:"run_id"`
+	Name       string             `json:"name"`
+	Status     JobStatus          `json:"status"`
+	StartedAt  pgtype.Timestamptz `json:"started_at"`
+	FinishedAt pgtype.Timestamptz `json:"finished_at"`
+	DurationMs int64              `json:"duration_ms"`
+	Meta       []byte             `json:"meta"`
+	StepIndex  float64            `json:"step_index"`
+	NodeID     pgtype.UUID        `json:"node_id"`
+}
+
 type Log struct {
 	ID        int64              `json:"id"`
 	RunID     pgtype.UUID        `json:"run_id"`
-	StageID   pgtype.UUID        `json:"stage_id"`
+	JobID     pgtype.UUID        `json:"job_id"`
 	BuildID   pgtype.UUID        `json:"build_id"`
 	ChunkNo   int32              `json:"chunk_no"`
 	Data      []byte             `json:"data"`
@@ -357,15 +370,4 @@ type RunsTiming struct {
 	ID      pgtype.UUID `json:"id"`
 	QueueMs int64       `json:"queue_ms"`
 	RunMs   int64       `json:"run_ms"`
-}
-
-type Stage struct {
-	ID         pgtype.UUID        `json:"id"`
-	RunID      pgtype.UUID        `json:"run_id"`
-	Name       string             `json:"name"`
-	Status     StageStatus        `json:"status"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	DurationMs int64              `json:"duration_ms"`
-	Meta       []byte             `json:"meta"`
 }

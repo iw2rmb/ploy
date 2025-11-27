@@ -328,7 +328,7 @@ func bootstrapCertificateHandler(st store.Store, tokenSecret string) http.Handle
 
 		// Generate worker token with 1 year expiration
 		tokenExpiry := time.Now().AddDate(1, 0, 0)
-		workerToken, err := auth.GenerateAPIToken(tokenSecret, clusterID, auth.RoleWorker, tokenExpiry)
+		workerToken, err := auth.GenerateAPIToken(tokenSecret, clusterID, string(auth.RoleWorker), tokenExpiry)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to generate worker token: %v", err), http.StatusInternalServerError)
 			slog.Error("bootstrap certificate: generate worker token failed", "err", err)

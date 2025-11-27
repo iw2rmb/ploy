@@ -4,32 +4,33 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// StageStatusFromStore converts store.StageStatus to mods API StageState.
+// StageStatusFromStore converts store.JobStatus to mods API StageState.
 // This provides a type-safe mapping from the database-authoritative status
 // to the external API representation.
 //
 // Mapping:
-//   - store.StageStatusPending -> StageStatePending
-//   - store.StageStatusRunning -> StageStateRunning
-//   - store.StageStatusSucceeded -> StageStateSucceeded
-//   - store.StageStatusFailed -> StageStateFailed
-//   - store.StageStatusSkipped -> StageStateFailed (skipped stages are represented as failed in mods API)
-//   - store.StageStatusCanceled -> StageStateCancelled (UK spelling for mods API)
-func StageStatusFromStore(status store.StageStatus) StageState {
+//   - store.JobStatusPending -> StageStatePending
+//   - store.JobStatusAssigned -> StageStatePending (assigned jobs are still pending from API perspective)
+//   - store.JobStatusRunning -> StageStateRunning
+//   - store.JobStatusSucceeded -> StageStateSucceeded
+//   - store.JobStatusFailed -> StageStateFailed
+//   - store.JobStatusSkipped -> StageStateFailed (skipped jobs are represented as failed in mods API)
+//   - store.JobStatusCanceled -> StageStateCancelled (UK spelling for mods API)
+func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
-	case store.StageStatusPending:
+	case store.JobStatusPending, store.JobStatusAssigned:
 		return StageStatePending
-	case store.StageStatusRunning:
+	case store.JobStatusRunning:
 		return StageStateRunning
-	case store.StageStatusSucceeded:
+	case store.JobStatusSucceeded:
 		return StageStateSucceeded
-	case store.StageStatusFailed:
+	case store.JobStatusFailed:
 		return StageStateFailed
-	case store.StageStatusSkipped:
-		// Skipped stages don't have a direct mods API equivalent;
+	case store.JobStatusSkipped:
+		// Skipped jobs don't have a direct mods API equivalent;
 		// map to failed for API consistency.
 		return StageStateFailed
-	case store.StageStatusCanceled:
+	case store.JobStatusCanceled:
 		return StageStateCancelled
 	default:
 		// Default to pending for unknown states (defensive).
@@ -68,31 +69,31 @@ func TicketStatusFromStore(status store.RunStatus) TicketState {
 	}
 }
 
-// StageStatusToStore converts mods API StageState to store.StageStatus.
+// StageStatusToStore converts mods API StageState to store.JobStatus.
 // This provides a type-safe mapping from the external API representation
 // to the database-authoritative status type.
 //
 // Mapping:
-//   - StageStatePending/StageStateQueued -> store.StageStatusPending
-//   - StageStateRunning -> store.StageStatusRunning
-//   - StageStateSucceeded -> store.StageStatusSucceeded
-//   - StageStateFailed -> store.StageStatusFailed
-//   - StageStateCancelling/StageStateCancelled -> store.StageStatusCanceled
-func StageStatusToStore(state StageState) store.StageStatus {
+//   - StageStatePending/StageStateQueued -> store.JobStatusPending
+//   - StageStateRunning -> store.JobStatusRunning
+//   - StageStateSucceeded -> store.JobStatusSucceeded
+//   - StageStateFailed -> store.JobStatusFailed
+//   - StageStateCancelling/StageStateCancelled -> store.JobStatusCanceled
+func StageStatusToStore(state StageState) store.JobStatus {
 	switch state {
 	case StageStatePending, StageStateQueued:
-		return store.StageStatusPending
+		return store.JobStatusPending
 	case StageStateRunning:
-		return store.StageStatusRunning
+		return store.JobStatusRunning
 	case StageStateSucceeded:
-		return store.StageStatusSucceeded
+		return store.JobStatusSucceeded
 	case StageStateFailed:
-		return store.StageStatusFailed
+		return store.JobStatusFailed
 	case StageStateCancelling, StageStateCancelled:
-		return store.StageStatusCanceled
+		return store.JobStatusCanceled
 	default:
 		// Default to pending for unknown states (defensive).
-		return store.StageStatusPending
+		return store.JobStatusPending
 	}
 }
 

@@ -15,7 +15,7 @@ func TestGenerateAPIToken_Success(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestGenerateAPIToken_Success(t *testing.T) {
 	if claims.ClusterID.String() != clusterID {
 		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
 	}
-	if claims.Role != role {
+	if claims.Role != string(role) {
 		t.Errorf("Role=%s want %s", claims.Role, role)
 	}
 	if claims.TokenType != TokenTypeAPI {
@@ -46,7 +46,7 @@ func TestGenerateAPIToken_ContainsCorrectClaims(t *testing.T) {
 	role := RoleCLIAdmin
 	expiresAt := time.Now().Add(365 * 24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestGenerateAPIToken_ContainsCorrectClaims(t *testing.T) {
 	if claims.ClusterID.String() != clusterID {
 		t.Errorf("ClusterID=%s want %s", claims.ClusterID, clusterID)
 	}
-	if claims.Role != role {
+	if claims.Role != string(role) {
 		t.Errorf("Role=%s want %s", claims.Role, role)
 	}
 	if claims.TokenType != TokenTypeAPI {
@@ -96,7 +96,7 @@ func TestGenerateAPIToken_UniqueTokenIDs(t *testing.T) {
 
 	tokens := make(map[string]bool)
 	for i := 0; i < 10; i++ {
-		tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+		tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 		if err != nil {
 			t.Fatalf("GenerateAPIToken error: %v", err)
 		}
@@ -161,7 +161,7 @@ func TestGenerateBootstrapToken_IncludesNodeID(t *testing.T) {
 	}
 
 	// Bootstrap tokens should always have worker role
-	if claims.Role != RoleWorker {
+	if claims.Role != string(RoleWorker) {
 		t.Errorf("Role=%s want %s", claims.Role, RoleWorker)
 	}
 }
@@ -195,7 +195,7 @@ func TestValidateToken_ValidToken(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -214,7 +214,7 @@ func TestValidateToken_InvalidSignature(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestValidateToken_ExpiredToken(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(-1 * time.Hour) // Already expired
 
-	tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestValidateToken_WrongSecret(t *testing.T) {
 
 	// Generate token with one secret
 	secret1 := "secret-one-12345678901234567890"
-	tokenString, err := GenerateAPIToken(secret1, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret1, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestValidateToken_WrongSigningMethod(t *testing.T) {
 	// Manually create a token with RS256 instead of HS256
 	claims := &TokenClaims{
 		ClusterID: "test-cluster",
-		Role:      RoleControlPlane,
+		Role:      string(RoleControlPlane),
 		TokenType: TokenTypeAPI,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
@@ -338,13 +338,13 @@ func TestGenerateTokenID_Uniqueness(t *testing.T) {
 }
 
 func TestTokenClaims_AllRoles(t *testing.T) {
-	roles := []string{RoleControlPlane, RoleWorker, RoleCLIAdmin}
+	roles := []Role{RoleControlPlane, RoleWorker, RoleCLIAdmin}
 	clusterID := "test-cluster"
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	for _, role := range roles {
-		t.Run(role, func(t *testing.T) {
-			tokenString, err := GenerateAPIToken(testSecret, clusterID, role, expiresAt)
+		t.Run(string(role), func(t *testing.T) {
+			tokenString, err := GenerateAPIToken(testSecret, clusterID, string(role), expiresAt)
 			if err != nil {
 				t.Fatalf("GenerateAPIToken error: %v", err)
 			}
@@ -354,7 +354,7 @@ func TestTokenClaims_AllRoles(t *testing.T) {
 				t.Fatalf("ValidateToken error: %v", err)
 			}
 
-			if claims.Role != role {
+			if claims.Role != string(role) {
 				t.Errorf("Role=%s want %s", claims.Role, role)
 			}
 		})

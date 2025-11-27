@@ -86,35 +86,35 @@ func TestAuthorizerRejectsForbiddenRole(t *testing.T) {
 func TestAuthorizerRoleGates(t *testing.T) {
 	tests := []struct {
 		name         string
-		allowedRoles []string
-		defaultRole  string
+		allowedRoles []Role
+		defaultRole  Role
 		wantCode     int
 		wantCalled   bool
 	}{
 		{
 			name:         "single allowed role matches",
-			allowedRoles: []string{RoleControlPlane},
+			allowedRoles: []Role{RoleControlPlane},
 			defaultRole:  RoleControlPlane,
 			wantCode:     http.StatusOK,
 			wantCalled:   true,
 		},
 		{
 			name:         "multiple allowed roles with match",
-			allowedRoles: []string{RoleControlPlane, RoleWorker, RoleCLIAdmin},
+			allowedRoles: []Role{RoleControlPlane, RoleWorker, RoleCLIAdmin},
 			defaultRole:  RoleWorker,
 			wantCode:     http.StatusOK,
 			wantCalled:   true,
 		},
 		{
 			name:         "multiple allowed roles without match",
-			allowedRoles: []string{RoleControlPlane, RoleCLIAdmin},
+			allowedRoles: []Role{RoleControlPlane, RoleCLIAdmin},
 			defaultRole:  RoleWorker,
 			wantCode:     http.StatusForbidden,
 			wantCalled:   false,
 		},
 		{
 			name:         "empty allowlist permits any role",
-			allowedRoles: []string{},
+			allowedRoles: []Role{},
 			defaultRole:  RoleWorker,
 			wantCode:     http.StatusOK,
 			wantCalled:   true,
@@ -127,15 +127,8 @@ func TestAuthorizerRoleGates(t *testing.T) {
 			wantCalled:   true,
 		},
 		{
-			name:         "case insensitive role matching",
-			allowedRoles: []string{"WORKER", "Control-Plane"},
-			defaultRole:  RoleWorker,
-			wantCode:     http.StatusOK,
-			wantCalled:   true,
-		},
-		{
-			name:         "admin alias matches cli-admin",
-			allowedRoles: []string{"admin"},
+			name:         "cli-admin can access control-plane endpoints",
+			allowedRoles: []Role{RoleControlPlane},
 			defaultRole:  RoleCLIAdmin,
 			wantCode:     http.StatusOK,
 			wantCalled:   true,

@@ -113,7 +113,7 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 		type artifactDetail struct {
 			ID        string  `json:"id"`
 			RunID     string  `json:"run_id"`
-			StageID   *string `json:"stage_id,omitempty"`
+			JobID     *string `json:"job_id,omitempty"`
 			BuildID   *string `json:"build_id,omitempty"`
 			Name      *string `json:"name,omitempty"`
 			CID       string  `json:"cid"`
@@ -126,9 +126,9 @@ func getArtifactHandler(st store.Store) http.HandlerFunc {
 			RunID: uuid.UUID(bundle.RunID.Bytes).String(),
 			Size:  int64(len(bundle.Bundle)),
 		}
-		if bundle.StageID.Valid {
-			stageID := uuid.UUID(bundle.StageID.Bytes).String()
-			detail.StageID = &stageID
+		if bundle.JobID.Valid {
+			jobID := uuid.UUID(bundle.JobID.Bytes).String()
+			detail.JobID = &jobID
 		}
 		if bundle.BuildID.Valid {
 			buildID := uuid.UUID(bundle.BuildID.Bytes).String()

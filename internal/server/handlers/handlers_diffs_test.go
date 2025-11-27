@@ -17,13 +17,13 @@ import (
 func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
 	st.listDiffsByRunResult = []store.Diff{{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
+		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{"exit_code":0}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -46,8 +46,8 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 	if item.ID != diffID.String() {
 		t.Errorf("id=%q, want %q", item.ID, diffID.String())
 	}
-	if item.StageID != stageID.String() {
-		t.Errorf("stage_id=%q, want %q", item.StageID, stageID.String())
+	if item.JobID != jobID.String() {
+		t.Errorf("job_id=%q, want %q", item.JobID, jobID.String())
 	}
 	if !item.CreatedAt.Equal(createdAt) {
 		t.Errorf("created_at=%v, want %v", item.CreatedAt, createdAt)
@@ -63,12 +63,12 @@ func TestListRunDiffs_ReturnsItems(t *testing.T) {
 func TestGetDiff_Download(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	diffID := uuid.New()
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
+		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0}`),
 		CreatedAt: pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
@@ -91,13 +91,13 @@ func TestGetDiff_Download(t *testing.T) {
 func TestGetDiff_Metadata(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	diffID := uuid.New()
 	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
+		JobID:     pgtype.UUID{Bytes: jobID, Valid: true},
 		Patch:     []byte{0x1f, 0x8b, 0x08},
 		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -122,8 +122,8 @@ func TestGetDiff_Metadata(t *testing.T) {
 	if resp.RunID != runID.String() {
 		t.Errorf("run_id=%q, want %q", resp.RunID, runID.String())
 	}
-	if resp.StageID == nil || *resp.StageID != stageID.String() {
-		t.Errorf("stage_id=%v, want %q", resp.StageID, stageID.String())
+	if resp.JobID == nil || *resp.JobID != jobID.String() {
+		t.Errorf("job_id=%v, want %q", resp.JobID, jobID.String())
 	}
 	if !resp.CreatedAt.Equal(createdAt) {
 		t.Errorf("created_at=%v, want %v", resp.CreatedAt, createdAt)
@@ -164,10 +164,10 @@ func TestGetDiff_MissingID(t *testing.T) {
 func TestGetDiff_NotFound(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	diffID := uuid.New()
 	_ = runID
-	_ = stageID
+	_ = jobID
 	st.getDiffErr = pgx.ErrNoRows
 
 	rr := httptest.NewRecorder()
@@ -179,7 +179,7 @@ func TestGetDiff_NotFound(t *testing.T) {
 	}
 }
 
-func TestGetDiff_Metadata_StageIDNull(t *testing.T) {
+func TestGetDiff_Metadata_JobIDNull(t *testing.T) {
 	st := &mockStore{}
 	runID := uuid.New()
 	diffID := uuid.New()
@@ -187,7 +187,7 @@ func TestGetDiff_Metadata_StageIDNull(t *testing.T) {
 	st.getDiffResult = store.Diff{
 		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
 		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Valid: false},
+		JobID:     pgtype.UUID{Valid: false},
 		Patch:     []byte{0x1f, 0x8b},
 		Summary:   []byte(`{}`),
 		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
@@ -203,155 +203,7 @@ func TestGetDiff_Metadata_StageIDNull(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.StageID != nil {
-		t.Errorf("stage_id=%v, want nil", *resp.StageID)
-	}
-}
-
-// TestListRunDiffs_WithStepIndex verifies that step_index is exposed in list responses.
-func TestListRunDiffs_WithStepIndex(t *testing.T) {
-	st := &mockStore{}
-	runID := uuid.New()
-	stageID := uuid.New()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-	stepIndex := int32(3)
-	st.listDiffsByRunResult = []store.Diff{{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
-		Patch:     []byte{0x1f, 0x8b},
-		Summary:   []byte(`{"exit_code":0}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-		StepIndex: &stepIndex, // step 3 in multi-step run
-	}}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/diffs", nil)
-	req.SetPathValue("id", runID.String())
-	listRunDiffsHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffListResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(resp.Diffs) != 1 {
-		t.Fatalf("expected 1 diff, got %d", len(resp.Diffs))
-	}
-	item := resp.Diffs[0]
-	// Verify step_index is present and correct.
-	if item.StepIndex == nil {
-		t.Fatalf("step_index is nil, want 3")
-	}
-	if *item.StepIndex != 3 {
-		t.Errorf("step_index=%d, want 3", *item.StepIndex)
-	}
-}
-
-// TestListRunDiffs_NullStepIndex verifies backward compat: diffs without step_index are handled.
-func TestListRunDiffs_NullStepIndex(t *testing.T) {
-	st := &mockStore{}
-	runID := uuid.New()
-	stageID := uuid.New()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-	st.listDiffsByRunResult = []store.Diff{{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
-		Patch:     []byte{0x1f, 0x8b},
-		Summary:   []byte(`{"exit_code":0}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-		StepIndex: nil, // legacy diff (single-step or final MR diff)
-	}}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/mods/"+runID.String()+"/diffs", nil)
-	req.SetPathValue("id", runID.String())
-	listRunDiffsHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffListResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(resp.Diffs) != 1 {
-		t.Fatalf("expected 1 diff, got %d", len(resp.Diffs))
-	}
-	item := resp.Diffs[0]
-	// Verify step_index is omitted (nil) for legacy diffs.
-	if item.StepIndex != nil {
-		t.Errorf("step_index=%v, want nil for legacy diff", *item.StepIndex)
-	}
-}
-
-// TestGetDiff_Metadata_WithStepIndex verifies step_index is exposed in single-diff responses.
-func TestGetDiff_Metadata_WithStepIndex(t *testing.T) {
-	st := &mockStore{}
-	runID := uuid.New()
-	stageID := uuid.New()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
-	stepIndex := int32(5)
-	st.getDiffResult = store.Diff{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
-		Patch:     []byte{0x1f, 0x8b, 0x08},
-		Summary:   []byte(`{"exit_code":0,"files_changed":3}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-		StepIndex: &stepIndex, // step 5
-	}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffGetResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	// Verify step_index is present and correct.
-	if resp.StepIndex == nil {
-		t.Fatalf("step_index is nil, want 5")
-	}
-	if *resp.StepIndex != 5 {
-		t.Errorf("step_index=%d, want 5", *resp.StepIndex)
-	}
-}
-
-// TestGetDiff_Metadata_NullStepIndex verifies backward compat for diff metadata without step_index.
-func TestGetDiff_Metadata_NullStepIndex(t *testing.T) {
-	st := &mockStore{}
-	runID := uuid.New()
-	stageID := uuid.New()
-	diffID := uuid.New()
-	createdAt := time.Date(2025, 1, 15, 14, 30, 0, 0, time.UTC)
-	st.getDiffResult = store.Diff{
-		ID:        pgtype.UUID{Bytes: diffID, Valid: true},
-		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-		StageID:   pgtype.UUID{Bytes: stageID, Valid: true},
-		Patch:     []byte{0x1f, 0x8b, 0x08},
-		Summary:   []byte(`{"exit_code":0}`),
-		CreatedAt: pgtype.Timestamptz{Time: createdAt, Valid: true},
-		StepIndex: nil, // legacy diff without step identity
-	}
-	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/diffs/"+diffID.String(), nil)
-	req.SetPathValue("id", diffID.String())
-	getDiffHandler(st).ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status %d", rr.Code)
-	}
-	var resp diffGetResponse
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	// Verify step_index is omitted (nil) for legacy diffs.
-	if resp.StepIndex != nil {
-		t.Errorf("step_index=%v, want nil for legacy diff", *resp.StepIndex)
+	if resp.JobID != nil {
+		t.Errorf("job_id=%v, want nil", *resp.JobID)
 	}
 }

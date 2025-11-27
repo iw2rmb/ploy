@@ -23,7 +23,7 @@ type mockStoreRunLogs struct {
 
 func (m *mockStoreRunLogs) CreateLog(_ context.Context, arg store.CreateLogParams) (store.Log, error) {
 	m.lastCreate = arg
-	return store.Log{ID: 1, RunID: arg.RunID, StageID: arg.StageID, BuildID: arg.BuildID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
+	return store.Log{ID: 1, RunID: arg.RunID, JobID: arg.JobID, BuildID: arg.BuildID, ChunkNo: arg.ChunkNo, Data: arg.Data}, nil
 }
 
 func TestCreateRunLogsHandler_Success(t *testing.T) {
@@ -67,13 +67,13 @@ func TestCreateRunLogsHandler_TooLarge(t *testing.T) {
 // ----- run diffs -----
 type mockStoreRunDiffs struct {
 	store.Store
-	stage   store.Stage
+	job     store.Job
 	run     store.Run
 	created store.CreateDiffParams
 }
 
-func (m *mockStoreRunDiffs) GetStage(_ context.Context, id pgtype.UUID) (store.Stage, error) {
-	return m.stage, nil
+func (m *mockStoreRunDiffs) GetJob(_ context.Context, id pgtype.UUID) (store.Job, error) {
+	return m.job, nil
 }
 func (m *mockStoreRunDiffs) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
 	return m.run, nil
@@ -85,13 +85,13 @@ func (m *mockStoreRunDiffs) CreateDiff(_ context.Context, p store.CreateDiffPara
 
 func TestCreateRunDiffHandler_Success(t *testing.T) {
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	ms := &mockStoreRunDiffs{
-		stage: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
-		run:   store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
+		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
+		run: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
 	}
 	h := createRunDiffHandler(ms)
-	payload := map[string]any{"stage_id": stageID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
+	payload := map[string]any{"job_id": jobID.String(), "patch": []byte("gz-diff"), "summary": map[string]any{"k": "v"}}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/diffs", bytes.NewReader(b))
 	req.SetPathValue("id", runID.String())
@@ -106,13 +106,13 @@ func TestCreateRunDiffHandler_Success(t *testing.T) {
 // ----- run artifacts -----
 type mockStoreRunArtifacts struct {
 	store.Store
-	stage   store.Stage
+	job     store.Job
 	run     store.Run
 	created store.CreateArtifactBundleParams
 }
 
-func (m *mockStoreRunArtifacts) GetStage(_ context.Context, id pgtype.UUID) (store.Stage, error) {
-	return m.stage, nil
+func (m *mockStoreRunArtifacts) GetJob(_ context.Context, id pgtype.UUID) (store.Job, error) {
+	return m.job, nil
 }
 func (m *mockStoreRunArtifacts) GetRun(_ context.Context, id pgtype.UUID) (store.Run, error) {
 	return m.run, nil
@@ -124,13 +124,13 @@ func (m *mockStoreRunArtifacts) CreateArtifactBundle(_ context.Context, p store.
 
 func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 	runID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	ms := &mockStoreRunArtifacts{
-		stage: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
-		run:   store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
+		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: runID, Valid: true}},
+		run: store.Run{ID: pgtype.UUID{Bytes: runID, Valid: true}},
 	}
 	h := createRunArtifactBundleHandler(ms)
-	payload := map[string]any{"stage_id": stageID.String(), "bundle": []byte("gz-tar")}
+	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID.String()+"/artifact_bundles", bytes.NewReader(b))
 	req.SetPathValue("id", runID.String())
@@ -144,13 +144,13 @@ func TestCreateRunArtifactBundleHandler_Success(t *testing.T) {
 
 func TestCreateModArtifactBundleHandler_Success(t *testing.T) {
 	modID := uuid.New()
-	stageID := uuid.New()
+	jobID := uuid.New()
 	ms := &mockStoreRunArtifacts{
-		stage: store.Stage{ID: pgtype.UUID{Bytes: stageID, Valid: true}, RunID: pgtype.UUID{Bytes: modID, Valid: true}},
-		run:   store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
+		job: store.Job{ID: pgtype.UUID{Bytes: jobID, Valid: true}, RunID: pgtype.UUID{Bytes: modID, Valid: true}},
+		run: store.Run{ID: pgtype.UUID{Bytes: modID, Valid: true}},
 	}
 	h := createRunArtifactBundleHandler(ms)
-	payload := map[string]any{"stage_id": stageID.String(), "bundle": []byte("gz-tar")}
+	payload := map[string]any{"job_id": jobID.String(), "bundle": []byte("gz-tar")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/mods/"+modID.String()+"/artifact_bundles", bytes.NewReader(b))
 	req.SetPathValue("id", modID.String())

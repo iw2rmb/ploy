@@ -171,7 +171,7 @@ func runServerDeploy(cfg serverDeployConfig, stderr io.Writer) error {
 	// Generate initial admin token for CLI use
 	_, _ = fmt.Fprintln(stderr, "Generating initial admin token...")
 	initialTokenExpiry := time.Now().AddDate(1, 0, 0) // 1 year
-	initialToken, err := auth.GenerateAPIToken(authSecret, clusterID, auth.RoleCLIAdmin, initialTokenExpiry)
+	initialToken, err := auth.GenerateAPIToken(authSecret, clusterID, string(auth.RoleCLIAdmin), initialTokenExpiry)
 	if err != nil {
 		return fmt.Errorf("server deploy: generate initial token: %w", err)
 	}

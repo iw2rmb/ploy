@@ -12,14 +12,14 @@ import (
 )
 
 const createEvent = `-- name: CreateEvent :one
-INSERT INTO events (run_id, stage_id, time, level, message, meta)
+INSERT INTO events (run_id, job_id, time, level, message, meta)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, run_id, stage_id, time, level, message, meta
+RETURNING id, run_id, job_id, time, level, message, meta
 `
 
 type CreateEventParams struct {
 	RunID   pgtype.UUID        `json:"run_id"`
-	StageID pgtype.UUID        `json:"stage_id"`
+	JobID   pgtype.UUID        `json:"job_id"`
 	Time    pgtype.Timestamptz `json:"time"`
 	Level   string             `json:"level"`
 	Message string             `json:"message"`
@@ -29,7 +29,7 @@ type CreateEventParams struct {
 func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error) {
 	row := q.db.QueryRow(ctx, createEvent,
 		arg.RunID,
-		arg.StageID,
+		arg.JobID,
 		arg.Time,
 		arg.Level,
 		arg.Message,
@@ -39,7 +39,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.Time,
 		&i.Level,
 		&i.Message,
@@ -49,7 +49,7 @@ func (q *Queries) CreateEvent(ctx context.Context, arg CreateEventParams) (Event
 }
 
 const getEvent = `-- name: GetEvent :one
-SELECT id, run_id, stage_id, time, level, message, meta FROM events
+SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE id = $1
 `
 
@@ -59,7 +59,7 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.Time,
 		&i.Level,
 		&i.Message,
@@ -69,7 +69,7 @@ func (q *Queries) GetEvent(ctx context.Context, id int64) (Event, error) {
 }
 
 const listEventsByRun = `-- name: ListEventsByRun :many
-SELECT id, run_id, stage_id, time, level, message, meta FROM events
+SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1
 ORDER BY time ASC, id ASC
 `
@@ -86,7 +86,7 @@ func (q *Queries) ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Eve
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.Time,
 			&i.Level,
 			&i.Message,
@@ -103,7 +103,7 @@ func (q *Queries) ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Eve
 }
 
 const listEventsByRunSince = `-- name: ListEventsByRunSince :many
-SELECT id, run_id, stage_id, time, level, message, meta FROM events
+SELECT id, run_id, job_id, time, level, message, meta FROM events
 WHERE run_id = $1 AND id > $2
 ORDER BY time ASC, id ASC
 `
@@ -125,7 +125,7 @@ func (q *Queries) ListEventsByRunSince(ctx context.Context, arg ListEventsByRunS
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.Time,
 			&i.Level,
 			&i.Message,

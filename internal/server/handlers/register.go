@@ -31,9 +31,9 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	s.HandleFunc("GET /v1/mods/{id}", getTicketStatusHandler(st), auth.RoleControlPlane)
 	// Mods ticket cancellation
 	s.HandleFunc("POST /v1/mods/{id}/cancel", cancelTicketHandler(st, eventsService), auth.RoleControlPlane)
-	// Diffs listing and download
-	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane)
-	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane)
+	// Diffs listing and download (Worker role for multi-node rehydration C2, ControlPlane for CLI access)
+	s.HandleFunc("GET /v1/mods/{id}/diffs", listRunDiffsHandler(st), auth.RoleControlPlane, auth.RoleWorker)
+	s.HandleFunc("GET /v1/diffs/{id}", getDiffHandler(st), auth.RoleControlPlane, auth.RoleWorker)
 	s.HandleFunc("POST /v1/mods/{id}/artifact_bundles", createRunArtifactBundleHandler(st), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/logs", createRunLogHandler(st, eventsService), auth.RoleControlPlane)
 	s.HandleFunc("POST /v1/mods/{id}/diffs", createRunDiffHandler(st), auth.RoleControlPlane)
@@ -56,14 +56,16 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 
 	// Node worker endpoints
 	s.HandleFunc("POST /v1/nodes/{id}/heartbeat", heartbeatHandler(st), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/claim", claimRunHandler(st, configHolder), auth.RoleWorker)
+	s.HandleFunc("POST /v1/nodes/{id}/claim", claimJobHandler(st, configHolder), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/ack", ackRunStartHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/complete", completeRunHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/events", createNodeEventsHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/logs", createNodeLogsHandler(st, eventsService), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/diff", createDiffHandler(st), auth.RoleWorker)
-	s.HandleFunc("POST /v1/nodes/{id}/stage/{stage}/artifact", createArtifactBundleHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/buildgate/claim", claimBuildGateJobHandler(st), auth.RoleWorker)
+
+	// Job artifact and diff upload endpoints (run-scoped, no node ID)
+	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st), auth.RoleWorker)
+	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/ack", ackBuildGateJobStartHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/complete", completeBuildGateJobHandler(st), auth.RoleWorker)
 

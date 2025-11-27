@@ -13,47 +13,35 @@ import (
 type Querier interface {
 	AckBuildGateJobStart(ctx context.Context, id pgtype.UUID) error
 	// Transitions run status to 'running' when execution starts.
-	// For single-step runs (claimed via ClaimRun), status is 'assigned' before ack.
-	// For multi-step runs (claimed via ClaimRunStep), status may be 'queued' since
-	// the run itself is never assigned to a node; only individual steps are assigned.
-	// We support both transitions: assigned→running and queued→running.
+	// Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
+	// the first job starts execution.
 	AckRunStart(ctx context.Context, id pgtype.UUID) error
+	// NOTE: ClaimRunStep has been replaced by ClaimJob in jobs.sql.
+	// Jobs use step_index (FLOAT) for ordering with dynamic insertion support.
 	// Acknowledges that a step has started execution (transitions from 'assigned' to 'running').
 	AckRunStepStart(ctx context.Context, id pgtype.UUID) error
 	CheckAPITokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	CheckBootstrapTokenRevoked(ctx context.Context, tokenID string) (pgtype.Timestamptz, error)
 	ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error)
-	// Claims a queued run for a node. Only claims runs that do NOT have run_steps rows.
-	// Multi-step runs (with run_steps entries) must be claimed via ClaimRunStep instead.
-	ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error)
-	// Claims the next available step for execution using FOR UPDATE SKIP LOCKED.
-	// Returns the step and its parent run information for execution.
-	//
-	// Claim strategy:
-	// 1. Find queued steps where the previous step (step_index - 1) has succeeded OR step_index = 0.
-	// 2. Join with runs to get run metadata (repo_url, base_ref, etc.).
-	// 3. Join with nodes to ensure the node is not drained.
-	// 4. Use FOR UPDATE SKIP LOCKED to avoid contention.
-	// 5. Update step status to 'assigned' and set node_id.
-	//
-	// This ensures sequential execution: step k can only be claimed after step k-1 succeeds.
-	ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (RunStep, error)
+	// Atomically claim the next pending job for a node.
+	// Returns the claimed job or nothing if no jobs are available.
+	ClaimJob(ctx context.Context, nodeID pgtype.UUID) (Job, error)
 	// Counts the total number of steps for a run.
 	CountRunSteps(ctx context.Context, runID pgtype.UUID) (int64, error)
 	// Counts steps for a run with a specific status.
 	CountRunStepsByStatus(ctx context.Context, arg CountRunStepsByStatusParams) (int64, error)
 	CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error)
 	CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error)
-	// Creates a new diff entry with optional step_index for multi-step runs.
-	// step_index is NULL for legacy single-step runs or final aggregate diffs.
+	// Creates a new diff entry associated with a job.
+	// Ordering is determined by the job's step_index.
 	CreateDiff(ctx context.Context, arg CreateDiffParams) (Diff, error)
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
+	CreateJob(ctx context.Context, arg CreateJobParams) (Job, error)
 	CreateLog(ctx context.Context, arg CreateLogParams) (Log, error)
 	CreateNode(ctx context.Context, arg CreateNodeParams) (Node, error)
 	CreateRun(ctx context.Context, arg CreateRunParams) (Run, error)
 	// Creates a new step for a run (called when multi-step run is queued).
 	CreateRunStep(ctx context.Context, arg CreateRunStepParams) (RunStep, error)
-	CreateStage(ctx context.Context, arg CreateStageParams) (Stage, error)
 	DeleteArtifactBundle(ctx context.Context, id pgtype.UUID) error
 	DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteDiff(ctx context.Context, id pgtype.UUID) error
@@ -66,18 +54,22 @@ type Querier interface {
 	DeleteExpiredEvents(ctx context.Context, time pgtype.Timestamptz) (int64, error)
 	// DeleteExpiredLogs removes log rows older than the specified timestamp.
 	DeleteExpiredLogs(ctx context.Context, createdAt pgtype.Timestamptz) (int64, error)
+	DeleteJob(ctx context.Context, id pgtype.UUID) error
 	DeleteLog(ctx context.Context, id int64) error
 	DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Timestamptz) error
 	DeleteNode(ctx context.Context, id pgtype.UUID) error
 	DeleteRun(ctx context.Context, id pgtype.UUID) error
 	// Deletes a step (usually for cleanup or test teardown).
 	DeleteRunStep(ctx context.Context, id pgtype.UUID) error
-	DeleteStage(ctx context.Context, id pgtype.UUID) error
+	// Get the step_index of a job and the next job's step_index for healing insertion.
+	// Returns prev_index (the given job's index) and next_index (the following job's index, or NULL if none).
+	GetAdjacentJobIndices(ctx context.Context, id pgtype.UUID) (GetAdjacentJobIndicesRow, error)
 	GetArtifactBundle(ctx context.Context, id pgtype.UUID) (ArtifactBundle, error)
 	GetBootstrapToken(ctx context.Context, tokenID string) (GetBootstrapTokenRow, error)
 	GetBuildGateJob(ctx context.Context, id pgtype.UUID) (BuildgateJob, error)
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
+	GetJob(ctx context.Context, id pgtype.UUID) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
@@ -86,7 +78,6 @@ type Querier interface {
 	// Retrieves a specific step of a run by step_index.
 	GetRunStepByIndex(ctx context.Context, arg GetRunStepByIndexParams) (RunStep, error)
 	GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming, error)
-	GetStage(ctx context.Context, id pgtype.UUID) (Stage, error)
 	InsertAPIToken(ctx context.Context, arg InsertAPITokenParams) error
 	InsertBootstrapToken(ctx context.Context, arg InsertBootstrapTokenParams) error
 	InsertNodeWithID(ctx context.Context, arg InsertNodeWithIDParams) (Node, error)
@@ -95,40 +86,43 @@ type Querier interface {
 	ListArtifactBundlePartitions(ctx context.Context) ([]string, error)
 	ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]ArtifactBundle, error)
 	ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUID) ([]ArtifactBundle, error)
-	ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error)
+	ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error)
 	// Returns all diffs for a run up to (and including) the specified step_index.
-	// Used for workspace rehydration: apply all diffs from steps 0..k to build workspace for step k+1.
-	// Excludes diffs with NULL step_index to avoid applying legacy/aggregate diffs during rehydration.
+	// Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
+	// Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
 	ListDiffsBeforeStep(ctx context.Context, arg ListDiffsBeforeStepParams) ([]Diff, error)
-	// Returns diffs for a run ordered by step_index (if present), then by created_at.
-	// This allows rehydration to select diffs in logical step order for multi-step runs.
+	// Returns diffs for a run ordered by job step_index, then by created_at.
+	// Joins with jobs to get ordering from job's step_index.
 	ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]Diff, error)
 	// ListEventPartitions retrieves all partition names for the events table.
 	ListEventPartitions(ctx context.Context) ([]string, error)
 	ListEventsByRun(ctx context.Context, runID pgtype.UUID) ([]Event, error)
 	ListEventsByRunSince(ctx context.Context, arg ListEventsByRunSinceParams) ([]Event, error)
+	ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
 	// ListLogPartitions retrieves all partition names for the logs table.
 	ListLogPartitions(ctx context.Context) ([]string, error)
 	ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, error)
-	ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAndStageParams) ([]Log, error)
-	ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsByRunAndStageSinceParams) ([]Log, error)
+	ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error)
+	ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error)
+	ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error)
+	ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLogsByRunJobAndBuildSinceParams) ([]Log, error)
 	ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSinceParams) ([]Log, error)
-	ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error)
-	ListLogsByRunStageAndBuildSince(ctx context.Context, arg ListLogsByRunStageAndBuildSinceParams) ([]Log, error)
 	// ListNodeMetricsPartitions retrieves all partition names for the node_metrics table.
 	ListNodeMetricsPartitions(ctx context.Context) ([]string, error)
 	ListNodes(ctx context.Context) ([]Node, error)
 	ListPendingBuildGateJobs(ctx context.Context, arg ListPendingBuildGateJobsParams) ([]BuildgateJob, error)
+	// List all pending jobs for a run, ordered by step_index.
+	ListPendingJobsByRun(ctx context.Context, runID pgtype.UUID) ([]Job, error)
 	// Lists all steps for a run ordered by step_index.
 	ListRunSteps(ctx context.Context, runID pgtype.UUID) ([]RunStep, error)
 	ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, error)
 	ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams) ([]RunsTiming, error)
-	ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]Stage, error)
 	MarkBootstrapTokenCertIssued(ctx context.Context, tokenID string) error
 	RevokeAPIToken(ctx context.Context, tokenID string) error
 	UpdateAPITokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBootstrapTokenLastUsed(ctx context.Context, tokenID string) error
 	UpdateBuildGateJobCompletion(ctx context.Context, arg UpdateBuildGateJobCompletionParams) error
+	UpdateJobStatus(ctx context.Context, arg UpdateJobStatusParams) error
 	UpdateNodeCertMetadata(ctx context.Context, arg UpdateNodeCertMetadataParams) error
 	UpdateNodeDrained(ctx context.Context, arg UpdateNodeDrainedParams) error
 	UpdateNodeHeartbeat(ctx context.Context, arg UpdateNodeHeartbeatParams) error
@@ -136,7 +130,6 @@ type Querier interface {
 	UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error
 	// Updates a step's terminal status (succeeded/failed/canceled) and timing.
 	UpdateRunStepCompletion(ctx context.Context, arg UpdateRunStepCompletionParams) error
-	UpdateStageStatus(ctx context.Context, arg UpdateStageStatusParams) error
 }
 
 var _ Querier = (*Queries)(nil)

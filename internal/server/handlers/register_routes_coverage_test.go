@@ -45,7 +45,7 @@ func TestRegisterRoutesMatchesOpenAPI(t *testing.T) {
 
 	// Prepare a test server instance with insecure authorizer so requests
 	// do not require mTLS. We'll exercise three roles to cover all routes.
-	newServer := func(defaultRole string) (*httpapi.Server, *events.Service) {
+	newServer := func(defaultRole auth.Role) (*httpapi.Server, *events.Service) {
 		authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: defaultRole})
 		srv, err := httpapi.New(httpapi.Options{Authorizer: authz})
 		if err != nil {
