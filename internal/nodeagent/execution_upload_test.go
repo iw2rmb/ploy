@@ -484,9 +484,9 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 	}
 }
 
-// TestRunController_uploadDiff_MainModMetadata verifies that main mod diffs
-// are tagged with mod_type="main" to distinguish from healing mod diffs.
-func TestRunController_uploadDiff_MainModMetadata(t *testing.T) {
+// TestRunController_uploadDiff_ModTypeMetadata verifies that mod step diffs
+// are tagged with mod_type="mod" to distinguish from other diff types.
+func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 	t.Parallel()
 
 	var capturedSummary types.DiffSummary
@@ -550,13 +550,13 @@ func TestRunController_uploadDiff_MainModMetadata(t *testing.T) {
 	ctx := context.Background()
 	controller.uploadDiff(ctx, "test-run", "test-stage", diffGen, workspace, result)
 
-	// Verify that mod_type is set to "main".
+	// Verify that mod_type is set to "mod".
 	modType, ok := capturedSummary["mod_type"].(string)
 	if !ok {
 		t.Errorf("mod_type field missing or not a string in summary: %+v", capturedSummary)
 	}
-	if modType != "main" {
-		t.Errorf("mod_type = %q, want \"main\"", modType)
+	if modType != "mod" {
+		t.Errorf("mod_type = %q, want \"mod\"", modType)
 	}
 
 	// Verify other fields are present.
