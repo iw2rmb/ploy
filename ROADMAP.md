@@ -67,7 +67,7 @@ Legend: [ ] todo, [x] done.
       - Context timeout case.
     - Run: `go test ./internal/workflow/runtime/step -run TestHTTPGateExecutor_Async`.
 
-- [ ] B4 — Make GateExecutor pluggable between docker and HTTP modes — Configuration-driven selection.
+- [x] B4 — Make GateExecutor pluggable between docker and HTTP modes — Configuration-driven selection.
   - Component: workflow runtime initialization (`internal/workflow/runtime/...`), node agent runtime wiring.
   - Scope:
     - Add factory:
