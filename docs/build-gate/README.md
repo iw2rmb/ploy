@@ -83,6 +83,43 @@ This decoupling enables:
 See `docs/mods-lifecycle.md` section 1.1 for gate sequence diagrams and healing
 flow details.
 
+### Designating Build Gate Worker Nodes
+
+Not all nodes need to execute Build Gate jobs. The `buildgate_worker_enabled`
+configuration flag controls whether a node participates in Build Gate job claiming.
+
+**Configuration:**
+- YAML config (`/etc/ploy/ployd-node.yaml`):
+  ```yaml
+  buildgate_worker_enabled: true
+  ```
+- Environment variable (takes precedence over YAML):
+  ```bash
+  PLOY_BUILDGATE_WORKER_ENABLED=true
+  ```
+
+**Behavior:**
+- When `buildgate_worker_enabled=true`: The node claims and executes Build Gate
+  jobs via the HTTP Build Gate API endpoints.
+- When `buildgate_worker_enabled=false` (default): The node skips Build Gate
+  job claiming entirely and only processes regular Mods runs.
+
+**Multi-node deployments:**
+In a multi-VPS setup, you can designate specific nodes as Build Gate workers
+while others handle only Mods runs. This enables:
+- Separation of concerns: heavy build validation on dedicated nodes.
+- Resource isolation: Build Gate jobs don't compete with Mods execution.
+- Horizontal scaling: add more Build Gate workers as validation load increases.
+
+Example two-node lab:
+- Node A: `buildgate_worker_enabled=true` — claims Build Gate jobs.
+- Node B: `buildgate_worker_enabled=false` — claims only Mods runs.
+
+Submit a Build Gate job; only Node A logs `claimed buildgate job`.
+Submit a Mods run; either node can claim it.
+
+See `docs/envs/README.md` for the complete environment variable reference.
+
 HTTP Build Gate API
 
 The Build Gate uses a repo+diff validation model: callers provide a Git repository URL and ref as baseline,
