@@ -21,7 +21,7 @@ Legend: [ ] todo, [x] done.
   - Test: `rg "Build Gate execution paths" docs -n` — Confirm the new section exists and is consistent; run `make test` to ensure no doc-related tests break.
 
 ## Phase B — Introduce a Build Gate HTTP client adapter in workflow layer
-- [ ] B1 — HTTP client wrapper for Build Gate API — Typed client for `/v1/buildgate/validate` + job polling.
+- [x] B1 — HTTP client wrapper for Build Gate API — Typed client for `/v1/buildgate/validate` + job polling.
   - Component: `internal/workflow/runtime/step/gate_http_client.go`, `internal/workflow/runtime/step/gate_iface.go`.
   - Scope:
     - In `gate_iface.go`, add:
