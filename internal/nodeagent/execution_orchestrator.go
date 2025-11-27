@@ -249,7 +249,7 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 				"duration", duration,
 				"exit_code", result.ExitCode,
 			)
-			finalExecResult = execResult
+			finalExecResult = mergeExecutionResults(finalExecResult, execResult)
 			finalExecErr = execErr
 			finalManifest = manifest
 			finalWorkspace = workspaceRoot
@@ -269,8 +269,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		stageID, _ := manifest.OptionString("stage_id")
 		r.uploadDiffForStep(ctx, req.RunID.String(), stageID, diffGenerator, workspaceRoot, result, stepIndex)
 
-		// Track the last successful execution result for final status reporting.
-		finalExecResult = execResult
+		// Track the last successful execution result (merged with prior gate history)
+		// for final status reporting.
+		finalExecResult = mergeExecutionResults(finalExecResult, execResult)
 		finalExecErr = nil
 		finalManifest = manifest
 		finalWorkspace = workspaceRoot
@@ -484,6 +485,30 @@ func (r *runController) buildExecutionStats(runID, stageID string, result step.R
 	}
 
 	return stats
+}
+
+// mergeExecutionResults aggregates gate history across phases (pre-mod + per-step)
+// while keeping the latest step.Result for terminal status reporting.
+// - PreGate is preserved from the accumulator when present (pre-mod gate).
+// - ReGates are appended in call order to accumulate healing re-gates.
+func mergeExecutionResults(acc executionResult, next executionResult) executionResult {
+	merged := executionResult{
+		Result:  next.Result,
+		PreGate: acc.PreGate,
+		ReGates: acc.ReGates,
+	}
+
+	// If there is no pre-mod gate recorded yet, fall back to the next result's PreGate.
+	if merged.PreGate == nil && next.PreGate != nil {
+		merged.PreGate = next.PreGate
+	}
+
+	// Append any re-gates from the next execution in order.
+	if len(next.ReGates) > 0 {
+		merged.ReGates = append(merged.ReGates, next.ReGates...)
+	}
+
+	return merged
 }
 
 // buildGateStats constructs gate statistics including pre-gate, re-gates, and final gate runs.
