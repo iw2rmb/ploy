@@ -154,7 +154,7 @@ Legend: [ ] todo, [x] done.
       - Verify that after a healing attempt, the re‑gate path uses the HTTP-based gate rather than direct docker execution.
 
 ## Phase E — Node workers that execute Build Gate jobs
-- [ ] E1 — Gate worker enable flag in node config — Control which nodes run Build Gate jobs.
+- [x] E1 — Gate worker enable flag in node config — Control which nodes run Build Gate jobs.
   - Component: `internal/nodeagent/config.go`, node config YAML/docs.
   - Scope:
     - Extend `Config` with `BuildGateWorkerEnabled bool "yaml:\"buildgate_worker_enabled\""` (or similar).
