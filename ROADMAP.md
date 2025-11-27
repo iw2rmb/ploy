@@ -1,213 +1,179 @@
-# Codex Build-Gate Handshake (Exit + Resume)
+# Mods Build Gate: Pre-Run Gate + Per-Mod Post Gates
 
 > When following this template:
 > - Align to the template structure
 > - Include steps to update relevant docs
 
-Scope: Refactor the `mods-codex` healing flow so Codex never runs Build Gate directly. Instead, Codex exits with a sentinel when it wants validation, Ploy reruns the Build Gate, and failed gates trigger a resumed Codex session that continues from the previous context across healing retries.
+Scope: Run a single pre-mod Build Gate before any mods, then run a post-mod Build Gate after every mod in `mods[]` that exits with code 0. Every Build Gate (pre and post) uses the existing fail → heal → re-gate loop when healing mods are configured; if a gate cannot be healed, the run fails and no further mods are executed.
 
-Documentation: `docs/mods-lifecycle.md`, `docs/envs/README.md`, `docs/schemas/mod.example.yaml`, `tests/e2e/mods/README.md`, `docker/mods/README.md`, `../auto/ROADMAP.md`, upstream Codex CLI non-interactive docs for `codex exec` / `codex exec resume`.
+Documentation: `docs/mods-lifecycle.md`, `docs/build-gate/README.md`, `docs/envs/README.md`, `docs/schemas/mod.example.yaml`, `docs/how-to/publish-mods.md`, `internal/nodeagent/execution_healing.go`, `internal/nodeagent/execution_orchestrator.go`, `internal/workflow/runtime/step/stub.go`, `internal/workflow/runtime/step/runner_gate_test.go`, `internal/domain/types/runstats.go`, `internal/cli/mods/inspect.go`, `tests/integration/build-gate`, `tests/e2e/mods`.
 
 Legend: [ ] todo, [x] done.
 
-## Phase A — Healing prompts and spec contract
-- [x] Define sentinel protocol for Codex healing runs — Allow Codex to signal “ready for Build Gate” without running the gate itself.
-  - Component: `tests/e2e/mods`, E2E specs for `build_gate_healing`.
-  - Scope: Update `tests/e2e/mods/scenario-orw-fail/mod.yaml` and `tests/e2e/mods/scenario-multi-node-rehydration/mod.yaml` so the embedded `CODEX_PROMPT` uses a sentinel-only contract:
-    - Remove explicit instructions to call `buildgate-validate` or run Maven/Gradle.
-    - Add a strict rule that, when Codex believes the workspace is ready for validation, it must reply with exactly `[[REQUEST_BUILD_VALIDATION]]` as its final message and then stop.
-    - Keep the task text pointing at `/in/build-gate.log` for failure context; only the validation loop moves out of Codex.
-    - Example prompt fragment in YAML:
-      ```yaml
-      build_gate_healing:
-        mods:
-          - image: docker.io/you/mods-codex:latest
-            env:
-              CODEX_PROMPT: |-
-                Rules:
-                - Use /workspace and /in/build-gate.log to understand the compile error.
-                - Edit files under /workspace as needed.
-                - When you believe the code is ready for a full build validation, reply with exactly:
-                  [[REQUEST_BUILD_VALIDATION]]
-                  as your final message and then stop.
-                Task:
-                Fix the compilation error described in /in/build-gate.log.
+## Phase A — Clarify pre-gate vs post-gate semantics
+- [ ] Document gate sequence for single- and multi-mod runs — Make pre-/post-gate order explicit.
+  - Component: `docs/mods-lifecycle.md`.
+  - Scope:
+    - Update the Build Gate section to describe:
+      - Pre-mod gate: runs once on the initial workspace before any mods execute; on failure and when healing mods are configured, enter the fail → heal mods → re-gate loop; if still failing after retries, the run exits without executing mods.
+      - Post-mod gates: run on the same workspace after each mod in `mods[]` that exits with code 0; on failure and when healing mods are configured, enter the same fail → heal mods → re-gate loop; if still failing after retries, the run fails and no further mods execute.
+     - Extend the Mods execution diagrams or bullet list to show: `pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gate[1](+healing) → ...`.
+  - Test: `rg "Pre-mod Build Gate" docs/mods-lifecycle.md` — Confirm the sequence is described; run `make test`.
+- [ ] Document workspace/rehydration semantics for gates — Avoid ambiguity about which code version each gate sees.
+  - Component: `docs/mods-lifecycle.md`.
+  - Scope:
+    - Add a short subsection referencing:
+      - `internal/nodeagent/execution_orchestrator.go` — `executeRun` and `rehydrateWorkspaceForStep`.
+      - Explain that:
+        - The pre-mod gate runs on the initial hydrated workspace (step 0).
+        - Each post-mod gate runs on the rehydrated workspace for that step (base clone + diffs from prior mods).
+  - Test: `rg "rehydrateWorkspaceForStep" docs/mods-lifecycle.md` — Confirm workspace semantics are called out.
+
+## Phase B — Keep step.Runner as pre-mod gate + mod executor
+- [ ] Confirm current Runner.Run behavior (pre-gate per call) — Establish the baseline before adding helpers.
+  - Component: `internal/workflow/runtime/step/stub.go`.
+  - Scope:
+    - Read `Runner.Run` implementation to confirm stages:
+      - Hydration.
+      - Pre-mod Build Gate (when `Gate.Enabled`).
+      - Container execution.
+      - Diff generation.
+    - Capture this in a short comment in `stub.go` to make the contract explicit.
+  - Test:
+    - Ensure existing tests in `internal/workflow/runtime/step/runner_gate_test.go` continue to pass (`TestRunner_Run_WithBuildGateEnabled`, `TestRunner_Run_PreModGateFailureWithoutHealing`).
+    - Run `go test ./internal/workflow/runtime/step -run TestRunner_Run_`.
+- [ ] Add a gate-only helper in step package (no container execution) — Allow nodeagent to reuse gate logic without running a mod.
+  - Component: `internal/workflow/runtime/step`.
+  - Scope:
+    - Add a new file, e.g. `internal/workflow/runtime/step/gate_only.go`, with a helper:
+      ```go
+      func RunGateOnly(ctx context.Context, r Runner, req Request) (Result, error) {
+          // Hydrate workspace, run gate (if enabled), populate Result.BuildGate and timings.
+          // Do not create or start any containers.
+      }
       ```
-  - Test: `bash tests/e2e/mods/scenario-orw-fail/run.sh` and `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh` — Logs show Codex producing `[[REQUEST_BUILD_VALIDATION]]` and no in-container Build Gate helper calls; Build Gate still re-runs and the scenarios pass.
-
-- [x] Remove buildgate-validate usage from Codex-specific docs and examples — Keep documentation aligned with the new handshake and externalize Build Gate execution.
-  - Component: `tests/e2e/mods/README.md`, `docs/schemas/mod.example.yaml`, `docs/how-to/publish-mods.md`.
-  - Scope:
-    - In `tests/e2e/mods/README.md`, replace the Codex healing example that called an in-container Build Gate helper with a sentinel-based description: Codex edits the workspace, emits `[[REQUEST_BUILD_VALIDATION]]`, and the control plane re-runs the Build Gate.
-    - In `docs/schemas/mod.example.yaml`, adjust the `build_gate_healing` example to:
-      - Remove explicit `buildgate-validate` commands.
-      - Show a `mods-codex` entry that relies on `/in/build-gate.log` plus the sentinel contract.
-    - In `docs/how-to/publish-mods.md`, update the `mod-codex` section to describe:
-      - The sentinel protocol.
-      - That Build Gate is always run by Ploy (docker gate) / Build Gate HTTP API, not by Codex.
-  - Test: `rg "buildgate-validate" -n` shows no accidental references in Codex healing prompts/docs or specs. Run `make test` to ensure doc-related tests or linters (if any) still pass.
-
-## Phase B — Simplify mods-codex image and wrapper
-- [x] Detach `buildgate-validate` from the `mods-codex` image — Ensure Codex cannot run the gate from inside the container.
-  - Component: `docker/mods/mod-codex`, Codex wrapper, and associated tests.
-  - Scope:
-    - In `docker/mods/mod-codex/Dockerfile`:
-      - Ensure only the `mod-codex` entrypoint is copied; no Build Gate helper is present in the image.
-    - Remove the legacy `buildgate-validate.sh` wrapper script from the repository entirely so Build Gate is always invoked by the node agent (docker gate) or HTTP API, never from inside Codex.
-    - Update tests that referenced this script:
-      - Remove the legacy `tests/unit/buildgate_validate_sh_test.sh`.
-      - In `tests/integration/mods/mod-codex/mod_codex_test.go`, ensure assertions and prompt content reference sentinel-based expectations only.
+    - Internally, share as much logic as possible with `Runner.Run` for the gate stage to keep behavior identical.
   - Test:
-    - `docker build -t mods-codex:latest -f docker/mods/mod-codex/Dockerfile .` — Image builds successfully without `buildgate-validate`.
-    - `GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/mods/mod-codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1` — Confirms the integration test passes with the new image and prompt contract.
+    - Add `TestRunGateOnly_Enabled` / `TestRunGateOnly_Disabled` in `internal/workflow/runtime/step/runner_gate_test.go` to assert:
+      - Gate executor is called when enabled.
+      - No container runtime methods are invoked.
+    - Run `go test ./internal/workflow/runtime/step -run TestRunGateOnly_`.
 
-- [x] Capture Codex last message and thread/session id from `codex exec` — Provide artifacts the node agent can use for resume and sentinel detection.
-  - Component: `docker/mods/mod-codex/mod-codex.sh`.
+## Phase C — Orchestrate pre-mod gate + healing before any mods
+- [ ] Factor gate+healing orchestration into a reusable helper — Share logic between pre- and post-mod gates.
+  - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
-    - Extend the `codex exec` invocation to enable structured output:
-      - After constructing `cmd=(codex exec ...)`, detect support for JSON/FS options via `--help`:
-        ```bash
-        if grep -q -- "--json" <<<"$help_out"; then
-          cmd+=(--json)
-        fi
-        if grep -q -- "--output-last-message" <<<"$help_out"; then
-          cmd+=(--output-last-message "$out_dir/codex-last.txt")
-        fi
-        if grep -q -- "--output-dir" <<<"$help_out"; then
-          cmd+=(--output-dir "$out_dir/codex-transcript")
-        fi
-        ```
-      - Keep the `--add-dir` detection in place so `/workspace` and `/in` remain attached.
-    - Capture JSON events to a sidecar file for session/thread extraction:
-      - Pipe Codex output to both `codex.log` and a JSONL file:
-        ```bash
-        jsonl="$out_dir/codex-events.jsonl"
-        echo "[mod-codex] starting codex exec with repo context" > "$logfile"
-        set +e
-        printf "%s" "$prompt" | "${cmd[@]}" 2>&1 | tee -a "$logfile" | tee "$jsonl" >/dev/null
-        status=${PIPESTATUS[1]}
-        set -e
-        ```
-      - Use `jq` (already installed in the Dockerfile) to extract the thread/session id from the first `thread.started` event:
-        ```bash
-        session_id=""
-        if command -v jq >/dev/null 2>&1 && [[ -s "$jsonl" ]]; then
-          session_id="$(jq -r 'select(.type=="thread.started") | .thread_id // empty' "$jsonl" | head -1 || true)"
-        fi
-        ```
-      - Write `/out/codex-session.txt` (or similar) with the `session_id` when non-empty:
-        ```bash
-        if [[ -n "$session_id" ]]; then
-          printf "%s\n" "$session_id" > "$out_dir/codex-session.txt"
-        fi
-        ```
-    - Record whether Codex requested Build Gate:
-      - After `codex exec` completes, check for `codex-last.txt` and set a flag in `codex-run.json`:
-        ```bash
-        requested_build=false
-        if [[ -f "$out_dir/codex-last.txt" ]]; then
-          if [[ "$(tr -d '\r\n' < "$out_dir/codex-last.txt")" == "[[REQUEST_BUILD_VALIDATION]]" ]]; then
-            requested_build=true
-            printf "true\n" > "$out_dir/request_build_validation"
-          fi
-        fi
-        ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-        printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","requested_build_validation":%s,"session_id":"%s"}\n' \
-          "$ts" "${status:-0}" "${model}" "$input_dir" \
-          "${requested_build:?false}" "${session_id}" > "$manifest"
-        ```
+    - Extract the gate+healing portion of `executeWithHealing` into:
+      ```go
+      func (r *runController) runGateWithHealing(
+          ctx context.Context,
+          runner step.Runner,
+          req StartRunRequest,
+          manifest contracts.StepManifest,
+          workspace, outDir string,
+          inDir *string,
+          gatePhase string, // "pre" or "post"
+      ) (*contracts.BuildGateStageMetadata, []gateRunMetadata, error)
+      ```
+    - Move the following into this helper:
+      - Gate execution (`runner.Gate.Execute`).
+      - `/in` directory creation and `/in/build-gate.log` writing.
+      - Healing mods loop and Codex session handling.
+      - Re-gate loop and `ReGates` slice population.
+      - Error wrapping on healing exhaustion, still rooted at `step.ErrBuildGateFailed`.
   - Test:
-    - Add or extend tests in `tests/integration/mods/mod-codex/mod_codex_test.go` to assert:
-      - `codex-last.txt` exists and contains `[[REQUEST_BUILD_VALIDATION]]` when the prompt requests a gate.
-      - `request_build_validation` and `codex-session.txt` exist in `/out` when running with a real Codex auth (or a stubbed CLI).
-    - Run `make test` and `scripts/validate-tdd-discipline.sh ./docker/mods/...` to ensure coverage thresholds referenced in `AGENTS.md` remain satisfied.
+    - Refactor existing tests in `internal/nodeagent/execution_healing_test.go` to call `runGateWithHealing` via `executeWithHealing`, preserving expectations for:
+      - Gate fail → heal → re-gate success.
+      - Gate fail → healing exhausted → `ErrBuildGateFailed`.
+    - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
+- [ ] Run a single pre-mod gate with healing before executing mods — Ensure the baseline compiles before any changes.
+  - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_healing.go`.
+  - Scope:
+    - In `executeRun`, before the loop over `stepIndex`:
+      - Hydrate the base workspace for step 0 using existing rehydration logic.
+      - Call `runGateWithHealing(..., gatePhase="pre")` once for the run.
+      - Persist the resulting `PreGate` and `ReGates` into an `executionResult` accumulator.
+    - Ensure that if the pre-mod gate cannot be healed:
+      - The run terminates with `ErrBuildGateFailed` and `reason="build-gate"`.
+      - No mods are executed.
+  - Test:
+    - Extend `internal/nodeagent/execution_healing_test.go` with focused scenarios:
+      - Pre-mod gate fails, healing fixes it, and the run proceeds to mods.
+      - Pre-mod gate fails, healing retries are exhausted, and the run exits without invoking any mod logic.
+    - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
 
-- [x] Implement Codex session resume mode inside `mod-codex.sh` — Allow subsequent healing attempts to re-use the original session.
-  - Component: `docker/mods/mod-codex/mod-codex.sh`.
+## Phase D — Add per-mod post gates with healing
+- [ ] Wire post-mod gates to reuse runGateWithHealing — Keep pre- and post-gate behavior consistent.
+  - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
-    - Introduce an opt-in resume mode controlled via environment:
-      - If `CODEX_RESUME=1` and `/in/codex-session.txt` exists, call `codex exec resume` instead of a fresh `codex exec`:
-        ```bash
-        resume_session=""
-        if [[ "${CODEX_RESUME:-}" == "1" && -f "/in/codex-session.txt" ]]; then
-          resume_session="$(tr -d '\r\n' < /in/codex-session.txt)"
-        fi
-        cmd=(codex exec)
-        # ... feature detection for flags as above ...
-        if [[ -n "$resume_session" ]]; then
-          cmd+=(resume "$resume_session")
-        fi
-        cmd+=( - )
-        ```
-      - For resume runs, prepend a short instruction to the prompt (either via an env var or by adjusting the YAML prompt) clarifying that:
-        - The previous Build Gate still failed (new `/in/build-gate.log` content).
-        - Codex should continue healing from the existing context and again emit `[[REQUEST_BUILD_VALIDATION]]` once ready.
-    - Ensure the resume path still writes `codex-last.txt`, `codex-session.txt`, and `codex-run.json` in the same format so the node agent does not have to distinguish between first and subsequent runs.
+    - After each mod step completes with `ExitCode == 0` inside `executeWithHealing` or its successor:
+      - Call `runGateWithHealing(..., gatePhase="post")` on the same workspace.
+      - Append any returned `gateRunMetadata` entries to the existing `ReGates` slice for full history.
+      - Set `result.BuildGate` to the final post-mod gate metadata.
   - Test:
-    - Extend `tests/integration/mods/mod-codex/mod_codex_test.go` with a (skipped-by-default) test that:
-      - Runs `mods-codex` once to create a session and `codex-session.txt`.
-      - Invokes `mods-codex` again with `CODEX_RESUME=1` and `/in/codex-session.txt` mounted.
-      - Verifies via logs that `codex exec resume` was used (e.g., by injecting a small marker into the prompt and checking the behavior).
-    - Manual smoke: run the E2E healing scenarios with real Codex to confirm logs show a resumed session (continuous conversation) instead of a fresh run.
+    - Add tests in `internal/nodeagent/execution_healing_test.go` to cover:
+      - Pre-mod gate passes, mod exits 0, post-mod gate passes without healing.
+      - Pre-mod gate passes, mod exits 0, post-mod gate fails once, heals, then passes.
+    - Run `go test ./internal/nodeagent -run TestExecuteWithHealing_PostGate`.
+- [ ] Stop executing further mods when a post-mod gate cannot be healed — Ensure a failing post gate terminates the run.
+  - Component: `internal/nodeagent/execution_orchestrator.go`.
+  - Scope:
+    - In `executeRun`, when the execution result for a given `stepIndex` contains an error rooted at `step.ErrBuildGateFailed` from a post gate:
+      - Set `finalExecErr` and `finalExecResult` and break out of the steps loop.
+      - Ensure no subsequent `stepIndex` is executed.
+  - Test:
+    - Add a multi-mod test in `internal/nodeagent/execution_healing_test.go` or a new `execution_multistep_postgate_test.go` that:
+      - Simulates two mods where the first mod’s post gate passes, the second mod’s post gate fails after healing retries.
+      - Asserts that only the first mod’s container is executed and the run terminates on the second post gate failure.
+    - Run `go test ./internal/nodeagent -run TestExecuteRun_PostGateStopsFurtherMods`.
 
-## Phase C — Node agent healing loop orchestration
-- [x] Propagate Codex session and sentinel artifacts through the healing loop — Let the node agent re-use Codex sessions across retries without changing gate semantics.
-  - Component: `internal/nodeagent/execution_healing.go`, `internal/nodeagent/manifest.go`, artifact upload helpers.
+## Phase E — Preserve stats and CLI surface while switching to pre-run + per-mod gates
+- [ ] Ensure stats capture pre-run gate and last post gate as final_gate — Keep CLI/API gate summaries correct with new semantics.
+  - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/domain/types/runstats.go`.
   - Scope:
-    - In `executeWithHealing` (see `internal/nodeagent/execution_healing.go`), extend the healing loop to track Codex session and sentinel state:
-      - Before the `for attempt := 1; attempt <= retries; attempt++` loop, declare variables to hold the last known Codex session id and a boolean indicating whether the last Codex run requested validation (e.g., `var codexSession string`).
-      - After each healing mod run (`healResult, healErr := runner.Run(...)`), inspect `/out` when the image is `mods-codex` (or when the expected files exist):
-        - Read `filepath.Join(outDir, "codex-session.txt")` into `codexSession` when present.
-        - Read `filepath.Join(outDir, "request_build_validation")` or `codex-run.json` to determine whether Codex produced the sentinel.
-      - Copy `codex-session.txt` into `/in` for subsequent attempts so `mod-codex.sh` can use resume mode:
-        ```go
-        if codexSession != "" && *inDir != "" {
-          if writeErr := os.WriteFile(filepath.Join(*inDir, "codex-session.txt"), []byte(codexSession), 0o644); writeErr != nil {
-            slog.Warn("healing: failed to persist codex-session.txt into /in", "run_id", req.RunID, "error", writeErr)
-          }
-        }
-        ```
-      - Keep Build Gate semantics unchanged: the node agent still re-runs the gate after healing mods complete on each attempt; sentinel state is used for observability and potential future policy, not to skip gates.
-    - In `buildHealingManifest` (`internal/nodeagent/manifest.go`), inject `CODEX_RESUME=1` into the healing mod environment when:
-      - A non-empty `codexSession` is available.
-      - The healing mod image (or name) indicates a Codex-based healer (e.g., `mods-codex` or a configurable list).
-      - For non-Codex healing mods, do not set `CODEX_RESUME`.
-    - Ensure the `/in` directory remains read-only inside the container; the agent writes `codex-session.txt` on the host side only.
+    - In `buildExecutionStats`, keep existing logic but ensure:
+      - `execResult.PreGate` is populated from the single pre-mod gate.
+      - `execResult.ReGates` contains all healing re-gates from both pre- and post-mod phases in chronological order.
+      - `result.BuildGate` reflects the last post-mod gate result (or the pre-mod gate when no mods executed).
+    - In `buildGateStats`:
+      - Continue to build `gate["pre_gate"]` from `execResult.PreGate`.
+      - Continue to build `gate["re_gates"]` from `execResult.ReGates` in order (pre- and post-mod healing).
+      - Keep `gate["final_gate"]` sourced from `result.BuildGate` and include uploaded logs as today.
+    - In `RunStats.GateSummary()` (`internal/domain/types/runstats.go`):
+      - Confirm the existing priority (final_gate → last re-gate → pre_gate) still holds.
+      - Update comments to clarify that `final_gate` represents the latest post-mod gate, or pre-mod gate for runs with no mods.
   - Test:
-    - Add tests in `internal/nodeagent/manifest_healing_test.go` to confirm:
-      - `buildHealingManifest` sets `CODEX_RESUME=1` only when a Codex session id is available and the healing mod image matches the Codex pattern.
-      - Non-Codex healing mods remain unaffected.
-    - Add tests in `internal/nodeagent/execution_healing_retry_test.go` to cover:
-      - A failing gate with `build_gate_healing` that uses `mods-codex`:
-        - First attempt populates `codex-session.txt` in `/out`.
-        - Second attempt sees `CODEX_RESUME=1` in the healing manifest and `codex-session.txt` in `/in`.
-      - Retries still stop once the gate passes or when the retry count is exhausted.
+    - Add/extend unit tests in `internal/domain/types/runstats_test.go` to cover:
+      - A run with pre_gate + post-mod final_gate; expect summary `"passed duration=...ms"` based on final gate.
+      - A run with failed final_gate after one or more mods; expect summary `"failed final-gate duration=...ms"`.
+    - Extend `internal/nodeagent/statusuploader_test.go` or related tests to assert `stats["gate"]` contains `pre_gate`, `re_gates`, and `final_gate` keys when gate is enabled.
 
-- [x] Keep HTTP Build Gate and docker gate behavior consistent — Ensure node agent still re-runs the gate and records the full gate history.
-  - Component: `internal/nodeagent/execution_healing.go`, `internal/workflow/runtime/step/gate_docker.go`, Build Gate API client docs.
+## Phase F — Update CLI, integration tests, and how-to docs
+- [ ] Keep CLI gate summary aligned with final (post-mod) gate — Ensure users see the post-mod gate result for each ticket.
+  - Component: `internal/cli/mods/inspect.go`.
   - Scope:
-    - Verify that the existing re-gate logic in `executeWithHealing` remains intact:
-      - Healing mods still operate on the same workspace; re-gate runs via `runner.Gate.Execute` with the updated workspace.
-      - The `BuildGateStageMetadata` for pre-gate and each re-gate is captured in `PreGate` and `ReGates` respectively.
-    - Ensure comments and docs reflect that:
-      - Healing mods may optionally call the HTTP Build Gate API directly (using their own tooling), but this is now discouraged for `mods-codex`.
-      - The canonical gate results are always those produced by the node agent’s `GateExecutor`, not by in-container scripts.
+    - Confirm `ploy mod inspect <ticket-id>` uses `GateSummary()` from stats and does not assume gate is pre-mod only.
+    - Update any inline help or output examples (if present) to mention that gate status reflects the final gate, which is typically post-mod.
   - Test:
-    - `go test ./internal/nodeagent -run TestRunController_ExecuteWithHealing` (and related tests in `execution_healing_test.go` / `execution_healing_retry_test.go`) — Confirm expectations around gate metadata and retry behavior still hold.
-    - Run `scripts/validate-tdd-discipline.sh ./internal/...` to verify coverage and static analysis thresholds for critical workflow packages.
+    - Add/adjust unit tests in `internal/cli/mods/inspect_test.go` (or equivalent) to assert that:
+      - A stats payload with `final_gate.failed` produces `Gate: failed final-gate ...`.
+      - A stats payload with only pre_gate (no mods executed) still renders `Gate: failed pre-gate ...`.
+    - Run `go test ./internal/cli/mods -run TestInspect`.
 
-## Phase D — End-to-end validation and discipline
-- [x] Align tests and TDD guardrails with the new handshake — Ensure RED→GREEN→REFACTOR for the Codex healing pipeline.
-  - Component: `tests/e2e/mods`, `tests/integration/mods/mod-codex`, `scripts/validate-tdd-discipline.sh`.
+- [ ] Extend integration and E2E coverage for post-mod failures and healing — Guard against regressions in gate-heal-regate behavior.
+  - Component: `tests/integration/build-gate`, `tests/e2e/mods`.
   - Scope:
-    - Update or add E2E assertions for the sentinel and session behavior:
-      - In `tests/e2e/mods/scenario-orw-fail/run.sh` and `scenario-multi-node-rehydration/run.sh`, validate (via logs or artifacts) that:
-        - Codex emits `[[REQUEST_BUILD_VALIDATION]]` before each gate rerun.
-        - After a failed gate, the next healing attempt logs that it is resuming a previous Codex session (e.g., by checking for the presence of `codex-session.txt` in artifacts).
-      - Optionally enhance `tests/e2e/mods/README.md` with a short checklist for:
-        - Sentinel visibility.
-        - Session resume across healing retries.
-    - Document the discipline in `GOLANG.md` and cross-link back to this roadmap section for future refactoring work.
+    - In `tests/integration/build-gate`, add a scenario (e.g. `scenario-post-mod-fail.sh`) that:
+      - Uses a Mods spec where the initial code passes pre-gate, the mod introduces a compile error, and healing plus post-gate restore a passing state.
+      - Asserts that:
+        - The run fails when healing cannot fix the post-mod break.
+        - The run succeeds when healing does fix it, and `GateSummary()` reflects the final post-gate result.
+    - In `tests/e2e/mods` (e.g., `scenario-multi-step` or `scenario-multi-node-rehydration`):
+      - Extend or add a scenario where:
+        - Each mods[] entry is followed by a post-gate check, with at least one step requiring healing after post-gate failure.
+        - Final artifacts and SSE events show gate and healing events for each step.
   - Test:
-    - `make test` — All unit and integration tests pass, including the Codex integration when `CODEX_AUTH_JSON` is set.
-    - `./scripts/validate-tdd-discipline.sh` — Repository-wide TDD discipline passes, confirming coverage (≥60% overall, ≥90% for critical workflow packages) and Build Gate binary size constraints are still met after the changes.
+    - Run the new integration scenario script(s) under `tests/integration/build-gate`.
+    - Run the affected E2E scripts under `tests/e2e/mods` and verify:
+      - For multi-step specs, Build Gate runs after every mod that exits with code 0.
+      - Healing applies uniformly to any failing gate (pre or post), with consistent logs and stats.
