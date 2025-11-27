@@ -253,6 +253,15 @@ func (r *runController) executeWithHealing(
 	// Track re-gate runs for stats.
 	var reGates []gateRunMetadata
 
+	// Track Codex session state across healing loop iterations.
+	// When a Codex-based healing mod writes codex-session.txt to /out, the agent
+	// reads and persists this session ID to /in for subsequent attempts. This enables
+	// Codex to resume conversations instead of starting fresh on each retry.
+	// The sentinel state (request_build_validation) is tracked for observability but
+	// does not affect gate semantics: the agent always re-runs the gate after healing.
+	var codexSession string
+	var codexRequestedValidation bool
+
 	// Attempt healing loop.
 	// Note: This is a domain-specific healing retry loop (not a transient error retry).
 	// It executes healing mods between gate validation attempts based on user-configured retries.
@@ -265,7 +274,10 @@ func (r *runController) executeWithHealing(
 
 		// Execute each healing mod in sequence using typed HealingMod structs.
 		for idx, mod := range healingConfig.Mods {
-			healManifest, buildErr := buildHealingManifest(req, mod, idx)
+			// Pass codexSession to enable CODEX_RESUME=1 injection for Codex-based healers.
+			// On the first attempt codexSession is empty; subsequent attempts may have
+			// a session ID from the previous healing mod run.
+			healManifest, buildErr := buildHealingManifest(req, mod, idx, codexSession)
 			if buildErr != nil {
 				slog.Error("failed to build healing manifest", "run_id", req.RunID, "mod_index", idx, "error", buildErr)
 				return executionResult{Result: result, PreGate: preGate, ReGates: reGates}, fmt.Errorf("build healing manifest[%d]: %w", idx, buildErr)
@@ -334,7 +346,40 @@ func (r *runController) executeWithHealing(
 			// Each healing mod diff is tagged with mod_type and mod_index to distinguish
 			// from the main mod diff captured later in execution_orchestrator.go.
 			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt)
+
+			// Read Codex session and sentinel artifacts from /out for session propagation.
+			// These files enable resume mode for Codex-based healers and observability
+			// for whether Codex requested build validation.
+			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
+				if session := strings.TrimSpace(string(sessionBytes)); session != "" {
+					codexSession = session
+					slog.Info("healing: captured codex session from /out", "run_id", req.RunID, "mod_index", idx, "session_id", codexSession)
+				}
+			}
+
+			// Check for sentinel file indicating Codex requested build validation.
+			// This is tracked for observability but does not affect gate semantics.
+			if _, statErr := os.Stat(filepath.Join(outDir, "request_build_validation")); statErr == nil {
+				codexRequestedValidation = true
+				slog.Info("healing: codex requested build validation", "run_id", req.RunID, "mod_index", idx)
+			}
 		}
+
+		// Persist codex-session.txt to /in for subsequent healing attempts.
+		// This allows Codex-based healers to resume from the previous conversation
+		// instead of starting fresh. The /in directory is read-only inside containers,
+		// so we write from the host side only.
+		if codexSession != "" && *inDir != "" {
+			sessionPath := filepath.Join(*inDir, "codex-session.txt")
+			if writeErr := os.WriteFile(sessionPath, []byte(codexSession), 0o644); writeErr != nil {
+				slog.Warn("healing: failed to persist codex-session.txt into /in", "run_id", req.RunID, "error", writeErr)
+			} else {
+				slog.Info("healing: persisted codex-session.txt to /in for resume", "run_id", req.RunID, "session_id", codexSession)
+			}
+		}
+
+		// Log sentinel state for observability (gate semantics unchanged).
+		_ = codexRequestedValidation // Use variable to silence unused warning in non-logging builds.
 
 		// Re-run the gate after healing mods complete.
 		// This verification uses the same repo+diff semantics as the HTTP Build Gate API:
