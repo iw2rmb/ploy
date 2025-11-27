@@ -452,6 +452,36 @@ func TestBuildGateHTTPClientConfigFromEnv(t *testing.T) {
 	}
 }
 
+// TestBuildGateHTTPClientConfigFromEnv_TLSConfig tests TLS settings loaded from env.
+func TestBuildGateHTTPClientConfigFromEnv_TLSConfig(t *testing.T) {
+	t.Setenv("PLOY_SERVER_URL", "https://api.test.ploy.io")
+	t.Setenv("PLOY_API_TOKEN", "test-token")
+	t.Setenv("PLOY_CA_CERT_PATH", "/etc/ploy/certs/ca.crt")
+	t.Setenv("PLOY_CLIENT_CERT_PATH", "/etc/ploy/certs/client.crt")
+	t.Setenv("PLOY_CLIENT_KEY_PATH", "/etc/ploy/certs/client.key")
+
+	cfg, err := BuildGateHTTPClientConfigFromEnv()
+	if err != nil {
+		t.Fatalf("BuildGateHTTPClientConfigFromEnv() error: %v", err)
+	}
+
+	if !cfg.TLSEnabled {
+		t.Fatal("expected TLSEnabled to be true")
+	}
+	if cfg.TLSCA != "/etc/ploy/certs/ca.crt" {
+		t.Errorf("expected TLSCA '/etc/ploy/certs/ca.crt', got '%s'", cfg.TLSCA)
+	}
+	if cfg.TLSCert != "/etc/ploy/certs/client.crt" {
+		t.Errorf("expected TLSCert '/etc/ploy/certs/client.crt', got '%s'", cfg.TLSCert)
+	}
+	if cfg.TLSKey != "/etc/ploy/certs/client.key" {
+		t.Errorf("expected TLSKey '/etc/ploy/certs/client.key', got '%s'", cfg.TLSKey)
+	}
+	if cfg.APIToken != "test-token" {
+		t.Errorf("expected APIToken 'test-token', got '%s'", cfg.APIToken)
+	}
+}
+
 // TestBuildGateHTTPClientConfigFromEnv_MissingServerURL tests error for missing URL.
 func TestBuildGateHTTPClientConfigFromEnv_MissingServerURL(t *testing.T) {
 	// Ensure PLOY_SERVER_URL is unset for this test.

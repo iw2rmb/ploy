@@ -7,7 +7,10 @@
 // Configuration is loaded from environment variables:
 //   - PLOY_SERVER_URL: Base URL for the Build Gate API (required).
 //   - PLOY_API_TOKEN: Bearer token for authentication (optional, uses mTLS otherwise).
-//   - TLS configuration via PLOY_TLS_* envs for mTLS authentication.
+//   - TLS configuration for mTLS via:
+//   - PLOY_CA_CERT_PATH: Path to CA certificate.
+//   - PLOY_CLIENT_CERT_PATH: Path to client certificate.
+//   - PLOY_CLIENT_KEY_PATH: Path to client private key.
 //
 // The client wraps permanent errors (4xx) with backoff.Permanent to prevent retries.
 package step
@@ -62,13 +65,22 @@ func BuildGateHTTPClientConfigFromEnv() (BuildGateHTTPClientConfig, error) {
 	}
 
 	cfg := BuildGateHTTPClientConfig{
-		ServerURL:  serverURL,
-		APIToken:   strings.TrimSpace(os.Getenv("PLOY_API_TOKEN")),
-		TLSEnabled: strings.TrimSpace(os.Getenv("PLOY_TLS_ENABLED")) == "true",
-		TLSCert:    strings.TrimSpace(os.Getenv("PLOY_TLS_CERT")),
-		TLSKey:     strings.TrimSpace(os.Getenv("PLOY_TLS_KEY")),
-		TLSCA:      strings.TrimSpace(os.Getenv("PLOY_TLS_CA")),
-		Timeout:    30 * time.Second, // Default timeout for HTTP requests.
+		ServerURL: serverURL,
+		APIToken:  strings.TrimSpace(os.Getenv("PLOY_API_TOKEN")),
+		Timeout:   30 * time.Second, // Default timeout for HTTP requests.
+	}
+
+	// TLS settings for mTLS authentication when healing containers call the Build Gate API.
+	// These are injected by the node agent per docs/envs/README.md.
+	caPath := strings.TrimSpace(os.Getenv("PLOY_CA_CERT_PATH"))
+	clientCertPath := strings.TrimSpace(os.Getenv("PLOY_CLIENT_CERT_PATH"))
+	clientKeyPath := strings.TrimSpace(os.Getenv("PLOY_CLIENT_KEY_PATH"))
+
+	if caPath != "" && clientCertPath != "" && clientKeyPath != "" {
+		cfg.TLSEnabled = true
+		cfg.TLSCA = caPath
+		cfg.TLSCert = clientCertPath
+		cfg.TLSKey = clientKeyPath
 	}
 
 	return cfg, nil
