@@ -129,10 +129,20 @@ func (e *httpGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 	// If RepoURL or Ref are empty, the HTTP client's Validate call will return a
 	// validation error, which is correct behavior — callers must ensure manifests
 	// have repo metadata before invoking HTTP-based gate execution.
+	//
+	// For re-gates after healing, DiffPatch contains the accumulated workspace changes
+	// (gzipped, base64-encoded). The Build Gate worker applies this patch to the
+	// cloned repo_url+ref baseline, enabling validation of healing modifications
+	// without shipping full workspace archives. This decouples the healing node
+	// from the gate node — healing can run on one node while gate runs on another.
 	req := contracts.BuildGateValidateRequest{
 		// Repo metadata wired from StepGateSpec (Phase C1).
 		RepoURL: spec.RepoURL,
 		Ref:     spec.Ref,
+
+		// DiffPatch for re-gates: accumulated healing changes relative to repo_url+ref.
+		// Empty for initial gates; populated by runGateWithHealing for re-gates.
+		DiffPatch: spec.DiffPatch,
 
 		// Profile from spec if provided; empty string triggers auto-detection on server.
 		Profile: spec.Profile,
