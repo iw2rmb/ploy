@@ -116,15 +116,25 @@ CREATE INDEX IF NOT EXISTS builds_run_idx ON builds(run_id);
 CREATE INDEX IF NOT EXISTS builds_stage_idx ON builds(stage_id);
 
 -- Diffs (per-run, small count)
+-- Each execution step (mod, healing, pre_gate, post_gate) may produce a diff.
+-- Diffs store `stage_id` and `run_id` for association; summary JSONB contains:
+--   - step_index: 0-based step number (for ordering/rehydration)
+--   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
+-- Rehydration fetches all diffs where step_index <= k, ordered by step_index then created_at.
 CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   stage_id   UUID REFERENCES stages(id) ON DELETE SET NULL,
   patch      BYTEA NOT NULL CHECK (octet_length(patch) <= 1048576),      -- expected gzipped (cap: 1 MiB)
   summary    JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  -- step_index: logical step number (0-based) for multi-step runs.
+  -- NULL for legacy diffs or aggregate diffs spanning multiple steps.
+  step_index INTEGER CHECK (step_index >= 0)
 );
 CREATE INDEX IF NOT EXISTS diffs_run_idx ON diffs(run_id);
+-- Index for efficient rehydration queries: "all diffs for run up to step k".
+CREATE INDEX IF NOT EXISTS diffs_run_step_idx ON diffs(run_id, step_index);
 
 -- Logs (append-only)
 CREATE TABLE IF NOT EXISTS logs (

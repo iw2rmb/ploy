@@ -352,3 +352,185 @@ index abc1234..def5678 100644
 
 	t.Log("✓✓✓ Smoke workflow end-to-end test completed successfully")
 }
+
+// TestSmokeWorkflow_HealingDiffs validates that healing diffs with mod_type and step_index
+// are correctly stored and retrieved alongside mod diffs.
+// C2: This test verifies the unified stage+diff model where both mod and healing diffs
+// share the same step_index, enabling rehydration to include all diffs for a step.
+//
+// Requires: PLOY_TEST_PG_DSN environment variable.
+func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
+	dsn := os.Getenv("PLOY_TEST_PG_DSN")
+	if dsn == "" {
+		t.Skip("PLOY_TEST_PG_DSN not set; skipping smoke workflow test")
+	}
+
+	ctx := context.Background()
+	db, err := store.NewStore(ctx, dsn)
+	if err != nil {
+		t.Fatalf("NewStore() failed: %v", err)
+	}
+	defer db.Close()
+
+	// Create a run for the healing diff test.
+	modSpec := []byte(`{"type": "healing-test"}`)
+	run, err := db.CreateRun(ctx, store.CreateRunParams{
+		RepoUrl:   "https://github.com/example/healing-test",
+		Spec:      modSpec,
+		Status:    store.RunStatusQueued,
+		BaseRef:   "main",
+		TargetRef: "feature/healing-test",
+	})
+	if err != nil {
+		t.Fatalf("CreateRun() failed: %v", err)
+	}
+	t.Logf("✓ Created run: id=%v", run.ID)
+
+	// Create a stage.
+	stage, err := db.CreateStage(ctx, store.CreateStageParams{
+		RunID:  run.ID,
+		Name:   "main",
+		Status: store.StageStatusRunning,
+		Meta:   []byte(`{"type":"mod"}`),
+	})
+	if err != nil {
+		t.Fatalf("CreateStage() failed: %v", err)
+	}
+	t.Logf("✓ Created stage: id=%v", stage.ID)
+
+	// C2: Create diffs with step_index and mod_type in summary.
+	// Step 0: mod diff + healing diff
+	step0ModSummary := []byte(`{"step_index":0,"mod_type":"mod"}`)
+	step0HealSummary := []byte(`{"step_index":0,"mod_type":"healing","healing_attempt":1}`)
+	// Step 1: mod diff + 2 healing diffs
+	step1ModSummary := []byte(`{"step_index":1,"mod_type":"mod"}`)
+	step1Heal1Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":1}`)
+	step1Heal2Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":2}`)
+
+	// Create step 0 mod diff with step_index.
+	step0Idx := int32(0)
+	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:     run.ID,
+		StageID:   stage.ID,
+		Patch:     []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
+		Summary:   step0ModSummary,
+		StepIndex: &step0Idx,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff(step0-mod) failed: %v", err)
+	}
+	t.Logf("✓ Created step 0 mod diff: id=%v", step0ModDiff.ID)
+
+	// Create step 0 healing diff with same step_index.
+	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:     run.ID,
+		StageID:   stage.ID,
+		Patch:     []byte{0x1f, 0x8b, 0x02},
+		Summary:   step0HealSummary,
+		StepIndex: &step0Idx,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff(step0-heal) failed: %v", err)
+	}
+	t.Logf("✓ Created step 0 healing diff: id=%v", step0HealDiff.ID)
+
+	// Create step 1 mod diff.
+	step1Idx := int32(1)
+	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:     run.ID,
+		StageID:   stage.ID,
+		Patch:     []byte{0x1f, 0x8b, 0x03},
+		Summary:   step1ModSummary,
+		StepIndex: &step1Idx,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff(step1-mod) failed: %v", err)
+	}
+	t.Logf("✓ Created step 1 mod diff: id=%v", step1ModDiff.ID)
+
+	// Create step 1 healing diffs (2 attempts).
+	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:     run.ID,
+		StageID:   stage.ID,
+		Patch:     []byte{0x1f, 0x8b, 0x04},
+		Summary:   step1Heal1Summary,
+		StepIndex: &step1Idx,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff(step1-heal1) failed: %v", err)
+	}
+	t.Logf("✓ Created step 1 healing diff 1: id=%v", step1Heal1Diff.ID)
+
+	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
+		RunID:     run.ID,
+		StageID:   stage.ID,
+		Patch:     []byte{0x1f, 0x8b, 0x05},
+		Summary:   step1Heal2Summary,
+		StepIndex: &step1Idx,
+	})
+	if err != nil {
+		t.Fatalf("CreateDiff(step1-heal2) failed: %v", err)
+	}
+	t.Logf("✓ Created step 1 healing diff 2: id=%v", step1Heal2Diff.ID)
+
+	// Verify ListDiffsByRun returns all 5 diffs.
+	allDiffs, err := db.ListDiffsByRun(ctx, run.ID)
+	if err != nil {
+		t.Fatalf("ListDiffsByRun() failed: %v", err)
+	}
+	if len(allDiffs) != 5 {
+		t.Errorf("Expected 5 diffs (2 for step 0 + 3 for step 1), got %d", len(allDiffs))
+	}
+	t.Logf("✓ ListDiffsByRun returned %d diffs", len(allDiffs))
+
+	// C2: Verify ListDiffsBeforeStep returns correct subset.
+	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).
+	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
+		RunID:     run.ID,
+		StepIndex: &step0Idx,
+	})
+	if err != nil {
+		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
+	}
+	if len(diffsBeforeStep0) != 2 {
+		t.Errorf("Expected 2 diffs for step <= 0, got %d", len(diffsBeforeStep0))
+	}
+	t.Logf("✓ ListDiffsBeforeStep(0) returned %d diffs", len(diffsBeforeStep0))
+
+	// Query for step_index <= 1 should return 5 diffs (all).
+	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
+		RunID:     run.ID,
+		StepIndex: &step1Idx,
+	})
+	if err != nil {
+		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)
+	}
+	if len(diffsBeforeStep1) != 5 {
+		t.Errorf("Expected 5 diffs for step <= 1, got %d", len(diffsBeforeStep1))
+	}
+	t.Logf("✓ ListDiffsBeforeStep(1) returned %d diffs", len(diffsBeforeStep1))
+
+	// Verify ordering: step 0 diffs first, then step 1 diffs.
+	// Within each step, order is by created_at ASC.
+	for i, d := range diffsBeforeStep1 {
+		var expectedStep int32
+		if i < 2 {
+			expectedStep = 0
+		} else {
+			expectedStep = 1
+		}
+		if d.StepIndex == nil || *d.StepIndex != expectedStep {
+			t.Errorf("diffs[%d] step_index=%v, want %d", i, d.StepIndex, expectedStep)
+		}
+	}
+	t.Logf("✓ Verified diff ordering (step 0 first, then step 1)")
+
+	// Silence unused variable warnings for diff IDs (used implicitly via DB state).
+	_ = step0ModDiff
+	_ = step0HealDiff
+	_ = step1ModDiff
+	_ = step1Heal1Diff
+	_ = step1Heal2Diff
+
+	t.Log("✓✓✓ Healing diffs smoke test completed successfully")
+}

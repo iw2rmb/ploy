@@ -1133,7 +1133,8 @@ func TestUploadHealingModDiff_MetadataTagging(t *testing.T) {
 
 	// Call uploadHealingModDiff (will fail at upload but we can verify the setup logic).
 	// In a real scenario, this would need a mock HTTP server to validate the uploaded metadata.
-	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", workspace, healResult, 2, 1)
+	// C2: Pass stepIndex=3 to tag the healing diff with the parent step.
+	rc.uploadHealingModDiff(context.Background(), "test-run-id", "test-stage-id", workspace, healResult, 2, 1, 3)
 
 	// Verify that the function completes without panics (basic smoke test).
 	// More comprehensive validation would require capturing the HTTP request in an integration test.
@@ -1466,7 +1467,7 @@ func TestRunGateWithHealing_GatePassesImmediately(t *testing.T) {
 
 	// Call runGateWithHealing directly (the reusable helper).
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Gate should pass without error.
@@ -1556,7 +1557,7 @@ func TestRunGateWithHealing_GateFailsNoHealing(t *testing.T) {
 
 	// Call runGateWithHealing directly.
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Should return ErrBuildGateFailed.
@@ -1676,7 +1677,7 @@ func TestRunGateWithHealing_GateFailsHealingSucceeds(t *testing.T) {
 
 	// Call runGateWithHealing directly.
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Should succeed after healing.
@@ -1779,7 +1780,7 @@ func TestRunGateWithHealing_HealingRetriesExhausted(t *testing.T) {
 	}
 
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Should return ErrBuildGateFailed.
@@ -1919,7 +1920,7 @@ func TestPreModGate_HealingFixesAndRunProceeds(t *testing.T) {
 
 	// Simulate runGateWithHealing for pre-mod gate phase (as executeRun does).
 	preGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Pre-mod gate should succeed after healing.
@@ -2059,7 +2060,7 @@ func TestPreModGate_HealingExhaustedNoMods(t *testing.T) {
 
 	// Simulate runGateWithHealing for pre-mod gate phase.
 	preGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Pre-mod gate should fail with ErrBuildGateFailed.
@@ -2163,7 +2164,7 @@ func TestPreModGate_GatePassesNoHealing(t *testing.T) {
 	}
 
 	preGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre",
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
 	)
 
 	// Pre-mod gate should pass immediately.
@@ -2523,7 +2524,7 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 
 	inDir := ""
 	initialGate, reGates, gateErr := rc.runGateWithHealing(
-		context.Background(), runner, req, manifest, "", "", &inDir, "pre",
+		context.Background(), runner, req, manifest, "", "", &inDir, "pre", 0,
 	)
 
 	if gateErr != nil {
