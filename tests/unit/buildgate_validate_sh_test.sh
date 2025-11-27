@@ -11,7 +11,9 @@
 set -uo pipefail
 
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-SCRIPT="$ROOT_DIR/docker/mods/mod-codex/buildgate-validate.sh"
+# Script moved from docker/mods/mod-codex/ to scripts/ so Codex cannot run
+# the gate from inside its container.
+SCRIPT="$ROOT_DIR/scripts/buildgate-validate.sh"
 
 # Track test results
 TESTS_RUN=0
