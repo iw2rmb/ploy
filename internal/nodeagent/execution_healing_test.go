@@ -196,6 +196,187 @@ func TestExecuteWithHealing_GateStatsTracking(t *testing.T) {
 	}
 }
 
+// TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails verifies that when the
+// initial gate fails, healing succeeds, and the main mod exits with a non-zero code
+// (so no post-mod gate runs), the final gate stored in Result.BuildGate reflects the
+// last successful healing re-gate rather than the initial failing pre-gate.
+func TestExecuteWithHealing_FinalGateFromHealingWhenMainModFails(t *testing.T) {
+	// Gate call sequence:
+	//  1. Pre-mod gate (fails)
+	//  2. Healing re-gate (passes)
+	gateCallCount := 0
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			switch gateCallCount {
+			case 1:
+				// Initial pre-mod gate failure.
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "maven", Passed: false},
+					},
+					LogsText:  "[ERROR] Initial pre-gate failure\n",
+					LogDigest: "pre-initial",
+				}, nil
+			case 2:
+				// Re-gate after healing succeeds.
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "maven", Passed: true},
+					},
+					LogsText:  "[INFO] Gate passed after healing\n",
+					LogDigest: "regate-final",
+				}, nil
+			default:
+				t.Fatalf("unexpected gate call %d", gateCallCount)
+				return nil, nil
+			}
+		},
+	}
+
+	// Container runtime: one healing mod (exit code 0) and one main mod (exit code 1).
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			switch spec.Image {
+			case "test/healer-final-gate:latest":
+				return step.ContainerHandle{ID: "healer"}, nil
+			case "test/main-mod-final-gate:latest":
+				return step.ContainerHandle{ID: "main"}, nil
+			default:
+				return step.ContainerHandle{ID: "unknown"}, nil
+			}
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			switch handle.ID {
+			case "healer":
+				// Healing container succeeds.
+				return step.ContainerResult{ExitCode: 0}, nil
+			case "main":
+				// Main mod exits with non-zero code to skip post-mod gate.
+				return step.ContainerResult{ExitCode: 1}, nil
+			default:
+				return step.ContainerResult{ExitCode: 0}, nil
+			}
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("logs"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-final-gate-healing-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-final-gate-healing-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("test-final-gate-healing-main-fail"),
+		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("test-branch"),
+		Env:       map[string]string{},
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods": []any{
+					map[string]any{
+						"image": "test/healer-final-gate:latest",
+					},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "test/main-mod-final-gate:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "workspace",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadWrite,
+				SnapshotCID: types.CID("bafy-final-gate"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
+	if err != nil {
+		t.Fatalf("executeWithHealing() error = %v, want nil (main mod failure reported via exit code)", err)
+	}
+
+	// Main mod should have non-zero exit code.
+	if execResult.ExitCode != 1 {
+		t.Errorf("executeWithHealing() exit code = %d, want 1", execResult.ExitCode)
+	}
+
+	// PreGate should capture the initial failing gate.
+	if execResult.PreGate == nil || execResult.PreGate.Metadata == nil {
+		t.Fatalf("PreGate should be populated for initial failing gate")
+	}
+	if execResult.PreGate.Metadata.LogDigest != "pre-initial" {
+		t.Errorf("PreGate.LogDigest = %q, want %q", execResult.PreGate.Metadata.LogDigest, "pre-initial")
+	}
+
+	// ReGates should contain the successful healing re-gate.
+	if len(execResult.ReGates) != 1 {
+		t.Fatalf("len(execResult.ReGates) = %d, want 1 (healing re-gate only)", len(execResult.ReGates))
+	}
+	finalReGate := execResult.ReGates[0]
+	if finalReGate.Metadata == nil || finalReGate.Metadata.LogDigest != "regate-final" {
+		t.Fatalf("final re-gate metadata = %#v, want LogDigest=%q", finalReGate.Metadata, "regate-final")
+	}
+
+	// Final gate in Result.BuildGate should reflect the last healing re-gate, not the initial pre-gate.
+	if execResult.BuildGate == nil {
+		t.Fatal("Result.BuildGate should be populated from final healing re-gate")
+	}
+	if execResult.BuildGate.LogDigest != "regate-final" {
+		t.Errorf("Result.BuildGate.LogDigest = %q, want %q", execResult.BuildGate.LogDigest, "regate-final")
+	}
+	if len(execResult.BuildGate.StaticChecks) == 0 || !execResult.BuildGate.StaticChecks[0].Passed {
+		t.Errorf("Result.BuildGate should represent a passing gate after healing")
+	}
+
+	// Only two gate executions should have occurred: initial pre-gate + healing re-gate.
+	if gateCallCount != 2 {
+		t.Errorf("gateCallCount = %d, want 2 (pre-gate + healing re-gate)", gateCallCount)
+	}
+}
+
 // TestExecuteWithHealing_GatePassesAfterHealingMod verifies that when the initial gate fails
 // but healing is configured, the healing mod executes and the gate is re-run.
 func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
