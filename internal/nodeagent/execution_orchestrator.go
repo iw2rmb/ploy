@@ -194,8 +194,16 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		// For step k: fetch step_index <= k-1 → gets pre_gate + all prior mod diffs
 		if len(preModReGates) > 0 {
 			// Healing occurred - upload the accumulated changes as a pre_gate diff.
+			// If diff is empty, fail the run (healing claimed success but made no changes).
 			stageID, _ := step0Manifest.OptionString("stage_id")
-			r.uploadBaselineDiff(ctx, req.RunID.String(), stageID, diffGenerator, baseClonePath, preModGateWorkspace, -1, "pre_gate")
+			if err := r.uploadBaselineDiff(ctx, req.RunID.String(), stageID, diffGenerator, baseClonePath, preModGateWorkspace, -1, "pre_gate"); err != nil {
+				slog.Error("pre-mod healing produced invalid state",
+					"run_id", req.RunID,
+					"error", err,
+				)
+				r.reportPreModGateFailure(ctx, req, err, preModGateResult, preModReGates, 0)
+				return
+			}
 		}
 	}
 
@@ -809,6 +817,8 @@ func (r *runController) uploadDiffForStep(
 //   - modifiedDir: the modified directory (e.g., healed workspace)
 //   - stepIndex: the step index to tag the diff with (0 for pre-mod healing)
 //   - modType: the mod_type to tag the diff with (e.g., "pre_gate", "post_gate")
+//
+// Returns error if diff generation fails or diff is empty (healing claimed success but made no changes).
 func (r *runController) uploadBaselineDiff(
 	ctx context.Context,
 	runID string,
@@ -818,21 +828,21 @@ func (r *runController) uploadBaselineDiff(
 	modifiedDir string,
 	stepIndex int,
 	modType string,
-) {
+) error {
 	if diffGenerator == nil {
-		slog.Warn("diff generator nil, cannot upload baseline diff", "run_id", runID, "mod_type", modType)
-		return
+		return fmt.Errorf("diff generator nil, cannot upload baseline diff")
 	}
 
 	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, modifiedDir)
 	if err != nil {
-		slog.Error("failed to generate baseline diff", "run_id", runID, "mod_type", modType, "error", err)
-		return
+		return fmt.Errorf("failed to generate baseline diff: %w", err)
 	}
 
 	if len(diffBytes) == 0 {
-		slog.Info("no baseline diff to upload (no changes)", "run_id", runID, "mod_type", modType)
-		return
+		// Empty diff after healing passed means something is wrong:
+		// either the gate is flaky or healing made no actual changes.
+		// Fail the run to surface this inconsistency.
+		return fmt.Errorf("healing produced empty diff but gate passed - possible flaky gate or healing made no changes")
 	}
 
 	summary := types.DiffSummary{
@@ -842,17 +852,16 @@ func (r *runController) uploadBaselineDiff(
 
 	diffUploader, err := NewDiffUploader(r.cfg)
 	if err != nil {
-		slog.Error("failed to create diff uploader", "run_id", runID, "mod_type", modType, "error", err)
-		return
+		return fmt.Errorf("failed to create diff uploader: %w", err)
 	}
 
 	stepIdx := int32(stepIndex)
 	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
-		slog.Error("failed to upload baseline diff", "run_id", runID, "mod_type", modType, "error", err)
-		return
+		return fmt.Errorf("failed to upload baseline diff: %w", err)
 	}
 
 	slog.Info("baseline diff uploaded successfully", "run_id", runID, "mod_type", modType, "step_index", stepIndex, "size", len(diffBytes))
+	return nil
 }
 
 // createGateExecutor creates a GateExecutor based on PLOY_BUILDGATE_MODE configuration.
