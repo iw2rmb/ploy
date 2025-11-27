@@ -94,11 +94,71 @@ post-gate) is surfaced in:
 - `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
 - `ploy mod inspect <ticket-id>` output as `Gate: passed|failed ...`.
 
+### Workspace and rehydration semantics
+
+This subsection clarifies which code version each Build Gate sees during execution.
+Understanding workspace state is essential for debugging gate failures and reasoning
+about multi-step runs where diffs accumulate across steps.
+
+**Implementation reference:**
+- `internal/nodeagent/execution_orchestrator.go` — `executeRun` and `rehydrateWorkspaceForStep`.
+
+#### Pre-mod gate workspace
+
+The **pre-mod gate** runs on the **initial hydrated workspace** (step 0). This workspace
+is created by cloning the repository at `base_ref` (optionally checking out `commit_sha`)
+and contains no modifications from any mods. The pre-mod gate validates that the baseline
+code compiles and tests pass before any mods execute.
+
+Workspace state for pre-mod gate:
+```
+base_ref (+ commit_sha if specified) → fresh clone → pre-mod gate
+```
+
+#### Post-mod gate workspace
+
+Each **post-mod gate** runs on the **rehydrated workspace for that step**. The workspace
+reflects all changes from prior mods (steps 0 through k-1) plus the changes from the
+current mod (step k). This is implemented via the `rehydrateWorkspaceForStep` function,
+which reconstructs workspace state from:
+
+1. **Base clone**: A cached copy of the initial repository state (base_ref + commit_sha).
+2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane and
+   applied in order using `git apply`.
+3. **Current mod output**: After the mod container exits, its changes become part of the
+   workspace that the post-mod gate validates.
+
+Workspace state for post-mod gate at step k:
+```
+base_ref → base clone → apply diffs[0..k-1] → mod[k] execution → post-mod gate[k]
+```
+
+#### Multi-node execution
+
+The rehydration strategy enables **multi-node execution**: any node can reconstruct
+the workspace for step k by fetching the base clone and applying the ordered diff chain.
+This decouples step execution from node affinity—step 0 can run on node A, step 1 on
+node B, etc.
+
+Key invariants:
+- Each step uploads its diff (tagged with `step_index`) after successful execution.
+- `rehydrateWorkspaceForStep` fetches diffs for steps `0..k-1` before executing step `k`.
+- A baseline commit is created after rehydration (via `ensureBaselineCommitForRehydration`)
+  so that `git diff HEAD` produces only the changes from step k, not cumulative changes.
+
+#### Summary table
+
+| Gate Phase     | Workspace State                                      | Code Reference                              |
+|----------------|------------------------------------------------------|---------------------------------------------|
+| Pre-mod gate   | Fresh clone of base_ref (+ commit_sha)               | `rehydrateWorkspaceForStep` with stepIndex=0 |
+| Post-mod gate[k] | Base clone + diffs[0..k-1] + mod[k] changes         | `rehydrateWorkspaceForStep` with stepIndex=k |
+
 ### Implementation references
 
 - Gate execution: `internal/workflow/runtime/step/stub.go` (`Runner.Run`).
 - Gate+healing orchestration: `internal/nodeagent/execution_healing.go`.
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
+- Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
 - Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
 
 ## 2. Data Model
