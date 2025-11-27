@@ -15,9 +15,10 @@ checkpoint notes in the repository.
 - **Spec** — YAML/JSON file or inline JSON describing container image,
   command, env, Build Gate and optional `mods[]` steps. Parsed by the CLI in
   `cmd/ploy/mod_run_spec.go`.
-- **Build Gate** — Validation pass run by the workflow runner
-  (`internal/workflow/runtime/step`) to ensure the workspace compiles/tests
-  successfully. Gates run at two distinct points in the lifecycle:
+- **Build Gate** — Validation pass run via the HTTP Build Gate API to ensure the
+  workspace compiles/tests successfully. The `GateExecutor` adapter
+  (`internal/workflow/runtime/step`) abstracts remote execution; Build Gate workers
+  claim and execute jobs. Gates run at two distinct points in the lifecycle:
   - **Pre-mod gate** — runs once on the initial workspace before any mods execute.
   - **Post-mod gate** — runs after each mod in `mods[]` that exits with code 0.
 - **Healing** — Optional corrective steps run when any Build Gate (pre or post)
@@ -76,6 +77,47 @@ pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gat
      - On failure with healing: enter fail → heal → re-gate loop.
      - If healing exhausted: run fails and no further mods execute.
    - If mod[k] exits non-zero: run fails; no post-gate and no further mods.
+
+### Remote gate execution via GateExecutor
+
+Pre-gate and re-gate validation calls the HTTP Build Gate API through the
+`GateExecutor` adapter. This decouples gate execution from the node running the
+Mods step:
+
+```
+┌─────────────────────┐     ┌────────────────────┐     ┌───────────────────────┐
+│ Node Orchestrator   │     │ GateExecutor       │     │ Control Plane         │
+│ (execution_healing) │────▶│ (HTTP adapter)     │────▶│ POST /v1/buildgate/   │
+│                     │     │                    │     │ validate              │
+└─────────────────────┘     └────────────────────┘     └───────────────────────┘
+                                                                │
+                                                                ▼
+                            ┌────────────────────┐     ┌───────────────────────┐
+                            │ Build Gate Worker  │◀────│ Job Queue (pending)   │
+                            │ (docker execution) │     │                       │
+                            └────────────────────┘     └───────────────────────┘
+                                      │
+                                      ▼
+                            ┌────────────────────┐
+                            │ BuildGateStage     │
+                            │ Metadata returned  │
+                            │ (passed/failed)    │
+                            └────────────────────┘
+```
+
+**Flow:**
+1. Orchestrator calls `GateExecutor.Execute()` with repo URL, ref, and optional diff_patch.
+2. The HTTP adapter submits a validation job to `POST /v1/buildgate/validate`.
+3. A Build Gate worker claims the job, executes docker validation, and reports results.
+4. The adapter polls or waits for completion, returning `BuildGateStageMetadata`.
+5. For healing flows: re-gate submits a new job with the workspace diff applied.
+
+This architecture enables:
+- Gate validation on dedicated Build Gate worker nodes (horizontal scaling).
+- Mods execution and gate execution on different nodes (separation of concerns).
+- Consistent workspace semantics via repo+diff reconstruction.
+
+See `docs/build-gate/README.md` for HTTP API details and worker configuration.
 
 ### Gate failure semantics
 
@@ -158,13 +200,13 @@ Key invariants:
 
 ### Implementation references
 
-- Gate execution: `internal/workflow/runtime/step/stub.go` (`Runner.Run`).
+- Gate execution via HTTP API: `internal/workflow/runtime/step/gate_executor.go` (`GateExecutor`).
 - Gate+healing orchestration: `internal/nodeagent/execution_healing.go`.
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
 - Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
 - Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
-- **Build Gate execution paths**: See `docs/build-gate/README.md` section "Build Gate
-  Execution Paths" for details on local docker vs HTTP API execution models.
+- **Build Gate remote execution**: See `docs/build-gate/README.md` for the repo+diff
+  validation model, HTTP API endpoints, and Build Gate worker configuration.
 
 ## 2. Data Model
 
