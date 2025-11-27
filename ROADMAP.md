@@ -103,7 +103,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
 
 ## Phase D — Add per-mod post gates with healing
-- [ ] Wire post-mod gates to reuse runGateWithHealing — Keep pre- and post-gate behavior consistent.
+- [x] Wire post-mod gates to reuse runGateWithHealing — Keep pre- and post-gate behavior consistent.
   - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
     - After each mod step completes with `ExitCode == 0` inside `executeWithHealing` or its successor:
