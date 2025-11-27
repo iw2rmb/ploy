@@ -51,9 +51,6 @@ const (
 //   - "" or "local-docker": Returns a dockerGateExecutor using the provided ContainerRuntime.
 //   - "remote-http": Returns an HTTPGateExecutor using the provided BuildGateHTTPClient.
 //   - Any other value: Logs a warning and falls back to local-docker mode.
-//
-// Returns nil only if both rt and httpClient are nil for their respective modes,
-// which allows callers to gracefully handle missing dependencies.
 func NewGateExecutor(mode string, rt ContainerRuntime, httpClient BuildGateHTTPClient) GateExecutor {
 	return NewGateExecutorWithLogger(mode, rt, httpClient, nil)
 }
