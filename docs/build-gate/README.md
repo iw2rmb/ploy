@@ -95,7 +95,7 @@ receive the following environment variables from the node agent:
 - `PLOY_API_TOKEN` — Bearer token for Build Gate API authentication when configured. On TLS-disabled
   local stacks the node agent may derive this from the worker bearer token file to simplify testing.
 
-The `buildgate-validate` CLI wrapper (bundled in `mods-codex`) accepts `--repo-url` and `--ref` flags
+The `buildgate-validate` CLI wrapper (external helper script, e.g., `scripts/buildgate-validate.sh`) accepts `--repo-url` and `--ref` flags
 or reads from `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` environment variables. When using the node-injected
 env vars, set `PLOY_BUILDGATE_REF="$PLOY_BASE_REF"` (or use `$PLOY_COMMIT_SHA` if pinned) in your healing
 mod command to map the node-provided baseline to the wrapper's expected variable.

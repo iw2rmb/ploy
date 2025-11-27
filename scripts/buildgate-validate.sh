@@ -41,7 +41,7 @@ set -euo pipefail
 # Defaults from environment or fallback values
 # ─────────────────────────────────────────────────────────────────────────────
 repo_url="${PLOY_REPO_URL:-}"
-ref="${PLOY_TARGET_REF:-}"
+ref="${PLOY_BUILDGATE_REF:-}"
 profile="${PLOY_BUILDGATE_PROFILE:-auto}"
 timeout="${PLOY_BUILDGATE_TIMEOUT:-10m}"
 diff_patch_file="${PLOY_DIFF_PATCH_FILE:-}"
