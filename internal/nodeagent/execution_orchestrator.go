@@ -168,8 +168,9 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 			}
 		}()
 
+		// C2: Pre-mod gate healing uses step_index=0 since it runs before any mods.
 		preModGateResult, preModReGates, err = r.runGateWithHealing(
-			ctx, runner, req, step0Manifest, preModGateWorkspace, outDir, &preModInDir, "pre",
+			ctx, runner, req, step0Manifest, preModGateWorkspace, outDir, &preModInDir, "pre", 0,
 		)
 
 		if err != nil {
@@ -760,9 +761,12 @@ func (r *runController) uploadDiffForStep(
 	}
 
 	// Build diff summary with step metadata for database storage.
-	// The step_index field enables ordering and rehydration across nodes.
+	// C2: Every diff is tagged with step_index + mod_type for unified rehydration.
+	// - step_index: 0-based step number for ordering and rehydration queries.
+	// - mod_type: "mod" for main mod diffs (healing diffs use "healing" in execution_healing.go).
 	summary := types.DiffSummary{
 		"step_index": stepIndex,
+		"mod_type":   "mod", // Identifies this diff as a main mod step diff.
 		"exit_code":  result.ExitCode,
 		"timings": map[string]interface{}{
 			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),

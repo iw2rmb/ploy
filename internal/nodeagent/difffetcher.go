@@ -12,6 +12,11 @@ import (
 // DiffFetcher fetches diffs from the control-plane server.
 // This is the symmetric counterpart to DiffUploader, enabling nodes to download
 // gzipped patches for workspace rehydration during multi-step Mods runs.
+//
+// C2: The fetcher retrieves all diffs (mod + healing) for rehydration. Each diff
+// has a step_index and mod_type in its summary. Rehydration applies diffs where
+// step_index <= k, which includes both mod diffs (mod_type="mod") and healing
+// diffs (mod_type="healing") from all steps up to and including step k.
 type DiffFetcher struct {
 	cfg    Config
 	client *http.Client
@@ -114,7 +119,14 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 // This is a convenience helper that combines ListRunDiffs and FetchDiffPatch to retrieve
 // the ordered set of patches needed to rehydrate a workspace for step k+1.
 //
+// C2: This function retrieves all diffs (mod + healing) where step_index <= stepIndex.
+// Both mod diffs (mod_type="mod") and healing diffs (mod_type="healing") are included,
+// enabling unified rehydration that replays the complete workspace state across all
+// execution steps (mods, healing, and gates). Future DAG mode will replace step_index
+// filter with "all ancestor stages" traversal.
+//
 // The returned slice contains gzipped patches in step order (step 0, 1, ..., stepIndex).
+// Within each step, diffs are ordered by created_at to preserve healing order.
 // Only diffs with non-nil step_index values are included (legacy aggregate diffs are excluded).
 func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex int32) ([][]byte, error) {
 	// Step 1: List all diffs for the run.

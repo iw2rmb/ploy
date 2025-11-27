@@ -18,13 +18,18 @@ import (
 )
 
 // diffItem represents a single diff in a list response.
+//
+// C2: Each diff is tagged with step_index and mod_type to enable unified rehydration.
+// - step_index: 0-based step number for ordering; same index for mod + healing diffs.
+// - mod_type: "mod" for main mod diffs, "healing" for healing diffs (in summary).
+// Rehydration queries fetch all diffs where step_index <= k, including healing diffs.
 type diffItem struct {
 	ID        string                  `json:"id"`
 	StageID   string                  `json:"stage_id"`
 	StepIndex *int32                  `json:"step_index,omitempty"` // step identity for multi-step runs (0-based)
 	CreatedAt time.Time               `json:"created_at"`
 	Size      int                     `json:"gzipped_size"`
-	Summary   domaintypes.DiffSummary `json:"summary,omitempty"`
+	Summary   domaintypes.DiffSummary `json:"summary,omitempty"` // Contains mod_type, step_index, timings.
 }
 
 // diffListResponse is the typed response for listing diffs.

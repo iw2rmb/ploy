@@ -257,6 +257,33 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			wantCount: 2, // Exclude legacy diff.
 			wantErr:   false,
 		},
+		{
+			// C2: Healing diffs with the same step_index as mod diffs are included.
+			name:      "include healing diffs with same step_index",
+			runID:     "run-healing",
+			stepIndex: 1,
+			diffs: []diffListItem{
+				// Step 0: mod + healing.
+				{ID: "diff-0-mod", StepIndex: ptrInt32(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-0-heal", StepIndex: ptrInt32(0), Summary: map[string]any{"mod_type": "healing"}},
+				// Step 1: mod + healing (2 attempts).
+				{ID: "diff-1-mod", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-1-heal1", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
+				{ID: "diff-1-heal2", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
+				// Step 2: mod (not included).
+				{ID: "diff-2-mod", StepIndex: ptrInt32(2), Summary: map[string]any{"mod_type": "mod"}},
+			},
+			patches: map[string][]byte{
+				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
+				"diff-0-heal":  gzipBytesHelper(t, []byte("patch 0 heal")),
+				"diff-1-mod":   gzipBytesHelper(t, []byte("patch 1 mod")),
+				"diff-1-heal1": gzipBytesHelper(t, []byte("patch 1 heal 1")),
+				"diff-1-heal2": gzipBytesHelper(t, []byte("patch 1 heal 2")),
+				"diff-2-mod":   gzipBytesHelper(t, []byte("patch 2 mod")),
+			},
+			wantCount: 5, // Steps 0-1: 2 + 3 diffs (mod + healing each step).
+			wantErr:   false,
+		},
 	}
 
 	for _, tt := range tests {

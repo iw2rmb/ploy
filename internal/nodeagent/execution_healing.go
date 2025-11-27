@@ -126,9 +126,13 @@ type executionResult struct {
 // It enriches the diff summary with healing-specific metadata (mod_type, mod_index, healing_attempt)
 // to distinguish healing mod diffs from main mod diffs in the database.
 //
+// C2: Healing diffs are tagged with the same step_index as their parent mod step, enabling
+// unified rehydration that includes both mod and healing diffs. The mod_type="healing" field
+// distinguishes healing diffs from regular mod diffs when filtering is needed.
+//
 // This per-step diff capture enables multi-node rehydration where each node can reconstruct
 // the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
-func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID, workspace string, healResult step.Result, modIndex, healingAttempt int) {
+func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID, workspace string, healResult step.Result, modIndex, healingAttempt, stepIndex int) {
 	// Retrieve the diff generator from runtime components.
 	// Since healing reuses the same runner, we need to access the diff generator.
 	// The diff generator is initialized in initializeRuntime and reused across healing steps.
@@ -150,9 +154,13 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 	}
 
 	// Build diff summary with healing mod metadata for database storage.
-	// The mod_type field distinguishes healing mod diffs from main mod diffs.
-	// The mod_index and healing_attempt fields enable ordering and rehydration.
+	// C2: step_index + mod_type enable unified rehydration across mod and healing diffs.
+	// - step_index: Same as parent step, so rehydration queries include healing diffs.
+	// - mod_type: "healing" distinguishes from regular "mod" diffs for filtering.
+	// - mod_index: Index of healing mod within the healing config (for ordering within step).
+	// - healing_attempt: Retry iteration (1-based) for debugging and telemetry.
 	summary := types.DiffSummary{
+		"step_index":      stepIndex, // C2: Tag healing diff with parent step's index.
 		"mod_type":        "healing",
 		"mod_index":       modIndex,
 		"healing_attempt": healingAttempt,
@@ -173,14 +181,16 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 		return
 	}
 
-	// Healing mod diffs don't have a step_index (they are intermediate diffs within a step).
-	// Pass nil for step_index to indicate this is a healing diff, not a per-step diff.
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, nil); err != nil {
-		slog.Error("failed to upload healing mod diff", "run_id", runID, "mod_index", modIndex, "error", err)
+	// C2: Pass step_index so healing diffs are included in rehydration queries.
+	// Healing diffs use the same step_index as their parent mod step, enabling
+	// unified rehydration that fetches all diffs (mod + healing) up to step k.
+	stepIdx := int32(stepIndex)
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
+		slog.Error("failed to upload healing mod diff", "run_id", runID, "mod_index", modIndex, "step_index", stepIndex, "error", err)
 		return
 	}
 
-	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "size", len(diffBytes))
+	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
 }
 
 // runGateWithHealing executes the build gate with optional healing loop when validation fails.
@@ -197,6 +207,7 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 //   - outDir: Path to the /out directory for artifacts.
 //   - inDir: Pointer to the /in directory path; created if empty and healing is triggered.
 //   - gatePhase: "pre" or "post" to indicate which gate phase is executing.
+//   - stepIndex: 0-based step number for tagging healing diffs (C2: stage+diff model).
 //
 // ## Returns
 //
@@ -213,7 +224,7 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 //     b. Write /in/build-gate.log for healer inspection
 //     c. For each retry attempt:
 //     - Execute each healing mod in sequence
-//     - Upload healing mod diffs for rehydration
+//     - Upload healing mod diffs for rehydration (tagged with stepIndex per C2)
 //     - Re-run gate after healing mods complete
 //     - If gate passes, return success
 //     d. If all retries exhausted, return ErrBuildGateFailed
@@ -237,6 +248,7 @@ func (r *runController) runGateWithHealing(
 	workspace, outDir string,
 	inDir *string,
 	gatePhase string, // "pre" or "post"
+	stepIndex int, // C2: step number for healing diff tagging
 ) (*gateRunMetadata, []gateRunMetadata, error) {
 	// Resolve gate spec from manifest (with backward compat for deprecated Shift field).
 	gateSpec := manifest.Gate
@@ -414,7 +426,8 @@ func (r *runController) runGateWithHealing(
 			}
 
 			// Per-step diff capture: Generate and upload diff after each healing mod step.
-			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt)
+			// C2: Pass stepIndex so healing diffs are included in rehydration queries.
+			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt, stepIndex)
 
 			// Read Codex session and sentinel artifacts from /out for session propagation.
 			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {
@@ -554,8 +567,9 @@ func (r *runController) executeWithHealing(
 	// Phase G: Run pre-mod gate via runGateWithHealing (not via Runner.Run).
 	// This centralizes all gate execution in runGateWithHealing, ensuring gate failures
 	// are handled uniformly with healing support. Runner.Run is reserved for container execution.
+	// C2: Pass stepIndex so healing diffs are tagged with the correct step.
 	preGate, preReGates, preGateErr := r.runGateWithHealing(
-		ctx, runner, req, manifest, workspace, outDir, inDir, "pre",
+		ctx, runner, req, manifest, workspace, outDir, inDir, "pre", stepIndex,
 	)
 
 	// Build the initial ReGates slice from any pre-mod healing attempts.
@@ -629,9 +643,10 @@ func (r *runController) executeWithHealing(
 	// Run post-mod gate only if main mod succeeded (ExitCode == 0).
 	// This validates the workspace after modifications using the same healing behavior
 	// as pre-mod gates, keeping gate orchestration consistent.
+	// C2: Pass stepIndex so post-gate healing diffs are tagged with the correct step.
 	if result.ExitCode == 0 {
 		postGate, postReGates, postErr := r.runGateWithHealing(
-			ctx, runner, req, manifest, workspace, outDir, inDir, "post",
+			ctx, runner, req, manifest, workspace, outDir, inDir, "post", stepIndex,
 		)
 		// Append initial post-gate run to history.
 		if postGate != nil {
