@@ -25,7 +25,7 @@ Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match examples.
 - Coordinates are passed via environment only (no JSON manifest support in mod-orw): set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
-- The Codex healer now uses the **sentinel protocol**: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]` when ready. The node agent then re-runs the Build Gate externally. Codex no longer calls `buildgate-validate` directly.
+- The Codex healer now uses the **sentinel protocol**: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]` when ready. The node agent then re-runs the Build Gate externally. Codex no longer invokes Build Gate tooling directly from inside the container.
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
@@ -90,8 +90,6 @@ Healing verification aligns with the HTTP Build Gate API's repo+diff model:
 
 The recommended approach for Codex-based healing is the sentinel protocol. Codex edits the workspace and, when ready for validation, emits `[[REQUEST_BUILD_VALIDATION]]` as its final message. The node agent re-runs the Build Gate externally after healing completes; the sentinel keeps Codex focused on fixing code while the control plane handles validation.
 
-Legacy healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
-
 **Codex Healing Handshake Checklist (TDD Validation):**
 
 Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifacts should be validated after Codex-based healing runs:
@@ -138,7 +136,7 @@ Cross-reference: `ROADMAP.md` Phase D, `GOLANG.md` Codex Healing Pipeline sectio
 **Generating diff patches for Build Gate verification (legacy healers only):**
 
 > NOTE: For Codex-based healing, use the **sentinel protocol** instead (see above).
-> Codex should NOT call `buildgate-validate` directly—it edits the workspace and
+> Codex should NOT invoke Build Gate tooling directly—it edits the workspace and
 > emits `[[REQUEST_BUILD_VALIDATION]]`; the node agent handles gate execution.
 
 Legacy (non-Codex) healing mods may optionally generate unified diff patches and
@@ -150,18 +148,7 @@ shipping full workspace archives over HTTP:
    cd /workspace && git diff > /out/heal.patch
    ```
 
-2. Call `buildgate-validate` with `--diff-patch` to verify via the HTTP API:
-   ```bash
-   buildgate-validate \
-     --repo-url "$PLOY_REPO_URL" \
-     --ref "$PLOY_BUILDGATE_REF" \
-     --profile auto \
-     --diff-patch /out/heal.patch
-   ```
-
-3. The Build Gate clones repo_url at ref, applies the diff patch, and runs the build.
-
-The system re-runs the gate regardless of in-container verification results.
+2. Optionally call the Build Gate HTTP API directly (for non-Codex healers) using the injected `PLOY_*` env vars if you need mid-healing verification.
 
 Example healing spec block (sentinel protocol):
 ```yaml
@@ -200,7 +187,7 @@ What to verify:
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the sentinel protocol, Codex no longer calls `buildgate-validate`—it simply emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent handles the actual gate execution.
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the sentinel protocol, Codex simply emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent handles the actual gate execution.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference

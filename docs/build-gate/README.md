@@ -83,8 +83,8 @@ Notes
 
 Healing Container Environment
 
-Healing containers that need to call the Build Gate HTTP API directly (e.g., via `buildgate-validate`)
-receive the following environment variables from the node agent:
+Healing containers that need to call the Build Gate HTTP API directly receive the following
+environment variables from the node agent:
 
 - `PLOY_REPO_URL` — Git repository URL (same as the Mods run)
 - `PLOY_BASE_REF` — Base Git reference (branch or tag) for the run
@@ -94,10 +94,5 @@ receive the following environment variables from the node agent:
 - `PLOY_HOST_WORKSPACE` — Host filesystem path to workspace for in-container tooling
 - `PLOY_API_TOKEN` — Bearer token for Build Gate API authentication when configured. On TLS-disabled
   local stacks the node agent may derive this from the worker bearer token file to simplify testing.
-
-The `buildgate-validate` CLI wrapper (external helper script, e.g., `scripts/buildgate-validate.sh`) accepts `--repo-url` and `--ref` flags
-or reads from `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF` environment variables. When using the node-injected
-env vars, set `PLOY_BUILDGATE_REF="$PLOY_BASE_REF"` (or use `$PLOY_COMMIT_SHA` if pinned) in your healing
-mod command to map the node-provided baseline to the wrapper's expected variable.
 
 See `docs/envs/README.md` for the complete environment variable reference.

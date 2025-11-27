@@ -81,7 +81,7 @@ Legend: [ ] todo, [x] done.
     - Reuse the existing diff generator used by `uploadHealingModDiff` (`r.createDiffGenerator()` in `internal/nodeagent/execution_healing.go`) to produce a unified diff of the workspace vs the baseline ref.
     - Introduce a helper, e.g. `buildGateDiffForWorkspace(ctx, workspace, baseline)` that:
       - Generates a diff in unified format.
-      - Gzips + base64 encodes it as expected by `BuildGateValidateRequest.diff_patch` (see `docker/mods/mod-codex/buildgate-validate.sh` for reference).
+      - Gzips + base64 encodes it as expected by `BuildGateValidateRequest.diff_patch`.
     - Wire this helper into `gate_http.go`:
       - Before sending the HTTP request, compute `diff_patch` for:
         - Initial gate (if any uncommitted changes already exist in workspace).
@@ -176,4 +176,3 @@ Legend: [ ] todo, [x] done.
     - Verify via logs and DB inspection that:
       - Build Gate jobs move through the new job workflow.
       - Mods steps and gates can land on different VPS nodes while producing the same observable behavior as the local-docker baseline.
-
