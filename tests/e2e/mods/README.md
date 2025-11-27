@@ -25,7 +25,7 @@ Notes:
 - Directory→repo mapping: `mod-foo` (folder) corresponds to registry repo `ploy/mods-foo`. Special-case: `mod-orw` maps to `ploy/mods-openrewrite` to match examples.
 - Coordinates are passed via environment only (no JSON manifest support in mod-orw): set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (and optional `MAVEN_PLUGIN_VERSION`).
 - The LLM image is a safe E2E stub: when it sees the sample’s failing branch, it creates `src/main/java/e2e/UnknownClass.java` to fix the compile.
-- The Codex healer image includes `buildgate-validate`; when run inside healing, it can self‑verify by calling the buildgate API using credentials injected by the node agent. The system re‑runs the Build Gate regardless.
+- The Codex healer now uses the **sentinel protocol**: Codex edits the workspace and emits `[[REQUEST_BUILD_VALIDATION]]` when ready. The node agent then re-runs the Build Gate externally. Codex no longer calls `buildgate-validate` directly.
 
 See also:
 - `docs/how-to/publish-mods.md` for end-to-end Mods image publishing via CLI.
@@ -86,7 +86,11 @@ Healing verification aligns with the HTTP Build Gate API's repo+diff model:
   The in-process re-gate avoids network overhead since the workspace already contains the modified state.
 - **Diff chain**: Workspace state equals base clone + ordered diff sequence. This matches Mods multi-step execution where each step's changes can be replayed for rehydration.
 
-Healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
+**Sentinel Protocol (Codex healing):**
+
+The recommended approach for Codex-based healing is the sentinel protocol. Codex edits the workspace and, when ready for validation, emits `[[REQUEST_BUILD_VALIDATION]]` as its final message. The node agent detects this sentinel and re-runs the Build Gate externally. This separates concerns: Codex focuses on fixing code; the control plane handles validation.
+
+Legacy healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
 
 **Cross-phase inputs available to healing mods:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
@@ -119,24 +123,24 @@ for verification. This avoids shipping full workspace archives over HTTP:
 
 3. The Build Gate clones repo_url at ref, applies the diff patch, and runs the build.
 
-Example healing spec block:
+Example healing spec block (sentinel protocol):
 ```yaml
 build_gate_healing:
   retries: 1
   mods:
     - image: docker.io/you/mods-codex:latest
-      command: ["mod-codex", "--input", "/workspace", "--out", "/out"]
       env:
         CODEX_PROMPT: |-
           Rules:
-          - After making any change, generate a unified diff and verify the build.
-          - Generate diff: cd /workspace && git diff > /out/heal.patch
-          - Run: buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch
-          - If it fails, iterate and try again until it passes.
-          - Only finalize once the gate passes; then print "BUILD PASSED".
+          - Use /workspace and /in/build-gate.log to understand the compile error.
+          - Edit files under /workspace as needed to fix the error.
+          - Do NOT run buildgate-validate or any build commands yourself.
+          - When you believe the code is ready for a full build validation, reply with exactly:
+            [[REQUEST_BUILD_VALIDATION]]
+            as your final message and then stop.
 
           Task:
-          Fix the build error in /in/build-gate.log
+          Fix the compilation error described in /in/build-gate.log.
       env_from_file:
         CODEX_AUTH_JSON: ~/.codex/auth.json
 ```
@@ -153,11 +157,11 @@ Run the failing→healing scenario with a single script:
     - `--follow --artifact-dir ./tmp/mods/scenario-orw-fail/<ts>`
 
 What to verify:
-- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with an embedded verification rule to call the Build Gate API via `buildgate-validate`, re‑gate passes, ORW proceeds.
+- First Build Gate fails (Maven compile error), healing runs using `mods-codex` with the sentinel protocol—Codex emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent re-runs the Build Gate, then ORW proceeds.
 
 **Notes**
 
-When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. The Build Gate verification inside Codex uses `buildgate-validate` which calls the ploy server's Build Gate HTTP API using `repo_url` + `ref` and an optional `diff_patch` (repo+diff model), instead of uploading full workspace archives.
+When `mods-codex` runs inside the repository directory (`/workspace`), it uses the mounted repo directly; no separate repo path is required for Codex itself. With the sentinel protocol, Codex no longer calls `buildgate-validate`—it simply emits `[[REQUEST_BUILD_VALIDATION]]` and the node agent handles the actual gate execution.
 
 Cross-phase inputs are mounted at `/in` (read-only):
 - `/in/build-gate.log` — First Build Gate failure log, available for healing mods to reference
