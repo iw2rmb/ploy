@@ -53,7 +53,7 @@ Legend: [ ] todo, [x] done.
       - Assert disabled spec returns `nil,nil`.
     - Run: `go test ./internal/workflow/runtime/step -run TestHTTPGateExecutor_Sync`.
 
-- [ ] B3 — Async job polling for HTTPGateExecutor — Support pending jobs via `GetJob` polling.
+- [x] B3 — Async job polling for HTTPGateExecutor — Support pending jobs via `GetJob` polling.
   - Component: `internal/workflow/runtime/step/gate_http.go`.
   - Scope:
     - Extend `Execute` so when `Validate` returns `Status=BuildGateJobStatusPending`:
