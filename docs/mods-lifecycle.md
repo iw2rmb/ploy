@@ -163,6 +163,8 @@ Key invariants:
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
 - Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).
 - Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
+- **Build Gate execution paths**: See `docs/build-gate/README.md` section "Build Gate
+  Execution Paths" for details on local docker vs HTTP API execution models.
 
 ## 2. Data Model
 
