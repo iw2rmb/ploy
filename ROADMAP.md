@@ -21,86 +21,104 @@ Legend: [ ] todo, [x] done.
   - Test: `rg "Build Gate execution paths" docs -n` — Confirm the new section exists and is consistent; run `make test` to ensure no doc-related tests break.
 
 ## Phase B — Introduce a Build Gate HTTP client adapter in workflow layer
-- [ ] Add a GateExecutor implementation that calls the HTTP Build Gate API — Bridge `step.GateExecutor` to the `/v1/buildgate/validate` repo+diff API.
-  - Component: `internal/workflow/runtime/step`.
+- [ ] B1 — HTTP client wrapper for Build Gate API — Typed client for `/v1/buildgate/validate` + job polling.
+  - Component: `internal/workflow/runtime/step/gate_http_client.go`, `internal/workflow/runtime/step/gate_iface.go`.
   - Scope:
-    - Add a new file, e.g. `internal/workflow/runtime/step/gate_http.go`, implementing `GateExecutor` with:
-      - Config for `BuildGateServerURL` and optional `PLOY_API_TOKEN` / TLS paths (reuse envs documented in `docs/envs/README.md`).
-      - `Execute(ctx, spec, workspace)` that:
-        - Builds a `contracts.BuildGateValidateRequest` with:
-          - `repo_url`, `ref` from the step manifest or run options (must be threaded through from `StartRunRequest`).
-          - `profile` and `timeout` from `spec.Profile` and a default (e.g., `PLOY_BUILDGATE_TIMEOUT`).
-          - `diff_patch` derived from the current workspace diff vs baseline (see Phase C).
-        - Issues `POST /v1/buildgate/validate` to `BuildGateServerURL`.
-        - Handles both sync and async responses:
-          - If `result` is present, decode into `contracts.BuildGateStageMetadata`.
-          - If only `job_id` + `status=pending` is returned, poll `GET /v1/buildgate/jobs/{id}` until terminal.
-      - Returns `BuildGateStageMetadata` and error semantics matching `dockerGateExecutor`.
-    - Keep `NewDockerGateExecutor` unchanged for now; `gate_http.go` is added but not yet wired.
+    - In `gate_iface.go`, add:
+      - `type BuildGateHTTPClient interface {`
+      - `  Validate(ctx context.Context, req contracts.BuildGateValidateRequest) (*contracts.BuildGateValidateResponse, error)`
+      - `  GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error)`
+      - `}`.
+    - Implement `BuildGateHTTPClient` in `gate_http_client.go` using `*http.Client`, `PLOY_SERVER_URL`, `PLOY_API_TOKEN`, TLS envs (reuse `createHTTPClient` patterns from node agent).
+    - Encode/decode `contracts.BuildGateValidateRequest` / `BuildGateValidateResponse` and `BuildGateJobStatusResponse`.
   - Test:
-    - Add unit tests in `internal/workflow/runtime/step/gate_http_test.go`:
-      - Mock HTTP client responding with:
-        - Immediate completion (`status=completed`, `result` present).
-        - Async completion via job polling.
-        - Error cases (400 validation error, 500 store error).
-      - Assert that `Execute` returns a populated `BuildGateStageMetadata` and propagates failure when `passed=false`.
-    - Run `GOFLAGS=${GOFLAGS:-} go test ./internal/workflow/runtime/step -run TestHTTPGate*`.
+    - Add `internal/workflow/runtime/step/gate_http_client_test.go`:
+      - Fake `http.RoundTripper` to assert `POST /v1/buildgate/validate` and `GET /v1/buildgate/jobs/{id}`.
+    - Run: `go test ./internal/workflow/runtime/step -run TestBuildGateHTTPClient`.
 
-- [ ] Make GateExecutor pluggable between docker and HTTP modes — Allow configuration-driven selection.
-  - Component: workflow runtime initialization (`internal/workflow/runtime/...`), node agent config.
+- [ ] B2 — HTTPGateExecutor skeleton wired to client — Minimal GateExecutor that calls the HTTP client (sync only).
+  - Component: `internal/workflow/runtime/step/gate_http.go`.
   - Scope:
-    - In the runtime initialization (currently where `NewDockerGateExecutor` is wired into `step.Runner`), add configuration:
-      - `PLOY_BUILDGATE_MODE` env or config value with allowed values: `local-docker`, `remote-http`.
-    - When `PLOY_BUILDGATE_MODE=remote-http`:
-      - Construct `gate := NewHTTPGateExecutor(...)` instead of `NewDockerGateExecutor`.
-    - Ensure fallback:
-      - If `PLOY_BUILDGATE_MODE` is unset or invalid, default to the current docker gate behavior to avoid regressing existing clusters.
+    - Define:
+      - `type HTTPGateExecutor struct { client BuildGateHTTPClient }`.
+      - `func NewHTTPGateExecutor(client BuildGateHTTPClient) GateExecutor`.
+    - Implement `Execute(ctx, spec, workspace)` with:
+      - Early return `nil, nil` when `spec==nil` or `!spec.Enabled` (mirror `dockerGateExecutor`).
+      - Build a minimal `contracts.BuildGateValidateRequest` (temporary: only `Profile`/`Timeout`, repo+diff wired in Phase C).
+      - Call `client.Validate`.
+      - If `resp.Result != nil`, return it; if `resp.Status==BuildGateJobStatusPending`, return a TODO error (`"async jobs not supported yet"`).
   - Test:
-    - Extend `internal/workflow/runtime/step/runner_gate_test.go` to cover:
-      - A runner constructed with HTTP gate mode calls the new executor.
-      - A runner constructed with docker gate mode behaves exactly as before.
+    - Add `internal/workflow/runtime/step/gate_http_test.go`:
+      - Fake `BuildGateHTTPClient` returning immediate completion and pending status.
+      - Assert disabled spec returns `nil,nil`.
+    - Run: `go test ./internal/workflow/runtime/step -run TestHTTPGateExecutor_Sync`.
+
+- [ ] B3 — Async job polling for HTTPGateExecutor — Support pending jobs via `GetJob` polling.
+  - Component: `internal/workflow/runtime/step/gate_http.go`.
+  - Scope:
+    - Extend `Execute` so when `Validate` returns `Status=BuildGateJobStatusPending`:
+      - Poll `GetJob` until `Status` is `BuildGateJobStatusCompleted`/`Failed` or context timeout.
+      - Use timeout from `spec` or `PLOY_BUILDGATE_TIMEOUT` env.
+      - Return `Result` on completed; return error on failed or timeout.
+  - Test:
+    - Extend `gate_http_test.go`:
+      - Fake client that returns `Pending` then `Completed` with `Result`.
+      - Fake client returning `Failed` with error string.
+      - Context timeout case.
+    - Run: `go test ./internal/workflow/runtime/step -run TestHTTPGateExecutor_Async`.
+
+- [ ] B4 — Make GateExecutor pluggable between docker and HTTP modes — Configuration-driven selection.
+  - Component: workflow runtime initialization (`internal/workflow/runtime/...`), node agent runtime wiring.
+  - Scope:
+    - Add factory:
+      - `func NewGateExecutor(mode string, rt ContainerRuntime, httpClient BuildGateHTTPClient) GateExecutor`.
+      - `mode==""` or `"local-docker"` → `NewDockerGateExecutor(rt)`.
+      - `mode=="remote-http"` → `NewHTTPGateExecutor(httpClient)`.
+    - In runtime initialization (where `step.Runner` is built in `internal/nodeagent/execution_orchestrator.go`), read `PLOY_BUILDGATE_MODE` (or config) and call `NewGateExecutor`.
+    - Keep default behavior (`local-docker`) when mode is unset/invalid.
+  - Test:
+    - Extend `internal/workflow/runtime/step/runner_gate_test.go`:
+      - Runner with `mode="remote-http"` uses HTTP executor (fake client).
+      - Runner with `mode=""` or `"local-docker"` uses `dockerGateExecutor`.
+    - Run: `go test ./internal/workflow/runtime/step -run TestNewGateExecutor`.
 
 ## Phase C — Define repo+diff inputs for gate from Mods runs
-- [ ] Thread repo metadata into step manifests for gate — Ensure GateExecutor has `repo_url` and `ref`.
+- [ ] C1 — Thread repo metadata into step manifests for gate — Ensure GateExecutor has `repo_url` and `ref`.
   - Component: `internal/nodeagent/manifest.go`, `internal/nodeagent/run_options.go`, `internal/workflow/contracts`.
   - Scope:
-    - Verify that `StartRunRequest` already carries `RepoURL`, `BaseRef`, `TargetRef`, `CommitSHA` (used by healing). Confirm these fields are accessible where the runtime is initialized.
-    - Extend `contracts.StepManifest` and/or gate spec options to carry:
-      - `RepoURL` and `BuildGateRef` (choose `BaseRef` or `CommitSHA` per docs in `docs/build-gate/README.md`).
-    - When building the main step manifest and gate spec in the node agent:
-      - Populate these fields from `StartRunRequest`.
-    - In `gate_http.go`, read this data to construct `BuildGateValidateRequest.repo_url` and `.ref`.
+    - Verify `StartRunRequest` exposes `RepoURL`, `BaseRef`, `TargetRef`, `CommitSHA` where runtime is initialized.
+    - Extend `contracts.StepManifest` and/or gate options to carry:
+      - `RepoURL` and `BuildGateRef` (decide `BaseRef` vs `CommitSHA` per `docs/build-gate/README.md`).
+    - When building manifests and gate spec in node agent, populate these fields from `StartRunRequest`.
+    - In `gate_http.go`, read this data to set `BuildGateValidateRequest.RepoURL` and `.Ref`.
   - Test:
-    - Add tests in `internal/nodeagent/manifest_test.go` to assert:
-      - Step manifests and gate spec contain the expected repo metadata for a Mods run.
-    - Run `go test ./internal/nodeagent -run TestManifestBuildWithGateRepoMeta`.
+    - Extend `internal/nodeagent/manifest_test.go`:
+      - Asserts step manifests and gate spec contain expected repo metadata.
+    - Run: `go test ./internal/nodeagent -run TestManifestBuildWithGateRepoMeta`.
 
-- [ ] Treat every execution step as a stage + diff — Unify Mods, healing, and Build Gate around stages and diffs.
+- [ ] C2 — Treat every execution step as a stage + diff — Unify Mods, healing, and Build Gate around stages and diffs.
   - Component: `SCHEMA.sql`, `internal/store/diffs.sql.go`, `internal/server/handlers/handlers_diffs.go`, `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/difffetcher.go`.
   - Scope:
-    - Use `stages` as the canonical “step/node” table:
-      - Each execution unit (pre-run gate, healing, mod, post-gate, future nodes) must have a `stages` row with:
-        - `stages.run_id`
-        - `stages.id` (stage_id used everywhere)
-        - `stages.name` and/or `stages.meta.type` (e.g., `"pre_gate"`, `"mod"`, `"post_gate"`, `"healing"`).
-        - `stages.meta.step_index` for linear Mods ordering (or DAG metadata later).
-    - Ensure every diff emitted during Mods execution (mod or healing) is:
-      - Stored with `diffs.run_id` and **non-null** `diffs.stage_id` (no more anonymous healing diffs).
-      - Tagged in `diffs.summary` with:
-        - `step_index` (matches `stages.meta.step_index` when applicable).
-        - `mod_type` (e.g., `"mod"`, `"healing"`, `"pre_gate"`, `"post_gate"`).
-    - Update rehydration logic to use stages + diffs consistently:
-      - For the current linear model: `rehydrateWorkspaceForStep(stepIndex=k)` must:
-        - Fetch all diffs where `summary.step_index <= k` (including healing) and apply them in `created_at` order.
-      - For future DAG execution: replace the `step_index` filter with “all diffs belonging to ancestor stages of the target stage”.
-    - Keep this model as the single source of truth for both Mods rehydration and repo+diff inputs to Build Gate.
+    - Use `stages` as canonical “step/node” table:
+      - Each execution unit (pre-run gate, healing, mod, post-gate, future nodes) has a `stages` row with:
+        - `run_id`, `id` (stage_id), `name`, `meta.type` (`"pre_gate"`, `"mod"`, `"post_gate"`, `"healing"`), `meta.step_index`.
+    - Ensure every diff emitted during execution:
+      - Stores non-null `diffs.stage_id` and `diffs.run_id`.
+      - Tags `diffs.summary` with `step_index` and `mod_type` (`"mod"`, `"healing"`, `"pre_gate"`, `"post_gate"`).
+    - Update rehydration logic so `rehydrateWorkspaceForStep(stepIndex=k)`:
+      - Fetches all diffs where `summary.step_index <= k` (mods + healing) and applies them in `created_at` order.
+      - Notes future DAG mode will replace `step_index` filter with “all ancestor stages”.
+    - Keep this model as the single source of truth for Mods rehydration and repo+diff inputs to Build Gate.
   - Test:
-    - Extend `internal/store/diffs_step_index_test.go` to assert:
-      - Diffs are ordered by `step_index` then `created_at`.
-      - Healing diffs with a stage_id and step_index are included in queries that drive rehydration.
-    - Extend `internal/nodeagent/difffetcher_test.go` and `tests/integration/smoke_workflow_test.go` to verify:
-      - `FetchDiffsForStep` includes all diffs (mods + healing) up to the target step.
-      - Rehydrated workspaces match a single-node execution.
+    - Extend `internal/store/diffs_step_index_test.go`:
+      - Asserts ordering by `step_index` then `created_at`, includes healing diffs.
+    - Extend `internal/nodeagent/difffetcher_test.go`, `tests/integration/smoke_workflow_test.go`:
+      - `FetchDiffsForStep` includes all diffs (mods + healing) up to target step.
+      - Rehydrated workspaces match single-node execution.
+    - Run:
+      - `go test ./internal/store -run TestDiffsStepIndex`.
+      - `go test ./internal/nodeagent -run TestDiffFetcher`.
+      - `go test ./tests/integration -run TestSmokeWorkflow`.
 
 ## Phase D — Switch Mods pre‑gate and re‑gate to HTTP Build Gate API
 - [ ] Route main pre-mod Build Gate calls through the HTTP adapter — Allow gate to run on any Build Gate worker.
@@ -136,25 +154,43 @@ Legend: [ ] todo, [x] done.
       - Verify that after a healing attempt, the re‑gate path uses the HTTP-based gate rather than direct docker execution.
 
 ## Phase E — Node workers that execute Build Gate jobs
-- [ ] Implement Build Gate worker loop on nodes — Let nodes claim and execute HTTP Build Gate jobs via docker.
-  - Component: `internal/nodeagent` (new worker), `internal/workflow/runtime/step/gate_docker.go`.
+- [ ] E1 — Gate worker enable flag in node config — Control which nodes run Build Gate jobs.
+  - Component: `internal/nodeagent/config.go`, node config YAML/docs.
   - Scope:
-    - Add a new node-side controller or worker loop that:
-      - Periodically calls `POST /v1/nodes/{id}/buildgate/claim` to claim jobs (`handlers_buildgate.go` → `ClaimBuildGateJob`).
-      - For each claimed job:
-        - ACK start via `POST /v1/nodes/{id}/buildgate/{job_id}/ack`.
-        - Execute gate locally using `dockerGateExecutor`:
-          - Clone `repo_url@ref` into a fresh temp `/workspace`.
-          - If `diff_patch` is present, decode, decompress, and apply via `git apply`.
-          - Run the profile-specific commands as in `gate_docker.go`.
-        - Submit completion via `POST /v1/nodes/{id}/buildgate/{job_id}/complete` with `status` and `result`.
-    - Ensure this worker loop is optional and controlled by config:
-      - e.g., `PLOY_BUILDGATE_WORKER_ENABLED=true` for nodes designated as gate workers.
+    - Extend `Config` with `BuildGateWorkerEnabled bool "yaml:\"buildgate_worker_enabled\""` (or similar).
+    - In `LoadConfig`, default `BuildGateWorkerEnabled` when unset.
+    - Document mapping from `buildgate_worker_enabled` and/or `PLOY_BUILDGATE_WORKER_ENABLED` env in `docs/envs/README.md`.
   - Test:
-    - Add tests for the worker loop wiring in `internal/nodeagent` (using a fake store or HTTP client) to verify:
-      - Jobs transition through `pending` → `claimed` → `running` → `completed`/`failed`.
-      - Errors in docker execution are surfaced as `BuildgateJobStatusFailed` with an error message.
-    - Manual/local: run a small stack with one control plane and two workers, one designated as a Build Gate worker, and verify jobs can be executed on either.
+    - Add `internal/nodeagent/config_test.go`:
+      - Parse YAML with and without `buildgate_worker_enabled` and assert defaults.
+    - Run: `go test ./internal/nodeagent -run TestLoadConfig`.
+
+- [ ] E2 — Condition claim loop on worker flag — Only enabled nodes claim Build Gate jobs.
+  - Component: `internal/nodeagent/claimer_loop.go`.
+  - Scope:
+    - In `claimWork`, guard Build Gate claim:
+      - When `cfg.BuildGateWorkerEnabled` is true, call `claimAndExecuteBuildGateJob`.
+      - When false, skip straight to `claimAndExecute` (runs only).
+  - Test:
+    - Add/extend `internal/nodeagent/claimer_loop_test.go`:
+      - Fake `ClaimManager` with `BuildGateWorkerEnabled=false` and injected fakes for claim methods; assert only run-claim path executes.
+    - Run: `go test ./internal/nodeagent -run TestClaimWork`.
+
+- [ ] E3 — Worker loop wiring and smoke coverage — Ensure nodes execute claimed Build Gate jobs end-to-end.
+  - Component: `internal/nodeagent/claimer_buildgate.go`, node agent entrypoint, docs.
+  - Scope:
+    - Confirm `ClaimManager.Start` is used for all nodes and Build Gate jobs flow:
+      - `claimAndExecuteBuildGateJob` → `BuildGateExecutor.Execute` → `/buildgate/{job_id}/complete`.
+    - Update `docs/build-gate/README.md` and `docs/envs/README.md`:
+      - Explain how to designate Build Gate worker nodes via config/env.
+      - Note that non-worker nodes will not claim Build Gate jobs.
+  - Test:
+    - Manual/local:
+      - Run two-node lab:
+        - Node A: `buildgate_worker_enabled=true`.
+        - Node B: `buildgate_worker_enabled=false`.
+      - Submit Build Gate job; verify only Node A logs `claimed buildgate job`.
+      - Submit Mods run; verify either node can claim it.
 
 ## Phase F — Update specs, docs, and E2E tests
 - [ ] Update Mods and Build Gate documentation to reflect the new architecture — Make repo+diff and remote execution the primary story.
