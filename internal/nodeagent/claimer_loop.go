@@ -57,18 +57,23 @@ func (c *ClaimManager) Start(ctx context.Context) error {
 
 // claimWork attempts to claim either a run or a buildgate job.
 // Tries buildgate jobs first (lighter weight), then falls back to runs.
+// Build Gate job claiming is gated by cfg.BuildGateWorkerEnabled; when false,
+// only regular run claims are attempted.
 // Returns true if work was claimed, false if no work is available.
 func (c *ClaimManager) claimWork(ctx context.Context) (bool, error) {
-	// Try claiming a buildgate job first.
-	claimedBuildGate, err := c.claimAndExecuteBuildGateJob(ctx)
-	if err != nil {
-		return false, fmt.Errorf("claim buildgate job: %w", err)
-	}
-	if claimedBuildGate {
-		return true, nil
+	// Only attempt Build Gate job claim when the worker flag is enabled.
+	// Nodes with BuildGateWorkerEnabled=false skip straight to run claims.
+	if c.cfg.BuildGateWorkerEnabled {
+		claimedBuildGate, err := c.claimAndExecuteBuildGateJob(ctx)
+		if err != nil {
+			return false, fmt.Errorf("claim buildgate job: %w", err)
+		}
+		if claimedBuildGate {
+			return true, nil
+		}
 	}
 
-	// If no buildgate job available, try claiming a run.
+	// Try claiming a run (always attempted regardless of worker flag).
 	claimedRun, err := c.claimAndExecute(ctx)
 	if err != nil {
 		return false, fmt.Errorf("claim run: %w", err)
