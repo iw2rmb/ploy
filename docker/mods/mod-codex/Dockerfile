@@ -4,12 +4,14 @@ ARG NODE_IMAGE=node:20-alpine
 FROM ${NODE_IMAGE}
 
 LABEL org.opencontainers.image.title="mod-codex" \
-      org.opencontainers.image.description="Ploy Mods: Codex CLI wrapper" \
-      org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
-      org.opencontainers.image.licenses="Apache-2.0"
+    org.opencontainers.image.description="Ploy Mods: Codex CLI wrapper" \
+    org.opencontainers.image.source="https://github.com/iw2rmb/ploy" \
+    org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apk add --no-cache bash git ca-certificates curl jq && \
-    npm install -g @openai/codex && \
+    npm install -g @openai/codex \
+    && npm cache clean --force \
+    && rm -rf /root/.npm /tmp/* \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
     chmod 700 /root/.codex && \
     chmod 755 /etc/ploy/certs
@@ -27,7 +29,7 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
-# Copy only the mod-codex entrypoint; buildgate-validate is NOT included
+# Copy only the mod-codex entrypoint; no Build Gate helper binary is included
 # to prevent Codex from running the gate inside the container. Build Gate
 # verification is performed externally by Ploy (docker gate) or the
 # Build Gate HTTP API.

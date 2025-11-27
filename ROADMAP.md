@@ -33,31 +33,30 @@ Legend: [ ] todo, [x] done.
                 Task:
                 Fix the compilation error described in /in/build-gate.log.
       ```
-  - Test: `bash tests/e2e/mods/scenario-orw-fail/run.sh` and `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh` — Logs show Codex producing `[[REQUEST_BUILD_VALIDATION]]` and no in-container `buildgate-validate` calls; Build Gate still re-runs and the scenarios pass.
+  - Test: `bash tests/e2e/mods/scenario-orw-fail/run.sh` and `bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh` — Logs show Codex producing `[[REQUEST_BUILD_VALIDATION]]` and no in-container Build Gate helper calls; Build Gate still re-runs and the scenarios pass.
 
-- [x] Remove buildgate-validate usage from Codex-specific docs and examples — Keep documentation aligned with the new handshake.
+- [x] Remove buildgate-validate usage from Codex-specific docs and examples — Keep documentation aligned with the new handshake and externalize Build Gate execution.
   - Component: `tests/e2e/mods/README.md`, `docs/schemas/mod.example.yaml`, `docs/how-to/publish-mods.md`.
   - Scope:
-    - In `tests/e2e/mods/README.md`, replace the Codex healing example that calls `buildgate-validate` with a sentinel-based description: Codex edits the workspace, emits `[[REQUEST_BUILD_VALIDATION]]`, and the control plane re-runs the Build Gate.
+    - In `tests/e2e/mods/README.md`, replace the Codex healing example that called an in-container Build Gate helper with a sentinel-based description: Codex edits the workspace, emits `[[REQUEST_BUILD_VALIDATION]]`, and the control plane re-runs the Build Gate.
     - In `docs/schemas/mod.example.yaml`, adjust the `build_gate_healing` example to:
       - Remove explicit `buildgate-validate` commands.
       - Show a `mods-codex` entry that relies on `/in/build-gate.log` plus the sentinel contract.
     - In `docs/how-to/publish-mods.md`, update the `mod-codex` section to describe:
       - The sentinel protocol.
       - That Build Gate is always run by Ploy (docker gate) / Build Gate HTTP API, not by Codex.
-  - Test: `rg "buildgate-validate" -n` shows no accidental references in Codex healing prompts/docs (only the standalone script under `docker/mods/mod-codex` or legacy docs, if retained intentionally). Run `make test` to ensure doc-related tests or linters (if any) still pass.
+  - Test: `rg "buildgate-validate" -n` shows no accidental references in Codex healing prompts/docs or specs. Run `make test` to ensure doc-related tests or linters (if any) still pass.
 
 ## Phase B — Simplify mods-codex image and wrapper
 - [x] Detach `buildgate-validate` from the `mods-codex` image — Ensure Codex cannot run the gate from inside the container.
-  - Component: `docker/mods/mod-codex`, unit tests referencing `buildgate-validate.sh`.
+  - Component: `docker/mods/mod-codex`, Codex wrapper, and associated tests.
   - Scope:
     - In `docker/mods/mod-codex/Dockerfile`:
-      - Remove the `COPY docker/mods/mod-codex/buildgate-validate.sh /usr/local/bin/buildgate-validate` line.
-      - Remove any `chmod` or symlink specific to `buildgate-validate`; keep `mod-codex` / `mods-codex` entrypoints unchanged.
-    - Delete `docker/mods/mod-codex/buildgate-validate.sh` if it is no longer needed by any tests or scripts, or move it under `scripts/` with a clearly documented, non-mods-specific purpose.
-    - Update tests that reference this script:
-      - `tests/unit/buildgate_validate_sh_test.sh` — either delete or relocate to match the new home of `buildgate-validate.sh`.
-      - `tests/integration/mods/mod-codex/mod_codex_test.go` — remove assertions or prompt content that reference `buildgate-validate`, replacing them with sentinel-based expectations.
+      - Ensure only the `mod-codex` entrypoint is copied; no Build Gate helper is present in the image.
+    - Remove the legacy `buildgate-validate.sh` wrapper script from the repository entirely so Build Gate is always invoked by the node agent (docker gate) or HTTP API, never from inside Codex.
+    - Update tests that referenced this script:
+      - Remove the legacy `tests/unit/buildgate_validate_sh_test.sh`.
+      - In `tests/integration/mods/mod-codex/mod_codex_test.go`, ensure assertions and prompt content reference sentinel-based expectations only.
   - Test:
     - `docker build -t mods-codex:latest -f docker/mods/mod-codex/Dockerfile .` — Image builds successfully without `buildgate-validate`.
     - `GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/mods/mod-codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1` — Confirms the integration test passes with the new image and prompt contract.
