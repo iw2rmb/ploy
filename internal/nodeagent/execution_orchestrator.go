@@ -348,8 +348,18 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 	// Initialize diff generator for workspace change detection.
 	diffGenerator := r.createDiffGenerator()
 
-	// Initialize gate executor with container runtime.
-	gateExecutor := step.NewDockerGateExecutor(containerRuntime)
+	// Initialize gate executor with configuration-driven mode selection.
+	// PLOY_BUILDGATE_MODE controls whether gates run locally (docker) or remotely (http).
+	// Default is "local-docker" for backward compatibility.
+	gateExecutor, gateErr := r.createGateExecutor(containerRuntime)
+	if gateErr != nil {
+		// Log warning but continue; gate executor may be nil if HTTP client creation fails.
+		// This allows runs to proceed without gate validation when misconfigured.
+		slog.Warn("failed to create gate executor, gate validation will be skipped",
+			"run_id", runID,
+			"error", gateErr,
+		)
+	}
 
 	// Initialize log streamer to stream logs as gzipped chunks to the server.
 	logStreamer := NewLogStreamer(r.cfg, runID, "")
@@ -778,4 +788,38 @@ func (r *runController) uploadDiffForStep(
 	}
 
 	slog.Info("step diff uploaded successfully", "run_id", runID, "step_index", stepIndex, "size", len(diffBytes))
+}
+
+// createGateExecutor creates a GateExecutor based on PLOY_BUILDGATE_MODE configuration.
+// Supports two modes:
+//   - "local-docker" (default): Uses container runtime for local gate execution.
+//   - "remote-http": Delegates to Build Gate workers via HTTP API.
+//
+// Returns the executor and any error from HTTP client creation (for remote-http mode).
+func (r *runController) createGateExecutor(containerRuntime step.ContainerRuntime) (step.GateExecutor, error) {
+	mode := os.Getenv("PLOY_BUILDGATE_MODE")
+
+	// For local-docker mode (default), use container runtime directly.
+	if mode == "" || mode == step.GateExecutorModeLocalDocker {
+		return step.NewGateExecutor(mode, containerRuntime, nil), nil
+	}
+
+	// For remote-http mode, create HTTP client from environment configuration.
+	if mode == step.GateExecutorModeRemoteHTTP {
+		cfg, err := step.BuildGateHTTPClientConfigFromEnv()
+		if err != nil {
+			// Return error but allow caller to decide whether to proceed without gate.
+			return nil, fmt.Errorf("load build gate http client config: %w", err)
+		}
+
+		httpClient, err := step.NewBuildGateHTTPClient(cfg)
+		if err != nil {
+			return nil, fmt.Errorf("create build gate http client: %w", err)
+		}
+
+		return step.NewGateExecutor(mode, containerRuntime, httpClient), nil
+	}
+
+	// Unrecognized mode: factory will log warning and fall back to local-docker.
+	return step.NewGateExecutor(mode, containerRuntime, nil), nil
 }
