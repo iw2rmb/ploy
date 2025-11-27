@@ -9,7 +9,7 @@ Environment:
   CODEX_PROMPT     Inline prompt text (used when --prompt-file not provided).
   CODEX_MODEL      Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
   CODEX_AUTH_JSON  Inline JSON for auth; if set, written to ~/.codex/auth.json.
-  PLOY_API_TOKEN   Optional bearer token for Build Gate API (consumed by buildgate-validate).
+  PLOY_API_TOKEN   Optional bearer token for Build Gate API (unused; gate runs externally).
 
 Behavior:
   - Installs Codex CLI in the image (via npm @openai/codex).

@@ -27,8 +27,11 @@ ENV PATH="/usr/local/bin:${PATH}" \
     PLOY_CLIENT_CERT_PATH="/etc/ploy/certs/client.crt" \
     PLOY_CLIENT_KEY_PATH="/etc/ploy/certs/client.key"
 
+# Copy only the mod-codex entrypoint; buildgate-validate is NOT included
+# to prevent Codex from running the gate inside the container. Build Gate
+# verification is performed externally by Ploy (docker gate) or the
+# Build Gate HTTP API.
 COPY docker/mods/mod-codex/mod-codex.sh /usr/local/bin/mod-codex
-COPY docker/mods/mod-codex/buildgate-validate.sh /usr/local/bin/buildgate-validate
 RUN chmod +x /usr/local/bin/mod-codex && \
     ln -s /usr/local/bin/mod-codex /usr/local/bin/mods-codex
 

@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# buildgate-validate.sh - Wrapper for calling ploy Build Gate HTTP API (repo+diff mode)
+# buildgate-validate.sh - Standalone wrapper for calling ploy Build Gate HTTP API
+#
+# This script is NOT bundled in mods-codex. Codex cannot run the gate from inside
+# its container. Build Gate verification is performed externally by:
+#   - Ploy (docker gate) during healing workflows
+#   - Direct calls to the Build Gate HTTP API
 #
 # Sends repo_url+ref(+diff_patch) payloads to the Build Gate API for build validation.
-# The script no longer creates workspace tarballs; instead, it relies on Git refs and
-# optional diff patches (gzipped unified diffs) for healing verification.
+# The script relies on Git refs and optional diff patches (gzipped unified diffs)
+# for verification.
 #
 # Usage:
 #   buildgate-validate --repo-url <url> --ref <ref> [options]
