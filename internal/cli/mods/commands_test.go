@@ -80,6 +80,21 @@ func TestInspectCommand_GateSummary(t *testing.T) {
 			wantContains: "Gate: failed pre-gate duration=567ms",
 		},
 		{
+			// Verifies CLI displays post-mod (final_gate) failure correctly.
+			// The gate_summary is populated by the server from stats.GateSummary(),
+			// which prioritizes final_gate over pre_gate. This test ensures the CLI
+			// renders the "failed final-gate ..." format without alteration.
+			name: "final gate failed after mods",
+			ticket: modsapi.TicketSummary{
+				TicketID: domaintypes.TicketID("t-gate-final-failed"),
+				State:    modsapi.TicketStateFailed,
+				Metadata: map[string]string{
+					"gate_summary": "failed final-gate duration=2345ms",
+				},
+			},
+			wantContains: "Gate: failed final-gate duration=2345ms",
+		},
+		{
 			name: "no gate summary",
 			ticket: modsapi.TicketSummary{
 				TicketID: domaintypes.TicketID("t-no-gate"),
