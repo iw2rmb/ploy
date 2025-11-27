@@ -179,7 +179,7 @@ Legend: [ ] todo, [x] done.
       - Healing applies uniformly to any failing gate (pre or post), with consistent logs and stats.
 
 ## Phase G — Remove per-step pre-gate, keep only pre-run + post-gates
-- [ ] Disable per-step pre-gate in executeWithHealing — Ensure Runner.Run is used only for container execution during steps.
+- [x] Disable per-step pre-gate in executeWithHealing — Ensure Runner.Run is used only for container execution during steps.
   - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
     - In `executeWithHealing`, clone the step manifest into `manifestForMainMod` and:
