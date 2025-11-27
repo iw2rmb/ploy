@@ -11,7 +11,7 @@ Documentation: `docs/build-gate/README.md`, `docs/mods-lifecycle.md`, `docs/envs
 Legend: [ ] todo, [x] done.
 
 ## Phase A — Clarify current Build Gate execution paths
-- [ ] Document local vs remote gate flows — Establish the baseline before decoupling.
+- [x] Document local vs remote gate flows — Establish the baseline before decoupling.
   - Component: `docs/build-gate/README.md`, `docs/mods-lifecycle.md`.
   - Scope:
     - Add a short section explaining the two existing paths:
