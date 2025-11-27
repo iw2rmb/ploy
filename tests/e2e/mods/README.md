@@ -269,6 +269,55 @@ Skip artifact collection for faster runs (e.g., in CI):
 SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-multi-node-rehydration/run.sh
 ```
 
+**Remote Build Gate Mode Scenario**
+
+E2E validation for Build Gate execution in remote-http mode where gate jobs are
+routed through the HTTP API and executed by dedicated Build Gate worker nodes:
+  - `PLOY_BUILDGATE_MODE=remote-http bash tests/e2e/mods/scenario-remote-buildgate/run.sh`
+
+This scenario validates:
+- HTTP-based gate routing: gates submitted via `/v1/buildgate/validate` instead of local docker.
+- Multi-VPS gate execution: gate jobs can run on different nodes than mods steps.
+- Job lifecycle: jobs transition through pending → claimed → running → passed/failed in `buildgate_jobs` table.
+- Repo+diff semantics: re-gates after healing include `diff_patch` for remote workspace reconstruction.
+- Healing flow compatibility: Codex sentinel protocol works identically in remote-http mode.
+
+Configuration for remote-http mode:
+- Workers must have `PLOY_BUILDGATE_MODE=remote-http` in their environment.
+- At least one node should be designated as a Build Gate worker (claims jobs from the queue).
+- `PLOY_SERVER_URL` must be set for HTTP gate client connectivity.
+- The spec is identical to local-docker mode; execution mode is controlled by worker environment.
+
+The scenario uses the failing branch (`e2e/fail-missing-symbol`) to trigger healing, demonstrating:
+1. Initial gate routed to remote Build Gate worker (fails due to missing symbol).
+2. Codex healing runs on the mods execution node.
+3. Re-gate includes `diff_patch` with accumulated healing changes.
+4. Build Gate worker clones repo+ref and applies diff_patch before validation.
+5. Final ORW transformation proceeds after gate passes.
+
+Comparison with local-docker mode:
+- Results should be identical between modes (same pass/fail outcomes, same healing behavior).
+- Only observable difference: gate execution location and latency.
+- Run `scenario-orw-fail` without `PLOY_BUILDGATE_MODE` for baseline comparison.
+
+Validation checklist (manual verification via DB/logs):
+```sql
+-- Check Build Gate job routing:
+SELECT id, status, node_id, created_at, started_at, finished_at
+FROM buildgate_jobs
+ORDER BY created_at DESC
+LIMIT 10;
+```
+- Jobs should show `node_id` set (claimed by Build Gate worker).
+- Status transitions: pending → claimed → running → passed/failed.
+- Control plane logs: "buildgate job claimed by node".
+- Node agent logs: "using remote-http gate executor".
+
+Skip artifact collection for faster runs (e.g., in CI):
+```bash
+SKIP_ARTIFACTS=1 PLOY_BUILDGATE_MODE=remote-http bash tests/e2e/mods/scenario-remote-buildgate/run.sh
+```
+
 **References**
 
 - Historic E2E assets (legacy Nomad-based) found in repo history under `tests/e2e/mods/...` and service Dockerfiles for OpenRewrite. The current implementation replaces that orchestration with an internal job runner and integrated Build Gate. Relevant current references:
