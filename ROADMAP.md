@@ -208,7 +208,7 @@ Legend: [ ] todo, [x] done.
     - Run `make test` to ensure doc-sensitive tests still pass.
     - Run `rg "local docker gate" docs -n` to confirm no stale descriptions remain.
 
-- [ ] Adjust E2E scenarios to cover remote Build Gate mode — Validate multi‑VPS gate behavior.
+- [x] Adjust E2E scenarios to cover remote Build Gate mode — Validate multi‑VPS gate behavior.
   - Component: `tests/e2e/mods`, cluster configuration for tests.
   - Scope:
     - Extend or add E2E scenarios (e.g., `tests/e2e/mods/scenario-multi-node-rehydration`) to run with:
