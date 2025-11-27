@@ -634,9 +634,9 @@ func (hr *healingResult) Unwrap() error {
 // runHealingAfterGateFailure orchestrates healing mods and re-gates after an initial gate failure.
 // This function is called by executeWithHealing when Runner.Run returns ErrBuildGateFailed.
 //
-// It uses runGateWithHealing internally to execute healing mods and re-gates in a loop.
-// Since runGateWithHealing expects to run the initial gate itself, we use a slightly
-// different approach here: we accept the pre-failed gate metadata and directly enter
+// It mirrors the healing + re-gate loop used by runGateWithHealing, but starts from an
+// already-executed (and failed) pre-mod gate. Instead of re-running the initial gate,
+// it accepts the failed gate metadata and writes build-gate.log before entering
 // the healing loop.
 //
 // Returns:
