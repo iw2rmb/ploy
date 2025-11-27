@@ -149,7 +149,7 @@ Legend: [ ] todo, [x] done.
     - Extend `internal/nodeagent/statusuploader_test.go` or related tests to assert `stats["gate"]` contains `pre_gate`, `re_gates`, and `final_gate` keys when gate is enabled.
 
 ## Phase F — Update CLI, integration tests, and how-to docs
-- [ ] Keep CLI gate summary aligned with final (post-mod) gate — Ensure users see the post-mod gate result for each ticket.
+- [x] Keep CLI gate summary aligned with final (post-mod) gate — Ensure users see the post-mod gate result for each ticket.
   - Component: `internal/cli/mods/inspect.go`.
   - Scope:
     - Confirm `ploy mod inspect <ticket-id>` uses `GateSummary()` from stats and does not assume gate is pre-mod only.
