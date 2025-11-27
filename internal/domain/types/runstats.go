@@ -75,6 +75,15 @@ func (s RunStats) MRURL() string {
 // GateSummary extracts build gate execution summary from the gate field.
 // Returns a human-readable summary string suitable for CLI/API display.
 // Format: "passed duration=123ms" or "failed pre-gate duration=45ms" or empty if no gate data.
+//
+// Priority order:
+//  1. final_gate — The latest post-mod gate result. For runs with no mods executed,
+//     final_gate is populated from the pre-mod gate to ensure consistent summary output.
+//  2. last re-gate — The most recent healing re-gate attempt (from either pre- or post-mod phases).
+//  3. pre_gate — The initial pre-mod gate before any mod execution (fallback when no final_gate).
+//
+// This priority ensures CLI and API consumers always get the most definitive gate result:
+// final_gate represents the authoritative build validation status at run completion.
 func (s RunStats) GateSummary() string {
 	gateRaw, ok := s["gate"]
 	if !ok || gateRaw == nil {
@@ -85,12 +94,12 @@ func (s RunStats) GateSummary() string {
 		return ""
 	}
 
-	// Check final_gate first (post-mod gate is most important).
+	// Check final_gate first (post-mod gate or pre-mod gate fallback for runs with no mods).
 	if finalGate := extractGatePhase(gate, "final_gate"); finalGate != "" {
 		return finalGate
 	}
 
-	// Check re_gates array (healing attempts).
+	// Check re_gates array (healing attempts from both pre- and post-mod phases).
 	if reGatesRaw, ok := gate["re_gates"]; ok && reGatesRaw != nil {
 		if reGates, ok := reGatesRaw.([]any); ok && len(reGates) > 0 {
 			// Take the last re-gate run as the most recent healing result.
@@ -102,7 +111,7 @@ func (s RunStats) GateSummary() string {
 		}
 	}
 
-	// Fall back to pre_gate (pre-mod gate).
+	// Fall back to pre_gate (pre-mod gate) — only reached if no final_gate was populated.
 	if preGate := extractGatePhase(gate, "pre_gate"); preGate != "" {
 		return preGate
 	}

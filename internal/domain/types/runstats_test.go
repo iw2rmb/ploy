@@ -241,6 +241,33 @@ func TestRunStats_GateSummary(t *testing.T) {
 	}
 }
 
+// TestRunStats_GateSummary_FinalGateFromPreModFallback verifies that when final_gate
+// is populated from a pre-mod gate fallback (runs with no mods executed), GateSummary
+// returns the final_gate content, not the pre_gate directly.
+func TestRunStats_GateSummary_FinalGateFromPreModFallback(t *testing.T) {
+	// Simulate stats from a run where no mods executed: pre_gate and final_gate both
+	// present with same content (final_gate populated as fallback from pre-mod gate).
+	stats := RunStats{
+		"gate": map[string]any{
+			"pre_gate": map[string]any{
+				"passed":      true,
+				"duration_ms": int64(500),
+			},
+			"final_gate": map[string]any{
+				"passed":      true,
+				"duration_ms": int64(500),
+			},
+		},
+	}
+
+	// GateSummary should use final_gate (which now exists), not fall back to pre_gate.
+	got := stats.GateSummary()
+	want := "passed duration=500ms" // final_gate passed, no "pre-gate" label.
+	if got != want {
+		t.Errorf("GateSummary() = %q, want %q", got, want)
+	}
+}
+
 func TestRunStats_GateSummary_FromJSON(t *testing.T) {
 	// Test that GateSummary works with real JSON-decoded data.
 	jsonData := `{

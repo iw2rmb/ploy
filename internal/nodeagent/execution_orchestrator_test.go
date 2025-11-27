@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
@@ -116,6 +117,108 @@ func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
 	// Result should come from the next execution result.
 	if merged.Result.ExitCode != 0 {
 		t.Errorf("merged.Result.ExitCode = %d, want 0", merged.Result.ExitCode)
+	}
+}
+
+// TestBuildGateStats_PreGateFallbackToFinalGate verifies that when no post-mod gate
+// (result.BuildGate) exists but a pre-mod gate was recorded, buildGateStats populates
+// final_gate from the pre-mod gate. This ensures CLI/API gate summaries always have
+// a final_gate to report on, even when no mods executed.
+func TestBuildGateStats_PreGateFallbackToFinalGate(t *testing.T) {
+	rc := &runController{cfg: Config{}}
+
+	// Pre-mod gate only — simulates a run that terminated before any mod execution.
+	preGateMeta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "maven", Passed: true},
+		},
+	}
+	execRes := executionResult{
+		PreGate: &gateRunMetadata{
+			Metadata:   preGateMeta,
+			DurationMs: 500,
+		},
+	}
+
+	// No BuildGate in result (no mods executed).
+	result := step.Result{}
+
+	got := rc.buildGateStats("run-fallback", "stage-fallback", result, execRes)
+
+	// Verify pre_gate is present.
+	if _, hasPre := got["pre_gate"]; !hasPre {
+		t.Fatalf("expected pre_gate in gate stats, got: %#v", got)
+	}
+
+	// Verify final_gate is populated from the pre-mod gate fallback.
+	fg, hasFinal := got["final_gate"]
+	if !hasFinal {
+		t.Fatalf("expected final_gate to be populated from pre-mod gate fallback, got: %#v", got)
+	}
+
+	fgMap, ok := fg.(map[string]any)
+	if !ok {
+		t.Fatalf("final_gate has unexpected type %T", fg)
+	}
+
+	// Verify final_gate content matches pre-mod gate.
+	if fgMap["passed"] != true {
+		t.Errorf("final_gate passed=%v, want true", fgMap["passed"])
+	}
+	if fgMap["duration_ms"] != int64(500) {
+		t.Errorf("final_gate duration_ms=%v, want 500", fgMap["duration_ms"])
+	}
+}
+
+// TestBuildGateStats_PostGateTakesPrecedence verifies that when both pre-mod gate
+// and post-mod gate (result.BuildGate) exist, final_gate uses the post-mod gate,
+// not the pre-mod gate fallback.
+func TestBuildGateStats_PostGateTakesPrecedence(t *testing.T) {
+	rc := &runController{cfg: Config{}}
+
+	// Both pre-mod and post-mod gates present.
+	preGateMeta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "maven", Passed: true},
+		},
+	}
+	postGateMeta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "gradle", Passed: false},
+		},
+	}
+
+	execRes := executionResult{
+		PreGate: &gateRunMetadata{
+			Metadata:   preGateMeta,
+			DurationMs: 300,
+		},
+	}
+
+	result := step.Result{
+		BuildGate: postGateMeta,
+		Timings:   step.StageTiming{BuildGateDuration: 700 * time.Millisecond},
+	}
+
+	got := rc.buildGateStats("run-precedence", "stage-precedence", result, execRes)
+
+	// Verify final_gate uses the post-mod gate (result.BuildGate), not the pre-mod fallback.
+	fg, hasFinal := got["final_gate"]
+	if !hasFinal {
+		t.Fatalf("expected final_gate in gate stats, got: %#v", got)
+	}
+
+	fgMap, ok := fg.(map[string]any)
+	if !ok {
+		t.Fatalf("final_gate has unexpected type %T", fg)
+	}
+
+	// Post-mod gate had passed=false, duration=700ms.
+	if fgMap["passed"] != false {
+		t.Errorf("final_gate passed=%v, want false (from post-mod gate)", fgMap["passed"])
+	}
+	if fgMap["duration_ms"] != int64(700) {
+		t.Errorf("final_gate duration_ms=%v, want 700 (from post-mod gate)", fgMap["duration_ms"])
 	}
 }
 
