@@ -77,9 +77,9 @@ Legend: [ ] todo, [x] done.
     - In runtime initialization (where `step.Runner` is built in `internal/nodeagent/execution_orchestrator.go`), read `PLOY_BUILDGATE_MODE` (or config) and call `NewGateExecutor`.
     - Keep default behavior (`local-docker`) when mode is unset/invalid.
   - Test:
-    - Extend `internal/workflow/runtime/step/runner_gate_test.go`:
-      - Runner with `mode="remote-http"` uses HTTP executor (fake client).
-      - Runner with `mode=""` or `"local-docker"` uses `dockerGateExecutor`.
+    - Add `internal/workflow/runtime/step/gate_factory_test.go`:
+      - `NewGateExecutor` with `mode="remote-http"` uses HTTP executor (fake client).
+      - `NewGateExecutor` with `mode=""` or `"local-docker"` uses `dockerGateExecutor`.
     - Run: `go test ./internal/workflow/runtime/step -run TestNewGateExecutor`.
 
 ## Phase C — Define repo+diff inputs for gate from Mods runs
