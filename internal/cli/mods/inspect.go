@@ -64,6 +64,9 @@ func (c InspectCommand) Run(ctx context.Context) error {
 			_, _ = fmt.Fprintf(c.Output, "MR: %s\n", mrURL)
 		}
 		// Display build gate summary when available for quick gate health visibility.
+		// The gate_summary reflects the final (post-mod) gate result when mods were executed,
+		// or the pre-mod gate result if no mods ran. This ensures users see the authoritative
+		// gate status at run completion. See stats.GateSummary() for priority logic.
 		if gateSummary, ok := payload.Ticket.Metadata["gate_summary"]; ok && gateSummary != "" {
 			_, _ = fmt.Fprintf(c.Output, "Gate: %s\n", gateSummary)
 		}
