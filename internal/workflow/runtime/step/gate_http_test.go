@@ -5,12 +5,14 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
 // fakeBuildGateHTTPClient is a test double for BuildGateHTTPClient.
 // It allows configuring responses for Validate and GetJob calls.
+// For async polling tests, use GetJobResponses to queue multiple responses.
 type fakeBuildGateHTTPClient struct {
 	// ValidateResp is returned by Validate when ValidateErr is nil.
 	ValidateResp *contracts.BuildGateValidateResponse
@@ -21,14 +23,22 @@ type fakeBuildGateHTTPClient struct {
 	// LastValidateReq stores the last request passed to Validate.
 	LastValidateReq contracts.BuildGateValidateRequest
 
-	// GetJobResp is returned by GetJob when GetJobErr is nil.
+	// GetJobResp is returned by GetJob when GetJobErr is nil and GetJobResponses is empty.
 	GetJobResp *contracts.BuildGateJobStatusResponse
-	// GetJobErr is returned by GetJob if non-nil.
+	// GetJobErr is returned by GetJob if non-nil and GetJobErrors is empty.
 	GetJobErr error
 	// GetJobCallCount tracks how many times GetJob was called.
 	GetJobCallCount int
 	// LastGetJobID stores the last jobID passed to GetJob.
 	LastGetJobID string
+
+	// GetJobResponses is a queue of responses for GetJob. If non-empty, each call
+	// to GetJob pops from this queue. When empty, falls back to GetJobResp/GetJobErr.
+	// Use this for async polling tests that need multiple poll iterations.
+	GetJobResponses []*contracts.BuildGateJobStatusResponse
+	// GetJobErrors is a queue of errors for GetJob, parallel to GetJobResponses.
+	// If an entry is non-nil, it is returned as the error for that call.
+	GetJobErrors []error
 }
 
 func (f *fakeBuildGateHTTPClient) Validate(ctx context.Context, req contracts.BuildGateValidateRequest) (*contracts.BuildGateValidateResponse, error) {
@@ -43,6 +53,24 @@ func (f *fakeBuildGateHTTPClient) Validate(ctx context.Context, req contracts.Bu
 func (f *fakeBuildGateHTTPClient) GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error) {
 	f.GetJobCallCount++
 	f.LastGetJobID = jobID
+
+	// If we have queued responses, pop from the queue.
+	if len(f.GetJobResponses) > 0 {
+		resp := f.GetJobResponses[0]
+		f.GetJobResponses = f.GetJobResponses[1:]
+
+		var err error
+		if len(f.GetJobErrors) > 0 {
+			err = f.GetJobErrors[0]
+			f.GetJobErrors = f.GetJobErrors[1:]
+		}
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	}
+
+	// Fall back to single response mode.
 	if f.GetJobErr != nil {
 		return nil, f.GetJobErr
 	}
@@ -166,87 +194,111 @@ func TestHTTPGateExecutor_Sync_CompletedNoResult(t *testing.T) {
 	}
 }
 
-// TestHTTPGateExecutor_Sync_Pending tests that pending status returns an error.
+// TestHTTPGateExecutor_Sync_Pending tests that pending status triggers async polling.
+// Note: With B3 implementation, pending status now triggers GetJob polling.
 func TestHTTPGateExecutor_Sync_Pending(t *testing.T) {
 	t.Parallel()
 
 	// Server returns pending status (async job queued).
+	// GetJob then returns Completed immediately.
 	fake := &fakeBuildGateHTTPClient{
 		ValidateResp: &contracts.BuildGateValidateResponse{
 			JobID:  "job-pending-456",
 			Status: contracts.BuildGateJobStatusPending,
 		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-pending-456", Status: contracts.BuildGateJobStatusCompleted, Result: &contracts.BuildGateStageMetadata{LogDigest: "pending-done"}},
+		},
 	}
 	executor := NewHTTPGateExecutor(fake)
 
-	spec := &contracts.StepGateSpec{Enabled: true}
-	result, err := executor.Execute(context.Background(), spec, "/workspace")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Should return error since async polling is not yet supported.
-	if err == nil {
-		t.Fatal("expected error for pending status")
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// With B3, pending status triggers polling and should complete successfully.
+	if err != nil {
+		t.Fatalf("expected nil error after polling, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "async jobs not supported") {
-		t.Errorf("expected 'async jobs not supported' error, got: %v", err)
+	if result == nil || result.LogDigest != "pending-done" {
+		t.Errorf("expected result with LogDigest 'pending-done', got: %+v", result)
 	}
-	if result != nil {
-		t.Errorf("expected nil result for pending status, got: %+v", result)
+	if fake.GetJobCallCount != 1 {
+		t.Errorf("expected 1 GetJob call, got %d", fake.GetJobCallCount)
 	}
 }
 
-// TestHTTPGateExecutor_Sync_Claimed tests that claimed status returns an error.
+// TestHTTPGateExecutor_Sync_Claimed tests that claimed status triggers async polling.
+// Note: With B3 implementation, claimed status now triggers GetJob polling.
 func TestHTTPGateExecutor_Sync_Claimed(t *testing.T) {
 	t.Parallel()
 
 	// Server returns claimed status (job picked up but not running).
+	// GetJob then returns Completed.
 	fake := &fakeBuildGateHTTPClient{
 		ValidateResp: &contracts.BuildGateValidateResponse{
 			JobID:  "job-claimed",
 			Status: contracts.BuildGateJobStatusClaimed,
 		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-claimed", Status: contracts.BuildGateJobStatusCompleted, Result: &contracts.BuildGateStageMetadata{LogDigest: "claimed-done"}},
+		},
 	}
 	executor := NewHTTPGateExecutor(fake)
 
-	spec := &contracts.StepGateSpec{Enabled: true}
-	result, err := executor.Execute(context.Background(), spec, "/workspace")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Should return error since async polling is not yet supported.
-	if err == nil {
-		t.Fatal("expected error for claimed status")
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// With B3, claimed status triggers polling and should complete successfully.
+	if err != nil {
+		t.Fatalf("expected nil error after polling, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "async jobs not supported") {
-		t.Errorf("expected 'async jobs not supported' error, got: %v", err)
+	if result == nil || result.LogDigest != "claimed-done" {
+		t.Errorf("expected result with LogDigest 'claimed-done', got: %+v", result)
 	}
-	if result != nil {
-		t.Errorf("expected nil result for claimed status, got: %+v", result)
+	if fake.GetJobCallCount != 1 {
+		t.Errorf("expected 1 GetJob call, got %d", fake.GetJobCallCount)
 	}
 }
 
-// TestHTTPGateExecutor_Sync_Running tests that running status returns an error.
+// TestHTTPGateExecutor_Sync_Running tests that running status triggers async polling.
+// Note: With B3 implementation, running status now triggers GetJob polling.
 func TestHTTPGateExecutor_Sync_Running(t *testing.T) {
 	t.Parallel()
 
 	// Server returns running status (job is executing).
+	// GetJob then returns Completed.
 	fake := &fakeBuildGateHTTPClient{
 		ValidateResp: &contracts.BuildGateValidateResponse{
 			JobID:  "job-running",
 			Status: contracts.BuildGateJobStatusRunning,
 		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-running", Status: contracts.BuildGateJobStatusCompleted, Result: &contracts.BuildGateStageMetadata{LogDigest: "running-done"}},
+		},
 	}
 	executor := NewHTTPGateExecutor(fake)
 
-	spec := &contracts.StepGateSpec{Enabled: true}
-	result, err := executor.Execute(context.Background(), spec, "/workspace")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
-	// Should return error since async polling is not yet supported.
-	if err == nil {
-		t.Fatal("expected error for running status")
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// With B3, running status triggers polling and should complete successfully.
+	if err != nil {
+		t.Fatalf("expected nil error after polling, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "async jobs not supported") {
-		t.Errorf("expected 'async jobs not supported' error, got: %v", err)
+	if result == nil || result.LogDigest != "running-done" {
+		t.Errorf("expected result with LogDigest 'running-done', got: %+v", result)
 	}
-	if result != nil {
-		t.Errorf("expected nil result for running status, got: %+v", result)
+	if fake.GetJobCallCount != 1 {
+		t.Errorf("expected 1 GetJob call, got %d", fake.GetJobCallCount)
 	}
 }
 
@@ -493,5 +545,439 @@ func TestHTTPGateExecutor_Sync_ResultPreserved(t *testing.T) {
 	}
 	if result.LogFindings[0].Code != "COMPILE_ERROR" {
 		t.Errorf("expected code 'COMPILE_ERROR', got '%s'", result.LogFindings[0].Code)
+	}
+}
+
+// =============================================================================
+// Async Polling Tests (B3 - Phase B3 of ROADMAP.md)
+// =============================================================================
+
+// TestHTTPGateExecutor_Async_PendingThenCompleted tests polling from Pending to Completed.
+// Simulates: Validate returns Pending, then GetJob returns Pending, Running, Completed.
+func TestHTTPGateExecutor_Async_PendingThenCompleted(t *testing.T) {
+	t.Parallel()
+
+	// Expected result after job completes.
+	expectedResult := &contracts.BuildGateStageMetadata{
+		LogDigest: "async-result-123",
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Language: "java", Tool: "maven", Passed: true},
+		},
+	}
+
+	// Configure fake: Validate returns Pending, then GetJob returns sequence.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-async-poll",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		// GetJob response sequence: Pending -> Running -> Completed with result.
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-async-poll", Status: contracts.BuildGateJobStatusPending},
+			{JobID: "job-async-poll", Status: contracts.BuildGateJobStatusRunning},
+			{JobID: "job-async-poll", Status: contracts.BuildGateJobStatusCompleted, Result: expectedResult},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	// Use a context with timeout to limit test duration.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result to be populated")
+	}
+	if result.LogDigest != "async-result-123" {
+		t.Errorf("expected LogDigest 'async-result-123', got '%s'", result.LogDigest)
+	}
+	if len(result.StaticChecks) != 1 || !result.StaticChecks[0].Passed {
+		t.Error("expected 1 passing static check")
+	}
+	// Verify GetJob was called 3 times (Pending -> Running -> Completed).
+	if fake.GetJobCallCount != 3 {
+		t.Errorf("expected 3 GetJob calls, got %d", fake.GetJobCallCount)
+	}
+	if fake.LastGetJobID != "job-async-poll" {
+		t.Errorf("expected job ID 'job-async-poll', got '%s'", fake.LastGetJobID)
+	}
+}
+
+// TestHTTPGateExecutor_Async_ClaimedThenCompleted tests polling from Claimed status.
+func TestHTTPGateExecutor_Async_ClaimedThenCompleted(t *testing.T) {
+	t.Parallel()
+
+	expectedResult := &contracts.BuildGateStageMetadata{LogDigest: "claimed-result"}
+
+	// Validate returns Claimed, GetJob returns Running then Completed.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-claimed-async",
+			Status: contracts.BuildGateJobStatusClaimed,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-claimed-async", Status: contracts.BuildGateJobStatusRunning},
+			{JobID: "job-claimed-async", Status: contracts.BuildGateJobStatusCompleted, Result: expectedResult},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if result == nil || result.LogDigest != "claimed-result" {
+		t.Errorf("expected result with LogDigest 'claimed-result', got: %+v", result)
+	}
+	if fake.GetJobCallCount != 2 {
+		t.Errorf("expected 2 GetJob calls, got %d", fake.GetJobCallCount)
+	}
+}
+
+// TestHTTPGateExecutor_Async_RunningThenCompleted tests polling from Running status.
+func TestHTTPGateExecutor_Async_RunningThenCompleted(t *testing.T) {
+	t.Parallel()
+
+	expectedResult := &contracts.BuildGateStageMetadata{LogDigest: "running-result"}
+
+	// Validate returns Running, GetJob returns Completed immediately.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-running-async",
+			Status: contracts.BuildGateJobStatusRunning,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-running-async", Status: contracts.BuildGateJobStatusCompleted, Result: expectedResult},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if result == nil || result.LogDigest != "running-result" {
+		t.Errorf("expected result with LogDigest 'running-result', got: %+v", result)
+	}
+	if fake.GetJobCallCount != 1 {
+		t.Errorf("expected 1 GetJob call, got %d", fake.GetJobCallCount)
+	}
+}
+
+// TestHTTPGateExecutor_Async_PendingThenFailed tests polling until job fails.
+func TestHTTPGateExecutor_Async_PendingThenFailed(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending, GetJob returns Pending then Failed.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-will-fail",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-will-fail", Status: contracts.BuildGateJobStatusPending},
+			{JobID: "job-will-fail", Status: contracts.BuildGateJobStatusFailed, Error: "compilation error"},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// Should return error for failed job.
+	if err == nil {
+		t.Fatal("expected error for failed job")
+	}
+	if !strings.Contains(err.Error(), "build gate job failed") {
+		t.Errorf("expected 'build gate job failed' error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "job-will-fail") {
+		t.Errorf("expected error to contain job ID, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "compilation error") {
+		t.Errorf("expected error to contain error message, got: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result for failed job, got: %+v", result)
+	}
+	// Should have polled twice before failing.
+	if fake.GetJobCallCount != 2 {
+		t.Errorf("expected 2 GetJob calls, got %d", fake.GetJobCallCount)
+	}
+}
+
+// TestHTTPGateExecutor_Async_FailedWithoutErrorMessage tests failed job without error details.
+func TestHTTPGateExecutor_Async_FailedWithoutErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending, GetJob returns Failed without error message.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-fail-no-msg",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-fail-no-msg", Status: contracts.BuildGateJobStatusFailed, Error: ""},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	_, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err == nil {
+		t.Fatal("expected error for failed job")
+	}
+	if !strings.Contains(err.Error(), "build gate job failed") {
+		t.Errorf("expected 'build gate job failed' error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "job-fail-no-msg") {
+		t.Errorf("expected error to contain job ID, got: %v", err)
+	}
+}
+
+// TestHTTPGateExecutor_Async_ContextTimeout tests that polling respects context timeout.
+func TestHTTPGateExecutor_Async_ContextTimeout(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending. GetJob always returns Pending (never completes).
+	// Configure GetJobResp for fallback after queue is empty.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-timeout",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		// Fallback response: always Pending.
+		GetJobResp: &contracts.BuildGateJobStatusResponse{
+			JobID:  "job-timeout",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	// Very short timeout to trigger timeout quickly.
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// Should return timeout error.
+	if err == nil {
+		t.Fatal("expected error for timeout")
+	}
+	if !strings.Contains(err.Error(), "timed out") && !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Errorf("expected timeout error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "job-timeout") {
+		t.Errorf("expected error to contain job ID, got: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result for timeout, got: %+v", result)
+	}
+	// Should have polled at least once.
+	if fake.GetJobCallCount < 1 {
+		t.Errorf("expected at least 1 GetJob call, got %d", fake.GetJobCallCount)
+	}
+}
+
+// TestHTTPGateExecutor_Async_ContextCancelledDuringPolling tests cancellation mid-poll.
+func TestHTTPGateExecutor_Async_ContextCancelledDuringPolling(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-cancelled",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		// GetJob returns Pending, then we cancel before next poll.
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-cancelled", Status: contracts.BuildGateJobStatusPending},
+		},
+		// Fallback: Pending forever.
+		GetJobResp: &contracts.BuildGateJobStatusResponse{
+			JobID:  "job-cancelled",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel after brief delay (enough for 1 poll).
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	// Should return cancellation error.
+	if err == nil {
+		t.Fatal("expected error for cancelled context")
+	}
+	if !errors.Is(err, context.Canceled) && !strings.Contains(err.Error(), "canceled") {
+		t.Errorf("expected context.Canceled error, got: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result for cancelled, got: %+v", result)
+	}
+}
+
+// TestHTTPGateExecutor_Async_CompletedNoResult tests async completion with nil result.
+func TestHTTPGateExecutor_Async_CompletedNoResult(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending, GetJob returns Completed but with nil Result.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-empty-result",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-empty-result", Status: contracts.BuildGateJobStatusCompleted, Result: nil},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	// Should return empty metadata, not nil.
+	if result == nil {
+		t.Fatal("expected non-nil result (empty metadata)")
+	}
+}
+
+// TestHTTPGateExecutor_Async_UnknownStatusDuringPolling tests handling of unknown status.
+func TestHTTPGateExecutor_Async_UnknownStatusDuringPolling(t *testing.T) {
+	t.Parallel()
+
+	// Validate returns Pending, GetJob returns unknown status.
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-unknown-async",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-unknown-async", Status: contracts.BuildGateJobStatus("weird_status")},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err == nil {
+		t.Fatal("expected error for unknown status")
+	}
+	if !strings.Contains(err.Error(), "unexpected job status") {
+		t.Errorf("expected 'unexpected job status' error, got: %v", err)
+	}
+	if result != nil {
+		t.Errorf("expected nil result, got: %+v", result)
+	}
+}
+
+// TestHTTPGateExecutor_Async_ResultPreservedAfterPolling tests full result preservation.
+func TestHTTPGateExecutor_Async_ResultPreservedAfterPolling(t *testing.T) {
+	t.Parallel()
+
+	// Rich result with multiple fields.
+	expectedResult := &contracts.BuildGateStageMetadata{
+		LogDigest: "rich-async-result",
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{
+				Language: "go",
+				Tool:     "go build",
+				Passed:   false,
+				Failures: []contracts.BuildGateStaticCheckFailure{
+					{File: "main.go", Line: 10, Column: 5, Severity: "error", Message: "undefined"},
+				},
+			},
+		},
+		LogFindings: []contracts.BuildGateLogFinding{
+			{Code: "BUILD_FAIL", Severity: "error", Message: "build failed", Evidence: "exit status 1"},
+		},
+	}
+
+	fake := &fakeBuildGateHTTPClient{
+		ValidateResp: &contracts.BuildGateValidateResponse{
+			JobID:  "job-rich-async",
+			Status: contracts.BuildGateJobStatusPending,
+		},
+		GetJobResponses: []*contracts.BuildGateJobStatusResponse{
+			{JobID: "job-rich-async", Status: contracts.BuildGateJobStatusRunning},
+			{JobID: "job-rich-async", Status: contracts.BuildGateJobStatusCompleted, Result: expectedResult},
+		},
+	}
+	executor := NewHTTPGateExecutor(fake)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	spec := &contracts.StepGateSpec{Enabled: true}
+	result, err := executor.Execute(ctx, spec, "/workspace")
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result")
+	}
+
+	// Verify all fields preserved.
+	if result.LogDigest != "rich-async-result" {
+		t.Errorf("expected LogDigest 'rich-async-result', got '%s'", result.LogDigest)
+	}
+	if len(result.StaticChecks) != 1 {
+		t.Fatalf("expected 1 static check, got %d", len(result.StaticChecks))
+	}
+	if result.StaticChecks[0].Passed {
+		t.Error("expected static check to fail")
+	}
+	if len(result.StaticChecks[0].Failures) != 1 {
+		t.Fatalf("expected 1 failure, got %d", len(result.StaticChecks[0].Failures))
+	}
+	if result.StaticChecks[0].Failures[0].Line != 10 {
+		t.Errorf("expected line 10, got %d", result.StaticChecks[0].Failures[0].Line)
+	}
+	if len(result.LogFindings) != 1 {
+		t.Fatalf("expected 1 log finding, got %d", len(result.LogFindings))
+	}
+	if result.LogFindings[0].Code != "BUILD_FAIL" {
+		t.Errorf("expected code 'BUILD_FAIL', got '%s'", result.LogFindings[0].Code)
 	}
 }

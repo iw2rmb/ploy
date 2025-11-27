@@ -16,10 +16,17 @@
 //
 // ## Sync vs Async Execution
 //
-// This implementation supports SYNC ONLY mode:
+// This implementation supports both synchronous and asynchronous job execution:
 //   - If Validate returns an immediate result (Status=Completed), it is returned directly.
-//   - If Validate returns Status=Pending, an error is returned indicating async jobs
-//     are not yet supported. Phase B3 will add polling support.
+//   - If Validate returns Status=Pending/Claimed/Running, the executor polls GetJob
+//     with exponential backoff until the job completes, fails, or the context times out.
+//
+// ## Timeout Configuration
+//
+// Async polling uses a timeout derived from (in priority order):
+//  1. Context deadline (if already set by caller)
+//  2. PLOY_BUILDGATE_TIMEOUT environment variable (e.g., "10m")
+//  3. Default of 10 minutes
 //
 // ## Relationship to DockerGateExecutor
 //
@@ -31,10 +38,22 @@ package step
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"log/slog"
+	"os"
+	"time"
 
+	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
+)
+
+const (
+	// defaultBuildGateTimeout is the default timeout for async job polling when no
+	// context deadline is set and PLOY_BUILDGATE_TIMEOUT is not configured.
+	defaultBuildGateTimeout = 10 * time.Minute
+
+	// buildGateTimeoutEnv is the environment variable for configuring the timeout.
+	buildGateTimeoutEnv = "PLOY_BUILDGATE_TIMEOUT"
 )
 
 // httpGateExecutor implements GateExecutor by delegating to the Build Gate HTTP API.
@@ -42,6 +61,9 @@ import (
 type httpGateExecutor struct {
 	// client handles HTTP communication with the Build Gate API.
 	client BuildGateHTTPClient
+
+	// logger for structured logging during polling. Falls back to slog.Default() if nil.
+	logger *slog.Logger
 }
 
 // NewHTTPGateExecutor constructs a GateExecutor that uses the Build Gate HTTP API
@@ -54,7 +76,19 @@ func NewHTTPGateExecutor(client BuildGateHTTPClient) GateExecutor {
 	if client == nil {
 		return nil
 	}
-	return &httpGateExecutor{client: client}
+	return &httpGateExecutor{client: client, logger: slog.Default()}
+}
+
+// NewHTTPGateExecutorWithLogger constructs a GateExecutor with a custom logger
+// for structured logging during async job polling.
+func NewHTTPGateExecutorWithLogger(client BuildGateHTTPClient, logger *slog.Logger) GateExecutor {
+	if client == nil {
+		return nil
+	}
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &httpGateExecutor{client: client, logger: logger}
 }
 
 // Execute submits a build validation request to the Build Gate HTTP API.
@@ -69,9 +103,10 @@ func NewHTTPGateExecutor(client BuildGateHTTPClient) GateExecutor {
 //     metadata from the step manifest.
 //
 // Response handling:
-//   - If the API returns an immediate result (Status != Pending), Result is returned.
-//   - If the API returns Status=Pending (async job), an error is returned. Phase B3
-//     will implement polling via client.GetJob().
+//   - If the API returns an immediate result (Status=Completed), Result is returned.
+//   - If the API returns Status=Failed, an error is returned with the job ID.
+//   - If the API returns Status=Pending/Claimed/Running (async job), the executor
+//     polls GetJob with exponential backoff until completion, failure, or timeout.
 //
 // The workspace parameter is currently unused for HTTP mode since remote workers
 // receive repo+diff payloads rather than direct workspace access.
@@ -113,6 +148,13 @@ func (e *httpGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 	}
 
 	// Handle response based on job status.
+	return e.handleValidateResponse(ctx, resp)
+}
+
+// handleValidateResponse processes the validate response and polls if needed.
+// For sync completion (Completed/Failed), returns immediately.
+// For async statuses (Pending/Claimed/Running), polls GetJob until terminal state.
+func (e *httpGateExecutor) handleValidateResponse(ctx context.Context, resp *contracts.BuildGateValidateResponse) (*contracts.BuildGateStageMetadata, error) {
 	switch resp.Status {
 	case contracts.BuildGateJobStatusCompleted:
 		// Sync completion: result is available immediately.
@@ -123,17 +165,156 @@ func (e *httpGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 		return &contracts.BuildGateStageMetadata{}, nil
 
 	case contracts.BuildGateJobStatusFailed:
-		// Job failed on the server. Return empty metadata with error.
-		// The server may have stored partial results; for now, return an error.
+		// Job failed on the server. Return error with job ID for debugging.
 		return nil, fmt.Errorf("build gate job failed: job_id=%s", resp.JobID)
 
 	case contracts.BuildGateJobStatusPending, contracts.BuildGateJobStatusClaimed, contracts.BuildGateJobStatusRunning:
-		// Async job: polling not yet implemented.
-		// Phase B3 will add polling via client.GetJob() until completion.
-		return nil, errors.New("async jobs not supported yet")
+		// Async job: poll GetJob until completion or timeout.
+		return e.pollJobUntilDone(ctx, resp.JobID)
 
 	default:
 		// Unknown status: defensive error handling.
 		return nil, fmt.Errorf("unexpected job status: %s", resp.Status)
 	}
+}
+
+// pollJobUntilDone polls the Build Gate API for job status until the job reaches
+// a terminal state (Completed or Failed) or the context times out.
+//
+// Timeout resolution (priority order):
+//  1. Existing context deadline (if set by caller)
+//  2. PLOY_BUILDGATE_TIMEOUT environment variable
+//  3. defaultBuildGateTimeout (10 minutes)
+//
+// Uses exponential backoff via internal/workflow/backoff to avoid hammering the API.
+func (e *httpGateExecutor) pollJobUntilDone(ctx context.Context, jobID string) (*contracts.BuildGateStageMetadata, error) {
+	// Create a polling context with appropriate timeout.
+	pollCtx, cancel := e.createPollContext(ctx)
+	defer cancel()
+
+	// Track result and error across poll iterations. The backoff.PollWithBackoff
+	// returns when condition returns (true, nil) or an error. We capture the final
+	// result/error in these variables since the condition func can't return them.
+	var (
+		result   *contracts.BuildGateStageMetadata
+		pollErr  error
+		jobError string // Error message from failed job (from BuildGateJobStatusResponse.Error).
+	)
+
+	e.logger.Debug("starting async job polling",
+		"job_id", jobID,
+		"timeout", e.getPollTimeout(),
+	)
+
+	// Define the polling policy. Use DefaultPolicy as a base but adjust:
+	// - Shorter initial interval (1s) for responsive polling
+	// - Max interval of 10s to avoid long gaps
+	// - No max attempts (controlled by context timeout instead)
+	// - No max elapsed time (controlled by context timeout instead)
+	policy := backoff.Policy{
+		InitialInterval: 1 * time.Second,
+		MaxInterval:     10 * time.Second,
+		Multiplier:      1.5, // Gentler growth than default 2.0 for polling.
+		MaxElapsedTime:  0,   // Rely on context timeout.
+		MaxAttempts:     0,   // Rely on context timeout.
+	}
+
+	// Poll using backoff helper. The condition returns:
+	// - (true, nil) when job is completed successfully
+	// - (false, permanentErr) when job failed (stops polling)
+	// - (false, nil) when job is still pending (continues polling)
+	// - (false, err) when GetJob call failed (retries with backoff)
+	err := backoff.PollWithBackoff(pollCtx, policy, e.logger, func() (bool, error) {
+		resp, getErr := e.client.GetJob(pollCtx, jobID)
+		if getErr != nil {
+			// GetJob call failed (network error, etc). Retry with backoff.
+			e.logger.Debug("getjob call failed, will retry",
+				"job_id", jobID,
+				"error", getErr,
+			)
+			return false, getErr
+		}
+
+		e.logger.Debug("poll status",
+			"job_id", jobID,
+			"status", resp.Status,
+		)
+
+		switch resp.Status {
+		case contracts.BuildGateJobStatusCompleted:
+			// Job completed successfully. Capture result and signal done.
+			if resp.Result != nil {
+				result = resp.Result
+			} else {
+				// Completed but no result is unexpected; use empty metadata.
+				result = &contracts.BuildGateStageMetadata{}
+			}
+			return true, nil
+
+		case contracts.BuildGateJobStatusFailed:
+			// Job failed. Capture error and stop polling with permanent error.
+			jobError = resp.Error
+			pollErr = fmt.Errorf("build gate job failed: job_id=%s", jobID)
+			if jobError != "" {
+				pollErr = fmt.Errorf("build gate job failed: job_id=%s, error=%s", jobID, jobError)
+			}
+			// Return permanent error to stop retries.
+			return false, backoff.Permanent(pollErr)
+
+		case contracts.BuildGateJobStatusPending, contracts.BuildGateJobStatusClaimed, contracts.BuildGateJobStatusRunning:
+			// Job still in progress. Continue polling.
+			return false, nil
+
+		default:
+			// Unknown status. Treat as permanent error.
+			pollErr = fmt.Errorf("unexpected job status during polling: %s", resp.Status)
+			return false, backoff.Permanent(pollErr)
+		}
+	})
+
+	// Handle polling outcome.
+	if err != nil {
+		// Check if context was cancelled/timed out.
+		if pollCtx.Err() != nil {
+			return nil, fmt.Errorf("build gate job polling timed out: job_id=%s: %w", jobID, pollCtx.Err())
+		}
+		// Check if we captured a specific poll error (e.g., job failed).
+		if pollErr != nil {
+			return nil, pollErr
+		}
+		// Otherwise return the backoff error (e.g., max retries on GetJob failures).
+		return nil, fmt.Errorf("build gate job polling failed: job_id=%s: %w", jobID, err)
+	}
+
+	// Success: return the result captured during polling.
+	e.logger.Debug("job polling completed successfully", "job_id", jobID)
+	return result, nil
+}
+
+// createPollContext creates a context with appropriate timeout for job polling.
+// If the parent context already has a deadline, it is used. Otherwise, the timeout
+// is derived from PLOY_BUILDGATE_TIMEOUT env or defaultBuildGateTimeout.
+func (e *httpGateExecutor) createPollContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	// If context already has a deadline, use it as-is.
+	if _, hasDeadline := ctx.Deadline(); hasDeadline {
+		return context.WithCancel(ctx)
+	}
+
+	// Otherwise apply configured or default timeout.
+	timeout := e.getPollTimeout()
+	return context.WithTimeout(ctx, timeout)
+}
+
+// getPollTimeout returns the polling timeout from environment or default.
+func (e *httpGateExecutor) getPollTimeout() time.Duration {
+	if envVal := os.Getenv(buildGateTimeoutEnv); envVal != "" {
+		if d, err := time.ParseDuration(envVal); err == nil && d > 0 {
+			return d
+		}
+		e.logger.Warn("invalid PLOY_BUILDGATE_TIMEOUT, using default",
+			"value", envVal,
+			"default", defaultBuildGateTimeout,
+		)
+	}
+	return defaultBuildGateTimeout
 }
