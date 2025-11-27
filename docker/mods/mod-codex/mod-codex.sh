@@ -74,6 +74,14 @@ if [[ "${CODEX_RESUME:-}" == "1" && -f "/in/codex-session.txt" ]]; then
   resume_session="$(tr -d '\r\n' < /in/codex-session.txt)"
 fi
 
+# For resume runs, prepend a short instruction to the prompt so Codex knows
+# that the previous Build Gate still failed and it should continue healing
+# from the existing context and emit [[REQUEST_BUILD_VALIDATION]] again.
+if [[ -n "$resume_session" ]]; then
+  resume_prefix="The previous Build Gate still failed (see /in/build-gate.log for the latest failure). Continue healing from the existing context and emit [[REQUEST_BUILD_VALIDATION]] again when ready for another gate run."
+  prompt="$resume_prefix"$'\n\n'"$prompt"
+fi
+
 # Build Codex exec command
 # Build base codex exec command; detect CLI capabilities via --help output.
 cmd=(codex exec)

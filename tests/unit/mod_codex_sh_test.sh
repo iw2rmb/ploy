@@ -405,8 +405,9 @@ test_resume_mode_with_existing_session() {
   tmp_ws=$(mktemp -d)
   tmp_in=$(mktemp -d)
 
-  # Write a prior session ID to /in/codex-session.txt
+  # Write a prior session ID and build gate log to /in
   echo "thread_prior_session_abc123" > "$tmp_in/codex-session.txt"
+  echo "build failed details" > "$tmp_in/build-gate.log"
 
   # Track if resume was invoked by recording all arguments
   local args_file="$tmp_out/.codex_args"
@@ -440,7 +441,7 @@ MOCKCODEX
   (
     export HOME="$tmp_home"
     export PATH="$tmp_bin:$PATH"
-    export CODEX_PROMPT="continue healing based on build-gate.log"
+    export CODEX_PROMPT="ORIGINAL_PROMPT"
     export CODEX_RESUME=1
     bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
   ) >/dev/null 2>&1
