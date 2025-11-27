@@ -58,7 +58,7 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Extend `Execute` so when `Validate` returns `Status=BuildGateJobStatusPending`:
       - Poll `GetJob` until `Status` is `BuildGateJobStatusCompleted`/`Failed` or context timeout.
-      - Use timeout from `spec` or `PLOY_BUILDGATE_TIMEOUT` env.
+      - Use timeout from the request context when set, otherwise derive from `PLOY_BUILDGATE_TIMEOUT` env (default 10m).
       - Return `Result` on completed; return error on failed or timeout.
   - Test:
     - Extend `gate_http_test.go`:

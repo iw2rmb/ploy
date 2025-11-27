@@ -98,7 +98,7 @@ func NewHTTPGateExecutorWithLogger(client BuildGateHTTPClient, logger *slog.Logg
 //   - Returns (nil, ctx.Err()) if the context is already cancelled.
 //
 // Request construction:
-//   - Profile and Timeout are taken from spec if provided.
+//   - Profile is taken from spec if provided.
 //   - RepoURL and Ref are temporary placeholders; Phase C will wire repo+diff
 //     metadata from the step manifest.
 //
@@ -137,8 +137,8 @@ func (e *httpGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 
 		// Profile from spec if provided; empty string triggers auto-detection on server.
 		Profile: spec.Profile,
-		// Timeout: StepGateSpec doesn't have timeout; use server default. Phase C may
-		// add timeout from manifest or env (PLOY_BUILDGATE_TIMEOUT).
+		// Timeout: StepGateSpec doesn't have a timeout field yet; use server default.
+		// Phase C may add timeout wiring from the step manifest or other config.
 	}
 
 	// Submit validation request to the Build Gate API.
