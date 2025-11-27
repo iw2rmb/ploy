@@ -152,7 +152,7 @@ Legend: [ ] todo, [x] done.
     - Manual smoke: run the E2E healing scenarios with real Codex to confirm logs show a resumed session (continuous conversation) instead of a fresh run.
 
 ## Phase C — Node agent healing loop orchestration
-- [ ] Propagate Codex session and sentinel artifacts through the healing loop — Let the node agent re-use Codex sessions across retries without changing gate semantics.
+- [x] Propagate Codex session and sentinel artifacts through the healing loop — Let the node agent re-use Codex sessions across retries without changing gate semantics.
   - Component: `internal/nodeagent/execution_healing.go`, `internal/nodeagent/manifest.go`, artifact upload helpers.
   - Scope:
     - In `executeWithHealing` (see `internal/nodeagent/execution_healing.go`), extend the healing loop to track Codex session and sentinel state:
