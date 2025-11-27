@@ -119,14 +119,17 @@ base_ref (+ commit_sha if specified) → fresh clone → pre-mod gate
 
 Each **post-mod gate** runs on the **rehydrated workspace for that step**. The workspace
 reflects all changes from prior mods (steps 0 through k-1) plus the changes from the
-current mod (step k). This is implemented via the `rehydrateWorkspaceForStep` function,
-which reconstructs workspace state from:
+current mod (step k).
+
+Before `mod[k]` executes, `rehydrateWorkspaceForStep` reconstructs the workspace for
+step k from:
 
 1. **Base clone**: A cached copy of the initial repository state (base_ref + commit_sha).
 2. **Ordered diffs**: Diffs from steps 0 through k-1 fetched from the control plane and
    applied in order using `git apply`.
-3. **Current mod output**: After the mod container exits, its changes become part of the
-   workspace that the post-mod gate validates.
+
+After `mod[k]` completes, its changes are present in the same workspace that the
+post-mod gate validates.
 
 Workspace state for post-mod gate at step k:
 ```
