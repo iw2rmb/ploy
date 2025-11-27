@@ -30,7 +30,7 @@ Legend: [ ] todo, [x] done.
   - Test: `rg "rehydrateWorkspaceForStep" docs/mods-lifecycle.md` — Confirm workspace semantics are called out.
 
 ## Phase B — Keep step.Runner as pre-mod gate + mod executor
-- [ ] Confirm current Runner.Run behavior (pre-gate per call) — Establish the baseline before adding helpers.
+- [x] Confirm current Runner.Run behavior (pre-gate per call) — Establish the baseline before adding helpers.
   - Component: `internal/workflow/runtime/step/stub.go`.
   - Scope:
     - Read `Runner.Run` implementation to confirm stages:
