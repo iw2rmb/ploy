@@ -96,7 +96,7 @@ Legend: [ ] todo, [x] done.
       - Asserts step manifests and gate spec contain expected repo metadata.
     - Run: `go test ./internal/nodeagent -run TestManifestBuildWithGateRepoMeta`.
 
-- [ ] C2 — Treat every execution step as a stage + diff — Unify Mods, healing, and Build Gate around stages and diffs.
+- [x] C2 — Treat every execution step as a stage + diff — Unify Mods, healing, and Build Gate around stages and diffs.
   - Component: `SCHEMA.sql`, `internal/store/diffs.sql.go`, `internal/server/handlers/handlers_diffs.go`, `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/difffetcher.go`.
   - Scope:
     - Use `stages` as canonical “step/node” table:
