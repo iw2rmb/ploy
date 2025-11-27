@@ -42,7 +42,7 @@ Legend: [ ] todo, [x] done.
   - Test:
     - Ensure existing tests in `internal/workflow/runtime/step/runner_gate_test.go` continue to pass (`TestRunner_Run_WithBuildGateEnabled`, `TestRunner_Run_PreModGateFailureWithoutHealing`).
     - Run `go test ./internal/workflow/runtime/step -run TestRunner_Run_`.
-- [ ] Add a gate-only helper in step package (no container execution) — Allow nodeagent to reuse gate logic without running a mod.
+- [x] Add a gate-only helper in step package (no container execution) — Allow nodeagent to reuse gate logic without running a mod.
   - Component: `internal/workflow/runtime/step`.
   - Scope:
     - Add a new file, e.g. `internal/workflow/runtime/step/gate_only.go`, with a helper:

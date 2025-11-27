@@ -420,3 +420,306 @@ func TestRunner_Run_GateTimingCapture(t *testing.T) {
 		t.Errorf("Run() BuildGateDuration = %v, expected >= %v", result.Timings.BuildGateDuration, gateDelay)
 	}
 }
+
+// -----------------------------------------------------------------------------
+// RunGateOnly Tests
+// -----------------------------------------------------------------------------
+
+// TestRunGateOnly_Enabled verifies that RunGateOnly invokes the gate executor
+// when the gate is enabled, populates BuildGate metadata, and does NOT invoke
+// any container runtime methods.
+func TestRunGateOnly_Enabled(t *testing.T) {
+	gateExecuted := false
+	containerCreated := false
+
+	runner := &Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate: &mockGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				gateExecuted = true
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{
+							Tool:   "checkstyle",
+							Passed: true,
+						},
+					},
+				}, nil
+			},
+		},
+		// Use a mock container runtime to detect if it's ever called.
+		Containers: &mockContainerRuntimeForGateOnly{
+			createFn: func() { containerCreated = true },
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "maven:3-eclipse-temurin-17",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+	}
+
+	req := Request{
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+	}
+
+	result, err := RunGateOnly(context.Background(), runner, req)
+	if err != nil {
+		t.Fatalf("RunGateOnly() unexpected error: %v", err)
+	}
+
+	// Verify gate was executed.
+	if !gateExecuted {
+		t.Errorf("RunGateOnly() gate executor not called when enabled")
+	}
+
+	// Verify container runtime was NOT invoked.
+	if containerCreated {
+		t.Errorf("RunGateOnly() should not create containers")
+	}
+
+	// Verify BuildGate metadata is populated.
+	if result.BuildGate == nil {
+		t.Errorf("RunGateOnly() BuildGate metadata not captured")
+	} else if len(result.BuildGate.StaticChecks) != 1 {
+		t.Errorf("RunGateOnly() BuildGate.StaticChecks = %d, want 1", len(result.BuildGate.StaticChecks))
+	}
+
+	// Verify timings are captured.
+	if result.Timings.BuildGateDuration == 0 {
+		t.Errorf("RunGateOnly() BuildGateDuration not captured when gate enabled")
+	}
+	if result.Timings.TotalDuration == 0 {
+		t.Errorf("RunGateOnly() TotalDuration not captured")
+	}
+
+	// Verify ExitCode is 0 (no container was executed).
+	if result.ExitCode != 0 {
+		t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
+	}
+}
+
+// TestRunGateOnly_Disabled verifies that RunGateOnly does NOT invoke the gate
+// executor when the gate is disabled in the manifest, and that no container
+// runtime methods are invoked.
+func TestRunGateOnly_Disabled(t *testing.T) {
+	gateExecuted := false
+	containerCreated := false
+
+	runner := &Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate: &mockGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				gateExecuted = true
+				return nil, nil
+			},
+		},
+		Containers: &mockContainerRuntimeForGateOnly{
+			createFn: func() { containerCreated = true },
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "maven:3-eclipse-temurin-17",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: false,
+			Profile: "java",
+		},
+	}
+
+	req := Request{
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+	}
+
+	result, err := RunGateOnly(context.Background(), runner, req)
+	if err != nil {
+		t.Fatalf("RunGateOnly() unexpected error: %v", err)
+	}
+
+	// Verify gate was NOT executed.
+	if gateExecuted {
+		t.Errorf("RunGateOnly() gate executor called when disabled")
+	}
+
+	// Verify container runtime was NOT invoked.
+	if containerCreated {
+		t.Errorf("RunGateOnly() should not create containers")
+	}
+
+	// Verify BuildGate metadata is nil when disabled.
+	if result.BuildGate != nil {
+		t.Errorf("RunGateOnly() BuildGate metadata should be nil when disabled")
+	}
+
+	// Verify ExitCode is 0.
+	if result.ExitCode != 0 {
+		t.Errorf("RunGateOnly() ExitCode = %d, want 0", result.ExitCode)
+	}
+}
+
+// TestRunGateOnly_GateFailure verifies that RunGateOnly returns ErrBuildGateFailed
+// when the gate validation fails, allowing callers to trigger healing.
+func TestRunGateOnly_GateFailure(t *testing.T) {
+	runner := &Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate: &mockGateExecutor{
+			executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+				// Simulate gate failure.
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{
+							Tool:   "maven",
+							Passed: false,
+						},
+					},
+					LogsText: "[ERROR] BUILD FAILURE",
+				}, nil
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "maven:3-eclipse-temurin-17",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+	}
+
+	req := Request{
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+	}
+
+	result, err := RunGateOnly(context.Background(), runner, req)
+
+	// Should return error when gate fails.
+	if err == nil {
+		t.Fatalf("RunGateOnly() expected error for failed gate, got nil")
+	}
+
+	// Error should wrap ErrBuildGateFailed sentinel.
+	if !errors.Is(err, ErrBuildGateFailed) {
+		t.Errorf("RunGateOnly() error should wrap ErrBuildGateFailed: %v", err)
+	}
+
+	// BuildGate metadata should be populated even on failure.
+	if result.BuildGate == nil {
+		t.Errorf("RunGateOnly() BuildGate metadata should be populated on gate failure")
+	} else if result.BuildGate.StaticChecks[0].Passed {
+		t.Errorf("RunGateOnly() BuildGate.StaticChecks[0].Passed = true, want false")
+	}
+
+	// Timings should be captured even on early failure.
+	if result.Timings.BuildGateDuration == 0 {
+		t.Errorf("RunGateOnly() BuildGateDuration should be captured on gate failure")
+	}
+	if result.Timings.TotalDuration == 0 {
+		t.Errorf("RunGateOnly() TotalDuration should be captured on gate failure")
+	}
+}
+
+// TestRunGateOnly_NilGate verifies that RunGateOnly succeeds without error
+// when no gate executor is configured.
+func TestRunGateOnly_NilGate(t *testing.T) {
+	runner := &Runner{
+		Workspace: &mockWorkspaceHydrator{},
+		Gate:      nil, // No gate executor configured.
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID("test-step"),
+		Name:  "Test Step",
+		Image: "test:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "source",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadOnly,
+				SnapshotCID: types.CID("bafytest123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+	}
+
+	req := Request{
+		Manifest:  manifest,
+		Workspace: "/tmp/test-workspace",
+	}
+
+	result, err := RunGateOnly(context.Background(), runner, req)
+	if err != nil {
+		t.Fatalf("RunGateOnly() unexpected error with nil gate: %v", err)
+	}
+
+	// BuildGate should be nil when no executor is configured.
+	if result.BuildGate != nil {
+		t.Errorf("RunGateOnly() BuildGate should be nil when gate executor is nil")
+	}
+}
+
+// mockContainerRuntimeForGateOnly is a minimal mock to detect if container
+// methods are invoked by RunGateOnly (they should not be).
+type mockContainerRuntimeForGateOnly struct {
+	createFn func()
+}
+
+func (m *mockContainerRuntimeForGateOnly) Create(ctx context.Context, spec ContainerSpec) (ContainerHandle, error) {
+	if m.createFn != nil {
+		m.createFn()
+	}
+	return ContainerHandle{ID: "mock-container"}, nil
+}
+
+func (m *mockContainerRuntimeForGateOnly) Start(ctx context.Context, handle ContainerHandle) error {
+	return nil
+}
+
+func (m *mockContainerRuntimeForGateOnly) Wait(ctx context.Context, handle ContainerHandle) (ContainerResult, error) {
+	return ContainerResult{ExitCode: 0}, nil
+}
+
+func (m *mockContainerRuntimeForGateOnly) Logs(ctx context.Context, handle ContainerHandle) ([]byte, error) {
+	return nil, nil
+}
+
+func (m *mockContainerRuntimeForGateOnly) Remove(ctx context.Context, handle ContainerHandle) error {
+	return nil
+}
