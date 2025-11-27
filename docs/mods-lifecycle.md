@@ -15,11 +15,91 @@ checkpoint notes in the repository.
 - **Spec** — YAML/JSON file or inline JSON describing container image,
   command, env, Build Gate and optional `mods[]` steps. Parsed by the CLI in
   `cmd/ploy/mod_run_spec.go`.
-- **Build Gate** — Pre-mod validation pass run by the workflow runner
-  (`internal/workflow/runtime/step`) before executing the mod container. It
-  typically compiles/tests the code.
-- **Healing** — Optional corrective steps run when the Build Gate fails before
-  re-gating and proceeding.
+- **Build Gate** — Validation pass run by the workflow runner
+  (`internal/workflow/runtime/step`) to ensure the workspace compiles/tests
+  successfully. Gates run at two distinct points in the lifecycle:
+  - **Pre-mod gate** — runs once on the initial workspace before any mods execute.
+  - **Post-mod gate** — runs after each mod in `mods[]` that exits with code 0.
+- **Healing** — Optional corrective steps run when any Build Gate (pre or post)
+  fails. The system enters a fail → heal mods → re-gate loop; if the gate still
+  fails after retries, the run terminates.
+
+## 1.1 Build Gate Sequence
+
+This section makes the pre-/post-gate execution order explicit for both
+single-mod and multi-mod runs. All gate failures follow the same healing
+protocol: fail → heal mods → re-gate; if healing is exhausted, the run fails
+and no further mods execute.
+
+### Single-mod runs (no `mods[]`)
+
+When the spec contains a single `mod` entry (or uses the legacy top-level
+image/command), the execution sequence is:
+
+```
+pre-gate(+healing) → mod → post-gate(+healing)
+```
+
+1. **Pre-mod Build Gate** — Runs once on the initial hydrated workspace (step 0)
+   before the mod container starts. Validates that the baseline code compiles
+   and tests pass.
+   - On failure with healing mods configured: enter fail → heal → re-gate loop.
+   - If healing is exhausted: run exits without executing the mod.
+
+2. **Mod execution** — The mod container runs against the validated workspace.
+   - Exit code 0: proceed to post-mod gate.
+   - Non-zero exit: run fails; no post-mod gate is run.
+
+3. **Post-mod Build Gate** — Runs on the same workspace after the mod exits
+   with code 0. Validates that the mod's changes do not break the build.
+   - On failure with healing mods configured: enter fail → heal → re-gate loop.
+   - If healing is exhausted: run fails.
+
+### Multi-mod runs (`mods[]`)
+
+When the spec contains a `mods[]` array with multiple entries, the execution
+sequence is:
+
+```
+pre-gate(+healing) → mod[0] → post-gate[0](+healing) → mod[1] → post-gate[1](+healing) → ... → mod[N-1] → post-gate[N-1](+healing)
+```
+
+1. **Pre-mod Build Gate** — Runs once on the initial hydrated workspace before
+   any mods execute.
+   - On failure with healing: enter fail → heal → re-gate loop.
+   - If healing exhausted: run exits without executing any mods.
+
+2. **For each mod[k] in `mods[]` (k = 0, 1, ..., N-1)**:
+   - **Mod[k] execution** — Runs against the workspace with changes from all
+     prior mods applied.
+   - **Post-mod gate[k]** — Runs after mod[k] exits with code 0.
+     - On failure with healing: enter fail → heal → re-gate loop.
+     - If healing exhausted: run fails and no further mods execute.
+   - If mod[k] exits non-zero: run fails; no post-gate and no further mods.
+
+### Gate failure semantics
+
+All Build Gate failures (pre or post) follow identical handling:
+
+- **Without healing mods**: The run fails immediately with `reason="build-gate"`.
+- **With healing mods**: The system enters the fail → heal → re-gate loop:
+  1. Gate fails: capture build output to `/in/build-gate.log`.
+  2. Execute healing mods (e.g., Codex) to fix the issue.
+  3. Re-run the gate on the healed workspace.
+  4. Repeat until gate passes or max retries exhausted.
+  5. If exhausted: run fails with `ErrBuildGateFailed`.
+
+The final gate result (pre-gate for runs with no mods executed, or the last
+post-gate) is surfaced in:
+- `Metadata["gate_summary"]` in `GET /v1/mods/{id}` responses.
+- `ploy mod inspect <ticket-id>` output as `Gate: passed|failed ...`.
+
+### Implementation references
+
+- Gate execution: `internal/workflow/runtime/step/stub.go` (`Runner.Run`).
+- Gate+healing orchestration: `internal/nodeagent/execution_healing.go`.
+- Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
+- Stats aggregation: `internal/domain/types/runstats.go` (`GateSummary()`).
 
 ## 2. Data Model
 
