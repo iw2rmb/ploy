@@ -62,7 +62,7 @@ Legend: [ ] todo, [x] done.
     - `docker build -t mods-codex:latest -f docker/mods/mod-codex/Dockerfile .` — Image builds successfully without `buildgate-validate`.
     - `GOFLAGS=${GOFLAGS:-} go test -v ./tests/integration/mods/mod-codex -run TestModCodex_HealsUsingBuildGateLog_FromFailingBranch -count=1` — Confirms the integration test passes with the new image and prompt contract.
 
-- [ ] Capture Codex last message and thread/session id from `codex exec` — Provide artifacts the node agent can use for resume and sentinel detection.
+- [x] Capture Codex last message and thread/session id from `codex exec` — Provide artifacts the node agent can use for resume and sentinel detection.
   - Component: `docker/mods/mod-codex/mod-codex.sh`.
   - Scope:
     - Extend the `codex exec` invocation to enable structured output:
