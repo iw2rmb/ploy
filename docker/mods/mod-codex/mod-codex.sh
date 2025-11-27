@@ -9,6 +9,8 @@ Environment:
   CODEX_PROMPT     Inline prompt text (used when --prompt-file not provided).
   CODEX_MODEL      Optional model override (e.g., o4-mini, gpt-4.1-mini, etc.).
   CODEX_AUTH_JSON  Inline JSON for auth; if set, written to ~/.codex/auth.json.
+  CODEX_RESUME     If set to "1" and /in/codex-session.txt exists, resume the prior
+                   Codex session instead of starting fresh (for healing retries).
   PLOY_API_TOKEN   Optional bearer token for Build Gate API (unused; gate runs externally).
 
 Behavior:
@@ -16,6 +18,8 @@ Behavior:
   - Places auth at /root/.codex/auth.json when --auth is given or CODEX_AUTH_JSON is set.
   - Always adds repository directory with: codex exec --add-dir <input> ...
   - Writes logs to <out>/codex.log and a small run manifest to <out>/codex-run.json.
+  - When CODEX_RESUME=1 and a prior session exists, uses "codex exec resume <session>"
+    to continue in the same thread, preserving context across healing attempts.
 USAGE
 }
 
@@ -59,6 +63,15 @@ elif [[ -n "${CODEX_PROMPT:-}" ]]; then
 else
   echo "ERROR: prompt required (use --prompt-file or CODEX_PROMPT)" >&2
   exit 2
+fi
+
+# Session resume mode: If CODEX_RESUME=1 and a prior session ID is available in
+# /in/codex-session.txt, we will use "codex exec resume <session>" to continue
+# in the same thread. This preserves conversation context across healing attempts.
+resume_session=""
+if [[ "${CODEX_RESUME:-}" == "1" && -f "/in/codex-session.txt" ]]; then
+  # Read session ID, stripping any trailing newlines/carriage returns.
+  resume_session="$(tr -d '\r\n' < /in/codex-session.txt)"
 fi
 
 # Build Codex exec command
@@ -109,6 +122,14 @@ if grep -q -- "--output-dir" <<<"$help_out"; then
   cmd+=(--output-dir "$out_dir/codex-transcript")
 fi
 
+# Append resume sub-command if we have a prior session ID. This instructs the Codex
+# CLI to continue the existing conversation thread rather than starting fresh.
+# The "resume <session_id>" subcommand must come after all flags but before the
+# trailing "-" that signals stdin prompt input.
+if [[ -n "$resume_session" ]]; then
+  cmd+=(resume "$resume_session")
+fi
+
 cmd+=( - )
 
 # Run Codex; pipe prompt via stdin; capture stdout/stderr to log and JSONL files.
@@ -116,7 +137,11 @@ logfile="$out_dir/codex.log"
 manifest="$out_dir/codex-run.json"
 jsonl="$out_dir/codex-events.jsonl"
 
+# Initialize log file with start message; log resume mode if active.
 echo "[mod-codex] starting codex exec with repo context" > "$logfile"
+if [[ -n "$resume_session" ]]; then
+  echo "[mod-codex] resume mode enabled; session=$resume_session" >> "$logfile"
+fi
 set +e
 # Pipe Codex output to:
 #   1. codex.log (human-readable log, appended)
@@ -164,9 +189,17 @@ fi
 #   input                    - Input directory path
 #   requested_build_validation - Whether sentinel was detected
 #   session_id               - Thread/session ID for resume (may be empty)
+#   resumed                  - Boolean indicating if this was a resume run
 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","requested_build_validation":%s,"session_id":"%s"}\n' \
+
+# Determine if this was a resumed session (for manifest metadata).
+was_resumed=false
+if [[ -n "$resume_session" ]]; then
+  was_resumed=true
+fi
+
+printf '{"ts":"%s","exit_code":%s,"model":"%s","input":"%s","requested_build_validation":%s,"session_id":"%s","resumed":%s}\n' \
   "$ts" "${status:-0}" "${model}" "$input_dir" \
-  "${requested_build}" "${session_id}" > "$manifest"
+  "${requested_build}" "${session_id}" "${was_resumed}" > "$manifest"
 
 exit "${status:-0}"
