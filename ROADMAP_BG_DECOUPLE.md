@@ -75,21 +75,32 @@ Legend: [ ] todo, [x] done.
       - Step manifests and gate spec contain the expected repo metadata for a Mods run.
     - Run `go test ./internal/nodeagent -run TestManifestBuildWithGateRepoMeta`.
 
-- [ ] Define how to compute `diff_patch` for gate from workspace state — Align in-process gate with HTTP repo+diff semantics.
-  - Component: diff generator (`internal/workflow/runtime/step/diff_*`), node agent `executeWithHealing`.
+- [ ] Treat every execution step as a stage + diff — Unify Mods, healing, and Build Gate around stages and diffs.
+  - Component: `SCHEMA.sql`, `internal/store/diffs.sql.go`, `internal/server/handlers/handlers_diffs.go`, `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/difffetcher.go`.
   - Scope:
-    - Reuse the existing diff generator used by `uploadHealingModDiff` (`r.createDiffGenerator()` in `internal/nodeagent/execution_healing.go`) to produce a unified diff of the workspace vs the baseline ref.
-    - Introduce a helper, e.g. `buildGateDiffForWorkspace(ctx, workspace, baseline)` that:
-      - Generates a diff in unified format.
-      - Gzips + base64 encodes it as expected by `BuildGateValidateRequest.diff_patch`.
-    - Wire this helper into `gate_http.go`:
-      - Before sending the HTTP request, compute `diff_patch` for:
-        - Initial gate (if any uncommitted changes already exist in workspace).
-        - Re‑gates after healing (healing changes are in workspace; diff captures them).
+    - Use `stages` as the canonical “step/node” table:
+      - Each execution unit (pre-run gate, healing, mod, post-gate, future nodes) must have a `stages` row with:
+        - `stages.run_id`
+        - `stages.id` (stage_id used everywhere)
+        - `stages.name` and/or `stages.meta.type` (e.g., `"pre_gate"`, `"mod"`, `"post_gate"`, `"healing"`).
+        - `stages.meta.step_index` for linear Mods ordering (or DAG metadata later).
+    - Ensure every diff emitted during Mods execution (mod or healing) is:
+      - Stored with `diffs.run_id` and **non-null** `diffs.stage_id` (no more anonymous healing diffs).
+      - Tagged in `diffs.summary` with:
+        - `step_index` (matches `stages.meta.step_index` when applicable).
+        - `mod_type` (e.g., `"mod"`, `"healing"`, `"pre_gate"`, `"post_gate"`).
+    - Update rehydration logic to use stages + diffs consistently:
+      - For the current linear model: `rehydrateWorkspaceForStep(stepIndex=k)` must:
+        - Fetch all diffs where `summary.step_index <= k` (including healing) and apply them in `created_at` order.
+      - For future DAG execution: replace the `step_index` filter with “all diffs belonging to ancestor stages of the target stage”.
+    - Keep this model as the single source of truth for both Mods rehydration and repo+diff inputs to Build Gate.
   - Test:
-    - Add tests in `internal/nodeagent/execution_healing_test.go`:
-      - Simulate a workspace with healing changes and assert `buildGateDiffForWorkspace` returns non‑empty `diff_patch`.
-    - Add unit tests around encoding in a small helper package or in `gate_http_test.go`, comparing the encoded `diff_patch` against a known diff+gzip+base64 pipeline.
+    - Extend `internal/store/diffs_step_index_test.go` to assert:
+      - Diffs are ordered by `step_index` then `created_at`.
+      - Healing diffs with a stage_id and step_index are included in queries that drive rehydration.
+    - Extend `internal/nodeagent/difffetcher_test.go` and `tests/integration/smoke_workflow_test.go` to verify:
+      - `FetchDiffsForStep` includes all diffs (mods + healing) up to the target step.
+      - Rehydrated workspaces match a single-node execution.
 
 ## Phase D — Switch Mods pre‑gate and re‑gate to HTTP Build Gate API
 - [ ] Route main pre-mod Build Gate calls through the HTTP adapter — Allow gate to run on any Build Gate worker.
