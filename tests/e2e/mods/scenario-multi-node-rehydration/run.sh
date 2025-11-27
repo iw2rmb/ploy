@@ -173,6 +173,45 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   echo "   - Rehydration still occurs and validates correctly"
   echo ""
 
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Validate Codex healing pipeline artifacts (if healing occurred)
+  # Per ROADMAP.md Phase D: RED→GREEN→REFACTOR discipline for Codex healing.
+  # ─────────────────────────────────────────────────────────────────────────────
+  if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+    echo "6. Codex healing handshake (if healing was triggered):"
+    echo "   - Sentinel visibility: Look for [[REQUEST_BUILD_VALIDATION]] in codex.log or codex-last.txt"
+    echo "   - Session resume: Check for codex-session.txt artifact for retry continuity"
+    echo ""
+
+    # Automated validation of Codex artifacts (if present).
+    CODEX_LOG="${ARTIFACT_DIR}/codex.log"
+    CODEX_SESSION="${ARTIFACT_DIR}/codex-session.txt"
+    CODEX_MANIFEST="${ARTIFACT_DIR}/codex-run.json"
+
+    echo "   Automated artifact checks:"
+    if [[ -f "$CODEX_LOG" ]]; then
+      if grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
+        echo "   ✓ Sentinel detected in codex.log"
+      else
+        echo "   - Sentinel not found (healing may not have used Codex)"
+      fi
+    else
+      echo "   - codex.log not present (no Codex healing in this run)"
+    fi
+
+    if [[ -f "$CODEX_SESSION" ]]; then
+      SESSION_ID=$(cat "$CODEX_SESSION" | tr -d '\r\n')
+      if [[ -n "$SESSION_ID" ]]; then
+        echo "   ✓ Session ID captured for resume: ${SESSION_ID:0:20}..."
+      fi
+    fi
+
+    if [[ -f "$CODEX_MANIFEST" ]]; then
+      echo "   ✓ codex-run.json manifest present"
+    fi
+    echo ""
+  fi
+
   if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
     echo "Artifacts saved to: $ARTIFACT_DIR"
     echo "Review artifacts with:"

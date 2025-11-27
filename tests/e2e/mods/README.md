@@ -92,6 +92,39 @@ The recommended approach for Codex-based healing is the sentinel protocol. Codex
 
 Legacy healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
 
+**Codex Healing Handshake Checklist (TDD Validation):**
+
+Per ROADMAP.md Phase D (RED→GREEN→REFACTOR discipline), the following artifacts should be validated after Codex-based healing runs:
+
+| Artifact | Location | Description | Required |
+|----------|----------|-------------|----------|
+| Sentinel message | `codex.log` or `codex-last.txt` | `[[REQUEST_BUILD_VALIDATION]]` signals Build Gate re-run | Recommended |
+| Sentinel flag | `request_build_validation` | Boolean flag file for sentinel detection | Optional |
+| Session ID | `codex-session.txt` | Thread ID for resume mode across healing retries | Recommended |
+| Run manifest | `codex-run.json` | JSON with `requested_build_validation`, `session_id`, `resumed` fields | Required |
+
+**Validation steps:**
+
+1. **Sentinel visibility**: After each healing attempt, verify that:
+   - `codex.log` or `codex-last.txt` contains `[[REQUEST_BUILD_VALIDATION]]`
+   - OR `request_build_validation` flag file exists with value `true`
+   - The node agent logs "codex requested build validation" upon sentinel detection
+
+2. **Session resume across healing retries**: When `retries > 1` in healing config:
+   - After first healing attempt: `codex-session.txt` is written to `/out` with thread ID
+   - Before second healing attempt: Session ID is propagated to `/in/codex-session.txt`
+   - Subsequent healing mods receive `CODEX_RESUME=1` environment variable
+   - `codex.log` shows "resume mode enabled; session=<id>" on retry attempts
+   - `codex-run.json` contains `"resumed":true` for resumed runs
+
+3. **Run manifest fields** (`codex-run.json`):
+   - `requested_build_validation`: `true` when sentinel was emitted
+   - `session_id`: Thread ID for conversation continuity (may be empty)
+   - `resumed`: `true` if this was a resumed session, `false` otherwise
+
+See `tests/unit/mod_codex_sh_test.sh` for unit tests covering these behaviors.
+Cross-reference: `ROADMAP.md` Phase D, `GOLANG.md` Codex Healing Pipeline section.
+
 **Cross-phase inputs available to healing mods:**
 - `/in/build-gate.log` — First Build Gate failure log (read-only mount)
 - `/in/prompt.txt` — Optional prompt file (mounted when provided in spec)
