@@ -123,7 +123,7 @@ Legend: [ ] todo, [x] done.
       - `request_build_validation` and `codex-session.txt` exist in `/out` when running with a real Codex auth (or a stubbed CLI).
     - Run `make test` and `scripts/validate-tdd-discipline.sh ./docker/mods/...` to ensure coverage thresholds referenced in `AGENTS.md` remain satisfied.
 
-- [ ] Implement Codex session resume mode inside `mod-codex.sh` — Allow subsequent healing attempts to re-use the original session.
+- [x] Implement Codex session resume mode inside `mod-codex.sh` — Allow subsequent healing attempts to re-use the original session.
   - Component: `docker/mods/mod-codex/mod-codex.sh`.
   - Scope:
     - Introduce an opt-in resume mode controlled via environment:
