@@ -36,7 +36,7 @@ Legend: [ ] todo, [x] done.
       - Fake `http.RoundTripper` to assert `POST /v1/buildgate/validate` and `GET /v1/buildgate/jobs/{id}`.
     - Run: `go test ./internal/workflow/runtime/step -run TestBuildGateHTTPClient`.
 
-- [ ] B2 — HTTPGateExecutor skeleton wired to client — Minimal GateExecutor that calls the HTTP client (sync only).
+- [x] B2 — HTTPGateExecutor skeleton wired to client — Minimal GateExecutor that calls the HTTP client (sync only).
   - Component: `internal/workflow/runtime/step/gate_http.go`.
   - Scope:
     - Define:
