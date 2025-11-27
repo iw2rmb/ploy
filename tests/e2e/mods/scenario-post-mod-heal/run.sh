@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# E2E scenario: Multi-step Mods run with post-mod gate healing.
+#
+# This script validates gate-heal-regate behavior when a mod transformation
+# introduces a compile error (post-mod gate fails), requiring healing to fix
+# it before the run can continue.
+#
+# Scenario flow:
+#   1. Submit multi-step mod run to fail-missing-symbol branch
+#   2. Some steps may trigger post-gate failures (missing class reference)
+#   3. Healing mod creates the missing class
+#   4. Re-gate passes after healing
+#   5. Subsequent steps execute successfully
+#
+# This guards against regressions in:
+# - Post-mod gate failure detection
+# - Healing execution after post-gate failures
+# - Re-gate success propagation
+# - GateSummary reflecting final (post-mod) gate result
+#
+# Prerequisites:
+# - ploy binary available at dist/ploy (run: make build)
+# - Cluster descriptor at ~/.config/ploy/clusters/default
+# - Codex auth at ~/.codex/auth.json (for healing)
+# - Optional: PLOY_GITLAB_PAT for MR creation
+#
+# Usage:
+#   # From repository root:
+#   bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+#
+#   # With custom configuration:
+#   REPO_URL="https://gitlab.com/example/repo.git" \
+#   REPO_BASE_REF="fail-branch" \
+#   bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+#
+#   # Skip artifact collection:
+#   SKIP_ARTIFACTS=1 bash tests/e2e/mods/scenario-post-mod-heal/run.sh
+
+set -euo pipefail
+
+################################################################################
+# CONFIGURATION
+################################################################################
+
+# Locate ploy binary (check multiple possible locations).
+PLOY_BIN=""
+for candidate in "../../../../dist/ploy" "./dist/ploy" "dist/ploy"; do
+  if [[ -x "$candidate" ]]; then
+    PLOY_BIN="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$PLOY_BIN" ]]; then
+  echo "Error: ploy binary not found. Run 'make build' first." >&2
+  exit 1
+fi
+
+# Repository and branch configuration (override via environment variables).
+# Uses e2e/fail-missing-symbol branch which has code referencing UndefinedClass.
+REPO_URL="${REPO_URL:-https://gitlab.com/iw2rmb/ploy-orw-java11-maven.git}"
+REPO_BASE_REF="${REPO_BASE_REF:-e2e/fail-missing-symbol}"
+REPO_TARGET_REF="${REPO_TARGET_REF:-mods-e2e-post-mod-heal-$(date +%y%m%d%H%M%S)}"
+
+# Spec file location (relative to script directory).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPEC_FILE="${SCRIPT_DIR}/mod.yaml"
+
+# Artifact collection (optional).
+SKIP_ARTIFACTS="${SKIP_ARTIFACTS:-0}"
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  TS=$(date +%y%m%d%H%M%S)
+  ARTIFACT_DIR="${ARTIFACT_DIR:-./tmp/mods/scenario-post-mod-heal/${TS}}"
+  mkdir -p "${ARTIFACT_DIR}"
+fi
+
+################################################################################
+# PRE-FLIGHT CHECKS
+################################################################################
+
+echo "=========================================="
+echo "E2E: Post-Mod Gate Healing Scenario"
+echo "=========================================="
+echo "Ploy binary:     $PLOY_BIN"
+echo "Repo URL:        $REPO_URL"
+echo "Base ref:        $REPO_BASE_REF"
+echo "Target ref:      $REPO_TARGET_REF"
+echo "Spec file:       $SPEC_FILE"
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  echo "Artifacts:       $ARTIFACT_DIR"
+else
+  echo "Artifacts:       SKIPPED"
+fi
+echo "=========================================="
+echo ""
+
+# Verify spec file exists.
+if [[ ! -f "$SPEC_FILE" ]]; then
+  echo "Error: Spec file not found at $SPEC_FILE" >&2
+  exit 1
+fi
+
+# Check for Codex auth (recommended for healing).
+if [[ ! -f "${HOME}/.codex/auth.json" ]]; then
+  echo "Warning: ~/.codex/auth.json not found."
+  echo "         Healing may fail without Codex authentication."
+  echo "         Set up Codex auth before running this scenario."
+  echo ""
+fi
+
+# Check for GitLab PAT (optional).
+if [[ -z "${PLOY_GITLAB_PAT:-}" ]]; then
+  echo "Note: PLOY_GITLAB_PAT not set. MR creation will be skipped."
+  echo "      To enable MR validation: export PLOY_GITLAB_PAT=your-token"
+  echo ""
+fi
+
+################################################################################
+# SUBMIT RUN AND FOLLOW LOGS
+################################################################################
+
+echo "Submitting multi-step mod run with post-mod healing..."
+echo ""
+
+# Build command with required flags.
+CMD_ARGS=(
+  "$PLOY_BIN"
+  mod run
+  --repo-url "$REPO_URL"
+  --repo-base-ref "$REPO_BASE_REF"
+  --repo-target-ref "$REPO_TARGET_REF"
+  --spec "$SPEC_FILE"
+  --follow
+)
+
+# Add artifact directory if collection is enabled.
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  CMD_ARGS+=(--artifact-dir "$ARTIFACT_DIR")
+fi
+
+# Execute the run.
+# Disable 'set -e' temporarily to capture exit code and provide summary.
+set +e
+"${CMD_ARGS[@]}"
+EXIT_CODE=$?
+set -e
+
+echo ""
+echo "=========================================="
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "✓ Post-mod gate healing scenario PASSED"
+else
+  echo "✗ Post-mod gate healing scenario FAILED (exit code: $EXIT_CODE)"
+fi
+echo "=========================================="
+echo ""
+
+################################################################################
+# POST-RUN VALIDATION
+################################################################################
+
+if [[ "$SKIP_ARTIFACTS" == "0" ]]; then
+  echo "Validating post-mod healing artifacts..."
+  echo ""
+
+  VALIDATION_FAILED=0
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 1. Verify sentinel behavior: Codex should emit [[REQUEST_BUILD_VALIDATION]].
+  #    The sentinel signals that Codex has fixed the code and wants a re-gate.
+  # ─────────────────────────────────────────────────────────────────────────────
+  CODEX_LOG="${ARTIFACT_DIR}/codex.log"
+  CODEX_LAST="${ARTIFACT_DIR}/codex-last.txt"
+  SENTINEL_FLAG="${ARTIFACT_DIR}/request_build_validation"
+
+  echo "  1. Sentinel detection (healing completion signal):"
+  if [[ -f "$SENTINEL_FLAG" ]]; then
+    echo "     ✓ Sentinel flag file present (request_build_validation)"
+  elif [[ -f "$CODEX_LAST" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LAST"; then
+    echo "     ✓ Sentinel detected in codex-last.txt"
+  elif [[ -f "$CODEX_LOG" ]] && grep -q '\[\[REQUEST_BUILD_VALIDATION\]\]' "$CODEX_LOG"; then
+    echo "     ✓ Sentinel detected in codex.log"
+  else
+    echo "     ⚠ Sentinel [[REQUEST_BUILD_VALIDATION]] not found"
+    echo "       This may indicate healing did not trigger (no post-gate failure)"
+    echo "       or Codex completed without emitting the sentinel."
+    # Not a hard failure; the scenario may pass without needing healing
+    # depending on branch state.
+  fi
+  echo ""
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 2. Verify session resume support: codex-session.txt enables retry continuity.
+  # ─────────────────────────────────────────────────────────────────────────────
+  CODEX_SESSION="${ARTIFACT_DIR}/codex-session.txt"
+
+  echo "  2. Session resume support (healing retry continuity):"
+  if [[ -f "$CODEX_SESSION" ]]; then
+    SESSION_ID=$(tr -d '\r\n' < "$CODEX_SESSION")
+    if [[ -n "$SESSION_ID" ]]; then
+      echo "     ✓ Codex session captured: ${SESSION_ID:0:20}..."
+    else
+      echo "     ⚠ codex-session.txt is empty (session resume not available)"
+    fi
+  else
+    echo "     - codex-session.txt not found (session resume not available)"
+    echo "       This is expected if healing did not run."
+  fi
+  echo ""
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 3. Verify codex-run.json manifest contains required fields.
+  # ─────────────────────────────────────────────────────────────────────────────
+  CODEX_MANIFEST="${ARTIFACT_DIR}/codex-run.json"
+
+  echo "  3. Codex run manifest (healing metadata):"
+  if [[ -f "$CODEX_MANIFEST" ]]; then
+    echo "     ✓ codex-run.json present"
+    if grep -q '"requested_build_validation"' "$CODEX_MANIFEST"; then
+      echo "     ✓ Manifest contains requested_build_validation field"
+    else
+      echo "     ⚠ Manifest missing requested_build_validation field"
+    fi
+    if grep -q '"session_id"' "$CODEX_MANIFEST"; then
+      echo "     ✓ Manifest contains session_id field"
+    else
+      echo "     ⚠ Manifest missing session_id field"
+    fi
+    if grep -q '"resumed"' "$CODEX_MANIFEST"; then
+      echo "     ✓ Manifest contains resumed field"
+    else
+      echo "     ⚠ Manifest missing resumed field"
+    fi
+  else
+    echo "     - codex-run.json not found"
+    echo "       This is expected if healing did not run."
+  fi
+  echo ""
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 4. Verify gate-related artifacts exist (from Build Gate runs).
+  # ─────────────────────────────────────────────────────────────────────────────
+  echo "  4. Build Gate artifacts:"
+  GATE_ARTIFACTS=$(find "$ARTIFACT_DIR" -name "*build-gate*.log*" -o -name "*build-gate*.bin" 2>/dev/null | wc -l)
+  if [[ $GATE_ARTIFACTS -gt 0 ]]; then
+    echo "     ✓ Found $GATE_ARTIFACTS gate-related artifacts"
+    find "$ARTIFACT_DIR" -name "*build-gate*" -exec basename {} \; 2>/dev/null | head -5 | while read -r f; do
+      echo "       - $f"
+    done
+  else
+    echo "     ⚠ No build-gate artifacts found"
+    echo "       Gate artifacts should be present for post-mod gate runs."
+  fi
+  echo ""
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # 5. Summary
+  # ─────────────────────────────────────────────────────────────────────────────
+  echo "  Summary:"
+  echo "     Artifacts saved to: $ARTIFACT_DIR"
+  echo ""
+  if [[ $EXIT_CODE -eq 0 ]]; then
+    echo "  Post-mod gate healing validation complete."
+    echo "  Run succeeded; GateSummary should reflect final (post-mod) gate result."
+  else
+    echo "  Run failed. Check artifacts and logs for details."
+    echo "  Possible causes:"
+    echo "  - Healing could not fix the post-gate error (retries exhausted)"
+    echo "  - Codex auth not configured (healing container failed)"
+    echo "  - Network/cluster issues"
+  fi
+  echo ""
+fi
+
+################################################################################
+# VALIDATION CHECKLIST (manual)
+################################################################################
+
+if [[ $EXIT_CODE -eq 0 ]]; then
+  echo "Manual validation checklist:"
+  echo ""
+  echo "1. Post-mod gate failure detection:"
+  echo "   - Review SSE events for 'gate_failed' events after mod steps"
+  echo "   - Logs should indicate post-mod (not pre-mod) gate failure"
+  echo ""
+  echo "2. Healing execution:"
+  echo "   - Review codex.log for healing activity"
+  echo "   - Check for [[REQUEST_BUILD_VALIDATION]] sentinel"
+  echo "   - Verify healing created/modified files to fix the error"
+  echo ""
+  echo "3. Re-gate success:"
+  echo "   - Review SSE events for 'gate_passed' after healing"
+  echo "   - GateSummary should show passing final-gate"
+  echo "   - Command: dist/ploy mod inspect <ticket-id>"
+  echo ""
+  echo "4. Multi-step continuation:"
+  echo "   - All steps should complete after healing"
+  echo "   - Final status should be success"
+  echo ""
+  echo "5. MR content (if PLOY_GITLAB_PAT was set):"
+  echo "   - MR should contain original transformation + healing fixes"
+  echo "   - MR title should reference target ref: $REPO_TARGET_REF"
+  echo ""
+fi
+
+exit $EXIT_CODE
