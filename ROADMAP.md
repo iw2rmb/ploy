@@ -47,7 +47,7 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Add a new file, e.g. `internal/workflow/runtime/step/gate_only.go`, with a helper:
       ```go
-      func RunGateOnly(ctx context.Context, r Runner, req Request) (Result, error) {
+      func RunGateOnly(ctx context.Context, r *Runner, req Request) (Result, error) {
           // Hydrate workspace, run gate (if enabled), populate Result.BuildGate and timings.
           // Do not create or start any containers.
       }
