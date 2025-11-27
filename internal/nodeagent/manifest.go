@@ -126,6 +126,20 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		mergedOpts["artifact_name"] = aname
 	}
 
+	// Derive the gate ref from repo metadata. Precedence:
+	//   1. CommitSHA — pinned commit ensures deterministic gate validation.
+	//   2. TargetRef — branch/tag for feature branches and PR flows.
+	//   3. BaseRef — fallback for baseline validations.
+	// This mirrors the ref precedence documented in StepGateSpec.
+	gateRef := ""
+	if sha := strings.TrimSpace(req.CommitSHA.String()); sha != "" {
+		gateRef = sha
+	} else if tr := strings.TrimSpace(req.TargetRef.String()); tr != "" {
+		gateRef = tr
+	} else if br := strings.TrimSpace(req.BaseRef.String()); br != "" {
+		gateRef = br
+	}
+
 	manifest := contracts.StepManifest{
 		ID:         types.StepID(req.RunID),
 		Name:       fmt.Sprintf("Run %s", req.RunID),
@@ -133,7 +147,16 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 		Command:    command,
 		WorkingDir: "/workspace",
 		Env:        env,
-		Gate:       &contracts.StepGateSpec{Enabled: true, Profile: "java-auto", Env: map[string]string{}},
+		// Gate spec includes repo metadata for HTTP-based gate execution (C1).
+		// RepoURL and Ref enable remote gate workers to clone and validate
+		// without direct workspace access.
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java-auto",
+			Env:     map[string]string{},
+			RepoURL: strings.TrimSpace(req.RepoURL.String()),
+			Ref:     gateRef,
+		},
 		Inputs: []contracts.StepInput{
 			{
 				Name:      "workspace",

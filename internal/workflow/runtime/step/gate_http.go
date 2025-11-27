@@ -121,24 +121,22 @@ func (e *httpGateExecutor) Execute(ctx context.Context, spec *contracts.StepGate
 		return nil, nil
 	}
 
-	// Build a minimal request. Phase C (C1) will wire repo metadata (RepoURL, Ref)
-	// from the step manifest. For now, these are temporary placeholders to satisfy
-	// the BuildGateValidateRequest.Validate() requirements.
+	// Build the validation request using repo metadata from the step manifest (C1).
+	// StepGateSpec.RepoURL and .Ref are populated by buildManifestFromRequest from
+	// the run's StartRunRequest, ensuring GateExecutor has access to the same repo
+	// baseline used for workspace hydration.
 	//
-	// NOTE: Callers must ensure RepoURL and Ref are populated before using this
-	// executor in production. This skeleton uses placeholder values that will fail
-	// validation in the HTTP client unless the spec carries real repo metadata.
+	// If RepoURL or Ref are empty, the HTTP client's Validate call will return a
+	// validation error, which is correct behavior — callers must ensure manifests
+	// have repo metadata before invoking HTTP-based gate execution.
 	req := contracts.BuildGateValidateRequest{
-		// Temporary: placeholder values. Phase C will populate from step manifest.
-		// The HTTP client will return a validation error if these remain empty,
-		// which is the expected behavior until repo+diff wiring is complete.
-		RepoURL: "", // TODO(B2): Wire from step manifest in Phase C.
-		Ref:     "", // TODO(B2): Wire from step manifest in Phase C.
+		// Repo metadata wired from StepGateSpec (Phase C1).
+		RepoURL: spec.RepoURL,
+		Ref:     spec.Ref,
 
 		// Profile from spec if provided; empty string triggers auto-detection on server.
 		Profile: spec.Profile,
 		// Timeout: StepGateSpec doesn't have a timeout field yet; use server default.
-		// Phase C may add timeout wiring from the step manifest or other config.
 	}
 
 	// Submit validation request to the Build Gate API.

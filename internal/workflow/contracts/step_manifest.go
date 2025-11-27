@@ -84,10 +84,28 @@ type StepShiftSpec struct {
 }
 
 // StepGateSpec configures Build Gate validation post step execution.
+//
+// The RepoURL and Ref fields provide repo metadata for HTTP-based gate execution,
+// enabling remote Build Gate workers to clone and validate the repository without
+// requiring direct workspace access. These fields are populated from the run's
+// StartRunRequest and threaded through manifests.
+//
+// Ref precedence (set by manifest builders):
+//  1. CommitSHA — pinned commit when available (ensures deterministic validation).
+//  2. TargetRef — branch/tag for feature branches and PR flows.
+//  3. BaseRef — fallback for baseline validations.
 type StepGateSpec struct {
 	Enabled bool
 	Profile string
 	Env     map[string]string
+
+	// RepoURL is the Git repository URL for remote gate execution.
+	// Populated from StartRunRequest.RepoURL when building manifests.
+	RepoURL string
+
+	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
+	// Derived from CommitSHA > TargetRef > BaseRef precedence when building manifests.
+	Ref string
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
