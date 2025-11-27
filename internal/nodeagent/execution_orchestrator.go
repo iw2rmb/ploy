@@ -186,11 +186,18 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		slog.Info("pre-mod gate passed, proceeding to mod execution", "run_id", req.RunID)
 	}
 
-	// Phase 4b: Execute steps sequentially (gate+mod for each step).
+	// Phase 4b: Execute steps sequentially (container execution + post-gates per step).
 	// For multi-step runs, loop over Steps; for single-step runs, execute once with stepIndex=0.
 	// For multi-node step-level claims, execute only the claimed step (startStepIndex..stepCount).
 	// Each step runs in a fresh workspace created via rehydration (base + ordered diffs).
 	// If any step fails, halt execution and report terminal status.
+	//
+	// GATE CONTRACT (ROADMAP Phase G):
+	// - The pre-run gate (Phase 4a above) is the ONLY pre-gate for the entire run.
+	// - Per-step execution via executeWithHealing does NOT run additional pre-step gates;
+	//   it disables Gate.Enabled on the cloned manifest before calling Runner.Run.
+	// - Only post-mod gates (gatePhase="post") are executed per step to validate changes.
+	// - This ensures exactly one pre-run gate per run, avoiding redundant validation.
 	var finalExecResult executionResult
 	var finalExecErr error
 	var finalManifest contracts.StepManifest
