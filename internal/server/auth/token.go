@@ -49,7 +49,7 @@ func GenerateAPIToken(secret, clusterID, role string, expiresAt time.Time) (stri
 func GenerateBootstrapToken(secret, clusterID, nodeID string, expiresAt time.Time) (string, error) {
 	claims := &TokenClaims{
 		ClusterID: domaintypes.ClusterID(clusterID),
-		Role:      RoleWorker,
+		Role:      string(RoleWorker),
 		TokenType: TokenTypeBootstrap,
 		NodeID:    nodeID,
 		RegisteredClaims: jwt.RegisteredClaims{

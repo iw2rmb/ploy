@@ -94,23 +94,13 @@ func submitTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Create stages for the run based on the spec (single-step or multi-step).
-		// For multi-step runs (mods[] array), create one stage per mod step.
-		// For single-step runs (mod or legacy top-level), create a single stage.
-		// Each stage metadata includes step_index and step_total to enable ordered execution.
-		if err := createStagesFromSpec(r.Context(), st, run.ID, spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create stages: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create stages failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
-			return
-		}
-
-		// Materialize run_steps rows for multi-step runs.
-		// For multi-step runs (mods[] array present), create one run_step record per mods[] entry.
-		// For single-step runs, skip run_steps materialization (run is claimed atomically via ClaimRun).
-		// This enables step-level claiming and multi-node execution for multi-step runs.
-		if err := materializeRunStepsIfNeeded(r.Context(), st, run.ID, spec); err != nil {
-			http.Error(w, fmt.Sprintf("failed to create run steps: %v", err), http.StatusInternalServerError)
-			slog.Error("submit ticket: create run steps failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+		// Create jobs for the run execution pipeline.
+		// Jobs are created with float step_index for ordered execution:
+		//   pre-gate (1000) → mod-0 (2000) → post-gate (3000)
+		// For multi-step runs (mods[] array), creates one mod job per entry.
+		if err := createJobsFromSpec(r.Context(), st, run.ID, spec); err != nil {
+			http.Error(w, fmt.Sprintf("failed to create jobs: %v", err), http.StatusInternalServerError)
+			slog.Error("submit ticket: create jobs failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
 
@@ -245,21 +235,21 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			summary.Metadata["reason"] = strings.TrimSpace(*run.Reason)
 		}
 
-		// Load stages and their artifacts.
-		stages, err := st.ListStagesByRun(r.Context(), storePgUUID(run.ID))
+		// Load jobs and their artifacts.
+		jobs, err := st.ListJobsByRun(r.Context(), storePgUUID(run.ID))
 		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to list stages: %v", err), http.StatusInternalServerError)
-			slog.Error("get ticket status: list stages failed", "ticket_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			http.Error(w, fmt.Sprintf("failed to list jobs: %v", err), http.StatusInternalServerError)
+			slog.Error("get ticket status: list jobs failed", "ticket_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
 			return
 		}
-		for _, stg := range stages {
-			// Use conversion helper to map store.StageStatus -> modsapi.StageState
-			s := modsapi.StageStatusFromStore(stg.Status)
+		for _, job := range jobs {
+			// Use conversion helper to map store.JobStatus -> modsapi.StageState
+			s := modsapi.StageStatusFromStore(job.Status)
 			artMap := make(map[string]string)
-			bundles, err := st.ListArtifactBundlesByRunAndStage(r.Context(), store.ListArtifactBundlesByRunAndStageParams{RunID: storePgUUID(run.ID), StageID: stg.ID})
+			bundles, err := st.ListArtifactBundlesByRunAndJob(r.Context(), store.ListArtifactBundlesByRunAndJobParams{RunID: storePgUUID(run.ID), JobID: job.ID})
 			if err != nil {
 				http.Error(w, fmt.Sprintf("failed to list artifacts: %v", err), http.StatusInternalServerError)
-				slog.Error("get ticket status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "stage_id", uuid.UUID(stg.ID.Bytes).String(), "err", err)
+				slog.Error("get ticket status: list artifacts failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
 				return
 			}
 			for _, b := range bundles {
@@ -272,20 +262,14 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 				}
 			}
 
-			// Parse step metadata from stage.meta JSONB.
-			// For multi-step runs, this includes step_index for ordering.
-			stepIndex := 0
-			if len(stg.Meta) > 0 && json.Valid(stg.Meta) {
-				var stageMeta modsapi.StageMetadata
-				if err := json.Unmarshal(stg.Meta, &stageMeta); err == nil {
-					stepIndex = stageMeta.StepIndex
-				}
-			}
+			// Use job's step_index directly for ordering (float, but expose as int for API).
+			stepIndex := int(job.StepIndex)
 
 			// Attempts/MaxAttempts are currently fixed at 1; future retries must
 			// update these counters without changing StepIndex semantics.
-			summary.Stages[uuid.UUID(stg.ID.Bytes).String()] = modsapi.StageStatus{
-				StageID:     domaintypes.StageID(uuid.UUID(stg.ID.Bytes).String()),
+			// Note: Using job.ID as StageID for API backward compatibility.
+			summary.Stages[uuid.UUID(job.ID.Bytes).String()] = modsapi.StageStatus{
+				StageID:     domaintypes.StageID(uuid.UUID(job.ID.Bytes).String()),
 				State:       s,
 				Attempts:    1,
 				MaxAttempts: 1,
@@ -302,126 +286,105 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 	}
 }
 
-// createStagesFromSpec parses the run spec and creates stages for multi-step or single-step runs.
-// For multi-step runs (mods[] array in spec), creates one stage per mod.
-// For single-step runs (mod or legacy top-level), creates a single stage named "mods-openrewrite".
-// Each stage's meta JSONB includes step_index and step_total for ordered execution. These values
-// are persisted in stages.meta JSONB and surfaced via GET /v1/mods/{id} as StageStatus.StepIndex.
-func createStagesFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
+// createJobsFromSpec parses the run spec and creates jobs for the execution pipeline.
+// Jobs are created with float step_index for ordered execution with dynamic insertion support.
+//
+// Default job layout:
+//   - pre-gate  (step_index=1000): Pre-mod validation/gate
+//   - mod-0     (step_index=2000): First mod execution
+//   - post-gate (step_index=3000): Post-mod validation
+//
+// For multi-step runs (mods[] array), creates one mod job per entry.
+// Healing jobs can be inserted dynamically between existing jobs using midpoint calculation.
+func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
 	// Parse spec to detect multi-step vs single-step.
 	var specMap map[string]interface{}
 	if len(spec) > 0 && json.Valid(spec) {
 		if err := json.Unmarshal(spec, &specMap); err != nil {
-			// Invalid JSON; fallback to single stage.
-			return createSingleStage(ctx, st, runID, 0, 1, "")
+			// Invalid JSON; fallback to single mod job.
+			return createSingleModJob(ctx, st, runID, "")
 		}
 	}
 
 	// Check for mods[] array (multi-step run).
 	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
-		// Multi-step run: create one stage per mod.
-		stepTotal := len(mods)
-		for stepIndex, modInterface := range mods {
-			// Extract mod image for metadata if present.
+		// Multi-step run: create pre-gate, one job per mod, and post-gate.
+		// Pre-gate job
+		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, ""); err != nil {
+			return fmt.Errorf("create pre-gate job: %w", err)
+		}
+
+		// Mod jobs: step_index starts at 2000, increment by 1000
+		for i, modInterface := range mods {
 			modImage := ""
 			if modMap, ok := modInterface.(map[string]interface{}); ok {
 				if img, ok := modMap["image"].(string); ok {
 					modImage = strings.TrimSpace(img)
 				}
 			}
-			// Stage name: "mods-openrewrite-0", "mods-openrewrite-1", etc.
-			// C2: Tag each mod stage with mod_type="mod".
-			stageName := fmt.Sprintf("mods-openrewrite-%d", stepIndex)
-			if err := createStageWithMeta(ctx, st, runID, stageName, "mod", stepIndex, stepTotal, modImage); err != nil {
-				return fmt.Errorf("create stage %d: %w", stepIndex, err)
+			jobName := fmt.Sprintf("mod-%d", i)
+			stepIndex := float64(2000 + i*1000)
+			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage); err != nil {
+				return fmt.Errorf("create mod job %d: %w", i, err)
 			}
+		}
+
+		// Post-gate job: after all mods
+		postGateIndex := float64(2000 + len(mods)*1000)
+		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, ""); err != nil {
+			return fmt.Errorf("create post-gate job: %w", err)
 		}
 		return nil
 	}
 
-	// Single-step run: create one stage.
-	// Extract mod image from spec if present (under "mod" or top-level).
+	// Single-step run: create pre-gate, single mod, and post-gate.
 	modImage := ""
 	if mod, ok := specMap["mod"].(map[string]interface{}); ok {
 		if img, ok := mod["image"].(string); ok {
 			modImage = strings.TrimSpace(img)
 		}
 	} else if img, ok := specMap["image"].(string); ok {
-		// Legacy top-level image.
 		modImage = strings.TrimSpace(img)
 	}
-	return createSingleStage(ctx, st, runID, 0, 1, modImage)
+	return createSingleModJob(ctx, st, runID, modImage)
 }
 
-// createSingleStage creates a single stage for a run with the given step metadata.
-func createSingleStage(ctx context.Context, st store.Store, runID pgtype.UUID, stepIndex, stepTotal int, modImage string) error {
-	return createStageWithMeta(ctx, st, runID, "mods-openrewrite", "mod", stepIndex, stepTotal, modImage)
-}
-
-// createStageWithMeta creates a stage with step metadata in the meta JSONB field.
-// C2: modType identifies the stage phase ("pre_gate", "mod", "post_gate", "healing").
-func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex, stepTotal int, modImage string) error {
-	// Build stage metadata with step information.
-	// C2: Include mod_type to identify the stage phase.
-	stageMeta := modsapi.StageMetadata{
-		ModType:   modType,
-		StepIndex: stepIndex,
-		StepTotal: stepTotal,
-		ModImage:  modImage,
+// createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
+func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, modImage string) error {
+	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, ""); err != nil {
+		return fmt.Errorf("create pre-gate job: %w", err)
 	}
-	metaBytes, err := json.Marshal(stageMeta)
+	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", 2000, modImage); err != nil {
+		return fmt.Errorf("create mod job: %w", err)
+	}
+	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", 3000, ""); err != nil {
+		return fmt.Errorf("create post-gate job: %w", err)
+	}
+	return nil
+}
+
+// createJobWithIndex creates a job with the given step_index and metadata.
+// modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
+func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string) error {
+	// Build job metadata with type information.
+	jobMeta := modsapi.StageMetadata{
+		ModType:  modType,
+		ModImage: modImage,
+	}
+	metaBytes, err := json.Marshal(jobMeta)
 	if err != nil {
-		return fmt.Errorf("marshal stage metadata: %w", err)
+		return fmt.Errorf("marshal job metadata: %w", err)
 	}
 
-	// Create the stage with metadata.
-	_, err = st.CreateStage(ctx, store.CreateStageParams{
-		RunID:  runID,
-		Name:   name,
-		Status: store.StageStatusPending,
-		Meta:   metaBytes,
+	// Create the job with step_index.
+	_, err = st.CreateJob(ctx, store.CreateJobParams{
+		RunID:     runID,
+		Name:      name,
+		Status:    store.JobStatusPending,
+		StepIndex: stepIndex,
+		Meta:      metaBytes,
 	})
 	return err
-}
-
-// materializeRunStepsIfNeeded creates run_steps rows for multi-step runs.
-// For multi-step runs (spec contains mods[] array), it materializes one run_step record
-// per mods[] entry with status 'queued'. Each run_step uses StepIndex that matches the
-// mods[] array index; scheduler and rehydration logic rely on this ordering. For single-step
-// runs, it does nothing (the run will be claimed atomically via ClaimRun). This enables
-// step-level claiming and multi-node execution for multi-step runs while preserving backward
-// compatibility for single-step runs.
-func materializeRunStepsIfNeeded(ctx context.Context, st store.Store, runID pgtype.UUID, spec []byte) error {
-	// Parse spec to detect multi-step vs single-step.
-	var specMap map[string]interface{}
-	if len(spec) > 0 && json.Valid(spec) {
-		if err := json.Unmarshal(spec, &specMap); err != nil {
-			// Invalid JSON; skip run_steps materialization (single-step fallback).
-			return nil
-		}
-	}
-
-	// Check for mods[] array (multi-step run).
-	mods, ok := specMap["mods"].([]interface{})
-	if !ok || len(mods) == 0 {
-		// Single-step run: no run_steps rows needed.
-		return nil
-	}
-
-	// Multi-step run: create one run_step per mods[] entry.
-	// Each step starts in 'queued' status and will be claimed via ClaimRunStep.
-	for stepIndex := range mods {
-		_, err := st.CreateRunStep(ctx, store.CreateRunStepParams{
-			RunID:     runID,
-			StepIndex: int32(stepIndex),
-			Status:    store.RunStepStatusQueued,
-		})
-		if err != nil {
-			return fmt.Errorf("create run_step for step %d: %w", stepIndex, err)
-		}
-	}
-
-	return nil
 }
 
 // helpers

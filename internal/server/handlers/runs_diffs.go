@@ -41,7 +41,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 
 		var req struct {
-			StageID *string                 `json:"stage_id,omitempty"`
+			JobID   *string                 `json:"job_id,omitempty"`
 			Patch   []byte                  `json:"patch"`
 			Summary domaintypes.DiffSummary `json:"summary"`
 		}
@@ -63,29 +63,29 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate stage belongs to run if provided.
-		var stageID pgtype.UUID
-		if req.StageID != nil && strings.TrimSpace(*req.StageID) != "" {
-			stageUUID, err := uuid.Parse(*req.StageID)
+		// Validate job belongs to run if provided.
+		var jobID pgtype.UUID
+		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
+			jobUUID, err := uuid.Parse(*req.JobID)
 			if err != nil {
-				http.Error(w, fmt.Sprintf("invalid stage_id: %v", err), http.StatusBadRequest)
+				http.Error(w, fmt.Sprintf("invalid job_id: %v", err), http.StatusBadRequest)
 				return
 			}
-			stage, err := st.GetStage(r.Context(), pgtype.UUID{Bytes: stageUUID, Valid: true})
+			job, err := st.GetJob(r.Context(), pgtype.UUID{Bytes: jobUUID, Valid: true})
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					http.Error(w, "stage not found", http.StatusNotFound)
+					http.Error(w, "job not found", http.StatusNotFound)
 					return
 				}
-				http.Error(w, fmt.Sprintf("failed to check stage: %v", err), http.StatusInternalServerError)
-				slog.Error("run diff: stage check failed", "stage_id", *req.StageID, "err", err)
+				http.Error(w, fmt.Sprintf("failed to check job: %v", err), http.StatusInternalServerError)
+				slog.Error("run diff: job check failed", "job_id", *req.JobID, "err", err)
 				return
 			}
-			if uuid.UUID(stage.RunID.Bytes) != runUUID {
-				http.Error(w, "stage does not belong to run", http.StatusBadRequest)
+			if uuid.UUID(job.RunID.Bytes) != runUUID {
+				http.Error(w, "job does not belong to run", http.StatusBadRequest)
 				return
 			}
-			stageID = stage.ID
+			jobID = job.ID
 		}
 
 		// Ensure the run exists.
@@ -106,7 +106,7 @@ func createRunDiffHandler(st store.Store) http.HandlerFunc {
 		}
 		params := store.CreateDiffParams{
 			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
-			StageID: stageID,
+			JobID:   jobID,
 			Patch:   req.Patch,
 			Summary: summaryBytes,
 		}

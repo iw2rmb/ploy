@@ -12,14 +12,14 @@ import (
 )
 
 const createLog = `-- name: CreateLog :one
-INSERT INTO logs (run_id, stage_id, build_id, chunk_no, data)
+INSERT INTO logs (run_id, job_id, build_id, chunk_no, data)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, run_id, stage_id, build_id, chunk_no, data, created_at
+RETURNING id, run_id, job_id, build_id, chunk_no, data, created_at
 `
 
 type CreateLogParams struct {
 	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
+	JobID   pgtype.UUID `json:"job_id"`
 	BuildID pgtype.UUID `json:"build_id"`
 	ChunkNo int32       `json:"chunk_no"`
 	Data    []byte      `json:"data"`
@@ -28,7 +28,7 @@ type CreateLogParams struct {
 func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, error) {
 	row := q.db.QueryRow(ctx, createLog,
 		arg.RunID,
-		arg.StageID,
+		arg.JobID,
 		arg.BuildID,
 		arg.ChunkNo,
 		arg.Data,
@@ -37,7 +37,7 @@ func (q *Queries) CreateLog(ctx context.Context, arg CreateLogParams) (Log, erro
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.BuildID,
 		&i.ChunkNo,
 		&i.Data,
@@ -67,7 +67,7 @@ func (q *Queries) DeleteLogsOlderThan(ctx context.Context, createdAt pgtype.Time
 }
 
 const getLog = `-- name: GetLog :one
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
 WHERE id = $1
 `
 
@@ -77,7 +77,7 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.BuildID,
 		&i.ChunkNo,
 		&i.Data,
@@ -87,7 +87,7 @@ func (q *Queries) GetLog(ctx context.Context, id int64) (Log, error) {
 }
 
 const listLogsByRun = `-- name: ListLogsByRun :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1
 ORDER BY chunk_no ASC, id ASC
 `
@@ -104,7 +104,7 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, 
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
@@ -120,19 +120,19 @@ func (q *Queries) ListLogsByRun(ctx context.Context, runID pgtype.UUID) ([]Log, 
 	return items, nil
 }
 
-const listLogsByRunAndStage = `-- name: ListLogsByRunAndStage :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND stage_id = $2
+const listLogsByRunAndJob = `-- name: ListLogsByRunAndJob :many
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND job_id = $2
 ORDER BY chunk_no ASC, id ASC
 `
 
-type ListLogsByRunAndStageParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
+type ListLogsByRunAndJobParams struct {
+	RunID pgtype.UUID `json:"run_id"`
+	JobID pgtype.UUID `json:"job_id"`
 }
 
-func (q *Queries) ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAndStageParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndStage, arg.RunID, arg.StageID)
+func (q *Queries) ListLogsByRunAndJob(ctx context.Context, arg ListLogsByRunAndJobParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (q *Queries) ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAn
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
@@ -159,20 +159,106 @@ func (q *Queries) ListLogsByRunAndStage(ctx context.Context, arg ListLogsByRunAn
 	return items, nil
 }
 
-const listLogsByRunAndStageSince = `-- name: ListLogsByRunAndStageSince :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND id > $3
+const listLogsByRunAndJobSince = `-- name: ListLogsByRunAndJobSince :many
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC
 `
 
-type ListLogsByRunAndStageSinceParams struct {
+type ListLogsByRunAndJobSinceParams struct {
+	RunID pgtype.UUID `json:"run_id"`
+	JobID pgtype.UUID `json:"job_id"`
+	ID    int64       `json:"id"`
+}
+
+func (q *Queries) ListLogsByRunAndJobSince(ctx context.Context, arg ListLogsByRunAndJobSinceParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunAndJobSince, arg.RunID, arg.JobID, arg.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Log{}
+	for rows.Next() {
+		var i Log
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.BuildID,
+			&i.ChunkNo,
+			&i.Data,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsByRunJobAndBuild = `-- name: ListLogsByRunJobAndBuild :many
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND job_id = $2 AND build_id = $3
+ORDER BY chunk_no ASC, id ASC
+`
+
+type ListLogsByRunJobAndBuildParams struct {
 	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
+	JobID   pgtype.UUID `json:"job_id"`
+	BuildID pgtype.UUID `json:"build_id"`
+}
+
+func (q *Queries) ListLogsByRunJobAndBuild(ctx context.Context, arg ListLogsByRunJobAndBuildParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunJobAndBuild, arg.RunID, arg.JobID, arg.BuildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Log{}
+	for rows.Next() {
+		var i Log
+		if err := rows.Scan(
+			&i.ID,
+			&i.RunID,
+			&i.JobID,
+			&i.BuildID,
+			&i.ChunkNo,
+			&i.Data,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLogsByRunJobAndBuildSince = `-- name: ListLogsByRunJobAndBuildSince :many
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
+WHERE run_id = $1 AND job_id = $2 AND build_id = $3 AND id > $4
+ORDER BY chunk_no ASC, id ASC
+`
+
+type ListLogsByRunJobAndBuildSinceParams struct {
+	RunID   pgtype.UUID `json:"run_id"`
+	JobID   pgtype.UUID `json:"job_id"`
+	BuildID pgtype.UUID `json:"build_id"`
 	ID      int64       `json:"id"`
 }
 
-func (q *Queries) ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsByRunAndStageSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunAndStageSince, arg.RunID, arg.StageID, arg.ID)
+func (q *Queries) ListLogsByRunJobAndBuildSince(ctx context.Context, arg ListLogsByRunJobAndBuildSinceParams) ([]Log, error) {
+	rows, err := q.db.Query(ctx, listLogsByRunJobAndBuildSince,
+		arg.RunID,
+		arg.JobID,
+		arg.BuildID,
+		arg.ID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +269,7 @@ func (q *Queries) ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsBy
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,
@@ -200,7 +286,7 @@ func (q *Queries) ListLogsByRunAndStageSince(ctx context.Context, arg ListLogsBy
 }
 
 const listLogsByRunSince = `-- name: ListLogsByRunSince :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
+SELECT id, run_id, job_id, build_id, chunk_no, data, created_at FROM logs
 WHERE run_id = $1 AND id > $2
 ORDER BY chunk_no ASC, id ASC
 `
@@ -222,93 +308,7 @@ func (q *Queries) ListLogsByRunSince(ctx context.Context, arg ListLogsByRunSince
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
-			&i.BuildID,
-			&i.ChunkNo,
-			&i.Data,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunStageAndBuild = `-- name: ListLogsByRunStageAndBuild :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND build_id = $3
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunStageAndBuildParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
-	BuildID pgtype.UUID `json:"build_id"`
-}
-
-func (q *Queries) ListLogsByRunStageAndBuild(ctx context.Context, arg ListLogsByRunStageAndBuildParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunStageAndBuild, arg.RunID, arg.StageID, arg.BuildID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.StageID,
-			&i.BuildID,
-			&i.ChunkNo,
-			&i.Data,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLogsByRunStageAndBuildSince = `-- name: ListLogsByRunStageAndBuildSince :many
-SELECT id, run_id, stage_id, build_id, chunk_no, data, created_at FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND build_id = $3 AND id > $4
-ORDER BY chunk_no ASC, id ASC
-`
-
-type ListLogsByRunStageAndBuildSinceParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
-	BuildID pgtype.UUID `json:"build_id"`
-	ID      int64       `json:"id"`
-}
-
-func (q *Queries) ListLogsByRunStageAndBuildSince(ctx context.Context, arg ListLogsByRunStageAndBuildSinceParams) ([]Log, error) {
-	rows, err := q.db.Query(ctx, listLogsByRunStageAndBuildSince,
-		arg.RunID,
-		arg.StageID,
-		arg.BuildID,
-		arg.ID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Log{}
-	for rows.Next() {
-		var i Log
-		if err := rows.Scan(
-			&i.ID,
-			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.ChunkNo,
 			&i.Data,

@@ -10,13 +10,13 @@ import (
 )
 
 func TestNormalizeRoleAndAllowlist(t *testing.T) {
-	cases := map[string]string{
+	cases := map[string]Role{
 		"control":       RoleControlPlane,
 		"Control-Plane": RoleControlPlane,
 		"worker":        RoleWorker,
 		"admin":         RoleCLIAdmin,
 		"cliadmin":      RoleCLIAdmin,
-		"custom":        "custom",
+		"custom":        "", // Unknown roles now return empty
 	}
 	for in, want := range cases {
 		if got := NormalizeRole(in); got != want {
@@ -27,15 +27,12 @@ func TestNormalizeRoleAndAllowlist(t *testing.T) {
 	if allowlist(nil) != nil {
 		t.Fatal("allowlist(nil) should return nil")
 	}
-	al := allowlist([]string{"WORKER", "controlplane", "unknown"})
+	al := allowlist([]Role{RoleWorker, RoleControlPlane})
 	if _, ok := al[RoleWorker]; !ok {
 		t.Fatal("allowlist should contain worker")
 	}
 	if _, ok := al[RoleControlPlane]; !ok {
 		t.Fatal("allowlist should contain control-plane")
-	}
-	if _, ok := al["unknown"]; !ok {
-		t.Fatal("allowlist should retain unknown role")
 	}
 }
 

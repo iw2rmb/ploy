@@ -4,36 +4,39 @@ import (
 	"fmt"
 )
 
-// ConvertToStageStatus converts various stage status string representations
-// to the canonical store.StageStatus type. This helper provides type-safe
+// ConvertToJobStatus converts various job status string representations
+// to the canonical store.JobStatus type. This helper provides type-safe
 // conversion from external API representations (e.g., mods API StageState)
-// to the database-authoritative store.StageStatus.
+// to the database-authoritative store.JobStatus.
 //
 // Supported mappings:
-//   - "pending" -> StageStatusPending
-//   - "queued" -> StageStatusPending (mods API compatibility)
-//   - "running" -> StageStatusRunning
-//   - "succeeded" -> StageStatusSucceeded
-//   - "failed" -> StageStatusFailed
-//   - "skipped" -> StageStatusSkipped
-//   - "canceled"/"cancelled" -> StageStatusCanceled (US/UK spelling)
-//   - "cancelling" -> StageStatusCanceled (mods API in-progress cancellation maps to final state)
-func ConvertToStageStatus(status string) (StageStatus, error) {
+//   - "pending" -> JobStatusPending
+//   - "queued" -> JobStatusPending (mods API compatibility)
+//   - "assigned" -> JobStatusAssigned
+//   - "running" -> JobStatusRunning
+//   - "succeeded" -> JobStatusSucceeded
+//   - "failed" -> JobStatusFailed
+//   - "skipped" -> JobStatusSkipped
+//   - "canceled"/"cancelled" -> JobStatusCanceled (US/UK spelling)
+//   - "cancelling" -> JobStatusCanceled (mods API in-progress cancellation maps to final state)
+func ConvertToJobStatus(status string) (JobStatus, error) {
 	switch status {
 	case "pending", "queued":
-		return StageStatusPending, nil
+		return JobStatusPending, nil
+	case "assigned":
+		return JobStatusAssigned, nil
 	case "running":
-		return StageStatusRunning, nil
+		return JobStatusRunning, nil
 	case "succeeded":
-		return StageStatusSucceeded, nil
+		return JobStatusSucceeded, nil
 	case "failed":
-		return StageStatusFailed, nil
+		return JobStatusFailed, nil
 	case "skipped":
-		return StageStatusSkipped, nil
+		return JobStatusSkipped, nil
 	case "canceled", "cancelled", "cancelling":
-		return StageStatusCanceled, nil
+		return JobStatusCanceled, nil
 	default:
-		return "", fmt.Errorf("unknown stage status: %q", status)
+		return "", fmt.Errorf("unknown job status: %q", status)
 	}
 }
 
@@ -70,16 +73,16 @@ func ConvertToRunStatus(status string) (RunStatus, error) {
 	}
 }
 
-// ValidateStageStatus validates that a string is a valid StageStatus value.
+// ValidateJobStatus validates that a string is a valid JobStatus value.
 // Returns the typed status if valid, otherwise returns an error.
-func ValidateStageStatus(status string) (StageStatus, error) {
-	s := StageStatus(status)
+func ValidateJobStatus(status string) (JobStatus, error) {
+	s := JobStatus(status)
 	switch s {
-	case StageStatusPending, StageStatusRunning, StageStatusSucceeded,
-		StageStatusFailed, StageStatusSkipped, StageStatusCanceled:
+	case JobStatusPending, JobStatusAssigned, JobStatusRunning, JobStatusSucceeded,
+		JobStatusFailed, JobStatusSkipped, JobStatusCanceled:
 		return s, nil
 	default:
-		return "", fmt.Errorf("invalid stage status: %q (expected: pending, running, succeeded, failed, skipped, canceled)", status)
+		return "", fmt.Errorf("invalid job status: %q (expected: pending, assigned, running, succeeded, failed, skipped, canceled)", status)
 	}
 }
 

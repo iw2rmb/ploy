@@ -15,7 +15,7 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestCancelTicket_Success transitions a non-terminal run to canceled and updates stages.
+// TestCancelTicket_Success transitions a non-terminal run to canceled and updates jobs.
 func TestCancelTicket_Success(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
@@ -25,8 +25,8 @@ func TestCancelTicket_Success(t *testing.T) {
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
-		listStagesByRunResult: []store.Stage{
-			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
+		listJobsByRunResult: []store.Job{
+			{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Second * 5), Valid: true}},
 		},
 	}
 
@@ -49,8 +49,8 @@ func TestCancelTicket_Success(t *testing.T) {
 	if st.updateRunStatusParams.Status != store.RunStatusCanceled {
 		t.Fatalf("expected status canceled, got %s", st.updateRunStatusParams.Status)
 	}
-	if !st.updateStageStatusCalled {
-		t.Fatal("expected UpdateStageStatus to be called for stages")
+	if !st.updateJobStatusCalled {
+		t.Fatal("expected UpdateJobStatus to be called for jobs")
 	}
 }
 
@@ -168,7 +168,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
-		listStagesByRunResult: []store.Stage{},
+		listJobsByRunResult: []store.Job{},
 	}
 
 	eventsService, err := createTestEventsService()
@@ -251,20 +251,20 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_OnlyPendingRunningStagesUpdated ensures only pending|running stages
-// are transitioned to canceled and terminal stages are left untouched.
+// TestCancelTicket_OnlyPendingRunningStagesUpdated ensures only pending|running jobs
+// are transitioned to canceled and terminal jobs are left untouched.
 func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	id := uuid.New()
 	now := time.Now()
-	stgPending := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusPending}
-	stgRunning := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
-	stgSucceeded := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusSucceeded}
-	stgFailed := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusFailed}
-	stgCanceled := store.Stage{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.StageStatusCanceled}
+	stgPending := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusPending}
+	stgRunning := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
+	stgSucceeded := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded}
+	stgFailed := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed}
+	stgCanceled := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCanceled}
 
 	st := &mockStore{
 		getRunResult: store.Run{ID: pgtype.UUID{Bytes: id, Valid: true}, Status: store.RunStatusRunning},
-		listStagesByRunResult: []store.Stage{
+		listJobsByRunResult: []store.Job{
 			stgPending, stgRunning, stgSucceeded, stgFailed, stgCanceled,
 		},
 	}
@@ -281,26 +281,26 @@ func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	if !st.updateRunStatusCalled {
 		t.Fatalf("expected UpdateRunStatus to be called")
 	}
-	// Only pending and running stages should be updated.
-	if len(st.updateStageStatusCalls) != 2 {
-		t.Fatalf("expected 2 stage updates, got %d", len(st.updateStageStatusCalls))
+	// Only pending and running jobs should be updated.
+	if len(st.updateJobStatusCalls) != 2 {
+		t.Fatalf("expected 2 job updates, got %d", len(st.updateJobStatusCalls))
 	}
 	updated := map[string]bool{}
-	for _, c := range st.updateStageStatusCalls {
+	for _, c := range st.updateJobStatusCalls {
 		updated[uuid.UUID(c.ID.Bytes).String()] = true
-		if c.Status != store.StageStatusCanceled {
-			t.Fatalf("expected stage status canceled, got %s", c.Status)
+		if c.Status != store.JobStatusCanceled {
+			t.Fatalf("expected job status canceled, got %s", c.Status)
 		}
 	}
 	if !updated[uuid.UUID(stgPending.ID.Bytes).String()] || !updated[uuid.UUID(stgRunning.ID.Bytes).String()] {
-		t.Fatalf("expected pending and running stages to be updated; got %+v", updated)
+		t.Fatalf("expected pending and running jobs to be updated; got %+v", updated)
 	}
 	if updated[uuid.UUID(stgSucceeded.ID.Bytes).String()] || updated[uuid.UUID(stgFailed.ID.Bytes).String()] || updated[uuid.UUID(stgCanceled.ID.Bytes).String()] {
-		t.Fatalf("did not expect terminal stages to be updated; got %+v", updated)
+		t.Fatalf("did not expect terminal jobs to be updated; got %+v", updated)
 	}
 }
 
-// TestCancelTicket_NoStages verifies behavior when run has no stages.
+// TestCancelTicket_NoStages verifies behavior when run has no jobs.
 func TestCancelTicket_NoStages(t *testing.T) {
 	id := uuid.New()
 	st := &mockStore{
@@ -310,7 +310,7 @@ func TestCancelTicket_NoStages(t *testing.T) {
 			RepoUrl:   "https://example/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: time.Now().Add(-time.Minute), Valid: true},
 		},
-		listStagesByRunResult: []store.Stage{},
+		listJobsByRunResult: []store.Job{},
 	}
 	handler := cancelTicketHandler(st, nil)
 
@@ -325,8 +325,8 @@ func TestCancelTicket_NoStages(t *testing.T) {
 	if !st.updateRunStatusCalled {
 		t.Fatal("expected UpdateRunStatus to be called")
 	}
-	if st.updateStageStatusCalled {
-		t.Fatal("did not expect UpdateStageStatus to be called when no stages")
+	if st.updateJobStatusCalled {
+		t.Fatal("did not expect UpdateJobStatus to be called when no jobs")
 	}
 }
 
@@ -379,7 +379,7 @@ func TestCancelTicket_JSONBodyVariations(t *testing.T) {
 					RepoUrl:   "https://example/repo.git",
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
-				listStagesByRunResult: []store.Stage{},
+				listJobsByRunResult: []store.Job{},
 			}
 			handler := cancelTicketHandler(st, nil)
 
@@ -396,7 +396,7 @@ func TestCancelTicket_JSONBodyVariations(t *testing.T) {
 	}
 }
 
-// TestCancelTicket_StageDuration verifies duration calculation for stages.
+// TestCancelTicket_StageDuration verifies duration calculation for jobs.
 func TestCancelTicket_StageDuration(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -404,12 +404,12 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 		wantDurationSet bool
 	}{
 		{
-			name:            "running stage with started time",
+			name:            "running job with started time",
 			startedAt:       pgtype.Timestamptz{Time: time.Now().Add(-5 * time.Second), Valid: true},
 			wantDurationSet: true,
 		},
 		{
-			name:            "pending stage without started time",
+			name:            "pending job without started time",
 			startedAt:       pgtype.Timestamptz{Valid: false},
 			wantDurationSet: false,
 		},
@@ -418,7 +418,7 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			id := uuid.New()
-			stageID := uuid.New()
+			jobID := uuid.New()
 			st := &mockStore{
 				getRunResult: store.Run{
 					ID:        pgtype.UUID{Bytes: id, Valid: true},
@@ -426,10 +426,10 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 					RepoUrl:   "https://example/repo.git",
 					CreatedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				},
-				listStagesByRunResult: []store.Stage{
+				listJobsByRunResult: []store.Job{
 					{
-						ID:        pgtype.UUID{Bytes: stageID, Valid: true},
-						Status:    store.StageStatusRunning,
+						ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+						Status:    store.JobStatusRunning,
 						StartedAt: tt.startedAt,
 					},
 				},
@@ -444,15 +444,15 @@ func TestCancelTicket_StageDuration(t *testing.T) {
 			if rr.Code != http.StatusAccepted {
 				t.Fatalf("expected 202, got %d", rr.Code)
 			}
-			if len(st.updateStageStatusCalls) != 1 {
-				t.Fatalf("expected 1 stage update, got %d", len(st.updateStageStatusCalls))
+			if len(st.updateJobStatusCalls) != 1 {
+				t.Fatalf("expected 1 job update, got %d", len(st.updateJobStatusCalls))
 			}
-			call := st.updateStageStatusCalls[0]
+			call := st.updateJobStatusCalls[0]
 			if tt.wantDurationSet && call.DurationMs == 0 {
-				t.Fatal("expected duration to be set for started stage")
+				t.Fatal("expected duration to be set for started job")
 			}
 			if !tt.wantDurationSet && call.DurationMs != 0 {
-				t.Fatalf("expected duration to be 0 for pending stage, got %d", call.DurationMs)
+				t.Fatalf("expected duration to be 0 for pending job, got %d", call.DurationMs)
 			}
 		})
 	}

@@ -21,6 +21,9 @@ type StepID string
 // ClusterID identifies a CLI/server cluster descriptor.
 type ClusterID string
 
+// NodeID identifies a worker node in the cluster.
+type NodeID string
+
 // String returns the underlying string value.
 func (v TicketID) String() string { return string(v) }
 
@@ -50,6 +53,12 @@ func (v ClusterID) String() string { return string(v) }
 
 // IsZero reports whether the value is empty (after trimming spaces).
 func (v ClusterID) IsZero() bool { return IsEmpty(string(v)) }
+
+// String returns the underlying string value.
+func (v NodeID) String() string { return string(v) }
+
+// IsZero reports whether the value is empty (after trimming spaces).
+func (v NodeID) IsZero() bool { return IsEmpty(string(v)) }
 
 // The following methods implement encoding.TextMarshaler/TextUnmarshaler and
 // JSON helpers for each ID type. Using small helpers avoids duplication while
@@ -121,3 +130,13 @@ func (v ClusterID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
 func (v *ClusterID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
 func (v ClusterID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
 func (v *ClusterID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }
+
+var _ interface {
+	encoding.TextMarshaler
+	encoding.TextUnmarshaler
+} = (*NodeID)(nil)
+
+func (v NodeID) MarshalText() ([]byte, error)  { return marshalIDText(v) }
+func (v *NodeID) UnmarshalText(b []byte) error { return unmarshalIDText(v, b) }
+func (v NodeID) MarshalJSON() ([]byte, error)  { return MarshalJSONFromText(v) }
+func (v *NodeID) UnmarshalJSON(b []byte) error { return UnmarshalJSONToText(b, v) }

@@ -170,11 +170,11 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			)
 		}
 
-		// Update stage to running and set started_at.
-		if stages, err := st.ListStagesByRun(r.Context(), runID); err == nil && len(stages) > 0 {
-			_ = st.UpdateStageStatus(r.Context(), store.UpdateStageStatusParams{
-				ID:         stages[0].ID,
-				Status:     store.StageStatusRunning,
+		// Update job to running and set started_at.
+		if jobs, err := st.ListJobsByRun(r.Context(), runID); err == nil && len(jobs) > 0 {
+			_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+				ID:         jobs[0].ID,
+				Status:     store.JobStatusRunning,
 				StartedAt:  pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
 				FinishedAt: pgtype.Timestamptz{},
 				DurationMs: 0,

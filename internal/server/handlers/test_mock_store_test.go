@@ -51,6 +51,11 @@ type mockStore struct {
 	claimRunStepResult store.RunStep
 	claimRunStepErr    error
 
+	claimJobCalled bool
+	claimJobParams pgtype.UUID
+	claimJobResult store.Job
+	claimJobErr    error
+
 	getNodeCalled bool
 	getNodeParams pgtype.UUID
 	getNodeResult store.Node
@@ -65,10 +70,10 @@ type mockStore struct {
 	createEventResult store.Event
 	createEventErr    error
 
-	getStageCalled bool
-	getStageParams pgtype.UUID
-	getStageResult store.Stage
-	getStageErr    error
+	getJobCalled bool
+	getJobParams pgtype.UUID
+	getJobResult store.Job
+	getJobErr    error
 
 	createDiffCalled bool
 	createDiffParams store.CreateDiffParams
@@ -117,30 +122,30 @@ type mockStore struct {
 	getArtifactBundleResult store.ArtifactBundle
 	getArtifactBundleErr    error
 
-	// ListArtifactBundlesByRunAndStage tracking
-	listArtifactBundlesByRunAndStageCalled bool
-	listArtifactBundlesByRunAndStageParams store.ListArtifactBundlesByRunAndStageParams
-	listArtifactBundlesByRunAndStageResult []store.ArtifactBundle
-	listArtifactBundlesByRunAndStageErr    error
+	// ListArtifactBundlesByRunAndJob tracking
+	listArtifactBundlesByRunAndJobCalled bool
+	listArtifactBundlesByRunAndJobParams store.ListArtifactBundlesByRunAndJobParams
+	listArtifactBundlesByRunAndJobResult []store.ArtifactBundle
+	listArtifactBundlesByRunAndJobErr    error
 
-	// CreateStage tracking
-	createStageCalled    bool
-	createStageCallCount int
-	createStageParams    []store.CreateStageParams
-	createStageResult    store.Stage
-	createStageErr       error
+	// CreateJob tracking
+	createJobCalled    bool
+	createJobCallCount int
+	createJobParams    []store.CreateJobParams
+	createJobResult    store.Job
+	createJobErr       error
 
-	// ListStagesByRun tracking
-	listStagesByRunCalled bool
-	listStagesByRunParam  pgtype.UUID
-	listStagesByRunResult []store.Stage
-	listStagesByRunErr    error
+	// ListJobsByRun tracking
+	listJobsByRunCalled bool
+	listJobsByRunParam  pgtype.UUID
+	listJobsByRunResult []store.Job
+	listJobsByRunErr    error
 
-	// UpdateStageStatus tracking
-	updateStageStatusCalled bool
-	updateStageStatusParams store.UpdateStageStatusParams
-	updateStageStatusCalls  []store.UpdateStageStatusParams
-	updateStageStatusErr    error
+	// UpdateJobStatus tracking
+	updateJobStatusCalled bool
+	updateJobStatusParams store.UpdateJobStatusParams
+	updateJobStatusCalls  []store.UpdateJobStatusParams
+	updateJobStatusErr    error
 
 	// ListDiffsByRun tracking
 	listDiffsByRunCalled bool
@@ -321,6 +326,19 @@ func (m *mockStore) ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (store
 	return m.claimRunStepResult, m.claimRunStepErr
 }
 
+// ClaimJob implements job claiming for the new unified job model.
+func (m *mockStore) ClaimJob(ctx context.Context, nodeID pgtype.UUID) (store.Job, error) {
+	m.claimJobCalled = true
+	m.claimJobParams = nodeID
+	if m.claimJobErr != nil {
+		return store.Job{}, m.claimJobErr
+	}
+	if !m.claimJobResult.ID.Valid {
+		return store.Job{}, pgx.ErrNoRows
+	}
+	return m.claimJobResult, nil
+}
+
 func (m *mockStore) GetNode(ctx context.Context, id pgtype.UUID) (store.Node, error) {
 	m.getNodeCalled = true
 	m.getNodeParams = id
@@ -339,10 +357,10 @@ func (m *mockStore) CreateEvent(ctx context.Context, params store.CreateEventPar
 	return m.createEventResult, m.createEventErr
 }
 
-func (m *mockStore) GetStage(ctx context.Context, id pgtype.UUID) (store.Stage, error) {
-	m.getStageCalled = true
-	m.getStageParams = id
-	return m.getStageResult, m.getStageErr
+func (m *mockStore) GetJob(ctx context.Context, id pgtype.UUID) (store.Job, error) {
+	m.getJobCalled = true
+	m.getJobParams = id
+	return m.getJobResult, m.getJobErr
 }
 
 func (m *mockStore) CreateDiff(ctx context.Context, params store.CreateDiffParams) (store.Diff, error) {
@@ -398,42 +416,42 @@ func (m *mockStore) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (stor
 	return m.getArtifactBundleResult, m.getArtifactBundleErr
 }
 
-func (m *mockStore) ListArtifactBundlesByRunAndStage(ctx context.Context, arg store.ListArtifactBundlesByRunAndStageParams) ([]store.ArtifactBundle, error) {
-	m.listArtifactBundlesByRunAndStageCalled = true
-	m.listArtifactBundlesByRunAndStageParams = arg
-	return m.listArtifactBundlesByRunAndStageResult, m.listArtifactBundlesByRunAndStageErr
+func (m *mockStore) ListArtifactBundlesByRunAndJob(ctx context.Context, arg store.ListArtifactBundlesByRunAndJobParams) ([]store.ArtifactBundle, error) {
+	m.listArtifactBundlesByRunAndJobCalled = true
+	m.listArtifactBundlesByRunAndJobParams = arg
+	return m.listArtifactBundlesByRunAndJobResult, m.listArtifactBundlesByRunAndJobErr
 }
 
-func (m *mockStore) CreateStage(ctx context.Context, params store.CreateStageParams) (store.Stage, error) {
-	m.createStageCalled = true
-	m.createStageCallCount++
-	// Append params to track all CreateStage calls (for multi-step tests).
-	m.createStageParams = append(m.createStageParams, params)
+func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams) (store.Job, error) {
+	m.createJobCalled = true
+	m.createJobCallCount++
+	// Append params to track all CreateJob calls (for multi-step tests).
+	m.createJobParams = append(m.createJobParams, params)
 
-	// Build a result stage for this call.
-	result := m.createStageResult
+	// Build a result job for this call.
+	result := m.createJobResult
 	if !result.ID.Valid {
-		// Provide a default stage id when not preset by the test.
+		// Provide a default job id when not preset by the test.
 		result.ID = pgtype.UUID{Bytes: uuid.New(), Valid: true}
 	}
 	result.RunID = params.RunID
 	result.Name = params.Name
 	result.Status = params.Status
 	result.Meta = params.Meta
-	return result, m.createStageErr
+	return result, m.createJobErr
 }
 
-func (m *mockStore) ListStagesByRun(ctx context.Context, runID pgtype.UUID) ([]store.Stage, error) {
-	m.listStagesByRunCalled = true
-	m.listStagesByRunParam = runID
-	return m.listStagesByRunResult, m.listStagesByRunErr
+func (m *mockStore) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Job, error) {
+	m.listJobsByRunCalled = true
+	m.listJobsByRunParam = runID
+	return m.listJobsByRunResult, m.listJobsByRunErr
 }
 
-func (m *mockStore) UpdateStageStatus(ctx context.Context, params store.UpdateStageStatusParams) error {
-	m.updateStageStatusCalled = true
-	m.updateStageStatusParams = params
-	m.updateStageStatusCalls = append(m.updateStageStatusCalls, params)
-	return m.updateStageStatusErr
+func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
+	m.updateJobStatusCalled = true
+	m.updateJobStatusParams = params
+	m.updateJobStatusCalls = append(m.updateJobStatusCalls, params)
+	return m.updateJobStatusErr
 }
 
 func (m *mockStore) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Diff, error) {

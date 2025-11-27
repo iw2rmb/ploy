@@ -18,59 +18,11 @@ WHERE id = $1 AND status IN ('assigned', 'queued')
 `
 
 // Transitions run status to 'running' when execution starts.
-// For single-step runs (claimed via ClaimRun), status is 'assigned' before ack.
-// For multi-step runs (claimed via ClaimRunStep), status may be 'queued' since
-// the run itself is never assigned to a node; only individual steps are assigned.
-// We support both transitions: assigned→running and queued→running.
+// Jobs are claimed via ClaimJob in jobs.sql; runs transition to running when
+// the first job starts execution.
 func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, ackRunStart, id)
 	return err
-}
-
-const claimRun = `-- name: ClaimRun :one
-WITH cte AS (
-  SELECT runs.id FROM runs
-  INNER JOIN nodes ON nodes.id = $1
-  WHERE runs.status = 'queued'
-    AND nodes.drained = false
-    -- Exclude runs that have run_steps: multi-step runs are claimed via ClaimRunStep.
-    AND NOT EXISTS (
-      SELECT 1 FROM run_steps
-      WHERE run_steps.run_id = runs.id
-    )
-  ORDER BY runs.created_at
-  FOR UPDATE SKIP LOCKED
-  LIMIT 1
-)
-UPDATE runs r
-SET status = 'assigned', node_id = $1, started_at = now()
-FROM cte
-WHERE r.id = cte.id
-RETURNING r.id, r.repo_url, r.spec, r.created_by, r.status, r.reason, r.created_at, r.started_at, r.finished_at, r.node_id, r.base_ref, r.target_ref, r.commit_sha, r.stats
-`
-
-// Claims a queued run for a node. Only claims runs that do NOT have run_steps rows.
-// Multi-step runs (with run_steps entries) must be claimed via ClaimRunStep instead.
-func (q *Queries) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (Run, error) {
-	row := q.db.QueryRow(ctx, claimRun, nodeID)
-	var i Run
-	err := row.Scan(
-		&i.ID,
-		&i.RepoUrl,
-		&i.Spec,
-		&i.CreatedBy,
-		&i.Status,
-		&i.Reason,
-		&i.CreatedAt,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.NodeID,
-		&i.BaseRef,
-		&i.TargetRef,
-		&i.CommitSha,
-		&i.Stats,
-	)
-	return i, err
 }
 
 const createRun = `-- name: CreateRun :one

@@ -239,31 +239,31 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Update stage status to terminal and set finished_at/duration.
-		if stages, err := st.ListStagesByRun(r.Context(), runID); err == nil && len(stages) > 0 {
+		// Update job status to terminal and set finished_at/duration.
+		if jobs, err := st.ListJobsByRun(r.Context(), runID); err == nil && len(jobs) > 0 {
 			now := time.Now().UTC()
-			var stStatus store.StageStatus
+			var jobStatus store.JobStatus
 			switch normalizedStatus {
 			case store.RunStatusSucceeded:
-				stStatus = store.StageStatusSucceeded
+				jobStatus = store.JobStatusSucceeded
 			case store.RunStatusFailed:
-				stStatus = store.StageStatusFailed
+				jobStatus = store.JobStatusFailed
 			case store.RunStatusCanceled:
-				stStatus = store.StageStatusCanceled
+				jobStatus = store.JobStatusCanceled
 			default:
-				stStatus = store.StageStatusFailed
+				jobStatus = store.JobStatusFailed
 			}
 			dur := int64(0)
-			if stages[0].StartedAt.Valid {
-				d := now.Sub(stages[0].StartedAt.Time).Milliseconds()
+			if jobs[0].StartedAt.Valid {
+				d := now.Sub(jobs[0].StartedAt.Time).Milliseconds()
 				if d > 0 {
 					dur = d
 				}
 			}
-			_ = st.UpdateStageStatus(r.Context(), store.UpdateStageStatusParams{
-				ID:         stages[0].ID,
-				Status:     stStatus,
-				StartedAt:  stages[0].StartedAt,
+			_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+				ID:         jobs[0].ID,
+				Status:     jobStatus,
+				StartedAt:  jobs[0].StartedAt,
 				FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 				DurationMs: dur,
 			})
@@ -420,31 +420,31 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 		return fmt.Errorf("update run completion: %w", err)
 	}
 
-	// Update stage status to terminal and set finished_at/duration.
-	if stages, err := st.ListStagesByRun(ctx, runID); err == nil && len(stages) > 0 {
+	// Update job status to terminal and set finished_at/duration.
+	if jobs, err := st.ListJobsByRun(ctx, runID); err == nil && len(jobs) > 0 {
 		now := time.Now().UTC()
-		var stStatus store.StageStatus
+		var jobStatus store.JobStatus
 		switch runStatus {
 		case store.RunStatusSucceeded:
-			stStatus = store.StageStatusSucceeded
+			jobStatus = store.JobStatusSucceeded
 		case store.RunStatusFailed:
-			stStatus = store.StageStatusFailed
+			jobStatus = store.JobStatusFailed
 		case store.RunStatusCanceled:
-			stStatus = store.StageStatusCanceled
+			jobStatus = store.JobStatusCanceled
 		default:
-			stStatus = store.StageStatusFailed
+			jobStatus = store.JobStatusFailed
 		}
 		dur := int64(0)
-		if stages[0].StartedAt.Valid {
-			d := now.Sub(stages[0].StartedAt.Time).Milliseconds()
+		if jobs[0].StartedAt.Valid {
+			d := now.Sub(jobs[0].StartedAt.Time).Milliseconds()
 			if d > 0 {
 				dur = d
 			}
 		}
-		_ = st.UpdateStageStatus(ctx, store.UpdateStageStatusParams{
-			ID:         stages[0].ID,
-			Status:     stStatus,
-			StartedAt:  stages[0].StartedAt,
+		_ = st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
+			ID:         jobs[0].ID,
+			Status:     jobStatus,
+			StartedAt:  jobs[0].StartedAt,
 			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			DurationMs: dur,
 		})

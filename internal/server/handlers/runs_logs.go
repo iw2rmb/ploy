@@ -44,7 +44,7 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 
 		// Decode request body.
 		var req struct {
-			StageID *string `json:"stage_id,omitempty"`
+			JobID   *string `json:"job_id,omitempty"`
 			BuildID *string `json:"build_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
@@ -68,10 +68,10 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Parse optional stage/build IDs using helper.
-		stageID, err := parseOptionalUUID(req.StageID)
+		// Parse optional job/build IDs using helper.
+		jobID, err := parseOptionalUUID(req.JobID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid stage_id: %v", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("invalid job_id: %v", err), http.StatusBadRequest)
 			return
 		}
 		buildID, err := parseOptionalUUID(req.BuildID)
@@ -83,7 +83,7 @@ func createRunLogHandler(st store.Store, eventsService *events.Service) http.Han
 		// Create log row.
 		params := store.CreateLogParams{
 			RunID:   pgtype.UUID{Bytes: runUUID, Valid: true},
-			StageID: stageID,
+			JobID:   jobID,
 			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,

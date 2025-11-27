@@ -48,7 +48,7 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 		var req struct {
 			RunID  string `json:"run_id"`
 			Events []struct {
-				StageID *string                `json:"stage_id,omitempty"`
+				JobID   *string                `json:"job_id,omitempty"`
 				Time    *string                `json:"time,omitempty"`
 				Level   string                 `json:"level"`
 				Message string                 `json:"message"`
@@ -112,12 +112,12 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 				return
 			}
 
-			// Parse stage_id if provided.
-			var stageID pgtype.UUID
-			if evt.StageID != nil && strings.TrimSpace(*evt.StageID) != "" {
-				stageID = domaintypes.ToPGUUID(*evt.StageID)
-				if !stageID.Valid {
-					http.Error(w, fmt.Sprintf("events[%d]: invalid stage_id: invalid uuid", i), http.StatusBadRequest)
+			// Parse job_id if provided.
+			var jobID pgtype.UUID
+			if evt.JobID != nil && strings.TrimSpace(*evt.JobID) != "" {
+				jobID = domaintypes.ToPGUUID(*evt.JobID)
+				if !jobID.Valid {
+					http.Error(w, fmt.Sprintf("events[%d]: invalid job_id: invalid uuid", i), http.StatusBadRequest)
 					return
 				}
 			}
@@ -151,8 +151,8 @@ func createNodeEventsHandler(st store.Store, eventsService *events.Service) http
 			level := strings.ToLower(strings.TrimSpace(evt.Level))
 
 			params := store.CreateEventParams{
-				RunID:   runID,
-				StageID: stageID,
+				RunID: runID,
+				JobID: jobID,
 				Time: pgtype.Timestamptz{
 					Time:  eventTime,
 					Valid: true,

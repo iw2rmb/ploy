@@ -86,7 +86,7 @@ func TestAuthorizerBearerToken_ValidToken(t *testing.T) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	// Generate valid token
-	tokenString, err := GenerateAPIToken(secret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestAuthorizerBearerToken_ExpiredToken(t *testing.T) {
 	expiresAt := time.Now().Add(-1 * time.Hour) // Already expired
 
 	// Generate expired token
-	tokenString, err := GenerateAPIToken(secret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestAuthorizerBearerToken_RevokedToken(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(secret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -280,21 +280,21 @@ func TestAuthorizerBearerToken_RoleExtraction(t *testing.T) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	tests := []struct {
-		role         string
-		allowedRoles []string
+		role         Role
+		allowedRoles []Role
 		wantAllowed  bool
 	}{
-		{RoleControlPlane, []string{RoleControlPlane}, true},
-		{RoleWorker, []string{RoleWorker}, true},
-		{RoleCLIAdmin, []string{RoleCLIAdmin}, true},
-		{RoleCLIAdmin, []string{RoleControlPlane}, true}, // Admin can access control-plane endpoints
-		{RoleControlPlane, []string{RoleWorker}, false},  // control-plane cannot access worker endpoints
-		{RoleWorker, []string{RoleCLIAdmin}, false},      // worker cannot access admin endpoints
+		{RoleControlPlane, []Role{RoleControlPlane}, true},
+		{RoleWorker, []Role{RoleWorker}, true},
+		{RoleCLIAdmin, []Role{RoleCLIAdmin}, true},
+		{RoleCLIAdmin, []Role{RoleControlPlane}, true}, // Admin can access control-plane endpoints
+		{RoleControlPlane, []Role{RoleWorker}, false},  // control-plane cannot access worker endpoints
+		{RoleWorker, []Role{RoleCLIAdmin}, false},      // worker cannot access admin endpoints
 	}
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%s_accessing_%v", tt.role, tt.allowedRoles), func(t *testing.T) {
-			tokenString, err := GenerateAPIToken(secret, clusterID, tt.role, expiresAt)
+			tokenString, err := GenerateAPIToken(secret, clusterID, string(tt.role), expiresAt)
 			if err != nil {
 				t.Fatalf("GenerateAPIToken error: %v", err)
 			}
@@ -383,7 +383,7 @@ func TestAuthorizerBearerToken_NoQuerierConfigured(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(secret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestAuthorizerBearerToken_WrongSecret(t *testing.T) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	// Generate token with secret1
-	tokenString, err := GenerateAPIToken(secret1, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret1, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestAuthorizerBearerToken_InsecureModeWithToken(t *testing.T) {
 	role := RoleControlPlane
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	tokenString, err := GenerateAPIToken(secret, clusterID, role, expiresAt)
+	tokenString, err := GenerateAPIToken(secret, clusterID, string(role), expiresAt)
 	if err != nil {
 		t.Fatalf("GenerateAPIToken error: %v", err)
 	}

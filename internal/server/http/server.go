@@ -137,7 +137,7 @@ func (s *Server) Addr() string {
 
 // Handle registers a handler for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *Server) Handle(pattern string, handler http.Handler, roles ...string) {
+func (s *Server) Handle(pattern string, handler http.Handler, roles ...auth.Role) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -150,7 +150,7 @@ func (s *Server) Handle(pattern string, handler http.Handler, roles ...string) {
 
 // HandleFunc registers a handler function for the given pattern with optional middleware.
 // The authorizer middleware will be applied if roles are provided.
-func (s *Server) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...string) {
+func (s *Server) HandleFunc(pattern string, handlerFunc http.HandlerFunc, roles ...auth.Role) {
 	s.Handle(pattern, handlerFunc, roles...)
 }
 

@@ -55,7 +55,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		// Decode request body.
 		var req struct {
 			RunID   string  `json:"run_id"`
-			StageID *string `json:"stage_id,omitempty"`
+			JobID   *string `json:"job_id,omitempty"`
 			BuildID *string `json:"build_id,omitempty"`
 			ChunkNo int32   `json:"chunk_no"`
 			Data    []byte  `json:"data"`
@@ -110,12 +110,12 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 			return
 		}
 
-		// Parse stage_id if provided.
-		var stageID pgtype.UUID
-		if req.StageID != nil && strings.TrimSpace(*req.StageID) != "" {
-			stageID = domaintypes.ToPGUUID(*req.StageID)
-			if !stageID.Valid {
-				http.Error(w, "invalid stage_id: invalid uuid", http.StatusBadRequest)
+		// Parse job_id if provided.
+		var jobID pgtype.UUID
+		if req.JobID != nil && strings.TrimSpace(*req.JobID) != "" {
+			jobID = domaintypes.ToPGUUID(*req.JobID)
+			if !jobID.Valid {
+				http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 				return
 			}
 		}
@@ -133,7 +133,7 @@ func createNodeLogsHandler(st store.Store, eventsService *events.Service) http.H
 		// Store the gzipped log chunk in the database.
 		params := store.CreateLogParams{
 			RunID:   runID,
-			StageID: stageID,
+			JobID:   jobID,
 			BuildID: buildID,
 			ChunkNo: req.ChunkNo,
 			Data:    req.Data,

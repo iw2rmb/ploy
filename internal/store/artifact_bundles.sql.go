@@ -12,14 +12,14 @@ import (
 )
 
 const createArtifactBundle = `-- name: CreateArtifactBundle :one
-INSERT INTO artifact_bundles (run_id, stage_id, build_id, name, bundle, cid, digest)
+INSERT INTO artifact_bundles (run_id, job_id, build_id, name, bundle, cid, digest)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest
+RETURNING id, run_id, job_id, build_id, name, bundle, created_at, cid, digest
 `
 
 type CreateArtifactBundleParams struct {
 	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
+	JobID   pgtype.UUID `json:"job_id"`
 	BuildID pgtype.UUID `json:"build_id"`
 	Name    *string     `json:"name"`
 	Bundle  []byte      `json:"bundle"`
@@ -30,7 +30,7 @@ type CreateArtifactBundleParams struct {
 func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBundleParams) (ArtifactBundle, error) {
 	row := q.db.QueryRow(ctx, createArtifactBundle,
 		arg.RunID,
-		arg.StageID,
+		arg.JobID,
 		arg.BuildID,
 		arg.Name,
 		arg.Bundle,
@@ -41,7 +41,7 @@ func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBu
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.BuildID,
 		&i.Name,
 		&i.Bundle,
@@ -73,7 +73,7 @@ func (q *Queries) DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt 
 }
 
 const getArtifactBundle = `-- name: GetArtifactBundle :one
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE id = $1
 `
 
@@ -83,7 +83,7 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 	err := row.Scan(
 		&i.ID,
 		&i.RunID,
-		&i.StageID,
+		&i.JobID,
 		&i.BuildID,
 		&i.Name,
 		&i.Bundle,
@@ -95,7 +95,7 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 }
 
 const listArtifactBundlesByCID = `-- name: ListArtifactBundlesByCID :many
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE cid = $1
 ORDER BY created_at DESC
 `
@@ -112,7 +112,7 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,
@@ -131,7 +131,7 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 }
 
 const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
 WHERE run_id = $1
 ORDER BY created_at DESC
 `
@@ -148,7 +148,7 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,
@@ -166,19 +166,19 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 	return items, nil
 }
 
-const listArtifactBundlesByRunAndStage = `-- name: ListArtifactBundlesByRunAndStage :many
-SELECT id, run_id, stage_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
-WHERE run_id = $1 AND stage_id = $2
+const listArtifactBundlesByRunAndJob = `-- name: ListArtifactBundlesByRunAndJob :many
+SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+WHERE run_id = $1 AND job_id = $2
 ORDER BY created_at DESC
 `
 
-type ListArtifactBundlesByRunAndStageParams struct {
-	RunID   pgtype.UUID `json:"run_id"`
-	StageID pgtype.UUID `json:"stage_id"`
+type ListArtifactBundlesByRunAndJobParams struct {
+	RunID pgtype.UUID `json:"run_id"`
+	JobID pgtype.UUID `json:"job_id"`
 }
 
-func (q *Queries) ListArtifactBundlesByRunAndStage(ctx context.Context, arg ListArtifactBundlesByRunAndStageParams) ([]ArtifactBundle, error) {
-	rows, err := q.db.Query(ctx, listArtifactBundlesByRunAndStage, arg.RunID, arg.StageID)
+func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListArtifactBundlesByRunAndJobParams) ([]ArtifactBundle, error) {
+	rows, err := q.db.Query(ctx, listArtifactBundlesByRunAndJob, arg.RunID, arg.JobID)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (q *Queries) ListArtifactBundlesByRunAndStage(ctx context.Context, arg List
 		if err := rows.Scan(
 			&i.ID,
 			&i.RunID,
-			&i.StageID,
+			&i.JobID,
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,

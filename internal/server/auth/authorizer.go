@@ -31,11 +31,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// Role represents an authentication role for access control.
+type Role string
+
 // Role constants encode connection-level privileges.
 const (
-	RoleControlPlane = "control-plane"
-	RoleWorker       = "worker"
-	RoleCLIAdmin     = "cli-admin"
+	RoleControlPlane Role = "control-plane"
+	RoleWorker       Role = "worker"
+	RoleCLIAdmin     Role = "cli-admin"
 )
 
 // Options configure the Authorizer.
@@ -45,7 +48,7 @@ const (
 // to false so that mutual TLS is mandatory.
 type Options struct {
 	AllowInsecure bool
-	DefaultRole   string
+	DefaultRole   Role
 	TokenSecret   string        // JWT signing secret for bearer token validation
 	Querier       store.Querier // Database querier for token validation
 	Logger        *slog.Logger  // Structured logger for auth events
@@ -55,7 +58,7 @@ type Options struct {
 // Use Middleware to wrap HTTP handlers with the required role allowlist.
 type Authorizer struct {
 	allowInsecure bool
-	defaultRole   string
+	defaultRole   Role
 	tokenSecret   string        // JWT signing secret
 	querier       store.Querier // Database for token validation
 	logger        *slog.Logger  // Structured logger
@@ -63,7 +66,7 @@ type Authorizer struct {
 
 // Identity describes the caller extracted from the TLS certificate.
 type Identity struct {
-	Role       string
+	Role       Role
 	CommonName string
 	Serial     string
 }
@@ -72,10 +75,7 @@ type identityKey struct{}
 
 // NewAuthorizer constructs an Authorizer.
 func NewAuthorizer(opts Options) *Authorizer {
-	role := NormalizeRole(opts.DefaultRole)
-	if role == "" {
-		role = opts.DefaultRole
-	}
+	role := opts.DefaultRole
 	logger := opts.Logger
 	if logger == nil {
 		logger = slog.Default()
@@ -103,7 +103,7 @@ func IdentityFromContext(ctx context.Context) (Identity, bool) {
 }
 
 // Middleware enforces the provided role allowlist (empty slice permits any role while still requiring TLS).
-func (a *Authorizer) Middleware(allowed ...string) func(http.Handler) http.Handler {
+func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler {
 	normalized := allowlist(allowed)
 	// Treat cli-admin as a superset of control-plane for authorization purposes.
 	// If a route allows control-plane, cli-admin should also be allowed.
@@ -188,27 +188,27 @@ func (a *Authorizer) identityFromRequest(r *http.Request) (Identity, error) {
 	}, nil
 }
 
-func extractRole(cert *x509.Certificate) string {
+func extractRole(cert *x509.Certificate) Role {
 	if cert == nil {
 		return ""
 	}
 	for _, ou := range cert.Subject.OrganizationalUnit {
-		role := NormalizeRole(strings.TrimPrefix(strings.TrimSpace(ou), "Ploy"))
-		role = strings.TrimSpace(strings.TrimPrefix(role, "role="))
-		if candidate := NormalizeRole(role); candidate != "" {
+		ouStr := strings.TrimPrefix(strings.TrimSpace(ou), "Ploy")
+		ouStr = strings.TrimPrefix(strings.TrimSpace(ouStr), "role=")
+		if candidate := NormalizeRole(ouStr); candidate != "" {
 			return candidate
 		}
 	}
 	if cn := strings.TrimSpace(cert.Subject.CommonName); cn != "" {
-		role := cn
+		roleStr := cn
 		// Prefer colon used by nodes (e.g., "node:<uuid>")
 		if idx := strings.Index(cn, ":"); idx > 0 {
-			role = cn[:idx]
+			roleStr = cn[:idx]
 		} else if idx := strings.Index(cn, "-"); idx > 0 {
 			// Fallback to hyphen delimiter (e.g., "control-xyz").
-			role = cn[:idx]
+			roleStr = cn[:idx]
 		}
-		if candidate := NormalizeRole(role); candidate != "" {
+		if candidate := NormalizeRole(roleStr); candidate != "" {
 			return candidate
 		}
 	}
@@ -263,7 +263,7 @@ func (a *Authorizer) identityFromBearerToken(ctx context.Context, tokenString st
 		"cluster_id", claims.ClusterID)
 
 	return Identity{
-		Role:       claims.Role,
+		Role:       Role(claims.Role),
 		CommonName: claims.ID, // Use token ID as identifier
 		// ClusterID is in claims but not in Identity struct yet
 	}, nil
@@ -330,7 +330,8 @@ func (a *Authorizer) updateTokenLastUsed(ctx context.Context, tokenID, tokenType
 
 // NormalizeRole normalizes a role string to one of the standard role constants.
 // It accepts common aliases and returns the canonical role name.
-func NormalizeRole(value string) string {
+// Returns empty Role if the value doesn't match any known role.
+func NormalizeRole(value string) Role {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "beacon", "control", "control-plane", "controlplane", "client":
 		return RoleControlPlane
@@ -339,18 +340,18 @@ func NormalizeRole(value string) string {
 	case "cli-admin", "cliadmin", "admin":
 		return RoleCLIAdmin
 	default:
-		return strings.ToLower(strings.TrimSpace(value))
+		return ""
 	}
 }
 
-func allowlist(roles []string) map[string]struct{} {
+func allowlist(roles []Role) map[Role]struct{} {
 	if len(roles) == 0 {
 		return nil
 	}
-	out := make(map[string]struct{}, len(roles))
+	out := make(map[Role]struct{}, len(roles))
 	for _, role := range roles {
-		if normalized := NormalizeRole(role); normalized != "" {
-			out[normalized] = struct{}{}
+		if role != "" {
+			out[role] = struct{}{}
 		}
 	}
 	return out

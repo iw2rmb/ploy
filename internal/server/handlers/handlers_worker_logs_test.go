@@ -41,10 +41,10 @@ func TestCreateNodeLogsHandler_Success(t *testing.T) {
 
 	// Prepare request payload.
 	runID := uuid.New().String()
-	stageID := uuid.New().String()
+	jobID := uuid.New().String()
 	payload := map[string]interface{}{
 		"run_id":   runID,
-		"stage_id": stageID,
+		"job_id":   jobID,
 		"chunk_no": 0,
 		"data":     gzippedData,
 	}
@@ -100,11 +100,11 @@ func TestCreateNodeLogsHandler_WithBuildID(t *testing.T) {
 
 	// Prepare request payload including build_id.
 	runID := uuid.New().String()
-	stageID := uuid.New().String()
+	jobID := uuid.New().String()
 	buildID := uuid.New().String()
 	payload := map[string]interface{}{
 		"run_id":   runID,
-		"stage_id": stageID,
+		"job_id":   jobID,
 		"build_id": buildID,
 		"chunk_no": 1,
 		"data":     gzippedData,
@@ -345,7 +345,7 @@ func (m *mockStoreForLogs) CreateLog(ctx context.Context, arg store.CreateLogPar
 	return store.Log{
 		ID:      1,
 		RunID:   arg.RunID,
-		StageID: arg.StageID,
+		JobID:   arg.JobID,
 		BuildID: arg.BuildID,
 		ChunkNo: arg.ChunkNo,
 		Data:    arg.Data,

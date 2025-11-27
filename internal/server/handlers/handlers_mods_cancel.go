@@ -81,24 +81,24 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Best-effort stage updates to canceled — only for pending|running stages
-		if stages, err := st.ListStagesByRun(r.Context(), pgID); err == nil && len(stages) > 0 {
-			for _, stg := range stages {
-				if stg.Status != store.StageStatusPending && stg.Status != store.StageStatusRunning {
+		// Best-effort job updates to canceled — only for pending|assigned|running jobs
+		if jobs, err := st.ListJobsByRun(r.Context(), pgID); err == nil && len(jobs) > 0 {
+			for _, job := range jobs {
+				if job.Status != store.JobStatusPending && job.Status != store.JobStatusAssigned && job.Status != store.JobStatusRunning {
 					continue
 				}
 				// Compute duration if started
 				dur := int64(0)
-				if stg.StartedAt.Valid {
-					d := now.Sub(stg.StartedAt.Time).Milliseconds()
+				if job.StartedAt.Valid {
+					d := now.Sub(job.StartedAt.Time).Milliseconds()
 					if d > 0 {
 						dur = d
 					}
 				}
-				_ = st.UpdateStageStatus(r.Context(), store.UpdateStageStatusParams{
-					ID:         stg.ID,
-					Status:     store.StageStatusCanceled,
-					StartedAt:  stg.StartedAt,
+				_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
+					ID:         job.ID,
+					Status:     store.JobStatusCanceled,
+					StartedAt:  job.StartedAt,
 					FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 					DurationMs: dur,
 				})

@@ -27,7 +27,7 @@ func TestCancelTicket_Authorization(t *testing.T) {
 		t.Fatalf("events: %v", err)
 	}
 
-	newServer := func(defaultRole string) *httpapi.Server {
+	newServer := func(defaultRole auth.Role) *httpapi.Server {
 		authz := auth.NewAuthorizer(auth.Options{AllowInsecure: true, DefaultRole: defaultRole})
 		srv, err := httpapi.New(httpapi.Options{Authorizer: authz})
 		if err != nil {

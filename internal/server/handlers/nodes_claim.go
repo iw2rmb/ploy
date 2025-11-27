@@ -16,14 +16,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// claimRunHandler allows nodes to claim a queued run or run step for execution.
-// Returns the assigned run/step or 204 No Content if no work is available.
+// claimJobHandler allows nodes to claim a pending job for execution.
+// Returns the assigned job with its parent run metadata or 204 No Content if no work is available.
 //
-// Claim strategy:
-//  1. Try to claim a queued step from a multi-step run (run_steps table).
-//  2. If no steps available, try to claim a whole run (legacy single-step runs).
-//  3. Return run metadata with optional step_index for multi-step execution.
-func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
+// Jobs are the unified execution unit for all work types: pre-gate, mod, heal, re-gate, post-gate.
+// Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
+func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
 		nodeIDStr := r.PathValue("id")
@@ -52,135 +50,89 @@ func claimRunHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Strategy 1: Try to claim a step from a multi-step run.
-		// This enables multiple nodes to execute distinct steps of the same run.
-		step, stepErr := st.ClaimRunStep(r.Context(), nodeID)
-		if stepErr == nil {
-			// Step claimed successfully; fetch parent run metadata and return.
-			run, runErr := st.GetRun(r.Context(), step.RunID)
-			if runErr != nil {
-				http.Error(w, fmt.Sprintf("failed to get run for claimed step: %v", runErr), http.StatusInternalServerError)
-				slog.Error("claim: get run failed for step", "node_id", nodeIDStr, "step_id", uuid.UUID(step.ID.Bytes).String(), "err", runErr)
-				return
-			}
-			// Build and send response with step information included.
-			// For step-level claims, pass the step so the response uses the step's node_id.
-			buildAndSendClaimResponse(w, r, st, configHolder, run, &step)
-			slog.Info("step claimed",
-				"step_id", uuid.UUID(step.ID.Bytes).String(),
-				"run_id", uuid.UUID(run.ID.Bytes).String(),
-				"step_index", step.StepIndex,
-				"node_id", nodeIDStr,
-			)
-			return
-		}
-
-		// If no step claimed (either no steps available or error), log and continue to run claim.
-		if !errors.Is(stepErr, pgx.ErrNoRows) {
-			slog.Warn("claim: step claim failed, trying run claim", "node_id", nodeIDStr, "err", stepErr)
-		}
-
-		// Strategy 2: Try to claim a whole run (legacy single-step runs or runs without steps).
-		run, err := st.ClaimRun(r.Context(), nodeID)
+		// Claim the next pending job.
+		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
-			// No queued runs or steps available; return 204 No Content.
+			// No pending jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {
 				w.WriteHeader(http.StatusNoContent)
-				slog.Debug("claim: no work available (no steps or runs)", "node_id", nodeIDStr)
+				slog.Debug("claim: no work available", "node_id", nodeIDStr)
 				return
 			}
-			http.Error(w, fmt.Sprintf("failed to claim run: %v", err), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("failed to claim job: %v", err), http.StatusInternalServerError)
 			slog.Error("claim: database error", "node_id", nodeIDStr, "err", err)
 			return
 		}
 
-		// Build and send response for whole run claim (no step_index).
-		buildAndSendClaimResponse(w, r, st, configHolder, run, nil)
-		slog.Info("run claimed",
+		// Fetch parent run metadata.
+		run, err := st.GetRun(r.Context(), job.RunID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("failed to get run for claimed job: %v", err), http.StatusInternalServerError)
+			slog.Error("claim: get run failed for job", "node_id", nodeIDStr, "job_id", uuid.UUID(job.ID.Bytes).String(), "err", err)
+			return
+		}
+
+		// Transition run to 'running' if it's still queued.
+		if run.Status == store.RunStatusQueued {
+			if err := st.AckRunStart(r.Context(), run.ID); err != nil {
+				slog.Warn("claim: failed to ack run start", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
+			}
+		}
+
+		// Build and send response with job and run information.
+		buildAndSendJobClaimResponse(w, r, configHolder, run, job)
+		slog.Info("job claimed",
+			"job_id", uuid.UUID(job.ID.Bytes).String(),
+			"job_name", job.Name,
 			"run_id", uuid.UUID(run.ID.Bytes).String(),
+			"step_index", job.StepIndex,
 			"node_id", nodeIDStr,
-			"repo_url", run.RepoUrl,
-			"status", run.Status,
 		)
 	}
 }
 
-// buildAndSendClaimResponse constructs and sends the claim response for a run or step.
-// If claimedStep is non-nil, includes step_index in the response and uses the step's node_id
-// for multi-step execution. Otherwise, uses the run's node_id for whole-run claims.
-func buildAndSendClaimResponse(
+// buildAndSendJobClaimResponse constructs and sends the claim response for a job.
+func buildAndSendJobClaimResponse(
 	w http.ResponseWriter,
 	r *http.Request,
-	st store.Store,
 	configHolder *ConfigHolder,
 	run store.Run,
-	claimedStep *store.RunStep,
+	job store.Job,
 ) {
-	// Determine or create a stage for this run and merge stage_id into spec.
-	stagesForRun, err := st.ListStagesByRun(r.Context(), run.ID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to list stages: %v", err), http.StatusInternalServerError)
-		slog.Error("claim: list stages failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
-		return
-	}
-	var stageIDStr string
-	if len(stagesForRun) > 0 {
-		stageIDStr = uuid.UUID(stagesForRun[0].ID.Bytes).String()
-	} else {
-		stg, err := st.CreateStage(r.Context(), store.CreateStageParams{RunID: run.ID, Name: "mods-openrewrite", Status: store.StageStatusPending, Meta: []byte("{}")})
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to create stage: %v", err), http.StatusInternalServerError)
-			slog.Error("claim: create stage failed", "run_id", uuid.UUID(run.ID.Bytes).String(), "err", err)
-			return
-		}
-		stageIDStr = uuid.UUID(stg.ID.Bytes).String()
-	}
-	mergedSpec := mergeStageIDIntoSpec(run.Spec, stageIDStr)
+	// Merge job_id into spec for downstream execution.
+	jobIDStr := uuid.UUID(job.ID.Bytes).String()
+	mergedSpec := mergeJobIDIntoSpec(run.Spec, jobIDStr)
 
 	// Merge server default GitLab config (token/domain) into spec if configured.
 	// Per-run overrides (already in spec) take precedence over server defaults.
 	gitlabCfg := configHolder.GetGitLab()
 	mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
 
-	// Build response with claimed run details.
-	// Include step_index if this is a step claim (multi-node execution).
-	// For step claims, use the step's node_id; for whole run claims, use the run's node_id.
-	// Domain types ensure VCS fields have been validated at ingestion.
-	// Use typed status (store.RunStatus) instead of string cast for type safety;
-	// JSON encoder will serialize the underlying string value.
-	var nodeIDStr string
-	var stepIndex *int32
-	if claimedStep != nil {
-		// Step-level claim: use step's node_id and include step_index.
-		nodeIDStr = uuid.UUID(claimedStep.NodeID.Bytes).String()
-		stepIndex = &claimedStep.StepIndex
-	} else {
-		// Whole-run claim: use run's node_id, step_index remains nil.
-		nodeIDStr = uuid.UUID(run.NodeID.Bytes).String()
-	}
-
 	resp := struct {
-		ID        string          `json:"id"`
+		ID        string          `json:"id"`         // Run ID
+		JobID     string          `json:"job_id"`     // Job ID
+		JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
+		StepIndex float64         `json:"step_index"` // Job ordering index
 		RepoURL   string          `json:"repo_url"`
-		Status    store.RunStatus `json:"status"` // Typed status instead of string cast
+		Status    store.RunStatus `json:"status"`
 		NodeID    string          `json:"node_id"`
 		BaseRef   string          `json:"base_ref"`
 		TargetRef string          `json:"target_ref"`
 		CommitSha *string         `json:"commit_sha,omitempty"`
-		StepIndex *int32          `json:"step_index,omitempty"` // Present for multi-step execution
 		StartedAt string          `json:"started_at"`
 		CreatedAt string          `json:"created_at"`
 		Spec      json.RawMessage `json:"spec,omitempty"`
 	}{
 		ID:        uuid.UUID(run.ID.Bytes).String(),
+		JobID:     jobIDStr,
+		JobName:   job.Name,
+		StepIndex: job.StepIndex,
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
-		NodeID:    nodeIDStr,
+		NodeID:    uuid.UUID(job.NodeID.Bytes).String(),
 		BaseRef:   run.BaseRef,
 		TargetRef: run.TargetRef,
 		CommitSha: run.CommitSha,
-		StepIndex: stepIndex, // Nullable: present for step claims, nil for whole run claims
-		// Use RFC3339 for consistency with other API responses.
 		StartedAt: run.StartedAt.Time.Format(time.RFC3339),
 		CreatedAt: run.CreatedAt.Time.Format(time.RFC3339),
 		Spec:      mergedSpec,
@@ -191,4 +143,15 @@ func buildAndSendClaimResponse(
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		slog.Error("claim: encode response failed", "err", err)
 	}
+}
+
+// mergeJobIDIntoSpec injects job_id into the spec JSONB for downstream execution.
+func mergeJobIDIntoSpec(spec []byte, jobID string) json.RawMessage {
+	var m map[string]interface{}
+	if err := json.Unmarshal(spec, &m); err != nil {
+		m = make(map[string]interface{})
+	}
+	m["job_id"] = jobID
+	merged, _ := json.Marshal(m)
+	return merged
 }

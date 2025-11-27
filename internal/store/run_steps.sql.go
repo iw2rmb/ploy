@@ -12,71 +12,18 @@ import (
 )
 
 const ackRunStepStart = `-- name: AckRunStepStart :exec
+
 UPDATE run_steps
 SET status = 'running'
 WHERE id = $1 AND status = 'assigned'
 `
 
+// NOTE: ClaimRunStep has been replaced by ClaimJob in jobs.sql.
+// Jobs use step_index (FLOAT) for ordering with dynamic insertion support.
 // Acknowledges that a step has started execution (transitions from 'assigned' to 'running').
 func (q *Queries) AckRunStepStart(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, ackRunStepStart, id)
 	return err
-}
-
-const claimRunStep = `-- name: ClaimRunStep :one
-WITH eligible_steps AS (
-  SELECT rs.id, rs.run_id, rs.step_index
-  FROM run_steps rs
-  INNER JOIN runs r ON r.id = rs.run_id
-  INNER JOIN nodes n ON n.id = $1
-  WHERE rs.status = 'queued'
-    AND n.drained = false
-    -- Step 0 can always be claimed; step k>0 requires step k-1 to have succeeded.
-    AND (
-      rs.step_index = 0
-      OR EXISTS (
-        SELECT 1 FROM run_steps prev
-        WHERE prev.run_id = rs.run_id
-          AND prev.step_index = rs.step_index - 1
-          AND prev.status = 'succeeded'
-      )
-    )
-  ORDER BY r.created_at, rs.step_index
-  FOR UPDATE OF rs SKIP LOCKED
-  LIMIT 1
-)
-UPDATE run_steps rs
-SET status = 'assigned', node_id = $1, started_at = now()
-FROM eligible_steps e
-WHERE rs.id = e.id
-RETURNING rs.id, rs.run_id, rs.step_index, rs.status, rs.node_id, rs.started_at, rs.finished_at, rs.reason
-`
-
-// Claims the next available step for execution using FOR UPDATE SKIP LOCKED.
-// Returns the step and its parent run information for execution.
-//
-// Claim strategy:
-// 1. Find queued steps where the previous step (step_index - 1) has succeeded OR step_index = 0.
-// 2. Join with runs to get run metadata (repo_url, base_ref, etc.).
-// 3. Join with nodes to ensure the node is not drained.
-// 4. Use FOR UPDATE SKIP LOCKED to avoid contention.
-// 5. Update step status to 'assigned' and set node_id.
-//
-// This ensures sequential execution: step k can only be claimed after step k-1 succeeds.
-func (q *Queries) ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (RunStep, error) {
-	row := q.db.QueryRow(ctx, claimRunStep, nodeID)
-	var i RunStep
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.StepIndex,
-		&i.Status,
-		&i.NodeID,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.Reason,
-	)
-	return i, err
 }
 
 const countRunSteps = `-- name: CountRunSteps :one
