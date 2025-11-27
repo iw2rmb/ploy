@@ -48,7 +48,7 @@ Legend: [ ] todo, [x] done.
   - Test: `rg "buildgate-validate" -n` shows no accidental references in Codex healing prompts/docs (only the standalone script under `docker/mods/mod-codex` or legacy docs, if retained intentionally). Run `make test` to ensure doc-related tests or linters (if any) still pass.
 
 ## Phase B — Simplify mods-codex image and wrapper
-- [ ] Detach `buildgate-validate` from the `mods-codex` image — Ensure Codex cannot run the gate from inside the container.
+- [x] Detach `buildgate-validate` from the `mods-codex` image — Ensure Codex cannot run the gate from inside the container.
   - Component: `docker/mods/mod-codex`, unit tests referencing `buildgate-validate.sh`.
   - Scope:
     - In `docker/mods/mod-codex/Dockerfile`:
