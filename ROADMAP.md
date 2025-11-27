@@ -137,7 +137,7 @@ Legend: [ ] todo, [x] done.
       - Assert that in HTTP mode, the gate executor makes at least one HTTP call to `/v1/buildgate/validate`.
       - Assert that the returned `BuildGateStageMetadata` is wired into step results as before.
 
-- [ ] Route re‑gates after healing through the HTTP adapter — Decouple healing node from gate node.
+- [x] Route re‑gates after healing through the HTTP adapter — Decouple healing node from gate node.
   - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
     - In `executeWithHealing`, where re‑gate currently uses `runner.Gate.Execute(ctx, gateSpec, workspace)`:
