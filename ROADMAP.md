@@ -199,7 +199,7 @@ Legend: [ ] todo, [x] done.
     - Extend orchestrator tests (or add new ones) to verify:
       - Exactly one pre-run gate is executed per run.
       - Per-step execution only observes post-mod gates.
-- [ ] Clarify Runner.Run contract (docs only) — Make nodeagent ownership of gates explicit.
+- [x] Clarify Runner.Run contract (docs only) — Make nodeagent ownership of gates explicit.
   - Component: `internal/workflow/runtime/step/stub.go`.
   - Scope:
     - Update `Runner.Run` comment to state:
