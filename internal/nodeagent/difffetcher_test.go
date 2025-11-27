@@ -258,8 +258,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			// C2: Healing diffs with the same step_index as mod diffs are included.
-			name:      "include healing diffs with same step_index",
+			// C2: Healing diffs with the same step_index as mod diffs are stored
+			// for observability, but rehydration uses only non-healing diffs.
+			name:      "exclude healing diffs from rehydration chain",
 			runID:     "run-healing",
 			stepIndex: 1,
 			diffs: []diffListItem{
@@ -281,7 +282,8 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 				"diff-1-heal2": gzipBytesHelper(t, []byte("patch 1 heal 2")),
 				"diff-2-mod":   gzipBytesHelper(t, []byte("patch 2 mod")),
 			},
-			wantCount: 5, // Steps 0-1: 2 + 3 diffs (mod + healing each step).
+			// Steps 0-1: only mod diffs ("mod_type=mod") are returned.
+			wantCount: 2,
 			wantErr:   false,
 		},
 	}

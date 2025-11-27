@@ -120,7 +120,9 @@ CREATE INDEX IF NOT EXISTS builds_stage_idx ON builds(stage_id);
 -- Diffs store `stage_id` and `run_id` for association; summary JSONB contains:
 --   - step_index: 0-based step number (for ordering/rehydration)
 --   - mod_type: "mod", "healing", "pre_gate", "post_gate" (for filtering)
--- Rehydration fetches all diffs where step_index <= k, ordered by step_index then created_at.
+-- Rehydration uses per-step mod diffs (mod_type!="healing") where step_index <= k,
+-- ordered by step_index then created_at; healing diffs share the same step_index
+-- for observability but are not applied in the patch chain.
 CREATE TABLE IF NOT EXISTS diffs (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id     UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,

@@ -4,7 +4,8 @@ WHERE id = $1;
 
 -- name: ListDiffsByRun :many
 -- Returns diffs for a run ordered by step_index (if present), then by created_at.
--- This allows rehydration to select diffs in logical step order for multi-step runs.
+-- Callers may further filter by summary.mod_type (e.g. exclude "healing" diffs)
+-- when building the rehydration patch chain.
 SELECT * FROM diffs
 WHERE run_id = $1
 ORDER BY
