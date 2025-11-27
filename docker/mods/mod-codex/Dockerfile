@@ -9,9 +9,9 @@ LABEL org.opencontainers.image.title="mod-codex" \
     org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apk add --no-cache bash git ca-certificates curl jq && \
-    npm install -g @openai/codex \
-    && npm cache clean --force \
-    && rm -rf /root/.npm /tmp/* \
+    npm install -g @openai/codex && \
+    npm cache clean --force && \
+    rm -rf /root/.npm /tmp/* && \
     mkdir -p /workspace /out /root/.codex /etc/ploy/certs && \
     chmod 700 /root/.codex && \
     chmod 755 /etc/ploy/certs
