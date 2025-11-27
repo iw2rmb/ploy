@@ -121,7 +121,7 @@ func TestBuildHealingManifest_RepoMetadataInjection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			manifest, err := buildHealingManifest(tc.req, tc.mod, 0)
+			manifest, err := buildHealingManifest(tc.req, tc.mod, 0, "")
 			if err != nil {
 				t.Fatalf("buildHealingManifest() error = %v", err)
 			}
@@ -170,7 +170,7 @@ func TestBuildHealingManifest_DoesNotMutateInputEnv(t *testing.T) {
 		Env:   originalEnv,
 	}
 
-	_, err := buildHealingManifest(req, mod, 0)
+	_, err := buildHealingManifest(req, mod, 0, "")
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -203,7 +203,7 @@ func TestBuildHealingManifest_NilEnvHandledGracefully(t *testing.T) {
 		Env:   nil, // explicitly nil
 	}
 
-	manifest, err := buildHealingManifest(req, mod, 0)
+	manifest, err := buildHealingManifest(req, mod, 0, "")
 	if err != nil {
 		t.Fatalf("buildHealingManifest() error = %v", err)
 	}
@@ -249,7 +249,7 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := buildHealingManifest(req, tc.mod, 0)
+			_, err := buildHealingManifest(req, tc.mod, 0, "")
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -257,6 +257,163 @@ func TestBuildHealingManifest_ValidationErrors(t *testing.T) {
 				t.Errorf("error = %q, want to contain %q", err.Error(), tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestIsCodexHealingImage verifies that the heuristic for detecting Codex-based
+// healing images correctly identifies common patterns.
+func TestIsCodexHealingImage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		image string
+		want  bool
+	}{
+		// Positive cases: images containing "codex".
+		{"mods-codex", true},
+		{"mods-codex:latest", true},
+		{"registry.io/mods-codex:v1", true},
+		{"my-codex-healer", true},
+		{"codex-fixer", true},
+		{"MODS-CODEX", true}, // case insensitive
+		{"Codex", true},
+
+		// Negative cases: images without "codex".
+		{"standard-healer", false},
+		{"ubuntu:latest", false},
+		{"maven:3.8", false},
+		{"mod-fix:latest", false},
+		{"codecov-tool", false}, // "codec" but not "codex"
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.image, func(t *testing.T) {
+			t.Parallel()
+			got := isCodexHealingImage(tc.image)
+			if got != tc.want {
+				t.Errorf("isCodexHealingImage(%q) = %v, want %v", tc.image, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestBuildHealingManifest_CodexResumeInjection verifies that CODEX_RESUME=1 is
+// injected into the healing manifest environment when:
+//  1. A non-empty codexSession is provided, AND
+//  2. The healing mod image matches the Codex pattern.
+//
+// Non-Codex healing mods should never receive CODEX_RESUME.
+func TestBuildHealingManifest_CodexResumeInjection(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		mod          HealingMod
+		codexSession string
+		wantResume   bool // true if CODEX_RESUME=1 should be set
+	}{
+		{
+			name:         "codex image with session sets CODEX_RESUME=1",
+			mod:          HealingMod{Image: "mods-codex:latest"},
+			codexSession: "session-abc-123",
+			wantResume:   true,
+		},
+		{
+			name:         "codex image without session does not set CODEX_RESUME",
+			mod:          HealingMod{Image: "mods-codex:latest"},
+			codexSession: "",
+			wantResume:   false,
+		},
+		{
+			name:         "non-codex image with session does not set CODEX_RESUME",
+			mod:          HealingMod{Image: "standard-healer:v1"},
+			codexSession: "session-xyz-456",
+			wantResume:   false,
+		},
+		{
+			name:         "non-codex image without session does not set CODEX_RESUME",
+			mod:          HealingMod{Image: "maven:3.8"},
+			codexSession: "",
+			wantResume:   false,
+		},
+		{
+			name:         "registry prefixed codex image with session",
+			mod:          HealingMod{Image: "registry.gitlab.io/ploy/mods-codex:v2"},
+			codexSession: "session-def-789",
+			wantResume:   true,
+		},
+		{
+			name:         "case insensitive codex detection",
+			mod:          HealingMod{Image: "my-CODEX-fixer:latest"},
+			codexSession: "session-ghi-012",
+			wantResume:   true,
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:   types.RunID("test-run-codex-resume"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			manifest, err := buildHealingManifest(req, tc.mod, 0, tc.codexSession)
+			if err != nil {
+				t.Fatalf("buildHealingManifest() error = %v", err)
+			}
+
+			gotResume, hasResume := manifest.Env["CODEX_RESUME"]
+			if tc.wantResume {
+				if !hasResume || gotResume != "1" {
+					t.Errorf("CODEX_RESUME = %q (present=%v), want '1'", gotResume, hasResume)
+				}
+			} else {
+				if hasResume {
+					t.Errorf("CODEX_RESUME = %q, want absent", gotResume)
+				}
+			}
+		})
+	}
+}
+
+// TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv verifies that
+// user-specified env vars are preserved when CODEX_RESUME is injected.
+func TestBuildHealingManifest_CodexResumeDoesNotOverrideUserEnv(t *testing.T) {
+	t.Parallel()
+
+	req := StartRunRequest{
+		RunID:   types.RunID("test-run-preserve-env"),
+		RepoURL: types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef: types.GitRef("main"),
+	}
+
+	mod := HealingMod{
+		Image: "mods-codex:latest",
+		Env: map[string]string{
+			"CUSTOM_VAR": "custom_value",
+			"ANOTHER":    "another_value",
+		},
+	}
+
+	manifest, err := buildHealingManifest(req, mod, 0, "session-id-123")
+	if err != nil {
+		t.Fatalf("buildHealingManifest() error = %v", err)
+	}
+
+	// Verify CODEX_RESUME is set.
+	if manifest.Env["CODEX_RESUME"] != "1" {
+		t.Errorf("CODEX_RESUME = %q, want '1'", manifest.Env["CODEX_RESUME"])
+	}
+
+	// Verify user env vars are preserved.
+	if manifest.Env["CUSTOM_VAR"] != "custom_value" {
+		t.Errorf("CUSTOM_VAR = %q, want 'custom_value'", manifest.Env["CUSTOM_VAR"])
+	}
+	if manifest.Env["ANOTHER"] != "another_value" {
+		t.Errorf("ANOTHER = %q, want 'another_value'", manifest.Env["ANOTHER"])
 	}
 }
 

@@ -160,6 +160,26 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	return manifest, nil
 }
 
+// isCodexHealingImage returns true if the image name indicates a Codex-based
+// healing mod container. This enables automatic session resume for Codex healers.
+//
+// The function checks for common Codex image patterns:
+//   - "mods-codex" (exact or as prefix/suffix)
+//   - Image names containing "codex" substring
+//
+// This heuristic allows session propagation without requiring explicit configuration.
+func isCodexHealingImage(image string) bool {
+	// Normalize image name by extracting the repository/image portion
+	// without registry prefix or tag suffix for matching.
+	// Examples:
+	//   - "mods-codex" → match
+	//   - "registry.io/mods-codex:v1" → match
+	//   - "my-codex-healer" → match
+	//   - "standard-healer" → no match
+	lower := strings.ToLower(image)
+	return strings.Contains(lower, "codex")
+}
+
 // buildHealingManifest constructs a StepManifest from a typed HealingMod.
 // The healing mod runs with /workspace (RW), /out (RW), and /in (RO) mounts.
 // Using typed HealingMod clarifies which fields are understood by the agent.
@@ -171,9 +191,14 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 //   - PLOY_TARGET_REF: target Git reference for the run
 //   - PLOY_COMMIT_SHA: pinned commit SHA when available
 //
+// When codexSession is non-empty and the healing mod image is a Codex-based healer,
+// the function injects CODEX_RESUME=1 to signal that the healer should resume from
+// an existing session. The codex-session.txt file must be placed in /in by the
+// caller (executeWithHealing) for the healer to read.
+//
 // These env vars enable healing mods to invoke buildgate-validate with the same
 // repo+ref baseline used by the initial Build Gate check.
-func buildHealingManifest(req StartRunRequest, mod HealingMod, index int) (contracts.StepManifest, error) {
+func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string) (contracts.StepManifest, error) {
 	// Validate required image field.
 	image := strings.TrimSpace(mod.Image)
 	if image == "" {
@@ -203,6 +228,15 @@ func buildHealingManifest(req StartRunRequest, mod HealingMod, index int) (contr
 	}
 	if commitSHA := strings.TrimSpace(req.CommitSHA.String()); commitSHA != "" {
 		env["PLOY_COMMIT_SHA"] = commitSHA
+	}
+
+	// Inject CODEX_RESUME=1 when a Codex session is available and the healing mod
+	// image is a Codex-based healer. This signals the healer to resume from an
+	// existing conversation instead of starting fresh. The session file itself
+	// (codex-session.txt) is placed in /in by the caller (executeWithHealing).
+	// Non-Codex healing mods remain unaffected by this injection.
+	if codexSession != "" && isCodexHealingImage(image) {
+		env["CODEX_RESUME"] = "1"
 	}
 
 	// Use typed retain flag.

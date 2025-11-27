@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -593,6 +595,208 @@ func TestExecuteWithHealing_InjectsBearerFromFileWhenTLSEnabledFalse(t *testing.
 	}
 	if got := capturedEnv["PLOY_API_TOKEN"]; got != "file-token-abc" {
 		t.Fatalf("PLOY_API_TOKEN=%q, want file-token-abc", got)
+	}
+}
+
+// TestExecuteWithHealing_CodexSessionPropagation verifies that Codex session
+// artifacts are propagated across healing retries:
+//  1. After a healing mod run, codex-session.txt from /out is read.
+//  2. The session is persisted to /in for subsequent attempts.
+//  3. CODEX_RESUME=1 is injected into subsequent Codex-based healer manifests.
+func TestExecuteWithHealing_CodexSessionPropagation(t *testing.T) {
+	// Track healing mod container specs to verify CODEX_RESUME injection.
+	var healerSpecs []step.ContainerSpec
+	gateCallCount := 0
+
+	mockGate := &mockGateExecutor{executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+		gateCallCount++
+		// Always fail gate to force multiple healing retries.
+		return &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "java", Passed: false}}, LogsText: "fail"}, nil
+	}}
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			// Capture healer specs for assertion.
+			healerSpecs = append(healerSpecs, spec)
+			return step.ContainerHandle{ID: "heal"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return []byte(""), nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	ws, err := os.MkdirTemp("", "ploy-codex-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(ws)
+
+	outDir, err := os.MkdirTemp("", "ploy-codex-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	// Write codex-session.txt to /out before healing mod runs (simulating
+	// what a Codex-based healer would produce).
+	sessionFile := filepath.Join(outDir, "codex-session.txt")
+	if err := os.WriteFile(sessionFile, []byte("session-id-abc-123\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write sentinel file to test observability tracking.
+	sentinelFile := filepath.Join(outDir, "request_build_validation")
+	if err := os.WriteFile(sentinelFile, []byte(""), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	inDir := ""
+
+	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
+	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("t-codex-session"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 2, // Two retries to verify session propagation.
+				"mods": []any{
+					map[string]any{"image": "mods-codex:latest"},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:      types.StepID(req.RunID),
+		Image:   "main:latest",
+		Inputs:  []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
+		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Options: req.Options,
+	}
+
+	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
+
+	// Verify we got 2 healing attempts (retries=2).
+	if len(healerSpecs) != 2 {
+		t.Fatalf("healing container calls = %d, want 2", len(healerSpecs))
+	}
+
+	// First healing attempt should NOT have CODEX_RESUME (no prior session).
+	if _, hasResume := healerSpecs[0].Env["CODEX_RESUME"]; hasResume {
+		t.Errorf("first healing attempt has CODEX_RESUME=%q, want absent", healerSpecs[0].Env["CODEX_RESUME"])
+	}
+
+	// Second healing attempt SHOULD have CODEX_RESUME=1 (session from first attempt).
+	if healerSpecs[1].Env["CODEX_RESUME"] != "1" {
+		t.Errorf("second healing attempt CODEX_RESUME=%q, want '1'", healerSpecs[1].Env["CODEX_RESUME"])
+	}
+
+	// Verify /in directory was created and contains codex-session.txt.
+	if inDir == "" {
+		t.Fatal("/in directory should be created for healing")
+	}
+
+	sessionInPath := filepath.Join(inDir, "codex-session.txt")
+	sessionBytes, readErr := os.ReadFile(sessionInPath)
+	if readErr != nil {
+		t.Fatalf("failed to read codex-session.txt from /in: %v", readErr)
+	}
+
+	if got := strings.TrimSpace(string(sessionBytes)); got != "session-id-abc-123" {
+		t.Errorf("codex-session.txt in /in = %q, want 'session-id-abc-123'", got)
+	}
+}
+
+// TestExecuteWithHealing_NonCodexHealerNoResume verifies that non-Codex healing
+// mods do not receive CODEX_RESUME even when a session is available.
+func TestExecuteWithHealing_NonCodexHealerNoResume(t *testing.T) {
+	var healerSpecs []step.ContainerSpec
+	gateCallCount := 0
+
+	mockGate := &mockGateExecutor{executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+		gateCallCount++
+		return &contracts.BuildGateStageMetadata{StaticChecks: []contracts.BuildGateStaticCheckReport{{Tool: "java", Passed: false}}, LogsText: "fail"}, nil
+	}}
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			healerSpecs = append(healerSpecs, spec)
+			return step.ContainerHandle{ID: "heal"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn:   func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) { return []byte(""), nil },
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error { return nil },
+	}
+
+	ws, err := os.MkdirTemp("", "ploy-noncodex-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(ws)
+
+	outDir, err := os.MkdirTemp("", "ploy-noncodex-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	// Write a session file (simulating a previous Codex run or external source).
+	sessionFile := filepath.Join(outDir, "codex-session.txt")
+	if err := os.WriteFile(sessionFile, []byte("some-session-id\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	inDir := ""
+
+	runner := step.Runner{Workspace: &mockWorkspaceHydrator{}, Containers: mockContainer, Gate: mockGate}
+	rc := &runController{cfg: Config{ServerURL: "http://localhost", NodeID: "n"}}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("t-noncodex-session"),
+		RepoURL:   types.RepoURL("https://gitlab.com/acme/x.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("br"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 2,
+				"mods": []any{
+					// Non-Codex healer image.
+					map[string]any{"image": "standard-healer:v1"},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:      types.StepID(req.RunID),
+		Image:   "main:latest",
+		Inputs:  []contracts.StepInput{{Name: "ws", MountPath: "/workspace", Mode: contracts.StepInputModeReadWrite}},
+		Gate:    &contracts.StepGateSpec{Enabled: true, Profile: "java"},
+		Options: req.Options,
+	}
+
+	_, _ = rc.executeWithHealing(context.Background(), runner, req, manifest, ws, outDir, &inDir, 0)
+
+	// Verify we got 2 healing attempts.
+	if len(healerSpecs) != 2 {
+		t.Fatalf("healing container calls = %d, want 2", len(healerSpecs))
+	}
+
+	// Neither attempt should have CODEX_RESUME (non-Codex image).
+	for i, spec := range healerSpecs {
+		if _, hasResume := spec.Env["CODEX_RESUME"]; hasResume {
+			t.Errorf("healing attempt %d has CODEX_RESUME=%q, want absent (non-Codex healer)", i+1, spec.Env["CODEX_RESUME"])
+		}
 	}
 }
 
