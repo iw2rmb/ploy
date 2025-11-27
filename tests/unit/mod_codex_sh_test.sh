@@ -69,6 +69,12 @@ test_help_flag() {
     fail "help mentions CODEX_PROMPT env" "expected CODEX_PROMPT in output"
     return
   fi
+  if echo "$output" | grep -q "CODEX_RESUME"; then
+    pass "help mentions CODEX_RESUME env"
+  else
+    fail "help mentions CODEX_RESUME env" "expected CODEX_RESUME in output"
+    return
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -387,6 +393,253 @@ MOCKCODEX
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Test: CODEX_RESUME=1 with existing session invokes resume mode
+# ─────────────────────────────────────────────────────────────────────────────
+test_resume_mode_with_existing_session() {
+  run_test
+
+  # Create temp directories for test
+  local tmp_bin tmp_out tmp_ws tmp_in
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+  tmp_in=$(mktemp -d)
+
+  # Write a prior session ID to /in/codex-session.txt
+  echo "thread_prior_session_abc123" > "$tmp_in/codex-session.txt"
+
+  # Track if resume was invoked by recording all arguments
+  local args_file="$tmp_out/.codex_args"
+
+  # Mock codex CLI that records invocation arguments
+  cat > "$tmp_bin/codex" <<MOCKCODEX
+#!/bin/bash
+if [[ "\$1" == "exec" && "\$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo                Skip confirmations"
+  echo "  --json                Output JSON events"
+  exit 0
+fi
+# Record all arguments to verify resume was passed
+printf "%s\n" "\$@" > "$args_file"
+# Output JSON event with new session (resumed sessions still emit thread.started)
+echo '{"type":"thread.started","thread_id":"thread_resumed_xyz789"}'
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  # Use temp dir as HOME to avoid /root permission issues
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  # Patch the test script to use /in as $tmp_in
+  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="continue healing based on build-gate.log"
+    export CODEX_RESUME=1
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  # Check that "resume" and the session ID were passed to codex
+  if [[ -f "$args_file" ]]; then
+    local args_content
+    args_content=$(cat "$args_file")
+    if echo "$args_content" | grep -q "resume" && echo "$args_content" | grep -q "thread_prior_session_abc123"; then
+      pass "resume mode invoked with session ID"
+    else
+      fail "resume mode invocation" "expected 'resume thread_prior_session_abc123' in args: $args_content"
+    fi
+  else
+    fail "resume mode invocation" "codex was not called (args file missing)"
+  fi
+
+  # Check that codex.log contains resume mode message
+  if [[ -f "$tmp_out/codex.log" ]] && grep -q "resume mode enabled" "$tmp_out/codex.log"; then
+    pass "codex.log indicates resume mode enabled"
+  else
+    fail "resume mode logging" "expected 'resume mode enabled' in codex.log"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: CODEX_RESUME=1 without session file runs fresh exec
+# ─────────────────────────────────────────────────────────────────────────────
+test_resume_mode_without_session_file() {
+  run_test
+
+  # Create temp directories for test
+  local tmp_bin tmp_out tmp_ws tmp_in
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+  tmp_in=$(mktemp -d)
+
+  # Do NOT create codex-session.txt; resume should be skipped
+
+  # Track invocation arguments
+  local args_file="$tmp_out/.codex_args"
+
+  # Mock codex CLI
+  cat > "$tmp_bin/codex" <<MOCKCODEX
+#!/bin/bash
+if [[ "\$1" == "exec" && "\$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo                Skip confirmations"
+  exit 0
+fi
+printf "%s\n" "\$@" > "$args_file"
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
+
+  local exit_code
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="test prompt"
+    export CODEX_RESUME=1
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+  exit_code=$?
+
+  # Check that "resume" was NOT passed
+  if [[ -f "$args_file" ]]; then
+    local args_content
+    args_content=$(cat "$args_file")
+    if echo "$args_content" | grep -q "resume"; then
+      fail "fresh exec mode" "resume was passed despite no session file: $args_content"
+    else
+      pass "fresh exec mode when no session file exists"
+    fi
+  else
+    fail "fresh exec mode" "codex was not called"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Manifest includes resumed:true when resuming
+# ─────────────────────────────────────────────────────────────────────────────
+test_manifest_resumed_field_true() {
+  run_test
+
+  local tmp_bin tmp_out tmp_ws tmp_in
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+  tmp_in=$(mktemp -d)
+
+  echo "thread_session_for_resume" > "$tmp_in/codex-session.txt"
+
+  # Mock codex CLI
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
+#!/bin/bash
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo                Skip confirmations"
+  echo "  --json                Output JSON events"
+  exit 0
+fi
+echo '{"type":"thread.started","thread_id":"thread_resumed_manifest"}'
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+  sed -i.bak "s|/in|$tmp_in|g" "$tmp_script"
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="test prompt"
+    export CODEX_RESUME=1
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+
+  # Check manifest contains resumed:true
+  if [[ -f "$tmp_out/codex-run.json" ]]; then
+    local manifest
+    manifest=$(cat "$tmp_out/codex-run.json")
+    if echo "$manifest" | grep -q '"resumed":true'; then
+      pass "manifest contains resumed:true when resuming"
+    else
+      fail "manifest resumed field" "expected resumed:true, got: $manifest"
+    fi
+  else
+    fail "manifest resumed field" "codex-run.json not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_in" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test: Manifest includes resumed:false when not resuming
+# ─────────────────────────────────────────────────────────────────────────────
+test_manifest_resumed_field_false() {
+  run_test
+
+  local tmp_bin tmp_out tmp_ws
+  tmp_bin=$(mktemp -d)
+  tmp_out=$(mktemp -d)
+  tmp_ws=$(mktemp -d)
+
+  # Mock codex CLI
+  cat > "$tmp_bin/codex" <<'MOCKCODEX'
+#!/bin/bash
+if [[ "$1" == "exec" && "$2" == "--help" ]]; then
+  echo "Usage: codex exec [OPTIONS]"
+  echo "  --yolo                Skip confirmations"
+  exit 0
+fi
+exit 0
+MOCKCODEX
+  chmod +x "$tmp_bin/codex"
+
+  local tmp_home tmp_script
+  tmp_home=$(mktemp -d)
+  tmp_script=$(create_test_script)
+
+  (
+    export HOME="$tmp_home"
+    export PATH="$tmp_bin:$PATH"
+    export CODEX_PROMPT="test prompt"
+    # CODEX_RESUME not set
+    bash "$tmp_script" --input "$tmp_ws" --out "$tmp_out"
+  ) >/dev/null 2>&1
+
+  # Check manifest contains resumed:false
+  if [[ -f "$tmp_out/codex-run.json" ]]; then
+    local manifest
+    manifest=$(cat "$tmp_out/codex-run.json")
+    if echo "$manifest" | grep -q '"resumed":false'; then
+      pass "manifest contains resumed:false when not resuming"
+    else
+      fail "manifest resumed field" "expected resumed:false, got: $manifest"
+    fi
+  else
+    fail "manifest resumed field" "codex-run.json not created"
+  fi
+
+  rm -rf "$tmp_bin" "$tmp_out" "$tmp_ws" "$tmp_home" "$tmp_script"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Test: Script detects --output-dir flag
 # ─────────────────────────────────────────────────────────────────────────────
 test_output_dir_flag_detection() {
@@ -472,6 +725,22 @@ test_manifest_contains_new_fields
 echo ""
 echo "Test: No JSON support fallback"
 test_no_json_support_fallback
+
+echo ""
+echo "Test: CODEX_RESUME=1 with existing session"
+test_resume_mode_with_existing_session
+
+echo ""
+echo "Test: CODEX_RESUME=1 without session file"
+test_resume_mode_without_session_file
+
+echo ""
+echo "Test: Manifest resumed:true when resuming"
+test_manifest_resumed_field_true
+
+echo ""
+echo "Test: Manifest resumed:false when not resuming"
+test_manifest_resumed_field_false
 
 echo ""
 echo "Test: --output-dir flag detection"
