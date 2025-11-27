@@ -86,7 +86,7 @@ Legend: [ ] todo, [x] done.
       - Gate fail → heal → re-gate success.
       - Gate fail → healing exhausted → `ErrBuildGateFailed`.
     - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
-- [ ] Run a single pre-mod gate with healing before executing mods — Ensure the baseline compiles before any changes.
+- [x] Run a single pre-mod gate with healing before executing mods — Ensure the baseline compiles before any changes.
   - Component: `internal/nodeagent/execution_orchestrator.go`, `internal/nodeagent/execution_healing.go`.
   - Scope:
     - In `executeRun`, before the loop over `stepIndex`:
