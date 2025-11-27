@@ -165,7 +165,7 @@ Legend: [ ] todo, [x] done.
       - Parse YAML with and without `buildgate_worker_enabled` and assert defaults.
     - Run: `go test ./internal/nodeagent -run TestLoadConfig`.
 
-- [ ] E2 — Condition claim loop on worker flag — Only enabled nodes claim Build Gate jobs.
+- [x] E2 — Condition claim loop on worker flag — Only enabled nodes claim Build Gate jobs.
   - Component: `internal/nodeagent/claimer_loop.go`.
   - Scope:
     - In `claimWork`, guard Build Gate claim:
