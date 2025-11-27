@@ -517,6 +517,12 @@ func mergeExecutionResults(acc executionResult, next executionResult) executionR
 
 // buildGateStats constructs gate statistics including pre-gate, re-gates, and final gate runs.
 // Uploads gate logs as artifact bundles for debugging.
+//
+// final_gate semantics:
+//   - When a post-mod gate exists (result.BuildGate != nil), final_gate is the last post-mod gate.
+//   - When no mods executed (no BuildGate), final_gate falls back to the pre-mod gate, ensuring
+//     CLI/API gate summaries always have a final_gate to report on.
+//   - This keeps gate summary behavior consistent: final_gate → last re-gate → pre_gate.
 func (r *runController) buildGateStats(runID, stageID string, result step.Result, execResult executionResult) map[string]any {
 	gate := map[string]any{}
 
@@ -555,7 +561,8 @@ func (r *runController) buildGateStats(runID, stageID string, result step.Result
 		gate["pre_gate"] = buildGateMetadata(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre")
 	}
 
-	// Include re-gate stats if present.
+	// Include re-gate stats if present (healing attempts from both pre- and post-mod phases
+	// in chronological order).
 	if len(execResult.ReGates) > 0 {
 		reGatesList := make([]map[string]any, 0, len(execResult.ReGates))
 		for i, rg := range execResult.ReGates {
@@ -565,9 +572,15 @@ func (r *runController) buildGateStats(runID, stageID string, result step.Result
 		gate["re_gates"] = reGatesList
 	}
 
-	// Always include final/post-mod gate stats under an explicit key when present.
+	// Populate final_gate: use the post-mod gate (result.BuildGate) when present,
+	// otherwise fall back to the pre-mod gate (for runs where no mods executed).
+	// This ensures CLI/API gate summaries always have a final_gate to report on.
 	if result.BuildGate != nil {
 		gate["final_gate"] = buildGateMetadata(result.BuildGate, result.Timings.BuildGateDuration.Milliseconds(), "")
+	} else if execResult.PreGate != nil {
+		// No post-mod gate executed (run terminated at pre-mod phase or no mods).
+		// Use the pre-mod gate as the final gate for consistent summary output.
+		gate["final_gate"] = buildGateMetadata(execResult.PreGate.Metadata, execResult.PreGate.DurationMs, "pre-as-final")
 	}
 
 	return gate
