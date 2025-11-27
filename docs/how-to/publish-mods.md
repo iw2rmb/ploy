@@ -5,7 +5,7 @@ Overview
   - `mod-orw` — OpenRewrite apply (Maven) → `mods-openrewrite`
     - Coordinates are passed via environment only (no JSON spec for coords):
       set `RECIPE_GROUP`, `RECIPE_ARTIFACT`, `RECIPE_VERSION`, `RECIPE_CLASSNAME` (optional `MAVEN_PLUGIN_VERSION`).
-  - `mod-codex` — Codex CLI wrapper + buildgate API client → `mods-codex`
+  - `mod-codex` — Codex CLI wrapper (sentinel protocol) → `mods-codex`
     - Build requires no special context; uses standard Node base image.
   - `mod-llm` — LLM plan/execute stub → `mods-llm`
   - `mod-plan` — Planner stub → `mods-plan`

@@ -102,10 +102,15 @@ Legacy healing containers may optionally call the HTTP Build Gate API directly v
 - `PLOY_HOST_WORKSPACE` — Host path to workspace (for direct host verification)
 - `PLOY_SERVER_URL` — ploy server URL for Build Gate HTTP API
 
-**Generating diff patches for Build Gate verification:**
+**Generating diff patches for Build Gate verification (legacy healers only):**
 
-Healing mods should generate unified diff patches and use the repo+diff Build Gate API
-for verification. This avoids shipping full workspace archives over HTTP:
+> NOTE: For Codex-based healing, use the **sentinel protocol** instead (see above).
+> Codex should NOT call `buildgate-validate` directly—it edits the workspace and
+> emits `[[REQUEST_BUILD_VALIDATION]]`; the node agent handles gate execution.
+
+Legacy (non-Codex) healing mods may optionally generate unified diff patches and
+use the repo+diff Build Gate API for mid-healing verification. This avoids
+shipping full workspace archives over HTTP:
 
 1. Generate a unified diff of healing changes:
    ```bash
@@ -123,6 +128,8 @@ for verification. This avoids shipping full workspace archives over HTTP:
 
 3. The Build Gate clones repo_url at ref, applies the diff patch, and runs the build.
 
+The system re-runs the gate regardless of in-container verification results.
+
 Example healing spec block (sentinel protocol):
 ```yaml
 build_gate_healing:
@@ -134,7 +141,6 @@ build_gate_healing:
           Rules:
           - Use /workspace and /in/build-gate.log to understand the compile error.
           - Edit files under /workspace as needed to fix the error.
-          - Do NOT run buildgate-validate or any build commands yourself.
           - When you believe the code is ready for a full build validation, reply with exactly:
             [[REQUEST_BUILD_VALIDATION]]
             as your final message and then stop.

@@ -78,12 +78,11 @@ build_gate:
 # step's gate fails, healing runs once per the retry count, then the gate is
 # re-evaluated before proceeding to the next step.
 #
-# Healing mods use the repo+diff Build Gate API model:
-# 1. Generate a unified diff of healing changes: `git diff > /out/heal.patch`
-# 2. Call buildgate-validate with --diff-patch to verify via the HTTP API:
-#    `buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" \
-#                        --profile auto --diff-patch /out/heal.patch`
-# 3. The Build Gate applies the diff on top of repo_url+ref and runs the build.
+# Sentinel Protocol (recommended for Codex healing):
+# - Codex edits the workspace and emits [[REQUEST_BUILD_VALIDATION]] when ready.
+# - The node agent (not Codex) re-runs the Build Gate externally after healing.
+# - This separation keeps Codex focused on code fixes while the control plane
+#   handles validation orchestration.
 #
 # Environment variables injected by the node agent for healing mods:
 # - PLOY_REPO_URL: Git repository URL (same as the Mods run)
@@ -96,18 +95,19 @@ build_gate_healing:
     - image: docker.io/your-dh-user/mods-codex:latest
       # Codex prompt can be provided via env (CODEX_PROMPT) or a prompt file.
       # Default prompt location: /in/prompt.txt (node mounts it R/O when provided in spec).
-      # The container must have Docker socket access (-v /var/run/docker.sock)
-      # for build verification.
       command: >-
         mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
+        # Sentinel protocol: Codex edits code then signals readiness for validation.
+        # The node agent re-runs the Build Gate externally; Codex does NOT run
+        # buildgate-validate or any build commands directly.
         CODEX_PROMPT: |-
           Rules:
-          - After making any change, generate a unified diff and verify the build.
-          - Generate diff: cd /workspace && git diff > /out/heal.patch
-          - Run: buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BUILDGATE_REF" --profile auto --diff-patch /out/heal.patch
-          - If it fails, iterate and try again until it passes.
-          - Only finalize once the gate passes; then print "BUILD PASSED".
+          - Use /workspace and /in/build-gate.log to understand the compile error.
+          - Edit files under /workspace as needed to fix the error.
+          - When you believe the code is ready for a full build validation, reply with exactly:
+            [[REQUEST_BUILD_VALIDATION]]
+            as your final message and then stop.
 
           Task:
           Fix the compilation error described in /in/build-gate.log.
@@ -117,11 +117,10 @@ build_gate_healing:
       retain_container: false
 
 # Optional GitLab integration (control plane/node redact PAT in logs).
-gitlab_domain: gitlab.com          # optional; defaults to gitlab.com when gitlab_pat is provided
+gitlab_domain: gitlab.com # optional; defaults to gitlab.com when gitlab_pat is provided
 # gitlab_pat: "<TOKEN>"           # optional; can be provided via env_from_file in CLI; avoid committing to VCS
 mr_on_success: true
 mr_on_fail: true
-
 ################################################################################
 # NOTES
 ################################################################################
