@@ -192,8 +192,9 @@ The smoke test suite validates these critical paths:
    - Mod container lifecycle
    - Log streaming from container
    - Artifact collection
-   - Build Gate validation
-   - Healing workflow (Build Gate failure → healing mods → re-gate)
+   - Build Gate validation via HTTP API (repo+diff model)
+   - Healing workflow (Build Gate failure → healing mods → re-gate via remote workers)
+   - Decoupled execution: Mods and Build Gate can run on different nodes
 
 ## Writing New Tests
 

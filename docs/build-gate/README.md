@@ -1,47 +1,40 @@
-Build Gate Contract
+# Build Gate Contract
 
 Scope
 - Minimal, stable contract to validate a repository after each Mods stage.
 - Works in Mods and standalone CI.
 
-## Build Gate Execution Paths
+## Overview: Remote Execution Architecture
 
-Ploy supports two distinct Build Gate execution paths. Understanding these paths
-establishes the baseline for the planned decoupling work (ROADMAP.md Phase A–F).
+Build Gate follows a **repo+diff remote execution model**: callers submit validation
+jobs to the control plane, and dedicated Build Gate worker nodes claim, execute, and
+report results. This architecture decouples gate validation from Mods execution,
+enabling horizontal scaling and separation of concerns.
 
-### Local Docker Gate (Current Default)
+**Primary execution path:**
+1. Mods pre-gate and re-gate (after healing) call the **HTTP Build Gate API**.
+2. The `GateExecutor` adapter in `internal/workflow/runtime/step` abstracts the HTTP
+   call, presenting a unified interface to the node orchestrator.
+3. Build Gate workers claim jobs via `/v1/nodes/{id}/buildgate/claim` and execute
+   validation inside Docker containers.
+4. Workers report results via `/v1/nodes/{id}/buildgate/{job_id}/complete`; the
+   orchestrator receives `BuildGateStageMetadata` through the API response.
 
-The **local docker gate** runs build validation directly on the node agent using
-a mounted workspace. This is the CANONICAL executor for Mods pre-gate and re-gate
-after healing.
+**Key benefits:**
+- **Horizontal scaling:** Add Build Gate workers independently of Mods nodes.
+- **Separation of concerns:** Heavy build validation runs on dedicated nodes.
+- **Consistent workspace semantics:** Repo+diff reconstruction ensures reproducible builds.
+- **Multi-VPS support:** Gate and Mods can run on different nodes without shared state.
 
-**Code path:** `internal/workflow/runtime/step/gate_docker.go`
+## Remote Execution Flow
 
-**Flow:**
-1. Node agent claims a run via `POST /v1/nodes/{id}/claim`.
-2. Node hydrates workspace (repo clone + optional diffs).
-3. `dockerGateExecutor.Execute()` runs build commands inside a language-specific
-   container image (e.g., `maven:3-eclipse-temurin-17`).
-4. Workspace is mounted at `/workspace` inside the container.
-5. Gate metadata (`BuildGateStageMetadata`) is captured and attached to run stats.
-6. For healing flows: re-gate runs after each healing attempt using the same
-   `dockerGateExecutor`, ensuring consistent validation semantics.
-
-**Characteristics:**
-- Workspace is local to the node; no network transfer of code.
-- Gate execution is coupled to the node running the Mods step.
-- Build tools have direct access to the working tree.
-- Full gate history (pre-gate + all re-gates) is captured in run stats (`gate.pre_gate`, `gate.re_gates`, `gate.final_gate`) built from `BuildGateStageMetadata` results.
-
-### HTTP Build Gate API (Remote Execution)
-
-The **HTTP Build Gate API** provides a repo+diff validation model for remote or
-decoupled gate execution. Callers submit validation jobs via HTTP; worker nodes
-claim and execute them.
+The **HTTP Build Gate API** is the canonical execution path for all gate validation.
+Callers submit validation jobs via HTTP; Build Gate worker nodes claim and execute them.
 
 **Code paths:**
 - Server handlers: `internal/server/handlers/handlers_buildgate.go`
 - Job storage: `internal/store/buildgate_jobs.sql.go`
+- Gate executor adapter: `internal/workflow/runtime/step/gate_executor.go`
 
 **Endpoints:**
 - `POST /v1/buildgate/validate` — Submit a validation job (repo_url + ref + optional diff_patch).
@@ -51,13 +44,14 @@ claim and execute them.
 - `POST /v1/nodes/{id}/buildgate/{job_id}/complete` — Report job completion with result.
 
 **Flow:**
-1. Caller submits `BuildGateValidateRequest` with `repo_url`, `ref`, and optional
-   `diff_patch` (gzipped unified diff for healing flows).
+1. Caller (Mods orchestrator or healing flow) submits `BuildGateValidateRequest` with
+   `repo_url`, `ref`, and optional `diff_patch` (gzipped unified diff for healing flows).
 2. Control plane creates a `buildgate_jobs` row with status `pending`.
 3. If job completes within `syncWaitTimeout` (30s), result returns synchronously.
 4. Otherwise, caller receives `job_id` with status `pending` for async polling.
-5. Worker node claims job via `/v1/nodes/{id}/buildgate/claim`.
-6. Worker clones repo at ref, applies diff_patch if present, runs build validation.
+5. Build Gate worker node claims job via `/v1/nodes/{id}/buildgate/claim`.
+6. Worker clones repo at ref, applies diff_patch if present, runs build validation
+   inside a Docker container.
 7. Worker reports completion via `/v1/nodes/{id}/buildgate/{job_id}/complete`.
 
 **Characteristics:**
@@ -65,20 +59,55 @@ claim and execute them.
 - Gate execution can run on any eligible Build Gate worker node.
 - Supports multi-VPS deployments where gate and Mods run on different nodes.
 - Job queue enables load distribution across workers.
+- Full gate history (pre-gate + all re-gates) is captured in run stats (`gate.pre_gate`,
+  `gate.re_gates`, `gate.final_gate`) built from `BuildGateStageMetadata` results.
 
-### Target State
+## GateExecutor Adapter
 
-The **target state** (ROADMAP.md Phases B–F) is:
-- Mods and healing call the HTTP Build Gate API (repo+diff model).
-- Build Gate workers encapsulate docker execution as an implementation detail.
-- Gate jobs can run on any eligible worker, decoupled from the node executing
-  the Mods step.
+The `GateExecutor` interface (in `internal/workflow/runtime/step`) abstracts gate
+execution for the node orchestrator. The HTTP-backed implementation calls the Build
+Gate API and waits for results:
 
-This decoupling enables:
-- Horizontal scaling of gate validation.
-- Separation of concerns: Mods nodes handle mod execution; gate nodes handle
-  build validation.
-- Consistent workspace semantics via repo+diff reconstruction.
+```
+┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────────┐
+│ Node Orchestr.  │      │ GateExecutor (HTTP) │      │ Control Plane       │
+│ (pre-gate/      │─────▶│                     │─────▶│ POST /buildgate/    │
+│  re-gate)       │      │                     │      │ validate            │
+└─────────────────┘      └─────────────────────┘      └─────────────────────┘
+                                                               │
+                                                               ▼
+                         ┌─────────────────────┐      ┌─────────────────────┐
+                         │ Build Gate Worker   │◀─────│ Job Queue           │
+                         │ (Docker execution)  │      │ (buildgate_jobs)    │
+                         └─────────────────────┘      └─────────────────────┘
+                                   │
+                                   ▼
+                         ┌─────────────────────┐
+                         │ BuildGateStage      │
+                         │ Metadata returned   │
+                         └─────────────────────┘
+```
+
+This adapter pattern allows:
+- Mods orchestration code to remain agnostic of execution location.
+- Future execution backends (e.g., Kubernetes jobs) to plug in via the same interface.
+- CLI-visible gate summaries (`ploy mod inspect`) to work unchanged.
+
+## Local Docker Gate (Legacy/Fallback)
+
+For local development or single-node deployments without Build Gate workers, the
+system can fall back to **local docker gate** execution. This runs build validation
+directly on the node agent using a mounted workspace.
+
+**Code path:** `internal/workflow/runtime/step/gate_docker.go`
+
+**Characteristics:**
+- Workspace is local to the node; no network transfer of code.
+- Gate execution is coupled to the node running the Mods step.
+- Build tools have direct access to the working tree.
+
+**Note:** Local docker gate is not the recommended production path. Use Build Gate
+workers with the HTTP API for scalable, decoupled gate validation.
 
 See `docs/mods-lifecycle.md` section 1.1 for gate sequence diagrams and healing
 flow details.

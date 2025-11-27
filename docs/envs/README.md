@@ -89,8 +89,10 @@ Role model (bearer token claims):
 ## Healing Container Environment
 
 The node agent injects the following environment variables into healing containers to support
-Build Gate verification via the repo+diff HTTP API model. These vars enable healing mods to
-derive the same Git baseline used by the Mods run and call the Build Gate API directly.
+Build Gate verification via the repo+diff HTTP API model. Build Gate execution is decoupled
+from Mods execution: healing mods run on the claiming node, but Build Gate validation jobs
+are submitted to the HTTP API and executed by dedicated Build Gate workers. These vars enable
+healing mods to derive the same Git baseline used by the Mods run.
 
 Repo metadata (injected from StartRunRequest):
 - `PLOY_REPO_URL` — Git repository URL for cloning/verification (same as the Mods run)
