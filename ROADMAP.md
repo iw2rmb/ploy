@@ -193,7 +193,7 @@ Legend: [ ] todo, [x] done.
       - Submit Mods run; verify either node can claim it.
 
 ## Phase F — Update specs, docs, and E2E tests
-- [ ] Update Mods and Build Gate documentation to reflect the new architecture — Make repo+diff and remote execution the primary story.
+- [x] Update Mods and Build Gate documentation to reflect the new architecture — Make repo+diff and remote execution the primary story.
   - Component: `docs/build-gate/README.md`, `docs/mods-lifecycle.md`, `docs/envs/README.md`, `cmd/ploy/README.md`, `tests/README.md`.
   - Scope:
     - In `docs/build-gate/README.md`, add a “Remote execution” section:
