@@ -703,6 +703,206 @@ func runCommand(dir, name string, args ...string) error {
 	return nil
 }
 
+// TestExecuteWithHealing_FullGateHistoryCapture verifies that the node agent
+// captures the complete gate execution history (PreGate + ReGates) regardless
+// of how many healing retries are configured. This test validates:
+//
+//   - PreGate is always captured when gate is enabled (even if it fails)
+//   - ReGates slice grows with each healing retry attempt
+//   - Each gate execution produces distinct BuildGateStageMetadata
+//   - Gate history enables telemetry and debugging across the healing workflow
+//
+// This test ensures consistency between HTTP Build Gate API and Docker gate
+// behavior by verifying the node agent always re-runs the gate after healing
+// and captures all results.
+func TestExecuteWithHealing_FullGateHistoryCapture(t *testing.T) {
+	// Track gate call sequence with distinct metadata per call.
+	gateCallCount := 0
+	gateLogs := []string{
+		"[ERROR] Initial failure: missing class Foo",
+		"[ERROR] After healing attempt 1: still failing",
+		"[ERROR] After healing attempt 2: type mismatch",
+		"[INFO] BUILD SUCCESS after attempt 3",
+	}
+
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			// Use distinct logs for each gate call to verify proper history capture.
+			idx := gateCallCount - 1
+			if idx >= len(gateLogs) {
+				idx = len(gateLogs) - 1
+			}
+			passed := gateCallCount >= 4 // Pass on 4th call (pre-gate + 3 re-gates).
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Language: "java", Passed: passed},
+				},
+				LogsText:  gateLogs[idx],
+				LogDigest: fmt.Sprintf("digest-%d", gateCallCount),
+				Resources: &contracts.BuildGateResourceUsage{
+					CPUTotalNs:    uint64(gateCallCount * 100000000), // Distinct per call.
+					MemUsageBytes: uint64(gateCallCount * 10485760),
+				},
+			}, nil
+		},
+	}
+
+	// Track healing container executions.
+	healingContainerCount := 0
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			healingContainerCount++
+			return step.ContainerHandle{ID: fmt.Sprintf("heal-%d", healingContainerCount)}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("healing complete"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-gate-history-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-gate-history-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("test-gate-history"),
+		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 3, // Three retry attempts → 3 re-gates + 1 pre-gate = 4 total.
+				"mods": []any{
+					map[string]any{"image": "healer:latest"},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "main:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:      "workspace",
+				MountPath: "/workspace",
+				Mode:      contracts.StepInputModeReadWrite,
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	execResult, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0)
+
+	// Should succeed after 3 healing attempts (4th gate call passes).
+	if err != nil {
+		t.Fatalf("executeWithHealing() error = %v, want nil", err)
+	}
+
+	// --- Verify PreGate capture ---
+	if execResult.PreGate == nil {
+		t.Fatal("PreGate should always be captured when gate is enabled")
+	}
+	if execResult.PreGate.Metadata == nil {
+		t.Fatal("PreGate.Metadata should not be nil")
+	}
+	if execResult.PreGate.Metadata.LogsText != gateLogs[0] {
+		t.Errorf("PreGate logs = %q, want %q", execResult.PreGate.Metadata.LogsText, gateLogs[0])
+	}
+	if execResult.PreGate.Metadata.LogDigest != "digest-1" {
+		t.Errorf("PreGate digest = %q, want 'digest-1'", execResult.PreGate.Metadata.LogDigest)
+	}
+	if len(execResult.PreGate.Metadata.StaticChecks) == 0 || execResult.PreGate.Metadata.StaticChecks[0].Passed {
+		t.Error("PreGate should have failed check")
+	}
+
+	// --- Verify ReGates capture (3 healing retries = 3 re-gates) ---
+	if len(execResult.ReGates) != 3 {
+		t.Fatalf("len(ReGates) = %d, want 3 (one per healing retry)", len(execResult.ReGates))
+	}
+
+	// Verify each re-gate has distinct metadata (proving node agent re-runs gate).
+	for i, regate := range execResult.ReGates {
+		if regate.Metadata == nil {
+			t.Fatalf("ReGates[%d].Metadata should not be nil", i)
+		}
+		expectedDigest := fmt.Sprintf("digest-%d", i+2) // digest-2, digest-3, digest-4
+		if regate.Metadata.LogDigest != expectedDigest {
+			t.Errorf("ReGates[%d] digest = %q, want %q", i, regate.Metadata.LogDigest, expectedDigest)
+		}
+		expectedLogs := gateLogs[i+1]
+		if regate.Metadata.LogsText != expectedLogs {
+			t.Errorf("ReGates[%d] logs = %q, want %q", i, regate.Metadata.LogsText, expectedLogs)
+		}
+		// Only the last re-gate should pass.
+		shouldPass := i == 2
+		if len(regate.Metadata.StaticChecks) == 0 {
+			t.Fatalf("ReGates[%d] should have StaticChecks", i)
+		}
+		if regate.Metadata.StaticChecks[0].Passed != shouldPass {
+			t.Errorf("ReGates[%d] passed = %v, want %v", i, regate.Metadata.StaticChecks[0].Passed, shouldPass)
+		}
+	}
+
+	// --- Verify total gate calls ---
+	if gateCallCount != 4 {
+		t.Errorf("total gate calls = %d, want 4 (1 pre-gate + 3 re-gates)", gateCallCount)
+	}
+
+	// --- Verify healing containers ran ---
+	// 3 healing containers (one per retry) + 1 main mod container (after gate passes) = 4 total.
+	if healingContainerCount != 4 {
+		t.Errorf("healing container count = %d, want 4 (3 healing + 1 main mod)", healingContainerCount)
+	}
+
+	// --- Verify duration tracking ---
+	if execResult.PreGate.DurationMs < 0 {
+		t.Errorf("PreGate duration = %d, want >= 0", execResult.PreGate.DurationMs)
+	}
+	for i, regate := range execResult.ReGates {
+		if regate.DurationMs < 0 {
+			t.Errorf("ReGates[%d] duration = %d, want >= 0", i, regate.DurationMs)
+		}
+	}
+}
+
 // Mock implementations for testing.
 
 type mockWorkspaceHydrator struct{}

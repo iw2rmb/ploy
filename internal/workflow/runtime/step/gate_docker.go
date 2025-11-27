@@ -1,3 +1,29 @@
+// gate_docker.go implements the Docker-based GateExecutor for build validation.
+//
+// ## HTTP Build Gate and Docker Gate Consistency
+//
+// This GateExecutor provides the CANONICAL gate validation used by the node agent.
+// While healing mods may optionally call the HTTP Build Gate API directly for
+// intermediate checks, the authoritative gate results are always produced by this
+// Docker-based executor. This ensures:
+//
+//   - Consistent validation semantics: The Docker gate validates the workspace
+//     directory directly, which is semantically equivalent to the HTTP Build Gate
+//     API with a diff_patch containing all workspace modifications.
+//
+//   - Full gate history: The node agent captures every gate execution (pre-gate
+//     and all re-gates after healing) in BuildGateStageMetadata, enabling
+//     complete telemetry and audit trails.
+//
+//   - Authoritative results: In-container HTTP Build Gate API calls are advisory
+//     only. The node agent always re-runs this Docker gate after healing mods
+//     complete, regardless of any intermediate validation results.
+//
+// ## Usage Note for Healing Mods
+//
+// Direct HTTP Build Gate API calls from healing mods are now DISCOURAGED for
+// mods-codex. The node agent handles all gate orchestration, ensuring consistent
+// behavior and complete history capture.
 package step
 
 import (
@@ -16,6 +42,11 @@ import (
 
 // dockerGateExecutor runs build validation inside language images using the
 // same container runtime as step execution, mounting the workspace at /workspace.
+//
+// This executor is the CANONICAL source of gate validation results for the node
+// agent. The node agent always uses this executor for both pre-gate (initial
+// validation) and re-gate (post-healing validation) phases, ensuring consistent
+// behavior and complete history capture.
 type dockerGateExecutor struct {
 	rt ContainerRuntime
 }
@@ -38,6 +69,19 @@ func NewDockerGateExecutor(rt ContainerRuntime) GateExecutor {
 // When the container runtime is nil, execution is skipped and empty metadata
 // is returned. A non‑zero exit code is reported as a static check failure and
 // a single log finding containing the captured logs or a synthesized message.
+//
+// ## Returned Metadata
+//
+// The BuildGateStageMetadata returned by this method is the CANONICAL gate result
+// used by the node agent for decision-making and history capture. It includes:
+//   - StaticChecks: Pass/fail status with language and tool information
+//   - LogFindings: Structured error messages extracted from build output
+//   - LogsText: Full build log text (truncated to 256 KiB) for debugging
+//   - LogDigest: SHA-256 hash of logs for deduplication and verification
+//   - Resources: Container resource usage metrics (CPU, memory, disk I/O)
+//
+// This metadata is captured by the node agent in both pre-gate (initial validation)
+// and re-gate (post-healing validation) phases, ensuring complete gate history.
 func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
 	if ctx != nil && ctx.Err() != nil {
 		return nil, ctx.Err()

@@ -6,6 +6,36 @@
 // logic is separated from core orchestration to maintain clear boundaries
 // between run lifecycle (orchestrator) and healing retry mechanics.
 //
+// ## HTTP Build Gate and Docker Gate Consistency
+//
+// The node agent maintains consistent gate behavior whether validation runs via:
+//   - The HTTP Build Gate API (POST /v1/buildgate/validate)
+//   - The Docker-based GateExecutor (gate_docker.go)
+//
+// Key consistency guarantees:
+//
+//  1. Re-gate execution: After healing mods complete, the node agent ALWAYS
+//     re-runs the gate via runner.Gate.Execute (the Docker GateExecutor).
+//     This ensures the canonical gate result is produced by the node agent,
+//     not by in-container scripts that may call the HTTP Build Gate API.
+//
+//  2. Full gate history capture: The node agent records all gate executions:
+//     - PreGate: The initial gate run before healing (BuildGateStageMetadata)
+//     - ReGates: All subsequent re-gate attempts after each healing iteration
+//     This history enables telemetry, debugging, and audit trails.
+//
+//  3. Healing mod flexibility: Healing containers MAY call the HTTP Build Gate
+//     API directly for intermediate validation (e.g., testing if a fix works
+//     before committing). However, these in-container calls are advisory only.
+//     The authoritative gate result is always from the node agent's re-gate.
+//     Note: Direct HTTP Build Gate calls from healing mods are now DISCOURAGED
+//     for mods-codex; the node agent handles all gate orchestration.
+//
+//  4. Workspace semantics: Both gate execution paths use identical semantics:
+//     - HTTP API: Validates repo_url+ref with optional diff_patch parameter
+//     - Docker gate: Validates workspace directory (repo_url+ref + modifications)
+//     The Docker gate is semantically equivalent to HTTP API with diff_patch.
+//
 // ## Repo+Diff Build Gate Semantics
 //
 // Healing verification aligns with the HTTP Build Gate API's repo+diff model:
@@ -53,23 +83,43 @@ import (
 // gateRunMetadata captures gate execution metadata and timing for stats reporting.
 // It wraps gate result metadata with the duration of the gate execution to enable
 // detailed observability reporting of gate performance across pre-gate and re-gate phases.
+//
+// This structure is used to maintain a complete history of all gate executions,
+// ensuring consistency between HTTP Build Gate API behavior and Docker gate behavior.
+// Both execution paths produce equivalent BuildGateStageMetadata that can be
+// compared and audited.
 type gateRunMetadata struct {
-	Metadata   *contracts.BuildGateStageMetadata
+	// Metadata contains the full BuildGateStageMetadata from the gate execution,
+	// including StaticChecks, LogFindings, LogsText, LogDigest, and Resources.
+	// This is the canonical gate result produced by the node agent's GateExecutor.
+	Metadata *contracts.BuildGateStageMetadata
+	// DurationMs records the wall-clock duration of this gate execution in milliseconds.
 	DurationMs int64
 }
 
 // executionResult wraps step.Result with additional gate run history for stats.
 // This type enriches the standard execution result with gate-specific telemetry that
 // tracks the initial gate attempt and any subsequent re-gate attempts after healing.
+//
+// The gate history (PreGate + ReGates) provides a complete audit trail of all
+// gate validations performed by the node agent during the healing workflow.
+// This ensures that:
+//   - The node agent always re-runs the gate after healing (not relying on in-container checks)
+//   - All gate results are captured for telemetry and debugging
+//   - Gate behavior is consistent whether using HTTP Build Gate API or Docker gate
 type executionResult struct {
 	step.Result
 	// PreGate captures the initial gate run metadata (if gate was executed).
 	// When a build gate is configured, this field records the outcome and timing
 	// of the gate check that runs before the main mod execution begins.
+	// This is always populated when Gate.Enabled=true, regardless of whether
+	// the gate passes or fails.
 	PreGate *gateRunMetadata
 	// ReGates captures re-gate attempts after healing (if healing was attempted).
 	// Each entry corresponds to one re-gate run following a healing mod execution,
 	// allowing telemetry to track healing efficacy across multiple retry attempts.
+	// The slice length equals the number of healing retry iterations executed.
+	// Combined with PreGate, this provides the full gate history for the run.
 	ReGates []gateRunMetadata
 }
 
@@ -382,6 +432,12 @@ func (r *runController) executeWithHealing(
 		_ = codexRequestedValidation // Use variable to silence unused warning in non-logging builds.
 
 		// Re-run the gate after healing mods complete.
+		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
+		// even if healing mods called the HTTP Build Gate API directly. This ensures:
+		//   1. Consistent gate semantics between HTTP API and Docker gate execution
+		//   2. Canonical gate results are produced by the node agent (not in-container scripts)
+		//   3. Full gate history is captured in ReGates for telemetry and auditing
+		//
 		// This verification uses the same repo+diff semantics as the HTTP Build Gate API:
 		// the workspace now contains repo_url+ref plus accumulated healing modifications.
 		// Conceptually equivalent to: POST /v1/buildgate/validate with diff_patch.
