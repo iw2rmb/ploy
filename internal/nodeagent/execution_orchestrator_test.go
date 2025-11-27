@@ -45,6 +45,109 @@ func TestBuildGateStats_FinalOnlyShape(t *testing.T) {
 	}
 }
 
+// TestMergeExecutionResults_PreservesPreModGate verifies that when a pre-mod gate
+// has already been recorded in the accumulator, merging a per-step execution
+// result keeps the original PreGate and appends new ReGates in order.
+func TestMergeExecutionResults_PreservesPreModGate(t *testing.T) {
+	preModMeta := &contracts.BuildGateStageMetadata{
+		StaticChecks: []contracts.BuildGateStaticCheckReport{
+			{Tool: "pre-mod", Passed: true},
+		},
+	}
+	preModGate := &gateRunMetadata{
+		Metadata:   preModMeta,
+		DurationMs: 100,
+	}
+	preReGate := gateRunMetadata{
+		Metadata: &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{
+				{Tool: "pre-regate", Passed: true},
+			},
+		},
+		DurationMs: 200,
+	}
+
+	acc := executionResult{
+		PreGate: preModGate,
+		ReGates: []gateRunMetadata{preReGate},
+	}
+
+	stepPreGate := &gateRunMetadata{
+		Metadata: &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{
+				{Tool: "step-pre", Passed: false},
+			},
+		},
+		DurationMs: 50,
+	}
+	stepReGate := gateRunMetadata{
+		Metadata: &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{
+				{Tool: "step-regate", Passed: true},
+			},
+		},
+		DurationMs: 300,
+	}
+
+	next := executionResult{
+		Result:  step.Result{ExitCode: 0},
+		PreGate: stepPreGate,
+		ReGates: []gateRunMetadata{stepReGate},
+	}
+
+	merged := mergeExecutionResults(acc, next)
+
+	// PreGate should remain the pre-mod gate from the accumulator.
+	if merged.PreGate != preModGate {
+		t.Fatalf("merged.PreGate = %#v, want accumulator pre-mod gate %#v", merged.PreGate, preModGate)
+	}
+
+	// ReGates should contain accumulator re-gates followed by next re-gates.
+	if len(merged.ReGates) != 2 {
+		t.Fatalf("len(merged.ReGates) = %d, want 2", len(merged.ReGates))
+	}
+	if merged.ReGates[0] != preReGate {
+		t.Errorf("merged.ReGates[0] = %#v, want preReGate %#v", merged.ReGates[0], preReGate)
+	}
+	if merged.ReGates[1] != stepReGate {
+		t.Errorf("merged.ReGates[1] = %#v, want stepReGate %#v", merged.ReGates[1], stepReGate)
+	}
+
+	// Result should come from the next execution result.
+	if merged.Result.ExitCode != 0 {
+		t.Errorf("merged.Result.ExitCode = %d, want 0", merged.Result.ExitCode)
+	}
+}
+
+// TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator verifies that when
+// there is no pre-mod gate recorded yet, mergeExecutionResults falls back to
+// the next execution's PreGate.
+func TestMergeExecutionResults_UsesNextPreGateWhenNoAccumulator(t *testing.T) {
+	nextPreGate := &gateRunMetadata{
+		Metadata: &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{
+				{Tool: "step-pre", Passed: true},
+			},
+		},
+		DurationMs: 42,
+	}
+
+	acc := executionResult{}
+	next := executionResult{
+		Result:  step.Result{ExitCode: 0},
+		PreGate: nextPreGate,
+	}
+
+	merged := mergeExecutionResults(acc, next)
+
+	if merged.PreGate != nextPreGate {
+		t.Fatalf("merged.PreGate = %#v, want nextPreGate %#v", merged.PreGate, nextPreGate)
+	}
+	if merged.Result.ExitCode != 0 {
+		t.Errorf("merged.Result.ExitCode = %d, want 0", merged.Result.ExitCode)
+	}
+}
+
 // TestUploadDiffForStep_TagsStepIndex verifies that uploadDiffForStep includes
 // step_index both at the top level and inside the summary for proper ordering in multi-step runs.
 func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {

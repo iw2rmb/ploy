@@ -30,7 +30,7 @@ func trimMavenLog(logText string) string {
 	// first meaningful failure block (compilation error or test failure summary).
 	anchor := -1
 	for i, l := range lines {
-		if strings.Contains(l, "[ERROR]") {
+		if strings.HasPrefix(l, "[ERROR] ") {
 			anchor = i
 			break
 		}
