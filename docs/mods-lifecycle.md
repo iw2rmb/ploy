@@ -200,7 +200,8 @@ Key invariants:
 
 ### Implementation references
 
-- Gate execution via HTTP API: `internal/workflow/runtime/step/gate_executor.go` (`GateExecutor`).
+- Gate execution via HTTP API: `internal/workflow/runtime/step/gate_http.go` and
+  `internal/workflow/runtime/step/gate_factory.go` (`GateExecutor`).
 - Gate+healing orchestration: `internal/nodeagent/execution_healing.go`.
 - Run orchestration: `internal/nodeagent/execution_orchestrator.go` (`executeRun`).
 - Workspace rehydration: `internal/nodeagent/execution_orchestrator.go` (`rehydrateWorkspaceForStep`).

@@ -34,7 +34,8 @@ Callers submit validation jobs via HTTP; Build Gate worker nodes claim and execu
 **Code paths:**
 - Server handlers: `internal/server/handlers/handlers_buildgate.go`
 - Job storage: `internal/store/buildgate_jobs.sql.go`
-- Gate executor adapter: `internal/workflow/runtime/step/gate_executor.go`
+- Gate executor adapter: `internal/workflow/runtime/step/gate_http.go` (HTTP) and
+  `internal/workflow/runtime/step/gate_factory.go` (mode selection)
 
 **Endpoints:**
 - `POST /v1/buildgate/validate` — Submit a validation job (repo_url + ref + optional diff_patch).
