@@ -152,6 +152,23 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 // This contract establishes the baseline for adding post-mod gate helpers
 // in subsequent phases. Each call to Run executes exactly one pre-mod gate
 // (when enabled) before a single mod container.
+//
+// # Gate Ownership Contract
+//
+// Runner supports an optional pre-mod gate when Manifest.Gate.Enabled=true.
+// This capability exists for direct invocations (e.g., standalone testing)
+// where Runner manages its own gate lifecycle.
+//
+// However, nodeagent step execution MUST pass manifests with Gate.Enabled=false.
+// The nodeagent orchestration layer owns all gate lifecycle management via
+// runGateWithHealing, which handles:
+//   - A single pre-run gate before the step loop begins.
+//   - Per-step post-mod gates after each container execution.
+//   - Healing retries when gates fail and healing is configured.
+//
+// Passing Gate.Enabled=true from nodeagent would cause duplicate pre-mod gates
+// (one from runGateWithHealing, one from Runner.Run) and break the single-gate-
+// per-run invariant. The nodeagent is the authoritative gate orchestrator.
 type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
