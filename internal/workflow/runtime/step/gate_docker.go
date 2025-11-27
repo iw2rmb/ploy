@@ -114,8 +114,10 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 		tool = "maven"
 		// Always include -e for full ERROR-level stack traces. Keep -q to reduce noise.
+		// Use --ff (fail-fast) to stop on the first failing module and run a full
+		// `clean install` so compilation and tests are validated together.
 		// Diagnostic guidance: switch to -X (drop -q) only for deep investigations.
-		cmd = []string{"/bin/sh", "-lc", "mvn -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test"}
+		cmd = []string{"/bin/sh", "-lc", "mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install"}
 	}
 	chooseGradle := func() {
 		if image == "" {
@@ -123,7 +125,8 @@ func (e *dockerGateExecutor) Execute(ctx context.Context, spec *contracts.StepGa
 		}
 		tool = "gradle"
 		// Include --stacktrace for error stack traces (similar to Maven -e). Keep -q to reduce noise.
-		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace test -p /workspace"}
+		// Use --fail-fast so Gradle test failures stop execution early.
+		cmd = []string{"/bin/sh", "-lc", "gradle -q --stacktrace --fail-fast test -p /workspace"}
 	}
 	chooseJava := func() {
 		if image == "" {
@@ -238,7 +241,7 @@ fi`
 		meta.LogFindings = append(meta.LogFindings, contracts.BuildGateLogFinding{Severity: "error", Message: msg})
 	}
 	// Attach logs text (truncated) for node-side artifact upload, and compute a digest.
-	const maxLogBytes = 256 << 10 // 256 KiB safety cap in memory
+	const maxLogBytes = 1 << 20 // 1 MiB safety cap in memory
 	if len(logs) > maxLogBytes {
 		logs = logs[:maxLogBytes]
 	}

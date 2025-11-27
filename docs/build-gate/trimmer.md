@@ -34,27 +34,22 @@ The trimmer is implemented as:
 For Maven (including Surefire + Spring Boot test output), the trimmer:
 
 - Splits logs into lines.
-- Anchors on the first occurrence of:
-  - `"[ERROR] Tests run:"`, or
-  - The first line starting with `"[ERROR]"` (fallback).
-- Preserves a small window of context before the anchor:
-  - Up to 40 lines above the anchor (bounded by the start of the file).
-  - This keeps the key stack trace and nearby context (e.g. `Caused by:`,
-    `BeanCreationException`, `MockitoException`).
-- Scans forward from the anchor and stops before Maven footer lines:
-  - `[INFO] BUILD ...`
-  - `[INFO] Total time:`
-  - `[INFO] Finished at:`
-  - The long `[INFO] ------------------------------------------------------------------------` separator.
-- Joins the selected region back into a string, preserving a trailing newline
-  when the original log ended with one.
+- Anchors on the first line containing `"[ERROR]"`.
+- Keeps everything from that line through the end of the log.
+- Preserves a trailing newline when the original log ended with one.
 
-Effectively, for Maven builds the trimmed view contains:
+With Maven `--ff` enabled in the gate, the first `"[ERROR]"` line typically
+corresponds to either:
 
-- The failing test name(s) and error summary (e.g. `Tests run: ... Errors: 1`).
-- The stack trace leading into the failure (e.g. `BeanCreationException`,
-  `MockitoException`, `NullPointerException`).
-- No Maven footer noise or redundant timing information.
+- A compilation error header (e.g. `COMPILATION ERROR` / `cannot find symbol`), or
+- The first failing test summary (e.g. `Tests run: ..., Errors: 1`).
+
+This yields a trimmed view that:
+
+- Drops early plugin/bootstrap noise.
+- Keeps the full failure block (summary plus stack trace).
+- May include Maven footers (`BUILD FAILURE`, `Total time`) when they appear
+  after the first error, which are often useful for context.
 
 ### Gradle Rules
 
@@ -97,8 +92,8 @@ The trimmer is invoked inside the Docker-based gate executor:
   - `TrimBuildGateLog(tool, string(logs))` is called.
   - The trimmed output (or original logs for unknown tools) is stored in
     `BuildGateStageMetadata.LogFindings[0].Message`.
-- `BuildGateStageMetadata.LogsText` still carries the full (truncated) logs
-  for:
+- `BuildGateStageMetadata.LogsText` still carries the full (truncated, ≤1 MiB)
+  logs for:
   - Node-side artifact upload (`build-gate.log` bundles).
   - Control-plane storage and manual inspection.
 
@@ -109,15 +104,19 @@ for downstream consumers.
 ## Healing and Codex Considerations
 
 Healing mods (including `mods-codex`) receive the first failing gate log in
-`/in/build-gate.log`, which is sourced from `BuildGateStageMetadata.LogsText`.
+`/in/build-gate.log`. The node agent now prefers the trimmed view when
+available:
 
-The trimmer does **not** change the full log content; instead, it produces a
-focused view used in `LogFindings`. This allows future improvements to:
+- When `BuildGateStageMetadata.LogFindings` contains at least one entry, the
+  first finding's `Message` is written to `/in/build-gate.log` for healing mods.
+- When no trimmed view is available (unknown tool / legacy gate), the agent
+  falls back to `BuildGateStageMetadata.LogsText`.
 
-- Switch `/in/build-gate.log` to use the trimmed view for known tools, while
-  leaving artifacts and `LogsText` unchanged.
-- Introduce additional language/framework-specific trimmers (e.g. for JUnit,
-  Jest, ESLint) without changing node agent behavior.
+This behavior ensures:
+
+- `mods-codex` and other healing mods see a focused failure slice for known
+  tools (Maven/Gradle).
+- Full logs remain available via artifacts and `LogsText` for manual inspection.
 
 ## Extensibility
 
@@ -134,4 +133,3 @@ To add support for new stacks:
 
 The node agent and CLI will automatically benefit from new trimmers via the
 existing `LogFindings` and metadata surfaces.
-

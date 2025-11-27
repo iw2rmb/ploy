@@ -10,7 +10,7 @@ func TestTrimBuildGateLog_Maven_WithErrorSummary(t *testing.T) {
 
 	const logText = `
 [INFO] --- maven-surefire-plugin:3.2.5:test (default-test) @ sample ---
-[INFO] 
+[INFO]
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
@@ -42,17 +42,20 @@ Mockito cannot mock/spy because :
 		t.Fatalf("TrimBuildGateLog(maven) did not trim logs")
 	}
 
+	// New behavior: Maven trimmer keeps everything starting from the first
+	// "[ERROR]" line to the end of the log.
+	if !strings.HasPrefix(strings.TrimSpace(trimmed), "[ERROR] Tests run:") {
+		t.Errorf("trimmed log should start at first [ERROR] line, got:\n%s", trimmed)
+	}
+
 	if !strings.Contains(trimmed, "[ERROR] Tests run:") {
 		t.Errorf("trimmed log missing error summary: %s", trimmed)
 	}
 	if !strings.Contains(trimmed, "Cannot mock/spy class") {
 		t.Errorf("trimmed log missing stack trace snippet")
 	}
-	if strings.Contains(trimmed, "[INFO] BUILD FAILURE") || strings.Contains(trimmed, "Total time:") {
-		t.Errorf("trimmed log should not contain Maven footer, got: %s", trimmed)
-	}
-	// We intentionally keep some context above the error summary (including
-	// the failing test class) so we do not assert on early plugin headers.
+	// Footer lines (e.g. BUILD FAILURE / Total time) may remain; we no longer
+	// strip them when anchoring on the first [ERROR] line.
 }
 
 func TestTrimBuildGateLog_Gradle_WithFailureHeader(t *testing.T) {
