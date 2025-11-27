@@ -54,11 +54,10 @@ func (r *runController) uploadDiff(ctx context.Context, runID, stageID string, d
 	}
 
 	// Build execution summary with timings for diff metadata.
-	// Mark this as the main mod diff to distinguish from healing mod diffs.
-	// The mod_type field enables rehydration logic to apply diffs in the correct order:
-	// healing diffs are applied sequentially, then the main mod diff is applied last.
+	// C2: Mark this as a mod diff using mod_type="mod" for consistency with uploadDiffForStep.
+	// The mod_type field enables rehydration logic to distinguish mod diffs from healing diffs.
 	summary := types.DiffSummary{
-		"mod_type":  "main",
+		"mod_type":  "mod",
 		"exit_code": result.ExitCode,
 		"timings": map[string]interface{}{
 			"hydration_duration_ms":  result.Timings.HydrationDuration.Milliseconds(),

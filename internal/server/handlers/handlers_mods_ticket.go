@@ -330,8 +330,9 @@ func createStagesFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID
 				}
 			}
 			// Stage name: "mods-openrewrite-0", "mods-openrewrite-1", etc.
+			// C2: Tag each mod stage with mod_type="mod".
 			stageName := fmt.Sprintf("mods-openrewrite-%d", stepIndex)
-			if err := createStageWithMeta(ctx, st, runID, stageName, stepIndex, stepTotal, modImage); err != nil {
+			if err := createStageWithMeta(ctx, st, runID, stageName, "mod", stepIndex, stepTotal, modImage); err != nil {
 				return fmt.Errorf("create stage %d: %w", stepIndex, err)
 			}
 		}
@@ -354,13 +355,16 @@ func createStagesFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID
 
 // createSingleStage creates a single stage for a run with the given step metadata.
 func createSingleStage(ctx context.Context, st store.Store, runID pgtype.UUID, stepIndex, stepTotal int, modImage string) error {
-	return createStageWithMeta(ctx, st, runID, "mods-openrewrite", stepIndex, stepTotal, modImage)
+	return createStageWithMeta(ctx, st, runID, "mods-openrewrite", "mod", stepIndex, stepTotal, modImage)
 }
 
 // createStageWithMeta creates a stage with step metadata in the meta JSONB field.
-func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID, name string, stepIndex, stepTotal int, modImage string) error {
+// C2: modType identifies the stage phase ("pre_gate", "mod", "post_gate", "healing").
+func createStageWithMeta(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex, stepTotal int, modImage string) error {
 	// Build stage metadata with step information.
+	// C2: Include mod_type to identify the stage phase.
 	stageMeta := modsapi.StageMetadata{
+		ModType:   modType,
 		StepIndex: stepIndex,
 		StepTotal: stepTotal,
 		ModImage:  modImage,

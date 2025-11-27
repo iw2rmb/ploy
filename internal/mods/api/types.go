@@ -105,7 +105,13 @@ type JobID string
 // This metadata enables the control plane to treat a run as an ordered
 // sequence of steps for multi-step Mods runs (mods[] array in spec). It is
 // serialized directly into stages.meta JSONB and reloaded via GET /v1/mods/{id}.
+//
+// C2: Each execution unit (pre_gate, mod, post_gate, healing) has a stage row
+// with mod_type identifying the phase type and step_index for ordering.
 type StageMetadata struct {
+	// ModType identifies the stage phase: "pre_gate", "mod", "post_gate", or "healing".
+	// Used by ROADMAP C2 to treat every execution unit as a typed stage.
+	ModType string `json:"mod_type,omitempty"`
 	// StepIndex is the 0-based position of this stage in the run's step sequence.
 	// For single-step runs, this is 0. For multi-step runs, this matches the
 	// index in the mods[] array (0, 1, 2, ...).

@@ -154,9 +154,10 @@ func createDiffHandler(st store.Store) http.HandlerFunc {
 			return
 		}
 
-		// Validate step_index if provided: must be non-negative per DB constraint.
-		if req.StepIndex != nil && *req.StepIndex < 0 {
-			http.Error(w, "step_index must be >= 0", http.StatusBadRequest)
+		// Validate step_index if provided: must be >= -1 per DB constraint.
+		// C2: -1 is used for pre_gate diffs (healed baseline before step 0).
+		if req.StepIndex != nil && *req.StepIndex < -1 {
+			http.Error(w, "step_index must be >= -1", http.StatusBadRequest)
 			return
 		}
 
