@@ -60,7 +60,7 @@ Legend: [ ] todo, [x] done.
     - Run `go test ./internal/workflow/runtime/step -run TestRunGateOnly_`.
 
 ## Phase C — Orchestrate pre-mod gate + healing before any mods
-- [ ] Factor gate+healing orchestration into a reusable helper — Share logic between pre- and post-mod gates.
+- [x] Factor gate+healing orchestration into a reusable helper — Share logic between pre- and post-mod gates.
   - Component: `internal/nodeagent/execution_healing.go`.
   - Scope:
     - Extract the gate+healing portion of `executeWithHealing` into:
