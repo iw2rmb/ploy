@@ -111,7 +111,82 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		}
 	}()
 
-	// Phase 4: Execute steps sequentially (gate+mod for each step).
+	// Phase 4a: Run a single pre-mod gate with healing BEFORE executing any mods.
+	// This ensures the baseline compiles before any changes are applied, providing
+	// early feedback if the repository's current state is broken.
+	//
+	// The pre-mod gate uses step 0's manifest and a freshly hydrated workspace.
+	// If the gate fails and cannot be healed, the run terminates immediately with
+	// ErrBuildGateFailed (reason="build-gate") and no mods are executed.
+	//
+	// PreGate and ReGates from this phase are accumulated into a shared result
+	// that gets merged with per-step execution results for final stats reporting.
+	var preModGateResult *gateRunMetadata // Captures initial pre-mod gate outcome.
+	var preModReGates []gateRunMetadata   // Captures re-gate attempts after healing.
+	var preModGateWorkspace string        // Workspace used for pre-mod gate (cleaned up after).
+
+	// Build manifest for step 0 to determine gate configuration.
+	step0Manifest, step0ManifestErr := buildManifestFromRequest(req, typedOpts, 0)
+	if step0ManifestErr != nil {
+		slog.Error("failed to build manifest for pre-mod gate", "run_id", req.RunID, "error", step0ManifestErr)
+		// Report failure and exit early.
+		r.reportPreModGateFailure(ctx, req, step0ManifestErr, nil, nil, 0)
+		return
+	}
+
+	// Check if gate is enabled before hydrating workspace (avoid unnecessary work).
+	gateEnabled := step0Manifest.Gate != nil && step0Manifest.Gate.Enabled
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift field.
+	if !gateEnabled && step0Manifest.Shift != nil && step0Manifest.Shift.Enabled {
+		gateEnabled = true
+	}
+
+	if gateEnabled {
+		slog.Info("running pre-mod gate with healing", "run_id", req.RunID)
+
+		// Hydrate workspace for step 0 to run the pre-mod gate.
+		var err error
+		preModGateWorkspace, err = r.rehydrateWorkspaceForStep(ctx, req, step0Manifest, 0, &baseClonePath)
+		if err != nil {
+			slog.Error("failed to rehydrate workspace for pre-mod gate", "run_id", req.RunID, "error", err)
+			r.reportPreModGateFailure(ctx, req, fmt.Errorf("rehydrate workspace for pre-mod gate: %w", err), nil, nil, 0)
+			return
+		}
+		// Cleanup pre-mod gate workspace when done (separate from per-step workspaces).
+		defer func() {
+			if preModGateWorkspace != "" {
+				_ = os.RemoveAll(preModGateWorkspace)
+			}
+		}()
+
+		// Execute the pre-mod gate with healing via runGateWithHealing.
+		// Pass empty inDir pointer; healing will create it if needed.
+		preModInDir := "" // Separate /in for pre-mod gate healing.
+		defer func() {
+			if preModInDir != "" {
+				_ = os.RemoveAll(preModInDir)
+			}
+		}()
+
+		preModGateResult, preModReGates, err = r.runGateWithHealing(
+			ctx, runner, req, step0Manifest, preModGateWorkspace, outDir, &preModInDir, "pre",
+		)
+
+		if err != nil {
+			// Pre-mod gate failed and could not be healed.
+			// Terminate the run with ErrBuildGateFailed and reason="build-gate".
+			slog.Error("pre-mod gate failed, no mods will be executed",
+				"run_id", req.RunID,
+				"error", err,
+			)
+			r.reportPreModGateFailure(ctx, req, err, preModGateResult, preModReGates, 0)
+			return
+		}
+
+		slog.Info("pre-mod gate passed, proceeding to mod execution", "run_id", req.RunID)
+	}
+
+	// Phase 4b: Execute steps sequentially (gate+mod for each step).
 	// For multi-step runs, loop over Steps; for single-step runs, execute once with stepIndex=0.
 	// For multi-node step-level claims, execute only the claimed step (startStepIndex..stepCount).
 	// Each step runs in a fresh workspace created via rehydration (base + ordered diffs).
@@ -121,6 +196,15 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	var finalManifest contracts.StepManifest
 	var finalWorkspace string // Track final workspace for artifacts and MR.
 	totalDuration := time.Duration(0)
+
+	// Merge pre-mod gate results into final execution result for stats reporting.
+	// These are set once before the loop and preserved through step execution.
+	if preModGateResult != nil {
+		finalExecResult.PreGate = preModGateResult
+	}
+	if len(preModReGates) > 0 {
+		finalExecResult.ReGates = preModReGates
+	}
 
 	for stepIndex := startStepIndex; stepIndex < stepCount; stepIndex++ {
 		slog.Info("executing step", "run_id", req.RunID, "step_index", stepIndex, "step_total", stepCount)
@@ -315,6 +399,58 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	// Pass req.StepIndex to trigger step-level completion for multi-step runs.
 	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats, req.StepIndex); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
+	}
+}
+
+// reportPreModGateFailure reports a terminal failure when the pre-mod gate fails.
+// This is called when the baseline cannot be validated before any mods execute.
+// The run terminates with status="failed" and reason="build-gate".
+//
+// Parameters:
+//   - ctx: Context for API calls.
+//   - req: StartRunRequest for run metadata.
+//   - gateErr: The error that caused the gate failure.
+//   - preGate: Pre-mod gate metadata (may be nil if gate never ran).
+//   - reGates: Re-gate attempts after healing (may be empty).
+//   - duration: Total time spent on pre-mod gate phase.
+func (r *runController) reportPreModGateFailure(
+	ctx context.Context,
+	req StartRunRequest,
+	gateErr error,
+	preGate *gateRunMetadata,
+	reGates []gateRunMetadata,
+	duration time.Duration,
+) {
+	// Build execution result with gate history for stats.
+	execResult := executionResult{
+		PreGate: preGate,
+		ReGates: reGates,
+	}
+
+	// Build stats payload with gate history.
+	// Use empty step.Result since no mods were executed.
+	stats := types.RunStats{
+		"exit_code":   -1, // Indicate no mod execution.
+		"duration_ms": duration.Milliseconds(),
+		"timings": map[string]interface{}{
+			"hydration_duration_ms":  0,
+			"execution_duration_ms":  0,
+			"build_gate_duration_ms": duration.Milliseconds(),
+			"diff_duration_ms":       0,
+			"total_duration_ms":      duration.Milliseconds(),
+		},
+	}
+
+	// Include gate stats if gate metadata is available.
+	if preGate != nil || len(reGates) > 0 {
+		gate := r.buildGateStats(req.RunID.String(), "", step.Result{}, execResult)
+		stats["gate"] = gate
+	}
+
+	// Set terminal status with reason="build-gate".
+	reason := "build-gate"
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &reason, stats, req.StepIndex); uploadErr != nil {
+		slog.Error("failed to upload pre-mod gate failure status", "run_id", req.RunID, "error", uploadErr)
 	}
 }
 
