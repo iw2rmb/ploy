@@ -291,12 +291,26 @@ func (r *runController) executeWithHealing(
 		// Caller handles cleanup via defer.
 
 		// Write build-gate.log to /in for healing containers.
-		if result.BuildGate != nil && result.BuildGate.LogsText != "" {
-			inLogPath := filepath.Join(*inDir, "build-gate.log")
-			if writeErr := os.WriteFile(inLogPath, []byte(result.BuildGate.LogsText), 0o644); writeErr != nil {
-				slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
-			} else {
-				slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
+		if result.BuildGate != nil {
+			// Prefer trimmed log view (LogFindings) when available so Codex and
+			// other healing mods see a focused failure slice instead of the full
+			// truncated gate log.
+			logPayload := result.BuildGate.LogsText
+			if len(result.BuildGate.LogFindings) > 0 {
+				if trimmed := strings.TrimSpace(result.BuildGate.LogFindings[0].Message); trimmed != "" {
+					logPayload = trimmed
+					if !strings.HasSuffix(logPayload, "\n") {
+						logPayload += "\n"
+					}
+				}
+			}
+			if logPayload != "" {
+				inLogPath := filepath.Join(*inDir, "build-gate.log")
+				if writeErr := os.WriteFile(inLogPath, []byte(logPayload), 0o644); writeErr != nil {
+					slog.Warn("failed to write /in/build-gate.log", "run_id", req.RunID, "error", writeErr)
+				} else {
+					slog.Info("build-gate.log persisted to /in for healing", "run_id", req.RunID, "path", inLogPath)
+				}
 			}
 		}
 	}

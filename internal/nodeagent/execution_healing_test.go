@@ -349,6 +349,138 @@ func TestExecuteWithHealing_GatePassesAfterHealingMod(t *testing.T) {
 	}
 }
 
+// TestExecuteWithHealing_UsesTrimmedLogsForInDir verifies that when the gate
+// provides a trimmed view via LogFindings, the node agent writes that trimmed
+// view (rather than the full LogsText) to /in/build-gate.log for healing mods.
+func TestExecuteWithHealing_UsesTrimmedLogsForInDir(t *testing.T) {
+	// Mock gate executor: first call fails with full + trimmed logs, second passes.
+	gateCallCount := 0
+	fullLog := "[INFO] lots of noise\n[ERROR] first failure line\nstacktrace...\n"
+	trimmedLog := "[ERROR] first failure line\nstacktrace...\n"
+
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			if gateCallCount == 1 {
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "maven", Passed: false},
+					},
+					LogsText: fullLog,
+					LogFindings: []contracts.BuildGateLogFinding{
+						{Severity: "error", Message: trimmedLog},
+					},
+				}, nil
+			}
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: true},
+				},
+				LogsText: "[INFO] success\n",
+			}, nil
+		},
+	}
+
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			return step.ContainerHandle{ID: "mock-container"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("healer logs"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	workspace, err := os.MkdirTemp("", "ploy-test-ws-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(workspace)
+
+	outDir, err := os.MkdirTemp("", "ploy-test-out-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(outDir)
+
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: mockContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("test-run-trimmed-log"),
+		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature"),
+		Env:       map[string]string{},
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods": []any{
+					map[string]any{
+						"image": "test/healer:latest",
+					},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Main mod",
+		Image: "test/main-mod:latest",
+		Inputs: []contracts.StepInput{
+			{
+				Name:        "workspace",
+				MountPath:   "/workspace",
+				Mode:        contracts.StepInputModeReadWrite,
+				SnapshotCID: types.CID("bafy123"),
+			},
+		},
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+		},
+		Options: req.Options,
+	}
+
+	if _, err := rc.executeWithHealing(context.Background(), runner, req, manifest, workspace, outDir, &inDir, 0); err != nil {
+		t.Fatalf("executeWithHealing() error = %v, want nil", err)
+	}
+
+	if inDir == "" {
+		t.Fatalf("expected inDir to be created")
+	}
+	logPath := filepath.Join(inDir, "build-gate.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read build-gate.log: %v", err)
+	}
+	got := string(data)
+	if got != trimmedLog && got != trimmedLog+"\n" {
+		t.Fatalf("build-gate.log content = %q, want trimmed log %q", got, trimmedLog)
+	}
+}
+
 // TestExecuteWithHealing_NoHealingConfigured verifies that when the gate fails and no
 // healing is configured, the function returns a terminal build gate error.
 func TestExecuteWithHealing_NoHealingConfigured(t *testing.T) {
