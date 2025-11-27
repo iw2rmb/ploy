@@ -153,7 +153,12 @@ See `docs/build-gate/README.md` for the complete HTTP Build Gate API contract.
   `/etc/ploy/ployd-node.yaml` by default and accepts an override via the
   CLI flag `--config`. There is currently no environment variable override
   for this path. TODO: consider introducing `PLOYD_NODE_CONFIG_PATH` for
-  parity with the server’s `PLOYD_CONFIG_PATH`.
+  parity with the server's `PLOYD_CONFIG_PATH`.
+- `PLOY_BUILDGATE_WORKER_ENABLED` — When set to `true`, `1`, or `yes` (case-insensitive),
+  the node participates in Build Gate job execution. When the environment variable is
+  set, it takes precedence over the YAML config value `buildgate_worker_enabled`.
+  Defaults to `false` (node does not claim Build Gate jobs). Configure in systemd
+  drop-in or via `environment:` in `ployd-node.yaml`.
 
 ## E2E Harness
 
