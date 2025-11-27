@@ -227,7 +227,11 @@ fi`
 		}},
 	}
 	if !passed {
-		msg := strings.TrimSpace(string(logs))
+		// For known tools (Maven, Gradle), trim logs down to the most relevant
+		// failure region to keep diagnostics focused. Unknown tools receive the
+		// raw logs without additional trimming.
+		trimmed := TrimBuildGateLog(tool, string(logs))
+		msg := strings.TrimSpace(trimmed)
 		if msg == "" {
 			msg = fmt.Sprintf("%s build failed (exit %d)", tool, res.ExitCode)
 		}
