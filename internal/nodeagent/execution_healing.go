@@ -624,9 +624,18 @@ func (r *runController) executeWithHealing(
 	if errors.As(healErr, &hr) {
 		// Healing was attempted. Check if it succeeded (MainResult != nil) or failed.
 		if hr.MainResult != nil {
-			// Healing succeeded and main mod ran. Run post-mod gate if main mod succeeded.
+			// Healing succeeded and main mod ran. Start from the healed main result and
+			// propagate the final pre-mod gate outcome into BuildGate when present.
 			mainResult := *hr.MainResult
 			reGates := hr.ReGates
+
+			// When healing succeeds (gate eventually passes before the main mod runs),
+			// FinalGate captures the last successful healing re-gate. Use this as the
+			// current BuildGate so downstream stats (final_gate) reflect the healed
+			// gate result even when no post-mod gate runs (e.g., main mod exits != 0).
+			if hr.FinalGate != nil {
+				mainResult.BuildGate = hr.FinalGate
+			}
 
 			// Run post-mod gate only if main mod succeeded (ExitCode == 0) and no error.
 			// This validates the workspace after modifications, consistent with pre-mod gate behavior.
