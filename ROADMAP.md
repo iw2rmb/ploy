@@ -177,3 +177,33 @@ Legend: [ ] todo, [x] done.
     - Run the affected E2E scripts under `tests/e2e/mods` and verify:
       - For multi-step specs, Build Gate runs after every mod that exits with code 0.
       - Healing applies uniformly to any failing gate (pre or post), with consistent logs and stats.
+
+## Phase G — Remove per-step pre-gate, keep only pre-run + post-gates
+- [ ] Disable per-step pre-gate in executeWithHealing — Ensure Runner.Run is used only for container execution during steps.
+  - Component: `internal/nodeagent/execution_healing.go`.
+  - Scope:
+    - In `executeWithHealing`, clone the step manifest into `manifestForMainMod` and:
+      - Set `manifestForMainMod.Gate = &contracts.StepGateSpec{Enabled: false}`.
+      - Clear deprecated `Shift` and any `Inputs[i].Hydration` entries.
+    - Call `runner.Run` with `manifestForMainMod` so step execution never triggers a pre-mod gate.
+    - Remove the branch that handles `ErrBuildGateFailed` from `Runner.Run`; all gate failures should come from `runGateWithHealing`.
+  - Test:
+    - Adjust `internal/nodeagent/execution_healing_test.go` to assert that `executeWithHealing` does not invoke healing in response to `Runner.Run` gate failures, only in response to `runGateWithHealing` failures.
+    - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
+- [ ] Keep pre-run gate only via runGateWithHealing — Ensure no additional pre-step gates are introduced in executeRun.
+  - Component: `internal/nodeagent/execution_orchestrator.go`.
+  - Scope:
+    - Keep the existing pre-run gate call (`runGateWithHealing(..., gatePhase="pre")`) before the step loop.
+    - Ensure per-step manifests used in the loop do not re-enable `Gate.Enabled` for Runner.Run.
+  - Test:
+    - Extend orchestrator tests (or add new ones) to verify:
+      - Exactly one pre-run gate is executed per run.
+      - Per-step execution only observes post-mod gates.
+- [ ] Clarify Runner.Run contract (docs only) — Make nodeagent ownership of gates explicit.
+  - Component: `internal/workflow/runtime/step/stub.go`.
+  - Scope:
+    - Update `Runner.Run` comment to state:
+      - Runner supports an optional pre-mod gate when `Gate.Enabled=true`.
+      - Nodeagent step execution must pass manifests with `Gate.Enabled=false` and rely on `runGateWithHealing` for all pre- and post-gates.
+  - Test:
+    - Ensure `internal/workflow/runtime/step/runner_gate_test.go` still passes without behavior changes.
