@@ -184,7 +184,7 @@ Legend: [ ] todo, [x] done.
         - Second attempt sees `CODEX_RESUME=1` in the healing manifest and `codex-session.txt` in `/in`.
       - Retries still stop once the gate passes or when the retry count is exhausted.
 
-- [ ] Keep HTTP Build Gate and docker gate behavior consistent — Ensure node agent still re-runs the gate and records the full gate history.
+- [x] Keep HTTP Build Gate and docker gate behavior consistent — Ensure node agent still re-runs the gate and records the full gate history.
   - Component: `internal/nodeagent/execution_healing.go`, `internal/workflow/runtime/step/gate_docker.go`, Build Gate API client docs.
   - Scope:
     - Verify that the existing re-gate logic in `executeWithHealing` remains intact:
