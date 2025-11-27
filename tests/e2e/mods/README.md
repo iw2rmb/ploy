@@ -88,7 +88,7 @@ Healing verification aligns with the HTTP Build Gate API's repo+diff model:
 
 **Sentinel Protocol (Codex healing):**
 
-The recommended approach for Codex-based healing is the sentinel protocol. Codex edits the workspace and, when ready for validation, emits `[[REQUEST_BUILD_VALIDATION]]` as its final message. The node agent detects this sentinel and re-runs the Build Gate externally. This separates concerns: Codex focuses on fixing code; the control plane handles validation.
+The recommended approach for Codex-based healing is the sentinel protocol. Codex edits the workspace and, when ready for validation, emits `[[REQUEST_BUILD_VALIDATION]]` as its final message. The node agent re-runs the Build Gate externally after healing completes; the sentinel keeps Codex focused on fixing code while the control plane handles validation.
 
 Legacy healing containers may optionally call the HTTP Build Gate API directly via `buildgate-validate` to verify changes mid-healing (see `PLOY_HOST_WORKSPACE`, `PLOY_SERVER_URL` env vars). The system re-runs the gate regardless of in-container verification results.
 
