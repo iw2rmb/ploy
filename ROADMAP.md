@@ -190,7 +190,7 @@ Legend: [ ] todo, [x] done.
   - Test:
     - Adjust `internal/nodeagent/execution_healing_test.go` to assert that `executeWithHealing` does not invoke healing in response to `Runner.Run` gate failures, only in response to `runGateWithHealing` failures.
     - Run `go test ./internal/nodeagent -run TestExecuteWithHealing`.
-- [ ] Keep pre-run gate only via runGateWithHealing — Ensure no additional pre-step gates are introduced in executeRun.
+- [x] Keep pre-run gate only via runGateWithHealing — Ensure no additional pre-step gates are introduced in executeRun.
   - Component: `internal/nodeagent/execution_orchestrator.go`.
   - Scope:
     - Keep the existing pre-run gate call (`runGateWithHealing(..., gatePhase="pre")`) before the step loop.
