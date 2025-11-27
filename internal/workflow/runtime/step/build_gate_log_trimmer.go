@@ -25,52 +25,21 @@ func trimMavenLog(logText string) string {
 	if len(lines) == 0 {
 		return logText
 	}
-
-	// Prefer the first "[ERROR] Tests run:" summary as the anchor; fall back
-	// to the first "[ERROR]" line when the summary is missing.
+	// Anchor on the first "[ERROR]" line and keep everything from there to the
+	// end of the log. With Maven --ff enabled this typically corresponds to the
+	// first meaningful failure block (compilation error or test failure summary).
 	anchor := -1
 	for i, l := range lines {
-		if strings.Contains(l, "[ERROR] Tests run:") {
+		if strings.Contains(l, "[ERROR]") {
 			anchor = i
 			break
 		}
 	}
 	if anchor == -1 {
-		for i, l := range lines {
-			if strings.HasPrefix(strings.TrimSpace(l), "[ERROR]") {
-				anchor = i
-				break
-			}
-		}
-	}
-	if anchor == -1 {
 		return logText
 	}
 
-	// Keep some context above the anchor so the stack trace leading into the
-	// error summary is preserved.
-	const contextLines = 40
-	start := anchor - contextLines
-	if start < 0 {
-		start = 0
-	}
-
-	end := len(lines)
-	for i := anchor + 1; i < len(lines); i++ {
-		trimmed := strings.TrimSpace(lines[i])
-		if strings.HasPrefix(trimmed, "[INFO] BUILD") ||
-			strings.HasPrefix(trimmed, "[INFO] Total time:") ||
-			strings.HasPrefix(trimmed, "[INFO] Finished at:") ||
-			strings.HasPrefix(trimmed, "[INFO] ------------------------------------------------------------------------") {
-			end = i
-			break
-		}
-	}
-	if end <= start {
-		return logText
-	}
-
-	result := strings.Join(lines[start:end], "\n")
+	result := strings.Join(lines[anchor:], "\n")
 	// Preserve trailing newline when present in the original text to avoid
 	// surprising callers that rely on newline-terminated logs.
 	if strings.HasSuffix(logText, "\n") {

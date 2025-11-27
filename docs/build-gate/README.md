@@ -64,14 +64,14 @@ Inputs
   - `PLOY_BUILDGATE_LIMIT_CPU_MILLIS` — CPU in millicores (e.g., `500`, `1500`).
 
 Behavior
-- For `java-maven`: run `mvn -B -q -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml test`.
-- For `java-gradle`: run `gradle -q test -p /workspace`.
+- For `java-maven`: run `mvn --ff -B -q -e -DskipTests=false -Dstyle.color=never -f /workspace/pom.xml clean install`.
+- For `java-gradle`: run `gradle -q --stacktrace --fail-fast test -p /workspace`.
 - For `java`: compile all `*.java` under `/workspace` with `javac --release 17` (succeeds when no Java sources are present).
 - The gate does not modify the repo; it validates the current working tree.
 
 Outputs
 - Exit code: `0` = success; non‑zero = error.
-- Logs: combined stdout/stderr captured and truncated to ≤256 KiB; uploaded as `build-gate.log` artifact.
+- Logs: combined stdout/stderr captured and truncated to ≤1 MiB; uploaded as `build-gate.log` artifact.
 - Summary: pass/fail flag, duration, optional resource usage (if available from Docker stats).
 - API exposure: gate status is surfaced via `ploy mod inspect <ticket-id>`.
   - Format: `Gate: passed duration=1234ms` or `Gate: failed pre-gate duration=567ms`.
