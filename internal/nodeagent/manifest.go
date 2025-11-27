@@ -196,7 +196,7 @@ func isCodexHealingImage(image string) bool {
 // an existing session. The codex-session.txt file must be placed in /in by the
 // caller (executeWithHealing) for the healer to read.
 //
-// These env vars enable healing mods to invoke buildgate-validate with the same
+// These env vars enable healing mods to call the Build Gate HTTP API with the same
 // repo+ref baseline used by the initial Build Gate check.
 func buildHealingManifest(req StartRunRequest, mod HealingMod, index int, codexSession string) (contracts.StepManifest, error) {
 	// Validate required image field.
