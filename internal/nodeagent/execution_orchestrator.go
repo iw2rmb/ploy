@@ -253,7 +253,11 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 			finalExecErr = execErr
 			finalManifest = manifest
 			finalWorkspace = workspaceRoot
-			// Stop execution on step failure.
+
+			// Stop execution on step failure. This includes post-mod gate failures:
+			// when executeWithHealing returns ErrBuildGateFailed from a post-mod gate
+			// that cannot be healed, we halt the multi-step loop to prevent subsequent
+			// mods from running on an invalid workspace state.
 			break
 		}
 
