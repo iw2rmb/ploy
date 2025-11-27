@@ -31,7 +31,7 @@ after healing.
 - Workspace is local to the node; no network transfer of code.
 - Gate execution is coupled to the node running the Mods step.
 - Build tools have direct access to the working tree.
-- Full gate history (pre-gate + all re-gates) is captured in `BuildGateStageMetadata`.
+- Full gate history (pre-gate + all re-gates) is captured in run stats (`gate.pre_gate`, `gate.re_gates`, `gate.final_gate`) built from `BuildGateStageMetadata` results.
 
 ### HTTP Build Gate API (Remote Execution)
 
