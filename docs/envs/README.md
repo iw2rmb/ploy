@@ -108,7 +108,7 @@ Server connection details (for Build Gate HTTP API access):
   containers so tools like `buildgate-validate` can call `POST /v1/buildgate/validate` without extra wiring.
 
 Usage with `buildgate-validate` wrapper:
-The `buildgate-validate` CLI (bundled in `mods-codex`) reads `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF`.
+The `buildgate-validate` CLI (external helper script, e.g., `scripts/buildgate-validate.sh`) reads `PLOY_REPO_URL` and `PLOY_BUILDGATE_REF`.
 Since the node injects `PLOY_BASE_REF` (not `PLOY_BUILDGATE_REF`), healing mod commands should either:
 1. Use CLI flags: `buildgate-validate --repo-url "$PLOY_REPO_URL" --ref "$PLOY_BASE_REF" ...`
 2. Or set the wrapper's expected var: `export PLOY_BUILDGATE_REF="$PLOY_BASE_REF"` before calling
@@ -343,10 +343,11 @@ usage but are documented here for completeness.
   network is used (no behavior change for non-Docker/VPS deployments).
 - `PLOY_SERVER_URL` — Control-plane base URL used by `ploy node add` bootstrap to populate
   `server_url` in `/etc/ploy/ployd-node.yaml` (e.g., `https://<server-host>:8443`).
-  Additionally, healing containers (e.g., `mods-codex`) consume this variable to call
-  the Build Gate HTTP API via the bundled `buildgate-validate` helper during the
-  fail→heal→re‑gate workflow. The CLI separately exposes a `--server-url` flag and
-  `PLOY_CONTROL_PLANE_URL` override for client operations.
+  Additionally, healing containers may consume this variable to call
+  the Build Gate HTTP API directly (for example via the `buildgate-validate`
+  helper) during the fail→heal→re‑gate workflow. The CLI separately exposes
+  a `--server-url` flag and `PLOY_CONTROL_PLANE_URL` override for client
+  operations.
 
 Primary reuse behavior:
 - On control‑plane (primary) hosts, when `/etc/ploy/pki/ca.key` already exists, the bootstrap
