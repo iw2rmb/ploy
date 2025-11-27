@@ -99,8 +99,8 @@ build_gate_healing:
         mod-codex --input /workspace --out /out --prompt-file /in/prompt.txt
       env:
         # Sentinel protocol: Codex edits code then signals readiness for validation.
-        # The node agent re-runs the Build Gate externally; Codex does NOT run
-        # buildgate-validate or any build commands directly.
+        # The node agent re-runs the Build Gate externally; Codex does NOT invoke
+        # the Build Gate binary or run any build commands directly.
         CODEX_PROMPT: |-
           Rules:
           - Use /workspace and /in/build-gate.log to understand the compile error.
