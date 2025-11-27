@@ -11,7 +11,7 @@ Documentation: `docs/mods-lifecycle.md`, `docs/envs/README.md`, `docs/schemas/mo
 Legend: [ ] todo, [x] done.
 
 ## Phase A — Healing prompts and spec contract
-- [ ] Define sentinel protocol for Codex healing runs — Allow Codex to signal “ready for Build Gate” without running the gate itself.
+- [x] Define sentinel protocol for Codex healing runs — Allow Codex to signal “ready for Build Gate” without running the gate itself.
   - Component: `tests/e2e/mods`, E2E specs for `build_gate_healing`.
   - Scope: Update `tests/e2e/mods/scenario-orw-fail/mod.yaml` and `tests/e2e/mods/scenario-multi-node-rehydration/mod.yaml` so the embedded `CODEX_PROMPT` uses a sentinel-only contract:
     - Remove explicit instructions to call `buildgate-validate` or run Maven/Gradle.
