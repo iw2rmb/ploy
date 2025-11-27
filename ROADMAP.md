@@ -121,7 +121,7 @@ Legend: [ ] todo, [x] done.
       - `go test ./tests/integration -run TestSmokeWorkflow`.
 
 ## Phase D — Switch Mods pre‑gate and re‑gate to HTTP Build Gate API
-- [ ] Route main pre-mod Build Gate calls through the HTTP adapter — Allow gate to run on any Build Gate worker.
+- [x] Route main pre-mod Build Gate calls through the HTTP adapter — Allow gate to run on any Build Gate worker.
   - Component: `internal/nodeagent/execution_orchestrator.go` (or equivalent runner), `internal/workflow/runtime/step`.
   - Scope:
     - In the runner that executes a Mods step:
