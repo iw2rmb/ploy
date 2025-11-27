@@ -126,6 +126,32 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 }
 
 // Runner executes workflow steps.
+//
+// # Execution Stages (Pre-mod Gate per Call)
+//
+// Runner.Run processes each step call through the following stages in order:
+//
+//  1. Hydration — Prepare the workspace by fetching repository sources via
+//     WorkspaceHydrator. Errors here abort the run immediately.
+//
+//  2. Pre-mod Build Gate — When Gate is enabled (Manifest.Gate.Enabled or
+//     deprecated Manifest.Shift.Enabled), run static validation on the
+//     workspace before executing the mod container. If the gate fails,
+//     Runner.Run returns ErrBuildGateFailed without executing container
+//     stages. The node agent orchestration layer handles healing when
+//     configured; Runner itself does not perform healing.
+//
+//  3. Container Execution — Create, start, and wait on the container via
+//     ContainerRuntime. Logs are forwarded to LogWriter if present.
+//     Container is removed after completion unless retention is requested.
+//
+//  4. Diff Generation — Generate a unified diff of workspace changes via
+//     DiffGenerator. The diff is not published here; the node agent
+//     uploads artifacts independently.
+//
+// This contract establishes the baseline for adding post-mod gate helpers
+// in subsequent phases. Each call to Run executes exactly one pre-mod gate
+// (when enabled) before a single mod container.
 type Runner struct {
 	Workspace  WorkspaceHydrator
 	Containers ContainerRuntime
