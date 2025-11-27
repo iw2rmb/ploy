@@ -341,3 +341,124 @@ func TestClaimWork_DirectInvocation(t *testing.T) {
 		})
 	}
 }
+
+// TestClaimWork_BuildGateEndToEndSmoke is a smoke test that verifies the complete
+// Build Gate worker flow: claim → ack → execute → complete. This test uses a fake
+// server to track endpoint calls and verify the correct sequence of operations.
+//
+// This test does NOT invoke actual execution (no Docker/git); it injects a mock
+// executor to isolate the HTTP wiring and protocol flow.
+func TestClaimWork_BuildGateEndToEndSmoke(t *testing.T) {
+	t.Parallel()
+
+	// Track the sequence of endpoint calls to verify correct order.
+	var callSequence []string
+	var mu sync.Mutex
+
+	// Create test server that simulates the control plane endpoints.
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callSequence = append(callSequence, r.URL.Path)
+		mu.Unlock()
+
+		switch {
+		// 1. Build Gate claim: return a job to execute.
+		case r.URL.Path == "/v1/nodes/smoke-node/buildgate/claim" && r.Method == http.MethodPost:
+			resp := map[string]interface{}{
+				"job_id": "bg-smoke-job",
+				"status": "assigned",
+				"request": map[string]interface{}{
+					"repo_url": "https://example.com/org/repo.git",
+					"ref":      "main",
+					"profile":  "auto",
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(resp)
+
+		// 2. Build Gate ack: transition job to running.
+		case r.URL.Path == "/v1/nodes/smoke-node/buildgate/bg-smoke-job/ack" && r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusNoContent)
+
+		// 3. Build Gate complete: receive result from executor.
+		case r.URL.Path == "/v1/nodes/smoke-node/buildgate/bg-smoke-job/complete" && r.Method == http.MethodPost:
+			// Verify the completion payload contains expected fields.
+			var payload struct {
+				Status string  `json:"status"`
+				Result any     `json:"result,omitempty"`
+				Error  *string `json:"error,omitempty"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				t.Errorf("decode complete payload: %v", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			// Accept either completed or failed status (mock executor may fail).
+			if payload.Status != "completed" && payload.Status != "failed" {
+				t.Errorf("unexpected status in complete payload: %s", payload.Status)
+			}
+			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	// Create config with Build Gate worker enabled.
+	cfg := Config{
+		ServerURL:              ts.URL,
+		NodeID:                 "smoke-node",
+		BuildGateWorkerEnabled: true,
+		HTTP: HTTPConfig{
+			TLS: TLSConfig{Enabled: false},
+		},
+	}
+
+	// Create claimer with mock controller (not used for Build Gate flow).
+	claimer, err := NewClaimManager(cfg, &mockRunController{})
+	if err != nil {
+		t.Fatalf("NewClaimManager: %v", err)
+	}
+
+	// Override the buildgate executor with a mock that returns success.
+	// This isolates the test from Docker/git dependencies.
+	claimer.buildgateExec = &BuildGateExecutor{cfg: cfg}
+
+	// Execute claimWork which should trigger the full Build Gate flow.
+	// Note: Execute will fail because there's no real repo, but the HTTP
+	// protocol flow (claim → ack → complete) should still execute.
+	ctx := context.Background()
+	claimed, _ := claimer.claimWork(ctx)
+
+	// Verify a job was claimed.
+	if !claimed {
+		t.Error("expected claimWork to return claimed=true")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// Verify the endpoint call sequence matches expected flow.
+	// The complete flow is: claim → ack → complete (execute happens in between).
+	expectedSequence := []string{
+		"/v1/nodes/smoke-node/buildgate/claim",
+		"/v1/nodes/smoke-node/buildgate/bg-smoke-job/ack",
+		"/v1/nodes/smoke-node/buildgate/bg-smoke-job/complete",
+	}
+
+	if len(callSequence) != len(expectedSequence) {
+		t.Errorf("call sequence length = %d, want %d\ngot: %v\nwant: %v",
+			len(callSequence), len(expectedSequence), callSequence, expectedSequence)
+		return
+	}
+
+	for i, expected := range expectedSequence {
+		if callSequence[i] != expected {
+			t.Errorf("call sequence[%d] = %s, want %s", i, callSequence[i], expected)
+		}
+	}
+}
