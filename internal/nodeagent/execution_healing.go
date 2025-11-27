@@ -66,10 +66,13 @@
 package nodeagent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -191,6 +194,61 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 	}
 
 	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
+}
+
+// computeGzippedDiff generates a unified git diff of workspace changes and compresses it.
+// Used by HTTP-based re-gates to send accumulated healing changes to remote Build Gate workers.
+//
+// The diff captures all changes relative to the initial repo_url+ref clone (HEAD), enabling
+// remote workers to reconstruct workspace state by cloning repo_url+ref and applying the patch.
+//
+// Returns:
+//   - Gzipped diff bytes (ready for BuildGateValidateRequest.DiffPatch).
+//   - nil if workspace has no changes or diff generation fails (logs warning but continues).
+func computeGzippedDiff(ctx context.Context, workspace string) []byte {
+	// Generate unified diff of all workspace changes relative to HEAD.
+	cmd := exec.CommandContext(ctx, "git", "diff", "HEAD")
+	cmd.Dir = workspace
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		// Log warning but don't fail re-gate — HTTP executor will use repo_url+ref baseline.
+		slog.Warn("failed to generate diff for HTTP re-gate",
+			"workspace", workspace,
+			"error", err,
+			"stderr", strings.TrimSpace(stderr.String()),
+		)
+		return nil
+	}
+
+	diffBytes := stdout.Bytes()
+	if len(diffBytes) == 0 {
+		// No changes in workspace; HTTP gate will validate baseline.
+		return nil
+	}
+
+	// Gzip the diff for efficient transmission.
+	var gzBuf bytes.Buffer
+	gzWriter := gzip.NewWriter(&gzBuf)
+	if _, err := gzWriter.Write(diffBytes); err != nil {
+		slog.Warn("failed to gzip diff for HTTP re-gate", "workspace", workspace, "error", err)
+		return nil
+	}
+	if err := gzWriter.Close(); err != nil {
+		slog.Warn("failed to close gzip writer for HTTP re-gate", "workspace", workspace, "error", err)
+		return nil
+	}
+
+	slog.Debug("computed gzipped diff for HTTP re-gate",
+		"workspace", workspace,
+		"raw_size", len(diffBytes),
+		"gzipped_size", gzBuf.Len(),
+	)
+
+	return gzBuf.Bytes()
 }
 
 // runGateWithHealing executes the build gate with optional healing loop when validation fails.
@@ -460,10 +518,28 @@ func (r *runController) runGateWithHealing(
 		// Re-run the gate after healing mods complete.
 		// CRITICAL: The node agent ALWAYS re-runs the gate via runner.Gate.Execute,
 		// even if healing mods called the HTTP Build Gate API directly.
+		//
+		// For HTTP-based gates (PLOY_BUILDGATE_MODE=remote-http), compute the accumulated
+		// workspace diff and pass it via DiffPatch. This enables remote Build Gate workers
+		// to reconstruct workspace state by cloning repo_url+ref and applying the patch,
+		// decoupling the healing node from the gate node.
 		slog.Info("re-running build gate after healing", "run_id", req.RunID, "attempt", attempt, "phase", gatePhase)
 
+		// Clone gateSpec and populate DiffPatch for HTTP re-gates.
+		// DiffPatch enables remote gate workers to validate accumulated healing changes
+		// without requiring direct workspace access. Docker-based gates ignore DiffPatch
+		// since they access the workspace directly.
+		regateSpec := &contracts.StepGateSpec{
+			Enabled:   gateSpec.Enabled,
+			Profile:   gateSpec.Profile,
+			Env:       gateSpec.Env,
+			RepoURL:   gateSpec.RepoURL,
+			Ref:       gateSpec.Ref,
+			DiffPatch: computeGzippedDiff(ctx, workspace),
+		}
+
 		regateStart := time.Now()
-		reGateMetadata, regateErr := runner.Gate.Execute(ctx, gateSpec, workspace)
+		reGateMetadata, regateErr := runner.Gate.Execute(ctx, regateSpec, workspace)
 		regateDuration := time.Since(regateStart)
 
 		if regateErr != nil {

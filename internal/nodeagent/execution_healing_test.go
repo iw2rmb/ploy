@@ -1,12 +1,15 @@
 package nodeagent
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	types "github.com/iw2rmb/ploy/internal/domain/types"
@@ -2535,6 +2538,247 @@ func TestRunGateWithHealing_GateDisabled(t *testing.T) {
 	}
 	if len(reGates) != 0 {
 		t.Error("reGates should be empty when gate is disabled")
+	}
+}
+
+// TestRunGateWithHealing_HTTPModePassesDiffPatch verifies that when healing mods modify
+// the workspace, the re-gate execution populates DiffPatch with the accumulated workspace
+// changes. This enables HTTP-based gates (PLOY_BUILDGATE_MODE=remote-http) to validate
+// healing modifications without requiring direct workspace access.
+//
+// ROADMAP: Route re‑gates after healing through the HTTP adapter — Decouple healing node from gate node.
+func TestRunGateWithHealing_HTTPModePassesDiffPatch(t *testing.T) {
+	// Skip if git is not available (needed for workspace setup and diff computation).
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available, skipping test")
+	}
+
+	// Track gate specs to verify DiffPatch is populated for re-gates.
+	var gateSpecs []*contracts.StepGateSpec
+	gateCallCount := 0
+
+	// Mock gate executor that records specs and alternates between fail/pass.
+	mockGate := &mockGateExecutor{
+		executeFn: func(ctx context.Context, spec *contracts.StepGateSpec, workspace string) (*contracts.BuildGateStageMetadata, error) {
+			gateCallCount++
+			// Deep copy spec to capture state at call time.
+			specCopy := &contracts.StepGateSpec{
+				Enabled:   spec.Enabled,
+				Profile:   spec.Profile,
+				RepoURL:   spec.RepoURL,
+				Ref:       spec.Ref,
+				DiffPatch: append([]byte(nil), spec.DiffPatch...), // Copy DiffPatch bytes.
+			}
+			gateSpecs = append(gateSpecs, specCopy)
+
+			if gateCallCount == 1 {
+				// First gate (pre-gate) fails to trigger healing.
+				return &contracts.BuildGateStageMetadata{
+					StaticChecks: []contracts.BuildGateStaticCheckReport{
+						{Tool: "maven", Passed: false},
+					},
+					LogsText: "[ERROR] Build failure\n",
+				}, nil
+			}
+			// Second gate (re-gate after healing) passes.
+			return &contracts.BuildGateStageMetadata{
+				StaticChecks: []contracts.BuildGateStaticCheckReport{
+					{Tool: "maven", Passed: true},
+				},
+				LogsText: "[INFO] BUILD SUCCESS\n",
+			}, nil
+		},
+	}
+
+	// Mock container runtime for healing mod execution.
+	mockContainer := &mockContainerRuntime{
+		createFn: func(ctx context.Context, spec step.ContainerSpec) (step.ContainerHandle, error) {
+			return step.ContainerHandle{ID: "healer"}, nil
+		},
+		startFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			return step.ContainerResult{ExitCode: 0}, nil
+		},
+		logsFn: func(ctx context.Context, handle step.ContainerHandle) ([]byte, error) {
+			return []byte("healer logs"), nil
+		},
+		removeFn: func(ctx context.Context, handle step.ContainerHandle) error {
+			return nil
+		},
+	}
+
+	// Create a real git workspace so diff computation works.
+	workspace := t.TempDir()
+
+	// Initialize git repo.
+	cmd := exec.Command("git", "init", workspace)
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git init failed: %v", err)
+	}
+
+	// Configure git user (required for commit).
+	cmd = exec.Command("git", "-C", workspace, "config", "user.email", "test@test.com")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git config email failed: %v", err)
+	}
+	cmd = exec.Command("git", "-C", workspace, "config", "user.name", "Test User")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git config name failed: %v", err)
+	}
+
+	// Create initial file and commit.
+	initialFile := filepath.Join(workspace, "Main.java")
+	if err := os.WriteFile(initialFile, []byte("public class Main {}\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("git", "-C", workspace, "add", ".")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git add failed: %v", err)
+	}
+	cmd = exec.Command("git", "-C", workspace, "commit", "-m", "Initial commit")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("git commit failed: %v", err)
+	}
+
+	// Simulate healing mod modification (modify workspace before re-gate).
+	// The healing container would modify files in the workspace; we simulate this
+	// by modifying the file directly before the re-gate is called.
+	healerModifiedContent := []byte("public class Main { void heal() {} }\n")
+	healingSimulator := func() {
+		if err := os.WriteFile(initialFile, healerModifiedContent, 0644); err != nil {
+			t.Fatalf("failed to simulate healing modification: %v", err)
+		}
+	}
+
+	// Wrap container runtime to simulate healing modification after healer runs.
+	wrappedContainer := &mockContainerRuntime{
+		createFn: mockContainer.createFn,
+		startFn:  mockContainer.startFn,
+		waitFn: func(ctx context.Context, handle step.ContainerHandle) (step.ContainerResult, error) {
+			// Simulate healing modification when healer container completes.
+			healingSimulator()
+			return mockContainer.waitFn(ctx, handle)
+		},
+		logsFn:   mockContainer.logsFn,
+		removeFn: mockContainer.removeFn,
+	}
+
+	outDir := t.TempDir()
+	inDir := ""
+
+	runner := step.Runner{
+		Workspace:  &mockWorkspaceHydrator{},
+		Containers: wrappedContainer,
+		Gate:       mockGate,
+	}
+
+	rc := &runController{
+		cfg: Config{
+			ServerURL: "http://localhost:9999",
+			NodeID:    "test-node",
+		},
+	}
+
+	req := StartRunRequest{
+		RunID:     types.RunID("test-http-diffpatch"),
+		RepoURL:   types.RepoURL("https://gitlab.com/test/repo.git"),
+		BaseRef:   types.GitRef("main"),
+		TargetRef: types.GitRef("feature"),
+		Options: map[string]any{
+			"build_gate_healing": map[string]any{
+				"retries": 1,
+				"mods": []any{
+					map[string]any{
+						"image": "test/healer:latest",
+					},
+				},
+			},
+		},
+	}
+
+	manifest := contracts.StepManifest{
+		ID:    types.StepID(req.RunID),
+		Name:  "Test mod",
+		Image: "test/mod:latest",
+		Gate: &contracts.StepGateSpec{
+			Enabled: true,
+			Profile: "java",
+			RepoURL: "https://gitlab.com/test/repo.git",
+			Ref:     "main",
+		},
+		Options: req.Options,
+	}
+
+	// Execute runGateWithHealing which should:
+	// 1. Run initial gate (fails) — no DiffPatch.
+	// 2. Execute healing mod (modifies workspace).
+	// 3. Run re-gate (passes) — WITH DiffPatch populated.
+	initialGate, reGates, err := rc.runGateWithHealing(
+		context.Background(), runner, req, manifest, workspace, outDir, &inDir, "pre", 0,
+	)
+
+	if err != nil {
+		t.Fatalf("runGateWithHealing() error = %v, want nil", err)
+	}
+
+	if initialGate == nil {
+		t.Fatal("initialGate should not be nil")
+	}
+
+	if len(reGates) != 1 {
+		t.Fatalf("len(reGates) = %d, want 1", len(reGates))
+	}
+
+	// Verify gate call count.
+	if gateCallCount != 2 {
+		t.Errorf("gate call count = %d, want 2 (initial + re-gate)", gateCallCount)
+	}
+
+	// Verify specs were captured.
+	if len(gateSpecs) != 2 {
+		t.Fatalf("len(gateSpecs) = %d, want 2", len(gateSpecs))
+	}
+
+	// First gate (initial): DiffPatch should be nil or empty.
+	initialSpec := gateSpecs[0]
+	if len(initialSpec.DiffPatch) > 0 {
+		t.Errorf("initial gate DiffPatch should be empty, got %d bytes", len(initialSpec.DiffPatch))
+	}
+
+	// Second gate (re-gate): DiffPatch should be populated with gzipped diff.
+	regateSpec := gateSpecs[1]
+	if len(regateSpec.DiffPatch) == 0 {
+		t.Error("re-gate DiffPatch should be populated with healing changes, got empty")
+	} else {
+		// Verify it's valid gzip by attempting to decompress.
+		gzReader, err := gzip.NewReader(bytes.NewReader(regateSpec.DiffPatch))
+		if err != nil {
+			t.Errorf("re-gate DiffPatch is not valid gzip: %v", err)
+		} else {
+			var diffContent bytes.Buffer
+			if _, err := diffContent.ReadFrom(gzReader); err != nil {
+				t.Errorf("failed to decompress DiffPatch: %v", err)
+			}
+			gzReader.Close()
+
+			// Verify diff contains the healing change.
+			diffStr := diffContent.String()
+			if !strings.Contains(diffStr, "heal()") {
+				t.Errorf("decompressed DiffPatch should contain healing change 'heal()', got:\n%s", diffStr)
+			}
+			t.Logf("DiffPatch contains valid gzipped diff (%d bytes -> %d bytes decompressed)",
+				len(regateSpec.DiffPatch), len(diffStr))
+		}
+	}
+
+	// Verify RepoURL and Ref are preserved in re-gate spec.
+	if regateSpec.RepoURL != "https://gitlab.com/test/repo.git" {
+		t.Errorf("re-gate RepoURL = %q, want 'https://gitlab.com/test/repo.git'", regateSpec.RepoURL)
+	}
+	if regateSpec.Ref != "main" {
+		t.Errorf("re-gate Ref = %q, want 'main'", regateSpec.Ref)
 	}
 }
 

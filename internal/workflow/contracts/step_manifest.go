@@ -106,6 +106,14 @@ type StepGateSpec struct {
 	// Ref is the Git reference (commit SHA, branch, or tag) for remote gate execution.
 	// Derived from CommitSHA > TargetRef > BaseRef precedence when building manifests.
 	Ref string
+
+	// DiffPatch is an optional gzipped unified diff (base64-encoded) to apply
+	// on top of the cloned repo_url+ref baseline. Used by healing re-gates to
+	// verify accumulated workspace changes without shipping full archives.
+	//
+	// Set by runGateWithHealing when executing re-gates after healing mods.
+	// The diff captures all changes relative to the initial repo_url+ref clone.
+	DiffPatch []byte
 }
 
 // StepInputHydration describes how to materialise repository state for an input.
