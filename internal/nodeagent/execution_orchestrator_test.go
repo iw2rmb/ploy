@@ -22,6 +22,10 @@ func (stubDiffGen) Generate(_ context.Context, _ string) ([]byte, error) {
 	return []byte("diff-bytes"), nil
 }
 
+func (stubDiffGen) GenerateBetween(_ context.Context, _, _ string) ([]byte, error) {
+	return []byte("diff-between-bytes"), nil
+}
+
 // Verify gate stats shape includes an explicit final_gate key when only a final
 // gate run is present (no pre_gate/regates), and does not replace the root map.
 func TestBuildGateStats_FinalOnlyShape(t *testing.T) {

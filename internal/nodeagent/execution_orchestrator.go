@@ -185,6 +185,18 @@ func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 		}
 
 		slog.Info("pre-mod gate passed, proceeding to mod execution", "run_id", req.RunID)
+
+		// C2: Upload pre-mod healing diff so step 0 runs on the healed baseline.
+		// After pre-mod healing succeeds, compute the diff between baseClonePath and
+		// preModGateWorkspace, then upload it with step_index=-1 and mod_type="pre_gate".
+		// Using step_index=-1 ensures it's included when any step fetches "all diffs from previous steps".
+		// For step 0: fetch step_index <= -1 → gets pre_gate diff
+		// For step k: fetch step_index <= k-1 → gets pre_gate + all prior mod diffs
+		if len(preModReGates) > 0 {
+			// Healing occurred - upload the accumulated changes as a pre_gate diff.
+			stageID, _ := step0Manifest.OptionString("stage_id")
+			r.uploadBaselineDiff(ctx, req.RunID.String(), stageID, diffGenerator, baseClonePath, preModGateWorkspace, -1, "pre_gate")
+		}
 	}
 
 	// Phase 4b: Execute steps sequentially (container execution + post-gates per step).
@@ -673,35 +685,28 @@ func (r *runController) rehydrateWorkspaceForStep(
 		slog.Info("base clone created", "run_id", runID, "path", baseClone)
 	}
 
-	// Step 2: For step 0, return a copy of the base clone (no diffs to apply).
-	// For step k>0, fetch diffs for steps 0 through k-1 and apply them.
+	// Step 2: Rehydrate workspace from base clone + ordered diffs.
+	// C2: For ALL steps (including step 0), fetch diffs and apply them.
+	// This ensures step 0 runs on the healed baseline if pre-mod healing occurred.
 	workspacePath, err := createWorkspaceDir()
 	if err != nil {
 		return "", fmt.Errorf("create workspace dir: %w", err)
 	}
 
-	if stepIndex == 0 {
-		// Step 0: Copy base clone to workspace (no diffs).
-		slog.Info("rehydrating workspace for step 0 (base clone only)", "run_id", runID)
-		if err := copyGitClone(*baseClonePathPtr, workspacePath); err != nil {
-			_ = os.RemoveAll(workspacePath)
-			return "", fmt.Errorf("copy base clone: %w", err)
-		}
-		return workspacePath, nil
-	}
-
-	// Step k>0: Fetch diffs from control plane and apply them.
 	slog.Info("rehydrating workspace from base + diffs", "run_id", runID, "step_index", stepIndex)
 
-	// Fetch diffs for steps 0 through k-1.
 	diffFetcher, err := NewDiffFetcher(r.cfg)
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("create diff fetcher: %w", err)
 	}
 
-	// FetchDiffsForStep returns diffs up to and including the specified step index.
-	// Since we want diffs *before* stepIndex, we fetch up to stepIndex-1.
+	// C2: Uniform rehydration query for ALL steps.
+	// Fetch diffs where step_index <= stepIndex-1 (all diffs from previous steps).
+	// - Pre_gate diffs have step_index=-1, so they're included for all steps:
+	//   - Step 0: fetch step_index <= -1 → gets pre_gate diff only
+	//   - Step 1: fetch step_index <= 0 → gets pre_gate + step 0 mod diff
+	//   - Step k: fetch step_index <= k-1 → gets pre_gate + all prior mod diffs
 	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, int32(stepIndex-1))
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
@@ -719,15 +724,17 @@ func (r *runController) rehydrateWorkspaceForStep(
 	slog.Info("workspace rehydrated successfully", "run_id", runID, "step_index", stepIndex, "workspace", workspacePath)
 
 	// Create baseline commit after rehydration to enable incremental diffs.
-	// This commit establishes a new HEAD so that "git diff HEAD" in step k generates
-	// only the changes from step k, not cumulative changes from steps 0..k.
-	// See ensureBaselineCommitForRehydration documentation for detailed explanation.
-	if err := ensureBaselineCommitForRehydration(ctx, workspacePath, stepIndex); err != nil {
-		_ = os.RemoveAll(workspacePath)
-		return "", fmt.Errorf("create baseline commit for rehydration: %w", err)
+	// C2: Now applies to ALL steps (including step 0) when diffs were applied.
+	// This commit establishes a new HEAD so that "git diff HEAD" generates
+	// only the changes from this step, not cumulative changes from prior steps.
+	if len(gzippedDiffs) > 0 {
+		if err := ensureBaselineCommitForRehydration(ctx, workspacePath, stepIndex); err != nil {
+			_ = os.RemoveAll(workspacePath)
+			return "", fmt.Errorf("create baseline commit for rehydration: %w", err)
+		}
+		slog.Info("baseline commit created for incremental diff", "run_id", runID, "step_index", stepIndex)
 	}
 
-	slog.Info("baseline commit created for incremental diff", "run_id", runID, "step_index", stepIndex)
 	return workspacePath, nil
 }
 
@@ -792,6 +799,60 @@ func (r *runController) uploadDiffForStep(
 	}
 
 	slog.Info("step diff uploaded successfully", "run_id", runID, "step_index", stepIndex, "size", len(diffBytes))
+}
+
+// uploadBaselineDiff uploads a diff between two directories with the specified mod_type and step_index.
+// Used by C2 to persist pre-mod or post-mod healing changes so subsequent steps run on the healed baseline.
+//
+// Parameters:
+//   - baseDir: the reference directory (e.g., base clone before healing)
+//   - modifiedDir: the modified directory (e.g., healed workspace)
+//   - stepIndex: the step index to tag the diff with (0 for pre-mod healing)
+//   - modType: the mod_type to tag the diff with (e.g., "pre_gate", "post_gate")
+func (r *runController) uploadBaselineDiff(
+	ctx context.Context,
+	runID string,
+	stageID string,
+	diffGenerator step.DiffGenerator,
+	baseDir string,
+	modifiedDir string,
+	stepIndex int,
+	modType string,
+) {
+	if diffGenerator == nil {
+		slog.Warn("diff generator nil, cannot upload baseline diff", "run_id", runID, "mod_type", modType)
+		return
+	}
+
+	diffBytes, err := diffGenerator.GenerateBetween(ctx, baseDir, modifiedDir)
+	if err != nil {
+		slog.Error("failed to generate baseline diff", "run_id", runID, "mod_type", modType, "error", err)
+		return
+	}
+
+	if len(diffBytes) == 0 {
+		slog.Info("no baseline diff to upload (no changes)", "run_id", runID, "mod_type", modType)
+		return
+	}
+
+	summary := types.DiffSummary{
+		"step_index": stepIndex,
+		"mod_type":   modType,
+	}
+
+	diffUploader, err := NewDiffUploader(r.cfg)
+	if err != nil {
+		slog.Error("failed to create diff uploader", "run_id", runID, "mod_type", modType, "error", err)
+		return
+	}
+
+	stepIdx := int32(stepIndex)
+	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
+		slog.Error("failed to upload baseline diff", "run_id", runID, "mod_type", modType, "error", err)
+		return
+	}
+
+	slog.Info("baseline diff uploaded successfully", "run_id", runID, "mod_type", modType, "step_index", stepIndex, "size", len(diffBytes))
 }
 
 // createGateExecutor creates a GateExecutor based on PLOY_BUILDGATE_MODE configuration.

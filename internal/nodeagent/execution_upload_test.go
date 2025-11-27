@@ -581,3 +581,11 @@ func (m *mockDiffGenerator) Generate(ctx context.Context, workspace string) ([]b
 	}
 	return []byte(m.diffContent), nil
 }
+
+// GenerateBetween implements step.DiffGenerator interface.
+func (m *mockDiffGenerator) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return []byte(m.diffContent), nil
+}

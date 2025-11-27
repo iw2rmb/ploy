@@ -84,6 +84,9 @@ type FilesystemDiffGeneratorOptions struct{}
 // DiffGenerator generates diffs between states.
 type DiffGenerator interface {
 	Generate(ctx context.Context, workspace string) ([]byte, error)
+	// GenerateBetween computes a diff between two directories (base and modified).
+	// Used by C2 to capture pre-mod healing changes (base clone → healed workspace).
+	GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error)
 }
 
 type filesystemDiffGenerator struct{}
@@ -97,6 +100,12 @@ func NewFilesystemDiffGenerator(opts FilesystemDiffGeneratorOptions) DiffGenerat
 // Generate produces a unified diff of all changes in the workspace using git diff.
 func (d *filesystemDiffGenerator) Generate(ctx context.Context, workspace string) ([]byte, error) {
 	return generateGitDiff(ctx, workspace)
+}
+
+// GenerateBetween computes a unified diff between two directories.
+// Uses git diff --no-index to compare arbitrary directories (not requiring a git repo).
+func (d *filesystemDiffGenerator) GenerateBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
+	return generateGitDiffBetween(ctx, baseDir, modifiedDir)
 }
 
 // generateGitDiff runs git diff to capture all changes in the workspace.
@@ -122,6 +131,47 @@ func generateGitDiff(ctx context.Context, workspace string) ([]byte, error) {
 		return nil, fmt.Errorf("git diff failed: %w", err)
 	}
 
+	return stdout.Bytes(), nil
+}
+
+// generateGitDiffBetween computes a unified diff between two directories using git diff --no-index.
+// This works even when neither directory is a git repository.
+// Used by C2 to compute pre-mod healing diffs (base clone vs healed workspace).
+func generateGitDiffBetween(ctx context.Context, baseDir, modifiedDir string) ([]byte, error) {
+	// Use git diff --no-index to compare two arbitrary directories.
+	// Note: git diff --no-index returns exit code 1 when there ARE differences (not an error).
+	cmd := exec.CommandContext(ctx, "git", "diff", "--no-index", baseDir, modifiedDir)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+
+	// Check for context cancellation first.
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("git diff --no-index cancelled: %w", ctx.Err())
+	}
+
+	// git diff --no-index exit codes:
+	// 0: no differences
+	// 1: differences found (this is success, not an error)
+	// >1: error
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				// Exit code 1 means differences were found - this is the expected case.
+				return stdout.Bytes(), nil
+			}
+		}
+		// Actual error occurred.
+		if stderr.Len() > 0 {
+			return nil, fmt.Errorf("git diff --no-index failed: %s", strings.TrimSpace(stderr.String()))
+		}
+		return nil, fmt.Errorf("git diff --no-index failed: %w", err)
+	}
+
+	// Exit code 0: no differences.
 	return stdout.Bytes(), nil
 }
 
