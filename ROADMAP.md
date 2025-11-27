@@ -176,7 +176,7 @@ Legend: [ ] todo, [x] done.
       - Fake `ClaimManager` with `BuildGateWorkerEnabled=false` and injected fakes for claim methods; assert only run-claim path executes.
     - Run: `go test ./internal/nodeagent -run TestClaimWork`.
 
-- [ ] E3 — Worker loop wiring and smoke coverage — Ensure nodes execute claimed Build Gate jobs end-to-end.
+- [x] E3 — Worker loop wiring and smoke coverage — Ensure nodes execute claimed Build Gate jobs end-to-end.
   - Component: `internal/nodeagent/claimer_buildgate.go`, node agent entrypoint, docs.
   - Scope:
     - Confirm `ClaimManager.Start` is used for all nodes and Build Gate jobs flow:
