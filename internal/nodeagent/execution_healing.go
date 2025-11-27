@@ -15,9 +15,10 @@
 // Key consistency guarantees:
 //
 //  1. Re-gate execution: After healing mods complete, the node agent ALWAYS
-//     re-runs the gate via runner.Gate.Execute (the Docker GateExecutor).
-//     This ensures the canonical gate result is produced by the node agent,
-//     not by in-container scripts that may call the HTTP Build Gate API.
+//     re-runs the gate via runner.Gate.Execute using the configured GateExecutor
+//     (remote HTTP or local Docker). This ensures the canonical gate result is
+//     produced by the gate system triggered by the node agent, not by
+//     in-container scripts that may call the HTTP Build Gate API.
 //
 //  2. Full gate history capture: The node agent records all gate executions:
 //     - PreGate: The initial gate run before healing (BuildGateStageMetadata)
