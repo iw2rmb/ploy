@@ -208,9 +208,10 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 //   - This is semantically equivalent to HTTP Build Gate with diff_patch parameter,
 //     but executed in-process to avoid network overhead for repeated validation.
 //
-// Healing containers can also invoke the HTTP Build Gate API directly via
-// buildgate-validate (see PLOY_HOST_WORKSPACE, PLOY_SERVER_URL env vars below).
-// The system re-runs the gate regardless of in-container verification results.
+// Healing containers can also invoke the HTTP Build Gate API directly using
+// the injected PLOY_* environment variables (see PLOY_HOST_WORKSPACE,
+// PLOY_SERVER_URL env vars below). The system re-runs the gate regardless of
+// any in-container verification results.
 //
 // ## Configuration
 //

@@ -80,7 +80,7 @@ func TestModCodex_HealsUsingBuildGateLog_FromFailingBranch(t *testing.T) {
 	_, _ = mustRun(t, "docker", "build", "-t", "mods-codex:latest", "-f", filepath.Join(repoRoot, "docker", "mods", "mod-codex", "Dockerfile"), repoRoot)
 
 	// Prepare prompt using sentinel protocol. Codex does NOT have access to
-	// buildgate-validate inside the container; Build Gate is run externally
+	// any Build Gate helper inside the container; Build Gate is run externally
 	// by Ploy (docker gate) or the Build Gate HTTP API. Instead, Codex writes
 	// a sentinel file to signal readiness for gate verification.
 	prompt := strings.Join([]string{

@@ -122,4 +122,3 @@ func trimGradleLog(logText string) string {
 	}
 	return result
 }
-
