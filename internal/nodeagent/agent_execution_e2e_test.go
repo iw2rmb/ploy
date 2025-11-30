@@ -57,11 +57,11 @@ func TestEndToEndFlow(t *testing.T) {
 			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.Contains(r.URL.Path, "/events"):
 				// Log events endpoint.
 				w.WriteHeader(http.StatusCreated)
-			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.Contains(r.URL.Path, "/stage/") && strings.HasSuffix(r.URL.Path, "/diff"):
-				// Diff upload endpoint.
+			case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.Contains(r.URL.Path, "/jobs/") && strings.HasSuffix(r.URL.Path, "/diff"):
+				// Diff upload endpoint: /v1/runs/{run_id}/jobs/{job_id}/diff
 				w.WriteHeader(http.StatusCreated)
-			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.Contains(r.URL.Path, "/stage/") && strings.HasSuffix(r.URL.Path, "/artifact"):
-				// Artifact upload endpoint.
+			case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.Contains(r.URL.Path, "/jobs/") && strings.HasSuffix(r.URL.Path, "/artifact"):
+				// Artifact upload endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
 				w.WriteHeader(http.StatusCreated)
 			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.HasSuffix(r.URL.Path, "/complete"):
 				// Terminal status endpoint.
@@ -89,13 +89,14 @@ func TestEndToEndFlow(t *testing.T) {
 		// Create the run controller.
 		rc := &runController{
 			cfg:  cfg,
-			runs: make(map[string]*runContext),
+			jobs: make(map[string]*jobContext),
 		}
 
 		// Create a simple StartRunRequest that will execute quickly.
 		// We use a tiny command that exits immediately to avoid long test runs.
 		req := StartRunRequest{
 			RunID:   types.RunID("test-run-e2e"),
+			JobID:   types.JobID("test-job-e2e"),
 			RepoURL: types.RepoURL("https://github.com/example/test-repo.git"),
 			BaseRef: types.GitRef("main"),
 			Options: map[string]any{
@@ -112,10 +113,10 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Fatalf("StartRun() failed: %v", err)
 		}
 
-		// Verify the run was registered.
+		// Verify the job was registered.
 		rc.mu.Lock()
-		if _, exists := rc.runs[req.RunID.String()]; !exists {
-			t.Errorf("run %s not found after StartRun", req.RunID)
+		if _, exists := rc.jobs[req.JobID.String()]; !exists {
+			t.Errorf("job %s not found after StartRun", req.JobID)
 		}
 		rc.mu.Unlock()
 
@@ -129,10 +130,10 @@ func TestEndToEndFlow(t *testing.T) {
 		// Wait a bit more for cleanup.
 		time.Sleep(500 * time.Millisecond)
 
-		// Verify the run was cleaned up from the controller.
+		// Verify the job was cleaned up from the controller.
 		rc.mu.Lock()
-		if _, exists := rc.runs[req.RunID.String()]; exists {
-			t.Errorf("run %s still exists after completion", req.RunID)
+		if _, exists := rc.jobs[req.JobID.String()]; exists {
+			t.Errorf("job %s still exists after completion", req.JobID)
 		}
 		rc.mu.Unlock()
 

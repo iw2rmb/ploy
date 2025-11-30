@@ -27,7 +27,7 @@ get:
             properties:
               id: { type: string, format: uuid }
               run_id: { type: string, format: uuid }
-              stage_id: { type: string, format: uuid, nullable: true }
+              job_id: { type: string, format: uuid, nullable: true }
               build_id: { type: string, format: uuid, nullable: true }
               name: { type: string, nullable: true }
               cid: { type: string }

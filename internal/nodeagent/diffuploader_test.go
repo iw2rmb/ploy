@@ -61,6 +61,12 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 					t.Errorf("expected POST request, got %s", r.Method)
 				}
 
+				// Verify URL path uses job-scoped endpoint.
+				expectedPath := "/v1/runs/test-run-id/jobs/test-job-id/diff"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
 				// Verify content type.
 				if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 					t.Errorf("expected Content-Type application/json, got %s", ct)
@@ -72,9 +78,9 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 					t.Errorf("failed to decode payload: %v", err)
 				}
 
-				// Verify run_id is present.
-				if _, ok := payload["run_id"]; !ok {
-					t.Error("run_id not present in payload")
+				// Verify run_id is NOT in payload (it's in the URL path).
+				if _, ok := payload["run_id"]; ok {
+					t.Error("run_id should not be in payload (it's in URL)")
 				}
 
 				// Verify patch is present and gzipped.
@@ -116,9 +122,9 @@ func TestDiffUploader_UploadDiff(t *testing.T) {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
 
-			// Upload diff with no step_index (legacy test).
+			// Upload diff with job-scoped endpoint.
 			ctx := context.Background()
-			err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(tt.diffContent), tt.summary, nil)
+			err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(tt.diffContent), tt.summary)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -172,7 +178,7 @@ func TestDiffUploader_SizeLimit(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", rnd, types.DiffSummary{}, nil)
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", rnd, types.DiffSummary{})
 	if err == nil {
 		t.Fatal("expected error for oversized diff but got none")
 	}
@@ -239,7 +245,7 @@ func TestDiffUploader_Compression(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	err = uploader.UploadDiff(ctx, "test-run-id", "test-stage-id", []byte(diffContent), types.DiffSummary{}, nil)
+	err = uploader.UploadDiff(ctx, "test-run-id", "test-job-id", []byte(diffContent), types.DiffSummary{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

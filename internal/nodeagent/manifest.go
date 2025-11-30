@@ -102,7 +102,7 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	//
 	// Allowed keys:
 	//   - gitlab_pat, gitlab_domain, mr_on_success, mr_on_fail (MR wiring)
-	//   - stage_id (server-provided stage identifier for uploads)
+	//   - job_id (server-provided job identifier for uploads)
 	//   - artifact_name (optional bundle name override)
 	mergedOpts := make(map[string]any)
 	if pat := strings.TrimSpace(typedOpts.MRWiring.GitLabPAT); pat != "" {
@@ -119,8 +119,8 @@ func buildManifestFromRequest(req StartRunRequest, typedOpts RunOptions, stepInd
 	if _, hasMRFail := req.Options["mr_on_fail"]; hasMRFail {
 		mergedOpts["mr_on_fail"] = typedOpts.MRWiring.MROnFail
 	}
-	if sid := strings.TrimSpace(typedOpts.ServerMetadata.StageID); sid != "" {
-		mergedOpts["stage_id"] = sid
+	if jid := strings.TrimSpace(typedOpts.ServerMetadata.JobID); jid != "" {
+		mergedOpts["job_id"] = jid
 	}
 	if aname := strings.TrimSpace(typedOpts.Artifacts.Name); aname != "" {
 		mergedOpts["artifact_name"] = aname

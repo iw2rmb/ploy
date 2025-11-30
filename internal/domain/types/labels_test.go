@@ -34,8 +34,8 @@ func TestLabelsForStep(t *testing.T) {
 		if len(m) != 1 {
 			t.Fatalf("expected single label, got %v", m)
 		}
-		if got := m[LabelStageID]; got != sid.String() {
-			t.Fatalf("label %q=%q, want %q", LabelStageID, got, sid.String())
+		if got := m[LabelJobID]; got != sid.String() {
+			t.Fatalf("label %q=%q, want %q", LabelJobID, got, sid.String())
 		}
 	})
 }

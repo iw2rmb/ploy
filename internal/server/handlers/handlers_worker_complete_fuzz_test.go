@@ -20,6 +20,7 @@ import (
 func FuzzCompleteRun_StatsShapes(f *testing.F) {
 	nodeID := uuid.New()
 	runID := uuid.New()
+	jobID := uuid.New()
 
 	// Seeds: valid object, nested object, empty object, array (invalid), string (invalid)
 	seeds := [][]byte{
@@ -38,15 +39,21 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 			getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 			getRunResult: store.Run{
 				ID:     pgtype.UUID{Bytes: runID, Valid: true},
-				NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
 				Status: store.RunStatusRunning,
 			},
+			listJobsByRunResult: []store.Job{{
+				ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+				RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+				NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+				Status:    store.JobStatusRunning,
+				StepIndex: 1000,
+			}},
 		}
 		h := completeRunHandler(st, nil)
 
 		// Build payload with fuzzed stats; always send a terminal status.
 		var payload map[string]any
-		_ = json.Unmarshal([]byte(`{"run_id":"`+runID.String()+`","status":"succeeded"}`), &payload)
+		_ = json.Unmarshal([]byte(`{"run_id":"`+runID.String()+`","status":"succeeded","step_index":1000}`), &payload)
 		var stats any
 		if err := json.Unmarshal(statsJSON, &stats); err == nil {
 			if m, ok := stats.(map[string]any); ok {

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	types "github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/worker/hydration"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -73,7 +74,7 @@ func (r *runController) createDiffGenerator() step.DiffGenerator {
 // In practice, callers use the control plane API endpoint GET /v1/mods/{id}/diffs to list
 // all diffs for a run and then filter/sort by step_index (see DiffFetcher.FetchDiffsForStep)
 // to obtain diffs for steps 0 through k-1 when preparing to execute step k. The same
-// step_index values are stored alongside stages and run_steps for this ticket.
+// step_index values are stored alongside jobs and diffs for this ticket.
 func RehydrateWorkspaceFromBaseAndDiffs(ctx context.Context, baseClonePath, destWorkspace string, diffs [][]byte) error {
 	// Step 1: Copy base clone to destination workspace.
 	// This creates a fresh workspace starting from the base snapshot (base_ref + optional commit_sha).
@@ -197,24 +198,21 @@ func decompressPatch(gzippedPatch []byte) ([]byte, error) {
 //   - diff[k] = git diff HEAD (after step k) = changes from step k only
 //   - Replaying diffs[0..k] on base clone reconstructs workspace[step_k+1]
 //
-// Control plane persists these per-step diffs under the same step_index used for stages/run_steps.
+// Control plane persists these per-step diffs under the same step_index used for jobs.
 //
 // Parameters:
 //   - ctx: Context for cancellation and deadlines.
 //   - workspace: Path to the rehydrated workspace (after diff application).
-//   - stepIndex: Zero-based index of the step being executed (for commit message).
+//   - stepIndex: Job step index (for commit message).
 //
 // Returns:
 //   - error: Non-nil if git commit fails (identity config, staging, or commit error).
-//
-// Note: This function should only be called for step k>0, after rehydration completes.
-// Step 0 operates directly on the base clone and doesn't need a baseline commit.
-func ensureBaselineCommitForRehydration(ctx context.Context, workspace string, stepIndex int) error {
+func ensureBaselineCommitForRehydration(ctx context.Context, workspace string, stepIndex types.StepIndex) error {
 	// Import the git helper package for commit operations.
 	// Using internal/nodeagent/git.EnsureCommit to stage and commit rehydrated state.
 	userName := "ploy-rehydrate"
 	userEmail := "ploy-rehydrate@ploy.local"
-	message := fmt.Sprintf("Ploy: rehydration baseline for step %d", stepIndex)
+	message := fmt.Sprintf("Ploy: rehydration baseline for step %.0f", stepIndex)
 
 	// Import git package at the top of the file if not already imported.
 	// For now, inline the commit logic to avoid circular dependency.

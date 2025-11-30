@@ -3,30 +3,28 @@ SELECT * FROM diffs
 WHERE id = $1;
 
 -- name: ListDiffsByRun :many
--- Returns diffs for a run ordered by step_index (if present), then by created_at.
--- Callers may further filter by summary.mod_type (e.g. exclude "healing" diffs)
--- when building the rehydration patch chain.
-SELECT * FROM diffs
-WHERE run_id = $1
-ORDER BY
-  step_index NULLS LAST,  -- NULL step_index (legacy diffs) appear last
-  created_at DESC;
+-- Returns diffs for a run ordered by job step_index, then by created_at.
+-- Joins with jobs to get ordering from job's step_index.
+SELECT d.* FROM diffs d
+LEFT JOIN jobs j ON d.job_id = j.id
+WHERE d.run_id = $1
+ORDER BY j.step_index NULLS LAST, d.created_at ASC;
 
 -- name: ListDiffsBeforeStep :many
 -- Returns all diffs for a run up to (and including) the specified step_index.
--- Used for workspace rehydration: apply all diffs from steps 0..k to build workspace for step k+1.
--- Excludes diffs with NULL step_index to avoid applying legacy/aggregate diffs during rehydration.
-SELECT * FROM diffs
-WHERE run_id = $1
-  AND step_index IS NOT NULL
-  AND step_index <= $2
-ORDER BY step_index ASC, created_at ASC;
+-- Used for workspace rehydration: apply all diffs from jobs with step_index <= k to build workspace for step k+1.
+-- Excludes diffs without associated jobs (NULL job_id) to avoid applying orphan diffs during rehydration.
+SELECT d.* FROM diffs d
+INNER JOIN jobs j ON d.job_id = j.id
+WHERE d.run_id = $1
+  AND j.step_index <= $2
+ORDER BY j.step_index ASC, d.created_at ASC;
 
 -- name: CreateDiff :one
--- Creates a new diff entry with optional step_index for multi-step runs.
--- step_index is NULL for legacy single-step runs or final aggregate diffs.
-INSERT INTO diffs (run_id, stage_id, patch, summary, step_index)
-VALUES ($1, $2, $3, $4, $5)
+-- Creates a new diff entry associated with a job.
+-- Ordering is determined by the job's step_index.
+INSERT INTO diffs (run_id, job_id, patch, summary)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: DeleteDiff :exec

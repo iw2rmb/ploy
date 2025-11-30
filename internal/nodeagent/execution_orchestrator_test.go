@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
@@ -542,11 +543,11 @@ func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 
 	rc := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	ctx := context.Background()
-	stepIndex := 2
+	stepIndex := types.StepIndex(2000)
 
 	rc.uploadDiffForStep(
 		ctx,
@@ -562,21 +563,13 @@ func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 		t.Fatalf("no payload captured from diff upload")
 	}
 
-	// Verify request path uses node id and stage id.
-	if gotPath != "/v1/nodes/node-1/stage/stage-abc/diff" {
-		t.Errorf("unexpected request path: got %q", gotPath)
+	// Verify request path uses job-scoped endpoint.
+	if gotPath != "/v1/runs/run-123/jobs/stage-abc/diff" {
+		t.Errorf("unexpected request path: got %q, want /v1/runs/run-123/jobs/stage-abc/diff", gotPath)
 	}
 
-	// Top-level step_index should be present and match the stepIndex argument.
-	rawStepIndex, ok := gotPayload["step_index"]
-	if !ok {
-		t.Fatalf("payload missing top-level step_index: %#v", gotPayload)
-	}
-	if v, ok := rawStepIndex.(float64); !ok || int(v) != stepIndex {
-		t.Errorf("top-level step_index=%v, want %d", rawStepIndex, stepIndex)
-	}
-
-	// Summary should be a JSON object containing step_index as well.
+	// step_index is no longer at top level (it's derived from job's step_index in DB).
+	// Summary should contain step_index for metadata purposes.
 	rawSummary, ok := gotPayload["summary"]
 	if !ok {
 		t.Fatalf("payload missing summary: %#v", gotPayload)
@@ -591,7 +584,7 @@ func TestUploadDiffForStep_TagsStepIndex(t *testing.T) {
 	if !ok {
 		t.Fatalf("summary missing step_index: %#v", summary)
 	}
-	if v, ok := rawSummaryStepIndex.(float64); !ok || int(v) != stepIndex {
-		t.Errorf("summary step_index=%v, want %d", rawSummaryStepIndex, stepIndex)
+	if v, ok := rawSummaryStepIndex.(float64); !ok || types.StepIndex(v) != stepIndex {
+		t.Errorf("summary step_index=%v, want %.0f", rawSummaryStepIndex, stepIndex)
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // DiffFetcher fetches diffs from the control-plane server.
@@ -37,12 +39,12 @@ func NewDiffFetcher(cfg Config) (*DiffFetcher, error) {
 // diffListItem represents a single diff in the list response from the control plane.
 // This mirrors the diffItem struct from internal/server/handlers/handlers_diffs.go.
 type diffListItem struct {
-	ID        string    `json:"id"`
-	StageID   string    `json:"stage_id"`
-	StepIndex *int32    `json:"step_index,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	Size      int       `json:"gzipped_size"`
-	Summary   any       `json:"summary,omitempty"` // DiffSummary is map[string]any
+	ID        string          `json:"id"`
+	JobID     string          `json:"job_id"`
+	StepIndex types.StepIndex `json:"step_index"`
+	CreatedAt time.Time       `json:"created_at"`
+	Size      int             `json:"gzipped_size"`
+	Summary   any             `json:"summary,omitempty"` // DiffSummary is map[string]any
 }
 
 // diffListResponse is the response structure for listing diffs.
@@ -121,9 +123,8 @@ func (f *DiffFetcher) FetchDiffPatch(ctx context.Context, diffID string) ([]byte
 // C2: Healing diffs (mod_type="healing") share the same step_index as their parent mod step
 // for observability, but rehydration uses only non-healing diffs (mod_type!="healing").
 // Each per-step mod diff is incremental from the rehydrated baseline, so applying only
-// these diffs in step_index order reconstructs the workspace safely. Legacy/aggregate diffs
-// with nil step_index are excluded.
-func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex int32) ([][]byte, error) {
+// these diffs in step_index order reconstructs the workspace safely.
+func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepIndex types.StepIndex) ([][]byte, error) {
 	// Step 1: List all diffs for the run.
 	diffs, err := f.ListRunDiffs(ctx, runID)
 	if err != nil {
@@ -131,11 +132,10 @@ func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepI
 	}
 
 	// Step 2: Filter diffs up to the target step index (inclusive).
-	// Only include diffs with non-nil step_index (exclude legacy/aggregate diffs)
-	// and skip healing diffs (mod_type="healing") when building the rehydration chain.
+	// Skip healing diffs (mod_type="healing") when building the rehydration chain.
 	var relevantDiffs []diffListItem
 	for _, d := range diffs {
-		if d.StepIndex == nil || *d.StepIndex > stepIndex {
+		if d.StepIndex > stepIndex {
 			continue
 		}
 
@@ -156,7 +156,7 @@ func (f *DiffFetcher) FetchDiffsForStep(ctx context.Context, runID string, stepI
 	for _, d := range relevantDiffs {
 		patch, err := f.FetchDiffPatch(ctx, d.ID)
 		if err != nil {
-			return nil, fmt.Errorf("fetch patch for diff %s (step %d): %w", d.ID, *d.StepIndex, err)
+			return nil, fmt.Errorf("fetch patch for diff %s (step %.0f): %w", d.ID, d.StepIndex, err)
 		}
 		patches = append(patches, patch)
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -19,20 +20,32 @@ type ClaimManager struct {
 }
 
 // ClaimResponse represents the response from POST /v1/nodes/{id}/claim.
-// Returned by the server when a run or step is successfully claimed and assigned to this node.
-// StepIndex is present for multi-step runs where a specific step was claimed (multi-node execution).
+// Returned by the server when a job is successfully claimed and assigned to this node.
+// Contains the run metadata plus the claimed job's ID and name.
 type ClaimResponse struct {
-	ID        string          `json:"id"`
+	ID        types.RunID     `json:"id"`         // Run ID
+	JobID     types.JobID     `json:"job_id"`     // Claimed job ID
+	JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
+	JobMeta   json.RawMessage `json:"job_meta"`   // Job metadata (ModType, ModImage, etc.)
+	StepIndex types.StepIndex `json:"step_index"` // Job ordering index
 	RepoURL   string          `json:"repo_url"`
 	Status    string          `json:"status"`
-	NodeID    string          `json:"node_id"`
+	NodeID    types.NodeID    `json:"node_id"`
 	BaseRef   string          `json:"base_ref"`
 	TargetRef string          `json:"target_ref"`
 	CommitSha *string         `json:"commit_sha,omitempty"`
-	StepIndex *int32          `json:"step_index,omitempty"` // Present for step-level claims
 	StartedAt string          `json:"started_at"`
 	CreatedAt string          `json:"created_at"`
 	Spec      json.RawMessage `json:"spec,omitempty"`
+}
+
+// JobMetadata represents the metadata stored in job.meta JSONB.
+// Used to identify job type (pre_gate, mod, post_gate, heal, re_gate) for dispatch.
+type JobMetadata struct {
+	ModType   string `json:"mod_type,omitempty"`   // "pre_gate", "mod", "post_gate", "heal", "re_gate"
+	ModImage  string `json:"mod_image,omitempty"`  // Container image for mod/heal jobs
+	StepIndex int    `json:"step_index,omitempty"` // 0-based step index for multi-step runs
+	StepTotal int    `json:"step_total,omitempty"` // Total step count for multi-step runs
 }
 
 // NewClaimManager constructs a claim manager with HTTP client and buildgate executor.

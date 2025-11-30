@@ -104,7 +104,7 @@ func createBootstrapTokenHandler(st store.Store, tokenSecret string) http.Handle
 			TokenHash: tokenHash,
 			TokenID:   claims.ID,
 			NodeID:    nodeID,
-			ClusterID: clusterID,
+			ClusterID: &clusterID,
 			IssuedAt:  pgtype.Timestamptz{Time: now, Valid: true},
 			ExpiresAt: pgtype.Timestamptz{Time: expiresAt, Valid: true},
 			IssuedBy:  issuedBy,

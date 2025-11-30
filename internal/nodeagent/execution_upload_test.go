@@ -46,12 +46,12 @@ func TestRunController_uploadDiff(t *testing.T) {
 			diffUploadCalled := false
 			artUploadCalled := false
 
-			// Mock server that handles both diff and artifact endpoints.
+			// Mock server that handles both diff and artifact endpoints (job-scoped).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/diff" {
+				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/diff" {
 					diffUploadCalled = true
 					w.WriteHeader(http.StatusCreated)
-				} else if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+				} else if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
 					artUploadCalled = true
 					w.WriteHeader(http.StatusCreated)
 					// Verify artifact name is "diff" for diff bundle.
@@ -162,9 +162,10 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			uploadCalled := false
 
-			// Mock server.
+			// Mock server (job-scoped endpoint).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
+				if r.URL.Path == "/v1/runs/test-run-123/jobs/test-job-id/artifact" {
 					uploadCalled = true
 					// Verify name matches manifest OptionString("artifact_name").
 					var payload map[string]any
@@ -206,6 +207,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 
 			req := StartRunRequest{
 				RunID: types.RunID("test-run-123"),
+				JobID: "test-job-id",
 				Options: map[string]interface{}{
 					"artifact_paths": tt.artifactPaths,
 				},
@@ -215,7 +217,7 @@ func TestRunController_uploadConfiguredArtifacts(t *testing.T) {
 				Image:   "test-image",
 				Command: []string{"test"},
 				Options: map[string]interface{}{
-					"stage_id":      "test-stage",
+					"job_id":        "test-job",
 					"artifact_name": "test-artifact",
 				},
 			}
@@ -270,9 +272,10 @@ func TestRunController_uploadOutDir(t *testing.T) {
 
 			uploadCalled := false
 
-			// Mock server.
+			// Mock server (job-scoped endpoint).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
+				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
 					uploadCalled = true
 					w.WriteHeader(http.StatusCreated)
 					_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})
@@ -374,11 +377,11 @@ func TestRunController_uploadStatus(t *testing.T) {
 
 			controller := &runController{cfg: cfg}
 
-			// Execute upload (nil stepIndex for run-level completion).
+			// Execute upload.
 			ctx := context.Background()
-			reason := "test reason"
+			var exitCode int32 = 0
 			stats := map[string]interface{}{"exit_code": 0}
-			err := controller.uploadStatus(ctx, "test-run", "succeeded", &reason, stats, nil)
+			err := controller.uploadStatus(ctx, "test-run", "succeeded", &exitCode, stats, 1000)
 
 			// Verify error expectation.
 			if (err != nil) != tt.wantErr {
@@ -438,9 +441,10 @@ func TestRunController_uploadGateLogsArtifact(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Mock server.
+			// Mock server (job-scoped endpoint).
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+				// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
+				if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
 					w.WriteHeader(tt.serverStatus)
 					if tt.serverStatus == http.StatusCreated {
 						_ = json.NewEncoder(w).Encode(map[string]string{
@@ -491,11 +495,10 @@ func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 
 	var capturedSummary types.DiffSummary
 
-	// Mock server that captures the diff summary for validation.
+	// Mock server that captures the diff summary for validation (job-scoped endpoints).
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/diff" {
+		if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/diff" {
 			var payload struct {
-				RunID   string            `json:"run_id"`
 				Patch   string            `json:"patch"`
 				Summary types.DiffSummary `json:"summary"`
 			}
@@ -505,7 +508,7 @@ func TestRunController_uploadDiff_ModTypeMetadata(t *testing.T) {
 			capturedSummary = payload.Summary
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]string{"diff_id": "test-diff-id"})
-		} else if r.URL.Path == "/v1/nodes/test-node/stage/test-stage/artifact" {
+		} else if r.URL.Path == "/v1/runs/test-run/jobs/test-stage/artifact" {
 			// Artifact endpoint (diff artifact bundle)
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(map[string]string{"artifact_bundle_id": "test-id", "cid": "test-cid"})

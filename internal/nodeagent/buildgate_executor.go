@@ -25,7 +25,7 @@ func NewBuildGateExecutor(cfg Config) *BuildGateExecutor {
 }
 
 // Execute runs a build gate validation job.
-func (e *BuildGateExecutor) Execute(ctx context.Context, jobID string, req contracts.BuildGateValidateRequest) (*contracts.BuildGateStageMetadata, error) {
+func (e *BuildGateExecutor) Execute(ctx context.Context, jobID types.JobID, req contracts.BuildGateValidateRequest) (*contracts.BuildGateStageMetadata, error) {
 	slog.Info("executing buildgate job", "job_id", jobID)
 
 	// Create ephemeral workspace directory.

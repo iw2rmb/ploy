@@ -1,19 +1,19 @@
 parameters:
   - in: path
-    name: id
+    name: run_id
     required: true
     schema: { type: string, format: uuid }
-    description: Node UUID
+    description: Run UUID
   - in: path
-    name: stage
+    name: job_id
     required: true
     schema: { type: string, format: uuid }
-    description: Stage UUID
+    description: Job UUID
 post:
   tags: [Artifacts]
-  summary: Upload gzipped artifact bundle for a stage (node → server)
+  summary: Upload gzipped artifact bundle for a job (node → server)
   description: |
-    Nodes upload a gzipped tar archive for a specific stage of a run. The server stores
+    Nodes upload a gzipped tar archive for a specific job of a run. The server stores
     the bundle in PostgreSQL under the `artifact_bundles` table. The decoded bundle
     bytes are limited to ≤ 1 MiB. The request body allows up to ~2 MiB to accommodate
     base64 overhead.
@@ -23,12 +23,8 @@ post:
       application/json:
         schema:
           type: object
-          required: [run_id, bundle]
+          required: [bundle]
           properties:
-            run_id:
-              type: string
-              format: uuid
-              description: The run ID associated with this stage
             build_id:
               type: string
               format: uuid
@@ -49,7 +45,6 @@ post:
               Basic artifact upload with gzipped tar archive (base64-encoded).
               The bundle field contains the compressed tar limited to 1 MiB.
             value:
-              run_id: "550e8400-e29b-41d4-a716-446655440000"
               bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
           named_artifact:
             summary: Named artifact bundle with build ID
@@ -57,7 +52,6 @@ post:
               Example including optional name and build_id for artifact tracking.
               Name can be used to identify the artifact type (e.g., "dist", "coverage").
             value:
-              run_id: "550e8400-e29b-41d4-a716-446655440000"
               build_id: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
               name: "dist"
               bundle: "H4sIAAAAAAAA/+3OMQ0AAAjAMPybhWt/Qi8FU0sNAAAAAAAAAAAAAAAAALpbAAAA//8DAOkOgRgAKAAA"
@@ -80,11 +74,10 @@ post:
                 format: uuid
                 description: Identifier of the stored artifact bundle
     '400':
-      description: Bad Request (invalid IDs, missing fields, or stage/run mismatch)
+      description: Bad Request (invalid IDs, missing fields, or job/run mismatch)
     '404':
-      description: Node, Run, or Stage not found
+      description: Run or Job not found
     '413':
       description: Payload Too Large (decoded bundle > 1 MiB or body over limit)
     '500':
       description: Internal server error
-

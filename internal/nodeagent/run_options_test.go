@@ -185,13 +185,13 @@ func TestParseRunOptions_ServerMetadata(t *testing.T) {
 	t.Parallel()
 
 	opts := map[string]any{
-		"stage_id": "stage-abc-123",
+		"job_id": "job-abc-123",
 	}
 
 	runOpts := parseRunOptions(opts)
 
-	if runOpts.ServerMetadata.StageID != "stage-abc-123" {
-		t.Errorf("expected stage_id=stage-abc-123, got %q", runOpts.ServerMetadata.StageID)
+	if runOpts.ServerMetadata.JobID != "job-abc-123" {
+		t.Errorf("expected job_id=job-abc-123, got %q", runOpts.ServerMetadata.JobID)
 	}
 }
 
@@ -224,7 +224,7 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 		},
 		"gitlab_pat": "glpat-secret",
 		"mr_on_success": true,
-		"stage_id": "stage-xyz"
+		"job_id": "job-xyz"
 	}`
 
 	var raw json.RawMessage = []byte(specJSON)
@@ -257,8 +257,8 @@ func TestParseSpec_ProducesTypedOptions(t *testing.T) {
 	if !typedOpts.MRWiring.MROnSuccess {
 		t.Errorf("expected typed mr_on_success=true")
 	}
-	if typedOpts.ServerMetadata.StageID != "stage-xyz" {
-		t.Errorf("expected typed stage_id=stage-xyz, got %q", typedOpts.ServerMetadata.StageID)
+	if typedOpts.ServerMetadata.JobID != "job-xyz" {
+		t.Errorf("expected typed job_id=job-xyz, got %q", typedOpts.ServerMetadata.JobID)
 	}
 }
 

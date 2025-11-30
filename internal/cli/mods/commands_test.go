@@ -254,7 +254,7 @@ func TestSimplePrinterFormats(t *testing.T) {
 	var b bytes.Buffer
 	p := SimplePrinter{out: &b}
 	p.Ticket(modsapi.TicketSummary{TicketID: domaintypes.TicketID("t1"), State: modsapi.TicketStateRunning})
-	p.Stage(modsapi.StageStatus{StageID: domaintypes.StageID("build"), State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: modsapi.JobID("j1"), LastError: "boom"})
+	p.Stage(modsapi.StageStatus{StageID: domaintypes.StageID("build"), State: modsapi.StageStateFailed, Attempts: 2, CurrentJobID: domaintypes.JobID("j1"), LastError: "boom"})
 	if b.Len() == 0 {
 		t.Fatalf("expected printer output")
 	}

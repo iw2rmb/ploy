@@ -256,7 +256,7 @@ func TestCancelTicket_SSEPublish(t *testing.T) {
 func TestCancelTicket_OnlyPendingRunningStagesUpdated(t *testing.T) {
 	id := uuid.New()
 	now := time.Now()
-	stgPending := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusPending}
+	stgPending := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusCreated}
 	stgRunning := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusRunning, StartedAt: pgtype.Timestamptz{Time: now.Add(-2 * time.Second), Valid: true}}
 	stgSucceeded := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusSucceeded}
 	stgFailed := store.Job{ID: pgtype.UUID{Bytes: uuid.New(), Valid: true}, Status: store.JobStatusFailed}

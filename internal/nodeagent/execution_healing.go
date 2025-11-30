@@ -136,7 +136,7 @@ type executionResult struct {
 //
 // This per-step diff capture enables multi-node rehydration where each node can reconstruct
 // the workspace state at any point in the healing sequence by applying an ordered chain of diffs.
-func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID, workspace string, healResult step.Result, modIndex, healingAttempt, stepIndex int) {
+func (r *runController) uploadHealingModDiff(ctx context.Context, runID types.RunID, jobID types.JobID, workspace string, healResult step.Result, modIndex, healingAttempt, stepIndex int) {
 	// Retrieve the diff generator from runtime components.
 	// Since healing reuses the same runner, we need to access the diff generator.
 	// The diff generator is initialized in initializeRuntime and reused across healing steps.
@@ -185,16 +185,13 @@ func (r *runController) uploadHealingModDiff(ctx context.Context, runID, stageID
 		return
 	}
 
-	// C2: Pass step_index so healing diffs are included in rehydration queries.
-	// Healing diffs use the same step_index as their parent mod step, enabling
-	// unified rehydration that fetches all diffs (mod + healing) up to step k.
-	stepIdx := int32(stepIndex)
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
-		slog.Error("failed to upload healing mod diff", "run_id", runID, "mod_index", modIndex, "step_index", stepIndex, "error", err)
+	// Upload diff to job-scoped endpoint. Step ordering is determined by the job's step_index.
+	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+		slog.Error("failed to upload healing mod diff", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex, "error", err)
 		return
 	}
 
-	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
+	slog.Info("healing mod diff uploaded successfully", "run_id", runID, "job_id", jobID, "mod_index", modIndex, "step_index", stepIndex, "size", len(diffBytes))
 }
 
 // computeGzippedDiff generates a unified git diff of workspace changes and compresses it.
@@ -479,14 +476,12 @@ func (r *runController) runGateWithHealing(
 			}
 
 			// Upload /out artifacts for this healing mod if present.
-			stageID, _ := manifest.OptionString("stage_id")
-			if uploadErr := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); uploadErr != nil {
-				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "mod_index", idx, "error", uploadErr)
+			if uploadErr := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); uploadErr != nil {
+				slog.Warn("failed to upload /out for healing mod", "run_id", req.RunID, "job_id", req.JobID, "mod_index", idx, "error", uploadErr)
 			}
 
 			// Per-step diff capture: Generate and upload diff after each healing mod step.
-			// C2: Pass stepIndex so healing diffs are included in rehydration queries.
-			r.uploadHealingModDiff(ctx, req.RunID.String(), stageID, workspace, healResult, idx, attempt, stepIndex)
+			r.uploadHealingModDiff(ctx, req.RunID, req.JobID, workspace, healResult, idx, attempt, stepIndex)
 
 			// Read Codex session and sentinel artifacts from /out for session propagation.
 			if sessionBytes, readErr := os.ReadFile(filepath.Join(outDir, "codex-session.txt")); readErr == nil {

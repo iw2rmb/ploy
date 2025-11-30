@@ -43,6 +43,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -178,7 +179,7 @@ func (e *httpGateExecutor) handleValidateResponse(ctx context.Context, resp *con
 
 	case contracts.BuildGateJobStatusPending, contracts.BuildGateJobStatusClaimed, contracts.BuildGateJobStatusRunning:
 		// Async job: poll GetJob until completion or timeout.
-		return e.pollJobUntilDone(ctx, resp.JobID)
+		return e.pollJobUntilDone(ctx, types.JobID(resp.JobID))
 
 	default:
 		// Unknown status: defensive error handling.
@@ -195,7 +196,7 @@ func (e *httpGateExecutor) handleValidateResponse(ctx context.Context, resp *con
 //  3. defaultBuildGateTimeout (10 minutes)
 //
 // Uses exponential backoff via internal/workflow/backoff to avoid hammering the API.
-func (e *httpGateExecutor) pollJobUntilDone(ctx context.Context, jobID string) (*contracts.BuildGateStageMetadata, error) {
+func (e *httpGateExecutor) pollJobUntilDone(ctx context.Context, jobID types.JobID) (*contracts.BuildGateStageMetadata, error) {
 	// Create a polling context with appropriate timeout.
 	pollCtx, cancel := e.createPollContext(ctx)
 	defer cancel()

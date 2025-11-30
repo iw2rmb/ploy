@@ -31,7 +31,7 @@ func stringValue(s *string) string {
 //     with top-level "env" winning on conflict.
 //   - The "build_gate" object is flattened into "build_gate_enabled" and
 //     "build_gate_profile" options for manifest builder consumption.
-//   - Server-injected metadata like "stage_id", "gitlab_pat", "gitlab_domain",
+//   - Server-injected metadata like "job_id", "gitlab_pat", "gitlab_domain",
 //     "mr_on_success", and "mr_on_fail" are passed through as-is.
 //   - The "build_gate_healing" block is preserved in options to support heal → re-gate loops.
 //
@@ -85,9 +85,9 @@ func parseSpec(spec json.RawMessage) (map[string]any, map[string]string, RunOpti
 	if b, ok := m["retain_container"].(bool); ok {
 		opts["retain_container"] = b
 	}
-	// Pass through stage_id if present (server injects it on claim).
-	if sid, ok := m["stage_id"].(string); ok && sid != "" {
-		opts["stage_id"] = sid
+	// Pass through job_id if present (server injects it on claim).
+	if jid, ok := m["job_id"].(string); ok && jid != "" {
+		opts["job_id"] = jid
 	}
 	// Pass through GitLab config (PAT and domain) if present (server injects defaults on claim).
 	if pat, ok := m["gitlab_pat"].(string); ok && pat != "" {

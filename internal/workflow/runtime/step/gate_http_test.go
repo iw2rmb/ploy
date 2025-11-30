@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -30,7 +31,7 @@ type fakeBuildGateHTTPClient struct {
 	// GetJobCallCount tracks how many times GetJob was called.
 	GetJobCallCount int
 	// LastGetJobID stores the last jobID passed to GetJob.
-	LastGetJobID string
+	LastGetJobID types.JobID
 
 	// GetJobResponses is a queue of responses for GetJob. If non-empty, each call
 	// to GetJob pops from this queue. When empty, falls back to GetJobResp/GetJobErr.
@@ -50,7 +51,7 @@ func (f *fakeBuildGateHTTPClient) Validate(ctx context.Context, req contracts.Bu
 	return f.ValidateResp, nil
 }
 
-func (f *fakeBuildGateHTTPClient) GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error) {
+func (f *fakeBuildGateHTTPClient) GetJob(ctx context.Context, jobID types.JobID) (*contracts.BuildGateJobStatusResponse, error) {
 	f.GetJobCallCount++
 	f.LastGetJobID = jobID
 

@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // ArtifactUploader uploads artifact bundles (tar.gz) to the control-plane server.
@@ -34,7 +36,8 @@ func NewArtifactUploader(cfg Config) (*ArtifactUploader, error) {
 }
 
 // UploadArtifact creates a tar.gz bundle from the specified paths and uploads it to the server.
-func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID string, paths []string, name string) (string, string, error) {
+// The artifact is associated with a specific job via the job_id parameter.
+func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID types.RunID, jobID types.JobID, paths []string, name string) (string, string, error) {
 	if len(paths) == 0 {
 		return "", "", nil // Nothing to upload.
 	}
@@ -52,8 +55,8 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID st
 	}
 
 	// Build request payload.
+	// run_id and job_id are in the URL path, not the body.
 	payload := map[string]interface{}{
-		"run_id": runID,
 		"bundle": bundleBytes,
 	}
 	if name != "" {
@@ -65,8 +68,8 @@ func (u *ArtifactUploader) UploadArtifact(ctx context.Context, runID, stageID st
 		return "", "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	// Construct URL.
-	url := fmt.Sprintf("%s/v1/nodes/%s/stage/%s/artifact", u.cfg.ServerURL, u.cfg.NodeID, stageID)
+	// Construct URL using job-scoped endpoint.
+	url := fmt.Sprintf("%s/v1/runs/%s/jobs/%s/artifact", u.cfg.ServerURL, runID.String(), jobID.String())
 
 	// Create HTTP request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))

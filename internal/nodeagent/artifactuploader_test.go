@@ -32,8 +32,10 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/v1/nodes/test-node-id/stage/test-stage-id/artifact" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
+		// Verify URL path uses job-scoped endpoint.
+		expectedPath := "/v1/runs/test-run-id/jobs/test-job-id/artifact"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 		}
 
 		body, err := io.ReadAll(r.Body)
@@ -62,14 +64,14 @@ func TestArtifactUploader_UploadArtifact_Success(t *testing.T) {
 
 	// Upload artifact.
 	ctx := context.Background()
-	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1, file2}, "test-bundle")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{file1, file2}, "test-bundle")
 	if err != nil {
 		t.Fatalf("upload artifact: %v", err)
 	}
 
-	// Verify received payload.
-	if receivedPayload["run_id"] != "test-run-id" {
-		t.Errorf("expected run_id 'test-run-id', got %v", receivedPayload["run_id"])
+	// Verify run_id is NOT in payload (it's in the URL path).
+	if _, exists := receivedPayload["run_id"]; exists {
+		t.Error("run_id should not be in payload (it's in URL)")
 	}
 	if receivedPayload["name"] != "test-bundle" {
 		t.Errorf("expected name 'test-bundle', got %v", receivedPayload["name"])
@@ -93,7 +95,7 @@ func TestArtifactUploader_UploadArtifact_EmptyPaths(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{}, "test-bundle")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{}, "test-bundle")
 	if err != nil {
 		t.Errorf("expected no error for empty paths, got %v", err)
 	}
@@ -124,7 +126,7 @@ func TestArtifactUploader_UploadArtifact_ServerError(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{file1}, "")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{file1}, "")
 	if err == nil {
 		t.Error("expected error when server returns 500")
 	}
@@ -314,7 +316,7 @@ func TestArtifactUploader_SizeCap(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-stage-id", []string{largeFile}, "")
+	_, _, err = uploader.UploadArtifact(ctx, "test-run-id", "test-job-id", []string{largeFile}, "")
 	if err == nil {
 		t.Error("expected error for oversized bundle")
 	}

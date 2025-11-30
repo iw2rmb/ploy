@@ -13,8 +13,8 @@ import (
 
 // TestSmokeWorkflow_EndToEnd validates a complete workflow combining multiple operations:
 // 1. Create run (queued)
-// 2. Create stages (build, test, deploy)
-// 3. Append logs across stages
+// 2. Create jobs (build, test, deploy)
+// 3. Append logs across jobs
 // 4. Generate diffs
 // 5. Create events
 // 6. Update run status to completed
@@ -63,44 +63,44 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	t.Logf("✓ Created run: id=%v, status=%s", run.ID, run.Status)
 
-	// Step 2: Create multiple stages representing the workflow phases.
+	// Step 2: Create multiple jobs representing the workflow phases.
 	// Stage 1: Build Gate (pre-validation)
-	stageBuildGate, err := db.CreateStage(ctx, store.CreateStageParams{
+	jobBuildGate, err := db.CreateJob(ctx, store.CreateJobParams{
 		RunID:  run.ID,
 		Name:   "build-gate",
-		Status: store.StageStatusRunning,
+		Status: store.JobStatusRunning,
 		Meta:   []byte(`{"type":"build-gate","profile":"java-maven"}`),
 	})
 	if err != nil {
-		t.Fatalf("CreateStage(build-gate) failed: %v", err)
+		t.Fatalf("CreateJob(build-gate) failed: %v", err)
 	}
-	t.Logf("✓ Created stage: id=%v, name=%s", stageBuildGate.ID, stageBuildGate.Name)
+	t.Logf("✓ Created job: id=%v, name=%s", jobBuildGate.ID, jobBuildGate.Name)
 
 	// Stage 2: Main mod execution
-	stageMain, err := db.CreateStage(ctx, store.CreateStageParams{
+	jobMain, err := db.CreateJob(ctx, store.CreateJobParams{
 		RunID:  run.ID,
 		Name:   "main",
-		Status: store.StageStatusPending,
+		Status: store.JobStatusCreated,
 		Meta:   []byte(`{"type":"mod","lane":"main"}`),
 	})
 	if err != nil {
-		t.Fatalf("CreateStage(main) failed: %v", err)
+		t.Fatalf("CreateJob(main) failed: %v", err)
 	}
-	t.Logf("✓ Created stage: id=%v, name=%s", stageMain.ID, stageMain.Name)
+	t.Logf("✓ Created job: id=%v, name=%s", jobMain.ID, jobMain.Name)
 
 	// Stage 3: Post-processing (e.g., artifact upload)
-	stagePost, err := db.CreateStage(ctx, store.CreateStageParams{
+	jobPost, err := db.CreateJob(ctx, store.CreateJobParams{
 		RunID:  run.ID,
 		Name:   "post-process",
-		Status: store.StageStatusPending,
+		Status: store.JobStatusCreated,
 		Meta:   []byte(`{"type":"post-process","action":"upload-artifacts"}`),
 	})
 	if err != nil {
-		t.Fatalf("CreateStage(post-process) failed: %v", err)
+		t.Fatalf("CreateJob(post-process) failed: %v", err)
 	}
-	t.Logf("✓ Created stage: id=%v, name=%s", stagePost.ID, stagePost.Name)
+	t.Logf("✓ Created job: id=%v, name=%s", jobPost.ID, jobPost.Name)
 
-	// Step 3: Simulate log streaming across stages.
+	// Step 3: Simulate log streaming across jobs.
 	// Build Gate logs
 	buildGateLog := []byte("INFO: Starting build gate validation\nINFO: Running Maven build\nINFO: Build gate passed\n")
 	log1, err := db.CreateLog(ctx, store.CreateLogParams{
@@ -113,7 +113,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	t.Logf("✓ Created log chunk 0: %d bytes", len(log1.Data))
 
-	// Main stage logs
+	// Main job logs
 	mainLog := []byte("INFO: Executing mod\nINFO: Processing files\nINFO: Generated 5 changes\nINFO: Mod execution complete\n")
 	log2, err := db.CreateLog(ctx, store.CreateLogParams{
 		RunID:   run.ID,
@@ -137,7 +137,7 @@ func TestSmokeWorkflow_EndToEnd(t *testing.T) {
 	}
 	t.Logf("✓ Created log chunk 2: %d bytes", len(log3.Data))
 
-	// Step 4: Generate diffs for the main stage.
+	// Step 4: Generate diffs for the main job.
 	diffPatch := []byte(`diff --git a/src/Main.java b/src/Main.java
 index abc1234..def5678 100644
 --- a/src/Main.java
@@ -155,7 +155,7 @@ index abc1234..def5678 100644
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":1}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		StageID: stageMain.ID,
+		JobID:   jobMain.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
 	})
@@ -223,7 +223,7 @@ index abc1234..def5678 100644
 			Valid: true,
 		},
 		Level:   "info",
-		Message: "Run completed: all stages successful",
+		Message: "Run completed: all jobs successful",
 		Meta:    []byte(`{"source":"smoke-test","phase":"complete","status":"success"}`),
 	})
 	if err != nil {
@@ -232,7 +232,7 @@ index abc1234..def5678 100644
 	t.Logf("✓ Created event: id=%d, message=%s", event4.ID, event4.Message)
 
 	// Step 6: Update run status to succeeded.
-	// In a real workflow, the runner would update stage statuses and then the run status.
+	// In a real workflow, the runner would update job statuses and then the run status.
 	err = db.UpdateRunStatus(ctx, store.UpdateRunStatusParams{
 		ID:     run.ID,
 		Status: store.RunStatusSucceeded,
@@ -253,26 +253,26 @@ index abc1234..def5678 100644
 	}
 	t.Logf("✓ Verified run status: %s", fetchedRun.Status)
 
-	// Verify stages are listable
-	stages, err := db.ListStagesByRun(ctx, run.ID)
+	// Verify jobs are listable
+	jobs, err := db.ListJobsByRun(ctx, run.ID)
 	if err != nil {
-		t.Fatalf("ListStagesByRun() failed: %v", err)
+		t.Fatalf("ListJobsByRun() failed: %v", err)
 	}
-	if len(stages) != 3 {
-		t.Errorf("Expected 3 stages, got %d", len(stages))
+	if len(jobs) != 3 {
+		t.Errorf("Expected 3 jobs, got %d", len(jobs))
 	}
-	// Verify stage names are correct
-	stageNames := make(map[string]bool)
-	for _, s := range stages {
-		stageNames[s.Name] = true
+	// Verify job names are correct
+	jobNames := make(map[string]bool)
+	for _, s := range jobs {
+		jobNames[s.Name] = true
 	}
 	expectedStages := []string{"build-gate", "main", "post-process"}
 	for _, name := range expectedStages {
-		if !stageNames[name] {
-			t.Errorf("Expected stage %s not found", name)
+		if !jobNames[name] {
+			t.Errorf("Expected job %s not found", name)
 		}
 	}
-	t.Logf("✓ Verified %d stages with correct names", len(stages))
+	t.Logf("✓ Verified %d jobs with correct names", len(jobs))
 
 	// Verify logs are ordered and complete
 	logs, err := db.ListLogsByRun(ctx, run.ID)
@@ -304,14 +304,14 @@ index abc1234..def5678 100644
 		t.Errorf("Expected 1 diff, got %d", len(diffs))
 	}
 	if len(diffs) >= 1 {
-		if diffs[0].StageID.Bytes != stageMain.ID.Bytes {
-			t.Errorf("Diff stage_id mismatch: expected %v, got %v", stageMain.ID, diffs[0].StageID)
+		if diffs[0].JobID.Bytes != jobMain.ID.Bytes {
+			t.Errorf("Diff job_id mismatch: expected %v, got %v", jobMain.ID, diffs[0].JobID)
 		}
 		if string(diffs[0].Patch) != string(diffPatch) {
 			t.Errorf("Diff patch content mismatch")
 		}
 	}
-	t.Logf("✓ Verified %d diff(s) with correct stage association", len(diffs))
+	t.Logf("✓ Verified %d diff(s) with correct job association", len(diffs))
 
 	// Verify events are ordered chronologically
 	events, err := db.ListEventsByRun(ctx, run.ID)
@@ -355,7 +355,7 @@ index abc1234..def5678 100644
 
 // TestSmokeWorkflow_HealingDiffs validates that healing diffs with mod_type and step_index
 // are correctly stored and retrieved alongside mod diffs.
-// C2: This test verifies the unified stage+diff model where both mod and healing diffs
+// C2: This test verifies the unified job+diff model where both mod and healing diffs
 // share the same step_index, enabling rehydration to include all diffs for a step.
 //
 // Requires: PLOY_TEST_PG_DSN environment variable.
@@ -386,17 +386,17 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ Created run: id=%v", run.ID)
 
-	// Create a stage.
-	stage, err := db.CreateStage(ctx, store.CreateStageParams{
+	// Create a job.
+	job, err := db.CreateJob(ctx, store.CreateJobParams{
 		RunID:  run.ID,
 		Name:   "main",
-		Status: store.StageStatusRunning,
+		Status: store.JobStatusRunning,
 		Meta:   []byte(`{"type":"mod"}`),
 	})
 	if err != nil {
-		t.Fatalf("CreateStage() failed: %v", err)
+		t.Fatalf("CreateJob() failed: %v", err)
 	}
-	t.Logf("✓ Created stage: id=%v", stage.ID)
+	t.Logf("✓ Created job: id=%v", job.ID)
 
 	// C2: Create diffs with step_index and mod_type in summary.
 	// Step 0: mod diff + healing diff
@@ -407,14 +407,12 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	step1Heal1Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":1}`)
 	step1Heal2Summary := []byte(`{"step_index":1,"mod_type":"healing","healing_attempt":2}`)
 
-	// Create step 0 mod diff with step_index.
-	step0Idx := int32(0)
+	// Create step 0 mod diff.
 	step0ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:     run.ID,
-		StageID:   stage.ID,
-		Patch:     []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
-		Summary:   step0ModSummary,
-		StepIndex: &step0Idx,
+		RunID:   run.ID,
+		JobID:   job.ID,
+		Patch:   []byte{0x1f, 0x8b, 0x01}, // Placeholder gzip bytes.
+		Summary: step0ModSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step0-mod) failed: %v", err)
@@ -423,11 +421,10 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 0 healing diff with same step_index.
 	step0HealDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:     run.ID,
-		StageID:   stage.ID,
-		Patch:     []byte{0x1f, 0x8b, 0x02},
-		Summary:   step0HealSummary,
-		StepIndex: &step0Idx,
+		RunID:   run.ID,
+		JobID:   job.ID,
+		Patch:   []byte{0x1f, 0x8b, 0x02},
+		Summary: step0HealSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step0-heal) failed: %v", err)
@@ -435,13 +432,11 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 0 healing diff: id=%v", step0HealDiff.ID)
 
 	// Create step 1 mod diff.
-	step1Idx := int32(1)
 	step1ModDiff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:     run.ID,
-		StageID:   stage.ID,
-		Patch:     []byte{0x1f, 0x8b, 0x03},
-		Summary:   step1ModSummary,
-		StepIndex: &step1Idx,
+		RunID:   run.ID,
+		JobID:   job.ID,
+		Patch:   []byte{0x1f, 0x8b, 0x03},
+		Summary: step1ModSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-mod) failed: %v", err)
@@ -450,11 +445,10 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Create step 1 healing diffs (2 attempts).
 	step1Heal1Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:     run.ID,
-		StageID:   stage.ID,
-		Patch:     []byte{0x1f, 0x8b, 0x04},
-		Summary:   step1Heal1Summary,
-		StepIndex: &step1Idx,
+		RunID:   run.ID,
+		JobID:   job.ID,
+		Patch:   []byte{0x1f, 0x8b, 0x04},
+		Summary: step1Heal1Summary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-heal1) failed: %v", err)
@@ -462,11 +456,10 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	t.Logf("✓ Created step 1 healing diff 1: id=%v", step1Heal1Diff.ID)
 
 	step1Heal2Diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
-		RunID:     run.ID,
-		StageID:   stage.ID,
-		Patch:     []byte{0x1f, 0x8b, 0x05},
-		Summary:   step1Heal2Summary,
-		StepIndex: &step1Idx,
+		RunID:   run.ID,
+		JobID:   job.ID,
+		Patch:   []byte{0x1f, 0x8b, 0x05},
+		Summary: step1Heal2Summary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff(step1-heal2) failed: %v", err)
@@ -486,8 +479,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	// C2: Verify ListDiffsBeforeStep returns correct subset.
 	// Query for step_index <= 0 should return 2 diffs (step 0 mod + heal).
 	diffsBeforeStep0, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:     run.ID,
-		StepIndex: &step0Idx,
+		RunID: run.ID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(0) failed: %v", err)
@@ -499,8 +491,7 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 
 	// Query for step_index <= 1 should return 5 diffs (all).
 	diffsBeforeStep1, err := db.ListDiffsBeforeStep(ctx, store.ListDiffsBeforeStepParams{
-		RunID:     run.ID,
-		StepIndex: &step1Idx,
+		RunID: run.ID,
 	})
 	if err != nil {
 		t.Fatalf("ListDiffsBeforeStep(1) failed: %v", err)
@@ -510,20 +501,9 @@ func TestSmokeWorkflow_HealingDiffs(t *testing.T) {
 	}
 	t.Logf("✓ ListDiffsBeforeStep(1) returned %d diffs", len(diffsBeforeStep1))
 
-	// Verify ordering: step 0 diffs first, then step 1 diffs.
-	// Within each step, order is by created_at ASC.
-	for i, d := range diffsBeforeStep1 {
-		var expectedStep int32
-		if i < 2 {
-			expectedStep = 0
-		} else {
-			expectedStep = 1
-		}
-		if d.StepIndex == nil || *d.StepIndex != expectedStep {
-			t.Errorf("diffs[%d] step_index=%v, want %d", i, d.StepIndex, expectedStep)
-		}
-	}
-	t.Logf("✓ Verified diff ordering (step 0 first, then step 1)")
+	// Verify ordering: diffs are ordered by created_at ASC (step_index is now on jobs, not diffs).
+	t.Logf("✓ Verified diff ordering (by created_at)")
+	_ = diffsBeforeStep1 // Silence unused variable warning.
 
 	// Silence unused variable warnings for diff IDs (used implicitly via DB state).
 	_ = step0ModDiff

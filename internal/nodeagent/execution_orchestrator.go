@@ -22,325 +22,450 @@ import (
 	"github.com/iw2rmb/ploy/internal/workflow/runtime/step"
 )
 
-// executeRun orchestrates the high-level lifecycle of a single run execution.
-// It coordinates workspace setup, runtime initialization, step execution with healing,
-// artifact collection, and terminal status reporting. This function owns the run's
-// lifecycle from start to completion and ensures cleanup of ephemeral resources.
+// executeRun orchestrates job execution based on job type (ModType).
+// Dispatches to specialized handlers: gate jobs, mod jobs, or healing jobs.
 //
-// Lifecycle phases:
-//  1. Manifest construction from run request
-//  2. Workspace directory creation and cleanup registration
-//  3. Runtime component initialization (git, hydrator, container, diff, gate, logs)
-//  4. Step execution with optional healing loop via executeWithHealing
-//  5. Diff generation and upload (when available)
-//  6. Artifact bundle uploads (configured paths + /out directory)
-//  7. Merge request creation (when conditions are met)
-//  8. Terminal status emission to control plane
+// Job types:
+//   - pre_gate, post_gate, re_gate: Run build gate validation
+//   - mod: Run container with mod execution
+//   - heal: Run healing container after gate failure
 //
-// The function uses defer to ensure cleanup occurs even on early returns or panics.
-// It removes the run from the controller's tracking map on exit.
+// Each job is atomic - there's no multi-step loop. The server creates
+// individual jobs (pre-gate, mod-0, ..., post-gate) and nodes execute
+// them independently. Healing jobs are created by the server when
+// gates fail, not run inline by the node.
 func (r *runController) executeRun(ctx context.Context, req StartRunRequest) {
 	defer func() {
 		r.mu.Lock()
-		delete(r.runs, req.RunID.String())
+		delete(r.jobs, req.JobID.String())
 		r.mu.Unlock()
 	}()
 
-	slog.Info("starting run execution", "run_id", req.RunID, "repo_url", req.RepoURL)
+	slog.Info("starting job execution",
+		"run_id", req.RunID,
+		"job_id", req.JobID,
+		"mod_type", req.ModType,
+		"step_index", req.StepIndex,
+	)
 
-	// Phase 1: Parse typed options from the raw options map to reduce map[string]any casts.
-	// Determine if this is a multi-step run (mods[] array) or single-step run.
+	// Dispatch based on job type (ModType).
+	switch req.ModType {
+	case "pre_gate", "post_gate", "re_gate":
+		r.executeGateJob(ctx, req)
+	case "mod":
+		r.executeModJob(ctx, req)
+	case "heal":
+		r.executeHealingJob(ctx, req)
+	default:
+		// Fallback for legacy jobs without ModType - execute as mod job.
+		slog.Warn("unknown mod_type, falling back to mod execution",
+			"run_id", req.RunID,
+			"mod_type", req.ModType,
+		)
+		r.executeModJob(ctx, req)
+	}
+}
+
+// executeGateJob runs a build gate validation job.
+// Reports pass/fail status to server. On failure with reason="build-gate",
+// the server will create healing jobs if configured.
+func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest) {
+	startTime := time.Now()
+
+	// Initialize runtime components.
+	runner, _, logStreamer, err := r.initializeRuntime(ctx, req.RunID.String())
+	if err != nil {
+		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = logStreamer.Close() }()
+
+	// Parse options and build manifest.
+	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
 	typedOpts := parseRunOptions(req.Options)
-
-	// Detect multi-step vs single-step execution mode.
-	// Multi-step runs loop over Steps; single-step runs execute once with stepIndex=0.
-	// When req.StepIndex is present, constrain execution to that single step (multi-node execution).
-	stepCount := 1
-	startStepIndex := 0
-	if len(typedOpts.Steps) > 0 {
-		stepCount = len(typedOpts.Steps)
-		slog.Info("multi-step run detected", "run_id", req.RunID, "step_count", stepCount)
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	if err != nil {
+		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
 	}
 
-	// If a specific step was claimed (multi-node execution), constrain to that step only.
-	if req.StepIndex != nil {
-		startStepIndex = int(*req.StepIndex)
-		stepCount = startStepIndex + 1 // Execute only this step
-		slog.Info("single-step execution (multi-node claim)", "run_id", req.RunID, "step_index", startStepIndex)
-	}
-
-	// Phase 2: Prepare base clone cache for rehydration.
-	// Instead of a single long-lived workspace, we'll create a fresh workspace per step
-	// by copying the base clone and applying ordered diffs. This enables multi-node execution
-	// where different steps can run on different nodes.
-	//
-	// The baseClonePath is created once and cached for all steps in this run.
-	// Each step gets its own ephemeral workspace via rehydration.
-	baseClonePath := ""
+	// Rehydrate workspace from base + diffs.
+	var baseClonePath string
 	defer func() {
 		if baseClonePath != "" {
 			_ = os.RemoveAll(baseClonePath)
 		}
 	}()
 
-	// Phase 3: Initialize runtime components (git fetcher, workspace hydrator, container runtime, diff generator, gate executor).
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	if err != nil {
+		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+
+	// Run the build gate.
+	gateResult, gateErr := r.runGate(ctx, runner, manifest, workspace)
+	duration := time.Since(startTime)
+
+	// Build stats with gate metadata.
+	stats := r.buildGateJobStats(gateResult, duration)
+
+	// Check if gate passed.
+	gatePassed := false
+	if gateResult != nil && len(gateResult.StaticChecks) > 0 {
+		gatePassed = gateResult.StaticChecks[0].Passed
+	}
+
+	// Determine status and exit code.
+	if gateErr != nil || !gatePassed {
+		// Gate failed - exit code 1 signals gate failure for healing.
+		var exitCode int32 = 1
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+			slog.Error("failed to upload gate failure status", "run_id", req.RunID, "error", uploadErr)
+		}
+		slog.Info("gate job failed",
+			"run_id", req.RunID,
+			"mod_type", req.ModType,
+			"duration", duration,
+		)
+		return
+	}
+
+	// Gate passed.
+	var exitCodeZero int32 = 0
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
+		slog.Error("failed to upload gate success status", "run_id", req.RunID, "error", uploadErr)
+	}
+	slog.Info("gate job succeeded",
+		"run_id", req.RunID,
+		"mod_type", req.ModType,
+		"duration", duration,
+	)
+}
+
+// runGate executes the build gate and returns the result.
+func (r *runController) runGate(ctx context.Context, runner step.Runner, manifest contracts.StepManifest, workspace string) (*contracts.BuildGateStageMetadata, error) {
+	// Resolve gate spec from manifest.
+	gateSpec := manifest.Gate
+	//lint:ignore SA1019 Backward compatibility: support deprecated Shift by mapping to Gate.
+	if gateSpec == nil && manifest.Shift != nil {
+		gateSpec = &contracts.StepGateSpec{
+			Enabled: manifest.Shift.Enabled,
+			Profile: manifest.Shift.Profile,
+			Env:     manifest.Shift.Env,
+		}
+	}
+
+	if runner.Gate == nil || gateSpec == nil || !gateSpec.Enabled {
+		// No gate configured - return success.
+		return &contracts.BuildGateStageMetadata{
+			StaticChecks: []contracts.BuildGateStaticCheckReport{{Passed: true, Tool: "none"}},
+		}, nil
+	}
+
+	return runner.Gate.Execute(ctx, gateSpec, workspace)
+}
+
+// buildGateJobStats constructs stats payload for gate job completion.
+func (r *runController) buildGateJobStats(gateResult *contracts.BuildGateStageMetadata, duration time.Duration) types.RunStats {
+	stats := types.RunStats{
+		"duration_ms": duration.Milliseconds(),
+	}
+
+	if gateResult != nil {
+		passed := false
+		if len(gateResult.StaticChecks) > 0 {
+			passed = gateResult.StaticChecks[0].Passed
+		}
+		stats["gate"] = map[string]any{
+			"passed":      passed,
+			"duration_ms": duration.Milliseconds(),
+		}
+	}
+
+	return stats
+}
+
+// executeModJob runs a mod container job.
+// Executes the container, uploads diff, and reports status.
+func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) {
+	startTime := time.Now()
+
+	// Initialize runtime components.
 	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, req.RunID.String())
 	if err != nil {
 		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
+	defer func() { _ = logStreamer.Close() }()
+
+	// Parse options and build manifest.
+	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
+	typedOpts := parseRunOptions(req.Options)
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	if err != nil {
+		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+
+	// Rehydrate workspace from base + diffs.
+	var baseClonePath string
 	defer func() {
-		if closeErr := logStreamer.Close(); closeErr != nil {
-			slog.Warn("failed to close log streamer", "run_id", req.RunID, "error", closeErr)
+		if baseClonePath != "" {
+			_ = os.RemoveAll(baseClonePath)
 		}
 	}()
 
-	// Prepare ephemeral /out directory for the container to write additional artifacts.
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	if err != nil {
+		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
+
+	// Prepare /out directory.
 	outDir, err := os.MkdirTemp("", "ploy-mod-out-*")
 	if err != nil {
 		slog.Error("failed to create /out directory", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
 		return
 	}
 	defer func() { _ = os.RemoveAll(outDir) }()
 
-	// Prepare ephemeral /in directory for cross-phase inputs (created on-demand by healing logic).
-	var inDir string
-	defer func() {
-		if inDir != "" {
-			_ = os.RemoveAll(inDir)
+	// Disable gate in manifest - mod jobs don't run gates.
+	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
+	//lint:ignore SA1019 Backward compatibility
+	manifest.Shift = nil
+
+	// Clear hydration since workspace is already hydrated.
+	if len(manifest.Inputs) > 0 {
+		inputs := make([]contracts.StepInput, len(manifest.Inputs))
+		copy(inputs, manifest.Inputs)
+		for i := range inputs {
+			inputs[i].Hydration = nil
 		}
-	}()
+		manifest.Inputs = inputs
+	}
 
-	// Phase 4a: Run a single pre-mod gate with healing BEFORE executing any mods.
-	// This ensures the baseline compiles before any changes are applied, providing
-	// early feedback if the repository's current state is broken.
-	//
-	// The pre-mod gate uses step 0's manifest and a freshly hydrated workspace.
-	// If the gate fails and cannot be healed, the run terminates immediately with
-	// ErrBuildGateFailed (reason="build-gate") and no mods are executed.
-	//
-	// PreGate and ReGates from this phase are accumulated into a shared result
-	// that gets merged with per-step execution results for final stats reporting.
-	var preModGateResult *gateRunMetadata // Captures initial pre-mod gate outcome.
-	var preModReGates []gateRunMetadata   // Captures re-gate attempts after healing.
-	var preModGateWorkspace string        // Workspace used for pre-mod gate (cleaned up after).
+	// Run the mod container.
+	result, runErr := runner.Run(ctx, step.Request{
+		TicketID:  types.TicketID(req.RunID),
+		Manifest:  manifest,
+		Workspace: workspace,
+		OutDir:    outDir,
+		InDir:     "",
+	})
+	duration := time.Since(startTime)
 
-	// Build manifest for step 0 to determine gate configuration.
-	step0Manifest, step0ManifestErr := buildManifestFromRequest(req, typedOpts, 0)
-	if step0ManifestErr != nil {
-		slog.Error("failed to build manifest for pre-mod gate", "run_id", req.RunID, "error", step0ManifestErr)
-		// Report failure and exit early.
-		r.reportPreModGateFailure(ctx, req, step0ManifestErr, nil, nil, 0)
+	// Upload diff for this mod.
+	r.uploadDiffForStep(ctx, req.RunID, req.JobID, diffGenerator, workspace, result, req.StepIndex)
+
+	// Upload /out artifacts.
+	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
+		slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
+	}
+
+	// Upload configured artifacts.
+	r.uploadConfiguredArtifacts(ctx, req, manifest, workspace)
+
+	// Build stats.
+	stats := types.RunStats{
+		"exit_code":   result.ExitCode,
+		"duration_ms": duration.Milliseconds(),
+		"timings": map[string]interface{}{
+			"hydration_duration_ms": result.Timings.HydrationDuration.Milliseconds(),
+			"execution_duration_ms": result.Timings.ExecutionDuration.Milliseconds(),
+			"diff_duration_ms":      result.Timings.DiffDuration.Milliseconds(),
+			"total_duration_ms":     result.Timings.TotalDuration.Milliseconds(),
+		},
+	}
+
+	// Determine status.
+	if runErr != nil {
+		var exitCode int32 = -1 // Use -1 to indicate runtime error
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "error", uploadErr)
+		}
+		slog.Info("mod job failed", "run_id", req.RunID, "error", runErr, "duration", duration)
 		return
 	}
 
-	// Check if gate is enabled before hydrating workspace (avoid unnecessary work).
-	gateEnabled := step0Manifest.Gate != nil && step0Manifest.Gate.Enabled
-	//lint:ignore SA1019 Backward compatibility: support deprecated Shift field.
-	if !gateEnabled && step0Manifest.Shift != nil && step0Manifest.Shift.Enabled {
-		gateEnabled = true
+	if result.ExitCode != 0 {
+		exitCode := int32(result.ExitCode)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "error", uploadErr)
+		}
+		slog.Info("mod job failed", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+		return
 	}
 
-	if gateEnabled {
-		slog.Info("running pre-mod gate with healing", "run_id", req.RunID)
-
-		// Hydrate workspace for step 0 to run the pre-mod gate.
-		var err error
-		preModGateWorkspace, err = r.rehydrateWorkspaceForStep(ctx, req, step0Manifest, 0, &baseClonePath)
-		if err != nil {
-			slog.Error("failed to rehydrate workspace for pre-mod gate", "run_id", req.RunID, "error", err)
-			r.reportPreModGateFailure(ctx, req, fmt.Errorf("rehydrate workspace for pre-mod gate: %w", err), nil, nil, 0)
-			return
-		}
-		// Cleanup pre-mod gate workspace when done (separate from per-step workspaces).
-		defer func() {
-			if preModGateWorkspace != "" {
-				_ = os.RemoveAll(preModGateWorkspace)
-			}
-		}()
-
-		// Execute the pre-mod gate with healing via runGateWithHealing.
-		// Pass empty inDir pointer; healing will create it if needed.
-		preModInDir := "" // Separate /in for pre-mod gate healing.
-		defer func() {
-			if preModInDir != "" {
-				_ = os.RemoveAll(preModInDir)
-			}
-		}()
-
-		// C2: Pre-mod gate healing uses step_index=0 since it runs before any mods.
-		preModGateResult, preModReGates, err = r.runGateWithHealing(
-			ctx, runner, req, step0Manifest, preModGateWorkspace, outDir, &preModInDir, "pre", 0,
-		)
-
-		if err != nil {
-			// Pre-mod gate failed and could not be healed.
-			// Terminate the run with ErrBuildGateFailed and reason="build-gate".
-			slog.Error("pre-mod gate failed, no mods will be executed",
-				"run_id", req.RunID,
-				"error", err,
-			)
-			r.reportPreModGateFailure(ctx, req, err, preModGateResult, preModReGates, 0)
-			return
-		}
-
-		slog.Info("pre-mod gate passed, proceeding to mod execution", "run_id", req.RunID)
-
-		// C2: Upload pre-mod healing diff so step 0 runs on the healed baseline.
-		// After pre-mod healing succeeds, compute the diff between baseClonePath and
-		// preModGateWorkspace, then upload it with step_index=-1 and mod_type="pre_gate".
-		// Using step_index=-1 ensures it's included when any step fetches "all diffs from previous steps".
-		// For step 0: fetch step_index <= -1 → gets pre_gate diff
-		// For step k: fetch step_index <= k-1 → gets pre_gate + all prior mod diffs
-		if len(preModReGates) > 0 {
-			// Healing occurred - upload the accumulated changes as a pre_gate diff.
-			// If diff is empty, fail the run (healing claimed success but made no changes).
-			stageID, _ := step0Manifest.OptionString("stage_id")
-			if err := r.uploadBaselineDiff(ctx, req.RunID.String(), stageID, diffGenerator, baseClonePath, preModGateWorkspace, -1, "pre_gate"); err != nil {
-				slog.Error("pre-mod healing produced invalid state",
-					"run_id", req.RunID,
-					"error", err,
-				)
-				r.reportPreModGateFailure(ctx, req, err, preModGateResult, preModReGates, 0)
-				return
-			}
+	// Conditionally create MR on success.
+	if shouldCreateMR("succeeded", manifest) {
+		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
+			slog.Error("failed to create MR", "run_id", req.RunID, "error", mrErr)
+		} else {
+			stats["metadata"] = map[string]interface{}{"mr_url": url}
+			slog.Info("MR created", "run_id", req.RunID, "mr_url", url)
 		}
 	}
 
-	// Phase 4b: Execute steps sequentially (container execution + post-gates per step).
-	// For multi-step runs, loop over Steps; for single-step runs, execute once with stepIndex=0.
-	// For multi-node step-level claims, execute only the claimed step (startStepIndex..stepCount).
-	// Each step runs in a fresh workspace created via rehydration (base + ordered diffs).
-	// If any step fails, halt execution and report terminal status.
-	//
-	// GATE CONTRACT (ROADMAP Phase G):
-	// - The pre-run gate (Phase 4a above) is the ONLY pre-gate for the entire run.
-	// - Per-step execution via executeWithHealing does NOT run additional pre-step gates;
-	//   it disables Gate.Enabled on the cloned manifest before calling Runner.Run.
-	// - Only post-mod gates (gatePhase="post") are executed per step to validate changes.
-	// - This ensures exactly one pre-run gate per run, avoiding redundant validation.
-	var finalExecResult executionResult
-	var finalExecErr error
-	var finalManifest contracts.StepManifest
-	var finalWorkspace string // Track final workspace for artifacts and MR.
-	totalDuration := time.Duration(0)
-
-	// Merge pre-mod gate results into final execution result for stats reporting.
-	// These are set once before the loop and preserved through step execution.
-	if preModGateResult != nil {
-		finalExecResult.PreGate = preModGateResult
+	var exitCodeZero int32 = 0
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
+		slog.Error("failed to upload mod success status", "run_id", req.RunID, "error", uploadErr)
 	}
-	if len(preModReGates) > 0 {
-		finalExecResult.ReGates = preModReGates
+	slog.Info("mod job succeeded", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+}
+
+// executeHealingJob runs a healing container job.
+// Fetches gate logs from parent job, runs healing container, uploads diff.
+func (r *runController) executeHealingJob(ctx context.Context, req StartRunRequest) {
+	startTime := time.Now()
+
+	// Initialize runtime components.
+	runner, diffGenerator, logStreamer, err := r.initializeRuntime(ctx, req.RunID.String())
+	if err != nil {
+		slog.Error("failed to initialize runtime", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
 	}
+	defer func() { _ = logStreamer.Close() }()
 
-	for stepIndex := startStepIndex; stepIndex < stepCount; stepIndex++ {
-		slog.Info("executing step", "run_id", req.RunID, "step_index", stepIndex, "step_total", stepCount)
-
-		// Build manifest for this step.
-		manifest, err := buildManifestFromRequest(req, typedOpts, stepIndex)
-		if err != nil {
-			slog.Error("failed to build manifest for step", "run_id", req.RunID, "step_index", stepIndex, "error", err)
-			finalExecErr = err
-			break
-		}
-
-		// Rehydrate workspace for this step from base clone + ordered diffs.
-		// For step 0: fresh clone (no diffs).
-		// For step k>0: base clone + apply diffs from steps 0 through k-1.
-		workspaceRoot, rehydrateErr := r.rehydrateWorkspaceForStep(ctx, req, manifest, stepIndex, &baseClonePath)
-		if rehydrateErr != nil {
-			slog.Error("failed to rehydrate workspace for step", "run_id", req.RunID, "step_index", stepIndex, "error", rehydrateErr)
-			finalExecErr = fmt.Errorf("rehydrate workspace: %w", rehydrateErr)
-			break
-		}
-		// Cleanup workspace after this step completes (unless it's the final step).
-		// Keep final workspace for artifact collection and MR creation.
-		defer func(ws string, isFinal bool) {
-			if !isFinal {
-				_ = os.RemoveAll(ws)
-			}
-		}(workspaceRoot, stepIndex == stepCount-1)
-
-		// Execute this step with possible healing loop.
-		startTime := time.Now()
-		execResult, execErr := r.executeWithHealing(ctx, runner, req, manifest, workspaceRoot, outDir, &inDir, stepIndex)
-		duration := time.Since(startTime)
-		totalDuration += duration
-		result := execResult.Result
-
-		if execErr != nil {
-			slog.Error("step execution failed",
-				"run_id", req.RunID,
-				"step_index", stepIndex,
-				"error", execErr,
-				"duration", duration,
-				"exit_code", result.ExitCode,
-			)
-			finalExecResult = mergeExecutionResults(finalExecResult, execResult)
-			finalExecErr = execErr
-			finalManifest = manifest
-			finalWorkspace = workspaceRoot
-
-			// Stop execution on step failure. This includes post-mod gate failures:
-			// when executeWithHealing returns ErrBuildGateFailed from a post-mod gate
-			// that cannot be healed, we halt the multi-step loop to prevent subsequent
-			// mods from running on an invalid workspace state.
-			break
-		}
-
-		slog.Info("step execution succeeded",
-			"run_id", req.RunID,
-			"step_index", stepIndex,
-			"duration", duration,
-			"exit_code", result.ExitCode,
-		)
-
-		// Upload diff for this step to enable rehydration of workspaces from base + ordered diff chain.
-		// Tag diff with step_index for ordering in multi-step/multi-node scenarios.
-		stageID, _ := manifest.OptionString("stage_id")
-		r.uploadDiffForStep(ctx, req.RunID.String(), stageID, diffGenerator, workspaceRoot, result, stepIndex)
-
-		// Track the last successful execution result (merged with prior gate history)
-		// for final status reporting.
-		finalExecResult = mergeExecutionResults(finalExecResult, execResult)
-		finalExecErr = nil
-		finalManifest = manifest
-		finalWorkspace = workspaceRoot
+	// Parse options and build manifest.
+	// stepIndex=0 is used for manifest building; job configuration comes from req.Options.
+	typedOpts := parseRunOptions(req.Options)
+	manifest, err := buildManifestFromRequest(req, typedOpts, 0)
+	if err != nil {
+		slog.Error("failed to build manifest", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
 	}
 
-	// Cleanup final workspace after artifact collection.
+	// Rehydrate workspace from base + diffs.
+	var baseClonePath string
 	defer func() {
-		if finalWorkspace != "" {
-			_ = os.RemoveAll(finalWorkspace)
+		if baseClonePath != "" {
+			_ = os.RemoveAll(baseClonePath)
 		}
 	}()
 
-	// Phase 6a: Upload configured artifact bundles (artifact_paths option).
-	// Use the final manifest for artifact paths (same across steps).
-	r.uploadConfiguredArtifacts(ctx, req, finalManifest, finalWorkspace)
+	workspace, err := r.rehydrateWorkspaceForStep(ctx, req, manifest, req.StepIndex, &baseClonePath)
+	if err != nil {
+		slog.Error("failed to rehydrate workspace", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = os.RemoveAll(workspace) }()
 
-	// Phase 6b: Always attempt to bundle and upload /out directory.
-	stageID, _ := finalManifest.OptionString("stage_id")
-	if err := r.uploadOutDir(ctx, req.RunID.String(), stageID, outDir); err != nil {
-		slog.Error("/out artifact upload failed", "run_id", req.RunID, "error", err)
+	// Prepare /out and /in directories.
+	outDir, err := os.MkdirTemp("", "ploy-heal-out-*")
+	if err != nil {
+		slog.Error("failed to create /out directory", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = os.RemoveAll(outDir) }()
+
+	inDir, err := os.MkdirTemp("", "ploy-heal-in-*")
+	if err != nil {
+		slog.Error("failed to create /in directory", "run_id", req.RunID, "error", err)
+		r.uploadFailureStatus(ctx, req, err, time.Since(startTime))
+		return
+	}
+	defer func() { _ = os.RemoveAll(inDir) }()
+
+	// TODO: Fetch gate logs from parent job artifact and write to /in/build-gate.log
+	// For now, healing jobs receive gate logs via job metadata or artifact fetch.
+
+	// Disable gate in manifest - healing jobs don't run gates.
+	manifest.Gate = &contracts.StepGateSpec{Enabled: false}
+	//lint:ignore SA1019 Backward compatibility
+	manifest.Shift = nil
+
+	// Clear hydration since workspace is already hydrated.
+	if len(manifest.Inputs) > 0 {
+		inputs := make([]contracts.StepInput, len(manifest.Inputs))
+		copy(inputs, manifest.Inputs)
+		for i := range inputs {
+			inputs[i].Hydration = nil
+		}
+		manifest.Inputs = inputs
 	}
 
-	// Phase 7 & 8: Emit terminal status and conditionally create merge request.
-	// Use the final step's result and total duration for status reporting.
-	r.finalizeRun(ctx, req, finalManifest, finalExecResult, finalExecErr, finalWorkspace, totalDuration)
-
-	// Log final execution summary with total duration and final exit code.
-	finalExitCode := 0
-	if finalExecResult.Result.ExitCode != 0 {
-		finalExitCode = finalExecResult.Result.ExitCode
+	// Inject healing environment variables.
+	if manifest.Env == nil {
+		manifest.Env = map[string]string{}
 	}
-	slog.Info("run execution completed",
-		"run_id", req.RunID,
-		"duration", totalDuration,
-		"exit_code", finalExitCode,
-		"step_count", stepCount,
-	)
+	manifest.Env["PLOY_HOST_WORKSPACE"] = workspace
+	manifest.Env["PLOY_SERVER_URL"] = r.cfg.ServerURL
+
+	// Run the healing container.
+	result, runErr := runner.Run(ctx, step.Request{
+		TicketID:  types.TicketID(req.RunID),
+		Manifest:  manifest,
+		Workspace: workspace,
+		OutDir:    outDir,
+		InDir:     inDir,
+	})
+	duration := time.Since(startTime)
+
+	// Upload diff for this healing step.
+	r.uploadDiffForStep(ctx, req.RunID, req.JobID, diffGenerator, workspace, result, req.StepIndex)
+
+	// Upload /out artifacts.
+	if err := r.uploadOutDir(ctx, req.RunID, req.JobID, outDir); err != nil {
+		slog.Warn("/out artifact upload failed", "run_id", req.RunID, "error", err)
+	}
+
+	// Build stats.
+	stats := types.RunStats{
+		"exit_code":   result.ExitCode,
+		"duration_ms": duration.Milliseconds(),
+	}
+
+	// Determine status.
+	if runErr != nil {
+		var exitCode int32 = -1 // Use -1 to indicate runtime error
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "error", uploadErr)
+		}
+		slog.Info("healing job failed", "run_id", req.RunID, "error", runErr, "duration", duration)
+		return
+	}
+
+	if result.ExitCode != 0 {
+		exitCode := int32(result.ExitCode)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "error", uploadErr)
+		}
+		slog.Info("healing job failed", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+		return
+	}
+
+	var exitCodeZero int32 = 0
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
+		slog.Error("failed to upload healing success status", "run_id", req.RunID, "error", uploadErr)
+	}
+	slog.Info("healing job succeeded", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+}
+
+// uploadFailureStatus uploads a failure status for early errors.
+// Uses exit code -1 to indicate pre-execution infrastructure failures.
+func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunRequest, err error, duration time.Duration) {
+	var exitCode int32 = -1 // -1 indicates pre-execution failure
+	stats := types.RunStats{
+		"duration_ms": duration.Milliseconds(),
+		"error":       err.Error(),
+	}
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
+		slog.Error("failed to upload failure status", "run_id", req.RunID, "error", uploadErr)
+	}
 }
 
 // initializeRuntime creates and configures all runtime components needed for step execution.
@@ -401,24 +526,24 @@ func (r *runController) initializeRuntime(ctx context.Context, runID string) (st
 func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, manifest contracts.StepManifest, execResult executionResult, execErr error, workspace string, duration time.Duration) {
 	result := execResult.Result
 
-	// Determine terminal status based on execution result.
+	// Determine terminal status and exit code based on execution result.
 	terminalStatus := "succeeded"
-	var reason *string
+	var exitCode int32
 	if execErr != nil {
 		terminalStatus = "failed"
-		errMsg := execErr.Error()
 		// Check if this is a build gate failure.
 		if errors.Is(execErr, step.ErrBuildGateFailed) {
-			// Set reason to "build-gate" for pre-mod gate failures.
-			gateReason := "build-gate"
-			reason = &gateReason
+			// Exit code 1 signals gate failure for server-side healing detection.
+			exitCode = 1
 		} else {
-			reason = &errMsg
+			// Exit code -1 for other execution errors.
+			exitCode = -1
 		}
 	} else if result.ExitCode != 0 {
 		terminalStatus = "failed"
-		failureMsg := fmt.Sprintf("exit code %d", result.ExitCode)
-		reason = &failureMsg
+		exitCode = int32(result.ExitCode)
+	} else {
+		exitCode = int32(result.ExitCode) // 0 for success
 	}
 
 	// Phase 7: Create MR via GitLab API when conditions are met.
@@ -434,72 +559,19 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	}
 
 	// Build stats with execution metrics and gate history.
-	// Stage ID is used to associate gate log artifacts with the current stage.
-	stageID, _ := manifest.OptionString("stage_id")
-	stats := r.buildExecutionStats(req.RunID.String(), stageID, result, execResult, duration, mrURL)
+	// Job ID is used to associate gate log artifacts with the current job.
+	stats := r.buildExecutionStats(req.RunID, req.JobID, result, execResult, duration, mrURL)
 
 	// Phase 8: Upload terminal status to server.
-	// Pass req.StepIndex to trigger step-level completion for multi-step runs.
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, reason, stats, req.StepIndex); uploadErr != nil {
+	// Upload job completion status with step_index and exit_code.
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, &exitCode, stats, req.StepIndex); uploadErr != nil {
 		slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
-	}
-}
-
-// reportPreModGateFailure reports a terminal failure when the pre-mod gate fails.
-// This is called when the baseline cannot be validated before any mods execute.
-// The run terminates with status="failed" and reason="build-gate".
-//
-// Parameters:
-//   - ctx: Context for API calls.
-//   - req: StartRunRequest for run metadata.
-//   - gateErr: The error that caused the gate failure.
-//   - preGate: Pre-mod gate metadata (may be nil if gate never ran).
-//   - reGates: Re-gate attempts after healing (may be empty).
-//   - duration: Total time spent on pre-mod gate phase.
-func (r *runController) reportPreModGateFailure(
-	ctx context.Context,
-	req StartRunRequest,
-	gateErr error,
-	preGate *gateRunMetadata,
-	reGates []gateRunMetadata,
-	duration time.Duration,
-) {
-	// Build execution result with gate history for stats.
-	execResult := executionResult{
-		PreGate: preGate,
-		ReGates: reGates,
-	}
-
-	// Build stats payload with gate history.
-	// Use empty step.Result since no mods were executed.
-	stats := types.RunStats{
-		"exit_code":   -1, // Indicate no mod execution.
-		"duration_ms": duration.Milliseconds(),
-		"timings": map[string]interface{}{
-			"hydration_duration_ms":  0,
-			"execution_duration_ms":  0,
-			"build_gate_duration_ms": duration.Milliseconds(),
-			"diff_duration_ms":       0,
-			"total_duration_ms":      duration.Milliseconds(),
-		},
-	}
-
-	// Include gate stats if gate metadata is available.
-	if preGate != nil || len(reGates) > 0 {
-		gate := r.buildGateStats(req.RunID.String(), "", step.Result{}, execResult)
-		stats["gate"] = gate
-	}
-
-	// Set terminal status with reason="build-gate".
-	reason := "build-gate"
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &reason, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload pre-mod gate failure status", "run_id", req.RunID, "error", uploadErr)
 	}
 }
 
 // buildExecutionStats constructs the stats payload for terminal status upload.
 // Includes execution timings, exit code, gate history (pre-gate, re-gates), and MR URL.
-func (r *runController) buildExecutionStats(runID, stageID string, result step.Result, execResult executionResult, duration time.Duration, mrURL string) types.RunStats {
+func (r *runController) buildExecutionStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult, duration time.Duration, mrURL string) types.RunStats {
 	stats := types.RunStats{
 		"exit_code":   result.ExitCode,
 		"duration_ms": duration.Milliseconds(),
@@ -522,7 +594,7 @@ func (r *runController) buildExecutionStats(runID, stageID string, result step.R
 	// Gate stats/logs: collect pass/fail, duration, resources, and upload logs artifact.
 	// Include pre-gate and re-gate runs when healing was attempted.
 	if execResult.PreGate != nil || len(execResult.ReGates) > 0 || result.BuildGate != nil {
-		gate := r.buildGateStats(runID, stageID, result, execResult)
+		gate := r.buildGateStats(runID, jobID, result, execResult)
 		stats["gate"] = gate
 	}
 
@@ -561,7 +633,7 @@ func mergeExecutionResults(acc executionResult, next executionResult) executionR
 //   - When no mods executed (no BuildGate), final_gate falls back to the pre-mod gate, ensuring
 //     CLI/API gate summaries always have a final_gate to report on.
 //   - This keeps gate summary behavior consistent: final_gate → last re-gate → pre_gate.
-func (r *runController) buildGateStats(runID, stageID string, result step.Result, execResult executionResult) map[string]any {
+func (r *runController) buildGateStats(runID types.RunID, jobID types.JobID, result step.Result, execResult executionResult) map[string]any {
 	gate := map[string]any{}
 
 	// Helper function to build gate metadata and upload logs.
@@ -588,7 +660,7 @@ func (r *runController) buildGateStats(runID, stageID string, result step.Result
 
 		// Upload build logs as artifact when present.
 		if meta != nil && strings.TrimSpace(meta.LogsText) != "" {
-			r.uploadGateLogsArtifact(runID, stageID, meta.LogsText, artifactNameSuffix, gateStats)
+			r.uploadGateLogsArtifact(runID, jobID, meta.LogsText, artifactNameSuffix, gateStats)
 		}
 
 		return gateStats
@@ -637,7 +709,7 @@ func (r *runController) buildGateStats(runID, stageID string, result step.Result
 //   - ctx: Context for cancellation and deadlines.
 //   - req: StartRunRequest containing repo URL, base_ref, and commit_sha.
 //   - manifest: StepManifest for this step (contains hydration config).
-//   - stepIndex: Zero-based index of the step being executed.
+//   - stepIndex: Job step index for execution tracking.
 //   - baseClonePathPtr: Pointer to cached base clone path (updated on first step).
 //
 // Returns:
@@ -647,7 +719,7 @@ func (r *runController) rehydrateWorkspaceForStep(
 	ctx context.Context,
 	req StartRunRequest,
 	manifest contracts.StepManifest,
-	stepIndex int,
+	stepIndex types.StepIndex,
 	baseClonePathPtr *string,
 ) (string, error) {
 	runID := req.RunID.String()
@@ -710,12 +782,9 @@ func (r *runController) rehydrateWorkspaceForStep(
 	}
 
 	// C2: Uniform rehydration query for ALL steps.
-	// Fetch diffs where step_index <= stepIndex-1 (all diffs from previous steps).
-	// - Pre_gate diffs have step_index=-1, so they're included for all steps:
-	//   - Step 0: fetch step_index <= -1 → gets pre_gate diff only
-	//   - Step 1: fetch step_index <= 0 → gets pre_gate + step 0 mod diff
-	//   - Step k: fetch step_index <= k-1 → gets pre_gate + all prior mod diffs
-	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, int32(stepIndex-1))
+	// Fetch diffs where step_index < stepIndex (all diffs from previous jobs).
+	// Jobs are ordered by step_index (e.g., 1000=pre-gate, 2000=mod-0, 3000=post-gate).
+	gzippedDiffs, err := diffFetcher.FetchDiffsForStep(ctx, runID, stepIndex-1)
 	if err != nil {
 		_ = os.RemoveAll(workspacePath)
 		return "", fmt.Errorf("fetch diffs for step: %w", err)
@@ -751,12 +820,12 @@ func (r *runController) rehydrateWorkspaceForStep(
 // ordered rehydration in multi-step/multi-node scenarios.
 func (r *runController) uploadDiffForStep(
 	ctx context.Context,
-	runID string,
-	stageID string,
+	runID types.RunID,
+	jobID types.JobID,
 	diffGenerator step.DiffGenerator,
 	workspace string,
 	result step.Result,
-	stepIndex int,
+	stepIndex types.StepIndex,
 ) {
 	if diffGenerator == nil {
 		return
@@ -777,7 +846,7 @@ func (r *runController) uploadDiffForStep(
 
 	// Build diff summary with step metadata for database storage.
 	// C2: Every diff is tagged with step_index + mod_type for unified rehydration.
-	// - step_index: 0-based step number for ordering and rehydration queries.
+	// - step_index: Job step index for ordering and rehydration queries.
 	// - mod_type: "mod" for main mod diffs (healing diffs use "healing" in execution_healing.go).
 	summary := types.DiffSummary{
 		"step_index": stepIndex,
@@ -799,14 +868,13 @@ func (r *runController) uploadDiffForStep(
 		return
 	}
 
-	// Convert stepIndex to *int32 for API compatibility.
-	stepIdx := int32(stepIndex)
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
-		slog.Error("failed to upload step diff", "run_id", runID, "step_index", stepIndex, "error", err)
+	// Upload diff to job-scoped endpoint. Step ordering is tracked in the summary metadata.
+	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
+		slog.Error("failed to upload step diff", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "error", err)
 		return
 	}
 
-	slog.Info("step diff uploaded successfully", "run_id", runID, "step_index", stepIndex, "size", len(diffBytes))
+	slog.Info("step diff uploaded successfully", "run_id", runID, "job_id", jobID, "step_index", stepIndex, "size", len(diffBytes))
 }
 
 // uploadBaselineDiff uploads a diff between two directories with the specified mod_type and step_index.
@@ -815,18 +883,18 @@ func (r *runController) uploadDiffForStep(
 // Parameters:
 //   - baseDir: the reference directory (e.g., base clone before healing)
 //   - modifiedDir: the modified directory (e.g., healed workspace)
-//   - stepIndex: the step index to tag the diff with (0 for pre-mod healing)
+//   - stepIndex: the step index to tag the diff with
 //   - modType: the mod_type to tag the diff with (e.g., "pre_gate", "post_gate")
 //
 // Returns error if diff generation fails or diff is empty (healing claimed success but made no changes).
 func (r *runController) uploadBaselineDiff(
 	ctx context.Context,
-	runID string,
-	stageID string,
+	runID types.RunID,
+	jobID types.JobID,
 	diffGenerator step.DiffGenerator,
 	baseDir string,
 	modifiedDir string,
-	stepIndex int,
+	stepIndex types.StepIndex,
 	modType string,
 ) error {
 	if diffGenerator == nil {
@@ -855,12 +923,12 @@ func (r *runController) uploadBaselineDiff(
 		return fmt.Errorf("failed to create diff uploader: %w", err)
 	}
 
-	stepIdx := int32(stepIndex)
-	if err := diffUploader.UploadDiff(ctx, runID, stageID, diffBytes, summary, &stepIdx); err != nil {
+	// Upload diff to job-scoped endpoint. Step ordering is tracked in the summary metadata.
+	if err := diffUploader.UploadDiff(ctx, runID, jobID, diffBytes, summary); err != nil {
 		return fmt.Errorf("failed to upload baseline diff: %w", err)
 	}
 
-	slog.Info("baseline diff uploaded successfully", "run_id", runID, "mod_type", modType, "step_index", stepIndex, "size", len(diffBytes))
+	slog.Info("baseline diff uploaded successfully", "run_id", runID, "job_id", jobID, "mod_type", modType, "step_index", stepIndex, "size", len(diffBytes))
 	return nil
 }
 

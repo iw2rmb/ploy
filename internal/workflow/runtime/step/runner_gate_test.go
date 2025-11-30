@@ -754,7 +754,7 @@ func (c *httpModeGateClient) Validate(ctx context.Context, req contracts.BuildGa
 	return c.validateResp, nil
 }
 
-func (c *httpModeGateClient) GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error) {
+func (c *httpModeGateClient) GetJob(ctx context.Context, jobID types.JobID) (*contracts.BuildGateJobStatusResponse, error) {
 	// Not used in sync mode tests.
 	return nil, nil
 }

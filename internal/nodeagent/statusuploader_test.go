@@ -15,15 +15,15 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 	tests := []struct {
 		name           string
 		status         string
-		reason         *string
+		exitCode       *int32
 		stats          types.RunStats
 		wantStatusCode int
 		wantErr        bool
 	}{
 		{
-			name:   "successful upload with stats",
-			status: "succeeded",
-			reason: nil,
+			name:     "successful upload with stats",
+			status:   "succeeded",
+			exitCode: int32Ptr(0),
 			stats: types.RunStats{
 				"exit_code":   0,
 				"duration_ms": 1000,
@@ -35,9 +35,9 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 			wantErr:        false,
 		},
 		{
-			name:   "failed status with reason",
-			status: "failed",
-			reason: stringPtr("exit code 1"),
+			name:     "failed status with exit code",
+			status:   "failed",
+			exitCode: int32Ptr(1),
 			stats: types.RunStats{
 				"exit_code":   1,
 				"duration_ms": 500,
@@ -48,7 +48,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 		{
 			name:           "minimal upload without stats",
 			status:         "succeeded",
-			reason:         nil,
+			exitCode:       nil,
 			stats:          nil,
 			wantStatusCode: http.StatusNoContent,
 			wantErr:        false,
@@ -56,7 +56,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 		{
 			name:           "server error",
 			status:         "succeeded",
-			reason:         nil,
+			exitCode:       nil,
 			stats:          types.RunStats{},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErr:        true,
@@ -64,7 +64,7 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 		{
 			name:           "conflict error (not running)",
 			status:         "succeeded",
-			reason:         nil,
+			exitCode:       nil,
 			stats:          types.RunStats{},
 			wantStatusCode: http.StatusConflict,
 			wantErr:        true,
@@ -101,10 +101,10 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 					t.Error("status not present in payload")
 				}
 
-				// Verify reason is present when expected.
-				if tt.reason != nil {
-					if _, ok := payload["reason"]; !ok {
-						t.Error("reason not present in payload when expected")
+				// Verify exit_code is present when expected.
+				if tt.exitCode != nil {
+					if _, ok := payload["exit_code"]; !ok {
+						t.Error("exit_code not present in payload when expected")
 					}
 				}
 
@@ -135,9 +135,9 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
 
-			// Upload status (nil stepIndex for run-level completion).
+			// Upload status.
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.reason, tt.stats, nil)
+			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.exitCode, tt.stats, 1000)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -180,7 +180,7 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	reason := stringPtr("test failure")
+	exitCode := int32Ptr(1)
 	stats := types.RunStats{
 		"exit_code":   1,
 		"duration_ms": 2500,
@@ -190,7 +190,7 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 		},
 	}
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "failed", reason, stats, nil)
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, 2000)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -204,8 +204,9 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 		t.Errorf("expected status=failed, got %v", receivedPayload["status"])
 	}
 
-	if receivedPayload["reason"] != "test failure" {
-		t.Errorf("expected reason='test failure', got %v", receivedPayload["reason"])
+	// Verify exit_code is present in payload.
+	if ec, ok := receivedPayload["exit_code"].(float64); !ok || ec != 1 {
+		t.Errorf("expected exit_code=1, got %v", receivedPayload["exit_code"])
 	}
 
 	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
@@ -220,9 +221,9 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 	}
 }
 
-// Helper function to create string pointers.
-func stringPtr(s string) *string {
-	return &s
+// Helper function to create int32 pointers.
+func int32Ptr(i int32) *int32 {
+	return &i
 }
 
 // TestStatusUploader_RetryOn5xx verifies retry behavior on transient 5xx errors.
@@ -318,7 +319,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
+			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -366,7 +367,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 
 	ctx := context.Background()
 	start := time.Now()
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -418,7 +419,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, nil)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
 
 	if err == nil {
 		t.Error("expected context cancellation error")
@@ -465,15 +466,15 @@ func TestStatusUploader_StepIndexIncluded(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	stepIndex := int32(2)
-	reason := stringPtr("build gate failed")
+	stepIndex := types.StepIndex(2000)
+	exitCode := int32Ptr(1)
 	stats := types.RunStats{
 		"exit_code":   1,
 		"duration_ms": 1500,
 	}
 
-	// Upload status with step_index (multi-step run completion).
-	err = uploader.UploadStatus(ctx, "test-run-id", "failed", reason, stats, &stepIndex)
+	// Upload status with step_index.
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, stepIndex)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -487,89 +488,20 @@ func TestStatusUploader_StepIndexIncluded(t *testing.T) {
 		t.Errorf("expected status=failed, got %v", receivedPayload["status"])
 	}
 
-	if receivedPayload["reason"] != "build gate failed" {
-		t.Errorf("expected reason='build gate failed', got %v", receivedPayload["reason"])
+	// Verify exit_code is present.
+	if ec, ok := receivedPayload["exit_code"].(float64); !ok || ec != 1 {
+		t.Errorf("expected exit_code=1, got %v", receivedPayload["exit_code"])
 	}
 
-	// Verify step_index is present and correct (triggers step-level completion).
-	if stepIdx, ok := receivedPayload["step_index"].(float64); !ok || int32(stepIdx) != stepIndex {
-		t.Errorf("expected step_index=2, got %v", receivedPayload["step_index"])
+	// Verify step_index is present and correct.
+	if stepIdx, ok := receivedPayload["step_index"].(float64); !ok || types.StepIndex(stepIdx) != stepIndex {
+		t.Errorf("expected step_index=2000, got %v", receivedPayload["step_index"])
 	}
 
 	// Verify stats are included.
 	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
 		if exitCode, ok := statsPayload["exit_code"].(float64); !ok || exitCode != 1 {
 			t.Errorf("expected stats.exit_code=1, got %v", statsPayload["exit_code"])
-		}
-	} else {
-		t.Error("stats not present or not a map in payload")
-	}
-}
-
-// TestStatusUploader_StepIndexOmitted verifies step_index is omitted from payload
-// when nil (run-level completion).
-func TestStatusUploader_StepIndexOmitted(t *testing.T) {
-	t.Parallel()
-
-	var receivedPayload map[string]interface{}
-
-	// Create a test server that captures the payload and verifies step_index is absent.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
-			t.Errorf("failed to decode payload: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer server.Close()
-
-	cfg := Config{
-		ServerURL: server.URL,
-		NodeID:    "test-node-id",
-		HTTP: HTTPConfig{
-			TLS: TLSConfig{
-				Enabled: false,
-			},
-		},
-	}
-
-	uploader, err := NewStatusUploader(cfg)
-	if err != nil {
-		t.Fatalf("failed to create uploader: %v", err)
-	}
-
-	ctx := context.Background()
-	stats := types.RunStats{
-		"exit_code":   0,
-		"duration_ms": 2000,
-	}
-
-	// Upload status without step_index (run-level completion).
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, stats, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	// Verify payload structure.
-	if receivedPayload["run_id"] != "test-run-id" {
-		t.Errorf("expected run_id=test-run-id, got %v", receivedPayload["run_id"])
-	}
-
-	if receivedPayload["status"] != "succeeded" {
-		t.Errorf("expected status=succeeded, got %v", receivedPayload["status"])
-	}
-
-	// Verify step_index is NOT present in payload (run-level completion).
-	if _, exists := receivedPayload["step_index"]; exists {
-		t.Errorf("expected step_index to be omitted for run-level completion, but it was present: %v", receivedPayload["step_index"])
-	}
-
-	// Verify stats are included.
-	if statsPayload, ok := receivedPayload["stats"].(map[string]interface{}); ok {
-		if exitCode, ok := statsPayload["exit_code"].(float64); !ok || exitCode != 0 {
-			t.Errorf("expected stats.exit_code=0, got %v", statsPayload["exit_code"])
 		}
 	} else {
 		t.Error("stats not present or not a map in payload")

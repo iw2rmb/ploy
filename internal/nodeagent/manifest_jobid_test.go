@@ -6,15 +6,15 @@ import (
 	types "github.com/iw2rmb/ploy/internal/domain/types"
 )
 
-// Ensures stage_id and artifact_name options are propagated into manifest.Options
+// Ensures job_id and artifact_name options are propagated into manifest.Options
 // so that orchestrator uploads can read them.
-func TestBuildManifestFromRequest_PropagatesStageAndArtifactName(t *testing.T) {
+func TestBuildManifestFromRequest_PropagatesJobAndArtifactName(t *testing.T) {
 	req := StartRunRequest{
 		RunID:   types.RunID("run-opts-1"),
 		RepoURL: types.RepoURL("https://gitlab.com/acme/repo.git"),
 		BaseRef: types.GitRef("main"),
 		Options: map[string]any{
-			"stage_id":      "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+			"job_id":        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
 			"artifact_name": "custom-bundle",
 		},
 	}
@@ -24,8 +24,8 @@ func TestBuildManifestFromRequest_PropagatesStageAndArtifactName(t *testing.T) {
 		t.Fatalf("buildManifestFromRequest error: %v", err)
 	}
 
-	if sid, ok := m.OptionString("stage_id"); !ok || sid == "" {
-		t.Fatalf("manifest.Options missing stage_id")
+	if jid, ok := m.OptionString("job_id"); !ok || jid == "" {
+		t.Fatalf("manifest.Options missing job_id")
 	}
 	if an, ok := m.OptionString("artifact_name"); !ok || an != "custom-bundle" {
 		t.Fatalf("manifest.Options artifact_name mismatch: got %q", an)

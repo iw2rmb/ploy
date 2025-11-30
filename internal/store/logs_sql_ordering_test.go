@@ -15,10 +15,10 @@ func TestLogsQueries_OrderByChunkThenID(t *testing.T) {
 	}{
 		{"ListLogsByRun", listLogsByRun},
 		{"ListLogsByRunSince", listLogsByRunSince},
-		{"ListLogsByRunAndStage", listLogsByRunAndStage},
-		{"ListLogsByRunAndStageSince", listLogsByRunAndStageSince},
-		{"ListLogsByRunStageAndBuild", listLogsByRunStageAndBuild},
-		{"ListLogsByRunStageAndBuildSince", listLogsByRunStageAndBuildSince},
+		{"ListLogsByRunAndJob", listLogsByRunAndJob},
+		{"ListLogsByRunAndJobSince", listLogsByRunAndJobSince},
+		{"ListLogsByRunJobAndBuild", listLogsByRunJobAndBuild},
+		{"ListLogsByRunJobAndBuildSince", listLogsByRunJobAndBuildSince},
 	}
 
 	for _, tc := range cases {

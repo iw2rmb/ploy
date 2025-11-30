@@ -92,12 +92,12 @@ paths:
   # Node logs endpoint (gzipped chunks)
   /v1/nodes/{id}/logs:
     $ref: './paths/nodes_id_logs.yaml'
-  # Node diff upload endpoint
-  /v1/nodes/{id}/stage/{stage}/diff:
-    $ref: './paths/nodes_id_stage_stage_diff.yaml'
-  # Node artifact bundle upload endpoint
-  /v1/nodes/{id}/stage/{stage}/artifact:
-    $ref: './paths/nodes_id_stage_stage_artifact.yaml'
+  # Job diff upload endpoint (run-scoped, no node ID)
+  /v1/runs/{run_id}/jobs/{job_id}/diff:
+    $ref: './paths/runs_run_id_jobs_job_id_diff.yaml'
+  # Job artifact bundle upload endpoint (run-scoped, no node ID)
+  /v1/runs/{run_id}/jobs/{job_id}/artifact:
+    $ref: './paths/runs_run_id_jobs_job_id_artifact.yaml'
   # Build Gate service
   /v1/buildgate/validate:
     $ref: './paths/buildgate_validate.yaml'

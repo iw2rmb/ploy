@@ -14,12 +14,12 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// ===== Run Claim Tests =====
-// claimJobHandler allows nodes to claim a queued run for execution.
+// ===== Job Claim Tests =====
+// claimJobHandler allows nodes to claim a pending job for execution.
 
-// TestClaimRun_Success verifies a node successfully claims a queued run
-// when a run is available and the node exists.
-func TestClaimRun_Success(t *testing.T) {
+// TestClaimJob_Success verifies a node successfully claims a pending job
+// when a job is available and the node exists.
+func TestClaimJob_Success(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
@@ -27,30 +27,30 @@ func TestClaimRun_Success(t *testing.T) {
 	jobID := uuid.New()
 	now := time.Now()
 
-	// Mock store that returns a node, a claimed run, and a job for that run.
+	// Mock store that returns a node, a claimed job, and the parent run.
 	st := &mockStore{
 		getNodeResult: store.Node{
 			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
 		},
-		claimRunResult: store.Run{
+		claimJobResult: store.Job{
+			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Name:      "mod-0",
+			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
+			StepIndex: 2000,
+			Meta:      []byte("{}"),
+		},
+		getRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.RunStatusAssigned,
+			Status:    store.RunStatusRunning,
 			RepoUrl:   "https://github.com/user/repo.git",
 			BaseRef:   "main",
 			TargetRef: "feature-branch",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{"key":"value"}`),
-		},
-		listJobsByRunResult: []store.Job{
-			{
-				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-				Name:   "mods-openrewrite",
-				Status: store.JobStatusPending,
-				Meta:   []byte("{}"),
-			},
 		},
 	}
 
@@ -69,44 +69,59 @@ func TestClaimRun_Success(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ClaimRun was called with the correct node ID.
-	if !st.claimRunCalled {
-		t.Fatal("expected ClaimRun to be called")
+	// Verify ClaimJob was called with the correct node ID.
+	if !st.claimJobCalled {
+		t.Fatal("expected ClaimJob to be called")
 	}
-	if st.claimRunParams.Bytes != nodeID {
-		t.Fatalf("ClaimRun called with wrong node id: %v", st.claimRunParams)
+	if st.claimJobParams.Bytes != nodeID {
+		t.Fatalf("ClaimJob called with wrong node id: %v", st.claimJobParams)
 	}
 
-	// Parse response and verify run details.
+	// Verify GetRun was called to fetch parent run metadata.
+	if !st.getRunCalled {
+		t.Fatal("expected GetRun to be called")
+	}
+
+	// Parse response and verify job details.
 	var resp map[string]any
 	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
 	if resp["id"] != runID.String() {
-		t.Errorf("expected id %s, got %v", runID.String(), resp["id"])
+		t.Errorf("expected id (run_id) %s, got %v", runID.String(), resp["id"])
 	}
-	if resp["status"] != string(store.RunStatusAssigned) {
-		t.Errorf("expected status %s, got %v", store.RunStatusAssigned, resp["status"])
+	if resp["job_id"] != jobID.String() {
+		t.Errorf("expected job_id %s, got %v", jobID.String(), resp["job_id"])
+	}
+	if resp["job_name"] != "mod-0" {
+		t.Errorf("expected job_name 'mod-0', got %v", resp["job_name"])
+	}
+	stepIndex, ok := resp["step_index"].(float64)
+	if !ok || stepIndex != 2000 {
+		t.Errorf("expected step_index 2000, got %v", resp["step_index"])
 	}
 	if resp["node_id"] != nodeID.String() {
 		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp["node_id"])
 	}
+	if resp["repo_url"] != "https://github.com/user/repo.git" {
+		t.Errorf("expected repo_url from parent run, got %v", resp["repo_url"])
+	}
 }
 
-// TestClaimRun_NoRunsAvailable verifies 204 No Content is returned when
-// no queued runs are available for claiming.
-func TestClaimRun_NoRunsAvailable(t *testing.T) {
+// TestClaimJob_NoJobsAvailable verifies 204 No Content is returned when
+// no pending jobs are available for claiming.
+func TestClaimJob_NoJobsAvailable(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
 
-	// Mock store that returns a node but no available runs (ClaimRun returns ErrNoRows).
+	// Mock store that returns a node but no available jobs (ClaimJob returns ErrNoRows).
 	st := &mockStore{
 		getNodeResult: store.Node{
 			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
 		},
-		claimRunErr: pgx.ErrNoRows,
+		claimJobErr: pgx.ErrNoRows,
 	}
 
 	configHolder := &ConfigHolder{}
@@ -122,11 +137,16 @@ func TestClaimRun_NoRunsAvailable(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
+
+	// Verify ClaimJob was called.
+	if !st.claimJobCalled {
+		t.Fatal("expected ClaimJob to be called")
+	}
 }
 
-// TestClaimRun_NodeNotFound verifies 404 Not Found is returned when
+// TestClaimJob_NodeNotFound verifies 404 Not Found is returned when
 // the requesting node does not exist.
-func TestClaimRun_NodeNotFound(t *testing.T) {
+func TestClaimJob_NodeNotFound(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
@@ -150,15 +170,15 @@ func TestClaimRun_NodeNotFound(t *testing.T) {
 		t.Fatalf("expected status 404, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify ClaimRun was not called since node check failed.
-	if st.claimRunCalled {
-		t.Fatal("did not expect ClaimRun to be called")
+	// Verify ClaimJob was not called since node check failed.
+	if st.claimJobCalled {
+		t.Fatal("did not expect ClaimJob to be called")
 	}
 }
 
-// TestClaimRun_InvalidNodeID verifies 400 Bad Request is returned when
+// TestClaimJob_InvalidNodeID verifies 400 Bad Request is returned when
 // the node ID path parameter is not a valid UUID.
-func TestClaimRun_InvalidNodeID(t *testing.T) {
+func TestClaimJob_InvalidNodeID(t *testing.T) {
 	t.Parallel()
 
 	st := &mockStore{}
@@ -177,24 +197,34 @@ func TestClaimRun_InvalidNodeID(t *testing.T) {
 	}
 }
 
-// TestClaimRun_CreatesStageWhenNoneExist verifies that a job is created
-// when a run is claimed but no jobs exist for that run.
-func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
+// TestClaimJob_AcksRunStart verifies that claiming a job on a queued run
+// transitions the run to running status via AckRunStart.
+func TestClaimJob_AcksRunStart(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	jobID := uuid.New()
 	now := time.Now()
 
-	// Mock store that returns no jobs, so a new job should be created.
+	// Mock store with a queued run - should trigger AckRunStart.
 	st := &mockStore{
 		getNodeResult: store.Node{
 			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
 		},
-		claimRunResult: store.Run{
+		claimJobResult: store.Job{
+			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Name:      "pre-gate",
+			Status:    store.JobStatusRunning, // Jobs go directly to running on claim
+			StepIndex: 1000,
+			Meta:      []byte("{}"),
+		},
+		getRunResult: store.Run{
 			ID:        pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.RunStatusAssigned,
+			Status:    store.RunStatusQueued, // Still queued
 			RepoUrl:   "https://github.com/user/repo.git",
 			BaseRef:   "main",
 			TargetRef: "feature-branch",
@@ -202,7 +232,6 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
 			Spec:      []byte(`{}`),
 		},
-		listJobsByRunResult: []store.Job{}, // No jobs exist
 	}
 
 	configHolder := &ConfigHolder{}
@@ -219,411 +248,11 @@ func TestClaimRun_CreatesStageWhenNoneExist(t *testing.T) {
 		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify CreateStage was called.
-	if !st.createJobCalled {
-		t.Fatal("expected CreateStage to be called")
+	// Verify AckRunStart was called to transition run to running.
+	if !st.ackRunStartCalled {
+		t.Fatal("expected AckRunStart to be called for queued run")
 	}
-
-	// Verify the job was created with correct parameters.
-	// Since createJobParams is now a slice, check the first element.
-	if len(st.createJobParams) == 0 {
-		t.Fatal("expected at least one CreateStage call")
-	}
-	if st.createJobParams[0].RunID.Bytes != runID {
-		t.Errorf("CreateStage called with wrong run_id: %v", st.createJobParams[0].RunID)
-	}
-	if st.createJobParams[0].Name != "mods-openrewrite" {
-		t.Errorf("expected job name 'mods-openrewrite', got %s", st.createJobParams[0].Name)
-	}
-	if st.createJobParams[0].Status != store.JobStatusPending {
-		t.Errorf("expected job status %s, got %s", store.JobStatusPending, st.createJobParams[0].Status)
-	}
-}
-
-// ===== Step-Level Claim Tests =====
-// These tests verify the step-level claiming mechanism for multi-step runs,
-// where nodes claim individual steps rather than entire runs.
-
-// TestClaimRun_StepLevelClaim_Success verifies that a node successfully claims
-// a single step from a multi-step run via ClaimRunStep, and receives a response
-// with step_index populated.
-func TestClaimRun_StepLevelClaim_Success(t *testing.T) {
-	t.Parallel()
-
-	nodeID := uuid.New()
-	runID := uuid.New()
-	stepID := uuid.New()
-	jobID := uuid.New()
-	now := time.Now()
-	stepIndex := int32(0)
-
-	// Mock store that returns a node, a claimed step (via ClaimRunStep),
-	// and the parent run metadata.
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
-		},
-		// ClaimRunStep returns a RunStep with step_index=0.
-		claimRunStepResult: store.RunStep{
-			ID:        pgtype.UUID{Bytes: stepID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			StepIndex: stepIndex,
-			Status:    store.RunStepStatusAssigned,
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		// GetRun provides parent run metadata for step-level claim response.
-		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.RunStatusQueued, // Run status may still be queued; step is assigned.
-			RepoUrl:   "https://github.com/user/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature-branch",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
-		},
-		listJobsByRunResult: []store.Job{
-			{
-				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-				Name:   "mods-openrewrite",
-				Status: store.JobStatusPending,
-				Meta:   []byte("{}"),
-			},
-		},
-	}
-
-	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	// Verify response status is 200 OK.
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	// Verify ClaimRunStep was called with the correct node ID.
-	if !st.claimRunStepCalled {
-		t.Fatal("expected ClaimRunStep to be called")
-	}
-	if st.claimRunStepParams.Bytes != nodeID {
-		t.Fatalf("ClaimRunStep called with wrong node id: %v", st.claimRunStepParams)
-	}
-
-	// Verify GetRun was called to fetch parent run metadata.
-	if !st.getRunCalled {
-		t.Fatal("expected GetRun to be called")
-	}
-	if st.getRunParams.Bytes != runID {
-		t.Fatalf("GetRun called with wrong run id: %v", st.getRunParams)
-	}
-
-	// Parse response and verify step-level claim details.
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	// Verify run_id is present and matches the parent run.
-	if resp["id"] != runID.String() {
-		t.Errorf("expected id %s, got %v", runID.String(), resp["id"])
-	}
-
-	// Verify step_index is present in the response.
-	stepIndexFloat, ok := resp["step_index"].(float64)
-	if !ok {
-		t.Fatalf("expected step_index to be present and numeric, got %v", resp["step_index"])
-	}
-	if int32(stepIndexFloat) != stepIndex {
-		t.Errorf("expected step_index %d, got %d", stepIndex, int32(stepIndexFloat))
-	}
-
-	// Verify node_id matches the claiming node.
-	if resp["node_id"] != nodeID.String() {
-		t.Errorf("expected node_id %s, got %v", nodeID.String(), resp["node_id"])
-	}
-
-	// Verify run metadata is included (repo_url, base_ref, target_ref).
-	if resp["repo_url"] != "https://github.com/user/repo.git" {
-		t.Errorf("expected repo_url from parent run, got %v", resp["repo_url"])
-	}
-	if resp["base_ref"] != "main" {
-		t.Errorf("expected base_ref from parent run, got %v", resp["base_ref"])
-	}
-	if resp["target_ref"] != "feature-branch" {
-		t.Errorf("expected target_ref from parent run, got %v", resp["target_ref"])
-	}
-}
-
-// TestClaimRun_StepLevelClaim_FallbackToWholRun verifies that when ClaimRunStep
-// returns ErrNoRows (no steps available), the handler falls back to ClaimRun
-// to claim a whole single-step run.
-func TestClaimRun_StepLevelClaim_FallbackToWholeRun(t *testing.T) {
-	t.Parallel()
-
-	nodeID := uuid.New()
-	runID := uuid.New()
-	jobID := uuid.New()
-	now := time.Now()
-
-	// Mock store where ClaimRunStep returns ErrNoRows (no steps available),
-	// but ClaimRun succeeds (single-step run available).
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
-		},
-		// ClaimRunStep returns ErrNoRows → trigger fallback to ClaimRun.
-		claimRunStepErr: pgx.ErrNoRows,
-		// ClaimRun succeeds with a single-step run.
-		claimRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.RunStatusAssigned,
-			RepoUrl:   "https://github.com/user/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature-branch",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			Spec:      []byte(`{"action":"shell","cmd":"echo hello"}`),
-		},
-		listJobsByRunResult: []store.Job{
-			{
-				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-				Name:   "mods-openrewrite",
-				Status: store.JobStatusPending,
-				Meta:   []byte("{}"),
-			},
-		},
-	}
-
-	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	// Verify response status is 200 OK.
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	// Verify ClaimRunStep was called first.
-	if !st.claimRunStepCalled {
-		t.Fatal("expected ClaimRunStep to be called first")
-	}
-
-	// Verify ClaimRun was called as fallback.
-	if !st.claimRunCalled {
-		t.Fatal("expected ClaimRun to be called as fallback")
-	}
-
-	// Parse response and verify step_index is NOT present (whole-run claim).
-	var resp map[string]any
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatalf("failed to decode response: %v", err)
-	}
-
-	// step_index should be absent for whole-run claims.
-	if _, exists := resp["step_index"]; exists {
-		t.Errorf("expected step_index to be absent for whole-run claim, got %v", resp["step_index"])
-	}
-
-	// Verify run metadata is present.
-	if resp["id"] != runID.String() {
-		t.Errorf("expected id %s, got %v", runID.String(), resp["id"])
-	}
-	if resp["status"] != string(store.RunStatusAssigned) {
-		t.Errorf("expected status %s, got %v", store.RunStatusAssigned, resp["status"])
-	}
-}
-
-// TestClaimRun_StepLevelClaim_BothStrategiesFail verifies that when both
-// ClaimRunStep and ClaimRun return ErrNoRows, the handler returns 204 No Content.
-func TestClaimRun_StepLevelClaim_BothStrategiesFail(t *testing.T) {
-	t.Parallel()
-
-	nodeID := uuid.New()
-
-	// Mock store where both ClaimRunStep and ClaimRun return ErrNoRows.
-	st := &mockStore{
-		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: nodeID, Valid: true},
-		},
-		claimRunStepErr: pgx.ErrNoRows,
-		claimRunErr:     pgx.ErrNoRows,
-	}
-
-	configHolder := &ConfigHolder{}
-	handler := claimJobHandler(st, configHolder)
-
-	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/claim", nil)
-	req.SetPathValue("id", nodeID.String())
-	rr := httptest.NewRecorder()
-
-	handler.ServeHTTP(rr, req)
-
-	// Verify response status is 204 No Content (no work available).
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
-	}
-
-	// Verify both claiming strategies were attempted.
-	if !st.claimRunStepCalled {
-		t.Fatal("expected ClaimRunStep to be called")
-	}
-	if !st.claimRunCalled {
-		t.Fatal("expected ClaimRun to be called as fallback")
-	}
-}
-
-// TestClaimRun_StepLevelClaim_MultipleSteps verifies that distinct nodes can
-// claim different steps of the same multi-step run sequentially.
-func TestClaimRun_StepLevelClaim_MultipleSteps(t *testing.T) {
-	t.Parallel()
-
-	node1ID := uuid.New()
-	node2ID := uuid.New()
-	runID := uuid.New()
-	step0ID := uuid.New()
-	step1ID := uuid.New()
-	jobID := uuid.New()
-	now := time.Now()
-
-	// Scenario: node1 claims step 0, then node2 claims step 1.
-	// We'll simulate two separate requests.
-
-	// ===== Node 1 claims step 0 =====
-	st1 := &mockStore{
-		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: node1ID, Valid: true},
-		},
-		claimRunStepResult: store.RunStep{
-			ID:        pgtype.UUID{Bytes: step0ID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			StepIndex: 0,
-			Status:    store.RunStepStatusAssigned,
-			NodeID:    pgtype.UUID{Bytes: node1ID, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			Status:    store.RunStatusQueued,
-			RepoUrl:   "https://github.com/user/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature-branch",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
-		},
-		listJobsByRunResult: []store.Job{
-			{
-				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-				Name:   "mods-openrewrite",
-				Status: store.JobStatusPending,
-				Meta:   []byte("{}"),
-			},
-		},
-	}
-
-	configHolder := &ConfigHolder{}
-	handler1 := claimJobHandler(st1, configHolder)
-
-	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+node1ID.String()+"/claim", nil)
-	req1.SetPathValue("id", node1ID.String())
-	rr1 := httptest.NewRecorder()
-
-	handler1.ServeHTTP(rr1, req1)
-
-	// Verify node1 successfully claimed step 0.
-	if rr1.Code != http.StatusOK {
-		t.Fatalf("node1 claim: expected status 200, got %d: %s", rr1.Code, rr1.Body.String())
-	}
-
-	var resp1 map[string]any
-	if err := json.NewDecoder(rr1.Body).Decode(&resp1); err != nil {
-		t.Fatalf("node1 claim: failed to decode response: %v", err)
-	}
-
-	if resp1["id"] != runID.String() {
-		t.Errorf("node1 claim: expected run id %s, got %v", runID.String(), resp1["id"])
-	}
-	stepIndex1, ok := resp1["step_index"].(float64)
-	if !ok || int32(stepIndex1) != 0 {
-		t.Errorf("node1 claim: expected step_index 0, got %v", resp1["step_index"])
-	}
-	if resp1["node_id"] != node1ID.String() {
-		t.Errorf("node1 claim: expected node_id %s, got %v", node1ID.String(), resp1["node_id"])
-	}
-
-	// ===== Node 2 claims step 1 =====
-	st2 := &mockStore{
-		getNodeResult: store.Node{
-			ID: pgtype.UUID{Bytes: node2ID, Valid: true},
-		},
-		claimRunStepResult: store.RunStep{
-			ID:        pgtype.UUID{Bytes: step1ID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			StepIndex: 1,
-			Status:    store.RunStepStatusAssigned,
-			NodeID:    pgtype.UUID{Bytes: node2ID, Valid: true},
-			StartedAt: pgtype.Timestamptz{Time: now, Valid: true},
-		},
-		getRunResult: store.Run{
-			ID:        pgtype.UUID{Bytes: runID, Valid: true},
-			Status:    store.RunStatusRunning, // Run is now running after step 0 started.
-			RepoUrl:   "https://github.com/user/repo.git",
-			BaseRef:   "main",
-			TargetRef: "feature-branch",
-			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			Spec:      []byte(`{"steps":[{"action":"shell","cmd":"echo step0"},{"action":"shell","cmd":"echo step1"}]}`),
-		},
-		listJobsByRunResult: []store.Job{
-			{
-				ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-				Name:   "mods-openrewrite",
-				Status: store.JobStatusPending,
-				Meta:   []byte("{}"),
-			},
-		},
-	}
-
-	handler2 := claimJobHandler(st2, configHolder)
-
-	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+node2ID.String()+"/claim", nil)
-	req2.SetPathValue("id", node2ID.String())
-	rr2 := httptest.NewRecorder()
-
-	handler2.ServeHTTP(rr2, req2)
-
-	// Verify node2 successfully claimed step 1.
-	if rr2.Code != http.StatusOK {
-		t.Fatalf("node2 claim: expected status 200, got %d: %s", rr2.Code, rr2.Body.String())
-	}
-
-	var resp2 map[string]any
-	if err := json.NewDecoder(rr2.Body).Decode(&resp2); err != nil {
-		t.Fatalf("node2 claim: failed to decode response: %v", err)
-	}
-
-	if resp2["id"] != runID.String() {
-		t.Errorf("node2 claim: expected run id %s, got %v", runID.String(), resp2["id"])
-	}
-	stepIndex2, ok := resp2["step_index"].(float64)
-	if !ok || int32(stepIndex2) != 1 {
-		t.Errorf("node2 claim: expected step_index 1, got %v", resp2["step_index"])
-	}
-	if resp2["node_id"] != node2ID.String() {
-		t.Errorf("node2 claim: expected node_id %s, got %v", node2ID.String(), resp2["node_id"])
+	if st.ackRunStartParam.Bytes != runID {
+		t.Fatalf("AckRunStart called with wrong run id: %v", st.ackRunStartParam)
 	}
 }
