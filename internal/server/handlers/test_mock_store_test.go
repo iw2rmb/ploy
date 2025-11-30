@@ -46,11 +46,6 @@ type mockStore struct {
 	claimRunResult store.Run
 	claimRunErr    error
 
-	claimRunStepCalled bool
-	claimRunStepParams pgtype.UUID
-	claimRunStepResult store.RunStep
-	claimRunStepErr    error
-
 	claimJobCalled bool
 	claimJobParams pgtype.UUID
 	claimJobResult store.Job
@@ -141,11 +136,40 @@ type mockStore struct {
 	listJobsByRunResult []store.Job
 	listJobsByRunErr    error
 
+	// CountJobsByRun tracking
+	countJobsByRunCalled bool
+	countJobsByRunParam  pgtype.UUID
+	countJobsByRunResult int64
+	countJobsByRunErr    error
+
+	// CountJobsByRunAndStatus tracking
+	countJobsByRunAndStatusCalled bool
+	countJobsByRunAndStatusParams store.CountJobsByRunAndStatusParams
+	countJobsByRunAndStatusResult int64
+	countJobsByRunAndStatusErr    error
+
+	// GetJobByRunAndStepIndex tracking
+	getJobByRunAndStepIndexCalled bool
+	getJobByRunAndStepIndexParams store.GetJobByRunAndStepIndexParams
+	getJobByRunAndStepIndexResult store.Job
+	getJobByRunAndStepIndexErr    error
+
 	// UpdateJobStatus tracking
 	updateJobStatusCalled bool
 	updateJobStatusParams store.UpdateJobStatusParams
 	updateJobStatusCalls  []store.UpdateJobStatusParams
 	updateJobStatusErr    error
+
+	// UpdateJobCompletion tracking
+	updateJobCompletionCalled bool
+	updateJobCompletionParams store.UpdateJobCompletionParams
+	updateJobCompletionErr    error
+
+	// ScheduleNextJob tracking
+	scheduleNextJobCalled bool
+	scheduleNextJobParam  pgtype.UUID
+	scheduleNextJobResult store.Job
+	scheduleNextJobErr    error
 
 	// ListDiffsByRun tracking
 	listDiffsByRunCalled bool
@@ -195,7 +219,7 @@ type mockStore struct {
 	insertAPITokenErr    error
 
 	listAPITokensCalled bool
-	listAPITokensParams string // cluster_id
+	listAPITokensParams *string // cluster_id (nullable)
 	listAPITokensResult []store.ListAPITokensRow
 	listAPITokensErr    error
 
@@ -234,42 +258,6 @@ type mockStore struct {
 	markBootstrapTokenUsedCalled bool
 	markBootstrapTokenUsedParam  string
 	markBootstrapTokenUsedErr    error
-
-	// CreateRunStep tracking
-	createRunStepCalled    bool
-	createRunStepCallCount int
-	createRunStepParams    []store.CreateRunStepParams
-	createRunStepResults   []store.RunStep
-	createRunStepErr       error
-
-	// GetRunStepByIndex tracking
-	getRunStepByIndexCalled bool
-	getRunStepByIndexParams store.GetRunStepByIndexParams
-	getRunStepByIndexResult store.RunStep
-	getRunStepByIndexErr    error
-
-	// AckRunStepStart tracking
-	ackRunStepStartCalled bool
-	ackRunStepStartParam  pgtype.UUID
-	ackRunStepStartErr    error
-
-	// UpdateRunStepCompletion tracking
-	updateRunStepCompletionCalled bool
-	updateRunStepCompletionParams store.UpdateRunStepCompletionParams
-	updateRunStepCompletionErr    error
-
-	// CountRunSteps tracking
-	countRunStepsCalled bool
-	countRunStepsParam  pgtype.UUID
-	countRunStepsResult int64
-	countRunStepsErr    error
-
-	// CountRunStepsByStatus tracking
-	countRunStepsByStatusCalled  bool
-	countRunStepsByStatusParams  store.CountRunStepsByStatusParams
-	countRunStepsByStatusResult  int64
-	countRunStepsByStatusErr     error
-	countRunStepsByStatusHandler func(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error)
 }
 
 func (m *mockStore) UpdateNodeCertMetadata(ctx context.Context, params store.UpdateNodeCertMetadataParams) error {
@@ -312,18 +300,6 @@ func (m *mockStore) ClaimRun(ctx context.Context, nodeID pgtype.UUID) (store.Run
 	m.claimRunCalled = true
 	m.claimRunParams = nodeID
 	return m.claimRunResult, m.claimRunErr
-}
-
-// ClaimRunStep implements the new step-level claim method for multi-node execution.
-func (m *mockStore) ClaimRunStep(ctx context.Context, nodeID pgtype.UUID) (store.RunStep, error) {
-	m.claimRunStepCalled = true
-	m.claimRunStepParams = nodeID
-	// If no specific error is set and no result is configured, return ErrNoRows by default.
-	// This ensures existing tests that don't configure ClaimRunStep fall back to ClaimRun.
-	if m.claimRunStepErr == nil && !m.claimRunStepResult.ID.Valid {
-		return store.RunStep{}, pgx.ErrNoRows
-	}
-	return m.claimRunStepResult, m.claimRunStepErr
 }
 
 // ClaimJob implements job claiming for the new unified job model.
@@ -447,11 +423,86 @@ func (m *mockStore) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]sto
 	return m.listJobsByRunResult, m.listJobsByRunErr
 }
 
+func (m *mockStore) CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error) {
+	m.countJobsByRunCalled = true
+	m.countJobsByRunParam = runID
+	if m.countJobsByRunErr != nil {
+		return 0, m.countJobsByRunErr
+	}
+	// Default: count from listJobsByRunResult if not explicitly set.
+	if m.countJobsByRunResult == 0 && len(m.listJobsByRunResult) > 0 {
+		return int64(len(m.listJobsByRunResult)), nil
+	}
+	return m.countJobsByRunResult, nil
+}
+
+func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.CountJobsByRunAndStatusParams) (int64, error) {
+	m.countJobsByRunAndStatusCalled = true
+	m.countJobsByRunAndStatusParams = arg
+	if m.countJobsByRunAndStatusErr != nil {
+		return 0, m.countJobsByRunAndStatusErr
+	}
+	// Default: count matching jobs from listJobsByRunResult, accounting for job completions.
+	if m.countJobsByRunAndStatusResult == 0 && len(m.listJobsByRunResult) > 0 {
+		var count int64
+		for _, j := range m.listJobsByRunResult {
+			// If this job was marked as completed via UpdateJobCompletion, use the completed status.
+			effectiveStatus := j.Status
+			if m.updateJobCompletionCalled && j.ID == m.updateJobCompletionParams.ID {
+				effectiveStatus = m.updateJobCompletionParams.Status
+			}
+			if effectiveStatus == arg.Status {
+				count++
+			}
+		}
+		return count, nil
+	}
+	return m.countJobsByRunAndStatusResult, nil
+}
+
+func (m *mockStore) GetJobByRunAndStepIndex(ctx context.Context, arg store.GetJobByRunAndStepIndexParams) (store.Job, error) {
+	m.getJobByRunAndStepIndexCalled = true
+	m.getJobByRunAndStepIndexParams = arg
+	if m.getJobByRunAndStepIndexErr != nil {
+		return store.Job{}, m.getJobByRunAndStepIndexErr
+	}
+	// Return configured result, or search in listJobsByRunResult for matching step_index.
+	if m.getJobByRunAndStepIndexResult.ID.Valid {
+		return m.getJobByRunAndStepIndexResult, nil
+	}
+	// Fall back to searching listJobsByRunResult by step_index.
+	for _, j := range m.listJobsByRunResult {
+		if j.RunID.Bytes == arg.RunID.Bytes && j.StepIndex == arg.StepIndex {
+			return j, nil
+		}
+	}
+	return store.Job{}, pgx.ErrNoRows
+}
+
 func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
 	m.updateJobStatusCalled = true
 	m.updateJobStatusParams = params
 	m.updateJobStatusCalls = append(m.updateJobStatusCalls, params)
 	return m.updateJobStatusErr
+}
+
+func (m *mockStore) UpdateJobCompletion(ctx context.Context, params store.UpdateJobCompletionParams) error {
+	m.updateJobCompletionCalled = true
+	m.updateJobCompletionParams = params
+	return m.updateJobCompletionErr
+}
+
+func (m *mockStore) ScheduleNextJob(ctx context.Context, runID pgtype.UUID) (store.Job, error) {
+	m.scheduleNextJobCalled = true
+	m.scheduleNextJobParam = runID
+	if m.scheduleNextJobErr != nil {
+		return store.Job{}, m.scheduleNextJobErr
+	}
+	// Return no rows by default if no result configured.
+	if !m.scheduleNextJobResult.ID.Valid {
+		return store.Job{}, pgx.ErrNoRows
+	}
+	return m.scheduleNextJobResult, nil
 }
 
 func (m *mockStore) ListDiffsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Diff, error) {
@@ -527,7 +578,7 @@ func (m *mockStore) InsertAPIToken(ctx context.Context, params store.InsertAPITo
 	return m.insertAPITokenErr
 }
 
-func (m *mockStore) ListAPITokens(ctx context.Context, clusterID string) ([]store.ListAPITokensRow, error) {
+func (m *mockStore) ListAPITokens(ctx context.Context, clusterID *string) ([]store.ListAPITokensRow, error) {
 	m.listAPITokensCalled = true
 	m.listAPITokensParams = clusterID
 	return m.listAPITokensResult, m.listAPITokensErr
@@ -581,64 +632,4 @@ func (m *mockStore) MarkBootstrapTokenUsed(ctx context.Context, tokenID string) 
 	m.markBootstrapTokenUsedCalled = true
 	m.markBootstrapTokenUsedParam = tokenID
 	return m.markBootstrapTokenUsedErr
-}
-
-// CreateRunStep implements the CreateRunStep method for testing.
-func (m *mockStore) CreateRunStep(ctx context.Context, params store.CreateRunStepParams) (store.RunStep, error) {
-	m.createRunStepCalled = true
-	m.createRunStepCallCount++
-	// Track params for all CreateRunStep calls (for multi-step tests).
-	m.createRunStepParams = append(m.createRunStepParams, params)
-
-	// Return a result for this call (use preset or generate default).
-	if m.createRunStepCallCount <= len(m.createRunStepResults) {
-		return m.createRunStepResults[m.createRunStepCallCount-1], m.createRunStepErr
-	}
-
-	// Default: generate a RunStep with the provided params.
-	return store.RunStep{
-		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:     params.RunID,
-		StepIndex: params.StepIndex,
-		Status:    params.Status,
-	}, m.createRunStepErr
-}
-
-// GetRunStepByIndex retrieves a specific step of a run by step_index.
-func (m *mockStore) GetRunStepByIndex(ctx context.Context, arg store.GetRunStepByIndexParams) (store.RunStep, error) {
-	m.getRunStepByIndexCalled = true
-	m.getRunStepByIndexParams = arg
-	return m.getRunStepByIndexResult, m.getRunStepByIndexErr
-}
-
-// AckRunStepStart acknowledges that a step has started execution (transitions from 'assigned' to 'running').
-func (m *mockStore) AckRunStepStart(ctx context.Context, id pgtype.UUID) error {
-	m.ackRunStepStartCalled = true
-	m.ackRunStepStartParam = id
-	return m.ackRunStepStartErr
-}
-
-// UpdateRunStepCompletion updates a step's terminal status (succeeded/failed/canceled) and timing.
-func (m *mockStore) UpdateRunStepCompletion(ctx context.Context, arg store.UpdateRunStepCompletionParams) error {
-	m.updateRunStepCompletionCalled = true
-	m.updateRunStepCompletionParams = arg
-	return m.updateRunStepCompletionErr
-}
-
-// CountRunSteps counts the total number of steps for a run.
-func (m *mockStore) CountRunSteps(ctx context.Context, runID pgtype.UUID) (int64, error) {
-	m.countRunStepsCalled = true
-	m.countRunStepsParam = runID
-	return m.countRunStepsResult, m.countRunStepsErr
-}
-
-// CountRunStepsByStatus counts steps for a run with a specific status.
-func (m *mockStore) CountRunStepsByStatus(ctx context.Context, arg store.CountRunStepsByStatusParams) (int64, error) {
-	m.countRunStepsByStatusCalled = true
-	m.countRunStepsByStatusParams = arg
-	// If a custom handler is set, use it instead of the default result.
-	if m.countRunStepsByStatusHandler != nil {
-		return m.countRunStepsByStatusHandler(ctx, arg)
-	}
-	return m.countRunStepsByStatusResult, m.countRunStepsByStatusErr
 }

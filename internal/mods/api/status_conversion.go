@@ -9,8 +9,8 @@ import (
 // to the external API representation.
 //
 // Mapping:
-//   - store.JobStatusPending -> StageStatePending
-//   - store.JobStatusAssigned -> StageStatePending (assigned jobs are still pending from API perspective)
+//   - store.JobStatusCreated -> StageStatePending (created jobs are pending from API perspective)
+//   - store.JobStatusScheduled -> StageStatePending (scheduled jobs are pending from API perspective)
 //   - store.JobStatusRunning -> StageStateRunning
 //   - store.JobStatusSucceeded -> StageStateSucceeded
 //   - store.JobStatusFailed -> StageStateFailed
@@ -18,7 +18,7 @@ import (
 //   - store.JobStatusCanceled -> StageStateCancelled (UK spelling for mods API)
 func StageStatusFromStore(status store.JobStatus) StageState {
 	switch status {
-	case store.JobStatusPending, store.JobStatusAssigned:
+	case store.JobStatusCreated, store.JobStatusScheduled:
 		return StageStatePending
 	case store.JobStatusRunning:
 		return StageStateRunning
@@ -74,7 +74,7 @@ func TicketStatusFromStore(status store.RunStatus) TicketState {
 // to the database-authoritative status type.
 //
 // Mapping:
-//   - StageStatePending/StageStateQueued -> store.JobStatusPending
+//   - StageStatePending/StageStateQueued -> store.JobStatusCreated
 //   - StageStateRunning -> store.JobStatusRunning
 //   - StageStateSucceeded -> store.JobStatusSucceeded
 //   - StageStateFailed -> store.JobStatusFailed
@@ -82,7 +82,7 @@ func TicketStatusFromStore(status store.RunStatus) TicketState {
 func StageStatusToStore(state StageState) store.JobStatus {
 	switch state {
 	case StageStatePending, StageStateQueued:
-		return store.JobStatusPending
+		return store.JobStatusCreated
 	case StageStateRunning:
 		return store.JobStatusRunning
 	case StageStateSucceeded:
@@ -92,8 +92,8 @@ func StageStatusToStore(state StageState) store.JobStatus {
 	case StageStateCancelling, StageStateCancelled:
 		return store.JobStatusCanceled
 	default:
-		// Default to pending for unknown states (defensive).
-		return store.JobStatusPending
+		// Default to created for unknown states (defensive).
+		return store.JobStatusCreated
 	}
 }
 

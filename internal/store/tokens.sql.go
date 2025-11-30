@@ -53,7 +53,7 @@ LIMIT 1
 
 type GetBootstrapTokenRow struct {
 	NodeID       pgtype.UUID        `json:"node_id"`
-	ClusterID    string             `json:"cluster_id"`
+	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 	UsedAt       pgtype.Timestamptz `json:"used_at"`
@@ -94,7 +94,7 @@ INSERT INTO api_tokens (
 type InsertAPITokenParams struct {
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
-	ClusterID   string             `json:"cluster_id"`
+	ClusterID   *string            `json:"cluster_id"`
 	Role        string             `json:"role"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
@@ -134,7 +134,7 @@ type InsertBootstrapTokenParams struct {
 	TokenHash string             `json:"token_hash"`
 	TokenID   string             `json:"token_id"`
 	NodeID    pgtype.UUID        `json:"node_id"`
-	ClusterID string             `json:"cluster_id"`
+	ClusterID *string            `json:"cluster_id"`
 	IssuedAt  pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 	IssuedBy  *string            `json:"issued_by"`
@@ -179,7 +179,7 @@ type ListAPITokensRow struct {
 	CreatedBy   *string            `json:"created_by"`
 }
 
-func (q *Queries) ListAPITokens(ctx context.Context, clusterID string) ([]ListAPITokensRow, error) {
+func (q *Queries) ListAPITokens(ctx context.Context, clusterID *string) ([]ListAPITokensRow, error) {
 	rows, err := q.db.Query(ctx, listAPITokens, clusterID)
 	if err != nil {
 		return nil, err

@@ -14,7 +14,7 @@ import (
 const createArtifactBundle = `-- name: CreateArtifactBundle :one
 INSERT INTO artifact_bundles (run_id, job_id, build_id, name, bundle, cid, digest)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, run_id, job_id, build_id, name, bundle, created_at, cid, digest
+RETURNING id, run_id, job_id, build_id, name, bundle, cid, digest, created_at
 `
 
 type CreateArtifactBundleParams struct {
@@ -45,9 +45,9 @@ func (q *Queries) CreateArtifactBundle(ctx context.Context, arg CreateArtifactBu
 		&i.BuildID,
 		&i.Name,
 		&i.Bundle,
-		&i.CreatedAt,
 		&i.Cid,
 		&i.Digest,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -73,7 +73,7 @@ func (q *Queries) DeleteArtifactBundlesOlderThan(ctx context.Context, createdAt 
 }
 
 const getArtifactBundle = `-- name: GetArtifactBundle :one
-SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE id = $1
 `
 
@@ -87,15 +87,15 @@ func (q *Queries) GetArtifactBundle(ctx context.Context, id pgtype.UUID) (Artifa
 		&i.BuildID,
 		&i.Name,
 		&i.Bundle,
-		&i.CreatedAt,
 		&i.Cid,
 		&i.Digest,
+		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const listArtifactBundlesByCID = `-- name: ListArtifactBundlesByCID :many
-SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE cid = $1
 ORDER BY created_at DESC
 `
@@ -116,9 +116,9 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,
-			&i.CreatedAt,
 			&i.Cid,
 			&i.Digest,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func (q *Queries) ListArtifactBundlesByCID(ctx context.Context, cid *string) ([]
 }
 
 const listArtifactBundlesByRun = `-- name: ListArtifactBundlesByRun :many
-SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1
 ORDER BY created_at DESC
 `
@@ -152,9 +152,9 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,
-			&i.CreatedAt,
 			&i.Cid,
 			&i.Digest,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -167,7 +167,7 @@ func (q *Queries) ListArtifactBundlesByRun(ctx context.Context, runID pgtype.UUI
 }
 
 const listArtifactBundlesByRunAndJob = `-- name: ListArtifactBundlesByRunAndJob :many
-SELECT id, run_id, job_id, build_id, name, bundle, created_at, cid, digest FROM artifact_bundles
+SELECT id, run_id, job_id, build_id, name, bundle, cid, digest, created_at FROM artifact_bundles
 WHERE run_id = $1 AND job_id = $2
 ORDER BY created_at DESC
 `
@@ -193,9 +193,9 @@ func (q *Queries) ListArtifactBundlesByRunAndJob(ctx context.Context, arg ListAr
 			&i.BuildID,
 			&i.Name,
 			&i.Bundle,
-			&i.CreatedAt,
 			&i.Cid,
 			&i.Digest,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

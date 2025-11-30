@@ -25,9 +25,9 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s, want POST", r.Method)
 		}
-		// NodeID and StageID are asserted below via path match
-		if r.URL.Path != "/v1/nodes/test-node/stage/stage-1/artifact" {
-			t.Fatalf("path = %s, want /v1/nodes/test-node/stage/stage-1/artifact", r.URL.Path)
+		// Job-scoped artifact endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
+		if r.URL.Path != "/v1/runs/run-1/jobs/stage-1/artifact" {
+			t.Fatalf("path = %s, want /v1/runs/run-1/jobs/stage-1/artifact", r.URL.Path)
 		}
 
 		var payload map[string]any
@@ -35,10 +35,8 @@ func TestUploadOutDirIfPresent_UploadsWhenFilesExist(t *testing.T) {
 		if err := dec.Decode(&payload); err != nil {
 			t.Fatalf("decode payload: %v", err)
 		}
-		// Expect run_id and name
-		if payload["run_id"] != "run-1" {
-			t.Fatalf("run_id = %v, want run-1", payload["run_id"])
-		}
+		// run_id is now in URL path, not payload
+		// Expect name to be set
 		if payload["name"] != "mod-out" {
 			t.Fatalf("name = %v, want mod-out", payload["name"])
 		}

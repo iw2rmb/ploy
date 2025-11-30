@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestDiffFetcher_ListRunDiffs verifies listing diffs for a run.
@@ -29,14 +31,14 @@ func TestDiffFetcher_ListRunDiffs(t *testing.T) {
 				Diffs: []diffListItem{
 					{
 						ID:        "diff-1",
-						StageID:   "stage-1",
-						StepIndex: ptrInt32(0),
+						JobID:     "job-1",
+						StepIndex: stepIndex(0),
 						Size:      100,
 					},
 					{
 						ID:        "diff-2",
-						StageID:   "stage-2",
-						StepIndex: ptrInt32(1),
+						JobID:     "job-2",
+						StepIndex: stepIndex(1),
 						Size:      200,
 					},
 				},
@@ -201,7 +203,7 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 	tests := []struct {
 		name      string
 		runID     string
-		stepIndex int32
+		stepIndex types.StepIndex
 		diffs     []diffListItem
 		patches   map[string][]byte
 		wantCount int
@@ -212,9 +214,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			runID:     "run-123",
 			stepIndex: 1,
 			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: ptrInt32(0)},
-				{ID: "diff-1", StepIndex: ptrInt32(1)},
-				{ID: "diff-2", StepIndex: ptrInt32(2)},
+				{ID: "diff-0", StepIndex: stepIndex(0)},
+				{ID: "diff-1", StepIndex: stepIndex(1)},
+				{ID: "diff-2", StepIndex: stepIndex(2)},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -229,9 +231,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			runID:     "run-456",
 			stepIndex: 2,
 			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: ptrInt32(0)},
-				{ID: "diff-1", StepIndex: ptrInt32(1)},
-				{ID: "diff-2", StepIndex: ptrInt32(2)},
+				{ID: "diff-0", StepIndex: stepIndex(0)},
+				{ID: "diff-1", StepIndex: stepIndex(1)},
+				{ID: "diff-2", StepIndex: stepIndex(2)},
 			},
 			patches: map[string][]byte{
 				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
@@ -242,22 +244,6 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "exclude legacy diffs (nil step_index)",
-			runID:     "run-789",
-			stepIndex: 1,
-			diffs: []diffListItem{
-				{ID: "diff-0", StepIndex: ptrInt32(0)},
-				{ID: "diff-1", StepIndex: ptrInt32(1)},
-				{ID: "diff-legacy", StepIndex: nil}, // Legacy aggregate diff.
-			},
-			patches: map[string][]byte{
-				"diff-0": gzipBytesHelper(t, []byte("patch 0")),
-				"diff-1": gzipBytesHelper(t, []byte("patch 1")),
-			},
-			wantCount: 2, // Exclude legacy diff.
-			wantErr:   false,
-		},
-		{
 			// C2: Healing diffs with the same step_index as mod diffs are stored
 			// for observability, but rehydration uses only non-healing diffs.
 			name:      "exclude healing diffs from rehydration chain",
@@ -265,14 +251,14 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 			stepIndex: 1,
 			diffs: []diffListItem{
 				// Step 0: mod + healing.
-				{ID: "diff-0-mod", StepIndex: ptrInt32(0), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-0-heal", StepIndex: ptrInt32(0), Summary: map[string]any{"mod_type": "healing"}},
+				{ID: "diff-0-mod", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-0-heal", StepIndex: stepIndex(0), Summary: map[string]any{"mod_type": "healing"}},
 				// Step 1: mod + healing (2 attempts).
-				{ID: "diff-1-mod", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "mod"}},
-				{ID: "diff-1-heal1", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
-				{ID: "diff-1-heal2", StepIndex: ptrInt32(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
+				{ID: "diff-1-mod", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-1-heal1", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 1}},
+				{ID: "diff-1-heal2", StepIndex: stepIndex(1), Summary: map[string]any{"mod_type": "healing", "healing_attempt": 2}},
 				// Step 2: mod (not included).
-				{ID: "diff-2-mod", StepIndex: ptrInt32(2), Summary: map[string]any{"mod_type": "mod"}},
+				{ID: "diff-2-mod", StepIndex: stepIndex(2), Summary: map[string]any{"mod_type": "mod"}},
 			},
 			patches: map[string][]byte{
 				"diff-0-mod":   gzipBytesHelper(t, []byte("patch 0 mod")),
@@ -343,9 +329,9 @@ func TestDiffFetcher_FetchDiffsForStep(t *testing.T) {
 
 // --- Test Helpers ---
 
-// ptrInt32 returns a pointer to an int32 value.
-func ptrInt32(v int32) *int32 {
-	return &v
+// stepIndex returns a StepIndex value.
+func stepIndex(v int32) types.StepIndex {
+	return types.StepIndex(v)
 }
 
 // gzipBytesHelper compresses input bytes using gzip (test helper).

@@ -12,28 +12,28 @@ SELECT * FROM logs
 WHERE run_id = $1 AND id > $2
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunAndStage :many
+-- name: ListLogsByRunAndJob :many
 SELECT * FROM logs
-WHERE run_id = $1 AND stage_id = $2
+WHERE run_id = $1 AND job_id = $2
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunAndStageSince :many
+-- name: ListLogsByRunAndJobSince :many
 SELECT * FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND id > $3
+WHERE run_id = $1 AND job_id = $2 AND id > $3
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunStageAndBuild :many
+-- name: ListLogsByRunJobAndBuild :many
 SELECT * FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND build_id = $3
+WHERE run_id = $1 AND job_id = $2 AND build_id = $3
 ORDER BY chunk_no ASC, id ASC;
 
--- name: ListLogsByRunStageAndBuildSince :many
+-- name: ListLogsByRunJobAndBuildSince :many
 SELECT * FROM logs
-WHERE run_id = $1 AND stage_id = $2 AND build_id = $3 AND id > $4
+WHERE run_id = $1 AND job_id = $2 AND build_id = $3 AND id > $4
 ORDER BY chunk_no ASC, id ASC;
 
 -- name: CreateLog :one
-INSERT INTO logs (run_id, stage_id, build_id, chunk_no, data)
+INSERT INTO logs (run_id, job_id, build_id, chunk_no, data)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 

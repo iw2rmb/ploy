@@ -153,9 +153,16 @@ func TestHandleRunStop(t *testing.T) {
 			cfg := Config{NodeID: "test-node", ServerURL: "http://127.0.0.1:8080"}
 			srv := &Server{cfg: cfg, controller: mock}
 
-			body, err := json.Marshal(tt.request)
-			if err != nil {
-				t.Fatalf("marshal request: %v", err)
+			// Use raw JSON for "missing run_id" test case to avoid MarshalJSON error on empty RunID.
+			var body []byte
+			if tt.request.RunID.IsZero() {
+				body = []byte(`{"reason":"user requested"}`)
+			} else {
+				var err error
+				body, err = json.Marshal(tt.request)
+				if err != nil {
+					t.Fatalf("marshal request: %v", err)
+				}
 			}
 
 			req := httptest.NewRequest(http.MethodPost, "/v1/run/stop", bytes.NewReader(body))

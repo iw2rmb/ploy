@@ -6,23 +6,24 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// TestStageStatusFromStore verifies that store.StageStatus values are correctly
+// TestStageStatusFromStore verifies that store.JobStatus values are correctly
 // converted to mods API StageState values.
 func TestStageStatusFromStore(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
-		input store.StageStatus
+		input store.JobStatus
 		want  StageState
 	}{
-		{name: "pending", input: store.StageStatusPending, want: StageStatePending},
-		{name: "running", input: store.StageStatusRunning, want: StageStateRunning},
-		{name: "succeeded", input: store.StageStatusSucceeded, want: StageStateSucceeded},
-		{name: "failed", input: store.StageStatusFailed, want: StageStateFailed},
-		{name: "skipped->failed", input: store.StageStatusSkipped, want: StageStateFailed},
-		{name: "canceled->cancelled", input: store.StageStatusCanceled, want: StageStateCancelled},
-		{name: "unknown->pending", input: store.StageStatus("unknown"), want: StageStatePending},
+		{name: "created->pending", input: store.JobStatusCreated, want: StageStatePending},
+		{name: "scheduled->pending", input: store.JobStatusScheduled, want: StageStatePending},
+		{name: "running", input: store.JobStatusRunning, want: StageStateRunning},
+		{name: "succeeded", input: store.JobStatusSucceeded, want: StageStateSucceeded},
+		{name: "failed", input: store.JobStatusFailed, want: StageStateFailed},
+		{name: "skipped->failed", input: store.JobStatusSkipped, want: StageStateFailed},
+		{name: "canceled->cancelled", input: store.JobStatusCanceled, want: StageStateCancelled},
+		{name: "unknown->pending", input: store.JobStatus("unknown"), want: StageStatePending},
 	}
 
 	for _, tt := range tests {
@@ -67,23 +68,23 @@ func TestTicketStatusFromStore(t *testing.T) {
 }
 
 // TestStageStatusToStore verifies that mods API StageState values are correctly
-// converted to store.StageStatus values.
+// converted to store.JobStatus values.
 func TestStageStatusToStore(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name  string
 		input StageState
-		want  store.StageStatus
+		want  store.JobStatus
 	}{
-		{name: "pending", input: StageStatePending, want: store.StageStatusPending},
-		{name: "queued->pending", input: StageStateQueued, want: store.StageStatusPending},
-		{name: "running", input: StageStateRunning, want: store.StageStatusRunning},
-		{name: "succeeded", input: StageStateSucceeded, want: store.StageStatusSucceeded},
-		{name: "failed", input: StageStateFailed, want: store.StageStatusFailed},
-		{name: "cancelling->canceled", input: StageStateCancelling, want: store.StageStatusCanceled},
-		{name: "cancelled->canceled", input: StageStateCancelled, want: store.StageStatusCanceled},
-		{name: "unknown->pending", input: StageState("unknown"), want: store.StageStatusPending},
+		{name: "pending->created", input: StageStatePending, want: store.JobStatusCreated},
+		{name: "queued->created", input: StageStateQueued, want: store.JobStatusCreated},
+		{name: "running", input: StageStateRunning, want: store.JobStatusRunning},
+		{name: "succeeded", input: StageStateSucceeded, want: store.JobStatusSucceeded},
+		{name: "failed", input: StageStateFailed, want: store.JobStatusFailed},
+		{name: "cancelling->canceled", input: StageStateCancelling, want: store.JobStatusCanceled},
+		{name: "cancelled->canceled", input: StageStateCancelled, want: store.JobStatusCanceled},
+		{name: "unknown->created", input: StageState("unknown"), want: store.JobStatusCreated},
 	}
 
 	for _, tt := range tests {
@@ -135,12 +136,12 @@ func TestRoundTripConversion(t *testing.T) {
 	t.Run("stage status round trip", func(t *testing.T) {
 		t.Parallel()
 		// Most statuses should round-trip cleanly
-		storeStatuses := []store.StageStatus{
-			store.StageStatusPending,
-			store.StageStatusRunning,
-			store.StageStatusSucceeded,
-			store.StageStatusFailed,
-			store.StageStatusCanceled,
+		storeStatuses := []store.JobStatus{
+			store.JobStatusCreated,
+			store.JobStatusRunning,
+			store.JobStatusSucceeded,
+			store.JobStatusFailed,
+			store.JobStatusCanceled,
 		}
 
 		for _, orig := range storeStatuses {
@@ -152,13 +153,13 @@ func TestRoundTripConversion(t *testing.T) {
 		}
 
 		// Skipped doesn't round-trip (maps to failed in API, which maps back to failed in store)
-		skipped := store.StageStatusSkipped
+		skipped := store.JobStatusSkipped
 		apiState := StageStatusFromStore(skipped)
 		backToStore := StageStatusToStore(apiState)
 		if apiState != StageStateFailed {
 			t.Errorf("Skipped should map to failed in API, got %v", apiState)
 		}
-		if backToStore != store.StageStatusFailed {
+		if backToStore != store.JobStatusFailed {
 			t.Errorf("Failed API state should map back to failed in store, got %v", backToStore)
 		}
 	})

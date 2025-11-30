@@ -14,7 +14,7 @@ func TestJSONRoundTrip(t *testing.T) {
 		TicketID: domaintypes.TicketID("t-123"),
 		State:    TicketStateRunning,
 		Stages: map[string]StageStatus{
-			"s1": {StageID: domaintypes.StageID("s1"), State: StageStateQueued, CurrentJobID: JobID("job-1")},
+			"s1": {StageID: domaintypes.StageID("s1"), State: StageStateQueued, CurrentJobID: domaintypes.JobID("job-1")},
 		},
 	}
 

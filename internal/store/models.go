@@ -60,8 +60,8 @@ func (ns NullBuildgateJobStatus) Value() (driver.Value, error) {
 type JobStatus string
 
 const (
-	JobStatusPending   JobStatus = "pending"
-	JobStatusAssigned  JobStatus = "assigned"
+	JobStatusCreated   JobStatus = "created"
+	JobStatusScheduled JobStatus = "scheduled"
 	JobStatusRunning   JobStatus = "running"
 	JobStatusSucceeded JobStatus = "succeeded"
 	JobStatusFailed    JobStatus = "failed"
@@ -150,64 +150,18 @@ func (ns NullRunStatus) Value() (driver.Value, error) {
 	return string(ns.RunStatus), nil
 }
 
-type RunStepStatus string
-
-const (
-	RunStepStatusQueued    RunStepStatus = "queued"
-	RunStepStatusAssigned  RunStepStatus = "assigned"
-	RunStepStatusRunning   RunStepStatus = "running"
-	RunStepStatusSucceeded RunStepStatus = "succeeded"
-	RunStepStatusFailed    RunStepStatus = "failed"
-	RunStepStatusCanceled  RunStepStatus = "canceled"
-)
-
-func (e *RunStepStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = RunStepStatus(s)
-	case string:
-		*e = RunStepStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for RunStepStatus: %T", src)
-	}
-	return nil
-}
-
-type NullRunStepStatus struct {
-	RunStepStatus RunStepStatus `json:"run_step_status"`
-	Valid         bool          `json:"valid"` // Valid is true if RunStepStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullRunStepStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.RunStepStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.RunStepStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullRunStepStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.RunStepStatus), nil
-}
-
 type ApiToken struct {
 	ID          pgtype.UUID        `json:"id"`
 	TokenHash   string             `json:"token_hash"`
 	TokenID     string             `json:"token_id"`
-	ClusterID   string             `json:"cluster_id"`
+	ClusterID   *string            `json:"cluster_id"`
 	Role        string             `json:"role"`
 	Description *string            `json:"description"`
 	IssuedAt    pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
 	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
 	CreatedBy   *string            `json:"created_by"`
-	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
@@ -218,9 +172,9 @@ type ArtifactBundle struct {
 	BuildID   pgtype.UUID        `json:"build_id"`
 	Name      *string            `json:"name"`
 	Bundle    []byte             `json:"bundle"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	Cid       *string            `json:"cid"`
 	Digest    *string            `json:"digest"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type BootstrapToken struct {
@@ -228,14 +182,13 @@ type BootstrapToken struct {
 	TokenHash    string             `json:"token_hash"`
 	TokenID      string             `json:"token_id"`
 	NodeID       pgtype.UUID        `json:"node_id"`
-	ClusterID    string             `json:"cluster_id"`
+	ClusterID    *string            `json:"cluster_id"`
 	IssuedAt     pgtype.Timestamptz `json:"issued_at"`
 	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
 	UsedAt       pgtype.Timestamptz `json:"used_at"`
 	CertIssuedAt pgtype.Timestamptz `json:"cert_issued_at"`
 	RevokedAt    pgtype.Timestamptz `json:"revoked_at"`
 	IssuedBy     *string            `json:"issued_by"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type Build struct {
@@ -253,14 +206,14 @@ type Build struct {
 
 type BuildgateJob struct {
 	ID             pgtype.UUID        `json:"id"`
-	Status         BuildgateJobStatus `json:"status"`
 	RequestPayload []byte             `json:"request_payload"`
+	Status         BuildgateJobStatus `json:"status"`
+	NodeID         pgtype.UUID        `json:"node_id"`
 	Result         []byte             `json:"result"`
 	Error          *string            `json:"error"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	StartedAt      pgtype.Timestamptz `json:"started_at"`
 	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
-	NodeID         pgtype.UUID        `json:"node_id"`
 }
 
 type Diff struct {
@@ -287,12 +240,13 @@ type Job struct {
 	RunID      pgtype.UUID        `json:"run_id"`
 	Name       string             `json:"name"`
 	Status     JobStatus          `json:"status"`
+	StepIndex  float64            `json:"step_index"`
+	NodeID     pgtype.UUID        `json:"node_id"`
+	ExitCode   *int32             `json:"exit_code"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 	DurationMs int64              `json:"duration_ms"`
 	Meta       []byte             `json:"meta"`
-	StepIndex  float64            `json:"step_index"`
-	NodeID     pgtype.UUID        `json:"node_id"`
 }
 
 type Log struct {
@@ -344,7 +298,6 @@ type Run struct {
 	Spec       []byte             `json:"spec"`
 	CreatedBy  *string            `json:"created_by"`
 	Status     RunStatus          `json:"status"`
-	Reason     *string            `json:"reason"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	StartedAt  pgtype.Timestamptz `json:"started_at"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
@@ -353,17 +306,6 @@ type Run struct {
 	TargetRef  string             `json:"target_ref"`
 	CommitSha  *string            `json:"commit_sha"`
 	Stats      []byte             `json:"stats"`
-}
-
-type RunStep struct {
-	ID         pgtype.UUID        `json:"id"`
-	RunID      pgtype.UUID        `json:"run_id"`
-	StepIndex  int32              `json:"step_index"`
-	Status     RunStepStatus      `json:"status"`
-	NodeID     pgtype.UUID        `json:"node_id"`
-	StartedAt  pgtype.Timestamptz `json:"started_at"`
-	FinishedAt pgtype.Timestamptz `json:"finished_at"`
-	Reason     *string            `json:"reason"`
 }
 
 type RunsTiming struct {

@@ -153,7 +153,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 				return store.Event{
 					ID:      1,
 					RunID:   arg.RunID,
-					StageID: arg.StageID,
+					JobID:   arg.JobID,
 					Time:    arg.Time,
 					Level:   arg.Level,
 					Message: arg.Message,
@@ -162,7 +162,7 @@ func TestStorage_CreateAndPublishEvent(t *testing.T) {
 			},
 			params: store.CreateEventParams{
 				RunID:   runID,
-				StageID: pgtype.UUID{Valid: false},
+				JobID:   pgtype.UUID{Valid: false},
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   "info",
 				Message: "test event",
@@ -287,7 +287,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 				return store.Event{
 					ID:      123,
 					RunID:   arg.RunID,
-					StageID: arg.StageID,
+					JobID:   arg.JobID,
 					Time:    arg.Time,
 					Level:   arg.Level,
 					Message: arg.Message,
@@ -303,7 +303,7 @@ func TestStorage_LevelNormalization(t *testing.T) {
 			ctx := context.Background()
 			params := store.CreateEventParams{
 				RunID:   runID,
-				StageID: pgtype.UUID{Valid: false},
+				JobID:   pgtype.UUID{Valid: false},
 				Time:    pgtype.Timestamptz{Time: time.Now(), Valid: true},
 				Level:   tc.inLevel,
 				Message: "msg",
@@ -361,7 +361,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 				return store.Log{
 					ID:        1,
 					RunID:     arg.RunID,
-					StageID:   arg.StageID,
+					JobID:     arg.JobID,
 					BuildID:   arg.BuildID,
 					ChunkNo:   arg.ChunkNo,
 					Data:      arg.Data,
@@ -370,7 +370,7 @@ func TestStorage_CreateAndPublishLog(t *testing.T) {
 			},
 			params: store.CreateLogParams{
 				RunID:   runID,
-				StageID: pgtype.UUID{Valid: false},
+				JobID:   pgtype.UUID{Valid: false},
 				BuildID: pgtype.UUID{Valid: false},
 				ChunkNo: 1,
 				Data:    []byte("test log line"),

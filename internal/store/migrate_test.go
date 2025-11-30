@@ -59,39 +59,6 @@ func TestRunMigrations(t *testing.T) {
 	}
 }
 
-func TestLoadMigrations(t *testing.T) {
-	migrations, err := loadMigrations()
-	if err != nil {
-		t.Fatalf("loadMigrations: %v", err)
-	}
-
-	if len(migrations) == 0 {
-		t.Fatal("expected at least one migration")
-	}
-
-	// Verify migrations are sorted by version.
-	for i := 1; i < len(migrations); i++ {
-		if migrations[i].Version <= migrations[i-1].Version {
-			t.Fatalf("migrations not sorted: %d <= %d", migrations[i].Version, migrations[i-1].Version)
-		}
-	}
-
-	// Verify first migration has version 1.
-	if migrations[0].Version != 1 {
-		t.Fatalf("first migration version: got %d, want 1", migrations[0].Version)
-	}
-
-	// Verify each migration has SQL content.
-	for _, m := range migrations {
-		if m.SQL == "" {
-			t.Fatalf("migration %d has empty SQL", m.Version)
-		}
-		if m.Name == "" {
-			t.Fatalf("migration %d has empty name", m.Version)
-		}
-	}
-}
-
 func TestEnsureVersionTable(t *testing.T) {
 	dsn := os.Getenv("PLOY_TEST_PG_DSN")
 	if dsn == "" {

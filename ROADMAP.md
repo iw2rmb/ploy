@@ -101,7 +101,7 @@ Legend: [ ] todo, [x] done.
   - Scope:
     - Use `stages` as canonical “step/node” table:
       - Each execution unit (pre-run gate, healing, mod, post-gate, future nodes) has a `stages` row with:
-        - `run_id`, `id` (stage_id), `name`, `meta.type` (`"pre_gate"`, `"mod"`, `"post_gate"`, `"healing"`), `meta.step_index`.
+        - `run_id`, `id` (stage_id), `name`, `mod_type` (`"pre_gate"`, `"mod"`, `"post_gate"`, `"healing"`), `step_index`.
     - Ensure every diff emitted during execution:
       - Stores non-null `diffs.stage_id` and `diffs.run_id`.
       - Tags `diffs.summary` with `step_index` and `mod_type` (`"mod"`, `"healing"`, `"pre_gate"`, `"post_gate"`).

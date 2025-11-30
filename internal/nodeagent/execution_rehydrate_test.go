@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/iw2rmb/ploy/internal/domain/types"
 )
 
 // TestDecompressPatch verifies gzip decompression of patches.
@@ -436,7 +438,7 @@ func TestEnsureBaselineCommitForRehydration(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupWorkspace func(t *testing.T, dir string)
-		stepIndex      int
+		stepIndex      types.StepIndex
 		wantErr        bool
 		validateAfter  func(t *testing.T, dir string)
 	}{

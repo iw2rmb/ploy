@@ -16,7 +16,7 @@ import (
 //   - "gitlab_domain" (string, optional) — GitLab domain override.
 //   - "mr_on_success" (bool) — create MR on success when true.
 //   - "mr_on_fail" (bool) — create MR on failure when true.
-//   - "stage_id" (string, optional) — server-provided stage identifier for uploads.
+//   - "job_id" (string, optional) — server-provided job identifier for uploads.
 //   - "artifact_name" (string, optional) — custom name for uploaded artifact bundle(s).
 //
 // Other options currently honoured by the node for execution shaping:
@@ -27,35 +27,40 @@ import (
 //   - "build_gate_healing" (object) — healing policy: {retries:int, mods:[{image,command,env,...}]}.
 //
 // StepIndex field:
-//   - When nil: execute all steps sequentially (traditional single-node execution).
-//   - When present: execute only the specified step (multi-node step-level execution).
+//   - Identifies the job's step index for job-level execution tracking.
+//
+// ModType field:
+//   - Identifies the job type: "pre_gate", "mod", "post_gate", "heal", "re_gate".
+//   - Used by orchestrator to dispatch to appropriate execution handler.
 type StartRunRequest struct {
 	RunID     types.RunID       `json:"run_id,omitempty"`
+	JobID     types.JobID       `json:"job_id,omitempty"` // Job ID for artifact/diff uploads
 	RepoURL   types.RepoURL     `json:"repo_url,omitempty"`
 	BaseRef   types.GitRef      `json:"base_ref,omitempty"`
 	TargetRef types.GitRef      `json:"target_ref,omitempty"`
 	CommitSHA types.CommitSHA   `json:"commit_sha,omitempty"`
-	StepIndex *int32            `json:"step_index,omitempty"` // Constrains execution to a single step
+	StepIndex types.StepIndex   `json:"step_index"`         // Job step index for execution tracking
+	ModType   string            `json:"mod_type,omitempty"` // Job type: pre_gate, mod, post_gate, heal, re_gate
 	Options   map[string]any    `json:"options"`
 	Env       map[string]string `json:"env"`
 }
 
 // StartRunResponse is returned when a run is accepted.
 type StartRunResponse struct {
-	RunID  string `json:"run_id"`
-	Status string `json:"status"`
+	RunID  types.RunID `json:"run_id"`
+	Status string      `json:"status"`
 }
 
 // StopRunRequest describes a run stop/cancel request.
 type StopRunRequest struct {
-	RunID  string `json:"run_id"`
-	Reason string `json:"reason"`
+	RunID  types.RunID `json:"run_id"`
+	Reason string      `json:"reason"`
 }
 
 // StopRunResponse is returned when a stop request is processed.
 type StopRunResponse struct {
-	RunID  string `json:"run_id"`
-	Status string `json:"status"`
+	RunID  types.RunID `json:"run_id"`
+	Status string      `json:"status"`
 }
 
 func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +87,7 @@ func (s *Server) handleRunStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := StartRunResponse{
-		RunID:  req.RunID.String(),
+		RunID:  req.RunID,
 		Status: "accepted",
 	}
 
@@ -103,7 +108,7 @@ func (s *Server) handleRunStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.RunID) == "" {
+	if req.RunID.IsZero() {
 		http.Error(w, "run_id is required", http.StatusBadRequest)
 		return
 	}

@@ -35,7 +35,7 @@ UPDATE buildgate_jobs bg
 SET status = 'claimed', node_id = $1, started_at = now()
 FROM cte
 WHERE bg.id = cte.id
-RETURNING bg.id, bg.status, bg.request_payload, bg.result, bg.error, bg.created_at, bg.started_at, bg.finished_at, bg.node_id
+RETURNING bg.id, bg.request_payload, bg.status, bg.node_id, bg.result, bg.error, bg.created_at, bg.started_at, bg.finished_at
 `
 
 func (q *Queries) ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (BuildgateJob, error) {
@@ -43,14 +43,14 @@ func (q *Queries) ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (Bu
 	var i BuildgateJob
 	err := row.Scan(
 		&i.ID,
-		&i.Status,
 		&i.RequestPayload,
+		&i.Status,
+		&i.NodeID,
 		&i.Result,
 		&i.Error,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-		&i.NodeID,
 	)
 	return i, err
 }
@@ -58,7 +58,7 @@ func (q *Queries) ClaimBuildGateJob(ctx context.Context, nodeID pgtype.UUID) (Bu
 const createBuildGateJob = `-- name: CreateBuildGateJob :one
 INSERT INTO buildgate_jobs (request_payload, status)
 VALUES ($1, 'pending')
-RETURNING id, status, request_payload, result, error, created_at, started_at, finished_at, node_id
+RETURNING id, request_payload, status, node_id, result, error, created_at, started_at, finished_at
 `
 
 func (q *Queries) CreateBuildGateJob(ctx context.Context, requestPayload []byte) (BuildgateJob, error) {
@@ -66,20 +66,20 @@ func (q *Queries) CreateBuildGateJob(ctx context.Context, requestPayload []byte)
 	var i BuildgateJob
 	err := row.Scan(
 		&i.ID,
-		&i.Status,
 		&i.RequestPayload,
+		&i.Status,
+		&i.NodeID,
 		&i.Result,
 		&i.Error,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-		&i.NodeID,
 	)
 	return i, err
 }
 
 const getBuildGateJob = `-- name: GetBuildGateJob :one
-SELECT id, status, request_payload, result, error, created_at, started_at, finished_at, node_id FROM buildgate_jobs
+SELECT id, request_payload, status, node_id, result, error, created_at, started_at, finished_at FROM buildgate_jobs
 WHERE id = $1
 `
 
@@ -88,20 +88,20 @@ func (q *Queries) GetBuildGateJob(ctx context.Context, id pgtype.UUID) (Buildgat
 	var i BuildgateJob
 	err := row.Scan(
 		&i.ID,
-		&i.Status,
 		&i.RequestPayload,
+		&i.Status,
+		&i.NodeID,
 		&i.Result,
 		&i.Error,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
-		&i.NodeID,
 	)
 	return i, err
 }
 
 const listPendingBuildGateJobs = `-- name: ListPendingBuildGateJobs :many
-SELECT id, status, request_payload, result, error, created_at, started_at, finished_at, node_id FROM buildgate_jobs
+SELECT id, request_payload, status, node_id, result, error, created_at, started_at, finished_at FROM buildgate_jobs
 WHERE status = 'pending'
 ORDER BY created_at
 LIMIT $1 OFFSET $2
@@ -123,14 +123,14 @@ func (q *Queries) ListPendingBuildGateJobs(ctx context.Context, arg ListPendingB
 		var i BuildgateJob
 		if err := rows.Scan(
 			&i.ID,
-			&i.Status,
 			&i.RequestPayload,
+			&i.Status,
+			&i.NodeID,
 			&i.Result,
 			&i.Error,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
-			&i.NodeID,
 		); err != nil {
 			return nil, err
 		}

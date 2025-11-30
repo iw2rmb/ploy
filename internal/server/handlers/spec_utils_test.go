@@ -12,7 +12,7 @@ import (
 func TestMergeGitLabConfigIntoSpec_EmptyConfig(t *testing.T) {
 	t.Parallel()
 
-	spec := json.RawMessage(`{"stage_id":"abc123"}`)
+	spec := json.RawMessage(`{"job_id":"abc123"}`)
 	cfg := config.GitLabConfig{}
 
 	result := mergeGitLabConfigIntoSpec(spec, cfg)
@@ -28,8 +28,8 @@ func TestMergeGitLabConfigIntoSpec_EmptyConfig(t *testing.T) {
 	if _, hasDomain := m["gitlab_domain"]; hasDomain {
 		t.Error("gitlab_domain should not be present when config is empty")
 	}
-	if m["stage_id"] != "abc123" {
-		t.Errorf("stage_id = %v, want abc123", m["stage_id"])
+	if m["job_id"] != "abc123" {
+		t.Errorf("job_id = %v, want abc123", m["job_id"])
 	}
 }
 
@@ -38,7 +38,7 @@ func TestMergeGitLabConfigIntoSpec_EmptyConfig(t *testing.T) {
 func TestMergeGitLabConfigIntoSpec_ServerDefaults(t *testing.T) {
 	t.Parallel()
 
-	spec := json.RawMessage(`{"stage_id":"abc123"}`)
+	spec := json.RawMessage(`{"job_id":"abc123"}`)
 	cfg := config.GitLabConfig{
 		Domain: "https://gitlab.example.com",
 		Token:  "server-token-default",
@@ -57,8 +57,8 @@ func TestMergeGitLabConfigIntoSpec_ServerDefaults(t *testing.T) {
 	if m["gitlab_domain"] != "https://gitlab.example.com" {
 		t.Errorf("gitlab_domain = %v, want https://gitlab.example.com", m["gitlab_domain"])
 	}
-	if m["stage_id"] != "abc123" {
-		t.Errorf("stage_id = %v, want abc123", m["stage_id"])
+	if m["job_id"] != "abc123" {
+		t.Errorf("job_id = %v, want abc123", m["job_id"])
 	}
 }
 
@@ -68,7 +68,7 @@ func TestMergeGitLabConfigIntoSpec_PerRunOverrides(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"stage_id":"abc123",
+		"job_id":"abc123",
 		"gitlab_pat":"per-run-token",
 		"gitlab_domain":"https://gitlab.custom.com"
 	}`)
@@ -91,8 +91,8 @@ func TestMergeGitLabConfigIntoSpec_PerRunOverrides(t *testing.T) {
 	if m["gitlab_domain"] != "https://gitlab.custom.com" {
 		t.Errorf("gitlab_domain = %v, want https://gitlab.custom.com", m["gitlab_domain"])
 	}
-	if m["stage_id"] != "abc123" {
-		t.Errorf("stage_id = %v, want abc123", m["stage_id"])
+	if m["job_id"] != "abc123" {
+		t.Errorf("job_id = %v, want abc123", m["job_id"])
 	}
 }
 
@@ -102,7 +102,7 @@ func TestMergeGitLabConfigIntoSpec_PartialOverrides(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"stage_id":"abc123",
+		"job_id":"abc123",
 		"gitlab_pat":"per-run-token"
 	}`)
 	cfg := config.GitLabConfig{
@@ -170,7 +170,7 @@ func TestMergeGitLabConfigIntoSpec_EmptySpec(t *testing.T) {
 func TestMergeGitLabConfigIntoSpec_OnlyToken(t *testing.T) {
 	t.Parallel()
 
-	spec := json.RawMessage(`{"stage_id":"abc123"}`)
+	spec := json.RawMessage(`{"job_id":"abc123"}`)
 	cfg := config.GitLabConfig{
 		Token: "server-token-only",
 	}
@@ -195,7 +195,7 @@ func TestMergeGitLabConfigIntoSpec_OnlyToken(t *testing.T) {
 func TestMergeGitLabConfigIntoSpec_OnlyDomain(t *testing.T) {
 	t.Parallel()
 
-	spec := json.RawMessage(`{"stage_id":"abc123"}`)
+	spec := json.RawMessage(`{"job_id":"abc123"}`)
 	cfg := config.GitLabConfig{
 		Domain: "https://gitlab.example.com",
 	}

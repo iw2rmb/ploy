@@ -31,7 +31,7 @@ type Agent struct {
 func New(cfg Config) (*Agent, error) {
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	server, err := NewServer(cfg, controller)

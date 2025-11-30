@@ -3,6 +3,7 @@ package step
 import (
 	"context"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -24,5 +25,5 @@ type BuildGateHTTPClient interface {
 
 	// GetJob retrieves the current status of a build gate job by ID.
 	// Used for polling when Validate returns a pending job.
-	GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error)
+	GetJob(ctx context.Context, jobID types.JobID) (*contracts.BuildGateJobStatusResponse, error)
 }

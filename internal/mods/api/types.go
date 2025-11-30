@@ -83,9 +83,8 @@ type StageStatus struct {
 	State       StageState          `json:"state"`
 	Attempts    int                 `json:"attempts"`
 	MaxAttempts int                 `json:"max_attempts"`
-	// JobID is a simple string-typed identifier for execution jobs.
-	// JSON representation remains a plain string for compatibility.
-	CurrentJobID JobID             `json:"current_job_id,omitempty"`
+	// CurrentJobID is the job identifier for execution jobs.
+	CurrentJobID domaintypes.JobID `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`
 	LastError    string            `json:"last_error,omitempty"`
 	// StepIndex identifies the position of this stage in multi-step Mods runs.
@@ -96,10 +95,6 @@ type StageStatus struct {
 	// and diffs.step_index for this stage.
 	StepIndex int `json:"step_index,omitempty"`
 }
-
-// JobID identifies a job within the Mods execution context.
-// Kept as a plain string type; JSON remains a string for compatibility.
-type JobID string
 
 // StageMetadata captures step-level metadata stored in stages.meta JSONB.
 // This metadata enables the control plane to treat a run as an ordered

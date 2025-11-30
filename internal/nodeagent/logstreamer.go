@@ -28,7 +28,7 @@ const (
 type LogStreamer struct {
 	cfg        Config
 	runID      string
-	stageID    string
+	jobID      string
 	chunkNo    int32
 	buffer     bytes.Buffer
 	gzWriter   *gzip.Writer
@@ -42,11 +42,11 @@ type LogStreamer struct {
 
 // NewLogStreamer creates a new log streamer for a specific run.
 // By default, uses NoOpLogHook (no PII scrubbing).
-func NewLogStreamer(cfg Config, runID string, stageID string) *LogStreamer {
+func NewLogStreamer(cfg Config, runID string, jobID string) *LogStreamer {
 	ls := &LogStreamer{
 		cfg:       cfg,
 		runID:     runID,
-		stageID:   stageID,
+		jobID:     jobID,
 		chunkNo:   0,
 		flushDone: make(chan struct{}),
 		stopCh:    make(chan struct{}),
@@ -194,7 +194,7 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 	// Prepare request payload.
 	payload := struct {
 		RunID   string  `json:"run_id"`
-		StageID *string `json:"stage_id,omitempty"`
+		JobID   *string `json:"job_id,omitempty"`
 		ChunkNo int32   `json:"chunk_no"`
 		Data    []byte  `json:"data"`
 	}{
@@ -202,8 +202,8 @@ func (ls *LogStreamer) sendChunk(data []byte, chunkNo int32) error {
 		ChunkNo: chunkNo,
 		Data:    data,
 	}
-	if ls.stageID != "" {
-		payload.StageID = &ls.stageID
+	if ls.jobID != "" {
+		payload.JobID = &ls.jobID
 	}
 
 	body, err := json.Marshal(payload)

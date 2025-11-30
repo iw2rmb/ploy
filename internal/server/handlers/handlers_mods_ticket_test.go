@@ -367,8 +367,6 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 	ticketID := uuid.New()
 	now := time.Now()
 	commitSha := "abc1234567890"
-	reason := "run failed due to timeout"
-
 	// Include MR URL under runs.stats.metadata to verify surfacing in response metadata.
 	stats := []byte(`{"metadata":{"mr_url":"https://gitlab.com/org/repo/-/merge_requests/99"}}`)
 
@@ -377,7 +375,6 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 			ID:         pgtype.UUID{Bytes: ticketID, Valid: true},
 			RepoUrl:    "https://github.com/user/repo.git",
 			Status:     store.RunStatusFailed,
-			Reason:     &reason,
 			BaseRef:    "main",
 			TargetRef:  "feature",
 			CommitSha:  &commitSha,
@@ -404,10 +401,6 @@ func TestGetTicketStatusHandlerWithOptionalFields(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	// Reason should be surfaced under metadata.reason
-	if resp.Ticket.Metadata["reason"] != reason {
-		t.Errorf("expected reason %q, got %q", reason, resp.Ticket.Metadata["reason"])
-	}
 	if resp.Ticket.Repository != "https://github.com/user/repo.git" {
 		t.Errorf("expected repo_url https://github.com/user/repo.git, got %s", resp.Ticket.Repository)
 	}
@@ -518,63 +511,58 @@ func TestSubmitTicketHandlerMultiStepCreatesMultipleStages(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify three jobs were created (one per mod in mods[] array).
-	if st.createJobCallCount != 3 {
-		t.Errorf("expected 3 CreateStage calls (one per mod), got %d", st.createJobCallCount)
+	// Verify 5 jobs were created: pre-gate + 3 mods + post-gate.
+	if st.createJobCallCount != 5 {
+		t.Errorf("expected 5 CreateJob calls (pre-gate + 3 mods + post-gate), got %d", st.createJobCallCount)
 	}
 
-	// Verify job names are sequential: mods-openrewrite-0, mods-openrewrite-1, mods-openrewrite-2.
-	expectedStageNames := []string{"mods-openrewrite-0", "mods-openrewrite-1", "mods-openrewrite-2"}
-	if len(st.createJobParams) != 3 {
-		t.Fatalf("expected 3 job params, got %d", len(st.createJobParams))
+	// Verify job names: pre-gate, mod-0, mod-1, mod-2, post-gate.
+	expectedJobNames := []string{"pre-gate", "mod-0", "mod-1", "mod-2", "post-gate"}
+	if len(st.createJobParams) != 5 {
+		t.Fatalf("expected 5 job params, got %d", len(st.createJobParams))
 	}
-	for i, expected := range expectedStageNames {
+	for i, expected := range expectedJobNames {
 		if st.createJobParams[i].Name != expected {
 			t.Errorf("expected job %d name %q, got %q", i, expected, st.createJobParams[i].Name)
 		}
 	}
 
-	// Verify each job has correct step metadata (step_index, step_total, mod_image).
-	for i, params := range st.createJobParams {
+	// Verify mod jobs (index 1-3) have correct mod_image metadata.
+	for i := 1; i <= 3; i++ {
+		params := st.createJobParams[i]
 		var meta modsapi.StageMetadata
 		if err := json.Unmarshal(params.Meta, &meta); err != nil {
 			t.Fatalf("failed to unmarshal job %d metadata: %v", i, err)
 		}
-		if meta.StepIndex != i {
-			t.Errorf("expected job %d step_index %d, got %d", i, i, meta.StepIndex)
-		}
-		if meta.StepTotal != 3 {
-			t.Errorf("expected job %d step_total 3, got %d", i, meta.StepTotal)
-		}
-		expectedImage := fmt.Sprintf("img%d:latest", i+1)
+		expectedImage := fmt.Sprintf("img%d:latest", i)
 		if meta.ModImage != expectedImage {
-			t.Errorf("expected job %d mod_image %q, got %q", i, expectedImage, meta.ModImage)
+			t.Errorf("expected mod job %d mod_image %q, got %q", i, expectedImage, meta.ModImage)
 		}
 	}
 }
 
-// TestSubmitTicketHandlerSingleStepCreatesOneStage verifies that submitting
-// a single-step spec (with mod section or legacy top-level) creates one job.
-func TestSubmitTicketHandlerSingleStepCreatesOneStage(t *testing.T) {
+// TestSubmitTicketHandlerSingleStepCreatesThreeJobs verifies that submitting
+// a single-step spec creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
+func TestSubmitTicketHandlerSingleStepCreatesThreeJobs(t *testing.T) {
 	cases := []struct {
-		name     string
-		spec     map[string]interface{}
-		wantName string
+		name      string
+		spec      map[string]interface{}
+		wantNames []string
 	}{
 		{
-			name:     "mod section",
-			spec:     map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
-			wantName: "mods-openrewrite",
+			name:      "mod section",
+			spec:      map[string]interface{}{"mod": map[string]string{"image": "single:latest"}},
+			wantNames: []string{"pre-gate", "mod-0", "post-gate"},
 		},
 		{
-			name:     "legacy top-level",
-			spec:     map[string]interface{}{"image": "legacy:latest"},
-			wantName: "mods-openrewrite",
+			name:      "legacy top-level",
+			spec:      map[string]interface{}{"image": "legacy:latest"},
+			wantNames: []string{"pre-gate", "mod-0", "post-gate"},
 		},
 		{
-			name:     "empty spec",
-			spec:     map[string]interface{}{},
-			wantName: "mods-openrewrite",
+			name:      "empty spec",
+			spec:      map[string]interface{}{},
+			wantNames: []string{"pre-gate", "mod-0", "post-gate"},
 		},
 	}
 
@@ -614,37 +602,28 @@ func TestSubmitTicketHandlerSingleStepCreatesOneStage(t *testing.T) {
 				t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 			}
 
-			// Verify one job was created.
-			if st.createJobCallCount != 1 {
-				t.Errorf("expected 1 CreateStage call, got %d", st.createJobCallCount)
+			// Verify 3 jobs were created: pre-gate, mod-0, post-gate.
+			if st.createJobCallCount != 3 {
+				t.Errorf("expected 3 CreateJob calls (pre-gate + mod-0 + post-gate), got %d", st.createJobCallCount)
 			}
 
-			// Verify job name matches expected.
-			if len(st.createJobParams) != 1 {
-				t.Fatalf("expected 1 job param, got %d", len(st.createJobParams))
+			// Verify job names match expected.
+			if len(st.createJobParams) != 3 {
+				t.Fatalf("expected 3 job params, got %d", len(st.createJobParams))
 			}
-			if st.createJobParams[0].Name != tc.wantName {
-				t.Errorf("expected job name %q, got %q", tc.wantName, st.createJobParams[0].Name)
-			}
-
-			// Verify job metadata has step_index=0 and step_total=1.
-			var meta modsapi.StageMetadata
-			if err := json.Unmarshal(st.createJobParams[0].Meta, &meta); err != nil {
-				t.Fatalf("failed to unmarshal job metadata: %v", err)
-			}
-			if meta.StepIndex != 0 {
-				t.Errorf("expected step_index 0, got %d", meta.StepIndex)
-			}
-			if meta.StepTotal != 1 {
-				t.Errorf("expected step_total 1, got %d", meta.StepTotal)
+			for i, wantName := range tc.wantNames {
+				if st.createJobParams[i].Name != wantName {
+					t.Errorf("expected job %d name %q, got %q", i, wantName, st.createJobParams[i].Name)
+				}
 			}
 		})
 	}
 }
 
-// TestSubmitTicketHandlerMultiStepMaterializesRunSteps verifies that submitting
-// a multi-step spec (with mods[] array) materializes run_steps rows (one per mod).
-func TestSubmitTicketHandlerMultiStepMaterializesRunSteps(t *testing.T) {
+// TestSubmitTicketHandlerMultiStepNoRunSteps verifies that submitting
+// a multi-step spec (with mods[] array) creates jobs but NOT run_steps.
+// Run steps have been replaced by jobs in the new architecture.
+func TestSubmitTicketHandlerMultiStepNoRunSteps(t *testing.T) {
 	runID := uuid.New()
 	now := time.Now()
 
@@ -684,31 +663,15 @@ func TestSubmitTicketHandlerMultiStepMaterializesRunSteps(t *testing.T) {
 		t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify three run_steps were materialized (one per mod in mods[] array).
-	if st.createRunStepCallCount != 3 {
-		t.Errorf("expected 3 CreateRunStep calls (one per mod), got %d", st.createRunStepCallCount)
-	}
-
-	// Verify each run_step has correct step_index and status.
-	if len(st.createRunStepParams) != 3 {
-		t.Fatalf("expected 3 run_step params, got %d", len(st.createRunStepParams))
-	}
-	for i, params := range st.createRunStepParams {
-		if params.StepIndex != int32(i) {
-			t.Errorf("expected run_step %d step_index %d, got %d", i, i, params.StepIndex)
-		}
-		if params.Status != store.RunStepStatusQueued {
-			t.Errorf("expected run_step %d status 'queued', got %s", i, params.Status)
-		}
-		if params.RunID.Bytes != runID {
-			t.Errorf("expected run_step %d run_id %s, got %s", i, runID.String(), uuid.UUID(params.RunID.Bytes).String())
-		}
+	// Verify 5 jobs were created: pre-gate + 3 mods + post-gate.
+	if st.createJobCallCount != 5 {
+		t.Errorf("expected 5 CreateJob calls, got %d", st.createJobCallCount)
 	}
 }
 
-// TestSubmitTicketHandlerSingleStepSkipsRunSteps verifies that submitting
-// a single-step spec (with mod section or legacy top-level) does NOT materialize run_steps.
-func TestSubmitTicketHandlerSingleStepSkipsRunSteps(t *testing.T) {
+// TestSubmitTicketHandlerSingleStep verifies that submitting
+// a single-step spec (with mod section or legacy top-level) creates a single job.
+func TestSubmitTicketHandlerSingleStep(t *testing.T) {
 	cases := []struct {
 		name string
 		spec map[string]interface{}
@@ -763,34 +726,37 @@ func TestSubmitTicketHandlerSingleStepSkipsRunSteps(t *testing.T) {
 				t.Fatalf("expected status 201, got %d: %s", rr.Code, rr.Body.String())
 			}
 
-			// Verify NO run_steps were materialized (single-step runs use ClaimRun).
-			if st.createRunStepCalled {
-				t.Errorf("expected CreateRunStep NOT to be called for single-step run, but it was called %d times", st.createRunStepCallCount)
+			// Verify job(s) were created for this single-step run.
+			if st.createJobCallCount == 0 {
+				t.Errorf("expected CreateJob to be called, but it wasn't")
 			}
 		})
 	}
 }
 
 // TestGetTicketStatusHandlerExposesStepIndex verifies that GET /v1/mods/{id}
-// exposes step_index for each job when multi-step metadata is present.
+// exposes step_index for each job based on the job's StepIndex field.
 func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 	ticketID := uuid.New()
 	now := time.Now()
 
-	// Create mock jobs with step metadata.
+	// Create mock jobs with step_index field set.
+	// Note: StepIndex is read from the Job struct directly, not from metadata.
 	job0 := store.Job{
-		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:  pgtype.UUID{Bytes: ticketID, Valid: true},
-		Name:   "mods-openrewrite-0",
-		Status: store.JobStatusPending,
-		Meta:   []byte(`{"step_index":0,"step_total":2,"mod_image":"img1:latest"}`),
+		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:     pgtype.UUID{Bytes: ticketID, Valid: true},
+		Name:      "mod-0",
+		Status:    store.JobStatusCreated,
+		StepIndex: 2000, // First mod job
+		Meta:      []byte(`{"mod_type":"mod","mod_image":"img1:latest"}`),
 	}
 	job1 := store.Job{
-		ID:     pgtype.UUID{Bytes: uuid.New(), Valid: true},
-		RunID:  pgtype.UUID{Bytes: ticketID, Valid: true},
-		Name:   "mods-openrewrite-1",
-		Status: store.JobStatusPending,
-		Meta:   []byte(`{"step_index":1,"step_total":2,"mod_image":"img2:latest"}`),
+		ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+		RunID:     pgtype.UUID{Bytes: ticketID, Valid: true},
+		Name:      "mod-1",
+		Status:    store.JobStatusCreated,
+		StepIndex: 3000, // Second mod job
+		Meta:      []byte(`{"mod_type":"mod","mod_image":"img2:latest"}`),
 	}
 
 	st := &mockStore{
@@ -832,14 +798,14 @@ func TestGetTicketStatusHandlerExposesStepIndex(t *testing.T) {
 	if _, ok := resp.Ticket.Stages[job0ID]; !ok {
 		t.Errorf("expected job %s to be present", job0ID)
 	}
-	if resp.Ticket.Stages[job0ID].StepIndex != 0 {
-		t.Errorf("expected job 0 step_index 0, got %d", resp.Ticket.Stages[job0ID].StepIndex)
+	if resp.Ticket.Stages[job0ID].StepIndex != 2000 {
+		t.Errorf("expected job 0 step_index 2000, got %d", resp.Ticket.Stages[job0ID].StepIndex)
 	}
 
 	if _, ok := resp.Ticket.Stages[job1ID]; !ok {
 		t.Errorf("expected job %s to be present", job1ID)
 	}
-	if resp.Ticket.Stages[job1ID].StepIndex != 1 {
-		t.Errorf("expected job 1 step_index 1, got %d", resp.Ticket.Stages[job1ID].StepIndex)
+	if resp.Ticket.Stages[job1ID].StepIndex != 3000 {
+		t.Errorf("expected job 1 step_index 3000, got %d", resp.Ticket.Stages[job1ID].StepIndex)
 	}
 }

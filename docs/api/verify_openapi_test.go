@@ -62,10 +62,10 @@ func TestOpenAPICompleteness(t *testing.T) {
 		{"/v1/nodes/{id}/events", "post"},
 		// Node logs
 		{"/v1/nodes/{id}/logs", "post"},
-		// Node diff
-		{"/v1/nodes/{id}/stage/{stage}/diff", "post"},
-		// Node artifact
-		{"/v1/nodes/{id}/stage/{stage}/artifact", "post"},
+		// Job diff upload (run-scoped, no node ID)
+		{"/v1/runs/{run_id}/jobs/{job_id}/diff", "post"},
+		// Job artifact upload (run-scoped, no node ID)
+		{"/v1/runs/{run_id}/jobs/{job_id}/artifact", "post"},
 	}
 
 	// Verify each implemented endpoint is documented

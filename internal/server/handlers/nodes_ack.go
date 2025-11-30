@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	domaintypes "github.com/iw2rmb/ploy/internal/domain/types"
 	modsapi "github.com/iw2rmb/ploy/internal/mods/api"
@@ -18,8 +17,9 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// ackRunStartHandler acknowledges that a node has started executing a run.
-// Transitions run status from 'assigned' to 'running'.
+// ackRunStartHandler acknowledges that a node has started executing a job.
+// Since jobs now transition directly to 'running' on claim, this handler
+// primarily serves for backward compatibility and SSE event publishing.
 func ackRunStartHandler(st store.Store, eventsService *events.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
@@ -36,11 +36,10 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Decode request body to get run_id and optional step_index.
-		// For multi-step runs, nodeagent includes step_index to trigger step-level ack.
+		// Decode request body to get run_id and job_id.
 		var req struct {
-			RunID     string `json:"run_id"`
-			StepIndex *int32 `json:"step_index,omitempty"` // Present for step-level claims
+			RunID domaintypes.RunID `json:"run_id"`
+			JobID domaintypes.JobID `json:"job_id"`
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -49,15 +48,28 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 		}
 
 		// Validate run_id is present.
-		if strings.TrimSpace(req.RunID) == "" {
+		if req.RunID.IsZero() {
 			http.Error(w, "run_id is required", http.StatusBadRequest)
 			return
 		}
 
+		// Validate job_id is present.
+		if req.JobID.IsZero() {
+			http.Error(w, "job_id is required", http.StatusBadRequest)
+			return
+		}
+
 		// Parse and validate run_id.
-		runID := domaintypes.ToPGUUID(req.RunID)
+		runID := domaintypes.ToPGUUID(req.RunID.String())
 		if !runID.Valid {
 			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate job_id.
+		jobID := domaintypes.ToPGUUID(req.JobID.String())
+		if !jobID.Valid {
+			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -70,11 +82,11 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check node: %v", err), http.StatusInternalServerError)
-			slog.Error("ack run start: node check failed", "node_id", nodeIDStr, "err", err)
+			slog.Error("ack job start: node check failed", "node_id", nodeIDStr, "err", err)
 			return
 		}
 
-		// Verify run exists and is assigned to this node.
+		// Verify run exists.
 		run, err := st.GetRun(r.Context(), runID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -82,117 +94,67 @@ func ackRunStartHandler(st store.Store, eventsService *events.Service) http.Hand
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to check run: %v", err), http.StatusInternalServerError)
-			slog.Error("ack run start: run check failed", "run_id", req.RunID, "err", err)
+			slog.Error("ack job start: run check failed", "run_id", req.RunID, "err", err)
 			return
 		}
 
-		// If step_index is present, this is a step-level ack (multi-step run).
-		// Otherwise, it's a run-level ack (single-step or legacy run).
-		if req.StepIndex != nil {
-			// Step-level ack: retrieve the run_step and transition it from assigned→running.
-			runStep, err := st.GetRunStepByIndex(r.Context(), store.GetRunStepByIndexParams{
-				RunID:     runID,
-				StepIndex: *req.StepIndex,
-			})
-			if err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					http.Error(w, "run step not found", http.StatusNotFound)
-					return
-				}
-				http.Error(w, fmt.Sprintf("failed to get run step: %v", err), http.StatusInternalServerError)
-				slog.Error("ack run step start: get step failed", "run_id", req.RunID, "step_index", *req.StepIndex, "err", err)
+		// Get the job and verify it belongs to the run and is assigned to this node.
+		job, err := st.GetJob(r.Context(), jobID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				http.Error(w, "job not found", http.StatusNotFound)
 				return
 			}
-
-			// Verify the step is assigned to the requesting node.
-			if !runStep.NodeID.Valid || runStep.NodeID != nodeID {
-				http.Error(w, "run step not assigned to this node", http.StatusForbidden)
-				return
-			}
-
-			// Verify the step is in 'assigned' status before transitioning to 'running'.
-			if runStep.Status != store.RunStepStatusAssigned {
-				http.Error(w, fmt.Sprintf("run step status is %s, expected assigned", runStep.Status), http.StatusConflict)
-				return
-			}
-
-			// Transition run_step status from 'assigned' to 'running'.
-			err = st.AckRunStepStart(r.Context(), runStep.ID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to acknowledge run step start: %v", err), http.StatusInternalServerError)
-				slog.Error("ack run step start: update failed", "run_id", req.RunID, "step_index", *req.StepIndex, "node_id", nodeIDStr, "err", err)
-				return
-			}
-
-			// For multi-step runs, transition the run status to 'running' when the first step starts.
-			// This ensures run.status reflects that execution has begun, even though individual steps
-			// are claimed via run_steps. We relax the status precondition to allow queued→running transition.
-			// AckRunStart is idempotent and only updates if status is 'assigned', so for subsequent steps
-			// (where run.status is already 'running'), this is a no-op.
-			//
-			// Note: The run may be in 'queued' status (no node_id) for multi-step runs since steps are
-			// claimed independently. We call AckRunStart regardless; if run.status is already 'running'
-			// or not 'assigned', the query will not match and that's acceptable (silent no-op).
-			_ = st.AckRunStart(r.Context(), runID)
-
-			slog.Info("run step start acknowledged",
-				"run_id", req.RunID,
-				"step_index", *req.StepIndex,
-				"node_id", nodeIDStr,
-				"status", "running",
-			)
-		} else {
-			// Run-level ack: verify the run is assigned to this node and transition from assigned→running.
-			// This path is used for single-step runs or legacy runs without run_steps rows.
-			if !run.NodeID.Valid || run.NodeID != nodeID {
-				http.Error(w, "run not assigned to this node", http.StatusForbidden)
-				return
-			}
-
-			// Verify the run is in 'assigned' status before transitioning to 'running'.
-			if run.Status != store.RunStatusAssigned {
-				http.Error(w, fmt.Sprintf("run status is %s, expected assigned", run.Status), http.StatusConflict)
-				return
-			}
-
-			// Transition run status from 'assigned' to 'running'.
-			err = st.AckRunStart(r.Context(), runID)
-			if err != nil {
-				http.Error(w, fmt.Sprintf("failed to acknowledge run start: %v", err), http.StatusInternalServerError)
-				slog.Error("ack run start: update failed", "run_id", req.RunID, "node_id", nodeIDStr, "err", err)
-				return
-			}
-
-			slog.Info("run start acknowledged",
-				"run_id", req.RunID,
-				"node_id", nodeIDStr,
-				"status", "running",
-			)
+			http.Error(w, fmt.Sprintf("failed to get job: %v", err), http.StatusInternalServerError)
+			slog.Error("ack job start: get job failed", "job_id", req.JobID, "err", err)
+			return
 		}
 
-		// Update job to running and set started_at.
-		if jobs, err := st.ListJobsByRun(r.Context(), runID); err == nil && len(jobs) > 0 {
-			_ = st.UpdateJobStatus(r.Context(), store.UpdateJobStatusParams{
-				ID:         jobs[0].ID,
-				Status:     store.JobStatusRunning,
-				StartedAt:  pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true},
-				FinishedAt: pgtype.Timestamptz{},
-				DurationMs: 0,
-			})
+		// Verify the job belongs to the specified run.
+		if job.RunID != runID {
+			http.Error(w, "job does not belong to this run", http.StatusBadRequest)
+			return
 		}
+
+		// Verify the job is assigned to the requesting node.
+		if !job.NodeID.Valid || job.NodeID != nodeID {
+			http.Error(w, "job not assigned to this node", http.StatusForbidden)
+			return
+		}
+
+		// Verify the job is in 'running' status.
+		// Jobs now transition directly to 'running' on claim, so this is expected.
+		if job.Status != store.JobStatusRunning {
+			http.Error(w, fmt.Sprintf("job status is %s, expected running", job.Status), http.StatusConflict)
+			return
+		}
+
+		// Job is already 'running' from the claim, no status update needed.
+
+		// Transition run status to 'running' if it's still queued or assigned.
+		// AckRunStart is idempotent and only updates if status allows transition.
+		_ = st.AckRunStart(r.Context(), runID)
+
+		slog.Info("job start acknowledged",
+			"run_id", req.RunID,
+			"job_id", req.JobID,
+			"job_name", job.Name,
+			"node_id", nodeIDStr,
+			"status", "running",
+		)
 
 		// Publish running event to SSE hub.
 		if eventsService != nil {
 			ticketSummary := modsapi.TicketSummary{
-				TicketID:   domaintypes.TicketID(req.RunID),
+				TicketID:   domaintypes.TicketID(req.RunID.String()),
 				State:      modsapi.TicketStateRunning,
 				Repository: run.RepoUrl,
 				CreatedAt:  run.CreatedAt.Time,
 				UpdatedAt:  time.Now().UTC(),
 				Stages:     make(map[string]modsapi.StageStatus),
 			}
-			if err := eventsService.PublishTicket(r.Context(), req.RunID, ticketSummary); err != nil {
-				slog.Error("ack run start: publish ticket event failed", "ticket_id", req.RunID, "err", err)
+			if err := eventsService.PublishTicket(r.Context(), req.RunID.String(), ticketSummary); err != nil {
+				slog.Error("ack job start: publish ticket event failed", "ticket_id", req.RunID, "err", err)
 			}
 		}
 

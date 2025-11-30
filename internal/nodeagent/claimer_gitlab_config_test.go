@@ -11,15 +11,15 @@ func TestParseSpec_GitLabConfigFromServer(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"stage_id": "stage-123",
+		"job_id": "job-123",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com"
 	}`)
 
 	opts, env, _ := parseSpec(spec)
 
-	if opts["stage_id"] != "stage-123" {
-		t.Errorf("stage_id = %v, want stage-123", opts["stage_id"])
+	if opts["job_id"] != "job-123" {
+		t.Errorf("job_id = %v, want job-123", opts["job_id"])
 	}
 
 	// Verify gitlab_pat is extracted into opts.
@@ -45,7 +45,7 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	t.Parallel()
 
 	spec := json.RawMessage(`{
-		"stage_id": "stage-123",
+		"job_id": "job-123",
 		"gitlab_pat": "server-default-token",
 		"gitlab_domain": "https://gitlab.example.com",
 		"mr_on_success": true
@@ -55,8 +55,8 @@ func TestParseSpec_GitLabConfigWithMRFlags(t *testing.T) {
 	opts, _, _ := parseSpec(spec)
 
 	// Verify all fields are extracted into opts.
-	if opts["stage_id"] != "stage-123" {
-		t.Errorf("stage_id = %v, want stage-123", opts["stage_id"])
+	if opts["job_id"] != "job-123" {
+		t.Errorf("job_id = %v, want job-123", opts["job_id"])
 	}
 	if opts["gitlab_pat"] != "server-default-token" {
 		t.Errorf("gitlab_pat = %v, want server-default-token", opts["gitlab_pat"])

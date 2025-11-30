@@ -177,7 +177,7 @@ type ArtifactOptions struct {
 	Paths []string
 
 	// Name is the custom name for the uploaded artifact bundle (optional).
-	// If empty, the server generates a default name based on run_id and stage_id.
+	// If empty, the server generates a default name based on run_id and job_id.
 	Name string
 }
 
@@ -185,9 +185,9 @@ type ArtifactOptions struct {
 // These options are populated by the control plane and used by the nodeagent
 // for status reporting, artifact uploads, and run correlation.
 type ServerMetadataOptions struct {
-	// StageID is the server-provided stage identifier for upload correlation.
-	// This value is used to associate artifacts and status updates with a stage.
-	StageID string
+	// JobID is the server-provided job identifier for upload correlation.
+	// This value is used to associate artifacts and status updates with a job.
+	JobID string
 }
 
 // StepMod describes a single mod step in a multi-step run (mods[] array).
@@ -288,8 +288,8 @@ func parseRunOptions(opts map[string]any) RunOptions {
 	// duplicating the conversion logic.
 
 	// Parse server metadata.
-	if stageID, ok := opts["stage_id"].(string); ok {
-		runOpts.ServerMetadata.StageID = stageID
+	if jobID, ok := opts["job_id"].(string); ok {
+		runOpts.ServerMetadata.JobID = jobID
 	}
 
 	// Parse multi-step mods array for sequential execution.

@@ -193,7 +193,7 @@ NodeClaimResponse:
     spec:
       description: |
         Opaque run specification JSON merged by the server at claim time.
-        May include fields like `stage_id`, `gitlab_pat`, `gitlab_domain`,
+        May include fields like `job_id`, `gitlab_pat`, `gitlab_domain`,
         `mr_on_success`, and `mr_on_fail`.
       type: object
       additionalProperties: true
@@ -204,7 +204,7 @@ Event:
   properties:
     id: { type: integer, format: int64 }
     run_id: { type: string, format: uuid }
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     time: { type: string, format: date-time }
     level: { type: string }
     message: { type: string }
@@ -246,7 +246,7 @@ Diff:
   properties:
     id: { type: string, format: uuid }
     run_id: { type: string, format: uuid }
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     patch:
       type: string
       description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
@@ -258,7 +258,7 @@ Diff:
 CreateDiffRequest:
   type: object
   properties:
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     patch:
       type: string
       description: Gzipped unified diff (≤1 MiB gzipped), base64-encoded.
@@ -271,7 +271,7 @@ Log:
   properties:
     id: { type: integer, format: int64 }
     run_id: { type: string, format: uuid }
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     build_id: { type: string, format: uuid, nullable: true }
     chunk_no: { type: integer, format: int32 }
     data:
@@ -294,7 +294,7 @@ NodeCreateLogResponse:
 CreateLogRequest:
   type: object
   properties:
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     build_id: { type: string, format: uuid, nullable: true }
     chunk_no: { type: integer, format: int32 }
     data:
@@ -308,7 +308,7 @@ NodeCreateLogRequest:
   type: object
   properties:
     run_id: { type: string, format: uuid }
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     build_id: { type: string, format: uuid, nullable: true }
     chunk_no: { type: integer, format: int32 }
     data:
@@ -322,7 +322,7 @@ ArtifactBundle:
   properties:
     id: { type: string, format: uuid }
     run_id: { type: string, format: uuid }
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     build_id: { type: string, format: uuid, nullable: true }
     name: { type: string, nullable: true }
     bundle:
@@ -335,7 +335,7 @@ ArtifactBundle:
 CreateArtifactBundleRequest:
   type: object
   properties:
-    stage_id: { type: string, format: uuid, nullable: true }
+    job_id: { type: string, format: uuid, nullable: true }
     build_id: { type: string, format: uuid, nullable: true }
     name: { type: string, nullable: true }
     bundle:

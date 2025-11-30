@@ -34,25 +34,22 @@ func NewStatusUploader(cfg Config) (*StatusUploader, error) {
 }
 
 // UploadStatus uploads terminal status and stats to the server with retry on transient 5xx errors.
-// When stepIndex is non-nil, includes step_index in the payload to trigger step-level completion.
-func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, reason *string, stats types.RunStats, stepIndex *int32) error {
+// Includes step_index in the payload to identify the job being completed.
+// exitCode is the exit code from job execution (required for terminal status).
+func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex) error {
 	// Build request payload.
 	payload := map[string]interface{}{
-		"run_id": runID,
-		"status": status,
+		"run_id":     runID,
+		"status":     status,
+		"step_index": stepIndex,
 	}
 
-	if reason != nil {
-		payload["reason"] = *reason
+	if exitCode != nil {
+		payload["exit_code"] = *exitCode
 	}
 
 	if stats != nil {
 		payload["stats"] = stats
-	}
-
-	// Include step_index for step-level completions (multi-step runs).
-	if stepIndex != nil {
-		payload["step_index"] = *stepIndex
 	}
 
 	body, err := json.Marshal(payload)

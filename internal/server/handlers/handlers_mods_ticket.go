@@ -230,11 +230,6 @@ func getTicketStatusHandler(st store.Store) http.HandlerFunc {
 			}
 		}
 
-		// Include terminal reason if available for quick diagnostics.
-		if run.Reason != nil && strings.TrimSpace(*run.Reason) != "" {
-			summary.Metadata["reason"] = strings.TrimSpace(*run.Reason)
-		}
-
 		// Load jobs and their artifacts.
 		jobs, err := st.ListJobsByRun(r.Context(), storePgUUID(run.ID))
 		if err != nil {
@@ -309,12 +304,14 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 	// Check for mods[] array (multi-step run).
 	if mods, ok := specMap["mods"].([]interface{}); ok && len(mods) > 0 {
 		// Multi-step run: create pre-gate, one job per mod, and post-gate.
-		// Pre-gate job
-		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, ""); err != nil {
+		// Server-driven scheduling: first job (pre-gate) is 'scheduled', rest are 'created'.
+		// Pre-gate job - scheduled (ready to be claimed immediately)
+		if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusScheduled); err != nil {
 			return fmt.Errorf("create pre-gate job: %w", err)
 		}
 
 		// Mod jobs: step_index starts at 2000, increment by 1000
+		// All mod jobs start as 'created' - server will schedule them after prior job completes.
 		for i, modInterface := range mods {
 			modImage := ""
 			if modMap, ok := modInterface.(map[string]interface{}); ok {
@@ -324,14 +321,14 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 			}
 			jobName := fmt.Sprintf("mod-%d", i)
 			stepIndex := float64(2000 + i*1000)
-			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage); err != nil {
+			if err := createJobWithIndex(ctx, st, runID, jobName, "mod", stepIndex, modImage, store.JobStatusCreated); err != nil {
 				return fmt.Errorf("create mod job %d: %w", i, err)
 			}
 		}
 
-		// Post-gate job: after all mods
+		// Post-gate job: after all mods - starts as 'created'
 		postGateIndex := float64(2000 + len(mods)*1000)
-		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, ""); err != nil {
+		if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", postGateIndex, "", store.JobStatusCreated); err != nil {
 			return fmt.Errorf("create post-gate job: %w", err)
 		}
 		return nil
@@ -350,22 +347,25 @@ func createJobsFromSpec(ctx context.Context, st store.Store, runID pgtype.UUID, 
 }
 
 // createSingleModJob creates the standard 3-job pipeline: pre-gate, mod-0, post-gate.
+// Server-driven scheduling: first job (pre-gate) is 'scheduled', rest are 'created'.
 func createSingleModJob(ctx context.Context, st store.Store, runID pgtype.UUID, modImage string) error {
-	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, ""); err != nil {
+	// Pre-gate is scheduled (ready to claim), others are created (wait for server to schedule).
+	if err := createJobWithIndex(ctx, st, runID, "pre-gate", "pre_gate", 1000, "", store.JobStatusScheduled); err != nil {
 		return fmt.Errorf("create pre-gate job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", 2000, modImage); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, "mod-0", "mod", 2000, modImage, store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create mod job: %w", err)
 	}
-	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", 3000, ""); err != nil {
+	if err := createJobWithIndex(ctx, st, runID, "post-gate", "post_gate", 3000, "", store.JobStatusCreated); err != nil {
 		return fmt.Errorf("create post-gate job: %w", err)
 	}
 	return nil
 }
 
-// createJobWithIndex creates a job with the given step_index and metadata.
+// createJobWithIndex creates a job with the given step_index, status, and metadata.
 // modType identifies the job phase ("pre_gate", "mod", "post_gate", "heal").
-func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string) error {
+// status should be JobStatusScheduled for the first job, JobStatusCreated for others.
+func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, name, modType string, stepIndex float64, modImage string, status store.JobStatus) error {
 	// Build job metadata with type information.
 	jobMeta := modsapi.StageMetadata{
 		ModType:  modType,
@@ -376,11 +376,11 @@ func createJobWithIndex(ctx context.Context, st store.Store, runID pgtype.UUID, 
 		return fmt.Errorf("marshal job metadata: %w", err)
 	}
 
-	// Create the job with step_index.
+	// Create the job with step_index and status.
 	_, err = st.CreateJob(ctx, store.CreateJobParams{
 		RunID:     runID,
 		Name:      name,
-		Status:    store.JobStatusPending,
+		Status:    status,
 		StepIndex: stepIndex,
 		Meta:      metaBytes,
 	})

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
 
@@ -74,9 +75,9 @@ func (c *ClaimManager) claimAndExecuteBuildGateJob(ctx context.Context) (bool, e
 
 	// Decode claim response containing job ID and request payload.
 	var claimResp struct {
-		JobID   string `json:"job_id"`
-		Request any    `json:"request"` // Arbitrary JSON; re-decode below.
-		Status  string `json:"status"`
+		JobID   types.JobID `json:"job_id"`
+		Request any         `json:"request"` // Arbitrary JSON; re-decode below.
+		Status  string      `json:"status"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&claimResp); err != nil {
 		return false, fmt.Errorf("decode claim response: %w", err)
@@ -120,8 +121,8 @@ func (c *ClaimManager) claimAndExecuteBuildGateJob(ctx context.Context) (bool, e
 //   - status: "completed" if execErr is nil, "failed" otherwise.
 //   - result: BuildGateStageMetadata if execution succeeded.
 //   - error: error message string if execErr is non-nil.
-func (c *ClaimManager) completeBuildGateJob(ctx context.Context, jobID string, result *contracts.BuildGateStageMetadata, execErr error) error {
-	completeURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/complete", c.cfg.ServerURL, c.cfg.NodeID, jobID)
+func (c *ClaimManager) completeBuildGateJob(ctx context.Context, jobID types.JobID, result *contracts.BuildGateStageMetadata, execErr error) error {
+	completeURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/complete", c.cfg.ServerURL, c.cfg.NodeID, jobID.String())
 
 	payload := struct {
 		Status string                            `json:"status"`
@@ -171,8 +172,8 @@ func (c *ClaimManager) completeBuildGateJob(ctx context.Context, jobID string, r
 
 // ackBuildGateJobStart sends POST /v1/nodes/{id}/buildgate/{job_id}/ack to mark job as running.
 // This transitions the job from "assigned" to "running" state before execution begins.
-func (c *ClaimManager) ackBuildGateJobStart(ctx context.Context, jobID string) error {
-	ackURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/ack", c.cfg.ServerURL, c.cfg.NodeID, jobID)
+func (c *ClaimManager) ackBuildGateJobStart(ctx context.Context, jobID types.JobID) error {
+	ackURL := fmt.Sprintf("%s/v1/nodes/%s/buildgate/%s/ack", c.cfg.ServerURL, c.cfg.NodeID, jobID.String())
 
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

@@ -44,20 +44,20 @@ func TestLabSmoke(t *testing.T) {
 	}
 	t.Logf("Created run: id=%v, repo_url=%s, status=%s", run.ID, run.RepoUrl, run.Status)
 
-	// Step 4: Simulate node operations - Create a stage for the run.
-	stage, err := db.CreateStage(ctx, store.CreateStageParams{
+	// Step 4: Simulate node operations - Create a job for the run.
+	job, err := db.CreateJob(ctx, store.CreateJobParams{
 		RunID:  run.ID,
 		Name:   "build",
-		Status: store.StageStatusRunning,
+		Status: store.JobStatusRunning,
 		Meta:   []byte(`{"type":"build","tool":"make"}`),
 	})
 	if err != nil {
-		t.Fatalf("CreateStage() failed: %v", err)
+		t.Fatalf("CreateJob() failed: %v", err)
 	}
-	t.Logf("Created stage: id=%v, run_id=%v, name=%s", stage.ID, stage.RunID, stage.Name)
+	t.Logf("Created job: id=%v, run_id=%v, name=%s", job.ID, job.RunID, job.Name)
 
 	// Step 5: Simulate node appends - Create logs (simulating log streaming from node).
-	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build stage\n")
+	logData := []byte("INFO: Starting smoke test run\nINFO: Cloning repository\nINFO: Running build job\n")
 	log, err := db.CreateLog(ctx, store.CreateLogParams{
 		RunID:   run.ID,
 		ChunkNo: 0,
@@ -94,14 +94,14 @@ index 1234567..abcdefg 100644
 	diffSummary := []byte(`{"files_changed":1,"insertions":1,"deletions":0}`)
 	diff, err := db.CreateDiff(ctx, store.CreateDiffParams{
 		RunID:   run.ID,
-		StageID: stage.ID,
+		JobID:   job.ID,
 		Patch:   diffPatch,
 		Summary: diffSummary,
 	})
 	if err != nil {
 		t.Fatalf("CreateDiff() failed: %v", err)
 	}
-	t.Logf("Created diff: id=%v, run_id=%v, stage_id=%v, patch_len=%d", diff.ID, diff.RunID, diff.StageID, len(diff.Patch))
+	t.Logf("Created diff: id=%v, run_id=%v, job_id=%v, patch_len=%d", diff.ID, diff.RunID, diff.JobID, len(diff.Patch))
 
 	// Step 7: Assert logs are stored - Verify logs can be listed by run.
 	logs, err := db.ListLogsByRun(ctx, run.ID)
@@ -140,8 +140,8 @@ index 1234567..abcdefg 100644
 		if diffs[0].RunID.Bytes != run.ID.Bytes {
 			t.Errorf("Diff run_id mismatch: expected %v, got %v", run.ID, diffs[0].RunID)
 		}
-		if diffs[0].StageID.Bytes != stage.ID.Bytes {
-			t.Errorf("Diff stage_id mismatch: expected %v, got %v", stage.ID, diffs[0].StageID)
+		if diffs[0].JobID.Bytes != job.ID.Bytes {
+			t.Errorf("Diff job_id mismatch: expected %v, got %v", job.ID, diffs[0].JobID)
 		}
 		if string(diffs[0].Patch) != string(diffPatch) {
 			t.Errorf("Diff patch mismatch")

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 )
 
@@ -33,10 +34,11 @@ func TestClaimLoop(t *testing.T) {
 			calls = append(calls, "claim")
 			// Return a run to claim.
 			resp := ClaimResponse{
-				ID:        "run-123",
+				ID:        types.RunID("run-123"),
+				JobID:     types.JobID("job-123"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
-				NodeID:    "test-node",
+				NodeID:    types.NodeID("test-node"),
 				BaseRef:   "main",
 				TargetRef: "feature-branch",
 			}
@@ -73,7 +75,7 @@ func TestClaimLoop(t *testing.T) {
 	// Create controller.
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	// Create claim manager.
@@ -165,7 +167,7 @@ func TestClaimLoopNoWork(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -245,7 +247,7 @@ func TestClaimLoopBackoff(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -340,10 +342,11 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 			// Return success to reset backoff.
 			resp := ClaimResponse{
-				ID:        "run-reset",
+				ID:        types.RunID("run-reset"),
+				JobID:     types.JobID("job-reset"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
-				NodeID:    "test-node",
+				NodeID:    types.NodeID("test-node"),
 				BaseRef:   "main",
 				TargetRef: "feature",
 			}
@@ -372,7 +375,7 @@ func TestClaimLoopBackoffReset(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -451,10 +454,11 @@ func TestClaimLoopAckFailure(t *testing.T) {
 			return
 		case "/v1/nodes/test-node/claim":
 			resp := ClaimResponse{
-				ID:        "run-456",
+				ID:        types.RunID("run-456"),
+				JobID:     types.JobID("job-456"),
 				RepoURL:   "https://github.com/test/repo",
 				Status:    "assigned",
-				NodeID:    "test-node",
+				NodeID:    types.NodeID("test-node"),
 				BaseRef:   "main",
 				TargetRef: "feature",
 			}
@@ -485,7 +489,7 @@ func TestClaimLoopAckFailure(t *testing.T) {
 
 	controller := &runController{
 		cfg:  cfg,
-		runs: make(map[string]*runContext),
+		jobs: make(map[string]*jobContext),
 	}
 
 	claimer, err := NewClaimManager(cfg, controller)
@@ -529,10 +533,11 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 
 	commit := "deadbeef"
 	claim := ClaimResponse{
-		ID:        "run-map-1",
+		ID:        types.RunID("run-map-1"),
+		JobID:     types.JobID("job-map-1"),
 		RepoURL:   "https://github.com/acme/thing.git",
 		Status:    "assigned",
-		NodeID:    "test-node",
+		NodeID:    types.NodeID("test-node"),
 		BaseRef:   "main",
 		TargetRef: "feature/x",
 		CommitSha: &commit,
@@ -593,7 +598,7 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 		t.Fatalf("controller.StartRun not called")
 	}
 	got := mock.lastStart
-	if got.RunID.String() != claim.ID {
+	if got.RunID != claim.ID {
 		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
 	}
 	if got.RepoURL.String() != claim.RepoURL {
@@ -616,17 +621,19 @@ func TestClaimLoop_MapsClaimToStartRunRequest(t *testing.T) {
 func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	t.Parallel()
 
-	stepIndex := int32(1)
+	stepIndex := types.StepIndex(2000) // Job step_index uses StepIndex type
 	commit := "abc123"
 	claim := ClaimResponse{
-		ID:        "run-step-map",
+		ID:        types.RunID("run-step-map"),
+		JobID:     types.JobID("job-123-step-map"),
+		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi.git",
 		Status:    "assigned",
-		NodeID:    "test-node",
+		NodeID:    types.NodeID("test-node"),
 		BaseRef:   "main",
 		TargetRef: "feature/multi-step",
 		CommitSha: &commit,
-		StepIndex: &stepIndex, // Step-level claim: node executes only step 1.
+		StepIndex: stepIndex, // Job step_index: StepIndex type.
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -688,31 +695,24 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	}
 	got := mock.lastStart
 
-	// Verify StepIndex is present and matches the claim.
-	if got.StepIndex == nil {
-		t.Fatalf("StartRunRequest.StepIndex is nil, expected %d", stepIndex)
-	}
-	if *got.StepIndex != stepIndex {
-		t.Errorf("StepIndex=%d want %d", *got.StepIndex, stepIndex)
+	// Verify StepIndex matches the claim.
+	if got.StepIndex != stepIndex {
+		t.Errorf("StepIndex=%.0f want %.0f", got.StepIndex, stepIndex)
 	}
 
-	// Verify ack request included step_index.
+	// Verify ack request included job_id (not step_index).
 	if ackPayload == nil {
 		t.Fatal("ack payload not captured")
 	}
-	ackStepIndex, ok := ackPayload["step_index"]
+	ackJobID, ok := ackPayload["job_id"]
 	if !ok {
-		t.Error("ack payload missing step_index field")
-	} else {
-		// JSON numbers decode as float64.
-		ackStepIndexFloat, ok := ackStepIndex.(float64)
-		if !ok || int32(ackStepIndexFloat) != stepIndex {
-			t.Errorf("ack step_index=%v want %d", ackStepIndex, stepIndex)
-		}
+		t.Error("ack payload missing job_id field")
+	} else if ackJobID != claim.JobID.String() {
+		t.Errorf("ack job_id=%v want %s", ackJobID, claim.JobID)
 	}
 
 	// Verify other fields remain correct.
-	if got.RunID.String() != claim.ID {
+	if got.RunID != claim.ID {
 		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
 	}
 	if got.RepoURL.String() != claim.RepoURL {
@@ -726,140 +726,45 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 	}
 }
 
-// TestClaimLoop_StepIndexOmittedForWholeRun verifies that when claiming a
-// whole run (no step_index in ClaimResponse), StepIndex remains nil in
-// StartRunRequest, enabling traditional single-node multi-step execution.
-func TestClaimLoop_StepIndexOmittedForWholeRun(t *testing.T) {
-	t.Parallel()
-
-	commit := "xyz789"
-	claim := ClaimResponse{
-		ID:        "run-whole",
-		RepoURL:   "https://github.com/acme/single.git",
-		Status:    "assigned",
-		NodeID:    "test-node",
-		BaseRef:   "main",
-		TargetRef: "feature/single-node",
-		CommitSha: &commit,
-		// StepIndex is nil → whole-run claim.
-		StartedAt: time.Now().UTC().Format(time.RFC3339),
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-
-	// HTTP test server that returns a whole-run claim.
-	var ackPayload map[string]interface{}
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/nodes/test-node/buildgate/claim":
-			w.WriteHeader(http.StatusNoContent)
-			return
-		case "/v1/nodes/test-node/claim":
-			// Return whole-run claim without step_index.
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(claim)
-		case "/v1/nodes/test-node/ack":
-			// Capture ack payload to verify step_index is absent.
-			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
-			w.WriteHeader(http.StatusNoContent)
-		case "/v1/nodes/test-node/complete":
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer ts.Close()
-
-	// Capture StartRunRequest via a mock controller.
-	mock := &mockRunController{}
-
-	cfg := Config{
-		ServerURL: ts.URL,
-		NodeID:    "test-node",
-		HTTP:      HTTPConfig{TLS: TLSConfig{Enabled: false}},
-	}
-
-	claimer, err := NewClaimManager(cfg, mock)
-	if err != nil {
-		t.Fatalf("NewClaimManager: %v", err)
-	}
-	// Override backoff policy to speed up test.
-	testPolicy := backoff.Policy{
-		InitialInterval: 10 * time.Millisecond,
-		MaxInterval:     20 * time.Millisecond,
-		Multiplier:      2.0,
-		MaxElapsedTime:  0,
-		MaxAttempts:     0,
-	}
-	claimer.backoff = backoff.NewStatefulBackoff(testPolicy)
-
-	// Run briefly to process one claim.
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	defer cancel()
-	_ = claimer.Start(ctx)
-
-	// Verify controller.StartRun was called.
-	if !mock.startCalled {
-		t.Fatalf("controller.StartRun not called")
-	}
-	got := mock.lastStart
-
-	// Verify StepIndex is nil for whole-run execution.
-	if got.StepIndex != nil {
-		t.Errorf("StartRunRequest.StepIndex=%v want nil (whole-run execution)", *got.StepIndex)
-	}
-
-	// Verify ack request does NOT include step_index.
-	if ackPayload == nil {
-		t.Fatal("ack payload not captured")
-	}
-	if _, exists := ackPayload["step_index"]; exists {
-		t.Errorf("ack payload contains step_index for whole-run claim: %v", ackPayload["step_index"])
-	}
-
-	// Verify other fields remain correct.
-	if got.RunID.String() != claim.ID {
-		t.Errorf("RunID=%q want %q", got.RunID, claim.ID)
-	}
-	if got.RepoURL.String() != claim.RepoURL {
-		t.Errorf("RepoURL=%q want %q", got.RepoURL, claim.RepoURL)
-	}
-}
-
 // TestClaimLoop_MultipleNodesSingleRun simulates two distinct nodes claiming
 // different steps of the same multi-step run, demonstrating end-to-end
 // step-level claiming and execution isolation.
 func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	t.Parallel()
 
-	runID := "run-multi-node-123"
+	runID := types.RunID("run-multi-node-123")
 	commit := "deadbeef"
 
-	// Node1 claims step 0.
-	stepIndex0 := int32(0)
+	// Node1 claims job 0 (pre-gate).
+	stepIndex0 := types.StepIndex(1000)
 	claim0 := ClaimResponse{
 		ID:        runID,
+		JobID:     types.JobID("job-node1-pregate"),
+		JobName:   "pre-gate",
 		RepoURL:   "https://github.com/acme/multi-node.git",
 		Status:    "assigned",
-		NodeID:    "node-1",
+		NodeID:    types.NodeID("node-1"),
 		BaseRef:   "main",
 		TargetRef: "feature/parallel-steps",
 		CommitSha: &commit,
-		StepIndex: &stepIndex0,
+		StepIndex: stepIndex0,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
 
-	// Node2 claims step 1.
-	stepIndex1 := int32(1)
+	// Node2 claims job 1 (mod-0).
+	stepIndex1 := types.StepIndex(2000)
 	claim1 := ClaimResponse{
 		ID:        runID,
+		JobID:     types.JobID("job-node2-mod0"),
+		JobName:   "mod-0",
 		RepoURL:   "https://github.com/acme/multi-node.git",
 		Status:    "assigned",
-		NodeID:    "node-2",
+		NodeID:    types.NodeID("node-2"),
 		BaseRef:   "main",
 		TargetRef: "feature/parallel-steps",
 		CommitSha: &commit,
-		StepIndex: &stepIndex1,
+		StepIndex: stepIndex1,
 		StartedAt: time.Now().UTC().Format(time.RFC3339),
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -906,17 +811,14 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	defer cancel1()
 	_ = claimer1.Start(ctx1)
 
-	// Verify node-1 claimed step 0.
+	// Verify node-1 claimed job 0 (pre-gate).
 	if !mock1.startCalled {
 		t.Fatalf("node-1: controller.StartRun not called")
 	}
-	if mock1.lastStart.StepIndex == nil {
-		t.Fatalf("node-1: StepIndex is nil, expected %d", stepIndex0)
+	if mock1.lastStart.StepIndex != stepIndex0 {
+		t.Errorf("node-1: StepIndex=%.0f want %.0f", mock1.lastStart.StepIndex, stepIndex0)
 	}
-	if *mock1.lastStart.StepIndex != stepIndex0 {
-		t.Errorf("node-1: StepIndex=%d want %d", *mock1.lastStart.StepIndex, stepIndex0)
-	}
-	if mock1.lastStart.RunID.String() != runID {
+	if mock1.lastStart.RunID != runID {
 		t.Errorf("node-1: RunID=%q want %q", mock1.lastStart.RunID, runID)
 	}
 
@@ -955,17 +857,14 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	defer cancel2()
 	_ = claimer2.Start(ctx2)
 
-	// Verify node-2 claimed step 1.
+	// Verify node-2 claimed job 1 (mod-0).
 	if !mock2.startCalled {
 		t.Fatalf("node-2: controller.StartRun not called")
 	}
-	if mock2.lastStart.StepIndex == nil {
-		t.Fatalf("node-2: StepIndex is nil, expected %d", stepIndex1)
+	if mock2.lastStart.StepIndex != stepIndex1 {
+		t.Errorf("node-2: StepIndex=%.0f want %.0f", mock2.lastStart.StepIndex, stepIndex1)
 	}
-	if *mock2.lastStart.StepIndex != stepIndex1 {
-		t.Errorf("node-2: StepIndex=%d want %d", *mock2.lastStart.StepIndex, stepIndex1)
-	}
-	if mock2.lastStart.RunID.String() != runID {
+	if mock2.lastStart.RunID != runID {
 		t.Errorf("node-2: RunID=%q want %q", mock2.lastStart.RunID, runID)
 	}
 
@@ -973,9 +872,7 @@ func TestClaimLoop_MultipleNodesSingleRun(t *testing.T) {
 	if mock1.lastStart.RunID != mock2.lastStart.RunID {
 		t.Errorf("nodes executed different runs: node-1=%q node-2=%q", mock1.lastStart.RunID, mock2.lastStart.RunID)
 	}
-	if mock1.lastStart.StepIndex != nil && mock2.lastStart.StepIndex != nil {
-		if *mock1.lastStart.StepIndex == *mock2.lastStart.StepIndex {
-			t.Error("nodes executed the same step, expected different step indices")
-		}
+	if mock1.lastStart.StepIndex == mock2.lastStart.StepIndex {
+		t.Error("nodes executed the same step, expected different step indices")
 	}
 }

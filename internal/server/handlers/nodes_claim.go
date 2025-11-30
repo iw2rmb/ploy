@@ -16,11 +16,15 @@ import (
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
-// claimJobHandler allows nodes to claim a pending job for execution.
-// Returns the assigned job with its parent run metadata or 204 No Content if no work is available.
+// claimJobHandler allows nodes to claim a scheduled job for execution.
+// Returns the claimed job with its parent run metadata or 204 No Content if no work is available.
+//
+// Server-driven scheduling: only 'scheduled' jobs can be claimed. When a job completes,
+// the server schedules the next 'created' job by transitioning it to 'scheduled'.
 //
 // Jobs are the unified execution unit for all work types: pre-gate, mod, heal, re-gate, post-gate.
 // Jobs are ordered by step_index (FLOAT) to support dynamic insertion of healing jobs.
+// Jobs transition directly from 'scheduled' to 'running' on claim (no 'assigned' intermediate state).
 func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Extract node id from path parameter.
@@ -50,10 +54,10 @@ func claimJobHandler(st store.Store, configHolder *ConfigHolder) http.HandlerFun
 			return
 		}
 
-		// Claim the next pending job.
+		// Claim the next scheduled job.
 		job, err := st.ClaimJob(r.Context(), nodeID)
 		if err != nil {
-			// No pending jobs available; return 204 No Content.
+			// No scheduled jobs available; return 204 No Content.
 			if errors.Is(err, pgx.ErrNoRows) {
 				w.WriteHeader(http.StatusNoContent)
 				slog.Debug("claim: no work available", "node_id", nodeIDStr)
@@ -109,24 +113,26 @@ func buildAndSendJobClaimResponse(
 	mergedSpec = mergeGitLabConfigIntoSpec(mergedSpec, gitlabCfg)
 
 	resp := struct {
-		ID        string          `json:"id"`         // Run ID
-		JobID     string          `json:"job_id"`     // Job ID
-		JobName   string          `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
-		StepIndex float64         `json:"step_index"` // Job ordering index
-		RepoURL   string          `json:"repo_url"`
-		Status    store.RunStatus `json:"status"`
-		NodeID    string          `json:"node_id"`
-		BaseRef   string          `json:"base_ref"`
-		TargetRef string          `json:"target_ref"`
-		CommitSha *string         `json:"commit_sha,omitempty"`
-		StartedAt string          `json:"started_at"`
-		CreatedAt string          `json:"created_at"`
-		Spec      json.RawMessage `json:"spec,omitempty"`
+		ID        string                `json:"id"`         // Run ID
+		JobID     string                `json:"job_id"`     // Job ID
+		JobName   string                `json:"job_name"`   // Job name (e.g., "pre-gate", "mod-0")
+		JobMeta   json.RawMessage       `json:"job_meta"`   // Job metadata (ModType, ModImage, etc.)
+		StepIndex domaintypes.StepIndex `json:"step_index"` // Job ordering index
+		RepoURL   string                `json:"repo_url"`
+		Status    store.RunStatus       `json:"status"`
+		NodeID    string                `json:"node_id"`
+		BaseRef   string                `json:"base_ref"`
+		TargetRef string                `json:"target_ref"`
+		CommitSha *string               `json:"commit_sha,omitempty"`
+		StartedAt string                `json:"started_at"`
+		CreatedAt string                `json:"created_at"`
+		Spec      json.RawMessage       `json:"spec,omitempty"`
 	}{
 		ID:        uuid.UUID(run.ID.Bytes).String(),
 		JobID:     jobIDStr,
 		JobName:   job.Name,
-		StepIndex: job.StepIndex,
+		JobMeta:   job.Meta,
+		StepIndex: domaintypes.StepIndex(job.StepIndex),
 		RepoURL:   run.RepoUrl,
 		Status:    run.Status,
 		NodeID:    uuid.UUID(job.NodeID.Bytes).String(),

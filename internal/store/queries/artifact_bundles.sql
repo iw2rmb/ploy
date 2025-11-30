@@ -7,13 +7,13 @@ SELECT * FROM artifact_bundles
 WHERE run_id = $1
 ORDER BY created_at DESC;
 
--- name: ListArtifactBundlesByRunAndStage :many
+-- name: ListArtifactBundlesByRunAndJob :many
 SELECT * FROM artifact_bundles
-WHERE run_id = $1 AND stage_id = $2
+WHERE run_id = $1 AND job_id = $2
 ORDER BY created_at DESC;
 
 -- name: CreateArtifactBundle :one
-INSERT INTO artifact_bundles (run_id, stage_id, build_id, name, bundle, cid, digest)
+INSERT INTO artifact_bundles (run_id, job_id, build_id, name, bundle, cid, digest)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 

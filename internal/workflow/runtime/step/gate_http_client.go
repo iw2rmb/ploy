@@ -30,6 +30,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/iw2rmb/ploy/internal/domain/types"
 	"github.com/iw2rmb/ploy/internal/workflow/backoff"
 	"github.com/iw2rmb/ploy/internal/workflow/contracts"
 )
@@ -237,14 +238,14 @@ func (c *buildGateHTTPClient) Validate(ctx context.Context, req contracts.BuildG
 // GetJob retrieves the status of a build gate job via GET /v1/buildgate/jobs/{id}.
 // Uses exponential backoff with retries for transient errors (5xx, network issues).
 // Returns a permanent error (no retry) for 4xx client errors (e.g., job not found).
-func (c *buildGateHTTPClient) GetJob(ctx context.Context, jobID string) (*contracts.BuildGateJobStatusResponse, error) {
+func (c *buildGateHTTPClient) GetJob(ctx context.Context, jobID types.JobID) (*contracts.BuildGateJobStatusResponse, error) {
 	// Validate job ID.
-	if strings.TrimSpace(jobID) == "" {
+	if jobID.IsZero() {
 		return nil, backoff.Permanent(fmt.Errorf("job ID is required"))
 	}
 
 	// Build the job status endpoint URL (URL-escape the job ID for safety).
-	jobURL := fmt.Sprintf("%s/v1/buildgate/jobs/%s", c.serverURL, url.PathEscape(jobID))
+	jobURL := fmt.Sprintf("%s/v1/buildgate/jobs/%s", c.serverURL, url.PathEscape(jobID.String()))
 
 	var resp *contracts.BuildGateJobStatusResponse
 

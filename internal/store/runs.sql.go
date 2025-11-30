@@ -28,7 +28,7 @@ func (q *Queries) AckRunStart(ctx context.Context, id pgtype.UUID) error {
 const createRun = `-- name: CreateRun :one
 INSERT INTO runs (repo_url, spec, created_by, status, base_ref, target_ref, commit_sha)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
+RETURNING id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats
 `
 
 type CreateRunParams struct {
@@ -58,7 +58,6 @@ func (q *Queries) CreateRun(ctx context.Context, arg CreateRunParams) (Run, erro
 		&i.Spec,
 		&i.CreatedBy,
 		&i.Status,
-		&i.Reason,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -82,7 +81,7 @@ func (q *Queries) DeleteRun(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getRun = `-- name: GetRun :one
-SELECT id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 WHERE id = $1
 `
 
@@ -95,7 +94,6 @@ func (q *Queries) GetRun(ctx context.Context, id pgtype.UUID) (Run, error) {
 		&i.Spec,
 		&i.CreatedBy,
 		&i.Status,
-		&i.Reason,
 		&i.CreatedAt,
 		&i.StartedAt,
 		&i.FinishedAt,
@@ -124,7 +122,7 @@ func (q *Queries) GetRunTiming(ctx context.Context, id pgtype.UUID) (RunsTiming,
 }
 
 const listRuns = `-- name: ListRuns :many
-SELECT id, repo_url, spec, created_by, status, reason, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
+SELECT id, repo_url, spec, created_by, status, created_at, started_at, finished_at, node_id, base_ref, target_ref, commit_sha, stats FROM runs
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -149,7 +147,6 @@ func (q *Queries) ListRuns(ctx context.Context, arg ListRunsParams) ([]Run, erro
 			&i.Spec,
 			&i.CreatedBy,
 			&i.Status,
-			&i.Reason,
 			&i.CreatedAt,
 			&i.StartedAt,
 			&i.FinishedAt,
@@ -205,46 +202,34 @@ func (q *Queries) ListRunsTimings(ctx context.Context, arg ListRunsTimingsParams
 
 const updateRunCompletion = `-- name: UpdateRunCompletion :exec
 UPDATE runs
-SET status = $2, reason = $3, finished_at = now(), stats = $4
+SET status = $2, finished_at = now(), stats = $3
 WHERE id = $1
 `
 
 type UpdateRunCompletionParams struct {
 	ID     pgtype.UUID `json:"id"`
 	Status RunStatus   `json:"status"`
-	Reason *string     `json:"reason"`
 	Stats  []byte      `json:"stats"`
 }
 
 func (q *Queries) UpdateRunCompletion(ctx context.Context, arg UpdateRunCompletionParams) error {
-	_, err := q.db.Exec(ctx, updateRunCompletion,
-		arg.ID,
-		arg.Status,
-		arg.Reason,
-		arg.Stats,
-	)
+	_, err := q.db.Exec(ctx, updateRunCompletion, arg.ID, arg.Status, arg.Stats)
 	return err
 }
 
 const updateRunStatus = `-- name: UpdateRunStatus :exec
 UPDATE runs
-SET status = $2, reason = $3, finished_at = $4
+SET status = $2, finished_at = $3
 WHERE id = $1
 `
 
 type UpdateRunStatusParams struct {
 	ID         pgtype.UUID        `json:"id"`
 	Status     RunStatus          `json:"status"`
-	Reason     *string            `json:"reason"`
 	FinishedAt pgtype.Timestamptz `json:"finished_at"`
 }
 
 func (q *Queries) UpdateRunStatus(ctx context.Context, arg UpdateRunStatusParams) error {
-	_, err := q.db.Exec(ctx, updateRunStatus,
-		arg.ID,
-		arg.Status,
-		arg.Reason,
-		arg.FinishedAt,
-	)
+	_, err := q.db.Exec(ctx, updateRunStatus, arg.ID, arg.Status, arg.FinishedAt)
 	return err
 }

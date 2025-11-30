@@ -67,12 +67,11 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Transition to canceled; set finished_at to now and persist optional reason
+		// Transition to canceled; set finished_at to now.
 		now := time.Now().UTC()
 		err = st.UpdateRunStatus(r.Context(), store.UpdateRunStatusParams{
 			ID:         pgID,
 			Status:     store.RunStatusCanceled,
-			Reason:     req.Reason,
 			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		})
 		if err != nil {
@@ -81,10 +80,10 @@ func cancelTicketHandler(st store.Store, eventsService *events.Service) http.Han
 			return
 		}
 
-		// Best-effort job updates to canceled — only for pending|assigned|running jobs
+		// Best-effort job updates to canceled — only for created|scheduled|running jobs
 		if jobs, err := st.ListJobsByRun(r.Context(), pgID); err == nil && len(jobs) > 0 {
 			for _, job := range jobs {
-				if job.Status != store.JobStatusPending && job.Status != store.JobStatusAssigned && job.Status != store.JobStatusRunning {
+				if job.Status != store.JobStatusCreated && job.Status != store.JobStatusScheduled && job.Status != store.JobStatusRunning {
 					continue
 				}
 				// Compute duration if started

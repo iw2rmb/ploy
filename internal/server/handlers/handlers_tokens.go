@@ -92,7 +92,7 @@ func createAPITokenHandler(st store.Store, tokenSecret string) http.HandlerFunc 
 		err = st.InsertAPIToken(r.Context(), store.InsertAPITokenParams{
 			TokenHash:   tokenHash,
 			TokenID:     claims.ID,
-			ClusterID:   clusterID,
+			ClusterID:   &clusterID,
 			Role:        string(normalizedRole),
 			Description: description,
 			IssuedAt:    pgtype.Timestamptz{Time: now, Valid: true},
@@ -151,7 +151,7 @@ func listAPITokensHandler(st store.Store) http.HandlerFunc {
 		}
 
 		// Query tokens from database.
-		tokens, err := st.ListAPITokens(r.Context(), clusterID)
+		tokens, err := st.ListAPITokens(r.Context(), &clusterID)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to list tokens: %v", err), http.StatusInternalServerError)
 			slog.Error("list api tokens: database query failed", "err", err)

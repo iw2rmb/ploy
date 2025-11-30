@@ -4,29 +4,31 @@ import (
 	"testing"
 )
 
-// TestConvertToStageStatus verifies that ConvertToStageStatus correctly maps
-// various string representations to canonical store.StageStatus values.
-func TestConvertToStageStatus(t *testing.T) {
+// TestConvertToJobStatus verifies that ConvertToJobStatus correctly maps
+// various string representations to canonical store.JobStatus values.
+func TestConvertToJobStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		input   string
-		want    StageStatus
+		want    JobStatus
 		wantErr bool
 	}{
 		// Direct matches
-		{name: "pending", input: "pending", want: StageStatusPending, wantErr: false},
-		{name: "running", input: "running", want: StageStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: StageStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: StageStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: StageStatusSkipped, wantErr: false},
-		{name: "canceled", input: "canceled", want: StageStatusCanceled, wantErr: false},
+		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
+		{name: "scheduled", input: "scheduled", want: JobStatusScheduled, wantErr: false},
+		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
+		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
+		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},
+		{name: "skipped", input: "skipped", want: JobStatusSkipped, wantErr: false},
+		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
 
 		// Mods API compatibility mappings
-		{name: "queued->pending", input: "queued", want: StageStatusPending, wantErr: false},
-		{name: "cancelled (UK)", input: "cancelled", want: StageStatusCanceled, wantErr: false},
-		{name: "cancelling", input: "cancelling", want: StageStatusCanceled, wantErr: false},
+		{name: "pending->created", input: "pending", want: JobStatusCreated, wantErr: false},
+		{name: "queued->created", input: "queued", want: JobStatusCreated, wantErr: false},
+		{name: "cancelled (UK)", input: "cancelled", want: JobStatusCanceled, wantErr: false},
+		{name: "cancelling", input: "cancelling", want: JobStatusCanceled, wantErr: false},
 
 		// Error cases
 		{name: "unknown", input: "unknown", want: "", wantErr: true},
@@ -37,13 +39,13 @@ func TestConvertToStageStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ConvertToStageStatus(tt.input)
+			got, err := ConvertToJobStatus(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ConvertToStageStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				t.Errorf("ConvertToJobStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("ConvertToStageStatus(%q) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("ConvertToJobStatus(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -94,25 +96,27 @@ func TestConvertToRunStatus(t *testing.T) {
 	}
 }
 
-// TestValidateStageStatus verifies that ValidateStageStatus correctly validates
-// canonical store.StageStatus values.
-func TestValidateStageStatus(t *testing.T) {
+// TestValidateJobStatus verifies that ValidateJobStatus correctly validates
+// canonical store.JobStatus values.
+func TestValidateJobStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name    string
 		input   string
-		want    StageStatus
+		want    JobStatus
 		wantErr bool
 	}{
-		{name: "pending", input: "pending", want: StageStatusPending, wantErr: false},
-		{name: "running", input: "running", want: StageStatusRunning, wantErr: false},
-		{name: "succeeded", input: "succeeded", want: StageStatusSucceeded, wantErr: false},
-		{name: "failed", input: "failed", want: StageStatusFailed, wantErr: false},
-		{name: "skipped", input: "skipped", want: StageStatusSkipped, wantErr: false},
-		{name: "canceled", input: "canceled", want: StageStatusCanceled, wantErr: false},
+		{name: "created", input: "created", want: JobStatusCreated, wantErr: false},
+		{name: "scheduled", input: "scheduled", want: JobStatusScheduled, wantErr: false},
+		{name: "running", input: "running", want: JobStatusRunning, wantErr: false},
+		{name: "succeeded", input: "succeeded", want: JobStatusSucceeded, wantErr: false},
+		{name: "failed", input: "failed", want: JobStatusFailed, wantErr: false},
+		{name: "skipped", input: "skipped", want: JobStatusSkipped, wantErr: false},
+		{name: "canceled", input: "canceled", want: JobStatusCanceled, wantErr: false},
 
 		// These should fail validation (non-canonical values)
+		{name: "pending invalid", input: "pending", want: "", wantErr: true},
 		{name: "queued invalid", input: "queued", want: "", wantErr: true},
 		{name: "cancelled invalid", input: "cancelled", want: "", wantErr: true},
 		{name: "cancelling invalid", input: "cancelling", want: "", wantErr: true},
@@ -123,13 +127,13 @@ func TestValidateStageStatus(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := ValidateStageStatus(tt.input)
+			got, err := ValidateJobStatus(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateStageStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+				t.Errorf("ValidateJobStatus(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("ValidateStageStatus(%q) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("ValidateJobStatus(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}

@@ -140,11 +140,11 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("decode claim response: %w", err)
 	}
 
-	slog.Info("claimed run", "run_id", claim.ID, "repo_url", claim.RepoURL)
+	slog.Info("claimed run", "run_id", claim.ID, "job_id", claim.JobID, "job_name", claim.JobName, "repo_url", claim.RepoURL)
 
 	// Send ack before execution.
-	// Include step_index if present (multi-step run) to trigger step-level ack.
-	if err := c.ackRun(ctx, claim.ID, claim.StepIndex); err != nil {
+	// Include job_id to acknowledge the specific job being executed.
+	if err := c.ackRun(ctx, claim.ID.String(), claim.JobID.String()); err != nil {
 		return true, fmt.Errorf("ack run: %w", err)
 	}
 
@@ -152,20 +152,26 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	// Parse spec into options/env and typed RunOptions.
 	optsFromSpec, envFromSpec, _ := parseSpec(claim.Spec)
 
+	// Parse job metadata to extract ModType for job-type dispatch.
+	var jobMeta JobMetadata
+	if len(claim.JobMeta) > 0 {
+		_ = json.Unmarshal(claim.JobMeta, &jobMeta)
+	}
+
 	startReq := StartRunRequest{
-		RunID:     types.RunID(claim.ID),
+		RunID:     claim.ID,    // Already types.RunID from ClaimResponse
+		JobID:     claim.JobID, // Already types.JobID from ClaimResponse
 		RepoURL:   types.RepoURL(claim.RepoURL),
 		BaseRef:   types.GitRef(claim.BaseRef),
 		TargetRef: types.GitRef(claim.TargetRef),
 		CommitSHA: types.CommitSHA(stringValue(claim.CommitSha)),
-		StepIndex: claim.StepIndex, // Present for multi-node step-level execution
+		StepIndex: claim.StepIndex, // Job step_index from server
+		ModType:   jobMeta.ModType, // Job type for dispatch (pre_gate, mod, post_gate, heal, re_gate)
 		Options:   optsFromSpec,
 		Env:       envFromSpec,
 	}
 
-	// Invoke controller.StartRun to execute the run or specific step.
-	// If StepIndex is present, only that step will be executed (multi-node execution).
-	// Otherwise, all steps are executed sequentially (single-node execution).
+	// Invoke controller.StartRun to execute the claimed job.
 	if err := c.controller.StartRun(ctx, startReq); err != nil {
 		// Even if StartRun fails, we've already claimed the work.
 		// The controller's executeRun will upload terminal status.
@@ -175,16 +181,15 @@ func (c *ClaimManager) claimAndExecute(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// ackRun sends POST /v1/nodes/{id}/ack to acknowledge run start.
-// If stepIndex is provided, transitions the run_step from "assigned" to "running" (multi-step run).
-// Otherwise, transitions the run from "assigned" to "running" (single-step or legacy run).
-func (c *ClaimManager) ackRun(ctx context.Context, runID string, stepIndex *int32) error {
+// ackRun sends POST /v1/nodes/{id}/ack to acknowledge job start.
+// Transitions the job from "assigned" to "running" and also updates the run status.
+func (c *ClaimManager) ackRun(ctx context.Context, runID string, jobID string) error {
 	ackURL := fmt.Sprintf("%s/v1/nodes/%s/ack", c.cfg.ServerURL, c.cfg.NodeID)
 
-	// Build payload with optional step_index for multi-step runs.
-	payload := map[string]interface{}{"run_id": runID}
-	if stepIndex != nil {
-		payload["step_index"] = *stepIndex
+	// Build payload with run_id and job_id.
+	payload := map[string]interface{}{
+		"run_id": runID,
+		"job_id": jobID,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -211,6 +216,6 @@ func (c *ClaimManager) ackRun(ctx context.Context, runID string, stepIndex *int3
 		return fmt.Errorf("ack failed: status %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	slog.Info("run acknowledged", "run_id", runID)
+	slog.Info("job acknowledged", "run_id", runID, "job_id", jobID)
 	return nil
 }

@@ -30,9 +30,9 @@ func TestCreateRunLogsHandler_Success(t *testing.T) {
 	ms := &mockStoreRunLogs{}
 	h := createRunLogHandler(ms, nil)
 	runID := uuid.New().String()
-	stageID := uuid.New().String()
+	jobID := uuid.New().String()
 	buildID := uuid.New().String()
-	payload := map[string]any{"stage_id": stageID, "build_id": buildID, "chunk_no": 2, "data": []byte("hello")}
+	payload := map[string]any{"job_id": jobID, "build_id": buildID, "chunk_no": 2, "data": []byte("hello")}
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs/"+runID+"/logs", bytes.NewReader(b))
 	req.SetPathValue("id", runID)

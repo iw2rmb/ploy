@@ -35,10 +35,10 @@ func NewDiffUploader(cfg Config) (*DiffUploader, error) {
 	}, nil
 }
 
-// UploadDiff compresses and uploads a diff to the server with optional step_index.
-// The step_index parameter enables multi-node execution by tagging diffs with their
-// logical step order, allowing rehydration to fetch diffs up to a specific step.
-func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, diffBytes []byte, summary types.DiffSummary, stepIndex *int32) error {
+// UploadDiff compresses and uploads a diff to the server.
+// The diff is associated with a specific job via the job_id parameter.
+// Step ordering is determined by the job's step_index in the database.
+func (u *DiffUploader) UploadDiff(ctx context.Context, runID types.RunID, jobID types.JobID, diffBytes []byte, summary types.DiffSummary) error {
 	// Gzip the diff content.
 	var gzBuf bytes.Buffer
 	gzWriter := gzip.NewWriter(&gzBuf)
@@ -58,14 +58,10 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, di
 	}
 
 	// Build request payload.
-	// Include step_index field for multi-step run ordering (nullable for backward compatibility).
+	// run_id and job_id are in the URL path, not the body.
 	payload := map[string]interface{}{
-		"run_id":  runID,
 		"patch":   gzippedDiff,
 		"summary": summary,
-	}
-	if stepIndex != nil {
-		payload["step_index"] = *stepIndex
 	}
 
 	body, err := json.Marshal(payload)
@@ -73,8 +69,8 @@ func (u *DiffUploader) UploadDiff(ctx context.Context, runID, stageID string, di
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	// Construct URL.
-	url := fmt.Sprintf("%s/v1/nodes/%s/stage/%s/diff", u.cfg.ServerURL, u.cfg.NodeID, stageID)
+	// Construct URL using job-scoped endpoint.
+	url := fmt.Sprintf("%s/v1/runs/%s/jobs/%s/diff", u.cfg.ServerURL, runID.String(), jobID.String())
 
 	// Create HTTP request.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
