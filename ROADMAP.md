@@ -440,7 +440,7 @@ Legend: [ ] todo, [x] done.
 
 ## 8. Consider job-level completion surface `/v1/jobs/{job_id}`
 
-- [ ] Evaluate and, if approved, introduce a job-level completion endpoint `/v1/jobs/{job_id}` — simplify node → server contract by addressing jobs directly
+- [x] Evaluate and, if approved, introduce a job-level completion endpoint `/v1/jobs/{job_id}` — simplify node → server contract by addressing jobs directly
   - Component: server router (`internal/server/handlers/register.go`), new handler (e.g., `internal/server/handlers/jobs_complete.go`), store interface (`internal/store/querier.go`), nodeagent `StatusUploader`, OpenAPI docs.
   - Scope:
     - Design:
