@@ -63,8 +63,8 @@ func TestEndToEndFlow(t *testing.T) {
 			case strings.HasPrefix(r.URL.Path, "/v1/runs/") && strings.Contains(r.URL.Path, "/jobs/") && strings.HasSuffix(r.URL.Path, "/artifact"):
 				// Artifact upload endpoint: /v1/runs/{run_id}/jobs/{job_id}/artifact
 				w.WriteHeader(http.StatusCreated)
-			case strings.HasPrefix(r.URL.Path, "/v1/nodes/") && strings.HasSuffix(r.URL.Path, "/complete"):
-				// Terminal status endpoint.
+			case strings.HasPrefix(r.URL.Path, "/v1/jobs/") && strings.HasSuffix(r.URL.Path, "/complete"):
+				// Job-level terminal status endpoint.
 				w.WriteHeader(http.StatusOK)
 			default:
 				t.Logf("unexpected endpoint called: %s", r.URL.Path)
@@ -140,7 +140,7 @@ func TestEndToEndFlow(t *testing.T) {
 		// Verify that at least the terminal status endpoint was called.
 		// (Other endpoints may or may not be called depending on how far execution got.)
 		t.Logf("Endpoints called: %+v", snapshot(endpointsCalled))
-		if get(endpointsCalled, "/v1/nodes/test-node-e2e/complete") < 1 {
+		if get(endpointsCalled, "/v1/jobs/test-job-e2e/complete") < 1 {
 			t.Errorf("terminal status endpoint was not called")
 		}
 	})
