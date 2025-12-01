@@ -650,7 +650,7 @@ func TestClaimLoop_StepIndexMapping(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(claim)
 		case "/v1/nodes/test-node/ack":
-			// Capture ack payload to verify step_index is sent.
+			// Capture ack payload to verify job_id is sent.
 			_ = json.NewDecoder(r.Body).Decode(&ackPayload)
 			w.WriteHeader(http.StatusNoContent)
 		case "/v1/nodes/test-node/complete":
