@@ -418,7 +418,7 @@ Legend: [ ] todo, [x] done.
 
 ## 7. Harmonize `Run` / `TicketStatus` schemas with new fields (`reason` → `stats`/`exit_code`)
 
-- [ ] Remove or redefine `reason` from run/ticket schemas and rely on `stats.exit_code` and metadata for failure context — prevent schema drift from DB model
+- [x] Remove or redefine `reason` from run/ticket schemas and rely on `stats.exit_code` and metadata for failure context — prevent schema drift from DB model
   - Component: `docs/api/components/schemas/controlplane.yaml`, any CLI that renders reasons, mods API (`internal/mods/api/types.go`) if it carries reason.
   - Scope:
     - In `controlplane.yaml`:
