@@ -35,25 +35,28 @@ func FuzzCompleteRun_StatsShapes(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, statsJSON []byte) {
+		// Set up job for GetJob lookup (job_id-based).
+		job := store.Job{
+			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning,
+			StepIndex: 1000,
+		}
 		st := &mockStore{
 			getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 			getRunResult: store.Run{
 				ID:     pgtype.UUID{Bytes: runID, Valid: true},
 				Status: store.RunStatusRunning,
 			},
-			listJobsByRunResult: []store.Job{{
-				ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-				RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-				NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-				Status:    store.JobStatusRunning,
-				StepIndex: 1000,
-			}},
+			getJobResult:        job,
+			listJobsByRunResult: []store.Job{job},
 		}
 		h := completeRunHandler(st, nil)
 
-		// Build payload with fuzzed stats; always send a terminal status.
+		// Build payload with fuzzed stats; always send a terminal status with job_id.
 		var payload map[string]any
-		_ = json.Unmarshal([]byte(`{"run_id":"`+runID.String()+`","status":"succeeded","step_index":1000}`), &payload)
+		_ = json.Unmarshal([]byte(`{"run_id":"`+runID.String()+`","job_id":"`+jobID.String()+`","status":"succeeded","step_index":1000}`), &payload)
 		var stats any
 		if err := json.Unmarshal(statsJSON, &stats); err == nil {
 			if m, ok := stats.(map[string]any); ok {
