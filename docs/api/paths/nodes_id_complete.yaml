@@ -1,50 +1,94 @@
+# Node job completion endpoint — marks a job as completed and drives run completion.
+# The nodeagent calls this endpoint when job execution finishes.
+# Uses job_id as the authoritative lookup key (avoids float equality issues with step_index).
 parameters:
   - in: path
     name: id
     required: true
     schema: { type: string, format: uuid }
     description: Node UUID
+
 post:
   tags: [Control]
-  summary: Mark run as completed (running → terminal)
+  summary: Mark job as completed and drive run completion
   description: |
-    Nodes call this endpoint when execution finishes to transition a run from
-    `running` to a terminal status. The server validates ownership and state,
-    sets `finished_at` to server time, stores an optional `reason`, and writes
-    `stats` (arbitrary JSON) into `runs.stats`.
+    Nodes call this endpoint when job execution finishes to transition a job from
+    `running` to a terminal status (succeeded, failed, or canceled). The server:
+
+    1. Validates node ownership and job state (must be `running`).
+    2. Transitions the job to terminal status with `finished_at`, `duration_ms`, and `exit_code`.
+    3. If the job succeeded, schedules the next job in the run (server-driven scheduling).
+    4. If a gate job failed, may create healing jobs and a re-gate job.
+    5. Checks if all jobs are terminal and, if so, derives run status gate-aware.
+
+    The `job_id` field is the authoritative key for job lookup — this avoids float
+    equality issues with `step_index`. The `step_index` is retained for logging/diagnostics.
   requestBody:
     required: true
     content:
       application/json:
         schema:
           type: object
-          required: [ run_id, status ]
+          # job_id is now required alongside run_id and status.
+          required: [ run_id, job_id, status ]
           properties:
             run_id:
               type: string
               format: uuid
-              description: The run ID to complete
+              description: The run ID that owns the job being completed
+            job_id:
+              type: string
+              format: uuid
+              description: |
+                The job ID to complete. This is the authoritative lookup key for
+                identifying which job to transition to terminal state.
             status:
               type: string
-              description: Terminal status
+              description: Terminal status derived from job execution
               enum: [ succeeded, failed, canceled ]
-            reason:
-              type: string
+            exit_code:
+              type: integer
+              format: int32
               nullable: true
-              description: Optional human-readable failure/cancel reason
+              description: |
+                Exit code reported by the node for this job. Typically 0 for success,
+                non-zero for failure. Stored in jobs.exit_code for diagnostics.
+            step_index:
+              type: number
+              format: double
+              nullable: true
+              description: |
+                Optional step index for logging and diagnostics. The job_id is the
+                authoritative lookup key; step_index is retained for compatibility
+                and human-readable logging.
             stats:
               type: object
-              description: JSON object with run statistics/metrics
+              description: JSON object with job-level statistics/metrics (stored in runs.stats)
   responses:
     '204':
-      description: Completed; run transitioned to terminal status
+      description: Completed; job transitioned to terminal status
     '400':
-      description: Bad Request (invalid IDs, non-terminal status, or malformed `stats` JSON)
+      description: |
+        Bad Request — possible causes:
+        - Missing or invalid `id` path parameter (node UUID)
+        - Missing or invalid `run_id` (UUID format)
+        - Missing or invalid `job_id` (UUID format)
+        - Missing `status` or non-terminal status value
+        - Job does not belong to the specified run
+        - Malformed `stats` JSON (must be a JSON object)
     '403':
-      description: Forbidden (run not assigned to this node)
+      description: Forbidden — job is not assigned to this node
     '404':
-      description: Node or run not found
+      description: |
+        Not Found — possible causes:
+        - Node not found (invalid node UUID)
+        - Run not found (invalid run UUID)
+        - Job not found (invalid job UUID)
     '409':
-      description: Conflict (run not in `running` state)
+      description: |
+        Conflict — job not in `running` state. This occurs when:
+        - The job is still in `created` or `scheduled` state (not yet started)
+        - The job has already been completed (succeeded, failed, or canceled)
+        - A duplicate completion request was received after the job transitioned
     '500':
       description: Internal server error
