@@ -173,36 +173,6 @@ func (q *Queries) GetJob(ctx context.Context, id pgtype.UUID) (Job, error) {
 	return i, err
 }
 
-const getJobByRunAndStepIndex = `-- name: GetJobByRunAndStepIndex :one
-SELECT id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
-WHERE run_id = $1 AND step_index = $2
-`
-
-type GetJobByRunAndStepIndexParams struct {
-	RunID     pgtype.UUID `json:"run_id"`
-	StepIndex float64     `json:"step_index"`
-}
-
-// Retrieves a specific job by run_id and step_index.
-func (q *Queries) GetJobByRunAndStepIndex(ctx context.Context, arg GetJobByRunAndStepIndexParams) (Job, error) {
-	row := q.db.QueryRow(ctx, getJobByRunAndStepIndex, arg.RunID, arg.StepIndex)
-	var i Job
-	err := row.Scan(
-		&i.ID,
-		&i.RunID,
-		&i.Name,
-		&i.Status,
-		&i.StepIndex,
-		&i.NodeID,
-		&i.ExitCode,
-		&i.StartedAt,
-		&i.FinishedAt,
-		&i.DurationMs,
-		&i.Meta,
-	)
-	return i, err
-}
-
 const listCreatedJobsByRun = `-- name: ListCreatedJobsByRun :many
 SELECT id, run_id, name, status, step_index, node_id, exit_code, started_at, finished_at, duration_ms, meta FROM jobs
 WHERE run_id = $1 AND status = 'created'

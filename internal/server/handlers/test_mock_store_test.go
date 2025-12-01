@@ -148,12 +148,6 @@ type mockStore struct {
 	countJobsByRunAndStatusResult int64
 	countJobsByRunAndStatusErr    error
 
-	// GetJobByRunAndStepIndex tracking
-	getJobByRunAndStepIndexCalled bool
-	getJobByRunAndStepIndexParams store.GetJobByRunAndStepIndexParams
-	getJobByRunAndStepIndexResult store.Job
-	getJobByRunAndStepIndexErr    error
-
 	// UpdateJobStatus tracking
 	updateJobStatusCalled bool
 	updateJobStatusParams store.UpdateJobStatusParams
@@ -469,25 +463,6 @@ func (m *mockStore) CountJobsByRunAndStatus(ctx context.Context, arg store.Count
 		return count, nil
 	}
 	return m.countJobsByRunAndStatusResult, nil
-}
-
-func (m *mockStore) GetJobByRunAndStepIndex(ctx context.Context, arg store.GetJobByRunAndStepIndexParams) (store.Job, error) {
-	m.getJobByRunAndStepIndexCalled = true
-	m.getJobByRunAndStepIndexParams = arg
-	if m.getJobByRunAndStepIndexErr != nil {
-		return store.Job{}, m.getJobByRunAndStepIndexErr
-	}
-	// Return configured result, or search in listJobsByRunResult for matching step_index.
-	if m.getJobByRunAndStepIndexResult.ID.Valid {
-		return m.getJobByRunAndStepIndexResult, nil
-	}
-	// Fall back to searching listJobsByRunResult by step_index.
-	for _, j := range m.listJobsByRunResult {
-		if j.RunID.Bytes == arg.RunID.Bytes && j.StepIndex == arg.StepIndex {
-			return j, nil
-		}
-	}
-	return store.Job{}, pgx.ErrNoRows
 }
 
 func (m *mockStore) UpdateJobStatus(ctx context.Context, params store.UpdateJobStatusParams) error {
