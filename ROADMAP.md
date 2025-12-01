@@ -270,7 +270,7 @@ Legend: [ ] todo, [x] done.
 
 ## 4. Align `/v1/nodes/{id}/complete` docs and 409 semantics with new behavior
 
-- [ ] Update node completion endpoint docs to reflect job-level completion and the new payload (including `job_id` and `exit_code`), and clarify 409 semantics — make OpenAPI match server behavior
+- [x] Update node completion endpoint docs to reflect job-level completion and the new payload (including `job_id` and `exit_code`), and clarify 409 semantics — make OpenAPI match server behavior
   - Component: OpenAPI docs (`docs/api/paths/nodes_id_complete.yaml`, `docs/api/OpenAPI.yaml`), control-plane handler (`nodes_complete.go`), any CLI/tooling that relies on schema.
   - Scope:
     - Update `docs/api/paths/nodes_id_complete.yaml`:
