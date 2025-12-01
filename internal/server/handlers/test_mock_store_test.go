@@ -420,7 +420,18 @@ func (m *mockStore) CreateJob(ctx context.Context, params store.CreateJobParams)
 func (m *mockStore) ListJobsByRun(ctx context.Context, runID pgtype.UUID) ([]store.Job, error) {
 	m.listJobsByRunCalled = true
 	m.listJobsByRunParam = runID
-	return m.listJobsByRunResult, m.listJobsByRunErr
+
+	// Return a copy with updated status from UpdateJobCompletion applied.
+	// This ensures maybeCompleteMultiStepRun sees the correct job statuses.
+	result := make([]store.Job, len(m.listJobsByRunResult))
+	for i, j := range m.listJobsByRunResult {
+		result[i] = j
+		// If this job was updated via UpdateJobCompletion, reflect the new status.
+		if m.updateJobCompletionCalled && j.ID == m.updateJobCompletionParams.ID {
+			result[i].Status = m.updateJobCompletionParams.Status
+		}
+	}
+	return result, m.listJobsByRunErr
 }
 
 func (m *mockStore) CountJobsByRun(ctx context.Context, runID pgtype.UUID) (int64, error) {
