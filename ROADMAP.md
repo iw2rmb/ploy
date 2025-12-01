@@ -489,7 +489,7 @@ Legend: [ ] todo, [x] done.
 
 ## 9. TDD + validation discipline
 
-- [ ] Maintain RED→GREEN→REFACTOR discipline and verify coverage for all above changes — ensure changes remain well-tested
+- [x] Maintain RED→GREEN→REFACTOR discipline and verify coverage for all above changes — ensure changes remain well-tested
   - Component: repo-wide tests, coverage tooling, binary size guardrails.
   - Scope:
     - For each slice of changes above:
