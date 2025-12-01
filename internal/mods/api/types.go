@@ -72,13 +72,16 @@ type TicketSummary struct {
 	Metadata   map[string]string    `json:"metadata,omitempty"`
 	CreatedAt  time.Time            `json:"created_at"`
 	UpdatedAt  time.Time            `json:"updated_at"`
-	// Stages is keyed by stage UUID (database id). Use StageStatus.StepIndex
-	// when you need an ordered, user-facing step sequence.
+	// Stages is keyed by job UUID (jobs.id). Each entry represents a row from the
+	// `jobs` table. The field name "stages" is retained for API backward compatibility.
+	// Use StageStatus.StepIndex (mirrors jobs.step_index) for ordered step sequencing.
 	Stages map[string]StageStatus `json:"stages"`
 }
 
-// StageStatus summarises the execution state for a ticket stage.
+// StageStatus summarises the execution state for a job (called "stage" for API
+// backward compatibility). Each StageStatus maps to a row in the `jobs` table.
 type StageStatus struct {
+	// StageID is the job UUID (jobs.id). Named "stage_id" for API backward compatibility.
 	StageID     domaintypes.StageID `json:"stage_id"`
 	State       StageState          `json:"state"`
 	Attempts    int                 `json:"attempts"`
@@ -87,33 +90,31 @@ type StageStatus struct {
 	CurrentJobID domaintypes.JobID `json:"current_job_id,omitempty"`
 	Artifacts    map[string]string `json:"artifacts,omitempty"`
 	LastError    string            `json:"last_error,omitempty"`
-	// StepIndex identifies the position of this stage in multi-step Mods runs.
-	// For single-step runs, this is 0. For multi-step runs (mods[]), this is
-	// the array index (0, 1, 2, ...). The control plane uses this to order
-	// stages when rehydrating workspaces with diffs from prior steps. It is
-	// populated from stages.meta.step_index and matches run_steps.step_index
-	// and diffs.step_index for this stage.
+	// StepIndex mirrors jobs.step_index and is used to order jobs in multi-step
+	// Mods runs. Float values (1000, 2000, 3000) allow dynamic insertion of
+	// healing jobs at midpoints (e.g., 1500, 1750). The control plane uses this
+	// to order jobs when rehydrating workspaces with diffs from prior steps.
+	// Diffs are fetched ordered by jobs.step_index for correct rehydration.
 	StepIndex int `json:"step_index,omitempty"`
 }
 
-// StageMetadata captures step-level metadata stored in stages.meta JSONB.
+// StageMetadata captures job-level metadata stored in jobs.meta JSONB.
 // This metadata enables the control plane to treat a run as an ordered
-// sequence of steps for multi-step Mods runs (mods[] array in spec). It is
-// serialized directly into stages.meta JSONB and reloaded via GET /v1/mods/{id}.
+// sequence of jobs for multi-step Mods runs (mods[] array in spec). It is
+// serialized directly into jobs.meta JSONB and exposed via GET /v1/mods/{id}.
 //
-// C2: Each execution unit (pre_gate, mod, post_gate, healing) has a stage row
-// with mod_type identifying the phase type and step_index for ordering.
+// Each execution unit (pre_gate, mod, post_gate, heal, re_gate) has a jobs row
+// with mod_type identifying the phase type. Float step_index on the jobs table
+// provides ordering (not stored in meta; see jobs.step_index).
 type StageMetadata struct {
-	// ModType identifies the stage phase: "pre_gate", "mod", "post_gate", or "healing".
-	// Used by ROADMAP C2 to treat every execution unit as a typed stage.
+	// ModType identifies the job phase: "pre_gate", "mod", "post_gate", "heal", or "re_gate".
 	ModType string `json:"mod_type,omitempty"`
-	// StepIndex is the 0-based position of this stage in the run's step sequence.
-	// For single-step runs, this is 0. For multi-step runs, this matches the
-	// index in the mods[] array (0, 1, 2, ...).
+	// StepIndex is deprecated in meta; use jobs.step_index directly.
+	// Retained for backward compatibility with older responses.
 	StepIndex int `json:"step_index"`
 	// StepTotal is the total number of steps in this run.
 	// For single-step runs, this is 1. For multi-step runs, this is len(mods[]).
 	StepTotal int `json:"step_total"`
-	// ModImage is the container image for this step (optional, for diagnostics).
+	// ModImage is the container image for this job (optional, for diagnostics).
 	ModImage string `json:"mod_image,omitempty"`
 }
