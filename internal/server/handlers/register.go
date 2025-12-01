@@ -66,6 +66,10 @@ func RegisterRoutes(s *httpapi.Server, st store.Store, eventsService *events.Ser
 	// Job artifact and diff upload endpoints (run-scoped, no node ID)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/artifact", createJobArtifactHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/runs/{run_id}/jobs/{job_id}/diff", createJobDiffHandler(st), auth.RoleWorker)
+
+	// Job-level completion endpoint — simplifies node → server contract by addressing jobs directly.
+	// Node identity is derived from mTLS certificate; no node_id in URL or body.
+	s.HandleFunc("POST /v1/jobs/{job_id}/complete", completeJobHandler(st, eventsService), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/ack", ackBuildGateJobStartHandler(st), auth.RoleWorker)
 	s.HandleFunc("POST /v1/nodes/{id}/buildgate/{job_id}/complete", completeBuildGateJobHandler(st), auth.RoleWorker)
 

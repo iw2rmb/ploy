@@ -102,6 +102,12 @@ func IdentityFromContext(ctx context.Context) (Identity, bool) {
 	return identity, ok
 }
 
+// ContextWithIdentity returns a new context with the given identity attached.
+// This is primarily intended for testing handlers that require caller identity.
+func ContextWithIdentity(ctx context.Context, identity Identity) context.Context {
+	return context.WithValue(ctx, identityKey{}, identity)
+}
+
 // Middleware enforces the provided role allowlist (empty slice permits any role while still requiring TLS).
 func (a *Authorizer) Middleware(allowed ...Role) func(http.Handler) http.Handler {
 	normalized := allowlist(allowed)
