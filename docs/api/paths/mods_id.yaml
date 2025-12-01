@@ -3,8 +3,8 @@ get:
   summary: Get Mods ticket status
   description: |
     Return the current status of a Mods ticket identified by its `ticket_id`
-    (equal to the underlying run UUID). The response includes status, optional
-    failure reason, repo details, refs, optional commit SHA, and timestamps.
+    (equal to the underlying run UUID). The response includes status, derived
+    failure/gate metadata, repo details, refs, optional commit SHA, and timestamps.
   parameters:
     - in: path
       name: id
@@ -38,4 +38,3 @@ get:
         application/json:
           schema:
             $ref: '../components/schemas/common.yaml#/Error'
-
