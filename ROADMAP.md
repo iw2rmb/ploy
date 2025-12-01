@@ -379,7 +379,7 @@ Legend: [ ] todo, [x] done.
 
 ## 6. Update Mods lifecycle docs to the job-centric model
 
-- [ ] Rewrite `docs/mods-lifecycle.md` sections that reference `stages` / `run_steps` to describe the `jobs` table, `step_index` floats, and server-driven scheduling — keep lifecycle doc authoritative for the new model
+- [x] Rewrite `docs/mods-lifecycle.md` sections that reference `stages` / `run_steps` to describe the `jobs` table, `step_index` floats, and server-driven scheduling — keep lifecycle doc authoritative for the new model
   - Component: `docs/mods-lifecycle.md`, mods API types (`internal/mods/api/types.go`), job creation handler (`handlers_mods_ticket.go`), diff and artifact handlers.
   - Scope:
     - In `docs/mods-lifecycle.md`:
