@@ -1,0 +1,74 @@
+# Job-level job completion endpoint — marks a job as completed and drives run completion.
+# The nodeagent calls this endpoint when job execution finishes.
+# Node identity is derived from the mTLS client certificate; no node_id is required in the URL or body.
+parameters:
+  - in: path
+    name: job_id
+    required: true
+    schema: { type: string, format: uuid }
+    description: Job UUID
+
+post:
+  tags: [Control]
+  summary: Mark job as completed via job-level endpoint
+  description: |
+    Nodes call this endpoint when job execution finishes to transition a job from
+    `running` to a terminal status (succeeded, failed, or canceled). The server:
+
+    1. Validates node identity from the client certificate and enforces job ownership.
+    2. Transitions the job to terminal status with `finished_at`, `duration_ms`, and `exit_code`.
+    3. If the job succeeded, schedules the next job in the run (server-driven scheduling).
+    4. If a gate job failed, may create healing jobs and a re-gate job.
+    5. Checks if all jobs are terminal and, if so, derives run status gate-aware.
+
+    This endpoint simplifies the node → server contract by addressing jobs directly
+    via the URL path. The request body no longer needs `run_id`, `step_index`, or
+    `job_id`; those are implied by the job resource itself.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [ status ]
+          properties:
+            status:
+              type: string
+              description: Terminal status derived from job execution
+              enum: [ succeeded, failed, canceled ]
+            exit_code:
+              type: integer
+              format: int32
+              nullable: true
+              description: |
+                Exit code reported by the node for this job. Typically 0 for success,
+                non-zero for failure. Stored in jobs.exit_code for diagnostics.
+            stats:
+              type: object
+              description: |
+                JSON object with job-level statistics/metrics. Must be a JSON object;
+                non-object values (string/number/array) are rejected.
+  responses:
+    '204':
+      description: Completed; job transitioned to terminal status
+    '400':
+      description: |
+        Bad Request — possible causes:
+        - Missing or invalid `job_id` path parameter (UUID format)
+        - Missing `status` or non-terminal status value
+        - Malformed `stats` JSON (must be a JSON object)
+    '401':
+      description: Unauthorized — caller identity missing or invalid in context
+    '403':
+      description: Forbidden — job is not assigned to the authenticated node
+    '404':
+      description: Job not found (invalid job UUID)
+    '409':
+      description: |
+        Conflict — job not in `running` state. This occurs when:
+        - The job is still in `created` or `scheduled` state (not yet started)
+        - The job has already been completed (succeeded, failed, or canceled)
+        - A duplicate completion request was received after the job transitioned
+    '500':
+      description: Internal server error
+
