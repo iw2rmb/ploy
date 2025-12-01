@@ -113,13 +113,15 @@ CREATE INDEX IF NOT EXISTS events_run_time_idx ON events USING BRIN (time) WITH 
 CREATE INDEX IF NOT EXISTS events_run_idx ON events(run_id);
 
 -- Builds (timed invocations inside a job, e.g., Maven/Gradle/Bazel)
+-- Note: status uses job_status enum; default is 'created' (not 'pending', which is not
+-- a valid job_status value). This aligns builds.status with the job_status vocabulary.
 CREATE TABLE IF NOT EXISTS builds (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   run_id       UUID NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
   job_id       UUID REFERENCES jobs(id) ON DELETE SET NULL,
   tool         TEXT,             -- e.g., 'maven', 'gradle', 'npm', 'bazel'
   command      TEXT,             -- full command line if available
-  status       job_status NOT NULL DEFAULT 'pending',
+  status       job_status NOT NULL DEFAULT 'created',
   started_at   TIMESTAMPTZ,
   finished_at  TIMESTAMPTZ,
   duration_ms  BIGINT NOT NULL DEFAULT 0 CHECK (duration_ms >= 0),
