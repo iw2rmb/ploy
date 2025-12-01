@@ -77,7 +77,7 @@ Legend: [ ] todo, [x] done.
 
 ## 2. Simplify `maybeCompleteMultiStepRun` and base run status on final gate result
 
-- [ ] Remove redundant job mutation from `maybeCompleteMultiStepRun` and compute run status from job outcomes in a gate-aware way — avoid rewriting per-job terminal states and make healing semantics correct
+- [x] Remove redundant job mutation from `maybeCompleteMultiStepRun` and compute run status from job outcomes in a gate-aware way — avoid rewriting per-job terminal states and make healing semantics correct
   - Component: control-plane handlers (`internal/server/handlers/nodes_complete.go`), mods API + events (`internal/mods/api/status_conversion.go`, `internal/server/events/service.go`), tests (`internal/server/handlers/server_runs_complete_test.go`, `test_mock_store_test.go`).
   - Scope:
     - In `internal/server/handlers/nodes_complete.go`, locate `maybeCompleteMultiStepRun` (search for `func maybeCompleteMultiStepRun`).
