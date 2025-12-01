@@ -63,8 +63,6 @@ type Querier interface {
 	GetDiff(ctx context.Context, id pgtype.UUID) (Diff, error)
 	GetEvent(ctx context.Context, id int64) (Event, error)
 	GetJob(ctx context.Context, id pgtype.UUID) (Job, error)
-	// Retrieves a specific job by run_id and step_index.
-	GetJobByRunAndStepIndex(ctx context.Context, arg GetJobByRunAndStepIndexParams) (Job, error)
 	GetLog(ctx context.Context, id int64) (Log, error)
 	GetNode(ctx context.Context, id pgtype.UUID) (Node, error)
 	GetRun(ctx context.Context, id pgtype.UUID) (Run, error)
