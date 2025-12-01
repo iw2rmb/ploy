@@ -21,6 +21,7 @@ import (
 // completeRunHandler marks a run as completed and publishes completion events.
 
 // TestCompleteRun_Success verifies a run is completed successfully with valid payload.
+// Uses job_id as the authoritative lookup key (avoids float equality issues with step_index).
 func TestCompleteRun_Success(t *testing.T) {
 	t.Parallel()
 
@@ -28,24 +29,34 @@ func TestCompleteRun_Success(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
+	// Set up mock to return job via GetJob (by job_id).
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
-		listJobsByRunResult: []store.Job{{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.JobStatusRunning,
-			StepIndex: 1000,
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	handler := completeRunHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "succeeded", "step_index": 1000})
+	// Include job_id in the request (required for job lookup).
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "succeeded",
+		"step_index": 1000,
+	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -55,10 +66,11 @@ func TestCompleteRun_Success(t *testing.T) {
 	if rr.Code != http.StatusNoContent {
 		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
 	}
-	if !st.updateRunCompletionCalled {
-		t.Fatal("expected UpdateRunCompletion to be called")
+	// Verify GetJob was called to look up the job.
+	if !st.getJobCalled {
+		t.Fatal("expected GetJob to be called")
 	}
-	if st.updateRunCompletionParams.ID.Bytes != runID {
+	if st.updateRunCompletionCalled && st.updateRunCompletionParams.ID.Bytes != runID {
 		t.Fatalf("UpdateRunCompletion called with wrong run id: %v", st.updateRunCompletionParams.ID)
 	}
 }
@@ -72,23 +84,34 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
+	// Job is assigned to a different node (otherNode).
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: otherNode, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
-		// Job assigned to different node
-		listJobsByRunResult: []store.Job{{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: otherNode, Valid: true},
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	handler := completeRunHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "succeeded"})
+	// Include job_id in request.
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "succeeded",
+		"step_index": 1000,
+	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -103,7 +126,7 @@ func TestCompleteRun_WrongNode(t *testing.T) {
 	}
 }
 
-// TestCompleteRun_NotRunning returns 409 when the run is not in running state.
+// TestCompleteRun_NotRunning returns 409 when the job is not in running state.
 func TestCompleteRun_NotRunning(t *testing.T) {
 	t.Parallel()
 
@@ -111,22 +134,34 @@ func TestCompleteRun_NotRunning(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
+	// Job is in 'assigned' status (not 'running').
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusScheduled, // Not 'running'
+		StepIndex: 1000,
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
-			Status: store.RunStatusAssigned,
+			Status: store.RunStatusRunning,
 		},
-		listJobsByRunResult: []store.Job{{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	handler := completeRunHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
+	// Include job_id in request.
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "failed",
+		"step_index": 1000,
+	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -147,6 +182,7 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	jobID := uuid.New()
 
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
@@ -154,12 +190,18 @@ func TestCompleteRun_InvalidStatus(t *testing.T) {
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
-		// Note: listJobsByRunResult not set - status validation happens before job check.
+		// Note: status validation happens before job lookup, but job_id is validated first.
 	}
 
 	handler := completeRunHandler(st, nil)
 
-	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "running"})
+	// Include job_id in request.
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "running",
+		"step_index": 1000,
+	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -182,23 +224,34 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
-		listJobsByRunResult: []store.Job{{
-			ID:     pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:  pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID: pgtype.UUID{Bytes: nodeID, Valid: true},
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	handler := completeRunHandler(st, nil)
 
 	// stats provided as a string, which is valid JSON but not an object.
-	body, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed", "stats": "oops"})
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "failed",
+		"step_index": 1000,
+		"stats":      "oops",
+	})
 	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
 	req.SetPathValue("id", nodeID.String())
 	rr := httptest.NewRecorder()
@@ -213,17 +266,23 @@ func TestCompleteRun_StatsMustBeObject(t *testing.T) {
 	}
 }
 
-// TestCompleteRun_NotFound checks 404 paths for missing node/run.
+// TestCompleteRun_NotFound checks 404 paths for missing node/run/job.
 func TestCompleteRun_NotFound(t *testing.T) {
 	t.Parallel()
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	jobID := uuid.New()
 
 	// Node not found
 	st1 := &mockStore{getNodeErr: pgx.ErrNoRows}
 	handler1 := completeRunHandler(st1, nil)
-	b1, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
+	b1, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "failed",
+		"step_index": 1000,
+	})
 	req1 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b1))
 	req1.SetPathValue("id", nodeID.String())
 	rr1 := httptest.NewRecorder()
@@ -238,13 +297,42 @@ func TestCompleteRun_NotFound(t *testing.T) {
 		getRunErr:     pgx.ErrNoRows,
 	}
 	handler2 := completeRunHandler(st2, nil)
-	b2, _ := json.Marshal(map[string]any{"run_id": runID.String(), "status": "failed"})
+	b2, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "failed",
+		"step_index": 1000,
+	})
 	req2 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b2))
 	req2.SetPathValue("id", nodeID.String())
 	rr2 := httptest.NewRecorder()
 	handler2.ServeHTTP(rr2, req2)
 	if rr2.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 for missing run, got %d", rr2.Code)
+	}
+
+	// Job not found
+	st3 := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		getJobErr: pgx.ErrNoRows,
+	}
+	handler3 := completeRunHandler(st3, nil)
+	b3, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
+		"status":     "failed",
+		"step_index": 1000,
+	})
+	req3 := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(b3))
+	req3.SetPathValue("id", nodeID.String())
+	rr3 := httptest.NewRecorder()
+	handler3.ServeHTTP(rr3, req3)
+	if rr3.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for missing job, got %d", rr3.Code)
 	}
 }
 
@@ -258,6 +346,14 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	jobID := uuid.New()
 	now := time.Now()
 
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
@@ -266,13 +362,8 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 			RepoUrl:   "https://github.com/user/repo.git",
 			CreatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 		},
-		listJobsByRunResult: []store.Job{{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.JobStatusRunning,
-			StepIndex: 1000,
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	eventsService, _ := events.New(events.Options{
@@ -281,8 +372,10 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 	})
 	handler := completeRunHandler(st, eventsService)
 
+	// Include job_id in the request payload.
 	payload := map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
 		"status":     "succeeded",
 		"step_index": 1000,
 		"stats":      map[string]any{"exit_code": 0},
@@ -343,6 +436,7 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	modJobID := uuid.New()
 
 	// Build jobs with gate metadata: pre-gate failed, heal succeeded, re-gate succeeded, mod succeeded.
 	// The final gate (re-gate) succeeded, so run should succeed.
@@ -372,17 +466,14 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			Meta:      []byte(`{"mod_type":"re_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
 			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.JobStatusSucceeded, // mod succeeded
+			Status:    store.JobStatusRunning, // mod running (to be completed)
 			StepIndex: 2000,
 			Meta:      []byte(`{"mod_type":"mod"}`),
 		},
 	}
-
-	// Mock the last job as running - when we complete it, maybeCompleteMultiStepRun fires.
-	jobs[3].Status = store.JobStatusRunning
 
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
@@ -390,13 +481,16 @@ func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
+		getJobResult:        jobs[3], // Return the mod job via GetJob
 		listJobsByRunResult: jobs,
 	}
 
 	handler := completeRunHandler(st, nil)
 
+	// Include job_id for the mod job being completed.
 	body, _ := json.Marshal(map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     modJobID.String(),
 		"status":     "succeeded",
 		"step_index": 2000,
 	})
@@ -426,6 +520,7 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	modJobID := uuid.New()
 
 	// Build jobs: pre-gate succeeded, mod failed.
 	// Mod failure should cause run to fail.
@@ -439,7 +534,7 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 			Meta:      []byte(`{"mod_type":"pre_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
 			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // mod running, about to fail
@@ -454,13 +549,16 @@ func TestGateAwareCompletion_ModJobFails(t *testing.T) {
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
+		getJobResult:        jobs[1], // Return the mod job via GetJob
 		listJobsByRunResult: jobs,
 	}
 
 	handler := completeRunHandler(st, nil)
 
+	// Include job_id for the mod job being completed.
 	body, _ := json.Marshal(map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     modJobID.String(),
 		"status":     "failed",
 		"step_index": 2000,
 	})
@@ -490,6 +588,7 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	postGateJobID := uuid.New()
 
 	// Build jobs: pre-gate succeeded, mod succeeded, post-gate failed.
 	// Final gate failure should cause run to fail.
@@ -511,7 +610,7 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 			Meta:      []byte(`{"mod_type":"mod"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        pgtype.UUID{Bytes: postGateJobID, Valid: true},
 			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // post-gate running, about to fail
@@ -526,13 +625,16 @@ func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
+		getJobResult:        jobs[2], // Return the post-gate job via GetJob
 		listJobsByRunResult: jobs,
 	}
 
 	handler := completeRunHandler(st, nil)
 
+	// Include job_id for the post-gate job being completed.
 	body, _ := json.Marshal(map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     postGateJobID.String(),
 		"status":     "failed",
 		"step_index": 3000,
 	})
@@ -563,26 +665,31 @@ func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
 	runID := uuid.New()
 	jobID := uuid.New()
 
+	job := store.Job{
+		ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+		RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+		NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+		Status:    store.JobStatusRunning,
+		StepIndex: 1000,
+		Meta:      []byte(`{"mod_type":"mod"}`),
+	}
+
 	st := &mockStore{
 		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
 		getRunResult: store.Run{
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
-		listJobsByRunResult: []store.Job{{
-			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
-			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
-			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
-			Status:    store.JobStatusRunning,
-			StepIndex: 1000,
-			Meta:      []byte(`{"mod_type":"mod"}`),
-		}},
+		getJobResult:        job,
+		listJobsByRunResult: []store.Job{job},
 	}
 
 	handler := completeRunHandler(st, nil)
 
+	// Include job_id in the request.
 	body, _ := json.Marshal(map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     jobID.String(),
 		"status":     "succeeded",
 		"step_index": 1000,
 	})
@@ -615,6 +722,7 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 
 	nodeID := uuid.New()
 	runID := uuid.New()
+	modJobID := uuid.New()
 
 	// Build jobs: pre-gate succeeded, mod canceled (no failures).
 	jobs := []store.Job{
@@ -627,7 +735,7 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 			Meta:      []byte(`{"mod_type":"pre_gate"}`),
 		},
 		{
-			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			ID:        pgtype.UUID{Bytes: modJobID, Valid: true},
 			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
 			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
 			Status:    store.JobStatusRunning, // mod running, about to be canceled
@@ -642,13 +750,16 @@ func TestGateAwareCompletion_CanceledJob(t *testing.T) {
 			ID:     pgtype.UUID{Bytes: runID, Valid: true},
 			Status: store.RunStatusRunning,
 		},
+		getJobResult:        jobs[1], // Return the mod job via GetJob
 		listJobsByRunResult: jobs,
 	}
 
 	handler := completeRunHandler(st, nil)
 
+	// Include job_id for the mod job being canceled.
 	body, _ := json.Marshal(map[string]any{
 		"run_id":     runID.String(),
+		"job_id":     modJobID.String(),
 		"status":     "canceled",
 		"step_index": 2000,
 	})

@@ -135,9 +135,9 @@ func TestStatusUploader_UploadStatus(t *testing.T) {
 				t.Fatalf("failed to create uploader: %v", err)
 			}
 
-			// Upload status.
+			// Upload status with job_id.
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.exitCode, tt.stats, 1000)
+			err = uploader.UploadStatus(ctx, "test-run-id", tt.status, tt.exitCode, tt.stats, 1000, "test-job-id")
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -190,7 +190,7 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 		},
 	}
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, 2000)
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, 2000, "test-job-id")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -198,6 +198,11 @@ func TestStatusUploader_PayloadFormat(t *testing.T) {
 	// Verify payload structure.
 	if receivedPayload["run_id"] != "test-run-id" {
 		t.Errorf("expected run_id=test-run-id, got %v", receivedPayload["run_id"])
+	}
+
+	// Verify job_id is present in payload.
+	if receivedPayload["job_id"] != "test-job-id" {
+		t.Errorf("expected job_id=test-job-id, got %v", receivedPayload["job_id"])
 	}
 
 	if receivedPayload["status"] != "failed" {
@@ -319,7 +324,7 @@ func TestStatusUploader_RetryOn5xx(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
+			err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000, "test-job-id")
 
 			if tt.wantErr && err == nil {
 				t.Error("expected error but got none")
@@ -367,7 +372,7 @@ func TestStatusUploader_RetryBackoff(t *testing.T) {
 
 	ctx := context.Background()
 	start := time.Now()
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000, "test-job-id")
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -419,7 +424,7 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 
-	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000)
+	err = uploader.UploadStatus(ctx, "test-run-id", "succeeded", nil, nil, 1000, "test-job-id")
 
 	if err == nil {
 		t.Error("expected context cancellation error")
@@ -431,14 +436,14 @@ func TestStatusUploader_ContextCancellation(t *testing.T) {
 	}
 }
 
-// TestStatusUploader_StepIndexIncluded verifies step_index is included in payload
-// when provided (multi-step run completion).
-func TestStatusUploader_StepIndexIncluded(t *testing.T) {
+// TestStatusUploader_StepIndexAndJobIDIncluded verifies step_index and job_id are included
+// in payload when provided (multi-step run completion).
+func TestStatusUploader_StepIndexAndJobIDIncluded(t *testing.T) {
 	t.Parallel()
 
 	var receivedPayload map[string]interface{}
 
-	// Create a test server that captures the payload and verifies step_index.
+	// Create a test server that captures the payload and verifies step_index and job_id.
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := json.NewDecoder(r.Body).Decode(&receivedPayload); err != nil {
 			t.Errorf("failed to decode payload: %v", err)
@@ -472,16 +477,22 @@ func TestStatusUploader_StepIndexIncluded(t *testing.T) {
 		"exit_code":   1,
 		"duration_ms": 1500,
 	}
+	jobID := types.JobID("test-job-id-uuid")
 
-	// Upload status with step_index.
-	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, stepIndex)
+	// Upload status with step_index and job_id.
+	err = uploader.UploadStatus(ctx, "test-run-id", "failed", exitCode, stats, stepIndex, jobID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	// Verify payload structure includes step_index.
+	// Verify payload structure includes run_id.
 	if receivedPayload["run_id"] != "test-run-id" {
 		t.Errorf("expected run_id=test-run-id, got %v", receivedPayload["run_id"])
+	}
+
+	// Verify job_id is present in payload.
+	if receivedPayload["job_id"] != "test-job-id-uuid" {
+		t.Errorf("expected job_id=test-job-id-uuid, got %v", receivedPayload["job_id"])
 	}
 
 	if receivedPayload["status"] != "failed" {

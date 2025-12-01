@@ -34,12 +34,14 @@ func NewStatusUploader(cfg Config) (*StatusUploader, error) {
 }
 
 // UploadStatus uploads terminal status and stats to the server with retry on transient 5xx errors.
-// Includes step_index in the payload to identify the job being completed.
+// Includes job_id in the payload to identify the job being completed (avoids float equality issues).
+// step_index is retained for logging/diagnostics but job_id is the authoritative lookup key.
 // exitCode is the exit code from job execution (required for terminal status).
-func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex) error {
-	// Build request payload.
+func (u *StatusUploader) UploadStatus(ctx context.Context, runID, status string, exitCode *int32, stats types.RunStats, stepIndex types.StepIndex, jobID types.JobID) error {
+	// Build request payload with job_id as the authoritative job identifier.
 	payload := map[string]interface{}{
 		"run_id":     runID,
+		"job_id":     jobID,
 		"status":     status,
 		"step_index": stepIndex,
 	}

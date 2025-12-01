@@ -124,11 +124,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 	if gateErr != nil || !gatePassed {
 		// Gate failed - exit code 1 signals gate failure for healing.
 		var exitCode int32 = 1
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-			slog.Error("failed to upload gate failure status", "run_id", req.RunID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload gate failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
 		slog.Info("gate job failed",
 			"run_id", req.RunID,
+			"job_id", req.JobID,
 			"mod_type", req.ModType,
 			"duration", duration,
 		)
@@ -137,11 +138,12 @@ func (r *runController) executeGateJob(ctx context.Context, req StartRunRequest)
 
 	// Gate passed.
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload gate success status", "run_id", req.RunID, "error", uploadErr)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload gate success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 	slog.Info("gate job succeeded",
 		"run_id", req.RunID,
+		"job_id", req.JobID,
 		"mod_type", req.ModType,
 		"duration", duration,
 	)
@@ -290,37 +292,37 @@ func (r *runController) executeModJob(ctx context.Context, req StartRunRequest) 
 	// Determine status.
 	if runErr != nil {
 		var exitCode int32 = -1 // Use -1 to indicate runtime error
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("mod job failed", "run_id", req.RunID, "error", runErr, "duration", duration)
+		slog.Info("mod job failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr, "duration", duration)
 		return
 	}
 
 	if result.ExitCode != 0 {
 		exitCode := int32(result.ExitCode)
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload mod failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("mod job failed", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+		slog.Info("mod job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
 		return
 	}
 
 	// Conditionally create MR on success.
 	if shouldCreateMR("succeeded", manifest) {
 		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			slog.Error("failed to create MR", "run_id", req.RunID, "error", mrErr)
+			slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
 		} else {
 			stats["metadata"] = map[string]interface{}{"mr_url": url}
-			slog.Info("MR created", "run_id", req.RunID, "mr_url", url)
+			slog.Info("MR created", "run_id", req.RunID, "job_id", req.JobID, "mr_url", url)
 		}
 	}
 
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload mod success status", "run_id", req.RunID, "error", uploadErr)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload mod success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
-	slog.Info("mod job succeeded", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+	slog.Info("mod job succeeded", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
 }
 
 // executeHealingJob runs a healing container job.
@@ -432,27 +434,27 @@ func (r *runController) executeHealingJob(ctx context.Context, req StartRunReque
 	// Determine status.
 	if runErr != nil {
 		var exitCode int32 = -1 // Use -1 to indicate runtime error
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("healing job failed", "run_id", req.RunID, "error", runErr, "duration", duration)
+		slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "error", runErr, "duration", duration)
 		return
 	}
 
 	if result.ExitCode != 0 {
 		exitCode := int32(result.ExitCode)
-		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "error", uploadErr)
+		if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+			slog.Error("failed to upload healing failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 		}
-		slog.Info("healing job failed", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+		slog.Info("healing job failed", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
 		return
 	}
 
 	var exitCodeZero int32 = 0
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload healing success status", "run_id", req.RunID, "error", uploadErr)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "succeeded", &exitCodeZero, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload healing success status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
-	slog.Info("healing job succeeded", "run_id", req.RunID, "exit_code", result.ExitCode, "duration", duration)
+	slog.Info("healing job succeeded", "run_id", req.RunID, "job_id", req.JobID, "exit_code", result.ExitCode, "duration", duration)
 }
 
 // uploadFailureStatus uploads a failure status for early errors.
@@ -463,8 +465,8 @@ func (r *runController) uploadFailureStatus(ctx context.Context, req StartRunReq
 		"duration_ms": duration.Milliseconds(),
 		"error":       err.Error(),
 	}
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload failure status", "run_id", req.RunID, "error", uploadErr)
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), "failed", &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload failure status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 }
 
@@ -551,10 +553,10 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	mrURL := ""
 	if shouldCreateMR(terminalStatus, manifest) {
 		if url, mrErr := r.createMR(ctx, req, manifest, workspace); mrErr != nil {
-			slog.Error("failed to create MR", "run_id", req.RunID, "error", mrErr)
+			slog.Error("failed to create MR", "run_id", req.RunID, "job_id", req.JobID, "error", mrErr)
 		} else {
 			mrURL = url
-			slog.Info("MR created successfully", "run_id", req.RunID, "mr_url", mrURL)
+			slog.Info("MR created successfully", "run_id", req.RunID, "job_id", req.JobID, "mr_url", mrURL)
 		}
 	}
 
@@ -563,9 +565,9 @@ func (r *runController) finalizeRun(ctx context.Context, req StartRunRequest, ma
 	stats := r.buildExecutionStats(req.RunID, req.JobID, result, execResult, duration, mrURL)
 
 	// Phase 8: Upload terminal status to server.
-	// Upload job completion status with step_index and exit_code.
-	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, &exitCode, stats, req.StepIndex); uploadErr != nil {
-		slog.Error("failed to upload terminal status", "run_id", req.RunID, "error", uploadErr)
+	// Upload job completion status with job_id, step_index and exit_code.
+	if uploadErr := r.uploadStatus(ctx, req.RunID.String(), terminalStatus, &exitCode, stats, req.StepIndex, req.JobID); uploadErr != nil {
+		slog.Error("failed to upload terminal status", "run_id", req.RunID, "job_id", req.JobID, "error", uploadErr)
 	}
 }
 

@@ -39,14 +39,16 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Decode request body to get run_id, status, exit_code, stats, and step_index.
-		// Nodeagent includes step_index to identify which job is being completed.
+		// Decode request body to get run_id, job_id, status, exit_code, stats, and step_index.
+		// Nodeagent includes job_id to identify which job is being completed (avoids float equality issues).
+		// step_index is retained for logging/diagnostics but job_id is the authoritative lookup key.
 		var req struct {
 			RunID     domaintypes.RunID     `json:"run_id"`
+			JobID     domaintypes.JobID     `json:"job_id"` // Job ID for completion (authoritative lookup key)
 			Status    string                `json:"status"`
 			ExitCode  *int32                `json:"exit_code,omitempty"` // Exit code from job execution
 			Stats     json.RawMessage       `json:"stats,omitempty"`
-			StepIndex domaintypes.StepIndex `json:"step_index"` // Job step index for completion
+			StepIndex domaintypes.StepIndex `json:"step_index"` // Retained for logging/compat
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -64,6 +66,19 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		runID := domaintypes.ToPGUUID(req.RunID.String())
 		if !runID.Valid {
 			http.Error(w, "invalid run_id: invalid uuid", http.StatusBadRequest)
+			return
+		}
+
+		// Validate job_id is present (required for job lookup).
+		if req.JobID.IsZero() {
+			http.Error(w, "job_id is required", http.StatusBadRequest)
+			return
+		}
+
+		// Parse and validate job_id as UUID.
+		jobID := domaintypes.ToPGUUID(req.JobID.String())
+		if !jobID.Valid {
+			http.Error(w, "invalid job_id: invalid uuid", http.StatusBadRequest)
 			return
 		}
 
@@ -113,26 +128,6 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			return
 		}
 
-		// Verify the node has a job assigned for this run.
-		// Node assignment is tracked via jobs.node_id, not runs.node_id.
-		jobs, err := st.ListJobsByRun(r.Context(), runID)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("failed to check jobs: %v", err), http.StatusInternalServerError)
-			slog.Error("complete run: jobs check failed", "run_id", req.RunID, "err", err)
-			return
-		}
-		hasJobAssignment := false
-		for _, job := range jobs {
-			if job.NodeID.Valid && job.NodeID == nodeID {
-				hasJobAssignment = true
-				break
-			}
-		}
-		if !hasJobAssignment {
-			http.Error(w, "no job for this run assigned to this node", http.StatusForbidden)
-			return
-		}
-
 		// Prepare stats field (default to empty JSON object if not provided).
 		// Stats validation is shared between run-level and step-level completions.
 		statsBytes := []byte("{}")
@@ -155,18 +150,22 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 			statsBytes = req.Stats
 		}
 
-		// Step-level completion: retrieve the job and transition it to terminal state.
-		job, err := st.GetJobByRunAndStepIndex(r.Context(), store.GetJobByRunAndStepIndexParams{
-			RunID:     runID,
-			StepIndex: float64(req.StepIndex),
-		})
+		// Job-level completion: retrieve the job by job_id and transition it to terminal state.
+		// Using job_id avoids float equality issues with step_index.
+		job, err := st.GetJob(r.Context(), jobID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				http.Error(w, "job not found", http.StatusNotFound)
 				return
 			}
 			http.Error(w, fmt.Sprintf("failed to get job: %v", err), http.StatusInternalServerError)
-			slog.Error("complete job: get job failed", "run_id", req.RunID, "step_index", req.StepIndex, "err", err)
+			slog.Error("complete job: get job failed", "run_id", req.RunID, "job_id", req.JobID, "err", err)
+			return
+		}
+
+		// Verify the job belongs to the specified run.
+		if job.RunID != runID {
+			http.Error(w, "job does not belong to this run", http.StatusBadRequest)
 			return
 		}
 
@@ -205,13 +204,14 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		})
 		if err != nil {
 			http.Error(w, fmt.Sprintf("failed to complete job: %v", err), http.StatusInternalServerError)
-			slog.Error("complete job: update failed", "run_id", req.RunID, "step_index", req.StepIndex, "node_id", nodeIDStr, "err", err)
+			slog.Error("complete job: update failed", "run_id", req.RunID, "job_id", req.JobID, "step_index", job.StepIndex, "node_id", nodeIDStr, "err", err)
 			return
 		}
 
 		slog.Info("job completed",
 			"run_id", req.RunID,
-			"step_index", req.StepIndex,
+			"job_id", req.JobID,
+			"step_index", job.StepIndex,
 			"node_id", nodeIDStr,
 			"status", jobStatus,
 			"exit_code", req.ExitCode,
@@ -220,11 +220,20 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 
 		// If gate job failed, check if healing jobs should be created.
 		// This allows the server to dynamically insert healing jobs when gates fail.
+		// Fetch jobs for healing job creation since we no longer have the pre-check.
 		if jobStatus == store.JobStatusFailed {
-			if err := maybeCreateHealingJobs(r.Context(), st, run, runID, req.StepIndex, jobs); err != nil {
+			jobs, jobsErr := st.ListJobsByRun(r.Context(), runID)
+			if jobsErr != nil {
+				slog.Error("complete job: failed to list jobs for healing",
+					"run_id", req.RunID,
+					"job_id", req.JobID,
+					"err", jobsErr,
+				)
+			} else if err := maybeCreateHealingJobs(r.Context(), st, run, runID, domaintypes.StepIndex(job.StepIndex), jobs); err != nil {
 				slog.Error("complete job: failed to create healing jobs",
 					"run_id", req.RunID,
-					"step_index", req.StepIndex,
+					"job_id", req.JobID,
+					"step_index", job.StepIndex,
 					"err", err,
 				)
 			}
@@ -239,7 +248,8 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 				if !errors.Is(err, pgx.ErrNoRows) {
 					slog.Error("complete job: failed to schedule next job",
 						"run_id", req.RunID,
-						"step_index", req.StepIndex,
+						"job_id", req.JobID,
+						"step_index", job.StepIndex,
 						"err", err,
 					)
 				}
@@ -251,7 +261,7 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 		// instead of trusting the caller's status field.
 		if err := maybeCompleteMultiStepRun(r.Context(), st, eventsService, run, runID); err != nil {
 			// Log error but don't fail the job completion (job is already marked complete).
-			slog.Error("complete job: failed to check run completion", "run_id", req.RunID, "step_index", req.StepIndex, "err", err)
+			slog.Error("complete job: failed to check run completion", "run_id", req.RunID, "job_id", req.JobID, "step_index", job.StepIndex, "err", err)
 		}
 
 		w.WriteHeader(http.StatusNoContent)
