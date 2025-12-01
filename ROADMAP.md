@@ -190,7 +190,7 @@ Legend: [ ] todo, [x] done.
 
 ## 3. Make job completion and node /complete use `job_id` instead of float `step_index`
 
-- [ ] Use `job_id` for job lookup and completion instead of `run_id + step_index` — avoid float equality issues and simplify handler logic
+- [x] Use `job_id` for job lookup and completion instead of `run_id + step_index` — avoid float equality issues and simplify handler logic
   - Component: control-plane handlers (`internal/server/handlers/nodes_complete.go`, `nodes_claim.go`), node agent status uploader (`internal/nodeagent/statusuploader.go`, `execution_upload.go`), types (`internal/domain/types/ids.go`, `internal/domain/types/stepindex`), OpenAPI docs.
   - Scope:
     - Extend the `/v1/nodes/{id}/complete` request payload to carry `job_id`:
