@@ -17,7 +17,7 @@ Legend: [ ] todo, [x] done.
 
 ## 1. Fix `builds.status` enum default and remove `'pending'` from `job_status`
 
-- [ ] Align `builds.status` with `job_status` and drop `'pending'` from the enum — prevent schema apply failures and keep status vocabulary consistent
+- [x] Align `builds.status` with `job_status` and drop `'pending'` from the enum — prevent schema apply failures and keep status vocabulary consistent
   - Component: server store schema (`SCHEMA.sql`, `internal/store/schema.sql`), generated models (`internal/store/models.go`), status helpers (`internal/store/status_conversion.go`), any tests referencing `JobStatusSkipped`/`JobStatusCreated`.
   - Scope:
     - Change `job_status` enum definition in both schema files:
