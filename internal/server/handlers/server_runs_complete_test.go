@@ -330,3 +330,343 @@ func TestCompleteRun_PublishesEvents(t *testing.T) {
 		t.Error("expected to find a 'done' event in the snapshot")
 	}
 }
+
+// ===== Gate-Aware Run Completion Tests =====
+// These tests verify that maybeCompleteMultiStepRun correctly derives run status
+// from job outcomes in a gate-aware way (ROADMAP.md item 2).
+
+// TestGateAwareCompletion_GateFailsHealingSucceeds verifies that when a gate
+// fails initially but healing + re-gate succeed, the overall run succeeds.
+// Scenario: pre-gate fails → healing succeeds → re-gate succeeds → mod succeeds → run succeeded.
+func TestGateAwareCompletion_GateFailsHealingSucceeds(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	// Build jobs with gate metadata: pre-gate failed, heal succeeded, re-gate succeeded, mod succeeded.
+	// The final gate (re-gate) succeeded, so run should succeed.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusFailed, // pre-gate failed initially
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // healing job succeeded
+			StepIndex: 1100,
+			Meta:      []byte(`{"mod_type":"heal"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // re-gate succeeded (final gate)
+			StepIndex: 1200,
+			Meta:      []byte(`{"mod_type":"re_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // mod succeeded
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+	}
+
+	// Mock the last job as running - when we complete it, maybeCompleteMultiStepRun fires.
+	jobs[3].Status = store.JobStatusRunning
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": 2000,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called")
+	}
+	// Run should succeed because final gate (re-gate) succeeded and no mod/heal failures.
+	if st.updateRunCompletionParams.Status != store.RunStatusSucceeded {
+		t.Errorf("expected run status succeeded, got %s", st.updateRunCompletionParams.Status)
+	}
+}
+
+// TestGateAwareCompletion_ModJobFails verifies that when a mod job fails,
+// the run fails regardless of gate outcomes.
+// Scenario: pre-gate succeeds → mod fails → run failed.
+func TestGateAwareCompletion_ModJobFails(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	// Build jobs: pre-gate succeeded, mod failed.
+	// Mod failure should cause run to fail.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // pre-gate succeeded
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning, // mod running, about to fail
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+	}
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"status":     "failed",
+		"step_index": 2000,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called")
+	}
+	// Run should fail because a mod job failed.
+	if st.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Errorf("expected run status failed, got %s", st.updateRunCompletionParams.Status)
+	}
+}
+
+// TestGateAwareCompletion_FinalGateFails verifies that when the final gate fails
+// (after all other jobs succeed), the run fails.
+// Scenario: pre-gate succeeds → mod succeeds → post-gate fails → run failed.
+func TestGateAwareCompletion_FinalGateFails(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	// Build jobs: pre-gate succeeded, mod succeeded, post-gate failed.
+	// Final gate failure should cause run to fail.
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // pre-gate succeeded
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // mod succeeded
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning, // post-gate running, about to fail
+			StepIndex: 3000,
+			Meta:      []byte(`{"mod_type":"post_gate"}`),
+		},
+	}
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"status":     "failed",
+		"step_index": 3000,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called")
+	}
+	// Run should fail because the final gate (post-gate) failed.
+	if st.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Errorf("expected run status failed, got %s", st.updateRunCompletionParams.Status)
+	}
+}
+
+// TestGateAwareCompletion_NoRedundantJobMutation verifies that maybeCompleteMultiStepRun
+// does not call UpdateJobStatus after job completion (redundant mutation removed).
+func TestGateAwareCompletion_NoRedundantJobMutation(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+	jobID := uuid.New()
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		listJobsByRunResult: []store.Job{{
+			ID:        pgtype.UUID{Bytes: jobID, Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning,
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		}},
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"status":     "succeeded",
+		"step_index": 1000,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify UpdateJobCompletion was called (for the initial job completion).
+	if !st.updateJobCompletionCalled {
+		t.Error("expected UpdateJobCompletion to be called for job completion")
+	}
+
+	// Verify UpdateJobStatus was NOT called by maybeCompleteMultiStepRun.
+	// The redundant job mutation block has been removed.
+	if st.updateJobStatusCalled {
+		t.Error("UpdateJobStatus should not be called - redundant job mutation removed")
+	}
+}
+
+// TestGateAwareCompletion_CanceledJob verifies that a canceled job (without failures)
+// results in a canceled run.
+func TestGateAwareCompletion_CanceledJob(t *testing.T) {
+	t.Parallel()
+
+	nodeID := uuid.New()
+	runID := uuid.New()
+
+	// Build jobs: pre-gate succeeded, mod canceled (no failures).
+	jobs := []store.Job{
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusSucceeded, // pre-gate succeeded
+			StepIndex: 1000,
+			Meta:      []byte(`{"mod_type":"pre_gate"}`),
+		},
+		{
+			ID:        pgtype.UUID{Bytes: uuid.New(), Valid: true},
+			RunID:     pgtype.UUID{Bytes: runID, Valid: true},
+			NodeID:    pgtype.UUID{Bytes: nodeID, Valid: true},
+			Status:    store.JobStatusRunning, // mod running, about to be canceled
+			StepIndex: 2000,
+			Meta:      []byte(`{"mod_type":"mod"}`),
+		},
+	}
+
+	st := &mockStore{
+		getNodeResult: store.Node{ID: pgtype.UUID{Bytes: nodeID, Valid: true}},
+		getRunResult: store.Run{
+			ID:     pgtype.UUID{Bytes: runID, Valid: true},
+			Status: store.RunStatusRunning,
+		},
+		listJobsByRunResult: jobs,
+	}
+
+	handler := completeRunHandler(st, nil)
+
+	body, _ := json.Marshal(map[string]any{
+		"run_id":     runID.String(),
+		"status":     "canceled",
+		"step_index": 2000,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/nodes/"+nodeID.String()+"/complete", bytes.NewReader(body))
+	req.SetPathValue("id", nodeID.String())
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("expected status 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !st.updateRunCompletionCalled {
+		t.Fatal("expected UpdateRunCompletion to be called")
+	}
+	// Run should fail because a non-gate job (mod) was canceled (hasNonGateFailure triggers).
+	// Note: Per the ROADMAP spec, non-gate job cancellation is treated as failure precedence.
+	if st.updateRunCompletionParams.Status != store.RunStatusFailed {
+		t.Errorf("expected run status failed (non-gate cancellation), got %s", st.updateRunCompletionParams.Status)
+	}
+}

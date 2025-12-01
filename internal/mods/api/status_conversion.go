@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+
 	"github.com/iw2rmb/ploy/internal/store"
 )
 
@@ -123,4 +125,23 @@ func TicketStatusToStore(state TicketState) store.RunStatus {
 		// Default to queued for unknown states (defensive).
 		return store.RunStatusQueued
 	}
+}
+
+// IsGateJob parses job metadata JSON and returns true if the job is a gate job.
+// Gate jobs are identified by mod_type being one of: pre_gate, post_gate, re_gate.
+// Returns false if metadata is empty, invalid JSON, or mod_type is not a gate type.
+//
+// This helper enables gate-aware run completion logic to distinguish between
+// gate jobs (whose failures may be recovered by healing) and mod/heal jobs
+// (whose failures are terminal for the run).
+func IsGateJob(meta []byte) bool {
+	if len(meta) == 0 {
+		return false
+	}
+	var sm StageMetadata
+	if err := json.Unmarshal(meta, &sm); err != nil {
+		return false
+	}
+	// Gate job types: pre_gate (initial), post_gate (after mods), re_gate (after healing).
+	return sm.ModType == "pre_gate" || sm.ModType == "post_gate" || sm.ModType == "re_gate"
 }

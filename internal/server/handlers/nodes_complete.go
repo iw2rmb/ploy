@@ -261,93 +261,128 @@ func completeRunHandler(st store.Store, eventsService *events.Service) http.Hand
 // maybeCompleteMultiStepRun checks if all jobs of a multi-step run are complete
 // and transitions the run to its terminal state (succeeded/failed/canceled).
 // This function derives the run's terminal status from the collective state of
-// all jobs instead of trusting the caller's status field.
+// all jobs in a gate-aware way—the final gate result determines success/failure
+// semantics for healing flows.
 //
-// Status derivation rules:
-// - If any job failed, the run is marked as failed.
-// - If any job was canceled, the run is marked as canceled (unless a job failed).
-// - If all jobs succeeded, the run is marked as succeeded.
-// - If jobs are still created/scheduled/running, the run remains in running state.
+// Gate-aware status derivation rules:
+//   - Fetch all jobs once and parse metadata to identify gate jobs (pre_gate, post_gate, re_gate).
+//   - Track:
+//   - hasNonGateFailure: whether any non-gate job (mod, heal) failed or was canceled.
+//   - lastGateStatus: terminal status of the gate with the highest step_index.
+//   - hasCanceled: whether any job was canceled (without failure precedence).
+//   - Determine run status:
+//   - If hasNonGateFailure: RunStatusFailed (mod/heal failures trump gate outcomes).
+//   - Else if lastGateStatus == JobStatusFailed: RunStatusFailed (final gate failed).
+//   - Else if hasCanceled: RunStatusCanceled.
+//   - Else: RunStatusSucceeded.
+//
+// This avoids rewriting per-job terminal states after completion; each job's
+// terminal status is set atomically by UpdateJobCompletion and remains unchanged.
 func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsService *events.Service, run store.Run, runID pgtype.UUID) error {
-	// Count the total number of jobs for this run.
-	totalJobs, err := st.CountJobsByRun(ctx, runID)
+	// Fetch all jobs for the run to compute gate-aware status in a single pass.
+	jobs, err := st.ListJobsByRun(ctx, runID)
 	if err != nil {
-		return fmt.Errorf("count jobs: %w", err)
+		return fmt.Errorf("list jobs: %w", err)
 	}
 
 	// Every run must have jobs. If there are no jobs, something is wrong.
-	if totalJobs == 0 {
+	if len(jobs) == 0 {
 		return fmt.Errorf("run has no jobs")
 	}
 
-	// Count jobs by terminal status to determine the run's effective state.
-	succeededCount, err := st.CountJobsByRunAndStatus(ctx, store.CountJobsByRunAndStatusParams{
-		RunID:  runID,
-		Status: store.JobStatusSucceeded,
-	})
-	if err != nil {
-		return fmt.Errorf("count succeeded jobs: %w", err)
-	}
+	// Iterate through jobs to compute:
+	// - terminalJobs: count of jobs in terminal state (for completion check).
+	// - hasNonGateFailure: any non-gate job (mod/heal) failed or canceled.
+	// - lastGateStepIndex + lastGateStatus: terminal status of highest-index gate.
+	// - hasCanceled: any job was canceled (for fallback precedence).
+	var (
+		terminalJobs      int64
+		hasNonGateFailure bool
+		lastGateStepIndex float64
+		lastGateStatus    store.JobStatus
+		lastGateFound     bool
+		hasCanceled       bool
+	)
 
-	failedCount, err := st.CountJobsByRunAndStatus(ctx, store.CountJobsByRunAndStatusParams{
-		RunID:  runID,
-		Status: store.JobStatusFailed,
-	})
-	if err != nil {
-		return fmt.Errorf("count failed jobs: %w", err)
-	}
+	for _, job := range jobs {
+		// Check if job is in terminal state.
+		isTerminal := job.Status == store.JobStatusSucceeded ||
+			job.Status == store.JobStatusFailed ||
+			job.Status == store.JobStatusCanceled
+		if isTerminal {
+			terminalJobs++
+		}
 
-	canceledCount, err := st.CountJobsByRunAndStatus(ctx, store.CountJobsByRunAndStatusParams{
-		RunID:  runID,
-		Status: store.JobStatusCanceled,
-	})
-	if err != nil {
-		return fmt.Errorf("count canceled jobs: %w", err)
-	}
+		// Track canceled jobs for fallback precedence.
+		if job.Status == store.JobStatusCanceled {
+			hasCanceled = true
+		}
 
-	// Calculate terminal jobs (succeeded + failed + canceled).
-	terminalJobs := succeededCount + failedCount + canceledCount
+		// Parse job metadata to determine if this is a gate job.
+		isGate := modsapi.IsGateJob(job.Meta)
+
+		if isGate {
+			// Track the gate with the highest step_index (final gate result wins).
+			if !lastGateFound || job.StepIndex > lastGateStepIndex {
+				lastGateStepIndex = job.StepIndex
+				lastGateStatus = job.Status
+				lastGateFound = true
+			}
+			continue
+		}
+
+		// Non-gate jobs (mods, heal): check for failure/cancellation.
+		// Non-gate failures take precedence over gate outcomes.
+		if job.Status == store.JobStatusFailed || job.Status == store.JobStatusCanceled {
+			hasNonGateFailure = true
+		}
+	}
 
 	// If not all jobs are in terminal state, the run is still in progress.
-	// Do not transition the run to a terminal state yet.
-	if terminalJobs < totalJobs {
+	if terminalJobs < int64(len(jobs)) {
 		slog.Debug("multi-step run still in progress",
 			"run_id", runID,
-			"total_jobs", totalJobs,
+			"total_jobs", len(jobs),
 			"terminal_jobs", terminalJobs,
-			"succeeded", succeededCount,
-			"failed", failedCount,
-			"canceled", canceledCount,
 		)
 		return nil
 	}
 
-	// All jobs are in terminal state. Derive the run's terminal status.
-	// Priority: failed > canceled > succeeded.
+	// All jobs are in terminal state. Derive the run's terminal status using
+	// gate-aware logic:
+	// 1. Non-gate failures (mod/heal) trump everything → failed.
+	// 2. Final gate failure → failed.
+	// 3. Any cancellation (no failures) → canceled.
+	// 4. All succeeded → succeeded.
 	var runStatus store.RunStatus
-
-	if failedCount > 0 {
-		// At least one job failed: mark the run as failed.
+	switch {
+	case hasNonGateFailure:
+		// Mod/heal job failed or was canceled → run failed.
 		runStatus = store.RunStatusFailed
-	} else if canceledCount > 0 {
-		// At least one job was canceled (and no failures): mark the run as canceled.
+	case lastGateFound && lastGateStatus == store.JobStatusFailed:
+		// Final gate failed (healing didn't recover) → run failed.
+		runStatus = store.RunStatusFailed
+	case hasCanceled:
+		// Some job was canceled but no failures → run canceled.
 		runStatus = store.RunStatusCanceled
-	} else {
-		// All jobs succeeded: mark the run as succeeded.
+	default:
+		// All jobs succeeded (including final gate) → run succeeded.
 		runStatus = store.RunStatusSucceeded
 	}
 
 	slog.Info("multi-step run completing",
 		"run_id", runID,
-		"total_jobs", totalJobs,
-		"succeeded", succeededCount,
-		"failed", failedCount,
-		"canceled", canceledCount,
+		"total_jobs", len(jobs),
+		"terminal_jobs", terminalJobs,
 		"derived_status", runStatus,
+		"last_gate_status", lastGateStatus,
+		"has_non_gate_failure", hasNonGateFailure,
 	)
 
 	// Transition the run to its terminal status.
 	// Use empty JSON object for stats (step-level stats are tracked per step).
+	// Note: We intentionally do NOT mutate per-job terminal states here—each job's
+	// status was set atomically by UpdateJobCompletion and should remain unchanged.
 	err = st.UpdateRunCompletion(ctx, store.UpdateRunCompletionParams{
 		ID:     runID,
 		Status: runStatus,
@@ -355,36 +390,6 @@ func maybeCompleteMultiStepRun(ctx context.Context, st store.Store, eventsServic
 	})
 	if err != nil {
 		return fmt.Errorf("update run completion: %w", err)
-	}
-
-	// Update job status to terminal and set finished_at/duration.
-	if jobs, err := st.ListJobsByRun(ctx, runID); err == nil && len(jobs) > 0 {
-		now := time.Now().UTC()
-		var jobStatus store.JobStatus
-		switch runStatus {
-		case store.RunStatusSucceeded:
-			jobStatus = store.JobStatusSucceeded
-		case store.RunStatusFailed:
-			jobStatus = store.JobStatusFailed
-		case store.RunStatusCanceled:
-			jobStatus = store.JobStatusCanceled
-		default:
-			jobStatus = store.JobStatusFailed
-		}
-		dur := int64(0)
-		if jobs[0].StartedAt.Valid {
-			d := now.Sub(jobs[0].StartedAt.Time).Milliseconds()
-			if d > 0 {
-				dur = d
-			}
-		}
-		_ = st.UpdateJobStatus(ctx, store.UpdateJobStatusParams{
-			ID:         jobs[0].ID,
-			Status:     jobStatus,
-			StartedAt:  jobs[0].StartedAt,
-			FinishedAt: pgtype.Timestamptz{Time: now, Valid: true},
-			DurationMs: dur,
-		})
 	}
 
 	// Publish terminal ticket event and done status to SSE hub.
